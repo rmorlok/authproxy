@@ -594,6 +594,13 @@ definitions:
         example: root.acme
         type: string
     type: object
+  routes.OpenAPIDisconnectConnectionRequestJson:
+    description: Request body for connection disconnect operations
+    properties:
+      timeout_seconds:
+        example: 600
+        type: integer
+    type: object
   routes.OpenAPIDisconnectResponseJson:
     description: Response for disconnect operation
     properties:
@@ -1988,6 +1995,11 @@ paths:
         name: id
         required: true
         type: string
+      - description: Disconnect options
+        in: body
+        name: request
+        schema:
+          $ref: '#/definitions/routes.OpenAPIDisconnectConnectionRequestJson'
       produces:
       - application/json
       responses:

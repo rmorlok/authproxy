@@ -185,6 +185,16 @@
       "required": ["items"],
       "additionalProperties": false
     },
+    "DisconnectConnectionRequest": {
+      "type": "object",
+      "properties": {
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
     "DisconnectResponse": {
       "type": "object",
       "properties": {

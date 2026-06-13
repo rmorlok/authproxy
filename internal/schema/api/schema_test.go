@@ -70,6 +70,7 @@ func TestSchemaSamples(t *testing.T) {
 		{name: "data source option", ref: "./schema.json#/$defs/DataSourceOption", file: "valid-data-source-option.json"},
 		{name: "connection", ref: "./schema.json#/$defs/Connection", file: "valid-connection.json"},
 		{name: "list connections", ref: "./schema.json#/$defs/ListConnectionResponse", file: "valid-list-connections.json"},
+		{name: "disconnect connection request", ref: "./schema.json#/$defs/DisconnectConnectionRequest", file: "valid-disconnect-connection-request.json"},
 		{name: "disconnect response", ref: "./schema.json#/$defs/DisconnectResponse", file: "valid-disconnect-response.json"},
 		{name: "force connection state", ref: "./schema.json#/$defs/ForceConnectionStateRequest", file: "valid-force-connection-state.json"},
 		{name: "update connection", ref: "./schema.json#/$defs/UpdateConnectionRequest", file: "valid-update-connection.json"},

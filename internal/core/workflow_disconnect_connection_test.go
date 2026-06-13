@@ -171,13 +171,16 @@ func TestWorkflowDisconnectConnection(t *testing.T) {
 
 // This test asserts that the real workflow will invoke the activities that are part of it.
 func TestDisconnectConnectionWorkflowV1ExecutesRegisteredActivities(t *testing.T) {
-	connectionId := apid.New(apid.PrefixConnection).String()
+	connectionId := apid.New(apid.PrefixConnection)
 	workflowTester := tester.NewWorkflowTester[any](disconnectConnectionWorkflowV1)
 
-	revokeActivity := func(context.Context, string) error {
+	revokeActivity := func(context.Context, apid.ID) error {
 		return nil
 	}
-	finalizeActivity := func(context.Context, string) error {
+	finalizeActivity := func(context.Context, apid.ID) error {
+		return nil
+	}
+	forceActivity := func(context.Context, apid.ID) error {
 		return nil
 	}
 
@@ -200,8 +203,62 @@ func TestDisconnectConnectionWorkflowV1ExecutesRegisteredActivities(t *testing.T
 		Return(nil).
 		Once().
 		NotBefore(revokeCall)
+	workflowTester.
+		OnActivityByName(
+			ActivityNameDisconnectConnectionForceV1,
+			forceActivity,
+			testifymock.Anything,
+			connectionId,
+		).
+		Return(nil).
+		Maybe()
 
-	workflowTester.Execute(context.Background(), connectionId)
+	workflowTester.Execute(context.Background(), disconnectConnectionWorkflowInputV1{
+		ConnectionID: connectionId,
+		Timeout:      time.Minute,
+	})
+
+	require.True(t, workflowTester.WorkflowFinished())
+	_, err := workflowTester.WorkflowResult()
+	require.NoError(t, err)
+	workflowTester.AssertExpectations(t)
+}
+
+func TestDisconnectConnectionWorkflowV1ForcesOnTimeout(t *testing.T) {
+	connectionId := apid.New(apid.PrefixConnection)
+	workflowTester := tester.NewWorkflowTester[any](disconnectConnectionWorkflowV1)
+
+	revokeActivity := func(ctx context.Context, _ apid.ID) error {
+		<-ctx.Done()
+		return ctx.Err()
+	}
+	forceActivity := func(context.Context, apid.ID) error {
+		return nil
+	}
+
+	workflowTester.
+		OnActivityByName(
+			ActivityNameDisconnectConnectionRevokeCredentialsV1,
+			revokeActivity,
+			testifymock.Anything,
+			connectionId,
+		).
+		Return(context.Canceled).
+		Maybe()
+	workflowTester.
+		OnActivityByName(
+			ActivityNameDisconnectConnectionForceV1,
+			forceActivity,
+			testifymock.Anything,
+			connectionId,
+		).
+		Return(nil).
+		Once()
+
+	workflowTester.Execute(context.Background(), disconnectConnectionWorkflowInputV1{
+		ConnectionID: connectionId,
+		Timeout:      time.Millisecond,
+	})
 
 	require.True(t, workflowTester.WorkflowFinished())
 	_, err := workflowTester.WorkflowResult()
@@ -225,5 +282,8 @@ func TestRegisterDisconnectConnectionWorkflowV1DurableNames(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = reg.GetActivity(ActivityNameDisconnectConnectionFinalizeV1)
+	require.NoError(t, err)
+
+	_, err = reg.GetActivity(ActivityNameDisconnectConnectionForceV1)
 	require.NoError(t, err)
 }

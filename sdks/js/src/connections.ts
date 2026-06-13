@@ -156,6 +156,10 @@ export interface DataSourceOption {
 }
 
 // Disconnect models
+export interface DisconnectConnectionRequest {
+    timeout_seconds?: number;
+}
+
 export interface DisconnectResponseJson {
     task_id: string;
     connection: Connection;
@@ -237,8 +241,11 @@ export const submitConnection = (
 /**
  * Disconnect a connection
  */
-export const disconnectConnection = (id: string) => {
-    return client.post<DisconnectResponseJson>(`/api/v1/connections/${id}/_disconnect`);
+export const disconnectConnection = (id: string, request?: DisconnectConnectionRequest) => {
+    return client.post<DisconnectResponseJson>(
+        `/api/v1/connections/${id}/_disconnect`,
+        request
+    );
 };
 
 /**

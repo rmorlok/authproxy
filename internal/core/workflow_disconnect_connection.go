@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/cschleiden/go-workflows/registry"
 	wflib "github.com/cschleiden/go-workflows/workflow"
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/util/retry"
 	apworkflows "github.com/rmorlok/authproxy/internal/workflows"
@@ -19,6 +21,7 @@ const (
 
 	ActivityNameDisconnectConnectionRevokeCredentialsV1 = "core.connection.disconnect.revoke_credentials.v1"
 	ActivityNameDisconnectConnectionFinalizeV1          = "core.connection.disconnect.finalize.v1"
+	ActivityNameDisconnectConnectionForceV1             = "core.connection.disconnect.force.v1"
 )
 
 // maxRevokeAttempts caps the number of times a revoke operation is retried
@@ -27,21 +30,82 @@ const (
 // because a 3rd-party revoke endpoint is misbehaving.
 const maxRevokeAttempts = 3
 
-func disconnectConnectionWorkflowV1(ctx wflib.Context, connectionId string) error {
-	if _, err := wflib.ExecuteActivity[any](
-		ctx,
+type disconnectConnectionWorkflowInputV1 struct {
+	ConnectionID apid.ID       `json:"connection_id"` // ConnectionID is the durable identifier for the connection to disconnect.
+	Timeout      time.Duration `json:"timeout"`       // Timeout is the maximum duration allowed for the disconnect workflow.
+}
+
+func disconnectConnectionWorkflowV1(ctx wflib.Context, input disconnectConnectionWorkflowInputV1) error {
+	activityCtx, cancelActivities := wflib.WithCancel(ctx)
+	defer cancelActivities()
+
+	timerCtx, cancelTimer := wflib.WithCancel(ctx)
+	timer := wflib.ScheduleTimer(
+		timerCtx,
+		input.Timeout,
+		wflib.WithTimerName("disconnect-timeout"),
+	)
+	defer cancelTimer()
+
+	disconnectFuture := wflib.ExecuteActivity[any](
+		activityCtx,
 		disconnectConnectionRevokeActivityOptions(),
 		ActivityNameDisconnectConnectionRevokeCredentialsV1,
-		connectionId,
-	).Get(ctx); err != nil {
+		input.ConnectionID,
+	)
+
+	timedOut := false
+	if err := waitForDisconnectConnectionStepV1(ctx, timer, disconnectFuture, cancelActivities, &timedOut); err != nil {
 		return err
 	}
 
+	if timedOut {
+		return forceDisconnectConnectionV1(ctx, input.ConnectionID)
+	}
+
+	disconnectFuture = wflib.ExecuteActivity[any](
+		activityCtx,
+		wflib.DefaultActivityOptions,
+		ActivityNameDisconnectConnectionFinalizeV1,
+		input.ConnectionID,
+	)
+	if err := waitForDisconnectConnectionStepV1(ctx, timer, disconnectFuture, cancelActivities, &timedOut); err != nil {
+		return err
+	}
+	if timedOut {
+		return forceDisconnectConnectionV1(ctx, input.ConnectionID)
+	}
+
+	cancelTimer()
+	return nil
+}
+
+func waitForDisconnectConnectionStepV1(
+	ctx wflib.Context,
+	timer wflib.Future[any],
+	step wflib.Future[any],
+	cancelActivities wflib.CancelFunc,
+	timedOut *bool,
+) error {
+	var stepErr error
+	wflib.Select(ctx,
+		wflib.Await(timer, func(_ wflib.Context, _ wflib.Future[any]) {
+			*timedOut = true
+			cancelActivities()
+		}),
+		wflib.Await(step, func(ctx wflib.Context, future wflib.Future[any]) {
+			_, stepErr = future.Get(ctx)
+		}),
+	)
+	return stepErr
+}
+
+func forceDisconnectConnectionV1(ctx wflib.Context, connectionID apid.ID) error {
 	_, err := wflib.ExecuteActivity[any](
 		ctx,
 		wflib.DefaultActivityOptions,
-		ActivityNameDisconnectConnectionFinalizeV1,
-		connectionId,
+		ActivityNameDisconnectConnectionForceV1,
+		connectionID,
 	).Get(ctx)
 	return err
 }
@@ -69,9 +133,15 @@ func (s *service) registerDisconnectConnectionWorkflow(worker workflowRegistrar)
 	); err != nil {
 		return err
 	}
-	return worker.RegisterActivity(
+	if err := worker.RegisterActivity(
 		s.finalizeDisconnectConnectionV1,
 		registry.WithName(ActivityNameDisconnectConnectionFinalizeV1),
+	); err != nil {
+		return err
+	}
+	return worker.RegisterActivity(
+		s.forceDisconnectConnectionV1,
+		registry.WithName(ActivityNameDisconnectConnectionForceV1),
 	)
 }
 
@@ -83,14 +153,21 @@ func disconnectConnectionWorkflowInstanceID(connectionId apid.ID) string {
 	return fmt.Sprintf("%s:%s", WorkflowNameDisconnectConnectionV1, connectionId)
 }
 
-func (s *service) startDisconnectConnectionWorkflow(ctx context.Context, connectionId apid.ID) (*wflib.Instance, error) {
+func (s *service) startDisconnectConnectionWorkflow(
+	ctx context.Context,
+	connectionId apid.ID,
+	opts iface.ConnectionDisconnectOptions,
+) (*wflib.Instance, error) {
 	if s.wc == nil {
 		return nil, fmt.Errorf("workflow client is not configured")
 	}
 	return s.wc.CreateWorkflowInstance(ctx, client.WorkflowInstanceOptions{
 		InstanceID: disconnectConnectionWorkflowInstanceID(connectionId),
 		Queue:      apworkflows.DefaultQueue,
-	}, WorkflowNameDisconnectConnectionV1, connectionId)
+	}, WorkflowNameDisconnectConnectionV1, disconnectConnectionWorkflowInputV1{
+		ConnectionID: connectionId,
+		Timeout:      opts.Timeout,
+	})
 }
 
 // revokeDisconnectConnectionCredentialsV1 is the revoke activity for disconnect connection.
@@ -160,7 +237,7 @@ func (s *service) finalizeDisconnectConnectionV1(ctx context.Context, id apid.ID
 		"workflow", WorkflowNameDisconnectConnectionV1,
 		"activity", ActivityNameDisconnectConnectionFinalizeV1,
 		"connection_id", id,
-		)
+	)
 	logger.Info("disconnect connection finalize activity started")
 	defer logger.Info("disconnect connection finalize activity completed")
 
@@ -183,5 +260,22 @@ func (s *service) finalizeDisconnectConnectionV1(ctx context.Context, id apid.ID
 		return err
 	}
 
+	return nil
+}
+
+func (s *service) forceDisconnectConnectionV1(ctx context.Context, id apid.ID) error {
+	if id == apid.Nil {
+		return fmt.Errorf("connection id not specified")
+	}
+	if err := id.ValidatePrefix(apid.PrefixConnection); err != nil {
+		return err
+	}
+
+	if err := s.db.SetConnectionState(ctx, id, database.ConnectionStateDisconnected); err != nil && !errors.Is(err, database.ErrNotFound) {
+		return err
+	}
+	if err := s.db.DeleteConnection(ctx, id); err != nil && !errors.Is(err, database.ErrNotFound) {
+		return err
+	}
 	return nil
 }

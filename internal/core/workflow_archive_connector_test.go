@@ -13,6 +13,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encfield"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
+	"github.com/rmorlok/authproxy/internal/test_utils"
 	apworkflows "github.com/rmorlok/authproxy/internal/workflows"
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -133,7 +134,7 @@ func TestArchiveConnectorStartsWorkflow(t *testing.T) {
 func TestArchiveConnectorVersionActivitiesTransitionStates(t *testing.T) {
 	ctx := context.Background()
 	_, db := database.MustApplyBlankTestDbConfig(t, nil)
-	svc := &service{db: db}
+	svc := &service{db: db, logger: test_utils.NewTestLogger()}
 	connectorID := apid.New(apid.PrefixConnectorVersion)
 
 	upsertConnectorVersion(t, db, connectorID, 1, database.ConnectorVersionStatePrimary)
@@ -157,7 +158,7 @@ func TestArchiveConnectorVersionActivitiesTransitionStates(t *testing.T) {
 func TestArchiveConnectorVersionActivitiesReturnNotFound(t *testing.T) {
 	ctx := context.Background()
 	_, db := database.MustApplyBlankTestDbConfig(t, nil)
-	svc := &service{db: db}
+	svc := &service{db: db, logger: test_utils.NewTestLogger()}
 	connectorID := apid.New(apid.PrefixConnectorVersion)
 
 	require.ErrorIs(t, svc.prepareArchiveConnectorVersionsV1(ctx, connectorID), database.ErrNotFound)
