@@ -21,6 +21,27 @@ type KeyDataType interface {
 	GetProviderType() ProviderType
 }
 
+// DataEncryptionKeyInfo is the database-visible metadata for a persisted DEK.
+// KMS-style providers use these rows to unwrap DEKs and expose them as
+// application-facing encryption key versions.
+type DataEncryptionKeyInfo struct {
+	ID              string
+	EncryptionKeyID string
+	Provider        ProviderType
+	ProviderID      string
+	ProviderVersion string
+	ProtectedData   *KeyVersionProtectedData
+	IsCurrent       bool
+}
+
+// KeyDataRequiresDataEncryptionKeys is implemented by providers that resolve
+// key bytes from persisted DEK rows instead of directly listing key bytes from
+// the provider. Implementing this interface on the provider signals to the
+// encryption service to do a pre-load of DEKs from the database.
+type KeyDataRequiresDataEncryptionKeys interface {
+	ListVersionsWithDataEncryptionKeys(ctx context.Context, deks []DataEncryptionKeyInfo) ([]KeyVersionInfo, error)
+}
+
 type KeyData struct {
 	InnerVal KeyDataType `json:"-" yaml:"-"`
 }
@@ -49,6 +70,37 @@ func (kd *KeyData) ListVersions(ctx context.Context) ([]KeyVersionInfo, error) {
 	return kd.InnerVal.ListVersions(ctx)
 }
 
+// RequiresDataEncryptionKeys checks if the provider for this key data requires
+// data encryption keys to be pre-loaded from the database.
+func (kd *KeyData) RequiresDataEncryptionKeys() bool {
+	if kd == nil || kd.InnerVal == nil {
+		return false
+	}
+
+	_, ok := kd.InnerVal.(KeyDataRequiresDataEncryptionKeys)
+	return ok
+}
+
+// ListVersionsWithDataEncryptionKeys allows the provider to list key version infos while supplying
+// data encryption keys to it. Consumers of KeyData should use this method and supply the DEKs if
+// RequiresDataEncryptionKeys() returns true. If RequiresDataEncryptionKeys() returns false, callers
+// can use ListVersions(...) directly. If this is called and this provider does not require DEKs,
+// it automatically returns the result of ListVersions(...).
+func (kd *KeyData) ListVersionsWithDataEncryptionKeys(
+	ctx context.Context,
+	deks []DataEncryptionKeyInfo,
+) ([]KeyVersionInfo, error) {
+	if kd == nil || kd.InnerVal == nil {
+		return nil, errors.New("key data is nil")
+	}
+
+	if withDEKs, ok := kd.InnerVal.(KeyDataRequiresDataEncryptionKeys); ok {
+		return withDEKs.ListVersionsWithDataEncryptionKeys(ctx, deks)
+	}
+
+	return kd.InnerVal.ListVersions(ctx)
+}
+
 func (kd *KeyData) GetProviderType() ProviderType {
 	if kd == nil || kd.InnerVal == nil {
 		return ""
@@ -58,7 +110,11 @@ func (kd *KeyData) GetProviderType() ProviderType {
 }
 
 // getVersionFromList is a helper for implementations that searches ListVersions for a matching version.
-func getVersionFromList(ctx context.Context, kdt KeyDataType, version string) (KeyVersionInfo, error) {
+func getVersionFromList(
+	ctx context.Context,
+	kdt KeyDataType,
+	version string,
+) (KeyVersionInfo, error) {
 	versions, err := kdt.ListVersions(ctx)
 	if err != nil {
 		return KeyVersionInfo{}, err

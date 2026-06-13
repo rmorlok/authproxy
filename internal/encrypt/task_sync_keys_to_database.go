@@ -33,10 +33,21 @@ func NewSyncKeysToDatabaseTask() *asynq.Task {
 	return asynq.NewTask(TaskTypeSyncKeysToDatabase, nil)
 }
 
-// versionWithCurrent pairs a key version info with whether it belongs to the current (primary) key.
-type versionWithCurrent struct {
-	ver       config.KeyVersionInfo
-	isCurrent bool
+// dataEncryptionKeyInfos converts a set of the database version of the DEK to the schema version.
+func dataEncryptionKeyInfos(deks []*database.DataEncryptionKey) []config.DataEncryptionKeyInfo {
+	infos := make([]config.DataEncryptionKeyInfo, 0, len(deks))
+	for _, dek := range deks {
+		infos = append(infos, config.DataEncryptionKeyInfo{
+			ID:              string(dek.Id),
+			EncryptionKeyID: string(dek.EncryptionKeyId),
+			Provider:        config.ProviderType(dek.Provider),
+			ProviderID:      dek.ProviderID,
+			ProviderVersion: dek.ProviderVersion,
+			ProtectedData:   dek.ProtectedData,
+			IsCurrent:       dek.IsCurrent,
+		})
+	}
+	return infos
 }
 
 // syncKeyVersionsForKeyToDatabase reconciles all key versions for an encryption key against the database.
@@ -49,9 +60,27 @@ func syncKeyVersionsForKeyToDatabase(
 	encryptionKeyId apid.ID,
 	kd *config.KeyData,
 ) error {
-	vers, err := kd.ListVersions(ctx)
-	if err != nil {
-		return errors.Wrapf(err, "failed to get %s key versions", encryptionKeyId)
+	var vers []config.KeyVersionInfo
+	var err error
+	if kd.RequiresDataEncryptionKeys() {
+		deks, err := db.ListDataEncryptionKeysForEncryptionKey(ctx, encryptionKeyId)
+		if err != nil {
+			return errors.Wrap(err, "failed to list data encryption keys")
+		}
+
+		// KMS-style providers consume already-generated DEK rows. The sync task
+		// maps those rows into application-facing encryption_key_versions; it does
+		// not create DEKs as a side effect.
+		vers, err = kd.ListVersionsWithDataEncryptionKeys(ctx, dataEncryptionKeyInfos(deks))
+		if err != nil {
+			return errors.Wrapf(err, "failed to get %s key versions", encryptionKeyId)
+		}
+	} else {
+		// Key data doesn't require DEKs, just list directly
+		vers, err = kd.ListVersions(ctx)
+		if err != nil {
+			return errors.Wrapf(err, "failed to get %s key versions", encryptionKeyId)
+		}
 	}
 
 	existing, err := db.ListEncryptionKeyVersionsForEncryptionKey(ctx, encryptionKeyId)

@@ -44,8 +44,10 @@ func (kd *KeyData) UnmarshalJSON(data []byte) error {
 		t = &KeyDataGcpSecret{}
 	} else if _, ok := valueMap["mock_id"]; ok {
 		t = &KeyDataMock{}
+	} else if _, ok := valueMap["mock_kms_id"]; ok {
+		t = &KeyDataMockKMS{}
 	} else {
-		return fmt.Errorf("invalid structure for value type; does not match value, base64, env_var, env_var_base64, path, random, vault_address, aws_secret_id, gcp_secret_name")
+		return fmt.Errorf("invalid structure for value type; does not match value, base64, env_var, env_var_base64, path, random, vault_address, aws_secret_id, gcp_secret_name, mock_id, mock_kms_id")
 	}
 
 	if err := json.Unmarshal(data, t); err != nil {
