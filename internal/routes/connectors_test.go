@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	wfcore "github.com/cschleiden/go-workflows/core"
 	wflib "github.com/cschleiden/go-workflows/workflow"
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
@@ -42,6 +43,16 @@ type fakeConnectorLifecycleCore struct {
 	archiveOpts    []connIface.ConnectorLifecycleOptions
 }
 
+type connectorRoutesTestSetup struct {
+	Gin           *gin.Engine
+	Cfg           config.C
+	AuthUtil      *auth2.AuthTestUtil
+	Encrypt       encrypt.E
+	LifecycleCore *fakeConnectorLifecycleCore
+	Workflow      *fakeTaskWorkflowClient
+	Routes        *ConnectorsRoutes
+}
+
 func (f *fakeConnectorLifecycleCore) DisconnectConnectorConnections(
 	_ context.Context,
 	_ apid.ID,
@@ -64,6 +75,48 @@ func (f *fakeConnectorLifecycleCore) ArchiveConnector(
 		InstanceID:  fmt.Sprintf("workflow-archive-%d", len(f.archiveOpts)),
 		ExecutionID: fmt.Sprintf("workflow-execution-%d", len(f.archiveOpts)),
 	}, core.WorkflowNameArchiveConnectorV1, string(apworkflows.DefaultQueue)), nil
+}
+
+func assertWorkflowTaskPolls(
+	t *testing.T,
+	tu *connectorRoutesTestSetup,
+	taskID string,
+	workflowName string,
+	workflowInstanceID string,
+	workflowExecutionID string,
+) {
+	t.Helper()
+
+	taskInfo, err := tasks.FromSecureEncryptedString(context.Background(), tu.Encrypt, taskID)
+	require.NoError(t, err)
+	require.Equal(t, tasks.TrackedViaWorkflow, taskInfo.TrackedVia)
+	require.Equal(t, workflowName, taskInfo.WorkflowName)
+	require.Equal(t, workflowInstanceID, taskInfo.WorkflowInstanceId)
+	require.Equal(t, workflowExecutionID, taskInfo.WorkflowExecutionId)
+	require.NotEqual(t, apid.Nil, taskInfo.ActorId)
+
+	w := httptest.NewRecorder()
+	req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+		http.MethodGet,
+		"/tasks/"+taskID,
+		nil,
+		"root",
+		"some-actor",
+		aschema.NoPermissions(),
+	)
+	require.NoError(t, err)
+
+	tu.Gin.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code)
+
+	var resp TaskInfoJson
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	require.Equal(t, taskID, resp.Id)
+	require.Equal(t, workflowName, resp.Type)
+	require.Equal(t, TaskStateActive, resp.State)
+	require.NotNil(t, tu.Workflow.requestedInstance)
+	require.Equal(t, workflowInstanceID, tu.Workflow.requestedInstance.InstanceID)
+	require.Equal(t, workflowExecutionID, tu.Workflow.requestedInstance.ExecutionID)
 }
 
 func TestParseConnectorID(t *testing.T) {
@@ -141,15 +194,7 @@ func TestParseConnectorVersionID(t *testing.T) {
 }
 
 func TestConnectors(t *testing.T) {
-	type TestSetup struct {
-		Gin           *gin.Engine
-		Cfg           config.C
-		AuthUtil      *auth2.AuthTestUtil
-		LifecycleCore *fakeConnectorLifecycleCore
-		Routes        *ConnectorsRoutes
-	}
-
-	setup := func(t *testing.T, cfg config.C) *TestSetup {
+	setup := func(t *testing.T, cfg config.C) *connectorRoutesTestSetup {
 		if cfg == nil {
 			cfg = config.FromRoot(&sconfig.Root{
 				Connectors: &sconfig.Connectors{
@@ -194,17 +239,22 @@ func TestConnectors(t *testing.T) {
 		c := core.NewCoreService(cfg, db, e, rs, h, ac, test_utils.NewTestLogger())
 		require.NoError(t, c.Migrate(context.Background()))
 		lifecycleCore := &fakeConnectorLifecycleCore{C: c}
+		workflowClient := &fakeTaskWorkflowClient{state: wfcore.WorkflowInstanceStateActive}
 
 		cr := NewConnectorsRoutes(cfg, auth, lifecycleCore, e)
+		tr := NewTaskRoutes(cfg, auth, e, asynqmock.NewMockInspector(ctrl), workflowClient)
 
 		r := apgin.ForTest(nil)
 		cr.Register(r)
+		tr.Register(r)
 
-		return &TestSetup{
+		return &connectorRoutesTestSetup{
 			Gin:           r,
 			Cfg:           cfg,
 			AuthUtil:      authUtil,
+			Encrypt:       e,
 			LifecycleCore: lifecycleCore,
+			Workflow:      workflowClient,
 			Routes:        cr,
 		}
 	}
@@ -275,6 +325,44 @@ func TestConnectors(t *testing.T) {
 			require.Equal(t, http.StatusForbidden, w.Code)
 		})
 
+		t.Run("disconnect all forbidden with archive-only permission", func(t *testing.T) {
+			tu := setup(t, nil)
+
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost,
+				"/connectors/cxr_test0000000000001/_disconnect_all",
+				nil,
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "connectors", "archive"),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
+			require.Empty(t, tu.LifecycleCore.disconnectOpts)
+		})
+
+		t.Run("archive forbidden with disconnect-all-only permission", func(t *testing.T) {
+			tu := setup(t, nil)
+
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost,
+				"/connectors/cxr_test0000000000001/_archive",
+				nil,
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "connectors", "disconnect_all"),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
+			require.Empty(t, tu.LifecycleCore.archiveOpts)
+		})
+
 		t.Run("archive rejects invalid timeout", func(t *testing.T) {
 			tu := setup(t, nil)
 
@@ -317,6 +405,14 @@ func TestConnectors(t *testing.T) {
 			require.Equal(t, apid.MustParse("cxr_test0000000000001"), resp.ConnectorId)
 			require.Len(t, tu.LifecycleCore.disconnectOpts, 1)
 			require.Equal(t, 600*time.Second, tu.LifecycleCore.disconnectOpts[0].Timeout)
+			assertWorkflowTaskPolls(
+				t,
+				tu,
+				resp.TaskId,
+				core.WorkflowNameDisconnectConnectorConnectionsV1,
+				"workflow-disconnect-1",
+				"workflow-execution-1",
+			)
 		})
 
 		t.Run("archive starts workflow task with default timeout", func(t *testing.T) {
@@ -342,6 +438,14 @@ func TestConnectors(t *testing.T) {
 			require.Equal(t, apid.MustParse("cxr_test0000000000001"), resp.ConnectorId)
 			require.Len(t, tu.LifecycleCore.archiveOpts, 1)
 			require.Equal(t, 600*time.Second, tu.LifecycleCore.archiveOpts[0].Timeout)
+			assertWorkflowTaskPolls(
+				t,
+				tu,
+				resp.TaskId,
+				core.WorkflowNameArchiveConnectorV1,
+				"workflow-archive-1",
+				"workflow-execution-1",
+			)
 		})
 	})
 
