@@ -42,12 +42,12 @@ func (s *service) startDisconnectConnectorConnectionsWorkflow(
 	})
 }
 
+// disconnectConnectorConnectionsWorkflowInstanceID computes the id used for the disconnect connector
+// connections workflow. This is specific to the connector id, so multiple invocations will result in
+// same id. If the workflow is already running, this will return an error. If the workflow had finished
+// previously and is then re-run, that will be allowed and be a new execution id.
 func disconnectConnectorConnectionsWorkflowInstanceID(connectorID apid.ID) string {
 	return fmt.Sprintf("%s:%s", WorkflowNameDisconnectConnectorConnectionsV1, connectorID)
-}
-
-func disconnectConnectorConnectionChildWorkflowInstanceID(parentInstanceID string, connectionID apid.ID) string {
-	return fmt.Sprintf("%s:%s", parentInstanceID, connectionID)
 }
 
 func disconnectConnectorConnectionsWorkflowV1(ctx wflib.Context, input disconnectConnectorConnectionsWorkflowInputV1) error {
@@ -64,15 +64,15 @@ func disconnectConnectorConnectionsWorkflowV1(ctx wflib.Context, input disconnec
 		return nil
 	}
 
-	parentInstanceID := wflib.WorkflowInstance(ctx).InstanceID
 	childCtx, cancelChildren := wflib.WithCancel(ctx)
 	defer cancelChildren()
+
 	pending := make(map[apid.ID]wflib.Future[any], len(connectionIDs))
 	for _, connectionID := range connectionIDs {
 		pending[connectionID] = wflib.CreateSubWorkflowInstance[any](
 			childCtx,
 			wflib.SubWorkflowOptions{
-				InstanceID: disconnectConnectorConnectionChildWorkflowInstanceID(parentInstanceID, connectionID),
+				InstanceID: disconnectConnectionWorkflowInstanceID(connectionID),
 				Queue:      apworkflows.DefaultQueue,
 			},
 			WorkflowNameDisconnectConnectionV1,
@@ -81,21 +81,31 @@ func disconnectConnectorConnectionsWorkflowV1(ctx wflib.Context, input disconnec
 	}
 
 	timerCtx, cancelTimer := wflib.WithCancel(ctx)
-	timer := wflib.ScheduleTimer(timerCtx, input.Timeout, wflib.WithTimerName("disconnect-all-timeout"))
+	timer := wflib.ScheduleTimer(
+		timerCtx,
+		input.Timeout,
+		wflib.WithTimerName("disconnect-all-timeout"),
+	)
 	defer cancelTimer()
-	timedOut := false
-	for len(pending) > 0 && !timedOut {
+	forceRemaining := false
+
+	// Loop until all workflows resolve, the timer expires, or a child workflow errors.
+	for len(pending) > 0 && !forceRemaining {
+		// Add a select case for the time for this iteration
 		cases := make([]wflib.SelectCase, 0, len(pending)+1)
 		cases = append(cases, wflib.Await(timer, func(_ wflib.Context, _ wflib.Future[any]) {
-			timedOut = true
+			forceRemaining = true
 			cancelChildren()
 		}))
+
+		// Add a select case for each pending workflow
 		for connectionID, future := range pending {
 			id := connectionID
 			f := future
 			cases = append(cases, wflib.Await(f, func(ctx wflib.Context, future wflib.Future[any]) {
 				if _, err := future.Get(ctx); err != nil {
-					timedOut = true
+					forceRemaining = true
+					cancelChildren()
 					return
 				}
 				delete(pending, id)
@@ -104,16 +114,20 @@ func disconnectConnectorConnectionsWorkflowV1(ctx wflib.Context, input disconnec
 		wflib.Select(ctx, cases...)
 	}
 
+	// Did everything finish in time?
 	if len(pending) == 0 {
+		// Yes, everything finished
 		cancelTimer()
 		return nil
 	}
 
+	// Not everything finished, force the remaining connections to the disconnected state
 	remaining := make([]apid.ID, 0, len(pending))
 	for connectionID, future := range pending {
 		_, _ = future.Get(ctx)
 		remaining = append(remaining, connectionID)
 	}
+
 	_, err = wflib.ExecuteActivity[any](
 		ctx,
 		wflib.DefaultActivityOptions,

@@ -120,12 +120,12 @@ func TestDisconnectConnectorConnectionsWorkflowV1ForcesRemainingOnTimeout(t *tes
 	workflowTester.AssertExpectations(t)
 }
 
-func TestDisconnectConnectorConnectionChildWorkflowInstanceID(t *testing.T) {
+func TestDisconnectConnectorConnectionChildWorkflowInstanceIDUsesConnectionWorkflowID(t *testing.T) {
 	connectionID := apid.New(apid.PrefixConnection)
 	require.Equal(
 		t,
-		"parent:"+connectionID.String(),
-		disconnectConnectorConnectionChildWorkflowInstanceID("parent", connectionID),
+		WorkflowNameDisconnectConnectionV1+":"+connectionID.String(),
+		disconnectConnectionWorkflowInstanceID(connectionID),
 	)
 }
 
