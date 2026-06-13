@@ -3,7 +3,6 @@ package core
 import (
 	"context"
 	"fmt"
-	"net/http"
 
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/core/iface"
@@ -37,9 +36,21 @@ func (s *service) DisconnectConnectorConnections(
 // ArchiveConnector archives a connector. First it disconnects all connections for the
 // connector and then it archives the connector.
 func (s *service) ArchiveConnector(
-	_ context.Context,
-	_ apid.ID,
-	_ iface.ConnectorLifecycleOptions,
+	ctx context.Context,
+	id apid.ID,
+	opts iface.ConnectorLifecycleOptions,
 ) (*tasks.TaskInfo, error) {
-	return nil, httperr.New(http.StatusNotImplemented, "connector archive workflow is not implemented")
+	if id == apid.Nil {
+		return nil, httperr.BadRequest("connector id is required")
+	}
+	if s.wc == nil {
+		return nil, fmt.Errorf("workflow client is not configured")
+	}
+
+	instance, err := s.startArchiveConnectorWorkflow(ctx, id, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	return tasks.FromWorkflowInstance(instance, WorkflowNameArchiveConnectorV1, string(apworkflows.DefaultQueue)), nil
 }
