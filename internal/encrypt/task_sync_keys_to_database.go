@@ -61,6 +61,7 @@ func syncKeyVersionsForKeyToDatabase(
 	kd *config.KeyData,
 ) error {
 	var vers []config.KeyVersionInfo
+	var err error
 	if kd.RequiresDataEncryptionKeys() {
 		deks, err := db.ListDataEncryptionKeysForEncryptionKey(ctx, encryptionKeyId)
 		if err != nil {
