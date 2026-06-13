@@ -70,7 +70,7 @@ func TestWorkflowDisconnectConnection(t *testing.T) {
 			DeleteConnection(gomock.Any(), connectionId).
 			Return(nil)
 
-		err := svc.finalizeDisconnectConnectionV1(ctx, connectionId.String())
+		err := svc.finalizeDisconnectConnectionV1(ctx, connectionId)
 
 		assert.NoError(t, err)
 	})
@@ -86,7 +86,7 @@ func TestWorkflowDisconnectConnection(t *testing.T) {
 			SetConnectionState(gomock.Any(), connectionId, database.ConnectionStateDisconnected).
 			Return(errors.New("some error"))
 
-		err := svc.finalizeDisconnectConnectionV1(ctx, connectionId.String())
+		err := svc.finalizeDisconnectConnectionV1(ctx, connectionId)
 		assert.Error(t, err)
 		assert.True(t, apasynq.IsRetriable(err))
 	})
@@ -143,7 +143,7 @@ func TestWorkflowDisconnectConnection(t *testing.T) {
 			}
 		}()
 
-		err := svc.revokeDisconnectConnectionCredentialsV1(retryCtx, connectionId.String())
+		err := svc.revokeDisconnectConnectionCredentialsV1(retryCtx, connectionId)
 		assert.NoError(t, err, "disconnect should succeed even when revocation fails")
 	})
 
@@ -163,7 +163,7 @@ func TestWorkflowDisconnectConnection(t *testing.T) {
 			DeleteConnection(gomock.Any(), connectionId).
 			Return(errors.New("some error"))
 
-		err := svc.finalizeDisconnectConnectionV1(ctx, connectionId.String())
+		err := svc.finalizeDisconnectConnectionV1(ctx, connectionId)
 		assert.Error(t, err)
 		assert.True(t, apasynq.IsRetriable(err))
 	})

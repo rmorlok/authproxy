@@ -101,27 +101,8 @@ func (s *service) startDisconnectConnectionWorkflow(ctx context.Context, connect
 	}, WorkflowNameDisconnectConnectionV1, connectionId.String())
 }
 
-func parseDisconnectConnectionWorkflowConnectionID(connectionId string) (apid.ID, error) {
-	id, err := apid.Parse(connectionId)
-	if err != nil {
-		return apid.Nil, fmt.Errorf("invalid connection id: %w", err)
-	}
-	if id == apid.Nil {
-		return apid.Nil, fmt.Errorf("connection id not specified")
-	}
-	if err := id.ValidatePrefix(apid.PrefixConnection); err != nil {
-		return apid.Nil, err
-	}
-	return id, nil
-}
-
 // revokeDisconnectConnectionCredentialsV1 is the revoke activity for disconnect connection.
-func (s *service) revokeDisconnectConnectionCredentialsV1(ctx context.Context, connectionId string) error {
-	id, err := parseDisconnectConnectionWorkflowConnectionID(connectionId)
-	if err != nil {
-		return err
-	}
-
+func (s *service) revokeDisconnectConnectionCredentialsV1(ctx context.Context, id apid.ID) error {
 	logger := s.logger.With(
 		"workflow", WorkflowNameDisconnectConnectionV1,
 		"activity", ActivityNameDisconnectConnectionRevokeCredentialsV1,
@@ -182,13 +163,12 @@ func (s *service) revokeDisconnectConnectionCredentialsV1(ctx context.Context, c
 }
 
 // finalizeDisconnectConnectionV1 is the finalize activity for disconnect connection.
-func (s *service) finalizeDisconnectConnectionV1(ctx context.Context, connectionId string) error {
-	id, err := parseDisconnectConnectionWorkflowConnectionID(connectionId)
-	if err != nil {
-		return err
-	}
-
-	logger := s.logger.With("workflow", WorkflowNameDisconnectConnectionV1, "activity", ActivityNameDisconnectConnectionFinalizeV1, "connection_id", id)
+func (s *service) finalizeDisconnectConnectionV1(ctx context.Context, id apid.ID) error {
+	logger := s.logger.With(
+		"workflow", WorkflowNameDisconnectConnectionV1,
+		"activity", ActivityNameDisconnectConnectionFinalizeV1,
+		"connection_id", id,
+		)
 	logger.Info("disconnect connection finalize activity started")
 	defer logger.Info("disconnect connection finalize activity completed")
 
