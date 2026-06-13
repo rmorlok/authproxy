@@ -81,8 +81,8 @@ func TestDisconnectConnection(t *testing.T) {
 		assert.Equal(t, "workflow-execution-id", taskInfo.WorkflowExecutionId)
 		assert.Equal(t, WorkflowNameDisconnectConnectionV1, taskInfo.WorkflowName)
 		assert.Equal(t, WorkflowNameDisconnectConnectionV1, workflowClient.workflow)
-		assert.Equal(t, []any{connectionId.String()}, workflowClient.args)
-		assert.Contains(t, workflowClient.options.InstanceID, connectionId.String())
+		assert.Equal(t, []any{connectionId}, workflowClient.args)
+		assert.Contains(t, workflowClient.options.InstanceID, connectionId)
 	})
 
 	t.Run("database not found error", func(t *testing.T) {

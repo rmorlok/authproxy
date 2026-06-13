@@ -21,11 +21,6 @@ const (
 	ActivityNameDisconnectConnectionFinalizeV1          = "core.connection.disconnect.finalize.v1"
 )
 
-type workflowRegistrar interface {
-	RegisterWorkflow(workflow wflib.Workflow, opts ...registry.RegisterOption) error
-	RegisterActivity(activity wflib.Activity, opts ...registry.RegisterOption) error
-}
-
 // maxRevokeAttempts caps the number of times a revoke operation is retried
 // inside a single disconnect task invocation. After exhausting attempts, the
 // disconnect proceeds so a connection cannot get stuck in `disconnecting`
@@ -80,10 +75,10 @@ func (s *service) registerDisconnectConnectionWorkflow(worker workflowRegistrar)
 	)
 }
 
-func (s *service) RegisterWorkflows(worker *apworkflows.Worker) error {
-	return s.registerDisconnectConnectionWorkflow(worker)
-}
-
+// disconnectConnectionWorkflowInstanceID generates the id used for the disconnect connection workflow. This is
+// specific to the connection id, so multiple invocations will result in same id. If the workflow is already
+// running, this will return an error. If the workflow had finished previously and is then re-run, that will
+// be allowed and be a new execution id.
 func disconnectConnectionWorkflowInstanceID(connectionId apid.ID) string {
 	return fmt.Sprintf("%s:%s", WorkflowNameDisconnectConnectionV1, connectionId)
 }
@@ -95,29 +90,11 @@ func (s *service) startDisconnectConnectionWorkflow(ctx context.Context, connect
 	return s.wc.CreateWorkflowInstance(ctx, client.WorkflowInstanceOptions{
 		InstanceID: disconnectConnectionWorkflowInstanceID(connectionId),
 		Queue:      apworkflows.DefaultQueue,
-	}, WorkflowNameDisconnectConnectionV1, connectionId.String())
+	}, WorkflowNameDisconnectConnectionV1, connectionId)
 }
 
-func parseDisconnectConnectionWorkflowConnectionID(connectionId string) (apid.ID, error) {
-	id, err := apid.Parse(connectionId)
-	if err != nil {
-		return apid.Nil, fmt.Errorf("invalid connection id: %w", err)
-	}
-	if id == apid.Nil {
-		return apid.Nil, fmt.Errorf("connection id not specified")
-	}
-	if err := id.ValidatePrefix(apid.PrefixConnection); err != nil {
-		return apid.Nil, err
-	}
-	return id, nil
-}
-
-func (s *service) revokeDisconnectConnectionCredentialsV1(ctx context.Context, connectionId string) error {
-	id, err := parseDisconnectConnectionWorkflowConnectionID(connectionId)
-	if err != nil {
-		return err
-	}
-
+// revokeDisconnectConnectionCredentialsV1 is the revoke activity for disconnect connection.
+func (s *service) revokeDisconnectConnectionCredentialsV1(ctx context.Context, id apid.ID) error {
 	logger := s.logger.With(
 		"workflow", WorkflowNameDisconnectConnectionV1,
 		"activity", ActivityNameDisconnectConnectionRevokeCredentialsV1,
@@ -177,13 +154,13 @@ func (s *service) revokeDisconnectConnectionCredentialsV1(ctx context.Context, c
 	return nil
 }
 
-func (s *service) finalizeDisconnectConnectionV1(ctx context.Context, connectionId string) error {
-	id, err := parseDisconnectConnectionWorkflowConnectionID(connectionId)
-	if err != nil {
-		return err
-	}
-
-	logger := s.logger.With("workflow", WorkflowNameDisconnectConnectionV1, "activity", ActivityNameDisconnectConnectionFinalizeV1, "connection_id", id)
+// finalizeDisconnectConnectionV1 is the finalize activity for disconnect connection.
+func (s *service) finalizeDisconnectConnectionV1(ctx context.Context, id apid.ID) error {
+	logger := s.logger.With(
+		"workflow", WorkflowNameDisconnectConnectionV1,
+		"activity", ActivityNameDisconnectConnectionFinalizeV1,
+		"connection_id", id,
+		)
 	logger.Info("disconnect connection finalize activity started")
 	defer logger.Info("disconnect connection finalize activity completed")
 
