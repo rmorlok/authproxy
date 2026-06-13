@@ -227,18 +227,27 @@ func (s *service) syncKeysFromDbToMemory(ctx context.Context) error {
 	return merr.ErrorOrNil()
 }
 
-func (s *service) getKeyVersionInfoForDatabaseVersion(ctx context.Context, keyData *sconfig.KeyData, ekv *database.EncryptionKeyVersion) (sconfig.KeyVersionInfo, error) {
+func (s *service) getKeyVersionInfoForDatabaseVersion(
+	ctx context.Context,
+	keyData *sconfig.KeyData,
+	ekv *database.EncryptionKeyVersion,
+) (sconfig.KeyVersionInfo, error) {
+	// If this key type takes DEKs, we need to pull that data from the separate table
+	// to provide it with that context to allow it to create a key version info.
 	if withDEKs, ok := keyData.InnerVal.(sconfig.KeyDataTypeWithDataEncryptionKeys); ok {
+		// Get the DEK from the database
 		dek, err := s.db.GetDataEncryptionKey(ctx, apid.ID(ekv.ProviderID))
 		if err != nil {
 			return sconfig.KeyVersionInfo{}, err
 		}
 
+		// Use the list method to get this single version
 		versions, err := withDEKs.ListVersionsWithDataEncryptionKeys(ctx, dataEncryptionKeyInfos([]*database.DataEncryptionKey{dek}))
 		if err != nil {
 			return sconfig.KeyVersionInfo{}, err
 		}
 
+		// Should be a loop of one iteration
 		for _, v := range versions {
 			if string(v.Provider) == ekv.Provider &&
 				v.ProviderID == ekv.ProviderID &&
@@ -250,6 +259,7 @@ func (s *service) getKeyVersionInfoForDatabaseVersion(ctx context.Context, keyDa
 		return sconfig.KeyVersionInfo{}, fmt.Errorf("version %q/%q/%q not returned by key data provider", ekv.Provider, ekv.ProviderID, ekv.ProviderVersion)
 	}
 
+	// Key type does not take DEKs, so we can just return the version.
 	return keyData.GetVersion(ctx, ekv.ProviderVersion)
 }
 
