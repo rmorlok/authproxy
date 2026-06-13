@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -133,7 +134,7 @@ func TestArchiveConnectorStartsWorkflow(t *testing.T) {
 func TestArchiveConnectorVersionActivitiesTransitionStates(t *testing.T) {
 	ctx := context.Background()
 	_, db := database.MustApplyBlankTestDbConfig(t, nil)
-	svc := &service{db: db}
+	svc := &service{db: db, logger: slog.Default()}
 	connectorID := apid.New(apid.PrefixConnectorVersion)
 
 	upsertConnectorVersion(t, db, connectorID, 1, database.ConnectorVersionStatePrimary)
@@ -157,7 +158,7 @@ func TestArchiveConnectorVersionActivitiesTransitionStates(t *testing.T) {
 func TestArchiveConnectorVersionActivitiesReturnNotFound(t *testing.T) {
 	ctx := context.Background()
 	_, db := database.MustApplyBlankTestDbConfig(t, nil)
-	svc := &service{db: db}
+	svc := &service{db: db, logger: slog.Default()}
 	connectorID := apid.New(apid.PrefixConnectorVersion)
 
 	require.ErrorIs(t, svc.prepareArchiveConnectorVersionsV1(ctx, connectorID), database.ErrNotFound)
