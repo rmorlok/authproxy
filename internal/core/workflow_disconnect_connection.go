@@ -115,6 +115,7 @@ func parseDisconnectConnectionWorkflowConnectionID(connectionId string) (apid.ID
 	return id, nil
 }
 
+// revokeDisconnectConnectionCredentialsV1 is the revoke activity for disconnect connection.
 func (s *service) revokeDisconnectConnectionCredentialsV1(ctx context.Context, connectionId string) error {
 	id, err := parseDisconnectConnectionWorkflowConnectionID(connectionId)
 	if err != nil {
@@ -180,6 +181,7 @@ func (s *service) revokeDisconnectConnectionCredentialsV1(ctx context.Context, c
 	return nil
 }
 
+// finalizeDisconnectConnectionV1 is the finalize activity for disconnect connection.
 func (s *service) finalizeDisconnectConnectionV1(ctx context.Context, connectionId string) error {
 	id, err := parseDisconnectConnectionWorkflowConnectionID(connectionId)
 	if err != nil {
