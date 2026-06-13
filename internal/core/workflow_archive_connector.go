@@ -41,6 +41,8 @@ func (s *service) startArchiveConnectorWorkflow(
 	})
 }
 
+// archiveConnectorWorkflowInstanceID returns a standardized identifier for the workflow instance. This name
+// guarantees tha only one instance of the workflow runs at a time.
 func archiveConnectorWorkflowInstanceID(connectorID apid.ID) string {
 	return fmt.Sprintf("%s:%s", WorkflowNameArchiveConnectorV1, connectorID)
 }
@@ -86,7 +88,18 @@ func validateArchiveConnectorWorkflowConnectorID(connectorID apid.ID) error {
 	return connectorID.ValidatePrefix(apid.PrefixConnectorVersion)
 }
 
+// prepareArchiveConnectorVersionsV1 is the activity that prepares the archive connector workflow by moving
+// draft state connector versions to archived and primary versions to active. This prevents any future
+// connections from being made while the existing connections are cleaned up.
 func (s *service) prepareArchiveConnectorVersionsV1(ctx context.Context, connectorID apid.ID) error {
+	logger := s.logger.With(
+		"workflow", WorkflowNameDisconnectConnectionV1,
+		"activity", ActivityNameDisconnectConnectionRevokeCredentialsV1,
+		"connector_id", connectorID,
+	)
+	logger.Info("prepare connector versions started")
+	defer logger.Info("prepare connector versions completed")
+
 	if err := validateArchiveConnectorWorkflowConnectorID(connectorID); err != nil {
 		return err
 	}
@@ -99,11 +112,15 @@ func (s *service) prepareArchiveConnectorVersionsV1(ctx context.Context, connect
 				found = true
 				switch version.State {
 				case database.ConnectorVersionStateDraft:
+					logger.Info("archiving draft connector version", "version_id", version.Id)
 					if err := s.db.SetConnectorVersionState(ctx, version.Id, version.Version, database.ConnectorVersionStateArchived); err != nil {
+						logger.Info("failed archiving draft connector version", "version_id", version.Id, "error", err)
 						return pagination.Stop, err
 					}
 				case database.ConnectorVersionStatePrimary:
+					logger.Info("moving version to primary", "version_id", version.Id)
 					if err := s.db.SetConnectorVersionState(ctx, version.Id, version.Version, database.ConnectorVersionStateActive); err != nil {
+						logger.Info("failed moving primary to active", "version_id", version.Id, "error", err)
 						return pagination.Stop, err
 					}
 				}
@@ -119,7 +136,17 @@ func (s *service) prepareArchiveConnectorVersionsV1(ctx context.Context, connect
 	return nil
 }
 
+// finalizeArchiveConnectorVersionsV1 is the activity that runs after all connections have been cleand up. It moves
+// all versions of the connector to the archived state.
 func (s *service) finalizeArchiveConnectorVersionsV1(ctx context.Context, connectorID apid.ID) error {
+	logger := s.logger.With(
+		"workflow", WorkflowNameDisconnectConnectionV1,
+		"activity", ActivityNameDisconnectConnectionRevokeCredentialsV1,
+		"connector_id", connectorID,
+	)
+	logger.Info("finalize connector versions started")
+	defer logger.Info("finalize connector versions completed")
+
 	if err := validateArchiveConnectorWorkflowConnectorID(connectorID); err != nil {
 		return err
 	}
@@ -133,7 +160,10 @@ func (s *service) finalizeArchiveConnectorVersionsV1(ctx context.Context, connec
 				if version.State == database.ConnectorVersionStateArchived {
 					continue
 				}
+
+				logger.Info("archiving connector version", "version_id", version.Id)
 				if err := s.db.SetConnectorVersionState(ctx, version.Id, version.Version, database.ConnectorVersionStateArchived); err != nil {
+					logger.Info("failed archiving connector version", "version_id", version.Id, "error", err)
 					return pagination.Stop, err
 				}
 			}
