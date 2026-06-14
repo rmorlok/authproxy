@@ -11,11 +11,13 @@ graph TD
         AWS[AWS Secrets Manager]
         GCP[GCP Secret Manager]
         HCV[HashiCorp Vault]
+        KMS[Cloud KMS / HSM]
         ENV[Environment Variables]
         FILE[File System]
     end
 
     subgraph "Encrypt Service"
+        DEKS[DEK Generator]
         SYNC[Key Sync Loop]
         CACHE[In-Memory Cache]
         ENC[AES-GCM Encrypt/Decrypt]
@@ -32,6 +34,8 @@ graph TD
     HCV --> SYNC
     ENV --> SYNC
     FILE --> SYNC
+    KMS --> DEKS
+    DEKS --> DB
     SYNC --> DB
     SYNC --> CACHE
     CACHE --> ENC
@@ -96,19 +100,27 @@ The `KeyData` wrapper supports multiple sources for key material. Each provider 
 | **File** | `path` | Reads key bytes from a file. Supports `~` expansion. |
 | **Value** | `value` | Inline string value. Development/testing only. |
 | **Random Bytes** | `num_bytes` | Generates secure random bytes at startup. Useful for ephemeral/dev keys. |
+| **KMS-backed providers** | provider-specific | Generate AuthProxy DEKs and wrap them with a provider-held KEK. The KEK never leaves the provider. |
 
 Cloud providers (AWS, GCP, Vault) support caching via `cache_ttl` and return multiple versions when the underlying secret has been rotated.
 
+KMS-backed providers are different from secret-backed providers. Secret-backed providers return AES key bytes directly to AuthProxy. KMS-backed providers generate or wrap data encryption keys (DEKs) and persist only the wrapped DEK in `data_encryption_keys`. The application-facing `encryption_key_versions` table still drives encryption and re-encryption; for KMS-backed versions, `encryption_key_versions.provider_id` points at the `dek_...` row that contains the protected DEK material.
+
 ## Key Sync and Rotation
 
-Two sync processes keep encryption keys current:
+Three processes keep encryption keys current:
 
 ```mermaid
 sequenceDiagram
     participant Provider as Key Provider<br/>(AWS/GCP/Vault/etc)
+    participant DEKTask as DEK Generation Task<br/>(every 15 min)
     participant SyncTask as Sync Task<br/>(every 15 min)
     participant DB as Database
     participant Memory as In-Memory Cache<br/>(every 5 min)
+
+    DEKTask->>Provider: Generate/wrap DEK when policy requires
+    Provider-->>DEKTask: wrapped DEK + provider metadata
+    DEKTask->>DB: Insert data_encryption_keys row
 
     SyncTask->>Provider: ListVersions()
     Provider-->>SyncTask: versions + key bytes
@@ -123,13 +135,23 @@ sequenceDiagram
     Note over Memory: Rebuild caches atomically
 ```
 
+### DEK Generation (every 15 minutes)
+
+KMS-backed namespace keys do not create usable `encryption_key_versions` directly from provider key bytes. Instead, the DEK generation task walks encryption keys in dependency order, decrypts each key's `KeyData` config, and applies `system_auth.data_encryption_keys` policy:
+
+1. If `ensure_current` is true (the default) and a KMS-backed key has no current DEK, generate one.
+2. If the current DEK is older than `rotation_interval` (default 90 days), generate a new current DEK.
+3. Persist only provider metadata and protected DEK material in `data_encryption_keys`.
+4. Sync the key's `encryption_key_versions` after generation so nested child key configs can be decrypted in the same traversal.
+
 ### Config-to-Database Sync (every 15 minutes)
 
 1. Acquires a Redis distributed lock to prevent concurrent syncs
 2. Syncs the global key first, then enumerates entity keys in dependency order (breadth-first from root) so parent keys are available to decrypt child key configs
-3. For each key, calls `ListVersions()` on the provider and reconciles against `encryption_key_versions`: creates new records, removes stale ones, updates `is_current`
-4. Walks all namespaces in depth order and resolves each namespace's `target_encryption_key_version_id` by inheritance
-5. Sets a Redis sentinel key (15-minute TTL) to rate-limit syncs
+3. For secret-backed keys, calls `ListVersions()` on the provider. For KMS-backed keys, loads existing `data_encryption_keys` rows and unwraps them through the provider.
+4. Reconciles against `encryption_key_versions`: creates new records, removes stale ones, updates `is_current`
+5. Walks all namespaces in depth order and resolves each namespace's `target_encryption_key_version_id` by inheritance
+6. Sets a Redis sentinel key (15-minute TTL) to rate-limit syncs
 
 ### Database-to-Memory Sync (every 5 minutes)
 
