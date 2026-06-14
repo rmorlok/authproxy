@@ -55,7 +55,7 @@ func setupReencryptTest(t *testing.T) reencryptTestEnv {
 	cfg, db, rawDb := database.MustApplyBlankTestDbConfigRaw(t, cfg)
 	cfg, enc := NewTestEncryptService(cfg, db)
 
-	globalVersions, err := db.ListEncryptionKeyVersionsForEncryptionKey(ctx, globalEncryptionKeyID)
+	globalVersions, err := db.ListEncryptionKeyVersionsForKey(ctx, globalEncryptionKeyID)
 	require.NoError(t, err)
 	require.Len(t, globalVersions, 1)
 
@@ -80,7 +80,7 @@ func (env *reencryptTestEnv) addGlobalV2(t *testing.T) (apid.ID, []byte) {
 	syncKeysVersionsToDatabase(env.ctx, env.cfg, env.db, env.logger, nil)
 	require.NoError(t, env.enc.SyncKeysFromDbToMemory(env.ctx))
 
-	versions, err := env.db.ListEncryptionKeyVersionsForEncryptionKey(env.ctx, globalEncryptionKeyID)
+	versions, err := env.db.ListEncryptionKeyVersionsForKey(env.ctx, globalEncryptionKeyID)
 	require.NoError(t, err)
 	for _, v := range versions {
 		if v.ProviderVersion == "v2" {

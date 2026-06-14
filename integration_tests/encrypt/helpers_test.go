@@ -28,7 +28,7 @@ func runReencryptAll(ctx context.Context, env *helpers.IntegrationTestEnv) error
 		var updates []database.ReEncryptedFieldUpdate
 
 		for _, target := range targets {
-			newEF, reencryptErr := env.DM.GetEncryptService().ReEncryptField(ctx, target.EncryptedFieldValue, target.TargetEncryptionKeyVersionId)
+			newEF, reencryptErr := env.DM.GetEncryptService().ReEncryptField(ctx, target.EncryptedFieldValue, target.TargetDataEncryptionKeyId)
 			if reencryptErr != nil {
 				return pagination.Stop, reencryptErr
 			}

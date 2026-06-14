@@ -28,7 +28,7 @@ const globalScope = "global"
 const memorySyncPeriod = 5 * time.Minute
 const maxInitialWait = 5 * time.Minute
 
-var globalEncryptionKeyID = database.GlobalEncryptionKeyID
+var globalEncryptionKeyID = database.GlobalKeyID
 
 type service struct {
 	cfg    config.C
@@ -130,7 +130,7 @@ func (s *service) syncKeysFromDbToMemory(ctx context.Context) error {
 		}
 	}()
 
-	_, err := s.db.EnumerateEncryptionKeysInDependencyOrder(ctx, func(keys []*database.EncryptionKey, _ int) (keepGoing pagination.KeepGoing, err error) {
+	_, err := s.db.EnumerateKeysInDependencyOrder(ctx, func(keys []*database.Key, _ int) (keepGoing pagination.KeepGoing, err error) {
 		for _, key := range keys {
 			var keyData *sconfig.KeyData
 			if key.Id == globalEncryptionKeyID {
@@ -174,7 +174,7 @@ func (s *service) syncKeysFromDbToMemory(ctx context.Context) error {
 				func(ekvs []*database.EncryptionKeyVersion, lastPage bool) (keepGoing pagination.KeepGoing, err error) {
 					for _, ekv := range ekvs {
 						if ekv.IsCurrent {
-							newEkToEkvCurrentVersionCache[ekv.EncryptionKeyId] = ekv.Id
+							newEkToEkvCurrentVersionCache[ekv.KeyId] = ekv.Id
 						}
 
 						if vi, ok := oldEkvToVersionInfoCache[ekv.Id]; ok {
@@ -183,7 +183,7 @@ func (s *service) syncKeysFromDbToMemory(ctx context.Context) error {
 						} else {
 							kvi, err := s.getKeyVersionInfoForDatabaseVersion(ctx, keyData, ekv)
 							if err != nil {
-								merr = multierror.Append(merr, fmt.Errorf("failed to get key version for encryption key %q for key version id %q: %w", ekv.EncryptionKeyId, ekv.Id, err))
+								merr = multierror.Append(merr, fmt.Errorf("failed to get key version for encryption key %q for key version id %q: %w", ekv.KeyId, ekv.Id, err))
 								continue
 							}
 
@@ -206,8 +206,8 @@ func (s *service) syncKeysFromDbToMemory(ctx context.Context) error {
 	// Identify all the keys used for the namespaces
 	err = s.db.ListNamespacesBuilder().Enumerate(ctx, func(pr pagination.PageResult[database.Namespace]) (keepGoing pagination.KeepGoing, err error) {
 		for _, ns := range pr.Results {
-			if ns.EncryptionKeyId != nil {
-				newNamespaceToEkCache[ns.Path] = *ns.EncryptionKeyId
+			if ns.KeyId != nil {
+				newNamespaceToEkCache[ns.Path] = *ns.KeyId
 			}
 		}
 

@@ -18,9 +18,9 @@ func TestEncryptionKeyVersion(t *testing.T) {
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		ekId := apid.New(apid.PrefixEncryptionKey)
+		ekId := apid.New(apid.PrefixKey)
 		ekv := &EncryptionKeyVersion{
-			EncryptionKeyId: ekId,
+			KeyId:           ekId,
 			Provider:        "local",
 			ProviderID:      "key-1",
 			ProviderVersion: "v1",
@@ -37,7 +37,7 @@ func TestEncryptionKeyVersion(t *testing.T) {
 		got, err := db.GetEncryptionKeyVersion(ctx, ekv.Id)
 		require.NoError(t, err)
 		assert.Equal(t, ekv.Id, got.Id)
-		assert.Equal(t, ekId, got.EncryptionKeyId)
+		assert.Equal(t, ekId, got.KeyId)
 		assert.Equal(t, "local", got.Provider)
 		assert.Equal(t, "key-1", got.ProviderID)
 		assert.Equal(t, "v1", got.ProviderVersion)
@@ -63,7 +63,7 @@ func TestEncryptionKeyVersion(t *testing.T) {
 		presetID := apid.New(apid.PrefixEncryptionKeyVersion)
 		ekv := &EncryptionKeyVersion{
 			Id:              presetID,
-			EncryptionKeyId: apid.New(apid.PrefixEncryptionKey),
+			KeyId:           apid.New(apid.PrefixKey),
 			Provider:        "local",
 			ProviderID:      "key-1",
 			ProviderVersion: "v1",
@@ -89,11 +89,11 @@ func TestEncryptionKeyVersion(t *testing.T) {
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		ekId := apid.New(apid.PrefixEncryptionKey)
+		ekId := apid.New(apid.PrefixKey)
 
 		// Create a non-current version
 		err := db.CreateEncryptionKeyVersion(ctx, &EncryptionKeyVersion{
-			EncryptionKeyId: ekId,
+			KeyId:           ekId,
 			Provider:        "local",
 			ProviderID:      "key-old",
 			ProviderVersion: "v1",
@@ -104,7 +104,7 @@ func TestEncryptionKeyVersion(t *testing.T) {
 
 		// Create the current version
 		current := &EncryptionKeyVersion{
-			EncryptionKeyId: ekId,
+			KeyId:           ekId,
 			Provider:        "local",
 			ProviderID:      "key-new",
 			ProviderVersion: "v2",
@@ -114,7 +114,7 @@ func TestEncryptionKeyVersion(t *testing.T) {
 		err = db.CreateEncryptionKeyVersion(ctx, current)
 		require.NoError(t, err)
 
-		got, err := db.GetCurrentEncryptionKeyVersionForEncryptionKey(ctx, ekId)
+		got, err := db.GetCurrentEncryptionKeyVersionForKey(ctx, ekId)
 		require.NoError(t, err)
 		assert.Equal(t, current.Id, got.Id)
 		assert.Equal(t, "key-new", got.ProviderID)
@@ -125,7 +125,7 @@ func TestEncryptionKeyVersion(t *testing.T) {
 		_, db := MustApplyBlankTestDbConfig(t, nil)
 		ctx := apctx.NewBuilderBackground().Build()
 
-		_, err := db.GetCurrentEncryptionKeyVersionForEncryptionKey(ctx, apid.New(apid.PrefixEncryptionKey))
+		_, err := db.GetCurrentEncryptionKeyVersionForKey(ctx, apid.New(apid.PrefixKey))
 		assert.ErrorIs(t, err, ErrNotFound)
 	})
 
@@ -134,13 +134,13 @@ func TestEncryptionKeyVersion(t *testing.T) {
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		ekId := apid.New(apid.PrefixEncryptionKey)
-		otherEkId := apid.New(apid.PrefixEncryptionKey)
+		ekId := apid.New(apid.PrefixKey)
+		otherEkId := apid.New(apid.PrefixKey)
 
 		// Create versions out of order
 		for _, v := range []int64{3, 1, 2} {
 			err := db.CreateEncryptionKeyVersion(ctx, &EncryptionKeyVersion{
-				EncryptionKeyId: ekId,
+				KeyId:           ekId,
 				Provider:        "local",
 				ProviderID:      "key",
 				ProviderVersion: "v1",
@@ -152,7 +152,7 @@ func TestEncryptionKeyVersion(t *testing.T) {
 
 		// Create a version with a different encryption key
 		err := db.CreateEncryptionKeyVersion(ctx, &EncryptionKeyVersion{
-			EncryptionKeyId: otherEkId,
+			KeyId:           otherEkId,
 			Provider:        "local",
 			ProviderID:      "key",
 			ProviderVersion: "v1",
@@ -161,7 +161,7 @@ func TestEncryptionKeyVersion(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		results, err := db.ListEncryptionKeyVersionsForEncryptionKey(ctx, ekId)
+		results, err := db.ListEncryptionKeyVersionsForKey(ctx, ekId)
 		require.NoError(t, err)
 		require.Len(t, results, 3)
 		assert.Equal(t, int64(1), results[0].OrderedVersion)
@@ -173,7 +173,7 @@ func TestEncryptionKeyVersion(t *testing.T) {
 		_, db := MustApplyBlankTestDbConfig(t, nil)
 		ctx := apctx.NewBuilderBackground().Build()
 
-		results, err := db.ListEncryptionKeyVersionsForEncryptionKey(ctx, apid.New(apid.PrefixEncryptionKey))
+		results, err := db.ListEncryptionKeyVersionsForKey(ctx, apid.New(apid.PrefixKey))
 		require.NoError(t, err)
 		assert.Empty(t, results)
 	})
@@ -183,17 +183,17 @@ func TestEncryptionKeyVersion(t *testing.T) {
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		ekId := apid.New(apid.PrefixEncryptionKey)
+		ekId := apid.New(apid.PrefixKey)
 
 		// No versions yet
-		maxVer, err := db.GetMaxOrderedVersionForEncryptionKey(ctx, ekId)
+		maxVer, err := db.GetMaxOrderedVersionForKey(ctx, ekId)
 		require.NoError(t, err)
 		assert.Equal(t, int64(0), maxVer)
 
 		// Add some versions
 		for _, v := range []int64{1, 5, 3} {
 			err := db.CreateEncryptionKeyVersion(ctx, &EncryptionKeyVersion{
-				EncryptionKeyId: ekId,
+				KeyId:           ekId,
 				Provider:        "local",
 				ProviderID:      "key",
 				ProviderVersion: "v1",
@@ -203,7 +203,7 @@ func TestEncryptionKeyVersion(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-		maxVer, err = db.GetMaxOrderedVersionForEncryptionKey(ctx, ekId)
+		maxVer, err = db.GetMaxOrderedVersionForKey(ctx, ekId)
 		require.NoError(t, err)
 		assert.Equal(t, int64(5), maxVer)
 	})
@@ -213,13 +213,13 @@ func TestEncryptionKeyVersion(t *testing.T) {
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		ekId := apid.New(apid.PrefixEncryptionKey)
-		otherEkId := apid.New(apid.PrefixEncryptionKey)
+		ekId := apid.New(apid.PrefixKey)
+		otherEkId := apid.New(apid.PrefixKey)
 
 		// Create two current versions for same encryption key
 		for i, id := range []string{"key-1", "key-2"} {
 			err := db.CreateEncryptionKeyVersion(ctx, &EncryptionKeyVersion{
-				EncryptionKeyId: ekId,
+				KeyId:           ekId,
 				Provider:        "local",
 				ProviderID:      id,
 				ProviderVersion: "v1",
@@ -231,7 +231,7 @@ func TestEncryptionKeyVersion(t *testing.T) {
 
 		// Create a current version with a different encryption key
 		otherEk := &EncryptionKeyVersion{
-			EncryptionKeyId: otherEkId,
+			KeyId:           otherEkId,
 			Provider:        "local",
 			ProviderID:      "key-other",
 			ProviderVersion: "v1",
@@ -241,15 +241,15 @@ func TestEncryptionKeyVersion(t *testing.T) {
 		err := db.CreateEncryptionKeyVersion(ctx, otherEk)
 		require.NoError(t, err)
 
-		err = db.ClearCurrentFlagForEncryptionKey(ctx, ekId)
+		err = db.ClearCurrentFlagForKey(ctx, ekId)
 		require.NoError(t, err)
 
 		// No current version for this encryption key
-		_, err = db.GetCurrentEncryptionKeyVersionForEncryptionKey(ctx, ekId)
+		_, err = db.GetCurrentEncryptionKeyVersionForKey(ctx, ekId)
 		assert.ErrorIs(t, err, ErrNotFound)
 
 		// Other encryption key unaffected
-		got, err := db.GetCurrentEncryptionKeyVersionForEncryptionKey(ctx, otherEkId)
+		got, err := db.GetCurrentEncryptionKeyVersionForKey(ctx, otherEkId)
 		require.NoError(t, err)
 		assert.True(t, got.IsCurrent)
 	})
@@ -259,9 +259,9 @@ func TestEncryptionKeyVersion(t *testing.T) {
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		ekId := apid.New(apid.PrefixEncryptionKey)
+		ekId := apid.New(apid.PrefixKey)
 		ekv := &EncryptionKeyVersion{
-			EncryptionKeyId: ekId,
+			KeyId:           ekId,
 			Provider:        "local",
 			ProviderID:      "key-1",
 			ProviderVersion: "v1",
@@ -279,7 +279,7 @@ func TestEncryptionKeyVersion(t *testing.T) {
 		assert.ErrorIs(t, err, ErrNotFound)
 
 		// Should not appear in list
-		results, err := db.ListEncryptionKeyVersionsForEncryptionKey(ctx, ekId)
+		results, err := db.ListEncryptionKeyVersionsForKey(ctx, ekId)
 		require.NoError(t, err)
 		assert.Empty(t, results)
 	})
@@ -298,7 +298,7 @@ func TestEncryptionKeyVersion(t *testing.T) {
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 		ekv := &EncryptionKeyVersion{
-			EncryptionKeyId: apid.New(apid.PrefixEncryptionKey),
+			KeyId:           apid.New(apid.PrefixKey),
 			Provider:        "local",
 			ProviderID:      "key-1",
 			ProviderVersion: "v1",
@@ -323,7 +323,7 @@ func TestEncryptionKeyVersion(t *testing.T) {
 
 		// Create a version that is already current
 		ekv := &EncryptionKeyVersion{
-			EncryptionKeyId: apid.New(apid.PrefixEncryptionKey),
+			KeyId:           apid.New(apid.PrefixKey),
 			Provider:        "local",
 			ProviderID:      "key-1",
 			ProviderVersion: "v1",
@@ -351,7 +351,7 @@ func TestEncryptionKeyVersion(t *testing.T) {
 		validEkv := func() *EncryptionKeyVersion {
 			return &EncryptionKeyVersion{
 				Id:              apid.New(apid.PrefixEncryptionKeyVersion),
-				EncryptionKeyId: apid.New(apid.PrefixEncryptionKey),
+				KeyId:           apid.New(apid.PrefixKey),
 				Provider:        "local",
 				ProviderID:      "key-1",
 				ProviderVersion: "v1",
@@ -378,13 +378,13 @@ func TestEncryptionKeyVersion(t *testing.T) {
 
 		t.Run("missing encryption key id", func(t *testing.T) {
 			ekv := validEkv()
-			ekv.EncryptionKeyId = apid.Nil
+			ekv.KeyId = apid.Nil
 			assert.ErrorContains(t, ekv.Validate(), "encryption key id is required")
 		})
 
 		t.Run("wrong encryption key id prefix", func(t *testing.T) {
 			ekv := validEkv()
-			ekv.EncryptionKeyId = apid.New(apid.PrefixActor)
+			ekv.KeyId = apid.New(apid.PrefixActor)
 			assert.Error(t, ekv.Validate())
 		})
 
@@ -423,10 +423,10 @@ func TestEncryptionKeyVersion(t *testing.T) {
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		ekId := apid.New(apid.PrefixEncryptionKey)
+		ekId := apid.New(apid.PrefixKey)
 
 		ekv := &EncryptionKeyVersion{
-			EncryptionKeyId: ekId,
+			KeyId:           ekId,
 			Provider:        "local",
 			ProviderID:      "key-1",
 			ProviderVersion: "v1",
@@ -437,7 +437,7 @@ func TestEncryptionKeyVersion(t *testing.T) {
 		require.NoError(t, err)
 
 		lower := &EncryptionKeyVersion{
-			EncryptionKeyId: ekId,
+			KeyId:           ekId,
 			Provider:        "local",
 			ProviderID:      "key-2",
 			ProviderVersion: "v1",
@@ -451,7 +451,7 @@ func TestEncryptionKeyVersion(t *testing.T) {
 		err = db.DeleteEncryptionKeyVersion(ctx, ekv.Id)
 		require.NoError(t, err)
 
-		maxVer, err := db.GetMaxOrderedVersionForEncryptionKey(ctx, ekId)
+		maxVer, err := db.GetMaxOrderedVersionForKey(ctx, ekId)
 		require.NoError(t, err)
 		assert.Equal(t, int64(5), maxVer)
 	})
@@ -463,19 +463,19 @@ func TestEncryptionKeyVersionForNamespace(t *testing.T) {
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		ekId := apid.New(apid.PrefixEncryptionKey)
+		ekId := apid.New(apid.PrefixKey)
 
 		// Create namespace with encryption_key_id
 		err := db.CreateNamespace(ctx, &Namespace{
-			Path:            "root.test",
-			State:           NamespaceStateActive,
-			EncryptionKeyId: &ekId,
+			Path:  "root.test",
+			State: NamespaceStateActive,
+			KeyId: &ekId,
 		})
 		require.NoError(t, err)
 
 		// Create a current version for that encryption key
 		current := &EncryptionKeyVersion{
-			EncryptionKeyId: ekId,
+			KeyId:           ekId,
 			Provider:        "local",
 			ProviderID:      "key-1",
 			ProviderVersion: "v1",
@@ -522,18 +522,18 @@ func TestEncryptionKeyVersionForNamespace(t *testing.T) {
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		ekId := apid.New(apid.PrefixEncryptionKey)
+		ekId := apid.New(apid.PrefixKey)
 
 		err := db.CreateNamespace(ctx, &Namespace{
-			Path:            "root.listtest",
-			State:           NamespaceStateActive,
-			EncryptionKeyId: &ekId,
+			Path:  "root.listtest",
+			State: NamespaceStateActive,
+			KeyId: &ekId,
 		})
 		require.NoError(t, err)
 
 		for _, v := range []int64{1, 2, 3} {
 			err := db.CreateEncryptionKeyVersion(ctx, &EncryptionKeyVersion{
-				EncryptionKeyId: ekId,
+				KeyId:           ekId,
 				Provider:        "local",
 				ProviderID:      fmt.Sprintf("key-%d", v),
 				ProviderVersion: "v1",
@@ -571,18 +571,18 @@ func TestEncryptionKeyVersionForNamespace(t *testing.T) {
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		ekId := apid.New(apid.PrefixEncryptionKey)
+		ekId := apid.New(apid.PrefixKey)
 
 		err := db.CreateNamespace(ctx, &Namespace{
-			Path:            "root.maxver",
-			State:           NamespaceStateActive,
-			EncryptionKeyId: &ekId,
+			Path:  "root.maxver",
+			State: NamespaceStateActive,
+			KeyId: &ekId,
 		})
 		require.NoError(t, err)
 
 		for _, v := range []int64{1, 5, 3} {
 			err := db.CreateEncryptionKeyVersion(ctx, &EncryptionKeyVersion{
-				EncryptionKeyId: ekId,
+				KeyId:           ekId,
 				Provider:        "local",
 				ProviderID:      fmt.Sprintf("key-%d", v),
 				ProviderVersion: "v1",
@@ -618,17 +618,17 @@ func TestEncryptionKeyVersionForNamespace(t *testing.T) {
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		ekId := apid.New(apid.PrefixEncryptionKey)
+		ekId := apid.New(apid.PrefixKey)
 
 		err := db.CreateNamespace(ctx, &Namespace{
-			Path:            "root.clearcurrent",
-			State:           NamespaceStateActive,
-			EncryptionKeyId: &ekId,
+			Path:  "root.clearcurrent",
+			State: NamespaceStateActive,
+			KeyId: &ekId,
 		})
 		require.NoError(t, err)
 
 		err = db.CreateEncryptionKeyVersion(ctx, &EncryptionKeyVersion{
-			EncryptionKeyId: ekId,
+			KeyId:           ekId,
 			Provider:        "local",
 			ProviderID:      "key-1",
 			ProviderVersion: "v1",
@@ -640,7 +640,7 @@ func TestEncryptionKeyVersionForNamespace(t *testing.T) {
 		err = db.ClearCurrentFlagForNamespace(ctx, "root.clearcurrent")
 		require.NoError(t, err)
 
-		_, err = db.GetCurrentEncryptionKeyVersionForEncryptionKey(ctx, ekId)
+		_, err = db.GetCurrentEncryptionKeyVersionForKey(ctx, ekId)
 		assert.ErrorIs(t, err, ErrNotFound)
 	})
 

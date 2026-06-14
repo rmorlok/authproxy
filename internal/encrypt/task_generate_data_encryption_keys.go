@@ -53,7 +53,7 @@ func createDataEncryptionKey(
 	}
 
 	dek := &database.DataEncryptionKey{
-		EncryptionKeyId: encryptionKeyId,
+		KeyId:           encryptionKeyId,
 		Provider:        string(generated.Provider),
 		ProviderID:      generated.ProviderID,
 		ProviderVersion: generated.ProviderVersion,
@@ -83,7 +83,7 @@ func ensureDataEncryptionKeyForKey(
 		return false, fmt.Errorf("key data provider %q requires DEKs but cannot generate them", kd.GetProviderType())
 	}
 
-	deks, err := db.ListDataEncryptionKeysForEncryptionKey(ctx, encryptionKeyId)
+	deks, err := db.ListDataEncryptionKeysForKey(ctx, encryptionKeyId)
 	if err != nil {
 		return false, err
 	}
@@ -153,7 +153,7 @@ func generateDataEncryptionKeysToDatabase(
 	}
 
 	var result *multierror.Error
-	_, err = db.EnumerateEncryptionKeysInDependencyOrder(ctx, func(keys []*database.EncryptionKey, _ int) (keepGoing pagination.KeepGoing, err error) {
+	_, err = db.EnumerateKeysInDependencyOrder(ctx, func(keys []*database.Key, _ int) (keepGoing pagination.KeepGoing, err error) {
 		for _, key := range keys {
 			if key.EncryptedKeyData == nil {
 				continue

@@ -22,18 +22,16 @@ const NamespacesTable = "namespaces"
 
 // Namespace is the grouping of resources within AuthProxy.
 type Namespace struct {
-	Path            string
-	depth           uint64
-	State           NamespaceState
-	EncryptionKeyId *apid.ID
-	// TargetEncryptionKeyVersionId is a transitional name. The database column is
-	// target_data_encryption_key_id and the value is a dek_ id under the new model.
-	TargetEncryptionKeyVersionId *apid.ID
-	Labels                       Labels
-	Annotations                  Annotations
-	CreatedAt                    time.Time
-	UpdatedAt                    time.Time
-	DeletedAt                    *time.Time
+	Path                      string
+	depth                     uint64
+	State                     NamespaceState
+	KeyId                     *apid.ID
+	TargetDataEncryptionKeyId *apid.ID
+	Labels                    Labels
+	Annotations               Annotations
+	CreatedAt                 time.Time
+	UpdatedAt                 time.Time
+	DeletedAt                 *time.Time
 }
 
 func (ns *Namespace) GetNamespace() string {
@@ -60,8 +58,8 @@ func (ns *Namespace) fields() []any {
 		&ns.Path,
 		&ns.depth,
 		&ns.State,
-		&ns.EncryptionKeyId,
-		&ns.TargetEncryptionKeyVersionId,
+		&ns.KeyId,
+		&ns.TargetDataEncryptionKeyId,
 		&ns.Labels,
 		&ns.Annotations,
 		&ns.CreatedAt,
@@ -75,8 +73,8 @@ func (ns *Namespace) values() []any {
 		ns.Path,
 		ns.depth,
 		ns.State,
-		ns.EncryptionKeyId,
-		ns.TargetEncryptionKeyVersionId,
+		ns.KeyId,
+		ns.TargetDataEncryptionKeyId,
 		ns.Labels,
 		ns.Annotations,
 		ns.CreatedAt,
@@ -394,9 +392,9 @@ func (s *service) DeleteNamespace(ctx context.Context, path string) error {
 	return nil
 }
 
-func (s *service) SetNamespaceEncryptionKeyId(ctx context.Context, path string, ekId *apid.ID) (*Namespace, error) {
+func (s *service) SetNamespaceKeyId(ctx context.Context, path string, ekId *apid.ID) (*Namespace, error) {
 	if ekId != nil {
-		ek, err := s.GetEncryptionKey(ctx, *ekId)
+		ek, err := s.GetKey(ctx, *ekId)
 		if err != nil {
 			return nil, fmt.Errorf("failed to look up encryption key: %w", err)
 		}
@@ -950,24 +948,24 @@ func (s *service) DeleteNamespaceAnnotations(ctx context.Context, path string, k
 }
 
 // NamespaceEncryptionTarget holds the fields needed by the background job that computes
-// and caches the target encryption key version for each namespace.
+// and caches the target data encryption key for each namespace.
 type NamespaceEncryptionTarget struct {
-	Path                         string
-	Depth                        uint64
-	EncryptionKeyId              *apid.ID
-	TargetEncryptionKeyVersionId *apid.ID
+	Path                      string
+	Depth                     uint64
+	KeyId                     *apid.ID
+	TargetDataEncryptionKeyId *apid.ID
 }
 
-// NamespaceTargetEncryptionKeyVersionUpdate carries an update to set the target encryption
-// key version for a specific namespace.
-type NamespaceTargetEncryptionKeyVersionUpdate struct {
-	Path                         string
-	TargetEncryptionKeyVersionId apid.ID
+// NamespaceTargetDataEncryptionKeyUpdate carries an update to set the target data
+// encryption key for a specific namespace.
+type NamespaceTargetDataEncryptionKeyUpdate struct {
+	Path                      string
+	TargetDataEncryptionKeyId apid.ID
 }
 
 func (s *service) EnumerateNamespaceEncryptionTargets(
 	ctx context.Context,
-	callback func(targets []NamespaceEncryptionTarget, lastPage bool) (updates []NamespaceTargetEncryptionKeyVersionUpdate, keepGoing pagination.KeepGoing, err error),
+	callback func(targets []NamespaceEncryptionTarget, lastPage bool) (updates []NamespaceTargetDataEncryptionKeyUpdate, keepGoing pagination.KeepGoing, err error),
 ) error {
 	const pageSize = 100
 	offset := uint64(0)
@@ -989,7 +987,7 @@ func (s *service) EnumerateNamespaceEncryptionTargets(
 		var results []NamespaceEncryptionTarget
 		for rows.Next() {
 			var r NamespaceEncryptionTarget
-			if err := rows.Scan(&r.Path, &r.Depth, &r.EncryptionKeyId, &r.TargetEncryptionKeyVersionId); err != nil {
+			if err := rows.Scan(&r.Path, &r.Depth, &r.KeyId, &r.TargetDataEncryptionKeyId); err != nil {
 				rows.Close()
 				return err
 			}
@@ -1013,14 +1011,14 @@ func (s *service) EnumerateNamespaceEncryptionTargets(
 			for _, u := range updates {
 				_, err := s.sq.
 					Update(NamespacesTable).
-					Set("target_data_encryption_key_id", u.TargetEncryptionKeyVersionId).
+					Set("target_data_encryption_key_id", u.TargetDataEncryptionKeyId).
 					Set("target_data_encryption_key_updated_at", now).
 					Set("updated_at", now).
 					Where(sq.Eq{"path": u.Path}).
 					RunWith(s.db).
 					Exec()
 				if err != nil {
-					return fmt.Errorf("failed to update target encryption key version for namespace '%s': %w", u.Path, err)
+					return fmt.Errorf("failed to update target data encryption key for namespace '%s': %w", u.Path, err)
 				}
 			}
 		}

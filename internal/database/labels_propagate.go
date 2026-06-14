@@ -190,7 +190,7 @@ func (s *service) refreshActorsInNamespace(ctx context.Context, nsPath string) e
 }
 
 func (s *service) refreshEncryptionKeysInNamespace(ctx context.Context, nsPath string) error {
-	ids, err := s.scanIdsByNamespace(EncryptionKeysTable, nsPath)
+	ids, err := s.scanIdsByNamespace(KeysTable, nsPath)
 	if err != nil {
 		return err
 	}
@@ -354,10 +354,10 @@ func (s *service) recomputeActorLabelsTx(ctx context.Context, id apid.ID) (bool,
 func (s *service) recomputeEncryptionKeyLabelsTx(ctx context.Context, id apid.ID) (bool, error) {
 	var corrected bool
 	err := s.transaction(func(tx *sql.Tx) error {
-		var ek EncryptionKey
+		var ek Key
 		err := s.sq.
 			Select(ek.cols()...).
-			From(EncryptionKeysTable).
+			From(KeysTable).
 			Where(sq.Eq{"id": id, "deleted_at": nil}).
 			RunWith(tx).
 			QueryRow().
@@ -385,7 +385,7 @@ func (s *service) recomputeEncryptionKeyLabelsTx(ctx context.Context, id apid.ID
 		newLabels = InjectSelfImplicitLabels(ek.Id, ek.Namespace, newLabels)
 
 		var werr error
-		corrected, werr = s.writeRecomputedLabels(ctx, tx, EncryptionKeysTable, sq.Eq{"id": id, "deleted_at": nil}, ek.Labels, newLabels)
+		corrected, werr = s.writeRecomputedLabels(ctx, tx, KeysTable, sq.Eq{"id": id, "deleted_at": nil}, ek.Labels, newLabels)
 		return werr
 	})
 	return corrected, err
@@ -703,9 +703,9 @@ func (s *service) reconcileEncryptionKeys(ctx context.Context, batchSize int32, 
 	var corrected int64
 	err := pagination.EnumerateThrottled(
 		ctx,
-		s.ListEncryptionKeysBuilder().Limit(batchSize).Enumerate,
+		s.ListKeysBuilder().Limit(batchSize).Enumerate,
 		limiter,
-		func(ek EncryptionKey) error {
+		func(ek Key) error {
 			wasCorrected, err := s.recomputeEncryptionKeyLabelsTx(ctx, ek.Id)
 			if err != nil {
 				return err

@@ -60,7 +60,7 @@ func (m *DataEncryptionKeyProviderMetadata) Scan(value interface{}) error {
 
 type DataEncryptionKey struct {
 	Id               apid.ID
-	EncryptionKeyId  apid.ID
+	KeyId            apid.ID
 	Provider         string
 	ProviderID       string
 	ProviderVersion  string
@@ -91,7 +91,7 @@ func (d *DataEncryptionKey) cols() []string {
 func (d *DataEncryptionKey) fields() []any {
 	return []any{
 		&d.Id,
-		&d.EncryptionKeyId,
+		&d.KeyId,
 		&d.Provider,
 		&d.ProviderID,
 		&d.ProviderVersion,
@@ -107,7 +107,7 @@ func (d *DataEncryptionKey) fields() []any {
 func (d *DataEncryptionKey) values() []any {
 	return []any{
 		d.Id,
-		d.EncryptionKeyId,
+		d.KeyId,
 		d.Provider,
 		d.ProviderID,
 		d.ProviderVersion,
@@ -129,9 +129,9 @@ func (d *DataEncryptionKey) Validate() error {
 		result = multierror.Append(result, err)
 	}
 
-	if d.EncryptionKeyId.IsNil() {
+	if d.KeyId.IsNil() {
 		result = multierror.Append(result, errors.New("encryption key id is required"))
-	} else if err := d.EncryptionKeyId.ValidatePrefix(apid.PrefixEncryptionKey); err != nil {
+	} else if err := d.KeyId.ValidatePrefix(apid.PrefixKey); err != nil {
 		result = multierror.Append(result, err)
 	}
 
@@ -178,7 +178,7 @@ func (s *service) CreateDataEncryptionKey(ctx context.Context, dek *DataEncrypti
 				Set("is_current", false).
 				Set("updated_at", now).
 				Where(sq.Eq{
-					"key_id":     dek.EncryptionKeyId,
+					"key_id":     dek.KeyId,
 					"deleted_at": nil,
 				}).
 				RunWith(tx).
@@ -223,7 +223,7 @@ func (s *service) GetDataEncryptionKey(ctx context.Context, id apid.ID) (*DataEn
 	return &result, nil
 }
 
-func (s *service) ListDataEncryptionKeysForEncryptionKey(ctx context.Context, encryptionKeyId apid.ID) ([]*DataEncryptionKey, error) {
+func (s *service) ListDataEncryptionKeysForKey(ctx context.Context, encryptionKeyId apid.ID) ([]*DataEncryptionKey, error) {
 	var result DataEncryptionKey
 	rows, err := s.sq.
 		Select(result.cols()...).

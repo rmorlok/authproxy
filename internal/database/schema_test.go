@@ -23,9 +23,9 @@ func TestKeyModelSchema(t *testing.T) {
 			Scan(&id, &usage, &materialType, &state)
 		require.NoError(t, err)
 		require.Equal(t, "key_global", id)
-		require.Equal(t, string(EncryptionKeyUsageDataEncryption), usage)
-		require.Equal(t, string(EncryptionKeyMaterialTypeSymmetric), materialType)
-		require.Equal(t, string(EncryptionKeyStateActive), state)
+		require.Equal(t, string(KeyUsageDataEncryption), usage)
+		require.Equal(t, string(KeyMaterialTypeSymmetric), materialType)
+		require.Equal(t, string(KeyStateActive), state)
 	})
 
 	t.Run("namespaces use key and target DEK columns", func(t *testing.T) {

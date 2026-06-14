@@ -145,7 +145,7 @@ func TestEncryptionKeys(t *testing.T) {
 
 		t.Run("not found", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			fakeId := apid.New(apid.PrefixEncryptionKey)
+			fakeId := apid.New(apid.PrefixKey)
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
 				fmt.Sprintf("/encryption-keys/%s", fakeId),
@@ -201,7 +201,7 @@ func TestEncryptionKeys(t *testing.T) {
 
 		t.Run("forbidden with non-matching resource id permission", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			fakeId := apid.New(apid.PrefixEncryptionKey)
+			fakeId := apid.New(apid.PrefixKey)
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
 				fmt.Sprintf("/encryption-keys/%s", created.Id),
@@ -314,7 +314,7 @@ func TestEncryptionKeys(t *testing.T) {
 
 		t.Run("valid with labels", func(t *testing.T) {
 			created := createKey(t, tu, "root", map[string]string{"env": "prod", "team": "backend"})
-			require.True(t, created.Id.HasPrefix(apid.PrefixEncryptionKey))
+			require.True(t, created.Id.HasPrefix(apid.PrefixKey))
 			require.Equal(t, "root", created.Namespace)
 			require.Equal(t, schemaapi.EncryptionKeyStateActive, created.State)
 			require.Equal(t, "prod", created.Labels["env"])
@@ -323,7 +323,7 @@ func TestEncryptionKeys(t *testing.T) {
 
 		t.Run("valid without labels", func(t *testing.T) {
 			created := createKey(t, tu, "root", nil)
-			require.True(t, created.Id.HasPrefix(apid.PrefixEncryptionKey))
+			require.True(t, created.Id.HasPrefix(apid.PrefixKey))
 			require.Equal(t, "root", created.Namespace)
 			require.Equal(t, schemaapi.EncryptionKeyStateActive, created.State)
 		})
@@ -537,7 +537,7 @@ func TestEncryptionKeys(t *testing.T) {
 
 		t.Run("not found", func(t *testing.T) {
 			body := `{"state": "disabled"}`
-			fakeId := apid.New(apid.PrefixEncryptionKey)
+			fakeId := apid.New(apid.PrefixKey)
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPatch,
@@ -612,9 +612,9 @@ func TestEncryptionKeys(t *testing.T) {
 			require.Equal(t, schemaapi.EncryptionKeyStateDisabled, resp.State)
 
 			// Verify in database
-			got, err := tu.Db.GetEncryptionKey(context.Background(), created.Id)
+			got, err := tu.Db.GetKey(context.Background(), created.Id)
 			require.NoError(t, err)
-			require.Equal(t, database.EncryptionKeyStateDisabled, got.State)
+			require.Equal(t, database.KeyStateDisabled, got.State)
 		})
 
 		t.Run("rejects apxy/-prefixed labels in request body", func(t *testing.T) {
@@ -739,7 +739,7 @@ func TestEncryptionKeys(t *testing.T) {
 		})
 
 		t.Run("not found returns 204", func(t *testing.T) {
-			fakeId := apid.New(apid.PrefixEncryptionKey)
+			fakeId := apid.New(apid.PrefixKey)
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodDelete,
@@ -790,7 +790,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodDelete,
-				fmt.Sprintf("/encryption-keys/%s", database.GlobalEncryptionKeyID),
+				fmt.Sprintf("/encryption-keys/%s", database.GlobalKeyID),
 				nil,
 				"root",
 				"some-actor",
@@ -840,7 +840,7 @@ func TestEncryptionKeys(t *testing.T) {
 		})
 
 		t.Run("not found", func(t *testing.T) {
-			fakeId := apid.New(apid.PrefixEncryptionKey)
+			fakeId := apid.New(apid.PrefixKey)
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
@@ -915,7 +915,7 @@ func TestEncryptionKeys(t *testing.T) {
 		})
 
 		t.Run("key not found", func(t *testing.T) {
-			fakeId := apid.New(apid.PrefixEncryptionKey)
+			fakeId := apid.New(apid.PrefixKey)
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
@@ -1005,7 +1005,7 @@ func TestEncryptionKeys(t *testing.T) {
 		})
 
 		t.Run("key not found", func(t *testing.T) {
-			fakeId := apid.New(apid.PrefixEncryptionKey)
+			fakeId := apid.New(apid.PrefixKey)
 			body := `{"value": "production"}`
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
@@ -1064,7 +1064,7 @@ func TestEncryptionKeys(t *testing.T) {
 			require.Equal(t, "production", resp.Value)
 
 			// Verify in database
-			got, err := tu.Db.GetEncryptionKey(context.Background(), created.Id)
+			got, err := tu.Db.GetKey(context.Background(), created.Id)
 			require.NoError(t, err)
 			require.Equal(t, "production", got.Labels["env"])
 		})
@@ -1112,7 +1112,7 @@ func TestEncryptionKeys(t *testing.T) {
 			require.Equal(t, http.StatusOK, w.Code)
 
 			// Verify both labels in database
-			got, err := tu.Db.GetEncryptionKey(context.Background(), ekWithLabels.Id)
+			got, err := tu.Db.GetKey(context.Background(), ekWithLabels.Id)
 			require.NoError(t, err)
 			require.Equal(t, "staging", got.Labels["env"])
 			require.Equal(t, "platform", got.Labels["team"])
@@ -1151,7 +1151,7 @@ func TestEncryptionKeys(t *testing.T) {
 		})
 
 		t.Run("key not found returns 204", func(t *testing.T) {
-			fakeId := apid.New(apid.PrefixEncryptionKey)
+			fakeId := apid.New(apid.PrefixKey)
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodDelete,
@@ -1185,7 +1185,7 @@ func TestEncryptionKeys(t *testing.T) {
 			require.Equal(t, http.StatusNoContent, w.Code)
 
 			// Verify the label is deleted but other labels remain
-			got, err := tu.Db.GetEncryptionKey(context.Background(), ekToDelete.Id)
+			got, err := tu.Db.GetKey(context.Background(), ekToDelete.Id)
 			require.NoError(t, err)
 			_, exists := got.Labels["to-delete"]
 			require.False(t, exists)
@@ -1212,7 +1212,7 @@ func TestEncryptionKeys(t *testing.T) {
 			}
 
 			// Verify the label is deleted
-			got, err := tu.Db.GetEncryptionKey(context.Background(), ekIdempotent.Id)
+			got, err := tu.Db.GetKey(context.Background(), ekIdempotent.Id)
 			require.NoError(t, err)
 			_, exists := got.Labels["label"]
 			require.False(t, exists)
@@ -1328,7 +1328,7 @@ func TestEncryptionKeys(t *testing.T) {
 		})
 
 		t.Run("not found", func(t *testing.T) {
-			fakeId := apid.New(apid.PrefixEncryptionKey)
+			fakeId := apid.New(apid.PrefixKey)
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
@@ -1418,7 +1418,7 @@ func TestEncryptionKeys(t *testing.T) {
 		})
 
 		t.Run("key not found", func(t *testing.T) {
-			fakeId := apid.New(apid.PrefixEncryptionKey)
+			fakeId := apid.New(apid.PrefixKey)
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
@@ -1508,7 +1508,7 @@ func TestEncryptionKeys(t *testing.T) {
 		})
 
 		t.Run("key not found", func(t *testing.T) {
-			fakeId := apid.New(apid.PrefixEncryptionKey)
+			fakeId := apid.New(apid.PrefixKey)
 			body := `{"value": "my description"}`
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
@@ -1567,7 +1567,7 @@ func TestEncryptionKeys(t *testing.T) {
 			require.Equal(t, "primary encryption key", resp.Value)
 
 			// Verify in database
-			got, err := tu.Db.GetEncryptionKey(context.Background(), created.Id)
+			got, err := tu.Db.GetKey(context.Background(), created.Id)
 			require.NoError(t, err)
 			require.Equal(t, "primary encryption key", got.Annotations["description"])
 		})
@@ -1631,7 +1631,7 @@ func TestEncryptionKeys(t *testing.T) {
 			require.Equal(t, http.StatusOK, w.Code)
 
 			// Verify both annotations in database
-			got, err := tu.Db.GetEncryptionKey(context.Background(), ekWithAnnotations.Id)
+			got, err := tu.Db.GetKey(context.Background(), ekWithAnnotations.Id)
 			require.NoError(t, err)
 			require.Equal(t, "updated desc", got.Annotations["description"])
 			require.Equal(t, "platform", got.Annotations["owner"])
@@ -1686,7 +1686,7 @@ func TestEncryptionKeys(t *testing.T) {
 		})
 
 		t.Run("key not found returns 204", func(t *testing.T) {
-			fakeId := apid.New(apid.PrefixEncryptionKey)
+			fakeId := apid.New(apid.PrefixKey)
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodDelete,
@@ -1736,7 +1736,7 @@ func TestEncryptionKeys(t *testing.T) {
 			require.Equal(t, http.StatusNoContent, w.Code)
 
 			// Verify the annotation is deleted but other annotations remain
-			got, err := tu.Db.GetEncryptionKey(context.Background(), ekToDelete.Id)
+			got, err := tu.Db.GetKey(context.Background(), ekToDelete.Id)
 			require.NoError(t, err)
 			_, exists := got.Annotations["to-delete"]
 			require.False(t, exists)
@@ -1779,7 +1779,7 @@ func TestEncryptionKeys(t *testing.T) {
 			}
 
 			// Verify the annotation is deleted
-			got, err := tu.Db.GetEncryptionKey(context.Background(), ekIdempotent.Id)
+			got, err := tu.Db.GetKey(context.Background(), ekIdempotent.Id)
 			require.NoError(t, err)
 			_, exists := got.Annotations["annotation"]
 			require.False(t, exists)

@@ -39,7 +39,7 @@ func dataEncryptionKeyInfos(deks []*database.DataEncryptionKey) []config.DataEnc
 	for _, dek := range deks {
 		infos = append(infos, config.DataEncryptionKeyInfo{
 			ID:              string(dek.Id),
-			EncryptionKeyID: string(dek.EncryptionKeyId),
+			EncryptionKeyID: string(dek.KeyId),
 			Provider:        config.ProviderType(dek.Provider),
 			ProviderID:      dek.ProviderID,
 			ProviderVersion: dek.ProviderVersion,
@@ -63,7 +63,7 @@ func syncKeyVersionsForKeyToDatabase(
 	var vers []config.KeyVersionInfo
 	var err error
 	if kd.RequiresDataEncryptionKeys() {
-		deks, err := db.ListDataEncryptionKeysForEncryptionKey(ctx, encryptionKeyId)
+		deks, err := db.ListDataEncryptionKeysForKey(ctx, encryptionKeyId)
 		if err != nil {
 			return errors.Wrap(err, "failed to list data encryption keys")
 		}
@@ -83,7 +83,7 @@ func syncKeyVersionsForKeyToDatabase(
 		}
 	}
 
-	existing, err := db.ListEncryptionKeyVersionsForEncryptionKey(ctx, encryptionKeyId)
+	existing, err := db.ListEncryptionKeyVersionsForKey(ctx, encryptionKeyId)
 	if err != nil {
 		return errors.Wrap(err, "failed to list existing encryption key versions")
 	}
@@ -103,14 +103,14 @@ func syncKeyVersionsForKeyToDatabase(
 
 		if found == nil {
 			// Create a new record
-			maxVersion, err := db.GetMaxOrderedVersionForEncryptionKey(ctx, encryptionKeyId)
+			maxVersion, err := db.GetMaxOrderedVersionForKey(ctx, encryptionKeyId)
 			if err != nil {
 				return errors.Wrap(err, "failed to get max ordered version")
 			}
 
 			ekv := &database.EncryptionKeyVersion{
 				Id:              apid.New(apid.PrefixEncryptionKeyVersion),
-				EncryptionKeyId: encryptionKeyId,
+				KeyId:           encryptionKeyId,
 				Provider:        string(ver.Provider),
 				ProviderID:      ver.ProviderID,
 				ProviderVersion: ver.ProviderVersion,
@@ -122,7 +122,7 @@ func syncKeyVersionsForKeyToDatabase(
 			cache[ekv.Id] = ver
 
 			if ver.IsCurrent {
-				if err := db.ClearCurrentFlagForEncryptionKey(ctx, encryptionKeyId); err != nil {
+				if err := db.ClearCurrentFlagForKey(ctx, encryptionKeyId); err != nil {
 					return errors.Wrapf(err, "failed to clear current flag for encryption key %s", encryptionKeyId)
 				}
 			}
@@ -138,7 +138,7 @@ func syncKeyVersionsForKeyToDatabase(
 
 			if ver.IsCurrent && !found.IsCurrent {
 				// This key should be current but isn't marked as such
-				if err := db.ClearCurrentFlagForEncryptionKey(ctx, encryptionKeyId); err != nil {
+				if err := db.ClearCurrentFlagForKey(ctx, encryptionKeyId); err != nil {
 					return errors.Wrapf(err, "failed to clear current flag for encryption key %s", encryptionKeyId)
 				}
 				if err := db.SetEncryptionKeyVersionCurrentFlag(ctx, found.Id, true); err != nil {
@@ -169,19 +169,19 @@ func reconcileNamespaceEncryptionTargets(
 	effectiveEKV := make(map[string]apid.ID)
 
 	return db.EnumerateNamespaceEncryptionTargets(ctx,
-		func(targets []database.NamespaceEncryptionTarget, lastPage bool) ([]database.NamespaceTargetEncryptionKeyVersionUpdate, pagination.KeepGoing, error) {
-			var updates []database.NamespaceTargetEncryptionKeyVersionUpdate
+		func(targets []database.NamespaceEncryptionTarget, lastPage bool) ([]database.NamespaceTargetDataEncryptionKeyUpdate, pagination.KeepGoing, error) {
+			var updates []database.NamespaceTargetDataEncryptionKeyUpdate
 
 			for _, target := range targets {
 				var resolvedEKVID apid.ID
 
-				if target.EncryptionKeyId != nil {
+				if target.KeyId != nil {
 					// Namespace has its own encryption key; look up its current version
-					currentEKV, err := db.GetCurrentEncryptionKeyVersionForEncryptionKey(ctx, *target.EncryptionKeyId)
+					currentEKV, err := db.GetCurrentEncryptionKeyVersionForKey(ctx, *target.KeyId)
 					if err != nil {
 						logger.Warn("failed to get current encryption key version for namespace encryption key",
 							"namespace", target.Path,
-							"encryption_key_id", *target.EncryptionKeyId,
+							"encryption_key_id", *target.KeyId,
 							"error", err,
 						)
 						continue
@@ -201,7 +201,7 @@ func reconcileNamespaceEncryptionTargets(
 
 					if !found {
 						// Fall back to the global key's current version
-						globalEKV, err := db.GetCurrentEncryptionKeyVersionForEncryptionKey(ctx, globalEncryptionKeyID)
+						globalEKV, err := db.GetCurrentEncryptionKeyVersionForKey(ctx, globalEncryptionKeyID)
 						if err != nil {
 							logger.Warn("failed to get current encryption key version for global key",
 								"namespace", target.Path,
@@ -216,10 +216,10 @@ func reconcileNamespaceEncryptionTargets(
 				effectiveEKV[target.Path] = resolvedEKVID
 
 				// Only emit an update if the value actually changed
-				if target.TargetEncryptionKeyVersionId == nil || *target.TargetEncryptionKeyVersionId != resolvedEKVID {
-					updates = append(updates, database.NamespaceTargetEncryptionKeyVersionUpdate{
-						Path:                         target.Path,
-						TargetEncryptionKeyVersionId: resolvedEKVID,
+				if target.TargetDataEncryptionKeyId == nil || *target.TargetDataEncryptionKeyId != resolvedEKVID {
+					updates = append(updates, database.NamespaceTargetDataEncryptionKeyUpdate{
+						Path:                      target.Path,
+						TargetDataEncryptionKeyId: resolvedEKVID,
 					})
 				}
 			}
@@ -286,7 +286,7 @@ func syncKeysVersionsToDatabase(
 
 	var result *multierror.Error
 
-	_, err = db.EnumerateEncryptionKeysInDependencyOrder(ctx, func(keys []*database.EncryptionKey, _ int) (keepGoing pagination.KeepGoing, err error) {
+	_, err = db.EnumerateKeysInDependencyOrder(ctx, func(keys []*database.Key, _ int) (keepGoing pagination.KeepGoing, err error) {
 		for _, key := range keys {
 			if key.EncryptedKeyData == nil {
 				// Global key already synced

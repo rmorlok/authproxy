@@ -55,7 +55,7 @@ func setupMockKMSGenerateTest(t *testing.T, kmsVersions bool) mockKMSGenerateTes
 
 	require.NoError(t, syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil))
 
-	globalVersions, err := db.ListEncryptionKeyVersionsForEncryptionKey(ctx, globalEncryptionKeyID)
+	globalVersions, err := db.ListEncryptionKeyVersionsForKey(ctx, globalEncryptionKeyID)
 	require.NoError(t, err)
 	require.Len(t, globalVersions, 1)
 
@@ -64,17 +64,17 @@ func setupMockKMSGenerateTest(t *testing.T, kmsVersions bool) mockKMSGenerateTes
 		sconfig.KeyDataMockKMSAddVersion("namespace-kms", "mock-kms-key", "v1", util.MustGenerateSecureRandomKey(32))
 	}
 
-	ekID := apid.New(apid.PrefixEncryptionKey)
+	ekID := apid.New(apid.PrefixKey)
 	namespace := "root.kms"
 	require.NoError(t, db.CreateNamespace(ctx, &database.Namespace{
-		Path:            namespace,
-		EncryptionKeyId: &ekID,
+		Path:  namespace,
+		KeyId: &ekID,
 	}))
 
-	require.NoError(t, db.CreateEncryptionKey(ctx, &database.EncryptionKey{
+	require.NoError(t, db.CreateKey(ctx, &database.Key{
 		Id:               ekID,
 		Namespace:        namespace,
-		State:            database.EncryptionKeyStateActive,
+		State:            database.KeyStateActive,
 		EncryptedKeyData: encryptKeyDataForTest(t, globalVersions[0].Id, globalKeyBytes, kmsKeyData),
 	}))
 
@@ -95,7 +95,7 @@ func TestGenerateDataEncryptionKeysToDatabase(t *testing.T) {
 
 		require.NoError(t, generateDataEncryptionKeysToDatabase(env.ctx, env.cfg, env.db, env.logger, nil))
 
-		deks, err := env.db.ListDataEncryptionKeysForEncryptionKey(env.ctx, env.ekID)
+		deks, err := env.db.ListDataEncryptionKeysForKey(env.ctx, env.ekID)
 		require.NoError(t, err)
 		require.Len(t, deks, 1)
 		require.True(t, deks[0].Id.HasPrefix(apid.PrefixDataEncryptionKey))
@@ -105,7 +105,7 @@ func TestGenerateDataEncryptionKeysToDatabase(t *testing.T) {
 		require.Equal(t, "v1", deks[0].ProviderVersion)
 		require.NotEmpty(t, deks[0].ProtectedData.WrappedData)
 
-		versions, err := env.db.ListEncryptionKeyVersionsForEncryptionKey(env.ctx, env.ekID)
+		versions, err := env.db.ListEncryptionKeyVersionsForKey(env.ctx, env.ekID)
 		require.NoError(t, err)
 		require.Len(t, versions, 1)
 		require.Equal(t, string(deks[0].Id), versions[0].ProviderID)
@@ -126,7 +126,7 @@ func TestGenerateDataEncryptionKeysToDatabase(t *testing.T) {
 		require.NoError(t, generateDataEncryptionKeysToDatabase(env.ctx, env.cfg, env.db, env.logger, nil))
 		require.NoError(t, generateDataEncryptionKeysToDatabase(env.ctx, env.cfg, env.db, env.logger, nil))
 
-		deks, err := env.db.ListDataEncryptionKeysForEncryptionKey(env.ctx, env.ekID)
+		deks, err := env.db.ListDataEncryptionKeysForKey(env.ctx, env.ekID)
 		require.NoError(t, err)
 		require.Len(t, deks, 1)
 	})
@@ -135,7 +135,7 @@ func TestGenerateDataEncryptionKeysToDatabase(t *testing.T) {
 		env := setupMockKMSGenerateTest(t, true)
 
 		require.NoError(t, generateDataEncryptionKeysToDatabase(env.ctx, env.cfg, env.db, env.logger, nil))
-		firstCurrent, err := env.db.ListDataEncryptionKeysForEncryptionKey(env.ctx, env.ekID)
+		firstCurrent, err := env.db.ListDataEncryptionKeysForKey(env.ctx, env.ekID)
 		require.NoError(t, err)
 		require.Len(t, firstCurrent, 1)
 
@@ -144,14 +144,14 @@ func TestGenerateDataEncryptionKeysToDatabase(t *testing.T) {
 
 		require.NoError(t, generateDataEncryptionKeysToDatabase(env.ctx, env.cfg, env.db, env.logger, nil))
 
-		deks, err := env.db.ListDataEncryptionKeysForEncryptionKey(env.ctx, env.ekID)
+		deks, err := env.db.ListDataEncryptionKeysForKey(env.ctx, env.ekID)
 		require.NoError(t, err)
 		require.Len(t, deks, 2)
 		require.False(t, deks[0].IsCurrent)
 		require.True(t, deks[1].IsCurrent)
 		require.Equal(t, "v2", deks[1].ProviderVersion)
 
-		versions, err := env.db.ListEncryptionKeyVersionsForEncryptionKey(env.ctx, env.ekID)
+		versions, err := env.db.ListEncryptionKeyVersionsForKey(env.ctx, env.ekID)
 		require.NoError(t, err)
 		require.Len(t, versions, 2)
 		require.Equal(t, string(deks[1].Id), versions[1].ProviderID)
@@ -164,7 +164,7 @@ func TestGenerateDataEncryptionKeysToDatabase(t *testing.T) {
 
 		require.NoError(t, generateDataEncryptionKeysToDatabase(env.ctx, env.cfg, env.db, env.logger, nil))
 
-		deks, err := env.db.ListDataEncryptionKeysForEncryptionKey(env.ctx, env.ekID)
+		deks, err := env.db.ListDataEncryptionKeysForKey(env.ctx, env.ekID)
 		require.NoError(t, err)
 		require.Empty(t, deks)
 	})
@@ -175,7 +175,7 @@ func TestGenerateDataEncryptionKeysToDatabase(t *testing.T) {
 		err := generateDataEncryptionKeysToDatabase(env.ctx, env.cfg, env.db, env.logger, nil)
 		require.ErrorContains(t, err, "no current version")
 
-		deks, listErr := env.db.ListDataEncryptionKeysForEncryptionKey(env.ctx, env.ekID)
+		deks, listErr := env.db.ListDataEncryptionKeysForKey(env.ctx, env.ekID)
 		require.NoError(t, listErr)
 		require.Empty(t, deks)
 	})
