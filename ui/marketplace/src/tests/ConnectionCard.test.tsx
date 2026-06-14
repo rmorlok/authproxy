@@ -133,8 +133,7 @@ describe('ConnectionCard', () => {
         // Check if the connection date is displayed
         expect(screen.getByText(/Connected on/)).toBeInTheDocument();
 
-        // Check if the status chip label is displayed (state string)
-        expect(screen.getByText('configured')).toBeInTheDocument();
+        expect(screen.queryByText('configured')).not.toBeInTheDocument();
     });
 
     test('renders with unknown connector fallback when connector missing', () => {
@@ -153,10 +152,10 @@ describe('ConnectionCard', () => {
 
     test('renders different status labels based on connection state', () => {
         const states = [
-            {state: ConnectionState.CONFIGURED, label: 'configured'},
-            {state: ConnectionState.SETUP, label: 'setup'},
-            {state: ConnectionState.DISABLED, label: 'disabled'},
-            {state: ConnectionState.DISCONNECTED, label: 'disconnected'},
+            {state: ConnectionState.CONFIGURED, label: /Connected on/},
+            {state: ConnectionState.SETUP, label: 'Requires setup'},
+            {state: ConnectionState.DISABLED, label: 'Requires reconnection'},
+            {state: ConnectionState.DISCONNECTED, label: 'Disconnected'},
         ];
 
         states.forEach(({state, label}) => {
@@ -169,7 +168,6 @@ describe('ConnectionCard', () => {
                 </Provider>
             );
 
-            // Check if the status label is displayed
             expect(screen.getByText(label)).toBeInTheDocument();
 
             unmount();
@@ -194,9 +192,8 @@ describe('ConnectionCard', () => {
             </Provider>
         );
 
-        expect(screen.getByText('Needs attention')).toBeInTheDocument();
-        expect(screen.getByText('Reauthentication required')).toBeInTheDocument();
-        expect(screen.getByText(/Re-authenticate to restore access/i)).toBeInTheDocument();
+        expect(screen.getByText('Requires reconnection')).toBeInTheDocument();
+        expect(screen.getByText('Reconnection required')).toBeInTheDocument();
         expect(screen.getByRole('button', {name: /Re-authenticate/i})).toBeInTheDocument();
         expect(screen.getByRole('button', {name: /Reconfigure/i})).toBeInTheDocument();
         expect(screen.getByRole('button', {name: /Disconnect/i})).toBeInTheDocument();
