@@ -28,19 +28,6 @@ func NewGenerateDataEncryptionKeysTask() *asynq.Task {
 	return asynq.NewTask(TaskTypeGenerateDataEncryptionKeys, nil)
 }
 
-func currentDataEncryptionKey(deks []*database.DataEncryptionKey) *database.DataEncryptionKey {
-	var current *database.DataEncryptionKey
-	for _, dek := range deks {
-		if !dek.IsCurrent {
-			continue
-		}
-		if current == nil || dek.CreatedAt.After(current.CreatedAt) {
-			current = dek
-		}
-	}
-	return current
-}
-
 func createDataEncryptionKey(
 	ctx context.Context,
 	db database.DB,
@@ -83,12 +70,11 @@ func ensureDataEncryptionKeyForKey(
 		return false, fmt.Errorf("key data provider %q requires DEKs but cannot generate them", kd.GetProviderType())
 	}
 
-	deks, err := db.ListDataEncryptionKeysForKey(ctx, encryptionKeyId)
-	if err != nil {
+	current, err := db.GetCurrentDataEncryptionKeyForKey(ctx, encryptionKeyId)
+	if err != nil && !errors.Is(err, database.ErrNotFound) {
 		return false, err
 	}
 
-	current := currentDataEncryptionKey(deks)
 	if current == nil {
 		if !policy.ShouldEnsureCurrent() {
 			return false, nil

@@ -14,6 +14,8 @@ import (
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
+	"github.com/rmorlok/authproxy/internal/util"
+	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
 const DataEncryptionKeysTable = "data_encryption_keys"
@@ -223,13 +225,121 @@ func (s *service) GetDataEncryptionKey(ctx context.Context, id apid.ID) (*DataEn
 	return &result, nil
 }
 
-func (s *service) ListDataEncryptionKeysForKey(ctx context.Context, encryptionKeyId apid.ID) ([]*DataEncryptionKey, error) {
+func (s *service) GetCurrentDataEncryptionKeyForKey(ctx context.Context, keyId apid.ID) (*DataEncryptionKey, error) {
+	var result DataEncryptionKey
+	err := s.sq.
+		Select(result.cols()...).
+		From(DataEncryptionKeysTable).
+		Where(sq.Eq{
+			"key_id":     keyId,
+			"is_current": true,
+			"deleted_at": nil,
+		}).
+		OrderBy("created_at DESC", "id DESC").
+		Limit(1).
+		RunWith(s.db).
+		QueryRow().
+		Scan(result.fields()...)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("failed to get current data encryption key: %w", err)
+	}
+
+	return &result, nil
+}
+
+func (s *service) ClearCurrentDataEncryptionKeyFlagForKey(ctx context.Context, keyId apid.ID) error {
+	now := apctx.GetClock(ctx).Now()
+	_, err := s.sq.
+		Update(DataEncryptionKeysTable).
+		Set("is_current", false).
+		Set("updated_at", now).
+		Where(sq.Eq{
+			"key_id":     keyId,
+			"is_current": true,
+			"deleted_at": nil,
+		}).
+		RunWith(s.db).
+		Exec()
+	if err != nil {
+		return fmt.Errorf("failed to clear current data encryption key flag for key %s: %w", keyId, err)
+	}
+
+	return nil
+}
+
+func (s *service) SetDataEncryptionKeyCurrentFlag(ctx context.Context, id apid.ID, isCurrent bool) error {
+	now := apctx.GetClock(ctx).Now()
+
+	return s.transaction(func(tx *sql.Tx) error {
+		var keyId apid.ID
+		err := s.sq.
+			Select("key_id").
+			From(DataEncryptionKeysTable).
+			Where(sq.Eq{
+				"id":         id,
+				"deleted_at": nil,
+			}).
+			RunWith(tx).
+			QueryRow().
+			Scan(&keyId)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrNotFound
+			}
+			return fmt.Errorf("failed to get data encryption key: %w", err)
+		}
+
+		if isCurrent {
+			if _, err := s.sq.
+				Update(DataEncryptionKeysTable).
+				Set("is_current", false).
+				Set("updated_at", now).
+				Where(sq.Eq{
+					"key_id":     keyId,
+					"deleted_at": nil,
+				}).
+				RunWith(tx).
+				Exec(); err != nil {
+				return fmt.Errorf("failed to clear current data encryption keys: %w", err)
+			}
+		}
+
+		result, err := s.sq.
+			Update(DataEncryptionKeysTable).
+			Set("is_current", isCurrent).
+			Set("updated_at", now).
+			Where(sq.Eq{
+				"id":         id,
+				"deleted_at": nil,
+			}).
+			RunWith(tx).
+			Exec()
+		if err != nil {
+			return fmt.Errorf("failed to set data encryption key current flag: %w", err)
+		}
+
+		affected, err := result.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("failed to set data encryption key current flag: %w", err)
+		}
+		if affected == 0 {
+			return ErrNotFound
+		}
+
+		return nil
+	})
+}
+
+func (s *service) ListDataEncryptionKeysForKey(ctx context.Context, keyId apid.ID) ([]*DataEncryptionKey, error) {
 	var result DataEncryptionKey
 	rows, err := s.sq.
 		Select(result.cols()...).
 		From(DataEncryptionKeysTable).
 		Where(sq.Eq{
-			"key_id":     encryptionKeyId,
+			"key_id":     keyId,
 			"deleted_at": nil,
 		}).
 		OrderBy("created_at ASC", "id ASC").
@@ -250,4 +360,63 @@ func (s *service) ListDataEncryptionKeysForKey(ctx context.Context, encryptionKe
 	}
 
 	return results, rows.Err()
+}
+
+func (s *service) EnumerateDataEncryptionKeysForKey(
+	ctx context.Context,
+	keyId apid.ID,
+	callback func(deks []*DataEncryptionKey, lastPage bool) (keepGoing pagination.KeepGoing, err error),
+) error {
+	const pageSize = 100
+	offset := uint64(0)
+
+	for {
+		rows, err := s.sq.
+			Select(util.ToPtr(DataEncryptionKey{}).cols()...).
+			From(DataEncryptionKeysTable).
+			Where(sq.Eq{
+				"key_id":     keyId,
+				"deleted_at": nil,
+			}).
+			OrderBy("created_at ASC", "id ASC").
+			Limit(pageSize + 1).
+			Offset(offset).
+			RunWith(s.db).
+			Query()
+		if err != nil {
+			return fmt.Errorf("failed to enumerate data encryption keys: %w", err)
+		}
+
+		var results []*DataEncryptionKey
+		for rows.Next() {
+			var dek DataEncryptionKey
+			if err := rows.Scan(dek.fields()...); err != nil {
+				rows.Close()
+				return fmt.Errorf("failed to scan data encryption key: %w", err)
+			}
+			results = append(results, &dek)
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			return fmt.Errorf("failed to enumerate data encryption keys: %w", err)
+		}
+		rows.Close()
+
+		lastPage := len(results) <= pageSize
+		if len(results) > pageSize {
+			results = results[:pageSize]
+		}
+
+		keepGoing, err := callback(results, lastPage)
+		if err != nil {
+			return err
+		}
+		if keepGoing == pagination.Stop || lastPage {
+			break
+		}
+
+		offset += pageSize
+	}
+
+	return nil
 }
