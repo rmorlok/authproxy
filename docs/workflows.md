@@ -25,6 +25,8 @@ Current examples:
 core.connection.disconnect.v1
 core.connection.disconnect.revoke_credentials.v1
 core.connection.disconnect.finalize.v1
+core.connector.disconnect_all.v1
+core.connector.archive.v1
 ```
 
 Rules:
