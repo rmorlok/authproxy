@@ -50,6 +50,7 @@ In-depth guides live under [`docs/`](docs/README.md):
 - [Labels and annotations](docs/labels.md) — the label system, system labels under `apxy/`, carry-forward through namespaces and connectors, label selectors.
 - [Telemetry](docs/telemetry.md) — OpenTelemetry traces, metrics, and logs; OTLP configuration, label projection, signal coverage, and the local Grafana dev stack.
 - [Background tasks](docs/background_tasks.md) — running the worker, monitoring queues.
+- [Connector lifecycle operations](docs/connector-lifecycle.md) — disconnect-all and archive workflows, task polling, timeout semantics.
 - [Blob storage](docs/blob_storage.md) — viewing data stored in MinIO / S3.
 - [Redis insight](docs/redis_insight.md) — viewing data stored in Redis.
 
@@ -593,6 +594,7 @@ The full set of long-form guides lives under [`docs/`](docs/README.md):
 | Label system, system labels, carry-forward, selectors | [docs/labels.md](docs/labels.md) |
 | OpenTelemetry traces / metrics / logs, OTLP config, label projection, dev Grafana stack | [docs/telemetry.md](docs/telemetry.md) |
 | Managing background tasks | [docs/background_tasks.md](docs/background_tasks.md) |
+| Connector lifecycle workflows and task polling | [docs/connector-lifecycle.md](docs/connector-lifecycle.md) |
 | Viewing data stored in Blob Storage (request logs, etc.) | [docs/blob_storage.md](docs/blob_storage.md) |
 | Viewing data stored in Redis | [docs/redis_insight.md](docs/redis_insight.md) |
 | Terraform provider — resource reference | [terraform/provider/docs/resources/](terraform/provider/docs/resources/) |

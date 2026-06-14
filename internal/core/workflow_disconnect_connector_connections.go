@@ -27,7 +27,7 @@ const (
 
 type disconnectConnectorConnectionsWorkflowInputV1 struct {
 	ConnectorID apid.ID       `json:"connector_id"` // The connector id for which all connections will be disconnected
-	Timeout     time.Duration `json:"timeout"`      // ...
+	Timeout     time.Duration `json:"timeout"`      // Maximum time before remaining child disconnects are forced terminal.
 }
 
 func (s *service) startDisconnectConnectorConnectionsWorkflow(
