@@ -23,7 +23,10 @@ func (c *connection) SubmitForm(ctx context.Context, req iface.SubmitConnectionR
 	}
 
 	flow := c.s.buildManifestSetupFlow(c)
-	current, ok := flow.StepById(setupStep.Id())
+	current, ok, err := flow.StepById(ctx, setupStep.Id())
+	if err != nil {
+		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to evaluate setup flow: %w", err))
+	}
 	if !ok {
 		return nil, httperr.InternalServerErrorMsg("current setup step is not addressable in manifest")
 	}
@@ -35,7 +38,10 @@ func (c *connection) SubmitForm(ctx context.Context, req iface.SubmitConnectionR
 		return nil, err
 	}
 
-	next, hasNext := flow.NextStep(current.Id())
+	next, hasNext, err := flow.NextStep(ctx, current.Id())
+	if err != nil {
+		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to evaluate setup flow: %w", err))
+	}
 	if !hasNext {
 		return c.completeFlow(ctx)
 	}

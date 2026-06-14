@@ -48,7 +48,10 @@ func (s *service) ReauthConnection(ctx context.Context, id apid.ID, returnToUrl 
 	}
 
 	flow := s.buildManifestSetupFlow(conn)
-	first := flow.FirstStep()
+	first, err := flow.FirstStep(ctx)
+	if err != nil {
+		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to evaluate setup flow: %w", err))
+	}
 	if first == nil {
 		return nil, httperr.BadRequest("connector has no setup flow to reauth through")
 	}

@@ -159,8 +159,21 @@ func (c *connection) renderResumeResponse(ctx context.Context, flow iface.Manife
 			CanRetry: true,
 		}, nil
 	}
-	step, ok := flow.StepById(setupStep.Id())
+	step, ok, err := flow.StepById(ctx, setupStep.Id())
+	if err != nil {
+		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to evaluate setup flow: %w", err))
+	}
 	if !ok {
+		if flow.ContainsStep(setupStep.Id()) {
+			next, hasNext, err := flow.NextStep(ctx, setupStep.Id())
+			if err != nil {
+				return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to evaluate setup flow: %w", err))
+			}
+			if !hasNext {
+				return c.completeFlow(ctx)
+			}
+			return c.advanceToStep(ctx, next, flow, "")
+		}
 		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("current setup step %q not in manifest", setupStep.String()))
 	}
 	return c.renderStepResponse(ctx, flow, step, iface.RenderRedirectOptions{})
