@@ -30,12 +30,12 @@ func (h *EncryptServiceTaskHandler) handleReencryptAll(ctx context.Context, task
 		var updates []database.ReEncryptedFieldUpdate
 
 		for _, target := range targets {
-			newEF, reencryptErr := h.enc.ReEncryptField(ctx, target.EncryptedFieldValue, target.TargetEncryptionKeyVersionId)
+			newEF, reencryptErr := h.enc.ReEncryptField(ctx, target.EncryptedFieldValue, target.TargetDataEncryptionKeyId)
 			if reencryptErr != nil {
 				h.logger.Warn("failed to re-encrypt field, skipping",
 					"table", target.Table,
 					"field", target.FieldColumn,
-					"target_ekv", target.TargetEncryptionKeyVersionId,
+					"target_dek", target.TargetDataEncryptionKeyId,
 					"error", reencryptErr,
 				)
 				totalErrors++

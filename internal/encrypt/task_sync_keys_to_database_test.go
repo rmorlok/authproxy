@@ -22,7 +22,7 @@ import (
 )
 
 // encryptKeyDataForTest encrypts a child KeyData config using the given parent key version,
-// returning the EncryptedField that should be stored on the child EncryptionKey.
+// returning the EncryptedField that should be stored on the child Key.
 func encryptKeyDataForTest(
 	t *testing.T,
 	parentEKVID apid.ID,
@@ -79,24 +79,24 @@ func setupMockKMSKeySyncTest(t *testing.T) mockKMSSyncTestEnv {
 
 	require.NoError(t, syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil))
 
-	globalVersions, err := db.ListEncryptionKeyVersionsForEncryptionKey(ctx, globalEncryptionKeyID)
+	globalVersions, err := db.ListEncryptionKeyVersionsForKey(ctx, globalEncryptionKeyID)
 	require.NoError(t, err)
 	require.Len(t, globalVersions, 1)
 
 	kmsKeyData := sconfig.NewKeyDataMockKMS("namespace-kms")
 	sconfig.KeyDataMockKMSAddVersion("namespace-kms", "mock-kms-key", "v1", util.MustGenerateSecureRandomKey(32))
 
-	ekID := apid.New(apid.PrefixEncryptionKey)
+	ekID := apid.New(apid.PrefixKey)
 	namespace := "root.kms"
 	require.NoError(t, db.CreateNamespace(ctx, &database.Namespace{
-		Path:            namespace,
-		EncryptionKeyId: &ekID,
+		Path:  namespace,
+		KeyId: &ekID,
 	}))
 
-	require.NoError(t, db.CreateEncryptionKey(ctx, &database.EncryptionKey{
+	require.NoError(t, db.CreateKey(ctx, &database.Key{
 		Id:               ekID,
 		Namespace:        namespace,
-		State:            database.EncryptionKeyStateActive,
+		State:            database.KeyStateActive,
 		EncryptedKeyData: encryptKeyDataForTest(t, globalVersions[0].Id, globalKeyBytes, kmsKeyData),
 	}))
 
@@ -131,7 +131,7 @@ func createMockKMSDataEncryptionKey(
 	require.NoError(t, err)
 
 	dek := &database.DataEncryptionKey{
-		EncryptionKeyId: ekID,
+		KeyId:           ekID,
 		Provider:        string(sconfig.ProviderTypeMockKMS),
 		ProviderID:      "mock-kms-key",
 		ProviderVersion: providerVersion,
@@ -146,7 +146,7 @@ func TestMockKMSKeySync(t *testing.T) {
 	t.Run("persists wrapped dek and decrypts after memory restart", func(t *testing.T) {
 		env := setupMockKMSKeySyncTest(t)
 
-		deks, err := env.db.ListDataEncryptionKeysForEncryptionKey(env.ctx, env.ekID)
+		deks, err := env.db.ListDataEncryptionKeysForKey(env.ctx, env.ekID)
 		require.NoError(t, err)
 		require.Len(t, deks, 1)
 		require.Equal(t, env.dekV1ID, deks[0].Id)
@@ -154,7 +154,7 @@ func TestMockKMSKeySync(t *testing.T) {
 		require.Equal(t, string(sconfig.ProviderTypeMockKMS), deks[0].ProtectedData.Type)
 		require.NotEmpty(t, deks[0].ProtectedData.WrappedData)
 
-		versions, err := env.db.ListEncryptionKeyVersionsForEncryptionKey(env.ctx, env.ekID)
+		versions, err := env.db.ListEncryptionKeyVersionsForKey(env.ctx, env.ekID)
 		require.NoError(t, err)
 		require.Len(t, versions, 1)
 		require.Equal(t, string(sconfig.ProviderTypeMockKMS), versions[0].Provider)
@@ -171,7 +171,7 @@ func TestMockKMSKeySync(t *testing.T) {
 		require.Equal(t, "kms plaintext", decrypted)
 
 		require.NoError(t, syncKeysVersionsToDatabase(env.ctx, env.cfg, env.db, env.logger, nil))
-		afterResync, err := env.db.ListEncryptionKeyVersionsForEncryptionKey(env.ctx, env.ekID)
+		afterResync, err := env.db.ListEncryptionKeyVersionsForKey(env.ctx, env.ekID)
 		require.NoError(t, err)
 		require.Len(t, afterResync, 1, "resync with existing protected data should not generate a duplicate version")
 		require.Equal(t, versions[0].Id, afterResync[0].Id)
@@ -180,11 +180,11 @@ func TestMockKMSKeySync(t *testing.T) {
 	t.Run("sync does not create versions before dek generation", func(t *testing.T) {
 		env := setupMockKMSKeySyncTest(t)
 
-		ekID := apid.New(apid.PrefixEncryptionKey)
+		ekID := apid.New(apid.PrefixKey)
 		namespace := "root.kms.nodek"
 		require.NoError(t, env.db.CreateNamespace(env.ctx, &database.Namespace{
-			Path:            namespace,
-			EncryptionKeyId: &ekID,
+			Path:  namespace,
+			KeyId: &ekID,
 		}))
 
 		keyData := sconfig.NewKeyDataMockKMS("namespace-kms")
@@ -192,15 +192,15 @@ func TestMockKMSKeySync(t *testing.T) {
 		require.NoError(t, err)
 		encKeyData, err := env.enc.EncryptGlobal(env.ctx, keyDataJSON)
 		require.NoError(t, err)
-		require.NoError(t, env.db.CreateEncryptionKey(env.ctx, &database.EncryptionKey{
+		require.NoError(t, env.db.CreateKey(env.ctx, &database.Key{
 			Id:               ekID,
 			Namespace:        namespace,
-			State:            database.EncryptionKeyStateActive,
+			State:            database.KeyStateActive,
 			EncryptedKeyData: &encKeyData,
 		}))
 
 		require.NoError(t, syncKeysVersionsToDatabase(env.ctx, env.cfg, env.db, env.logger, nil))
-		versions, err := env.db.ListEncryptionKeyVersionsForEncryptionKey(env.ctx, ekID)
+		versions, err := env.db.ListEncryptionKeyVersionsForKey(env.ctx, ekID)
 		require.NoError(t, err)
 		require.Empty(t, versions)
 	})
@@ -272,7 +272,7 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 		err := syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
 		require.NoError(t, err)
 
-		versions, err := db.ListEncryptionKeyVersionsForEncryptionKey(ctx, globalEncryptionKeyID)
+		versions, err := db.ListEncryptionKeyVersionsForKey(ctx, globalEncryptionKeyID)
 		require.NoError(t, err)
 		require.Len(t, versions, 1)
 		require.Equal(t, string(sconfig.ProviderTypeMock), versions[0].Provider)
@@ -288,7 +288,7 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 		err = syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
 		require.NoError(t, err)
 
-		versions, err = db.ListEncryptionKeyVersionsForEncryptionKey(ctx, globalEncryptionKeyID)
+		versions, err = db.ListEncryptionKeyVersionsForKey(ctx, globalEncryptionKeyID)
 		require.NoError(t, err)
 		require.Len(t, versions, 2)
 
@@ -312,7 +312,7 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 		err = syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
 		require.NoError(t, err)
 
-		versions, err = db.ListEncryptionKeyVersionsForEncryptionKey(ctx, globalEncryptionKeyID)
+		versions, err = db.ListEncryptionKeyVersionsForKey(ctx, globalEncryptionKeyID)
 		require.NoError(t, err)
 		require.Len(t, versions, 2, "idempotent sync should not create duplicates")
 	})
@@ -339,7 +339,7 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 		err := syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
 		require.NoError(t, err)
 
-		globalVersions, err := db.ListEncryptionKeyVersionsForEncryptionKey(ctx, globalEncryptionKeyID)
+		globalVersions, err := db.ListEncryptionKeyVersionsForKey(ctx, globalEncryptionKeyID)
 		require.NoError(t, err)
 		require.Len(t, globalVersions, 1)
 		globalEKVID := globalVersions[0].Id
@@ -351,21 +351,21 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 		sconfig.KeyDataMockAddVersion(childMockID, "child-key", "cv1", childKeyBytes)
 		childKeyData := sconfig.NewKeyDataMock(childMockID)
 
-		childEKID := apid.New(apid.PrefixEncryptionKey)
+		childEKID := apid.New(apid.PrefixKey)
 		childEF := encryptKeyDataForTest(t, globalEKVID, globalKeyBytes, childKeyData)
 
-		childEK := &database.EncryptionKey{
+		childEK := &database.Key{
 			Id:               childEKID,
 			Namespace:        "root",
-			State:            database.EncryptionKeyStateActive,
+			State:            database.KeyStateActive,
 			EncryptedKeyData: childEF,
 		}
-		require.NoError(t, db.CreateEncryptionKey(ctx, childEK))
+		require.NoError(t, db.CreateKey(ctx, childEK))
 
 		err = syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
 		require.NoError(t, err)
 
-		childVersions, err := db.ListEncryptionKeyVersionsForEncryptionKey(ctx, childEKID)
+		childVersions, err := db.ListEncryptionKeyVersionsForKey(ctx, childEKID)
 		require.NoError(t, err)
 		require.Len(t, childVersions, 1)
 		require.True(t, childVersions[0].IsCurrent)
@@ -379,31 +379,31 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 		sconfig.KeyDataMockAddVersion(grandchildMockID, "grandchild-key", "gv1", grandchildKeyBytes)
 		grandchildKeyData := sconfig.NewKeyDataMock(grandchildMockID)
 
-		grandchildEKID := apid.New(apid.PrefixEncryptionKey)
+		grandchildEKID := apid.New(apid.PrefixKey)
 		grandchildEF := encryptKeyDataForTest(t, childEKVID, childKeyBytes, grandchildKeyData)
 
-		grandchildEK := &database.EncryptionKey{
+		grandchildEK := &database.Key{
 			Id:               grandchildEKID,
 			Namespace:        "root",
-			State:            database.EncryptionKeyStateActive,
+			State:            database.KeyStateActive,
 			EncryptedKeyData: grandchildEF,
 		}
-		require.NoError(t, db.CreateEncryptionKey(ctx, grandchildEK))
+		require.NoError(t, db.CreateKey(ctx, grandchildEK))
 
 		err = syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
 		require.NoError(t, err)
 
-		grandchildVersions, err := db.ListEncryptionKeyVersionsForEncryptionKey(ctx, grandchildEKID)
+		grandchildVersions, err := db.ListEncryptionKeyVersionsForKey(ctx, grandchildEKID)
 		require.NoError(t, err)
 		require.Len(t, grandchildVersions, 1)
 		require.True(t, grandchildVersions[0].IsCurrent)
 
 		// Verify all three keys still have exactly one version
-		globalVersions, err = db.ListEncryptionKeyVersionsForEncryptionKey(ctx, globalEncryptionKeyID)
+		globalVersions, err = db.ListEncryptionKeyVersionsForKey(ctx, globalEncryptionKeyID)
 		require.NoError(t, err)
 		require.Len(t, globalVersions, 1)
 
-		childVersions, err = db.ListEncryptionKeyVersionsForEncryptionKey(ctx, childEKID)
+		childVersions, err = db.ListEncryptionKeyVersionsForKey(ctx, childEKID)
 		require.NoError(t, err)
 		require.Len(t, childVersions, 1)
 
@@ -411,15 +411,15 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 		err = syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
 		require.NoError(t, err)
 
-		globalVersions, err = db.ListEncryptionKeyVersionsForEncryptionKey(ctx, globalEncryptionKeyID)
+		globalVersions, err = db.ListEncryptionKeyVersionsForKey(ctx, globalEncryptionKeyID)
 		require.NoError(t, err)
 		require.Len(t, globalVersions, 1)
 
-		childVersions, err = db.ListEncryptionKeyVersionsForEncryptionKey(ctx, childEKID)
+		childVersions, err = db.ListEncryptionKeyVersionsForKey(ctx, childEKID)
 		require.NoError(t, err)
 		require.Len(t, childVersions, 1)
 
-		grandchildVersions, err = db.ListEncryptionKeyVersionsForEncryptionKey(ctx, grandchildEKID)
+		grandchildVersions, err = db.ListEncryptionKeyVersionsForKey(ctx, grandchildEKID)
 		require.NoError(t, err)
 		require.Len(t, grandchildVersions, 1)
 	})
@@ -448,7 +448,7 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 		err := syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
 		require.NoError(t, err)
 
-		globalVersions, err := db.ListEncryptionKeyVersionsForEncryptionKey(ctx, globalEncryptionKeyID)
+		globalVersions, err := db.ListEncryptionKeyVersionsForKey(ctx, globalEncryptionKeyID)
 		require.NoError(t, err)
 		globalEKVID := globalVersions[0].Id
 
@@ -459,22 +459,22 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 		sconfig.KeyDataMockAddVersion(childMockID, "child-key", "cv1", childKeyBytesV1)
 		childKeyData := sconfig.NewKeyDataMock(childMockID)
 
-		childEKID := apid.New(apid.PrefixEncryptionKey)
+		childEKID := apid.New(apid.PrefixKey)
 		childEF := encryptKeyDataForTest(t, globalEKVID, globalKeyBytes, childKeyData)
 
-		childEK := &database.EncryptionKey{
+		childEK := &database.Key{
 			Id:               childEKID,
 			Namespace:        "root",
-			State:            database.EncryptionKeyStateActive,
+			State:            database.KeyStateActive,
 			EncryptedKeyData: childEF,
 		}
-		require.NoError(t, db.CreateEncryptionKey(ctx, childEK))
+		require.NoError(t, db.CreateKey(ctx, childEK))
 
 		// Sync: child should have 1 version
 		err = syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
 		require.NoError(t, err)
 
-		childVersions, err := db.ListEncryptionKeyVersionsForEncryptionKey(ctx, childEKID)
+		childVersions, err := db.ListEncryptionKeyVersionsForKey(ctx, childEKID)
 		require.NoError(t, err)
 		require.Len(t, childVersions, 1)
 		require.True(t, childVersions[0].IsCurrent)
@@ -489,7 +489,7 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 		err = syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
 		require.NoError(t, err)
 
-		childVersions, err = db.ListEncryptionKeyVersionsForEncryptionKey(ctx, childEKID)
+		childVersions, err = db.ListEncryptionKeyVersionsForKey(ctx, childEKID)
 		require.NoError(t, err)
 		require.Len(t, childVersions, 2)
 
@@ -532,7 +532,7 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 		err := syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
 		require.NoError(t, err)
 
-		globalVersions, err := db.ListEncryptionKeyVersionsForEncryptionKey(ctx, globalEncryptionKeyID)
+		globalVersions, err := db.ListEncryptionKeyVersionsForKey(ctx, globalEncryptionKeyID)
 		require.NoError(t, err)
 		globalEKVID := globalVersions[0].Id
 
@@ -545,21 +545,21 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 		sconfig.KeyDataMockAddVersion(childMockID, "child-key", "cv2", childKeyBytesV2)
 		childKeyData := sconfig.NewKeyDataMock(childMockID)
 
-		childEKID := apid.New(apid.PrefixEncryptionKey)
+		childEKID := apid.New(apid.PrefixKey)
 		childEF := encryptKeyDataForTest(t, globalEKVID, globalKeyBytes, childKeyData)
 
-		childEK := &database.EncryptionKey{
+		childEK := &database.Key{
 			Id:               childEKID,
 			Namespace:        "root",
-			State:            database.EncryptionKeyStateActive,
+			State:            database.KeyStateActive,
 			EncryptedKeyData: childEF,
 		}
-		require.NoError(t, db.CreateEncryptionKey(ctx, childEK))
+		require.NoError(t, db.CreateKey(ctx, childEK))
 
 		err = syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
 		require.NoError(t, err)
 
-		childVersions, err := db.ListEncryptionKeyVersionsForEncryptionKey(ctx, childEKID)
+		childVersions, err := db.ListEncryptionKeyVersionsForKey(ctx, childEKID)
 		require.NoError(t, err)
 		require.Len(t, childVersions, 2)
 
@@ -569,7 +569,7 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 		err = syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
 		require.NoError(t, err)
 
-		childVersions, err = db.ListEncryptionKeyVersionsForEncryptionKey(ctx, childEKID)
+		childVersions, err = db.ListEncryptionKeyVersionsForKey(ctx, childEKID)
 		require.NoError(t, err)
 		require.Len(t, childVersions, 1)
 		require.Equal(t, "cv2", childVersions[0].ProviderVersion)
@@ -601,7 +601,7 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 		err := syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
 		require.NoError(t, err)
 
-		versions, err := db.ListEncryptionKeyVersionsForEncryptionKey(ctx, globalEncryptionKeyID)
+		versions, err := db.ListEncryptionKeyVersionsForKey(ctx, globalEncryptionKeyID)
 		require.NoError(t, err)
 		require.Len(t, versions, 2)
 
@@ -611,7 +611,7 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 		err = syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
 		require.NoError(t, err)
 
-		versions, err = db.ListEncryptionKeyVersionsForEncryptionKey(ctx, globalEncryptionKeyID)
+		versions, err = db.ListEncryptionKeyVersionsForKey(ctx, globalEncryptionKeyID)
 		require.NoError(t, err)
 		require.Len(t, versions, 1)
 		require.Equal(t, "v2", versions[0].ProviderVersion)
@@ -648,7 +648,7 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 		require.NoError(t, err)
 
 		// Get v2's EKV ID
-		globalVersions, err := db.ListEncryptionKeyVersionsForEncryptionKey(ctx, globalEncryptionKeyID)
+		globalVersions, err := db.ListEncryptionKeyVersionsForKey(ctx, globalEncryptionKeyID)
 		require.NoError(t, err)
 		var globalV2EKVID apid.ID
 		for _, v := range globalVersions {
@@ -665,21 +665,21 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 		sconfig.KeyDataMockAddVersion(childMockID, "child-key", "cv1", childKeyBytes)
 		childKeyData := sconfig.NewKeyDataMock(childMockID)
 
-		childEKID := apid.New(apid.PrefixEncryptionKey)
+		childEKID := apid.New(apid.PrefixKey)
 		childEF := encryptKeyDataForTest(t, globalV2EKVID, globalKeyBytesV2, childKeyData)
 
-		childEK := &database.EncryptionKey{
+		childEK := &database.Key{
 			Id:               childEKID,
 			Namespace:        "root",
-			State:            database.EncryptionKeyStateActive,
+			State:            database.KeyStateActive,
 			EncryptedKeyData: childEF,
 		}
-		require.NoError(t, db.CreateEncryptionKey(ctx, childEK))
+		require.NoError(t, db.CreateKey(ctx, childEK))
 
 		err = syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
 		require.NoError(t, err)
 
-		childVersions, err := db.ListEncryptionKeyVersionsForEncryptionKey(ctx, childEKID)
+		childVersions, err := db.ListEncryptionKeyVersionsForKey(ctx, childEKID)
 		require.NoError(t, err)
 		require.Len(t, childVersions, 1)
 		require.True(t, childVersions[0].IsCurrent)
@@ -708,7 +708,7 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 		require.NoError(t, err)
 
 		// Get v1's EKV ID before adding v2
-		globalVersions, err := db.ListEncryptionKeyVersionsForEncryptionKey(ctx, globalEncryptionKeyID)
+		globalVersions, err := db.ListEncryptionKeyVersionsForKey(ctx, globalEncryptionKeyID)
 		require.NoError(t, err)
 		globalV1EKVID := globalVersions[0].Id
 
@@ -719,16 +719,16 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 		sconfig.KeyDataMockAddVersion(childMockID, "child-key", "cv1", childKeyBytes)
 		childKeyData := sconfig.NewKeyDataMock(childMockID)
 
-		childEKID := apid.New(apid.PrefixEncryptionKey)
+		childEKID := apid.New(apid.PrefixKey)
 		childEF := encryptKeyDataForTest(t, globalV1EKVID, globalKeyBytesV1, childKeyData)
 
-		childEK := &database.EncryptionKey{
+		childEK := &database.Key{
 			Id:               childEKID,
 			Namespace:        "root",
-			State:            database.EncryptionKeyStateActive,
+			State:            database.KeyStateActive,
 			EncryptedKeyData: childEF,
 		}
-		require.NoError(t, db.CreateEncryptionKey(ctx, childEK))
+		require.NoError(t, db.CreateKey(ctx, childEK))
 
 		// Now add v2 to global, making v1 non-current
 		globalKeyBytesV2 := util.MustGenerateSecureRandomKey(32)
@@ -738,7 +738,7 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 		err = syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
 		require.NoError(t, err)
 
-		childVersions, err := db.ListEncryptionKeyVersionsForEncryptionKey(ctx, childEKID)
+		childVersions, err := db.ListEncryptionKeyVersionsForKey(ctx, childEKID)
 		require.NoError(t, err)
 		require.Len(t, childVersions, 1)
 		require.True(t, childVersions[0].IsCurrent)
@@ -771,32 +771,32 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 		err := syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
 		require.NoError(t, err)
 
-		globalVersions, err := db.ListEncryptionKeyVersionsForEncryptionKey(ctx, globalEncryptionKeyID)
+		globalVersions, err := db.ListEncryptionKeyVersionsForKey(ctx, globalEncryptionKeyID)
 		require.NoError(t, err)
 		globalEKVID := globalVersions[0].Id
 
 		// Create child encryption key
-		childEKID := apid.New(apid.PrefixEncryptionKey)
+		childEKID := apid.New(apid.PrefixKey)
 		childEF := encryptKeyDataForTest(t, globalEKVID, globalKeyBytes, childKeyData)
-		childEK := &database.EncryptionKey{
+		childEK := &database.Key{
 			Id:               childEKID,
 			Namespace:        "root",
-			State:            database.EncryptionKeyStateActive,
+			State:            database.KeyStateActive,
 			EncryptedKeyData: childEF,
 		}
-		require.NoError(t, db.CreateEncryptionKey(ctx, childEK))
+		require.NoError(t, db.CreateKey(ctx, childEK))
 
 		// Create namespace that uses the child encryption key
 		require.NoError(t, db.CreateNamespace(ctx, &database.Namespace{
-			Path:            "root.withkey",
-			EncryptionKeyId: &childEKID,
+			Path:  "root.withkey",
+			KeyId: &childEKID,
 		}))
 
 		// Sync: should set target_encryption_key_version_id on the namespace
 		err = syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
 		require.NoError(t, err)
 
-		childVersions, err := db.ListEncryptionKeyVersionsForEncryptionKey(ctx, childEKID)
+		childVersions, err := db.ListEncryptionKeyVersionsForKey(ctx, childEKID)
 		require.NoError(t, err)
 		require.Len(t, childVersions, 1)
 		childEKVID := childVersions[0].Id
@@ -804,7 +804,7 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 		// Verify the namespace got the correct target
 		var collected []database.NamespaceEncryptionTarget
 		err = db.EnumerateNamespaceEncryptionTargets(ctx,
-			func(targets []database.NamespaceEncryptionTarget, lastPage bool) ([]database.NamespaceTargetEncryptionKeyVersionUpdate, pagination.KeepGoing, error) {
+			func(targets []database.NamespaceEncryptionTarget, lastPage bool) ([]database.NamespaceTargetDataEncryptionKeyUpdate, pagination.KeepGoing, error) {
 				collected = append(collected, targets...)
 				return nil, pagination.Continue, nil
 			},
@@ -813,8 +813,8 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 
 		for _, target := range collected {
 			if target.Path == "root.withkey" {
-				require.NotNil(t, target.TargetEncryptionKeyVersionId)
-				require.Equal(t, childEKVID, *target.TargetEncryptionKeyVersionId)
+				require.NotNil(t, target.TargetDataEncryptionKeyId)
+				require.Equal(t, childEKVID, *target.TargetDataEncryptionKeyId)
 			}
 		}
 	})
@@ -846,25 +846,25 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 		err := syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
 		require.NoError(t, err)
 
-		globalVersions, err := db.ListEncryptionKeyVersionsForEncryptionKey(ctx, globalEncryptionKeyID)
+		globalVersions, err := db.ListEncryptionKeyVersionsForKey(ctx, globalEncryptionKeyID)
 		require.NoError(t, err)
 		globalEKVID := globalVersions[0].Id
 
 		// Create parent encryption key
-		parentEKID := apid.New(apid.PrefixEncryptionKey)
+		parentEKID := apid.New(apid.PrefixKey)
 		parentEF := encryptKeyDataForTest(t, globalEKVID, globalKeyBytes, parentKeyData)
-		parentEK := &database.EncryptionKey{
+		parentEK := &database.Key{
 			Id:               parentEKID,
 			Namespace:        "root",
-			State:            database.EncryptionKeyStateActive,
+			State:            database.KeyStateActive,
 			EncryptedKeyData: parentEF,
 		}
-		require.NoError(t, db.CreateEncryptionKey(ctx, parentEK))
+		require.NoError(t, db.CreateKey(ctx, parentEK))
 
 		// Create parent namespace with encryption key
 		require.NoError(t, db.CreateNamespace(ctx, &database.Namespace{
-			Path:            "root.parent",
-			EncryptionKeyId: &parentEKID,
+			Path:  "root.parent",
+			KeyId: &parentEKID,
 		}))
 
 		// Create child namespace WITHOUT encryption key — should inherit from parent
@@ -876,7 +876,7 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 		err = syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
 		require.NoError(t, err)
 
-		parentVersions, err := db.ListEncryptionKeyVersionsForEncryptionKey(ctx, parentEKID)
+		parentVersions, err := db.ListEncryptionKeyVersionsForKey(ctx, parentEKID)
 		require.NoError(t, err)
 		require.Len(t, parentVersions, 1)
 		parentEKVID := parentVersions[0].Id
@@ -884,7 +884,7 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 		// Verify child inherited from parent
 		var collected []database.NamespaceEncryptionTarget
 		err = db.EnumerateNamespaceEncryptionTargets(ctx,
-			func(targets []database.NamespaceEncryptionTarget, lastPage bool) ([]database.NamespaceTargetEncryptionKeyVersionUpdate, pagination.KeepGoing, error) {
+			func(targets []database.NamespaceEncryptionTarget, lastPage bool) ([]database.NamespaceTargetDataEncryptionKeyUpdate, pagination.KeepGoing, error) {
 				collected = append(collected, targets...)
 				return nil, pagination.Continue, nil
 			},
@@ -893,12 +893,12 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 
 		for _, target := range collected {
 			if target.Path == "root.parent.child" {
-				require.NotNil(t, target.TargetEncryptionKeyVersionId)
-				require.Equal(t, parentEKVID, *target.TargetEncryptionKeyVersionId)
+				require.NotNil(t, target.TargetDataEncryptionKeyId)
+				require.Equal(t, parentEKVID, *target.TargetDataEncryptionKeyId)
 			}
 			if target.Path == "root.parent" {
-				require.NotNil(t, target.TargetEncryptionKeyVersionId)
-				require.Equal(t, parentEKVID, *target.TargetEncryptionKeyVersionId)
+				require.NotNil(t, target.TargetDataEncryptionKeyId)
+				require.Equal(t, parentEKVID, *target.TargetDataEncryptionKeyId)
 			}
 		}
 	})
@@ -930,7 +930,7 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 		err := syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
 		require.NoError(t, err)
 
-		globalVersions, err := db.ListEncryptionKeyVersionsForEncryptionKey(ctx, globalEncryptionKeyID)
+		globalVersions, err := db.ListEncryptionKeyVersionsForKey(ctx, globalEncryptionKeyID)
 		require.NoError(t, err)
 		require.Len(t, globalVersions, 1)
 		globalEKVID := globalVersions[0].Id
@@ -938,7 +938,7 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 		// Verify namespace uses global key version
 		var collected []database.NamespaceEncryptionTarget
 		err = db.EnumerateNamespaceEncryptionTargets(ctx,
-			func(targets []database.NamespaceEncryptionTarget, lastPage bool) ([]database.NamespaceTargetEncryptionKeyVersionUpdate, pagination.KeepGoing, error) {
+			func(targets []database.NamespaceEncryptionTarget, lastPage bool) ([]database.NamespaceTargetDataEncryptionKeyUpdate, pagination.KeepGoing, error) {
 				collected = append(collected, targets...)
 				return nil, pagination.Continue, nil
 			},
@@ -947,8 +947,8 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 
 		for _, target := range collected {
 			if target.Path == "root.nokey" {
-				require.NotNil(t, target.TargetEncryptionKeyVersionId)
-				require.Equal(t, globalEKVID, *target.TargetEncryptionKeyVersionId)
+				require.NotNil(t, target.TargetDataEncryptionKeyId)
+				require.Equal(t, globalEKVID, *target.TargetDataEncryptionKeyId)
 			}
 		}
 	})
@@ -982,7 +982,7 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 		// Capture state after first sync
 		var firstCollected []database.NamespaceEncryptionTarget
 		err = db.EnumerateNamespaceEncryptionTargets(ctx,
-			func(targets []database.NamespaceEncryptionTarget, lastPage bool) ([]database.NamespaceTargetEncryptionKeyVersionUpdate, pagination.KeepGoing, error) {
+			func(targets []database.NamespaceEncryptionTarget, lastPage bool) ([]database.NamespaceTargetDataEncryptionKeyUpdate, pagination.KeepGoing, error) {
 				firstCollected = append(firstCollected, targets...)
 				return nil, pagination.Continue, nil
 			},
@@ -995,7 +995,7 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 
 		var secondCollected []database.NamespaceEncryptionTarget
 		err = db.EnumerateNamespaceEncryptionTargets(ctx,
-			func(targets []database.NamespaceEncryptionTarget, lastPage bool) ([]database.NamespaceTargetEncryptionKeyVersionUpdate, pagination.KeepGoing, error) {
+			func(targets []database.NamespaceEncryptionTarget, lastPage bool) ([]database.NamespaceTargetDataEncryptionKeyUpdate, pagination.KeepGoing, error) {
 				secondCollected = append(secondCollected, targets...)
 				return nil, pagination.Continue, nil
 			},
@@ -1005,7 +1005,7 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 		require.Equal(t, len(firstCollected), len(secondCollected))
 		for i := range firstCollected {
 			require.Equal(t, firstCollected[i].Path, secondCollected[i].Path)
-			require.Equal(t, firstCollected[i].TargetEncryptionKeyVersionId, secondCollected[i].TargetEncryptionKeyVersionId)
+			require.Equal(t, firstCollected[i].TargetDataEncryptionKeyId, secondCollected[i].TargetDataEncryptionKeyId)
 		}
 	})
 }

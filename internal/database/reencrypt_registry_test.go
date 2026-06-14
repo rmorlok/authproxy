@@ -26,7 +26,7 @@ func TestReEncryptRegistry(t *testing.T) {
 		require.True(t, tableNames[ActorTable])
 		require.True(t, tableNames[ConnectorVersionsTable])
 		require.True(t, tableNames[OAuth2TokensTable])
-		require.True(t, tableNames[EncryptionKeysTable])
+		require.True(t, tableNames[KeysTable])
 	})
 
 	t.Run("enumerate finds actor needing re-encryption", func(t *testing.T) {
@@ -66,7 +66,7 @@ func TestReEncryptRegistry(t *testing.T) {
 				// Check it's our actor
 				if id, ok := tgt.PrimaryKeyValues[0].(string); ok && apid.ID(id) == actorId {
 					found = true
-					require.Equal(t, targetEKVId, tgt.TargetEncryptionKeyVersionId)
+					require.Equal(t, targetEKVId, tgt.TargetDataEncryptionKeyId)
 					require.Equal(t, oldEKVId, tgt.EncryptedFieldValue.ID)
 				}
 			}
@@ -231,7 +231,7 @@ func TestReEncryptRegistry(t *testing.T) {
 				if tgt.Table == OAuth2TokensTable {
 					if id, ok := tgt.PrimaryKeyValues[0].(string); ok && apid.ID(id) == token.Id {
 						found = true
-						require.Equal(t, targetEKVId, tgt.TargetEncryptionKeyVersionId)
+						require.Equal(t, targetEKVId, tgt.TargetDataEncryptionKeyId)
 					}
 				}
 			}

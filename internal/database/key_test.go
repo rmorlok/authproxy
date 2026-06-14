@@ -1,77 +1,98 @@
 package database
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/encfield"
+	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 	"github.com/stretchr/testify/require"
 	clock "k8s.io/utils/clock/testing"
 )
 
-func TestEncryptionKey(t *testing.T) {
+func createDependencyDEK(t *testing.T, ctx context.Context, db DB, keyID apid.ID) apid.ID {
+	t.Helper()
+
+	dekID := apid.New(apid.PrefixDataEncryptionKey)
+	require.NoError(t, db.CreateDataEncryptionKey(ctx, &DataEncryptionKey{
+		Id:              dekID,
+		KeyId:           keyID,
+		Provider:        "test",
+		ProviderID:      string(dekID),
+		ProviderVersion: "v1",
+		ProtectedData: &sconfig.KeyVersionProtectedData{
+			Type:        "test",
+			WrappedData: "wrapped",
+		},
+	}))
+
+	return dekID
+}
+
+func TestKey(t *testing.T) {
 	t.Run("CRUD", func(t *testing.T) {
 		_, db, _ := MustApplyBlankTestDbConfigRaw(t, nil)
 		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 		// Create
-		ek := &EncryptionKey{
-			Id:        apid.New(apid.PrefixEncryptionKey),
+		ek := &Key{
+			Id:        apid.New(apid.PrefixKey),
 			Namespace: "root",
-			State:     EncryptionKeyStateActive,
+			State:     KeyStateActive,
 			Labels:    Labels{"env": "test"},
 		}
 
-		err := db.CreateEncryptionKey(ctx, ek)
+		err := db.CreateKey(ctx, ek)
 		require.NoError(t, err)
 		require.Equal(t, now, ek.CreatedAt)
 		require.Equal(t, now, ek.UpdatedAt)
 
 		// Get
-		got, err := db.GetEncryptionKey(ctx, ek.Id)
+		got, err := db.GetKey(ctx, ek.Id)
 		require.NoError(t, err)
 		require.Equal(t, ek.Id, got.Id)
 		require.Equal(t, "root", got.Namespace)
-		require.Equal(t, EncryptionKeyStateActive, got.State)
+		require.Equal(t, KeyStateActive, got.State)
 		gotUser, _ := SplitUserAndApxyLabels(got.Labels)
 		require.Equal(t, Labels{"env": "test"}, gotUser)
 		require.Equal(t, string(ek.Id), got.Labels["apxy/key/-/id"])
 		require.Equal(t, "root", got.Labels["apxy/key/-/ns"])
 
-		// Update state via UpdateEncryptionKey
+		// Update state via UpdateKey
 		later := now.Add(time.Hour)
 		ctx = apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(later)).Build()
 
-		updated, err := db.UpdateEncryptionKey(ctx, ek.Id, map[string]interface{}{
-			"state": EncryptionKeyStateDisabled,
+		updated, err := db.UpdateKey(ctx, ek.Id, map[string]interface{}{
+			"state": KeyStateDisabled,
 		})
 		require.NoError(t, err)
 		require.True(t, later.Equal(updated.UpdatedAt), "UpdatedAt should match the clock time")
-		require.Equal(t, EncryptionKeyStateDisabled, updated.State)
+		require.Equal(t, KeyStateDisabled, updated.State)
 
 		// Revert state for subsequent tests
-		_, err = db.UpdateEncryptionKey(ctx, ek.Id, map[string]interface{}{
-			"state": EncryptionKeyStateActive,
+		_, err = db.UpdateKey(ctx, ek.Id, map[string]interface{}{
+			"state": KeyStateActive,
 		})
 		require.NoError(t, err)
 
 		// Get not found
-		_, err = db.GetEncryptionKey(ctx, apid.New(apid.PrefixEncryptionKey))
+		_, err = db.GetKey(ctx, apid.New(apid.PrefixKey))
 		require.ErrorIs(t, err, ErrNotFound)
 
 		// Delete (soft)
-		err = db.DeleteEncryptionKey(ctx, ek.Id)
+		err = db.DeleteKey(ctx, ek.Id)
 		require.NoError(t, err)
 
-		_, err = db.GetEncryptionKey(ctx, ek.Id)
+		_, err = db.GetKey(ctx, ek.Id)
 		require.ErrorIs(t, err, ErrNotFound)
 
 		// Delete not found
-		err = db.DeleteEncryptionKey(ctx, apid.New(apid.PrefixEncryptionKey))
+		err = db.DeleteKey(ctx, apid.New(apid.PrefixKey))
 		require.ErrorIs(t, err, ErrNotFound)
 	})
 
@@ -80,13 +101,13 @@ func TestEncryptionKey(t *testing.T) {
 		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		err := db.DeleteEncryptionKey(ctx, GlobalEncryptionKeyID)
+		err := db.DeleteKey(ctx, GlobalKeyID)
 		require.ErrorIs(t, err, ErrProtected)
 
 		// Verify the global key still exists
-		ek, err := db.GetEncryptionKey(ctx, GlobalEncryptionKeyID)
+		ek, err := db.GetKey(ctx, GlobalKeyID)
 		require.NoError(t, err)
-		require.Equal(t, GlobalEncryptionKeyID, ek.Id)
+		require.Equal(t, GlobalKeyID, ek.Id)
 	})
 
 	t.Run("SetState", func(t *testing.T) {
@@ -94,19 +115,19 @@ func TestEncryptionKey(t *testing.T) {
 		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		ek := &EncryptionKey{
-			Id:        apid.New(apid.PrefixEncryptionKey),
+		ek := &Key{
+			Id:        apid.New(apid.PrefixKey),
 			Namespace: "root",
-			State:     EncryptionKeyStateActive,
+			State:     KeyStateActive,
 		}
-		require.NoError(t, db.CreateEncryptionKey(ctx, ek))
+		require.NoError(t, db.CreateKey(ctx, ek))
 
-		err := db.SetEncryptionKeyState(ctx, ek.Id, EncryptionKeyStateDisabled)
+		err := db.SetKeyState(ctx, ek.Id, KeyStateDisabled)
 		require.NoError(t, err)
 
-		got, err := db.GetEncryptionKey(ctx, ek.Id)
+		got, err := db.GetKey(ctx, ek.Id)
 		require.NoError(t, err)
-		require.Equal(t, EncryptionKeyStateDisabled, got.State)
+		require.Equal(t, KeyStateDisabled, got.State)
 	})
 
 	t.Run("Labels", func(t *testing.T) {
@@ -114,31 +135,31 @@ func TestEncryptionKey(t *testing.T) {
 		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		ek := &EncryptionKey{
-			Id:        apid.New(apid.PrefixEncryptionKey),
+		ek := &Key{
+			Id:        apid.New(apid.PrefixKey),
 			Namespace: "root",
-			State:     EncryptionKeyStateActive,
+			State:     KeyStateActive,
 			Labels:    Labels{"env": "test"},
 		}
-		require.NoError(t, db.CreateEncryptionKey(ctx, ek))
+		require.NoError(t, db.CreateKey(ctx, ek))
 
 		// PutLabels
 		later := now.Add(time.Hour)
 		ctx = apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(later)).Build()
-		updated, err := db.PutEncryptionKeyLabels(ctx, ek.Id, map[string]string{"region": "us-east"})
+		updated, err := db.PutKeyLabels(ctx, ek.Id, map[string]string{"region": "us-east"})
 		require.NoError(t, err)
 		require.Equal(t, "test", updated.Labels["env"])
 		require.Equal(t, "us-east", updated.Labels["region"])
 
 		// UpdateLabels (full replace) — apxy/ system labels are preserved.
-		updated, err = db.UpdateEncryptionKeyLabels(ctx, ek.Id, map[string]string{"new-label": "value"})
+		updated, err = db.UpdateKeyLabels(ctx, ek.Id, map[string]string{"new-label": "value"})
 		require.NoError(t, err)
 		updatedUser, _ := SplitUserAndApxyLabels(updated.Labels)
 		require.Equal(t, Labels{"new-label": "value"}, updatedUser)
 		require.Equal(t, string(ek.Id), updated.Labels["apxy/key/-/id"])
 
 		// DeleteLabels
-		updated, err = db.DeleteEncryptionKeyLabels(ctx, ek.Id, []string{"new-label"})
+		updated, err = db.DeleteKeyLabels(ctx, ek.Id, []string{"new-label"})
 		require.NoError(t, err)
 		updatedUser, _ = SplitUserAndApxyLabels(updated.Labels)
 		require.Empty(t, updatedUser)
@@ -149,58 +170,58 @@ func TestEncryptionKey(t *testing.T) {
 		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		ek := &EncryptionKey{
-			Id:          apid.New(apid.PrefixEncryptionKey),
+		ek := &Key{
+			Id:          apid.New(apid.PrefixKey),
 			Namespace:   "root",
-			State:       EncryptionKeyStateActive,
+			State:       KeyStateActive,
 			Annotations: Annotations{"description": "test key"},
 		}
-		require.NoError(t, db.CreateEncryptionKey(ctx, ek))
+		require.NoError(t, db.CreateKey(ctx, ek))
 
 		// Verify annotations persisted on create
-		got, err := db.GetEncryptionKey(ctx, ek.Id)
+		got, err := db.GetKey(ctx, ek.Id)
 		require.NoError(t, err)
 		require.Equal(t, Annotations{"description": "test key"}, got.Annotations)
 
 		// PutAnnotations - merges with existing
 		later := now.Add(time.Hour)
 		ctx = apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(later)).Build()
-		updated, err := db.PutEncryptionKeyAnnotations(ctx, ek.Id, map[string]string{"owner": "team-a"})
+		updated, err := db.PutKeyAnnotations(ctx, ek.Id, map[string]string{"owner": "team-a"})
 		require.NoError(t, err)
 		require.Equal(t, "test key", updated.Annotations["description"])
 		require.Equal(t, "team-a", updated.Annotations["owner"])
 
 		// UpdateAnnotations (full replace)
-		updated, err = db.UpdateEncryptionKeyAnnotations(ctx, ek.Id, map[string]string{"new-annotation": "value"})
+		updated, err = db.UpdateKeyAnnotations(ctx, ek.Id, map[string]string{"new-annotation": "value"})
 		require.NoError(t, err)
 		require.Equal(t, Annotations{"new-annotation": "value"}, updated.Annotations)
 
 		// DeleteAnnotations
-		updated, err = db.DeleteEncryptionKeyAnnotations(ctx, ek.Id, []string{"new-annotation"})
+		updated, err = db.DeleteKeyAnnotations(ctx, ek.Id, []string{"new-annotation"})
 		require.NoError(t, err)
 		require.Empty(t, updated.Annotations)
 
 		// PutAnnotations on key with no annotations
-		ek2 := &EncryptionKey{
-			Id:        apid.New(apid.PrefixEncryptionKey),
+		ek2 := &Key{
+			Id:        apid.New(apid.PrefixKey),
 			Namespace: "root",
-			State:     EncryptionKeyStateActive,
+			State:     KeyStateActive,
 		}
-		require.NoError(t, db.CreateEncryptionKey(ctx, ek2))
+		require.NoError(t, db.CreateKey(ctx, ek2))
 
-		updated, err = db.PutEncryptionKeyAnnotations(ctx, ek2.Id, map[string]string{"note": "hello"})
+		updated, err = db.PutKeyAnnotations(ctx, ek2.Id, map[string]string{"note": "hello"})
 		require.NoError(t, err)
 		require.Equal(t, "hello", updated.Annotations["note"])
 
 		// Not found errors
-		fakeId := apid.New(apid.PrefixEncryptionKey)
-		_, err = db.PutEncryptionKeyAnnotations(ctx, fakeId, map[string]string{"k": "v"})
+		fakeId := apid.New(apid.PrefixKey)
+		_, err = db.PutKeyAnnotations(ctx, fakeId, map[string]string{"k": "v"})
 		require.ErrorIs(t, err, ErrNotFound)
 
-		_, err = db.UpdateEncryptionKeyAnnotations(ctx, fakeId, map[string]string{"k": "v"})
+		_, err = db.UpdateKeyAnnotations(ctx, fakeId, map[string]string{"k": "v"})
 		require.ErrorIs(t, err, ErrNotFound)
 
-		_, err = db.DeleteEncryptionKeyAnnotations(ctx, fakeId, []string{"k"})
+		_, err = db.DeleteKeyAnnotations(ctx, fakeId, []string{"k"})
 		require.ErrorIs(t, err, ErrNotFound)
 	})
 
@@ -211,43 +232,43 @@ func TestEncryptionKey(t *testing.T) {
 
 		// Create several keys
 		for i := 0; i < 5; i++ {
-			ek := &EncryptionKey{
-				Id:        apid.New(apid.PrefixEncryptionKey),
+			ek := &Key{
+				Id:        apid.New(apid.PrefixKey),
 				Namespace: "root",
-				State:     EncryptionKeyStateActive,
+				State:     KeyStateActive,
 			}
 			if i == 3 {
-				ek.State = EncryptionKeyStateDisabled
+				ek.State = KeyStateDisabled
 			}
-			require.NoError(t, db.CreateEncryptionKey(ctx, ek))
+			require.NoError(t, db.CreateKey(ctx, ek))
 		}
 
 		// List all (5 created + 1 seeded key_global from migration)
-		result := db.ListEncryptionKeysBuilder().FetchPage(ctx)
+		result := db.ListKeysBuilder().FetchPage(ctx)
 		require.NoError(t, result.Error)
 		require.Len(t, result.Results, 6)
 
 		// Filter by state (4 active created + 1 seeded key_global)
-		result = db.ListEncryptionKeysBuilder().ForState(EncryptionKeyStateActive).FetchPage(ctx)
+		result = db.ListKeysBuilder().ForState(KeyStateActive).FetchPage(ctx)
 		require.NoError(t, result.Error)
 		require.Len(t, result.Results, 5)
 
-		result = db.ListEncryptionKeysBuilder().ForState(EncryptionKeyStateDisabled).FetchPage(ctx)
+		result = db.ListKeysBuilder().ForState(KeyStateDisabled).FetchPage(ctx)
 		require.NoError(t, result.Error)
 		require.Len(t, result.Results, 1)
 
 		// Limit
-		result = db.ListEncryptionKeysBuilder().Limit(2).FetchPage(ctx)
+		result = db.ListKeysBuilder().Limit(2).FetchPage(ctx)
 		require.NoError(t, result.Error)
 		require.Len(t, result.Results, 2)
 		require.True(t, result.HasMore)
 
 		// Namespace matcher (5 created + 1 seeded key_global, all in "root")
-		result = db.ListEncryptionKeysBuilder().ForNamespaceMatcher("root").FetchPage(ctx)
+		result = db.ListKeysBuilder().ForNamespaceMatcher("root").FetchPage(ctx)
 		require.NoError(t, result.Error)
 		require.Len(t, result.Results, 6)
 
-		result = db.ListEncryptionKeysBuilder().ForNamespaceMatcher("root.nonexistent").FetchPage(ctx)
+		result = db.ListKeysBuilder().ForNamespaceMatcher("root.nonexistent").FetchPage(ctx)
 		require.NoError(t, result.Error)
 		require.Len(t, result.Results, 0)
 	})
@@ -258,19 +279,19 @@ func TestEncryptionKey(t *testing.T) {
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 		ef := encfield.EncryptedField{
-			ID:   apid.New(apid.PrefixEncryptionKeyVersion),
+			ID:   apid.New(apid.PrefixDataEncryptionKey),
 			Data: "encrypted-data-here",
 		}
 
-		ek := &EncryptionKey{
-			Id:               apid.New(apid.PrefixEncryptionKey),
+		ek := &Key{
+			Id:               apid.New(apid.PrefixKey),
 			Namespace:        "root",
-			State:            EncryptionKeyStateActive,
+			State:            KeyStateActive,
 			EncryptedKeyData: &ef,
 		}
-		require.NoError(t, db.CreateEncryptionKey(ctx, ek))
+		require.NoError(t, db.CreateKey(ctx, ek))
 
-		got, err := db.GetEncryptionKey(ctx, ek.Id)
+		got, err := db.GetKey(ctx, ek.Id)
 		require.NoError(t, err)
 		require.NotNil(t, got.EncryptedKeyData)
 		require.Equal(t, ef.ID, got.EncryptedKeyData.ID)
@@ -288,7 +309,7 @@ func TestEncryptionKey(t *testing.T) {
 			depth int
 		}
 
-		orphans, err := db.EnumerateEncryptionKeysInDependencyOrder(ctx, func(keys []*EncryptionKey, depth int) (pagination.KeepGoing, error) {
+		orphans, err := db.EnumerateKeysInDependencyOrder(ctx, func(keys []*Key, depth int) (pagination.KeepGoing, error) {
 			var ids []apid.ID
 			for _, k := range keys {
 				ids = append(ids, k.Id)
@@ -317,65 +338,47 @@ func TestEncryptionKey(t *testing.T) {
 		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		// Create an encryption key version for key_global so children can reference it
-		ekvGlobal := &EncryptionKeyVersion{
-			Id:              apid.New(apid.PrefixEncryptionKeyVersion),
-			EncryptionKeyId: "key_global",
-			Provider:        "local",
-			ProviderID:      "global-key",
-			ProviderVersion: "v1",
-			OrderedVersion:  1,
-			IsCurrent:       true,
-		}
-		require.NoError(t, db.CreateEncryptionKeyVersion(ctx, ekvGlobal))
+		// Create a DEK owned by key_global so children can reference it.
+		globalDEKID := createDependencyDEK(t, ctx, db, GlobalKeyID)
 
-		// Create childA encrypted by key_global's version
-		childA := &EncryptionKey{
-			Id:        apid.New(apid.PrefixEncryptionKey),
+		// Create childA encrypted by key_global's DEK.
+		childA := &Key{
+			Id:        apid.New(apid.PrefixKey),
 			Namespace: "root",
-			State:     EncryptionKeyStateActive,
+			State:     KeyStateActive,
 			EncryptedKeyData: &encfield.EncryptedField{
-				ID:   ekvGlobal.Id,
+				ID:   globalDEKID,
 				Data: "childA-encrypted-data",
 			},
 		}
-		require.NoError(t, db.CreateEncryptionKey(ctx, childA))
+		require.NoError(t, db.CreateKey(ctx, childA))
 
-		// Create childB encrypted by key_global's version
-		childB := &EncryptionKey{
-			Id:        apid.New(apid.PrefixEncryptionKey),
+		// Create childB encrypted by key_global's DEK.
+		childB := &Key{
+			Id:        apid.New(apid.PrefixKey),
 			Namespace: "root",
-			State:     EncryptionKeyStateActive,
+			State:     KeyStateActive,
 			EncryptedKeyData: &encfield.EncryptedField{
-				ID:   ekvGlobal.Id,
+				ID:   globalDEKID,
 				Data: "childB-encrypted-data",
 			},
 		}
-		require.NoError(t, db.CreateEncryptionKey(ctx, childB))
+		require.NoError(t, db.CreateKey(ctx, childB))
 
-		// Create an encryption key version for childB so grandchild can reference it
-		ekvChildB := &EncryptionKeyVersion{
-			Id:              apid.New(apid.PrefixEncryptionKeyVersion),
-			EncryptionKeyId: childB.Id,
-			Provider:        "local",
-			ProviderID:      "childB-key",
-			ProviderVersion: "v1",
-			OrderedVersion:  1,
-			IsCurrent:       true,
-		}
-		require.NoError(t, db.CreateEncryptionKeyVersion(ctx, ekvChildB))
+		// Create a DEK owned by childB so grandchild can reference it.
+		childBDEKID := createDependencyDEK(t, ctx, db, childB.Id)
 
-		// Create grandchild encrypted by childB's version
-		grandchild := &EncryptionKey{
-			Id:        apid.New(apid.PrefixEncryptionKey),
+		// Create grandchild encrypted by childB's DEK.
+		grandchild := &Key{
+			Id:        apid.New(apid.PrefixKey),
 			Namespace: "root",
-			State:     EncryptionKeyStateActive,
+			State:     KeyStateActive,
 			EncryptedKeyData: &encfield.EncryptedField{
-				ID:   ekvChildB.Id,
+				ID:   childBDEKID,
 				Data: "grandchild-encrypted-data",
 			},
 		}
-		require.NoError(t, db.CreateEncryptionKey(ctx, grandchild))
+		require.NoError(t, db.CreateKey(ctx, grandchild))
 
 		// Enumerate and collect results
 		type level struct {
@@ -384,7 +387,7 @@ func TestEncryptionKey(t *testing.T) {
 		}
 		var levels []level
 
-		orphans, err := db.EnumerateEncryptionKeysInDependencyOrder(ctx, func(keys []*EncryptionKey, depth int) (pagination.KeepGoing, error) {
+		orphans, err := db.EnumerateKeysInDependencyOrder(ctx, func(keys []*Key, depth int) (pagination.KeepGoing, error) {
 			ids := make(map[apid.ID]bool)
 			for _, k := range keys {
 				ids[k.Id] = true
@@ -420,31 +423,22 @@ func TestEncryptionKey(t *testing.T) {
 		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		// Create a child so there would be depth 1
-		ekvGlobal := &EncryptionKeyVersion{
-			Id:              apid.New(apid.PrefixEncryptionKeyVersion),
-			EncryptionKeyId: "key_global",
-			Provider:        "local",
-			ProviderID:      "global-key",
-			ProviderVersion: "v1",
-			OrderedVersion:  1,
-			IsCurrent:       true,
-		}
-		require.NoError(t, db.CreateEncryptionKeyVersion(ctx, ekvGlobal))
+		// Create a child so there would be depth 1.
+		globalDEKID := createDependencyDEK(t, ctx, db, GlobalKeyID)
 
-		child := &EncryptionKey{
-			Id:        apid.New(apid.PrefixEncryptionKey),
+		child := &Key{
+			Id:        apid.New(apid.PrefixKey),
 			Namespace: "root",
-			State:     EncryptionKeyStateActive,
+			State:     KeyStateActive,
 			EncryptedKeyData: &encfield.EncryptedField{
-				ID:   ekvGlobal.Id,
+				ID:   globalDEKID,
 				Data: "child-data",
 			},
 		}
-		require.NoError(t, db.CreateEncryptionKey(ctx, child))
+		require.NoError(t, db.CreateKey(ctx, child))
 
 		callCount := 0
-		_, err := db.EnumerateEncryptionKeysInDependencyOrder(ctx, func(keys []*EncryptionKey, depth int) (pagination.KeepGoing, error) {
+		_, err := db.EnumerateKeysInDependencyOrder(ctx, func(keys []*Key, depth int) (pagination.KeepGoing, error) {
 			callCount++
 			return pagination.Stop, nil // stop immediately after first level
 		})
@@ -458,33 +452,24 @@ func TestEncryptionKey(t *testing.T) {
 		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		ekvGlobal := &EncryptionKeyVersion{
-			Id:              apid.New(apid.PrefixEncryptionKeyVersion),
-			EncryptionKeyId: "key_global",
-			Provider:        "local",
-			ProviderID:      "global-key",
-			ProviderVersion: "v1",
-			OrderedVersion:  1,
-			IsCurrent:       true,
-		}
-		require.NoError(t, db.CreateEncryptionKeyVersion(ctx, ekvGlobal))
+		globalDEKID := createDependencyDEK(t, ctx, db, GlobalKeyID)
 
-		child := &EncryptionKey{
-			Id:        apid.New(apid.PrefixEncryptionKey),
+		child := &Key{
+			Id:        apid.New(apid.PrefixKey),
 			Namespace: "root",
-			State:     EncryptionKeyStateActive,
+			State:     KeyStateActive,
 			EncryptedKeyData: &encfield.EncryptedField{
-				ID:   ekvGlobal.Id,
+				ID:   globalDEKID,
 				Data: "child-data",
 			},
 		}
-		require.NoError(t, db.CreateEncryptionKey(ctx, child))
+		require.NoError(t, db.CreateKey(ctx, child))
 
 		// Soft-delete the child
-		require.NoError(t, db.DeleteEncryptionKey(ctx, child.Id))
+		require.NoError(t, db.DeleteKey(ctx, child.Id))
 
 		var allIDs []apid.ID
-		orphans, err := db.EnumerateEncryptionKeysInDependencyOrder(ctx, func(keys []*EncryptionKey, depth int) (pagination.KeepGoing, error) {
+		orphans, err := db.EnumerateKeysInDependencyOrder(ctx, func(keys []*Key, depth int) (pagination.KeepGoing, error) {
 			for _, k := range keys {
 				allIDs = append(allIDs, k.Id)
 			}
@@ -497,24 +482,24 @@ func TestEncryptionKey(t *testing.T) {
 	})
 
 	t.Run("EnumerateInDependencyOrder/orphaned_key_returned", func(t *testing.T) {
-		// A key whose EncryptedKeyData references a non-existent ekv should be returned as an orphan.
+		// A key whose EncryptedKeyData references a non-existent DEK should be returned as an orphan.
 		_, db, _ := MustApplyBlankTestDbConfigRaw(t, nil)
 		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		orphan := &EncryptionKey{
-			Id:        apid.New(apid.PrefixEncryptionKey),
+		orphan := &Key{
+			Id:        apid.New(apid.PrefixKey),
 			Namespace: "root",
-			State:     EncryptionKeyStateActive,
+			State:     KeyStateActive,
 			EncryptedKeyData: &encfield.EncryptedField{
-				ID:   apid.New(apid.PrefixEncryptionKeyVersion), // non-existent version
+				ID:   apid.New(apid.PrefixDataEncryptionKey), // non-existent DEK
 				Data: "orphan-data",
 			},
 		}
-		require.NoError(t, db.CreateEncryptionKey(ctx, orphan))
+		require.NoError(t, db.CreateKey(ctx, orphan))
 
 		var allIDs []apid.ID
-		orphans, err := db.EnumerateEncryptionKeysInDependencyOrder(ctx, func(keys []*EncryptionKey, depth int) (pagination.KeepGoing, error) {
+		orphans, err := db.EnumerateKeysInDependencyOrder(ctx, func(keys []*Key, depth int) (pagination.KeepGoing, error) {
 			for _, k := range keys {
 				allIDs = append(allIDs, k.Id)
 			}
@@ -533,18 +518,18 @@ func TestEncryptionKey(t *testing.T) {
 		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		ek := &EncryptionKey{
-			Id:        apid.New(apid.PrefixEncryptionKey),
+		ek := &Key{
+			Id:        apid.New(apid.PrefixKey),
 			Namespace: "root",
-			State:     EncryptionKeyStateActive,
+			State:     KeyStateActive,
 		}
-		require.NoError(t, db.CreateEncryptionKey(ctx, ek))
+		require.NoError(t, db.CreateKey(ctx, ek))
 
 		// Create multiple versions for this key
 		var versionIds []apid.ID
 		for i := int64(1); i <= 3; i++ {
 			ekv := &EncryptionKeyVersion{
-				EncryptionKeyId: ek.Id,
+				KeyId:           ek.Id,
 				Provider:        "local",
 				ProviderID:      "key",
 				ProviderVersion: "v1",
@@ -556,15 +541,15 @@ func TestEncryptionKey(t *testing.T) {
 		}
 
 		// Create a version for a different key to ensure it's not affected
-		otherEk := &EncryptionKey{
-			Id:        apid.New(apid.PrefixEncryptionKey),
+		otherEk := &Key{
+			Id:        apid.New(apid.PrefixKey),
 			Namespace: "root",
-			State:     EncryptionKeyStateActive,
+			State:     KeyStateActive,
 		}
-		require.NoError(t, db.CreateEncryptionKey(ctx, otherEk))
+		require.NoError(t, db.CreateKey(ctx, otherEk))
 
 		otherEkv := &EncryptionKeyVersion{
-			EncryptionKeyId: otherEk.Id,
+			KeyId:           otherEk.Id,
 			Provider:        "local",
 			ProviderID:      "other-key",
 			ProviderVersion: "v1",
@@ -574,20 +559,20 @@ func TestEncryptionKey(t *testing.T) {
 		require.NoError(t, db.CreateEncryptionKeyVersion(ctx, otherEkv))
 
 		// Verify versions exist before delete
-		versions, err := db.ListEncryptionKeyVersionsForEncryptionKey(ctx, ek.Id)
+		versions, err := db.ListEncryptionKeyVersionsForKey(ctx, ek.Id)
 		require.NoError(t, err)
 		require.Len(t, versions, 3)
 
 		// Delete the encryption key
-		err = db.DeleteEncryptionKey(ctx, ek.Id)
+		err = db.DeleteKey(ctx, ek.Id)
 		require.NoError(t, err)
 
 		// The key should be gone
-		_, err = db.GetEncryptionKey(ctx, ek.Id)
+		_, err = db.GetKey(ctx, ek.Id)
 		require.ErrorIs(t, err, ErrNotFound)
 
 		// All versions for the deleted key should be gone
-		versions, err = db.ListEncryptionKeyVersionsForEncryptionKey(ctx, ek.Id)
+		versions, err = db.ListEncryptionKeyVersionsForKey(ctx, ek.Id)
 		require.NoError(t, err)
 		require.Empty(t, versions)
 
@@ -598,7 +583,7 @@ func TestEncryptionKey(t *testing.T) {
 		}
 
 		// The other key's version should be unaffected
-		otherVersions, err := db.ListEncryptionKeyVersionsForEncryptionKey(ctx, otherEk.Id)
+		otherVersions, err := db.ListEncryptionKeyVersionsForKey(ctx, otherEk.Id)
 		require.NoError(t, err)
 		require.Len(t, otherVersions, 1)
 	})
@@ -609,17 +594,17 @@ func TestEncryptionKey(t *testing.T) {
 		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		ek := &EncryptionKey{
-			Id:        apid.New(apid.PrefixEncryptionKey),
+		ek := &Key{
+			Id:        apid.New(apid.PrefixKey),
 			Namespace: "root",
-			State:     EncryptionKeyStateActive,
+			State:     KeyStateActive,
 		}
-		require.NoError(t, db.CreateEncryptionKey(ctx, ek))
+		require.NoError(t, db.CreateKey(ctx, ek))
 
-		err := db.DeleteEncryptionKey(ctx, ek.Id)
+		err := db.DeleteKey(ctx, ek.Id)
 		require.NoError(t, err)
 
-		_, err = db.GetEncryptionKey(ctx, ek.Id)
+		_, err = db.GetKey(ctx, ek.Id)
 		require.ErrorIs(t, err, ErrNotFound)
 	})
 
@@ -629,19 +614,19 @@ func TestEncryptionKey(t *testing.T) {
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 		// Missing id
-		ek := &EncryptionKey{
+		ek := &Key{
 			Namespace: "root",
-			State:     EncryptionKeyStateActive,
+			State:     KeyStateActive,
 		}
-		err := db.CreateEncryptionKey(ctx, ek)
+		err := db.CreateKey(ctx, ek)
 		require.Error(t, err)
 
 		// Missing namespace
-		ek = &EncryptionKey{
-			Id:    apid.New(apid.PrefixEncryptionKey),
-			State: EncryptionKeyStateActive,
+		ek = &Key{
+			Id:    apid.New(apid.PrefixKey),
+			State: KeyStateActive,
 		}
-		err = db.CreateEncryptionKey(ctx, ek)
+		err = db.CreateKey(ctx, ek)
 		require.Error(t, err)
 	})
 }

@@ -31,15 +31,15 @@ type OpenAPIListEncryptionKeysResponseJson = schemaapiopenapi.ListEncryptionKeys
 type OpenAPIUpdateEncryptionKeyRequestJson = schemaapiopenapi.UpdateEncryptionKeyRequestJson
 
 type ListEncryptionKeysRequestQueryParams struct {
-	Cursor        *string                      `form:"cursor"`
-	LimitVal      *int32                       `form:"limit"`
-	StateVal      *database.EncryptionKeyState `form:"state"`
-	NamespaceVal  *string                      `form:"namespace"`
-	LabelSelector *string                      `form:"label_selector"`
-	OrderByVal    *string                      `form:"order_by"`
+	Cursor        *string            `form:"cursor"`
+	LimitVal      *int32             `form:"limit"`
+	StateVal      *database.KeyState `form:"state"`
+	NamespaceVal  *string            `form:"namespace"`
+	LabelSelector *string            `form:"label_selector"`
+	OrderByVal    *string            `form:"order_by"`
 }
 
-func EncryptionKeyToJson(ek coreIface.EncryptionKey) EncryptionKeyJson {
+func EncryptionKeyToJson(ek coreIface.Key) EncryptionKeyJson {
 	return EncryptionKeyJson{
 		Id:          ek.GetId(),
 		Namespace:   ek.GetNamespace(),
@@ -84,7 +84,7 @@ func (r *EncryptionKeysRoutes) get(gctx *gin.Context) {
 		return
 	}
 
-	ek, err := r.core.GetEncryptionKey(ctx, id)
+	ek, err := r.core.GetKey(ctx, id)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
 			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("encryption key '%s' not found", id), httperr.WithInternalErr(err)))
@@ -148,7 +148,7 @@ func (r *EncryptionKeysRoutes) create(gctx *gin.Context) {
 		}
 	}
 
-	ek, err := r.core.CreateEncryptionKey(ctx, req.Namespace, req.KeyData, req.Labels)
+	ek, err := r.core.CreateKey(ctx, req.Namespace, req.KeyData, req.Labels)
 	if err != nil {
 		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
@@ -163,7 +163,7 @@ func (r *EncryptionKeysRoutes) create(gctx *gin.Context) {
 			return
 		}
 
-		ek, err = r.core.UpdateEncryptionKeyAnnotations(ctx, ek.GetId(), req.Annotations)
+		ek, err = r.core.UpdateKeyAnnotations(ctx, ek.GetId(), req.Annotations)
 		if err != nil {
 			apgin.WriteErr(gctx, nil, err)
 			val.MarkErrorReturn()
@@ -203,17 +203,17 @@ func (r *EncryptionKeysRoutes) list(gctx *gin.Context) {
 	}
 
 	var err error
-	var ex coreIface.ListEncryptionKeysExecutor
+	var ex coreIface.ListKeysExecutor
 
 	if req.Cursor != nil {
-		ex, err = r.core.ListEncryptionKeysFromCursor(ctx, *req.Cursor)
+		ex, err = r.core.ListKeysFromCursor(ctx, *req.Cursor)
 		if err != nil {
 			apgin.WriteError(gctx, nil, httperr.InternalServerErrorMsg("failed to list encryption keys from cursor", httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
 	} else {
-		b := r.core.ListEncryptionKeysBuilder()
+		b := r.core.ListKeysBuilder()
 
 		if req.LimitVal != nil {
 			b = b.Limit(*req.LimitVal)
@@ -230,14 +230,14 @@ func (r *EncryptionKeysRoutes) list(gctx *gin.Context) {
 		}
 
 		if req.OrderByVal != nil {
-			field, order, err := pagination.SplitOrderByParam[database.EncryptionKeyOrderByField](*req.OrderByVal)
+			field, order, err := pagination.SplitOrderByParam[database.KeyOrderByField](*req.OrderByVal)
 			if err != nil {
 				apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
 				val.MarkErrorReturn()
 				return
 			}
 
-			if !database.IsValidEncryptionKeyOrderByField(field) {
+			if !database.IsValidKeyOrderByField(field) {
 				apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid sort field '%s'", field))
 				val.MarkErrorReturn()
 				return
@@ -297,7 +297,7 @@ func (r *EncryptionKeysRoutes) update(gctx *gin.Context) {
 	}
 
 	// Validate state if provided
-	if req.State != nil && !database.IsValidEncryptionKeyState(string(*req.State)) {
+	if req.State != nil && !database.IsValidKeyState(string(*req.State)) {
 		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid state '%s'", *req.State))
 		val.MarkErrorReturn()
 		return
@@ -322,7 +322,7 @@ func (r *EncryptionKeysRoutes) update(gctx *gin.Context) {
 	}
 
 	// Get existing key for authorization check
-	ek, err := r.core.GetEncryptionKey(ctx, id)
+	ek, err := r.core.GetKey(ctx, id)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
 			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("encryption key '%s' not found", id), httperr.WithInternalErr(err)))
@@ -341,7 +341,7 @@ func (r *EncryptionKeysRoutes) update(gctx *gin.Context) {
 	}
 
 	if req.State != nil {
-		err = r.core.SetEncryptionKeyState(ctx, id, database.EncryptionKeyState(*req.State))
+		err = r.core.SetKeyState(ctx, id, database.KeyState(*req.State))
 		if err != nil {
 			if errors.Is(err, core.ErrNotFound) {
 				apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("encryption key '%s' not found", id), httperr.WithInternalErr(err)))
@@ -355,7 +355,7 @@ func (r *EncryptionKeysRoutes) update(gctx *gin.Context) {
 	}
 
 	if req.Labels != nil {
-		_, err = r.core.UpdateEncryptionKeyLabels(ctx, id, *req.Labels)
+		_, err = r.core.UpdateKeyLabels(ctx, id, *req.Labels)
 		if err != nil {
 			if errors.Is(err, core.ErrNotFound) {
 				apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("encryption key '%s' not found", id), httperr.WithInternalErr(err)))
@@ -369,7 +369,7 @@ func (r *EncryptionKeysRoutes) update(gctx *gin.Context) {
 	}
 
 	if req.Annotations != nil {
-		_, err = r.core.UpdateEncryptionKeyAnnotations(ctx, id, *req.Annotations)
+		_, err = r.core.UpdateKeyAnnotations(ctx, id, *req.Annotations)
 		if err != nil {
 			if errors.Is(err, core.ErrNotFound) {
 				apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("encryption key '%s' not found", id), httperr.WithInternalErr(err)))
@@ -382,7 +382,7 @@ func (r *EncryptionKeysRoutes) update(gctx *gin.Context) {
 		}
 	}
 
-	ek, err = r.core.GetEncryptionKey(ctx, id)
+	ek, err = r.core.GetKey(ctx, id)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
 			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("encryption key '%s' not found", id), httperr.WithInternalErr(err)))
@@ -422,14 +422,14 @@ func (r *EncryptionKeysRoutes) delete(gctx *gin.Context) {
 		return
 	}
 
-	if id == database.GlobalEncryptionKeyID {
+	if id == database.GlobalKeyID {
 		apgin.WriteError(gctx, nil, httperr.BadRequest("the global encryption key cannot be deleted"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	// Get existing key for authorization check
-	ek, err := r.core.GetEncryptionKey(ctx, id)
+	ek, err := r.core.GetKey(ctx, id)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
 			gctx.Status(http.StatusNoContent)
@@ -447,7 +447,7 @@ func (r *EncryptionKeysRoutes) delete(gctx *gin.Context) {
 		return
 	}
 
-	err = r.core.DeleteEncryptionKey(ctx, id)
+	err = r.core.DeleteKey(ctx, id)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
 			gctx.Status(http.StatusNoContent)
@@ -595,7 +595,7 @@ func (r *EncryptionKeysRoutes) Register(g gin.IRouter) {
 		"/encryption-keys",
 		r.authService.NewRequiredBuilder().
 			ForResource("encryption_keys").
-			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.EncryptionKey).GetId()) }).
+			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }).
 			ForVerb("list").
 			Build(),
 		r.list,
@@ -604,7 +604,7 @@ func (r *EncryptionKeysRoutes) Register(g gin.IRouter) {
 		"/encryption-keys",
 		r.authService.NewRequiredBuilder().
 			ForResource("encryption_keys").
-			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.EncryptionKey).GetId()) }).
+			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }).
 			ForVerb("create").
 			Build(),
 		r.create,
@@ -614,7 +614,7 @@ func (r *EncryptionKeysRoutes) Register(g gin.IRouter) {
 		r.authService.NewRequiredBuilder().
 			ForResource("encryption_keys").
 			ForIdField("id").
-			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.EncryptionKey).GetId()) }).
+			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }).
 			ForVerb("get").
 			Build(),
 		r.get,
@@ -624,7 +624,7 @@ func (r *EncryptionKeysRoutes) Register(g gin.IRouter) {
 		r.authService.NewRequiredBuilder().
 			ForResource("encryption_keys").
 			ForIdField("id").
-			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.EncryptionKey).GetId()) }).
+			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }).
 			ForVerb("update").
 			Build(),
 		r.update,
@@ -634,7 +634,7 @@ func (r *EncryptionKeysRoutes) Register(g gin.IRouter) {
 		r.authService.NewRequiredBuilder().
 			ForResource("encryption_keys").
 			ForIdField("id").
-			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.EncryptionKey).GetId()) }).
+			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }).
 			ForVerb("delete").
 			Build(),
 		r.delete,
@@ -644,7 +644,7 @@ func (r *EncryptionKeysRoutes) Register(g gin.IRouter) {
 		r.authService.NewRequiredBuilder().
 			ForResource("encryption_keys").
 			ForIdField("id").
-			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.EncryptionKey).GetId()) }).
+			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }).
 			ForVerb("get").
 			Build(),
 		r.getLabels,
@@ -654,7 +654,7 @@ func (r *EncryptionKeysRoutes) Register(g gin.IRouter) {
 		r.authService.NewRequiredBuilder().
 			ForResource("encryption_keys").
 			ForIdField("id").
-			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.EncryptionKey).GetId()) }).
+			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }).
 			ForVerb("get").
 			Build(),
 		r.getLabel,
@@ -664,7 +664,7 @@ func (r *EncryptionKeysRoutes) Register(g gin.IRouter) {
 		r.authService.NewRequiredBuilder().
 			ForResource("encryption_keys").
 			ForIdField("id").
-			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.EncryptionKey).GetId()) }).
+			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }).
 			ForVerb("update").
 			Build(),
 		r.putLabel,
@@ -674,7 +674,7 @@ func (r *EncryptionKeysRoutes) Register(g gin.IRouter) {
 		r.authService.NewRequiredBuilder().
 			ForResource("encryption_keys").
 			ForIdField("id").
-			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.EncryptionKey).GetId()) }).
+			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }).
 			ForVerb("update").
 			Build(),
 		r.deleteLabel,
@@ -684,7 +684,7 @@ func (r *EncryptionKeysRoutes) Register(g gin.IRouter) {
 		r.authService.NewRequiredBuilder().
 			ForResource("encryption_keys").
 			ForIdField("id").
-			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.EncryptionKey).GetId()) }).
+			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }).
 			ForVerb("get").
 			Build(),
 		r.getAnnotations,
@@ -694,7 +694,7 @@ func (r *EncryptionKeysRoutes) Register(g gin.IRouter) {
 		r.authService.NewRequiredBuilder().
 			ForResource("encryption_keys").
 			ForIdField("id").
-			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.EncryptionKey).GetId()) }).
+			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }).
 			ForVerb("get").
 			Build(),
 		r.getAnnotation,
@@ -704,7 +704,7 @@ func (r *EncryptionKeysRoutes) Register(g gin.IRouter) {
 		r.authService.NewRequiredBuilder().
 			ForResource("encryption_keys").
 			ForIdField("id").
-			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.EncryptionKey).GetId()) }).
+			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }).
 			ForVerb("update").
 			Build(),
 		r.putAnnotation,
@@ -714,7 +714,7 @@ func (r *EncryptionKeysRoutes) Register(g gin.IRouter) {
 		r.authService.NewRequiredBuilder().
 			ForResource("encryption_keys").
 			ForIdField("id").
-			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.EncryptionKey).GetId()) }).
+			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }).
 			ForVerb("update").
 			Build(),
 		r.deleteAnnotation,
@@ -731,7 +731,7 @@ func NewEncryptionKeysRoutes(cfg config.C, authService auth.A, c coreIface.C) *E
 	}
 
 	getEncryptionKey := func(ctx context.Context, id apid.ID) (key_value.Resource, error) {
-		ek, err := c.GetEncryptionKey(ctx, id)
+		ek, err := c.GetKey(ctx, id)
 		if err != nil {
 			if errors.Is(err, core.ErrNotFound) {
 				return nil, database.ErrNotFound
@@ -744,7 +744,7 @@ func NewEncryptionKeysRoutes(cfg config.C, authService auth.A, c coreIface.C) *E
 		return ek, nil
 	}
 
-	idExtractor := func(ek interface{}) string { return string(ek.(coreIface.EncryptionKey).GetId()) }
+	idExtractor := func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }
 
 	authGet := authService.NewRequiredBuilder().
 		ForResource("encryption_keys").
@@ -768,10 +768,10 @@ func NewEncryptionKeysRoutes(cfg config.C, authService auth.A, c coreIface.C) *E
 		ParseID:      parseEncryptionKeyID,
 		Get:          getEncryptionKey,
 		Put: func(ctx context.Context, id apid.ID, kv map[string]string) (key_value.Resource, error) {
-			return c.PutEncryptionKeyLabels(ctx, id, kv)
+			return c.PutKeyLabels(ctx, id, kv)
 		},
 		Delete: func(ctx context.Context, id apid.ID, keys []string) (key_value.Resource, error) {
-			return c.DeleteEncryptionKeyLabels(ctx, id, keys)
+			return c.DeleteKeyLabels(ctx, id, keys)
 		},
 	}
 
@@ -784,10 +784,10 @@ func NewEncryptionKeysRoutes(cfg config.C, authService auth.A, c coreIface.C) *E
 		ParseID:      parseEncryptionKeyID,
 		Get:          getEncryptionKey,
 		Put: func(ctx context.Context, id apid.ID, kv map[string]string) (key_value.Resource, error) {
-			return c.PutEncryptionKeyAnnotations(ctx, id, kv)
+			return c.PutKeyAnnotations(ctx, id, kv)
 		},
 		Delete: func(ctx context.Context, id apid.ID, keys []string) (key_value.Resource, error) {
-			return c.DeleteEncryptionKeyAnnotations(ctx, id, keys)
+			return c.DeleteKeyAnnotations(ctx, id, keys)
 		},
 	}
 

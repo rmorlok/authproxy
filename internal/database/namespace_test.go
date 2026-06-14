@@ -1575,18 +1575,18 @@ INSERT INTO namespaces
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-			ekId := apid.New(apid.PrefixEncryptionKey)
+			ekId := apid.New(apid.PrefixKey)
 			err := db.CreateNamespace(ctx, &Namespace{
-				Path:            "root.roundtrip",
-				State:           NamespaceStateActive,
-				EncryptionKeyId: &ekId,
+				Path:  "root.roundtrip",
+				State: NamespaceStateActive,
+				KeyId: &ekId,
 			})
 			require.NoError(t, err)
 
 			retrieved, err := db.GetNamespace(ctx, "root.roundtrip")
 			require.NoError(t, err)
-			require.NotNil(t, retrieved.EncryptionKeyId)
-			require.Equal(t, ekId, *retrieved.EncryptionKeyId)
+			require.NotNil(t, retrieved.KeyId)
+			require.Equal(t, ekId, *retrieved.KeyId)
 		})
 
 		t.Run("nil encryption key id round-trips as nil", func(t *testing.T) {
@@ -1602,7 +1602,7 @@ INSERT INTO namespaces
 
 			retrieved, err := db.GetNamespace(ctx, "root.nilkey")
 			require.NoError(t, err)
-			require.Nil(t, retrieved.EncryptionKeyId)
+			require.Nil(t, retrieved.KeyId)
 		})
 	})
 
@@ -1615,8 +1615,8 @@ INSERT INTO namespaces
 			_, err := rawDb.Exec(`DELETE FROM namespaces`)
 			require.NoError(t, err)
 
-			ekId1 := apid.New(apid.PrefixEncryptionKey)
-			ekId2 := apid.New(apid.PrefixEncryptionKey)
+			ekId1 := apid.New(apid.PrefixKey)
+			ekId2 := apid.New(apid.PrefixKey)
 			dekId1 := apid.New(apid.PrefixDataEncryptionKey)
 
 			_, err = rawDb.Exec(fmt.Sprintf(`
@@ -1631,7 +1631,7 @@ INSERT INTO namespaces
 
 			var collected []NamespaceEncryptionTarget
 			err = db.EnumerateNamespaceEncryptionTargets(ctx,
-				func(targets []NamespaceEncryptionTarget, lastPage bool) ([]NamespaceTargetEncryptionKeyVersionUpdate, pagination.KeepGoing, error) {
+				func(targets []NamespaceEncryptionTarget, lastPage bool) ([]NamespaceTargetDataEncryptionKeyUpdate, pagination.KeepGoing, error) {
 					collected = append(collected, targets...)
 					return nil, pagination.Continue, nil
 				},
@@ -1644,21 +1644,21 @@ INSERT INTO namespaces
 			// Results ordered by depth, then path
 			require.Equal(t, "root", collected[0].Path)
 			require.Equal(t, uint64(0), collected[0].Depth)
-			require.Nil(t, collected[0].EncryptionKeyId)
-			require.Nil(t, collected[0].TargetEncryptionKeyVersionId)
+			require.Nil(t, collected[0].KeyId)
+			require.Nil(t, collected[0].TargetDataEncryptionKeyId)
 
 			require.Equal(t, "root.ns1", collected[1].Path)
 			require.Equal(t, uint64(1), collected[1].Depth)
-			require.NotNil(t, collected[1].EncryptionKeyId)
-			require.Equal(t, ekId1, *collected[1].EncryptionKeyId)
-			require.Nil(t, collected[1].TargetEncryptionKeyVersionId)
+			require.NotNil(t, collected[1].KeyId)
+			require.Equal(t, ekId1, *collected[1].KeyId)
+			require.Nil(t, collected[1].TargetDataEncryptionKeyId)
 
 			require.Equal(t, "root.ns2", collected[2].Path)
 			require.Equal(t, uint64(1), collected[2].Depth)
-			require.NotNil(t, collected[2].EncryptionKeyId)
-			require.Equal(t, ekId2, *collected[2].EncryptionKeyId)
-			require.NotNil(t, collected[2].TargetEncryptionKeyVersionId)
-			require.Equal(t, dekId1, *collected[2].TargetEncryptionKeyVersionId)
+			require.NotNil(t, collected[2].KeyId)
+			require.Equal(t, ekId2, *collected[2].KeyId)
+			require.NotNil(t, collected[2].TargetDataEncryptionKeyId)
+			require.Equal(t, dekId1, *collected[2].TargetDataEncryptionKeyId)
 		})
 
 		t.Run("callback can update target encryption key version", func(t *testing.T) {
@@ -1670,7 +1670,7 @@ INSERT INTO namespaces
 			_, err := rawDb.Exec(`DELETE FROM namespaces`)
 			require.NoError(t, err)
 
-			ekId := apid.New(apid.PrefixEncryptionKey)
+			ekId := apid.New(apid.PrefixKey)
 			newDekId := apid.New(apid.PrefixDataEncryptionKey)
 
 			_, err = rawDb.Exec(fmt.Sprintf(`
@@ -1682,13 +1682,13 @@ INSERT INTO namespaces
 			require.NoError(t, err)
 
 			err = db.EnumerateNamespaceEncryptionTargets(ctx,
-				func(targets []NamespaceEncryptionTarget, lastPage bool) ([]NamespaceTargetEncryptionKeyVersionUpdate, pagination.KeepGoing, error) {
-					var updates []NamespaceTargetEncryptionKeyVersionUpdate
+				func(targets []NamespaceEncryptionTarget, lastPage bool) ([]NamespaceTargetDataEncryptionKeyUpdate, pagination.KeepGoing, error) {
+					var updates []NamespaceTargetDataEncryptionKeyUpdate
 					for _, t := range targets {
-						if t.EncryptionKeyId != nil {
-							updates = append(updates, NamespaceTargetEncryptionKeyVersionUpdate{
-								Path:                         t.Path,
-								TargetEncryptionKeyVersionId: newDekId,
+						if t.KeyId != nil {
+							updates = append(updates, NamespaceTargetDataEncryptionKeyUpdate{
+								Path:                      t.Path,
+								TargetDataEncryptionKeyId: newDekId,
 							})
 						}
 					}
@@ -1739,7 +1739,7 @@ INSERT INTO namespaces
 
 			callCount := 0
 			err = db.EnumerateNamespaceEncryptionTargets(ctx,
-				func(targets []NamespaceEncryptionTarget, lastPage bool) ([]NamespaceTargetEncryptionKeyVersionUpdate, pagination.KeepGoing, error) {
+				func(targets []NamespaceEncryptionTarget, lastPage bool) ([]NamespaceTargetDataEncryptionKeyUpdate, pagination.KeepGoing, error) {
 					callCount++
 					return nil, pagination.Stop, nil // stop immediately
 				},
@@ -1765,7 +1765,7 @@ INSERT INTO namespaces
 
 			expectedErr := fmt.Errorf("test error")
 			err = db.EnumerateNamespaceEncryptionTargets(ctx,
-				func(targets []NamespaceEncryptionTarget, lastPage bool) ([]NamespaceTargetEncryptionKeyVersionUpdate, pagination.KeepGoing, error) {
+				func(targets []NamespaceEncryptionTarget, lastPage bool) ([]NamespaceTargetDataEncryptionKeyUpdate, pagination.KeepGoing, error) {
 					return nil, pagination.Stop, expectedErr
 				},
 			)
@@ -1782,7 +1782,7 @@ INSERT INTO namespaces
 
 			callCount := 0
 			err = db.EnumerateNamespaceEncryptionTargets(ctx,
-				func(targets []NamespaceEncryptionTarget, lastPage bool) ([]NamespaceTargetEncryptionKeyVersionUpdate, pagination.KeepGoing, error) {
+				func(targets []NamespaceEncryptionTarget, lastPage bool) ([]NamespaceTargetDataEncryptionKeyUpdate, pagination.KeepGoing, error) {
 					callCount++
 					require.Empty(t, targets)
 					require.True(t, lastPage)
@@ -1813,7 +1813,7 @@ INSERT INTO namespaces
 
 			var lastPageValues []bool
 			err = db.EnumerateNamespaceEncryptionTargets(ctx,
-				func(targets []NamespaceEncryptionTarget, lastPage bool) ([]NamespaceTargetEncryptionKeyVersionUpdate, pagination.KeepGoing, error) {
+				func(targets []NamespaceEncryptionTarget, lastPage bool) ([]NamespaceTargetDataEncryptionKeyUpdate, pagination.KeepGoing, error) {
 					lastPageValues = append(lastPageValues, lastPage)
 					return nil, pagination.Continue, nil
 				},
@@ -1920,54 +1920,54 @@ func TestSetNamespaceEncryptionKeyIdAncestorValidation(t *testing.T) {
 	}
 
 	// Create encryption keys in various namespaces
-	ekRoot := &EncryptionKey{
-		Id:        apid.New(apid.PrefixEncryptionKey),
+	ekRoot := &Key{
+		Id:        apid.New(apid.PrefixKey),
 		Namespace: "root",
-		State:     EncryptionKeyStateActive,
+		State:     KeyStateActive,
 	}
-	ekParent := &EncryptionKey{
-		Id:        apid.New(apid.PrefixEncryptionKey),
+	ekParent := &Key{
+		Id:        apid.New(apid.PrefixKey),
 		Namespace: "root.parent",
-		State:     EncryptionKeyStateActive,
+		State:     KeyStateActive,
 	}
-	ekChild := &EncryptionKey{
-		Id:        apid.New(apid.PrefixEncryptionKey),
+	ekChild := &Key{
+		Id:        apid.New(apid.PrefixKey),
 		Namespace: "root.parent.child",
-		State:     EncryptionKeyStateActive,
+		State:     KeyStateActive,
 	}
-	ekGrandchild := &EncryptionKey{
-		Id:        apid.New(apid.PrefixEncryptionKey),
+	ekGrandchild := &Key{
+		Id:        apid.New(apid.PrefixKey),
 		Namespace: "root.parent.child.grandchild",
-		State:     EncryptionKeyStateActive,
+		State:     KeyStateActive,
 	}
-	ekSibling := &EncryptionKey{
-		Id:        apid.New(apid.PrefixEncryptionKey),
+	ekSibling := &Key{
+		Id:        apid.New(apid.PrefixKey),
 		Namespace: "root.sibling",
-		State:     EncryptionKeyStateActive,
+		State:     KeyStateActive,
 	}
 
-	for _, ek := range []*EncryptionKey{ekRoot, ekParent, ekChild, ekGrandchild, ekSibling} {
-		require.NoError(t, db.CreateEncryptionKey(ctx, ek))
+	for _, ek := range []*Key{ekRoot, ekParent, ekChild, ekGrandchild, ekSibling} {
+		require.NoError(t, db.CreateKey(ctx, ek))
 	}
 
 	t.Run("valid: key in ancestor namespace", func(t *testing.T) {
 		// ekRoot is ancestor of root.parent.child
-		ns, err := db.SetNamespaceEncryptionKeyId(ctx, "root.parent.child", &ekRoot.Id)
+		ns, err := db.SetNamespaceKeyId(ctx, "root.parent.child", &ekRoot.Id)
 		require.NoError(t, err)
 		require.NotNil(t, ns)
-		require.NotNil(t, ns.EncryptionKeyId)
-		require.Equal(t, ekRoot.Id, *ns.EncryptionKeyId)
+		require.NotNil(t, ns.KeyId)
+		require.Equal(t, ekRoot.Id, *ns.KeyId)
 
 		// ekParent is also an ancestor of root.parent.child
-		ns, err = db.SetNamespaceEncryptionKeyId(ctx, "root.parent.child", &ekParent.Id)
+		ns, err = db.SetNamespaceKeyId(ctx, "root.parent.child", &ekParent.Id)
 		require.NoError(t, err)
 		require.NotNil(t, ns)
-		require.NotNil(t, ns.EncryptionKeyId)
-		require.Equal(t, ekParent.Id, *ns.EncryptionKeyId)
+		require.NotNil(t, ns.KeyId)
+		require.Equal(t, ekParent.Id, *ns.KeyId)
 	})
 
 	t.Run("rejected: key in same namespace", func(t *testing.T) {
-		_, err := db.SetNamespaceEncryptionKeyId(ctx, "root.parent.child", &ekChild.Id)
+		_, err := db.SetNamespaceKeyId(ctx, "root.parent.child", &ekChild.Id)
 		require.Error(t, err)
 		var httpErr *httperr.Error
 		require.True(t, errors.As(err, &httpErr))
@@ -1975,7 +1975,7 @@ func TestSetNamespaceEncryptionKeyIdAncestorValidation(t *testing.T) {
 	})
 
 	t.Run("rejected: key in descendant namespace", func(t *testing.T) {
-		_, err := db.SetNamespaceEncryptionKeyId(ctx, "root.parent.child", &ekGrandchild.Id)
+		_, err := db.SetNamespaceKeyId(ctx, "root.parent.child", &ekGrandchild.Id)
 		require.Error(t, err)
 		var httpErr *httperr.Error
 		require.True(t, errors.As(err, &httpErr))
@@ -1983,7 +1983,7 @@ func TestSetNamespaceEncryptionKeyIdAncestorValidation(t *testing.T) {
 	})
 
 	t.Run("rejected: key in sibling namespace", func(t *testing.T) {
-		_, err := db.SetNamespaceEncryptionKeyId(ctx, "root.parent.child", &ekSibling.Id)
+		_, err := db.SetNamespaceKeyId(ctx, "root.parent.child", &ekSibling.Id)
 		require.Error(t, err)
 		var httpErr *httperr.Error
 		require.True(t, errors.As(err, &httpErr))
@@ -1991,7 +1991,7 @@ func TestSetNamespaceEncryptionKeyIdAncestorValidation(t *testing.T) {
 	})
 
 	t.Run("rejected: key on root namespace", func(t *testing.T) {
-		_, err := db.SetNamespaceEncryptionKeyId(ctx, "root", &ekRoot.Id)
+		_, err := db.SetNamespaceKeyId(ctx, "root", &ekRoot.Id)
 		require.Error(t, err)
 		var httpErr *httperr.Error
 		require.True(t, errors.As(err, &httpErr))
@@ -2001,14 +2001,14 @@ func TestSetNamespaceEncryptionKeyIdAncestorValidation(t *testing.T) {
 
 	t.Run("clear encryption key succeeds", func(t *testing.T) {
 		// First set a valid key
-		_, err := db.SetNamespaceEncryptionKeyId(ctx, "root.parent.child", &ekRoot.Id)
+		_, err := db.SetNamespaceKeyId(ctx, "root.parent.child", &ekRoot.Id)
 		require.NoError(t, err)
 
 		// Clear it
-		ns, err := db.SetNamespaceEncryptionKeyId(ctx, "root.parent.child", nil)
+		ns, err := db.SetNamespaceKeyId(ctx, "root.parent.child", nil)
 		require.NoError(t, err)
 		require.NotNil(t, ns)
-		require.Nil(t, ns.EncryptionKeyId)
+		require.Nil(t, ns.KeyId)
 	})
 }
 
@@ -2038,16 +2038,16 @@ func TestNamespaceLabelChangePropagation(t *testing.T) {
 			Id: actorIn_t, ExternalId: "act-t", Namespace: "root.t",
 		}))
 
-		ekIn_b := apid.New(apid.PrefixEncryptionKey)
-		require.NoError(t, db.CreateEncryptionKey(ctx, &EncryptionKey{
-			Id: ekIn_b, Namespace: "root.t.b", State: EncryptionKeyStateActive,
+		ekIn_b := apid.New(apid.PrefixKey)
+		require.NoError(t, db.CreateKey(ctx, &Key{
+			Id: ekIn_b, Namespace: "root.t.b", State: KeyStateActive,
 		}))
 
 		// Sanity: before the update, descendants reflect the original labels.
 		a, err := db.GetActor(ctx, actorIn_t)
 		require.NoError(t, err)
 		require.Equal(t, "woof", a.Labels["apxy/ns/dog"])
-		ek, err := db.GetEncryptionKey(ctx, ekIn_b)
+		ek, err := db.GetKey(ctx, ekIn_b)
 		require.NoError(t, err)
 		require.Equal(t, "woof", ek.Labels["apxy/ns/dog"])
 		require.Equal(t, "oink", ek.Labels["apxy/ns/pig"])
@@ -2067,7 +2067,7 @@ func TestNamespaceLabelChangePropagation(t *testing.T) {
 
 		// Encryption key in root.t.b: cow propagates through root.t.b's
 		// chain (its own pig label + parent's cow). Old dog is gone.
-		ek, err = db.GetEncryptionKey(ctx, ekIn_b)
+		ek, err = db.GetKey(ctx, ekIn_b)
 		require.NoError(t, err)
 		require.Equal(t, "moo", ek.Labels["apxy/ns/cow"])
 		require.Equal(t, "oink", ek.Labels["apxy/ns/pig"])
@@ -2210,8 +2210,8 @@ func TestReconcileCarryForwardLabels(t *testing.T) {
 			Id: connID, Namespace: "root.recon", ConnectorId: cvID, ConnectorVersion: 1,
 			State: ConnectionStateSetup,
 		}))
-		require.NoError(t, db.CreateEncryptionKey(ctx, &EncryptionKey{
-			Id: apid.New(apid.PrefixEncryptionKey), Namespace: "root.recon", State: EncryptionKeyStateActive,
+		require.NoError(t, db.CreateKey(ctx, &Key{
+			Id: apid.New(apid.PrefixKey), Namespace: "root.recon", State: KeyStateActive,
 		}))
 		require.NoError(t, db.CreateActor(ctx, &Actor{
 			Id: apid.New(apid.PrefixActor), ExternalId: "act-recon", Namespace: "root.recon",

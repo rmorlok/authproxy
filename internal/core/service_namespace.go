@@ -158,14 +158,14 @@ func (s *service) DeleteNamespaceAnnotations(ctx context.Context, path string, k
 	return wrapNamespace(*ns, s), nil
 }
 
-func (s *service) SetNamespaceEncryptionKey(ctx context.Context, path string, ekId apid.ID) (iface.Namespace, error) {
+func (s *service) SetNamespaceKey(ctx context.Context, path string, ekId apid.ID) (iface.Namespace, error) {
 	// Validate the encryption key exists
-	_, err := s.GetEncryptionKey(ctx, ekId)
+	_, err := s.GetKey(ctx, ekId)
 	if err != nil {
 		return nil, err
 	}
 
-	ns, err := s.db.SetNamespaceEncryptionKeyId(ctx, path, &ekId)
+	ns, err := s.db.SetNamespaceKeyId(ctx, path, &ekId)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
 			return nil, ErrNotFound
@@ -176,8 +176,8 @@ func (s *service) SetNamespaceEncryptionKey(ctx context.Context, path string, ek
 	return wrapNamespace(*ns, s), nil
 }
 
-func (s *service) ClearNamespaceEncryptionKey(ctx context.Context, path string) (iface.Namespace, error) {
-	ns, err := s.db.SetNamespaceEncryptionKeyId(ctx, path, nil)
+func (s *service) ClearNamespaceKey(ctx context.Context, path string) (iface.Namespace, error) {
+	ns, err := s.db.SetNamespaceKeyId(ctx, path, nil)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
 			return nil, ErrNotFound

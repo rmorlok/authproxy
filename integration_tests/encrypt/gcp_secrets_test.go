@@ -81,11 +81,11 @@ func TestGcpSecretManagerKeySyncAndReencrypt(t *testing.T) {
 	require.NoError(t, err)
 
 	namespace := fmt.Sprintf("root.gcp-sm-test-%d", time.Now().UnixNano())
-	ekID := apid.New(apid.PrefixEncryptionKey)
+	ekID := apid.New(apid.PrefixKey)
 
 	require.NoError(t, env.Db.CreateNamespace(ctx, &database.Namespace{
-		Path:            namespace,
-		EncryptionKeyId: &ekID,
+		Path:  namespace,
+		KeyId: &ekID,
 	}))
 
 	keyData := sconfig.KeyData{
@@ -100,11 +100,11 @@ func TestGcpSecretManagerKeySyncAndReencrypt(t *testing.T) {
 	encKeyData, err := env.DM.GetEncryptService().EncryptGlobal(ctx, keyDataJSON)
 	require.NoError(t, err)
 
-	require.NoError(t, env.Db.CreateEncryptionKey(ctx, &database.EncryptionKey{
+	require.NoError(t, env.Db.CreateKey(ctx, &database.Key{
 		Id:               ekID,
 		Namespace:        namespace,
 		EncryptedKeyData: &encKeyData,
-		State:            database.EncryptionKeyStateActive,
+		State:            database.KeyStateActive,
 	}))
 
 	require.NoError(t, encrypt.SyncKeysToDatabase(ctx, env.Cfg, env.Db, env.Logger, nil))

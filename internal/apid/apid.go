@@ -31,7 +31,7 @@ const (
 	PrefixRequestEvents        Prefix = "req_"
 	PrefixCorrelation          Prefix = "cor_"
 	PrefixJwtId                Prefix = "jti_"
-	PrefixEncryptionKey        Prefix = "key_"
+	PrefixKey                  Prefix = "key_"
 	PrefixEncryptionKeyVersion Prefix = "ekv_"
 	PrefixDataEncryptionKey    Prefix = "dek_"
 	PrefixSession              Prefix = "sess_"
@@ -53,7 +53,7 @@ var validPrefixes = map[Prefix]bool{
 	PrefixJwtId:                true,
 	PrefixOauth2State:          true,
 	PrefixSession:              true,
-	PrefixEncryptionKey:        true,
+	PrefixKey:                  true,
 	PrefixEncryptionKeyVersion: true,
 	PrefixDataEncryptionKey:    true,
 	PrefixRateLimit:            true,

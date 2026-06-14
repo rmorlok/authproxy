@@ -115,12 +115,12 @@ func isRegisteredEncryptedField(table, col string) bool {
 
 // ReEncryptionTarget represents one encrypted field on one row that needs re-encryption.
 type ReEncryptionTarget struct {
-	Table                        string
-	PrimaryKeyCols               []string                // column names in PK order (from registration)
-	PrimaryKeyValues             []any                   // values in PK column order
-	FieldColumn                  string                  // which encrypted column
-	EncryptedFieldValue          encfield.EncryptedField // current value (contains EKV ID)
-	TargetEncryptionKeyVersionId apid.ID                 // what it should be
+	Table                     string
+	PrimaryKeyCols            []string                // column names in PK order (from registration)
+	PrimaryKeyValues          []any                   // values in PK column order
+	FieldColumn               string                  // which encrypted column
+	EncryptedFieldValue       encfield.EncryptedField // current value (contains the active DEK ID)
+	TargetDataEncryptionKeyId apid.ID                 // target DEK for the namespace
 }
 
 // ReEncryptedFieldUpdate carries the data to update a single encrypted field after re-encryption.
@@ -306,12 +306,12 @@ func (s *service) queryReEncryptionPage(
 			}
 			if ef.ID != rd.targetEKVId {
 				targets = append(targets, ReEncryptionTarget{
-					Table:                        reg.Table,
-					PrimaryKeyCols:               reg.PrimaryKeyCols,
-					PrimaryKeyValues:             rd.pkValues,
-					FieldColumn:                  ec,
-					EncryptedFieldValue:          ef,
-					TargetEncryptionKeyVersionId: rd.targetEKVId,
+					Table:                     reg.Table,
+					PrimaryKeyCols:            reg.PrimaryKeyCols,
+					PrimaryKeyValues:          rd.pkValues,
+					FieldColumn:               ec,
+					EncryptedFieldValue:       ef,
+					TargetDataEncryptionKeyId: rd.targetEKVId,
 				})
 			}
 		}

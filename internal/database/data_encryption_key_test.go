@@ -17,9 +17,9 @@ func TestDataEncryptionKey(t *testing.T) {
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		ekID := apid.New(apid.PrefixEncryptionKey)
+		ekID := apid.New(apid.PrefixKey)
 		dek := &DataEncryptionKey{
-			EncryptionKeyId: ekID,
+			KeyId:           ekID,
 			Provider:        "mock_kms",
 			ProviderID:      "provider-key",
 			ProviderVersion: "v1",
@@ -42,7 +42,7 @@ func TestDataEncryptionKey(t *testing.T) {
 		got, err := db.GetDataEncryptionKey(ctx, dek.Id)
 		require.NoError(t, err)
 		require.Equal(t, dek.Id, got.Id)
-		require.Equal(t, ekID, got.EncryptionKeyId)
+		require.Equal(t, ekID, got.KeyId)
 		require.Equal(t, "mock_kms", got.Provider)
 		require.Equal(t, "provider-key", got.ProviderID)
 		require.Equal(t, "v1", got.ProviderVersion)
@@ -52,7 +52,7 @@ func TestDataEncryptionKey(t *testing.T) {
 		require.Equal(t, "wrapped", got.ProtectedData.WrappedData)
 		require.Equal(t, "v", got.ProtectedData.Metadata["k"])
 
-		listed, err := db.ListDataEncryptionKeysForEncryptionKey(ctx, ekID)
+		listed, err := db.ListDataEncryptionKeysForKey(ctx, ekID)
 		require.NoError(t, err)
 		require.Len(t, listed, 1)
 		require.Equal(t, dek.Id, listed[0].Id)
@@ -61,7 +61,7 @@ func TestDataEncryptionKey(t *testing.T) {
 	t.Run("new current clears previous current", func(t *testing.T) {
 		_, db := MustApplyBlankTestDbConfig(t, nil)
 		ctx := apctx.NewBuilderBackground().Build()
-		ekID := apid.New(apid.PrefixEncryptionKey)
+		ekID := apid.New(apid.PrefixKey)
 
 		first := validTestDataEncryptionKey(ekID, "v1", true)
 		require.NoError(t, db.CreateDataEncryptionKey(ctx, first))
@@ -79,7 +79,7 @@ func TestDataEncryptionKey(t *testing.T) {
 	})
 
 	t.Run("validation", func(t *testing.T) {
-		ekID := apid.New(apid.PrefixEncryptionKey)
+		ekID := apid.New(apid.PrefixKey)
 		require.NoError(t, validTestDataEncryptionKey(ekID, "v1", true).Validate())
 
 		missingProtected := validTestDataEncryptionKey(ekID, "v1", true)
@@ -95,7 +95,7 @@ func TestDataEncryptionKey(t *testing.T) {
 func validTestDataEncryptionKey(ekID apid.ID, version string, isCurrent bool) *DataEncryptionKey {
 	return &DataEncryptionKey{
 		Id:              apid.New(apid.PrefixDataEncryptionKey),
-		EncryptionKeyId: ekID,
+		KeyId:           ekID,
 		Provider:        "mock_kms",
 		ProviderID:      "provider-key",
 		ProviderVersion: version,

@@ -443,7 +443,7 @@ func TestApidPrefixToLabelToken(t *testing.T) {
 	require.Equal(t, "cxr", ApidPrefixToLabelToken(apid.PrefixConnectorVersion))
 	require.Equal(t, "cxn", ApidPrefixToLabelToken(apid.PrefixConnection))
 	require.Equal(t, "act", ApidPrefixToLabelToken(apid.PrefixActor))
-	require.Equal(t, "key", ApidPrefixToLabelToken(apid.PrefixEncryptionKey))
+	require.Equal(t, "key", ApidPrefixToLabelToken(apid.PrefixKey))
 	require.Equal(t, "", ApidPrefixToLabelToken(apid.Prefix("")))
 }
 

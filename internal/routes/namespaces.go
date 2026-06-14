@@ -34,19 +34,19 @@ type OpenAPIListNamespacesResponseJson = schemaapiopenapi.ListNamespacesResponse
 
 func NamespaceToJson(ns coreIface.Namespace) NamespaceJson {
 	var ekId *string
-	if ns.GetEncryptionKeyId() != nil {
-		s := string(*ns.GetEncryptionKeyId())
+	if ns.GetKeyId() != nil {
+		s := string(*ns.GetKeyId())
 		ekId = &s
 	}
 
 	return NamespaceJson{
-		Path:            ns.GetPath(),
-		State:           schemaapi.NamespaceState(ns.GetState()),
-		EncryptionKeyId: ekId,
-		Labels:          ns.GetLabels(),
-		Annotations:     ns.GetAnnotations(),
-		CreatedAt:       ns.GetCreatedAt(),
-		UpdatedAt:       ns.GetUpdatedAt(),
+		Path:        ns.GetPath(),
+		State:       schemaapi.NamespaceState(ns.GetState()),
+		KeyId:       ekId,
+		Labels:      ns.GetLabels(),
+		Annotations: ns.GetAnnotations(),
+		CreatedAt:   ns.GetCreatedAt(),
+		UpdatedAt:   ns.GetUpdatedAt(),
 	}
 }
 
@@ -553,7 +553,7 @@ func (r *NamespacesRoutes) getEncryptionKey(gctx *gin.Context) {
 		return
 	}
 
-	ekId := ns.GetEncryptionKeyId()
+	ekId := ns.GetKeyId()
 	if ekId == nil {
 		apgin.WriteError(gctx, nil, httperr.NotFoundf("namespace '%s' has no encryption key set", path))
 		val.MarkErrorReturn()
@@ -561,7 +561,7 @@ func (r *NamespacesRoutes) getEncryptionKey(gctx *gin.Context) {
 	}
 
 	gctx.PureJSON(http.StatusOK, NamespaceEncryptionKeyJson{
-		EncryptionKeyId: string(*ekId),
+		KeyId: string(*ekId),
 	})
 }
 
@@ -584,7 +584,7 @@ func (r *NamespacesRoutes) setEncryptionKey(gctx *gin.Context) {
 		return
 	}
 
-	if req.EncryptionKeyId == "" {
+	if req.KeyId == "" {
 		apgin.WriteError(gctx, nil, httperr.BadRequest("encryption_key_id is required"))
 		val.MarkErrorReturn()
 		return
@@ -609,10 +609,10 @@ func (r *NamespacesRoutes) setEncryptionKey(gctx *gin.Context) {
 		return
 	}
 
-	ns, err = r.core.SetNamespaceEncryptionKey(ctx, path, apid.ID(req.EncryptionKeyId))
+	ns, err = r.core.SetNamespaceKey(ctx, path, apid.ID(req.KeyId))
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("encryption key '%s' not found", req.EncryptionKeyId), httperr.WithInternalErr(err)))
+			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("encryption key '%s' not found", req.KeyId), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
@@ -663,7 +663,7 @@ func (r *NamespacesRoutes) clearEncryptionKey(gctx *gin.Context) {
 		return
 	}
 
-	_, err = r.core.ClearNamespaceEncryptionKey(ctx, path)
+	_, err = r.core.ClearNamespaceKey(ctx, path)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
 			gctx.Status(http.StatusNoContent)

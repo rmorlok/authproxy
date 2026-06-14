@@ -19,7 +19,7 @@ const EncryptionKeyVersionsTable = "encryption_key_versions"
 
 type EncryptionKeyVersion struct {
 	Id              apid.ID
-	EncryptionKeyId apid.ID
+	KeyId           apid.ID
 	Provider        string
 	ProviderID      string
 	ProviderVersion string
@@ -48,7 +48,7 @@ func (e *EncryptionKeyVersion) cols() []string {
 func (e *EncryptionKeyVersion) fields() []any {
 	return []any{
 		&e.Id,
-		&e.EncryptionKeyId,
+		&e.KeyId,
 		&e.Provider,
 		&e.ProviderID,
 		&e.ProviderVersion,
@@ -63,7 +63,7 @@ func (e *EncryptionKeyVersion) fields() []any {
 func (e *EncryptionKeyVersion) values() []any {
 	return []any{
 		e.Id,
-		e.EncryptionKeyId,
+		e.KeyId,
 		e.Provider,
 		e.ProviderID,
 		e.ProviderVersion,
@@ -84,9 +84,9 @@ func (ekv *EncryptionKeyVersion) Validate() error {
 		result = multierror.Append(result, err)
 	}
 
-	if ekv.EncryptionKeyId.IsNil() {
+	if ekv.KeyId.IsNil() {
 		result = multierror.Append(result, errors.New("encryption key id is required"))
-	} else if err := ekv.EncryptionKeyId.ValidatePrefix(apid.PrefixEncryptionKey); err != nil {
+	} else if err := ekv.KeyId.ValidatePrefix(apid.PrefixKey); err != nil {
 		result = multierror.Append(result, err)
 	}
 
@@ -168,12 +168,12 @@ func (s *service) getEncryptionKeyIdForNamespace(ctx context.Context, namespaceP
 	if err != nil {
 		return nil, err
 	}
-	return ns.EncryptionKeyId, nil
+	return ns.KeyId, nil
 }
 
 // ForEncryptionKey methods - direct queries by encryption_key_id
 
-func (s *service) GetCurrentEncryptionKeyVersionForEncryptionKey(ctx context.Context, encryptionKeyId apid.ID) (*EncryptionKeyVersion, error) {
+func (s *service) GetCurrentEncryptionKeyVersionForKey(ctx context.Context, encryptionKeyId apid.ID) (*EncryptionKeyVersion, error) {
 	var result EncryptionKeyVersion
 
 	err := s.sq.
@@ -198,7 +198,7 @@ func (s *service) GetCurrentEncryptionKeyVersionForEncryptionKey(ctx context.Con
 	return &result, nil
 }
 
-func (s *service) ListEncryptionKeyVersionsForEncryptionKey(ctx context.Context, encryptionKeyId apid.ID) ([]*EncryptionKeyVersion, error) {
+func (s *service) ListEncryptionKeyVersionsForKey(ctx context.Context, encryptionKeyId apid.ID) ([]*EncryptionKeyVersion, error) {
 	var result EncryptionKeyVersion
 
 	rows, err := s.sq.
@@ -229,7 +229,7 @@ func (s *service) ListEncryptionKeyVersionsForEncryptionKey(ctx context.Context,
 	return results, rows.Err()
 }
 
-func (s *service) GetMaxOrderedVersionForEncryptionKey(ctx context.Context, encryptionKeyId apid.ID) (int64, error) {
+func (s *service) GetMaxOrderedVersionForKey(ctx context.Context, encryptionKeyId apid.ID) (int64, error) {
 	var maxVersion sql.NullInt64
 
 	err := s.sq.
@@ -254,7 +254,7 @@ func (s *service) GetMaxOrderedVersionForEncryptionKey(ctx context.Context, encr
 	return maxVersion.Int64, nil
 }
 
-func (s *service) ClearCurrentFlagForEncryptionKey(ctx context.Context, encryptionKeyId apid.ID) error {
+func (s *service) ClearCurrentFlagForKey(ctx context.Context, encryptionKeyId apid.ID) error {
 	now := apctx.GetClock(ctx).Now()
 
 	_, err := s.sq.
@@ -286,7 +286,7 @@ func (s *service) GetCurrentEncryptionKeyVersionForNamespace(ctx context.Context
 	if ekId == nil {
 		return nil, nil
 	}
-	return s.GetCurrentEncryptionKeyVersionForEncryptionKey(ctx, *ekId)
+	return s.GetCurrentEncryptionKeyVersionForKey(ctx, *ekId)
 }
 
 func (s *service) ListEncryptionKeyVersionsForNamespace(ctx context.Context, namespacePath string) ([]*EncryptionKeyVersion, error) {
@@ -297,7 +297,7 @@ func (s *service) ListEncryptionKeyVersionsForNamespace(ctx context.Context, nam
 	if ekId == nil {
 		return nil, nil
 	}
-	return s.ListEncryptionKeyVersionsForEncryptionKey(ctx, *ekId)
+	return s.ListEncryptionKeyVersionsForKey(ctx, *ekId)
 }
 
 func (s *service) GetMaxOrderedVersionForNamespace(ctx context.Context, namespacePath string) (int64, error) {
@@ -308,7 +308,7 @@ func (s *service) GetMaxOrderedVersionForNamespace(ctx context.Context, namespac
 	if ekId == nil {
 		return 0, nil
 	}
-	return s.GetMaxOrderedVersionForEncryptionKey(ctx, *ekId)
+	return s.GetMaxOrderedVersionForKey(ctx, *ekId)
 }
 
 func (s *service) ClearCurrentFlagForNamespace(ctx context.Context, namespacePath string) error {
@@ -319,7 +319,7 @@ func (s *service) ClearCurrentFlagForNamespace(ctx context.Context, namespacePat
 	if ekId == nil {
 		return nil
 	}
-	return s.ClearCurrentFlagForEncryptionKey(ctx, *ekId)
+	return s.ClearCurrentFlagForKey(ctx, *ekId)
 }
 
 func (s *service) DeleteEncryptionKeyVersion(ctx context.Context, id apid.ID) error {
@@ -345,7 +345,7 @@ func (s *service) DeleteEncryptionKeyVersion(ctx context.Context, id apid.ID) er
 	return nil
 }
 
-func (s *service) DeleteEncryptionKeyVersionsForEncryptionKey(ctx context.Context, encryptionKeyId apid.ID) error {
+func (s *service) DeleteEncryptionKeyVersionsForKey(ctx context.Context, encryptionKeyId apid.ID) error {
 	_, err := s.sq.
 		Update(EncryptionKeyVersionsTable).
 		Set("deleted_at", apctx.GetClock(ctx).Now()).
