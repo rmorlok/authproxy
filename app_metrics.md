@@ -4,7 +4,7 @@ AuthProxy stores Admin UI-facing application metrics in the `app_metrics` store.
 
 ## Configuration
 
-`app_metrics` is required because request-event listing and metrics queries are routed through it. In development the store can use SQLite, Postgres, or ClickHouse. Deployed environments should prefer ClickHouse or a dedicated Postgres database when request volume is high.
+`app_metrics` is required because request-event listing and metrics queries are routed through it. In development the store can use the same SQLite or Postgres database as the primary application database; app_metrics tracks its migrations in `app_metrics_schema_migrations` so it does not conflict with the primary `schema_migrations` table. Deployed environments should prefer ClickHouse or a dedicated Postgres database when request volume is high.
 
 ```yaml
 app_metrics:
@@ -28,7 +28,7 @@ Key settings:
 
 | Setting | Purpose |
 |---|---|
-| `app_metrics.database` | Dedicated database for request events and resource sample tables. |
+| `app_metrics.database` | Database for request events and resource sample tables; can be shared with the primary application database for development. |
 | `app_metrics.resource_snapshot_interval` | Cadence for the worker snapshot job. Defaults to `15m`. |
 | `app_metrics.request_events.full_request_recording` | Controls when full request/response bodies are captured. |
 | `app_metrics.blob_storage` | Stores full request/response payloads when capture is enabled. |
