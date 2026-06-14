@@ -8,6 +8,7 @@ This directory holds long-form documentation that supplements the [main repo REA
 - **[Rate limits](rate-limits.md)** — define rate-limit resources, configure connector-level reactive 429 handling, understand the request log attribution fields.
 - **[Labels and annotations](labels.md)** — the Kubernetes-style label system, system labels under `apxy/`, carry-forward through the namespace → connector → connection hierarchy, label selectors, per-request label snapshots.
 - **[Application metrics](app_metrics.md)** — configure the app metrics store, query request-event and resource metrics, and understand supported aggregations and dimensions.
+- **[Unified key model migration](key-model-migration.md)** — design contract for replacing encryption key versions with `keys` and `data_encryption_keys`.
 
 ## Operational guides
 
