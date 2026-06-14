@@ -113,6 +113,12 @@ type ManifestSetupStep interface {
 	// carries request-scoped values (ReturnToUrl) the step may need to mint
 	// the URL.
 	RenderRedirect(ctx context.Context, opts RenderRedirectOptions) (RedirectInfo, error)
+
+	// IsEligible reports whether this step should currently participate in
+	// the setup flow. Auth-method-emitted steps and apxy:* pseudo-steps are
+	// always eligible; connector-authored steps may use this to evaluate an
+	// if.javascript condition against the connection state.
+	IsEligible(ctx context.Context) (bool, error)
 }
 
 // ManifestSetupFlow is the ordered, fully-materialized setup flow for a
@@ -122,26 +128,32 @@ type ManifestSetupStep interface {
 // apxy:auth_failed) and the verify step (apxy:verify) are addressable by id
 // but not part of the linear order returned by Steps() / NextStep().
 type ManifestSetupFlow interface {
-	// Steps returns the ordered, linear steps a user walks through during
-	// setup. Implicit terminal steps (verify_failed, auth_failed) and the
-	// verify pseudo-step are not included; use StepById for those.
-	Steps() []ManifestSetupStep
+	// Steps returns the ordered, eligible linear steps a user walks through
+	// during setup. Implicit terminal steps (verify_failed, auth_failed) and
+	// the verify pseudo-step are not included; use StepById for those.
+	Steps(ctx context.Context) ([]ManifestSetupStep, error)
 
-	// StepById returns the step with the given id, including implicit
-	// terminal/verify pseudo-steps. Returns false if the id is unknown.
-	StepById(id string) (ManifestSetupStep, bool)
+	// StepById returns the eligible step with the given id, including the
+	// implicit verify pseudo-step. Returns false if the id is unknown or known
+	// but currently ineligible.
+	StepById(ctx context.Context, id string) (ManifestSetupStep, bool, error)
+
+	// ContainsStep reports whether id belongs to a manifest step regardless of
+	// current eligibility. Used by resume paths to distinguish stale gated-off
+	// steps from corrupted setup state.
+	ContainsStep(id string) bool
 
 	// FirstStep returns the first step in the linear flow. Returns nil if
 	// the flow has no linear steps (a connector with no preconnect, no
 	// auth-emitted steps, and no configure — which means setup is already
 	// complete on initiate).
-	FirstStep() ManifestSetupStep
+	FirstStep(ctx context.Context) (ManifestSetupStep, error)
 
 	// NextStep returns the step that follows the step with the given id in
 	// the linear flow, or false when currentId is the final linear step.
 	// Pseudo-steps (verify, verify_failed, auth_failed) are not part of the
 	// linear successor relation.
-	NextStep(currentId string) (ManifestSetupStep, bool)
+	NextStep(ctx context.Context, currentId string) (ManifestSetupStep, bool, error)
 }
 
 // FormStepConfig configures NewFormStep. All fields are optional except Id
@@ -155,6 +167,7 @@ type FormStepConfig struct {
 	JsonSchema  json.RawMessage
 	UiSchema    json.RawMessage
 	OnSubmit    func(ctx context.Context, data json.RawMessage) error
+	IsEligible  func(ctx context.Context) (bool, error)
 }
 
 // NewFormStep returns a form-type ManifestSetupStep backed by the supplied
@@ -169,6 +182,7 @@ type RedirectStepConfig struct {
 	Id          string
 	Title       string
 	Description string
+	IsEligible  func(ctx context.Context) (bool, error)
 	// Render resolves the redirect URL when the flow runner reaches this
 	// step. Required.
 	Render func(ctx context.Context, opts RenderRedirectOptions) (RedirectInfo, error)
@@ -210,6 +224,13 @@ func (s *formStep) RenderRedirect(_ context.Context, _ RenderRedirectOptions) (R
 	return RedirectInfo{}, ErrRedirectNotSupported
 }
 
+func (s *formStep) IsEligible(ctx context.Context) (bool, error) {
+	if s.cfg.IsEligible == nil {
+		return true, nil
+	}
+	return s.cfg.IsEligible(ctx)
+}
+
 type redirectStep struct {
 	cfg RedirectStepConfig
 }
@@ -232,6 +253,13 @@ func (s *redirectStep) RenderRedirect(ctx context.Context, opts RenderRedirectOp
 	return s.cfg.Render(ctx, opts)
 }
 
+func (s *redirectStep) IsEligible(ctx context.Context) (bool, error) {
+	if s.cfg.IsEligible == nil {
+		return true, nil
+	}
+	return s.cfg.IsEligible(ctx)
+}
+
 // verifyStep is the synthetic apxy:verify pseudo-step. Stateless — no
 // configuration is needed since its sole purpose is to mark "probes are
 // running; the UI should display Verifying."
@@ -250,4 +278,8 @@ func (s *verifyStep) OnSubmit(_ context.Context, _ json.RawMessage) error {
 
 func (s *verifyStep) RenderRedirect(_ context.Context, _ RenderRedirectOptions) (RedirectInfo, error) {
 	return RedirectInfo{}, ErrRedirectNotSupported
+}
+
+func (s *verifyStep) IsEligible(_ context.Context) (bool, error) {
+	return true, nil
 }

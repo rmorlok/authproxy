@@ -212,6 +212,40 @@ func TestSubmitForm(t *testing.T) {
 		assert.Equal(t, iface.ConnectionSetupResponseTypeComplete, resp.GetType())
 	})
 
+	t.Run("skips next step when submitted config makes condition false", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		sf := &cschema.SetupFlow{
+			Configure: &cschema.SetupFlowPhase{
+				Steps: []cschema.SetupFlowStep{
+					{Id: "region", JsonSchema: regionSchema},
+					{
+						Id:         "us_only",
+						JsonSchema: workspaceSchema,
+						If:         &cschema.SetupFlowStepIf{Javascript: `cfg.region === "us"`},
+					},
+					{Id: "workspace", JsonSchema: workspaceSchema},
+				},
+			},
+		}
+
+		conn, db := newTestConnectionWithSetupFlow(t, ctrl, sf)
+		step := cschema.MustNewSetupStep("region")
+		conn.SetupStep = &step
+
+		db.EXPECT().SetConnectionEncryptedConfiguration(gomock.Any(), conn.Id, gomock.Any()).Return(nil)
+		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewSetupStep("workspace"))).Return(nil)
+
+		resp, err := conn.SubmitForm(context.Background(), iface.SubmitConnectionRequest{
+			StepId: "region",
+			Data:   json.RawMessage(`{"region":"eu"}`),
+		})
+		require.NoError(t, err)
+		require.IsType(t, &iface.ConnectionSetupForm{}, resp)
+		assert.Equal(t, "workspace", resp.(*iface.ConnectionSetupForm).StepId)
+	})
+
 	t.Run("merges data from multiple steps", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
@@ -359,6 +393,38 @@ func TestGetCurrentSetupStepResponse(t *testing.T) {
 		conn, _ := newTestConnectionWithSetupFlow(t, ctrl, sf)
 		step := cschema.MustNewSetupStep("workspace")
 		conn.SetupStep = &step
+
+		resp, err := conn.GetCurrentSetupStepResponse(context.Background())
+		require.NoError(t, err)
+		require.IsType(t, &iface.ConnectionSetupForm{}, resp)
+
+		form := resp.(*iface.ConnectionSetupForm)
+		assert.Equal(t, "workspace", form.StepId)
+		assert.Equal(t, "Select Workspace", form.StepTitle)
+	})
+
+	t.Run("advances past ineligible stored step on resume", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		sf := &cschema.SetupFlow{
+			Configure: &cschema.SetupFlowPhase{
+				Steps: []cschema.SetupFlowStep{
+					{
+						Id:         "us_only",
+						JsonSchema: workspaceSchema,
+						If:         &cschema.SetupFlowStepIf{Javascript: `cfg.region === "us"`},
+					},
+					{Id: "workspace", Title: "Select Workspace", JsonSchema: workspaceSchema},
+				},
+			},
+		}
+		conn, db := newTestConnectionWithSetupFlow(t, ctrl, sf)
+		setConnectionConfigFixture(t, conn, map[string]any{"region": "eu"})
+		step := cschema.MustNewSetupStep("us_only")
+		conn.SetupStep = &step
+
+		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewSetupStep("workspace"))).Return(nil)
 
 		resp, err := conn.GetCurrentSetupStepResponse(context.Background())
 		require.NoError(t, err)
