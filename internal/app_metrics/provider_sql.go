@@ -13,8 +13,9 @@ import (
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/golang-migrate/migrate/v4"
-	_ "github.com/golang-migrate/migrate/v4/database/postgres"
-	_ "github.com/golang-migrate/migrate/v4/database/sqlite3"
+	migratedb "github.com/golang-migrate/migrate/v4/database"
+	"github.com/golang-migrate/migrate/v4/database/postgres"
+	"github.com/golang-migrate/migrate/v4/database/sqlite3"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -28,13 +29,15 @@ import (
 //go:embed migrations/**/*.sql
 var appMetricsMigrationsFs embed.FS
 
-const entryRecordsTable = "app_metrics_request_events"
+const (
+	appMetricsMigrationsTable = "app_metrics_schema_migrations"
+	entryRecordsTable         = "app_metrics_request_events"
+)
 
 // --- SQL RecordStore ---
 
 type sqlRecordStore struct {
 	db                *sql.DB
-	uri               string
 	provider          config.DatabaseProvider
 	cfg               *config.Database
 	logger            *slog.Logger
@@ -49,7 +52,6 @@ func NewSqlRecordStore(cfg *config.Database, logger *slog.Logger, opts ...sqlh.O
 
 	return &sqlRecordStore{
 		db:                db,
-		uri:               cfg.GetUri(),
 		provider:          cfg.GetProvider(),
 		cfg:               cfg,
 		logger:            logger.With("sub_component", "store"),
@@ -179,8 +181,14 @@ func (s *sqlRecordStore) Migrate(ctx context.Context) error {
 		return fmt.Errorf("failed to load app metrics migrations for '%s': %w", provider, err)
 	}
 
-	m, err := migrate.NewWithSourceInstance("iofs", d, s.uri)
+	driver, err := s.newMigrationDriver()
 	if err != nil {
+		return fmt.Errorf("failed to setup app metrics migration driver: %w", err)
+	}
+
+	m, err := migrate.NewWithInstance("iofs", d, provider, driver)
+	if err != nil {
+		_ = driver.Close()
 		return fmt.Errorf("failed to setup app metrics migrations: %w", err)
 	}
 	defer func() {
@@ -200,6 +208,35 @@ func (s *sqlRecordStore) Migrate(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (s *sqlRecordStore) newMigrationDriver() (migratedb.Driver, error) {
+	migrationConn, err := sql.Open(s.cfg.GetDriver(), s.cfg.GetDsn())
+	if err != nil {
+		return nil, err
+	}
+
+	switch s.cfg.GetProvider() {
+	case config.DatabaseProviderPostgres:
+		driver, err := postgres.WithInstance(migrationConn, &postgres.Config{
+			MigrationsTable: appMetricsMigrationsTable,
+		})
+		if err != nil {
+			_ = migrationConn.Close()
+		}
+		return driver, err
+	case config.DatabaseProviderSqlite:
+		driver, err := sqlite3.WithInstance(migrationConn, &sqlite3.Config{
+			MigrationsTable: appMetricsMigrationsTable,
+		})
+		if err != nil {
+			_ = migrationConn.Close()
+		}
+		return driver, err
+	default:
+		_ = migrationConn.Close()
+		return nil, fmt.Errorf("unsupported SQL app metrics provider %q", s.cfg.GetProvider())
+	}
 }
 
 func (s *sqlRecordStore) Ping(ctx context.Context) bool {
