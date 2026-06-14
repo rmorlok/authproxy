@@ -300,6 +300,20 @@ func (mr *MockDBMockRecorder) CheckNonceValidAndMarkUsed(ctx, nonce, retainRecor
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CheckNonceValidAndMarkUsed", reflect.TypeOf((*MockDB)(nil).CheckNonceValidAndMarkUsed), ctx, nonce, retainRecordUntil)
 }
 
+// ClearCurrentDataEncryptionKeyFlagForKey mocks base method.
+func (m *MockDB) ClearCurrentDataEncryptionKeyFlagForKey(ctx context.Context, keyId apid.ID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ClearCurrentDataEncryptionKeyFlagForKey", ctx, keyId)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ClearCurrentDataEncryptionKeyFlagForKey indicates an expected call of ClearCurrentDataEncryptionKeyFlagForKey.
+func (mr *MockDBMockRecorder) ClearCurrentDataEncryptionKeyFlagForKey(ctx, keyId interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ClearCurrentDataEncryptionKeyFlagForKey", reflect.TypeOf((*MockDB)(nil).ClearCurrentDataEncryptionKeyFlagForKey), ctx, keyId)
+}
+
 // ClearCurrentFlagForKey mocks base method.
 func (m *MockDB) ClearCurrentFlagForKey(ctx context.Context, encryptionKeyId apid.ID) error {
 	m.ctrl.T.Helper()
@@ -803,6 +817,20 @@ func (mr *MockDBMockRecorder) EnsureNamespaceByPath(ctx, path interface{}) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureNamespaceByPath", reflect.TypeOf((*MockDB)(nil).EnsureNamespaceByPath), ctx, path)
 }
 
+// EnumerateDataEncryptionKeysForKey mocks base method.
+func (m *MockDB) EnumerateDataEncryptionKeysForKey(ctx context.Context, keyId apid.ID, callback func([]*database.DataEncryptionKey, bool) (pagination.KeepGoing, error)) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "EnumerateDataEncryptionKeysForKey", ctx, keyId, callback)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// EnumerateDataEncryptionKeysForKey indicates an expected call of EnumerateDataEncryptionKeysForKey.
+func (mr *MockDBMockRecorder) EnumerateDataEncryptionKeysForKey(ctx, keyId, callback interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnumerateDataEncryptionKeysForKey", reflect.TypeOf((*MockDB)(nil).EnumerateDataEncryptionKeysForKey), ctx, keyId, callback)
+}
+
 // EnumerateEncryptionKeyVersionsForKey mocks base method.
 func (m *MockDB) EnumerateEncryptionKeyVersionsForKey(ctx context.Context, ekId apid.ID, callback func([]*database.EncryptionKeyVersion, bool) (pagination.KeepGoing, error)) error {
 	m.ctrl.T.Helper()
@@ -1007,6 +1035,21 @@ func (m *MockDB) GetConnectorVersions(ctx context.Context, requested []database.
 func (mr *MockDBMockRecorder) GetConnectorVersions(ctx, requested interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnectorVersions", reflect.TypeOf((*MockDB)(nil).GetConnectorVersions), ctx, requested)
+}
+
+// GetCurrentDataEncryptionKeyForKey mocks base method.
+func (m *MockDB) GetCurrentDataEncryptionKeyForKey(ctx context.Context, keyId apid.ID) (*database.DataEncryptionKey, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCurrentDataEncryptionKeyForKey", ctx, keyId)
+	ret0, _ := ret[0].(*database.DataEncryptionKey)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCurrentDataEncryptionKeyForKey indicates an expected call of GetCurrentDataEncryptionKeyForKey.
+func (mr *MockDBMockRecorder) GetCurrentDataEncryptionKeyForKey(ctx, keyId interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentDataEncryptionKeyForKey", reflect.TypeOf((*MockDB)(nil).GetCurrentDataEncryptionKeyForKey), ctx, keyId)
 }
 
 // GetCurrentEncryptionKeyVersionForKey mocks base method.
@@ -1351,18 +1394,18 @@ func (mr *MockDBMockRecorder) ListConnectorsFromCursor(ctx, cursor interface{}) 
 }
 
 // ListDataEncryptionKeysForKey mocks base method.
-func (m *MockDB) ListDataEncryptionKeysForKey(ctx context.Context, encryptionKeyId apid.ID) ([]*database.DataEncryptionKey, error) {
+func (m *MockDB) ListDataEncryptionKeysForKey(ctx context.Context, keyId apid.ID) ([]*database.DataEncryptionKey, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListDataEncryptionKeysForKey", ctx, encryptionKeyId)
+	ret := m.ctrl.Call(m, "ListDataEncryptionKeysForKey", ctx, keyId)
 	ret0, _ := ret[0].([]*database.DataEncryptionKey)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ListDataEncryptionKeysForKey indicates an expected call of ListDataEncryptionKeysForKey.
-func (mr *MockDBMockRecorder) ListDataEncryptionKeysForKey(ctx, encryptionKeyId interface{}) *gomock.Call {
+func (mr *MockDBMockRecorder) ListDataEncryptionKeysForKey(ctx, keyId interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListDataEncryptionKeysForKey", reflect.TypeOf((*MockDB)(nil).ListDataEncryptionKeysForKey), ctx, encryptionKeyId)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListDataEncryptionKeysForKey", reflect.TypeOf((*MockDB)(nil).ListDataEncryptionKeysForKey), ctx, keyId)
 }
 
 // ListEncryptionKeyVersionsForKey mocks base method.
@@ -1842,6 +1885,20 @@ func (m *MockDB) SetCursorEncryptor(e pagination.CursorEncryptor) {
 func (mr *MockDBMockRecorder) SetCursorEncryptor(e interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetCursorEncryptor", reflect.TypeOf((*MockDB)(nil).SetCursorEncryptor), e)
+}
+
+// SetDataEncryptionKeyCurrentFlag mocks base method.
+func (m *MockDB) SetDataEncryptionKeyCurrentFlag(ctx context.Context, id apid.ID, isCurrent bool) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetDataEncryptionKeyCurrentFlag", ctx, id, isCurrent)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetDataEncryptionKeyCurrentFlag indicates an expected call of SetDataEncryptionKeyCurrentFlag.
+func (mr *MockDBMockRecorder) SetDataEncryptionKeyCurrentFlag(ctx, id, isCurrent interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDataEncryptionKeyCurrentFlag", reflect.TypeOf((*MockDB)(nil).SetDataEncryptionKeyCurrentFlag), ctx, id, isCurrent)
 }
 
 // SetEncryptionKeyVersionCurrentFlag mocks base method.
