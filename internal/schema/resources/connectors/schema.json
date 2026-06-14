@@ -202,6 +202,20 @@
           "additionalProperties": {
             "$ref": "#/$defs/DataSourceDef"
           }
+        },
+        "if": {
+          "$ref": "#/$defs/SetupFlowStepIf"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SetupFlowStepIf": {
+      "type": "object",
+      "required": ["javascript"],
+      "properties": {
+        "javascript": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "additionalProperties": false
