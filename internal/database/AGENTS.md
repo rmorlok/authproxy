@@ -129,10 +129,10 @@ When using `rawDb.Exec()` for test setup, **do not use `?` placeholders** — th
 
 ```go
 // WRONG — fails on PostgreSQL
-rawDb.Exec(`UPDATE namespaces SET encryption_key_id = ? WHERE path = 'root'`, ekId)
+rawDb.Exec(`UPDATE namespaces SET key_id = ? WHERE path = 'root'`, ekId)
 
 // CORRECT — works on both
-rawDb.Exec(fmt.Sprintf(`UPDATE namespaces SET encryption_key_id = '%s' WHERE path = 'root'`, ekId))
+rawDb.Exec(fmt.Sprintf(`UPDATE namespaces SET key_id = '%s' WHERE path = 'root'`, ekId))
 ```
 
 ### Timezone Handling in Tests

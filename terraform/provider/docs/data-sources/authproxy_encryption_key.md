@@ -6,7 +6,7 @@ Reads an existing AuthProxy encryption key.
 
 ```hcl
 data "authproxy_encryption_key" "main" {
-  id = "ek_abc123"
+  id = "key_abc123"
 }
 ```
 

@@ -88,7 +88,7 @@ definitions:
       created_at:
         type: string
       id:
-        example: ek_test550e8400abcde
+        example: key_test550e8400abcd
         type: string
       labels:
         additionalProperties:
@@ -136,7 +136,7 @@ definitions:
       created_at:
         type: string
       encryption_key_id:
-        example: ek_test550e8400abcde
+        example: key_test550e8400abcd
         type: string
       labels:
         additionalProperties:
@@ -371,7 +371,7 @@ definitions:
       created_at:
         type: string
       id:
-        example: ek_test550e8400abcde
+        example: key_test550e8400abcd
         type: string
       labels:
         additionalProperties:
@@ -453,7 +453,7 @@ definitions:
       created_at:
         type: string
       encryption_key_id:
-        example: ek_test550e8400abcde
+        example: key_test550e8400abcd
         type: string
       labels:
         additionalProperties:

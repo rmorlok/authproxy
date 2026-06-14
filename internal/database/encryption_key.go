@@ -26,11 +26,47 @@ func init() {
 	})
 }
 
-const EncryptionKeysTable = "encryption_keys"
+const EncryptionKeysTable = "keys"
 
 // GlobalEncryptionKeyID is the ID of the global encryption key created by migration. It is the root
 // of the encryption key hierarchy and must not be deleted.
-var GlobalEncryptionKeyID = apid.ID("ek_global")
+var GlobalEncryptionKeyID = apid.ID("key_global")
+
+type EncryptionKeyUsage string
+
+const (
+	EncryptionKeyUsageDataEncryption EncryptionKeyUsage = "data_encryption"
+)
+
+func IsValidEncryptionKeyUsage[T string | EncryptionKeyUsage](usage T) bool {
+	switch EncryptionKeyUsage(usage) {
+	case EncryptionKeyUsageDataEncryption:
+		return true
+	default:
+		return false
+	}
+}
+
+type EncryptionKeyMaterialType string
+
+const (
+	EncryptionKeyMaterialTypeSymmetric EncryptionKeyMaterialType = "symmetric"
+	EncryptionKeyMaterialTypePublic    EncryptionKeyMaterialType = "public"
+	EncryptionKeyMaterialTypePrivate   EncryptionKeyMaterialType = "private"
+	EncryptionKeyMaterialTypeExternal  EncryptionKeyMaterialType = "external"
+)
+
+func IsValidEncryptionKeyMaterialType[T string | EncryptionKeyMaterialType](materialType T) bool {
+	switch EncryptionKeyMaterialType(materialType) {
+	case EncryptionKeyMaterialTypeSymmetric,
+		EncryptionKeyMaterialTypePublic,
+		EncryptionKeyMaterialTypePrivate,
+		EncryptionKeyMaterialTypeExternal:
+		return true
+	default:
+		return false
+	}
+}
 
 type EncryptionKeyState string
 
@@ -71,6 +107,8 @@ func IsValidEncryptionKeyOrderByField[T string | EncryptionKeyOrderByField](fiel
 type EncryptionKey struct {
 	Id               apid.ID
 	Namespace        string
+	Usage            EncryptionKeyUsage
+	MaterialType     EncryptionKeyMaterialType
 	EncryptedKeyData *encfield.EncryptedField
 	State            EncryptionKeyState
 	Labels           Labels
@@ -89,6 +127,8 @@ func (ek *EncryptionKey) cols() []string {
 	return []string{
 		"id",
 		"namespace",
+		"usage",
+		"material_type",
 		"encrypted_key_data",
 		"state",
 		"labels",
@@ -104,6 +144,8 @@ func (ek *EncryptionKey) fields() []any {
 	return []any{
 		&ek.Id,
 		&ek.Namespace,
+		&ek.Usage,
+		&ek.MaterialType,
 		&ek.EncryptedKeyData,
 		&ek.State,
 		&ek.Labels,
@@ -119,6 +161,8 @@ func (ek *EncryptionKey) values() []any {
 	return []any{
 		ek.Id,
 		ek.Namespace,
+		ek.Usage,
+		ek.MaterialType,
 		ek.EncryptedKeyData,
 		ek.State,
 		ek.Labels,
@@ -131,6 +175,12 @@ func (ek *EncryptionKey) values() []any {
 }
 
 func (ek *EncryptionKey) normalize() {
+	if ek.Usage == "" {
+		ek.Usage = EncryptionKeyUsageDataEncryption
+	}
+	if ek.MaterialType == "" {
+		ek.MaterialType = EncryptionKeyMaterialTypeSymmetric
+	}
 	if ek.State == "" {
 		ek.State = EncryptionKeyStateActive
 	}
@@ -147,6 +197,14 @@ func (ek *EncryptionKey) Validate() error {
 
 	if ek.Namespace == "" {
 		result = multierror.Append(result, errors.New("namespace is required"))
+	}
+
+	if !IsValidEncryptionKeyUsage(ek.Usage) {
+		result = multierror.Append(result, errors.New("invalid encryption key usage"))
+	}
+
+	if !IsValidEncryptionKeyMaterialType(ek.MaterialType) {
+		result = multierror.Append(result, errors.New("invalid encryption key material type"))
 	}
 
 	if !IsValidEncryptionKeyState(ek.State) {
@@ -823,7 +881,7 @@ func (s *service) ListEncryptionKeysFromCursor(ctx context.Context, cursor strin
 }
 
 // EnumerateEncryptionKeysInDependencyOrder walks all non-deleted encryption keys in breadth-first
-// order rooted at the global key (ek_global). Encryption keys form a tree: the root key has nil
+// order rooted at the global key (key_global). Encryption keys form a tree: the root key has nil
 // EncryptedKeyData, while every other key's EncryptedKeyData.ID references an encryption_key_version
 // row whose encryption_key_id points to the parent encryption key. The method loads all keys and
 // key-version mappings into memory, builds this tree, then invokes the callback once per depth level

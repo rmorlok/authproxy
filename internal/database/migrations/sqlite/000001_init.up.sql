@@ -65,9 +65,9 @@ create table namespaces
     path                                   text primary key,
     depth                                  integer,
     state                                  text,
-    encryption_key_id                      text,
-    target_encryption_key_version_id       text,
-    target_encryption_key_version_updated_at datetime,
+    key_id                                 text,
+    target_data_encryption_key_id          text,
+    target_data_encryption_key_updated_at  datetime,
     labels                                 text,
     annotations                            text,
     created_at                             datetime,
@@ -105,9 +105,11 @@ create table used_nonces
 create index idx_used_nonces_retain_until
     on used_nonces (retain_until);
 
-create table encryption_keys (
+create table keys (
     id                 text primary key,
     namespace          text not null,
+    usage              text not null default 'data_encryption',
+    material_type      text not null default 'symmetric',
     encrypted_key_data text,
     state              text not null default 'active',
     labels             text,
@@ -118,12 +120,14 @@ create table encryption_keys (
     deleted_at         datetime
 );
 
-create index idx_encryption_keys_deleted_at on encryption_keys (deleted_at);
-create index idx_encryption_keys_namespace on encryption_keys (deleted_at, namespace);
+create index idx_keys_deleted_at on keys (deleted_at);
+create index idx_keys_namespace on keys (deleted_at, namespace);
 
-insert into encryption_keys (
+insert into keys (
     id,
     namespace,
+    usage,
+    material_type,
     encrypted_key_data,
     state,
     labels,
@@ -131,8 +135,10 @@ insert into encryption_keys (
     updated_at,
     deleted_at
 ) values (
-    'ek_global',
+    'key_global',
     'root',
+    'data_encryption',
+    'symmetric',
     null,
     'active',
     '{}',

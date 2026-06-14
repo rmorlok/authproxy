@@ -3,6 +3,8 @@ package database
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -16,26 +18,68 @@ import (
 
 const DataEncryptionKeysTable = "data_encryption_keys"
 
+type DataEncryptionKeyProviderMetadata map[string]string
+
+func (m DataEncryptionKeyProviderMetadata) Value() (driver.Value, error) {
+	if len(m) == 0 {
+		return nil, nil
+	}
+	b, err := json.Marshal(m)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal data encryption key provider metadata: %w", err)
+	}
+	return string(b), nil
+}
+
+func (m *DataEncryptionKeyProviderMetadata) Scan(value interface{}) error {
+	if value == nil {
+		*m = nil
+		return nil
+	}
+
+	var data []byte
+	switch v := value.(type) {
+	case string:
+		if v == "" {
+			*m = nil
+			return nil
+		}
+		data = []byte(v)
+	case []byte:
+		if len(v) == 0 {
+			*m = nil
+			return nil
+		}
+		data = v
+	default:
+		return fmt.Errorf("cannot scan %T into DataEncryptionKeyProviderMetadata", value)
+	}
+
+	return json.Unmarshal(data, m)
+}
+
 type DataEncryptionKey struct {
-	Id              apid.ID
-	EncryptionKeyId apid.ID
-	Provider        string
-	ProviderID      string
-	ProviderVersion string
-	ProtectedData   *sconfig.KeyVersionProtectedData
-	IsCurrent       bool
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-	DeletedAt       *time.Time
+	Id               apid.ID
+	EncryptionKeyId  apid.ID
+	Provider         string
+	ProviderID       string
+	ProviderVersion  string
+	ProviderMetadata DataEncryptionKeyProviderMetadata
+	ProtectedData    *sconfig.KeyVersionProtectedData
+	IsCurrent        bool
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+	DeletedAt        *time.Time
 }
 
 func (d *DataEncryptionKey) cols() []string {
 	return []string{
 		"id",
-		"encryption_key_id",
+		"key_id",
 		"provider",
 		"provider_id",
 		"provider_version",
+		"provider_metadata",
 		"protected_data",
 		"is_current",
 		"created_at",
@@ -51,6 +95,7 @@ func (d *DataEncryptionKey) fields() []any {
 		&d.Provider,
 		&d.ProviderID,
 		&d.ProviderVersion,
+		&d.ProviderMetadata,
 		&d.ProtectedData,
 		&d.IsCurrent,
 		&d.CreatedAt,
@@ -66,6 +111,7 @@ func (d *DataEncryptionKey) values() []any {
 		d.Provider,
 		d.ProviderID,
 		d.ProviderVersion,
+		d.ProviderMetadata,
 		d.ProtectedData,
 		d.IsCurrent,
 		d.CreatedAt,
@@ -132,8 +178,8 @@ func (s *service) CreateDataEncryptionKey(ctx context.Context, dek *DataEncrypti
 				Set("is_current", false).
 				Set("updated_at", now).
 				Where(sq.Eq{
-					"encryption_key_id": dek.EncryptionKeyId,
-					"deleted_at":        nil,
+					"key_id":     dek.EncryptionKeyId,
+					"deleted_at": nil,
 				}).
 				RunWith(tx).
 				Exec(); err != nil {
@@ -183,8 +229,8 @@ func (s *service) ListDataEncryptionKeysForEncryptionKey(ctx context.Context, en
 		Select(result.cols()...).
 		From(DataEncryptionKeysTable).
 		Where(sq.Eq{
-			"encryption_key_id": encryptionKeyId,
-			"deleted_at":        nil,
+			"key_id":     encryptionKeyId,
+			"deleted_at": nil,
 		}).
 		OrderBy("created_at ASC", "id ASC").
 		RunWith(s.db).

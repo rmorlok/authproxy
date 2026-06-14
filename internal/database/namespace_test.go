@@ -1617,16 +1617,16 @@ INSERT INTO namespaces
 
 			ekId1 := apid.New(apid.PrefixEncryptionKey)
 			ekId2 := apid.New(apid.PrefixEncryptionKey)
-			ekvId1 := apid.New(apid.PrefixEncryptionKeyVersion)
+			dekId1 := apid.New(apid.PrefixDataEncryptionKey)
 
 			_, err = rawDb.Exec(fmt.Sprintf(`
 INSERT INTO namespaces
-(path, depth, state, encryption_key_id, target_encryption_key_version_id, created_at, updated_at, deleted_at) VALUES
+(path, depth, state, key_id, target_data_encryption_key_id, created_at, updated_at, deleted_at) VALUES
 ('root',           0, 'active', NULL,  NULL,  '2023-10-01 00:00:00', '2023-10-01 00:00:00', null),
 ('root.ns1',       1, 'active', '%s',  NULL,  '2023-10-02 00:00:00', '2023-10-02 00:00:00', null),
 ('root.ns2',       1, 'active', '%s',  '%s',  '2023-10-03 00:00:00', '2023-10-03 00:00:00', null),
 ('root.ns3',       1, 'active', NULL,  NULL,  '2023-10-04 00:00:00', '2023-10-04 00:00:00', '2023-10-05 00:00:00')
-`, ekId1, ekId2, ekvId1))
+`, ekId1, ekId2, dekId1))
 			require.NoError(t, err)
 
 			var collected []NamespaceEncryptionTarget
@@ -1658,7 +1658,7 @@ INSERT INTO namespaces
 			require.NotNil(t, collected[2].EncryptionKeyId)
 			require.Equal(t, ekId2, *collected[2].EncryptionKeyId)
 			require.NotNil(t, collected[2].TargetEncryptionKeyVersionId)
-			require.Equal(t, ekvId1, *collected[2].TargetEncryptionKeyVersionId)
+			require.Equal(t, dekId1, *collected[2].TargetEncryptionKeyVersionId)
 		})
 
 		t.Run("callback can update target encryption key version", func(t *testing.T) {
@@ -1671,11 +1671,11 @@ INSERT INTO namespaces
 			require.NoError(t, err)
 
 			ekId := apid.New(apid.PrefixEncryptionKey)
-			newEkvId := apid.New(apid.PrefixEncryptionKeyVersion)
+			newDekId := apid.New(apid.PrefixDataEncryptionKey)
 
 			_, err = rawDb.Exec(fmt.Sprintf(`
 INSERT INTO namespaces
-(path, depth, state, encryption_key_id, created_at, updated_at, deleted_at) VALUES
+(path, depth, state, key_id, created_at, updated_at, deleted_at) VALUES
 ('root',       0, 'active', NULL, '2023-10-01 00:00:00', '2023-10-01 00:00:00', null),
 ('root.ns1',   1, 'active', '%s', '2023-10-02 00:00:00', '2023-10-02 00:00:00', null)
 `, ekId))
@@ -1688,7 +1688,7 @@ INSERT INTO namespaces
 						if t.EncryptionKeyId != nil {
 							updates = append(updates, NamespaceTargetEncryptionKeyVersionUpdate{
 								Path:                         t.Path,
-								TargetEncryptionKeyVersionId: newEkvId,
+								TargetEncryptionKeyVersionId: newDekId,
 							})
 						}
 					}
@@ -1702,11 +1702,11 @@ INSERT INTO namespaces
 			var targetUpdatedAt *time.Time
 			var updatedAt time.Time
 			err = rawDb.QueryRow(
-				`SELECT target_encryption_key_version_id, target_encryption_key_version_updated_at, updated_at FROM namespaces WHERE path = 'root.ns1'`,
+				`SELECT target_data_encryption_key_id, target_data_encryption_key_updated_at, updated_at FROM namespaces WHERE path = 'root.ns1'`,
 			).Scan(&targetEkvId, &targetUpdatedAt, &updatedAt)
 			require.NoError(t, err)
 			require.NotNil(t, targetEkvId)
-			require.Equal(t, newEkvId, *targetEkvId)
+			require.Equal(t, newDekId, *targetEkvId)
 			require.NotNil(t, targetUpdatedAt)
 			require.True(t, now.Equal(*targetUpdatedAt), "targetUpdatedAt should match the clock time")
 			require.True(t, now.Equal(updatedAt), "updatedAt should match the clock time")
@@ -1714,7 +1714,7 @@ INSERT INTO namespaces
 			// Verify namespace without encryption key was NOT updated
 			var rootTargetEkvId *apid.ID
 			err = rawDb.QueryRow(
-				`SELECT target_encryption_key_version_id FROM namespaces WHERE path = 'root'`,
+				`SELECT target_data_encryption_key_id FROM namespaces WHERE path = 'root'`,
 			).Scan(&rootTargetEkvId)
 			require.NoError(t, err)
 			require.Nil(t, rootTargetEkvId)

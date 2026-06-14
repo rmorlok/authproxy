@@ -39,8 +39,8 @@ func TestEncryptionKey(t *testing.T) {
 		require.Equal(t, EncryptionKeyStateActive, got.State)
 		gotUser, _ := SplitUserAndApxyLabels(got.Labels)
 		require.Equal(t, Labels{"env": "test"}, gotUser)
-		require.Equal(t, string(ek.Id), got.Labels["apxy/ek/-/id"])
-		require.Equal(t, "root", got.Labels["apxy/ek/-/ns"])
+		require.Equal(t, string(ek.Id), got.Labels["apxy/key/-/id"])
+		require.Equal(t, "root", got.Labels["apxy/key/-/ns"])
 
 		// Update state via UpdateEncryptionKey
 		later := now.Add(time.Hour)
@@ -135,7 +135,7 @@ func TestEncryptionKey(t *testing.T) {
 		require.NoError(t, err)
 		updatedUser, _ := SplitUserAndApxyLabels(updated.Labels)
 		require.Equal(t, Labels{"new-label": "value"}, updatedUser)
-		require.Equal(t, string(ek.Id), updated.Labels["apxy/ek/-/id"])
+		require.Equal(t, string(ek.Id), updated.Labels["apxy/key/-/id"])
 
 		// DeleteLabels
 		updated, err = db.DeleteEncryptionKeyLabels(ctx, ek.Id, []string{"new-label"})
@@ -222,12 +222,12 @@ func TestEncryptionKey(t *testing.T) {
 			require.NoError(t, db.CreateEncryptionKey(ctx, ek))
 		}
 
-		// List all (5 created + 1 seeded ek_global from migration)
+		// List all (5 created + 1 seeded key_global from migration)
 		result := db.ListEncryptionKeysBuilder().FetchPage(ctx)
 		require.NoError(t, result.Error)
 		require.Len(t, result.Results, 6)
 
-		// Filter by state (4 active created + 1 seeded ek_global)
+		// Filter by state (4 active created + 1 seeded key_global)
 		result = db.ListEncryptionKeysBuilder().ForState(EncryptionKeyStateActive).FetchPage(ctx)
 		require.NoError(t, result.Error)
 		require.Len(t, result.Results, 5)
@@ -242,7 +242,7 @@ func TestEncryptionKey(t *testing.T) {
 		require.Len(t, result.Results, 2)
 		require.True(t, result.HasMore)
 
-		// Namespace matcher (5 created + 1 seeded ek_global, all in "root")
+		// Namespace matcher (5 created + 1 seeded key_global, all in "root")
 		result = db.ListEncryptionKeysBuilder().ForNamespaceMatcher("root").FetchPage(ctx)
 		require.NoError(t, result.Error)
 		require.Len(t, result.Results, 6)
@@ -278,7 +278,7 @@ func TestEncryptionKey(t *testing.T) {
 	})
 
 	t.Run("EnumerateInDependencyOrder/single_root", func(t *testing.T) {
-		// The seeded ek_global is the only key; it should appear at depth 0.
+		// The seeded key_global is the only key; it should appear at depth 0.
 		_, db, _ := MustApplyBlankTestDbConfigRaw(t, nil)
 		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
@@ -304,12 +304,12 @@ func TestEncryptionKey(t *testing.T) {
 		require.Len(t, levels, 1)
 		require.Equal(t, 0, levels[0].depth)
 		require.Len(t, levels[0].ids, 1)
-		require.Equal(t, apid.ID("ek_global"), levels[0].ids[0])
+		require.Equal(t, apid.ID("key_global"), levels[0].ids[0])
 	})
 
 	t.Run("EnumerateInDependencyOrder/three_levels", func(t *testing.T) {
 		// Build a 3-level tree:
-		//   ek_global (root, seeded)
+		//   key_global (root, seeded)
 		//     ├── childA (depth 1)
 		//     └── childB (depth 1)
 		//           └── grandchild (depth 2)
@@ -317,10 +317,10 @@ func TestEncryptionKey(t *testing.T) {
 		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		// Create an encryption key version for ek_global so children can reference it
+		// Create an encryption key version for key_global so children can reference it
 		ekvGlobal := &EncryptionKeyVersion{
 			Id:              apid.New(apid.PrefixEncryptionKeyVersion),
-			EncryptionKeyId: "ek_global",
+			EncryptionKeyId: "key_global",
 			Provider:        "local",
 			ProviderID:      "global-key",
 			ProviderVersion: "v1",
@@ -329,7 +329,7 @@ func TestEncryptionKey(t *testing.T) {
 		}
 		require.NoError(t, db.CreateEncryptionKeyVersion(ctx, ekvGlobal))
 
-		// Create childA encrypted by ek_global's version
+		// Create childA encrypted by key_global's version
 		childA := &EncryptionKey{
 			Id:        apid.New(apid.PrefixEncryptionKey),
 			Namespace: "root",
@@ -341,7 +341,7 @@ func TestEncryptionKey(t *testing.T) {
 		}
 		require.NoError(t, db.CreateEncryptionKey(ctx, childA))
 
-		// Create childB encrypted by ek_global's version
+		// Create childB encrypted by key_global's version
 		childB := &EncryptionKey{
 			Id:        apid.New(apid.PrefixEncryptionKey),
 			Namespace: "root",
@@ -400,7 +400,7 @@ func TestEncryptionKey(t *testing.T) {
 		// Depth 0: root only
 		require.Equal(t, 0, levels[0].depth)
 		require.Len(t, levels[0].ids, 1)
-		require.True(t, levels[0].ids[apid.ID("ek_global")])
+		require.True(t, levels[0].ids[apid.ID("key_global")])
 
 		// Depth 1: childA and childB
 		require.Equal(t, 1, levels[1].depth)
@@ -423,7 +423,7 @@ func TestEncryptionKey(t *testing.T) {
 		// Create a child so there would be depth 1
 		ekvGlobal := &EncryptionKeyVersion{
 			Id:              apid.New(apid.PrefixEncryptionKeyVersion),
-			EncryptionKeyId: "ek_global",
+			EncryptionKeyId: "key_global",
 			Provider:        "local",
 			ProviderID:      "global-key",
 			ProviderVersion: "v1",
@@ -460,7 +460,7 @@ func TestEncryptionKey(t *testing.T) {
 
 		ekvGlobal := &EncryptionKeyVersion{
 			Id:              apid.New(apid.PrefixEncryptionKeyVersion),
-			EncryptionKeyId: "ek_global",
+			EncryptionKeyId: "key_global",
 			Provider:        "local",
 			ProviderID:      "global-key",
 			ProviderVersion: "v1",
@@ -493,7 +493,7 @@ func TestEncryptionKey(t *testing.T) {
 		require.NoError(t, err)
 		require.Empty(t, orphans)
 		// Only the root should remain
-		require.Equal(t, []apid.ID{"ek_global"}, allIDs)
+		require.Equal(t, []apid.ID{"key_global"}, allIDs)
 	})
 
 	t.Run("EnumerateInDependencyOrder/orphaned_key_returned", func(t *testing.T) {
@@ -522,7 +522,7 @@ func TestEncryptionKey(t *testing.T) {
 		})
 		require.NoError(t, err)
 		// Only root in the walk; orphan is not walked
-		require.Equal(t, []apid.ID{"ek_global"}, allIDs)
+		require.Equal(t, []apid.ID{"key_global"}, allIDs)
 		// Orphan is returned separately
 		require.Len(t, orphans, 1)
 		require.Equal(t, orphan.Id, orphans[0].Id)

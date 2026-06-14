@@ -26,11 +26,14 @@ type Namespace struct {
 	depth           uint64
 	State           NamespaceState
 	EncryptionKeyId *apid.ID
-	Labels          Labels
-	Annotations     Annotations
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-	DeletedAt       *time.Time
+	// TargetEncryptionKeyVersionId is a transitional name. The database column is
+	// target_data_encryption_key_id and the value is a dek_ id under the new model.
+	TargetEncryptionKeyVersionId *apid.ID
+	Labels                       Labels
+	Annotations                  Annotations
+	CreatedAt                    time.Time
+	UpdatedAt                    time.Time
+	DeletedAt                    *time.Time
 }
 
 func (ns *Namespace) GetNamespace() string {
@@ -42,7 +45,8 @@ func (ns *Namespace) cols() []string {
 		"path",
 		"depth",
 		"state",
-		"encryption_key_id",
+		"key_id",
+		"target_data_encryption_key_id",
 		"labels",
 		"annotations",
 		"created_at",
@@ -57,6 +61,7 @@ func (ns *Namespace) fields() []any {
 		&ns.depth,
 		&ns.State,
 		&ns.EncryptionKeyId,
+		&ns.TargetEncryptionKeyVersionId,
 		&ns.Labels,
 		&ns.Annotations,
 		&ns.CreatedAt,
@@ -71,6 +76,7 @@ func (ns *Namespace) values() []any {
 		ns.depth,
 		ns.State,
 		ns.EncryptionKeyId,
+		ns.TargetEncryptionKeyVersionId,
 		ns.Labels,
 		ns.Annotations,
 		ns.CreatedAt,
@@ -422,7 +428,7 @@ func (s *service) SetNamespaceEncryptionKeyId(ctx context.Context, path string, 
 	dbResult, err := s.sq.
 		Update(NamespacesTable).
 		Set("updated_at", now).
-		Set("encryption_key_id", ekId).
+		Set("key_id", ekId).
 		Where(sq.Eq{"path": path, "deleted_at": nil}).
 		RunWith(s.db).
 		Exec()
@@ -968,7 +974,7 @@ func (s *service) EnumerateNamespaceEncryptionTargets(
 
 	for {
 		rows, err := s.sq.
-			Select("path", "depth", "encryption_key_id", "target_encryption_key_version_id").
+			Select("path", "depth", "key_id", "target_data_encryption_key_id").
 			From(NamespacesTable).
 			Where(sq.Eq{"deleted_at": nil}).
 			OrderBy("depth, path").
@@ -1007,8 +1013,8 @@ func (s *service) EnumerateNamespaceEncryptionTargets(
 			for _, u := range updates {
 				_, err := s.sq.
 					Update(NamespacesTable).
-					Set("target_encryption_key_version_id", u.TargetEncryptionKeyVersionId).
-					Set("target_encryption_key_version_updated_at", now).
+					Set("target_data_encryption_key_id", u.TargetEncryptionKeyVersionId).
+					Set("target_data_encryption_key_updated_at", now).
 					Set("updated_at", now).
 					Where(sq.Eq{"path": u.Path}).
 					RunWith(s.db).

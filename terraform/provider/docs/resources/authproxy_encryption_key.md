@@ -31,5 +31,5 @@ resource "authproxy_encryption_key" "main" {
 Encryption keys can be imported by ID:
 
 ```bash
-terraform import authproxy_encryption_key.example ek_abc123
+terraform import authproxy_encryption_key.example key_abc123
 ```
