@@ -66,6 +66,9 @@ setup_flow:
             transform: "data.map(w => ({ value: w.id, label: w.name }))"
       - id: sync_options
         title: "Sync Options"
+        if:
+          javascript: |
+            cfg.region === "eu" && labels["apxy/cxr/type"] === "acme-crm"
         json_schema:
           type: object
           properties:

@@ -84,6 +84,57 @@ func TestSetupFlowValidation(t *testing.T) {
 		assert.NoError(t, sf.Validate(vc))
 	})
 
+	t.Run("valid conditional step", func(t *testing.T) {
+		sf := &SetupFlow{
+			Configure: &SetupFlowPhase{
+				Steps: []SetupFlowStep{
+					{
+						Id:         "advanced_options",
+						JsonSchema: common.RawJSON(`{"type":"object"}`),
+						If: &SetupFlowStepIf{
+							Javascript: `cfg.region === "eu" && labels["apxy/cxr/type"] === "salesforce"`,
+						},
+					},
+				},
+			},
+		}
+		assert.NoError(t, sf.Validate(vc))
+	})
+
+	t.Run("conditional step missing javascript", func(t *testing.T) {
+		sf := &SetupFlow{
+			Configure: &SetupFlowPhase{
+				Steps: []SetupFlowStep{
+					{
+						Id:         "advanced_options",
+						JsonSchema: common.RawJSON(`{"type":"object"}`),
+						If:         &SetupFlowStepIf{},
+					},
+				},
+			},
+		}
+		err := sf.Validate(vc)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "javascript is required")
+	})
+
+	t.Run("conditional step rejects blank javascript", func(t *testing.T) {
+		sf := &SetupFlow{
+			Configure: &SetupFlowPhase{
+				Steps: []SetupFlowStep{
+					{
+						Id:         "advanced_options",
+						JsonSchema: common.RawJSON(`{"type":"object"}`),
+						If:         &SetupFlowStepIf{Javascript: " \n\t "},
+					},
+				},
+			},
+		}
+		err := sf.Validate(vc)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "javascript is required")
+	})
+
 	t.Run("duplicate step id across phases", func(t *testing.T) {
 		sf := &SetupFlow{
 			Preconnect: &SetupFlowPhase{
@@ -754,6 +805,8 @@ func TestSetupFlowYAMLRoundtrip(t *testing.T) {
 		step2 := connector.SetupFlow.Configure.Steps[1]
 		assert.Equal(t, "sync_options", step2.Id)
 		assert.Empty(t, step2.DataSources)
+		require.NotNil(t, step2.If)
+		assert.Equal(t, "cfg.region === \"eu\" && labels[\"apxy/cxr/type\"] === \"acme-crm\"\n", step2.If.Javascript)
 
 		// Validate
 		vc := &common.ValidationContext{Path: "connector"}
@@ -777,6 +830,9 @@ func TestSetupFlowYAMLRoundtrip(t *testing.T) {
 					{
 						Id:         "workspace",
 						JsonSchema: common.RawJSON(`{"type":"object"}`),
+						If: &SetupFlowStepIf{
+							Javascript: `annotations["setup-mode"] !== "basic"`,
+						},
 						DataSources: map[string]DataSourceDef{
 							"items": {
 								ProxyRequest: &DataSourceProxyRequest{
@@ -803,6 +859,8 @@ func TestSetupFlowYAMLRoundtrip(t *testing.T) {
 		assert.Equal(t, "tenant", parsed.Preconnect.Steps[0].Id)
 		require.True(t, parsed.HasConfigure())
 		assert.Equal(t, "workspace", parsed.Configure.Steps[0].Id)
+		require.NotNil(t, parsed.Configure.Steps[0].If)
+		assert.Equal(t, `annotations["setup-mode"] !== "basic"`, parsed.Configure.Steps[0].If.Javascript)
 		require.NotNil(t, parsed.Configure.Steps[0].DataSources["items"].ProxyRequest)
 		assert.Equal(t, "GET", parsed.Configure.Steps[0].DataSources["items"].ProxyRequest.Method)
 		assert.Equal(t, "application/json", parsed.Configure.Steps[0].DataSources["items"].ProxyRequest.Headers["Accept"])
