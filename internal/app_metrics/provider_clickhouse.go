@@ -153,6 +153,7 @@ func (s *clickhouseRecordStore) Migrate(ctx context.Context) error {
 
 	driver, err := chmigrate.WithInstance(migrationConn, &chmigrate.Config{
 		DatabaseName:          dbName,
+		MigrationsTable:       appMetricsMigrationsTable,
 		MultiStatementEnabled: true,
 	})
 	if err != nil {

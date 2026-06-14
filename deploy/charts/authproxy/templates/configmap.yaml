@@ -106,37 +106,13 @@ template syntax.
 
 {{/* --- app_metrics (server unconditionally wires up the metrics store) --- */}}
 {{/*
-  The app_metrics migrator + the main DB migrator share golang-migrate's
-  default `schema_migrations` table, so they can't run against the same
-  schema. For SQLite that means a sibling file (default path with an
-  `.app-metrics` suffix); for Postgres, app_metrics uses tables prefixed
-  inside the same DB and conflicts are not observed in practice.
-
   Server-side this used to be `http_logging`; renamed to `app_metrics`
   with the request-event capture moved under a `request_events`
   sub-block. See internal/schema/config/app_metrics.go.
 */}}
-{{/*
-  When shareMainDatabase is true we pick a per-provider strategy that
-  avoids the golang-migrate `schema_migrations` collision:
-    - SQLite: sibling file path (`<main>.app-metrics`).
-    - Postgres: app_metrics gets pinned to an ephemeral SQLite file
-      under /tmp instead of sharing the main Postgres database.
-      Postgres-share would have to either (a) create a second
-      database on the same server, or (b) pass an
-      `x-migrations-table` URI param the Go migrator picks up.
-      Both are bigger lifts than warranted for a demo; flip
-      `shareMainDatabase: false` + supply your own
-      `appMetrics.database` block for production-grade setups.
-*/}}
 {{- $metricsDb := dict -}}
 {{- if .Values.appMetrics.shareMainDatabase -}}
-{{-   if eq .Values.database.provider "sqlite" -}}
-{{-     $sharedPath := printf "%s.app-metrics" .Values.database.path -}}
-{{-     $metricsDb = dict "provider" "sqlite" "path" $sharedPath -}}
-{{-   else -}}
-{{-     $metricsDb = dict "provider" "sqlite" "path" "/tmp/authproxy-app-metrics.db" -}}
-{{-   end -}}
+{{-   $metricsDb = $db -}}
 {{- else -}}
 {{-   $metricsDb = .Values.appMetrics.database -}}
 {{- end -}}
