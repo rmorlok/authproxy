@@ -22,8 +22,8 @@ type KeyDataType interface {
 }
 
 // DataEncryptionKeyInfo is the database-visible metadata for a persisted DEK.
-// KMS-style providers use these rows to unwrap DEKs and expose them as
-// application-facing encryption key versions.
+// Providers use these rows to unwrap DEKs and expose runtime key bytes without
+// storing provider key versions in the database.
 type DataEncryptionKeyInfo struct {
 	ID              string
 	EncryptionKeyID string
@@ -34,9 +34,18 @@ type DataEncryptionKeyInfo struct {
 	IsCurrent       bool
 }
 
-// GeneratedDataEncryptionKey is protected DEK material produced by a KMS-style
-// provider. The plaintext DEK may be returned for tests, but callers should only
-// persist the provider metadata and ProtectedData.
+// KeyWrappingKeyInfo identifies the provider key material currently used to
+// wrap DEKs. The wrapping key bytes are deliberately not exposed here.
+type KeyWrappingKeyInfo struct {
+	Provider        ProviderType
+	ProviderID      string
+	ProviderVersion string
+	Metadata        map[string]string
+}
+
+// GeneratedDataEncryptionKey is protected DEK material produced by a key data
+// provider. The plaintext DEK is returned for immediate cache use by callers,
+// but only the provider metadata and ProtectedData should be persisted.
 type GeneratedDataEncryptionKey struct {
 	Provider        ProviderType
 	ProviderID      string
@@ -53,8 +62,21 @@ type KeyDataRequiresDataEncryptionKeys interface {
 	ListVersionsWithDataEncryptionKeys(ctx context.Context, deks []DataEncryptionKeyInfo) ([]KeyVersionInfo, error)
 }
 
+// KeyDataWrapsDataEncryptionKeys is implemented by providers that manage DEK
+// wrapping themselves. Providers that expose raw key bytes do not need to
+// implement this; the KeyData facade can wrap and unwrap with the current
+// KeyVersionInfo.Data.
+type KeyDataWrapsDataEncryptionKeys interface {
+	CurrentWrappingKey(ctx context.Context) (KeyWrappingKeyInfo, error)
+	WrapDataEncryptionKey(ctx context.Context, dek []byte) (GeneratedDataEncryptionKey, error)
+	UnwrapDataEncryptionKey(ctx context.Context, dek DataEncryptionKeyInfo) ([]byte, error)
+}
+
 // KeyDataGeneratesDataEncryptionKeys is implemented by providers that can
-// generate and wrap a new DEK for persistence in data_encryption_keys.
+// natively generate and wrap a new DEK for persistence in data_encryption_keys.
+// KeyData itself also exposes GenerateDataEncryptionKey, falling back to
+// AuthProxy-generated random bytes plus provider wrapping when this interface
+// is not implemented by the inner provider.
 type KeyDataGeneratesDataEncryptionKeys interface {
 	GenerateDataEncryptionKey(ctx context.Context) (GeneratedDataEncryptionKey, error)
 }

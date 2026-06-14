@@ -153,27 +153,14 @@ func (m *KeyDataMockKMS) ListVersions(ctx context.Context) ([]KeyVersionInfo, er
 	return m.ListVersionsWithDataEncryptionKeys(ctx, nil)
 }
 
-func (m *KeyDataMockKMS) ListVersionsWithDataEncryptionKeys(_ context.Context, deks []DataEncryptionKeyInfo) ([]KeyVersionInfo, error) {
+func (m *KeyDataMockKMS) ListVersionsWithDataEncryptionKeys(ctx context.Context, deks []DataEncryptionKeyInfo) ([]KeyVersionInfo, error) {
 	var result []KeyVersionInfo
 	for _, dekInfo := range deks {
 		if dekInfo.Provider != ProviderTypeMockKMS {
 			continue
 		}
-		if dekInfo.ProtectedData == nil || dekInfo.ProtectedData.IsZero() {
-			continue
-		}
 
-		kekVersion := dekInfo.ProtectedData.Metadata["kek_version"]
-		if kekVersion == "" {
-			kekVersion = dekInfo.ProviderVersion
-		}
-
-		kek, err := m.version(dekInfo.ProviderID, kekVersion)
-		if err != nil {
-			return nil, err
-		}
-
-		dekBytes, err := mockKMSUnwrap(kek.KeyEncryptionKey, *dekInfo.ProtectedData)
+		dekBytes, err := m.UnwrapDataEncryptionKey(ctx, dekInfo)
 		if err != nil {
 			return nil, err
 		}
@@ -190,15 +177,35 @@ func (m *KeyDataMockKMS) ListVersionsWithDataEncryptionKeys(_ context.Context, d
 	return result, nil
 }
 
-func (m *KeyDataMockKMS) GenerateDataEncryptionKey(_ context.Context) (GeneratedDataEncryptionKey, error) {
+func (m *KeyDataMockKMS) CurrentWrappingKey(_ context.Context) (KeyWrappingKeyInfo, error) {
+	current, err := m.currentVersion()
+	if err != nil {
+		return KeyWrappingKeyInfo{}, err
+	}
+
+	return KeyWrappingKeyInfo{
+		Provider:        ProviderTypeMockKMS,
+		ProviderID:      current.ProviderID,
+		ProviderVersion: current.ProviderVersion,
+	}, nil
+}
+
+func (m *KeyDataMockKMS) GenerateDataEncryptionKey(ctx context.Context) (GeneratedDataEncryptionKey, error) {
+	dek, err := generateAuthProxyDataEncryptionKey()
+	if err != nil {
+		return GeneratedDataEncryptionKey{}, fmt.Errorf("failed to generate mock kms data key: %w", err)
+	}
+
+	return m.WrapDataEncryptionKey(ctx, dek)
+}
+
+func (m *KeyDataMockKMS) WrapDataEncryptionKey(_ context.Context, dek []byte) (GeneratedDataEncryptionKey, error) {
 	current, err := m.currentVersion()
 	if err != nil {
 		return GeneratedDataEncryptionKey{}, err
 	}
-
-	dek := make([]byte, 32)
-	if _, err := io.ReadFull(rand.Reader, dek); err != nil {
-		return GeneratedDataEncryptionKey{}, fmt.Errorf("failed to generate mock kms data key: %w", err)
+	if len(dek) == 0 {
+		return GeneratedDataEncryptionKey{}, fmt.Errorf("data encryption key is empty")
 	}
 
 	protected, err := mockKMSWrap(current.KeyEncryptionKey, current.ProviderVersion, dek)
@@ -211,8 +218,29 @@ func (m *KeyDataMockKMS) GenerateDataEncryptionKey(_ context.Context) (Generated
 		ProviderID:      current.ProviderID,
 		ProviderVersion: current.ProviderVersion,
 		ProtectedData:   protected,
-		Data:            dek,
+		Data:            append([]byte(nil), dek...),
 	}, nil
+}
+
+func (m *KeyDataMockKMS) UnwrapDataEncryptionKey(_ context.Context, dekInfo DataEncryptionKeyInfo) ([]byte, error) {
+	if dekInfo.Provider != ProviderTypeMockKMS {
+		return nil, fmt.Errorf("unsupported mock kms provider %q", dekInfo.Provider)
+	}
+	if dekInfo.ProtectedData == nil || dekInfo.ProtectedData.IsZero() {
+		return nil, fmt.Errorf("data encryption key protected data is empty")
+	}
+
+	kekVersion := dekInfo.ProtectedData.Metadata["kek_version"]
+	if kekVersion == "" {
+		kekVersion = dekInfo.ProviderVersion
+	}
+
+	kek, err := m.version(dekInfo.ProviderID, kekVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	return mockKMSUnwrap(kek.KeyEncryptionKey, *dekInfo.ProtectedData)
 }
 
 func (m *KeyDataMockKMS) GetProviderType() ProviderType {
@@ -296,4 +324,5 @@ func mockKMSDecrypt(key []byte, data []byte) ([]byte, error) {
 
 var _ KeyDataType = (*KeyDataMockKMS)(nil)
 var _ KeyDataRequiresDataEncryptionKeys = (*KeyDataMockKMS)(nil)
+var _ KeyDataWrapsDataEncryptionKeys = (*KeyDataMockKMS)(nil)
 var _ KeyDataGeneratesDataEncryptionKeys = (*KeyDataMockKMS)(nil)

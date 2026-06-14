@@ -32,9 +32,9 @@ func createDataEncryptionKey(
 	ctx context.Context,
 	db database.DB,
 	encryptionKeyId apid.ID,
-	generator config.KeyDataGeneratesDataEncryptionKeys,
+	kd *config.KeyData,
 ) (*database.DataEncryptionKey, error) {
-	generated, err := generator.GenerateDataEncryptionKey(ctx)
+	generated, err := kd.GenerateDataEncryptionKey(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -65,11 +65,6 @@ func ensureDataEncryptionKeyForKey(
 		return false, nil
 	}
 
-	generator, ok := kd.InnerVal.(config.KeyDataGeneratesDataEncryptionKeys)
-	if !ok {
-		return false, fmt.Errorf("key data provider %q requires DEKs but cannot generate them", kd.GetProviderType())
-	}
-
 	current, err := db.GetCurrentDataEncryptionKeyForKey(ctx, encryptionKeyId)
 	if err != nil && !errors.Is(err, database.ErrNotFound) {
 		return false, err
@@ -79,14 +74,14 @@ func ensureDataEncryptionKeyForKey(
 		if !policy.ShouldEnsureCurrent() {
 			return false, nil
 		}
-		if _, err := createDataEncryptionKey(ctx, db, encryptionKeyId, generator); err != nil {
+		if _, err := createDataEncryptionKey(ctx, db, encryptionKeyId, kd); err != nil {
 			return false, err
 		}
 		return true, nil
 	}
 
 	if policy.ShouldRotate(apctx.GetClock(ctx).Now(), current.CreatedAt) {
-		if _, err := createDataEncryptionKey(ctx, db, encryptionKeyId, generator); err != nil {
+		if _, err := createDataEncryptionKey(ctx, db, encryptionKeyId, kd); err != nil {
 			return false, err
 		}
 		return true, nil
