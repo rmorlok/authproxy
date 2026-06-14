@@ -594,7 +594,7 @@ func (s *service) ReconcileCarryForwardLabels(ctx context.Context, batchSize int
 		{name: "connector_versions", walk: s.reconcileConnectorVersions},
 		{name: "connections", walk: s.reconcileConnections},
 		{name: "actors", walk: s.reconcileActors},
-		{name: "encryption_keys", walk: s.reconcileEncryptionKeys},
+		{name: "keys", walk: s.reconcileEncryptionKeys},
 		{name: "rate_limits", walk: s.reconcileRateLimits},
 	}
 

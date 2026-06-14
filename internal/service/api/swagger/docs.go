@@ -7829,7 +7829,7 @@ const docTemplateApi = `{
                 },
                 "id": {
                     "type": "string",
-                    "example": "ek_test550e8400abcde"
+                    "example": "key_test550e8400abcd"
                 },
                 "labels": {
                     "type": "object",
@@ -7898,7 +7898,7 @@ const docTemplateApi = `{
                 },
                 "encryption_key_id": {
                     "type": "string",
-                    "example": "ek_test550e8400abcde"
+                    "example": "key_test550e8400abcd"
                 },
                 "labels": {
                     "type": "object",
@@ -8228,7 +8228,7 @@ const docTemplateApi = `{
                 },
                 "id": {
                     "type": "string",
-                    "example": "ek_test550e8400abcde"
+                    "example": "key_test550e8400abcd"
                 },
                 "labels": {
                     "type": "object",
@@ -8338,7 +8338,7 @@ const docTemplateApi = `{
                 },
                 "encryption_key_id": {
                     "type": "string",
-                    "example": "ek_test550e8400abcde"
+                    "example": "key_test550e8400abcd"
                 },
                 "labels": {
                     "type": "object",

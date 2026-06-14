@@ -34,11 +34,11 @@ func TestReEncryptRegistry(t *testing.T) {
 		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		targetEKVId := apid.New(apid.PrefixEncryptionKeyVersion)
-		oldEKVId := apid.New(apid.PrefixEncryptionKeyVersion)
+		targetEKVId := apid.New(apid.PrefixDataEncryptionKey)
+		oldEKVId := apid.New(apid.PrefixDataEncryptionKey)
 
 		// Set up namespace with target EKV
-		_, err := rawDb.Exec(fmt.Sprintf(`UPDATE namespaces SET target_encryption_key_version_id = '%s' WHERE path = 'root'`, string(targetEKVId)))
+		_, err := rawDb.Exec(fmt.Sprintf(`UPDATE namespaces SET target_data_encryption_key_id = '%s' WHERE path = 'root'`, string(targetEKVId)))
 		require.NoError(t, err)
 
 		// Create actor with mismatched EKV
@@ -79,9 +79,9 @@ func TestReEncryptRegistry(t *testing.T) {
 		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		targetEKVId := apid.New(apid.PrefixEncryptionKeyVersion)
+		targetEKVId := apid.New(apid.PrefixDataEncryptionKey)
 
-		_, err := rawDb.Exec(fmt.Sprintf(`UPDATE namespaces SET target_encryption_key_version_id = '%s' WHERE path = 'root'`, string(targetEKVId)))
+		_, err := rawDb.Exec(fmt.Sprintf(`UPDATE namespaces SET target_data_encryption_key_id = '%s' WHERE path = 'root'`, string(targetEKVId)))
 		require.NoError(t, err)
 
 		// Create actor with matching EKV
@@ -115,10 +115,10 @@ func TestReEncryptRegistry(t *testing.T) {
 		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		targetEKVId := apid.New(apid.PrefixEncryptionKeyVersion)
-		oldEKVId := apid.New(apid.PrefixEncryptionKeyVersion)
+		targetEKVId := apid.New(apid.PrefixDataEncryptionKey)
+		oldEKVId := apid.New(apid.PrefixDataEncryptionKey)
 
-		_, err := rawDb.Exec(fmt.Sprintf(`UPDATE namespaces SET target_encryption_key_version_id = '%s' WHERE path = 'root'`, string(targetEKVId)))
+		_, err := rawDb.Exec(fmt.Sprintf(`UPDATE namespaces SET target_data_encryption_key_id = '%s' WHERE path = 'root'`, string(targetEKVId)))
 		require.NoError(t, err)
 
 		// Create connection in root namespace
@@ -158,10 +158,10 @@ func TestReEncryptRegistry(t *testing.T) {
 		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		targetEKVId := apid.New(apid.PrefixEncryptionKeyVersion)
-		oldEKVId := apid.New(apid.PrefixEncryptionKeyVersion)
+		targetEKVId := apid.New(apid.PrefixDataEncryptionKey)
+		oldEKVId := apid.New(apid.PrefixDataEncryptionKey)
 
-		_, err := rawDb.Exec(fmt.Sprintf(`UPDATE namespaces SET target_encryption_key_version_id = '%s' WHERE path = 'root'`, string(targetEKVId)))
+		_, err := rawDb.Exec(fmt.Sprintf(`UPDATE namespaces SET target_data_encryption_key_id = '%s' WHERE path = 'root'`, string(targetEKVId)))
 		require.NoError(t, err)
 
 		connId := apid.New(apid.PrefixConnection)
@@ -205,10 +205,10 @@ func TestReEncryptRegistry(t *testing.T) {
 		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		targetEKVId := apid.New(apid.PrefixEncryptionKeyVersion)
-		oldEKVId := apid.New(apid.PrefixEncryptionKeyVersion)
+		targetEKVId := apid.New(apid.PrefixDataEncryptionKey)
+		oldEKVId := apid.New(apid.PrefixDataEncryptionKey)
 
-		_, err := rawDb.Exec(fmt.Sprintf(`UPDATE namespaces SET target_encryption_key_version_id = '%s' WHERE path = 'root'`, string(targetEKVId)))
+		_, err := rawDb.Exec(fmt.Sprintf(`UPDATE namespaces SET target_data_encryption_key_id = '%s' WHERE path = 'root'`, string(targetEKVId)))
 		require.NoError(t, err)
 
 		connId := apid.New(apid.PrefixConnection)
@@ -246,10 +246,10 @@ func TestReEncryptRegistry(t *testing.T) {
 		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		targetEKVId := apid.New(apid.PrefixEncryptionKeyVersion)
-		oldEKVId := apid.New(apid.PrefixEncryptionKeyVersion)
+		targetEKVId := apid.New(apid.PrefixDataEncryptionKey)
+		oldEKVId := apid.New(apid.PrefixDataEncryptionKey)
 
-		_, err := rawDb.Exec(fmt.Sprintf(`UPDATE namespaces SET target_encryption_key_version_id = '%s' WHERE path = 'root'`, string(targetEKVId)))
+		_, err := rawDb.Exec(fmt.Sprintf(`UPDATE namespaces SET target_data_encryption_key_id = '%s' WHERE path = 'root'`, string(targetEKVId)))
 		require.NoError(t, err)
 
 		cvId := apid.New(apid.PrefixConnectorVersion)
@@ -286,9 +286,9 @@ func TestReEncryptRegistry(t *testing.T) {
 		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		targetEKVId := apid.New(apid.PrefixEncryptionKeyVersion)
+		targetEKVId := apid.New(apid.PrefixDataEncryptionKey)
 
-		_, err := rawDb.Exec(fmt.Sprintf(`UPDATE namespaces SET target_encryption_key_version_id = '%s' WHERE path = 'root'`, string(targetEKVId)))
+		_, err := rawDb.Exec(fmt.Sprintf(`UPDATE namespaces SET target_data_encryption_key_id = '%s' WHERE path = 'root'`, string(targetEKVId)))
 		require.NoError(t, err)
 
 		// Create actor with NULL encrypted_key
@@ -320,10 +320,10 @@ func TestReEncryptRegistry(t *testing.T) {
 		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		targetEKVId := apid.New(apid.PrefixEncryptionKeyVersion)
-		oldEKVId := apid.New(apid.PrefixEncryptionKeyVersion)
+		targetEKVId := apid.New(apid.PrefixDataEncryptionKey)
+		oldEKVId := apid.New(apid.PrefixDataEncryptionKey)
 
-		_, err := rawDb.Exec(fmt.Sprintf(`UPDATE namespaces SET target_encryption_key_version_id = '%s' WHERE path = 'root'`, string(targetEKVId)))
+		_, err := rawDb.Exec(fmt.Sprintf(`UPDATE namespaces SET target_data_encryption_key_id = '%s' WHERE path = 'root'`, string(targetEKVId)))
 		require.NoError(t, err)
 
 		actorId := apid.New(apid.PrefixActor)
@@ -377,12 +377,12 @@ func TestReEncryptRegistry(t *testing.T) {
 		require.Empty(t, allTargets)
 	})
 
-	t.Run("namespace with NULL target_encryption_key_version_id skipped", func(t *testing.T) {
+	t.Run("namespace with NULL target_data_encryption_key_id skipped", func(t *testing.T) {
 		_, db, _ := MustApplyBlankTestDbConfigRaw(t, nil)
 		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		oldEKVId := apid.New(apid.PrefixEncryptionKeyVersion)
+		oldEKVId := apid.New(apid.PrefixDataEncryptionKey)
 
 		// Create actor with encrypted key but namespace has no target EKV (NULL by default)
 		actorId := apid.New(apid.PrefixActor)

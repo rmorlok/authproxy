@@ -19,7 +19,7 @@ const (
 //
 //	@Description	Encryption key API response
 type EncryptionKeyJson struct {
-	Id          apid.ID            `json:"id" yaml:"id" swaggertype:"string" example:"ek_test550e8400abcde"`
+	Id          apid.ID            `json:"id" yaml:"id" swaggertype:"string" example:"key_test550e8400abcd"`
 	Namespace   string             `json:"namespace" yaml:"namespace" example:"root.acme"`
 	State       EncryptionKeyState `json:"state" yaml:"state" swaggertype:"string" example:"active"`
 	Labels      map[string]string  `json:"labels,omitempty" yaml:"labels,omitempty"`

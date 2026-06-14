@@ -181,7 +181,7 @@ func (s *service) queryReEncryptionPage(
 	pageSize uint64,
 	offset uint64,
 ) ([]ReEncryptionTarget, int, error) {
-	// Build select columns: PK cols (qualified) + encrypted cols (qualified) + target EKV ID
+	// Build select columns: PK cols (qualified) + encrypted cols (qualified) + target DEK ID.
 	var selectCols []string
 	for _, pk := range reg.PrimaryKeyCols {
 		selectCols = append(selectCols, reg.Table+"."+pk)
@@ -189,7 +189,7 @@ func (s *service) queryReEncryptionPage(
 	for _, ec := range reg.EncryptedCols {
 		selectCols = append(selectCols, reg.Table+"."+ec)
 	}
-	selectCols = append(selectCols, "namespaces.target_encryption_key_version_id")
+	selectCols = append(selectCols, "namespaces.target_data_encryption_key_id")
 
 	// Build base query
 	q := s.sq.
@@ -224,7 +224,7 @@ func (s *service) queryReEncryptionPage(
 
 	// WHERE conditions
 	q = q.Where(sq.Eq{reg.Table + ".deleted_at": nil})
-	q = q.Where(sq.NotEq{"namespaces.target_encryption_key_version_id": nil})
+	q = q.Where(sq.NotEq{"namespaces.target_data_encryption_key_id": nil})
 	q = q.Where(sq.Eq{NamespacesTable + ".deleted_at": nil})
 
 	// OR condition: at least one encrypted col doesn't match the target
@@ -238,7 +238,7 @@ func (s *service) queryReEncryptionPage(
 			jsonIdExpr = fmt.Sprintf("COALESCE(json_extract(%s, '$.id'), '')", qualifiedCol)
 		}
 		orConditions = append(orConditions, sq.Expr(
-			fmt.Sprintf("(%s != namespaces.target_encryption_key_version_id AND %s IS NOT NULL)", jsonIdExpr, qualifiedCol),
+			fmt.Sprintf("(%s != namespaces.target_data_encryption_key_id AND %s IS NOT NULL)", jsonIdExpr, qualifiedCol),
 		))
 	}
 	if len(orConditions) == 1 {

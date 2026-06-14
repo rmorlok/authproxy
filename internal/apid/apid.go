@@ -31,7 +31,7 @@ const (
 	PrefixRequestEvents        Prefix = "req_"
 	PrefixCorrelation          Prefix = "cor_"
 	PrefixJwtId                Prefix = "jti_"
-	PrefixEncryptionKey        Prefix = "ek_"
+	PrefixEncryptionKey        Prefix = "key_"
 	PrefixEncryptionKeyVersion Prefix = "ekv_"
 	PrefixDataEncryptionKey    Prefix = "dek_"
 	PrefixSession              Prefix = "sess_"

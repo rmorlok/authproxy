@@ -91,11 +91,11 @@ func (env *reencryptTestEnv) addGlobalV2(t *testing.T) (apid.ID, []byte) {
 	return "", nil
 }
 
-// setNamespaceTarget sets the target_encryption_key_version_id for a namespace.
+// setNamespaceTarget sets the target_data_encryption_key_id for a namespace.
 func (env *reencryptTestEnv) setNamespaceTarget(t *testing.T, namespacePath string, ekvId apid.ID) {
 	t.Helper()
 	_, err := env.rawDb.Exec(
-		fmt.Sprintf(`UPDATE namespaces SET target_encryption_key_version_id = '%s' WHERE path = '%s'`, string(ekvId), namespacePath),
+		fmt.Sprintf(`UPDATE namespaces SET target_data_encryption_key_id = '%s' WHERE path = '%s'`, string(ekvId), namespacePath),
 	)
 	require.NoError(t, err)
 }

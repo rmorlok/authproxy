@@ -23,6 +23,9 @@ func TestDataEncryptionKey(t *testing.T) {
 			Provider:        "mock_kms",
 			ProviderID:      "provider-key",
 			ProviderVersion: "v1",
+			ProviderMetadata: DataEncryptionKeyProviderMetadata{
+				"rotation": "r1",
+			},
 			ProtectedData: &sconfig.KeyVersionProtectedData{
 				Type:        "mock_kms",
 				WrappedData: "wrapped",
@@ -43,6 +46,7 @@ func TestDataEncryptionKey(t *testing.T) {
 		require.Equal(t, "mock_kms", got.Provider)
 		require.Equal(t, "provider-key", got.ProviderID)
 		require.Equal(t, "v1", got.ProviderVersion)
+		require.Equal(t, "r1", got.ProviderMetadata["rotation"])
 		require.True(t, got.IsCurrent)
 		require.NotNil(t, got.ProtectedData)
 		require.Equal(t, "wrapped", got.ProtectedData.WrappedData)

@@ -7823,7 +7823,7 @@
                 },
                 "id": {
                     "type": "string",
-                    "example": "ek_test550e8400abcde"
+                    "example": "key_test550e8400abcd"
                 },
                 "labels": {
                     "type": "object",
@@ -7892,7 +7892,7 @@
                 },
                 "encryption_key_id": {
                     "type": "string",
-                    "example": "ek_test550e8400abcde"
+                    "example": "key_test550e8400abcd"
                 },
                 "labels": {
                     "type": "object",
@@ -8222,7 +8222,7 @@
                 },
                 "id": {
                     "type": "string",
-                    "example": "ek_test550e8400abcde"
+                    "example": "key_test550e8400abcd"
                 },
                 "labels": {
                     "type": "object",
@@ -8332,7 +8332,7 @@
                 },
                 "encryption_key_id": {
                     "type": "string",
-                    "example": "ek_test550e8400abcde"
+                    "example": "key_test550e8400abcd"
                 },
                 "labels": {
                     "type": "object",
