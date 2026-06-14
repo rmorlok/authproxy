@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
@@ -9,18 +9,47 @@ import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import Drawer from '@mui/material/Drawer';
 import MuiLink from '@mui/material/Link';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import LinkOffIcon from '@mui/icons-material/LinkOff';
+import ArchiveIcon from '@mui/icons-material/Archive';
 import dayjs from 'dayjs';
-import {Connector, connectors, ConnectorVersion} from '@authproxy/api';
+import {
+  Connector,
+  connectors,
+  ConnectorVersion,
+  PollForTaskResult,
+  TaskInfoJson,
+  tasks,
+  TaskState,
+} from '@authproxy/api';
 import {Link, useNavigate} from 'react-router-dom';
 import {StateChip} from "./StateChip";
 import ConnectorVersionDetail from "./ConnectorVersionDetail";
 import AnnotationsEditor from "./AnnotationsEditor";
 
+const CONNECTOR_LIFECYCLE_TIMEOUT_SECONDS = 600;
+
+type LifecycleAction = 'disconnect-all' | 'archive';
+
+interface LifecycleStatus {
+  action: LifecycleAction;
+  state: 'starting' | 'polling' | 'completed' | 'failed';
+  taskId?: string;
+  task?: TaskInfoJson;
+  message?: string;
+}
+
 export default function ConnectorDetail({connectorId, initialVersion}: { connectorId: string, initialVersion?: number }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [conn, setConn] = useState<Connector | null>(null);
+  const [confirmDisconnectAllOpen, setConfirmDisconnectAllOpen] = useState(false);
+  const [confirmArchiveOpen, setConfirmArchiveOpen] = useState(false);
+  const [lifecycleStatus, setLifecycleStatus] = useState<LifecycleStatus | null>(null);
 
   // versions state
   const [versions, setVersions] = useState<ConnectorVersion[]>([]);
@@ -28,8 +57,9 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
   const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
   const [selectedVersion, setSelectedVersion] = useState<number | undefined>(initialVersion);
   const navigate = useNavigate();
+  const actionInProgress = lifecycleStatus?.state === 'starting' || lifecycleStatus?.state === 'polling';
 
-  useEffect(() => {
+  const fetchConnector = useCallback(() => {
     let cancelled = false;
     setLoading(true);
     setError(null);
@@ -49,8 +79,7 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
     return () => { cancelled = true; };
   }, [connectorId]);
 
-  // fetch versions
-  useEffect(() => {
+  const fetchVersions = useCallback(() => {
     let cancelled = false;
     setVersionsError(null);
     setVersions([]);
@@ -64,6 +93,17 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
         setVersionsError(err?.response?.data?.error || err.message || 'Failed to load versions');
       });
     return () => { cancelled = true; };
+  }, [connectorId]);
+
+  useEffect(() => fetchConnector(), [fetchConnector]);
+
+  // fetch versions
+  useEffect(() => fetchVersions(), [fetchVersions]);
+
+  useEffect(() => {
+    setConfirmDisconnectAllOpen(false);
+    setConfirmArchiveOpen(false);
+    setLifecycleStatus(null);
   }, [connectorId]);
 
   // open drawer if initialVersion provided
@@ -86,6 +126,66 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
   };
 
   const selected = useMemo<ConnectorVersion | undefined>(() => versions.find(v => v.version === selectedVersion), [versions, selectedVersion]);
+
+  const refreshConnectorData = useCallback(() => {
+    fetchConnector();
+    fetchVersions();
+  }, [fetchConnector, fetchVersions]);
+
+  const runLifecycleAction = async (action: LifecycleAction) => {
+    if (!conn) return;
+
+    setLifecycleStatus({action, state: 'starting'});
+    try {
+      const request = {timeout_seconds: CONNECTOR_LIFECYCLE_TIMEOUT_SECONDS};
+      const response = action === 'archive'
+        ? await connectors.archive(conn.id, request)
+        : await connectors.disconnectAll(conn.id, request);
+
+      setLifecycleStatus({
+        action,
+        state: 'polling',
+        taskId: response.data.task_id,
+      });
+
+      const result = await tasks.pollForTaskFinalized(response.data.task_id, {
+        initialDelay: 1000,
+        maxDelay: 5000,
+        maxAttempts: 140,
+        backoffFactor: 1.4,
+      });
+
+      if (result.result !== PollForTaskResult.FINALIZED || result.taskInfo?.state !== TaskState.COMPLETED) {
+        setLifecycleStatus({
+          action,
+          state: 'failed',
+          taskId: response.data.task_id,
+          task: result.taskInfo,
+          message: result.taskInfo?.state === TaskState.FAILED
+            ? 'Workflow failed before completing.'
+            : 'Task polling ended before the operation completed.',
+        });
+        refreshConnectorData();
+        return;
+      }
+
+      setLifecycleStatus({
+        action,
+        state: 'completed',
+        taskId: response.data.task_id,
+        task: result.taskInfo,
+      });
+      refreshConnectorData();
+    } catch (err: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
+      setLifecycleStatus({
+        action,
+        state: 'failed',
+        message: err?.response?.data?.error || err.message || 'Connector lifecycle operation failed.',
+      });
+    }
+  };
+
+  const lifecycleActionLabel = lifecycleStatus?.action === 'archive' ? 'Archive' : 'Disconnect all';
 
   if (loading) return (<Box sx={{display: 'flex', justifyContent: 'center', p: 4}}><CircularProgress/></Box>);
   if (error) return (<Alert severity="error">{error}</Alert>);
@@ -112,6 +212,61 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
           Status Page <OpenInNewIcon fontSize="inherit" />
         </MuiLink>
       )}
+
+      <Box sx={{border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 2}}>
+        <Stack direction={{xs: 'column', sm: 'row'}} spacing={2} justifyContent="space-between" alignItems={{xs: 'stretch', sm: 'center'}}>
+          <Box>
+            <Typography variant="h6">Lifecycle</Typography>
+            <Typography variant="body2" color="text.secondary">
+              Connector-wide operations run in the background and can take several minutes.
+            </Typography>
+          </Box>
+          <Stack direction={{xs: 'column', sm: 'row'}} spacing={1}>
+            <Button
+              variant="outlined"
+              color="warning"
+              startIcon={<LinkOffIcon />}
+              disabled={actionInProgress}
+              onClick={() => setConfirmDisconnectAllOpen(true)}
+            >
+              Disconnect all
+            </Button>
+            <Button
+              variant="contained"
+              color="error"
+              startIcon={<ArchiveIcon />}
+              disabled={actionInProgress}
+              onClick={() => setConfirmArchiveOpen(true)}
+            >
+              Archive
+            </Button>
+          </Stack>
+        </Stack>
+
+        {lifecycleStatus && (
+          <Alert
+            severity={
+              lifecycleStatus.state === 'completed'
+                ? 'success'
+                : lifecycleStatus.state === 'failed'
+                  ? 'error'
+                  : 'info'
+            }
+            sx={{mt: 2}}
+          >
+            {lifecycleStatus.state === 'starting' && `${lifecycleActionLabel} is starting...`}
+            {lifecycleStatus.state === 'polling' && `${lifecycleActionLabel} is running. Task state will update when the workflow completes.`}
+            {lifecycleStatus.state === 'completed' && `${lifecycleActionLabel} completed.`}
+            {lifecycleStatus.state === 'failed' && (lifecycleStatus.message || `${lifecycleActionLabel} failed.`)}
+            {lifecycleStatus.taskId && (
+              <Typography component="div" variant="caption" sx={{mt: 0.5, wordBreak: 'break-all'}}>
+                Task: {lifecycleStatus.taskId}
+                {lifecycleStatus.task?.state ? ` (${lifecycleStatus.task.state})` : ''}
+              </Typography>
+            )}
+          </Alert>
+        )}
+      </Box>
 
       <Stack direction={{xs: 'column', sm: 'row'}} spacing={4}>
         <Box>
@@ -184,6 +339,54 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
       <Drawer anchor="right" open={drawerOpen} onClose={closeDrawer} sx={{'& .MuiDrawer-paper': { width: { xs: '100%', sm: 800 }}}}>
           {(selected && <ConnectorVersionDetail connectorVersion={selected} />)}
       </Drawer>
+
+      <Dialog open={confirmDisconnectAllOpen} onClose={() => !actionInProgress && setConfirmDisconnectAllOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Disconnect all connections</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            This starts a workflow that disconnects every connection for this connector. Connections may need to be reconnected before they can be used again.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmDisconnectAllOpen(false)} disabled={actionInProgress}>Cancel</Button>
+          <Button
+            color="warning"
+            variant="contained"
+            disabled={actionInProgress}
+            startIcon={actionInProgress ? <CircularProgress size={16} /> : <LinkOffIcon />}
+            onClick={() => {
+              setConfirmDisconnectAllOpen(false);
+              void runLifecycleAction('disconnect-all');
+            }}
+          >
+            Disconnect all
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={confirmArchiveOpen} onClose={() => !actionInProgress && setConfirmArchiveOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Archive connector</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            This archives draft versions, prevents new connections, disconnects existing connections, and archives active versions when the workflow finishes.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmArchiveOpen(false)} disabled={actionInProgress}>Cancel</Button>
+          <Button
+            color="error"
+            variant="contained"
+            disabled={actionInProgress}
+            startIcon={actionInProgress ? <CircularProgress size={16} /> : <ArchiveIcon />}
+            onClick={() => {
+              setConfirmArchiveOpen(false);
+              void runLifecycleAction('archive');
+            }}
+          >
+            Archive
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Stack>
   );
 }
