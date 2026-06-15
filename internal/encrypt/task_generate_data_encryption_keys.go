@@ -147,12 +147,7 @@ func generateDataEncryptionKeysToDatabase(
 	policy := sa.DataEncryptionKeys
 	// key material id -> data for that material. During the migration this can
 	// contain both transitional ekv_ ids and canonical dek_ ids.
-	keyVersionIdDataCache := make(map[apid.ID]config.KeyVersionInfo)
-
-	err := syncKeyVersionsForKeyToDatabase(ctx, db, keyVersionIdDataCache, globalEncryptionKeyID, sa.GlobalAESKey)
-	if err != nil {
-		return errors.Wrap(err, "failed to sync global key data")
-	}
+	keyMaterialDataCache := make(map[apid.ID]config.KeyVersionInfo)
 
 	var result *multierror.Error
 	generated, err := ensureDataEncryptionKeyForKey(ctx, db, policy, globalEncryptionKeyID, sa.GlobalAESKey)
@@ -162,13 +157,8 @@ func generateDataEncryptionKeysToDatabase(
 		if generated {
 			logger.Info("generated data encryption key", "key_id", globalEncryptionKeyID)
 		}
-
-		err = syncKeyVersionsForKeyToDatabase(ctx, db, keyVersionIdDataCache, globalEncryptionKeyID, sa.GlobalAESKey)
-		if err != nil {
-			result = multierror.Append(result, errors.Wrap(err, "failed to sync global key data after data encryption key generation"))
-		}
 	}
-	err = cacheDataEncryptionKeysForKey(ctx, db, keyVersionIdDataCache, globalEncryptionKeyID, sa.GlobalAESKey)
+	err = cacheDataEncryptionKeysForKey(ctx, db, keyMaterialDataCache, globalEncryptionKeyID, sa.GlobalAESKey)
 	if err != nil {
 		result = multierror.Append(result, errors.Wrap(err, "failed to cache global data encryption keys"))
 	}
@@ -183,9 +173,9 @@ func generateDataEncryptionKeysToDatabase(
 			}
 
 			ef := key.EncryptedKeyData
-			kvi, ok := keyVersionIdDataCache[ef.ID]
+			kvi, ok := keyMaterialDataCache[ef.ID]
 			if !ok {
-				result = multierror.Append(result, fmt.Errorf("key version info not found for key ID %s key version %s", key.Id, ef.ID))
+				result = multierror.Append(result, fmt.Errorf("key material info not found for key ID %s key material %s", key.Id, ef.ID))
 				continue
 			}
 
@@ -219,13 +209,7 @@ func generateDataEncryptionKeysToDatabase(
 				}
 			}
 
-			err = syncKeyVersionsForKeyToDatabase(ctx, db, keyVersionIdDataCache, key.Id, &keyData)
-			if err != nil {
-				result = multierror.Append(result, errors.Wrapf(err, "failed to sync key data for key ID %s", key.Id))
-				continue
-			}
-
-			err = cacheDataEncryptionKeysForKey(ctx, db, keyVersionIdDataCache, key.Id, &keyData)
+			err = cacheDataEncryptionKeysForKey(ctx, db, keyMaterialDataCache, key.Id, &keyData)
 			if err != nil {
 				result = multierror.Append(result, errors.Wrapf(err, "failed to cache data encryption keys for key ID %s", key.Id))
 				continue

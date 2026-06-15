@@ -2017,6 +2017,20 @@ func (mr *MockDBMockRecorder) UpdateConnectionLabels(ctx, id, labels interface{}
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateConnectionLabels", reflect.TypeOf((*MockDB)(nil).UpdateConnectionLabels), ctx, id, labels)
 }
 
+// UpdateDataEncryptionKeyWrapping mocks base method.
+func (m *MockDB) UpdateDataEncryptionKeyWrapping(ctx context.Context, dek *database.DataEncryptionKey) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateDataEncryptionKeyWrapping", ctx, dek)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateDataEncryptionKeyWrapping indicates an expected call of UpdateDataEncryptionKeyWrapping.
+func (mr *MockDBMockRecorder) UpdateDataEncryptionKeyWrapping(ctx, dek interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateDataEncryptionKeyWrapping", reflect.TypeOf((*MockDB)(nil).UpdateDataEncryptionKeyWrapping), ctx, dek)
+}
+
 // UpdateKey mocks base method.
 func (m *MockDB) UpdateKey(ctx context.Context, id apid.ID, updates map[string]interface{}) (*database.Key, error) {
 	m.ctrl.T.Helper()

@@ -16,7 +16,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/encfield"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util"
-	"github.com/rmorlok/authproxy/internal/util/pagination"
 	"github.com/stretchr/testify/require"
 	clock "k8s.io/utils/clock/testing"
 )
@@ -103,7 +102,7 @@ func setupMockKMSKeySyncTest(t *testing.T) mockKMSSyncTestEnv {
 	cfg, db := database.MustApplyBlankTestDbConfig(t, cfg)
 	globalDEK, globalDEKBytes := createDataEncryptionKeyForTest(t, ctx, db, globalEncryptionKeyID, globalKD)
 
-	require.NoError(t, syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil))
+	require.NoError(t, syncKeysToDatabase(ctx, cfg, db, logger, nil))
 
 	kmsKeyData := sconfig.NewKeyDataMockKMS("namespace-kms")
 	sconfig.KeyDataMockKMSAddVersion("namespace-kms", "mock-kms-key", "v1", util.MustGenerateSecureRandomKey(32))
@@ -123,7 +122,7 @@ func setupMockKMSKeySyncTest(t *testing.T) mockKMSSyncTestEnv {
 	}))
 
 	dekV1ID := createMockKMSDataEncryptionKey(t, ctx, db, ekID, "v1", true)
-	require.NoError(t, syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil))
+	require.NoError(t, syncKeysToDatabase(ctx, cfg, db, logger, nil))
 	enc := newTestService(cfg, db)
 
 	return mockKMSSyncTestEnv{
@@ -178,10 +177,7 @@ func TestMockKMSKeySync(t *testing.T) {
 
 		versions, err := env.db.ListEncryptionKeyVersionsForKey(env.ctx, env.ekID)
 		require.NoError(t, err)
-		require.Len(t, versions, 1)
-		require.Equal(t, string(sconfig.ProviderTypeMockKMS), versions[0].Provider)
-		require.Equal(t, string(env.dekV1ID), versions[0].ProviderID)
-		require.Equal(t, "v1", versions[0].ProviderVersion)
+		require.Empty(t, versions)
 
 		encrypted, err := env.enc.EncryptStringForNamespace(env.ctx, env.namespace, "kms plaintext")
 		require.NoError(t, err)
@@ -192,11 +188,15 @@ func TestMockKMSKeySync(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, "kms plaintext", decrypted)
 
-		require.NoError(t, syncKeysVersionsToDatabase(env.ctx, env.cfg, env.db, env.logger, nil))
+		require.NoError(t, syncKeysToDatabase(env.ctx, env.cfg, env.db, env.logger, nil))
 		afterResync, err := env.db.ListEncryptionKeyVersionsForKey(env.ctx, env.ekID)
 		require.NoError(t, err)
-		require.Len(t, afterResync, 1, "resync with existing protected data should not generate a duplicate version")
-		require.Equal(t, versions[0].Id, afterResync[0].Id)
+		require.Empty(t, afterResync)
+
+		afterDEKs, err := env.db.ListDataEncryptionKeysForKey(env.ctx, env.ekID)
+		require.NoError(t, err)
+		require.Len(t, afterDEKs, 1, "resync with existing protected data should not generate duplicate DEKs")
+		require.Equal(t, env.dekV1ID, afterDEKs[0].Id)
 	})
 
 	t.Run("sync does not create versions before dek generation", func(t *testing.T) {
@@ -221,7 +221,7 @@ func TestMockKMSKeySync(t *testing.T) {
 			EncryptedKeyData: &encKeyData,
 		}))
 
-		require.NoError(t, syncKeysVersionsToDatabase(env.ctx, env.cfg, env.db, env.logger, nil))
+		require.NoError(t, syncKeysToDatabase(env.ctx, env.cfg, env.db, env.logger, nil))
 		versions, err := env.db.ListEncryptionKeyVersionsForKey(env.ctx, ekID)
 		require.NoError(t, err)
 		require.Empty(t, versions)
@@ -230,8 +230,9 @@ func TestMockKMSKeySync(t *testing.T) {
 	t.Run("rotation creates new protected dek and re-encrypts fields", func(t *testing.T) {
 		env := setupMockKMSKeySyncTest(t)
 
-		currentV1, err := env.db.GetCurrentEncryptionKeyVersionForNamespace(env.ctx, env.namespace)
+		currentV1, err := env.db.GetCurrentDataEncryptionKeyForKey(env.ctx, env.ekID)
 		require.NoError(t, err)
+		require.Equal(t, env.dekV1ID, currentV1.Id)
 
 		actorID := apid.New(apid.PrefixActor)
 		encrypted, err := env.enc.EncryptStringForNamespace(env.ctx, env.namespace, "rotate me")
@@ -246,14 +247,15 @@ func TestMockKMSKeySync(t *testing.T) {
 
 		sconfig.KeyDataMockKMSAddVersion("namespace-kms", "mock-kms-key", "v2", util.MustGenerateSecureRandomKey(32))
 		dekV2ID := createMockKMSDataEncryptionKey(t, env.ctx, env.db, env.ekID, "v2", true)
-		require.NoError(t, syncKeysVersionsToDatabase(env.ctx, env.cfg, env.db, env.logger, nil))
+		require.NoError(t, syncKeysToDatabase(env.ctx, env.cfg, env.db, env.logger, nil))
 		require.NoError(t, env.enc.SyncKeysFromDbToMemory(env.ctx))
 
-		currentV2, err := env.db.GetCurrentEncryptionKeyVersionForNamespace(env.ctx, env.namespace)
+		currentV2, err := env.db.GetCurrentDataEncryptionKeyForKey(env.ctx, env.ekID)
 		require.NoError(t, err)
 		require.NotEqual(t, currentV1.Id, currentV2.Id)
-		require.Equal(t, string(dekV2ID), currentV2.ProviderID)
+		require.Equal(t, dekV2ID, currentV2.Id)
 		require.Equal(t, "v2", currentV2.ProviderVersion)
+		requireNamespaceTarget(t, env.ctx, env.db, env.namespace, dekV2ID)
 
 		handler := NewEncryptServiceTaskHandler(env.cfg, env.db, env.enc, nil, env.logger)
 		require.NoError(t, handler.handleReencryptAll(env.ctx, asynq.NewTask(TaskTypeReencryptAll, nil)))
@@ -269,744 +271,297 @@ func TestMockKMSKeySync(t *testing.T) {
 	})
 }
 
-func TestSyncKeysVersionsToDatabase(t *testing.T) {
+type rewrapSyncTestEnv struct {
+	ctx       context.Context
+	cfg       config.C
+	db        database.DB
+	logger    *slog.Logger
+	namespace string
+	keyID     apid.ID
+	keyData   *sconfig.KeyData
+	dekID     apid.ID
+	dekBytes  []byte
+}
+
+func setupRewrapSyncTest(t *testing.T) rewrapSyncTestEnv {
+	t.Helper()
+
+	sconfig.ResetKeyDataMockRegistry()
+	sconfig.ResetKeyDataMockKMSRegistry()
+	t.Cleanup(sconfig.ResetKeyDataMockRegistry)
+	t.Cleanup(sconfig.ResetKeyDataMockKMSRegistry)
+
+	now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
+	ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 	logger := slog.Default()
 
-	t.Run("global key only then add versions", func(t *testing.T) {
-		sconfig.ResetKeyDataMockRegistry()
-		t.Cleanup(sconfig.ResetKeyDataMockRegistry)
+	globalKeyBytes := util.MustGenerateSecureRandomKey(32)
+	globalKD := sconfig.NewKeyDataMock("global")
+	sconfig.KeyDataMockAddVersion("global", "global-key", "v1", globalKeyBytes)
 
-		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
-		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+	cfg := config.FromRoot(&sconfig.Root{
+		SystemAuth: sconfig.SystemAuth{
+			GlobalAESKey: globalKD,
+		},
+	})
+	cfg, db := database.MustApplyBlankTestDbConfig(t, cfg)
+	globalDEK, globalDEKBytes := createDataEncryptionKeyForTest(t, ctx, db, globalEncryptionKeyID, globalKD)
 
-		globalKeyBytes := util.MustGenerateSecureRandomKey(32)
-		globalKD := sconfig.NewKeyDataMock("global")
-		sconfig.KeyDataMockAddVersion("global", "global-key", "v1", globalKeyBytes)
+	keyBytes := util.MustGenerateSecureRandomKey(32)
+	keyData := sconfig.NewKeyDataMock("namespace-secret")
+	sconfig.KeyDataMockAddVersion("namespace-secret", "mock-secret-key", "v1", keyBytes)
 
-		cfg := config.FromRoot(&sconfig.Root{
-			SystemAuth: sconfig.SystemAuth{
-				GlobalAESKey: globalKD,
-			},
-		})
-		_, db := database.MustApplyBlankTestDbConfig(t, cfg)
+	keyID := apid.New(apid.PrefixKey)
+	namespace := "root.secret"
+	require.NoError(t, db.CreateNamespace(ctx, &database.Namespace{
+		Path:  namespace,
+		KeyId: &keyID,
+	}))
 
-		// --- Iteration 1: initial sync with single global key version ---
-		err := syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
+	require.NoError(t, db.CreateKey(ctx, &database.Key{
+		Id:               keyID,
+		Namespace:        namespace,
+		State:            database.KeyStateActive,
+		EncryptedKeyData: encryptKeyDataForTest(t, globalDEK.Id, globalDEKBytes, keyData),
+	}))
+
+	dek, dekBytes := createDataEncryptionKeyForTest(t, ctx, db, keyID, keyData)
+	require.NoError(t, syncKeysToDatabase(ctx, cfg, db, logger, nil))
+
+	return rewrapSyncTestEnv{
+		ctx:       ctx,
+		cfg:       cfg,
+		db:        db,
+		logger:    logger,
+		namespace: namespace,
+		keyID:     keyID,
+		keyData:   keyData,
+		dekID:     dek.Id,
+		dekBytes:  dekBytes,
+	}
+}
+
+func unwrapDataEncryptionKeyForTest(
+	t *testing.T,
+	ctx context.Context,
+	kd *sconfig.KeyData,
+	dek *database.DataEncryptionKey,
+) []byte {
+	t.Helper()
+
+	infos := dataEncryptionKeyInfos([]*database.DataEncryptionKey{dek})
+	require.Len(t, infos, 1)
+	plaintext, err := kd.UnwrapDataEncryptionKey(ctx, infos[0])
+	require.NoError(t, err)
+	return plaintext
+}
+
+func requireNamespaceTarget(
+	t *testing.T,
+	ctx context.Context,
+	db database.DB,
+	namespacePath string,
+	expected apid.ID,
+) {
+	t.Helper()
+
+	ns, err := db.GetNamespace(ctx, namespacePath)
+	require.NoError(t, err)
+	require.NotNil(t, ns.TargetDataEncryptionKeyId)
+	require.Equal(t, expected, *ns.TargetDataEncryptionKeyId)
+}
+
+func TestSyncKeysToDatabase(t *testing.T) {
+	t.Run("does not manifest provider versions as rows", func(t *testing.T) {
+		env := setupRewrapSyncTest(t)
+
+		globalVersions, err := env.db.ListEncryptionKeyVersionsForKey(env.ctx, globalEncryptionKeyID)
 		require.NoError(t, err)
+		require.Empty(t, globalVersions)
 
-		versions, err := db.ListEncryptionKeyVersionsForKey(ctx, globalEncryptionKeyID)
+		keyVersions, err := env.db.ListEncryptionKeyVersionsForKey(env.ctx, env.keyID)
 		require.NoError(t, err)
-		require.Len(t, versions, 1)
-		require.Equal(t, string(sconfig.ProviderTypeMock), versions[0].Provider)
-		require.Equal(t, "global-key", versions[0].ProviderID)
-		require.Equal(t, "v1", versions[0].ProviderVersion)
-		require.True(t, versions[0].IsCurrent)
-		require.Equal(t, int64(1), versions[0].OrderedVersion)
-
-		// --- Iteration 2: add a second version to the global key ---
-		globalKeyBytesV2 := util.MustGenerateSecureRandomKey(32)
-		sconfig.KeyDataMockAddVersion("global", "global-key", "v2", globalKeyBytesV2)
-
-		err = syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
-		require.NoError(t, err)
-
-		versions, err = db.ListEncryptionKeyVersionsForKey(ctx, globalEncryptionKeyID)
-		require.NoError(t, err)
-		require.Len(t, versions, 2)
-
-		var v1, v2 *database.EncryptionKeyVersion
-		for _, v := range versions {
-			switch v.ProviderVersion {
-			case "v1":
-				v1 = v
-			case "v2":
-				v2 = v
-			}
-		}
-		require.NotNil(t, v1)
-		require.NotNil(t, v2)
-		require.False(t, v1.IsCurrent, "v1 should no longer be current")
-		require.True(t, v2.IsCurrent, "v2 should be current")
-		require.Equal(t, int64(1), v1.OrderedVersion)
-		require.Equal(t, int64(2), v2.OrderedVersion)
-
-		// --- Iteration 3: re-sync is idempotent ---
-		err = syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
-		require.NoError(t, err)
-
-		versions, err = db.ListEncryptionKeyVersionsForKey(ctx, globalEncryptionKeyID)
-		require.NoError(t, err)
-		require.Len(t, versions, 2, "idempotent sync should not create duplicates")
+		require.Empty(t, keyVersions)
 	})
 
-	t.Run("three level key hierarchy", func(t *testing.T) {
-		sconfig.ResetKeyDataMockRegistry()
-		t.Cleanup(sconfig.ResetKeyDataMockRegistry)
+	t.Run("rewraps stale dek with current provider material", func(t *testing.T) {
+		env := setupRewrapSyncTest(t)
 
-		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
-		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
-
-		globalKeyBytes := util.MustGenerateSecureRandomKey(32)
-		globalKD := sconfig.NewKeyDataMock("global")
-		sconfig.KeyDataMockAddVersion("global", "global-key", "v1", globalKeyBytes)
-
-		cfg := config.FromRoot(&sconfig.Root{
-			SystemAuth: sconfig.SystemAuth{
-				GlobalAESKey: globalKD,
-			},
-		})
-		_, db := database.MustApplyBlankTestDbConfig(t, cfg)
-		globalDEK, globalDEKBytes := createDataEncryptionKeyForTest(t, ctx, db, globalEncryptionKeyID, globalKD)
-
-		// --- Iteration 1: sync global key only ---
-		err := syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
+		before, err := env.db.GetDataEncryptionKey(env.ctx, env.dekID)
 		require.NoError(t, err)
+		beforePlaintext := unwrapDataEncryptionKeyForTest(t, env.ctx, env.keyData, before)
 
-		globalVersions, err := db.ListEncryptionKeyVersionsForKey(ctx, globalEncryptionKeyID)
+		sconfig.KeyDataMockAddVersion("namespace-secret", "mock-secret-key", "v2", util.MustGenerateSecureRandomKey(32))
+
+		require.NoError(t, syncKeysToDatabase(env.ctx, env.cfg, env.db, env.logger, nil))
+
+		after, err := env.db.GetDataEncryptionKey(env.ctx, env.dekID)
 		require.NoError(t, err)
-		require.Len(t, globalVersions, 1)
-
-		// --- Iteration 2: add a child key (depth 1) encrypted by the global key ---
-		childKeyBytes := util.MustGenerateSecureRandomKey(32)
-		childMockID := "child"
-		sconfig.NewKeyDataMock(childMockID)
-		sconfig.KeyDataMockAddVersion(childMockID, "child-key", "cv1", childKeyBytes)
-		childKeyData := sconfig.NewKeyDataMock(childMockID)
-
-		childEKID := apid.New(apid.PrefixKey)
-		childEF := encryptKeyDataForTest(t, globalDEK.Id, globalDEKBytes, childKeyData)
-
-		childEK := &database.Key{
-			Id:               childEKID,
-			Namespace:        "root",
-			State:            database.KeyStateActive,
-			EncryptedKeyData: childEF,
-		}
-		require.NoError(t, db.CreateKey(ctx, childEK))
-		childDEK, childDEKBytes := createDataEncryptionKeyForTest(t, ctx, db, childEKID, childKeyData)
-
-		err = syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
-		require.NoError(t, err)
-
-		childVersions, err := db.ListEncryptionKeyVersionsForKey(ctx, childEKID)
-		require.NoError(t, err)
-		require.Len(t, childVersions, 1)
-		require.True(t, childVersions[0].IsCurrent)
-		require.Equal(t, string(sconfig.ProviderTypeMock), childVersions[0].Provider)
-
-		// --- Iteration 3: add a grandchild key (depth 2) encrypted by the child key ---
-		grandchildKeyBytes := util.MustGenerateSecureRandomKey(32)
-		grandchildMockID := "grandchild"
-		sconfig.NewKeyDataMock(grandchildMockID)
-		sconfig.KeyDataMockAddVersion(grandchildMockID, "grandchild-key", "gv1", grandchildKeyBytes)
-		grandchildKeyData := sconfig.NewKeyDataMock(grandchildMockID)
-
-		grandchildEKID := apid.New(apid.PrefixKey)
-		grandchildEF := encryptKeyDataForTest(t, childDEK.Id, childDEKBytes, grandchildKeyData)
-
-		grandchildEK := &database.Key{
-			Id:               grandchildEKID,
-			Namespace:        "root",
-			State:            database.KeyStateActive,
-			EncryptedKeyData: grandchildEF,
-		}
-		require.NoError(t, db.CreateKey(ctx, grandchildEK))
-
-		err = syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
-		require.NoError(t, err)
-
-		grandchildVersions, err := db.ListEncryptionKeyVersionsForKey(ctx, grandchildEKID)
-		require.NoError(t, err)
-		require.Len(t, grandchildVersions, 1)
-		require.True(t, grandchildVersions[0].IsCurrent)
-
-		// Verify all three keys still have exactly one version
-		globalVersions, err = db.ListEncryptionKeyVersionsForKey(ctx, globalEncryptionKeyID)
-		require.NoError(t, err)
-		require.Len(t, globalVersions, 1)
-
-		childVersions, err = db.ListEncryptionKeyVersionsForKey(ctx, childEKID)
-		require.NoError(t, err)
-		require.Len(t, childVersions, 1)
-
-		// --- Iteration 4: idempotent re-sync ---
-		err = syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
-		require.NoError(t, err)
-
-		globalVersions, err = db.ListEncryptionKeyVersionsForKey(ctx, globalEncryptionKeyID)
-		require.NoError(t, err)
-		require.Len(t, globalVersions, 1)
-
-		childVersions, err = db.ListEncryptionKeyVersionsForKey(ctx, childEKID)
-		require.NoError(t, err)
-		require.Len(t, childVersions, 1)
-
-		grandchildVersions, err = db.ListEncryptionKeyVersionsForKey(ctx, grandchildEKID)
-		require.NoError(t, err)
-		require.Len(t, grandchildVersions, 1)
+		require.Equal(t, env.dekID, after.Id)
+		require.Equal(t, before.KeyId, after.KeyId)
+		require.Equal(t, before.IsCurrent, after.IsCurrent)
+		require.True(t, before.CreatedAt.Equal(after.CreatedAt))
+		require.Equal(t, "v2", after.ProviderVersion)
+		require.NotEqual(t, before.ProtectedData.WrappedData, after.ProtectedData.WrappedData)
+		require.Equal(t, beforePlaintext, unwrapDataEncryptionKeyForTest(t, env.ctx, env.keyData, after))
+		requireNamespaceTarget(t, env.ctx, env.db, env.namespace, env.dekID)
 	})
 
-	t.Run("child key gets new version added", func(t *testing.T) {
-		// Scenario: a child key backed by a mock provider gains a new version between syncs.
-		// Because the mock registry is shared, the deserialized KeyDataMock sees the new version.
-		sconfig.ResetKeyDataMockRegistry()
-		t.Cleanup(sconfig.ResetKeyDataMockRegistry)
+	t.Run("does not rewrite encrypted application fields during rewrap", func(t *testing.T) {
+		env := setupRewrapSyncTest(t)
+		enc := newTestService(env.cfg, env.db)
 
-		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
-		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
-
-		globalKeyBytes := util.MustGenerateSecureRandomKey(32)
-		globalKD := sconfig.NewKeyDataMock("global")
-		sconfig.KeyDataMockAddVersion("global", "global-key", "v1", globalKeyBytes)
-
-		cfg := config.FromRoot(&sconfig.Root{
-			SystemAuth: sconfig.SystemAuth{
-				GlobalAESKey: globalKD,
-			},
-		})
-		_, db := database.MustApplyBlankTestDbConfig(t, cfg)
-		globalDEK, globalDEKBytes := createDataEncryptionKeyForTest(t, ctx, db, globalEncryptionKeyID, globalKD)
-
-		// Sync global key
-		err := syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
+		actorID := apid.New(apid.PrefixActor)
+		encrypted, err := enc.EncryptStringForNamespace(env.ctx, env.namespace, "leave me alone")
 		require.NoError(t, err)
-
-		// Create child key with mock provider starting with cv1
-		childKeyBytesV1 := util.MustGenerateSecureRandomKey(32)
-		childMockID := "child"
-		sconfig.NewKeyDataMock(childMockID)
-		sconfig.KeyDataMockAddVersion(childMockID, "child-key", "cv1", childKeyBytesV1)
-		childKeyData := sconfig.NewKeyDataMock(childMockID)
-
-		childEKID := apid.New(apid.PrefixKey)
-		childEF := encryptKeyDataForTest(t, globalDEK.Id, globalDEKBytes, childKeyData)
-
-		childEK := &database.Key{
-			Id:               childEKID,
-			Namespace:        "root",
-			State:            database.KeyStateActive,
-			EncryptedKeyData: childEF,
-		}
-		require.NoError(t, db.CreateKey(ctx, childEK))
-
-		// Sync: child should have 1 version
-		err = syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
-		require.NoError(t, err)
-
-		childVersions, err := db.ListEncryptionKeyVersionsForKey(ctx, childEKID)
-		require.NoError(t, err)
-		require.Len(t, childVersions, 1)
-		require.True(t, childVersions[0].IsCurrent)
-		require.Equal(t, "cv1", childVersions[0].ProviderVersion)
-
-		// Add a second version to the child mock — no need to re-encrypt, the mock registry
-		// is shared and the deserialized KeyDataMock will see the new version.
-		childKeyBytesV2 := util.MustGenerateSecureRandomKey(32)
-		sconfig.KeyDataMockAddVersion(childMockID, "child-key", "cv2", childKeyBytesV2)
-
-		// Sync again: child should now have 2 versions
-		err = syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
-		require.NoError(t, err)
-
-		childVersions, err = db.ListEncryptionKeyVersionsForKey(ctx, childEKID)
-		require.NoError(t, err)
-		require.Len(t, childVersions, 2)
-
-		var cv1, cv2 *database.EncryptionKeyVersion
-		for _, v := range childVersions {
-			switch v.ProviderVersion {
-			case "cv1":
-				cv1 = v
-			case "cv2":
-				cv2 = v
-			}
-		}
-		require.NotNil(t, cv1)
-		require.NotNil(t, cv2)
-		require.False(t, cv1.IsCurrent, "cv1 should no longer be current")
-		require.True(t, cv2.IsCurrent, "cv2 should be current")
-		require.Equal(t, int64(1), cv1.OrderedVersion)
-		require.Equal(t, int64(2), cv2.OrderedVersion)
-	})
-
-	t.Run("child key version removed", func(t *testing.T) {
-		// Scenario: a child key's old version is removed from the mock provider.
-		sconfig.ResetKeyDataMockRegistry()
-		t.Cleanup(sconfig.ResetKeyDataMockRegistry)
-
-		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
-		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
-
-		globalKeyBytes := util.MustGenerateSecureRandomKey(32)
-		globalKD := sconfig.NewKeyDataMock("global")
-		sconfig.KeyDataMockAddVersion("global", "global-key", "v1", globalKeyBytes)
-
-		cfg := config.FromRoot(&sconfig.Root{
-			SystemAuth: sconfig.SystemAuth{
-				GlobalAESKey: globalKD,
-			},
-		})
-		_, db := database.MustApplyBlankTestDbConfig(t, cfg)
-		globalDEK, globalDEKBytes := createDataEncryptionKeyForTest(t, ctx, db, globalEncryptionKeyID, globalKD)
-
-		err := syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
-		require.NoError(t, err)
-
-		// Create child with two versions
-		childKeyBytesV1 := util.MustGenerateSecureRandomKey(32)
-		childKeyBytesV2 := util.MustGenerateSecureRandomKey(32)
-		childMockID := "child"
-		sconfig.NewKeyDataMock(childMockID)
-		sconfig.KeyDataMockAddVersion(childMockID, "child-key", "cv1", childKeyBytesV1)
-		sconfig.KeyDataMockAddVersion(childMockID, "child-key", "cv2", childKeyBytesV2)
-		childKeyData := sconfig.NewKeyDataMock(childMockID)
-
-		childEKID := apid.New(apid.PrefixKey)
-		childEF := encryptKeyDataForTest(t, globalDEK.Id, globalDEKBytes, childKeyData)
-
-		childEK := &database.Key{
-			Id:               childEKID,
-			Namespace:        "root",
-			State:            database.KeyStateActive,
-			EncryptedKeyData: childEF,
-		}
-		require.NoError(t, db.CreateKey(ctx, childEK))
-
-		err = syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
-		require.NoError(t, err)
-
-		childVersions, err := db.ListEncryptionKeyVersionsForKey(ctx, childEKID)
-		require.NoError(t, err)
-		require.Len(t, childVersions, 2)
-
-		// Remove cv1
-		sconfig.KeyDataMockRemoveVersion(childMockID, "cv1")
-
-		err = syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
-		require.NoError(t, err)
-
-		childVersions, err = db.ListEncryptionKeyVersionsForKey(ctx, childEKID)
-		require.NoError(t, err)
-		require.Len(t, childVersions, 1)
-		require.Equal(t, "cv2", childVersions[0].ProviderVersion)
-		require.True(t, childVersions[0].IsCurrent)
-	})
-
-	t.Run("version removed from global provider gets deleted", func(t *testing.T) {
-		sconfig.ResetKeyDataMockRegistry()
-		t.Cleanup(sconfig.ResetKeyDataMockRegistry)
-
-		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
-		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
-
-		globalKD := sconfig.NewKeyDataMock("global")
-		globalKeyBytesV1 := util.MustGenerateSecureRandomKey(32)
-		sconfig.KeyDataMockAddVersion("global", "global-key", "v1", globalKeyBytesV1)
-
-		// Add second version before first sync
-		globalKeyBytesV2 := util.MustGenerateSecureRandomKey(32)
-		sconfig.KeyDataMockAddVersion("global", "global-key", "v2", globalKeyBytesV2)
-
-		cfg := config.FromRoot(&sconfig.Root{
-			SystemAuth: sconfig.SystemAuth{
-				GlobalAESKey: globalKD,
-			},
-		})
-		_, db := database.MustApplyBlankTestDbConfig(t, cfg)
-
-		err := syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
-		require.NoError(t, err)
-
-		versions, err := db.ListEncryptionKeyVersionsForKey(ctx, globalEncryptionKeyID)
-		require.NoError(t, err)
-		require.Len(t, versions, 2)
-
-		// Remove v1 from the provider
-		sconfig.KeyDataMockRemoveVersion("global", "v1")
-
-		err = syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
-		require.NoError(t, err)
-
-		versions, err = db.ListEncryptionKeyVersionsForKey(ctx, globalEncryptionKeyID)
-		require.NoError(t, err)
-		require.Len(t, versions, 1)
-		require.Equal(t, "v2", versions[0].ProviderVersion)
-		require.True(t, versions[0].IsCurrent)
-	})
-
-	t.Run("global key rotated then child added using new version", func(t *testing.T) {
-		sconfig.ResetKeyDataMockRegistry()
-		t.Cleanup(sconfig.ResetKeyDataMockRegistry)
-
-		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
-		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
-
-		globalKeyBytesV1 := util.MustGenerateSecureRandomKey(32)
-		globalKD := sconfig.NewKeyDataMock("global")
-		sconfig.KeyDataMockAddVersion("global", "global-key", "v1", globalKeyBytesV1)
-
-		cfg := config.FromRoot(&sconfig.Root{
-			SystemAuth: sconfig.SystemAuth{
-				GlobalAESKey: globalKD,
-			},
-		})
-		_, db := database.MustApplyBlankTestDbConfig(t, cfg)
-		createDataEncryptionKeyForTest(t, ctx, db, globalEncryptionKeyID, globalKD)
-
-		// Sync v1
-		err := syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
-		require.NoError(t, err)
-
-		// Add v2 to global and sync
-		globalKeyBytesV2 := util.MustGenerateSecureRandomKey(32)
-		sconfig.KeyDataMockAddVersion("global", "global-key", "v2", globalKeyBytesV2)
-		globalDEKV2, globalDEKV2Bytes := createDataEncryptionKeyForTest(t, ctx, db, globalEncryptionKeyID, globalKD)
-
-		err = syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
-		require.NoError(t, err)
-		require.Equal(t, "v2", globalDEKV2.ProviderVersion)
-
-		// Create a child key encrypted with global v2
-		childKeyBytes := util.MustGenerateSecureRandomKey(32)
-		childMockID := "child"
-		sconfig.NewKeyDataMock(childMockID)
-		sconfig.KeyDataMockAddVersion(childMockID, "child-key", "cv1", childKeyBytes)
-		childKeyData := sconfig.NewKeyDataMock(childMockID)
-
-		childEKID := apid.New(apid.PrefixKey)
-		childEF := encryptKeyDataForTest(t, globalDEKV2.Id, globalDEKV2Bytes, childKeyData)
-
-		childEK := &database.Key{
-			Id:               childEKID,
-			Namespace:        "root",
-			State:            database.KeyStateActive,
-			EncryptedKeyData: childEF,
-		}
-		require.NoError(t, db.CreateKey(ctx, childEK))
-
-		err = syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
-		require.NoError(t, err)
-
-		childVersions, err := db.ListEncryptionKeyVersionsForKey(ctx, childEKID)
-		require.NoError(t, err)
-		require.Len(t, childVersions, 1)
-		require.True(t, childVersions[0].IsCurrent)
-	})
-
-	t.Run("global key with multiple versions and child encrypted with non-current", func(t *testing.T) {
-		sconfig.ResetKeyDataMockRegistry()
-		t.Cleanup(sconfig.ResetKeyDataMockRegistry)
-
-		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
-		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
-
-		globalKeyBytesV1 := util.MustGenerateSecureRandomKey(32)
-		globalKD := sconfig.NewKeyDataMock("global")
-		sconfig.KeyDataMockAddVersion("global", "global-key", "v1", globalKeyBytesV1)
-
-		cfg := config.FromRoot(&sconfig.Root{
-			SystemAuth: sconfig.SystemAuth{
-				GlobalAESKey: globalKD,
-			},
-		})
-		_, db := database.MustApplyBlankTestDbConfig(t, cfg)
-		globalDEKV1, globalDEKV1Bytes := createDataEncryptionKeyForTest(t, ctx, db, globalEncryptionKeyID, globalKD)
-
-		// Sync v1
-		err := syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
-		require.NoError(t, err)
-
-		// Create a child encrypted with v1
-		childKeyBytes := util.MustGenerateSecureRandomKey(32)
-		childMockID := "child"
-		sconfig.NewKeyDataMock(childMockID)
-		sconfig.KeyDataMockAddVersion(childMockID, "child-key", "cv1", childKeyBytes)
-		childKeyData := sconfig.NewKeyDataMock(childMockID)
-
-		childEKID := apid.New(apid.PrefixKey)
-		childEF := encryptKeyDataForTest(t, globalDEKV1.Id, globalDEKV1Bytes, childKeyData)
-
-		childEK := &database.Key{
-			Id:               childEKID,
-			Namespace:        "root",
-			State:            database.KeyStateActive,
-			EncryptedKeyData: childEF,
-		}
-		require.NoError(t, db.CreateKey(ctx, childEK))
-
-		// Now add v2 to global, making v1 non-current
-		globalKeyBytesV2 := util.MustGenerateSecureRandomKey(32)
-		sconfig.KeyDataMockAddVersion("global", "global-key", "v2", globalKeyBytesV2)
-		globalDEKV2, _ := createDataEncryptionKeyForTest(t, ctx, db, globalEncryptionKeyID, globalKD)
-		require.Equal(t, "v2", globalDEKV2.ProviderVersion)
-
-		// Sync: should handle child encrypted with the now-non-current v1
-		err = syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
-		require.NoError(t, err)
-
-		childVersions, err := db.ListEncryptionKeyVersionsForKey(ctx, childEKID)
-		require.NoError(t, err)
-		require.Len(t, childVersions, 1)
-		require.True(t, childVersions[0].IsCurrent)
-	})
-
-	t.Run("namespace with encryption_key_id gets target data encryption key id set", func(t *testing.T) {
-		sconfig.ResetKeyDataMockRegistry()
-		t.Cleanup(sconfig.ResetKeyDataMockRegistry)
-
-		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
-		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
-
-		globalKeyBytes := util.MustGenerateSecureRandomKey(32)
-		globalKD := sconfig.NewKeyDataMock("global")
-		sconfig.KeyDataMockAddVersion("global", "global-key", "v1", globalKeyBytes)
-
-		childKeyBytes := util.MustGenerateSecureRandomKey(32)
-		sconfig.NewKeyDataMock("child")
-		sconfig.KeyDataMockAddVersion("child", "child-key", "cv1", childKeyBytes)
-		childKeyData := sconfig.NewKeyDataMock("child")
-
-		cfg := config.FromRoot(&sconfig.Root{
-			SystemAuth: sconfig.SystemAuth{
-				GlobalAESKey: globalKD,
-			},
-		})
-		_, db := database.MustApplyBlankTestDbConfig(t, cfg)
-		globalDEK, globalDEKBytes := createDataEncryptionKeyForTest(t, ctx, db, globalEncryptionKeyID, globalKD)
-
-		// Sync global key first
-		err := syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
-		require.NoError(t, err)
-
-		// Create child encryption key
-		childEKID := apid.New(apid.PrefixKey)
-		childEF := encryptKeyDataForTest(t, globalDEK.Id, globalDEKBytes, childKeyData)
-		childEK := &database.Key{
-			Id:               childEKID,
-			Namespace:        "root",
-			State:            database.KeyStateActive,
-			EncryptedKeyData: childEF,
-		}
-		require.NoError(t, db.CreateKey(ctx, childEK))
-		childDEK, _ := createDataEncryptionKeyForTest(t, ctx, db, childEKID, childKeyData)
-
-		// Create namespace that uses the child encryption key
-		require.NoError(t, db.CreateNamespace(ctx, &database.Namespace{
-			Path:  "root.withkey",
-			KeyId: &childEKID,
+		require.Equal(t, env.dekID, encrypted.ID)
+		require.NoError(t, env.db.CreateActor(env.ctx, &database.Actor{
+			Id:           actorID,
+			Namespace:    env.namespace,
+			ExternalId:   "sync-does-not-reencrypt",
+			EncryptedKey: &encrypted,
 		}))
 
-		// Sync: should set target_data_encryption_key_id on the namespace
-		err = syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
+		actorBefore, err := env.db.GetActor(env.ctx, actorID)
 		require.NoError(t, err)
+		require.NotNil(t, actorBefore.EncryptedKey)
 
-		childVersions, err := db.ListEncryptionKeyVersionsForKey(ctx, childEKID)
+		sconfig.KeyDataMockAddVersion("namespace-secret", "mock-secret-key", "v2", util.MustGenerateSecureRandomKey(32))
+
+		require.NoError(t, syncKeysToDatabase(env.ctx, env.cfg, env.db, env.logger, nil))
+
+		afterDEK, err := env.db.GetDataEncryptionKey(env.ctx, env.dekID)
 		require.NoError(t, err)
-		require.Len(t, childVersions, 1)
+		require.Equal(t, "v2", afterDEK.ProviderVersion)
 
-		// Verify the namespace got the correct target
-		var collected []database.NamespaceEncryptionTarget
-		err = db.EnumerateNamespaceEncryptionTargets(ctx,
-			func(targets []database.NamespaceEncryptionTarget, lastPage bool) ([]database.NamespaceTargetDataEncryptionKeyUpdate, pagination.KeepGoing, error) {
-				collected = append(collected, targets...)
-				return nil, pagination.Continue, nil
-			},
-		)
+		actorAfter, err := env.db.GetActor(env.ctx, actorID)
 		require.NoError(t, err)
-
-		for _, target := range collected {
-			if target.Path == "root.withkey" {
-				require.NotNil(t, target.TargetDataEncryptionKeyId)
-				require.Equal(t, childDEK.Id, *target.TargetDataEncryptionKeyId)
-			}
-		}
+		require.NotNil(t, actorAfter.EncryptedKey)
+		require.Equal(t, actorBefore.EncryptedKey.ID, actorAfter.EncryptedKey.ID)
+		require.Equal(t, actorBefore.EncryptedKey.Data, actorAfter.EncryptedKey.Data)
 	})
 
-	t.Run("namespace without encryption_key_id inherits from ancestor", func(t *testing.T) {
+	t.Run("no-op when wrapping material is current", func(t *testing.T) {
+		env := setupRewrapSyncTest(t)
+
+		before, err := env.db.GetDataEncryptionKey(env.ctx, env.dekID)
+		require.NoError(t, err)
+
+		require.NoError(t, syncKeysToDatabase(env.ctx, env.cfg, env.db, env.logger, nil))
+
+		after, err := env.db.GetDataEncryptionKey(env.ctx, env.dekID)
+		require.NoError(t, err)
+		require.Equal(t, before.Provider, after.Provider)
+		require.Equal(t, before.ProviderID, after.ProviderID)
+		require.Equal(t, before.ProviderVersion, after.ProviderVersion)
+		require.Equal(t, before.ProtectedData, after.ProtectedData)
+		require.True(t, before.UpdatedAt.Equal(after.UpdatedAt))
+	})
+
+	t.Run("unwrap failure leaves dek unchanged", func(t *testing.T) {
+		env := setupRewrapSyncTest(t)
+		before, err := env.db.GetDataEncryptionKey(env.ctx, env.dekID)
+		require.NoError(t, err)
+
+		sconfig.KeyDataMockAddVersion("namespace-secret", "mock-secret-key", "v2", util.MustGenerateSecureRandomKey(32))
+		sconfig.KeyDataMockRemoveVersion("namespace-secret", "v1")
+
+		err = syncKeysToDatabase(env.ctx, env.cfg, env.db, env.logger, nil)
+		require.ErrorContains(t, err, "failed to unwrap data encryption key")
+
+		after, getErr := env.db.GetDataEncryptionKey(env.ctx, env.dekID)
+		require.NoError(t, getErr)
+		require.Equal(t, before.ProviderVersion, after.ProviderVersion)
+		require.Equal(t, before.ProtectedData, after.ProtectedData)
+	})
+
+	t.Run("wrap failure leaves dek unchanged", func(t *testing.T) {
+		env := setupRewrapSyncTest(t)
+		before, err := env.db.GetDataEncryptionKey(env.ctx, env.dekID)
+		require.NoError(t, err)
+
+		sconfig.KeyDataMockAddVersion("namespace-secret", "mock-secret-key", "v2", []byte("bad"))
+
+		err = syncKeysToDatabase(env.ctx, env.cfg, env.db, env.logger, nil)
+		require.ErrorContains(t, err, "failed to rewrap data encryption key")
+
+		after, getErr := env.db.GetDataEncryptionKey(env.ctx, env.dekID)
+		require.NoError(t, getErr)
+		require.Equal(t, before.ProviderVersion, after.ProviderVersion)
+		require.Equal(t, before.ProtectedData, after.ProtectedData)
+	})
+
+	t.Run("rewraps mock kms protected metadata", func(t *testing.T) {
+		env := setupMockKMSKeySyncTest(t)
+		keyData := sconfig.NewKeyDataMockKMS("namespace-kms")
+
+		before, err := env.db.GetDataEncryptionKey(env.ctx, env.dekV1ID)
+		require.NoError(t, err)
+		beforePlaintext := unwrapDataEncryptionKeyForTest(t, env.ctx, keyData, before)
+
+		sconfig.KeyDataMockKMSAddVersion("namespace-kms", "mock-kms-key", "v2", util.MustGenerateSecureRandomKey(32))
+
+		require.NoError(t, syncKeysToDatabase(env.ctx, env.cfg, env.db, env.logger, nil))
+
+		after, err := env.db.GetDataEncryptionKey(env.ctx, env.dekV1ID)
+		require.NoError(t, err)
+		require.Equal(t, env.dekV1ID, after.Id)
+		require.Equal(t, "v2", after.ProviderVersion)
+		require.Equal(t, "v2", after.ProtectedData.Metadata["kek_version"])
+		require.Equal(t, beforePlaintext, unwrapDataEncryptionKeyForTest(t, env.ctx, keyData, after))
+	})
+
+	t.Run("namespace targets resolve direct inherited and global deks idempotently", func(t *testing.T) {
 		sconfig.ResetKeyDataMockRegistry()
 		t.Cleanup(sconfig.ResetKeyDataMockRegistry)
 
-		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
-		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC))).Build()
+		logger := slog.Default()
 
 		globalKeyBytes := util.MustGenerateSecureRandomKey(32)
-		globalKD := sconfig.NewKeyDataMock("global")
-		sconfig.KeyDataMockAddVersion("global", "global-key", "v1", globalKeyBytes)
+		globalKD := sconfig.NewKeyDataMock("global-targets")
+		sconfig.KeyDataMockAddVersion("global-targets", "global-key", "v1", globalKeyBytes)
+
+		cfg := config.FromRoot(&sconfig.Root{
+			SystemAuth: sconfig.SystemAuth{
+				GlobalAESKey: globalKD,
+			},
+		})
+		cfg, db := database.MustApplyBlankTestDbConfig(t, cfg)
+		globalDEK, globalDEKBytes := createDataEncryptionKeyForTest(t, ctx, db, globalEncryptionKeyID, globalKD)
 
 		parentKeyBytes := util.MustGenerateSecureRandomKey(32)
-		sconfig.NewKeyDataMock("parent")
-		sconfig.KeyDataMockAddVersion("parent", "parent-key", "pv1", parentKeyBytes)
-		parentKeyData := sconfig.NewKeyDataMock("parent")
+		parentKeyData := sconfig.NewKeyDataMock("parent-targets")
+		sconfig.KeyDataMockAddVersion("parent-targets", "parent-key", "v1", parentKeyBytes)
 
-		cfg := config.FromRoot(&sconfig.Root{
-			SystemAuth: sconfig.SystemAuth{
-				GlobalAESKey: globalKD,
-			},
-		})
-		_, db := database.MustApplyBlankTestDbConfig(t, cfg)
-		globalDEK, globalDEKBytes := createDataEncryptionKeyForTest(t, ctx, db, globalEncryptionKeyID, globalKD)
-
-		// Sync global key
-		err := syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
-		require.NoError(t, err)
-
-		// Create parent encryption key
-		parentEKID := apid.New(apid.PrefixKey)
-		parentEF := encryptKeyDataForTest(t, globalDEK.Id, globalDEKBytes, parentKeyData)
-		parentEK := &database.Key{
-			Id:               parentEKID,
+		parentKeyID := apid.New(apid.PrefixKey)
+		require.NoError(t, db.CreateKey(ctx, &database.Key{
+			Id:               parentKeyID,
 			Namespace:        "root",
 			State:            database.KeyStateActive,
-			EncryptedKeyData: parentEF,
-		}
-		require.NoError(t, db.CreateKey(ctx, parentEK))
-		parentDEK, _ := createDataEncryptionKeyForTest(t, ctx, db, parentEKID, parentKeyData)
+			EncryptedKeyData: encryptKeyDataForTest(t, globalDEK.Id, globalDEKBytes, parentKeyData),
+		}))
+		parentDEK, _ := createDataEncryptionKeyForTest(t, ctx, db, parentKeyID, parentKeyData)
 
-		// Create parent namespace with encryption key
 		require.NoError(t, db.CreateNamespace(ctx, &database.Namespace{
 			Path:  "root.parent",
-			KeyId: &parentEKID,
+			KeyId: &parentKeyID,
 		}))
+		require.NoError(t, db.CreateNamespace(ctx, &database.Namespace{Path: "root.parent.child"}))
+		require.NoError(t, db.CreateNamespace(ctx, &database.Namespace{Path: "root.global"}))
 
-		// Create child namespace WITHOUT encryption key — should inherit from parent
-		require.NoError(t, db.CreateNamespace(ctx, &database.Namespace{
-			Path: "root.parent.child",
-		}))
+		require.NoError(t, syncKeysToDatabase(ctx, cfg, db, logger, nil))
+		requireNamespaceTarget(t, ctx, db, "root.parent", parentDEK.Id)
+		requireNamespaceTarget(t, ctx, db, "root.parent.child", parentDEK.Id)
+		requireNamespaceTarget(t, ctx, db, "root.global", globalDEK.Id)
 
-		// Sync
-		err = syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
+		parentBefore, err := db.GetNamespace(ctx, "root.parent")
 		require.NoError(t, err)
 
-		parentVersions, err := db.ListEncryptionKeyVersionsForKey(ctx, parentEKID)
+		require.NoError(t, syncKeysToDatabase(ctx, cfg, db, logger, nil))
+		parentAfter, err := db.GetNamespace(ctx, "root.parent")
 		require.NoError(t, err)
-		require.Len(t, parentVersions, 1)
-
-		// Verify child inherited from parent
-		var collected []database.NamespaceEncryptionTarget
-		err = db.EnumerateNamespaceEncryptionTargets(ctx,
-			func(targets []database.NamespaceEncryptionTarget, lastPage bool) ([]database.NamespaceTargetDataEncryptionKeyUpdate, pagination.KeepGoing, error) {
-				collected = append(collected, targets...)
-				return nil, pagination.Continue, nil
-			},
-		)
-		require.NoError(t, err)
-
-		for _, target := range collected {
-			if target.Path == "root.parent.child" {
-				require.NotNil(t, target.TargetDataEncryptionKeyId)
-				require.Equal(t, parentDEK.Id, *target.TargetDataEncryptionKeyId)
-			}
-			if target.Path == "root.parent" {
-				require.NotNil(t, target.TargetDataEncryptionKeyId)
-				require.Equal(t, parentDEK.Id, *target.TargetDataEncryptionKeyId)
-			}
-		}
-	})
-
-	t.Run("namespace falls back to global key when no ancestor has encryption key", func(t *testing.T) {
-		sconfig.ResetKeyDataMockRegistry()
-		t.Cleanup(sconfig.ResetKeyDataMockRegistry)
-
-		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
-		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
-
-		globalKeyBytes := util.MustGenerateSecureRandomKey(32)
-		globalKD := sconfig.NewKeyDataMock("global")
-		sconfig.KeyDataMockAddVersion("global", "global-key", "v1", globalKeyBytes)
-
-		cfg := config.FromRoot(&sconfig.Root{
-			SystemAuth: sconfig.SystemAuth{
-				GlobalAESKey: globalKD,
-			},
-		})
-		_, db := database.MustApplyBlankTestDbConfig(t, cfg)
-		globalDEK, _ := createDataEncryptionKeyForTest(t, ctx, db, globalEncryptionKeyID, globalKD)
-
-		// Create namespace without encryption key (root already exists from db init)
-		require.NoError(t, db.CreateNamespace(ctx, &database.Namespace{
-			Path: "root.nokey",
-		}))
-
-		// Sync
-		err := syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
-		require.NoError(t, err)
-
-		globalVersions, err := db.ListEncryptionKeyVersionsForKey(ctx, globalEncryptionKeyID)
-		require.NoError(t, err)
-		require.Len(t, globalVersions, 1)
-
-		// Verify namespace uses the global key's current DEK.
-		var collected []database.NamespaceEncryptionTarget
-		err = db.EnumerateNamespaceEncryptionTargets(ctx,
-			func(targets []database.NamespaceEncryptionTarget, lastPage bool) ([]database.NamespaceTargetDataEncryptionKeyUpdate, pagination.KeepGoing, error) {
-				collected = append(collected, targets...)
-				return nil, pagination.Continue, nil
-			},
-		)
-		require.NoError(t, err)
-
-		for _, target := range collected {
-			if target.Path == "root.nokey" {
-				require.NotNil(t, target.TargetDataEncryptionKeyId)
-				require.Equal(t, globalDEK.Id, *target.TargetDataEncryptionKeyId)
-			}
-		}
-	})
-
-	t.Run("idempotent re-sync produces no spurious updates", func(t *testing.T) {
-		sconfig.ResetKeyDataMockRegistry()
-		t.Cleanup(sconfig.ResetKeyDataMockRegistry)
-
-		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
-		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
-
-		globalKeyBytes := util.MustGenerateSecureRandomKey(32)
-		globalKD := sconfig.NewKeyDataMock("global")
-		sconfig.KeyDataMockAddVersion("global", "global-key", "v1", globalKeyBytes)
-
-		cfg := config.FromRoot(&sconfig.Root{
-			SystemAuth: sconfig.SystemAuth{
-				GlobalAESKey: globalKD,
-			},
-		})
-		_, db := database.MustApplyBlankTestDbConfig(t, cfg)
-		createDataEncryptionKeyForTest(t, ctx, db, globalEncryptionKeyID, globalKD)
-
-		require.NoError(t, db.CreateNamespace(ctx, &database.Namespace{
-			Path: "root.stable",
-		}))
-
-		// First sync sets everything
-		err := syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
-		require.NoError(t, err)
-
-		// Capture state after first sync
-		var firstCollected []database.NamespaceEncryptionTarget
-		err = db.EnumerateNamespaceEncryptionTargets(ctx,
-			func(targets []database.NamespaceEncryptionTarget, lastPage bool) ([]database.NamespaceTargetDataEncryptionKeyUpdate, pagination.KeepGoing, error) {
-				firstCollected = append(firstCollected, targets...)
-				return nil, pagination.Continue, nil
-			},
-		)
-		require.NoError(t, err)
-
-		// Second sync should be idempotent
-		err = syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil)
-		require.NoError(t, err)
-
-		var secondCollected []database.NamespaceEncryptionTarget
-		err = db.EnumerateNamespaceEncryptionTargets(ctx,
-			func(targets []database.NamespaceEncryptionTarget, lastPage bool) ([]database.NamespaceTargetDataEncryptionKeyUpdate, pagination.KeepGoing, error) {
-				secondCollected = append(secondCollected, targets...)
-				return nil, pagination.Continue, nil
-			},
-		)
-		require.NoError(t, err)
-
-		require.Equal(t, len(firstCollected), len(secondCollected))
-		for i := range firstCollected {
-			require.Equal(t, firstCollected[i].Path, secondCollected[i].Path)
-			require.Equal(t, firstCollected[i].TargetDataEncryptionKeyId, secondCollected[i].TargetDataEncryptionKeyId)
-		}
+		require.Equal(t, parentBefore.TargetDataEncryptionKeyId, parentAfter.TargetDataEncryptionKeyId)
+		require.True(t, parentBefore.UpdatedAt.Equal(parentAfter.UpdatedAt))
 	})
 }
