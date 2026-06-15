@@ -136,7 +136,7 @@ func (env *reencryptTestEnv) runReencrypt(t *testing.T) error {
 }
 
 func TestHandleReencryptAll(t *testing.T) {
-	t.Run("re-encrypts actor with mismatched key version", func(t *testing.T) {
+	t.Run("re-encrypts actor with mismatched DEK", func(t *testing.T) {
 		env := setupReencryptTest(t)
 		v2DEKID, _ := env.addGlobalV2(t)
 

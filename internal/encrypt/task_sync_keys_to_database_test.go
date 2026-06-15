@@ -175,10 +175,6 @@ func TestMockKMSKeySync(t *testing.T) {
 		require.Equal(t, string(sconfig.ProviderTypeMockKMS), deks[0].ProtectedData.Type)
 		require.NotEmpty(t, deks[0].ProtectedData.WrappedData)
 
-		versions, err := env.db.ListEncryptionKeyVersionsForKey(env.ctx, env.ekID)
-		require.NoError(t, err)
-		require.Empty(t, versions)
-
 		encrypted, err := env.enc.EncryptStringForNamespace(env.ctx, env.namespace, "kms plaintext")
 		require.NoError(t, err)
 		require.Equal(t, env.dekV1ID, encrypted.ID)
@@ -189,10 +185,6 @@ func TestMockKMSKeySync(t *testing.T) {
 		require.Equal(t, "kms plaintext", decrypted)
 
 		require.NoError(t, syncKeysToDatabase(env.ctx, env.cfg, env.db, env.logger, nil))
-		afterResync, err := env.db.ListEncryptionKeyVersionsForKey(env.ctx, env.ekID)
-		require.NoError(t, err)
-		require.Empty(t, afterResync)
-
 		afterDEKs, err := env.db.ListDataEncryptionKeysForKey(env.ctx, env.ekID)
 		require.NoError(t, err)
 		require.Len(t, afterDEKs, 1, "resync with existing protected data should not generate duplicate DEKs")
@@ -222,9 +214,9 @@ func TestMockKMSKeySync(t *testing.T) {
 		}))
 
 		require.NoError(t, syncKeysToDatabase(env.ctx, env.cfg, env.db, env.logger, nil))
-		versions, err := env.db.ListEncryptionKeyVersionsForKey(env.ctx, ekID)
+		deks, err := env.db.ListDataEncryptionKeysForKey(env.ctx, ekID)
 		require.NoError(t, err)
-		require.Empty(t, versions)
+		require.Empty(t, deks)
 	})
 
 	t.Run("rotation creates new protected dek and re-encrypts fields", func(t *testing.T) {
@@ -372,16 +364,26 @@ func requireNamespaceTarget(
 }
 
 func TestSyncKeysToDatabase(t *testing.T) {
-	t.Run("does not manifest provider versions as rows", func(t *testing.T) {
+	t.Run("does not create or duplicate deks", func(t *testing.T) {
 		env := setupRewrapSyncTest(t)
 
-		globalVersions, err := env.db.ListEncryptionKeyVersionsForKey(env.ctx, globalEncryptionKeyID)
+		globalDEKs, err := env.db.ListDataEncryptionKeysForKey(env.ctx, globalEncryptionKeyID)
 		require.NoError(t, err)
-		require.Empty(t, globalVersions)
+		require.Len(t, globalDEKs, 1)
 
-		keyVersions, err := env.db.ListEncryptionKeyVersionsForKey(env.ctx, env.keyID)
+		keyDEKs, err := env.db.ListDataEncryptionKeysForKey(env.ctx, env.keyID)
 		require.NoError(t, err)
-		require.Empty(t, keyVersions)
+		require.Len(t, keyDEKs, 1)
+
+		require.NoError(t, syncKeysToDatabase(env.ctx, env.cfg, env.db, env.logger, nil))
+
+		globalDEKs, err = env.db.ListDataEncryptionKeysForKey(env.ctx, globalEncryptionKeyID)
+		require.NoError(t, err)
+		require.Len(t, globalDEKs, 1)
+
+		keyDEKs, err = env.db.ListDataEncryptionKeysForKey(env.ctx, env.keyID)
+		require.NoError(t, err)
+		require.Len(t, keyDEKs, 1)
 	})
 
 	t.Run("rewraps stale dek with current provider material", func(t *testing.T) {

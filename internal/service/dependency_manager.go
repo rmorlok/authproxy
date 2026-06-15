@@ -731,7 +731,7 @@ func (dm *DependencyManager) AutoMigratePredefinedActors() {
 	}()
 }
 
-// AutoMigrateSyncKeysToDatabase syncs encryption key versions from config into the database.
+// AutoMigrateSyncKeysToDatabase syncs key wrapping state into the database.
 // Uses a Redis sentinel to avoid redundant runs across processes.
 func (dm *DependencyManager) AutoMigrateSyncKeysToDatabase() {
 	if err := encrypt.SyncKeysToDatabase(

@@ -294,8 +294,7 @@ func syncKeysToDatabase(
 		return errors.New("no global AES key configured")
 	}
 
-	// key material id -> data for that material. During the migration this can
-	// contain both transitional ekv_ ids and canonical dek_ ids.
+	// key material id -> plaintext DEK for decrypting child key data.
 	keyMaterialDataCache := make(map[apid.ID]config.KeyVersionInfo)
 
 	// Manually sync the global key first because other keys depend on it.

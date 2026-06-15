@@ -107,12 +107,11 @@ func TestVaultKeySyncAndReencrypt(t *testing.T) {
 		EncryptedKeyData: &encKeyData,
 		State:            database.KeyStateActive,
 	}))
+	currentV1 := createDataEncryptionKeyForIntegrationTest(t, ctx, env.Db, ekID, &keyData)
 
 	require.NoError(t, encrypt.SyncKeysToDatabase(ctx, env.Cfg, env.Db, env.Logger, nil))
 	require.NoError(t, env.DM.GetEncryptService().SyncKeysFromDbToMemory(ctx))
 
-	currentV1, err := env.Db.GetCurrentEncryptionKeyVersionForNamespace(ctx, namespace)
-	require.NoError(t, err)
 	require.Equal(t, "1", currentV1.ProviderVersion)
 
 	plaintext := "vault-kv-test"
@@ -140,9 +139,9 @@ func TestVaultKeySyncAndReencrypt(t *testing.T) {
 	require.NoError(t, encrypt.SyncKeysToDatabase(ctx, env.Cfg, env.Db, env.Logger, nil))
 	require.NoError(t, env.DM.GetEncryptService().SyncKeysFromDbToMemory(ctx))
 
-	currentV2, err := env.Db.GetCurrentEncryptionKeyVersionForNamespace(ctx, namespace)
+	currentV2, err := env.Db.GetCurrentDataEncryptionKeyForKey(ctx, ekID)
 	require.NoError(t, err)
-	require.NotEqual(t, currentV1.Id, currentV2.Id)
+	require.Equal(t, currentV1.Id, currentV2.Id)
 	require.Equal(t, "2", currentV2.ProviderVersion)
 
 	require.NoError(t, runReencryptAll(ctx, env))
@@ -151,6 +150,7 @@ func TestVaultKeySyncAndReencrypt(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, updated.EncryptedKey)
 	require.Equal(t, currentV2.Id, updated.EncryptedKey.ID)
+	require.Equal(t, encrypted.Data, updated.EncryptedKey.Data)
 
 	decrypted, err := env.DM.GetEncryptService().DecryptString(ctx, *updated.EncryptedKey)
 	require.NoError(t, err)

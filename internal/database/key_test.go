@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -513,7 +514,7 @@ func TestKey(t *testing.T) {
 		require.Equal(t, orphan.Id, orphans[0].Id)
 	})
 
-	t.Run("DeleteCascadesVersions", func(t *testing.T) {
+	t.Run("DeleteCascadesDataEncryptionKeys", func(t *testing.T) {
 		_, db, _ := MustApplyBlankTestDbConfigRaw(t, nil)
 		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
@@ -525,22 +526,13 @@ func TestKey(t *testing.T) {
 		}
 		require.NoError(t, db.CreateKey(ctx, ek))
 
-		// Create multiple versions for this key
-		var versionIds []apid.ID
+		var dekIDs []apid.ID
 		for i := int64(1); i <= 3; i++ {
-			ekv := &EncryptionKeyVersion{
-				KeyId:           ek.Id,
-				Provider:        "local",
-				ProviderID:      "key",
-				ProviderVersion: "v1",
-				OrderedVersion:  i,
-				IsCurrent:       i == 3,
-			}
-			require.NoError(t, db.CreateEncryptionKeyVersion(ctx, ekv))
-			versionIds = append(versionIds, ekv.Id)
+			dek := validTestDataEncryptionKey(ek.Id, fmt.Sprintf("v%d", i), i == 3)
+			require.NoError(t, db.CreateDataEncryptionKey(ctx, dek))
+			dekIDs = append(dekIDs, dek.Id)
 		}
 
-		// Create a version for a different key to ensure it's not affected
 		otherEk := &Key{
 			Id:        apid.New(apid.PrefixKey),
 			Namespace: "root",
@@ -548,48 +540,35 @@ func TestKey(t *testing.T) {
 		}
 		require.NoError(t, db.CreateKey(ctx, otherEk))
 
-		otherEkv := &EncryptionKeyVersion{
-			KeyId:           otherEk.Id,
-			Provider:        "local",
-			ProviderID:      "other-key",
-			ProviderVersion: "v1",
-			OrderedVersion:  1,
-			IsCurrent:       true,
-		}
-		require.NoError(t, db.CreateEncryptionKeyVersion(ctx, otherEkv))
+		otherDEK := validTestDataEncryptionKey(otherEk.Id, "v1", true)
+		require.NoError(t, db.CreateDataEncryptionKey(ctx, otherDEK))
 
-		// Verify versions exist before delete
-		versions, err := db.ListEncryptionKeyVersionsForKey(ctx, ek.Id)
+		deks, err := db.ListDataEncryptionKeysForKey(ctx, ek.Id)
 		require.NoError(t, err)
-		require.Len(t, versions, 3)
+		require.Len(t, deks, 3)
 
-		// Delete the encryption key
 		err = db.DeleteKey(ctx, ek.Id)
 		require.NoError(t, err)
 
-		// The key should be gone
 		_, err = db.GetKey(ctx, ek.Id)
 		require.ErrorIs(t, err, ErrNotFound)
 
-		// All versions for the deleted key should be gone
-		versions, err = db.ListEncryptionKeyVersionsForKey(ctx, ek.Id)
+		deks, err = db.ListDataEncryptionKeysForKey(ctx, ek.Id)
 		require.NoError(t, err)
-		require.Empty(t, versions)
+		require.Empty(t, deks)
 
-		// Each version should individually be not found
-		for _, vid := range versionIds {
-			_, err = db.GetEncryptionKeyVersion(ctx, vid)
+		for _, dekID := range dekIDs {
+			_, err = db.GetDataEncryptionKey(ctx, dekID)
 			require.ErrorIs(t, err, ErrNotFound)
 		}
 
-		// The other key's version should be unaffected
-		otherVersions, err := db.ListEncryptionKeyVersionsForKey(ctx, otherEk.Id)
+		otherDEKs, err := db.ListDataEncryptionKeysForKey(ctx, otherEk.Id)
 		require.NoError(t, err)
-		require.Len(t, otherVersions, 1)
+		require.Len(t, otherDEKs, 1)
+		require.Equal(t, otherDEK.Id, otherDEKs[0].Id)
 	})
 
-	t.Run("DeleteCascadesNoVersions", func(t *testing.T) {
-		// Deleting a key with no versions should succeed without error
+	t.Run("DeleteCascadesNoDataEncryptionKeys", func(t *testing.T) {
 		_, db, _ := MustApplyBlankTestDbConfigRaw(t, nil)
 		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()

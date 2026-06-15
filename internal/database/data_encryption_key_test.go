@@ -184,7 +184,7 @@ func TestDataEncryptionKey(t *testing.T) {
 		require.ErrorContains(t, missingProtected.Validate(), "protected data is required")
 
 		wrongPrefix := validTestDataEncryptionKey(ekID, "v1", true)
-		wrongPrefix.Id = apid.New(apid.PrefixEncryptionKeyVersion)
+		wrongPrefix.Id = apid.New(apid.PrefixActor)
 		require.Error(t, wrongPrefix.Validate())
 	})
 }

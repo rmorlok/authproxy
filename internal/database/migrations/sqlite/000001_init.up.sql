@@ -146,20 +146,3 @@ insert into keys (
     strftime('%Y-%m-%dT%H:%M:%SZ','now'),
     null
 );
-
-create table encryption_key_versions (
-    id                text primary key,
-    encryption_key_id text not null,
-    provider          text not null,
-    provider_id       text not null,
-    provider_version  text not null,
-    ordered_version   integer not null,
-    is_current        integer not null default 0,
-    created_at        datetime not null,
-    updated_at        datetime not null,
-    deleted_at        datetime
-);
-
-create index idx_ekv_scope on encryption_key_versions (deleted_at, encryption_key_id);
-create index idx_ekv_scope_current on encryption_key_versions (deleted_at, encryption_key_id, is_current);
-create unique index idx_ekv_scope_ordered_version on encryption_key_versions (encryption_key_id, ordered_version);

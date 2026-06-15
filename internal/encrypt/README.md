@@ -48,10 +48,10 @@ Encryption keys form a tree rooted at a single **global AES key**.
 
 ```mermaid
 graph TD
-    GLOBAL["Global Key (ek_global)<br/>from config, never encrypted in DB"]
-    EK1["ek_abc<br/>namespace: root.tenant-a"]
-    EK2["ek_def<br/>namespace: root.tenant-b"]
-    EK3["ek_ghi<br/>namespace: root.tenant-a.app1"]
+    GLOBAL["Global Key (key_global)<br/>from config, never encrypted in DB"]
+    EK1["key_abc<br/>namespace: root.tenant-a"]
+    EK2["key_def<br/>namespace: root.tenant-b"]
+    EK3["key_ghi<br/>namespace: root.tenant-a.app1"]
 
     GLOBAL --> EK1
     GLOBAL --> EK2
@@ -59,8 +59,8 @@ graph TD
 ```
 
 - The **global key** is loaded from `system_auth.global_aes_key` in the YAML configuration. It is always present and its raw key data is never stored in the database.
-- **Entity keys** are stored in the `encryption_keys` table. Their `KeyData` configuration (which tells the system how to fetch the actual key bytes) is itself encrypted using the parent key and stored in the `encrypted_key_data` column.
-- Each key has one or more **versions** (`encryption_key_versions` table). Exactly one version is marked `is_current` and is used for new encryptions. Old versions are retained for decryption until all data is re-encrypted.
+- **Keys** are stored in the `keys` table. Their `KeyData` configuration (which tells the system how to fetch or use wrapping material) is itself encrypted using the parent key's current DEK and stored in the `encrypted_key_data` column.
+- Each data-encryption key owns one or more **DEKs** (`data_encryption_keys` table). Exactly one DEK is marked `is_current` and is used for new encryptions. Old DEKs are retained for decryption until all data is re-encrypted.
 
 ## Encrypted Field Format
 
@@ -77,7 +77,7 @@ This self-describing format enables decryption without knowing which DEK was use
 
 ## Namespace-Scoped Encryption
 
-Namespaces can be assigned a specific encryption key via `encryption_key_id`. When encrypting data for a namespace, the service resolves the key by walking up the namespace path:
+Namespaces can be assigned a specific key via `key_id`. When encrypting data for a namespace, the service resolves the key by walking up the namespace path:
 
 ```
 root.tenant-a.app1  →  root.tenant-a  →  root  →  global
@@ -102,7 +102,7 @@ The `KeyData` wrapper supports multiple sources for key material. Each provider 
 | **Random Bytes** | `num_bytes` | Generates secure random bytes at startup. Useful for ephemeral/dev keys. |
 | **KMS-backed providers** | provider-specific | Generate AuthProxy DEKs and wrap them with a provider-held KEK. The KEK never leaves the provider. |
 
-Cloud providers (AWS, GCP, Vault) support caching via `cache_ttl` and return multiple versions when the underlying secret has been rotated.
+Cloud providers (AWS, GCP, Vault) support caching via `cache_ttl` and report provider-version metadata when the underlying secret has been rotated.
 
 KMS-backed providers are different from secret-backed providers. Secret-backed providers return AES key bytes directly to AuthProxy. KMS-backed providers generate or wrap data encryption keys (DEKs) and persist only the wrapped DEK in `data_encryption_keys`. Runtime encryption and re-encryption are driven by the current DEK for the namespace key.
 
@@ -122,11 +122,11 @@ sequenceDiagram
     Provider-->>DEKTask: wrapped DEK + provider metadata
     DEKTask->>DB: Insert data_encryption_keys row
 
-    SyncTask->>Provider: ListVersions()
-    Provider-->>SyncTask: versions + key bytes
+    SyncTask->>Provider: CurrentWrappingKey()
+    Provider-->>SyncTask: current wrapping metadata
 
-    SyncTask->>DB: Reconcile encryption_key_versions
-    Note over SyncTask,DB: Create new versions,<br/>remove stale versions,<br/>update is_current flag
+    SyncTask->>DB: Rewrap stale data_encryption_keys
+    Note over SyncTask,DB: Unwrap existing DEKs,<br/>wrap with current provider material,<br/>update protected_data + metadata
 
     SyncTask->>DB: Resolve namespace targets
     Note over SyncTask,DB: Walk namespaces in depth order,<br/>set target_data_encryption_key_id<br/>based on inheritance
@@ -137,19 +137,19 @@ sequenceDiagram
 
 ### DEK Generation (every 15 minutes)
 
-KMS-backed namespace keys do not create usable `encryption_key_versions` directly from provider key bytes. Instead, the DEK generation task walks encryption keys in dependency order, decrypts each key's `KeyData` config, and applies `system_auth.data_encryption_keys` policy:
+The DEK generation task walks keys in dependency order, decrypts each key's `KeyData` config, and applies `system_auth.data_encryption_keys` policy:
 
-1. If `ensure_current` is true (the default) and a KMS-backed key has no current DEK, generate one.
+1. If `ensure_current` is true (the default) and a data-encryption key has no current DEK, generate one.
 2. If the current DEK is older than `rotation_interval` (default 90 days), generate a new current DEK.
 3. Persist only provider metadata and protected DEK material in `data_encryption_keys`.
-4. Sync the key's `encryption_key_versions` after generation so nested child key configs can be decrypted in the same traversal.
+4. Cache each plaintext DEK in memory during traversal so nested child key configs can be decrypted.
 
 ### Config-to-Database Sync (every 15 minutes)
 
 1. Acquires a Redis distributed lock to prevent concurrent syncs
 2. Syncs the global key first, then enumerates entity keys in dependency order (breadth-first from root) so parent keys are available to decrypt child key configs
-3. For secret-backed keys, calls `ListVersions()` on the provider. For KMS-backed keys, loads existing `data_encryption_keys` rows and unwraps them through the provider.
-4. Reconciles against `encryption_key_versions`: creates new records, removes stale ones, updates `is_current`
+3. Loads existing `data_encryption_keys` rows and asks each provider for the current wrapping metadata.
+4. Rewraps stale DEKs by unwrapping with the recorded provider metadata, wrapping with the latest provider material, and updating only DEK wrapping fields.
 5. Walks all namespaces in depth order and resolves each namespace's `target_data_encryption_key_id` by inheritance
 6. Sets a Redis sentinel key (15-minute TTL) to rate-limit syncs
 
@@ -168,7 +168,7 @@ A background task (every 30 minutes) automatically re-encrypts data when namespa
 3. Mismatched fields are decrypted with the old DEK and re-encrypted with the target DEK
 4. Updates are applied in batches
 
-This means key rotation is fully automatic: rotate the secret in your provider, and the system will detect the new version, sync it, and re-encrypt all data.
+This means key rotation is fully automatic: rotating wrapping material in a provider rewraps existing DEKs, and rotating to a new current DEK causes the system to re-encrypt stored data.
 
 ### Encrypted Field Registry
 

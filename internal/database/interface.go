@@ -211,32 +211,6 @@ type DB interface {
 	) ([]*Key, error)
 
 	/*
-	 * Encryption Key Versions
-	 */
-
-	CreateEncryptionKeyVersion(ctx context.Context, ekv *EncryptionKeyVersion) error
-	GetEncryptionKeyVersion(ctx context.Context, id apid.ID) (*EncryptionKeyVersion, error)
-	GetCurrentEncryptionKeyVersionForKey(ctx context.Context, encryptionKeyId apid.ID) (*EncryptionKeyVersion, error)
-	ListEncryptionKeyVersionsForKey(ctx context.Context, encryptionKeyId apid.ID) ([]*EncryptionKeyVersion, error)
-	GetMaxOrderedVersionForKey(ctx context.Context, encryptionKeyId apid.ID) (int64, error)
-	ClearCurrentFlagForKey(ctx context.Context, encryptionKeyId apid.ID) error
-	GetCurrentEncryptionKeyVersionForNamespace(ctx context.Context, namespacePath string) (*EncryptionKeyVersion, error)
-	ListEncryptionKeyVersionsForNamespace(ctx context.Context, namespacePath string) ([]*EncryptionKeyVersion, error)
-	GetMaxOrderedVersionForNamespace(ctx context.Context, namespacePath string) (int64, error)
-	ClearCurrentFlagForNamespace(ctx context.Context, namespacePath string) error
-	DeleteEncryptionKeyVersion(ctx context.Context, id apid.ID) error
-	DeleteEncryptionKeyVersionsForKey(ctx context.Context, encryptionKeyId apid.ID) error
-	SetEncryptionKeyVersionCurrentFlag(ctx context.Context, id apid.ID, isCurrent bool) error
-
-	// EnumerateEncryptionKeyVersionsForKey enumerates all non-deleted encryption key versions for a
-	// specified key in batches.
-	EnumerateEncryptionKeyVersionsForKey(
-		ctx context.Context,
-		ekId apid.ID,
-		callback func(ekvs []*EncryptionKeyVersion, lastPage bool) (keepGoing pagination.KeepGoing, err error),
-	) error
-
-	/*
 	 * Data Encryption Keys
 	 */
 

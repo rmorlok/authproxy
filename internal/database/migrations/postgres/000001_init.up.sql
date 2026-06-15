@@ -146,19 +146,3 @@ insert into keys (
     CURRENT_TIMESTAMP,
     null
 );
-
-create table encryption_key_versions (
-    id                text primary key,
-    encryption_key_id text not null,
-    provider          text not null,
-    provider_id       text not null,
-    provider_version  text not null,
-    ordered_version   integer not null,
-    is_current        boolean not null default false,
-    created_at        timestamptz not null,
-    updated_at        timestamptz not null,
-    deleted_at        timestamptz
-);
-
-create index idx_ekv_scope_current on encryption_key_versions (deleted_at, encryption_key_id, is_current);
-create unique index idx_ekv_scope_ordered_version on encryption_key_versions (encryption_key_id, ordered_version);

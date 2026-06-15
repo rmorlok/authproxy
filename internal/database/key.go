@@ -345,9 +345,26 @@ func (s *service) DeleteKey(ctx context.Context, id apid.ID) error {
 		return ErrNotFound
 	}
 
-	// Soft-delete all associated encryption key versions while that table still exists.
-	if err := s.DeleteEncryptionKeyVersionsForKey(ctx, id); err != nil {
-		return fmt.Errorf("failed to delete encryption key versions for key: %w", err)
+	if err := s.deleteDataEncryptionKeysForKey(ctx, id, now); err != nil {
+		return fmt.Errorf("failed to delete data encryption keys for key: %w", err)
+	}
+
+	return nil
+}
+
+func (s *service) deleteDataEncryptionKeysForKey(ctx context.Context, keyId apid.ID, deletedAt time.Time) error {
+	_, err := s.sq.
+		Update(DataEncryptionKeysTable).
+		Set("updated_at", deletedAt).
+		Set("deleted_at", deletedAt).
+		Where(sq.Eq{
+			"key_id":     keyId,
+			"deleted_at": nil,
+		}).
+		RunWith(s.db).
+		Exec()
+	if err != nil {
+		return fmt.Errorf("failed to soft delete data encryption keys for key %s: %w", keyId, err)
 	}
 
 	return nil
@@ -883,8 +900,7 @@ func (s *service) ListKeysFromCursor(ctx context.Context, cursor string) (ListKe
 // EnumerateKeysInDependencyOrder walks all non-deleted keys in breadth-first order rooted at
 // the unencrypted root key. Keys form a tree: the root key has nil EncryptedKeyData, while every
 // other key's EncryptedKeyData.ID references the DEK that wrapped its key data. The DEK's key_id
-// points to the parent key. During the migration, this also falls back to encryption_key_versions
-// for any still-transitional rows whose encrypted key data references an ekv_ id.
+// points to the parent key.
 func (s *service) EnumerateKeysInDependencyOrder(
 	ctx context.Context,
 	callback func(keys []*Key, depth int) (keepGoing pagination.KeepGoing, err error),
@@ -943,32 +959,6 @@ func (s *service) EnumerateKeysInDependencyOrder(
 	}
 	dekRows.Close()
 
-	// Transitional fallback until encryption_key_versions is removed.
-	ekvRows, err := s.sq.
-		Select("id", "encryption_key_id").
-		From(EncryptionKeyVersionsTable).
-		Where(sq.Eq{"deleted_at": nil}).
-		RunWith(s.db).
-		Query()
-	if err != nil {
-		return nil, fmt.Errorf("failed to query encryption key versions: %w", err)
-	}
-
-	ekvToKey := make(map[apid.ID]apid.ID)
-	for ekvRows.Next() {
-		var ekvID, keyID apid.ID
-		if err := ekvRows.Scan(&ekvID, &keyID); err != nil {
-			ekvRows.Close()
-			return nil, fmt.Errorf("failed to scan encryption key version: %w", err)
-		}
-		ekvToKey[ekvID] = keyID
-	}
-	if err := ekvRows.Err(); err != nil {
-		ekvRows.Close()
-		return nil, fmt.Errorf("failed to query encryption key versions: %w", err)
-	}
-	ekvRows.Close()
-
 	// Build parent map and find root(s), collecting orphans.
 	parentOf := make(map[apid.ID]apid.ID)
 	var roots []*Key
@@ -979,9 +969,6 @@ func (s *service) EnumerateKeysInDependencyOrder(
 			roots = append(roots, ek)
 		} else {
 			parentKeyID, ok := dekToKey[ek.EncryptedKeyData.ID]
-			if !ok {
-				parentKeyID, ok = ekvToKey[ek.EncryptedKeyData.ID]
-			}
 			if !ok || allKeys[parentKeyID] == nil {
 				orphans = append(orphans, ek)
 			} else {
