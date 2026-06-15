@@ -81,6 +81,19 @@ export const LongDescription: Story = {
   },
 };
 
+export const DescriptionFallback: Story = {
+  args: {
+    connector: {
+      ...mockConnector,
+      highlight: undefined,
+      description: 'Allow the agent to manage your calendar on your behalf. It is like having your own personal assistant.',
+    },
+    onConnect: (id) => console.log(`Connect clicked for ${id}`),
+    onDetails: (id) => console.log(`Details clicked for ${id}`),
+    isConnecting: false,
+  },
+};
+
 export const WideLogo: Story = {
   args: {
     connector: {
