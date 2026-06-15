@@ -137,7 +137,7 @@ func TestConnectionGetConfiguration(t *testing.T) {
 		conn := newTestConnectionWithService(s)
 
 		// Set an encrypted field with a non-fake key ID to trigger decrypt error
-		conn.EncryptedConfiguration = &encfield.EncryptedField{ID: "ekv_wrong", Data: "some-data"}
+		conn.EncryptedConfiguration = &encfield.EncryptedField{ID: "dek_wrong", Data: "some-data"}
 
 		_, err := conn.GetConfiguration(context.Background())
 		assert.Error(t, err)
@@ -177,7 +177,7 @@ func TestConnectionSetConfiguration(t *testing.T) {
 		db.EXPECT().SetConnectionEncryptedConfiguration(gomock.Any(), conn.Id, gomock.Any()).
 			DoAndReturn(func(ctx context.Context, id apid.ID, ef *encfield.EncryptedField) error {
 				require.NotNil(t, ef)
-				assert.Equal(t, apid.ID("ekv_fake"), ef.ID)
+				assert.Equal(t, apid.ID("dek_fake"), ef.ID)
 				assert.NotEmpty(t, ef.Data)
 				return nil
 			})
@@ -185,7 +185,7 @@ func TestConnectionSetConfiguration(t *testing.T) {
 		err := conn.SetConfiguration(context.Background(), data)
 		require.NoError(t, err)
 		require.NotNil(t, conn.EncryptedConfiguration)
-		assert.Equal(t, apid.ID("ekv_fake"), conn.EncryptedConfiguration.ID)
+		assert.Equal(t, apid.ID("dek_fake"), conn.EncryptedConfiguration.ID)
 	})
 
 	t.Run("round trip set then get", func(t *testing.T) {
@@ -362,7 +362,7 @@ func TestConnectionGetMustacheContext(t *testing.T) {
 		e := encrypt.NewFakeEncryptService(false)
 		s := &service{encrypt: e, logger: aplog.NewNoopLogger()}
 		conn := newTestConnectionWithService(s)
-		conn.EncryptedConfiguration = &encfield.EncryptedField{ID: "ekv_wrong", Data: "some-data"}
+		conn.EncryptedConfiguration = &encfield.EncryptedField{ID: "dek_wrong", Data: "some-data"}
 
 		_, err := conn.GetMustacheContext(context.Background())
 		assert.Error(t, err)

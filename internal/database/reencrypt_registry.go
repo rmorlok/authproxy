@@ -265,7 +265,7 @@ func (s *service) queryReEncryptionPage(
 	type rowData struct {
 		pkValues      []any
 		encryptedVals []encfield.EncryptedField
-		targetEKVId   apid.ID
+		targetDEKId   apid.ID
 	}
 
 	var allRows []rowData
@@ -283,7 +283,7 @@ func (s *service) queryReEncryptionPage(
 		for i := range reg.EncryptedCols {
 			scanDest = append(scanDest, &rd.encryptedVals[i])
 		}
-		scanDest = append(scanDest, &rd.targetEKVId)
+		scanDest = append(scanDest, &rd.targetDEKId)
 
 		if err := rows.Scan(scanDest...); err != nil {
 			return nil, 0, err
@@ -304,14 +304,14 @@ func (s *service) queryReEncryptionPage(
 			if ef.IsZero() {
 				continue
 			}
-			if ef.ID != rd.targetEKVId {
+			if ef.ID != rd.targetDEKId {
 				targets = append(targets, ReEncryptionTarget{
 					Table:                     reg.Table,
 					PrimaryKeyCols:            reg.PrimaryKeyCols,
 					PrimaryKeyValues:          rd.pkValues,
 					FieldColumn:               ec,
 					EncryptedFieldValue:       ef,
-					TargetDataEncryptionKeyId: rd.targetEKVId,
+					TargetDataEncryptionKeyId: rd.targetDEKId,
 				})
 			}
 		}

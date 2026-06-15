@@ -28,8 +28,8 @@ type reencryptTestEnv struct {
 	rawDb       *sql.DB
 	enc         E
 	logger      *slog.Logger
-	globalEKVID apid.ID
-	globalKeyV1 []byte
+	globalDEKID apid.ID
+	globalDEKV1 []byte
 }
 
 func setupReencryptTest(t *testing.T) reencryptTestEnv {
@@ -55,9 +55,10 @@ func setupReencryptTest(t *testing.T) reencryptTestEnv {
 	cfg, db, rawDb := database.MustApplyBlankTestDbConfigRaw(t, cfg)
 	cfg, enc := NewTestEncryptService(cfg, db)
 
-	globalVersions, err := db.ListEncryptionKeyVersionsForKey(ctx, globalEncryptionKeyID)
+	globalDEK, err := db.GetCurrentDataEncryptionKeyForKey(ctx, globalEncryptionKeyID)
 	require.NoError(t, err)
-	require.Len(t, globalVersions, 1)
+	globalDEKBytes, err := globalKD.UnwrapDataEncryptionKey(ctx, dataEncryptionKeyInfos([]*database.DataEncryptionKey{globalDEK})[0])
+	require.NoError(t, err)
 
 	return reencryptTestEnv{
 		ctx:         ctx,
@@ -66,47 +67,50 @@ func setupReencryptTest(t *testing.T) reencryptTestEnv {
 		rawDb:       rawDb,
 		enc:         enc,
 		logger:      logger,
-		globalEKVID: globalVersions[0].Id,
-		globalKeyV1: globalKeyBytes,
+		globalDEKID: globalDEK.Id,
+		globalDEKV1: globalDEKBytes,
 	}
 }
 
-// addGlobalV2 adds a second version to the global key, syncs, and returns the new EKV ID.
+// addGlobalV2 adds a second global DEK, syncs, and returns the new DEK ID.
 func (env *reencryptTestEnv) addGlobalV2(t *testing.T) (apid.ID, []byte) {
 	t.Helper()
 
 	v2Bytes := util.MustGenerateSecureRandomKey(32)
 	sconfig.KeyDataMockAddVersion("global", "global-key", "v2", v2Bytes)
-	syncKeysVersionsToDatabase(env.ctx, env.cfg, env.db, env.logger, nil)
+
+	generated, err := env.cfg.GetRoot().SystemAuth.GlobalAESKey.GenerateDataEncryptionKey(env.ctx)
+	require.NoError(t, err)
+	dek := &database.DataEncryptionKey{
+		KeyId:           globalEncryptionKeyID,
+		Provider:        string(generated.Provider),
+		ProviderID:      generated.ProviderID,
+		ProviderVersion: generated.ProviderVersion,
+		ProtectedData:   &generated.ProtectedData,
+		IsCurrent:       true,
+	}
+	require.NoError(t, env.db.CreateDataEncryptionKey(env.ctx, dek))
 	require.NoError(t, env.enc.SyncKeysFromDbToMemory(env.ctx))
 
-	versions, err := env.db.ListEncryptionKeyVersionsForKey(env.ctx, globalEncryptionKeyID)
-	require.NoError(t, err)
-	for _, v := range versions {
-		if v.ProviderVersion == "v2" {
-			return v.Id, v2Bytes
-		}
-	}
-	t.Fatal("v2 not found after sync")
-	return "", nil
+	return dek.Id, generated.Data
 }
 
 // setNamespaceTarget sets the target_data_encryption_key_id for a namespace.
-func (env *reencryptTestEnv) setNamespaceTarget(t *testing.T, namespacePath string, ekvId apid.ID) {
+func (env *reencryptTestEnv) setNamespaceTarget(t *testing.T, namespacePath string, dekId apid.ID) {
 	t.Helper()
 	_, err := env.rawDb.Exec(
-		fmt.Sprintf(`UPDATE namespaces SET target_data_encryption_key_id = '%s' WHERE path = '%s'`, string(ekvId), namespacePath),
+		fmt.Sprintf(`UPDATE namespaces SET target_data_encryption_key_id = '%s' WHERE path = '%s'`, string(dekId), namespacePath),
 	)
 	require.NoError(t, err)
 }
 
-// encryptWithV1 encrypts data using the v1 global key and returns an EncryptedField tagged with the v1 EKV ID.
+// encryptWithV1 encrypts data using the first global DEK and returns an EncryptedField tagged with the v1 DEK ID.
 func (env *reencryptTestEnv) encryptWithV1(t *testing.T, plaintext []byte) encfield.EncryptedField {
 	t.Helper()
-	encrypted, err := encryptWithKey(env.globalKeyV1, plaintext)
+	encrypted, err := encryptWithKey(env.globalDEKV1, plaintext)
 	require.NoError(t, err)
 	return encfield.EncryptedField{
-		ID:   env.globalEKVID,
+		ID:   env.globalDEKID,
 		Data: base64.StdEncoding.EncodeToString(encrypted),
 	}
 }
@@ -134,7 +138,7 @@ func (env *reencryptTestEnv) runReencrypt(t *testing.T) error {
 func TestHandleReencryptAll(t *testing.T) {
 	t.Run("re-encrypts actor with mismatched key version", func(t *testing.T) {
 		env := setupReencryptTest(t)
-		v2EKVID, _ := env.addGlobalV2(t)
+		v2DEKID, _ := env.addGlobalV2(t)
 
 		// Create actor encrypted with v1
 		actorId := apid.New(apid.PrefixActor)
@@ -147,7 +151,7 @@ func TestHandleReencryptAll(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		env.setNamespaceTarget(t, "root", v2EKVID)
+		env.setNamespaceTarget(t, "root", v2DEKID)
 
 		err = env.runReencrypt(t)
 		require.NoError(t, err)
@@ -156,7 +160,7 @@ func TestHandleReencryptAll(t *testing.T) {
 		actor, err := env.db.GetActor(env.ctx, actorId)
 		require.NoError(t, err)
 		require.NotNil(t, actor.EncryptedKey)
-		require.Equal(t, v2EKVID, actor.EncryptedKey.ID)
+		require.Equal(t, v2DEKID, actor.EncryptedKey.ID)
 
 		decrypted, err := env.enc.DecryptString(env.ctx, *actor.EncryptedKey)
 		require.NoError(t, err)
@@ -170,7 +174,7 @@ func TestHandleReencryptAll(t *testing.T) {
 		actorId := apid.New(apid.PrefixActor)
 		ef, err := env.enc.EncryptStringForKey(env.ctx, globalEncryptionKeyID, "my-key")
 		require.NoError(t, err)
-		require.Equal(t, env.globalEKVID, ef.ID)
+		require.Equal(t, env.globalDEKID, ef.ID)
 
 		err = env.db.CreateActor(env.ctx, &database.Actor{
 			Id:           actorId,
@@ -180,7 +184,7 @@ func TestHandleReencryptAll(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		env.setNamespaceTarget(t, "root", env.globalEKVID)
+		env.setNamespaceTarget(t, "root", env.globalDEKID)
 
 		err = env.runReencrypt(t)
 		require.NoError(t, err)
@@ -188,12 +192,12 @@ func TestHandleReencryptAll(t *testing.T) {
 		actor, err := env.db.GetActor(env.ctx, actorId)
 		require.NoError(t, err)
 		require.NotNil(t, actor.EncryptedKey)
-		require.Equal(t, env.globalEKVID, actor.EncryptedKey.ID)
+		require.Equal(t, env.globalDEKID, actor.EncryptedKey.ID)
 	})
 
 	t.Run("re-encrypts oauth2 token via connection JOIN", func(t *testing.T) {
 		env := setupReencryptTest(t)
-		v2EKVID, _ := env.addGlobalV2(t)
+		v2DEKID, _ := env.addGlobalV2(t)
 
 		connId := env.createConnection(t, "root")
 
@@ -202,15 +206,15 @@ func TestHandleReencryptAll(t *testing.T) {
 		_, err := env.db.InsertOAuth2Token(env.ctx, connId, nil, refreshEF, accessEF, nil, "scope1", "scope1", nil)
 		require.NoError(t, err)
 
-		env.setNamespaceTarget(t, "root", v2EKVID)
+		env.setNamespaceTarget(t, "root", v2DEKID)
 
 		err = env.runReencrypt(t)
 		require.NoError(t, err)
 
 		updatedToken, err := env.db.GetOAuth2Token(env.ctx, connId)
 		require.NoError(t, err)
-		require.Equal(t, v2EKVID, updatedToken.EncryptedAccessToken.ID)
-		require.Equal(t, v2EKVID, updatedToken.EncryptedRefreshToken.ID)
+		require.Equal(t, v2DEKID, updatedToken.EncryptedAccessToken.ID)
+		require.Equal(t, v2DEKID, updatedToken.EncryptedRefreshToken.ID)
 
 		accessPlain, err := env.enc.DecryptString(env.ctx, updatedToken.EncryptedAccessToken)
 		require.NoError(t, err)
@@ -230,7 +234,7 @@ func TestHandleReencryptAll(t *testing.T) {
 
 	t.Run("re-encryption is idempotent", func(t *testing.T) {
 		env := setupReencryptTest(t)
-		v2EKVID, _ := env.addGlobalV2(t)
+		v2DEKID, _ := env.addGlobalV2(t)
 
 		actorId := apid.New(apid.PrefixActor)
 		ef := env.encryptWithV1(t, []byte("secret"))
@@ -242,7 +246,7 @@ func TestHandleReencryptAll(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		env.setNamespaceTarget(t, "root", v2EKVID)
+		env.setNamespaceTarget(t, "root", v2DEKID)
 
 		// First run
 		err = env.runReencrypt(t)
@@ -250,7 +254,7 @@ func TestHandleReencryptAll(t *testing.T) {
 
 		actor, err := env.db.GetActor(env.ctx, actorId)
 		require.NoError(t, err)
-		require.Equal(t, v2EKVID, actor.EncryptedKey.ID)
+		require.Equal(t, v2DEKID, actor.EncryptedKey.ID)
 
 		// Second run — should find nothing to re-encrypt
 		err = env.runReencrypt(t)
@@ -258,7 +262,7 @@ func TestHandleReencryptAll(t *testing.T) {
 
 		actor, err = env.db.GetActor(env.ctx, actorId)
 		require.NoError(t, err)
-		require.Equal(t, v2EKVID, actor.EncryptedKey.ID)
+		require.Equal(t, v2DEKID, actor.EncryptedKey.ID)
 
 		decrypted, err := env.enc.DecryptString(env.ctx, *actor.EncryptedKey)
 		require.NoError(t, err)
@@ -267,7 +271,7 @@ func TestHandleReencryptAll(t *testing.T) {
 
 	t.Run("multiple fields on same row re-encrypted", func(t *testing.T) {
 		env := setupReencryptTest(t)
-		v2EKVID, _ := env.addGlobalV2(t)
+		v2DEKID, _ := env.addGlobalV2(t)
 
 		connId := env.createConnection(t, "root")
 
@@ -277,14 +281,14 @@ func TestHandleReencryptAll(t *testing.T) {
 		_, err := env.db.InsertOAuth2Token(env.ctx, connId, nil, refreshEF, accessEF, nil, "", "", nil)
 		require.NoError(t, err)
 
-		env.setNamespaceTarget(t, "root", v2EKVID)
+		env.setNamespaceTarget(t, "root", v2DEKID)
 
 		err = env.runReencrypt(t)
 		require.NoError(t, err)
 
 		token, err := env.db.GetOAuth2Token(env.ctx, connId)
 		require.NoError(t, err)
-		require.Equal(t, v2EKVID, token.EncryptedAccessToken.ID, "access token should be re-encrypted")
-		require.Equal(t, v2EKVID, token.EncryptedRefreshToken.ID, "refresh token should be re-encrypted")
+		require.Equal(t, v2DEKID, token.EncryptedAccessToken.ID, "access token should be re-encrypted")
+		require.Equal(t, v2DEKID, token.EncryptedRefreshToken.ID, "refresh token should be re-encrypted")
 	})
 }

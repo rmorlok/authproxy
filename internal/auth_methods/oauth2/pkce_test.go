@@ -324,7 +324,7 @@ func TestCallbackFrom3rdParty_PKCESendsVerifier(t *testing.T) {
 		BodyString(`{"access_token":"a","expires_in":3600}`)
 
 	encrypt.EXPECT().EncryptStringForEntity(gomock.Any(), gomock.Any(), "a").
-		Return(encfield.EncryptedField{ID: "ekv_test", Data: "enc-a"}, nil)
+		Return(encfield.EncryptedField{ID: "dek_test", Data: "enc-a"}, nil)
 	db.EXPECT().InsertOAuth2Token(gomock.Any(), connectionId, nil, gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(&database.OAuth2Token{Id: tokenId}, nil)
 
@@ -399,7 +399,7 @@ func TestCallbackFrom3rdParty_PKCEOmittedWhenStateHasNoVerifier(t *testing.T) {
 		BodyString(`{"access_token":"a","expires_in":3600}`)
 
 	encrypt.EXPECT().EncryptStringForEntity(gomock.Any(), gomock.Any(), "a").
-		Return(encfield.EncryptedField{ID: "ekv_test", Data: "enc-a"}, nil)
+		Return(encfield.EncryptedField{ID: "dek_test", Data: "enc-a"}, nil)
 	db.EXPECT().InsertOAuth2Token(gomock.Any(), connectionId, nil, gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(&database.OAuth2Token{Id: tokenId}, nil)
 

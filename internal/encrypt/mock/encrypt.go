@@ -225,18 +225,18 @@ func (mr *MockEMockRecorder) EncryptStringGlobal(ctx, data interface{}) *gomock.
 }
 
 // ReEncryptField mocks base method.
-func (m *MockE) ReEncryptField(ctx context.Context, ef encfield.EncryptedField, targetEkvId apid.ID) (encfield.EncryptedField, error) {
+func (m *MockE) ReEncryptField(ctx context.Context, ef encfield.EncryptedField, targetDEKId apid.ID) (encfield.EncryptedField, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ReEncryptField", ctx, ef, targetEkvId)
+	ret := m.ctrl.Call(m, "ReEncryptField", ctx, ef, targetDEKId)
 	ret0, _ := ret[0].(encfield.EncryptedField)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ReEncryptField indicates an expected call of ReEncryptField.
-func (mr *MockEMockRecorder) ReEncryptField(ctx, ef, targetEkvId interface{}) *gomock.Call {
+func (mr *MockEMockRecorder) ReEncryptField(ctx, ef, targetDEKId interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReEncryptField", reflect.TypeOf((*MockE)(nil).ReEncryptField), ctx, ef, targetEkvId)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReEncryptField", reflect.TypeOf((*MockE)(nil).ReEncryptField), ctx, ef, targetDEKId)
 }
 
 // Shutdown mocks base method.

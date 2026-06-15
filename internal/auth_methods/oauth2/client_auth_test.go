@@ -133,7 +133,7 @@ func TestResolveClientCredentials_ClientCredentialsUsesStoredSetupCredential(t *
 
 	db := mockDb.NewMockDB(ctrl)
 	encrypt := mockEncrypt.NewMockE(ctrl)
-	encrypted := encfield.EncryptedField{ID: "ekv_test", Data: "encrypted"}
+	encrypted := encfield.EncryptedField{ID: "dek_test", Data: "encrypted"}
 	db.EXPECT().
 		GetActiveApiKeyCredential(gomock.Any(), connectionId).
 		Return(&database.ApiKeyCredential{
@@ -223,7 +223,7 @@ func callbackConnFor(t *testing.T, ctrl *gomock.Controller, method sconfig.Token
 	}
 
 	encrypt.EXPECT().EncryptStringForEntity(gomock.Any(), gomock.Any(), "a").
-		Return(encfield.EncryptedField{ID: "ekv_test", Data: "enc-a"}, nil)
+		Return(encfield.EncryptedField{ID: "dek_test", Data: "enc-a"}, nil)
 	db.EXPECT().InsertOAuth2Token(gomock.Any(), connectionId, nil, gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(&database.OAuth2Token{Id: tokenId}, nil)
 

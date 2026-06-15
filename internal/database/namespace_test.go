@@ -2153,7 +2153,7 @@ func TestConnectorVersionLabelChangePropagation(t *testing.T) {
 			State:               ConnectorVersionStateDraft,
 			Labels:              Labels{"type": "google-drive"},
 			Hash:                "h1",
-			EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "d"},
+			EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "d"},
 		}))
 
 		connID := apid.New(apid.PrefixConnection)
@@ -2177,7 +2177,7 @@ func TestConnectorVersionLabelChangePropagation(t *testing.T) {
 			State:               ConnectorVersionStateDraft,
 			Labels:              Labels{"type": "slack", "extra": "x"},
 			Hash:                "h2",
-			EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "d2"},
+			EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "d2"},
 		}))
 		require.NoError(t, db.RefreshConnectionsForConnectorVersion(ctx, cvID, 1))
 
@@ -2203,7 +2203,7 @@ func TestReconcileCarryForwardLabels(t *testing.T) {
 		require.NoError(t, db.UpsertConnectorVersion(ctx, &ConnectorVersion{
 			Id: cvID, Version: 1, Namespace: "root.recon",
 			State: ConnectorVersionStateDraft, Labels: Labels{"type": "google-drive"},
-			Hash: "h", EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "d"},
+			Hash: "h", EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "d"},
 		}))
 		connID := apid.New(apid.PrefixConnection)
 		require.NoError(t, db.CreateConnection(ctx, &Connection{

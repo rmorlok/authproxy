@@ -19,9 +19,9 @@ type CursorEncryptor interface {
 	Decrypt(ctx context.Context, ef encfield.EncryptedField) ([]byte, error)
 }
 
-// syntheticEkvID is a fixed ID used by the default cursor encryptor since it doesn't
-// participate in the key versioning system.
-const syntheticEkvID = "ekv_cursor_default"
+// syntheticDEKID is a fixed ID used by the default cursor encryptor since it doesn't
+// participate in persisted DEK management.
+const syntheticDEKID = "dek_cursor_default"
 
 // DefaultCursorEncryptor is a simple AES-GCM encryptor that uses a raw key for cursor
 // encryption. It does not participate in the key rotation system.
@@ -63,7 +63,7 @@ func (e *DefaultCursorEncryptor) EncryptGlobal(_ context.Context, data []byte) (
 	combined := append(nonce, ciphertext...)
 
 	return encfield.EncryptedField{
-		ID:   apid.ID(syntheticEkvID),
+		ID:   apid.ID(syntheticDEKID),
 		Data: base64.StdEncoding.EncodeToString(combined),
 	}, nil
 }

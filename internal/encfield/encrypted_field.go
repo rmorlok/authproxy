@@ -9,7 +9,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 )
 
-// EncryptedField represents an encrypted value stored as JSON {"id":"<ekv_id>","d":"<base64>"}.
+// EncryptedField represents an encrypted value stored as JSON {"id":"<dek_id>","d":"<base64>"}.
 // It implements driver.Valuer and sql.Scanner for seamless database integration.
 type EncryptedField struct {
 	ID   apid.ID `json:"id"`
@@ -26,7 +26,7 @@ func (ef EncryptedField) IsEncryptedWithKey(keyID apid.ID) bool {
 	return ef.ID == keyID
 }
 
-// ToInlineString returns the field in the "<ekv_id>:<base64>" format.
+// ToInlineString returns the field in the "<dek_id>:<base64>" format.
 func (ef EncryptedField) ToInlineString() string {
 	return fmt.Sprintf("%s:%s", ef.ID, ef.Data)
 }
@@ -84,16 +84,16 @@ func (ef *EncryptedField) Scan(value interface{}) error {
 	return json.Unmarshal(data, ef)
 }
 
-// ParseInlineString parses the "<ekv_id>:<base64>" format into an EncryptedField.
+// ParseInlineString parses the "<dek_id>:<base64>" format into an EncryptedField.
 // This is for use in non-DB contexts (e.g. cursor encryption) and is NOT used during Scan.
 func ParseInlineString(s string) (EncryptedField, error) {
-	if !strings.HasPrefix(s, string(apid.PrefixEncryptionKeyVersion)) {
-		return EncryptedField{}, fmt.Errorf("invalid legacy format: missing ekv_ prefix")
+	if !strings.HasPrefix(s, string(apid.PrefixDataEncryptionKey)) {
+		return EncryptedField{}, fmt.Errorf("invalid encrypted field format: missing dek_ prefix")
 	}
 
 	colonIdx := strings.Index(s, ":")
 	if colonIdx < 0 {
-		return EncryptedField{}, fmt.Errorf("invalid legacy format: missing colon separator")
+		return EncryptedField{}, fmt.Errorf("invalid encrypted field format: missing colon separator")
 	}
 
 	return EncryptedField{

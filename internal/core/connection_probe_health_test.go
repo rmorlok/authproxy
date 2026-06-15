@@ -345,7 +345,7 @@ func TestRecordPeriodicProbeOutcome_ApiKeyStampsLastValidatedAt(t *testing.T) {
 		Return(&database.ApiKeyCredential{
 			Id:                   credId,
 			ConnectionId:         connId,
-			EncryptedCredentials: encfield.EncryptedField{ID: "ekv_fake", Data: "x"},
+			EncryptedCredentials: encfield.EncryptedField{ID: "dek_fake", Data: "x"},
 		}, nil)
 	db.EXPECT().
 		UpdateApiKeyCredentialLastValidated(gomock.Any(), credId, now).

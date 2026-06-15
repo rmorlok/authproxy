@@ -148,8 +148,8 @@ func TestOAuth2Tokens(t *testing.T) {
 			ctx,
 			connectionId,
 			nil,
-			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedRefreshToken"},
-			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedAccessToken"},
+			encfield.EncryptedField{ID: "dek_test", Data: "encryptedRefreshToken"},
+			encfield.EncryptedField{ID: "dek_test", Data: "encryptedAccessToken"},
 			nil,
 			"scope1 scope2",
 			"scope1 scope2",
@@ -159,8 +159,8 @@ func TestOAuth2Tokens(t *testing.T) {
 		require.NotNil(t, tok)
 		require.Equal(t, connectionId, tok.ConnectionId)
 		require.Nil(t, tok.RefreshedFromId)
-		require.Equal(t, encfield.EncryptedField{ID: "ekv_test", Data: "encryptedRefreshToken"}, tok.EncryptedRefreshToken)
-		require.Equal(t, encfield.EncryptedField{ID: "ekv_test", Data: "encryptedAccessToken"}, tok.EncryptedAccessToken)
+		require.Equal(t, encfield.EncryptedField{ID: "dek_test", Data: "encryptedRefreshToken"}, tok.EncryptedRefreshToken)
+		require.Equal(t, encfield.EncryptedField{ID: "dek_test", Data: "encryptedAccessToken"}, tok.EncryptedAccessToken)
 		require.Equal(t, now, tok.CreatedAt)
 
 		tok2, err := db.GetOAuth2Token(ctx, connectionId)
@@ -168,8 +168,8 @@ func TestOAuth2Tokens(t *testing.T) {
 		require.NotNil(t, tok2)
 		require.Equal(t, connectionId, tok2.ConnectionId)
 		require.Nil(t, tok2.RefreshedFromId)
-		require.Equal(t, encfield.EncryptedField{ID: "ekv_test", Data: "encryptedRefreshToken"}, tok2.EncryptedRefreshToken)
-		require.Equal(t, encfield.EncryptedField{ID: "ekv_test", Data: "encryptedAccessToken"}, tok2.EncryptedAccessToken)
+		require.Equal(t, encfield.EncryptedField{ID: "dek_test", Data: "encryptedRefreshToken"}, tok2.EncryptedRefreshToken)
+		require.Equal(t, encfield.EncryptedField{ID: "dek_test", Data: "encryptedAccessToken"}, tok2.EncryptedAccessToken)
 	})
 	t.Run("no tokens", func(t *testing.T) {
 		_, db := MustApplyBlankTestDbConfig(t, nil)
@@ -183,8 +183,8 @@ func TestOAuth2Tokens(t *testing.T) {
 			ctx,
 			connectionId1,
 			nil,
-			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedRefreshToken"},
-			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedAccessToken"},
+			encfield.EncryptedField{ID: "dek_test", Data: "encryptedRefreshToken"},
+			encfield.EncryptedField{ID: "dek_test", Data: "encryptedAccessToken"},
 			nil,
 			"scope1 scope2",
 			"scope1 scope2",
@@ -207,8 +207,8 @@ func TestOAuth2Tokens(t *testing.T) {
 			ctx,
 			connectionId,
 			nil,
-			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedRefreshToken"},
-			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedAccessToken"},
+			encfield.EncryptedField{ID: "dek_test", Data: "encryptedRefreshToken"},
+			encfield.EncryptedField{ID: "dek_test", Data: "encryptedAccessToken"},
 			nil,
 			"scope1 scope2",
 			"scope1 scope2",
@@ -218,16 +218,16 @@ func TestOAuth2Tokens(t *testing.T) {
 		require.NotNil(t, tok1)
 		require.Equal(t, connectionId, tok1.ConnectionId)
 		require.Nil(t, tok1.RefreshedFromId)
-		require.Equal(t, encfield.EncryptedField{ID: "ekv_test", Data: "encryptedRefreshToken"}, tok1.EncryptedRefreshToken)
-		require.Equal(t, encfield.EncryptedField{ID: "ekv_test", Data: "encryptedAccessToken"}, tok1.EncryptedAccessToken)
+		require.Equal(t, encfield.EncryptedField{ID: "dek_test", Data: "encryptedRefreshToken"}, tok1.EncryptedRefreshToken)
+		require.Equal(t, encfield.EncryptedField{ID: "dek_test", Data: "encryptedAccessToken"}, tok1.EncryptedAccessToken)
 		require.Equal(t, now, tok1.CreatedAt)
 
 		tok2, err := db.InsertOAuth2Token(
 			ctx,
 			connectionId,
 			&tok1.Id,
-			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedRefreshToken2"},
-			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedAccessToken2"},
+			encfield.EncryptedField{ID: "dek_test", Data: "encryptedRefreshToken2"},
+			encfield.EncryptedField{ID: "dek_test", Data: "encryptedAccessToken2"},
 			nil,
 			"scope1 scope2",
 			"scope1 scope2",
@@ -237,8 +237,8 @@ func TestOAuth2Tokens(t *testing.T) {
 		require.NotNil(t, tok2)
 		require.Equal(t, connectionId, tok2.ConnectionId)
 		require.Equal(t, &tok1.Id, tok2.RefreshedFromId)
-		require.Equal(t, encfield.EncryptedField{ID: "ekv_test", Data: "encryptedRefreshToken2"}, tok2.EncryptedRefreshToken)
-		require.Equal(t, encfield.EncryptedField{ID: "ekv_test", Data: "encryptedAccessToken2"}, tok2.EncryptedAccessToken)
+		require.Equal(t, encfield.EncryptedField{ID: "dek_test", Data: "encryptedRefreshToken2"}, tok2.EncryptedRefreshToken)
+		require.Equal(t, encfield.EncryptedField{ID: "dek_test", Data: "encryptedAccessToken2"}, tok2.EncryptedAccessToken)
 		require.Equal(t, now, tok2.CreatedAt)
 
 		tok3, err := db.GetOAuth2Token(ctx, connectionId)
@@ -246,8 +246,8 @@ func TestOAuth2Tokens(t *testing.T) {
 		require.NotNil(t, tok2)
 		require.Equal(t, connectionId, tok3.ConnectionId)
 		require.Equal(t, &tok1.Id, tok2.RefreshedFromId)
-		require.Equal(t, encfield.EncryptedField{ID: "ekv_test", Data: "encryptedRefreshToken2"}, tok2.EncryptedRefreshToken)
-		require.Equal(t, encfield.EncryptedField{ID: "ekv_test", Data: "encryptedAccessToken2"}, tok2.EncryptedAccessToken)
+		require.Equal(t, encfield.EncryptedField{ID: "dek_test", Data: "encryptedRefreshToken2"}, tok2.EncryptedRefreshToken)
+		require.Equal(t, encfield.EncryptedField{ID: "dek_test", Data: "encryptedAccessToken2"}, tok2.EncryptedAccessToken)
 	})
 	t.Run("replaces previous when not tagging previous", func(t *testing.T) {
 		_, db := MustApplyBlankTestDbConfig(t, nil)
@@ -260,8 +260,8 @@ func TestOAuth2Tokens(t *testing.T) {
 			ctx,
 			connectionId,
 			nil,
-			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedRefreshToken"},
-			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedAccessToken"},
+			encfield.EncryptedField{ID: "dek_test", Data: "encryptedRefreshToken"},
+			encfield.EncryptedField{ID: "dek_test", Data: "encryptedAccessToken"},
 			nil,
 			"scope1 scope2",
 			"scope1 scope2",
@@ -271,16 +271,16 @@ func TestOAuth2Tokens(t *testing.T) {
 		require.NotNil(t, tok1)
 		require.Equal(t, connectionId, tok1.ConnectionId)
 		require.Nil(t, tok1.RefreshedFromId)
-		require.Equal(t, encfield.EncryptedField{ID: "ekv_test", Data: "encryptedRefreshToken"}, tok1.EncryptedRefreshToken)
-		require.Equal(t, encfield.EncryptedField{ID: "ekv_test", Data: "encryptedAccessToken"}, tok1.EncryptedAccessToken)
+		require.Equal(t, encfield.EncryptedField{ID: "dek_test", Data: "encryptedRefreshToken"}, tok1.EncryptedRefreshToken)
+		require.Equal(t, encfield.EncryptedField{ID: "dek_test", Data: "encryptedAccessToken"}, tok1.EncryptedAccessToken)
 		require.Equal(t, now, tok1.CreatedAt)
 
 		tok2, err := db.InsertOAuth2Token(
 			ctx,
 			connectionId,
 			nil, // not tagging previous
-			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedRefreshToken2"},
-			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedAccessToken2"},
+			encfield.EncryptedField{ID: "dek_test", Data: "encryptedRefreshToken2"},
+			encfield.EncryptedField{ID: "dek_test", Data: "encryptedAccessToken2"},
 			nil,
 			"scope1 scope2",
 			"scope1 scope2",
@@ -290,8 +290,8 @@ func TestOAuth2Tokens(t *testing.T) {
 		require.NotNil(t, tok2)
 		require.Equal(t, connectionId, tok2.ConnectionId)
 		require.Nil(t, tok2.RefreshedFromId)
-		require.Equal(t, encfield.EncryptedField{ID: "ekv_test", Data: "encryptedRefreshToken2"}, tok2.EncryptedRefreshToken)
-		require.Equal(t, encfield.EncryptedField{ID: "ekv_test", Data: "encryptedAccessToken2"}, tok2.EncryptedAccessToken)
+		require.Equal(t, encfield.EncryptedField{ID: "dek_test", Data: "encryptedRefreshToken2"}, tok2.EncryptedRefreshToken)
+		require.Equal(t, encfield.EncryptedField{ID: "dek_test", Data: "encryptedAccessToken2"}, tok2.EncryptedAccessToken)
 		require.Equal(t, now, tok2.CreatedAt)
 
 		tok3, err := db.GetOAuth2Token(ctx, connectionId)
@@ -299,8 +299,8 @@ func TestOAuth2Tokens(t *testing.T) {
 		require.NotNil(t, tok2)
 		require.Equal(t, connectionId, tok3.ConnectionId)
 		require.Nil(t, tok2.RefreshedFromId)
-		require.Equal(t, encfield.EncryptedField{ID: "ekv_test", Data: "encryptedRefreshToken2"}, tok2.EncryptedRefreshToken)
-		require.Equal(t, encfield.EncryptedField{ID: "ekv_test", Data: "encryptedAccessToken2"}, tok2.EncryptedAccessToken)
+		require.Equal(t, encfield.EncryptedField{ID: "dek_test", Data: "encryptedRefreshToken2"}, tok2.EncryptedRefreshToken)
+		require.Equal(t, encfield.EncryptedField{ID: "dek_test", Data: "encryptedAccessToken2"}, tok2.EncryptedAccessToken)
 	})
 	t.Run("persists created by actor id", func(t *testing.T) {
 		_, db := MustApplyBlankTestDbConfig(t, nil)
@@ -314,8 +314,8 @@ func TestOAuth2Tokens(t *testing.T) {
 			ctx,
 			connectionId,
 			nil,
-			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedRefreshToken"},
-			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedAccessToken"},
+			encfield.EncryptedField{ID: "dek_test", Data: "encryptedRefreshToken"},
+			encfield.EncryptedField{ID: "dek_test", Data: "encryptedAccessToken"},
 			nil,
 			"scope1",
 			"scope1",
@@ -341,8 +341,8 @@ func TestOAuth2Tokens(t *testing.T) {
 			ctx,
 			connectionId,
 			nil,
-			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedRefreshToken"},
-			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedAccessToken"},
+			encfield.EncryptedField{ID: "dek_test", Data: "encryptedRefreshToken"},
+			encfield.EncryptedField{ID: "dek_test", Data: "encryptedAccessToken"},
 			nil,
 			"scope1 scope2",
 			"scope1 scope2",
@@ -355,8 +355,8 @@ func TestOAuth2Tokens(t *testing.T) {
 			ctx,
 			connectionId2,
 			nil,
-			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedRefreshToken2"},
-			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedAccessToken2"},
+			encfield.EncryptedField{ID: "dek_test", Data: "encryptedRefreshToken2"},
+			encfield.EncryptedField{ID: "dek_test", Data: "encryptedAccessToken2"},
 			nil,
 			"scope1",
 			"scope1",
@@ -394,8 +394,8 @@ func TestOAuth2Tokens(t *testing.T) {
 			ctx,
 			connectionId,
 			nil,
-			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedRefreshToken"},
-			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedAccessToken"},
+			encfield.EncryptedField{ID: "dek_test", Data: "encryptedRefreshToken"},
+			encfield.EncryptedField{ID: "dek_test", Data: "encryptedAccessToken"},
 			nil,
 			"scope1 scope2",
 			"scope1 scope2",
@@ -407,8 +407,8 @@ func TestOAuth2Tokens(t *testing.T) {
 			ctx,
 			connectionId,
 			&tok.Id,
-			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedRefreshToken2"},
-			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedAccessToken2"},
+			encfield.EncryptedField{ID: "dek_test", Data: "encryptedRefreshToken2"},
+			encfield.EncryptedField{ID: "dek_test", Data: "encryptedAccessToken2"},
 			nil,
 			"scope1 scope2",
 			"scope1 scope2",
@@ -421,8 +421,8 @@ func TestOAuth2Tokens(t *testing.T) {
 			ctx,
 			connectionId2,
 			nil,
-			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedRefreshToken3"},
-			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedAccessToken3"},
+			encfield.EncryptedField{ID: "dek_test", Data: "encryptedRefreshToken3"},
+			encfield.EncryptedField{ID: "dek_test", Data: "encryptedAccessToken3"},
 			nil,
 			"scope1",
 			"scope1",
@@ -667,8 +667,8 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 						ctx,
 						token.ConnectionId,
 						nil,
-						encfield.EncryptedField{ID: "ekv_test", Data: "refreshToken"},
-						encfield.EncryptedField{ID: "ekv_test", Data: "accessToken"},
+						encfield.EncryptedField{ID: "dek_test", Data: "refreshToken"},
+						encfield.EncryptedField{ID: "dek_test", Data: "accessToken"},
 						token.AccessTokenExpiresAt,
 						"scope1 scope2",
 						"scope1 scope2",

@@ -18,7 +18,7 @@ graph TD
 
     subgraph "Encrypt Service"
         DEKS[DEK Generator]
-        SYNC[Key Sync Loop]
+        SYNC[Key/DEK Sync Loop]
         CACHE[In-Memory Cache]
         ENC[AES-GCM Encrypt/Decrypt]
     end
@@ -67,13 +67,13 @@ graph TD
 All encrypted values are stored as JSON using the `EncryptedField` type:
 
 ```json
-{"id": "ekv_abc123", "d": "base64-encoded-ciphertext"}
+{"id": "dek_abc123", "d": "base64-encoded-ciphertext"}
 ```
 
-- `id` — the `encryption_key_version` ID that encrypted this value
+- `id` — the `data_encryption_keys` ID that encrypted this value
 - `d` — AES-GCM ciphertext: `nonce (12 bytes) || ciphertext || auth tag`, base64-encoded
 
-This self-describing format enables decryption without knowing which key was used ahead of time, and drives the re-encryption system by comparing `id` against the target version.
+This self-describing format enables decryption without knowing which DEK was used ahead of time, and drives the re-encryption system by comparing `id` against the namespace's target DEK.
 
 ## Namespace-Scoped Encryption
 
@@ -104,7 +104,7 @@ The `KeyData` wrapper supports multiple sources for key material. Each provider 
 
 Cloud providers (AWS, GCP, Vault) support caching via `cache_ttl` and return multiple versions when the underlying secret has been rotated.
 
-KMS-backed providers are different from secret-backed providers. Secret-backed providers return AES key bytes directly to AuthProxy. KMS-backed providers generate or wrap data encryption keys (DEKs) and persist only the wrapped DEK in `data_encryption_keys`. The application-facing `encryption_key_versions` table still drives encryption and re-encryption; for KMS-backed versions, `encryption_key_versions.provider_id` points at the `dek_...` row that contains the protected DEK material.
+KMS-backed providers are different from secret-backed providers. Secret-backed providers return AES key bytes directly to AuthProxy. KMS-backed providers generate or wrap data encryption keys (DEKs) and persist only the wrapped DEK in `data_encryption_keys`. Runtime encryption and re-encryption are driven by the current DEK for the namespace key.
 
 ## Key Sync and Rotation
 
@@ -129,9 +129,9 @@ sequenceDiagram
     Note over SyncTask,DB: Create new versions,<br/>remove stale versions,<br/>update is_current flag
 
     SyncTask->>DB: Resolve namespace targets
-    Note over SyncTask,DB: Walk namespaces in depth order,<br/>set target_encryption_key_version_id<br/>based on inheritance
+    Note over SyncTask,DB: Walk namespaces in depth order,<br/>set target_data_encryption_key_id<br/>based on inheritance
 
-    Memory->>DB: Load keys + versions
+    Memory->>DB: Load keys + DEKs
     Note over Memory: Rebuild caches atomically
 ```
 
@@ -150,22 +150,22 @@ KMS-backed namespace keys do not create usable `encryption_key_versions` directl
 2. Syncs the global key first, then enumerates entity keys in dependency order (breadth-first from root) so parent keys are available to decrypt child key configs
 3. For secret-backed keys, calls `ListVersions()` on the provider. For KMS-backed keys, loads existing `data_encryption_keys` rows and unwraps them through the provider.
 4. Reconciles against `encryption_key_versions`: creates new records, removes stale ones, updates `is_current`
-5. Walks all namespaces in depth order and resolves each namespace's `target_encryption_key_version_id` by inheritance
+5. Walks all namespaces in depth order and resolves each namespace's `target_data_encryption_key_id` by inheritance
 6. Sets a Redis sentinel key (15-minute TTL) to rate-limit syncs
 
 ### Database-to-Memory Sync (every 5 minutes)
 
-A background goroutine loads all keys and versions from the database into in-memory caches. Caches are rebuilt atomically and swapped under a write lock. Version data is immutable and reused across syncs.
+A background goroutine loads keys and DEKs from the database into in-memory caches. Caches are rebuilt atomically and swapped under a write lock.
 
 On startup, the service blocks until the global key is available (up to 5 minutes with exponential backoff), then signals readiness.
 
 ## Automatic Re-encryption
 
-A background task (every 30 minutes) automatically re-encrypts data when key versions change:
+A background task (every 30 minutes) automatically re-encrypts data when namespace target DEKs change:
 
 1. Scans all tables registered in the **encrypted field registry** (see below)
-2. For each encrypted column, compares the `EncryptedField.id` against the row's namespace `target_encryption_key_version_id`
-3. Mismatched fields are decrypted with the old key version and re-encrypted with the target version
+2. For each encrypted column, compares the `EncryptedField.id` against the row's namespace `target_data_encryption_key_id`
+3. Mismatched fields are decrypted with the old DEK and re-encrypted with the target DEK
 4. Updates are applied in batches
 
 This means key rotation is fully automatic: rotate the secret in your provider, and the system will detect the new version, sync it, and re-encrypt all data.
@@ -206,11 +206,11 @@ type E interface {
     // Encrypt using the namespace from an entity
     EncryptForEntity(ctx, entity, data) (EncryptedField, error)
 
-    // Decrypt any EncryptedField (key version is embedded in the field)
+    // Decrypt any EncryptedField (DEK ID is embedded in the field)
     Decrypt(ctx, ef) ([]byte, error)
 
-    // Re-encrypt a field to a target key version
-    ReEncryptField(ctx, ef, targetEkvId) (EncryptedField, error)
+    // Re-encrypt a field to a target DEK
+    ReEncryptField(ctx, ef, targetDEKId) (EncryptedField, error)
 }
 ```
 

@@ -25,9 +25,9 @@ type E interface {
 	DecryptString(ctx context.Context, ef encfield.EncryptedField) (string, error)
 
 	// ReEncryptField decrypts the given encrypted field and re-encrypts it with the specified
-	// target key version. If the field is already encrypted with the target version, it is
+	// target DEK. If the field is already encrypted with the target DEK, it is
 	// returned unchanged.
-	ReEncryptField(ctx context.Context, ef encfield.EncryptedField, targetEkvId apid.ID) (encfield.EncryptedField, error)
+	ReEncryptField(ctx context.Context, ef encfield.EncryptedField, targetDEKId apid.ID) (encfield.EncryptedField, error)
 
 	// SyncKeysFromDbToMemory forces a refresh of the in-memory key caches from the database.
 	SyncKeysFromDbToMemory(ctx context.Context) error
