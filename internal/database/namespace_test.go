@@ -1661,7 +1661,7 @@ INSERT INTO namespaces
 			require.Equal(t, dekId1, *collected[2].TargetDataEncryptionKeyId)
 		})
 
-		t.Run("callback can update target encryption key version", func(t *testing.T) {
+		t.Run("callback can update target data encryption key", func(t *testing.T) {
 			_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			clk := clock.NewFakeClock(now)

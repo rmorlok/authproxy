@@ -112,7 +112,6 @@ func (s *service) syncKeysFromDbToMemory(ctx context.Context) error {
 	var newDekToBytesCache map[apid.ID][]byte
 	var newKeyToCurrentDEKCache map[apid.ID]apid.ID
 	var newNamespaceToKeyCache map[string]apid.ID
-	legacyEkvToVersionInfoCache := make(map[apid.ID]*sconfig.KeyVersionInfo)
 
 	var merr *multierror.Error
 
@@ -142,16 +141,8 @@ func (s *service) syncKeysFromDbToMemory(ctx context.Context) error {
 				continue
 			} else {
 				// Because we are enumerating in dependency order, the parent key
-				// should have already loaded the DEK that encrypted this child key
-				// data. The legacy EKV lookup is transitional until key-version
-				// rows are removed.
+				// should have already loaded the DEK that encrypted this child key data.
 				keyBytes, ok := newDekToBytesCache[key.EncryptedKeyData.ID]
-				if !ok {
-					if vi, hasLegacyEKV := legacyEkvToVersionInfoCache[key.EncryptedKeyData.ID]; hasLegacyEKV {
-						keyBytes = vi.Data
-						ok = true
-					}
-				}
 				if !ok {
 					merr = multierror.Append(merr, fmt.Errorf("key material %s not found in cache for key %q: %w", key.EncryptedKeyData.ID, key.Id, err))
 					continue
@@ -206,26 +197,6 @@ func (s *service) syncKeysFromDbToMemory(ctx context.Context) error {
 				merr = multierror.Append(merr, fmt.Errorf("failed to enumerate data encryption keys for key %q: %w", key.Id, err))
 				continue
 			}
-
-			// Transitional cache for child key data still encrypted with EKV ids.
-			err = s.db.EnumerateEncryptionKeyVersionsForKey(ctx, key.Id,
-				func(ekvs []*database.EncryptionKeyVersion, lastPage bool) (keepGoing pagination.KeepGoing, err error) {
-					for _, ekv := range ekvs {
-						kvi, err := s.getKeyVersionInfoForDatabaseVersion(ctx, keyData, ekv)
-						if err != nil {
-							merr = multierror.Append(merr, fmt.Errorf("failed to get key version for encryption key %q for key version id %q: %w", ekv.KeyId, ekv.Id, err))
-							continue
-						}
-
-						legacyEkvToVersionInfoCache[ekv.Id] = &kvi
-					}
-
-					return pagination.Continue, nil
-				},
-			)
-			if err != nil {
-				merr = multierror.Append(merr, fmt.Errorf("failed to enumerate transitional encryption key versions for key %q: %w", key.Id, err))
-			}
 		}
 
 		return pagination.Continue, nil
@@ -258,45 +229,6 @@ func (s *service) syncKeysFromDbToMemory(ctx context.Context) error {
 	s.mu.Unlock()
 
 	return merr.ErrorOrNil()
-}
-
-func (s *service) getKeyVersionInfoForDatabaseVersion(
-	ctx context.Context,
-	keyData *sconfig.KeyData,
-	ekv *database.EncryptionKeyVersion,
-) (sconfig.KeyVersionInfo, error) {
-	// If this key type takes DEKs, we need to pull that data from the separate table
-	// to provide it with that context to allow it to create a key version info.
-	if keyData.RequiresDataEncryptionKeys() {
-		// Get the DEK from the database
-		dek, err := s.db.GetDataEncryptionKey(ctx, apid.ID(ekv.ProviderID))
-		if err != nil {
-			return sconfig.KeyVersionInfo{}, err
-		}
-
-		// Use the list method to get this single version
-		versions, err := keyData.ListVersionsWithDataEncryptionKeys(
-			ctx,
-			dataEncryptionKeyInfos([]*database.DataEncryptionKey{dek}),
-		)
-		if err != nil {
-			return sconfig.KeyVersionInfo{}, err
-		}
-
-		// Should be a loop of one iteration
-		for _, v := range versions {
-			if string(v.Provider) == ekv.Provider &&
-				v.ProviderID == ekv.ProviderID &&
-				v.ProviderVersion == ekv.ProviderVersion {
-				return v, nil
-			}
-		}
-
-		return sconfig.KeyVersionInfo{}, fmt.Errorf("version %q/%q/%q not returned by key data provider", ekv.Provider, ekv.ProviderID, ekv.ProviderVersion)
-	}
-
-	// Key type does not take DEKs, so we can just return the version.
-	return keyData.GetVersion(ctx, ekv.ProviderVersion)
 }
 
 // ensureSynced blocks until the background goroutine has completed its first successful sync,

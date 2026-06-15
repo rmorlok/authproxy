@@ -20,7 +20,7 @@ destroyed and recreated when this branch merges.
 
 ## Why The Model Changes
 
-The current model evolved from one global AES key into three database layers:
+The legacy model evolved from one global AES key into three database layers:
 
 - `encryption_keys`
 - `encryption_key_versions`
@@ -150,7 +150,7 @@ versions. They are wrapping metadata on each DEK.
 
 The meaning of `id` changes:
 
-- Current model: `id` is an `encryption_key_versions.id` value, usually `ekv_...`.
+- Removed model: `id` was an `encryption_key_versions.id` value, usually `ekv_...`.
 - Target model: `id` is a `data_encryption_keys.id` value, always `dek_...`.
 
 This keeps encrypted fields self-describing while making the database DEK row the
@@ -242,8 +242,7 @@ Required behavior:
 
 ### Cache Sync
 
-The encrypt service cache continues to exist, but it becomes keyed by DEK id
-instead of key-version id.
+The encrypt service cache continues to exist, keyed by DEK id.
 
 Cache entries should map:
 
