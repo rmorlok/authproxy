@@ -4,6 +4,7 @@ import '@testing-library/jest-dom';
 import userEvent from '@testing-library/user-event';
 import {Provider} from 'react-redux';
 import {combineReducers, configureStore} from '@reduxjs/toolkit';
+import {MemoryRouter, Route, Routes, useLocation} from 'react-router-dom';
 import ConnectionCard, {ConnectionCardSkeleton} from '../components/ConnectionCard';
 import {
     Connection,
@@ -68,6 +69,26 @@ const rootInitialState = () => ({
     toasts: {items: []},
 });
 
+const renderConnectionCard = (connection: Connection, store = createMockStore(rootInitialState())) => {
+    const LocationProbe = () => {
+        const location = useLocation();
+        return <span data-testid="location">{location.pathname}{location.search}</span>;
+    };
+
+    render(
+        <MemoryRouter initialEntries={['/connections']}>
+            <Provider store={store}>
+                <Routes>
+                    <Route path="/connections" element={<ConnectionCard connection={connection}/>} />
+                    <Route path="/connections/:connectionId" element={<LocationProbe/>} />
+                </Routes>
+            </Provider>
+        </MemoryRouter>
+    );
+
+    return store;
+};
+
 describe('ConnectionCard', () => {
     const mockConnector: Connector = {
         id: 'google-calendar',
@@ -124,11 +145,7 @@ describe('ConnectionCard', () => {
     test('renders connection information correctly with connector details', () => {
         const store = createMockStore(rootInitialState());
 
-        render(
-            <Provider store={store}>
-                <ConnectionCard connection={baseConnection}/>
-            </Provider>
-        );
+        renderConnectionCard(baseConnection, store);
 
         // Check if the connector name is displayed
         expect(screen.getByText('Google Calendar')).toBeInTheDocument();
@@ -143,11 +160,7 @@ describe('ConnectionCard', () => {
         const store = createMockStore(rootInitialState());
         const connWithoutConnector = {...baseConnection, connector: undefined as unknown as any};
 
-        render(
-            <Provider store={store}>
-                <ConnectionCard connection={connWithoutConnector}/>
-            </Provider>
-        );
+        renderConnectionCard(connWithoutConnector, store);
 
         // Check if the unknown connector text is displayed
         expect(screen.getByText('Unknown Connector')).toBeInTheDocument();
@@ -166,9 +179,11 @@ describe('ConnectionCard', () => {
             const connection = {...baseConnection, state};
 
             const {unmount} = render(
-                <Provider store={store}>
-                    <ConnectionCard connection={connection}/>
-                </Provider>
+                <MemoryRouter>
+                    <Provider store={store}>
+                        <ConnectionCard connection={connection}/>
+                    </Provider>
+                </MemoryRouter>
             );
 
             expect(screen.getByText(label)).toBeInTheDocument();
@@ -196,11 +211,7 @@ describe('ConnectionCard', () => {
             },
         } as any);
 
-        render(
-            <Provider store={store}>
-                <ConnectionCard connection={setupConnection}/>
-            </Provider>
-        );
+        renderConnectionCard(setupConnection, store);
 
         await user.click(screen.getByRole('button', {name: /Resume setup/i}));
 
@@ -229,11 +240,7 @@ describe('ConnectionCard', () => {
             health_state: ConnectionHealthState.UNHEALTHY,
         };
 
-        render(
-            <Provider store={store}>
-                <ConnectionCard connection={unhealthyConnection}/>
-            </Provider>
-        );
+        renderConnectionCard(unhealthyConnection, store);
 
         expect(screen.getByText('Requires reconnection')).toBeInTheDocument();
         expect(screen.getByText('Reconnection required')).toBeInTheDocument();
@@ -262,11 +269,7 @@ describe('ConnectionCard', () => {
             },
         };
 
-        render(
-            <Provider store={store}>
-                <ConnectionCard connection={healthyConnection}/>
-            </Provider>
-        );
+        renderConnectionCard(healthyConnection, store);
 
         expect(screen.getByRole('button', {name: /Reconfigure/i})).toBeInTheDocument();
         expect(screen.queryByRole('button', {name: /Re-authenticate/i})).not.toBeInTheDocument();
@@ -274,6 +277,7 @@ describe('ConnectionCard', () => {
 
         await user.click(screen.getByRole('button', {name: /Connection actions/i}));
 
+        expect(screen.getByRole('menuitem', {name: /View details/i})).toBeInTheDocument();
         expect(screen.getByRole('menuitem', {name: /Re-authenticate/i})).toBeInTheDocument();
         expect(screen.getByRole('menuitem', {name: /^Disconnect$/i})).toBeInTheDocument();
 
@@ -287,15 +291,23 @@ describe('ConnectionCard', () => {
         });
     });
 
+    test('navigates to connection details from the healthy connection action menu', async () => {
+        const store = createMockStore(rootInitialState());
+        const user = userEvent.setup();
+
+        renderConnectionCard(baseConnection, store);
+
+        await user.click(screen.getByRole('button', {name: /Connection actions/i}));
+        await user.click(screen.getByRole('menuitem', {name: /View details/i}));
+
+        expect(screen.getByTestId('location')).toHaveTextContent(`/connections/${baseConnection.id}`);
+    });
+
     test('opens disconnect confirmation from healthy connection action menu', async () => {
         const store = createMockStore(rootInitialState());
         const user = userEvent.setup();
 
-        render(
-            <Provider store={store}>
-                <ConnectionCard connection={baseConnection}/>
-            </Provider>
-        );
+        renderConnectionCard(baseConnection, store);
 
         await user.click(screen.getByRole('button', {name: /Connection actions/i}));
         await user.click(screen.getByRole('menuitem', {name: /^Disconnect$/i}));

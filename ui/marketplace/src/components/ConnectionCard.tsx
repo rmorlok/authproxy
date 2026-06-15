@@ -19,7 +19,7 @@ import {
   MenuItem,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import {tasks, Connection, ConnectionState, ConnectionHealthState, canBeDisconnected, isCompleteResponse, isRedirectResponse, PollForTaskResult, DisconnectResponseJson} from '@authproxy/api';
+import {tasks, Connection, ConnectionState, canBeDisconnected, isCompleteResponse, isRedirectResponse, PollForTaskResult, DisconnectResponseJson} from '@authproxy/api';
 import { useDispatch } from 'react-redux';
 import {
   disconnectConnectionAsync,
@@ -31,12 +31,15 @@ import {
 import SettingsIcon from '@mui/icons-material/Settings';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { marketplaceTokens } from '../theme';
 import ConnectorLogo from './ConnectorLogo';
+import { useNavigate } from 'react-router-dom';
+import { getConnectionStatusPresentation } from './connectionPresentation';
 interface ConnectionCardProps {
   connection: Connection;
   highlightNew?: boolean;
@@ -52,6 +55,7 @@ const truncateText = (text: string, maxLength: number = 120): string => {
  */
 const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection, highlightNew = false }) => {
   const dispatch = useDispatch<AppDispatch>();
+  const navigate = useNavigate();
   const connector = connection.connector;
 
   // Use highlight field if available, otherwise use truncated description.
@@ -66,12 +70,17 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection, highlightNe
   const [isResumingSetup, setIsResumingSetup] = useState(false);
   const actionsMenuOpen = Boolean(actionsAnchorEl);
 
-  // Format the date
-  const createdDate = new Date(connection.created_at).toLocaleDateString();
-
   // Handle reconfigure button click
   const handleReconfigureClick = () => {
     dispatch(reconfigureConnectionAsync(connection.id));
+  };
+
+  const handleViewDetailsClick = () => {
+    if (!connector) {
+      return;
+    }
+    handleActionsMenuClose();
+    navigate(`/connections/${encodeURIComponent(connection.id)}`);
   };
 
   const handleResumeSetupClick = () => {
@@ -116,37 +125,17 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection, highlightNe
   // in initial setup; later states are tearing down). Visibility itself is the
   // signal — when health is unhealthy the button is emphasized.
   const canReauth = connection.state === ConnectionState.CONFIGURED;
-  const isUnhealthy =
-    connection.state === ConnectionState.CONFIGURED &&
-    connection.health_state === ConnectionHealthState.UNHEALTHY;
-  const isHealthyConfigured =
-    connection.state === ConnectionState.CONFIGURED &&
-    !isUnhealthy;
   const canReconfigure = connection.state === ConnectionState.CONFIGURED && connector?.has_configure;
-  const requiresSetup = connection.state === ConnectionState.SETUP;
-  const requiresReconnection = isUnhealthy || connection.state === ConnectionState.DISABLED;
-  const statusBadgeLabel = requiresSetup
-    ? 'Requires setup'
-    : requiresReconnection
-      ? 'Requires reconnection'
-      : null;
-  const statusBadgeColor: 'warning' | 'error' = requiresReconnection ? 'error' : 'warning';
-  const statusText = requiresSetup
-    ? 'Setup required'
-    : requiresReconnection
-      ? 'Reconnection required'
-      : connection.state === ConnectionState.DISCONNECTING
-        ? 'Disconnecting'
-        : connection.state === ConnectionState.DISCONNECTED
-          ? 'Disconnected'
-          : `Connected on ${createdDate}`;
-  const statusDotColor = requiresReconnection
-    ? 'error.main'
-    : requiresSetup || connection.state === ConnectionState.DISCONNECTING
-      ? 'warning.main'
-      : isHealthyConfigured
-        ? 'success.main'
-        : 'text.disabled';
+  const {
+    isHealthyConfigured,
+    isUnhealthy,
+    requiresSetup,
+    requiresReconnection,
+    statusBadgeLabel,
+    statusBadgeColor,
+    statusDotColor,
+    statusText,
+  } = getConnectionStatusPresentation(connection);
 
   const handleActionsMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setActionsAnchorEl(event.currentTarget);
@@ -226,6 +215,14 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection, highlightNe
         open={actionsMenuOpen}
         onClose={handleActionsMenuClose}
       >
+        {connector && (
+          <MenuItem onClick={handleViewDetailsClick}>
+            <ListItemIcon>
+              <InfoOutlinedIcon fontSize="small" />
+            </ListItemIcon>
+            View details
+          </MenuItem>
+        )}
         {canReauth && (
           <MenuItem onClick={handleReauthClick}>
             <ListItemIcon>
