@@ -28,6 +28,7 @@ vi.mock('@authproxy/api', async () => {
         connections: {
             ...actual.connections,
             disconnect: vi.fn(),
+            getSetupStep: vi.fn(),
             list: vi.fn(),
             reauth: vi.fn(),
         },
@@ -96,6 +97,7 @@ describe('ConnectionCard', () => {
 
     beforeEach(() => {
         vi.mocked(connections.disconnect).mockReset();
+        vi.mocked(connections.getSetupStep).mockReset();
         vi.mocked(connections.list).mockReset();
         vi.mocked(connections.reauth).mockReset();
         vi.mocked(tasks.pollForTaskFinalized).mockReset();
@@ -112,6 +114,7 @@ describe('ConnectionCard', () => {
             status: 200,
             data: {items: [], cursor: ''},
         } as any);
+        vi.mocked(connections.getSetupStep).mockResolvedValue({data: {id: baseConnection.id, type: 'complete'}} as any);
         vi.mocked(connections.reauth).mockResolvedValue({data: {type: 'complete'}} as any);
         vi.mocked(tasks.pollForTaskFinalized).mockResolvedValue({
             result: PollForTaskResult.FINALIZED,
@@ -171,6 +174,46 @@ describe('ConnectionCard', () => {
             expect(screen.getByText(label)).toBeInTheDocument();
 
             unmount();
+        });
+    });
+
+    test('resumes setup connections from their current step', async () => {
+        const store = createMockStore(rootInitialState());
+        const user = userEvent.setup();
+        const setupConnection: Connection = {
+            ...baseConnection,
+            state: ConnectionState.SETUP,
+        };
+        vi.mocked(connections.getSetupStep).mockResolvedValue({
+            data: {
+                id: setupConnection.id,
+                type: 'form',
+                step_id: 'calendar',
+                step_title: 'Select a Calendar',
+                step_description: 'Choose which calendar should be managed.',
+                json_schema: {type: 'object'},
+                ui_schema: {type: 'VerticalLayout'},
+            },
+        } as any);
+
+        render(
+            <Provider store={store}>
+                <ConnectionCard connection={setupConnection}/>
+            </Provider>
+        );
+
+        await user.click(screen.getByRole('button', {name: /Resume setup/i}));
+
+        await waitFor(() => {
+            expect(connections.getSetupStep).toHaveBeenCalledWith(
+                setupConnection.id,
+                window.location.href,
+            );
+        });
+        expect(store.getState().connections.currentFormStep).toMatchObject({
+            connectionId: setupConnection.id,
+            stepId: 'calendar',
+            stepTitle: 'Select a Calendar',
         });
     });
 

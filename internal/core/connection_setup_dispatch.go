@@ -146,7 +146,7 @@ func (c *connection) renderStepResponse(
 // Terminal-failure pseudo-steps (apxy:verify_failed, apxy:auth_failed) are
 // not in the manifest — the dispatcher recognizes them by IsTerminalFailure
 // and renders a ConnectionSetupError directly.
-func (c *connection) renderResumeResponse(ctx context.Context, flow iface.ManifestSetupFlow, setupStep cschema.SetupStep) (iface.ConnectionSetupResponse, error) {
+func (c *connection) renderResumeResponse(ctx context.Context, flow iface.ManifestSetupFlow, setupStep cschema.SetupStep, returnToUrl string) (iface.ConnectionSetupResponse, error) {
 	if setupStep.IsTerminalFailure() {
 		msg := ""
 		if e := c.GetSetupError(); e != nil {
@@ -172,11 +172,11 @@ func (c *connection) renderResumeResponse(ctx context.Context, flow iface.Manife
 			if !hasNext {
 				return c.completeFlow(ctx)
 			}
-			return c.advanceToStep(ctx, next, flow, "")
+			return c.advanceToStep(ctx, next, flow, returnToUrl)
 		}
 		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("current setup step %q not in manifest", setupStep.String()))
 	}
-	return c.renderStepResponse(ctx, flow, step, iface.RenderRedirectOptions{})
+	return c.renderStepResponse(ctx, flow, step, iface.RenderRedirectOptions{ReturnToUrl: returnToUrl})
 }
 
 // ensureStepMatches enforces that the supplied request step_id matches the

@@ -68,7 +68,7 @@ type Connection interface {
 		w http.ResponseWriter,
 	) error
 	SubmitForm(ctx context.Context, req SubmitConnectionRequest) (ConnectionSetupResponse, error)
-	GetCurrentSetupStepResponse(ctx context.Context) (ConnectionSetupResponse, error)
+	GetCurrentSetupStepResponse(ctx context.Context, returnToUrl ...string) (ConnectionSetupResponse, error)
 	GetDataSource(ctx context.Context, sourceId string) ([]apjs.DataSourceOption, error)
 	Reconfigure(ctx context.Context) (ConnectionSetupResponse, error)
 

@@ -166,7 +166,7 @@ func (m *Connection) SubmitForm(ctx context.Context, req iface.SubmitConnectionR
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (m *Connection) GetCurrentSetupStepResponse(ctx context.Context) (iface.ConnectionSetupResponse, error) {
+func (m *Connection) GetCurrentSetupStepResponse(ctx context.Context, returnToUrl ...string) (iface.ConnectionSetupResponse, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
