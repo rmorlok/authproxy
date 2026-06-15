@@ -171,8 +171,10 @@ export const cancelSetupConnectionAsync = createAsyncThunk(
 
 export const getSetupStepAsync = createAsyncThunk(
     'connections/getSetupStep',
-    async (connectionId: string) => {
-        const response = await connections.getSetupStep(connectionId);
+    async (request: string | { connectionId: string, returnToUrl?: string }) => {
+        const connectionId = typeof request === 'string' ? request : request.connectionId;
+        const returnToUrl = typeof request === 'string' ? undefined : request.returnToUrl;
+        const response = await connections.getSetupStep(connectionId, returnToUrl);
         return response.data;
     }
 );

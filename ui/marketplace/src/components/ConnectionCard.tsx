@@ -19,16 +19,18 @@ import {
   MenuItem,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import {tasks, Connection, ConnectionState, ConnectionHealthState, canBeDisconnected, isRedirectResponse, PollForTaskResult, DisconnectResponseJson} from '@authproxy/api';
+import {tasks, Connection, ConnectionState, ConnectionHealthState, canBeDisconnected, isCompleteResponse, isRedirectResponse, PollForTaskResult, DisconnectResponseJson} from '@authproxy/api';
 import { useDispatch } from 'react-redux';
 import {
   disconnectConnectionAsync,
+  getSetupStepAsync,
   reconfigureConnectionAsync,
   reauthConnectionAsync,
   AppDispatch, addToast, fetchConnectionsAsync,
 } from '../store';
 import SettingsIcon from '@mui/icons-material/Settings';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import ReactMarkdown from "react-markdown";
@@ -61,6 +63,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection, highlightNe
   // State for confirmation dialog
   const [openDialog, setOpenDialog] = useState(false);
   const [actionsAnchorEl, setActionsAnchorEl] = useState<null | HTMLElement>(null);
+  const [isResumingSetup, setIsResumingSetup] = useState(false);
   const actionsMenuOpen = Boolean(actionsAnchorEl);
 
   // Format the date
@@ -69,6 +72,26 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection, highlightNe
   // Handle reconfigure button click
   const handleReconfigureClick = () => {
     dispatch(reconfigureConnectionAsync(connection.id));
+  };
+
+  const handleResumeSetupClick = () => {
+    setIsResumingSetup(true);
+    dispatch(getSetupStepAsync({
+      connectionId: connection.id,
+      returnToUrl: window.location.href,
+    })).then((action) => {
+      if (action.meta.requestStatus === 'fulfilled') {
+        const response = action.payload as any;
+        if (isRedirectResponse(response) && response.redirect_url) {
+          window.location.href = response.redirect_url;
+          return;
+        }
+        if (isCompleteResponse(response)) {
+          dispatch(fetchConnectionsAsync());
+        }
+      }
+      setIsResumingSetup(false);
+    });
   };
 
   // Handle re-authenticate button click. Reauth returns a setup-flow response
@@ -356,6 +379,20 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection, highlightNe
           )}
           {!isHealthyConfigured && (
             <>
+              {requiresSetup && (
+                <Button
+                  size="medium"
+                  startIcon={<PlayArrowIcon />}
+                  onClick={handleResumeSetupClick}
+                  color="warning"
+                  variant="contained"
+                  fullWidth
+                  disabled={isResumingSetup}
+                  sx={{ justifyContent: 'flex-start' }}
+                >
+                  {isResumingSetup ? 'Resuming setup...' : 'Resume setup'}
+                </Button>
+              )}
               {canReauth && (
                 <Button
                   size={isUnhealthy ? 'medium' : 'small'}
