@@ -26,7 +26,7 @@ type mockKMSGenerateTestEnv struct {
 	ekID      apid.ID
 }
 
-func setupMockKMSGenerateTest(t *testing.T, kmsVersions bool) mockKMSGenerateTestEnv {
+func setupGenerateTest(t *testing.T, keyDataFactory func() *sconfig.KeyData) mockKMSGenerateTestEnv {
 	t.Helper()
 
 	sconfig.ResetKeyDataMockRegistry()
@@ -59,10 +59,7 @@ func setupMockKMSGenerateTest(t *testing.T, kmsVersions bool) mockKMSGenerateTes
 	require.NoError(t, err)
 	require.Len(t, globalVersions, 1)
 
-	kmsKeyData := sconfig.NewKeyDataMockKMS("namespace-kms")
-	if kmsVersions {
-		sconfig.KeyDataMockKMSAddVersion("namespace-kms", "mock-kms-key", "v1", util.MustGenerateSecureRandomKey(32))
-	}
+	keyData := keyDataFactory()
 
 	ekID := apid.New(apid.PrefixKey)
 	namespace := "root.kms"
@@ -75,7 +72,7 @@ func setupMockKMSGenerateTest(t *testing.T, kmsVersions bool) mockKMSGenerateTes
 		Id:               ekID,
 		Namespace:        namespace,
 		State:            database.KeyStateActive,
-		EncryptedKeyData: encryptKeyDataForTest(t, globalVersions[0].Id, globalKeyBytes, kmsKeyData),
+		EncryptedKeyData: encryptKeyDataForTest(t, globalVersions[0].Id, globalKeyBytes, keyData),
 	}))
 
 	return mockKMSGenerateTestEnv{
@@ -87,6 +84,28 @@ func setupMockKMSGenerateTest(t *testing.T, kmsVersions bool) mockKMSGenerateTes
 		namespace: namespace,
 		ekID:      ekID,
 	}
+}
+
+func setupMockKMSGenerateTest(t *testing.T, kmsVersions bool) mockKMSGenerateTestEnv {
+	t.Helper()
+
+	return setupGenerateTest(t, func() *sconfig.KeyData {
+		kmsKeyData := sconfig.NewKeyDataMockKMS("namespace-kms")
+		if kmsVersions {
+			sconfig.KeyDataMockKMSAddVersion("namespace-kms", "mock-kms-key", "v1", util.MustGenerateSecureRandomKey(32))
+		}
+		return kmsKeyData
+	})
+}
+
+func setupMockSecretGenerateTest(t *testing.T, keyBytes []byte) mockKMSGenerateTestEnv {
+	t.Helper()
+
+	return setupGenerateTest(t, func() *sconfig.KeyData {
+		keyData := sconfig.NewKeyDataMock("namespace-secret")
+		sconfig.KeyDataMockAddVersion("namespace-secret", "mock-secret-key", "v1", keyBytes)
+		return keyData
+	})
 }
 
 func TestGenerateDataEncryptionKeysToDatabase(t *testing.T) {
@@ -104,6 +123,13 @@ func TestGenerateDataEncryptionKeysToDatabase(t *testing.T) {
 		require.Equal(t, "mock-kms-key", deks[0].ProviderID)
 		require.Equal(t, "v1", deks[0].ProviderVersion)
 		require.NotEmpty(t, deks[0].ProtectedData.WrappedData)
+
+		globalDEKs, err := env.db.ListDataEncryptionKeysForKey(env.ctx, globalEncryptionKeyID)
+		require.NoError(t, err)
+		require.Len(t, globalDEKs, 1)
+		require.True(t, globalDEKs[0].IsCurrent)
+		require.Equal(t, string(sconfig.ProviderTypeMock), globalDEKs[0].Provider)
+		require.Equal(t, sconfig.KeyVersionProtectedDataTypeAuthProxyAESGCM, globalDEKs[0].ProtectedData.Type)
 
 		versions, err := env.db.ListEncryptionKeyVersionsForKey(env.ctx, env.ekID)
 		require.NoError(t, err)
@@ -129,6 +155,10 @@ func TestGenerateDataEncryptionKeysToDatabase(t *testing.T) {
 		deks, err := env.db.ListDataEncryptionKeysForKey(env.ctx, env.ekID)
 		require.NoError(t, err)
 		require.Len(t, deks, 1)
+
+		globalDEKs, err := env.db.ListDataEncryptionKeysForKey(env.ctx, globalEncryptionKeyID)
+		require.NoError(t, err)
+		require.Len(t, globalDEKs, 1)
 	})
 
 	t.Run("rotates when current dek exceeds policy age", func(t *testing.T) {
@@ -156,6 +186,14 @@ func TestGenerateDataEncryptionKeysToDatabase(t *testing.T) {
 		require.Len(t, versions, 2)
 		require.Equal(t, string(deks[1].Id), versions[1].ProviderID)
 		require.True(t, versions[1].IsCurrent)
+
+		globalDEKs, err := env.db.ListDataEncryptionKeysForKey(env.ctx, globalEncryptionKeyID)
+		require.NoError(t, err)
+		require.Len(t, globalDEKs, 2)
+		require.False(t, globalDEKs[0].IsCurrent)
+		require.True(t, globalDEKs[1].IsCurrent)
+		require.Equal(t, string(sconfig.ProviderTypeMock), globalDEKs[1].Provider)
+		require.Equal(t, "v1", globalDEKs[1].ProviderVersion)
 	})
 
 	t.Run("does not create first dek when ensure current is disabled", func(t *testing.T) {
@@ -167,6 +205,32 @@ func TestGenerateDataEncryptionKeysToDatabase(t *testing.T) {
 		deks, err := env.db.ListDataEncryptionKeysForKey(env.ctx, env.ekID)
 		require.NoError(t, err)
 		require.Empty(t, deks)
+
+		globalDEKs, err := env.db.ListDataEncryptionKeysForKey(env.ctx, globalEncryptionKeyID)
+		require.NoError(t, err)
+		require.Empty(t, globalDEKs)
+	})
+
+	t.Run("creates authproxy generated dek for secret-backed key", func(t *testing.T) {
+		env := setupMockSecretGenerateTest(t, util.MustGenerateSecureRandomKey(32))
+
+		require.NoError(t, generateDataEncryptionKeysToDatabase(env.ctx, env.cfg, env.db, env.logger, nil))
+
+		deks, err := env.db.ListDataEncryptionKeysForKey(env.ctx, env.ekID)
+		require.NoError(t, err)
+		require.Len(t, deks, 1)
+		require.True(t, deks[0].IsCurrent)
+		require.Equal(t, string(sconfig.ProviderTypeMock), deks[0].Provider)
+		require.Equal(t, "mock-secret-key", deks[0].ProviderID)
+		require.Equal(t, "v1", deks[0].ProviderVersion)
+		require.NotNil(t, deks[0].ProtectedData)
+		require.Equal(t, sconfig.KeyVersionProtectedDataTypeAuthProxyAESGCM, deks[0].ProtectedData.Type)
+		require.NotEmpty(t, deks[0].ProtectedData.WrappedData)
+
+		require.NoError(t, generateDataEncryptionKeysToDatabase(env.ctx, env.cfg, env.db, env.logger, nil))
+		deks, err = env.db.ListDataEncryptionKeysForKey(env.ctx, env.ekID)
+		require.NoError(t, err)
+		require.Len(t, deks, 1)
 	})
 
 	t.Run("returns provider errors without creating partial dek", func(t *testing.T) {
@@ -174,6 +238,21 @@ func TestGenerateDataEncryptionKeysToDatabase(t *testing.T) {
 
 		err := generateDataEncryptionKeysToDatabase(env.ctx, env.cfg, env.db, env.logger, nil)
 		require.ErrorContains(t, err, "no current version")
+
+		deks, listErr := env.db.ListDataEncryptionKeysForKey(env.ctx, env.ekID)
+		require.NoError(t, listErr)
+		require.Empty(t, deks)
+
+		globalDEKs, listErr := env.db.ListDataEncryptionKeysForKey(env.ctx, globalEncryptionKeyID)
+		require.NoError(t, listErr)
+		require.Len(t, globalDEKs, 1)
+	})
+
+	t.Run("returns fallback provider errors without creating partial dek", func(t *testing.T) {
+		env := setupMockSecretGenerateTest(t, []byte("bad"))
+
+		err := generateDataEncryptionKeysToDatabase(env.ctx, env.cfg, env.db, env.logger, nil)
+		require.ErrorContains(t, err, "failed to create DEK wrapping cipher")
 
 		deks, listErr := env.db.ListDataEncryptionKeysForKey(env.ctx, env.ekID)
 		require.NoError(t, listErr)

@@ -61,8 +61,8 @@ func ensureDataEncryptionKeyForKey(
 	encryptionKeyId apid.ID,
 	kd *config.KeyData,
 ) (bool, error) {
-	if kd == nil || !kd.RequiresDataEncryptionKeys() {
-		return false, nil
+	if kd == nil {
+		return false, errors.New("key data is nil")
 	}
 
 	current, err := db.GetCurrentDataEncryptionKeyForKey(ctx, encryptionKeyId)
@@ -88,6 +88,25 @@ func ensureDataEncryptionKeyForKey(
 	}
 
 	return false, nil
+}
+
+func shouldManageDataEncryptionKeysForKey(key *database.Key) bool {
+	if key == nil {
+		return false
+	}
+	if key.State != database.KeyStateActive {
+		return false
+	}
+	if key.Usage != database.KeyUsageDataEncryption {
+		return false
+	}
+
+	switch key.MaterialType {
+	case database.KeyMaterialTypeSymmetric, database.KeyMaterialTypeExternal:
+		return true
+	default:
+		return false
+	}
 }
 
 func generateDataEncryptionKeysToDatabase(
@@ -134,8 +153,25 @@ func generateDataEncryptionKeysToDatabase(
 	}
 
 	var result *multierror.Error
+	generated, err := ensureDataEncryptionKeyForKey(ctx, db, policy, globalEncryptionKeyID, sa.GlobalAESKey)
+	if err != nil {
+		result = multierror.Append(result, errors.Wrap(err, "failed to reconcile data encryption key for global key"))
+	} else {
+		if generated {
+			logger.Info("generated data encryption key", "key_id", globalEncryptionKeyID)
+		}
+
+		err = syncKeyVersionsForKeyToDatabase(ctx, db, keyVersionIdDataCache, globalEncryptionKeyID, sa.GlobalAESKey)
+		if err != nil {
+			result = multierror.Append(result, errors.Wrap(err, "failed to sync global key data after data encryption key generation"))
+		}
+	}
+
 	_, err = db.EnumerateKeysInDependencyOrder(ctx, func(keys []*database.Key, _ int) (keepGoing pagination.KeepGoing, err error) {
 		for _, key := range keys {
+			if key.Id == globalEncryptionKeyID {
+				continue
+			}
 			if key.EncryptedKeyData == nil {
 				continue
 			}
@@ -166,13 +202,15 @@ func generateDataEncryptionKeysToDatabase(
 				continue
 			}
 
-			generated, err := ensureDataEncryptionKeyForKey(ctx, db, policy, key.Id, &keyData)
-			if err != nil {
-				result = multierror.Append(result, errors.Wrapf(err, "failed to reconcile data encryption key for key ID %s", key.Id))
-				continue
-			}
-			if generated {
-				logger.Info("generated data encryption key", "encryption_key_id", key.Id)
+			if shouldManageDataEncryptionKeysForKey(key) {
+				generated, err := ensureDataEncryptionKeyForKey(ctx, db, policy, key.Id, &keyData)
+				if err != nil {
+					result = multierror.Append(result, errors.Wrapf(err, "failed to reconcile data encryption key for key ID %s", key.Id))
+					continue
+				}
+				if generated {
+					logger.Info("generated data encryption key", "key_id", key.Id)
+				}
 			}
 
 			err = syncKeyVersionsForKeyToDatabase(ctx, db, keyVersionIdDataCache, key.Id, &keyData)
