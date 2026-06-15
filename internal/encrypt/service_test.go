@@ -76,7 +76,7 @@ func TestService(t *testing.T) {
 		State:               database.ConnectorVersionStatePrimary,
 		Labels:              map[string]string{"type": "test"},
 		Hash:                "test",
-		EncryptedDefinition: encfield.EncryptedField{ID: "ekv_test", Data: "test"},
+		EncryptedDefinition: encfield.EncryptedField{ID: "dek_test", Data: "test"},
 	}
 	require.NoError(t, db.UpsertConnectorVersion(context.Background(), &connectorVersion))
 
@@ -85,6 +85,7 @@ func TestService(t *testing.T) {
 			encrypted, err := s.EncryptStringGlobal(context.Background(), someString)
 			require.NoError(t, err)
 			require.False(t, encrypted.IsZero())
+			require.True(t, encrypted.ID.HasPrefix(apid.PrefixDataEncryptionKey))
 
 			decrypted, err := s.DecryptString(context.Background(), encrypted)
 			require.NoError(t, err)
@@ -94,6 +95,7 @@ func TestService(t *testing.T) {
 			encrypted, err := s.EncryptStringForEntity(context.Background(), &connection, someString)
 			require.NoError(t, err)
 			require.False(t, encrypted.IsZero())
+			require.True(t, encrypted.ID.HasPrefix(apid.PrefixDataEncryptionKey))
 
 			decrypted, err := s.DecryptString(context.Background(), encrypted)
 			require.NoError(t, err)
@@ -103,6 +105,7 @@ func TestService(t *testing.T) {
 			encrypted, err := s.EncryptStringForEntity(context.Background(), &connectorVersion, someString)
 			require.NoError(t, err)
 			require.False(t, encrypted.IsZero())
+			require.True(t, encrypted.ID.HasPrefix(apid.PrefixDataEncryptionKey))
 
 			decrypted, err := s.DecryptString(context.Background(), encrypted)
 			require.NoError(t, err)

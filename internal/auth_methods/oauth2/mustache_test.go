@@ -380,8 +380,8 @@ func TestCallbackFrom3rdParty_TemplatedEndpoint(t *testing.T) {
 			AddHeader("Content-Type", "application/json").
 			BodyString(`{"access_token": "new-access-token", "refresh_token": "new-refresh-token", "scope": "read", "expires_in": 3600}`)
 
-		encrypt.EXPECT().EncryptStringForEntity(gomock.Any(), gomock.Any(), "new-access-token").Return(encfield.EncryptedField{ID: "ekv_test", Data: "encrypted-access"}, nil)
-		encrypt.EXPECT().EncryptStringForEntity(gomock.Any(), gomock.Any(), "new-refresh-token").Return(encfield.EncryptedField{ID: "ekv_test", Data: "encrypted-refresh"}, nil)
+		encrypt.EXPECT().EncryptStringForEntity(gomock.Any(), gomock.Any(), "new-access-token").Return(encfield.EncryptedField{ID: "dek_test", Data: "encrypted-access"}, nil)
+		encrypt.EXPECT().EncryptStringForEntity(gomock.Any(), gomock.Any(), "new-refresh-token").Return(encfield.EncryptedField{ID: "dek_test", Data: "encrypted-refresh"}, nil)
 		db.EXPECT().InsertOAuth2Token(gomock.Any(), connectionId, nil, gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(&database.OAuth2Token{Id: tokenId}, nil)
 
 		query := url.Values{"code": {"auth-code-123"}}
@@ -406,7 +406,7 @@ func TestCallbackFrom3rdParty_TemplatedEndpoint(t *testing.T) {
 			AddHeader("Content-Type", "application/json").
 			BodyString(`{"access_token": "access-tok", "scope": "read", "expires_in": 3600}`)
 
-		encrypt.EXPECT().EncryptStringForEntity(gomock.Any(), gomock.Any(), "access-tok").Return(encfield.EncryptedField{ID: "ekv_test", Data: "encrypted-access"}, nil)
+		encrypt.EXPECT().EncryptStringForEntity(gomock.Any(), gomock.Any(), "access-tok").Return(encfield.EncryptedField{ID: "dek_test", Data: "encrypted-access"}, nil)
 		db.EXPECT().InsertOAuth2Token(gomock.Any(), connectionId, nil, gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(&database.OAuth2Token{Id: tokenId}, nil)
 
 		query := url.Values{"code": {"auth-code-456"}}
@@ -458,8 +458,8 @@ func TestRevoke_TemplatedEndpoint(t *testing.T) {
 		MockOAuthTokenForConnection(context.Background(), db, encrypt, database.OAuth2Token{
 			Id:                    tokenId,
 			ConnectionId:          connectionId,
-			EncryptedAccessToken:  encfield.EncryptedField{ID: "ekv_test", Data: "some-access-token"},
-			EncryptedRefreshToken: encfield.EncryptedField{ID: "ekv_test", Data: "some-refresh-token"},
+			EncryptedAccessToken:  encfield.EncryptedField{ID: "dek_test", Data: "some-access-token"},
+			EncryptedRefreshToken: encfield.EncryptedField{ID: "dek_test", Data: "some-refresh-token"},
 		})
 
 		db.EXPECT().DeleteOAuth2Token(gomock.Any(), tokenId).Return(nil)
@@ -491,8 +491,8 @@ func TestRevoke_TemplatedEndpoint(t *testing.T) {
 		MockOAuthTokenForConnection(context.Background(), db, encrypt, database.OAuth2Token{
 			Id:                    tokenId,
 			ConnectionId:          connectionId,
-			EncryptedAccessToken:  encfield.EncryptedField{ID: "ekv_test", Data: "some-access-token"},
-			EncryptedRefreshToken: encfield.EncryptedField{ID: "ekv_test", Data: "some-refresh-token"},
+			EncryptedAccessToken:  encfield.EncryptedField{ID: "dek_test", Data: "some-access-token"},
+			EncryptedRefreshToken: encfield.EncryptedField{ID: "dek_test", Data: "some-refresh-token"},
 		})
 
 		db.EXPECT().DeleteOAuth2Token(gomock.Any(), tokenId).Return(nil)
@@ -534,16 +534,16 @@ func TestRevoke_TemplatedEndpoint(t *testing.T) {
 		MockOAuthTokenForConnection(context.Background(), dbA, encryptA, database.OAuth2Token{
 			Id:                    tokenIdA,
 			ConnectionId:          connectionId,
-			EncryptedAccessToken:  encfield.EncryptedField{ID: "ekv_test", Data: "access-a"},
-			EncryptedRefreshToken: encfield.EncryptedField{ID: "ekv_test", Data: "refresh-a"},
+			EncryptedAccessToken:  encfield.EncryptedField{ID: "dek_test", Data: "access-a"},
+			EncryptedRefreshToken: encfield.EncryptedField{ID: "dek_test", Data: "refresh-a"},
 		})
 		dbA.EXPECT().DeleteOAuth2Token(gomock.Any(), tokenIdA).Return(nil)
 
 		MockOAuthTokenForConnection(context.Background(), dbB, encryptB, database.OAuth2Token{
 			Id:                    tokenIdB,
 			ConnectionId:          connectionId,
-			EncryptedAccessToken:  encfield.EncryptedField{ID: "ekv_test", Data: "access-b"},
-			EncryptedRefreshToken: encfield.EncryptedField{ID: "ekv_test", Data: "refresh-b"},
+			EncryptedAccessToken:  encfield.EncryptedField{ID: "dek_test", Data: "access-b"},
+			EncryptedRefreshToken: encfield.EncryptedField{ID: "dek_test", Data: "refresh-b"},
 		})
 		dbB.EXPECT().DeleteOAuth2Token(gomock.Any(), tokenIdB).Return(nil)
 

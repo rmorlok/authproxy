@@ -145,6 +145,8 @@ func generateDataEncryptionKeysToDatabase(
 	}
 
 	policy := sa.DataEncryptionKeys
+	// key material id -> data for that material. During the migration this can
+	// contain both transitional ekv_ ids and canonical dek_ ids.
 	keyVersionIdDataCache := make(map[apid.ID]config.KeyVersionInfo)
 
 	err := syncKeyVersionsForKeyToDatabase(ctx, db, keyVersionIdDataCache, globalEncryptionKeyID, sa.GlobalAESKey)
@@ -165,6 +167,10 @@ func generateDataEncryptionKeysToDatabase(
 		if err != nil {
 			result = multierror.Append(result, errors.Wrap(err, "failed to sync global key data after data encryption key generation"))
 		}
+	}
+	err = cacheDataEncryptionKeysForKey(ctx, db, keyVersionIdDataCache, globalEncryptionKeyID, sa.GlobalAESKey)
+	if err != nil {
+		result = multierror.Append(result, errors.Wrap(err, "failed to cache global data encryption keys"))
 	}
 
 	_, err = db.EnumerateKeysInDependencyOrder(ctx, func(keys []*database.Key, _ int) (keepGoing pagination.KeepGoing, err error) {
@@ -218,6 +224,12 @@ func generateDataEncryptionKeysToDatabase(
 				result = multierror.Append(result, errors.Wrapf(err, "failed to sync key data for key ID %s", key.Id))
 				continue
 			}
+
+			err = cacheDataEncryptionKeysForKey(ctx, db, keyVersionIdDataCache, key.Id, &keyData)
+			if err != nil {
+				result = multierror.Append(result, errors.Wrapf(err, "failed to cache data encryption keys for key ID %s", key.Id))
+				continue
+			}
 		}
 
 		return pagination.Continue, nil
@@ -228,7 +240,7 @@ func generateDataEncryptionKeysToDatabase(
 
 	err = reconcileNamespaceEncryptionTargets(ctx, db, logger)
 	if err != nil {
-		result = multierror.Append(result, errors.Wrap(err, "failed to update namespace target encryption key versions"))
+		result = multierror.Append(result, errors.Wrap(err, "failed to update namespace target data encryption keys"))
 	}
 
 	return result.ErrorOrNil()

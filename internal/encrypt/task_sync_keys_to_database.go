@@ -50,6 +50,37 @@ func dataEncryptionKeyInfos(deks []*database.DataEncryptionKey) []config.DataEnc
 	return infos
 }
 
+func cacheDataEncryptionKeysForKey(
+	ctx context.Context,
+	db database.DB,
+	cache map[apid.ID]config.KeyVersionInfo,
+	keyId apid.ID,
+	kd *config.KeyData,
+) error {
+	deks, err := db.ListDataEncryptionKeysForKey(ctx, keyId)
+	if err != nil {
+		return errors.Wrap(err, "failed to list data encryption keys")
+	}
+
+	infos := dataEncryptionKeyInfos(deks)
+	for i, dek := range deks {
+		dekBytes, err := kd.UnwrapDataEncryptionKey(ctx, infos[i])
+		if err != nil {
+			return errors.Wrapf(err, "failed to unwrap data encryption key %s for key %s", dek.Id, keyId)
+		}
+
+		cache[dek.Id] = config.KeyVersionInfo{
+			Provider:        config.ProviderType(dek.Provider),
+			ProviderID:      dek.ProviderID,
+			ProviderVersion: dek.ProviderVersion,
+			Data:            dekBytes,
+			IsCurrent:       dek.IsCurrent,
+		}
+	}
+
+	return nil
+}
+
 // syncKeyVersionsForKeyToDatabase reconciles all key versions for an encryption key against the database.
 // It takes all versions from all key datas for the encryption key at once, so that versions from
 // different key datas don't delete each other.
@@ -164,62 +195,62 @@ func reconcileNamespaceEncryptionTargets(
 	db database.DB,
 	logger *slog.Logger,
 ) error {
-	// effectiveEKV maps namespace path -> resolved target EKV ID, declared outside the callback
+	// effectiveDEK maps namespace path -> resolved target DEK ID, declared outside the callback
 	// so it persists across pages (depth ordering ensures parents are processed first).
-	effectiveEKV := make(map[string]apid.ID)
+	effectiveDEK := make(map[string]apid.ID)
 
 	return db.EnumerateNamespaceEncryptionTargets(ctx,
 		func(targets []database.NamespaceEncryptionTarget, lastPage bool) ([]database.NamespaceTargetDataEncryptionKeyUpdate, pagination.KeepGoing, error) {
 			var updates []database.NamespaceTargetDataEncryptionKeyUpdate
 
 			for _, target := range targets {
-				var resolvedEKVID apid.ID
+				var resolvedDEKID apid.ID
 
 				if target.KeyId != nil {
-					// Namespace has its own encryption key; look up its current version
-					currentEKV, err := db.GetCurrentEncryptionKeyVersionForKey(ctx, *target.KeyId)
+					// Namespace has its own key; look up its current DEK.
+					currentDEK, err := db.GetCurrentDataEncryptionKeyForKey(ctx, *target.KeyId)
 					if err != nil {
-						logger.Warn("failed to get current encryption key version for namespace encryption key",
+						logger.Warn("failed to get current data encryption key for namespace key",
 							"namespace", target.Path,
-							"encryption_key_id", *target.KeyId,
+							"key_id", *target.KeyId,
 							"error", err,
 						)
 						continue
 					}
-					resolvedEKVID = currentEKV.Id
+					resolvedDEKID = currentDEK.Id
 				} else {
-					// Inherit from nearest ancestor with a resolved EKV
+					// Inherit from nearest ancestor with a resolved DEK.
 					prefixes := namespace.SplitNamespacePathToPrefixes(target.Path)
 					found := false
 					for i := len(prefixes) - 2; i >= 0; i-- {
-						if ekvID, ok := effectiveEKV[prefixes[i]]; ok {
-							resolvedEKVID = ekvID
+						if dekID, ok := effectiveDEK[prefixes[i]]; ok {
+							resolvedDEKID = dekID
 							found = true
 							break
 						}
 					}
 
 					if !found {
-						// Fall back to the global key's current version
-						globalEKV, err := db.GetCurrentEncryptionKeyVersionForKey(ctx, globalEncryptionKeyID)
+						// Fall back to the global key's current DEK.
+						globalDEK, err := db.GetCurrentDataEncryptionKeyForKey(ctx, globalEncryptionKeyID)
 						if err != nil {
-							logger.Warn("failed to get current encryption key version for global key",
+							logger.Warn("failed to get current data encryption key for global key",
 								"namespace", target.Path,
 								"error", err,
 							)
 							continue
 						}
-						resolvedEKVID = globalEKV.Id
+						resolvedDEKID = globalDEK.Id
 					}
 				}
 
-				effectiveEKV[target.Path] = resolvedEKVID
+				effectiveDEK[target.Path] = resolvedDEKID
 
 				// Only emit an update if the value actually changed
-				if target.TargetDataEncryptionKeyId == nil || *target.TargetDataEncryptionKeyId != resolvedEKVID {
+				if target.TargetDataEncryptionKeyId == nil || *target.TargetDataEncryptionKeyId != resolvedDEKID {
 					updates = append(updates, database.NamespaceTargetDataEncryptionKeyUpdate{
 						Path:                      target.Path,
-						TargetDataEncryptionKeyId: resolvedEKVID,
+						TargetDataEncryptionKeyId: resolvedDEKID,
 					})
 				}
 			}
@@ -275,13 +306,18 @@ func syncKeysVersionsToDatabase(
 		return errors.New("no global AES key configured")
 	}
 
-	// ekv_id -> data for that version
+	// key material id -> data for that material. During the migration this can
+	// contain both transitional ekv_ ids and canonical dek_ ids.
 	keyVersionIdDataCache := make(map[apid.ID]config.KeyVersionInfo)
 
 	// Manually sync the global key first because other keys depend on it
 	err := syncKeyVersionsForKeyToDatabase(ctx, db, keyVersionIdDataCache, globalEncryptionKeyID, sa.GlobalAESKey)
 	if err != nil {
 		return errors.Wrap(err, "failed to sync global key data")
+	}
+	err = cacheDataEncryptionKeysForKey(ctx, db, keyVersionIdDataCache, globalEncryptionKeyID, sa.GlobalAESKey)
+	if err != nil {
+		return errors.Wrap(err, "failed to cache global data encryption keys")
 	}
 
 	var result *multierror.Error
@@ -296,7 +332,7 @@ func syncKeysVersionsToDatabase(
 			ef := key.EncryptedKeyData
 			kvi, ok := keyVersionIdDataCache[ef.ID]
 			if !ok {
-				result = multierror.Append(result, fmt.Errorf("key version info not found for key ID %s key version %s", key.Id, ef.ID))
+				result = multierror.Append(result, fmt.Errorf("key material info not found for key ID %s key material %s", key.Id, ef.ID))
 				continue
 			}
 
@@ -324,6 +360,12 @@ func syncKeysVersionsToDatabase(
 				result = multierror.Append(result, errors.Wrapf(err, "failed to sync key data for key ID %s", key.Id))
 				continue
 			}
+
+			err = cacheDataEncryptionKeysForKey(ctx, db, keyVersionIdDataCache, key.Id, &keyData)
+			if err != nil {
+				result = multierror.Append(result, errors.Wrapf(err, "failed to cache data encryption keys for key ID %s", key.Id))
+				continue
+			}
 		}
 
 		return pagination.Continue, nil
@@ -335,7 +377,7 @@ func syncKeysVersionsToDatabase(
 
 	err = reconcileNamespaceEncryptionTargets(ctx, db, logger)
 	if err != nil {
-		result = multierror.Append(result, errors.Wrap(err, "failed to update namespace target encryption key versions"))
+		result = multierror.Append(result, errors.Wrap(err, "failed to update namespace target data encryption keys"))
 	}
 
 	// Set sentinel after successful sync

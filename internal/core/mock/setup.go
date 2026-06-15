@@ -45,7 +45,7 @@ func MockConnectorRetrival(ctx context.Context, dbMock *mockDb.MockDB, e *mockE.
 	clock := apctx.GetClock(ctx)
 	hash := fmt.Sprintf("%s-hash", c.Id.String())
 	encryptedDefinition := encfield.EncryptedField{
-		ID:   "ekv_mock",
+		ID:   "dek_mock",
 		Data: fmt.Sprintf("%s-encrypted-definition", c.Id.String()),
 	}
 

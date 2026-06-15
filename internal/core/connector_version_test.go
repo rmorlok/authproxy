@@ -43,7 +43,7 @@ func TestWrapConnectorVersion(t *testing.T) {
 		Labels:              map[string]string{"type": "test-connector"},
 		State:               database.ConnectorVersionStateDraft,
 		Hash:                "some-hash",
-		EncryptedDefinition: encfield.EncryptedField{ID: "ekv_test", Data: "encrypted-data"},
+		EncryptedDefinition: encfield.EncryptedField{ID: "dek_test", Data: "encrypted-data"},
 	}
 
 	// Test
@@ -73,7 +73,7 @@ func TestConnectorVersion_GetDefinition(t *testing.T) {
 		Labels:              map[string]string{"type": "test-connector"},
 		State:               database.ConnectorVersionStateDraft,
 		Hash:                "some-hash",
-		EncryptedDefinition: encfield.EncryptedField{ID: "ekv_test", Data: "encrypted-data"},
+		EncryptedDefinition: encfield.EncryptedField{ID: "dek_test", Data: "encrypted-data"},
 	}
 
 	cv := wrapConnectorVersion(dbConnectorVersion, s)
@@ -88,7 +88,7 @@ func TestConnectorVersion_GetDefinition(t *testing.T) {
 
 	// Set up expectations for the encrypt service
 	mockEncrypt.EXPECT().
-		DecryptString(gomock.Any(), encfield.EncryptedField{ID: "ekv_test", Data: "encrypted-data"}).
+		DecryptString(gomock.Any(), encfield.EncryptedField{ID: "dek_test", Data: "encrypted-data"}).
 		Return(string(defJSON), nil)
 
 	// Test
@@ -121,7 +121,7 @@ func TestConnectorVersion_SetDefinition(t *testing.T) {
 		Labels:              map[string]string{"type": "test-connector"},
 		State:               database.ConnectorVersionStateDraft,
 		Hash:                "some-hash",
-		EncryptedDefinition: encfield.EncryptedField{ID: "ekv_test", Data: "encrypted-data"},
+		EncryptedDefinition: encfield.EncryptedField{ID: "dek_test", Data: "encrypted-data"},
 	}
 
 	cv := wrapConnectorVersion(dbConnectorVersion, s)
@@ -137,7 +137,7 @@ func TestConnectorVersion_SetDefinition(t *testing.T) {
 	expectedHash := def.Hash()
 
 	// Set up expectations for the encrypt service
-	newEncryptedDef := encfield.EncryptedField{ID: "ekv_test", Data: "new-encrypted-data"}
+	newEncryptedDef := encfield.EncryptedField{ID: "dek_test", Data: "new-encrypted-data"}
 	mockEncrypt.EXPECT().
 		EncryptStringForEntity(
 			gomock.Any(),

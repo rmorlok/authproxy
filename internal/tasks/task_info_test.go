@@ -70,7 +70,7 @@ func TestToSecureEncryptedString(t *testing.T) {
 
 	// Mock encrypted field
 	mockEF := encfield.EncryptedField{
-		ID:   "ekv_mock",
+		ID:   "dek_mock",
 		Data: "encrypted-data",
 	}
 

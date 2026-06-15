@@ -179,7 +179,7 @@ func upsertConnectorVersion(
 		Namespace:           sconfig.RootNamespace,
 		State:               state,
 		Hash:                "hash",
-		EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "encrypted-definition"},
+		EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "encrypted-definition"},
 		Labels:              database.Labels{"type": "test"},
 	}))
 }

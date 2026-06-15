@@ -48,7 +48,7 @@ func setupVerifyTest(
 		Return(conn, nil).
 		AnyTimes()
 
-	encryptedDef := encfield.EncryptedField{ID: "ekv_mock", Data: "encrypted-def"}
+	encryptedDef := encfield.EncryptedField{ID: "dek_mock", Data: "encrypted-def"}
 	db.EXPECT().
 		GetConnectorVersion(gomock.Any(), connector.Id, connector.Version).
 		Return(&database.ConnectorVersion{

@@ -1702,7 +1702,7 @@ func TestMigration(t *testing.T) {
 					Namespace:           "root",
 					State:               database.ConnectorVersionStatePrimary,
 					Hash:                "api-created-hash",
-					EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "api-created"},
+					EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "api-created"},
 					Labels:              database.Labels{"type": "api-only"},
 				})
 				require.NoError(t, err)

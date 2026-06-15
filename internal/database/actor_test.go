@@ -473,8 +473,8 @@ func TestActor(t *testing.T) {
 					ExternalId: externalId,
 					Namespace:  "root",
 					Labels: Labels{
-						"team":             "platform",
-						"apxy/cxr/source":  "api",
+						"team":            "platform",
+						"apxy/cxr/source": "api",
 					},
 				})
 				require.NoError(t, err)
@@ -484,8 +484,8 @@ func TestActor(t *testing.T) {
 					ExternalId: externalId,
 					Namespace:  "root",
 					Labels: Labels{
-						"team":             "platform-2",
-						"apxy/cxr/source":  "config",
+						"team":            "platform-2",
+						"apxy/cxr/source": "config",
 					},
 				})
 				require.NoError(t, err)
@@ -504,8 +504,8 @@ func TestActor(t *testing.T) {
 					ExternalId: externalId,
 					Namespace:  "root",
 					Labels: Labels{
-						"team":             "platform",
-						"apxy/cxr/source":  "config",
+						"team":            "platform",
+						"apxy/cxr/source": "config",
 					},
 				})
 				require.NoError(t, err)
@@ -591,7 +591,7 @@ func TestActor(t *testing.T) {
 		u := Actor{}
 		require.False(t, u.CanSelfSign())
 
-		encryptedKey := encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "some-encrypted-key"}
+		encryptedKey := encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "some-encrypted-key"}
 		u.EncryptedKey = &encryptedKey
 		require.True(t, u.CanSelfSign())
 
@@ -932,7 +932,7 @@ func TestActor(t *testing.T) {
 		t.Run("stores and retrieves encrypted key", func(t *testing.T) {
 			setup(t)
 
-			encryptedKeyVal := encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "base64encodedencryptedkey123"}
+			encryptedKeyVal := encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "base64encodedencryptedkey123"}
 			actor := &Actor{
 				Id:           apid.New(apid.PrefixActor),
 				Namespace:    "root",

@@ -421,7 +421,7 @@ func TestReEncryptRegistry(t *testing.T) {
 				PrimaryKeyCols:   []string{"id"},
 				PrimaryKeyValues: []any{"fake_id"},
 				FieldColumn:      "fake_col",
-				NewValue:         encfield.EncryptedField{ID: "ekv_x", Data: "data"},
+				NewValue:         encfield.EncryptedField{ID: "dek_x", Data: "data"},
 			},
 		})
 		require.Error(t, err)

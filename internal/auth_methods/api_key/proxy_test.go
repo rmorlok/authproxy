@@ -46,7 +46,7 @@ func TestResolveAuth_UsesPlacementSnapshotWhenPresent(t *testing.T) {
 		&database.ApiKeyCredential{
 			Id:                   apid.New(apid.PrefixApiKeyCredential),
 			ConnectionId:         connectionId,
-			EncryptedCredentials: encfield.EncryptedField{ID: "ekv_fake", Data: `{"api_key":"sk-snapshot"}`},
+			EncryptedCredentials: encfield.EncryptedField{ID: "dek_fake", Data: `{"api_key":"sk-snapshot"}`},
 			PlacementSnapshot: &cschema.ApiKeyPlacement{
 				Type:       cschema.ApiKeyPlacementHeader,
 				HeaderName: "X-API-Key",
@@ -74,7 +74,7 @@ func TestResolveAuth_FailsWhenPlacementSnapshotMissing(t *testing.T) {
 		&database.ApiKeyCredential{
 			Id:                   apid.New(apid.PrefixApiKeyCredential),
 			ConnectionId:         connectionId,
-			EncryptedCredentials: encfield.EncryptedField{ID: "ekv_fake", Data: `{"api_key":"sk-live"}`},
+			EncryptedCredentials: encfield.EncryptedField{ID: "dek_fake", Data: `{"api_key":"sk-live"}`},
 			// PlacementSnapshot: nil
 		}, nil,
 	)
@@ -112,7 +112,7 @@ func TestResolveAuth_FailsOnMalformedPlaintext(t *testing.T) {
 	db.EXPECT().GetActiveApiKeyCredential(gomock.Any(), connectionId).Return(
 		&database.ApiKeyCredential{
 			ConnectionId:         connectionId,
-			EncryptedCredentials: encfield.EncryptedField{ID: "ekv_fake", Data: "not-json"},
+			EncryptedCredentials: encfield.EncryptedField{ID: "dek_fake", Data: "not-json"},
 			PlacementSnapshot:    &cschema.ApiKeyPlacement{Type: cschema.ApiKeyPlacementBearer},
 		}, nil,
 	)
@@ -133,7 +133,7 @@ func TestResolveAuth_BasicPlacementResolvesUsername(t *testing.T) {
 		&database.ApiKeyCredential{
 			ConnectionId: connectionId,
 			EncryptedCredentials: encfield.EncryptedField{
-				ID:   "ekv_fake",
+				ID:   "dek_fake",
 				Data: `{"api_key":"pw","username":"u"}`,
 			},
 			PlacementSnapshot: &cschema.ApiKeyPlacement{

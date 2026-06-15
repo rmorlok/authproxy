@@ -22,11 +22,11 @@ func MockOAuthTokenForConnection(ctx context.Context, dbMock *mockDb.MockDB, e *
 	unencryptedAccessToken := token.EncryptedAccessToken.Data
 
 	encryptedRefreshToken := encfield.EncryptedField{
-		ID:   "ekv_mock",
+		ID:   "dek_mock",
 		Data: fmt.Sprintf("%s-encrypted-refresh-token", token.ConnectionId.String()),
 	}
 	encryptedAccessToken := encfield.EncryptedField{
-		ID:   "ekv_mock",
+		ID:   "dek_mock",
 		Data: fmt.Sprintf("%s-encrypted-access-token", token.ConnectionId.String()),
 	}
 	token.EncryptedRefreshToken = encryptedRefreshToken

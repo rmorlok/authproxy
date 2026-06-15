@@ -140,7 +140,7 @@ func TestGenerateDataEncryptionKeysToDatabase(t *testing.T) {
 		enc := newTestService(env.cfg, env.db)
 		encrypted, err := enc.EncryptStringForNamespace(env.ctx, env.namespace, "generated dek")
 		require.NoError(t, err)
-		require.Equal(t, versions[0].Id, encrypted.ID)
+		require.Equal(t, deks[0].Id, encrypted.ID)
 		decrypted, err := enc.DecryptString(env.ctx, encrypted)
 		require.NoError(t, err)
 		require.Equal(t, "generated dek", decrypted)
