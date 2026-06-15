@@ -333,8 +333,7 @@ func (s *service) Shutdown() {
 func (s *service) startForTest() {
 	ctx := context.Background()
 
-	// Generate DEKs and sync transitional key-version rows for tests before
-	// loading the runtime DEK cache.
+	// Generate DEKs for tests before loading the runtime DEK cache.
 	if s.cfg != nil && s.cfg.GetRoot() != nil {
 		root := s.cfg.GetRoot()
 		originalPolicy := root.SystemAuth.DataEncryptionKeys

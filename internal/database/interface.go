@@ -243,6 +243,7 @@ type DB interface {
 	CreateDataEncryptionKey(ctx context.Context, dek *DataEncryptionKey) error
 	GetDataEncryptionKey(ctx context.Context, id apid.ID) (*DataEncryptionKey, error)
 	GetCurrentDataEncryptionKeyForKey(ctx context.Context, keyId apid.ID) (*DataEncryptionKey, error)
+	UpdateDataEncryptionKeyWrapping(ctx context.Context, dek *DataEncryptionKey) error
 	ClearCurrentDataEncryptionKeyFlagForKey(ctx context.Context, keyId apid.ID) error
 	SetDataEncryptionKeyCurrentFlag(ctx context.Context, id apid.ID, isCurrent bool) error
 	ListDataEncryptionKeysForKey(ctx context.Context, keyId apid.ID) ([]*DataEncryptionKey, error)

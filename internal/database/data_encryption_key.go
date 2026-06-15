@@ -250,6 +250,60 @@ func (s *service) GetCurrentDataEncryptionKeyForKey(ctx context.Context, keyId a
 	return &result, nil
 }
 
+func (s *service) UpdateDataEncryptionKeyWrapping(ctx context.Context, dek *DataEncryptionKey) error {
+	if dek == nil {
+		return errors.New("data encryption key is nil")
+	}
+	if dek.Id.IsNil() {
+		return errors.New("id is required")
+	}
+	if err := dek.Id.ValidatePrefix(apid.PrefixDataEncryptionKey); err != nil {
+		return err
+	}
+	if dek.Provider == "" {
+		return errors.New("provider is required")
+	}
+	if dek.ProviderID == "" {
+		return errors.New("provider id is required")
+	}
+	if dek.ProviderVersion == "" {
+		return errors.New("provider version is required")
+	}
+	if dek.ProtectedData == nil || dek.ProtectedData.IsZero() {
+		return errors.New("protected data is required")
+	}
+
+	now := apctx.GetClock(ctx).Now()
+	result, err := s.sq.
+		Update(DataEncryptionKeysTable).
+		Set("provider", dek.Provider).
+		Set("provider_id", dek.ProviderID).
+		Set("provider_version", dek.ProviderVersion).
+		Set("provider_metadata", dek.ProviderMetadata).
+		Set("protected_data", dek.ProtectedData).
+		Set("updated_at", now).
+		Where(sq.Eq{
+			"id":         dek.Id,
+			"deleted_at": nil,
+		}).
+		RunWith(s.db).
+		Exec()
+	if err != nil {
+		return fmt.Errorf("failed to update data encryption key wrapping: %w", err)
+	}
+
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to update data encryption key wrapping: %w", err)
+	}
+	if affected == 0 {
+		return ErrNotFound
+	}
+
+	dek.UpdatedAt = now
+	return nil
+}
+
 func (s *service) ClearCurrentDataEncryptionKeyFlagForKey(ctx context.Context, keyId apid.ID) error {
 	now := apctx.GetClock(ctx).Now()
 	_, err := s.sq.

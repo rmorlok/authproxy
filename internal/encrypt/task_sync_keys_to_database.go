@@ -19,7 +19,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
-	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
@@ -81,113 +80,101 @@ func cacheDataEncryptionKeysForKey(
 	return nil
 }
 
-// syncKeyVersionsForKeyToDatabase reconciles all key versions for an encryption key against the database.
-// It takes all versions from all key datas for the encryption key at once, so that versions from
-// different key datas don't delete each other.
-func syncKeyVersionsForKeyToDatabase(
+func providerMetadataFromWrappingKey(info config.KeyWrappingKeyInfo) database.DataEncryptionKeyProviderMetadata {
+	if len(info.Metadata) == 0 {
+		return nil
+	}
+
+	metadata := make(database.DataEncryptionKeyProviderMetadata, len(info.Metadata))
+	for k, v := range info.Metadata {
+		metadata[k] = v
+	}
+	return metadata
+}
+
+func providerMetadataMatches(dekMetadata database.DataEncryptionKeyProviderMetadata, wrappingMetadata map[string]string) bool {
+	if len(dekMetadata) != len(wrappingMetadata) {
+		return false
+	}
+	for k, v := range wrappingMetadata {
+		if dekMetadata[k] != v {
+			return false
+		}
+	}
+	return true
+}
+
+func dataEncryptionKeyNeedsRewrap(dek *database.DataEncryptionKey, current config.KeyWrappingKeyInfo) bool {
+	if dek.Provider != string(current.Provider) {
+		return true
+	}
+	if dek.ProviderID != current.ProviderID {
+		return true
+	}
+	if dek.ProviderVersion != current.ProviderVersion {
+		return true
+	}
+	return !providerMetadataMatches(dek.ProviderMetadata, current.Metadata)
+}
+
+func rewrapDataEncryptionKeysForKey(
 	ctx context.Context,
 	db database.DB,
-	cache map[apid.ID]config.KeyVersionInfo,
-	encryptionKeyId apid.ID,
+	keyId apid.ID,
 	kd *config.KeyData,
 ) error {
-	var vers []config.KeyVersionInfo
-	var err error
-	if kd.RequiresDataEncryptionKeys() {
-		deks, err := db.ListDataEncryptionKeysForKey(ctx, encryptionKeyId)
-		if err != nil {
-			return errors.Wrap(err, "failed to list data encryption keys")
-		}
-
-		// KMS-style providers consume already-generated DEK rows. The sync task
-		// maps those rows into application-facing encryption_key_versions; it does
-		// not create DEKs as a side effect.
-		vers, err = kd.ListVersionsWithDataEncryptionKeys(ctx, dataEncryptionKeyInfos(deks))
-		if err != nil {
-			return errors.Wrapf(err, "failed to get %s key versions", encryptionKeyId)
-		}
-	} else {
-		// Key data doesn't require DEKs, just list directly
-		vers, err = kd.ListVersions(ctx)
-		if err != nil {
-			return errors.Wrapf(err, "failed to get %s key versions", encryptionKeyId)
-		}
-	}
-
-	existing, err := db.ListEncryptionKeyVersionsForKey(ctx, encryptionKeyId)
+	current, err := kd.CurrentWrappingKey(ctx)
 	if err != nil {
-		return errors.Wrap(err, "failed to list existing encryption key versions")
+		return errors.Wrapf(err, "failed to get current wrapping key for key %s", keyId)
 	}
-	unused := util.NewSetFrom(existing)
 
-	for i, ver := range vers {
-		var found *database.EncryptionKeyVersion
-		for ekv := range unused.All() {
-			if ekv.Provider == string(ver.Provider) &&
-				ekv.ProviderID == ver.ProviderID &&
-				ekv.ProviderVersion == ver.ProviderVersion {
-				unused.Remove(ekv)
-				found = ekv
-				break
-			}
-		}
+	var result *multierror.Error
+	err = db.EnumerateDataEncryptionKeysForKey(ctx, keyId,
+		func(deks []*database.DataEncryptionKey, lastPage bool) (keepGoing pagination.KeepGoing, err error) {
+			for _, dek := range deks {
+				if !dataEncryptionKeyNeedsRewrap(dek, current) {
+					continue
+				}
 
-		if found == nil {
-			// Create a new record
-			maxVersion, err := db.GetMaxOrderedVersionForKey(ctx, encryptionKeyId)
-			if err != nil {
-				return errors.Wrap(err, "failed to get max ordered version")
-			}
+				infos := dataEncryptionKeyInfos([]*database.DataEncryptionKey{dek})
+				if len(infos) != 1 {
+					result = multierror.Append(result, fmt.Errorf("failed to map data encryption key %s for key %s", dek.Id, keyId))
+					continue
+				}
 
-			ekv := &database.EncryptionKeyVersion{
-				Id:              apid.New(apid.PrefixEncryptionKeyVersion),
-				KeyId:           encryptionKeyId,
-				Provider:        string(ver.Provider),
-				ProviderID:      ver.ProviderID,
-				ProviderVersion: ver.ProviderVersion,
-				OrderedVersion:  maxVersion + 1,
-				IsCurrent:       ver.IsCurrent,
-			}
+				dekBytes, err := kd.UnwrapDataEncryptionKey(ctx, infos[0])
+				if err != nil {
+					result = multierror.Append(result, errors.Wrapf(err, "failed to unwrap data encryption key %s for key %s", dek.Id, keyId))
+					continue
+				}
 
-			// Cache the information
-			cache[ekv.Id] = ver
+				wrapped, err := kd.WrapDataEncryptionKey(ctx, dekBytes)
+				if err != nil {
+					result = multierror.Append(result, errors.Wrapf(err, "failed to rewrap data encryption key %s for key %s", dek.Id, keyId))
+					continue
+				}
 
-			if ver.IsCurrent {
-				if err := db.ClearCurrentFlagForKey(ctx, encryptionKeyId); err != nil {
-					return errors.Wrapf(err, "failed to clear current flag for encryption key %s", encryptionKeyId)
+				updated := *dek
+				updated.Provider = string(wrapped.Provider)
+				updated.ProviderID = wrapped.ProviderID
+				updated.ProviderVersion = wrapped.ProviderVersion
+				updated.ProviderMetadata = providerMetadataFromWrappingKey(current)
+				updated.ProtectedData = &wrapped.ProtectedData
+
+				if err := db.UpdateDataEncryptionKeyWrapping(ctx, &updated); err != nil {
+					result = multierror.Append(result, errors.Wrapf(err, "failed to update data encryption key %s wrapping for key %s", dek.Id, keyId))
+					continue
 				}
 			}
 
-			if err := db.CreateEncryptionKeyVersion(ctx, ekv); err != nil {
-				return errors.Wrapf(err, "failed to create encryption key version for index %d for encryption key %s", i, encryptionKeyId)
-			}
-
-			found = ekv
-		} else {
-			// Cache the information
-			cache[found.Id] = ver
-
-			if ver.IsCurrent && !found.IsCurrent {
-				// This key should be current but isn't marked as such
-				if err := db.ClearCurrentFlagForKey(ctx, encryptionKeyId); err != nil {
-					return errors.Wrapf(err, "failed to clear current flag for encryption key %s", encryptionKeyId)
-				}
-				if err := db.SetEncryptionKeyVersionCurrentFlag(ctx, found.Id, true); err != nil {
-					return errors.Wrapf(err, "failed to set current flag for encryption key %s for version %s", encryptionKeyId, found.Id)
-				}
-				found.IsCurrent = true
-			}
-		}
+			return pagination.Continue, nil
+		},
+	)
+	if err != nil {
+		result = multierror.Append(result, err)
 	}
 
-	// Remove any old versions that are no longer present
-	for ekv := range unused.All() {
-		if err := db.DeleteEncryptionKeyVersion(ctx, ekv.Id); err != nil {
-			return errors.Wrapf(err, "failed to delete encryption key version %s for encryption key %s", ekv.Id, encryptionKeyId)
-		}
-	}
-
-	return nil
+	return result.ErrorOrNil()
 }
 
 func reconcileNamespaceEncryptionTargets(
@@ -260,18 +247,19 @@ func reconcileNamespaceEncryptionTargets(
 	)
 }
 
-// syncKeysVersionsToDatabase is the standalone function that syncs key versions into the database. It lists
-// all keys and makes sure the version for those keys are accurate. It can be called directly during startup
-// without constructing a task handler. When redis is provided, it uses a sentinel key to rate-limit syncs.
-func syncKeysVersionsToDatabase(
+// syncKeysToDatabase is the standalone function that syncs key wrapping state into the database.
+// It rewraps existing DEKs with their provider's current wrapping material and refreshes namespace DEK
+// targets. It can be called directly during startup without constructing a task handler. When redis is
+// provided, it uses a sentinel key to rate-limit syncs.
+func syncKeysToDatabase(
 	ctx context.Context,
 	cfg iconfig.C,
 	db database.DB,
 	logger *slog.Logger,
 	redis apredis.Client,
 ) error {
-	logger.Info("syncing encryption key versions to database")
-	defer logger.Info("syncing encryption key versions to database complete")
+	logger.Info("syncing data encryption key wrapping to database")
+	defer logger.Info("syncing data encryption key wrapping to database complete")
 
 	if redis != nil {
 		// Redis can be skipped in test cases
@@ -292,7 +280,7 @@ func syncKeysVersionsToDatabase(
 		err = m.Lock(context.Background())
 		if err != nil {
 			logger.Info("failed to establish redis lock")
-			return errors.Wrap(err, "failed to establish lock for encryption key version sync")
+			return errors.Wrap(err, "failed to establish lock for data encryption key wrapping sync")
 		}
 		defer m.Unlock(context.Background())
 	}
@@ -308,14 +296,14 @@ func syncKeysVersionsToDatabase(
 
 	// key material id -> data for that material. During the migration this can
 	// contain both transitional ekv_ ids and canonical dek_ ids.
-	keyVersionIdDataCache := make(map[apid.ID]config.KeyVersionInfo)
+	keyMaterialDataCache := make(map[apid.ID]config.KeyVersionInfo)
 
-	// Manually sync the global key first because other keys depend on it
-	err := syncKeyVersionsForKeyToDatabase(ctx, db, keyVersionIdDataCache, globalEncryptionKeyID, sa.GlobalAESKey)
+	// Manually sync the global key first because other keys depend on it.
+	err := rewrapDataEncryptionKeysForKey(ctx, db, globalEncryptionKeyID, sa.GlobalAESKey)
 	if err != nil {
-		return errors.Wrap(err, "failed to sync global key data")
+		return errors.Wrap(err, "failed to rewrap global data encryption keys")
 	}
-	err = cacheDataEncryptionKeysForKey(ctx, db, keyVersionIdDataCache, globalEncryptionKeyID, sa.GlobalAESKey)
+	err = cacheDataEncryptionKeysForKey(ctx, db, keyMaterialDataCache, globalEncryptionKeyID, sa.GlobalAESKey)
 	if err != nil {
 		return errors.Wrap(err, "failed to cache global data encryption keys")
 	}
@@ -330,7 +318,7 @@ func syncKeysVersionsToDatabase(
 			}
 
 			ef := key.EncryptedKeyData
-			kvi, ok := keyVersionIdDataCache[ef.ID]
+			kvi, ok := keyMaterialDataCache[ef.ID]
 			if !ok {
 				result = multierror.Append(result, fmt.Errorf("key material info not found for key ID %s key material %s", key.Id, ef.ID))
 				continue
@@ -355,13 +343,13 @@ func syncKeysVersionsToDatabase(
 				continue
 			}
 
-			err = syncKeyVersionsForKeyToDatabase(ctx, db, keyVersionIdDataCache, key.Id, &keyData)
+			err = rewrapDataEncryptionKeysForKey(ctx, db, key.Id, &keyData)
 			if err != nil {
-				result = multierror.Append(result, errors.Wrapf(err, "failed to sync key data for key ID %s", key.Id))
+				result = multierror.Append(result, errors.Wrapf(err, "failed to rewrap data encryption keys for key ID %s", key.Id))
 				continue
 			}
 
-			err = cacheDataEncryptionKeysForKey(ctx, db, keyVersionIdDataCache, key.Id, &keyData)
+			err = cacheDataEncryptionKeysForKey(ctx, db, keyMaterialDataCache, key.Id, &keyData)
 			if err != nil {
 				result = multierror.Append(result, errors.Wrapf(err, "failed to cache data encryption keys for key ID %s", key.Id))
 				continue
@@ -399,7 +387,7 @@ func SyncKeysToDatabase(
 	logger *slog.Logger,
 	redis apredis.Client,
 ) error {
-	return syncKeysVersionsToDatabase(ctx, cfg, db, logger, redis)
+	return syncKeysToDatabase(ctx, cfg, db, logger, redis)
 }
 
 func (h *EncryptServiceTaskHandler) handleSyncKeysToDatabase(ctx context.Context, task *asynq.Task) error {
@@ -408,7 +396,7 @@ func (h *EncryptServiceTaskHandler) handleSyncKeysToDatabase(ctx context.Context
 
 // doSyncKeysToDatabase delegates to the standalone function with the redis sentinel.
 func (h *EncryptServiceTaskHandler) doSyncKeysToDatabase(ctx context.Context) error {
-	return syncKeysVersionsToDatabase(ctx, h.cfg, h.db, h.logger, h.redis)
+	return syncKeysToDatabase(ctx, h.cfg, h.db, h.logger, h.redis)
 }
 
 // EnqueueForceSyncKeysToDatabase clears the sync sentinel and enqueues a sync task immediately.

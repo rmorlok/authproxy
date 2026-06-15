@@ -52,12 +52,7 @@ func setupGenerateTest(t *testing.T, keyDataFactory func() *sconfig.KeyData) moc
 		},
 	})
 	cfg, db := database.MustApplyBlankTestDbConfig(t, cfg)
-
-	require.NoError(t, syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil))
-
-	globalVersions, err := db.ListEncryptionKeyVersionsForKey(ctx, globalEncryptionKeyID)
-	require.NoError(t, err)
-	require.Len(t, globalVersions, 1)
+	globalDEK, globalDEKBytes := createDataEncryptionKeyForTest(t, ctx, db, globalEncryptionKeyID, globalKD)
 
 	keyData := keyDataFactory()
 
@@ -72,7 +67,7 @@ func setupGenerateTest(t *testing.T, keyDataFactory func() *sconfig.KeyData) moc
 		Id:               ekID,
 		Namespace:        namespace,
 		State:            database.KeyStateActive,
-		EncryptedKeyData: encryptKeyDataForTest(t, globalVersions[0].Id, globalKeyBytes, keyData),
+		EncryptedKeyData: encryptKeyDataForTest(t, globalDEK.Id, globalDEKBytes, keyData),
 	}))
 
 	return mockKMSGenerateTestEnv{
@@ -109,7 +104,7 @@ func setupMockSecretGenerateTest(t *testing.T, keyBytes []byte) mockKMSGenerateT
 }
 
 func TestGenerateDataEncryptionKeysToDatabase(t *testing.T) {
-	t.Run("creates first dek and synced key version", func(t *testing.T) {
+	t.Run("creates first dek without syncing key versions", func(t *testing.T) {
 		env := setupMockKMSGenerateTest(t, true)
 
 		require.NoError(t, generateDataEncryptionKeysToDatabase(env.ctx, env.cfg, env.db, env.logger, nil))
@@ -133,9 +128,7 @@ func TestGenerateDataEncryptionKeysToDatabase(t *testing.T) {
 
 		versions, err := env.db.ListEncryptionKeyVersionsForKey(env.ctx, env.ekID)
 		require.NoError(t, err)
-		require.Len(t, versions, 1)
-		require.Equal(t, string(deks[0].Id), versions[0].ProviderID)
-		require.True(t, versions[0].IsCurrent)
+		require.Empty(t, versions)
 
 		enc := newTestService(env.cfg, env.db)
 		encrypted, err := enc.EncryptStringForNamespace(env.ctx, env.namespace, "generated dek")
@@ -183,9 +176,7 @@ func TestGenerateDataEncryptionKeysToDatabase(t *testing.T) {
 
 		versions, err := env.db.ListEncryptionKeyVersionsForKey(env.ctx, env.ekID)
 		require.NoError(t, err)
-		require.Len(t, versions, 2)
-		require.Equal(t, string(deks[1].Id), versions[1].ProviderID)
-		require.True(t, versions[1].IsCurrent)
+		require.Empty(t, versions)
 
 		globalDEKs, err := env.db.ListDataEncryptionKeysForKey(env.ctx, globalEncryptionKeyID)
 		require.NoError(t, err)
@@ -208,7 +199,7 @@ func TestGenerateDataEncryptionKeysToDatabase(t *testing.T) {
 
 		globalDEKs, err := env.db.ListDataEncryptionKeysForKey(env.ctx, globalEncryptionKeyID)
 		require.NoError(t, err)
-		require.Empty(t, globalDEKs)
+		require.Len(t, globalDEKs, 1)
 	})
 
 	t.Run("creates authproxy generated dek for secret-backed key", func(t *testing.T) {
