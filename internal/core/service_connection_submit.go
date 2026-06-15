@@ -52,7 +52,7 @@ func (c *connection) SubmitForm(ctx context.Context, req iface.SubmitConnectionR
 // current setup_step without transitioning anything. Used by the resume /
 // polling path on the UI. When returnToUrl is supplied, redirect steps can
 // mint a fresh provider URL for an interrupted browser flow.
-func (c *connection) GetCurrentSetupStepResponse(ctx context.Context, returnToUrl ...string) (iface.ConnectionSetupResponse, error) {
+func (c *connection) GetCurrentSetupStepResponse(ctx context.Context, returnToUrl string) (iface.ConnectionSetupResponse, error) {
 	setupStep := c.GetSetupStep()
 	if setupStep == nil {
 		return &iface.ConnectionSetupComplete{
@@ -61,9 +61,5 @@ func (c *connection) GetCurrentSetupStepResponse(ctx context.Context, returnToUr
 		}, nil
 	}
 	flow := c.s.buildManifestSetupFlow(c)
-	resumeReturnToUrl := ""
-	if len(returnToUrl) > 0 {
-		resumeReturnToUrl = returnToUrl[0]
-	}
-	return c.renderResumeResponse(ctx, flow, *setupStep, resumeReturnToUrl)
+	return c.renderResumeResponse(ctx, flow, *setupStep, returnToUrl)
 }

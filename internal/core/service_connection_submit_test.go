@@ -315,7 +315,7 @@ func TestGetCurrentSetupStepResponse(t *testing.T) {
 
 		conn, _ := newTestConnectionWithSetupFlow(t, ctrl, &cschema.SetupFlow{})
 
-		resp, err := conn.GetCurrentSetupStepResponse(context.Background())
+		resp, err := conn.GetCurrentSetupStepResponse(context.Background(), "")
 		require.NoError(t, err)
 		assert.Equal(t, iface.ConnectionSetupResponseTypeComplete, resp.GetType())
 	})
@@ -336,7 +336,7 @@ func TestGetCurrentSetupStepResponse(t *testing.T) {
 		step := cschema.MustNewSetupStep("tenant")
 		conn.SetupStep = &step
 
-		resp, err := conn.GetCurrentSetupStepResponse(context.Background())
+		resp, err := conn.GetCurrentSetupStepResponse(context.Background(), "")
 		require.NoError(t, err)
 		require.IsType(t, &iface.ConnectionSetupForm{}, resp)
 
@@ -372,7 +372,7 @@ func TestGetCurrentSetupStepResponse(t *testing.T) {
 		step := cschema.MustNewSetupStep(oauth2.OAuth2AuthorizeStepId)
 		conn.SetupStep = &step
 
-		resp, err := conn.GetCurrentSetupStepResponse(context.Background())
+		resp, err := conn.GetCurrentSetupStepResponse(context.Background(), "")
 		require.NoError(t, err)
 		assert.Equal(t, iface.ConnectionSetupResponseTypeRedirect, resp.GetType())
 		// Resume mode: URL is intentionally empty.
@@ -394,7 +394,7 @@ func TestGetCurrentSetupStepResponse(t *testing.T) {
 		step := cschema.MustNewSetupStep("workspace")
 		conn.SetupStep = &step
 
-		resp, err := conn.GetCurrentSetupStepResponse(context.Background())
+		resp, err := conn.GetCurrentSetupStepResponse(context.Background(), "")
 		require.NoError(t, err)
 		require.IsType(t, &iface.ConnectionSetupForm{}, resp)
 
@@ -426,7 +426,7 @@ func TestGetCurrentSetupStepResponse(t *testing.T) {
 
 		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewSetupStep("workspace"))).Return(nil)
 
-		resp, err := conn.GetCurrentSetupStepResponse(context.Background())
+		resp, err := conn.GetCurrentSetupStepResponse(context.Background(), "")
 		require.NoError(t, err)
 		require.IsType(t, &iface.ConnectionSetupForm{}, resp)
 
@@ -446,7 +446,7 @@ func TestGetCurrentSetupStepResponse(t *testing.T) {
 		step := cschema.SetupStepVerify
 		conn.SetupStep = &step
 
-		resp, err := conn.GetCurrentSetupStepResponse(context.Background())
+		resp, err := conn.GetCurrentSetupStepResponse(context.Background(), "")
 		require.NoError(t, err)
 		require.IsType(t, &iface.ConnectionSetupVerifying{}, resp)
 		assert.Equal(t, iface.ConnectionSetupResponseTypeVerifying, resp.GetType())
@@ -462,7 +462,7 @@ func TestGetCurrentSetupStepResponse(t *testing.T) {
 		errMsg := `probe "ping" failed: 401 unauthorized`
 		conn.SetupError = &errMsg
 
-		resp, err := conn.GetCurrentSetupStepResponse(context.Background())
+		resp, err := conn.GetCurrentSetupStepResponse(context.Background(), "")
 		require.NoError(t, err)
 		require.IsType(t, &iface.ConnectionSetupError{}, resp)
 		errResp := resp.(*iface.ConnectionSetupError)
