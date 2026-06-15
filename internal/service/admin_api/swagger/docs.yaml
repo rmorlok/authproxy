@@ -78,8 +78,8 @@ definitions:
         example: 2
         type: integer
     type: object
-  github_com_rmorlok_authproxy_internal_schema_api.EncryptionKeyJson:
-    description: Encryption key API response
+  github_com_rmorlok_authproxy_internal_schema_api.KeyJson:
+    description: Key API response
     properties:
       annotations:
         additionalProperties:
@@ -135,7 +135,7 @@ definitions:
         type: object
       created_at:
         type: string
-      encryption_key_id:
+      key_id:
         example: key_test550e8400abcd
         type: string
       labels:
@@ -317,8 +317,8 @@ definitions:
         example: root.acme
         type: string
     type: object
-  routes.CreateEncryptionKeyRequestJson:
-    description: Request to create a new encryption key
+  routes.CreateKeyRequestJson:
+    description: Request to create a new key
     properties:
       annotations:
         additionalProperties:
@@ -359,31 +359,6 @@ definitions:
       value:
         description: Option value.
         example: ws-123
-        type: string
-    type: object
-  routes.EncryptionKeyJson:
-    description: Encryption key API response
-    properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      created_at:
-        type: string
-      id:
-        example: key_test550e8400abcd
-        type: string
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-      namespace:
-        example: root.acme
-        type: string
-      state:
-        example: active
-        type: string
-      updated_at:
         type: string
     type: object
   routes.ErrorResponse:
@@ -434,6 +409,31 @@ definitions:
         example: https://example.com/callback
         type: string
     type: object
+  routes.KeyJson:
+    description: Key API response
+    properties:
+      annotations:
+        additionalProperties:
+          type: string
+        type: object
+      created_at:
+        type: string
+      id:
+        example: key_test550e8400abcd
+        type: string
+      labels:
+        additionalProperties:
+          type: string
+        type: object
+      namespace:
+        example: root.acme
+        type: string
+      state:
+        example: active
+        type: string
+      updated_at:
+        type: string
+    type: object
   routes.KeyValueJson:
     properties:
       key:
@@ -452,7 +452,7 @@ definitions:
         type: object
       created_at:
         type: string
-      encryption_key_id:
+      key_id:
         example: key_test550e8400abcd
         type: string
       labels:
@@ -676,14 +676,14 @@ definitions:
           $ref: '#/definitions/github_com_rmorlok_authproxy_internal_schema_api.ConnectorJson'
         type: array
     type: object
-  routes.OpenAPIListEncryptionKeysResponseJson:
-    description: Paginated list of encryption keys
+  routes.OpenAPIListKeysResponseJson:
+    description: Paginated list of keys
     properties:
       cursor:
         type: string
       items:
         items:
-          $ref: '#/definitions/github_com_rmorlok_authproxy_internal_schema_api.EncryptionKeyJson'
+          $ref: '#/definitions/github_com_rmorlok_authproxy_internal_schema_api.KeyJson'
         type: array
     type: object
   routes.OpenAPIListNamespacesResponseJson:
@@ -852,8 +852,8 @@ definitions:
           type: string
         type: object
     type: object
-  routes.OpenAPIUpdateEncryptionKeyRequestJson:
-    description: Request to update an encryption key
+  routes.OpenAPIUpdateKeyRequestJson:
+    description: Request to update a key
     properties:
       annotations:
         additionalProperties:
@@ -4044,11 +4044,11 @@ paths:
       summary: Set a label for a connector version
       tags:
       - connectors
-  /encryption-keys:
+  /keys:
     get:
       consumes:
       - application/json
-      description: List encryption keys with optional filtering and pagination
+      description: List keys with optional filtering and pagination
       parameters:
       - description: Pagination cursor
         in: query
@@ -4080,7 +4080,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIListEncryptionKeysResponseJson'
+            $ref: '#/definitions/routes.OpenAPIListKeysResponseJson'
         "400":
           description: Bad Request
           schema:
@@ -4095,27 +4095,27 @@ paths:
             $ref: '#/definitions/routes.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: List encryption keys
+      summary: List keys
       tags:
-      - encryption_keys
+      - keys
     post:
       consumes:
       - application/json
-      description: Create a new encryption key
+      description: Create a new key
       parameters:
-      - description: Encryption key creation request
+      - description: Key creation request
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.CreateEncryptionKeyRequestJson'
+          $ref: '#/definitions/routes.CreateKeyRequestJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.EncryptionKeyJson'
+            $ref: '#/definitions/routes.KeyJson'
         "400":
           description: Bad Request
           schema:
@@ -4130,16 +4130,16 @@ paths:
             $ref: '#/definitions/routes.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Create encryption key
+      summary: Create key
       tags:
-      - encryption_keys
-  /encryption-keys/{id}:
+      - keys
+  /keys/{id}:
     delete:
       consumes:
       - application/json
-      description: Soft delete an encryption key
+      description: Soft delete a key
       parameters:
-      - description: Encryption key ID
+      - description: Key ID
         in: path
         name: id
         required: true
@@ -4163,15 +4163,15 @@ paths:
             $ref: '#/definitions/routes.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Delete encryption key
+      summary: Delete key
       tags:
-      - encryption_keys
+      - keys
     get:
       consumes:
       - application/json
-      description: Get a specific encryption key by ID
+      description: Get a specific key by ID
       parameters:
-      - description: Encryption key ID
+      - description: Key ID
         in: path
         name: id
         required: true
@@ -4182,7 +4182,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.EncryptionKeyJson'
+            $ref: '#/definitions/routes.KeyJson'
         "400":
           description: Bad Request
           schema:
@@ -4201,15 +4201,15 @@ paths:
             $ref: '#/definitions/routes.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Get encryption key
+      summary: Get key
       tags:
-      - encryption_keys
+      - keys
     patch:
       consumes:
       - application/json
-      description: Update an encryption key's properties
+      description: Update a key's properties
       parameters:
-      - description: Encryption key ID
+      - description: Key ID
         in: path
         name: id
         required: true
@@ -4219,14 +4219,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.OpenAPIUpdateEncryptionKeyRequestJson'
+          $ref: '#/definitions/routes.OpenAPIUpdateKeyRequestJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.EncryptionKeyJson'
+            $ref: '#/definitions/routes.KeyJson'
         "400":
           description: Bad Request
           schema:
@@ -4245,14 +4245,14 @@ paths:
             $ref: '#/definitions/routes.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Update encryption key
+      summary: Update key
       tags:
-      - encryption_keys
-  /encryption-keys/{id}/annotations:
+      - keys
+  /keys/{id}/annotations:
     get:
-      description: Get all annotations associated with a specific encryption key
+      description: Get all annotations associated with a specific key
       parameters:
-      - description: Encryption key ID
+      - description: Key ID
         in: path
         name: id
         required: true
@@ -4284,14 +4284,14 @@ paths:
             $ref: '#/definitions/routes.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Get all annotations for an encryption key
+      summary: Get all annotations for a key
       tags:
-      - encryption_keys
-  /encryption-keys/{id}/annotations/{annotation}:
+      - keys
+  /keys/{id}/annotations/{annotation}:
     delete:
-      description: Delete a specific annotation by key from an encryption key
+      description: Delete a specific annotation by key from a key
       parameters:
-      - description: Encryption key ID
+      - description: Key ID
         in: path
         name: id
         required: true
@@ -4322,13 +4322,13 @@ paths:
             $ref: '#/definitions/routes.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Delete an annotation from an encryption key
+      summary: Delete an annotation from a key
       tags:
-      - encryption_keys
+      - keys
     get:
-      description: Get a specific annotation value by key for an encryption key
+      description: Get a specific annotation value by key for a key
       parameters:
-      - description: Encryption key ID
+      - description: Key ID
         in: path
         name: id
         required: true
@@ -4363,16 +4363,15 @@ paths:
             $ref: '#/definitions/routes.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Get a specific annotation for an encryption key
+      summary: Get a specific annotation for a key
       tags:
-      - encryption_keys
+      - keys
     put:
       consumes:
       - application/json
-      description: Set or update a specific annotation value by key for an encryption
-        key
+      description: Set or update a specific annotation value by key for a key
       parameters:
-      - description: Encryption key ID
+      - description: Key ID
         in: path
         name: id
         required: true
@@ -4417,14 +4416,14 @@ paths:
             $ref: '#/definitions/routes.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Set an annotation for an encryption key
+      summary: Set an annotation for a key
       tags:
-      - encryption_keys
-  /encryption-keys/{id}/labels:
+      - keys
+  /keys/{id}/labels:
     get:
-      description: Get all labels associated with a specific encryption key
+      description: Get all labels associated with a specific key
       parameters:
-      - description: Encryption key ID
+      - description: Key ID
         in: path
         name: id
         required: true
@@ -4456,14 +4455,14 @@ paths:
             $ref: '#/definitions/routes.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Get all labels for an encryption key
+      summary: Get all labels for a key
       tags:
-      - encryption_keys
-  /encryption-keys/{id}/labels/{label}:
+      - keys
+  /keys/{id}/labels/{label}:
     delete:
-      description: Delete a specific label by key from an encryption key
+      description: Delete a specific label by key from a key
       parameters:
-      - description: Encryption key ID
+      - description: Key ID
         in: path
         name: id
         required: true
@@ -4494,13 +4493,13 @@ paths:
             $ref: '#/definitions/routes.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Delete a label from an encryption key
+      summary: Delete a label from a key
       tags:
-      - encryption_keys
+      - keys
     get:
-      description: Get a specific label value by key for an encryption key
+      description: Get a specific label value by key for a key
       parameters:
-      - description: Encryption key ID
+      - description: Key ID
         in: path
         name: id
         required: true
@@ -4535,15 +4534,15 @@ paths:
             $ref: '#/definitions/routes.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Get a specific label for an encryption key
+      summary: Get a specific label for a key
       tags:
-      - encryption_keys
+      - keys
     put:
       consumes:
       - application/json
-      description: Set or update a specific label value by key for an encryption key
+      description: Set or update a specific label value by key for a key
       parameters:
-      - description: Encryption key ID
+      - description: Key ID
         in: path
         name: id
         required: true
@@ -4588,9 +4587,9 @@ paths:
             $ref: '#/definitions/routes.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Set a label for an encryption key
+      summary: Set a label for a key
       tags:
-      - encryption_keys
+      - keys
   /metrics/query:
     post:
       consumes:

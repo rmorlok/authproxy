@@ -11,8 +11,8 @@ import ConnectionDetail from "./pages/ConnectionDetail";
 import ConnectorVersionDetail from "./pages/ConnectorVersionDetail";
 import ActorsPage from "./pages/Actors";
 import ActorDetailPage from "./pages/ActorDetail";
-import EncryptionKeysPage from "./pages/EncryptionKeys";
-import EncryptionKeyDetail from "./pages/EncryptionKeyDetail";
+import KeysPage from "./pages/Keys";
+import KeyDetail from "./pages/KeyDetail";
 import RateLimitsPage from "./pages/RateLimits";
 import RateLimitDetail from "./pages/RateLimitDetail";
 import RateLimitDryRunPage from "./pages/RateLimitDryRun";
@@ -112,21 +112,21 @@ export const router = createBrowserRouter([
                 element: <RequestDetail />,
             },
             {
-                path: 'encryption-keys',
-                element: (<ListParent><EncryptionKeysPage /></ListParent>),
-                handle: { title: 'Encryption Keys' },
+                path: 'keys',
+                element: (<ListParent><KeysPage /></ListParent>),
+                handle: { title: 'Keys' },
             },
             {
-                path: 'encryption-keys/:id',
-                element: <EncryptionKeyDetail />,
+                path: 'keys/:id',
+                element: <KeyDetail />,
                 handle: [
                     {
-                        title: 'Encryption Keys',
-                        path: (_params: Params<string>) => `/encryption-keys`,
+                        title: 'Keys',
+                        path: (_params: Params<string>) => `/keys`,
                     },
                     {
                         attr: 'id',
-                        path: (params: Params<string>) => `/encryption-keys/${params.id}`,
+                        path: (params: Params<string>) => `/keys/${params.id}`,
                     },
                 ],
             },

@@ -11,14 +11,14 @@ import (
 	"github.com/rmorlok/authproxy/terraform/provider/internal/client"
 )
 
-var _ resource.Resource = &EncryptionKeyResource{}
-var _ resource.ResourceWithImportState = &EncryptionKeyResource{}
+var _ resource.Resource = &KeyResource{}
+var _ resource.ResourceWithImportState = &KeyResource{}
 
-type EncryptionKeyResource struct {
+type KeyResource struct {
 	client *client.Client
 }
 
-type EncryptionKeyResourceModel struct {
+type KeyResourceModel struct {
 	Id          types.String `tfsdk:"id"`
 	Namespace   types.String `tfsdk:"namespace"`
 	State       types.String `tfsdk:"state"`
@@ -28,20 +28,20 @@ type EncryptionKeyResourceModel struct {
 	UpdatedAt   types.String `tfsdk:"updated_at"`
 }
 
-func NewEncryptionKeyResource() resource.Resource {
-	return &EncryptionKeyResource{}
+func NewKeyResource() resource.Resource {
+	return &KeyResource{}
 }
 
-func (r *EncryptionKeyResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_encryption_key"
+func (r *KeyResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_key"
 }
 
-func (r *EncryptionKeyResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *KeyResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages an AuthProxy encryption key.",
+		Description: "Manages an AuthProxy key.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Description: "The encryption key ID.",
+				Description: "The key ID.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
@@ -55,18 +55,18 @@ func (r *EncryptionKeyResource) Schema(_ context.Context, _ resource.SchemaReque
 				},
 			},
 			"state": schema.StringAttribute{
-				Description: "The encryption key state (active, disabled).",
+				Description: "The key state (active, disabled).",
 				Optional:    true,
 				Computed:    true,
 			},
 			"labels": schema.MapAttribute{
-				Description: "Labels for the encryption key.",
+				Description: "Labels for the key.",
 				Optional:    true,
 				Computed:    true,
 				ElementType: types.StringType,
 			},
 			"annotations": schema.MapAttribute{
-				Description: "Annotations for the encryption key.",
+				Description: "Annotations for the key.",
 				Optional:    true,
 				Computed:    true,
 				ElementType: types.StringType,
@@ -77,15 +77,15 @@ func (r *EncryptionKeyResource) Schema(_ context.Context, _ resource.SchemaReque
 	}
 }
 
-func (r *EncryptionKeyResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *KeyResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
 	r.client = req.ProviderData.(*client.Client)
 }
 
-func (r *EncryptionKeyResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan EncryptionKeyResourceModel
+func (r *KeyResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	var plan KeyResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -101,44 +101,44 @@ func (r *EncryptionKeyResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 
-	ek, err := r.client.CreateEncryptionKey(ctx, client.CreateEncryptionKeyRequest{
+	ek, err := r.client.CreateKey(ctx, client.CreateKeyRequest{
 		Namespace:   plan.Namespace.ValueString(),
 		Labels:      labels,
 		Annotations: annotations,
 		KeyData:     map[string]interface{}{"random": true},
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to create encryption key", err.Error())
+		resp.Diagnostics.AddError("Failed to create key", err.Error())
 		return
 	}
 
-	setEncryptionKeyState(&plan, ek)
+	setKeyState(&plan, ek)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
-func (r *EncryptionKeyResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state EncryptionKeyResourceModel
+func (r *KeyResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	var state KeyResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	ek, err := r.client.GetEncryptionKey(ctx, state.Id.ValueString())
+	ek, err := r.client.GetKey(ctx, state.Id.ValueString())
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
 			return
 		}
-		resp.Diagnostics.AddError("Failed to read encryption key", err.Error())
+		resp.Diagnostics.AddError("Failed to read key", err.Error())
 		return
 	}
 
-	setEncryptionKeyState(&state, ek)
+	setKeyState(&state, ek)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
-func (r *EncryptionKeyResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan EncryptionKeyResourceModel
+func (r *KeyResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	var plan KeyResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -154,7 +154,7 @@ func (r *EncryptionKeyResource) Update(ctx context.Context, req resource.UpdateR
 		return
 	}
 
-	updateReq := client.UpdateEncryptionKeyRequest{}
+	updateReq := client.UpdateKeyRequest{}
 	if !plan.State.IsNull() && !plan.State.IsUnknown() {
 		s := plan.State.ValueString()
 		updateReq.State = &s
@@ -166,34 +166,34 @@ func (r *EncryptionKeyResource) Update(ctx context.Context, req resource.UpdateR
 		updateReq.Annotations = &annotations
 	}
 
-	ek, err := r.client.UpdateEncryptionKey(ctx, plan.Id.ValueString(), updateReq)
+	ek, err := r.client.UpdateKey(ctx, plan.Id.ValueString(), updateReq)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to update encryption key", err.Error())
+		resp.Diagnostics.AddError("Failed to update key", err.Error())
 		return
 	}
 
-	setEncryptionKeyState(&plan, ek)
+	setKeyState(&plan, ek)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
-func (r *EncryptionKeyResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var state EncryptionKeyResourceModel
+func (r *KeyResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	var state KeyResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	err := r.client.DeleteEncryptionKey(ctx, state.Id.ValueString())
+	err := r.client.DeleteKey(ctx, state.Id.ValueString())
 	if err != nil && !client.IsNotFound(err) {
-		resp.Diagnostics.AddError("Failed to delete encryption key", err.Error())
+		resp.Diagnostics.AddError("Failed to delete key", err.Error())
 	}
 }
 
-func (r *EncryptionKeyResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+func (r *KeyResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, pathAttr("id"), req.ID)...)
 }
 
-func setEncryptionKeyState(model *EncryptionKeyResourceModel, ek *client.EncryptionKey) {
+func setKeyState(model *KeyResourceModel, ek *client.Key) {
 	model.Id = types.StringValue(ek.Id)
 	model.Namespace = types.StringValue(ek.Namespace)
 	model.State = types.StringValue(ek.State)

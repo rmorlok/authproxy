@@ -30,14 +30,14 @@ provider "authproxy" {
 ## Resources
 
 - `authproxy_namespace` - Manages namespaces for multi-tenancy
-- `authproxy_encryption_key` - Manages encryption keys
+- `authproxy_key` - Manages keys
 - `authproxy_actor` - Manages actors (users/entities that own connections)
 - `authproxy_connector` - Manages connectors with automatic version lifecycle
 
 ## Data Sources
 
 - `data.authproxy_namespace` - Reads an existing namespace
-- `data.authproxy_encryption_key` - Reads an existing encryption key
+- `data.authproxy_key` - Reads an existing key
 - `data.authproxy_actor` - Reads an existing actor
 - `data.authproxy_connector` - Reads an existing connector
 

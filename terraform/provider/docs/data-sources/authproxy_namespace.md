@@ -17,7 +17,7 @@ data "authproxy_namespace" "production" {
 ## Attribute Reference
 
 - `state` - The namespace state.
-- `encryption_key_id` - The encryption key ID, if set.
+- `key_id` - The key ID, if set.
 - `labels` - Labels map.
 - `created_at` - Timestamp of creation.
 - `updated_at` - Timestamp of last update.

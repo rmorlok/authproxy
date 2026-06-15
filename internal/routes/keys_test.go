@@ -37,7 +37,7 @@ import (
 	clock "k8s.io/utils/clock/testing"
 )
 
-func TestEncryptionKeys(t *testing.T) {
+func TestKeys(t *testing.T) {
 	type TestSetup struct {
 		Gin      *gin.Engine
 		Cfg      config.C
@@ -66,7 +66,7 @@ func TestEncryptionKeys(t *testing.T) {
 
 		c := core.NewCoreService(cfg, db, e, rs, h, ac, test_utils.NewTestLogger())
 		require.NoError(t, c.Migrate(ctx))
-		ekr := NewEncryptionKeysRoutes(cfg, auth, c)
+		ekr := NewKeysRoutes(cfg, auth, c)
 		r := apgin.ForTest(nil)
 		ekr.Register(r)
 
@@ -80,8 +80,8 @@ func TestEncryptionKeys(t *testing.T) {
 			}
 	}
 
-	// Helper to create an encryption key via the API and return its ID
-	createKey := func(t *testing.T, tu *TestSetup, namespace string, labels map[string]string) EncryptionKeyJson {
+	// Helper to create an key via the API and return its ID
+	createKey := func(t *testing.T, tu *TestSetup, namespace string, labels map[string]string) KeyJson {
 		body := map[string]interface{}{
 			"namespace": namespace,
 			"key_data": map[string]interface{}{
@@ -95,7 +95,7 @@ func TestEncryptionKeys(t *testing.T) {
 		w := httptest.NewRecorder()
 		req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 			http.MethodPost,
-			"/encryption-keys",
+			"/keys",
 			bytes.NewReader(jsonBody),
 			"root",
 			"some-actor",
@@ -107,12 +107,12 @@ func TestEncryptionKeys(t *testing.T) {
 		tu.Gin.ServeHTTP(w, req)
 		require.Equal(t, http.StatusOK, w.Code)
 
-		var resp EncryptionKeyJson
+		var resp KeyJson
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 		return resp
 	}
 
-	t.Run("get encryption key", func(t *testing.T) {
+	t.Run("get key", func(t *testing.T) {
 		tu, done := setup(t, context.Background(), nil)
 		defer done()
 
@@ -120,7 +120,7 @@ func TestEncryptionKeys(t *testing.T) {
 
 		t.Run("unauthorized", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("/encryption-keys/%s", created.Id), nil)
+			req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("/keys/%s", created.Id), nil)
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -131,11 +131,11 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
-				fmt.Sprintf("/encryption-keys/%s", created.Id),
+				fmt.Sprintf("/keys/%s", created.Id),
 				nil,
 				"root",
 				"some-actor",
-				aschema.PermissionsSingle("root.**", "encryption_keys", "list"), // Wrong verb
+				aschema.PermissionsSingle("root.**", "keys", "list"), // Wrong verb
 			)
 			require.NoError(t, err)
 
@@ -148,7 +148,7 @@ func TestEncryptionKeys(t *testing.T) {
 			fakeId := apid.New(apid.PrefixKey)
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
-				fmt.Sprintf("/encryption-keys/%s", fakeId),
+				fmt.Sprintf("/keys/%s", fakeId),
 				nil,
 				"root",
 				"some-actor",
@@ -164,7 +164,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
-				fmt.Sprintf("/encryption-keys/%s", created.Id),
+				fmt.Sprintf("/keys/%s", created.Id),
 				nil,
 				"root",
 				"some-actor",
@@ -175,11 +175,11 @@ func TestEncryptionKeys(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp EncryptionKeyJson
+			var resp KeyJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			require.Equal(t, created.Id, resp.Id)
 			require.Equal(t, "root", resp.Namespace)
-			require.Equal(t, schemaapi.EncryptionKeyStateActive, resp.State)
+			require.Equal(t, schemaapi.KeyStateActive, resp.State)
 			require.Equal(t, "test", resp.Labels["env"])
 		})
 
@@ -187,11 +187,11 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
-				fmt.Sprintf("/encryption-keys/%s", created.Id),
+				fmt.Sprintf("/keys/%s", created.Id),
 				nil,
 				"root",
 				"some-actor",
-				aschema.PermissionsSingleWithResourceIds("root.**", "encryption_keys", "get", string(created.Id)),
+				aschema.PermissionsSingleWithResourceIds("root.**", "keys", "get", string(created.Id)),
 			)
 			require.NoError(t, err)
 
@@ -204,11 +204,11 @@ func TestEncryptionKeys(t *testing.T) {
 			fakeId := apid.New(apid.PrefixKey)
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
-				fmt.Sprintf("/encryption-keys/%s", created.Id),
+				fmt.Sprintf("/keys/%s", created.Id),
 				nil,
 				"root",
 				"some-actor",
-				aschema.PermissionsSingleWithResourceIds("root.**", "encryption_keys", "get", string(fakeId)),
+				aschema.PermissionsSingleWithResourceIds("root.**", "keys", "get", string(fakeId)),
 			)
 			require.NoError(t, err)
 
@@ -217,7 +217,7 @@ func TestEncryptionKeys(t *testing.T) {
 		})
 	})
 
-	t.Run("create encryption key", func(t *testing.T) {
+	t.Run("create key", func(t *testing.T) {
 		tu, done := setup(t, context.Background(), nil)
 		defer done()
 
@@ -231,7 +231,7 @@ func TestEncryptionKeys(t *testing.T) {
 			}
 			jsonBody, _ := json.Marshal(body)
 			w := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodPost, "/encryption-keys", bytes.NewReader(jsonBody))
+			req, err := http.NewRequest(http.MethodPost, "/keys", bytes.NewReader(jsonBody))
 			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/json")
 
@@ -251,11 +251,11 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPost,
-				"/encryption-keys",
+				"/keys",
 				bytes.NewReader(jsonBody),
 				"root",
 				"some-actor",
-				aschema.PermissionsSingle("root.**", "encryption_keys", "list"), // Wrong verb
+				aschema.PermissionsSingle("root.**", "keys", "list"), // Wrong verb
 			)
 			require.NoError(t, err)
 
@@ -274,7 +274,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPost,
-				"/encryption-keys",
+				"/keys",
 				bytes.NewReader(jsonBody),
 				"root",
 				"some-actor",
@@ -299,11 +299,11 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPost,
-				"/encryption-keys",
+				"/keys",
 				bytes.NewReader(jsonBody),
 				"root",
 				"some-actor",
-				aschema.PermissionsSingle("root.other.**", "encryption_keys", "create"), // Wrong namespace
+				aschema.PermissionsSingle("root.other.**", "keys", "create"), // Wrong namespace
 			)
 			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/json")
@@ -316,7 +316,7 @@ func TestEncryptionKeys(t *testing.T) {
 			created := createKey(t, tu, "root", map[string]string{"env": "prod", "team": "backend"})
 			require.True(t, created.Id.HasPrefix(apid.PrefixKey))
 			require.Equal(t, "root", created.Namespace)
-			require.Equal(t, schemaapi.EncryptionKeyStateActive, created.State)
+			require.Equal(t, schemaapi.KeyStateActive, created.State)
 			require.Equal(t, "prod", created.Labels["env"])
 			require.Equal(t, "backend", created.Labels["team"])
 		})
@@ -325,11 +325,11 @@ func TestEncryptionKeys(t *testing.T) {
 			created := createKey(t, tu, "root", nil)
 			require.True(t, created.Id.HasPrefix(apid.PrefixKey))
 			require.Equal(t, "root", created.Namespace)
-			require.Equal(t, schemaapi.EncryptionKeyStateActive, created.State)
+			require.Equal(t, schemaapi.KeyStateActive, created.State)
 		})
 	})
 
-	t.Run("list encryption keys", func(t *testing.T) {
+	t.Run("list keys", func(t *testing.T) {
 		now := time.Now()
 		c := clock.NewFakeClock(now)
 		ctx := apctx.WithClock(context.Background(), c)
@@ -354,7 +354,7 @@ func TestEncryptionKeys(t *testing.T) {
 
 		t.Run("unauthorized", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodGet, "/encryption-keys", nil)
+			req, err := http.NewRequest(http.MethodGet, "/keys", nil)
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -365,11 +365,11 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
-				"/encryption-keys",
+				"/keys",
 				nil,
 				"root",
 				"some-actor",
-				aschema.PermissionsSingle("root.**", "encryption_keys", "get"), // Wrong verb
+				aschema.PermissionsSingle("root.**", "keys", "get"), // Wrong verb
 			)
 			require.NoError(t, err)
 
@@ -381,18 +381,18 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
-				"/encryption-keys",
+				"/keys",
 				nil,
 				"root",
 				"some-actor",
-				aschema.PermissionsSingle("root.**", "encryption_keys", "list"),
+				aschema.PermissionsSingle("root.**", "keys", "list"),
 			)
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ListEncryptionKeysResponseJson
+			var resp ListKeysResponseJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			require.Len(t, resp.Items, 4)
 		})
@@ -403,7 +403,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPatch,
-				fmt.Sprintf("/encryption-keys/%s", key1.Id),
+				fmt.Sprintf("/keys/%s", key1.Id),
 				bytes.NewBufferString(body),
 				"root",
 				"some-actor",
@@ -418,7 +418,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w = httptest.NewRecorder()
 			req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
-				"/encryption-keys?state=active",
+				"/keys?state=active",
 				nil,
 				"root",
 				"some-actor",
@@ -429,11 +429,11 @@ func TestEncryptionKeys(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ListEncryptionKeysResponseJson
+			var resp ListKeysResponseJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			require.Len(t, resp.Items, 3)
 			for _, item := range resp.Items {
-				require.Equal(t, schemaapi.EncryptionKeyStateActive, item.State)
+				require.Equal(t, schemaapi.KeyStateActive, item.State)
 			}
 		})
 
@@ -441,7 +441,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
-				"/encryption-keys?limit=1",
+				"/keys?limit=1",
 				nil,
 				"root",
 				"some-actor",
@@ -452,7 +452,7 @@ func TestEncryptionKeys(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ListEncryptionKeysResponseJson
+			var resp ListKeysResponseJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			require.Len(t, resp.Items, 1)
 			require.NotEmpty(t, resp.Cursor)
@@ -461,7 +461,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w = httptest.NewRecorder()
 			req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
-				fmt.Sprintf("/encryption-keys?cursor=%s", url.QueryEscape(resp.Cursor)),
+				fmt.Sprintf("/keys?cursor=%s", url.QueryEscape(resp.Cursor)),
 				nil,
 				"root",
 				"some-actor",
@@ -472,7 +472,7 @@ func TestEncryptionKeys(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp2 ListEncryptionKeysResponseJson
+			var resp2 ListKeysResponseJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp2))
 			require.Len(t, resp2.Items, 1)
 		})
@@ -481,7 +481,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
-				"/encryption-keys?label_selector=env%3Dprod",
+				"/keys?label_selector=env%3Dprod",
 				nil,
 				"root",
 				"some-actor",
@@ -492,7 +492,7 @@ func TestEncryptionKeys(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ListEncryptionKeysResponseJson
+			var resp ListKeysResponseJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			require.Len(t, resp.Items, 1)
 			require.Equal(t, key2.Id, resp.Items[0].Id)
@@ -500,7 +500,7 @@ func TestEncryptionKeys(t *testing.T) {
 		})
 	})
 
-	t.Run("update encryption key", func(t *testing.T) {
+	t.Run("update key", func(t *testing.T) {
 		tu, done := setup(t, context.Background(), nil)
 		defer done()
 
@@ -509,7 +509,7 @@ func TestEncryptionKeys(t *testing.T) {
 		t.Run("unauthorized", func(t *testing.T) {
 			body := `{"state": "disabled"}`
 			w := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodPatch, fmt.Sprintf("/encryption-keys/%s", created.Id), bytes.NewBufferString(body))
+			req, err := http.NewRequest(http.MethodPatch, fmt.Sprintf("/keys/%s", created.Id), bytes.NewBufferString(body))
 			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/json")
 
@@ -522,11 +522,11 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPatch,
-				fmt.Sprintf("/encryption-keys/%s", created.Id),
+				fmt.Sprintf("/keys/%s", created.Id),
 				bytes.NewBufferString(body),
 				"root",
 				"some-actor",
-				aschema.PermissionsSingle("root.**", "encryption_keys", "get"), // Wrong verb
+				aschema.PermissionsSingle("root.**", "keys", "get"), // Wrong verb
 			)
 			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/json")
@@ -541,7 +541,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPatch,
-				fmt.Sprintf("/encryption-keys/%s", fakeId),
+				fmt.Sprintf("/keys/%s", fakeId),
 				bytes.NewBufferString(body),
 				"root",
 				"some-actor",
@@ -559,7 +559,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPatch,
-				fmt.Sprintf("/encryption-keys/%s", created.Id),
+				fmt.Sprintf("/keys/%s", created.Id),
 				bytes.NewBufferString(body),
 				"root",
 				"some-actor",
@@ -577,7 +577,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPatch,
-				fmt.Sprintf("/encryption-keys/%s", created.Id),
+				fmt.Sprintf("/keys/%s", created.Id),
 				bytes.NewBufferString(body),
 				"root",
 				"some-actor",
@@ -595,7 +595,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPatch,
-				fmt.Sprintf("/encryption-keys/%s", created.Id),
+				fmt.Sprintf("/keys/%s", created.Id),
 				bytes.NewBufferString(body),
 				"root",
 				"some-actor",
@@ -607,9 +607,9 @@ func TestEncryptionKeys(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp EncryptionKeyJson
+			var resp KeyJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-			require.Equal(t, schemaapi.EncryptionKeyStateDisabled, resp.State)
+			require.Equal(t, schemaapi.KeyStateDisabled, resp.State)
 
 			// Verify in database
 			got, err := tu.Db.GetKey(context.Background(), created.Id)
@@ -622,7 +622,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPatch,
-				fmt.Sprintf("/encryption-keys/%s", created.Id),
+				fmt.Sprintf("/keys/%s", created.Id),
 				bytes.NewBufferString(body),
 				"root",
 				"some-actor",
@@ -641,7 +641,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPatch,
-				fmt.Sprintf("/encryption-keys/%s", created.Id),
+				fmt.Sprintf("/keys/%s", created.Id),
 				bytes.NewBufferString(body),
 				"root",
 				"some-actor",
@@ -653,7 +653,7 @@ func TestEncryptionKeys(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp EncryptionKeyJson
+			var resp KeyJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			require.Equal(t, "production", resp.Labels["env"])
 			require.Equal(t, "backend", resp.Labels["team"])
@@ -664,7 +664,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPatch,
-				fmt.Sprintf("/encryption-keys/%s", created.Id),
+				fmt.Sprintf("/keys/%s", created.Id),
 				bytes.NewBufferString(body),
 				"root",
 				"some-actor",
@@ -676,9 +676,9 @@ func TestEncryptionKeys(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp EncryptionKeyJson
+			var resp KeyJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-			require.Equal(t, schemaapi.EncryptionKeyStateActive, resp.State)
+			require.Equal(t, schemaapi.KeyStateActive, resp.State)
 			respUser, _ := database.SplitUserAndApxyLabels(database.Labels(resp.Labels))
 			require.Equal(t, database.Labels{"new-label": "value"}, respUser)
 		})
@@ -688,7 +688,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPatch,
-				fmt.Sprintf("/encryption-keys/%s", created.Id),
+				fmt.Sprintf("/keys/%s", created.Id),
 				bytes.NewBufferString(body),
 				"root",
 				"some-actor",
@@ -700,14 +700,14 @@ func TestEncryptionKeys(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp EncryptionKeyJson
+			var resp KeyJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			respUser, _ := database.SplitUserAndApxyLabels(database.Labels(resp.Labels))
 			require.Equal(t, database.Labels{"new-label": "value"}, respUser)
 		})
 	})
 
-	t.Run("delete encryption key", func(t *testing.T) {
+	t.Run("delete key", func(t *testing.T) {
 		tu, done := setup(t, context.Background(), nil)
 		defer done()
 
@@ -715,7 +715,7 @@ func TestEncryptionKeys(t *testing.T) {
 
 		t.Run("unauthorized", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("/encryption-keys/%s", created.Id), nil)
+			req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("/keys/%s", created.Id), nil)
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -726,11 +726,11 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodDelete,
-				fmt.Sprintf("/encryption-keys/%s", created.Id),
+				fmt.Sprintf("/keys/%s", created.Id),
 				nil,
 				"root",
 				"some-actor",
-				aschema.PermissionsSingle("root.**", "encryption_keys", "get"), // Wrong verb
+				aschema.PermissionsSingle("root.**", "keys", "get"), // Wrong verb
 			)
 			require.NoError(t, err)
 
@@ -743,7 +743,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodDelete,
-				fmt.Sprintf("/encryption-keys/%s", fakeId),
+				fmt.Sprintf("/keys/%s", fakeId),
 				nil,
 				"root",
 				"some-actor",
@@ -759,7 +759,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodDelete,
-				fmt.Sprintf("/encryption-keys/%s", created.Id),
+				fmt.Sprintf("/keys/%s", created.Id),
 				nil,
 				"root",
 				"some-actor",
@@ -774,7 +774,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w = httptest.NewRecorder()
 			req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
-				fmt.Sprintf("/encryption-keys/%s", created.Id),
+				fmt.Sprintf("/keys/%s", created.Id),
 				nil,
 				"root",
 				"some-actor",
@@ -790,7 +790,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodDelete,
-				fmt.Sprintf("/encryption-keys/%s", database.GlobalKeyID),
+				fmt.Sprintf("/keys/%s", database.GlobalKeyID),
 				nil,
 				"root",
 				"some-actor",
@@ -803,14 +803,14 @@ func TestEncryptionKeys(t *testing.T) {
 
 			var errResp httperr.ErrorResponse
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &errResp))
-			require.Contains(t, errResp.Error, "global encryption key cannot be deleted")
+			require.Contains(t, errResp.Error, "global key cannot be deleted")
 		})
 
 		t.Run("delete is idempotent", func(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodDelete,
-				fmt.Sprintf("/encryption-keys/%s", created.Id),
+				fmt.Sprintf("/keys/%s", created.Id),
 				nil,
 				"root",
 				"some-actor",
@@ -832,7 +832,7 @@ func TestEncryptionKeys(t *testing.T) {
 
 		t.Run("unauthorized", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("/encryption-keys/%s/labels", withLabels.Id), nil)
+			req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("/keys/%s/labels", withLabels.Id), nil)
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -844,7 +844,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
-				fmt.Sprintf("/encryption-keys/%s/labels", fakeId),
+				fmt.Sprintf("/keys/%s/labels", fakeId),
 				nil,
 				"root",
 				"some-actor",
@@ -860,7 +860,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
-				fmt.Sprintf("/encryption-keys/%s/labels", withLabels.Id),
+				fmt.Sprintf("/keys/%s/labels", withLabels.Id),
 				nil,
 				"root",
 				"some-actor",
@@ -881,7 +881,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
-				fmt.Sprintf("/encryption-keys/%s/labels", withoutLabels.Id),
+				fmt.Sprintf("/keys/%s/labels", withoutLabels.Id),
 				nil,
 				"root",
 				"some-actor",
@@ -907,7 +907,7 @@ func TestEncryptionKeys(t *testing.T) {
 
 		t.Run("unauthorized", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("/encryption-keys/%s/labels/env", created.Id), nil)
+			req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("/keys/%s/labels/env", created.Id), nil)
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -919,7 +919,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
-				fmt.Sprintf("/encryption-keys/%s/labels/env", fakeId),
+				fmt.Sprintf("/keys/%s/labels/env", fakeId),
 				nil,
 				"root",
 				"some-actor",
@@ -935,7 +935,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
-				fmt.Sprintf("/encryption-keys/%s/labels/nonexistent", created.Id),
+				fmt.Sprintf("/keys/%s/labels/nonexistent", created.Id),
 				nil,
 				"root",
 				"some-actor",
@@ -951,7 +951,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
-				fmt.Sprintf("/encryption-keys/%s/labels/env", created.Id),
+				fmt.Sprintf("/keys/%s/labels/env", created.Id),
 				nil,
 				"root",
 				"some-actor",
@@ -978,7 +978,7 @@ func TestEncryptionKeys(t *testing.T) {
 		t.Run("unauthorized", func(t *testing.T) {
 			body := `{"value": "production"}`
 			w := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("/encryption-keys/%s/labels/env", created.Id), bytes.NewBufferString(body))
+			req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("/keys/%s/labels/env", created.Id), bytes.NewBufferString(body))
 			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/json")
 
@@ -991,11 +991,11 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
-				fmt.Sprintf("/encryption-keys/%s/labels/env", created.Id),
+				fmt.Sprintf("/keys/%s/labels/env", created.Id),
 				bytes.NewBufferString(body),
 				"root",
 				"some-actor",
-				aschema.PermissionsSingle("root.**", "encryption_keys", "get"), // Wrong verb
+				aschema.PermissionsSingle("root.**", "keys", "get"), // Wrong verb
 			)
 			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/json")
@@ -1010,7 +1010,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
-				fmt.Sprintf("/encryption-keys/%s/labels/env", fakeId),
+				fmt.Sprintf("/keys/%s/labels/env", fakeId),
 				bytes.NewBufferString(body),
 				"root",
 				"some-actor",
@@ -1028,7 +1028,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
-				fmt.Sprintf("/encryption-keys/%s/labels/env", created.Id),
+				fmt.Sprintf("/keys/%s/labels/env", created.Id),
 				bytes.NewBufferString(body),
 				"root",
 				"some-actor",
@@ -1046,7 +1046,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
-				fmt.Sprintf("/encryption-keys/%s/labels/env", created.Id),
+				fmt.Sprintf("/keys/%s/labels/env", created.Id),
 				bytes.NewBufferString(body),
 				"root",
 				"some-actor",
@@ -1074,7 +1074,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
-				fmt.Sprintf("/encryption-keys/%s/labels/env", created.Id),
+				fmt.Sprintf("/keys/%s/labels/env", created.Id),
 				bytes.NewBufferString(body),
 				"root",
 				"some-actor",
@@ -1099,7 +1099,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
-				fmt.Sprintf("/encryption-keys/%s/labels/env", ekWithLabels.Id),
+				fmt.Sprintf("/keys/%s/labels/env", ekWithLabels.Id),
 				bytes.NewBufferString(body),
 				"root",
 				"some-actor",
@@ -1127,7 +1127,7 @@ func TestEncryptionKeys(t *testing.T) {
 
 		t.Run("unauthorized", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("/encryption-keys/%s/labels/env", created.Id), nil)
+			req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("/keys/%s/labels/env", created.Id), nil)
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -1138,11 +1138,11 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodDelete,
-				fmt.Sprintf("/encryption-keys/%s/labels/env", created.Id),
+				fmt.Sprintf("/keys/%s/labels/env", created.Id),
 				nil,
 				"root",
 				"some-actor",
-				aschema.PermissionsSingle("root.**", "encryption_keys", "get"), // Wrong verb
+				aschema.PermissionsSingle("root.**", "keys", "get"), // Wrong verb
 			)
 			require.NoError(t, err)
 
@@ -1155,7 +1155,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodDelete,
-				fmt.Sprintf("/encryption-keys/%s/labels/env", fakeId),
+				fmt.Sprintf("/keys/%s/labels/env", fakeId),
 				nil,
 				"root",
 				"some-actor",
@@ -1173,7 +1173,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodDelete,
-				fmt.Sprintf("/encryption-keys/%s/labels/to-delete", ekToDelete.Id),
+				fmt.Sprintf("/keys/%s/labels/to-delete", ekToDelete.Id),
 				nil,
 				"root",
 				"some-actor",
@@ -1199,7 +1199,7 @@ func TestEncryptionKeys(t *testing.T) {
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 					http.MethodDelete,
-					fmt.Sprintf("/encryption-keys/%s/labels/label", ekIdempotent.Id),
+					fmt.Sprintf("/keys/%s/labels/label", ekIdempotent.Id),
 					nil,
 					"root",
 					"some-actor",
@@ -1219,7 +1219,7 @@ func TestEncryptionKeys(t *testing.T) {
 		})
 	})
 
-	t.Run("update encryption key with annotations", func(t *testing.T) {
+	t.Run("update key with annotations", func(t *testing.T) {
 		tu, done := setup(t, context.Background(), nil)
 		defer done()
 
@@ -1230,7 +1230,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPatch,
-				fmt.Sprintf("/encryption-keys/%s", created.Id),
+				fmt.Sprintf("/keys/%s", created.Id),
 				bytes.NewBufferString(body),
 				"root",
 				"some-actor",
@@ -1242,7 +1242,7 @@ func TestEncryptionKeys(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp EncryptionKeyJson
+			var resp KeyJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			require.Equal(t, "primary key", resp.Annotations["description"])
 			require.Equal(t, "team-a", resp.Annotations["owner"])
@@ -1253,7 +1253,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPatch,
-				fmt.Sprintf("/encryption-keys/%s", created.Id),
+				fmt.Sprintf("/keys/%s", created.Id),
 				bytes.NewBufferString(body),
 				"root",
 				"some-actor",
@@ -1265,7 +1265,7 @@ func TestEncryptionKeys(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp EncryptionKeyJson
+			var resp KeyJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			require.Equal(t, "primary key", resp.Annotations["description"])
 			require.Equal(t, "team-a", resp.Annotations["owner"])
@@ -1276,7 +1276,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPatch,
-				fmt.Sprintf("/encryption-keys/%s", created.Id),
+				fmt.Sprintf("/keys/%s", created.Id),
 				bytes.NewBufferString(body),
 				"root",
 				"some-actor",
@@ -1288,7 +1288,7 @@ func TestEncryptionKeys(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp EncryptionKeyJson
+			var resp KeyJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			require.Equal(t, map[string]string{"new-key": "new-value"}, resp.Annotations)
 		})
@@ -1305,7 +1305,7 @@ func TestEncryptionKeys(t *testing.T) {
 		w := httptest.NewRecorder()
 		req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 			http.MethodPatch,
-			fmt.Sprintf("/encryption-keys/%s", created.Id),
+			fmt.Sprintf("/keys/%s", created.Id),
 			bytes.NewBufferString(body),
 			"root",
 			"some-actor",
@@ -1320,7 +1320,7 @@ func TestEncryptionKeys(t *testing.T) {
 
 		t.Run("unauthorized", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("/encryption-keys/%s/annotations", created.Id), nil)
+			req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("/keys/%s/annotations", created.Id), nil)
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -1332,7 +1332,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
-				fmt.Sprintf("/encryption-keys/%s/annotations", fakeId),
+				fmt.Sprintf("/keys/%s/annotations", fakeId),
 				nil,
 				"root",
 				"some-actor",
@@ -1348,7 +1348,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
-				fmt.Sprintf("/encryption-keys/%s/annotations", created.Id),
+				fmt.Sprintf("/keys/%s/annotations", created.Id),
 				nil,
 				"root",
 				"some-actor",
@@ -1369,7 +1369,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
-				fmt.Sprintf("/encryption-keys/%s/annotations", withoutAnnotations.Id),
+				fmt.Sprintf("/keys/%s/annotations", withoutAnnotations.Id),
 				nil,
 				"root",
 				"some-actor",
@@ -1397,7 +1397,7 @@ func TestEncryptionKeys(t *testing.T) {
 		w := httptest.NewRecorder()
 		req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 			http.MethodPatch,
-			fmt.Sprintf("/encryption-keys/%s", created.Id),
+			fmt.Sprintf("/keys/%s", created.Id),
 			bytes.NewBufferString(body),
 			"root",
 			"some-actor",
@@ -1410,7 +1410,7 @@ func TestEncryptionKeys(t *testing.T) {
 
 		t.Run("unauthorized", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("/encryption-keys/%s/annotations/description", created.Id), nil)
+			req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("/keys/%s/annotations/description", created.Id), nil)
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -1422,7 +1422,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
-				fmt.Sprintf("/encryption-keys/%s/annotations/description", fakeId),
+				fmt.Sprintf("/keys/%s/annotations/description", fakeId),
 				nil,
 				"root",
 				"some-actor",
@@ -1438,7 +1438,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
-				fmt.Sprintf("/encryption-keys/%s/annotations/nonexistent", created.Id),
+				fmt.Sprintf("/keys/%s/annotations/nonexistent", created.Id),
 				nil,
 				"root",
 				"some-actor",
@@ -1454,7 +1454,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
-				fmt.Sprintf("/encryption-keys/%s/annotations/description", created.Id),
+				fmt.Sprintf("/keys/%s/annotations/description", created.Id),
 				nil,
 				"root",
 				"some-actor",
@@ -1481,7 +1481,7 @@ func TestEncryptionKeys(t *testing.T) {
 		t.Run("unauthorized", func(t *testing.T) {
 			body := `{"value": "my description"}`
 			w := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("/encryption-keys/%s/annotations/description", created.Id), bytes.NewBufferString(body))
+			req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("/keys/%s/annotations/description", created.Id), bytes.NewBufferString(body))
 			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/json")
 
@@ -1494,11 +1494,11 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
-				fmt.Sprintf("/encryption-keys/%s/annotations/description", created.Id),
+				fmt.Sprintf("/keys/%s/annotations/description", created.Id),
 				bytes.NewBufferString(body),
 				"root",
 				"some-actor",
-				aschema.PermissionsSingle("root.**", "encryption_keys", "get"), // Wrong verb
+				aschema.PermissionsSingle("root.**", "keys", "get"), // Wrong verb
 			)
 			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/json")
@@ -1513,7 +1513,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
-				fmt.Sprintf("/encryption-keys/%s/annotations/description", fakeId),
+				fmt.Sprintf("/keys/%s/annotations/description", fakeId),
 				bytes.NewBufferString(body),
 				"root",
 				"some-actor",
@@ -1531,7 +1531,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
-				fmt.Sprintf("/encryption-keys/%s/annotations/description", created.Id),
+				fmt.Sprintf("/keys/%s/annotations/description", created.Id),
 				bytes.NewBufferString(body),
 				"root",
 				"some-actor",
@@ -1545,11 +1545,11 @@ func TestEncryptionKeys(t *testing.T) {
 		})
 
 		t.Run("success - add new annotation", func(t *testing.T) {
-			body := `{"value": "primary encryption key"}`
+			body := `{"value": "primary key"}`
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
-				fmt.Sprintf("/encryption-keys/%s/annotations/description", created.Id),
+				fmt.Sprintf("/keys/%s/annotations/description", created.Id),
 				bytes.NewBufferString(body),
 				"root",
 				"some-actor",
@@ -1564,12 +1564,12 @@ func TestEncryptionKeys(t *testing.T) {
 			var resp key_value.KeyValueJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			require.Equal(t, "description", resp.Key)
-			require.Equal(t, "primary encryption key", resp.Value)
+			require.Equal(t, "primary key", resp.Value)
 
 			// Verify in database
 			got, err := tu.Db.GetKey(context.Background(), created.Id)
 			require.NoError(t, err)
-			require.Equal(t, "primary encryption key", got.Annotations["description"])
+			require.Equal(t, "primary key", got.Annotations["description"])
 		})
 
 		t.Run("success - update existing annotation", func(t *testing.T) {
@@ -1577,7 +1577,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
-				fmt.Sprintf("/encryption-keys/%s/annotations/description", created.Id),
+				fmt.Sprintf("/keys/%s/annotations/description", created.Id),
 				bytes.NewBufferString(body),
 				"root",
 				"some-actor",
@@ -1603,7 +1603,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPatch,
-				fmt.Sprintf("/encryption-keys/%s", ekWithAnnotations.Id),
+				fmt.Sprintf("/keys/%s", ekWithAnnotations.Id),
 				bytes.NewBufferString(body),
 				"root",
 				"some-actor",
@@ -1619,7 +1619,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w = httptest.NewRecorder()
 			req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
-				fmt.Sprintf("/encryption-keys/%s/annotations/description", ekWithAnnotations.Id),
+				fmt.Sprintf("/keys/%s/annotations/description", ekWithAnnotations.Id),
 				bytes.NewBufferString(body),
 				"root",
 				"some-actor",
@@ -1649,7 +1649,7 @@ func TestEncryptionKeys(t *testing.T) {
 		w := httptest.NewRecorder()
 		req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 			http.MethodPatch,
-			fmt.Sprintf("/encryption-keys/%s", created.Id),
+			fmt.Sprintf("/keys/%s", created.Id),
 			bytes.NewBufferString(body),
 			"root",
 			"some-actor",
@@ -1662,7 +1662,7 @@ func TestEncryptionKeys(t *testing.T) {
 
 		t.Run("unauthorized", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("/encryption-keys/%s/annotations/description", created.Id), nil)
+			req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("/keys/%s/annotations/description", created.Id), nil)
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -1673,11 +1673,11 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodDelete,
-				fmt.Sprintf("/encryption-keys/%s/annotations/description", created.Id),
+				fmt.Sprintf("/keys/%s/annotations/description", created.Id),
 				nil,
 				"root",
 				"some-actor",
-				aschema.PermissionsSingle("root.**", "encryption_keys", "get"), // Wrong verb
+				aschema.PermissionsSingle("root.**", "keys", "get"), // Wrong verb
 			)
 			require.NoError(t, err)
 
@@ -1690,7 +1690,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodDelete,
-				fmt.Sprintf("/encryption-keys/%s/annotations/description", fakeId),
+				fmt.Sprintf("/keys/%s/annotations/description", fakeId),
 				nil,
 				"root",
 				"some-actor",
@@ -1710,7 +1710,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPatch,
-				fmt.Sprintf("/encryption-keys/%s", ekToDelete.Id),
+				fmt.Sprintf("/keys/%s", ekToDelete.Id),
 				bytes.NewBufferString(body),
 				"root",
 				"some-actor",
@@ -1724,7 +1724,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w = httptest.NewRecorder()
 			req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodDelete,
-				fmt.Sprintf("/encryption-keys/%s/annotations/to-delete", ekToDelete.Id),
+				fmt.Sprintf("/keys/%s/annotations/to-delete", ekToDelete.Id),
 				nil,
 				"root",
 				"some-actor",
@@ -1751,7 +1751,7 @@ func TestEncryptionKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPatch,
-				fmt.Sprintf("/encryption-keys/%s", ekIdempotent.Id),
+				fmt.Sprintf("/keys/%s", ekIdempotent.Id),
 				bytes.NewBufferString(body),
 				"root",
 				"some-actor",
@@ -1766,7 +1766,7 @@ func TestEncryptionKeys(t *testing.T) {
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 					http.MethodDelete,
-					fmt.Sprintf("/encryption-keys/%s/annotations/annotation", ekIdempotent.Id),
+					fmt.Sprintf("/keys/%s/annotations/annotation", ekIdempotent.Id),
 					nil,
 					"root",
 					"some-actor",

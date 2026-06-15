@@ -22,29 +22,29 @@ import MoreVertIcon from '@mui/icons-material/MoreVert';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import dayjs from 'dayjs';
 import Tooltip from '@mui/material/Tooltip';
-import {EncryptionKey, encryptionKeys, EncryptionKeyState} from '@authproxy/api';
+import {Key, keys, KeyState} from '@authproxy/api';
 import { useNavigate } from "react-router-dom";
 import AnnotationsEditor from "./AnnotationsEditor";
 
-function StateChip({state}: { state: EncryptionKeyState }) {
-  const colors: Record<EncryptionKeyState, "default" | "success" | "error" | "info" | "warning" | "primary" | "secondary"> = {
-    [EncryptionKeyState.ACTIVE]: 'success',
-    [EncryptionKeyState.DISABLED]: 'default',
+function StateChip({state}: { state: KeyState }) {
+  const colors: Record<KeyState, "default" | "success" | "error" | "info" | "warning" | "primary" | "secondary"> = {
+    [KeyState.ACTIVE]: 'success',
+    [KeyState.DISABLED]: 'default',
   };
   return <Chip label={state} color={colors[state]} size="small"/>;
 }
 
-export default function EncryptionKeyDetail({encryptionKeyId}: { encryptionKeyId: string }) {
+export default function KeyDetail({keyId}: { keyId: string }) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [ek, setEk] = useState<EncryptionKey | null>(null);
+  const [ek, setEk] = useState<Key | null>(null);
 
   // Actions UI state
   const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
   const [changeStateOpen, setChangeStateOpen] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
-  const [selectedState, setSelectedState] = useState<EncryptionKeyState | ''>('');
+  const [selectedState, setSelectedState] = useState<KeyState | ''>('');
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -60,17 +60,17 @@ export default function EncryptionKeyDetail({encryptionKeyId}: { encryptionKeyId
     }
   };
 
-  const stateOptions = useMemo(() => Object.values(EncryptionKeyState), []);
+  const stateOptions = useMemo(() => Object.values(KeyState), []);
 
   const fetchKey = () => {
     setLoading(true);
     setError(null);
-    encryptionKeys.get(encryptionKeyId)
+    keys.get(keyId)
       .then(res => {
         setEk(res.data);
       })
       .catch(err => {
-        const msg = err?.response?.data?.error || err.message || 'Failed to load encryption key';
+        const msg = err?.response?.data?.error || err.message || 'Failed to load key';
         setError(msg);
       })
       .finally(() => setLoading(false));
@@ -80,21 +80,21 @@ export default function EncryptionKeyDetail({encryptionKeyId}: { encryptionKeyId
     let cancelled = false;
     setLoading(true);
     setError(null);
-    encryptionKeys.get(encryptionKeyId)
+    keys.get(keyId)
       .then(res => {
         if (cancelled) return;
         setEk(res.data);
       })
       .catch(err => {
         if (cancelled) return;
-        const msg = err?.response?.data?.error || err.message || 'Failed to load encryption key';
+        const msg = err?.response?.data?.error || err.message || 'Failed to load key';
         setError(msg);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [encryptionKeyId]);
+  }, [keyId]);
 
   if (loading) return (<Box sx={{display: 'flex', justifyContent: 'center', p: 4}}><CircularProgress/></Box>);
   if (error) return (<Alert severity="error">{error}</Alert>);
@@ -115,7 +115,7 @@ export default function EncryptionKeyDetail({encryptionKeyId}: { encryptionKeyId
     setActionError(null);
     setActionLoading(true);
     try {
-      await encryptionKeys.update(ek.id, { state: selectedState as EncryptionKeyState });
+      await keys.update(ek.id, { state: selectedState as KeyState });
       setChangeStateOpen(false);
       fetchKey();
     } catch (err: any) {
@@ -137,11 +137,11 @@ export default function EncryptionKeyDetail({encryptionKeyId}: { encryptionKeyId
     setActionError(null);
     setActionLoading(true);
     try {
-      await encryptionKeys.delete(ek.id);
+      await keys.delete(ek.id);
       setConfirmDeleteOpen(false);
-      navigate('/encryption-keys');
+      navigate('/keys');
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err.message || 'Failed to delete encryption key';
+      const msg = err?.response?.data?.error || err.message || 'Failed to delete key';
       setActionError(msg);
     } finally {
       setActionLoading(false);
@@ -151,7 +151,7 @@ export default function EncryptionKeyDetail({encryptionKeyId}: { encryptionKeyId
   return (
     <Stack spacing={2} sx={{p: 2}}>
       <Stack direction="row" justifyContent="space-between" alignItems="center">
-        <Typography variant="h5">Encryption Key</Typography>
+        <Typography variant="h5">Key</Typography>
         <Stack direction="row" spacing={1} alignItems="center">
           <StateChip state={ek.state}/>
           <IconButton aria-label="actions" onClick={openMenu} size="small">
@@ -187,7 +187,7 @@ export default function EncryptionKeyDetail({encryptionKeyId}: { encryptionKeyId
             {ek.id}
           </Typography>
           <Tooltip title={copied ? 'Copied!' : 'Copy'} placement="top">
-            <IconButton size="small" aria-label="Copy encryption key id" onClick={handleCopyId}>
+            <IconButton size="small" aria-label="Copy key id" onClick={handleCopyId}>
               <ContentCopyIcon fontSize="inherit" />
             </IconButton>
           </Tooltip>
@@ -226,18 +226,18 @@ export default function EncryptionKeyDetail({encryptionKeyId}: { encryptionKeyId
       <AnnotationsEditor
         annotations={ek.annotations}
         onPut={async (key, value) => {
-          await encryptionKeys.putAnnotation(ek.id, key, value);
+          await keys.putAnnotation(ek.id, key, value);
           fetchKey();
         }}
         onDelete={async (key) => {
-          await encryptionKeys.deleteAnnotation(ek.id, key);
+          await keys.deleteAnnotation(ek.id, key);
           fetchKey();
         }}
       />
 
       {/* Change state dialog */}
       <Dialog open={changeStateOpen} onClose={() => !actionLoading && setChangeStateOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Change encryption key state</DialogTitle>
+        <DialogTitle>Change key state</DialogTitle>
         <DialogContent>
           <FormControl fullWidth sx={{mt: 2}}>
             <InputLabel id="change-state-label">State</InputLabel>
@@ -246,14 +246,14 @@ export default function EncryptionKeyDetail({encryptionKeyId}: { encryptionKeyId
               labelId="change-state-label"
               label="State"
               value={selectedState || ''}
-              onChange={(e) => setSelectedState((e.target as HTMLSelectElement).value as EncryptionKeyState)}
+              onChange={(e) => setSelectedState((e.target as HTMLSelectElement).value as KeyState)}
             >
               <option aria-label="None" value="" />
               {stateOptions.map(s => (
                 <option key={s} value={s}>{s}</option>
               ))}
             </Select>
-            <FormHelperText>Select the new state for this encryption key.</FormHelperText>
+            <FormHelperText>Select the new state for this key.</FormHelperText>
           </FormControl>
         </DialogContent>
         <DialogActions>
@@ -264,10 +264,10 @@ export default function EncryptionKeyDetail({encryptionKeyId}: { encryptionKeyId
 
       {/* Delete confirmation dialog */}
       <Dialog open={confirmDeleteOpen} onClose={() => !actionLoading && setConfirmDeleteOpen(false)}>
-        <DialogTitle>Delete encryption key</DialogTitle>
+        <DialogTitle>Delete key</DialogTitle>
         <DialogContent>
           <Typography variant="body2">
-            Are you sure you want to delete this encryption key? This action cannot be undone.
+            Are you sure you want to delete this key? This action cannot be undone.
           </Typography>
         </DialogContent>
         <DialogActions>

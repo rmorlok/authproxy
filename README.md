@@ -184,13 +184,13 @@ This means the system can always determine which key encrypted a given value wit
 
 #### Namespace-Scoped Keys
 
-Encryption keys follow the same hierarchical namespace model as the rest of AuthProxy. A global AES key (configured at startup) serves as the root, and each namespace can optionally define its own encryption key. When encrypting data for a namespace, the system resolves the key by walking up the namespace tree:
+Keys used for data encryption follow the same hierarchical namespace model as the rest of AuthProxy. A global AES key (configured at startup) serves as the root, and each namespace can optionally define its own key. When encrypting data for a namespace, the system resolves the key by walking up the namespace tree:
 
 ```
 root.tenant-a.app1  →  root.tenant-a  →  root  →  global key
 ```
 
-The first namespace with an assigned encryption key is used. Child namespaces inherit their parent's key unless they explicitly set their own. This enables **per-tenant key isolation**: a customer can bring their own encryption key so that their data is cryptographically separated from other tenants, even within a shared database.
+The first namespace with an assigned key is used. Child namespaces inherit their parent's key unless they explicitly set their own. This enables **per-tenant key isolation**: a customer can bring their own key so that their data is cryptographically separated from other tenants, even within a shared database.
 
 Keys can be sourced from external secret managers including AWS Secrets Manager, GCP Secret Manager, HashiCorp Vault, environment variables, or the filesystem — allowing customers to retain control of their key material.
 

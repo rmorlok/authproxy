@@ -446,7 +446,7 @@ func TestRateLimits(t *testing.T) {
 		})
 
 		t.Run("delete already-deleted returns 204", func(t *testing.T) {
-			// The encryption-keys delete returns 204 even when the row is
+			// The keys delete returns 204 even when the row is
 			// already gone; rate limits should match.
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(

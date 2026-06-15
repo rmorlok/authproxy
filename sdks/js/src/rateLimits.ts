@@ -207,7 +207,7 @@ export const dryRunRateLimit = (req: DryRunRateLimitRequest) => {
     return client.post<DryRunRateLimitResponse>('/api/v1/rate-limits/_dry_run', req);
 };
 
-// --- Label & annotation sub-resources, identical shape to encryption keys. ---
+// --- Label & annotation sub-resources, identical shape to keys. ---
 
 export interface RateLimitLabel {
     key: string;
