@@ -42,8 +42,11 @@ func createDataEncryptionKeyForIntegrationTest(
 		Provider:        string(generated.Provider),
 		ProviderID:      generated.ProviderID,
 		ProviderVersion: generated.ProviderVersion,
-		ProtectedData:   &generated.ProtectedData,
-		IsCurrent:       true,
+		ProviderMetadata: database.DataEncryptionKeyProviderMetadata(
+			generated.ProviderMetadata,
+		),
+		ProtectedData: &generated.ProtectedData,
+		IsCurrent:     true,
 	}
 	require.NoError(t, db.CreateDataEncryptionKey(ctx, dek))
 

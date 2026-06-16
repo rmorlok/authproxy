@@ -210,6 +210,11 @@ func TestSchemaDefinitions(t *testing.T) {
 					Data:  `{"test": {"num_bytes": 32}}`,
 				},
 				{
+					Name:  "aws kms",
+					Valid: true,
+					Data:  `{"test": {"aws_kms_key_id": "alias/authproxy", "aws_region": "us-east-1", "aws_kms_endpoint": "http://localhost:4566", "aws_credentials": {"type": "implicit"}, "cache_ttl": "5m"}}`,
+				},
+				{
 					Name:  "empty object",
 					Valid: false,
 					Data:  `{"test": {}}`,

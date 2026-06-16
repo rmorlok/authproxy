@@ -47,11 +47,12 @@ type KeyWrappingKeyInfo struct {
 // provider. The plaintext DEK is returned for immediate cache use by callers,
 // but only the provider metadata and ProtectedData should be persisted.
 type GeneratedDataEncryptionKey struct {
-	Provider        ProviderType
-	ProviderID      string
-	ProviderVersion string
-	ProtectedData   KeyVersionProtectedData
-	Data            []byte
+	Provider         ProviderType
+	ProviderID       string
+	ProviderVersion  string
+	ProviderMetadata map[string]string
+	ProtectedData    KeyVersionProtectedData
+	Data             []byte
 }
 
 // KeyDataRequiresDataEncryptionKeys is implemented by providers that resolve

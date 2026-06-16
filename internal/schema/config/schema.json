@@ -878,6 +878,18 @@
           },
           "required": ["num_bytes"],
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "aws_kms_key_id": { "type": "string" },
+            "aws_region": { "type": "string" },
+            "aws_kms_endpoint": { "type": "string" },
+            "aws_credentials": { "$ref": "#/$defs/AwsCredentials" },
+            "cache_ttl": { "type": "string" }
+          },
+          "required": ["aws_kms_key_id"],
+          "additionalProperties": false
         }
       ]
     },
