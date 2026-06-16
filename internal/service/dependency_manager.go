@@ -731,6 +731,20 @@ func (dm *DependencyManager) AutoMigratePredefinedActors() {
 	}()
 }
 
+// AutoMigrateGenerateDataEncryptionKeys ensures current DEKs exist before any
+// service constructs the runtime encryption cache.
+func (dm *DependencyManager) AutoMigrateGenerateDataEncryptionKeys() {
+	if err := encrypt.GenerateDataEncryptionKeysToDatabase(
+		context.Background(),
+		dm.GetConfig(),
+		dm.GetDatabase(),
+		dm.GetLogger(),
+		dm.GetRedisClient(),
+	); err != nil {
+		panic(fmt.Errorf("failed to generate data encryption keys: %w", err))
+	}
+}
+
 // AutoMigrateSyncKeysToDatabase syncs key wrapping state into the database.
 // Uses a Redis sentinel to avoid redundant runs across processes.
 func (dm *DependencyManager) AutoMigrateSyncKeysToDatabase() {
@@ -747,8 +761,9 @@ func (dm *DependencyManager) AutoMigrateSyncKeysToDatabase() {
 
 func (dm *DependencyManager) AutoMigrateAll() {
 	dm.AutoMigrateDatabase()
-	dm.AutoMigrateAppMetricsService()
+	dm.AutoMigrateGenerateDataEncryptionKeys()
 	dm.AutoMigrateSyncKeysToDatabase()
+	dm.AutoMigrateAppMetricsService()
 	dm.AutoMigrateCore()
 	dm.AutoMigratePredefinedActors()
 }

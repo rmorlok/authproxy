@@ -232,3 +232,15 @@ func generateDataEncryptionKeysToDatabase(
 func (h *EncryptServiceTaskHandler) handleGenerateDataEncryptionKeys(ctx context.Context, _ *asynq.Task) error {
 	return generateDataEncryptionKeysToDatabase(ctx, h.cfg, h.db, h.logger, h.redis)
 }
+
+// GenerateDataEncryptionKeysToDatabase reconciles current DEKs for configured
+// data-encryption keys without constructing the runtime encryption service.
+func GenerateDataEncryptionKeysToDatabase(
+	ctx context.Context,
+	cfg iconfig.C,
+	db database.DB,
+	logger *slog.Logger,
+	redis apredis.Client,
+) error {
+	return generateDataEncryptionKeysToDatabase(ctx, cfg, db, logger, redis)
+}
