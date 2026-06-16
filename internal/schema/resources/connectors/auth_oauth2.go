@@ -156,8 +156,8 @@ func (a *AuthOAuth2) Clone() AuthImpl {
 	}
 
 	scopes := make([]Scope, 0, len(a.Scopes))
-	for _, scope := range a.Scopes {
-		scopes = append(scopes, scope)
+	for i := range a.Scopes {
+		scopes = append(scopes, a.Scopes[i].Clone())
 	}
 	clone.Scopes = scopes
 
@@ -247,6 +247,12 @@ func (a *AuthOAuth2) Validate(vc *common.ValidationContext) error {
 	hasSecret := a.ClientSecret != nil && a.ClientSecret.InnerVal != nil
 	if grantType == OAuth2GrantAuthorizationCode && !hasClientId {
 		result = multierror.Append(result, vc.NewErrorfForField("client_id", "is required"))
+	}
+
+	for i := range a.Scopes {
+		if err := a.Scopes[i].Validate(vc.PushField("scopes").PushIndex(i)); err != nil {
+			result = multierror.Append(result, err)
+		}
 	}
 
 	method := a.GetTokenEndpointAuthMethodOrDefault()

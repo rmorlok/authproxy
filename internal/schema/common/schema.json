@@ -27,6 +27,20 @@
       ],
       "description": "Identifies the kind of traffic flowing through the proxy."
     },
+    "Predicate": {
+      "type": "object",
+      "required": [
+        "javascript"
+      ],
+      "properties": {
+        "javascript": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false,
+      "description": "A JavaScript predicate that must evaluate to a boolean."
+    },
     "UUID": {
       "type": "string",
       "pattern": "^[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}$",

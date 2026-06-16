@@ -223,7 +223,7 @@ func TestSubmitForm(t *testing.T) {
 					{
 						Id:         "us_only",
 						JsonSchema: workspaceSchema,
-						If:         &cschema.SetupFlowStepIf{Javascript: `cfg.region === "us"`},
+						If:         &common.Predicate{Javascript: `cfg.region === "us"`},
 					},
 					{Id: "workspace", JsonSchema: workspaceSchema},
 				},
@@ -413,7 +413,7 @@ func TestGetCurrentSetupStepResponse(t *testing.T) {
 					{
 						Id:         "us_only",
 						JsonSchema: workspaceSchema,
-						If:         &cschema.SetupFlowStepIf{Javascript: `cfg.region === "us"`},
+						If:         &common.Predicate{Javascript: `cfg.region === "us"`},
 					},
 					{Id: "workspace", Title: "Select Workspace", JsonSchema: workspaceSchema},
 				},

@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/rmorlok/authproxy/internal/schema/resources/connectors"
-	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
@@ -81,7 +80,7 @@ connectors:
 							},
 							{
 								Id:       "https://www.googleapis.com/auth/drive.activity.readonly",
-								Required: util.ToPtr(false),
+								Required: NewScopeRequiredBool(false),
 								Reason:   "We need to be able to see what's been going on in drive\n",
 							},
 						},

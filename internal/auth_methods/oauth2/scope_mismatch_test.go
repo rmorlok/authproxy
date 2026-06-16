@@ -10,8 +10,7 @@ import (
 func TestDetectScopeMismatch(t *testing.T) {
 	required := func(id string) sconfig.Scope { return sconfig.Scope{Id: id} }
 	optional := func(id string) sconfig.Scope {
-		f := false
-		return sconfig.Scope{Id: id, Required: &f}
+		return sconfig.Scope{Id: id, Required: sconfig.NewScopeRequiredBool(false)}
 	}
 
 	tests := []struct {

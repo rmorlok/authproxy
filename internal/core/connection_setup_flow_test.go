@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,17 +22,17 @@ func TestManifestSetupFlowIfJavascript(t *testing.T) {
 				{
 					Id:         "cfg_false",
 					JsonSchema: workspaceSchema,
-					If:         &cschema.SetupFlowStepIf{Javascript: `cfg.region === "us"`},
+					If:         &common.Predicate{Javascript: `cfg.region === "us"`},
 				},
 				{
 					Id:         "label_true",
 					JsonSchema: workspaceSchema,
-					If:         &cschema.SetupFlowStepIf{Javascript: `labels["apxy/cxr/type"] === "salesforce"`},
+					If:         &common.Predicate{Javascript: `labels["apxy/cxr/type"] === "salesforce"`},
 				},
 				{
 					Id:         "annotation_true",
 					JsonSchema: workspaceSchema,
-					If:         &cschema.SetupFlowStepIf{Javascript: `annotations["setup-mode"] === "advanced"`},
+					If:         &common.Predicate{Javascript: `annotations["setup-mode"] === "advanced"`},
 				},
 			},
 		},
@@ -68,7 +69,7 @@ func TestManifestSetupFlowIfJavascriptVerifyBoundary(t *testing.T) {
 				{
 					Id:         "us_only",
 					JsonSchema: regionSchema,
-					If:         &cschema.SetupFlowStepIf{Javascript: `cfg.region === "us"`},
+					If:         &common.Predicate{Javascript: `cfg.region === "us"`},
 				},
 			},
 		},
@@ -98,7 +99,7 @@ func TestManifestSetupFlowIfJavascriptError(t *testing.T) {
 				{
 					Id:         "broken",
 					JsonSchema: workspaceSchema,
-					If:         &cschema.SetupFlowStepIf{Javascript: `cfg.region ===`},
+					If:         &common.Predicate{Javascript: `cfg.region ===`},
 				},
 			},
 		},

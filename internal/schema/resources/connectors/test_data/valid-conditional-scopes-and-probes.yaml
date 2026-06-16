@@ -1,0 +1,37 @@
+# $schema: ./schema.json
+
+labels:
+  type: google-drive
+display_name: Google Drive
+logo:
+  public_url: https://example.com/logo.png
+description: Conditional scope and probe example
+auth:
+  type: OAuth2
+  client_id:
+    env_var: GOOGLE_CLIENT_ID
+  client_secret:
+    env_var: GOOGLE_CLIENT_SECRET
+  authorization:
+    endpoint: https://accounts.google.com/o/oauth2/v2/auth
+  token:
+    endpoint: https://oauth2.googleapis.com/token
+  scopes:
+    - id: https://www.googleapis.com/auth/drive.readonly
+      reason: We need to be able to view the files
+    - id: https://www.googleapis.com/auth/drive.file
+      if:
+        javascript: cfg.push_files === true
+      reason: We need to be able to write files
+    - id: https://www.googleapis.com/auth/drive.activity.readonly
+      required:
+        javascript: cfg.sync_activity === true
+      reason: We need to be able to see activity
+probes:
+  - id: drive-health
+    period: 1m
+    if:
+      javascript: cfg.has_drive === true
+    proxy_http:
+      method: GET
+      url: https://www.googleapis.com/drive/v3/about
