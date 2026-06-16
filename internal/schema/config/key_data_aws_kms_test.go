@@ -191,7 +191,7 @@ func TestKeyDataAwsKMS_ListVersionsWithDataEncryptionKeys(t *testing.T) {
 		},
 		{
 			ID:       "dek_secret",
-			Provider: ProviderTypeAws,
+			Provider: ProviderTypeAwsSecretsManager,
 		},
 	})
 
@@ -241,7 +241,7 @@ func TestKeyDataAwsKMS_Errors(t *testing.T) {
 	t.Run("unsupported provider", func(t *testing.T) {
 		ka := newTestAwsKMS("alias/authproxy", &mockKMSClient{})
 		_, err := ka.UnwrapDataEncryptionKey(context.Background(), DataEncryptionKeyInfo{
-			Provider: ProviderTypeAws,
+			Provider: ProviderTypeAwsSecretsManager,
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unsupported AWS KMS provider")
