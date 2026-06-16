@@ -28,8 +28,8 @@ type NamespaceJson = schemaapi.NamespaceJson
 type CreateNamespaceRequestJson = schemaapi.CreateNamespaceRequestJson
 type UpdateNamespaceRequestJson = schemaapi.UpdateNamespaceRequestJson
 type ListNamespacesResponseJson = schemaapi.ListNamespacesResponseJson
-type SetNamespaceEncryptionKeyRequestJson = schemaapi.SetNamespaceEncryptionKeyRequestJson
-type NamespaceEncryptionKeyJson = schemaapi.NamespaceEncryptionKeyJson
+type SetNamespaceKeyRequestJson = schemaapi.SetNamespaceKeyRequestJson
+type NamespaceKeyJson = schemaapi.NamespaceKeyJson
 type OpenAPIListNamespacesResponseJson = schemaapiopenapi.ListNamespacesResponseJson
 
 func NamespaceToJson(ns coreIface.Namespace) NamespaceJson {
@@ -523,7 +523,7 @@ func (r *NamespacesRoutes) putAnnotation(gctx *gin.Context) { r.annotsAdapter.Ha
 // @Router			/namespaces/{path}/annotations/{annotation} [delete]
 func (r *NamespacesRoutes) deleteAnnotation(gctx *gin.Context) { r.annotsAdapter.HandleDelete(gctx) }
 
-func (r *NamespacesRoutes) getEncryptionKey(gctx *gin.Context) {
+func (r *NamespacesRoutes) getKey(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
@@ -555,17 +555,17 @@ func (r *NamespacesRoutes) getEncryptionKey(gctx *gin.Context) {
 
 	ekId := ns.GetKeyId()
 	if ekId == nil {
-		apgin.WriteError(gctx, nil, httperr.NotFoundf("namespace '%s' has no encryption key set", path))
+		apgin.WriteError(gctx, nil, httperr.NotFoundf("namespace '%s' has no key set", path))
 		val.MarkErrorReturn()
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, NamespaceEncryptionKeyJson{
+	gctx.PureJSON(http.StatusOK, NamespaceKeyJson{
 		KeyId: string(*ekId),
 	})
 }
 
-func (r *NamespacesRoutes) setEncryptionKey(gctx *gin.Context) {
+func (r *NamespacesRoutes) setKey(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
@@ -577,7 +577,7 @@ func (r *NamespacesRoutes) setEncryptionKey(gctx *gin.Context) {
 		return
 	}
 
-	var req SetNamespaceEncryptionKeyRequestJson
+	var req SetNamespaceKeyRequestJson
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
@@ -585,7 +585,7 @@ func (r *NamespacesRoutes) setEncryptionKey(gctx *gin.Context) {
 	}
 
 	if req.KeyId == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("encryption_key_id is required"))
+		apgin.WriteError(gctx, nil, httperr.BadRequest("key_id is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -612,7 +612,7 @@ func (r *NamespacesRoutes) setEncryptionKey(gctx *gin.Context) {
 	ns, err = r.core.SetNamespaceKey(ctx, path, apid.ID(req.KeyId))
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("encryption key '%s' not found", req.KeyId), httperr.WithInternalErr(err)))
+			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("key '%s' not found", req.KeyId), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
@@ -632,7 +632,7 @@ func (r *NamespacesRoutes) setEncryptionKey(gctx *gin.Context) {
 	gctx.PureJSON(http.StatusOK, NamespaceToJson(ns))
 }
 
-func (r *NamespacesRoutes) clearEncryptionKey(gctx *gin.Context) {
+func (r *NamespacesRoutes) clearKey(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
@@ -798,34 +798,34 @@ func (r *NamespacesRoutes) Register(g gin.IRouter) {
 		r.deleteAnnotation,
 	)
 	g.GET(
-		"/namespaces/:path/encryption-key",
+		"/namespaces/:path/key",
 		r.authService.NewRequiredBuilder().
 			ForResource("namespaces").
 			ForIdField("path").
 			ForIdExtractor(func(ns interface{}) string { return ns.(coreIface.Namespace).GetPath() }).
 			ForVerb("get").
 			Build(),
-		r.getEncryptionKey,
+		r.getKey,
 	)
 	g.PUT(
-		"/namespaces/:path/encryption-key",
+		"/namespaces/:path/key",
 		r.authService.NewRequiredBuilder().
 			ForResource("namespaces").
 			ForIdField("path").
 			ForIdExtractor(func(ns interface{}) string { return ns.(coreIface.Namespace).GetPath() }).
 			ForVerb("update").
 			Build(),
-		r.setEncryptionKey,
+		r.setKey,
 	)
 	g.DELETE(
-		"/namespaces/:path/encryption-key",
+		"/namespaces/:path/key",
 		r.authService.NewRequiredBuilder().
 			ForResource("namespaces").
 			ForIdField("path").
 			ForIdExtractor(func(ns interface{}) string { return ns.(coreIface.Namespace).GetPath() }).
 			ForVerb("update").
 			Build(),
-		r.clearEncryptionKey,
+		r.clearKey,
 	)
 }
 

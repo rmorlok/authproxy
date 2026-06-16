@@ -16,13 +16,13 @@ type NamespaceDataSource struct {
 }
 
 type NamespaceDataSourceModel struct {
-	Path            types.String `tfsdk:"path"`
-	State           types.String `tfsdk:"state"`
-	EncryptionKeyId types.String `tfsdk:"encryption_key_id"`
-	Labels          types.Map    `tfsdk:"labels"`
-	Annotations     types.Map    `tfsdk:"annotations"`
-	CreatedAt       types.String `tfsdk:"created_at"`
-	UpdatedAt       types.String `tfsdk:"updated_at"`
+	Path        types.String `tfsdk:"path"`
+	State       types.String `tfsdk:"state"`
+	KeyId       types.String `tfsdk:"key_id"`
+	Labels      types.Map    `tfsdk:"labels"`
+	Annotations types.Map    `tfsdk:"annotations"`
+	CreatedAt   types.String `tfsdk:"created_at"`
+	UpdatedAt   types.String `tfsdk:"updated_at"`
 }
 
 func NewNamespaceDataSource() datasource.DataSource {
@@ -37,13 +37,13 @@ func (d *NamespaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 	resp.Schema = schema.Schema{
 		Description: "Reads an AuthProxy namespace.",
 		Attributes: map[string]schema.Attribute{
-			"path":              schema.StringAttribute{Required: true},
-			"state":             schema.StringAttribute{Computed: true},
-			"encryption_key_id": schema.StringAttribute{Computed: true},
-			"labels":            schema.MapAttribute{Computed: true, ElementType: types.StringType},
-			"annotations":       schema.MapAttribute{Computed: true, ElementType: types.StringType},
-			"created_at":        schema.StringAttribute{Computed: true},
-			"updated_at":        schema.StringAttribute{Computed: true},
+			"path":        schema.StringAttribute{Required: true},
+			"state":       schema.StringAttribute{Computed: true},
+			"key_id":      schema.StringAttribute{Computed: true},
+			"labels":      schema.MapAttribute{Computed: true, ElementType: types.StringType},
+			"annotations": schema.MapAttribute{Computed: true, ElementType: types.StringType},
+			"created_at":  schema.StringAttribute{Computed: true},
+			"updated_at":  schema.StringAttribute{Computed: true},
 		},
 	}
 }
@@ -69,10 +69,10 @@ func (d *NamespaceDataSource) Read(ctx context.Context, req datasource.ReadReque
 	}
 
 	config.State = types.StringValue(ns.State)
-	if ns.EncryptionKeyId != nil {
-		config.EncryptionKeyId = types.StringValue(*ns.EncryptionKeyId)
+	if ns.KeyId != nil {
+		config.KeyId = types.StringValue(*ns.KeyId)
 	} else {
-		config.EncryptionKeyId = types.StringNull()
+		config.KeyId = types.StringNull()
 	}
 	config.Labels = labelsToMap(ns.Labels)
 	config.Annotations = annotationsToMap(ns.Annotations)

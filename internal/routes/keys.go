@@ -22,15 +22,15 @@ import (
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
-type EncryptionKeyJson = schemaapi.EncryptionKeyJson
-type CreateEncryptionKeyRequestJson = schemaapi.CreateEncryptionKeyRequestJson
-type UpdateEncryptionKeyRequestJson = schemaapi.UpdateEncryptionKeyRequestJson
-type ListEncryptionKeysResponseJson = schemaapi.ListEncryptionKeysResponseJson
+type KeyJson = schemaapi.KeyJson
+type CreateKeyRequestJson = schemaapi.CreateKeyRequestJson
+type UpdateKeyRequestJson = schemaapi.UpdateKeyRequestJson
+type ListKeysResponseJson = schemaapi.ListKeysResponseJson
 
-type OpenAPIListEncryptionKeysResponseJson = schemaapiopenapi.ListEncryptionKeysResponseJson
-type OpenAPIUpdateEncryptionKeyRequestJson = schemaapiopenapi.UpdateEncryptionKeyRequestJson
+type OpenAPIListKeysResponseJson = schemaapiopenapi.ListKeysResponseJson
+type OpenAPIUpdateKeyRequestJson = schemaapiopenapi.UpdateKeyRequestJson
 
-type ListEncryptionKeysRequestQueryParams struct {
+type ListKeysRequestQueryParams struct {
 	Cursor        *string            `form:"cursor"`
 	LimitVal      *int32             `form:"limit"`
 	StateVal      *database.KeyState `form:"state"`
@@ -39,11 +39,11 @@ type ListEncryptionKeysRequestQueryParams struct {
 	OrderByVal    *string            `form:"order_by"`
 }
 
-func EncryptionKeyToJson(ek coreIface.Key) EncryptionKeyJson {
-	return EncryptionKeyJson{
+func KeyToJson(ek coreIface.Key) KeyJson {
+	return KeyJson{
 		Id:          ek.GetId(),
 		Namespace:   ek.GetNamespace(),
-		State:       schemaapi.EncryptionKeyState(ek.GetState()),
+		State:       schemaapi.KeyState(ek.GetState()),
 		Labels:      ek.GetLabels(),
 		Annotations: ek.GetAnnotations(),
 		CreatedAt:   ek.GetCreatedAt(),
@@ -51,7 +51,7 @@ func EncryptionKeyToJson(ek coreIface.Key) EncryptionKeyJson {
 	}
 }
 
-type EncryptionKeysRoutes struct {
+type KeysRoutes struct {
 	cfg           config.C
 	core          coreIface.C
 	authService   auth.A
@@ -59,20 +59,20 @@ type EncryptionKeysRoutes struct {
 	annotsAdapter key_value.Adapter[apid.ID]
 }
 
-// @Summary		Get encryption key
-// @Description	Get a specific encryption key by ID
-// @Tags			encryption_keys
+// @Summary		Get key
+// @Description	Get a specific key by ID
+// @Tags			keys
 // @Accept			json
 // @Produce		json
-// @Param			id	path		string	true	"Encryption key ID"
-// @Success		200		{object}	EncryptionKeyJson
+// @Param			id	path		string	true	"Key ID"
+// @Success		200		{object}	KeyJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		404		{object}	ErrorResponse
 // @Failure		500		{object}	ErrorResponse
 // @Security		BearerAuth
-// @Router			/encryption-keys/{id} [get]
-func (r *EncryptionKeysRoutes) get(gctx *gin.Context) {
+// @Router			/keys/{id} [get]
+func (r *KeysRoutes) get(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
@@ -87,7 +87,7 @@ func (r *EncryptionKeysRoutes) get(gctx *gin.Context) {
 	ek, err := r.core.GetKey(ctx, id)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("encryption key '%s' not found", id), httperr.WithInternalErr(err)))
+			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("key '%s' not found", id), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
@@ -102,26 +102,26 @@ func (r *EncryptionKeysRoutes) get(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, EncryptionKeyToJson(ek))
+	gctx.PureJSON(http.StatusOK, KeyToJson(ek))
 }
 
-// @Summary		Create encryption key
-// @Description	Create a new encryption key
-// @Tags			encryption_keys
+// @Summary		Create key
+// @Description	Create a new key
+// @Tags			keys
 // @Accept			json
 // @Produce		json
-// @Param			request	body		CreateEncryptionKeyRequestJson	true	"Encryption key creation request"
-// @Success		200		{object}	EncryptionKeyJson
+// @Param			request	body		CreateKeyRequestJson	true	"Key creation request"
+// @Success		200		{object}	KeyJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		500		{object}	ErrorResponse
 // @Security		BearerAuth
-// @Router			/encryption-keys [post]
-func (r *EncryptionKeysRoutes) create(gctx *gin.Context) {
+// @Router			/keys [post]
+func (r *KeysRoutes) create(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
-	var req CreateEncryptionKeyRequestJson
+	var req CreateKeyRequestJson
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
@@ -171,12 +171,12 @@ func (r *EncryptionKeysRoutes) create(gctx *gin.Context) {
 		}
 	}
 
-	gctx.PureJSON(http.StatusOK, EncryptionKeyToJson(ek))
+	gctx.PureJSON(http.StatusOK, KeyToJson(ek))
 }
 
-// @Summary		List encryption keys
-// @Description	List encryption keys with optional filtering and pagination
-// @Tags			encryption_keys
+// @Summary		List keys
+// @Description	List keys with optional filtering and pagination
+// @Tags			keys
 // @Accept			json
 // @Produce		json
 // @Param			cursor			query		string	false	"Pagination cursor"
@@ -185,17 +185,17 @@ func (r *EncryptionKeysRoutes) create(gctx *gin.Context) {
 // @Param			namespace		query		string	false	"Filter by namespace"
 // @Param			label_selector	query		string	false	"Filter by label selector"
 // @Param			order_by		query		string	false	"Order by field (e.g., 'state:asc')"
-// @Success		200				{object}	OpenAPIListEncryptionKeysResponseJson
+// @Success		200				{object}	OpenAPIListKeysResponseJson
 // @Failure		400				{object}	ErrorResponse
 // @Failure		401				{object}	ErrorResponse
 // @Failure		500				{object}	ErrorResponse
 // @Security		BearerAuth
-// @Router			/encryption-keys [get]
-func (r *EncryptionKeysRoutes) list(gctx *gin.Context) {
+// @Router			/keys [get]
+func (r *KeysRoutes) list(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
-	var req ListEncryptionKeysRequestQueryParams
+	var req ListKeysRequestQueryParams
 	if err := gctx.ShouldBindQuery(&req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
@@ -208,7 +208,7 @@ func (r *EncryptionKeysRoutes) list(gctx *gin.Context) {
 	if req.Cursor != nil {
 		ex, err = r.core.ListKeysFromCursor(ctx, *req.Cursor)
 		if err != nil {
-			apgin.WriteError(gctx, nil, httperr.InternalServerErrorMsg("failed to list encryption keys from cursor", httperr.WithInternalErr(err)))
+			apgin.WriteError(gctx, nil, httperr.InternalServerErrorMsg("failed to list keys from cursor", httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
@@ -257,27 +257,27 @@ func (r *EncryptionKeysRoutes) list(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, ListEncryptionKeysResponseJson{
-		Items:  util.Map(auth.FilterForValidatedResources(val, result.Results), EncryptionKeyToJson),
+	gctx.PureJSON(http.StatusOK, ListKeysResponseJson{
+		Items:  util.Map(auth.FilterForValidatedResources(val, result.Results), KeyToJson),
 		Cursor: result.Cursor,
 	})
 }
 
-// @Summary		Update encryption key
-// @Description	Update an encryption key's properties
-// @Tags			encryption_keys
+// @Summary		Update key
+// @Description	Update a key's properties
+// @Tags			keys
 // @Accept			json
 // @Produce		json
-// @Param			id		path		string								true	"Encryption key ID"
-// @Param			request	body		OpenAPIUpdateEncryptionKeyRequestJson		true	"Update request"
-// @Success		200		{object}	EncryptionKeyJson
+// @Param			id		path		string								true	"Key ID"
+// @Param			request	body		OpenAPIUpdateKeyRequestJson		true	"Update request"
+// @Success		200		{object}	KeyJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		404		{object}	ErrorResponse
 // @Failure		500		{object}	ErrorResponse
 // @Security		BearerAuth
-// @Router			/encryption-keys/{id} [patch]
-func (r *EncryptionKeysRoutes) update(gctx *gin.Context) {
+// @Router			/keys/{id} [patch]
+func (r *KeysRoutes) update(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
@@ -289,7 +289,7 @@ func (r *EncryptionKeysRoutes) update(gctx *gin.Context) {
 		return
 	}
 
-	var req UpdateEncryptionKeyRequestJson
+	var req UpdateKeyRequestJson
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
@@ -325,7 +325,7 @@ func (r *EncryptionKeysRoutes) update(gctx *gin.Context) {
 	ek, err := r.core.GetKey(ctx, id)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("encryption key '%s' not found", id), httperr.WithInternalErr(err)))
+			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("key '%s' not found", id), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
@@ -344,7 +344,7 @@ func (r *EncryptionKeysRoutes) update(gctx *gin.Context) {
 		err = r.core.SetKeyState(ctx, id, database.KeyState(*req.State))
 		if err != nil {
 			if errors.Is(err, core.ErrNotFound) {
-				apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("encryption key '%s' not found", id), httperr.WithInternalErr(err)))
+				apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("key '%s' not found", id), httperr.WithInternalErr(err)))
 				val.MarkErrorReturn()
 				return
 			}
@@ -358,7 +358,7 @@ func (r *EncryptionKeysRoutes) update(gctx *gin.Context) {
 		_, err = r.core.UpdateKeyLabels(ctx, id, *req.Labels)
 		if err != nil {
 			if errors.Is(err, core.ErrNotFound) {
-				apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("encryption key '%s' not found", id), httperr.WithInternalErr(err)))
+				apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("key '%s' not found", id), httperr.WithInternalErr(err)))
 				val.MarkErrorReturn()
 				return
 			}
@@ -372,7 +372,7 @@ func (r *EncryptionKeysRoutes) update(gctx *gin.Context) {
 		_, err = r.core.UpdateKeyAnnotations(ctx, id, *req.Annotations)
 		if err != nil {
 			if errors.Is(err, core.ErrNotFound) {
-				apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("encryption key '%s' not found", id), httperr.WithInternalErr(err)))
+				apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("key '%s' not found", id), httperr.WithInternalErr(err)))
 				val.MarkErrorReturn()
 				return
 			}
@@ -385,7 +385,7 @@ func (r *EncryptionKeysRoutes) update(gctx *gin.Context) {
 	ek, err = r.core.GetKey(ctx, id)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("encryption key '%s' not found", id), httperr.WithInternalErr(err)))
+			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("key '%s' not found", id), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
@@ -395,22 +395,22 @@ func (r *EncryptionKeysRoutes) update(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, EncryptionKeyToJson(ek))
+	gctx.PureJSON(http.StatusOK, KeyToJson(ek))
 }
 
-// @Summary		Delete encryption key
-// @Description	Soft delete an encryption key
-// @Tags			encryption_keys
+// @Summary		Delete key
+// @Description	Soft delete a key
+// @Tags			keys
 // @Accept			json
 // @Produce		json
-// @Param			id	path	string	true	"Encryption key ID"
+// @Param			id	path	string	true	"Key ID"
 // @Success		204		"No Content"
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		500		{object}	ErrorResponse
 // @Security		BearerAuth
-// @Router			/encryption-keys/{id} [delete]
-func (r *EncryptionKeysRoutes) delete(gctx *gin.Context) {
+// @Router			/keys/{id} [delete]
+func (r *KeysRoutes) delete(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
@@ -423,7 +423,7 @@ func (r *EncryptionKeysRoutes) delete(gctx *gin.Context) {
 	}
 
 	if id == database.GlobalKeyID {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("the global encryption key cannot be deleted"))
+		apgin.WriteError(gctx, nil, httperr.BadRequest("the global key cannot be deleted"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -462,29 +462,29 @@ func (r *EncryptionKeysRoutes) delete(gctx *gin.Context) {
 	gctx.Status(http.StatusNoContent)
 }
 
-// Label and annotation handlers for encryption keys delegate to a shared
+// Label and annotation handlers for keys delegate to a shared
 // generic adapter (see internal/routes/key_value). The doc comments below
 // drive the OpenAPI spec; the bodies forward to the adapter.
 
-// @Summary		Get all labels for an encryption key
-// @Description	Get all labels associated with a specific encryption key
-// @Tags			encryption_keys
+// @Summary		Get all labels for a key
+// @Description	Get all labels associated with a specific key
+// @Tags			keys
 // @Produce		json
-// @Param			id	path		string	true	"Encryption key ID"
+// @Param			id	path		string	true	"Key ID"
 // @Success		200	{object}	map[string]string
 // @Failure		400	{object}	ErrorResponse
 // @Failure		401	{object}	ErrorResponse
 // @Failure		404	{object}	ErrorResponse
 // @Failure		500	{object}	ErrorResponse
 // @Security		BearerAuth
-// @Router			/encryption-keys/{id}/labels [get]
-func (r *EncryptionKeysRoutes) getLabels(gctx *gin.Context) { r.labelsAdapter.HandleList(gctx) }
+// @Router			/keys/{id}/labels [get]
+func (r *KeysRoutes) getLabels(gctx *gin.Context) { r.labelsAdapter.HandleList(gctx) }
 
-// @Summary		Get a specific label for an encryption key
-// @Description	Get a specific label value by key for an encryption key
-// @Tags			encryption_keys
+// @Summary		Get a specific label for a key
+// @Description	Get a specific label value by key for a key
+// @Tags			keys
 // @Produce		json
-// @Param			id		path		string	true	"Encryption key ID"
+// @Param			id		path		string	true	"Key ID"
 // @Param			label	path		string	true	"Label key"
 // @Success		200		{object}	KeyValueJson
 // @Failure		400		{object}	ErrorResponse
@@ -492,15 +492,15 @@ func (r *EncryptionKeysRoutes) getLabels(gctx *gin.Context) { r.labelsAdapter.Ha
 // @Failure		404		{object}	ErrorResponse
 // @Failure		500		{object}	ErrorResponse
 // @Security		BearerAuth
-// @Router			/encryption-keys/{id}/labels/{label} [get]
-func (r *EncryptionKeysRoutes) getLabel(gctx *gin.Context) { r.labelsAdapter.HandleGet(gctx) }
+// @Router			/keys/{id}/labels/{label} [get]
+func (r *KeysRoutes) getLabel(gctx *gin.Context) { r.labelsAdapter.HandleGet(gctx) }
 
-// @Summary		Set a label for an encryption key
-// @Description	Set or update a specific label value by key for an encryption key
-// @Tags			encryption_keys
+// @Summary		Set a label for a key
+// @Description	Set or update a specific label value by key for a key
+// @Tags			keys
 // @Accept			json
 // @Produce		json
-// @Param			id		path		string						true	"Encryption key ID"
+// @Param			id		path		string						true	"Key ID"
 // @Param			label	path		string						true	"Label key"
 // @Param			request	body		PutKeyValueRequestJson	true	"Label value"
 // @Success		200		{object}	KeyValueJson
@@ -510,13 +510,13 @@ func (r *EncryptionKeysRoutes) getLabel(gctx *gin.Context) { r.labelsAdapter.Han
 // @Failure		404		{object}	ErrorResponse
 // @Failure		500		{object}	ErrorResponse
 // @Security		BearerAuth
-// @Router			/encryption-keys/{id}/labels/{label} [put]
-func (r *EncryptionKeysRoutes) putLabel(gctx *gin.Context) { r.labelsAdapter.HandlePut(gctx) }
+// @Router			/keys/{id}/labels/{label} [put]
+func (r *KeysRoutes) putLabel(gctx *gin.Context) { r.labelsAdapter.HandlePut(gctx) }
 
-// @Summary		Delete a label from an encryption key
-// @Description	Delete a specific label by key from an encryption key
-// @Tags			encryption_keys
-// @Param			id		path	string	true	"Encryption key ID"
+// @Summary		Delete a label from a key
+// @Description	Delete a specific label by key from a key
+// @Tags			keys
+// @Param			id		path	string	true	"Key ID"
 // @Param			label	path	string	true	"Label key"
 // @Success		204		"No Content"
 // @Failure		400		{object}	ErrorResponse
@@ -524,28 +524,28 @@ func (r *EncryptionKeysRoutes) putLabel(gctx *gin.Context) { r.labelsAdapter.Han
 // @Failure		403		{object}	ErrorResponse
 // @Failure		500		{object}	ErrorResponse
 // @Security		BearerAuth
-// @Router			/encryption-keys/{id}/labels/{label} [delete]
-func (r *EncryptionKeysRoutes) deleteLabel(gctx *gin.Context) { r.labelsAdapter.HandleDelete(gctx) }
+// @Router			/keys/{id}/labels/{label} [delete]
+func (r *KeysRoutes) deleteLabel(gctx *gin.Context) { r.labelsAdapter.HandleDelete(gctx) }
 
-// @Summary		Get all annotations for an encryption key
-// @Description	Get all annotations associated with a specific encryption key
-// @Tags			encryption_keys
+// @Summary		Get all annotations for a key
+// @Description	Get all annotations associated with a specific key
+// @Tags			keys
 // @Produce		json
-// @Param			id	path		string	true	"Encryption key ID"
+// @Param			id	path		string	true	"Key ID"
 // @Success		200	{object}	map[string]string
 // @Failure		400	{object}	ErrorResponse
 // @Failure		401	{object}	ErrorResponse
 // @Failure		404	{object}	ErrorResponse
 // @Failure		500	{object}	ErrorResponse
 // @Security		BearerAuth
-// @Router			/encryption-keys/{id}/annotations [get]
-func (r *EncryptionKeysRoutes) getAnnotations(gctx *gin.Context) { r.annotsAdapter.HandleList(gctx) }
+// @Router			/keys/{id}/annotations [get]
+func (r *KeysRoutes) getAnnotations(gctx *gin.Context) { r.annotsAdapter.HandleList(gctx) }
 
-// @Summary		Get a specific annotation for an encryption key
-// @Description	Get a specific annotation value by key for an encryption key
-// @Tags			encryption_keys
+// @Summary		Get a specific annotation for a key
+// @Description	Get a specific annotation value by key for a key
+// @Tags			keys
 // @Produce		json
-// @Param			id			path		string	true	"Encryption key ID"
+// @Param			id			path		string	true	"Key ID"
 // @Param			annotation	path		string	true	"Annotation key"
 // @Success		200			{object}	KeyValueJson
 // @Failure		400			{object}	ErrorResponse
@@ -553,15 +553,15 @@ func (r *EncryptionKeysRoutes) getAnnotations(gctx *gin.Context) { r.annotsAdapt
 // @Failure		404			{object}	ErrorResponse
 // @Failure		500			{object}	ErrorResponse
 // @Security		BearerAuth
-// @Router			/encryption-keys/{id}/annotations/{annotation} [get]
-func (r *EncryptionKeysRoutes) getAnnotation(gctx *gin.Context) { r.annotsAdapter.HandleGet(gctx) }
+// @Router			/keys/{id}/annotations/{annotation} [get]
+func (r *KeysRoutes) getAnnotation(gctx *gin.Context) { r.annotsAdapter.HandleGet(gctx) }
 
-// @Summary		Set an annotation for an encryption key
-// @Description	Set or update a specific annotation value by key for an encryption key
-// @Tags			encryption_keys
+// @Summary		Set an annotation for a key
+// @Description	Set or update a specific annotation value by key for a key
+// @Tags			keys
 // @Accept			json
 // @Produce		json
-// @Param			id			path		string						true	"Encryption key ID"
+// @Param			id			path		string						true	"Key ID"
 // @Param			annotation	path		string						true	"Annotation key"
 // @Param			request		body		PutKeyValueRequestJson	true	"Annotation value"
 // @Success		200			{object}	KeyValueJson
@@ -571,13 +571,13 @@ func (r *EncryptionKeysRoutes) getAnnotation(gctx *gin.Context) { r.annotsAdapte
 // @Failure		404			{object}	ErrorResponse
 // @Failure		500			{object}	ErrorResponse
 // @Security		BearerAuth
-// @Router			/encryption-keys/{id}/annotations/{annotation} [put]
-func (r *EncryptionKeysRoutes) putAnnotation(gctx *gin.Context) { r.annotsAdapter.HandlePut(gctx) }
+// @Router			/keys/{id}/annotations/{annotation} [put]
+func (r *KeysRoutes) putAnnotation(gctx *gin.Context) { r.annotsAdapter.HandlePut(gctx) }
 
-// @Summary		Delete an annotation from an encryption key
-// @Description	Delete a specific annotation by key from an encryption key
-// @Tags			encryption_keys
-// @Param			id			path	string	true	"Encryption key ID"
+// @Summary		Delete an annotation from a key
+// @Description	Delete a specific annotation by key from a key
+// @Tags			keys
+// @Param			id			path	string	true	"Key ID"
 // @Param			annotation	path	string	true	"Annotation key"
 // @Success		204			"No Content"
 // @Failure		400			{object}	ErrorResponse
@@ -585,34 +585,34 @@ func (r *EncryptionKeysRoutes) putAnnotation(gctx *gin.Context) { r.annotsAdapte
 // @Failure		403			{object}	ErrorResponse
 // @Failure		500			{object}	ErrorResponse
 // @Security		BearerAuth
-// @Router			/encryption-keys/{id}/annotations/{annotation} [delete]
-func (r *EncryptionKeysRoutes) deleteAnnotation(gctx *gin.Context) {
+// @Router			/keys/{id}/annotations/{annotation} [delete]
+func (r *KeysRoutes) deleteAnnotation(gctx *gin.Context) {
 	r.annotsAdapter.HandleDelete(gctx)
 }
 
-func (r *EncryptionKeysRoutes) Register(g gin.IRouter) {
+func (r *KeysRoutes) Register(g gin.IRouter) {
 	g.GET(
-		"/encryption-keys",
+		"/keys",
 		r.authService.NewRequiredBuilder().
-			ForResource("encryption_keys").
+			ForResource("keys").
 			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }).
 			ForVerb("list").
 			Build(),
 		r.list,
 	)
 	g.POST(
-		"/encryption-keys",
+		"/keys",
 		r.authService.NewRequiredBuilder().
-			ForResource("encryption_keys").
+			ForResource("keys").
 			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }).
 			ForVerb("create").
 			Build(),
 		r.create,
 	)
 	g.GET(
-		"/encryption-keys/:id",
+		"/keys/:id",
 		r.authService.NewRequiredBuilder().
-			ForResource("encryption_keys").
+			ForResource("keys").
 			ForIdField("id").
 			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }).
 			ForVerb("get").
@@ -620,9 +620,9 @@ func (r *EncryptionKeysRoutes) Register(g gin.IRouter) {
 		r.get,
 	)
 	g.PATCH(
-		"/encryption-keys/:id",
+		"/keys/:id",
 		r.authService.NewRequiredBuilder().
-			ForResource("encryption_keys").
+			ForResource("keys").
 			ForIdField("id").
 			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }).
 			ForVerb("update").
@@ -630,9 +630,9 @@ func (r *EncryptionKeysRoutes) Register(g gin.IRouter) {
 		r.update,
 	)
 	g.DELETE(
-		"/encryption-keys/:id",
+		"/keys/:id",
 		r.authService.NewRequiredBuilder().
-			ForResource("encryption_keys").
+			ForResource("keys").
 			ForIdField("id").
 			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }).
 			ForVerb("delete").
@@ -640,9 +640,9 @@ func (r *EncryptionKeysRoutes) Register(g gin.IRouter) {
 		r.delete,
 	)
 	g.GET(
-		"/encryption-keys/:id/labels",
+		"/keys/:id/labels",
 		r.authService.NewRequiredBuilder().
-			ForResource("encryption_keys").
+			ForResource("keys").
 			ForIdField("id").
 			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }).
 			ForVerb("get").
@@ -650,9 +650,9 @@ func (r *EncryptionKeysRoutes) Register(g gin.IRouter) {
 		r.getLabels,
 	)
 	g.GET(
-		"/encryption-keys/:id/labels/:label",
+		"/keys/:id/labels/:label",
 		r.authService.NewRequiredBuilder().
-			ForResource("encryption_keys").
+			ForResource("keys").
 			ForIdField("id").
 			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }).
 			ForVerb("get").
@@ -660,9 +660,9 @@ func (r *EncryptionKeysRoutes) Register(g gin.IRouter) {
 		r.getLabel,
 	)
 	g.PUT(
-		"/encryption-keys/:id/labels/:label",
+		"/keys/:id/labels/:label",
 		r.authService.NewRequiredBuilder().
-			ForResource("encryption_keys").
+			ForResource("keys").
 			ForIdField("id").
 			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }).
 			ForVerb("update").
@@ -670,9 +670,9 @@ func (r *EncryptionKeysRoutes) Register(g gin.IRouter) {
 		r.putLabel,
 	)
 	g.DELETE(
-		"/encryption-keys/:id/labels/:label",
+		"/keys/:id/labels/:label",
 		r.authService.NewRequiredBuilder().
-			ForResource("encryption_keys").
+			ForResource("keys").
 			ForIdField("id").
 			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }).
 			ForVerb("update").
@@ -680,9 +680,9 @@ func (r *EncryptionKeysRoutes) Register(g gin.IRouter) {
 		r.deleteLabel,
 	)
 	g.GET(
-		"/encryption-keys/:id/annotations",
+		"/keys/:id/annotations",
 		r.authService.NewRequiredBuilder().
-			ForResource("encryption_keys").
+			ForResource("keys").
 			ForIdField("id").
 			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }).
 			ForVerb("get").
@@ -690,9 +690,9 @@ func (r *EncryptionKeysRoutes) Register(g gin.IRouter) {
 		r.getAnnotations,
 	)
 	g.GET(
-		"/encryption-keys/:id/annotations/:annotation",
+		"/keys/:id/annotations/:annotation",
 		r.authService.NewRequiredBuilder().
-			ForResource("encryption_keys").
+			ForResource("keys").
 			ForIdField("id").
 			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }).
 			ForVerb("get").
@@ -700,9 +700,9 @@ func (r *EncryptionKeysRoutes) Register(g gin.IRouter) {
 		r.getAnnotation,
 	)
 	g.PUT(
-		"/encryption-keys/:id/annotations/:annotation",
+		"/keys/:id/annotations/:annotation",
 		r.authService.NewRequiredBuilder().
-			ForResource("encryption_keys").
+			ForResource("keys").
 			ForIdField("id").
 			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }).
 			ForVerb("update").
@@ -710,9 +710,9 @@ func (r *EncryptionKeysRoutes) Register(g gin.IRouter) {
 		r.putAnnotation,
 	)
 	g.DELETE(
-		"/encryption-keys/:id/annotations/:annotation",
+		"/keys/:id/annotations/:annotation",
 		r.authService.NewRequiredBuilder().
-			ForResource("encryption_keys").
+			ForResource("keys").
 			ForIdField("id").
 			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }).
 			ForVerb("update").
@@ -721,8 +721,8 @@ func (r *EncryptionKeysRoutes) Register(g gin.IRouter) {
 	)
 }
 
-func NewEncryptionKeysRoutes(cfg config.C, authService auth.A, c coreIface.C) *EncryptionKeysRoutes {
-	parseEncryptionKeyID := func(gctx *gin.Context) (apid.ID, *httperr.Error) {
+func NewKeysRoutes(cfg config.C, authService auth.A, c coreIface.C) *KeysRoutes {
+	parseKeyID := func(gctx *gin.Context) (apid.ID, *httperr.Error) {
 		id := apid.ID(gctx.Param("id"))
 		if id.IsNil() {
 			return apid.Nil, httperr.BadRequest("id is required")
@@ -730,7 +730,7 @@ func NewEncryptionKeysRoutes(cfg config.C, authService auth.A, c coreIface.C) *E
 		return id, nil
 	}
 
-	getEncryptionKey := func(ctx context.Context, id apid.ID) (key_value.Resource, error) {
+	getKey := func(ctx context.Context, id apid.ID) (key_value.Resource, error) {
 		ek, err := c.GetKey(ctx, id)
 		if err != nil {
 			if errors.Is(err, core.ErrNotFound) {
@@ -747,13 +747,13 @@ func NewEncryptionKeysRoutes(cfg config.C, authService auth.A, c coreIface.C) *E
 	idExtractor := func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }
 
 	authGet := authService.NewRequiredBuilder().
-		ForResource("encryption_keys").
+		ForResource("keys").
 		ForIdField("id").
 		ForIdExtractor(idExtractor).
 		ForVerb("get").
 		Build()
 	authMutate := authService.NewRequiredBuilder().
-		ForResource("encryption_keys").
+		ForResource("keys").
 		ForIdField("id").
 		ForIdExtractor(idExtractor).
 		ForVerb("update").
@@ -761,12 +761,12 @@ func NewEncryptionKeysRoutes(cfg config.C, authService auth.A, c coreIface.C) *E
 
 	labelsAdapter := key_value.Adapter[apid.ID]{
 		Kind:         key_value.Label,
-		ResourceName: "encryption key",
-		PathPrefix:   "/encryption-keys/:id",
+		ResourceName: "key",
+		PathPrefix:   "/keys/:id",
 		AuthGet:      authGet,
 		AuthMutate:   authMutate,
-		ParseID:      parseEncryptionKeyID,
-		Get:          getEncryptionKey,
+		ParseID:      parseKeyID,
+		Get:          getKey,
 		Put: func(ctx context.Context, id apid.ID, kv map[string]string) (key_value.Resource, error) {
 			return c.PutKeyLabels(ctx, id, kv)
 		},
@@ -777,12 +777,12 @@ func NewEncryptionKeysRoutes(cfg config.C, authService auth.A, c coreIface.C) *E
 
 	annotsAdapter := key_value.Adapter[apid.ID]{
 		Kind:         key_value.Annotation,
-		ResourceName: "encryption key",
-		PathPrefix:   "/encryption-keys/:id",
+		ResourceName: "key",
+		PathPrefix:   "/keys/:id",
 		AuthGet:      authGet,
 		AuthMutate:   authMutate,
-		ParseID:      parseEncryptionKeyID,
-		Get:          getEncryptionKey,
+		ParseID:      parseKeyID,
+		Get:          getKey,
 		Put: func(ctx context.Context, id apid.ID, kv map[string]string) (key_value.Resource, error) {
 			return c.PutKeyAnnotations(ctx, id, kv)
 		},
@@ -791,7 +791,7 @@ func NewEncryptionKeysRoutes(cfg config.C, authService auth.A, c coreIface.C) *E
 		},
 	}
 
-	return &EncryptionKeysRoutes{
+	return &KeysRoutes{
 		cfg:           cfg,
 		authService:   authService,
 		core:          c,

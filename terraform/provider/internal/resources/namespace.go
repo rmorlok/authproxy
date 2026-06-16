@@ -19,13 +19,13 @@ type NamespaceResource struct {
 }
 
 type NamespaceResourceModel struct {
-	Path            types.String `tfsdk:"path"`
-	State           types.String `tfsdk:"state"`
-	EncryptionKeyId types.String `tfsdk:"encryption_key_id"`
-	Labels          types.Map    `tfsdk:"labels"`
-	Annotations     types.Map    `tfsdk:"annotations"`
-	CreatedAt       types.String `tfsdk:"created_at"`
-	UpdatedAt       types.String `tfsdk:"updated_at"`
+	Path        types.String `tfsdk:"path"`
+	State       types.String `tfsdk:"state"`
+	KeyId       types.String `tfsdk:"key_id"`
+	Labels      types.Map    `tfsdk:"labels"`
+	Annotations types.Map    `tfsdk:"annotations"`
+	CreatedAt   types.String `tfsdk:"created_at"`
+	UpdatedAt   types.String `tfsdk:"updated_at"`
 }
 
 func NewNamespaceResource() resource.Resource {
@@ -51,8 +51,8 @@ func (r *NamespaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Description: "The namespace state.",
 				Computed:    true,
 			},
-			"encryption_key_id": schema.StringAttribute{
-				Description: "The encryption key ID associated with this namespace.",
+			"key_id": schema.StringAttribute{
+				Description: "The key ID associated with this namespace.",
 				Computed:    true,
 			},
 			"labels": schema.MapAttribute{
@@ -186,10 +186,10 @@ func (r *NamespaceResource) ImportState(ctx context.Context, req resource.Import
 func setNamespaceState(model *NamespaceResourceModel, ns *client.Namespace) {
 	model.Path = types.StringValue(ns.Path)
 	model.State = types.StringValue(ns.State)
-	if ns.EncryptionKeyId != nil {
-		model.EncryptionKeyId = types.StringValue(*ns.EncryptionKeyId)
+	if ns.KeyId != nil {
+		model.KeyId = types.StringValue(*ns.KeyId)
 	} else {
-		model.EncryptionKeyId = types.StringNull()
+		model.KeyId = types.StringNull()
 	}
 	model.Labels = labelsToMap(ns.Labels)
 	model.Annotations = annotationsToMap(ns.Annotations)

@@ -22,7 +22,7 @@
       "type": "string",
       "enum": ["healthy", "unhealthy"]
     },
-    "EncryptionKeyState": {
+    "KeyState": {
       "type": "string",
       "enum": ["active", "disabled"]
     },
@@ -239,7 +239,7 @@
       "properties": {
         "path": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
         "state": { "$ref": "#/$defs/NamespaceState" },
-        "encryption_key_id": { "type": "string" },
+        "key_id": { "type": "string" },
         "labels": { "$ref": "#/$defs/StringMap" },
         "annotations": { "$ref": "#/$defs/StringMap" },
         "created_at": {
@@ -284,20 +284,20 @@
       "required": ["items"],
       "additionalProperties": false
     },
-    "SetNamespaceEncryptionKeyRequest": {
+    "SetNamespaceKeyRequest": {
       "type": "object",
       "properties": {
-        "encryption_key_id": { "type": "string" }
+        "key_id": { "type": "string" }
       },
-      "required": ["encryption_key_id"],
+      "required": ["key_id"],
       "additionalProperties": false
     },
-    "NamespaceEncryptionKey": {
+    "NamespaceKey": {
       "type": "object",
       "properties": {
-        "encryption_key_id": { "type": "string" }
+        "key_id": { "type": "string" }
       },
-      "required": ["encryption_key_id"],
+      "required": ["key_id"],
       "additionalProperties": false
     },
     "Actor": {
@@ -808,12 +808,12 @@
       "required": ["request_label_snapshot", "matched", "not_matched"],
       "additionalProperties": false
     },
-    "EncryptionKey": {
+    "Key": {
       "type": "object",
       "properties": {
         "id": { "type": "string" },
         "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
-        "state": { "$ref": "#/$defs/EncryptionKeyState" },
+        "state": { "$ref": "#/$defs/KeyState" },
         "labels": { "$ref": "#/$defs/StringMap" },
         "annotations": { "$ref": "#/$defs/StringMap" },
         "created_at": {
@@ -828,19 +828,19 @@
       "required": ["id", "namespace", "state", "created_at", "updated_at"],
       "additionalProperties": false
     },
-    "ListEncryptionKeysResponse": {
+    "ListKeysResponse": {
       "type": "object",
       "properties": {
         "items": {
           "type": "array",
-          "items": { "$ref": "#/$defs/EncryptionKey" }
+          "items": { "$ref": "#/$defs/Key" }
         },
         "cursor": { "type": "string" }
       },
       "required": ["items"],
       "additionalProperties": false
     },
-    "CreateEncryptionKeyRequest": {
+    "CreateKeyRequest": {
       "type": "object",
       "properties": {
         "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
@@ -851,10 +851,10 @@
       "required": ["namespace"],
       "additionalProperties": false
     },
-    "UpdateEncryptionKeyRequest": {
+    "UpdateKeyRequest": {
       "type": "object",
       "properties": {
-        "state": { "$ref": "#/$defs/EncryptionKeyState" },
+        "state": { "$ref": "#/$defs/KeyState" },
         "labels": { "$ref": "#/$defs/StringMap" },
         "annotations": { "$ref": "#/$defs/StringMap" }
       },

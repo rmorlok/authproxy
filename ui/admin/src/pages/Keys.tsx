@@ -17,8 +17,8 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import TextField from '@mui/material/TextField';
 import {
-    listEncryptionKeys, EncryptionKeyState, EncryptionKey, ListResponse,
-    ListEncryptionKeysParams, namespaceAndChildren, createEncryptionKey, CreateEncryptionKeyRequest
+    listKeys, KeyState, Key, ListResponse,
+    ListKeysParams, namespaceAndChildren, createKey, CreateKeyRequest
 } from '@authproxy/api';
 import dayjs from 'dayjs';
 import {useQueryState, parseAsInteger, parseAsStringLiteral, parseAsString} from 'nuqs'
@@ -26,16 +26,16 @@ import {useNavigate} from "react-router-dom";
 import {useSelector} from "react-redux";
 import {selectCurrentNamespacePath} from "../store/namespacesSlice";
 
-function renderState(state: EncryptionKeyState) {
-    const colors: Record<EncryptionKeyState, "default" | "success" | "error" | "info" | "warning" | "primary" | "secondary"> = {
-        [EncryptionKeyState.ACTIVE]: 'success',
-        [EncryptionKeyState.DISABLED]: 'default',
+function renderState(state: KeyState) {
+    const colors: Record<KeyState, "default" | "success" | "error" | "info" | "warning" | "primary" | "secondary"> = {
+        [KeyState.ACTIVE]: 'success',
+        [KeyState.DISABLED]: 'default',
     };
 
     return <Chip label={state} color={colors[state]} size="small" />;
 }
 
-export const columns: GridColDef<EncryptionKey>[] = [
+export const columns: GridColDef<Key>[] = [
     {
         field: 'id',
         headerName: 'ID',
@@ -56,7 +56,7 @@ export const columns: GridColDef<EncryptionKey>[] = [
         flex: 0.3,
         minWidth: 80,
         sortable: true,
-        renderCell: (params) => renderState(params.value as EncryptionKeyState),
+        renderCell: (params) => renderState(params.value as KeyState),
     },
     {
         field: 'labels',
@@ -108,18 +108,18 @@ const keySourceTypes = [
     { label: 'HashiCorp Vault', value: 'hashicorp_vault' },
 ];
 
-export default function EncryptionKeys() {
+export default function Keys() {
     const defaultPageSize = 20;
     const stateOptions = useMemo(() => [
         { label: 'All', value: '' },
-        { label: 'Active', value: EncryptionKeyState.ACTIVE },
-        { label: 'Disabled', value: EncryptionKeyState.DISABLED },
+        { label: 'Active', value: KeyState.ACTIVE },
+        { label: 'Disabled', value: KeyState.DISABLED },
     ], []);
     const navigate = useNavigate();
     const stateVals = useMemo(() => stateOptions.map(opt => opt.value), [stateOptions]);
     const ns = useSelector(selectCurrentNamespacePath);
 
-    const [rows, setRows] = useState<EncryptionKey[]>([]);
+    const [rows, setRows] = useState<Key[]>([]);
     const [rowCount, setRowCount] = useState<number>(-1);
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
@@ -138,12 +138,12 @@ export default function EncryptionKeys() {
     const [keySourceType, setKeySourceType] = useState('random');
     const [createFields, setCreateFields] = useState<Record<string, string>>({});
 
-    const responsesCacheRef = useRef<ListResponse<EncryptionKey>[]>([]);
+    const responsesCacheRef = useRef<ListResponse<Key>[]>([]);
     const pageRequestCacheRef = useRef<Set<number>>(new Set());
 
     const handleRowClick: GridEventListener<'rowClick'> = (params, event) => {
         const id = params.id;
-        const itemUrl = `/encryption-keys/${id}`;
+        const itemUrl = `/keys/${id}`;
         if (event.ctrlKey || event.metaKey || event.button === 1) {
             window.open(itemUrl, '_blank');
         } else {
@@ -196,14 +196,14 @@ export default function EncryptionKeys() {
                 const thisPage = responsesCacheRef.current.length;
                 const prevResp = responsesCacheRef.current[responsesCacheRef.current.length - 1];
 
-                const params: ListEncryptionKeysParams = prevResp?.cursor ? {cursor: prevResp.cursor} : {
-                    state: (stateFilter as EncryptionKeyState) || undefined,
+                const params: ListKeysParams = prevResp?.cursor ? {cursor: prevResp.cursor} : {
+                    state: (stateFilter as KeyState) || undefined,
                     namespace: namespaceAndChildren(ns),
                     order_by: sort || undefined,
                     limit: pageSize,
                 };
 
-                const resp = await listEncryptionKeys(params);
+                const resp = await listKeys(params);
 
                 if(resp.status !== 200) {
                     setError("Failed to fetch page of results from server");
@@ -223,7 +223,7 @@ export default function EncryptionKeys() {
                 setRowCount(responsesCacheRef.current.map((v) => v.items.length).reduceRight((acc, val)=> acc+val, 0));
             }
         } catch (e: any) {
-            setError(e?.message || 'Failed to load encryption keys');
+            setError(e?.message || 'Failed to load keys');
         } finally {
             setLoading(false);
         }
@@ -281,18 +281,18 @@ export default function EncryptionKeys() {
         setCreateLoading(true);
         setCreateError(null);
         try {
-            const request: CreateEncryptionKeyRequest = {
+            const request: CreateKeyRequest = {
                 namespace: ns,
                 key_data: buildKeyData(),
             };
-            await createEncryptionKey(request);
+            await createKey(request);
             setCreateOpen(false);
             setKeySourceType('random');
             setCreateFields({});
             resetPagination();
             fetchPage(1);
         } catch (err: any) {
-            const msg = err?.response?.data?.error || err.message || 'Failed to create encryption key';
+            const msg = err?.response?.data?.error || err.message || 'Failed to create key';
             setCreateError(msg);
         } finally {
             setCreateLoading(false);
@@ -437,7 +437,7 @@ export default function EncryptionKeys() {
         <Box sx={{width: '100%', maxWidth: {sm: '100%', md: '1700px'}}}>
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{mb: 2}}>
                 <Typography component="h2" variant="h6">
-                    Encryption Keys
+                    Keys
                 </Typography>
                 <Button variant="contained" size="small" onClick={() => setCreateOpen(true)}>
                     Create Key
@@ -524,9 +524,9 @@ export default function EncryptionKeys() {
                 )}
             </Grid>
 
-            {/* Create encryption key dialog */}
+            {/* Create key dialog */}
             <Dialog open={createOpen} onClose={() => !createLoading && setCreateOpen(false)} fullWidth maxWidth="sm">
-                <DialogTitle>Create Encryption Key</DialogTitle>
+                <DialogTitle>Create Key</DialogTitle>
                 <DialogContent>
                     {createError && (
                         <Typography color="error" sx={{ mb: 2 }}>{createError}</Typography>

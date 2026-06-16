@@ -83,7 +83,7 @@ Namespaces can be assigned a specific key via `key_id`. When encrypting data for
 root.tenant-a.app1  →  root.tenant-a  →  root  →  global
 ```
 
-The first namespace with an `encryption_key_id` set determines the key used. If none is found, the global key is used.
+The first namespace with a `key_id` set determines the key used. If none is found, the global key is used.
 
 Child namespaces automatically inherit their parent's key unless they explicitly set their own, enabling tenant-level or application-level key isolation.
 
@@ -108,7 +108,7 @@ KMS-backed providers are different from secret-backed providers. Secret-backed p
 
 ## Key Sync and Rotation
 
-Three processes keep encryption keys current:
+Three processes keep keys and DEKs current:
 
 ```mermaid
 sequenceDiagram
@@ -197,7 +197,7 @@ type E interface {
     // Encrypt with the global key
     EncryptGlobal(ctx, data) (EncryptedField, error)
 
-    // Encrypt with a specific encryption key
+    // Encrypt with a specific key
     EncryptForKey(ctx, keyId, data) (EncryptedField, error)
 
     // Encrypt using the key resolved for a namespace

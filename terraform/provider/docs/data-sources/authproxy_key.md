@@ -1,18 +1,18 @@
-# authproxy_encryption_key (Data Source)
+# authproxy_key (Data Source)
 
-Reads an existing AuthProxy encryption key.
+Reads an existing AuthProxy key.
 
 ## Example Usage
 
 ```hcl
-data "authproxy_encryption_key" "main" {
+data "authproxy_key" "main" {
   id = "key_abc123"
 }
 ```
 
 ## Argument Reference
 
-- `id` - (Required) The encryption key ID.
+- `id` - (Required) The key ID.
 
 ## Attribute Reference
 

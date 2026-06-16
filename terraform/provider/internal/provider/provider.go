@@ -40,7 +40,7 @@ func (p *AuthProxyProvider) Metadata(_ context.Context, _ provider.MetadataReque
 
 func (p *AuthProxyProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Terraform provider for managing AuthProxy resources (namespaces, encryption keys, actors, connectors).",
+		Description: "Terraform provider for managing AuthProxy resources (namespaces, keys, actors, connectors).",
 		Attributes: map[string]schema.Attribute{
 			"endpoint": schema.StringAttribute{
 				Description: "The AuthProxy admin API endpoint URL (e.g. http://localhost:8082). Can also be set with AUTHPROXY_ENDPOINT.",
@@ -108,7 +108,7 @@ func (p *AuthProxyProvider) Configure(ctx context.Context, req provider.Configur
 func (p *AuthProxyProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		resources.NewNamespaceResource,
-		resources.NewEncryptionKeyResource,
+		resources.NewKeyResource,
 		resources.NewActorResource,
 		resources.NewConnectorResource,
 		resources.NewRateLimitResource,
@@ -118,7 +118,7 @@ func (p *AuthProxyProvider) Resources(_ context.Context) []func() resource.Resou
 func (p *AuthProxyProvider) DataSources(_ context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		datasources.NewNamespaceDataSource,
-		datasources.NewEncryptionKeyDataSource,
+		datasources.NewKeyDataSource,
 		datasources.NewActorDataSource,
 		datasources.NewConnectorDataSource,
 	}
