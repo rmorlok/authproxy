@@ -281,6 +281,11 @@ The provider tests should prove:
 - Encrypted application data uses `dek_` ids and remains decryptable after
   provider rotation and DEK rewrap.
 
+AWS KMS integration tests require an existing symmetric KMS key because KMS keys
+cannot be deleted immediately after creation. Set `AUTH_PROXY_AWS_KMS_KEY_ID_V2`
+to a second accessible key ID or alias to exercise metadata advancement and
+rewrap under new provider material.
+
 ## Implementation Order
 
 The child issues under #605 are intended to land in this rough order:

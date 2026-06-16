@@ -94,6 +94,7 @@ The `KeyData` wrapper supports multiple sources for key material. Each provider 
 | Provider | Config Field | Description |
 |---|---|---|
 | **AWS Secrets Manager** | `aws_secret_id`, `aws_region` | Fetches secret value from AWS. Supports `aws_secret_key` for JSON extraction. Caches with configurable TTL. |
+| **AWS KMS** | `aws_kms_key_id`, `aws_region` | Uses AWS KMS to generate, wrap, and unwrap DEKs. The KMS key material never leaves AWS; AuthProxy persists only wrapped DEKs and provider metadata. Supports `aws_credentials`, `aws_kms_endpoint`, and `cache_ttl`. |
 | **GCP Secret Manager** | `gcp_secret_name`, `gcp_project` | Fetches from Google Cloud. Defaults to `latest` version. |
 | **HashiCorp Vault** | `vault_address`, `vault_path` | KV v1/v2 auto-detection. Reads `VAULT_TOKEN` from env if not configured. Exponential backoff retry. |
 | **Environment Variable** | `env_var` | Reads key bytes from an environment variable (also available as base64-encoded variant). |
@@ -102,7 +103,7 @@ The `KeyData` wrapper supports multiple sources for key material. Each provider 
 | **Random Bytes** | `num_bytes` | Generates secure random bytes at startup. Useful for ephemeral/dev keys. |
 | **KMS-backed providers** | provider-specific | Generate AuthProxy DEKs and wrap them with a provider-held KEK. The KEK never leaves the provider. |
 
-Cloud providers (AWS, GCP, Vault) support caching via `cache_ttl` and report provider-version metadata when the underlying secret has been rotated.
+Cloud providers (AWS, GCP, Vault) support caching via `cache_ttl` and report provider-version metadata when the underlying secret or KMS material has been rotated.
 
 KMS-backed providers are different from secret-backed providers. Secret-backed providers return AES key bytes directly to AuthProxy. KMS-backed providers generate or wrap data encryption keys (DEKs) and persist only the wrapped DEK in `data_encryption_keys`. Runtime encryption and re-encryption are driven by the current DEK for the namespace key.
 

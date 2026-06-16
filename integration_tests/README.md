@@ -57,6 +57,33 @@ Notes:
 - The test creates a short-lived secret and deletes it at the end.
 - For CI, provide `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and optional `AWS_SESSION_TOKEN` via secrets.
 
+## AWS KMS Integration Test
+
+This test hits real AWS KMS and is gated behind the `aws` build tag and an env flag.
+
+Requirements:
+- AWS credentials available via the standard AWS SDK chain.
+- `AWS_REGION` set.
+- `AUTH_PROXY_AWS_KMS_TEST=1` set to opt in.
+- `AUTH_PROXY_AWS_KMS_KEY_ID` set to an existing symmetric KMS key ID, key ARN, alias name, or alias ARN.
+- IAM permissions: `kms:DescribeKey`, `kms:GenerateDataKey`, `kms:Encrypt`, `kms:Decrypt`.
+
+Optional:
+- `AUTH_PROXY_AWS_KMS_KEY_ID_V2` set to a second accessible symmetric KMS key to exercise provider metadata advancement and DEK rewrap.
+- `AUTH_PROXY_AWS_KMS_ENDPOINT` set to override the KMS endpoint.
+
+Run:
+```bash
+cd integration_tests
+AUTH_PROXY_AWS_KMS_TEST=1 AWS_REGION=us-east-1 \\
+  AUTH_PROXY_AWS_KMS_KEY_ID=alias/authproxy-test \\
+  go test -tags "integration,aws" -v ./encrypt/...
+```
+
+Notes:
+- The test does not create or delete KMS keys because AWS KMS keys have delayed deletion windows.
+- For CI, provide `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and optional `AWS_SESSION_TOKEN` via secrets.
+
 ## GCP Secret Manager Integration Test
 
 This test hits real GCP Secret Manager and is gated behind the `gcp` build tag and an env flag.

@@ -50,6 +50,9 @@ fieldLoop:
 		case "vault_address":
 			keyData = &KeyDataVault{}
 			break fieldLoop
+		case "aws_kms_key_id":
+			keyData = &KeyDataAwsKMS{}
+			break fieldLoop
 		case "aws_secret_id":
 			keyData = &KeyDataAwsSecret{}
 			break fieldLoop
@@ -66,7 +69,7 @@ fieldLoop:
 	}
 
 	if keyData == nil {
-		return fmt.Errorf("invalid structure for key data type; does not match value, base64, env_var, env_var_base64, path, random, vault_address, aws_secret_id, gcp_secret_name, mock_id, mock_kms_id")
+		return fmt.Errorf("invalid structure for key data type; does not match value, base64, env_var, env_var_base64, path, random, vault_address, aws_kms_key_id, aws_secret_id, gcp_secret_name, mock_id, mock_kms_id")
 	}
 
 	if err := value.Decode(keyData); err != nil {

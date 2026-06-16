@@ -18,6 +18,7 @@ const (
 	ProviderTypeFile           ProviderType = "file"
 	ProviderTypeRandom         ProviderType = "random"
 	ProviderTypeAws            ProviderType = "aws"
+	ProviderTypeAwsKMS         ProviderType = "aws_kms"
 	ProviderTypeGcp            ProviderType = "gcp"
 	ProviderTypeHashicorpVault ProviderType = "hashicorpvault"
 	ProviderTypeRaw            ProviderType = "raw"

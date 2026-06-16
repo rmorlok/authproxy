@@ -44,8 +44,11 @@ func createDataEncryptionKey(
 		Provider:        string(generated.Provider),
 		ProviderID:      generated.ProviderID,
 		ProviderVersion: generated.ProviderVersion,
-		ProtectedData:   &generated.ProtectedData,
-		IsCurrent:       true,
+		ProviderMetadata: database.DataEncryptionKeyProviderMetadata(
+			generated.ProviderMetadata,
+		),
+		ProtectedData: &generated.ProtectedData,
+		IsCurrent:     true,
 	}
 	if err := db.CreateDataEncryptionKey(ctx, dek); err != nil {
 		return nil, err
