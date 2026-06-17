@@ -60,6 +60,28 @@ func TestProbe_Validate_AcceptsValidThresholds(t *testing.T) {
 	}
 }
 
+func TestProbe_Validate_IfPredicate(t *testing.T) {
+	t.Run("accepts conditional probe", func(t *testing.T) {
+		p := &Probe{
+			Id:   "ping",
+			If:   &common.Predicate{Javascript: `cfg.has_calendar === true`},
+			Http: &ProbeHttp{Method: "GET", URL: "https://example.com"},
+		}
+		require.NoError(t, p.Validate(&common.ValidationContext{}))
+	})
+
+	t.Run("rejects blank javascript", func(t *testing.T) {
+		p := &Probe{
+			Id:   "ping",
+			If:   &common.Predicate{Javascript: " \n\t "},
+			Http: &ProbeHttp{Method: "GET", URL: "https://example.com"},
+		}
+		err := p.Validate(&common.ValidationContext{Path: "probe"})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "probe.if.javascript")
+	})
+}
+
 func TestProbe_Validate_RejectsZero(t *testing.T) {
 	t.Run("failure_threshold = 0", func(t *testing.T) {
 		p := &Probe{

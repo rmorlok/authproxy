@@ -112,6 +112,44 @@ func TestSchema(t *testing.T) {
 			},
 		},
 		{
+			Name: "Predicate",
+			Schema: `
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/schema/common/test.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["test"],
+  "properties": {
+	"test": {
+		"$ref": "./schema.json#/$defs/Predicate"
+    }
+  }
+}`,
+			Tests: []test{
+				{
+					Name:  "valid",
+					Valid: true,
+					Data:  `{"test": {"javascript": "cfg.enabled === true"}}`,
+				},
+				{
+					Name:  "missing javascript",
+					Valid: false,
+					Data:  `{"test": {}}`,
+				},
+				{
+					Name:  "empty javascript",
+					Valid: false,
+					Data:  `{"test": {"javascript": ""}}`,
+				},
+				{
+					Name:  "additional property",
+					Valid: false,
+					Data:  `{"test": {"javascript": "true", "type": "javascript"}}`,
+				},
+			},
+		},
+		{
 			Name: "Cron",
 			Schema: `
 {

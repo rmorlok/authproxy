@@ -91,7 +91,7 @@ func TestSetupFlowValidation(t *testing.T) {
 					{
 						Id:         "advanced_options",
 						JsonSchema: common.RawJSON(`{"type":"object"}`),
-						If: &SetupFlowStepIf{
+						If: &common.Predicate{
 							Javascript: `cfg.region === "eu" && labels["apxy/cxr/type"] === "salesforce"`,
 						},
 					},
@@ -108,7 +108,7 @@ func TestSetupFlowValidation(t *testing.T) {
 					{
 						Id:         "advanced_options",
 						JsonSchema: common.RawJSON(`{"type":"object"}`),
-						If:         &SetupFlowStepIf{},
+						If:         &common.Predicate{},
 					},
 				},
 			},
@@ -125,7 +125,7 @@ func TestSetupFlowValidation(t *testing.T) {
 					{
 						Id:         "advanced_options",
 						JsonSchema: common.RawJSON(`{"type":"object"}`),
-						If:         &SetupFlowStepIf{Javascript: " \n\t "},
+						If:         &common.Predicate{Javascript: " \n\t "},
 					},
 				},
 			},
@@ -830,7 +830,7 @@ func TestSetupFlowYAMLRoundtrip(t *testing.T) {
 					{
 						Id:         "workspace",
 						JsonSchema: common.RawJSON(`{"type":"object"}`),
-						If: &SetupFlowStepIf{
+						If: &common.Predicate{
 							Javascript: `annotations["setup-mode"] !== "basic"`,
 						},
 						DataSources: map[string]DataSourceDef{

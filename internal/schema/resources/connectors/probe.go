@@ -42,6 +42,11 @@ type Probe struct {
 	// Http defines the probe as using a raw HTTP request as the probe.
 	Http *ProbeHttp `json:"http,omitempty" yaml:"http,omitempty"`
 
+	// If optionally disables this probe for a connection. Runtime evaluates
+	// the configured condition server-side with cfg, labels, and annotations
+	// variables in scope.
+	If *common.Predicate `json:"if,omitempty" yaml:"if,omitempty"`
+
 	// FailureThreshold is the number of consecutive failures that must occur
 	// before the connection's health_state flips to unhealthy. Defaults to
 	// DefaultProbeFailureThreshold when omitted. Must be ≥ 1 when set.
@@ -85,6 +90,10 @@ func (p *Probe) Validate(vc *common.ValidationContext) error {
 
 	if typeCount != 1 {
 		result = multierror.Append(result, vc.NewErrorf("exactly one of proxy_http or http must be defined"))
+	}
+
+	if err := p.If.Validate(vc.PushField("if"), connectorPredicateValidationVars()); err != nil {
+		result = multierror.Append(result, err)
 	}
 
 	if p.Period != nil && p.Cron != nil {

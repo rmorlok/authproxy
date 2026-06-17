@@ -384,33 +384,11 @@ type SetupFlowStep struct {
 
 	// If optionally gates this user-authored setup step. Runtime evaluates the
 	// configured condition server-side; clients only see eligible steps.
-	If *SetupFlowStepIf `json:"if,omitempty" yaml:"if,omitempty"`
+	If *common.Predicate `json:"if,omitempty" yaml:"if,omitempty"`
 
 	// Redirect carries the redirect-step-specific configuration. Required
 	// when Type == redirect; must be absent otherwise.
 	Redirect *SetupFlowStepRedirect `json:"redirect,omitempty" yaml:"redirect,omitempty"`
-}
-
-// SetupFlowStepIf defines the condition that controls whether a user-authored
-// setup step participates in a connection setup flow. Auth-method-emitted
-// steps and apxy:* pseudo-steps are not represented in connector YAML and
-// therefore cannot be gated through this schema.
-type SetupFlowStepIf struct {
-	// Javascript is a JavaScript fragment evaluated with cfg, labels, and
-	// annotations variables in scope. Runtime work requires the fragment to
-	// return a boolean.
-	Javascript string `json:"javascript" yaml:"javascript"`
-}
-
-func (i *SetupFlowStepIf) Validate(vc *common.ValidationContext) error {
-	if i == nil {
-		return nil
-	}
-	result := &multierror.Error{}
-	if strings.TrimSpace(i.Javascript) == "" {
-		result = multierror.Append(result, vc.NewErrorfForField("javascript", "javascript is required"))
-	}
-	return result.ErrorOrNil()
 }
 
 // SetupFlowStepRedirect describes a redirect-kind step's destination. The
@@ -459,7 +437,7 @@ func (s *SetupFlowStep) Validate(vc *common.ValidationContext, seenIds map[strin
 		result = multierror.Append(result, vc.NewErrorfForField("type", "type must be %q or %q (got %q)", SetupFlowStepTypeForm, SetupFlowStepTypeRedirect, s.Type))
 	}
 
-	if err := s.If.Validate(vc.PushField("if")); err != nil {
+	if err := s.If.Validate(vc.PushField("if"), connectorPredicateValidationVars()); err != nil {
 		result = multierror.Append(result, err)
 	}
 

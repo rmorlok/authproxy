@@ -94,6 +94,9 @@
         "http": {
           "$ref": "#/$defs/ProbeHttp"
         },
+        "if": {
+          "$ref": "../../common/schema.json#/$defs/Predicate"
+        },
         "failure_threshold": {
           "type": "integer",
           "minimum": 1
@@ -204,18 +207,7 @@
           }
         },
         "if": {
-          "$ref": "#/$defs/SetupFlowStepIf"
-        }
-      },
-      "additionalProperties": false
-    },
-    "SetupFlowStepIf": {
-      "type": "object",
-      "required": ["javascript"],
-      "properties": {
-        "javascript": {
-          "type": "string",
-          "minLength": 1
+          "$ref": "../../common/schema.json#/$defs/Predicate"
         }
       },
       "additionalProperties": false

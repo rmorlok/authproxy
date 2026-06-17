@@ -7,6 +7,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -119,7 +120,7 @@ func TestReconfigure(t *testing.T) {
 					{
 						Id:         "us_only",
 						JsonSchema: workspaceSchema,
-						If:         &cschema.SetupFlowStepIf{Javascript: `cfg.region === "us"`},
+						If:         &common.Predicate{Javascript: `cfg.region === "us"`},
 					},
 					{Id: "workspace", Title: "Select Workspace", JsonSchema: workspaceSchema},
 				},
