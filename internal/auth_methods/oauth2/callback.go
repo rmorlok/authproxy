@@ -272,8 +272,14 @@ func (o *oAuth2Connection) exchangeClientCredentialsInner(ctx context.Context) e
 	values := url.Values{
 		"grant_type": {"client_credentials"},
 	}
-	if scopes := JoinScopes(o.auth.Scopes); scopes != "" {
-		values.Set("scope", scopes)
+	effectiveScopes, err := o.effectiveScopes(ctx)
+	if err != nil {
+		err = fmt.Errorf("failed to resolve oauth2 scopes: %w", err)
+		o.emitAndRecordExchangeFailure(ctx, tokenExchangeInternalError, o.tokenExchangeAttrsFromConn(err))
+		return err
+	}
+	if scopeString := JoinScopes(effectiveScopes); scopeString != "" {
+		values.Set("scope", scopeString)
 	}
 
 	values, authHeader, err := applyTokenEndpointClientAuth(
