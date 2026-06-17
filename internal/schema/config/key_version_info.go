@@ -20,6 +20,7 @@ const (
 	ProviderTypeAwsSecretsManager ProviderType = "aws_secrets_manager"
 	ProviderTypeAwsKMS            ProviderType = "aws_kms"
 	ProviderTypeGcp               ProviderType = "gcp"
+	ProviderTypeGcpKMS            ProviderType = "gcp_kms"
 	ProviderTypeHashicorpVault    ProviderType = "hashicorpvault"
 	ProviderTypeRaw               ProviderType = "raw"
 )

@@ -3,6 +3,7 @@ module github.com/rmorlok/authproxy
 go 1.24.5
 
 require (
+	cloud.google.com/go/kms v1.22.0
 	cloud.google.com/go/secretmanager v1.16.0
 	github.com/ClickHouse/clickhouse-go/v2 v2.43.0
 	github.com/Masterminds/squirrel v1.5.4
@@ -31,6 +32,7 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
+	github.com/googleapis/gax-go/v2 v2.15.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/vault/api v1.22.0
 	github.com/hibiken/asynq v0.25.1
@@ -78,10 +80,12 @@ require (
 )
 
 require (
+	cloud.google.com/go v0.120.0 // indirect
 	cloud.google.com/go/auth v0.16.4 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	cloud.google.com/go/iam v1.5.2 // indirect
+	cloud.google.com/go/longrunning v0.6.7 // indirect
 	github.com/ClickHouse/ch-go v0.71.0 // indirect
 	github.com/KyleBanks/depth v1.2.1 // indirect
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
@@ -135,7 +139,6 @@ require (
 	github.com/google/pprof v0.0.0-20230207041349-798e818bf904 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.6 // indirect
-	github.com/googleapis/gax-go/v2 v2.15.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.3 // indirect
 	github.com/h2non/parth v0.0.0-20190131123155-b4df798d6542 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect

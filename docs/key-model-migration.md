@@ -286,6 +286,12 @@ cannot be deleted immediately after creation. Set `AUTH_PROXY_AWS_KMS_KEY_ID_V2`
 to a second accessible key ID or alias to exercise metadata advancement and
 rewrap under new provider material.
 
+Google Cloud KMS integration tests require an existing symmetric encryption
+CryptoKey. Google Cloud KMS does not expose an AWS-style `GenerateDataKey` API,
+so AuthProxy uses `GenerateRandomBytes` for provider-generated DEK bytes and
+then wraps the DEK with `Encrypt`; the DEK row stores the CryptoKeyVersion used
+for wrapping.
+
 ## Implementation Order
 
 The child issues under #605 are intended to land in this rough order:

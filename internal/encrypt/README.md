@@ -96,6 +96,7 @@ The `KeyData` wrapper supports multiple sources for key material. Each provider 
 | **AWS Secrets Manager** | `aws_secret_id`, `aws_region` | Fetches secret value from AWS. Supports `aws_secret_key` for JSON extraction. Caches with configurable TTL. |
 | **AWS KMS** | `aws_kms_key_id`, `aws_region` | Uses AWS KMS to generate, wrap, and unwrap DEKs. The KMS key material never leaves AWS; AuthProxy persists only wrapped DEKs and provider metadata. Supports `aws_credentials`, `aws_kms_endpoint`, and `cache_ttl`. |
 | **GCP Secret Manager** | `gcp_secret_name`, `gcp_project` | Fetches from Google Cloud. Defaults to `latest` version. |
+| **GCP KMS** | `gcp_kms_key_name` or `gcp_project`, `gcp_location`, `gcp_key_ring`, `gcp_crypto_key` | Uses Google Cloud KMS to generate DEK bytes, wrap/unwrap DEKs with the configured CryptoKey, and track the CryptoKeyVersion used for wrapping. Supports ADC, `gcp_credentials_file`, `gcp_credentials_json`, `gcp_kms_endpoint`, and `cache_ttl`. |
 | **HashiCorp Vault** | `vault_address`, `vault_path` | KV v1/v2 auto-detection. Reads `VAULT_TOKEN` from env if not configured. Exponential backoff retry. |
 | **Environment Variable** | `env_var` | Reads key bytes from an environment variable (also available as base64-encoded variant). |
 | **File** | `path` | Reads key bytes from a file. Supports `~` expansion. |
