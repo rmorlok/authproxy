@@ -909,6 +909,19 @@
             { "required": ["gcp_project", "gcp_location", "gcp_key_ring", "gcp_crypto_key"] }
           ],
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "vault_address": { "type": "string" },
+            "vault_token": { "type": "string" },
+            "vault_namespace": { "type": "string" },
+            "vault_transit_mount_path": { "type": "string" },
+            "vault_transit_key_name": { "type": "string" },
+            "cache_ttl": { "type": "string" }
+          },
+          "required": ["vault_address", "vault_transit_key_name"],
+          "additionalProperties": false
         }
       ]
     },
