@@ -28,3 +28,8 @@ func (p *Predicate) Validate(vc *ValidationContext, vars map[string]any) error {
 	}
 	return result.ErrorOrNil()
 }
+
+// GetValue returns the boolean value by evaluating the predicate's javascript.
+func (p *Predicate) GetValue(vars map[string]any) (bool, error) {
+	return apjs.EvaluateBoolean(p.Javascript, vars)
+}

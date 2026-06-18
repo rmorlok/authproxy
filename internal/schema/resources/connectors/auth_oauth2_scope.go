@@ -17,13 +17,14 @@ type Scope struct {
 	Reason   string            `json:"reason" yaml:"reason"`
 }
 
-func (s *Scope) IsRequired() bool {
+func (s *Scope) IsRequired(vars map[string]any) (bool, error) {
+	// If the attribute is not specified, scopes default to required.
 	if s == nil || s.Required == nil {
 		// If unspecified, assume required.
-		return true
+		return true, nil
 	}
 
-	return s.Required.IsRequired()
+	return s.Required.IsRequired(vars)
 }
 
 func (s *Scope) Validate(vc *common.ValidationContext) error {
@@ -53,7 +54,8 @@ func (s Scope) Clone() Scope {
 }
 
 // ScopeRequired preserves the existing `required: true|false` shape while
-// allowing a dynamic predicate object at the same YAML key.
+// allowing a dynamic predicate object at the same YAML key. It does this by
+// implementing custom JSON/YAML marshalling and unmarshalling.
 type ScopeRequired struct {
 	Bool      *bool             `json:"-" yaml:"-"`
 	Predicate *common.Predicate `json:"-" yaml:"-"`
@@ -67,13 +69,20 @@ func NewScopeRequiredPredicate(predicate *common.Predicate) *ScopeRequired {
 	return &ScopeRequired{Predicate: predicate}
 }
 
-func (r *ScopeRequired) IsRequired() bool {
-	if r == nil || r.Bool == nil {
-		// Runtime evaluates Predicate in the OAuth runtime work. Until then,
-		// preserve the historical required-by-default behavior.
-		return true
+func (r *ScopeRequired) IsRequired(vars map[string]any) (bool, error) {
+	if r == nil {
+		return true, nil
 	}
-	return *r.Bool
+
+	if r.Bool != nil {
+		return *r.Bool, nil
+	}
+
+	if r.Predicate == nil {
+		return false, fmt.Errorf("required must be a boolean or predicate object")
+	}
+
+	return r.Predicate.GetValue(vars)
 }
 
 func (r *ScopeRequired) Clone() *ScopeRequired {
@@ -93,10 +102,24 @@ func (r *ScopeRequired) Clone() *ScopeRequired {
 }
 
 func (r *ScopeRequired) Validate(vc *common.ValidationContext) error {
-	if r == nil || r.Predicate == nil {
+	// The scope will default to required.
+	if r == nil {
 		return nil
 	}
-	return r.Predicate.Validate(vc, connectorPredicateValidationVars())
+
+	if r.Bool != nil && r.Predicate != nil {
+		return vc.NewError("required must be a boolean or predicate object; cannot be both")
+	}
+
+	if r.Bool == nil && r.Predicate == nil {
+		return vc.NewError("required must be a boolean or predicate object")
+	}
+
+	if r.Predicate != nil {
+		return r.Predicate.Validate(vc, connectorPredicateValidationVars())
+	}
+
+	return nil
 }
 
 func (r ScopeRequired) MarshalJSON() ([]byte, error) {

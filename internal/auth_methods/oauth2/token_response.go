@@ -119,7 +119,10 @@ func (o *oAuth2Connection) createDbTokenFromResponseWithOptions(
 		return nil, fmt.Errorf("failed to insert oauth2 token: %w", err)
 	}
 
-	mismatch := detectScopeMismatch(effectiveScopes, scopes)
+	mismatch, err := detectScopeMismatch(effectiveScopes, scopes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect oauth2 scope mismatch: %w", err)
+	}
 	if err := o.applyScopeMismatch(ctx, mismatch); err != nil {
 		return nil, err
 	}

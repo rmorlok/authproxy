@@ -24,7 +24,7 @@ type scopeMismatchOutcome struct {
 // detectScopeMismatch compares the scopes declared on the connector against the scopes echoed
 // by the provider. The granted set falls back to the requested set when the provider omits the
 // `scope` parameter (RFC 6749 §5.1 — silent agreement to the request).
-func detectScopeMismatch(declared []sconfig.Scope, granted string) scopeMismatchOutcome {
+func detectScopeMismatch(declared []sconfig.Scope, granted string) (scopeMismatchOutcome, error) {
 	grantedSet := scopeSet(granted)
 
 	var outcome scopeMismatchOutcome
@@ -34,7 +34,11 @@ func detectScopeMismatch(declared []sconfig.Scope, granted string) scopeMismatch
 		if _, ok := grantedSet[s.Id]; ok {
 			continue
 		}
-		if s.IsRequired() {
+		required, err := s.IsRequired(nil)
+		if err != nil {
+			return scopeMismatchOutcome{}, fmt.Errorf("scope %q required: %w", s.Id, err)
+		}
+		if required {
 			outcome.missingRequired = append(outcome.missingRequired, s.Id)
 		} else {
 			outcome.missingOptional = append(outcome.missingOptional, s.Id)
@@ -48,7 +52,7 @@ func detectScopeMismatch(declared []sconfig.Scope, granted string) scopeMismatch
 	sort.Strings(outcome.missingRequired)
 	sort.Strings(outcome.missingOptional)
 	sort.Strings(outcome.extraGranted)
-	return outcome
+	return outcome, nil
 }
 
 // applyScopeMismatch records the outcome on the connection. Required-scope misses produce an

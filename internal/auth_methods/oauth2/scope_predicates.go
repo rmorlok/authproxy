@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/rmorlok/authproxy/internal/apjs"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 )
 
@@ -19,9 +18,12 @@ func (o *oAuth2Connection) effectiveScopes(ctx context.Context) ([]sconfig.Scope
 		if vars != nil {
 			return vars, nil
 		}
-		resolved, err := o.scopePredicateVars(ctx)
+		if o.connection == nil {
+			return nil, errors.New("connection is nil")
+		}
+		resolved, err := o.connection.GetPredicateVars(ctx)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("get predicate vars: %w", err)
 		}
 		vars = resolved
 		return vars, nil
@@ -35,7 +37,7 @@ func (o *oAuth2Connection) effectiveScopes(ctx context.Context) ([]sconfig.Scope
 			if err != nil {
 				return nil, err
 			}
-			ok, err := apjs.EvaluateBoolean(scope.If.Javascript, vars)
+			ok, err := scope.If.GetValue(vars)
 			if err != nil {
 				return nil, fmt.Errorf("scope %q if.javascript: %w", scope.Id, err)
 			}
@@ -49,7 +51,7 @@ func (o *oAuth2Connection) effectiveScopes(ctx context.Context) ([]sconfig.Scope
 			if err != nil {
 				return nil, err
 			}
-			required, err := apjs.EvaluateBoolean(scope.Required.Predicate.Javascript, vars)
+			required, err := scope.IsRequired(vars)
 			if err != nil {
 				return nil, fmt.Errorf("scope %q required.javascript: %w", scope.Id, err)
 			}
@@ -59,34 +61,4 @@ func (o *oAuth2Connection) effectiveScopes(ctx context.Context) ([]sconfig.Scope
 		scopes = append(scopes, scope)
 	}
 	return scopes, nil
-}
-
-func (o *oAuth2Connection) scopePredicateVars(ctx context.Context) (map[string]any, error) {
-	if o.connection == nil {
-		return nil, errors.New("connection is nil")
-	}
-
-	cfg, err := o.connection.GetConfiguration(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get connection configuration: %w", err)
-	}
-	if cfg == nil {
-		cfg = map[string]any{}
-	}
-
-	labels := o.connection.GetLabels()
-	if labels == nil {
-		labels = map[string]string{}
-	}
-
-	annotations := o.connection.GetAnnotations()
-	if annotations == nil {
-		annotations = map[string]string{}
-	}
-
-	return map[string]any{
-		"cfg":         cfg,
-		"labels":      labels,
-		"annotations": annotations,
-	}, nil
 }

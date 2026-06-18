@@ -144,6 +144,29 @@ func (m *Connection) SetConfiguration(ctx context.Context, data map[string]any) 
 	return nil
 }
 
+func (m *Connection) GetPredicateVars(ctx context.Context) (map[string]any, error) {
+	cfg := m.Configuration
+	if cfg == nil {
+		cfg = map[string]any{}
+	}
+
+	labels := m.Labels
+	if labels == nil {
+		labels = map[string]string{}
+	}
+
+	annotations := m.Annotations
+	if annotations == nil {
+		annotations = map[string]string{}
+	}
+
+	return map[string]any{
+		"cfg":         cfg,
+		"labels":      labels,
+		"annotations": annotations,
+	}, nil
+}
+
 func (m *Connection) GetMustacheContext(ctx context.Context) (map[string]any, error) {
 	data := map[string]any{}
 

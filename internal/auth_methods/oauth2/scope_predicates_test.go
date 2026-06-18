@@ -60,9 +60,15 @@ func TestEffectiveScopes_UsesConnectionPredicateContext(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, got, 3)
 	assert.Equal(t, []string{"read", "write", "activity"}, []string{got[0].Id, got[1].Id, got[2].Id})
-	assert.True(t, got[0].IsRequired())
-	assert.True(t, got[1].IsRequired())
-	assert.False(t, got[2].IsRequired())
+	required, err := got[0].IsRequired(nil)
+	require.NoError(t, err)
+	assert.True(t, required)
+	required, err = got[1].IsRequired(nil)
+	require.NoError(t, err)
+	assert.True(t, required)
+	required, err = got[2].IsRequired(nil)
+	require.NoError(t, err)
+	assert.False(t, required)
 }
 
 func TestEffectiveScopes_PredicateErrorIncludesScopeContext(t *testing.T) {

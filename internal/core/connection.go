@@ -100,6 +100,32 @@ func (c *connection) GetConnectorVersionEntity() iface.ConnectorVersion {
 	return c.cv
 }
 
+func (c *connection) GetPredicateVars(ctx context.Context) (map[string]any, error) {
+	cfg, err := c.GetConfiguration(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get connection configuration: %w", err)
+	}
+	if cfg == nil {
+		cfg = map[string]any{}
+	}
+
+	labels := c.GetLabels()
+	if labels == nil {
+		labels = map[string]string{}
+	}
+
+	annotations := c.GetAnnotations()
+	if annotations == nil {
+		annotations = map[string]string{}
+	}
+
+	return map[string]any{
+		"cfg":         cfg,
+		"labels":      labels,
+		"annotations": annotations,
+	}, nil
+}
+
 func (c *connection) Logger() *slog.Logger {
 	return c.logger
 }
