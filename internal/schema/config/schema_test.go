@@ -215,6 +215,21 @@ func TestSchemaDefinitions(t *testing.T) {
 					Data:  `{"test": {"aws_kms_key_id": "alias/authproxy", "aws_region": "us-east-1", "aws_kms_endpoint": "http://localhost:4566", "aws_credentials": {"type": "implicit"}, "cache_ttl": "5m"}}`,
 				},
 				{
+					Name:  "gcp kms full resource",
+					Valid: true,
+					Data:  `{"test": {"gcp_kms_key_name": "projects/test-project/locations/global/keyRings/authproxy/cryptoKeys/dek-wrapper", "gcp_kms_endpoint": "localhost:8085", "gcp_credentials_json": {"env_var": "GCP_CREDS_JSON"}, "cache_ttl": "5m"}}`,
+				},
+				{
+					Name:  "gcp kms components",
+					Valid: true,
+					Data:  `{"test": {"gcp_project": "test-project", "gcp_location": "global", "gcp_key_ring": "authproxy", "gcp_crypto_key": "dek-wrapper", "gcp_credentials_file": "/tmp/gcp-creds.json", "cache_ttl": "5m"}}`,
+				},
+				{
+					Name:  "gcp kms missing component",
+					Valid: false,
+					Data:  `{"test": {"gcp_project": "test-project", "gcp_location": "global", "gcp_crypto_key": "dek-wrapper"}}`,
+				},
+				{
 					Name:  "empty object",
 					Valid: false,
 					Data:  `{"test": {}}`,

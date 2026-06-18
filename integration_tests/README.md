@@ -119,6 +119,33 @@ Notes:
 - For CI, provide `GCP_PROJECT_ID` and `GOOGLE_APPLICATION_CREDENTIALS_JSON` (the full service account key JSON) as repository secrets. The GitHub Actions workflow writes the JSON to a temp file and points `GOOGLE_APPLICATION_CREDENTIALS` at it.
 - The workflow runs only on pushes to `main` (and manual `workflow_dispatch`) to avoid exposing the GCP secrets to PRs from forks.
 
+## GCP KMS Integration Test
+
+This test hits real Google Cloud KMS and is gated behind the `gcp` build tag and an env flag.
+
+Requirements:
+- GCP credentials available via Application Default Credentials.
+- `AUTH_PROXY_GCP_KMS_TEST=1` set to opt in.
+- `AUTH_PROXY_GCP_KMS_KEY_NAME` set to an existing symmetric encryption CryptoKey resource name, or `GCP_PROJECT_ID`, `AUTH_PROXY_GCP_KMS_LOCATION`, `AUTH_PROXY_GCP_KMS_KEY_RING`, and `AUTH_PROXY_GCP_KMS_CRYPTO_KEY` set to its components.
+- IAM permissions: `cloudkms.cryptoKeys.get`, `cloudkms.cryptoKeyVersions.useToEncrypt`, `cloudkms.cryptoKeyVersions.useToDecrypt`, and `cloudkms.locations.generateRandomBytes`.
+
+Optional:
+- `AUTH_PROXY_GCP_KMS_KEY_NAME_V2` set to a second accessible CryptoKey to exercise provider metadata advancement and DEK rewrap.
+- `AUTH_PROXY_GCP_KMS_ENDPOINT` set to override the KMS endpoint.
+
+Run:
+```bash
+cd integration_tests
+AUTH_PROXY_GCP_KMS_TEST=1 \
+  AUTH_PROXY_GCP_KMS_KEY_NAME=projects/my-project/locations/global/keyRings/authproxy/cryptoKeys/dek-wrapper \
+  GOOGLE_APPLICATION_CREDENTIALS=/path/to/sa.json \
+  go test -tags "integration,gcp" -v ./encrypt/...
+```
+
+Notes:
+- The test does not create or delete KMS keys because Google Cloud KMS keys are long-lived resources.
+- GCP KMS DEK generation uses `GenerateRandomBytes` and then wraps the generated DEK with the configured CryptoKey.
+
 ## HashiCorp Vault Integration Test
 
 This test hits a running HashiCorp Vault server and is gated behind the `vault` build tag and an env flag. Unlike the AWS and GCP tests, Vault runs locally (in dev mode) both on developer machines and in CI — no external credentials required.
