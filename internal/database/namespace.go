@@ -235,6 +235,12 @@ func (s *service) getNamespaceByPath(ctx context.Context, tx sq.BaseRunner, path
 	return &result, nil
 }
 
+// validateNamespaceKeyScope enforces that a namespace can only target a key
+// scoped to the namespace itself or one of its ancestors. This keeps a
+// namespace from depending on key material owned by a child or sibling
+// namespace, which could be deleted independently while the namespace still
+// references it. The seeded root key (key_global) naturally satisfies this
+// rule for root and its descendants.
 func (s *service) validateNamespaceKeyScope(ctx context.Context, runner sq.BaseRunner, path string, keyID apid.ID) error {
 	var keyNamespace string
 	err := s.sq.
