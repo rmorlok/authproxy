@@ -12,6 +12,7 @@ import (
 	mockDb "github.com/rmorlok/authproxy/internal/database/mock"
 	mockEncrypt "github.com/rmorlok/authproxy/internal/encrypt/mock"
 	mockH "github.com/rmorlok/authproxy/internal/httpf/mock"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -200,6 +201,40 @@ func TestRunProbe_ProbeNotFound(t *testing.T) {
 	require.Error(t, err)
 	assert.ErrorIs(t, err, asynq.SkipRetry,
 		"missing probe id should be SkipRetry — retrying won't bring it back")
+}
+
+func TestRunProbe_DisabledProbeSkipsRetry(t *testing.T) {
+	connectionId := apid.New(apid.PrefixConnection)
+	connector := &cschema.Connector{
+		Id:          apid.New(apid.PrefixConnectorVersion),
+		Version:     1,
+		DisplayName: "disabled-probe-test",
+		Auth:        &cschema.Auth{InnerVal: &cschema.AuthApiKey{Type: cschema.AuthTypeAPIKey}},
+		Probes: []cschema.Probe{{
+			Id: "ping",
+			If: &common.Predicate{Javascript: `cfg.run_probe === true`},
+			Http: &cschema.ProbeHttp{
+				Method: "GET",
+				URL:    "https://upstream.example.invalid/health",
+			},
+		}},
+	}
+	conn := &database.Connection{
+		Id:               connectionId,
+		Namespace:        "root",
+		State:            database.ConnectionStateConfigured,
+		HealthState:      database.ConnectionHealthStateHealthy,
+		ConnectorId:      connector.Id,
+		ConnectorVersion: connector.Version,
+	}
+
+	svc, _, _, ctrl := setupVerifyTest(t, connectionId, conn, connector)
+	defer ctrl.Finish()
+
+	err := svc.RunProbe(context.Background(), connectionId, "ping")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, asynq.SkipRetry,
+		"disabled probe task should be SkipRetry — retrying will not enable it")
 }
 
 // TestRunProbe_ConnectionNotFound returns SkipRetry so the asynq retry loop

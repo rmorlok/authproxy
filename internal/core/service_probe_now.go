@@ -48,7 +48,11 @@ func (s *service) EnqueueProbeNow(ctx context.Context, connectionId apid.ID) err
 		return err
 	}
 
-	probes := conn.GetProbes()
+	probes, err := conn.GetEnabledProbes(ctx)
+	if err != nil {
+		logger.Warn("probe-now: failed to resolve enabled probes", "error", err)
+		return err
+	}
 	if len(probes) == 0 {
 		return nil
 	}

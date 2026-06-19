@@ -57,6 +57,8 @@ type Connection interface {
 	GetMustacheContext(ctx context.Context) (map[string]any, error)
 	GetProbe(probeId string) (Probe, error)
 	GetProbes() []Probe
+	GetEnabledProbe(ctx context.Context, probeId string) (Probe, error)
+	GetEnabledProbes(ctx context.Context) ([]Probe, error)
 	ProxyRequest(
 		ctx context.Context,
 		reqType httpf.RequestType,

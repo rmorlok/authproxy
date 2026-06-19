@@ -88,23 +88,24 @@ func (c *connection) maybeRecoverHealth(ctx context.Context, probe iface.Probe) 
 		return nil
 	}
 
-	// Recovery requires every OTHER probe to be within its failure threshold.
-	// A recovery on probe A doesn't restore health while probe B is still
-	// over-failing.
-	def := c.cv.GetDefinition()
-	if def != nil {
-		for _, p := range def.Probes {
-			if p.Id == probe.GetId() {
-				continue
-			}
-			otherFailureThreshold := p.EffectiveFailureThreshold()
-			otherStreak, err := c.consecutiveOutcomeStreak(ctx, p.Id, database.ProbeOutcomeStatusFailure, otherFailureThreshold)
-			if err != nil {
-				return err
-			}
-			if otherStreak >= otherFailureThreshold {
-				return nil // another probe is still failing
-			}
+	// Recovery requires every OTHER enabled probe to be within its failure
+	// threshold. A recovery on probe A doesn't restore health while enabled
+	// probe B is still over-failing, but disabled peers are ignored.
+	enabledProbes, err := c.GetEnabledProbes(ctx)
+	if err != nil {
+		return err
+	}
+	for _, otherProbe := range enabledProbes {
+		if otherProbe.GetId() == probe.GetId() {
+			continue
+		}
+		otherFailureThreshold := otherProbe.EffectiveFailureThreshold()
+		otherStreak, err := c.consecutiveOutcomeStreak(ctx, otherProbe.GetId(), database.ProbeOutcomeStatusFailure, otherFailureThreshold)
+		if err != nil {
+			return err
+		}
+		if otherStreak >= otherFailureThreshold {
+			return nil // another probe is still failing
 		}
 	}
 

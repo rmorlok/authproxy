@@ -93,7 +93,10 @@ func (s *service) runVerifyConnection(ctx context.Context, connectionId apid.ID)
 		return nil
 	}
 
-	probes := conn.GetProbes()
+	probes, err := conn.GetEnabledProbes(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to resolve enabled probes for verify: %w", err)
+	}
 	for _, probe := range probes {
 		outcome, invokeErr := probe.Invoke(ctx)
 		if invokeErr == nil {

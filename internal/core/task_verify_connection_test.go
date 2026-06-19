@@ -14,6 +14,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/encfield"
 	mockEncrypt "github.com/rmorlok/authproxy/internal/encrypt/mock"
 	mockH "github.com/rmorlok/authproxy/internal/httpf/mock"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -98,6 +99,98 @@ func TestRunVerifyConnection_NoProbes_AdvancesToReady(t *testing.T) {
 
 	// onVerifyPassed: no configure step → next is zero → clear setup_step
 	// + advance to Ready.
+	db.EXPECT().
+		SetConnectionSetupStep(gomock.Any(), connectionId, (*cschema.SetupStep)(nil)).
+		Return(nil)
+	db.EXPECT().
+		SetConnectionState(gomock.Any(), connectionId, database.ConnectionStateConfigured).
+		Return(nil)
+
+	require.NoError(t, svc.RunVerifyConnection(context.Background(), connectionId))
+}
+
+func TestRunVerifyConnection_AllProbesDisabled_AdvancesToReady(t *testing.T) {
+	connectionId := apid.New(apid.PrefixConnection)
+	connector := &cschema.Connector{
+		Id:          apid.New(apid.PrefixConnectorVersion),
+		Version:     1,
+		DisplayName: "verify-disabled-test",
+		Auth:        &cschema.Auth{InnerVal: &cschema.AuthApiKey{Type: cschema.AuthTypeAPIKey}},
+		Probes: []cschema.Probe{{
+			Id: "disabled",
+			If: &common.Predicate{Javascript: `cfg.run_probe === true`},
+			Http: &cschema.ProbeHttp{
+				Method: "GET",
+				URL:    "https://upstream.example.invalid/disabled",
+			},
+		}},
+	}
+	verifyStep := cschema.SetupStepVerify
+	conn := &database.Connection{
+		Id:               connectionId,
+		Namespace:        "root",
+		State:            database.ConnectionStateSetup,
+		HealthState:      database.ConnectionHealthStateHealthy,
+		ConnectorId:      connector.Id,
+		ConnectorVersion: connector.Version,
+		SetupStep:        &verifyStep,
+	}
+
+	svc, db, _, ctrl := setupVerifyTest(t, connectionId, conn, connector)
+	defer ctrl.Finish()
+
+	db.EXPECT().
+		SetConnectionSetupStep(gomock.Any(), connectionId, (*cschema.SetupStep)(nil)).
+		Return(nil)
+	db.EXPECT().
+		SetConnectionState(gomock.Any(), connectionId, database.ConnectionStateConfigured).
+		Return(nil)
+
+	require.NoError(t, svc.RunVerifyConnection(context.Background(), connectionId))
+}
+
+func TestRunVerifyConnection_MixedProbePredicates_RunOnlyEnabled(t *testing.T) {
+	connectionId := apid.New(apid.PrefixConnection)
+	connector := &cschema.Connector{
+		Id:          apid.New(apid.PrefixConnectorVersion),
+		Version:     1,
+		DisplayName: "verify-mixed-test",
+		Auth:        &cschema.Auth{InnerVal: &cschema.AuthApiKey{Type: cschema.AuthTypeAPIKey}},
+		Probes: []cschema.Probe{
+			{
+				Id: "enabled",
+				Http: &cschema.ProbeHttp{
+					Method: "GET",
+					URL:    "https://upstream.example.invalid/enabled",
+				},
+			},
+			{
+				Id: "disabled",
+				If: &common.Predicate{Javascript: `cfg.run_disabled === true`},
+				Http: &cschema.ProbeHttp{
+					Method: "GET",
+					URL:    "https://upstream.example.invalid/disabled",
+				},
+			},
+		},
+	}
+	verifyStep := cschema.SetupStepVerify
+	conn := &database.Connection{
+		Id:               connectionId,
+		Namespace:        "root",
+		State:            database.ConnectionStateSetup,
+		HealthState:      database.ConnectionHealthStateHealthy,
+		ConnectorId:      connector.Id,
+		ConnectorVersion: connector.Version,
+		SetupStep:        &verifyStep,
+	}
+
+	svc, db, _, ctrl := setupVerifyTest(t, connectionId, conn, connector)
+	defer ctrl.Finish()
+
+	svc.httpf = mockH.NewFactoryWithMockingClient(ctrl)
+	genmock.New("https://upstream.example.invalid").Get("/enabled").Reply(200)
+
 	db.EXPECT().
 		SetConnectionSetupStep(gomock.Any(), connectionId, (*cschema.SetupStep)(nil)).
 		Return(nil)

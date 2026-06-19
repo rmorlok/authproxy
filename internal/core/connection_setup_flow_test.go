@@ -89,6 +89,36 @@ func TestManifestSetupFlowIfJavascriptVerifyBoundary(t *testing.T) {
 	assert.Equal(t, "apxy:verify", first.Id())
 }
 
+func TestManifestSetupFlowSkipsVerifyWhenAllProbesDisabled(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	conn, _ := newTestConnectionWithSetupFlow(t, ctrl, &cschema.SetupFlow{
+		Configure: &cschema.SetupFlowPhase{
+			Steps: []cschema.SetupFlowStep{
+				{Id: "workspace", JsonSchema: workspaceSchema},
+			},
+		},
+	})
+	setConnectionConfigFixture(t, conn, map[string]any{"run_probe": false})
+	conn.cv.GetDefinition().Probes = []cschema.Probe{{
+		Id: "ping",
+		If: &common.Predicate{Javascript: `cfg.run_probe === true`},
+	}}
+
+	flow := conn.s.buildManifestSetupFlow(conn)
+	first, err := flow.FirstStep(context.Background())
+	require.NoError(t, err)
+	require.NotNil(t, first)
+	assert.Equal(t, "workspace", first.Id())
+	assert.True(t, flow.ContainsStep("apxy:verify"))
+
+	verify, ok, err := flow.StepById(context.Background(), "apxy:verify")
+	require.NoError(t, err)
+	assert.False(t, ok)
+	assert.Nil(t, verify)
+}
+
 func TestManifestSetupFlowIfJavascriptError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()

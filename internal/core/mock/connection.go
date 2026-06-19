@@ -96,6 +96,14 @@ func (m *Connection) GetProbes() []iface.Probe {
 	return nil
 }
 
+func (m *Connection) GetEnabledProbe(ctx context.Context, probeId string) (iface.Probe, error) {
+	return m.GetProbe(probeId)
+}
+
+func (m *Connection) GetEnabledProbes(ctx context.Context) ([]iface.Probe, error) {
+	return m.GetProbes(), nil
+}
+
 func (m *Connection) GetAnnotations() map[string]string {
 	return m.Annotations
 }
