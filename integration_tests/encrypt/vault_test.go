@@ -261,8 +261,8 @@ func TestVaultTransitKeySyncAndReencrypt(t *testing.T) {
 	require.Equal(t, encrypted.Data, updated.EncryptedKey.Data)
 
 	freshEncryptService := encrypt.NewEncryptService(env.Cfg, env.Db, env.Logger)
+	freshEncryptService.Start()
 	defer freshEncryptService.Shutdown()
-	require.NoError(t, freshEncryptService.SyncKeysFromDbToMemory(ctx))
 
 	decrypted, err := freshEncryptService.DecryptString(ctx, *updated.EncryptedKey)
 	require.NoError(t, err)

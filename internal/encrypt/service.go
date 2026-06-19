@@ -44,6 +44,8 @@ type service struct {
 	stopCh    chan struct{} // signal goroutine to stop
 	doneCh    chan struct{} // closed when goroutine exits
 	syncReady chan struct{} // closed after first successful sync
+
+	syncReadyOnce sync.Once
 }
 
 func NewTestEncryptService(
@@ -249,6 +251,25 @@ func (s *service) ensureSynced(ctx context.Context) error {
 	}
 }
 
+func (s *service) markSyncReady() {
+	s.syncReadyOnce.Do(func() {
+		close(s.syncReady)
+	})
+}
+
+func (s *service) hasGlobalDataEncryptionKey() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	dekID, hasGlobal := s.keyToCurrentDEKCache[globalEncryptionKeyID]
+	if !hasGlobal {
+		return false
+	}
+
+	_, hasGlobalBytes := s.dekToBytesCache[dekID]
+	return hasGlobalBytes
+}
+
 // Start launches the background key sync goroutine.
 func (s *service) Start() {
 	go s.syncLoop()
@@ -289,7 +310,7 @@ func (s *service) startForTest() {
 		s.logger.Warn("test encrypt service: failed to sync keys from db to memory", "error", err)
 	}
 
-	close(s.syncReady)
+	s.markSyncReady()
 	close(s.doneCh) // No goroutine to wait for
 }
 
@@ -304,21 +325,13 @@ func (s *service) syncLoop() {
 	maxBackoff := 30 * time.Second
 
 	for {
-		if err := s.syncKeysFromDbToMemory(ctx); err != nil {
+		err := s.syncKeysFromDbToMemory(ctx)
+		if err != nil {
 			s.logger.Warn("encrypt service: initial key sync failed", "error", err)
 		}
 
-		hasGlobalVersion := false
-
-		// Check if global AES key is available
-		s.mu.RLock()
-		if dekID, hasGlobal := s.keyToCurrentDEKCache[globalEncryptionKeyID]; hasGlobal {
-			_, hasGlobalVersion = s.dekToBytesCache[dekID]
-		}
-		s.mu.RUnlock()
-
-		if hasGlobalVersion {
-			close(s.syncReady)
+		if err == nil && s.hasGlobalDataEncryptionKey() {
+			s.markSyncReady()
 			break
 		}
 
@@ -612,7 +625,15 @@ func (s *service) ReEncryptField(ctx context.Context, ef encfield.EncryptedField
 
 // SyncKeysFromDbToMemory forces a refresh of the in-memory key caches from the database.
 func (s *service) SyncKeysFromDbToMemory(ctx context.Context) error {
-	return s.syncKeysFromDbToMemory(ctx)
+	if err := s.syncKeysFromDbToMemory(ctx); err != nil {
+		return err
+	}
+
+	if s.hasGlobalDataEncryptionKey() {
+		s.markSyncReady()
+	}
+
+	return nil
 }
 
 // DecryptString decrypts an EncryptedField using the key ID embedded in the field.

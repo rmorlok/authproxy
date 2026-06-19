@@ -17,15 +17,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
-func init() {
-	RegisterEncryptedField(EncryptedFieldRegistration{
-		Table:          KeysTable,
-		PrimaryKeyCols: []string{"id"},
-		EncryptedCols:  []string{"encrypted_key_data"},
-		NamespaceCol:   "namespace",
-	})
-}
-
 const KeysTable = "keys"
 
 // GlobalKeyID is the ID of the global key created by migration. It is the root
