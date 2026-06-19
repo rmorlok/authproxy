@@ -55,7 +55,7 @@ AUTH_PROXY_AWS_SECRETS_TEST=1 AWS_REGION=us-east-1 \\
 
 Notes:
 - The test creates a short-lived secret and deletes it at the end.
-- For CI, provide `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and optional `AWS_SESSION_TOKEN` via secrets.
+- For CI, provide `AWS_REGION` as an environment variable and `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and optional `AWS_SESSION_TOKEN` as environment secrets.
 
 ## AWS KMS Integration Test
 
@@ -77,6 +77,7 @@ Run:
 cd integration_tests
 AUTH_PROXY_AWS_KMS_TEST=1 AWS_REGION=us-east-1 \\
   AUTH_PROXY_AWS_KMS_KEY_ID=alias/authproxy-test \\
+  AUTH_PROXY_AWS_KMS_KEY_ID_V2=alias/authproxy-test-v2 \\
   go test -tags "integration,aws" -v ./encrypt/... -run TestAwsKMSKeySyncAndReencrypt
 ```
 
@@ -84,7 +85,7 @@ Notes:
 - The test does not create or delete KMS keys because AWS KMS keys have delayed deletion windows.
 - AWS KMS DEK generation uses `GenerateDataKey`; rewrap uses `Encrypt` / `Decrypt` and keeps the same `dek_` id.
 - Set `AUTH_PROXY_AWS_KMS_KEY_ID_V2` to verify provider metadata advancement and DEK rewrap with a second key or alias.
-- For CI, provide `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and optional `AWS_SESSION_TOKEN` via secrets.
+- For CI, provide `AWS_REGION`, `AUTH_PROXY_AWS_KMS_TEST`, `AUTH_PROXY_AWS_KMS_KEY_ID`, and `AUTH_PROXY_AWS_KMS_KEY_ID_V2` as environment variables. Provide `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and optional `AWS_SESSION_TOKEN` as environment secrets. CI treats `AUTH_PROXY_AWS_KMS_KEY_ID_V2` as required so the rewrap path is covered.
 
 ## GCP Secret Manager Integration Test
 
@@ -118,7 +119,7 @@ GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/sa.json
 
 Notes:
 - The test creates a short-lived secret and deletes it at the end.
-- For CI, provide `GCP_PROJECT_ID` and `GOOGLE_APPLICATION_CREDENTIALS_JSON` (the full service account key JSON) as repository secrets. The GitHub Actions workflow writes the JSON to a temp file and points `GOOGLE_APPLICATION_CREDENTIALS` at it.
+- For CI, provide `GCP_PROJECT_ID` as an environment variable and `GOOGLE_APPLICATION_CREDENTIALS_JSON` (the full service account key JSON) as an environment secret. The GitHub Actions workflow writes the JSON to a temp file and points `GOOGLE_APPLICATION_CREDENTIALS` at it.
 - The workflow runs only on pushes to `main` (and manual `workflow_dispatch`) to avoid exposing the GCP secrets to PRs from forks.
 
 ## GCP KMS Integration Test
@@ -140,6 +141,7 @@ Run:
 cd integration_tests
 AUTH_PROXY_GCP_KMS_TEST=1 \
   AUTH_PROXY_GCP_KMS_KEY_NAME=projects/my-project/locations/global/keyRings/authproxy/cryptoKeys/dek-wrapper \
+  AUTH_PROXY_GCP_KMS_KEY_NAME_V2=projects/my-project/locations/global/keyRings/authproxy/cryptoKeys/dek-wrapper-v2 \
   GOOGLE_APPLICATION_CREDENTIALS=/path/to/sa.json \
   go test -tags "integration,gcp" -v ./encrypt/... -run TestGcpKMSKeySyncAndReencrypt
 ```
@@ -148,6 +150,7 @@ Notes:
 - The test does not create or delete KMS keys because Google Cloud KMS keys are long-lived resources.
 - GCP KMS DEK generation uses `GenerateRandomBytes` and then wraps the generated DEK with the configured CryptoKey.
 - Set `AUTH_PROXY_GCP_KMS_KEY_NAME_V2` to verify provider metadata advancement and DEK rewrap with a second CryptoKey.
+- For CI, provide `GCP_PROJECT_ID`, `AUTH_PROXY_GCP_KMS_TEST`, `AUTH_PROXY_GCP_KMS_KEY_NAME`, and `AUTH_PROXY_GCP_KMS_KEY_NAME_V2` as environment variables. Provide `GOOGLE_APPLICATION_CREDENTIALS_JSON` as an environment secret. CI treats `AUTH_PROXY_GCP_KMS_KEY_NAME_V2` as required so the rewrap path is covered.
 
 ## HashiCorp Vault Integration Test
 
@@ -188,11 +191,13 @@ cd integration_tests
 # AWS KMS
 AUTH_PROXY_AWS_KMS_TEST=1 AWS_REGION=us-east-1 \
   AUTH_PROXY_AWS_KMS_KEY_ID=alias/authproxy-test \
+  AUTH_PROXY_AWS_KMS_KEY_ID_V2=alias/authproxy-test-v2 \
   go test -tags "integration,aws" -v ./encrypt/... -run TestAwsKMSKeySyncAndReencrypt
 
 # Google Cloud KMS
 AUTH_PROXY_GCP_KMS_TEST=1 \
   AUTH_PROXY_GCP_KMS_KEY_NAME=projects/my-project/locations/global/keyRings/authproxy/cryptoKeys/dek-wrapper \
+  AUTH_PROXY_GCP_KMS_KEY_NAME_V2=projects/my-project/locations/global/keyRings/authproxy/cryptoKeys/dek-wrapper-v2 \
   GOOGLE_APPLICATION_CREDENTIALS=/path/to/sa.json \
   go test -tags "integration,gcp" -v ./encrypt/... -run TestGcpKMSKeySyncAndReencrypt
 
