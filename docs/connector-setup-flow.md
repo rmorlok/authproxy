@@ -19,7 +19,7 @@ setup_flow:
 Auth-method steps and AuthProxy pseudo-steps are inserted by the runtime. Connector YAML cannot conditionally hide or override them. In particular:
 
 - Auth-method steps, such as OAuth redirect or API-key credential collection, are always eligible.
-- `apxy:verify` is always eligible when verification is needed.
+- `apxy:verify` is inserted when verification is needed, which means at least one probe is enabled for the connection.
 - Connector-authored step ids must not start with `apxy:`.
 
 ## Form Steps
@@ -71,6 +71,8 @@ Redirect steps cannot define `json_schema`, `ui_schema`, or `data_sources`.
 ## Conditional Steps
 
 Connector-authored form and redirect steps can include an `if.javascript` condition. AuthProxy evaluates the condition server-side each time it resolves the current or next setup step. Clients only receive steps whose condition is true.
+
+Setup-step predicates share the same shape and runtime context as OAuth scope and probe predicates. See [Connector predicates](connector-predicates.md) for the shared predicate contract and non-setup examples.
 
 ```yaml
 setup_flow:
