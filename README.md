@@ -192,7 +192,7 @@ root.tenant-a.app1  →  root.tenant-a  →  root  →  global key
 
 The first namespace with an assigned key is used. Child namespaces inherit their parent's key unless they explicitly set their own. This enables **per-tenant key isolation**: a customer can bring their own key so that their data is cryptographically separated from other tenants, even within a shared database.
 
-Keys can be sourced from external secret managers including AWS Secrets Manager, GCP Secret Manager, HashiCorp Vault, environment variables, or the filesystem — allowing customers to retain control of their key material.
+Keys can be backed by external secret managers and KMS providers including AWS Secrets Manager, AWS KMS, GCP Secret Manager, Google Cloud KMS, HashiCorp Vault KV, Vault Transit, environment variables, or the filesystem — allowing customers to retain control of their key material.
 
 #### Automatic Key Rotation and Re-encryption
 
