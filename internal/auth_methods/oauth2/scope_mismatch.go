@@ -24,16 +24,21 @@ type scopeMismatchOutcome struct {
 // detectScopeMismatch compares the scopes declared on the connector against the scopes echoed
 // by the provider. The granted set falls back to the requested set when the provider omits the
 // `scope` parameter (RFC 6749 §5.1 — silent agreement to the request).
-func detectScopeMismatch(declared []sconfig.Scope, granted string) (scopeMismatchOutcome, error) {
+//
+// The declared scopes are expected to have had predicates resolved prior to calling this function.
+func detectScopeMismatch(declaredEffectiveScopes []sconfig.Scope, granted string) (scopeMismatchOutcome, error) {
 	grantedSet := scopeSet(granted)
 
 	var outcome scopeMismatchOutcome
-	declaredIds := make(map[string]struct{}, len(declared))
-	for _, s := range declared {
+	declaredIds := make(map[string]struct{}, len(declaredEffectiveScopes))
+	for _, s := range declaredEffectiveScopes {
 		declaredIds[s.Id] = struct{}{}
 		if _, ok := grantedSet[s.Id]; ok {
 			continue
 		}
+
+		// We can use nil here because these are effective scopes that have
+		// had predicates resolved.
 		required, err := s.IsRequired(nil)
 		if err != nil {
 			return scopeMismatchOutcome{}, fmt.Errorf("scope %q required: %w", s.Id, err)
