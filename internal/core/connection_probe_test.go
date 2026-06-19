@@ -48,7 +48,9 @@ func TestConnection_Probe(t *testing.T) {
 	})
 }
 
-func TestConnection_EnabledProbePredicates(t *testing.T) {
+func newConditionalProbeTestConnection(t *testing.T) *connection {
+	t.Helper()
+
 	conn := newTestConnection(cschema.Connector{
 		Probes: []cschema.Probe{
 			{
@@ -75,6 +77,11 @@ func TestConnection_EnabledProbePredicates(t *testing.T) {
 	setConnectionConfigFixture(t, conn, map[string]any{"region": "eu"})
 	conn.Labels = map[string]string{"apxy/cxr/type": "salesforce"}
 	conn.Annotations = map[string]string{"setup-mode": "advanced"}
+	return conn
+}
+
+func TestConnection_GetEnabledProbes(t *testing.T) {
+	conn := newConditionalProbeTestConnection(t)
 
 	probes, err := conn.GetEnabledProbes(context.Background())
 	require.NoError(t, err)
@@ -83,6 +90,10 @@ func TestConnection_EnabledProbePredicates(t *testing.T) {
 	assert.Equal(t, "label_true", probes[1].GetId())
 	assert.Equal(t, "annotation_true", probes[2].GetId())
 	assert.Equal(t, "always", probes[3].GetId())
+}
+
+func TestConnection_GetEnabledProbe(t *testing.T) {
+	conn := newConditionalProbeTestConnection(t)
 
 	p, err := conn.GetEnabledProbe(context.Background(), "cfg_true")
 	require.NoError(t, err)
@@ -97,7 +108,23 @@ func TestConnection_EnabledProbePredicates(t *testing.T) {
 	require.Nil(t, p)
 }
 
-func TestConnection_EnabledProbePredicateError(t *testing.T) {
+func TestConnection_GetEnabledProbePredicateError(t *testing.T) {
+	conn := newTestConnection(cschema.Connector{
+		Probes: []cschema.Probe{
+			{
+				Id: "broken",
+				If: &common.Predicate{Javascript: `cfg.region ===`},
+			},
+		},
+	})
+
+	p, err := conn.GetEnabledProbe(context.Background(), "broken")
+	require.Error(t, err)
+	require.Nil(t, p)
+	assert.Contains(t, err.Error(), `probe "broken" if.javascript`)
+}
+
+func TestConnection_GetEnabledProbesPredicateError(t *testing.T) {
 	conn := newTestConnection(cschema.Connector{
 		Probes: []cschema.Probe{
 			{
