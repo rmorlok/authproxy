@@ -20,11 +20,6 @@ This directory holds long-form documentation that supplements the [main repo REA
 - **[Redis insight](redis_insight.md)** — viewing data stored in Redis (rate-limit counters, session state, etc.).
 - **[EKS deployment runbook](../deploy/docs/runbook.md)** — cluster setup, deploy workflows, per-branch dev environments, slim storage verification, and recovery operations.
 
-## Reference
-
-- **[OAuth test provider gaps](oauth_test_provider_gaps.md)** — limitations of the in-repo OAuth test provider that the integration tests run against.
-- **[Schema and OpenAPI generation](schema-openapi-generation.md)** — recommendation for keeping Swagger generation with centralized schema DTOs instead of moving to JSON Schema-driven OpenAPI generation.
-
 ## Architecture diagrams
 
 - **[OAuth connection flow](oauth_flow.mmd)** — Mermaid diagram of the OAuth2 authorization-code lifecycle.
