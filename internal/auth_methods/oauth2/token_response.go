@@ -53,6 +53,12 @@ func (o *oAuth2Connection) createDbTokenFromResponseWithOptions(
 		return nil, errors.New("no access token in response")
 	}
 
+	effectiveScopes, err := o.effectiveScopes(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve oauth2 scopes: %w", err)
+	}
+	requestedScopes := JoinScopes(effectiveScopes)
+
 	encryptedAccessToken, err := o.encrypt.EncryptStringForEntity(ctx, o.connection, jsonResp.AccessToken)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encrypt access token: %w", err)
@@ -72,7 +78,6 @@ func (o *oAuth2Connection) createDbTokenFromResponseWithOptions(
 		o.logger.WarnContext(ctx, "oauth token response included refresh_token for client_credentials grant; discarding")
 	}
 
-	requestedScopes := JoinScopes(o.auth.Scopes)
 	scopes := requestedScopes
 	if jsonResp.Scope != "" {
 		scopes = jsonResp.Scope
@@ -114,7 +119,10 @@ func (o *oAuth2Connection) createDbTokenFromResponseWithOptions(
 		return nil, fmt.Errorf("failed to insert oauth2 token: %w", err)
 	}
 
-	mismatch := detectScopeMismatch(o.auth.Scopes, scopes)
+	mismatch, err := detectScopeMismatch(effectiveScopes, scopes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect oauth2 scope mismatch: %w", err)
+	}
 	if err := o.applyScopeMismatch(ctx, mismatch); err != nil {
 		return nil, err
 	}

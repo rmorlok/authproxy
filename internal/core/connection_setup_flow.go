@@ -9,7 +9,6 @@ import (
 
 	apauthcore "github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apid"
-	"github.com/rmorlok/authproxy/internal/apjs"
 	"github.com/rmorlok/authproxy/internal/aptmpl"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/core/setup_token"
@@ -175,29 +174,12 @@ func newSchemaStepEligibility(c iface.Connection, spec *cschema.SetupFlowStep) f
 		return nil
 	}
 	return func(ctx context.Context) (bool, error) {
-		cfg, err := c.GetConfiguration(ctx)
+		vars, err := c.GetPredicateVars(ctx)
 		if err != nil {
-			return false, fmt.Errorf("step %q: get connection configuration: %w", spec.Id, err)
-		}
-		if cfg == nil {
-			cfg = map[string]any{}
+			return false, fmt.Errorf("step %q: get predicate vars: %w", spec.Id, err)
 		}
 
-		labels := c.GetLabels()
-		if labels == nil {
-			labels = map[string]string{}
-		}
-
-		annotations := c.GetAnnotations()
-		if annotations == nil {
-			annotations = map[string]string{}
-		}
-
-		ok, err := apjs.EvaluateBoolean(spec.If.Javascript, map[string]any{
-			"cfg":         cfg,
-			"labels":      labels,
-			"annotations": annotations,
-		})
+		ok, err := spec.If.GetValue(vars)
 		if err != nil {
 			return false, fmt.Errorf("step %q if.javascript: %w", spec.Id, err)
 		}

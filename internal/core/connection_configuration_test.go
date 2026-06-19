@@ -369,3 +369,62 @@ func TestConnectionGetMustacheContext(t *testing.T) {
 		assert.Contains(t, err.Error(), "failed to get connection configuration")
 	})
 }
+
+func TestConnectionGetPredicateVars(t *testing.T) {
+	t.Run("returns cfg labels and annotations", func(t *testing.T) {
+		e := encrypt.NewFakeEncryptService(false)
+		s := &service{encrypt: e, logger: aplog.NewNoopLogger()}
+		conn := newTestConnectionWithService(s)
+
+		ef, err := e.EncryptStringForNamespace(context.Background(), "root", `{"tenant":"acme"}`)
+		require.NoError(t, err)
+		conn.EncryptedConfiguration = &ef
+		conn.Labels = map[string]string{"env": "prod"}
+		conn.Annotations = map[string]string{"region": "us-east"}
+
+		data, err := conn.GetPredicateVars(context.Background())
+		require.NoError(t, err)
+
+		cfg, ok := data["cfg"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "acme", cfg["tenant"])
+
+		labels, ok := data["labels"].(map[string]string)
+		require.True(t, ok)
+		assert.Equal(t, "prod", labels["env"])
+
+		annotations, ok := data["annotations"].(map[string]string)
+		require.True(t, ok)
+		assert.Equal(t, "us-east", annotations["region"])
+	})
+
+	t.Run("returns empty maps when values are absent", func(t *testing.T) {
+		conn := newTestConnection(cschema.Connector{})
+
+		data, err := conn.GetPredicateVars(context.Background())
+		require.NoError(t, err)
+
+		cfg, ok := data["cfg"].(map[string]any)
+		require.True(t, ok)
+		assert.Empty(t, cfg)
+
+		labels, ok := data["labels"].(map[string]string)
+		require.True(t, ok)
+		assert.Empty(t, labels)
+
+		annotations, ok := data["annotations"].(map[string]string)
+		require.True(t, ok)
+		assert.Empty(t, annotations)
+	})
+
+	t.Run("returns error on decrypt failure", func(t *testing.T) {
+		e := encrypt.NewFakeEncryptService(false)
+		s := &service{encrypt: e, logger: aplog.NewNoopLogger()}
+		conn := newTestConnectionWithService(s)
+		conn.EncryptedConfiguration = &encfield.EncryptedField{ID: "ekv_wrong", Data: "some-data"}
+
+		_, err := conn.GetPredicateVars(context.Background())
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "get connection configuration")
+	})
+}

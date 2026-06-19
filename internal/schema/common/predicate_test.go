@@ -8,13 +8,14 @@ import (
 
 func TestPredicateValidate(t *testing.T) {
 	vars := map[string]any{
-		"cfg":         map[string]any{},
-		"labels":      map[string]string{},
-		"annotations": map[string]string{},
+		"sounds": map[string]string{
+			"dog": "woof",
+			"cat": "meow",
+		},
 	}
 
 	t.Run("accepts boolean result", func(t *testing.T) {
-		p := &Predicate{Javascript: `cfg.enabled === true`}
+		p := &Predicate{Javascript: `sounds.dog === 'woof'`}
 		require.NoError(t, p.Validate(&ValidationContext{Path: "predicate"}, vars))
 	})
 
@@ -26,16 +27,57 @@ func TestPredicateValidate(t *testing.T) {
 	})
 
 	t.Run("rejects syntax errors", func(t *testing.T) {
-		p := &Predicate{Javascript: `cfg.enabled ===`}
+		p := &Predicate{Javascript: `sounds.dog ===`}
 		err := p.Validate(&ValidationContext{Path: "predicate"}, vars)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "must evaluate to a boolean")
 	})
 
 	t.Run("rejects non boolean results", func(t *testing.T) {
-		p := &Predicate{Javascript: `cfg.enabled`}
+		p := &Predicate{Javascript: `sounds.dog`}
 		err := p.Validate(&ValidationContext{Path: "predicate"}, vars)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "must evaluate to a boolean")
+	})
+}
+
+func TestPredicateGetValue(t *testing.T) {
+	vars := map[string]any{
+		"sounds": map[string]string{
+			"dog": "woof",
+			"cat": "meow",
+		},
+	}
+
+	t.Run("returns true", func(t *testing.T) {
+		p := &Predicate{Javascript: `sounds.dog === 'woof'`}
+		v, err := p.GetValue(vars)
+		require.NoError(t, err)
+		require.True(t, v)
+	})
+
+	t.Run("returns false", func(t *testing.T) {
+		p := &Predicate{Javascript: `sounds.dog === 'meow'`}
+		v, err := p.GetValue(vars)
+		require.NoError(t, err)
+		require.False(t, v)
+	})
+
+	t.Run("errors on blank javascript", func(t *testing.T) {
+		p := &Predicate{Javascript: " \n\t "}
+		_, err := p.GetValue(vars)
+		require.Error(t, err)
+	})
+
+	t.Run("errors on syntax errors", func(t *testing.T) {
+		p := &Predicate{Javascript: `sounds.dog ===`}
+		_, err := p.GetValue(vars)
+		require.Error(t, err)
+	})
+
+	t.Run("errors on non boolean results", func(t *testing.T) {
+		p := &Predicate{Javascript: `sounds.dog`}
+		_, err := p.GetValue(vars)
+		require.Error(t, err)
 	})
 }

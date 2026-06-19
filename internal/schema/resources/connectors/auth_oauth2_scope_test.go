@@ -23,7 +23,9 @@ reason: |
 			assert.NoError(err)
 			assert.Equal("https://www.googleapis.com/auth/drive.readonly", scope.Id)
 			assert.Equal("We need to be able to view the files\n", scope.Reason)
-			assert.True(scope.IsRequired())
+			required, err := scope.IsRequired(nil)
+			assert.NoError(err)
+			assert.True(required)
 		})
 		t.Run("allowed to be not required", func(t *testing.T) {
 			data := `id: https://www.googleapis.com/auth/drive.readonly
@@ -35,7 +37,9 @@ reason: We need to be able to view the files
 			assert.NoError(err)
 			assert.Equal("https://www.googleapis.com/auth/drive.readonly", scope.Id)
 			assert.Equal("We need to be able to view the files", scope.Reason)
-			assert.False(scope.IsRequired())
+			required, err := scope.IsRequired(nil)
+			assert.NoError(err)
+			assert.False(required)
 		})
 		t.Run("allowed to use dynamic required", func(t *testing.T) {
 			data := `id: https://www.googleapis.com/auth/drive.activity.readonly
@@ -49,7 +53,16 @@ reason: We need to be able to see what's been going on in drive
 			require.NotNil(t, scope.Required)
 			require.NotNil(t, scope.Required.Predicate)
 			assert.Equal("cfg.sync_activity === true", scope.Required.Predicate.Javascript)
-			assert.True(scope.IsRequired())
+			required, err := scope.IsRequired(map[string]any{
+				"cfg": map[string]any{"sync_activity": true},
+			})
+			assert.NoError(err)
+			assert.True(required)
+			required, err = scope.IsRequired(map[string]any{
+				"cfg": map[string]any{"sync_activity": false},
+			})
+			assert.NoError(err)
+			assert.False(required)
 		})
 		t.Run("allowed to use conditional inclusion", func(t *testing.T) {
 			data := `id: https://www.googleapis.com/auth/drive.readwrite
@@ -107,6 +120,24 @@ reason: We need to be able to see what's been going on in drive
 			err := scope.Validate(&common.ValidationContext{Path: "scope"})
 			assert.Error(err)
 			assert.Contains(err.Error(), "scope.required.javascript")
+		})
+		t.Run("rejects empty required object", func(t *testing.T) {
+			scope := &Scope{Required: &ScopeRequired{}}
+			err := scope.Validate(&common.ValidationContext{Path: "scope"})
+			assert.Error(err)
+			assert.Contains(err.Error(), "scope.required")
+		})
+		t.Run("rejects required object with bool and predicate", func(t *testing.T) {
+			required := false
+			scope := &Scope{
+				Required: &ScopeRequired{
+					Bool:      &required,
+					Predicate: &common.Predicate{Javascript: "true"},
+				},
+			}
+			err := scope.Validate(&common.ValidationContext{Path: "scope"})
+			assert.Error(err)
+			assert.Contains(err.Error(), "scope.required")
 		})
 	})
 }

@@ -5,13 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"strings"
 
 	"github.com/rmorlok/authproxy/internal/apauth/jwt"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/schema/config"
-	"github.com/rmorlok/authproxy/internal/util"
 )
 
 func (o *oAuth2Connection) getPublicRedirectUrl(ctx context.Context, stateId apid.ID, actor IActorData) (string, error) {
@@ -79,9 +77,10 @@ func (o *oAuth2Connection) GenerateAuthUrl(ctx context.Context, actor IActorData
 		return "", fmt.Errorf("failed to get public callback url: %w", err)
 	}
 
-	scopes := util.Map(o.auth.Scopes, func(s config.Scope) string {
-		return s.Id
-	})
+	scopes, err := o.effectiveScopes(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve oauth2 scopes for connector %s: %w", cv.GetId(), err)
+	}
 
 	authEndpoint, err := o.renderMustache(ctx, o.auth.Authorization.Endpoint)
 	if err != nil {
@@ -99,7 +98,7 @@ func (o *oAuth2Connection) GenerateAuthUrl(ctx context.Context, actor IActorData
 	query.Set("access_type", "offline")
 	query.Set("response_type", "code")
 	query.Set("client_id", clientId)
-	query.Set("scope", strings.Join(scopes, " "))
+	query.Set("scope", JoinScopes(scopes))
 	query.Set("state", o.state.Id.String())
 
 	if o.auth.Authorization.PKCE != nil {
