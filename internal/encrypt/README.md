@@ -98,6 +98,7 @@ The `KeyData` wrapper supports multiple sources for key material. Each provider 
 | **GCP Secret Manager** | `gcp_secret_name`, `gcp_project` | Fetches from Google Cloud. Defaults to `latest` version. |
 | **GCP KMS** | `gcp_kms_key_name` or `gcp_project`, `gcp_location`, `gcp_key_ring`, `gcp_crypto_key` | Uses Google Cloud KMS to generate DEK bytes, wrap/unwrap DEKs with the configured CryptoKey, and track the CryptoKeyVersion used for wrapping. Supports ADC, `gcp_credentials_file`, `gcp_credentials_json`, `gcp_kms_endpoint`, and `cache_ttl`. |
 | **HashiCorp Vault** | `vault_address`, `vault_path` | KV v1/v2 auto-detection. Reads `VAULT_TOKEN` from env if not configured. Exponential backoff retry. |
+| **HashiCorp Vault Transit** | `vault_address`, `vault_transit_key_name` | Uses Transit datakey generation and encrypt/decrypt operations to generate, wrap, and unwrap DEKs. Supports `vault_token`, `vault_namespace`, `vault_transit_mount_path`, and `cache_ttl`. |
 | **Environment Variable** | `env_var` | Reads key bytes from an environment variable (also available as base64-encoded variant). |
 | **File** | `path` | Reads key bytes from a file. Supports `~` expansion. |
 | **Value** | `value` | Inline string value. Development/testing only. |

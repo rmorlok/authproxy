@@ -230,6 +230,16 @@ func TestSchemaDefinitions(t *testing.T) {
 					Data:  `{"test": {"gcp_project": "test-project", "gcp_location": "global", "gcp_crypto_key": "dek-wrapper"}}`,
 				},
 				{
+					Name:  "vault transit",
+					Valid: true,
+					Data:  `{"test": {"vault_address": "http://127.0.0.1:8200", "vault_token": "dev-only-token", "vault_namespace": "admin", "vault_transit_mount_path": "transit", "vault_transit_key_name": "authproxy", "cache_ttl": "5m"}}`,
+				},
+				{
+					Name:  "vault transit missing key name",
+					Valid: false,
+					Data:  `{"test": {"vault_address": "http://127.0.0.1:8200", "vault_transit_mount_path": "transit"}}`,
+				},
+				{
 					Name:  "empty object",
 					Valid: false,
 					Data:  `{"test": {}}`,

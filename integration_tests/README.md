@@ -148,10 +148,10 @@ Notes:
 
 ## HashiCorp Vault Integration Test
 
-This test hits a running HashiCorp Vault server and is gated behind the `vault` build tag and an env flag. Unlike the AWS and GCP tests, Vault runs locally (in dev mode) both on developer machines and in CI — no external credentials required.
+These tests hit a running HashiCorp Vault server and are gated behind the `vault` build tag and an env flag. Unlike the AWS and GCP tests, Vault runs locally (in dev mode) both on developer machines and in CI — no external credentials required.
 
 Requirements:
-- A Vault server reachable at `VAULT_ADDR` with a token in `VAULT_TOKEN` that can read and write the `secret/` KV v2 mount.
+- A Vault server reachable at `VAULT_ADDR` with a token in `VAULT_TOKEN` that can read and write the `secret/` KV v2 mount, enable/read/write the `transit/` mount, and rotate Transit keys.
 - `AUTH_PROXY_VAULT_TEST=1` set to opt in.
 
 The `docker-compose.yml` in this directory already includes a Vault dev-mode service with the root token `dev-only-token`. Bring it up with `docker compose up -d` and point the test at it:
@@ -173,7 +173,8 @@ docker run -d --name vault -p 8200:8200 --cap-add=IPC_LOCK \
 ```
 
 Notes:
-- The test writes a short-lived KV v2 secret at a unique path and deletes its metadata on cleanup.
+- The KV test writes a short-lived KV v2 secret at a unique path and deletes its metadata on cleanup.
+- The Transit test creates a unique Transit key, generates a DEK through `datakey/plaintext`, rotates the Transit key, verifies DEK rewrap, and decrypts through a fresh encrypt service cache.
 - CI uses `.github/workflows/vault-integration.yml`, which runs Vault as a dev-mode container inside the workflow. The workflow runs on pushes to `main` and on `workflow_dispatch`.
 
 ## Teardown
