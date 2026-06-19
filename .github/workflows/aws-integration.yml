@@ -74,14 +74,14 @@ jobs:
     - name: Check AWS key provider configuration
       env:
         AWS_REGION: ${{ vars.AWS_REGION }}
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_ACCESS_KEY_ID: ${{ vars.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         AUTH_PROXY_AWS_KMS_TEST: ${{ vars.AUTH_PROXY_AWS_KMS_TEST }}
         AUTH_PROXY_AWS_KMS_KEY_ID: ${{ vars.AUTH_PROXY_AWS_KMS_KEY_ID }}
         AUTH_PROXY_AWS_KMS_KEY_ID_V2: ${{ vars.AUTH_PROXY_AWS_KMS_KEY_ID_V2 }}
       run: |
         : "${AWS_REGION:?AWS_REGION environment variable is required}"
-        : "${AWS_ACCESS_KEY_ID:?AWS_ACCESS_KEY_ID environment secret is required}"
+        : "${AWS_ACCESS_KEY_ID:?AWS_ACCESS_KEY_ID environment variable is required}"
         : "${AWS_SECRET_ACCESS_KEY:?AWS_SECRET_ACCESS_KEY environment secret is required}"
         : "${AUTH_PROXY_AWS_KMS_TEST:?AUTH_PROXY_AWS_KMS_TEST environment variable is required}"
         : "${AUTH_PROXY_AWS_KMS_KEY_ID:?AUTH_PROXY_AWS_KMS_KEY_ID environment variable is required}"
@@ -104,7 +104,7 @@ jobs:
         AUTH_PROXY_AWS_KMS_KEY_ID_V2: ${{ vars.AUTH_PROXY_AWS_KMS_KEY_ID_V2 }}
         AUTH_PROXY_AWS_KMS_ENDPOINT: ${{ vars.AUTH_PROXY_AWS_KMS_ENDPOINT }}
         AWS_REGION: ${{ vars.AWS_REGION }}
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_ACCESS_KEY_ID: ${{ vars.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
       run: go test -tags "integration,aws" -v -timeout 10m ./encrypt/...
