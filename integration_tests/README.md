@@ -77,11 +77,13 @@ Run:
 cd integration_tests
 AUTH_PROXY_AWS_KMS_TEST=1 AWS_REGION=us-east-1 \\
   AUTH_PROXY_AWS_KMS_KEY_ID=alias/authproxy-test \\
-  go test -tags "integration,aws" -v ./encrypt/...
+  go test -tags "integration,aws" -v ./encrypt/... -run TestAwsKMSKeySyncAndReencrypt
 ```
 
 Notes:
 - The test does not create or delete KMS keys because AWS KMS keys have delayed deletion windows.
+- AWS KMS DEK generation uses `GenerateDataKey`; rewrap uses `Encrypt` / `Decrypt` and keeps the same `dek_` id.
+- Set `AUTH_PROXY_AWS_KMS_KEY_ID_V2` to verify provider metadata advancement and DEK rewrap with a second key or alias.
 - For CI, provide `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and optional `AWS_SESSION_TOKEN` via secrets.
 
 ## GCP Secret Manager Integration Test
@@ -139,12 +141,13 @@ cd integration_tests
 AUTH_PROXY_GCP_KMS_TEST=1 \
   AUTH_PROXY_GCP_KMS_KEY_NAME=projects/my-project/locations/global/keyRings/authproxy/cryptoKeys/dek-wrapper \
   GOOGLE_APPLICATION_CREDENTIALS=/path/to/sa.json \
-  go test -tags "integration,gcp" -v ./encrypt/...
+  go test -tags "integration,gcp" -v ./encrypt/... -run TestGcpKMSKeySyncAndReencrypt
 ```
 
 Notes:
 - The test does not create or delete KMS keys because Google Cloud KMS keys are long-lived resources.
 - GCP KMS DEK generation uses `GenerateRandomBytes` and then wraps the generated DEK with the configured CryptoKey.
+- Set `AUTH_PROXY_GCP_KMS_KEY_NAME_V2` to verify provider metadata advancement and DEK rewrap with a second CryptoKey.
 
 ## HashiCorp Vault Integration Test
 
@@ -161,7 +164,7 @@ cd integration_tests
 AUTH_PROXY_VAULT_TEST=1 \
   VAULT_ADDR=http://127.0.0.1:8200 \
   VAULT_TOKEN=dev-only-token \
-  go test -tags "integration,vault" -v ./encrypt/...
+  go test -tags "integration,vault" -v ./encrypt/... -run 'TestVault(KeySyncAndReencrypt|TransitKeySyncAndReencrypt)'
 ```
 
 Or start Vault ad hoc:
@@ -176,6 +179,29 @@ Notes:
 - The KV test writes a short-lived KV v2 secret at a unique path and deletes its metadata on cleanup.
 - The Transit test creates a unique Transit key, generates a DEK through `datakey/plaintext`, rotates the Transit key, verifies DEK rewrap, and decrypts through a fresh encrypt service cache.
 - CI uses `.github/workflows/vault-integration.yml`, which runs Vault as a dev-mode container inside the workflow. The workflow runs on pushes to `main` and on `workflow_dispatch`.
+
+Focused KMS provider commands:
+
+```bash
+cd integration_tests
+
+# AWS KMS
+AUTH_PROXY_AWS_KMS_TEST=1 AWS_REGION=us-east-1 \
+  AUTH_PROXY_AWS_KMS_KEY_ID=alias/authproxy-test \
+  go test -tags "integration,aws" -v ./encrypt/... -run TestAwsKMSKeySyncAndReencrypt
+
+# Google Cloud KMS
+AUTH_PROXY_GCP_KMS_TEST=1 \
+  AUTH_PROXY_GCP_KMS_KEY_NAME=projects/my-project/locations/global/keyRings/authproxy/cryptoKeys/dek-wrapper \
+  GOOGLE_APPLICATION_CREDENTIALS=/path/to/sa.json \
+  go test -tags "integration,gcp" -v ./encrypt/... -run TestGcpKMSKeySyncAndReencrypt
+
+# Vault Transit
+AUTH_PROXY_VAULT_TEST=1 \
+  VAULT_ADDR=http://127.0.0.1:8200 \
+  VAULT_TOKEN=dev-only-token \
+  go test -tags "integration,vault" -v ./encrypt/... -run TestVaultTransitKeySyncAndReencrypt
+```
 
 ## Teardown
 

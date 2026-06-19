@@ -1,8 +1,8 @@
 # Unified Key Model Migration
 
-This document is the design contract for the key model migration tracked by
-[#605](https://github.com/rmorlok/authproxy/issues/605). The feature branch for
-the full migration is `codex/key-model-migration`.
+This document is the design and operations contract for the key model migration
+tracked by [#605](https://github.com/rmorlok/authproxy/issues/605). The feature
+branch for the full migration is `codex/key-model-migration`.
 
 ## Branching
 
@@ -17,6 +17,18 @@ This migration is not backwards compatible. No production environment is running
 the current encryption model, so implementation PRs may use forward migrations to
 rename, drop, or recreate tables. Demo and development environments can be
 destroyed and recreated when this branch merges.
+
+For demo and development environments, the expected rollout is:
+
+1. Destroy the existing database and Redis state.
+2. Recreate the environment from the merged branch.
+3. Let startup migrations create `keys`, `data_encryption_keys`, and namespace
+   target DEK columns from scratch.
+4. Let startup key sync generate the first current DEK for each active
+   data-encryption key before serving encrypted-data paths.
+
+Do not attempt to preserve old `encryption_keys` or `encryption_key_versions`
+rows in those environments.
 
 ## Why The Model Changes
 
@@ -250,6 +262,103 @@ Cache entries should map:
 dek_id -> plaintext DEK bytes and metadata needed for encryption/decryption
 ```
 
+## Operating The Model
+
+There are two independent rotation workflows. Keeping them separate is the point
+of the unified model:
+
+- **Wrapping-key rotation** changes the provider-managed key encryption key
+  (KEK) or secret value that protects DEKs. The DEK ids stay the same.
+- **DEK rotation** creates a new `dek_...` row and makes it current for future
+  writes. Existing encrypted fields are moved to that DEK by re-encryption.
+
+### Rotating Wrapping Keys
+
+Use this workflow when rotating AWS KMS keys, Google Cloud KMS CryptoKeys,
+HashiCorp Vault Transit keys, secret-manager versions, environment-backed
+secrets, or file-backed wrapping material.
+
+1. Rotate or update the wrapping material in the provider.
+2. Keep old provider material available for decrypt or unwrap until AuthProxy has
+   rewrapped every retained DEK.
+3. Run or wait for `encrypt:sync_keys_to_database`.
+4. Confirm `data_encryption_keys.provider_version` and
+   `data_encryption_keys.provider_metadata` reflect the latest provider material.
+5. After all DEKs for the logical key are rewrapped, retire the old provider
+   material according to the provider's own recovery/deletion policy.
+
+Wrapping-key rotation should not change `data_encryption_keys.id` and should not
+trigger application-data re-encryption by itself. The sync task unwraps each
+stale DEK, wraps the same plaintext DEK with current provider material, and saves
+updated wrapping metadata on the same row.
+
+Provider notes:
+
+- AWS KMS uses `GenerateDataKey` for new DEKs and KMS `Encrypt` / `Decrypt` for
+  explicit wrap and unwrap. AWS KMS keys have delayed deletion windows; use a
+  new key or alias when testing key advancement.
+- Google Cloud KMS uses `GenerateRandomBytes` for provider-generated DEK bytes,
+  then wraps with `Encrypt`. The stored metadata includes the CryptoKeyVersion
+  used for wrapping.
+- Vault Transit uses `datakey/plaintext` for new DEKs and Transit
+  `encrypt` / `decrypt` for explicit wrap and unwrap. Rotate the Transit key
+  with `transit/keys/<name>/rotate`.
+- Secret-backed providers expose wrapping bytes to AuthProxy. Keep the old
+  secret version readable until sync has rewrapped retained DEKs.
+
+### Rotating DEKs
+
+Use this workflow when the actual data-encryption key should change, such as a
+routine cryptoperiod rotation or a tenant isolation change.
+
+Configure policy under `system_auth.data_encryption_keys`:
+
+```yaml
+system_auth:
+  data_encryption_keys:
+    ensure_current: true
+    rotation_interval: 2160h # 90 days
+```
+
+Operational steps:
+
+1. Set `ensure_current` to `true` so every active data-encryption key has a
+   current DEK.
+2. Set `rotation_interval` to the desired cryptoperiod. The default is 90 days;
+   `0` disables age-based rotation.
+3. Run or wait for `encrypt:generate_data_encryption_keys`.
+4. Run or wait for `encrypt:sync_keys_to_database` so namespace
+   `target_data_encryption_key_id` values advance by inheritance.
+5. Run or wait for `encrypt:reencrypt_all` to move stored application fields to
+   the namespace target DEK.
+6. Retain old DEKs until scans show no encrypted fields reference their `dek_`
+   ids. Removing retired DEKs before that point makes those fields
+   undecryptable.
+
+The normal worker schedule runs DEK generation and key sync every 15 minutes,
+and full re-encryption every 30 minutes.
+
+### Namespace Key Changes
+
+Changing a namespace's `key_id` changes which logical key owns future
+encryption. After sync resolves a new `target_data_encryption_key_id`, the
+re-encryption task decrypts fields that still reference an older DEK and writes
+them with the namespace target DEK. Child namespaces inherit the nearest
+ancestor `key_id` unless they set their own.
+
+### Operational Checks
+
+For a healthy deployment:
+
+- Every active data-encryption key has exactly one current DEK.
+- Every namespace resolves to a non-deleted `target_data_encryption_key_id`.
+- Encrypted fields store `{"id":"dek_...","d":"..."}` and no longer reference
+  `ekv_...` ids.
+- Provider-backed DEKs retain provider metadata sufficient for unwrap and stale
+  wrapping detection.
+- Old wrapping material and old DEKs remain available until rewrap and
+  re-encryption are complete.
+
 ## API And Generated Artifacts
 
 Public naming changes from encryption keys to keys:
@@ -291,6 +400,33 @@ CryptoKey. Google Cloud KMS does not expose an AWS-style `GenerateDataKey` API,
 so AuthProxy uses `GenerateRandomBytes` for provider-generated DEK bytes and
 then wraps the DEK with `Encrypt`; the DEK row stores the CryptoKeyVersion used
 for wrapping.
+
+HashiCorp Vault Transit integration tests run against a Vault server with a
+Transit mount. The test creates a unique Transit key, generates a DEK with
+`datakey/plaintext`, rotates the Transit key, verifies that sync rewraps the same
+DEK id, and verifies decrypt through a fresh encrypt-service cache.
+
+See [integration_tests/README.md](../integration_tests/README.md) for provider
+credentials, IAM/policy requirements, and focused run commands.
+
+## Superseded KMS Project
+
+The older `project:kms` issue set is closed and superseded by this migration:
+
+- [#100](https://github.com/rmorlok/authproxy/issues/100) - original KMS support
+  request
+- [#581](https://github.com/rmorlok/authproxy/issues/581) - generalized KMS key
+  protection
+- [#582](https://github.com/rmorlok/authproxy/issues/582) - AWS KMS support
+- [#583](https://github.com/rmorlok/authproxy/issues/583) - Google Cloud KMS
+  support
+- [#584](https://github.com/rmorlok/authproxy/issues/584) - Vault Transit support
+- [#585](https://github.com/rmorlok/authproxy/issues/585) - KMS operations docs
+- [#598](https://github.com/rmorlok/authproxy/issues/598) - DEK generation and
+  rotation policy
+
+Use [#605](https://github.com/rmorlok/authproxy/issues/605) and its child issues
+as the source of truth for the unified key model.
 
 ## Implementation Order
 

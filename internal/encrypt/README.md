@@ -107,7 +107,7 @@ The `KeyData` wrapper supports multiple sources for key material. Each provider 
 
 Cloud providers (AWS, GCP, Vault) support caching via `cache_ttl` and report provider-version metadata when the underlying secret or KMS material has been rotated.
 
-KMS-backed providers are different from secret-backed providers. Secret-backed providers return AES key bytes directly to AuthProxy. KMS-backed providers generate or wrap data encryption keys (DEKs) and persist only the wrapped DEK in `data_encryption_keys`. Runtime encryption and re-encryption are driven by the current DEK for the namespace key.
+KMS-backed providers are different from secret-backed providers. Secret-backed providers return AES key bytes directly to AuthProxy, and AuthProxy uses those bytes to wrap generated DEKs. KMS-backed providers keep wrapping material outside AuthProxy, generate or wrap DEKs through provider APIs, and persist only wrapped DEKs plus provider metadata in `data_encryption_keys`. Runtime encryption and re-encryption are driven by the current DEK for the namespace key.
 
 ## Key Sync and Rotation
 
@@ -161,6 +161,33 @@ The DEK generation task walks keys in dependency order, decrypts each key's `Key
 A background goroutine loads keys and DEKs from the database into in-memory caches. Caches are rebuilt atomically and swapped under a write lock.
 
 On startup, the service blocks until the global key is available (up to 5 minutes with exponential backoff), then signals readiness.
+
+## Operational Runbook
+
+There are two separate rotations:
+
+- **Wrapping-key rotation** changes the provider material that protects existing DEKs. Run or wait for `encrypt:sync_keys_to_database`; it keeps each `dek_` id stable while updating `protected_data`, `provider_version`, and `provider_metadata`.
+- **DEK rotation** creates a new current DEK for a key. Run or wait for `encrypt:generate_data_encryption_keys`, then `encrypt:sync_keys_to_database` to advance namespace targets, then `encrypt:reencrypt_all` to move stored fields to the target DEK.
+
+DEK policy lives under `system_auth.data_encryption_keys`:
+
+```yaml
+system_auth:
+  data_encryption_keys:
+    ensure_current: true
+    rotation_interval: 2160h # 90 days
+```
+
+Defaults are `ensure_current: true` and a 90-day `rotation_interval`. A `rotation_interval` of `0` disables age-based DEK rotation, but `ensure_current` can still create the first DEK for a key.
+
+Operational guardrails:
+
+- Keep old provider wrapping material available until sync has rewrapped every retained DEK.
+- Keep old DEK rows available until re-encryption has moved all encrypted fields off their `dek_` ids.
+- Rotating wrapping material alone should not change encrypted field ids.
+- Rotating DEKs should change namespace targets first, then encrypted field ids as the re-encryption task processes rows.
+
+The full migration and operator guide lives in [docs/key-model-migration.md](../../docs/key-model-migration.md).
 
 ## Automatic Re-encryption
 
