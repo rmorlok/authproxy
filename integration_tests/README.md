@@ -55,7 +55,7 @@ AUTH_PROXY_AWS_SECRETS_TEST=1 AWS_REGION=us-east-1 \\
 
 Notes:
 - The test creates a short-lived secret and deletes it at the end.
-- For CI, provide `AWS_REGION` as an environment variable and `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and optional `AWS_SESSION_TOKEN` as environment secrets.
+- For CI, provide `AWS_REGION` and `AWS_ACCESS_KEY_ID` as environment variables. Provide `AWS_SECRET_ACCESS_KEY` and optional `AWS_SESSION_TOKEN` as environment secrets.
 
 ## AWS KMS Integration Test
 
@@ -85,7 +85,7 @@ Notes:
 - The test does not create or delete KMS keys because AWS KMS keys have delayed deletion windows.
 - AWS KMS DEK generation uses `GenerateDataKey`; rewrap uses `Encrypt` / `Decrypt` and keeps the same `dek_` id.
 - Set `AUTH_PROXY_AWS_KMS_KEY_ID_V2` to verify provider metadata advancement and DEK rewrap with a second key or alias.
-- For CI, provide `AWS_REGION`, `AUTH_PROXY_AWS_KMS_TEST`, `AUTH_PROXY_AWS_KMS_KEY_ID`, and `AUTH_PROXY_AWS_KMS_KEY_ID_V2` as environment variables. Provide `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and optional `AWS_SESSION_TOKEN` as environment secrets. CI treats `AUTH_PROXY_AWS_KMS_KEY_ID_V2` as required so the rewrap path is covered.
+- For CI, provide `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AUTH_PROXY_AWS_KMS_TEST`, `AUTH_PROXY_AWS_KMS_KEY_ID`, and `AUTH_PROXY_AWS_KMS_KEY_ID_V2` as environment variables. Provide `AWS_SECRET_ACCESS_KEY` and optional `AWS_SESSION_TOKEN` as environment secrets. CI treats `AUTH_PROXY_AWS_KMS_KEY_ID_V2` as required so the rewrap path is covered.
 
 ## GCP Secret Manager Integration Test
 
@@ -130,7 +130,7 @@ Requirements:
 - GCP credentials available via Application Default Credentials.
 - `AUTH_PROXY_GCP_KMS_TEST=1` set to opt in.
 - `AUTH_PROXY_GCP_KMS_KEY_NAME` set to an existing symmetric encryption CryptoKey resource name, or `GCP_PROJECT_ID`, `AUTH_PROXY_GCP_KMS_LOCATION`, `AUTH_PROXY_GCP_KMS_KEY_RING`, and `AUTH_PROXY_GCP_KMS_CRYPTO_KEY` set to its components.
-- IAM permissions: `cloudkms.cryptoKeys.get`, `cloudkms.cryptoKeyVersions.useToEncrypt`, `cloudkms.cryptoKeyVersions.useToDecrypt`, and `cloudkms.locations.generateRandomBytes`.
+- IAM permissions: `cloudkms.cryptoKeys.get`, `cloudkms.cryptoKeyVersions.useToEncrypt`, `cloudkms.cryptoKeyVersions.useToDecrypt`, and `cloudkms.locations.generateRandomBytes`. The `cloudkms.locations.generateRandomBytes` permission must be granted on the KMS location used by `AUTH_PROXY_GCP_KMS_KEY_NAME` (for example, `projects/my-project/locations/global`).
 
 Optional:
 - `AUTH_PROXY_GCP_KMS_KEY_NAME_V2` set to a second accessible CryptoKey to exercise provider metadata advancement and DEK rewrap.
