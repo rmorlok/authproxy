@@ -110,8 +110,7 @@ func setupMockKMSKeySyncTest(t *testing.T) mockKMSSyncTestEnv {
 	ekID := apid.New(apid.PrefixKey)
 	namespace := "root.kms"
 	require.NoError(t, db.CreateNamespace(ctx, &database.Namespace{
-		Path:  namespace,
-		KeyId: &ekID,
+		Path: namespace,
 	}))
 
 	require.NoError(t, db.CreateKey(ctx, &database.Key{
@@ -120,6 +119,8 @@ func setupMockKMSKeySyncTest(t *testing.T) mockKMSSyncTestEnv {
 		State:            database.KeyStateActive,
 		EncryptedKeyData: encryptKeyDataForTest(t, globalDEK.Id, globalDEKBytes, kmsKeyData),
 	}))
+	_, err := db.SetNamespaceKeyId(ctx, namespace, &ekID)
+	require.NoError(t, err)
 
 	dekV1ID := createMockKMSDataEncryptionKey(t, ctx, db, ekID, "v1", true)
 	require.NoError(t, syncKeysToDatabase(ctx, cfg, db, logger, nil))
@@ -197,8 +198,7 @@ func TestMockKMSKeySync(t *testing.T) {
 		ekID := apid.New(apid.PrefixKey)
 		namespace := "root.kms.nodek"
 		require.NoError(t, env.db.CreateNamespace(env.ctx, &database.Namespace{
-			Path:  namespace,
-			KeyId: &ekID,
+			Path: namespace,
 		}))
 
 		keyData := sconfig.NewKeyDataMockKMS("namespace-kms")
@@ -212,6 +212,8 @@ func TestMockKMSKeySync(t *testing.T) {
 			State:            database.KeyStateActive,
 			EncryptedKeyData: &encKeyData,
 		}))
+		_, err = env.db.SetNamespaceKeyId(env.ctx, namespace, &ekID)
+		require.NoError(t, err)
 
 		require.NoError(t, syncKeysToDatabase(env.ctx, env.cfg, env.db, env.logger, nil))
 		deks, err := env.db.ListDataEncryptionKeysForKey(env.ctx, ekID)
@@ -306,8 +308,7 @@ func setupRewrapSyncTest(t *testing.T) rewrapSyncTestEnv {
 	keyID := apid.New(apid.PrefixKey)
 	namespace := "root.secret"
 	require.NoError(t, db.CreateNamespace(ctx, &database.Namespace{
-		Path:  namespace,
-		KeyId: &keyID,
+		Path: namespace,
 	}))
 
 	require.NoError(t, db.CreateKey(ctx, &database.Key{
@@ -316,6 +317,8 @@ func setupRewrapSyncTest(t *testing.T) rewrapSyncTestEnv {
 		State:            database.KeyStateActive,
 		EncryptedKeyData: encryptKeyDataForTest(t, globalDEK.Id, globalDEKBytes, keyData),
 	}))
+	_, err := db.SetNamespaceKeyId(ctx, namespace, &keyID)
+	require.NoError(t, err)
 
 	dek, dekBytes := createDataEncryptionKeyForTest(t, ctx, db, keyID, keyData)
 	require.NoError(t, syncKeysToDatabase(ctx, cfg, db, logger, nil))

@@ -1576,6 +1576,12 @@ INSERT INTO namespaces
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 			ekId := apid.New(apid.PrefixKey)
+			require.NoError(t, db.CreateKey(ctx, &Key{
+				Id:        ekId,
+				Namespace: "root",
+				State:     KeyStateActive,
+			}))
+
 			err := db.CreateNamespace(ctx, &Namespace{
 				Path:  "root.roundtrip",
 				State: NamespaceStateActive,
@@ -1966,12 +1972,12 @@ func TestSetNamespaceEncryptionKeyIdAncestorValidation(t *testing.T) {
 		require.Equal(t, ekParent.Id, *ns.KeyId)
 	})
 
-	t.Run("rejected: key in same namespace", func(t *testing.T) {
-		_, err := db.SetNamespaceKeyId(ctx, "root.parent.child", &ekChild.Id)
-		require.Error(t, err)
-		var httpErr *httperr.Error
-		require.True(t, errors.As(err, &httpErr))
-		require.Equal(t, http.StatusBadRequest, httpErr.Status)
+	t.Run("valid: key in same namespace", func(t *testing.T) {
+		ns, err := db.SetNamespaceKeyId(ctx, "root.parent.child", &ekChild.Id)
+		require.NoError(t, err)
+		require.NotNil(t, ns)
+		require.NotNil(t, ns.KeyId)
+		require.Equal(t, ekChild.Id, *ns.KeyId)
 	})
 
 	t.Run("rejected: key in descendant namespace", func(t *testing.T) {
@@ -1990,13 +1996,49 @@ func TestSetNamespaceEncryptionKeyIdAncestorValidation(t *testing.T) {
 		require.Equal(t, http.StatusBadRequest, httpErr.Status)
 	})
 
-	t.Run("rejected: key on root namespace", func(t *testing.T) {
-		_, err := db.SetNamespaceKeyId(ctx, "root", &ekRoot.Id)
+	t.Run("valid: key in root namespace", func(t *testing.T) {
+		ns, err := db.SetNamespaceKeyId(ctx, "root", &ekRoot.Id)
+		require.NoError(t, err)
+		require.NotNil(t, ns)
+		require.NotNil(t, ns.KeyId)
+		require.Equal(t, ekRoot.Id, *ns.KeyId)
+	})
+
+	t.Run("valid: global key in root and descendant namespace", func(t *testing.T) {
+		ns, err := db.SetNamespaceKeyId(ctx, "root", &GlobalKeyID)
+		require.NoError(t, err)
+		require.NotNil(t, ns)
+		require.NotNil(t, ns.KeyId)
+		require.Equal(t, GlobalKeyID, *ns.KeyId)
+
+		ns, err = db.SetNamespaceKeyId(ctx, "root.parent.child", &GlobalKeyID)
+		require.NoError(t, err)
+		require.NotNil(t, ns)
+		require.NotNil(t, ns.KeyId)
+		require.Equal(t, GlobalKeyID, *ns.KeyId)
+	})
+
+	t.Run("create validates key namespace", func(t *testing.T) {
+		require.NoError(t, db.CreateNamespace(ctx, &Namespace{
+			Path:  "root.parent.created",
+			State: NamespaceStateActive,
+			KeyId: &ekParent.Id,
+		}))
+
+		created, err := db.GetNamespace(ctx, "root.parent.created")
+		require.NoError(t, err)
+		require.NotNil(t, created.KeyId)
+		require.Equal(t, ekParent.Id, *created.KeyId)
+
+		err = db.CreateNamespace(ctx, &Namespace{
+			Path:  "root.parent.rejected",
+			State: NamespaceStateActive,
+			KeyId: &ekSibling.Id,
+		})
 		require.Error(t, err)
 		var httpErr *httperr.Error
 		require.True(t, errors.As(err, &httpErr))
 		require.Equal(t, http.StatusBadRequest, httpErr.Status)
-		require.Contains(t, httpErr.ResponseMsg, "root namespace")
 	})
 
 	t.Run("clear encryption key succeeds", func(t *testing.T) {

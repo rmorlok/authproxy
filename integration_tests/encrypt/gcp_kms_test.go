@@ -44,8 +44,7 @@ func TestGcpKMSKeySyncAndReencrypt(t *testing.T) {
 	keyID := apid.New(apid.PrefixKey)
 
 	require.NoError(t, env.Db.CreateNamespace(ctx, &database.Namespace{
-		Path:  namespace,
-		KeyId: &keyID,
+		Path: namespace,
 	}))
 
 	keyData := gcpKMSKeyData(keyName)
@@ -62,6 +61,8 @@ func TestGcpKMSKeySyncAndReencrypt(t *testing.T) {
 		EncryptedKeyData: &encKeyData,
 		State:            database.KeyStateActive,
 	}))
+	_, err = env.Db.SetNamespaceKeyId(ctx, namespace, &keyID)
+	require.NoError(t, err)
 
 	currentV1 := createDataEncryptionKeyForIntegrationTest(t, ctx, env.Db, keyID, &keyData)
 	require.Equal(t, gcpKMSProviderString, currentV1.Provider)

@@ -48,8 +48,7 @@ func TestAwsKMSKeySyncAndReencrypt(t *testing.T) {
 	keyIDAuthProxy := apid.New(apid.PrefixKey)
 
 	require.NoError(t, env.Db.CreateNamespace(ctx, &database.Namespace{
-		Path:  namespace,
-		KeyId: &keyIDAuthProxy,
+		Path: namespace,
 	}))
 
 	keyData := awsKMSKeyData(keyID, region)
@@ -66,6 +65,8 @@ func TestAwsKMSKeySyncAndReencrypt(t *testing.T) {
 		EncryptedKeyData: &encKeyData,
 		State:            database.KeyStateActive,
 	}))
+	_, err = env.Db.SetNamespaceKeyId(ctx, namespace, &keyIDAuthProxy)
+	require.NoError(t, err)
 
 	currentV1 := createDataEncryptionKeyForIntegrationTest(t, ctx, env.Db, keyIDAuthProxy, &keyData)
 	require.Equal(t, awsKMSProviderString, currentV1.Provider)

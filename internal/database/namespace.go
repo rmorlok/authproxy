@@ -235,6 +235,32 @@ func (s *service) getNamespaceByPath(ctx context.Context, tx sq.BaseRunner, path
 	return &result, nil
 }
 
+func (s *service) validateNamespaceKeyScope(ctx context.Context, runner sq.BaseRunner, path string, keyID apid.ID) error {
+	var keyNamespace string
+	err := s.sq.
+		Select("namespace").
+		From(KeysTable).
+		Where(sq.Eq{
+			"id":         keyID,
+			"deleted_at": nil,
+		}).
+		RunWith(runner).
+		QueryRow().
+		Scan(&keyNamespace)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("failed to look up encryption key: %w", ErrNotFound)
+		}
+		return fmt.Errorf("failed to look up encryption key: %w", err)
+	}
+
+	if !namespace.NamespaceIsSameOrChild(keyNamespace, path) {
+		return httperr.BadRequestf("encryption key belongs to namespace '%s' which is not the same as or an ancestor of '%s'", keyNamespace, path)
+	}
+
+	return nil
+}
+
 func (s *service) createNamespace(ctx context.Context, tx *sql.Tx, ns *Namespace) error {
 	prefixes := namespace.SplitNamespacePathToPrefixes(ns.Path)
 	state := ns.State
@@ -261,6 +287,12 @@ func (s *service) createNamespace(ctx context.Context, tx *sql.Tx, ns *Namespace
 
 	// Update the state so that we are always bound by the parent namespace state
 	ns.State = state
+
+	if ns.KeyId != nil {
+		if err := s.validateNamespaceKeyScope(ctx, tx, ns.Path, *ns.KeyId); err != nil {
+			return err
+		}
+	}
 
 	// Materialize parent-namespace carry-forward. Each ancestor namespace
 	// already stored its own ancestor chain at create time, so it suffices
@@ -393,54 +425,40 @@ func (s *service) DeleteNamespace(ctx context.Context, path string) error {
 }
 
 func (s *service) SetNamespaceKeyId(ctx context.Context, path string, ekId *apid.ID) (*Namespace, error) {
-	if ekId != nil {
-		ek, err := s.GetKey(ctx, *ekId)
-		if err != nil {
-			return nil, fmt.Errorf("failed to look up encryption key: %w", err)
-		}
-
-		prefixes := namespace.SplitNamespacePathToPrefixes(path)
-		// Strict ancestors: all prefixes except the last (self)
-		var strictAncestors []string
-		if len(prefixes) > 1 {
-			strictAncestors = prefixes[:len(prefixes)-1]
-		}
-
-		found := false
-		for _, ancestor := range strictAncestors {
-			if ek.Namespace == ancestor {
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			if len(strictAncestors) == 0 {
-				return nil, httperr.BadRequestf("cannot assign encryption key to root namespace; encryption keys must belong to a strict ancestor namespace")
-			}
-			return nil, httperr.BadRequestf("encryption key belongs to namespace '%s' which is not a strict ancestor of '%s'", ek.Namespace, path)
-		}
-	}
-
 	now := apctx.GetClock(ctx).Now()
-	dbResult, err := s.sq.
-		Update(NamespacesTable).
-		Set("updated_at", now).
-		Set("key_id", ekId).
-		Where(sq.Eq{"path": path, "deleted_at": nil}).
-		RunWith(s.db).
-		Exec()
-	if err != nil {
-		return nil, fmt.Errorf("failed to set namespace encryption key: %w", err)
-	}
 
-	affected, err := dbResult.RowsAffected()
-	if err != nil {
-		return nil, fmt.Errorf("failed to set namespace encryption key: %w", err)
-	}
+	err := s.transaction(func(tx *sql.Tx) error {
+		if ekId != nil {
+			if err := s.validateNamespaceKeyScope(ctx, tx, path, *ekId); err != nil {
+				return err
+			}
+		}
 
-	if affected == 0 {
-		return nil, ErrNotFound
+		dbResult, err := s.sq.
+			Update(NamespacesTable).
+			Set("updated_at", now).
+			Set("key_id", ekId).
+			Where(sq.Eq{"path": path, "deleted_at": nil}).
+			RunWith(tx).
+			Exec()
+		if err != nil {
+			return fmt.Errorf("failed to set namespace encryption key: %w", err)
+		}
+
+		affected, err := dbResult.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("failed to set namespace encryption key: %w", err)
+		}
+
+		if affected == 0 {
+			return ErrNotFound
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
 	}
 
 	return s.GetNamespace(ctx, path)
