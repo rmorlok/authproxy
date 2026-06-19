@@ -72,9 +72,20 @@ func (s *service) buildManifestSetupFlow(c iface.Connection) iface.ManifestSetup
 	}
 
 	return &manifestFlow{
-		steps:        steps,
-		hasProbes:    connector.HasProbes(),
-		authBoundary: authBoundary,
+		steps:            steps,
+		hasProbes:        connector.HasProbes(),
+		hasEnabledProbes: cHasEnabledProbes(c),
+		authBoundary:     authBoundary,
+	}
+}
+
+func cHasEnabledProbes(c iface.Connection) func(context.Context) (bool, error) {
+	return func(ctx context.Context) (bool, error) {
+		probes, err := c.GetEnabledProbes(ctx)
+		if err != nil {
+			return false, err
+		}
+		return len(probes) > 0, nil
 	}
 }
 
@@ -220,9 +231,10 @@ func (s *service) mintReturnURL(ctx context.Context, connectionId apid.ID, stepI
 // manifestFlow is the materialized setup flow for a single connection.
 // Exposed as iface.ManifestSetupFlow.
 type manifestFlow struct {
-	steps        []iface.ManifestSetupStep
-	hasProbes    bool
-	authBoundary int // index in steps after which verify slots in when hasProbes
+	steps            []iface.ManifestSetupStep
+	hasProbes        bool
+	hasEnabledProbes func(context.Context) (bool, error)
+	authBoundary     int // index in steps after which verify slots in when probes are enabled
 }
 
 func (f *manifestFlow) Steps(ctx context.Context) ([]iface.ManifestSetupStep, error) {
@@ -244,6 +256,13 @@ func (f *manifestFlow) StepById(ctx context.Context, id string) (iface.ManifestS
 		return nil, false, nil
 	}
 	if id == iface.NewVerifyStep().Id() && f.hasProbes {
+		ok, err := f.verifyEnabled(ctx)
+		if err != nil {
+			return nil, false, err
+		}
+		if !ok {
+			return nil, false, nil
+		}
 		return iface.NewVerifyStep(), true, nil
 	}
 	for i, s := range f.steps {
@@ -280,7 +299,13 @@ func (f *manifestFlow) FirstStep(ctx context.Context) (iface.ManifestSetupStep, 
 		if err != nil || ok {
 			return step, err
 		}
-		return iface.NewVerifyStep(), nil
+		verify, err := f.verifyEnabled(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if verify {
+			return iface.NewVerifyStep(), nil
+		}
 	}
 	step, _, err := f.nextEligibleStep(ctx, 0, len(f.steps)-1)
 	return step, err
@@ -307,11 +332,28 @@ func (f *manifestFlow) NextStep(ctx context.Context, currentId string) (iface.Ma
 			if err != nil || ok {
 				return next, ok, err
 			}
-			return iface.NewVerifyStep(), true, nil
+			verify, err := f.verifyEnabled(ctx)
+			if err != nil {
+				return nil, false, err
+			}
+			if verify {
+				return iface.NewVerifyStep(), true, nil
+			}
+			return f.nextEligibleStep(ctx, f.authBoundary+1, len(f.steps)-1)
 		}
 		return f.nextEligibleStep(ctx, i+1, len(f.steps)-1)
 	}
 	return nil, false, nil
+}
+
+func (f *manifestFlow) verifyEnabled(ctx context.Context) (bool, error) {
+	if !f.hasProbes {
+		return false, nil
+	}
+	if f.hasEnabledProbes == nil {
+		return true, nil
+	}
+	return f.hasEnabledProbes(ctx)
 }
 
 func (f *manifestFlow) nextEligibleStep(ctx context.Context, start int, end int) (iface.ManifestSetupStep, bool, error) {

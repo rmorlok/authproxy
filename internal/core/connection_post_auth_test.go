@@ -10,6 +10,7 @@ import (
 	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/internal/auth_methods/oauth2"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -101,6 +102,42 @@ func TestHandleCredentialsEstablished(t *testing.T) {
 		conn.SetupStep = &current
 
 		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewSetupStep("workspace"))).Return(nil)
+
+		outcome, err := conn.HandleCredentialsEstablished(context.Background())
+		require.NoError(t, err)
+		assert.True(t, outcome.SetupPending)
+		require.NotNil(t, conn.GetSetupStep())
+		assert.Equal(t, "workspace", conn.GetSetupStep().String())
+	})
+
+	t.Run("skips verify when all probes are disabled", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		sf := &cschema.SetupFlow{
+			Configure: &cschema.SetupFlowPhase{
+				Steps: []cschema.SetupFlowStep{
+					{Id: "workspace", JsonSchema: workspaceSchema},
+				},
+			},
+		}
+		conn, db, _ := newTestConnectionWithSetupFlowAndAsynq(t, ctrl, sf)
+		conn.cv = NewTestConnectorVersion(cschema.Connector{
+			Auth:      &cschema.Auth{InnerVal: &cschema.AuthOAuth2{Type: cschema.AuthTypeOAuth2}},
+			SetupFlow: sf,
+			Probes: []cschema.Probe{{
+				Id: "ping",
+				If: &common.Predicate{Javascript: `cfg.run_probe === true`},
+			}},
+		})
+		conn.ConnectorId = conn.cv.GetId()
+		conn.ConnectorVersion = conn.cv.GetVersion()
+		setConnectionConfigFixture(t, conn, map[string]any{"run_probe": false})
+		current := cschema.MustNewSetupStep(oauth2.OAuth2AuthorizeStepId)
+		conn.SetupStep = &current
+
+		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewSetupStep("workspace"))).Return(nil)
+		// No EnqueueContext expectation — disabled probes must skip verify.
 
 		outcome, err := conn.HandleCredentialsEstablished(context.Background())
 		require.NoError(t, err)

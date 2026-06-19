@@ -12,6 +12,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	mockRedisPkg "github.com/rmorlok/authproxy/internal/apredis/mock"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -45,6 +46,39 @@ func TestEnqueueProbeNow_EnqueuesEachProbeWhenThrottleAllows(t *testing.T) {
 	defer ctrl.Finish()
 	svc.r = mockRedisAllowingSetNX(ctrl, connectionId, []string{"p1", "p2"}, true)
 	svc.ac = mockAsynqExpectingEnqueues(ctrl, 2)
+
+	require.NoError(t, svc.EnqueueProbeNow(context.Background(), connectionId))
+}
+
+func TestEnqueueProbeNow_EnqueuesOnlyEnabledProbes(t *testing.T) {
+	connectionId := apid.New(apid.PrefixConnection)
+	connector := &cschema.Connector{
+		Id:          apid.New(apid.PrefixConnectorVersion),
+		Version:     1,
+		DisplayName: "probe-now-conditional",
+		Auth:        &cschema.Auth{InnerVal: &cschema.AuthApiKey{Type: cschema.AuthTypeAPIKey}},
+		Probes: []cschema.Probe{
+			{Id: "enabled", Http: &cschema.ProbeHttp{Method: "GET", URL: "https://x.example/health"}},
+			{
+				Id:   "disabled",
+				If:   &common.Predicate{Javascript: `cfg.run_disabled === true`},
+				Http: &cschema.ProbeHttp{Method: "GET", URL: "https://y.example/health"},
+			},
+		},
+	}
+	conn := &database.Connection{
+		Id:               connectionId,
+		Namespace:        "root",
+		State:            database.ConnectionStateConfigured,
+		HealthState:      database.ConnectionHealthStateHealthy,
+		ConnectorId:      connector.Id,
+		ConnectorVersion: connector.Version,
+	}
+
+	svc, _, _, ctrl := setupVerifyTest(t, connectionId, conn, connector)
+	defer ctrl.Finish()
+	svc.r = mockRedisAllowingSetNX(ctrl, connectionId, []string{"enabled"}, true)
+	svc.ac = mockAsynqExpectingEnqueues(ctrl, 1)
 
 	require.NoError(t, svc.EnqueueProbeNow(context.Background(), connectionId))
 }
