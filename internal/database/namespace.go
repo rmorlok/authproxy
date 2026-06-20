@@ -90,7 +90,7 @@ func (ns *Namespace) normalize() {
 
 	ns.depth = namespace.DepthOfNamespacePath(ns.Path)
 
-	if ns.Path == namespace.RootNamespace {
+	if ns.Path == namespace.RootNamespace && ns.KeyId == nil {
 		ns.KeyId = rootNamespaceKeyID()
 	}
 }
@@ -98,18 +98,6 @@ func (ns *Namespace) normalize() {
 func rootNamespaceKeyID() *apid.ID {
 	id := GlobalKeyID
 	return &id
-}
-
-func normalizeNamespaceKeyID(path string, keyID *apid.ID) (*apid.ID, error) {
-	if path != namespace.RootNamespace {
-		return keyID, nil
-	}
-
-	if keyID != nil && *keyID != GlobalKeyID {
-		return nil, httperr.BadRequestf("root namespace must use the global key '%s'", GlobalKeyID)
-	}
-
-	return rootNamespaceKeyID(), nil
 }
 
 func (ns *Namespace) Validate() error {
@@ -455,14 +443,9 @@ func (s *service) DeleteNamespace(ctx context.Context, path string) error {
 func (s *service) SetNamespaceKeyId(ctx context.Context, path string, ekId *apid.ID) (*Namespace, error) {
 	now := apctx.GetClock(ctx).Now()
 
-	normalizedKeyID, err := normalizeNamespaceKeyID(path, ekId)
-	if err != nil {
-		return nil, err
-	}
-
-	err = s.transaction(func(tx *sql.Tx) error {
-		if normalizedKeyID != nil {
-			if err := s.validateNamespaceKeyScope(ctx, tx, path, *normalizedKeyID); err != nil {
+	err := s.transaction(func(tx *sql.Tx) error {
+		if ekId != nil {
+			if err := s.validateNamespaceKeyScope(ctx, tx, path, *ekId); err != nil {
 				return err
 			}
 		}
@@ -470,7 +453,7 @@ func (s *service) SetNamespaceKeyId(ctx context.Context, path string, ekId *apid
 		dbResult, err := s.sq.
 			Update(NamespacesTable).
 			Set("updated_at", now).
-			Set("key_id", normalizedKeyID).
+			Set("key_id", ekId).
 			Where(sq.Eq{"path": path, "deleted_at": nil}).
 			RunWith(tx).
 			Exec()

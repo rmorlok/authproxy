@@ -33,10 +33,18 @@ func NewSyncKeysToDatabaseTask() *asynq.Task {
 }
 
 func ensureRootNamespaceUsesGlobalKey(ctx context.Context, db database.DB) error {
-	_, err := db.SetNamespaceKeyId(ctx, namespace.RootNamespace, &globalEncryptionKeyID)
+	rootNamespace, err := db.GetNamespace(ctx, namespace.RootNamespace)
 	if errors.Is(err, database.ErrNotFound) {
 		return nil
 	}
+	if err != nil {
+		return err
+	}
+	if rootNamespace.KeyId != nil {
+		return nil
+	}
+
+	_, err = db.SetNamespaceKeyId(ctx, namespace.RootNamespace, &globalEncryptionKeyID)
 	return err
 }
 

@@ -397,6 +397,37 @@ func TestSyncKeysToDatabase(t *testing.T) {
 		require.Equal(t, database.GlobalKeyID, *root.KeyId)
 	})
 
+	t.Run("preserves existing root namespace key before wrapping sync", func(t *testing.T) {
+		sconfig.ResetKeyDataMockRegistry()
+		t.Cleanup(sconfig.ResetKeyDataMockRegistry)
+
+		ctx := context.Background()
+		globalKD := sconfig.NewKeyDataMock("global-root-sync-preserve")
+		sconfig.KeyDataMockAddVersion("global-root-sync-preserve", "global-key", "v1", util.MustGenerateSecureRandomKey(32))
+		cfg := config.FromRoot(&sconfig.Root{
+			SystemAuth: sconfig.SystemAuth{
+				GlobalAESKey: globalKD,
+			},
+		})
+		cfg, db := database.MustApplyBlankTestDbConfig(t, cfg)
+		createDataEncryptionKeyForTest(t, ctx, db, globalEncryptionKeyID, globalKD)
+
+		rootKeyID := apid.New(apid.PrefixKey)
+		require.NoError(t, db.CreateKey(ctx, &database.Key{
+			Id:        rootKeyID,
+			Namespace: sconfig.RootNamespace,
+		}))
+		_, err := db.SetNamespaceKeyId(ctx, sconfig.RootNamespace, &rootKeyID)
+		require.NoError(t, err)
+
+		require.NoError(t, syncKeysToDatabase(ctx, cfg, db, slog.Default(), nil))
+
+		root, err := db.GetNamespace(ctx, sconfig.RootNamespace)
+		require.NoError(t, err)
+		require.NotNil(t, root.KeyId)
+		require.Equal(t, rootKeyID, *root.KeyId)
+	})
+
 	t.Run("does not create or duplicate deks", func(t *testing.T) {
 		env := setupRewrapSyncTest(t)
 
