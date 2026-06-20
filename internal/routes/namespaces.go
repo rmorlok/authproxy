@@ -249,7 +249,21 @@ func (r *NamespacesRoutes) list(gctx *gin.Context) {
 		}
 
 		if req.ChildrenOf != nil {
+			if err := namespace.ValidateNamespacePath(*req.ChildrenOf); err != nil {
+				apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid children_of namespace '%s': %s", *req.ChildrenOf, err.Error()))
+				val.MarkErrorReturn()
+				return
+			}
+
 			b = b.ForChildrenOf(*req.ChildrenOf)
+		}
+
+		if req.NamespaceVal != nil {
+			if err := namespace.ValidateNamespaceMatcher(*req.NamespaceVal); err != nil {
+				apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid namespace matcher '%s': %s", *req.NamespaceVal, err.Error()))
+				val.MarkErrorReturn()
+				return
+			}
 		}
 
 		b = b.ForNamespaceMatchers(val.GetEffectiveNamespaceMatchers(req.NamespaceVal))
