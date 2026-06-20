@@ -539,7 +539,7 @@ func (s *service) EncryptKeyForNamespace(ctx context.Context, namespacePath stri
 
 	// Keys are always encrypted with the parent namespace key to avoid creating a dependency cycle.
 	parentNamespace := namespace.NamespaceParentPath(namespacePath)
-	return s.EncryptKeyForNamespace(ctx, parentNamespace, keyData)
+	return s.EncryptForNamespace(ctx, parentNamespace, keyData)
 }
 
 func decryptFieldWithBytes(keyBytes []byte, ef encfield.EncryptedField) ([]byte, error) {

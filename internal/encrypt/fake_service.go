@@ -28,11 +28,6 @@ func (s *fakeService) encryptForKey(ctx context.Context, ekId apid.ID, data []by
 	}, nil
 }
 
-// EncryptStringForKey encrypts a string with the current DEK of the specified key.
-func (s *fakeService) EncryptStringForKey(ctx context.Context, ekId apid.ID, data string) (encfield.EncryptedField, error) {
-	return s.encryptForKey(ctx, ekId, []byte(data))
-}
-
 // EncryptGlobal encrypts raw bytes with the current global key.
 func (s *fakeService) EncryptGlobal(ctx context.Context, data []byte) (encfield.EncryptedField, error) {
 	return s.encryptForKey(ctx, globalEncryptionKeyID, data)
@@ -49,6 +44,10 @@ func (s *fakeService) EncryptForNamespace(ctx context.Context, _ string, data []
 
 func (s *fakeService) EncryptStringForNamespace(ctx context.Context, namespacePath string, data string) (encfield.EncryptedField, error) {
 	return s.EncryptForNamespace(ctx, namespacePath, []byte(data))
+}
+
+func (s *fakeService) EncryptKeyForNamespace(ctx context.Context, namespacePath string, keyData []byte) (encfield.EncryptedField, error) {
+	return s.EncryptForNamespace(ctx, namespacePath, keyData)
 }
 
 func (s *fakeService) EncryptForEntity(ctx context.Context, entity NamespacedEntity, data []byte) (encfield.EncryptedField, error) {
