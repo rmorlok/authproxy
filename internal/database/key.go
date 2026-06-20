@@ -17,15 +17,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
-func init() {
-	RegisterEncryptedField(EncryptedFieldRegistration{
-		Table:          KeysTable,
-		PrimaryKeyCols: []string{"id"},
-		EncryptedCols:  []string{"encrypted_key_data"},
-		NamespaceCol:   "namespace",
-	})
-}
-
 const KeysTable = "keys"
 
 // GlobalKeyID is the ID of the global key created by migration. It is the root
@@ -105,10 +96,13 @@ func IsValidKeyOrderByField[T string | KeyOrderByField](field T) bool {
 
 // Key represents a user-managed key configuration.
 type Key struct {
-	Id               apid.ID
-	Namespace        string
-	Usage            KeyUsage
-	MaterialType     KeyMaterialType
+	Id           apid.ID
+	Namespace    string
+	Usage        KeyUsage
+	MaterialType KeyMaterialType
+	// Key provider configuration is encrypted at rest, but it is not registered
+	// with namespace re-encryption. It defines the key hierarchy, so rewrapping
+	// it based on namespace targets can make a key depend on its own DEK.
 	EncryptedKeyData *encfield.EncryptedField
 	State            KeyState
 	Labels           Labels

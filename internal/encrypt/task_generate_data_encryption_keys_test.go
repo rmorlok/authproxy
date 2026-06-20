@@ -59,8 +59,7 @@ func setupGenerateTest(t *testing.T, keyDataFactory func() *sconfig.KeyData) moc
 	ekID := apid.New(apid.PrefixKey)
 	namespace := "root.kms"
 	require.NoError(t, db.CreateNamespace(ctx, &database.Namespace{
-		Path:  namespace,
-		KeyId: &ekID,
+		Path: namespace,
 	}))
 
 	require.NoError(t, db.CreateKey(ctx, &database.Key{
@@ -69,6 +68,8 @@ func setupGenerateTest(t *testing.T, keyDataFactory func() *sconfig.KeyData) moc
 		State:            database.KeyStateActive,
 		EncryptedKeyData: encryptKeyDataForTest(t, globalDEK.Id, globalDEKBytes, keyData),
 	}))
+	_, err := db.SetNamespaceKeyId(ctx, namespace, &ekID)
+	require.NoError(t, err)
 
 	return mockKMSGenerateTestEnv{
 		ctx:       ctx,

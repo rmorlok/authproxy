@@ -1576,6 +1576,12 @@ INSERT INTO namespaces
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 			ekId := apid.New(apid.PrefixKey)
+			require.NoError(t, db.CreateKey(ctx, &Key{
+				Id:        ekId,
+				Namespace: "root",
+				State:     KeyStateActive,
+			}))
+
 			err := db.CreateNamespace(ctx, &Namespace{
 				Path:  "root.roundtrip",
 				State: NamespaceStateActive,
@@ -1966,12 +1972,12 @@ func TestSetNamespaceEncryptionKeyIdAncestorValidation(t *testing.T) {
 		require.Equal(t, ekParent.Id, *ns.KeyId)
 	})
 
-	t.Run("rejected: key in same namespace", func(t *testing.T) {
-		_, err := db.SetNamespaceKeyId(ctx, "root.parent.child", &ekChild.Id)
-		require.Error(t, err)
-		var httpErr *httperr.Error
-		require.True(t, errors.As(err, &httpErr))
-		require.Equal(t, http.StatusBadRequest, httpErr.Status)
+	t.Run("valid: key in same namespace", func(t *testing.T) {
+		ns, err := db.SetNamespaceKeyId(ctx, "root.parent.child", &ekChild.Id)
+		require.NoError(t, err)
+		require.NotNil(t, ns)
+		require.NotNil(t, ns.KeyId)
+		require.Equal(t, ekChild.Id, *ns.KeyId)
 	})
 
 	t.Run("rejected: key in descendant namespace", func(t *testing.T) {
@@ -1990,13 +1996,49 @@ func TestSetNamespaceEncryptionKeyIdAncestorValidation(t *testing.T) {
 		require.Equal(t, http.StatusBadRequest, httpErr.Status)
 	})
 
-	t.Run("rejected: key on root namespace", func(t *testing.T) {
-		_, err := db.SetNamespaceKeyId(ctx, "root", &ekRoot.Id)
+	t.Run("valid: key in root namespace", func(t *testing.T) {
+		ns, err := db.SetNamespaceKeyId(ctx, "root", &ekRoot.Id)
+		require.NoError(t, err)
+		require.NotNil(t, ns)
+		require.NotNil(t, ns.KeyId)
+		require.Equal(t, ekRoot.Id, *ns.KeyId)
+	})
+
+	t.Run("valid: global key in root and descendant namespace", func(t *testing.T) {
+		ns, err := db.SetNamespaceKeyId(ctx, "root", &GlobalKeyID)
+		require.NoError(t, err)
+		require.NotNil(t, ns)
+		require.NotNil(t, ns.KeyId)
+		require.Equal(t, GlobalKeyID, *ns.KeyId)
+
+		ns, err = db.SetNamespaceKeyId(ctx, "root.parent.child", &GlobalKeyID)
+		require.NoError(t, err)
+		require.NotNil(t, ns)
+		require.NotNil(t, ns.KeyId)
+		require.Equal(t, GlobalKeyID, *ns.KeyId)
+	})
+
+	t.Run("create validates key namespace", func(t *testing.T) {
+		require.NoError(t, db.CreateNamespace(ctx, &Namespace{
+			Path:  "root.parent.created",
+			State: NamespaceStateActive,
+			KeyId: &ekParent.Id,
+		}))
+
+		created, err := db.GetNamespace(ctx, "root.parent.created")
+		require.NoError(t, err)
+		require.NotNil(t, created.KeyId)
+		require.Equal(t, ekParent.Id, *created.KeyId)
+
+		err = db.CreateNamespace(ctx, &Namespace{
+			Path:  "root.parent.rejected",
+			State: NamespaceStateActive,
+			KeyId: &ekSibling.Id,
+		})
 		require.Error(t, err)
 		var httpErr *httperr.Error
 		require.True(t, errors.As(err, &httpErr))
 		require.Equal(t, http.StatusBadRequest, httpErr.Status)
-		require.Contains(t, httpErr.ResponseMsg, "root namespace")
 	})
 
 	t.Run("clear encryption key succeeds", func(t *testing.T) {
@@ -2010,6 +2052,121 @@ func TestSetNamespaceEncryptionKeyIdAncestorValidation(t *testing.T) {
 		require.NotNil(t, ns)
 		require.Nil(t, ns.KeyId)
 	})
+}
+
+func TestValidateNamespaceKeyScope(t *testing.T) {
+	_, db := MustApplyBlankTestDbConfig(t, nil)
+	svc := db.(*service)
+	now := time.Date(2024, time.January, 10, 12, 0, 0, 0, time.UTC)
+	ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+	for _, path := range []string{"root.parent", "root.parent.child", "root.parent.child.grandchild", "root.sibling"} {
+		require.NoError(t, db.CreateNamespace(ctx, &Namespace{
+			Path:  path,
+			State: NamespaceStateActive,
+		}))
+	}
+
+	rootKey := &Key{
+		Id:        apid.New(apid.PrefixKey),
+		Namespace: "root",
+		State:     KeyStateActive,
+	}
+	parentKey := &Key{
+		Id:        apid.New(apid.PrefixKey),
+		Namespace: "root.parent",
+		State:     KeyStateActive,
+	}
+	childKey := &Key{
+		Id:        apid.New(apid.PrefixKey),
+		Namespace: "root.parent.child",
+		State:     KeyStateActive,
+	}
+	grandchildKey := &Key{
+		Id:        apid.New(apid.PrefixKey),
+		Namespace: "root.parent.child.grandchild",
+		State:     KeyStateActive,
+	}
+	siblingKey := &Key{
+		Id:        apid.New(apid.PrefixKey),
+		Namespace: "root.sibling",
+		State:     KeyStateActive,
+	}
+
+	for _, key := range []*Key{rootKey, parentKey, childKey, grandchildKey, siblingKey} {
+		require.NoError(t, db.CreateKey(ctx, key))
+	}
+
+	tests := []struct {
+		name           string
+		targetPath     string
+		keyID          apid.ID
+		wantBadRequest bool
+		wantNotFound   bool
+	}{
+		{
+			name:       "root key can scope descendant",
+			targetPath: "root.parent.child",
+			keyID:      rootKey.Id,
+		},
+		{
+			name:       "parent key can scope child",
+			targetPath: "root.parent.child",
+			keyID:      parentKey.Id,
+		},
+		{
+			name:       "same namespace key can scope namespace",
+			targetPath: "root.parent.child",
+			keyID:      childKey.Id,
+		},
+		{
+			name:       "global key can scope root",
+			targetPath: "root",
+			keyID:      GlobalKeyID,
+		},
+		{
+			name:       "global key can scope descendant",
+			targetPath: "root.parent.child",
+			keyID:      GlobalKeyID,
+		},
+		{
+			name:           "descendant key cannot scope ancestor",
+			targetPath:     "root.parent.child",
+			keyID:          grandchildKey.Id,
+			wantBadRequest: true,
+		},
+		{
+			name:           "sibling key cannot scope namespace",
+			targetPath:     "root.parent.child",
+			keyID:          siblingKey.Id,
+			wantBadRequest: true,
+		},
+		{
+			name:         "missing key returns not found",
+			targetPath:   "root.parent.child",
+			keyID:        apid.New(apid.PrefixKey),
+			wantNotFound: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := svc.validateNamespaceKeyScope(ctx, svc.db, test.targetPath, test.keyID)
+			if test.wantNotFound {
+				require.ErrorIs(t, err, ErrNotFound)
+				return
+			}
+			if test.wantBadRequest {
+				require.Error(t, err)
+				var httpErr *httperr.Error
+				require.True(t, errors.As(err, &httpErr))
+				require.Equal(t, http.StatusBadRequest, httpErr.Status)
+				return
+			}
+
+			require.NoError(t, err)
+		})
+	}
 }
 
 func TestNamespaceLabelChangePropagation(t *testing.T) {

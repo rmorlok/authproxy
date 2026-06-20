@@ -44,8 +44,7 @@ func TestGcpKMSKeySyncAndReencrypt(t *testing.T) {
 	keyID := apid.New(apid.PrefixKey)
 
 	require.NoError(t, env.Db.CreateNamespace(ctx, &database.Namespace{
-		Path:  namespace,
-		KeyId: &keyID,
+		Path: namespace,
 	}))
 
 	keyData := gcpKMSKeyData(keyName)
@@ -62,6 +61,8 @@ func TestGcpKMSKeySyncAndReencrypt(t *testing.T) {
 		EncryptedKeyData: &encKeyData,
 		State:            database.KeyStateActive,
 	}))
+	_, err = env.Db.SetNamespaceKeyId(ctx, namespace, &keyID)
+	require.NoError(t, err)
 
 	currentV1 := createDataEncryptionKeyForIntegrationTest(t, ctx, env.Db, keyID, &keyData)
 	require.Equal(t, gcpKMSProviderString, currentV1.Provider)
@@ -124,6 +125,21 @@ func TestGcpKMSKeySyncAndReencrypt(t *testing.T) {
 	decrypted, err := env.DM.GetEncryptService().DecryptString(ctx, *updated.EncryptedKey)
 	require.NoError(t, err)
 	require.Equal(t, plaintext, decrypted)
+}
+
+func TestGcpKMSGlobalAESKeyStartup(t *testing.T) {
+	if os.Getenv(gcpKMSTestEnv) != "1" {
+		t.Skipf("%s is not set to 1", gcpKMSTestEnv)
+	}
+
+	keyName := gcpKMSKeyNameFromEnv(t, "")
+
+	ctx := context.Background()
+	keyData := gcpKMSKeyData(keyName)
+	env := setupWithGlobalKeyDataIntegrationTest(t, &keyData)
+	defer env.Cleanup()
+
+	requireGlobalKeyProviderRoundTrip(t, ctx, env, sconfig.ProviderTypeGcpKMS, keyName)
 }
 
 func gcpKMSKeyData(keyName string) sconfig.KeyData {

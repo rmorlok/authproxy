@@ -172,7 +172,7 @@ func TestHandleReencryptAll(t *testing.T) {
 
 		// Create actor encrypted with current (only) version
 		actorId := apid.New(apid.PrefixActor)
-		ef, err := env.enc.EncryptStringForKey(env.ctx, globalEncryptionKeyID, "my-key")
+		ef, err := env.enc.EncryptStringGlobal(env.ctx, "my-key")
 		require.NoError(t, err)
 		require.Equal(t, env.globalDEKID, ef.ID)
 
@@ -223,6 +223,74 @@ func TestHandleReencryptAll(t *testing.T) {
 		refreshPlain, err := env.enc.DecryptString(env.ctx, updatedToken.EncryptedRefreshToken)
 		require.NoError(t, err)
 		require.Equal(t, "refresh-token", refreshPlain)
+	})
+
+	t.Run("re-encrypts root namespace key with global target", func(t *testing.T) {
+		env := setupReencryptTest(t)
+		v2DEKID, _ := env.addGlobalV2(t)
+
+		keyData := []byte(`{"mock_id":"root-key"}`)
+		ef := env.encryptWithV1(t, keyData)
+		keyID := apid.New(apid.PrefixKey)
+		require.NoError(t, env.db.CreateKey(env.ctx, &database.Key{
+			Id:               keyID,
+			Namespace:        "root",
+			EncryptedKeyData: &ef,
+			State:            database.KeyStateActive,
+		}))
+
+		env.setNamespaceTarget(t, "root", v2DEKID)
+
+		err := env.runReencrypt(t)
+		require.NoError(t, err)
+
+		key, err := env.db.GetKey(env.ctx, keyID)
+		require.NoError(t, err)
+		require.NotNil(t, key.EncryptedKeyData)
+		require.Equal(t, v2DEKID, key.EncryptedKeyData.ID)
+
+		decrypted, err := env.enc.Decrypt(env.ctx, *key.EncryptedKeyData)
+		require.NoError(t, err)
+		require.Equal(t, keyData, decrypted)
+	})
+
+	t.Run("re-encrypts child namespace key with parent namespace target", func(t *testing.T) {
+		env := setupReencryptTest(t)
+		rootTargetDEKID, rootTargetBytes := env.addGlobalV2(t)
+
+		require.NoError(t, env.db.CreateNamespace(env.ctx, &database.Namespace{Path: "root.parent"}))
+		require.NoError(t, env.db.CreateNamespace(env.ctx, &database.Namespace{Path: "root.parent.child"}))
+
+		keyData := []byte(`{"mock_id":"child-key"}`)
+		encrypted, err := encryptWithKey(rootTargetBytes, keyData)
+		require.NoError(t, err)
+		ef := encfield.EncryptedField{
+			ID:   rootTargetDEKID,
+			Data: base64.StdEncoding.EncodeToString(encrypted),
+		}
+		keyID := apid.New(apid.PrefixKey)
+		require.NoError(t, env.db.CreateKey(env.ctx, &database.Key{
+			Id:               keyID,
+			Namespace:        "root.parent.child",
+			EncryptedKeyData: &ef,
+			State:            database.KeyStateActive,
+		}))
+
+		env.setNamespaceTarget(t, "root", rootTargetDEKID)
+		env.setNamespaceTarget(t, "root.parent", env.globalDEKID)
+		env.setNamespaceTarget(t, "root.parent.child", rootTargetDEKID)
+
+		err = env.runReencrypt(t)
+		require.NoError(t, err)
+
+		key, err := env.db.GetKey(env.ctx, keyID)
+		require.NoError(t, err)
+		require.NotNil(t, key.EncryptedKeyData)
+		require.Equal(t, env.globalDEKID, key.EncryptedKeyData.ID)
+
+		decrypted, err := env.enc.Decrypt(env.ctx, *key.EncryptedKeyData)
+		require.NoError(t, err)
+		require.Equal(t, keyData, decrypted)
 	})
 
 	t.Run("empty no rows need re-encryption", func(t *testing.T) {

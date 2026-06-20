@@ -43,7 +43,7 @@ func (s *service) CreateKey(ctx context.Context, namespace string, keyData *cfgs
 		return nil, fmt.Errorf("failed to marshal key data to JSON: %w", err)
 	}
 
-	ef, err := s.encrypt.EncryptStringGlobal(ctx, string(keyDataBytes))
+	ef, err := s.encrypt.EncryptKeyForNamespace(ctx, namespace, keyDataBytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encrypt key data: %w", err)
 	}

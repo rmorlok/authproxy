@@ -18,15 +18,18 @@ func TestReEncryptRegistry(t *testing.T) {
 		regs := GetEncryptedFieldRegistrations()
 		require.GreaterOrEqual(t, len(regs), 4, "expected at least 4 registrations from init()")
 
-		// Verify the four expected registrations exist
+		// Key provider configuration is intentionally not registered here:
+		// namespace re-encryption can otherwise make a key depend on its own DEK.
 		tableNames := make(map[string]bool)
 		for _, r := range regs {
 			tableNames[r.Table] = true
 		}
 		require.True(t, tableNames[ActorTable])
+		require.True(t, tableNames[ConnectionsTable])
 		require.True(t, tableNames[ConnectorVersionsTable])
+		require.True(t, tableNames[ConnectionCredentialsTable])
 		require.True(t, tableNames[OAuth2TokensTable])
-		require.True(t, tableNames[KeysTable])
+		require.False(t, tableNames[KeysTable])
 	})
 
 	t.Run("enumerate finds actor needing re-encryption", func(t *testing.T) {

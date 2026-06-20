@@ -84,8 +84,7 @@ func TestVaultKeySyncAndReencrypt(t *testing.T) {
 	ekID := apid.New(apid.PrefixKey)
 
 	require.NoError(t, env.Db.CreateNamespace(ctx, &database.Namespace{
-		Path:  namespace,
-		KeyId: &ekID,
+		Path: namespace,
 	}))
 
 	keyData := sconfig.KeyData{
@@ -108,6 +107,8 @@ func TestVaultKeySyncAndReencrypt(t *testing.T) {
 		EncryptedKeyData: &encKeyData,
 		State:            database.KeyStateActive,
 	}))
+	_, err = env.Db.SetNamespaceKeyId(ctx, namespace, &ekID)
+	require.NoError(t, err)
 	currentV1 := createDataEncryptionKeyForIntegrationTest(t, ctx, env.Db, ekID, &keyData)
 
 	require.NoError(t, encrypt.SyncKeysToDatabase(ctx, env.Cfg, env.Db, env.Logger, nil))
@@ -190,8 +191,7 @@ func TestVaultTransitKeySyncAndReencrypt(t *testing.T) {
 	keyID := apid.New(apid.PrefixKey)
 
 	require.NoError(t, env.Db.CreateNamespace(ctx, &database.Namespace{
-		Path:  namespace,
-		KeyId: &keyID,
+		Path: namespace,
 	}))
 
 	keyData := sconfig.KeyData{
@@ -215,6 +215,8 @@ func TestVaultTransitKeySyncAndReencrypt(t *testing.T) {
 		EncryptedKeyData: &encKeyData,
 		State:            database.KeyStateActive,
 	}))
+	_, err = env.Db.SetNamespaceKeyId(ctx, namespace, &keyID)
+	require.NoError(t, err)
 
 	currentV1 := createDataEncryptionKeyForIntegrationTest(t, ctx, env.Db, keyID, &keyData)
 	require.Equal(t, string(sconfig.ProviderTypeHashicorpVaultTransit), currentV1.Provider)
@@ -261,12 +263,57 @@ func TestVaultTransitKeySyncAndReencrypt(t *testing.T) {
 	require.Equal(t, encrypted.Data, updated.EncryptedKey.Data)
 
 	freshEncryptService := encrypt.NewEncryptService(env.Cfg, env.Db, env.Logger)
+	freshEncryptService.Start()
 	defer freshEncryptService.Shutdown()
-	require.NoError(t, freshEncryptService.SyncKeysFromDbToMemory(ctx))
 
 	decrypted, err := freshEncryptService.DecryptString(ctx, *updated.EncryptedKey)
 	require.NoError(t, err)
 	require.Equal(t, plaintext, decrypted)
+}
+
+func TestVaultTransitGlobalAESKeyStartup(t *testing.T) {
+	if os.Getenv(vaultTestEnv) != "1" {
+		t.Skipf("%s is not set to 1", vaultTestEnv)
+	}
+
+	vaultAddr := os.Getenv(vaultAddrEnv)
+	if vaultAddr == "" {
+		t.Skipf("%s is not set", vaultAddrEnv)
+	}
+
+	vaultToken := os.Getenv(vaultTokenEnv)
+	if vaultToken == "" {
+		t.Skipf("%s is not set", vaultTokenEnv)
+	}
+
+	ctx := context.Background()
+	client := newVaultClient(t, vaultAddr, vaultToken)
+	ensureVaultTransitMount(t, ctx, client, vaultTransitMount)
+
+	transitKeyName := fmt.Sprintf("authproxy-global-transit-test-%d", time.Now().UnixNano())
+	_, err := client.Logical().WriteWithContext(ctx, fmt.Sprintf("%s/keys/%s", vaultTransitMount, transitKeyName), map[string]interface{}{
+		"type": "aes256-gcm96",
+	})
+	require.NoError(t, err)
+
+	keyData := sconfig.KeyData{
+		InnerVal: &sconfig.KeyDataVaultTransit{
+			VaultAddress:          vaultAddr,
+			VaultToken:            vaultToken,
+			VaultTransitMountPath: vaultTransitMount,
+			VaultTransitKeyName:   transitKeyName,
+		},
+	}
+	env := setupWithGlobalKeyDataIntegrationTest(t, &keyData)
+	defer env.Cleanup()
+
+	requireGlobalKeyProviderRoundTrip(
+		t,
+		ctx,
+		env,
+		sconfig.ProviderTypeHashicorpVaultTransit,
+		fmt.Sprintf("%s/%s", vaultTransitMount, transitKeyName),
+	)
 }
 
 func newVaultClient(t *testing.T, addr, token string) *vault.Client {

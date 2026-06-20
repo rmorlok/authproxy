@@ -84,8 +84,7 @@ func TestGcpSecretManagerKeySyncAndReencrypt(t *testing.T) {
 	ekID := apid.New(apid.PrefixKey)
 
 	require.NoError(t, env.Db.CreateNamespace(ctx, &database.Namespace{
-		Path:  namespace,
-		KeyId: &ekID,
+		Path: namespace,
 	}))
 
 	keyData := sconfig.KeyData{
@@ -106,6 +105,8 @@ func TestGcpSecretManagerKeySyncAndReencrypt(t *testing.T) {
 		EncryptedKeyData: &encKeyData,
 		State:            database.KeyStateActive,
 	}))
+	_, err = env.Db.SetNamespaceKeyId(ctx, namespace, &ekID)
+	require.NoError(t, err)
 	currentV1 := createDataEncryptionKeyForIntegrationTest(t, ctx, env.Db, ekID, &keyData)
 
 	require.NoError(t, encrypt.SyncKeysToDatabase(ctx, env.Cfg, env.Db, env.Logger, nil))

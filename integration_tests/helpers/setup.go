@@ -105,6 +105,12 @@ type SetupOptions struct {
 	// Defaults to integration_tests/config/integration.yaml.
 	ConfigPath string
 
+	// ConfigureRoot, when non-nil, can mutate the loaded config before the
+	// dependency manager is built and before encryption DEK seeding runs. It is
+	// called after test database isolation is applied, so callers should leave
+	// the database block intact unless they intentionally need a custom DB.
+	ConfigureRoot func(root *sconfig.Root)
+
 	// Service specifies which service to start. Defaults to ServiceTypeAPI.
 	Service ServiceType
 
@@ -227,6 +233,10 @@ func Setup(t *testing.T, opts SetupOptions) *IntegrationTestEnv {
 			cfgRoot.Connectors = &sconfig.Connectors{}
 		}
 		cfgRoot.Connectors.LoadFromList = append(cfgRoot.Connectors.LoadFromList, opts.Connectors...)
+	}
+
+	if opts.ConfigureRoot != nil {
+		opts.ConfigureRoot(cfg.GetRoot())
 	}
 
 	// Hook the log capture before the dependency manager builds its cached

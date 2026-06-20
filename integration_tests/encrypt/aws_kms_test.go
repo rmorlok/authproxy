@@ -48,8 +48,7 @@ func TestAwsKMSKeySyncAndReencrypt(t *testing.T) {
 	keyIDAuthProxy := apid.New(apid.PrefixKey)
 
 	require.NoError(t, env.Db.CreateNamespace(ctx, &database.Namespace{
-		Path:  namespace,
-		KeyId: &keyIDAuthProxy,
+		Path: namespace,
 	}))
 
 	keyData := awsKMSKeyData(keyID, region)
@@ -66,6 +65,8 @@ func TestAwsKMSKeySyncAndReencrypt(t *testing.T) {
 		EncryptedKeyData: &encKeyData,
 		State:            database.KeyStateActive,
 	}))
+	_, err = env.Db.SetNamespaceKeyId(ctx, namespace, &keyIDAuthProxy)
+	require.NoError(t, err)
 
 	currentV1 := createDataEncryptionKeyForIntegrationTest(t, ctx, env.Db, keyIDAuthProxy, &keyData)
 	require.Equal(t, awsKMSProviderString, currentV1.Provider)
@@ -128,6 +129,28 @@ func TestAwsKMSKeySyncAndReencrypt(t *testing.T) {
 	decrypted, err := env.DM.GetEncryptService().DecryptString(ctx, *updated.EncryptedKey)
 	require.NoError(t, err)
 	require.Equal(t, plaintext, decrypted)
+}
+
+func TestAwsKMSGlobalAESKeyStartup(t *testing.T) {
+	if os.Getenv(awsKMSTestEnv) != "1" {
+		t.Skipf("%s is not set to 1", awsKMSTestEnv)
+	}
+
+	region := os.Getenv("AWS_REGION")
+	if region == "" {
+		t.Skip("AWS_REGION is not set")
+	}
+	keyID := os.Getenv(awsKMSKeyIDEnv)
+	if keyID == "" {
+		t.Skipf("%s is not set", awsKMSKeyIDEnv)
+	}
+
+	ctx := context.Background()
+	keyData := awsKMSKeyData(keyID, region)
+	env := setupWithGlobalKeyDataIntegrationTest(t, &keyData)
+	defer env.Cleanup()
+
+	requireGlobalKeyProviderRoundTrip(t, ctx, env, sconfig.ProviderTypeAwsKMS, keyID)
 }
 
 func awsKMSKeyData(keyID string, region string) sconfig.KeyData {
