@@ -3,6 +3,7 @@ package httperr
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -17,6 +18,8 @@ type Error struct {
 	ResponseMsg string
 	InternalErr error
 }
+
+const StatusClientClosedRequest = 499
 
 func (e *Error) Error() string {
 	if e.InternalErr != nil {
@@ -42,6 +45,31 @@ func (e *Error) ResponseMsgOrDefault() string {
 		return e.ResponseMsg
 	}
 	return StatusText(e.Status)
+}
+
+// ForContext returns an HTTP error adjusted for request-context state.
+// A canceled client request commonly surfaces as context.Canceled from
+// downstream dependencies; classify those as 499 rather than a server 5xx.
+func (e *Error) ForContext(ctx context.Context) *Error {
+	if e == nil {
+		return nil
+	}
+
+	if e.Status >= http.StatusInternalServerError && IsClientClosedRequest(ctx, e) {
+		clone := *e
+		clone.Status = StatusClientClosedRequest
+		clone.ResponseMsg = ""
+		return &clone
+	}
+
+	return e
+}
+
+func IsClientClosedRequest(ctx context.Context, err error) bool {
+	if ctx == nil || err == nil {
+		return false
+	}
+	return errors.Is(ctx.Err(), context.Canceled) && errors.Is(err, context.Canceled)
 }
 
 // ErrorResponse is the standardized JSON error response format.
@@ -70,7 +98,11 @@ func (e *Error) LogError(logger *slog.Logger) {
 	}
 
 	responseMsg := e.ResponseMsgOrDefault()
-	if e.Status >= http.StatusInternalServerError {
+	if e.Status == StatusClientClosedRequest {
+		// The client already left; this is useful as a status code but not an
+		// application error worth surfacing in the error log.
+		return
+	} else if e.Status >= http.StatusInternalServerError {
 		logger.Error("api error", "status", e.Status, "response_msg", responseMsg, "error", e.InternalErr)
 	} else if e.Status == http.StatusUnauthorized {
 		// No logging for unauthorized
@@ -81,6 +113,7 @@ func (e *Error) LogError(logger *slog.Logger) {
 
 // WriteResponse writes the error as a JSON response to an http.ResponseWriter.
 func (e *Error) WriteResponse(ctx context.Context, logger *slog.Logger, w http.ResponseWriter) {
+	e = e.ForContext(ctx)
 	e.LogError(logger)
 
 	if e.InternalErr != nil {
@@ -113,6 +146,8 @@ func StatusText(status int) string {
 		return "Conflict"
 	case 422:
 		return "Unprocessable Entity"
+	case StatusClientClosedRequest:
+		return "Client Closed Request"
 	case 500:
 		return "Internal Server Error"
 	case 501:

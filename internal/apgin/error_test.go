@@ -70,6 +70,20 @@ func TestWriteErr_PlainError(t *testing.T) {
 	require.Equal(t, http.StatusInternalServerError, rec.Code)
 }
 
+func TestWriteErr_ClientClosedRequest(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	gctx, _ := gin.CreateTestContext(rec)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	gctx.Request = httptest.NewRequest("GET", "/", nil).WithContext(ctx)
+
+	WriteErr(gctx, nil, errors.Join(errors.New("redis write failed"), context.Canceled))
+
+	require.Equal(t, httperr.StatusClientClosedRequest, rec.Code)
+	require.Equal(t, `{"error":"Client Closed Request"}`, strings.TrimSpace(rec.Body.String()))
+}
+
 func TestWriteErr_HttpError(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	rec := httptest.NewRecorder()
