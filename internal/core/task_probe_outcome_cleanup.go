@@ -43,14 +43,14 @@ func newProbeOutcomeCleanupTask(retention time.Duration) (*asynq.Task, error) {
 // runProbeOutcomeCleanup walks every non-deleted connection and prunes its
 // probe outcome events. For each (connection, probe):
 //
-//   - Reads the probe's effective failure_threshold and recovery_threshold
-//     from the connector definition; keeps at least max(those) most-recent
-//     rows so the runtime always has enough history to compute transitions.
+//   - Reads each enabled probe's effective failure_threshold and
+//     recovery_threshold; keeps at least max(those) most-recent rows so the
+//     runtime always has enough history to compute transitions.
 //   - Deletes rows older than the retention window beyond that minimum.
 //
-// Probe ids that have outcomes but no longer appear in the connector
-// definition (e.g. probe was removed from YAML) still get pruned using
-// default thresholds — keeps stale outcomes from accumulating forever.
+// Probe ids that have outcomes but no longer appear in the enabled probe set
+// (e.g. probe was removed from YAML or is now disabled) still get pruned
+// using default thresholds — keeps stale outcomes from accumulating forever.
 //
 // Errors on individual connections are logged and skipped — one bad connection
 // shouldn't poison the whole sweep.
@@ -109,7 +109,7 @@ func (s *service) cleanupProbeOutcomesForConnection(ctx context.Context, connect
 	// thresholds. A connection without a resolvable definition still gets
 	// outcomes pruned using default thresholds — stale outcomes for a
 	// missing definition would otherwise grow unbounded.
-	probesByID, err := s.probeConfigsForConnection(ctx, connectionId)
+	probesByID, err := s.enabledProbeThresholdsForConnection(ctx, connectionId)
 	if err != nil {
 		// Don't bail — fall through to default thresholds.
 		probesByID = nil
@@ -150,7 +150,12 @@ var defaultKeepMinimum = func() int {
 // probeKeepMinimum returns the number of recent outcomes that must be kept for
 // transition correctness: enough history to satisfy whichever threshold is
 // larger.
-func probeKeepMinimum(p *cschema.Probe) int {
+type probeThresholds interface {
+	EffectiveFailureThreshold() int
+	EffectiveRecoveryThreshold() int
+}
+
+func probeKeepMinimum(p probeThresholds) int {
 	a := p.EffectiveFailureThreshold()
 	b := p.EffectiveRecoveryThreshold()
 	if a > b {
@@ -159,22 +164,22 @@ func probeKeepMinimum(p *cschema.Probe) int {
 	return b
 }
 
-// probeConfigsForConnection returns the connection's connector-defined probes
+// enabledProbeThresholdsForConnection returns the connection's enabled probes
 // keyed by id, for threshold lookup during cleanup. Returns nil + error if the
-// connection or definition can't be resolved; caller falls back to defaults.
-func (s *service) probeConfigsForConnection(ctx context.Context, connectionId apid.ID) (map[string]*cschema.Probe, error) {
+// connection, definition, or predicate context can't be resolved; caller falls
+// back to defaults.
+func (s *service) enabledProbeThresholdsForConnection(ctx context.Context, connectionId apid.ID) (map[string]probeThresholds, error) {
 	conn, err := s.getConnection(ctx, connectionId)
 	if err != nil {
 		return nil, err
 	}
-	def := conn.cv.GetDefinition()
-	if def == nil {
-		return nil, fmt.Errorf("nil connector definition")
+	probes, err := conn.GetEnabledProbes(ctx)
+	if err != nil {
+		return nil, err
 	}
-	out := make(map[string]*cschema.Probe, len(def.Probes))
-	for i := range def.Probes {
-		p := &def.Probes[i]
-		out[p.Id] = p
+	out := make(map[string]probeThresholds, len(probes))
+	for _, p := range probes {
+		out[p.GetId()] = p
 	}
 	return out, nil
 }

@@ -93,8 +93,8 @@ func validateArchiveConnectorWorkflowConnectorID(connectorID apid.ID) error {
 // connections from being made while the existing connections are cleaned up.
 func (s *service) prepareArchiveConnectorVersionsV1(ctx context.Context, connectorID apid.ID) error {
 	logger := s.logger.With(
-		"workflow", WorkflowNameDisconnectConnectionV1,
-		"activity", ActivityNameDisconnectConnectionRevokeCredentialsV1,
+		"workflow", WorkflowNameArchiveConnectorV1,
+		"activity", ActivityNameArchiveConnectorPrepareVersionsV1,
 		"connector_id", connectorID,
 	)
 	logger.Info("prepare connector versions started")
@@ -118,7 +118,7 @@ func (s *service) prepareArchiveConnectorVersionsV1(ctx context.Context, connect
 						return pagination.Stop, err
 					}
 				case database.ConnectorVersionStatePrimary:
-					logger.Info("moving version to primary", "version_id", version.Id)
+					logger.Info("moving primary connector version to active", "version_id", version.Id)
 					if err := s.db.SetConnectorVersionState(ctx, version.Id, version.Version, database.ConnectorVersionStateActive); err != nil {
 						logger.Info("failed moving primary to active", "version_id", version.Id, "error", err)
 						return pagination.Stop, err
@@ -136,12 +136,12 @@ func (s *service) prepareArchiveConnectorVersionsV1(ctx context.Context, connect
 	return nil
 }
 
-// finalizeArchiveConnectorVersionsV1 is the activity that runs after all connections have been cleand up. It moves
+// finalizeArchiveConnectorVersionsV1 is the activity that runs after all connections have been cleaned up. It moves
 // all versions of the connector to the archived state.
 func (s *service) finalizeArchiveConnectorVersionsV1(ctx context.Context, connectorID apid.ID) error {
 	logger := s.logger.With(
-		"workflow", WorkflowNameDisconnectConnectionV1,
-		"activity", ActivityNameDisconnectConnectionRevokeCredentialsV1,
+		"workflow", WorkflowNameArchiveConnectorV1,
+		"activity", ActivityNameArchiveConnectorFinalizeVersionsV1,
 		"connector_id", connectorID,
 	)
 	logger.Info("finalize connector versions started")

@@ -3,6 +3,7 @@ package oauth2
 import (
 	"testing"
 
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/stretchr/testify/assert"
 )
@@ -10,8 +11,7 @@ import (
 func TestDetectScopeMismatch(t *testing.T) {
 	required := func(id string) sconfig.Scope { return sconfig.Scope{Id: id} }
 	optional := func(id string) sconfig.Scope {
-		f := false
-		return sconfig.Scope{Id: id, Required: &f}
+		return sconfig.Scope{Id: id, Required: sconfig.NewScopeRequiredBool(false)}
 	}
 
 	tests := []struct {
@@ -71,10 +71,22 @@ func TestDetectScopeMismatch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := detectScopeMismatch(tt.declared, tt.granted)
+			got, err := detectScopeMismatch(tt.declared, tt.granted)
+			assert.NoError(t, err)
 			assert.Equal(t, tt.wantRequired, got.missingRequired, "missingRequired")
 			assert.Equal(t, tt.wantOptional, got.missingOptional, "missingOptional")
 			assert.Equal(t, tt.wantExtraGranted, got.extraGranted, "extraGranted")
 		})
 	}
+}
+
+func TestDetectScopeMismatchRejectsUnresolvedDynamicRequired(t *testing.T) {
+	_, err := detectScopeMismatch([]sconfig.Scope{
+		{
+			Id:       "activity",
+			Required: sconfig.NewScopeRequiredPredicate(&common.Predicate{Javascript: `cfg.sync_activity === true`}),
+		},
+	}, "")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), `scope "activity" required`)
 }

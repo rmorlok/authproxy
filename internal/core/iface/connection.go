@@ -30,6 +30,7 @@ type Connection interface {
 	GetAnnotations() map[string]string
 	GetSetupStep() *cschema.SetupStep
 	GetSetupError() *string
+	GetPredicateVars(ctx context.Context) (map[string]any, error)
 
 	/*
 	 * Nested entities
@@ -56,6 +57,8 @@ type Connection interface {
 	GetMustacheContext(ctx context.Context) (map[string]any, error)
 	GetProbe(probeId string) (Probe, error)
 	GetProbes() []Probe
+	GetEnabledProbe(ctx context.Context, probeId string) (Probe, error)
+	GetEnabledProbes(ctx context.Context) ([]Probe, error)
 	ProxyRequest(
 		ctx context.Context,
 		reqType httpf.RequestType,
@@ -68,7 +71,7 @@ type Connection interface {
 		w http.ResponseWriter,
 	) error
 	SubmitForm(ctx context.Context, req SubmitConnectionRequest) (ConnectionSetupResponse, error)
-	GetCurrentSetupStepResponse(ctx context.Context) (ConnectionSetupResponse, error)
+	GetCurrentSetupStepResponse(ctx context.Context, returnToUrl string) (ConnectionSetupResponse, error)
 	GetDataSource(ctx context.Context, sourceId string) ([]apjs.DataSourceOption, error)
 	Reconfigure(ctx context.Context) (ConnectionSetupResponse, error)
 

@@ -96,6 +96,14 @@ func (m *Connection) GetProbes() []iface.Probe {
 	return nil
 }
 
+func (m *Connection) GetEnabledProbe(ctx context.Context, probeId string) (iface.Probe, error) {
+	return m.GetProbe(probeId)
+}
+
+func (m *Connection) GetEnabledProbes(ctx context.Context) ([]iface.Probe, error) {
+	return m.GetProbes(), nil
+}
+
 func (m *Connection) GetAnnotations() map[string]string {
 	return m.Annotations
 }
@@ -144,6 +152,29 @@ func (m *Connection) SetConfiguration(ctx context.Context, data map[string]any) 
 	return nil
 }
 
+func (m *Connection) GetPredicateVars(ctx context.Context) (map[string]any, error) {
+	cfg := m.Configuration
+	if cfg == nil {
+		cfg = map[string]any{}
+	}
+
+	labels := m.Labels
+	if labels == nil {
+		labels = map[string]string{}
+	}
+
+	annotations := m.Annotations
+	if annotations == nil {
+		annotations = map[string]string{}
+	}
+
+	return map[string]any{
+		"cfg":         cfg,
+		"labels":      labels,
+		"annotations": annotations,
+	}, nil
+}
+
 func (m *Connection) GetMustacheContext(ctx context.Context) (map[string]any, error) {
 	data := map[string]any{}
 
@@ -166,7 +197,7 @@ func (m *Connection) SubmitForm(ctx context.Context, req iface.SubmitConnectionR
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (m *Connection) GetCurrentSetupStepResponse(ctx context.Context) (iface.ConnectionSetupResponse, error) {
+func (m *Connection) GetCurrentSetupStepResponse(ctx context.Context, returnToUrl string) (iface.ConnectionSetupResponse, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 

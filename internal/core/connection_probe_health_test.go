@@ -14,6 +14,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	mockDb "github.com/rmorlok/authproxy/internal/database/mock"
 	"github.com/rmorlok/authproxy/internal/encfield"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -277,6 +278,36 @@ func TestRecordPeriodicProbeOutcome_AnotherProbeOverThresholdBlocksRecovery(t *t
 	for _, rec := range decodeJSONLines(t, buf) {
 		assert.NotEqual(t, connectionHealthStateChangedMessage, rec["msg"])
 	}
+}
+
+func TestRecordPeriodicProbeOutcome_DisabledPeerDoesNotBlockRecovery(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	probes := []cschema.Probe{
+		{Id: "ping", FailureThreshold: intPtr(3), RecoveryThreshold: intPtr(1)},
+		{
+			Id:                "pong",
+			If:                &common.Predicate{Javascript: `cfg.enable_pong === true`},
+			FailureThreshold:  intPtr(1),
+			RecoveryThreshold: intPtr(1),
+		},
+	}
+	conn, db, _ := newProbeHealthTestConn(t, ctrl, probes, database.ConnectionHealthStateUnhealthy)
+
+	probe := &stubProbe{id: "ping", failureThresh: 3, recoveryThresh: 1}
+	db.EXPECT().
+		InsertProbeOutcome(gomock.Any(), conn.Id, "ping", database.ProbeOutcomeStatusSuccess, "").
+		Return(&database.ConnectionProbeOutcome{}, nil)
+	db.EXPECT().
+		GetRecentProbeOutcomes(gomock.Any(), conn.Id, "ping", 1).
+		Return(outcomes("s"), nil)
+	db.EXPECT().
+		SetConnectionHealthState(gomock.Any(), conn.Id, database.ConnectionHealthStateHealthy).
+		Return(nil)
+	// No pong outcome lookup — disabled peer probes do not block recovery.
+
+	require.NoError(t, conn.recordPeriodicProbeOutcome(context.Background(), probe, true, nil))
+	assert.Equal(t, database.ConnectionHealthStateHealthy, conn.HealthState)
 }
 
 func TestRecordPeriodicProbeOutcome_AnotherProbeRecoveredAllowsRecovery(t *testing.T) {

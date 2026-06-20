@@ -334,8 +334,11 @@ export const abortConnection = (id: string) => {
 /**
  * Get the current setup step for a connection
  */
-export const getSetupStep = (connectionId: string) => {
-    return client.get<ConnectionSetupResponse>(`/api/v1/connections/${connectionId}/_setup_step`);
+export const getSetupStep = (connectionId: string, returnToUrl?: string) => {
+    return client.get<ConnectionSetupResponse>(
+        `/api/v1/connections/${connectionId}/_setup_step`,
+        returnToUrl ? {params: {return_to_url: returnToUrl}} : undefined
+    );
 };
 
 /**

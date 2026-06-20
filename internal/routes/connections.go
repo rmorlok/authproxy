@@ -162,6 +162,7 @@ func (r *ConnectionsRoutes) submit(gctx *gin.Context) {
 // @Tags			connections
 // @Produce		json
 // @Param			id	path		string	true	"Connection ID"
+// @Param			return_to_url	query	string	false	"URL to return to after a resumed redirect step"
 // @Success		200	{object}	ConnectionSetupComplete
 // @Failure		400	{object}	ErrorResponse
 // @Failure		401	{object}	ErrorResponse
@@ -201,7 +202,7 @@ func (r *ConnectionsRoutes) getSetupStep(gctx *gin.Context) {
 		return
 	}
 
-	resp, err := c.GetCurrentSetupStepResponse(ctx)
+	resp, err := c.GetCurrentSetupStepResponse(ctx, gctx.Query("return_to_url"))
 	if err != nil {
 		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()

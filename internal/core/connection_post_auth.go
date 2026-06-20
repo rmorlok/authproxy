@@ -25,7 +25,10 @@ func (c *connection) HandleCredentialsEstablished(ctx context.Context) (iface.Po
 	}
 
 	flow := c.s.buildManifestSetupFlow(c)
-	next, hasNext := flow.NextStep(current.Id())
+	next, hasNext, err := flow.NextStep(ctx, current.Id())
+	if err != nil {
+		return iface.PostAuthOutcome{}, fmt.Errorf("failed to evaluate setup flow: %w", err)
+	}
 	if !hasNext {
 		if _, err := c.completeFlow(ctx); err != nil {
 			return iface.PostAuthOutcome{}, err

@@ -29,6 +29,13 @@ func (c *connection) GetDataSource(ctx context.Context, sourceId string) ([]apjs
 		return nil, httperr.BadRequest("data sources are only available during configure steps")
 	}
 
+	flow := c.s.buildManifestSetupFlow(c)
+	if _, ok, err := flow.StepById(ctx, setupStep.Id()); err != nil {
+		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to evaluate setup flow: %w", err))
+	} else if !ok {
+		return nil, httperr.BadRequest("current setup step is not eligible for data sources")
+	}
+
 	step, ok := connector.SetupFlow.FindStepById(setupStep.Id())
 	if !ok {
 		return nil, httperr.InternalServerErrorMsg("current setup step not found in connector definition")

@@ -69,6 +69,7 @@ const ConnectorLogo: React.FC<ConnectorLogoProps> = ({ connector, variant = 'com
     borderRadius: marketplaceTokens.radius.card,
     border: 1,
     borderColor: 'divider',
+    boxSizing: 'border-box',
     overflow: 'hidden',
   };
 

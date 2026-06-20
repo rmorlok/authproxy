@@ -1,0 +1,15 @@
+# $schema: ./schema.json
+
+labels:
+  type: google-drive
+display_name: Google Drive
+description: Invalid probe predicate example
+auth:
+  type: no-auth
+probes:
+  - id: drive-health
+    period: 1m
+    if: {}
+    http:
+      method: GET
+      url: https://example.com/health

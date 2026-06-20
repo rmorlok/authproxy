@@ -72,9 +72,20 @@ func (s *service) buildManifestSetupFlow(c iface.Connection) iface.ManifestSetup
 	}
 
 	return &manifestFlow{
-		steps:         steps,
-		hasProbes:     connector.HasProbes(),
-		authBoundary:  authBoundary,
+		steps:            steps,
+		hasProbes:        connector.HasProbes(),
+		hasEnabledProbes: cHasEnabledProbes(c),
+		authBoundary:     authBoundary,
+	}
+}
+
+func cHasEnabledProbes(c iface.Connection) func(context.Context) (bool, error) {
+	return func(ctx context.Context) (bool, error) {
+		probes, err := c.GetEnabledProbes(ctx)
+		if err != nil {
+			return false, err
+		}
+		return len(probes) > 0, nil
 	}
 }
 
@@ -99,6 +110,7 @@ func newSchemaFormStep(c iface.Connection, spec *cschema.SetupFlowStep) iface.Ma
 		Description: spec.Description,
 		JsonSchema:  json.RawMessage(spec.JsonSchema),
 		UiSchema:    json.RawMessage(spec.UiSchema),
+		IsEligible:  newSchemaStepEligibility(c, spec),
 		OnSubmit: func(ctx context.Context, data json.RawMessage) error {
 			existing, err := c.GetConfiguration(ctx)
 			if err != nil {
@@ -127,6 +139,7 @@ func (s *service) newSchemaRedirectStep(c iface.Connection, spec *cschema.SetupF
 		Id:          spec.Id,
 		Title:       spec.Title,
 		Description: spec.Description,
+		IsEligible:  newSchemaStepEligibility(c, spec),
 		Render: func(ctx context.Context, opts iface.RenderRedirectOptions) (iface.RedirectInfo, error) {
 			if spec.Redirect == nil || spec.Redirect.URL == "" {
 				return iface.RedirectInfo{}, fmt.Errorf("redirect step %q has no URL configured", spec.Id)
@@ -167,6 +180,24 @@ func (s *service) newSchemaRedirectStep(c iface.Connection, spec *cschema.SetupF
 	})
 }
 
+func newSchemaStepEligibility(c iface.Connection, spec *cschema.SetupFlowStep) func(context.Context) (bool, error) {
+	if spec.If == nil {
+		return nil
+	}
+	return func(ctx context.Context) (bool, error) {
+		vars, err := c.GetPredicateVars(ctx)
+		if err != nil {
+			return false, fmt.Errorf("step %q: get predicate vars: %w", spec.Id, err)
+		}
+
+		ok, err := spec.If.GetValue(vars)
+		if err != nil {
+			return false, fmt.Errorf("step %q if.javascript: %w", spec.Id, err)
+		}
+		return ok, nil
+	}
+}
+
 // mintReturnURL mints a setup_token and returns the public-endpoint URL
 // (/setup/connections/{id}/{advance|abort}?token=<jti>) that substitutes
 // for the corresponding placeholder in a redirect step's URL template.
@@ -200,51 +231,93 @@ func (s *service) mintReturnURL(ctx context.Context, connectionId apid.ID, stepI
 // manifestFlow is the materialized setup flow for a single connection.
 // Exposed as iface.ManifestSetupFlow.
 type manifestFlow struct {
-	steps        []iface.ManifestSetupStep
-	hasProbes    bool
-	authBoundary int // index in steps after which verify slots in when hasProbes
+	steps            []iface.ManifestSetupStep
+	hasProbes        bool
+	hasEnabledProbes func(context.Context) (bool, error)
+	authBoundary     int // index in steps after which verify slots in when probes are enabled
 }
 
-func (f *manifestFlow) Steps() []iface.ManifestSetupStep {
-	// Defensive copy so callers can't mutate the underlying slice.
-	out := make([]iface.ManifestSetupStep, len(f.steps))
-	copy(out, f.steps)
-	return out
-}
-
-func (f *manifestFlow) StepById(id string) (iface.ManifestSetupStep, bool) {
-	if id == "" {
-		return nil, false
-	}
-	if id == iface.NewVerifyStep().Id() && f.hasProbes {
-		return iface.NewVerifyStep(), true
-	}
-	for _, s := range f.steps {
-		if s.Id() == id {
-			return s, true
+func (f *manifestFlow) Steps(ctx context.Context) ([]iface.ManifestSetupStep, error) {
+	out := make([]iface.ManifestSetupStep, 0, len(f.steps))
+	for i := range f.steps {
+		eligible, err := f.isStepEligible(ctx, i)
+		if err != nil {
+			return nil, err
+		}
+		if eligible {
+			out = append(out, f.steps[i])
 		}
 	}
-	return nil, false
+	return out, nil
 }
 
-func (f *manifestFlow) FirstStep() iface.ManifestSetupStep {
-	if len(f.steps) == 0 {
-		return nil
+func (f *manifestFlow) StepById(ctx context.Context, id string) (iface.ManifestSetupStep, bool, error) {
+	if id == "" {
+		return nil, false, nil
 	}
-	return f.steps[0]
+	if id == iface.NewVerifyStep().Id() && f.hasProbes {
+		ok, err := f.verifyEnabled(ctx)
+		if err != nil {
+			return nil, false, err
+		}
+		if !ok {
+			return nil, false, nil
+		}
+		return iface.NewVerifyStep(), true, nil
+	}
+	for i, s := range f.steps {
+		if s.Id() != id {
+			continue
+		}
+		eligible, err := f.isStepEligible(ctx, i)
+		if err != nil {
+			return nil, false, err
+		}
+		return s, eligible, nil
+	}
+	return nil, false, nil
 }
 
-func (f *manifestFlow) NextStep(currentId string) (iface.ManifestSetupStep, bool) {
+func (f *manifestFlow) ContainsStep(id string) bool {
+	if id == "" {
+		return false
+	}
+	if id == iface.NewVerifyStep().Id() && f.hasProbes {
+		return true
+	}
+	for _, step := range f.steps {
+		if step.Id() == id {
+			return true
+		}
+	}
+	return false
+}
+
+func (f *manifestFlow) FirstStep(ctx context.Context) (iface.ManifestSetupStep, error) {
+	if f.hasProbes && f.authBoundary >= 0 {
+		step, ok, err := f.nextEligibleStep(ctx, 0, f.authBoundary)
+		if err != nil || ok {
+			return step, err
+		}
+		verify, err := f.verifyEnabled(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if verify {
+			return iface.NewVerifyStep(), nil
+		}
+	}
+	step, _, err := f.nextEligibleStep(ctx, 0, len(f.steps)-1)
+	return step, err
+}
+
+func (f *manifestFlow) NextStep(ctx context.Context, currentId string) (iface.ManifestSetupStep, bool, error) {
 	verifyId := iface.NewVerifyStep().Id()
 
 	// Coming out of verify: jump to the step right after the auth boundary
 	// (the first configure step, typically).
 	if currentId == verifyId {
-		next := f.authBoundary + 1
-		if next < 0 || next >= len(f.steps) {
-			return nil, false
-		}
-		return f.steps[next], true
+		return f.nextEligibleStep(ctx, f.authBoundary+1, len(f.steps)-1)
 	}
 
 	for i, step := range f.steps {
@@ -252,14 +325,62 @@ func (f *manifestFlow) NextStep(currentId string) (iface.ManifestSetupStep, bool
 			continue
 		}
 		// Verify insertion: when the current step is the last one in the
-		// credential-establishing phase, transition to verify next.
-		if f.hasProbes && i == f.authBoundary {
-			return iface.NewVerifyStep(), true
+		// credential-establishing phase, transition to verify next. Gated-off
+		// steps in the same phase are skipped before verify is considered.
+		if f.hasProbes && i <= f.authBoundary {
+			next, ok, err := f.nextEligibleStep(ctx, i+1, f.authBoundary)
+			if err != nil || ok {
+				return next, ok, err
+			}
+			verify, err := f.verifyEnabled(ctx)
+			if err != nil {
+				return nil, false, err
+			}
+			if verify {
+				return iface.NewVerifyStep(), true, nil
+			}
+			return f.nextEligibleStep(ctx, f.authBoundary+1, len(f.steps)-1)
 		}
-		if i+1 < len(f.steps) {
-			return f.steps[i+1], true
-		}
-		return nil, false
+		return f.nextEligibleStep(ctx, i+1, len(f.steps)-1)
 	}
-	return nil, false
+	return nil, false, nil
+}
+
+func (f *manifestFlow) verifyEnabled(ctx context.Context) (bool, error) {
+	if !f.hasProbes {
+		return false, nil
+	}
+	if f.hasEnabledProbes == nil {
+		return true, nil
+	}
+	return f.hasEnabledProbes(ctx)
+}
+
+func (f *manifestFlow) nextEligibleStep(ctx context.Context, start int, end int) (iface.ManifestSetupStep, bool, error) {
+	if start < 0 {
+		start = 0
+	}
+	if end >= len(f.steps) {
+		end = len(f.steps) - 1
+	}
+	if start > end {
+		return nil, false, nil
+	}
+	for i := start; i <= end; i++ {
+		eligible, err := f.isStepEligible(ctx, i)
+		if err != nil {
+			return nil, false, err
+		}
+		if eligible {
+			return f.steps[i], true, nil
+		}
+	}
+	return nil, false, nil
+}
+
+func (f *manifestFlow) isStepEligible(ctx context.Context, idx int) (bool, error) {
+	if idx < 0 || idx >= len(f.steps) {
+		return false, nil
+	}
+	return f.steps[idx].IsEligible(ctx)
 }

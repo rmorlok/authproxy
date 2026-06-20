@@ -156,6 +156,29 @@ describe('ConnectorList', () => {
         });
     });
 
+    test('shows connector card copy on the available connectors screen', () => {
+        renderConnectorList({
+            connectors: {
+                items: [
+                    connector,
+                    {
+                        ...connector,
+                        id: 'gmail',
+                        display_name: 'GMail',
+                        highlight: undefined,
+                        description: 'Have the agent respond to your emails without you needing to be involved. Like magic.',
+                    },
+                ],
+                status: 'succeeded',
+                error: null,
+            },
+            connections: baseConnectionsState,
+        });
+
+        expect(screen.getByText('Calendar highlight')).toBeInTheDocument();
+        expect(screen.getByText('Have the agent respond to your emails without you needing to be involved. Like magic.')).toBeInTheDocument();
+    });
+
     test('returns to the connections page when connect completes without setup steps', async () => {
         const user = userEvent.setup();
         renderConnectorList({

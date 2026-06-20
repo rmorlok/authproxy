@@ -31,7 +31,7 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
   onDetails,
   isConnecting
 }) => {
-  const displayText = connector.highlight;
+  const displayText = connector.highlight || connector.description;
   const cardBody = (
     <>
       <ConnectorLogo connector={connector} variant="media" />

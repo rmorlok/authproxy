@@ -7,6 +7,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -107,6 +108,34 @@ func TestReconfigure(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, resp)
 		assert.Equal(t, iface.ConnectionSetupResponseTypeForm, resp.GetType())
+	})
+
+	t.Run("skips ineligible configure steps", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		conn, db := newTestConnectionWithSetupFlow(t, ctrl, &cschema.SetupFlow{
+			Configure: &cschema.SetupFlowPhase{
+				Steps: []cschema.SetupFlowStep{
+					{
+						Id:         "us_only",
+						JsonSchema: workspaceSchema,
+						If:         &common.Predicate{Javascript: `cfg.region === "us"`},
+					},
+					{Id: "workspace", Title: "Select Workspace", JsonSchema: workspaceSchema},
+				},
+			},
+		})
+		conn.State = database.ConnectionStateConfigured
+		setConnectionConfigFixture(t, conn, map[string]any{"region": "eu"})
+
+		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewSetupStep("workspace"))).Return(nil)
+
+		resp, err := conn.Reconfigure(context.Background())
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.IsType(t, &iface.ConnectionSetupForm{}, resp)
+		assert.Equal(t, "workspace", resp.(*iface.ConnectionSetupForm).StepId)
 	})
 }
 

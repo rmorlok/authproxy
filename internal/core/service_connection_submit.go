@@ -23,7 +23,10 @@ func (c *connection) SubmitForm(ctx context.Context, req iface.SubmitConnectionR
 	}
 
 	flow := c.s.buildManifestSetupFlow(c)
-	current, ok := flow.StepById(setupStep.Id())
+	current, ok, err := flow.StepById(ctx, setupStep.Id())
+	if err != nil {
+		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to evaluate setup flow: %w", err))
+	}
 	if !ok {
 		return nil, httperr.InternalServerErrorMsg("current setup step is not addressable in manifest")
 	}
@@ -35,7 +38,10 @@ func (c *connection) SubmitForm(ctx context.Context, req iface.SubmitConnectionR
 		return nil, err
 	}
 
-	next, hasNext := flow.NextStep(current.Id())
+	next, hasNext, err := flow.NextStep(ctx, current.Id())
+	if err != nil {
+		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to evaluate setup flow: %w", err))
+	}
 	if !hasNext {
 		return c.completeFlow(ctx)
 	}
@@ -44,8 +50,9 @@ func (c *connection) SubmitForm(ctx context.Context, req iface.SubmitConnectionR
 
 // GetCurrentSetupStepResponse renders the response for the connection's
 // current setup_step without transitioning anything. Used by the resume /
-// polling path on the UI.
-func (c *connection) GetCurrentSetupStepResponse(ctx context.Context) (iface.ConnectionSetupResponse, error) {
+// polling path on the UI. When returnToUrl is supplied, redirect steps can
+// mint a fresh provider URL for an interrupted browser flow.
+func (c *connection) GetCurrentSetupStepResponse(ctx context.Context, returnToUrl string) (iface.ConnectionSetupResponse, error) {
 	setupStep := c.GetSetupStep()
 	if setupStep == nil {
 		return &iface.ConnectionSetupComplete{
@@ -54,5 +61,5 @@ func (c *connection) GetCurrentSetupStepResponse(ctx context.Context) (iface.Con
 		}, nil
 	}
 	flow := c.s.buildManifestSetupFlow(c)
-	return c.renderResumeResponse(ctx, flow, *setupStep)
+	return c.renderResumeResponse(ctx, flow, *setupStep, returnToUrl)
 }

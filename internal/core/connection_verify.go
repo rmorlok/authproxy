@@ -22,7 +22,10 @@ func (c *connection) onVerifyPassed(ctx context.Context) error {
 	}
 
 	flow := c.s.buildManifestSetupFlow(c)
-	next, hasNext := flow.NextStep(cschema.SetupStepVerify.Id())
+	next, hasNext, err := flow.NextStep(ctx, cschema.SetupStepVerify.Id())
+	if err != nil {
+		return fmt.Errorf("failed to evaluate setup flow after verify: %w", err)
+	}
 	if !hasNext {
 		if _, err := c.completeFlow(ctx); err != nil {
 			return err

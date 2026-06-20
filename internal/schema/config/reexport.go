@@ -56,8 +56,15 @@ type (
 	Connectors              = connectors.Connectors
 	PKCEMethod              = connectors.PKCEMethod
 	OAuth2GrantType         = connectors.OAuth2GrantType
+	Predicate               = common.Predicate
 	Scope                   = connectors.Scope
+	ScopeRequired           = connectors.ScopeRequired
 	TokenEndpointAuthMethod = connectors.TokenEndpointAuthMethod
+)
+
+var (
+	NewScopeRequiredBool      = connectors.NewScopeRequiredBool
+	NewScopeRequiredPredicate = connectors.NewScopeRequiredPredicate
 )
 
 // Re-export constants from the connectors sub-package

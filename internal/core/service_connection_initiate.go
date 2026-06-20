@@ -86,7 +86,11 @@ func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConn
 	}
 
 	flow := s.buildManifestSetupFlow(connection)
-	first := flow.FirstStep()
+	first, err := flow.FirstStep(ctx)
+	if err != nil {
+		val.MarkErrorReturn()
+		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to evaluate setup flow: %w", err))
+	}
 	if first == nil {
 		// No setup steps to walk through — the connection is immediately
 		// considered configured.

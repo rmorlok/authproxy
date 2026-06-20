@@ -29,7 +29,7 @@ interface ConnectorDetailProps {
   connectorId?: string;
 }
 
-const markdownComponents = {
+export const markdownComponents = {
   h1: ({ children }: { children?: React.ReactNode }) => <Typography variant="h4" component="h2" sx={{ mt: 4, mb: 2 }}>{children}</Typography>,
   h2: ({ children }: { children?: React.ReactNode }) => <Typography variant="h5" component="h2" sx={{ mt: 4, mb: 2 }}>{children}</Typography>,
   h3: ({ children }: { children?: React.ReactNode }) => <Typography variant="h6" component="h3" sx={{ mt: 3, mb: 1.5 }}>{children}</Typography>,
@@ -93,11 +93,11 @@ const markdownComponents = {
   ),
 };
 
-const markdownUrlTransform = (url: string) => (
+export const markdownUrlTransform = (url: string) => (
   url.startsWith('data:image/') ? url : defaultUrlTransform(url)
 );
 
-const connectorInitials = (displayName: string): string => {
+export const connectorInitials = (displayName: string): string => {
   const words = displayName.split(/[^a-zA-Z0-9]+/).filter(Boolean);
   if (words.length === 0) {
     return 'AP';

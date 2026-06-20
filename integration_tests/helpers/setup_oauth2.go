@@ -115,9 +115,8 @@ func NewOAuth2Connector(connectorID apid.ID, displayName string, provider *OAuth
 	for _, id := range opts.Scopes {
 		scopes = append(scopes, connectors.Scope{Id: id, Reason: "integration test"})
 	}
-	notRequired := false
 	for _, id := range opts.OptionalScopes {
-		scopes = append(scopes, connectors.Scope{Id: id, Required: &notRequired, Reason: "integration test"})
+		scopes = append(scopes, connectors.Scope{Id: id, Required: connectors.NewScopeRequiredBool(false), Reason: "integration test"})
 	}
 
 	auth := &connectors.AuthOAuth2{

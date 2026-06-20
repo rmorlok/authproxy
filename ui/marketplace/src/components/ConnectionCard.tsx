@@ -6,7 +6,6 @@ import {
   Chip,
   Box,
   Skeleton,
-  CardHeader,
   Button,
   CardActions,
   Dialog,
@@ -20,23 +19,27 @@ import {
   MenuItem,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import {tasks, Connection, ConnectionState, ConnectionHealthState, canBeDisconnected, isRedirectResponse, PollForTaskResult, DisconnectResponseJson} from '@authproxy/api';
+import {tasks, Connection, ConnectionState, canBeDisconnected, isCompleteResponse, isRedirectResponse, PollForTaskResult, DisconnectResponseJson} from '@authproxy/api';
 import { useDispatch } from 'react-redux';
 import {
   disconnectConnectionAsync,
+  getSetupStepAsync,
   reconfigureConnectionAsync,
   reauthConnectionAsync,
   AppDispatch, addToast, fetchConnectionsAsync,
 } from '../store';
 import SettingsIcon from '@mui/icons-material/Settings';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { marketplaceTokens } from '../theme';
 import ConnectorLogo from './ConnectorLogo';
+import { useNavigate } from 'react-router-dom';
+import { getConnectionStatusPresentation } from './connectionPresentation';
 interface ConnectionCardProps {
   connection: Connection;
   highlightNew?: boolean;
@@ -52,6 +55,7 @@ const truncateText = (text: string, maxLength: number = 120): string => {
  */
 const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection, highlightNew = false }) => {
   const dispatch = useDispatch<AppDispatch>();
+  const navigate = useNavigate();
   const connector = connection.connector;
 
   // Use highlight field if available, otherwise use truncated description.
@@ -63,33 +67,40 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection, highlightNe
   // State for confirmation dialog
   const [openDialog, setOpenDialog] = useState(false);
   const [actionsAnchorEl, setActionsAnchorEl] = useState<null | HTMLElement>(null);
+  const [isResumingSetup, setIsResumingSetup] = useState(false);
   const actionsMenuOpen = Boolean(actionsAnchorEl);
-
-  // Format the date
-  const createdDate = new Date(connection.created_at).toLocaleDateString();
-
-  // Determine the status color
-  let statusColor: 'success' | 'error' | 'warning' | 'default' = marketplaceTokens.status.neutral;
-  switch (connection.state) {
-    case ConnectionState.CONFIGURED:
-      statusColor = marketplaceTokens.status.healthy;
-      break;
-    case ConnectionState.DISABLED:
-      statusColor = marketplaceTokens.status.disabled;
-      break;
-    case ConnectionState.SETUP:
-      statusColor = marketplaceTokens.status.setup;
-      break;
-    case ConnectionState.DISCONNECTING:
-      statusColor = marketplaceTokens.status.setup;
-      break;
-    default:
-      statusColor = marketplaceTokens.status.neutral;
-  }
 
   // Handle reconfigure button click
   const handleReconfigureClick = () => {
     dispatch(reconfigureConnectionAsync(connection.id));
+  };
+
+  const handleViewDetailsClick = () => {
+    if (!connector) {
+      return;
+    }
+    handleActionsMenuClose();
+    navigate(`/connections/${encodeURIComponent(connection.id)}`);
+  };
+
+  const handleResumeSetupClick = () => {
+    setIsResumingSetup(true);
+    dispatch(getSetupStepAsync({
+      connectionId: connection.id,
+      returnToUrl: window.location.href,
+    })).then((action) => {
+      if (action.meta.requestStatus === 'fulfilled') {
+        const response = action.payload as any;
+        if (isRedirectResponse(response) && response.redirect_url) {
+          window.location.href = response.redirect_url;
+          return;
+        }
+        if (isCompleteResponse(response)) {
+          dispatch(fetchConnectionsAsync());
+        }
+      }
+      setIsResumingSetup(false);
+    });
   };
 
   // Handle re-authenticate button click. Reauth returns a setup-flow response
@@ -114,13 +125,17 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection, highlightNe
   // in initial setup; later states are tearing down). Visibility itself is the
   // signal — when health is unhealthy the button is emphasized.
   const canReauth = connection.state === ConnectionState.CONFIGURED;
-  const isUnhealthy =
-    connection.state === ConnectionState.CONFIGURED &&
-    connection.health_state === ConnectionHealthState.UNHEALTHY;
-  const isHealthyConfigured =
-    connection.state === ConnectionState.CONFIGURED &&
-    !isUnhealthy;
   const canReconfigure = connection.state === ConnectionState.CONFIGURED && connector?.has_configure;
+  const {
+    isHealthyConfigured,
+    isUnhealthy,
+    requiresSetup,
+    requiresReconnection,
+    statusBadgeLabel,
+    statusBadgeColor,
+    statusDotColor,
+    statusText,
+  } = getConnectionStatusPresentation(connection);
 
   const handleActionsMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setActionsAnchorEl(event.currentTarget);
@@ -200,6 +215,14 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection, highlightNe
         open={actionsMenuOpen}
         onClose={handleActionsMenuClose}
       >
+        {connector && (
+          <MenuItem onClick={handleViewDetailsClick}>
+            <ListItemIcon>
+              <InfoOutlinedIcon fontSize="small" />
+            </ListItemIcon>
+            View details
+          </MenuItem>
+        )}
         {canReauth && (
           <MenuItem onClick={handleReauthClick}>
             <ListItemIcon>
@@ -245,61 +268,50 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection, highlightNe
         transition: 'background-color 500ms ease, border-color 500ms ease, box-shadow 500ms ease',
       }}
     >
-      <CardHeader
-        sx={{
-          alignItems: 'flex-start',
-          flexWrap: { xs: 'wrap', sm: 'nowrap' },
-          '& .MuiCardHeader-content': {
-            minWidth: 0,
-          },
-          '& .MuiCardHeader-action': {
-            ml: 1,
-            mt: 0,
-          },
-        }}
-        avatar={
-          <ConnectorLogo connector={connector} variant="compact" />
-        }
-        title={connector ? connector.display_name : 'Unknown Connector'}
-        action={(
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+      <Box sx={{ position: 'relative' }}>
+        <ConnectorLogo connector={connector} variant="media" />
+        {statusBadgeLabel && (
+          <Box sx={{ position: 'absolute', top: 12, right: 12 }}>
             <Chip
-              label={isUnhealthy ? 'Needs attention' : connection.state}
-              color={isUnhealthy ? marketplaceTokens.status.attention : statusColor}
+              label={statusBadgeLabel}
+              color={statusBadgeColor}
               size="small"
-              variant={isUnhealthy ? 'filled' : 'outlined'}
-              icon={isUnhealthy ? <WarningAmberIcon /> : undefined}
+              variant="filled"
+              sx={{
+                boxShadow: 2,
+                bgcolor: (theme) => alpha(theme.palette[statusBadgeColor].main, 0.92),
+              }}
             />
-            {actionMenu}
           </Box>
         )}
-        subheader={`Connected on ${createdDate}`}
-      />
-      <CardContent sx={{ flexGrow: 1 }}>
-        {isUnhealthy && (
+      </Box>
+      <CardContent sx={{ flexGrow: 1, width: '100%', boxSizing: 'border-box' }}>
+        <Typography gutterBottom variant="h5" component="div">
+          {connector ? connector.display_name : 'Unknown Connector'}
+        </Typography>
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 0.75,
+            mb: displayText ? 2 : 0,
+            color: requiresReconnection ? 'error.main' : 'text.secondary',
+          }}
+        >
           <Box
+            aria-hidden="true"
             sx={{
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: 1,
-              mb: 2,
-              p: 1.5,
-              borderRadius: marketplaceTokens.radius.control,
-              bgcolor: (theme) => alpha(theme.palette.warning.main, 0.14),
-              color: 'warning.dark',
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              bgcolor: statusDotColor,
+              flexShrink: 0,
             }}
-          >
-            <WarningAmberIcon fontSize="small" sx={{ mt: 0.25 }} />
-            <Box>
-              <Typography variant="subtitle2" component="p">
-                Reauthentication required
-              </Typography>
-              <Typography variant="body2">
-                This connection needs attention. Re-authenticate to restore access.
-              </Typography>
-            </Box>
-          </Box>
-        )}
+          />
+          <Typography variant="body2" color="inherit">
+            {statusText}
+          </Typography>
+        </Box>
         <Box sx={{
           '& p': { margin: 0, fontSize: marketplaceTokens.markdown.bodyFontSize, color: 'text.secondary' },
           '& strong': { color: 'text.primary' },
@@ -335,7 +347,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection, highlightNe
         </Box>
       </CardContent>
 
-      {canBeDisconnected(connection) && (canReconfigure || !isHealthyConfigured) && (
+      {canBeDisconnected(connection) && (canReconfigure || actionMenu || !isHealthyConfigured) && (
         <CardActions
           sx={{
             alignItems: 'flex-start',
@@ -357,8 +369,27 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection, highlightNe
               Reconfigure
             </Button>
           )}
+          {actionMenu && (
+            <Box sx={{ ml: 'auto' }}>
+              {actionMenu}
+            </Box>
+          )}
           {!isHealthyConfigured && (
             <>
+              {requiresSetup && (
+                <Button
+                  size="medium"
+                  startIcon={<PlayArrowIcon />}
+                  onClick={handleResumeSetupClick}
+                  color="warning"
+                  variant="contained"
+                  fullWidth
+                  disabled={isResumingSetup}
+                  sx={{ justifyContent: 'flex-start' }}
+                >
+                  {isResumingSetup ? 'Resuming setup...' : 'Resume setup'}
+                </Button>
+              )}
               {canReauth && (
                 <Button
                   size={isUnhealthy ? 'medium' : 'small'}
@@ -413,16 +444,10 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection, highlightNe
 export const ConnectionCardSkeleton: React.FC = () => {
   return (
     <Card sx={{ maxWidth: 345, height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <CardHeader
-        avatar={<Skeleton variant="rounded" width={96} height={48} />}
-        title={<Skeleton variant="text" width="80%" />}
-        subheader={<Skeleton variant="text" width="60%" />}
-      />
+      <Skeleton variant="rectangular" height={marketplaceTokens.card.mediaHeight} />
       <CardContent sx={{ flexGrow: 1 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <Skeleton variant="text" width="30%" />
-          <Skeleton variant="rectangular" width={60} height={24} />
-        </Box>
+        <Skeleton variant="text" height={32} width="80%" />
+        <Skeleton variant="text" width="60%" />
         <Skeleton variant="text" width="100%" />
       </CardContent>
     </Card>

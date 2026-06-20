@@ -1959,6 +1959,12 @@ const docTemplateadmin_api = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "URL to return to after a resumed redirect step",
+                        "name": "return_to_url",
+                        "in": "query"
                     }
                 ],
                 "responses": {

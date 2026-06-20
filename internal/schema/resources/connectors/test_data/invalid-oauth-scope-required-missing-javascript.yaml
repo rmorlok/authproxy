@@ -1,0 +1,20 @@
+# $schema: ./schema.json
+
+labels:
+  type: google-drive
+display_name: Google Drive
+description: Invalid dynamic required predicate example
+auth:
+  type: OAuth2
+  client_id:
+    env_var: GOOGLE_CLIENT_ID
+  client_secret:
+    env_var: GOOGLE_CLIENT_SECRET
+  authorization:
+    endpoint: https://accounts.google.com/o/oauth2/v2/auth
+  token:
+    endpoint: https://oauth2.googleapis.com/token
+  scopes:
+    - id: https://www.googleapis.com/auth/drive.activity.readonly
+      required: {}
+      reason: We need to be able to see activity

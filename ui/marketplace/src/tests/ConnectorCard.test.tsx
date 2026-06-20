@@ -71,7 +71,7 @@ describe('ConnectorCard', () => {
         expect(mockOnDetails).toHaveBeenCalledTimes(2);
     });
 
-    test('does not fall back to the full description when the highlight is absent', () => {
+    test('falls back to the description when the highlight is absent', () => {
         render(
             <ConnectorCard
                 connector={{...mockConnector, highlight: undefined}}
@@ -81,7 +81,7 @@ describe('ConnectorCard', () => {
         );
 
         expect(screen.getByText('Google Calendar')).toBeInTheDocument();
-        expect(screen.queryByText('Connect to your Google Calendar to manage events and appointments.')).not.toBeInTheDocument();
+        expect(screen.getByText('Connect to your Google Calendar to manage events and appointments.')).toBeInTheDocument();
     });
 
     test('calls onConnect when the connect button is clicked', () => {

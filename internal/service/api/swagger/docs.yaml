@@ -2264,6 +2264,10 @@ paths:
         name: id
         required: true
         type: string
+      - description: URL to return to after a resumed redirect step
+        in: query
+        name: return_to_url
+        type: string
       produces:
       - application/json
       responses:

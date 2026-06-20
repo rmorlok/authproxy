@@ -7,6 +7,7 @@ import Layout from './components/Layout';
 import ConnectorList from './components/ConnectorList';
 import ConnectorDetail from './components/ConnectorDetail';
 import ConnectionList from './components/ConnectionList';
+import ConnectionDetail from './components/ConnectionDetail';
 import Dev from './components/Dev';
 import { Error } from "./Error";
 
@@ -49,6 +50,7 @@ export function Router() {
                       <Route path={'/'} element={<Navigate to="/connections" replace />} />
                       <Route path={'/connectors/:connectorId'} Component={ConnectorDetail}/>
                       <Route path={'/connectors'} Component={ConnectorList}/>
+                      <Route path={'/connections/:connectionId'} Component={ConnectionDetail}/>
                       <Route path={'/connections'} Component={ConnectionList}/>
                   </Route>
               </Route>

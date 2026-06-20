@@ -48,8 +48,10 @@ In-depth guides live under [`docs/`](docs/README.md):
 - [CLI (`ap`)](docs/cli.md) — config file shape, signing keys, every command (list, sign-jwt, signing-proxy, proxy + curl/wget modes, …).
 - [Rate limits](docs/rate-limits.md) — defining rate-limit resources, the connector-level reactive 429 handler, and the request-log attribution fields.
 - [Labels and annotations](docs/labels.md) — the label system, system labels under `apxy/`, carry-forward through namespaces and connectors, label selectors.
+- [Connector setup flow](docs/connector-setup-flow.md) — preconnect/configure steps, conditional `if.javascript` steps, redirect steps, and data sources.
 - [Telemetry](docs/telemetry.md) — OpenTelemetry traces, metrics, and logs; OTLP configuration, label projection, signal coverage, and the local Grafana dev stack.
 - [Background tasks](docs/background_tasks.md) — running the worker, monitoring queues.
+- [Connector lifecycle operations](docs/connector-lifecycle.md) — disconnect-all and archive workflows, task polling, timeout semantics.
 - [Blob storage](docs/blob_storage.md) — viewing data stored in MinIO / S3.
 - [Redis insight](docs/redis_insight.md) — viewing data stored in Redis.
 
@@ -591,8 +593,10 @@ The full set of long-form guides lives under [`docs/`](docs/README.md):
 | `ap` CLI — config file, signing keys, every command | [docs/cli.md](docs/cli.md) |
 | Define rate-limit resources, connector reactive 429 handling, log attribution | [docs/rate-limits.md](docs/rate-limits.md) |
 | Label system, system labels, carry-forward, selectors | [docs/labels.md](docs/labels.md) |
+| Connector setup flow, conditional steps, redirect steps, data sources | [docs/connector-setup-flow.md](docs/connector-setup-flow.md) |
 | OpenTelemetry traces / metrics / logs, OTLP config, label projection, dev Grafana stack | [docs/telemetry.md](docs/telemetry.md) |
 | Managing background tasks | [docs/background_tasks.md](docs/background_tasks.md) |
+| Connector lifecycle workflows and task polling | [docs/connector-lifecycle.md](docs/connector-lifecycle.md) |
 | Viewing data stored in Blob Storage (request logs, etc.) | [docs/blob_storage.md](docs/blob_storage.md) |
 | Viewing data stored in Redis | [docs/redis_insight.md](docs/redis_insight.md) |
 | Terraform provider — resource reference | [terraform/provider/docs/resources/](terraform/provider/docs/resources/) |

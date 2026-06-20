@@ -4,6 +4,7 @@ import '@testing-library/jest-dom';
 import userEvent from '@testing-library/user-event';
 import {Provider} from 'react-redux';
 import {combineReducers, configureStore} from '@reduxjs/toolkit';
+import {MemoryRouter, Route, Routes, useLocation} from 'react-router-dom';
 import ConnectionCard, {ConnectionCardSkeleton} from '../components/ConnectionCard';
 import {
     Connection,
@@ -28,6 +29,7 @@ vi.mock('@authproxy/api', async () => {
         connections: {
             ...actual.connections,
             disconnect: vi.fn(),
+            getSetupStep: vi.fn(),
             list: vi.fn(),
             reauth: vi.fn(),
         },
@@ -67,6 +69,26 @@ const rootInitialState = () => ({
     toasts: {items: []},
 });
 
+const renderConnectionCard = (connection: Connection, store = createMockStore(rootInitialState())) => {
+    const LocationProbe = () => {
+        const location = useLocation();
+        return <span data-testid="location">{location.pathname}{location.search}</span>;
+    };
+
+    render(
+        <MemoryRouter initialEntries={['/connections']}>
+            <Provider store={store}>
+                <Routes>
+                    <Route path="/connections" element={<ConnectionCard connection={connection}/>} />
+                    <Route path="/connections/:connectionId" element={<LocationProbe/>} />
+                </Routes>
+            </Provider>
+        </MemoryRouter>
+    );
+
+    return store;
+};
+
 describe('ConnectionCard', () => {
     const mockConnector: Connector = {
         id: 'google-calendar',
@@ -96,6 +118,7 @@ describe('ConnectionCard', () => {
 
     beforeEach(() => {
         vi.mocked(connections.disconnect).mockReset();
+        vi.mocked(connections.getSetupStep).mockReset();
         vi.mocked(connections.list).mockReset();
         vi.mocked(connections.reauth).mockReset();
         vi.mocked(tasks.pollForTaskFinalized).mockReset();
@@ -112,6 +135,7 @@ describe('ConnectionCard', () => {
             status: 200,
             data: {items: [], cursor: ''},
         } as any);
+        vi.mocked(connections.getSetupStep).mockResolvedValue({data: {id: baseConnection.id, type: 'complete'}} as any);
         vi.mocked(connections.reauth).mockResolvedValue({data: {type: 'complete'}} as any);
         vi.mocked(tasks.pollForTaskFinalized).mockResolvedValue({
             result: PollForTaskResult.FINALIZED,
@@ -121,11 +145,7 @@ describe('ConnectionCard', () => {
     test('renders connection information correctly with connector details', () => {
         const store = createMockStore(rootInitialState());
 
-        render(
-            <Provider store={store}>
-                <ConnectionCard connection={baseConnection}/>
-            </Provider>
-        );
+        renderConnectionCard(baseConnection, store);
 
         // Check if the connector name is displayed
         expect(screen.getByText('Google Calendar')).toBeInTheDocument();
@@ -133,19 +153,14 @@ describe('ConnectionCard', () => {
         // Check if the connection date is displayed
         expect(screen.getByText(/Connected on/)).toBeInTheDocument();
 
-        // Check if the status chip label is displayed (state string)
-        expect(screen.getByText('configured')).toBeInTheDocument();
+        expect(screen.queryByText('configured')).not.toBeInTheDocument();
     });
 
     test('renders with unknown connector fallback when connector missing', () => {
         const store = createMockStore(rootInitialState());
         const connWithoutConnector = {...baseConnection, connector: undefined as unknown as any};
 
-        render(
-            <Provider store={store}>
-                <ConnectionCard connection={connWithoutConnector}/>
-            </Provider>
-        );
+        renderConnectionCard(connWithoutConnector, store);
 
         // Check if the unknown connector text is displayed
         expect(screen.getByText('Unknown Connector')).toBeInTheDocument();
@@ -153,10 +168,10 @@ describe('ConnectionCard', () => {
 
     test('renders different status labels based on connection state', () => {
         const states = [
-            {state: ConnectionState.CONFIGURED, label: 'configured'},
-            {state: ConnectionState.SETUP, label: 'setup'},
-            {state: ConnectionState.DISABLED, label: 'disabled'},
-            {state: ConnectionState.DISCONNECTED, label: 'disconnected'},
+            {state: ConnectionState.CONFIGURED, label: /Connected on/},
+            {state: ConnectionState.SETUP, label: 'Requires setup'},
+            {state: ConnectionState.DISABLED, label: 'Requires reconnection'},
+            {state: ConnectionState.DISCONNECTED, label: 'Disconnected'},
         ];
 
         states.forEach(({state, label}) => {
@@ -164,15 +179,52 @@ describe('ConnectionCard', () => {
             const connection = {...baseConnection, state};
 
             const {unmount} = render(
-                <Provider store={store}>
-                    <ConnectionCard connection={connection}/>
-                </Provider>
+                <MemoryRouter>
+                    <Provider store={store}>
+                        <ConnectionCard connection={connection}/>
+                    </Provider>
+                </MemoryRouter>
             );
 
-            // Check if the status label is displayed
             expect(screen.getByText(label)).toBeInTheDocument();
 
             unmount();
+        });
+    });
+
+    test('resumes setup connections from their current step', async () => {
+        const store = createMockStore(rootInitialState());
+        const user = userEvent.setup();
+        const setupConnection: Connection = {
+            ...baseConnection,
+            state: ConnectionState.SETUP,
+        };
+        vi.mocked(connections.getSetupStep).mockResolvedValue({
+            data: {
+                id: setupConnection.id,
+                type: 'form',
+                step_id: 'calendar',
+                step_title: 'Select a Calendar',
+                step_description: 'Choose which calendar should be managed.',
+                json_schema: {type: 'object'},
+                ui_schema: {type: 'VerticalLayout'},
+            },
+        } as any);
+
+        renderConnectionCard(setupConnection, store);
+
+        await user.click(screen.getByRole('button', {name: /Resume setup/i}));
+
+        await waitFor(() => {
+            expect(connections.getSetupStep).toHaveBeenCalledWith(
+                setupConnection.id,
+                window.location.href,
+            );
+        });
+        expect(store.getState().connections.currentFormStep).toMatchObject({
+            connectionId: setupConnection.id,
+            stepId: 'calendar',
+            stepTitle: 'Select a Calendar',
         });
     });
 
@@ -188,15 +240,10 @@ describe('ConnectionCard', () => {
             health_state: ConnectionHealthState.UNHEALTHY,
         };
 
-        render(
-            <Provider store={store}>
-                <ConnectionCard connection={unhealthyConnection}/>
-            </Provider>
-        );
+        renderConnectionCard(unhealthyConnection, store);
 
-        expect(screen.getByText('Needs attention')).toBeInTheDocument();
-        expect(screen.getByText('Reauthentication required')).toBeInTheDocument();
-        expect(screen.getByText(/Re-authenticate to restore access/i)).toBeInTheDocument();
+        expect(screen.getByText('Requires reconnection')).toBeInTheDocument();
+        expect(screen.getByText('Reconnection required')).toBeInTheDocument();
         expect(screen.getByRole('button', {name: /Re-authenticate/i})).toBeInTheDocument();
         expect(screen.getByRole('button', {name: /Reconfigure/i})).toBeInTheDocument();
         expect(screen.getByRole('button', {name: /Disconnect/i})).toBeInTheDocument();
@@ -222,11 +269,7 @@ describe('ConnectionCard', () => {
             },
         };
 
-        render(
-            <Provider store={store}>
-                <ConnectionCard connection={healthyConnection}/>
-            </Provider>
-        );
+        renderConnectionCard(healthyConnection, store);
 
         expect(screen.getByRole('button', {name: /Reconfigure/i})).toBeInTheDocument();
         expect(screen.queryByRole('button', {name: /Re-authenticate/i})).not.toBeInTheDocument();
@@ -234,6 +277,7 @@ describe('ConnectionCard', () => {
 
         await user.click(screen.getByRole('button', {name: /Connection actions/i}));
 
+        expect(screen.getByRole('menuitem', {name: /View details/i})).toBeInTheDocument();
         expect(screen.getByRole('menuitem', {name: /Re-authenticate/i})).toBeInTheDocument();
         expect(screen.getByRole('menuitem', {name: /^Disconnect$/i})).toBeInTheDocument();
 
@@ -247,15 +291,23 @@ describe('ConnectionCard', () => {
         });
     });
 
+    test('navigates to connection details from the healthy connection action menu', async () => {
+        const store = createMockStore(rootInitialState());
+        const user = userEvent.setup();
+
+        renderConnectionCard(baseConnection, store);
+
+        await user.click(screen.getByRole('button', {name: /Connection actions/i}));
+        await user.click(screen.getByRole('menuitem', {name: /View details/i}));
+
+        expect(screen.getByTestId('location')).toHaveTextContent(`/connections/${baseConnection.id}`);
+    });
+
     test('opens disconnect confirmation from healthy connection action menu', async () => {
         const store = createMockStore(rootInitialState());
         const user = userEvent.setup();
 
-        render(
-            <Provider store={store}>
-                <ConnectionCard connection={baseConnection}/>
-            </Provider>
-        );
+        renderConnectionCard(baseConnection, store);
 
         await user.click(screen.getByRole('button', {name: /Connection actions/i}));
         await user.click(screen.getByRole('menuitem', {name: /^Disconnect$/i}));

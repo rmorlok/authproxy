@@ -92,11 +92,15 @@ func (s *service) runProbeInternal(ctx context.Context, logger *slog.Logger, con
 		return nil, err
 	}
 
-	probe, err := conn.GetProbe(probeId)
+	probe, err := conn.GetEnabledProbe(ctx, probeId)
 	if err != nil {
 		if errors.Is(err, ErrProbeNotFound) {
 			logger.Error("probe not found", "error", err)
 			return nil, fmt.Errorf("%s probe not found: %w", taskTypeProbe, asynq.SkipRetry)
+		}
+		if errors.Is(err, ErrProbeDisabled) {
+			logger.Info("probe disabled; skipping", "error", err)
+			return nil, fmt.Errorf("%s probe disabled: %w", taskTypeProbe, asynq.SkipRetry)
 		}
 
 		return probe, err

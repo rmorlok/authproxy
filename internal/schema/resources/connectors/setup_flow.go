@@ -382,6 +382,10 @@ type SetupFlowStep struct {
 	// form steps.
 	DataSources map[string]DataSourceDef `json:"data_sources,omitempty" yaml:"data_sources,omitempty"`
 
+	// If optionally gates this user-authored setup step. Runtime evaluates the
+	// configured condition server-side; clients only see eligible steps.
+	If *common.Predicate `json:"if,omitempty" yaml:"if,omitempty"`
+
 	// Redirect carries the redirect-step-specific configuration. Required
 	// when Type == redirect; must be absent otherwise.
 	Redirect *SetupFlowStepRedirect `json:"redirect,omitempty" yaml:"redirect,omitempty"`
@@ -431,6 +435,10 @@ func (s *SetupFlowStep) Validate(vc *common.ValidationContext, seenIds map[strin
 
 	if !s.Type.IsValid() {
 		result = multierror.Append(result, vc.NewErrorfForField("type", "type must be %q or %q (got %q)", SetupFlowStepTypeForm, SetupFlowStepTypeRedirect, s.Type))
+	}
+
+	if err := s.If.Validate(vc.PushField("if"), connectorPredicateValidationVars()); err != nil {
+		result = multierror.Append(result, err)
 	}
 
 	switch s.Type.Normalized() {

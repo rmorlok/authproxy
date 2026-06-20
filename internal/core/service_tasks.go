@@ -44,7 +44,13 @@ func (s *service) GetCronTasks() []*asynq.PeriodicTaskConfig {
 						continue
 					}
 
-					for _, probe := range c.GetProbes() {
+					probes, err := c.GetEnabledProbes(context.Background())
+					if err != nil {
+						logger.Error("failed to resolve enabled probes for periodic tasks", "error", err)
+						continue
+					}
+
+					for _, probe := range probes {
 						if probe.IsPeriodic() {
 							logger.Debug("adding periodic probe task", "probe_id", probe.GetId())
 							t, err := newProbeTask(c.Id, probe.GetId())

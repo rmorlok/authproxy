@@ -94,6 +94,9 @@
         "http": {
           "$ref": "#/$defs/ProbeHttp"
         },
+        "if": {
+          "$ref": "../../common/schema.json#/$defs/Predicate"
+        },
         "failure_threshold": {
           "type": "integer",
           "minimum": 1
@@ -202,6 +205,9 @@
           "additionalProperties": {
             "$ref": "#/$defs/DataSourceDef"
           }
+        },
+        "if": {
+          "$ref": "../../common/schema.json#/$defs/Predicate"
         }
       },
       "additionalProperties": false

@@ -131,8 +131,13 @@ func (o *oAuth2Connection) refreshAccessTokenInner(ctx context.Context, token *d
 		values.Set("refresh_token", refreshToken)
 	} else {
 		values.Set("grant_type", "client_credentials")
-		if scopes := JoinScopes(o.auth.Scopes); scopes != "" {
-			values.Set("scope", scopes)
+		effectiveScopes, err := o.effectiveScopes(ctx)
+		if err != nil {
+			return nil, o.classifyAndRecordRefreshFailure(ctx, tokenRefreshInternalError, 0, "", 0,
+				fmt.Errorf("failed to resolve oauth2 scopes: %w", err))
+		}
+		if scopeString := JoinScopes(effectiveScopes); scopeString != "" {
+			values.Set("scope", scopeString)
 		}
 		persistOptions.PersistRefreshToken = false
 	}

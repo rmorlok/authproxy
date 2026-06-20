@@ -7,6 +7,8 @@ This directory holds long-form documentation that supplements the [main repo REA
 - **[CLI (`ap`)](cli.md)** — config file shape (`~/.authproxy.yaml`), RS256 vs HS256 signing keys, every command (list, sign-jwt / verify-jwt, signing-proxy, the connection-scoped streaming `proxy` with `curl`/`wget` modes, marketplace helpers).
 - **[Rate limits](rate-limits.md)** — define rate-limit resources, configure connector-level reactive 429 handling, understand the request log attribution fields.
 - **[Labels and annotations](labels.md)** — the Kubernetes-style label system, system labels under `apxy/`, carry-forward through the namespace → connector → connection hierarchy, label selectors, per-request label snapshots.
+- **[Connector setup flow](connector-setup-flow.md)** — author preconnect/configure steps, conditional `if.javascript` steps, redirect steps, and configure-time data sources.
+- **[Connector predicates](connector-predicates.md)** — condition setup steps, OAuth scopes, dynamic required OAuth scopes, and probes with JavaScript predicates over `cfg`, `labels`, and `annotations`.
 - **[Application metrics](app_metrics.md)** — configure the app metrics store, query request-event and resource metrics, and understand supported aggregations and dimensions.
 - **[Unified key model migration](key-model-migration.md)** — design and operations guide for replacing encryption key versions with `keys` and `data_encryption_keys`.
 
@@ -14,15 +16,11 @@ This directory holds long-form documentation that supplements the [main repo REA
 
 - **[Telemetry](telemetry.md)** — OpenTelemetry traces / metrics / logs across all services, OTLP exporter configuration, label projection, the metrics catalog, and the local Grafana + Tempo + Loki + Prometheus dev stack under `docker compose --profile observability`.
 - **[Background tasks](background_tasks.md)** — running the worker, monitoring queues with Asynqmon.
+- **[Connector lifecycle operations](connector-lifecycle.md)** — disconnect-all and archive workflows, task polling, timeout semantics, and workflow names.
 - **[Workflow versioning](workflows.md)** — naming and evolution conventions for go-workflows-backed background work.
 - **[Blob storage](blob_storage.md)** — viewing data stored in MinIO / S3 (full request bodies, etc.).
 - **[Redis insight](redis_insight.md)** — viewing data stored in Redis (rate-limit counters, session state, etc.).
 - **[EKS deployment runbook](../deploy/docs/runbook.md)** — cluster setup, deploy workflows, per-branch dev environments, slim storage verification, and recovery operations.
-
-## Reference
-
-- **[OAuth test provider gaps](oauth_test_provider_gaps.md)** — limitations of the in-repo OAuth test provider that the integration tests run against.
-- **[Schema and OpenAPI generation](schema-openapi-generation.md)** — recommendation for keeping Swagger generation with centralized schema DTOs instead of moving to JSON Schema-driven OpenAPI generation.
 
 ## Architecture diagrams
 
