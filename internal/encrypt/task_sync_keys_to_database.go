@@ -32,7 +32,9 @@ func NewSyncKeysToDatabaseTask() *asynq.Task {
 	return asynq.NewTask(TaskTypeSyncKeysToDatabase, nil)
 }
 
-func ensureRootNamespaceUsesGlobalKey(ctx context.Context, db database.DB) error {
+// ensureRootNamespaceHasKeySet makes sure the root namespace has a key set. If it does not, it sets
+// it to the global key. If it has a key, it leaves it unchanged.
+func ensureRootNamespaceHasKeySet(ctx context.Context, db database.DB) error {
 	rootNamespace, err := db.GetNamespace(ctx, namespace.RootNamespace)
 	if errors.Is(err, database.ErrNotFound) {
 		return nil
@@ -277,7 +279,7 @@ func syncKeysToDatabase(
 	logger.Info("syncing data encryption key wrapping to database")
 	defer logger.Info("syncing data encryption key wrapping to database complete")
 
-	if err := ensureRootNamespaceUsesGlobalKey(ctx, db); err != nil {
+	if err := ensureRootNamespaceHasKeySet(ctx, db); err != nil {
 		return errors.Wrap(err, "failed to ensure root namespace uses global key")
 	}
 

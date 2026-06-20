@@ -148,7 +148,7 @@ func generateDataEncryptionKeysToDatabase(
 	}
 
 	var result *multierror.Error
-	if err := ensureRootNamespaceUsesGlobalKey(ctx, db); err != nil {
+	if err := ensureRootNamespaceHasKeySet(ctx, db); err != nil {
 		result = multierror.Append(result, errors.Wrap(err, "failed to ensure root namespace uses global key"))
 	}
 
