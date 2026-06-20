@@ -423,6 +423,7 @@ func TestGetEffectiveNamespaceMatchers(t *testing.T) {
 
 			result := validator.GetEffectiveNamespaceMatchers(tt.queryMatcher)
 			assert.Equal(t, tt.expected, result)
+			assert.False(t, validator.hasBeenValidated)
 		})
 	}
 }
@@ -500,6 +501,7 @@ func TestGetEffectiveNamespaceMatchers_MultiVerb(t *testing.T) {
 
 			result := validator.GetEffectiveNamespaceMatchers(tt.queryMatcher)
 			assert.ElementsMatch(t, tt.expected, result)
+			assert.False(t, validator.hasBeenValidated)
 		})
 	}
 }
@@ -833,6 +835,86 @@ func TestValidatorOnRoutes(t *testing.T) {
 
 			require.True(t, panicOccurred)
 		})
+	})
+
+	t.Run("namespace matcher alone is not validation", func(t *testing.T) {
+		fakeRouteThatConstrainsQuery := func(gctx *gin.Context) {
+			val := MustGetValidatorFromGinContext(gctx)
+			require.Equal(t, []string{"root.test.**"}, val.GetEffectiveNamespaceMatchers(nil))
+
+			gctx.PureJSON(200, gin.H{"status": "ok"})
+		}
+
+		register := func(g gin.IRouter, auth A) {
+			g.GET(
+				"/cats",
+				auth.NewRequiredBuilder().
+					ForResource("cats").
+					ForVerb("meow").
+					Build(),
+				fakeRouteThatConstrainsQuery,
+			)
+		}
+
+		tu := setup(t, register)
+
+		panicOccurred := false
+		defer func() {
+			if r := recover(); r != nil {
+				panicOccurred = true
+			}
+			require.True(t, panicOccurred)
+		}()
+
+		w := httptest.NewRecorder()
+		req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+			http.MethodGet,
+			"/cats",
+			nil,
+			"root",
+			"some-actor",
+			aschema.PermissionsSingle("root.test.**", "cats", "meow"),
+		)
+		require.NoError(t, err)
+
+		tu.Gin.ServeHTTP(w, req)
+	})
+
+	t.Run("explicit query validation mark", func(t *testing.T) {
+		fakeRouteThatConstrainsQuery := func(gctx *gin.Context) {
+			val := MustGetValidatorFromGinContext(gctx)
+			require.Equal(t, []string{"root.test.**"}, val.GetEffectiveNamespaceMatchers(nil))
+			val.MarkValidated()
+
+			gctx.PureJSON(200, gin.H{"status": "ok"})
+		}
+
+		register := func(g gin.IRouter, auth A) {
+			g.GET(
+				"/cats",
+				auth.NewRequiredBuilder().
+					ForResource("cats").
+					ForVerb("meow").
+					Build(),
+				fakeRouteThatConstrainsQuery,
+			)
+		}
+
+		tu := setup(t, register)
+
+		w := httptest.NewRecorder()
+		req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+			http.MethodGet,
+			"/cats",
+			nil,
+			"root",
+			"some-actor",
+			aschema.PermissionsSingle("root.test.**", "cats", "meow"),
+		)
+		require.NoError(t, err)
+
+		tu.Gin.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code)
 	})
 
 	t.Run("ForVerbs accepts any matching verb", func(t *testing.T) {
