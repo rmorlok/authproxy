@@ -450,7 +450,7 @@ func (s *SetupFlowStep) validate(vc *common.ValidationContext, seenIds map[strin
 		result = multierror.Append(result, vc.NewErrorfForField("type", "type must be %q or %q (got %q)", SetupFlowStepTypeForm, SetupFlowStepTypeRedirect, s.Type))
 	}
 
-	if err := s.If.ValidateWithContext(vc.PushField("if"), connectorPredicateValidationContext(library)); err != nil {
+	if err := s.If.Validate(vc.PushField("if"), connectorPredicateValidationContext(library)); err != nil {
 		result = multierror.Append(result, err)
 	}
 

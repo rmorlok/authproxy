@@ -97,7 +97,7 @@ func (p *Probe) ValidateWithJavascript(vc *common.ValidationContext, library *ap
 		result = multierror.Append(result, vc.NewErrorf("exactly one of proxy_http or http must be defined"))
 	}
 
-	if err := p.If.ValidateWithContext(vc.PushField("if"), connectorPredicateValidationContext(library)); err != nil {
+	if err := p.If.Validate(vc.PushField("if"), connectorPredicateValidationContext(library)); err != nil {
 		result = multierror.Append(result, err)
 	}
 

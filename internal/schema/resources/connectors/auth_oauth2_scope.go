@@ -38,7 +38,7 @@ func (s *Scope) ValidateWithJavascript(vc *common.ValidationContext, library *ap
 	}
 	result := &multierror.Error{}
 	jsctx := connectorPredicateValidationContext(library)
-	if err := s.If.ValidateWithContext(vc.PushField("if"), jsctx); err != nil {
+	if err := s.If.Validate(vc.PushField("if"), jsctx); err != nil {
 		result = multierror.Append(result, err)
 	}
 	if err := s.Required.ValidateWithJavascript(vc.PushField("required"), library); err != nil {
@@ -126,7 +126,7 @@ func (r *ScopeRequired) ValidateWithJavascript(vc *common.ValidationContext, lib
 	}
 
 	if r.Predicate != nil {
-		return r.Predicate.ValidateWithContext(vc, connectorPredicateValidationContext(library))
+		return r.Predicate.Validate(vc, connectorPredicateValidationContext(library))
 	}
 
 	return nil

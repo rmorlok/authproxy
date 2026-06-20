@@ -14,11 +14,7 @@ type Predicate struct {
 	Javascript string `json:"javascript" yaml:"javascript"`
 }
 
-func (p *Predicate) Validate(vc *ValidationContext, vars map[string]any) error {
-	return p.ValidateWithContext(vc, apjs.NewContext(nil, vars))
-}
-
-func (p *Predicate) ValidateWithContext(vc *ValidationContext, jsctx apjs.Context) error {
+func (p *Predicate) Validate(vc *ValidationContext, jsctx apjs.Context) error {
 	if p == nil {
 		return nil
 	}
