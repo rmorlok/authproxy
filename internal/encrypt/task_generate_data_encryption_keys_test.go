@@ -105,6 +105,35 @@ func setupMockSecretGenerateTest(t *testing.T, keyBytes []byte) mockKMSGenerateT
 }
 
 func TestGenerateDataEncryptionKeysToDatabase(t *testing.T) {
+	t.Run("repairs root namespace key", func(t *testing.T) {
+		sconfig.ResetKeyDataMockRegistry()
+		t.Cleanup(sconfig.ResetKeyDataMockRegistry)
+
+		ctx := context.Background()
+		globalKD := sconfig.NewKeyDataMock("global-root-repair")
+		sconfig.KeyDataMockAddVersion("global-root-repair", "global-key", "v1", util.MustGenerateSecureRandomKey(32))
+		cfg := config.FromRoot(&sconfig.Root{
+			SystemAuth: sconfig.SystemAuth{
+				GlobalAESKey: globalKD,
+			},
+		})
+		cfg, db, rawDb := database.MustApplyBlankTestDbConfigRaw(t, cfg)
+
+		_, err := rawDb.Exec("UPDATE namespaces SET key_id = NULL WHERE path = 'root'")
+		require.NoError(t, err)
+
+		root, err := db.GetNamespace(ctx, sconfig.RootNamespace)
+		require.NoError(t, err)
+		require.Nil(t, root.KeyId)
+
+		require.NoError(t, generateDataEncryptionKeysToDatabase(ctx, cfg, db, slog.Default(), nil))
+
+		root, err = db.GetNamespace(ctx, sconfig.RootNamespace)
+		require.NoError(t, err)
+		require.NotNil(t, root.KeyId)
+		require.Equal(t, database.GlobalKeyID, *root.KeyId)
+	})
+
 	t.Run("creates first dek without changing wrapping sync state", func(t *testing.T) {
 		env := setupMockKMSGenerateTest(t, true)
 

@@ -1996,12 +1996,12 @@ func TestSetNamespaceEncryptionKeyIdAncestorValidation(t *testing.T) {
 		require.Equal(t, http.StatusBadRequest, httpErr.Status)
 	})
 
-	t.Run("valid: key in root namespace", func(t *testing.T) {
-		ns, err := db.SetNamespaceKeyId(ctx, "root", &ekRoot.Id)
-		require.NoError(t, err)
-		require.NotNil(t, ns)
-		require.NotNil(t, ns.KeyId)
-		require.Equal(t, ekRoot.Id, *ns.KeyId)
+	t.Run("rejected: root namespace only uses global key", func(t *testing.T) {
+		_, err := db.SetNamespaceKeyId(ctx, "root", &ekRoot.Id)
+		require.Error(t, err)
+		var httpErr *httperr.Error
+		require.True(t, errors.As(err, &httpErr))
+		require.Equal(t, http.StatusBadRequest, httpErr.Status)
 	})
 
 	t.Run("valid: global key in root and descendant namespace", func(t *testing.T) {
@@ -2012,6 +2012,14 @@ func TestSetNamespaceEncryptionKeyIdAncestorValidation(t *testing.T) {
 		require.Equal(t, GlobalKeyID, *ns.KeyId)
 
 		ns, err = db.SetNamespaceKeyId(ctx, "root.parent.child", &GlobalKeyID)
+		require.NoError(t, err)
+		require.NotNil(t, ns)
+		require.NotNil(t, ns.KeyId)
+		require.Equal(t, GlobalKeyID, *ns.KeyId)
+	})
+
+	t.Run("clearing root namespace resets it to global key", func(t *testing.T) {
+		ns, err := db.SetNamespaceKeyId(ctx, "root", nil)
 		require.NoError(t, err)
 		require.NotNil(t, ns)
 		require.NotNil(t, ns.KeyId)

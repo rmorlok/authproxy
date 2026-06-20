@@ -32,6 +32,14 @@ func NewSyncKeysToDatabaseTask() *asynq.Task {
 	return asynq.NewTask(TaskTypeSyncKeysToDatabase, nil)
 }
 
+func ensureRootNamespaceUsesGlobalKey(ctx context.Context, db database.DB) error {
+	_, err := db.SetNamespaceKeyId(ctx, namespace.RootNamespace, &globalEncryptionKeyID)
+	if errors.Is(err, database.ErrNotFound) {
+		return nil
+	}
+	return err
+}
+
 // dataEncryptionKeyInfos converts a set of the database version of the DEK to the schema version.
 func dataEncryptionKeyInfos(deks []*database.DataEncryptionKey) []config.DataEncryptionKeyInfo {
 	infos := make([]config.DataEncryptionKeyInfo, 0, len(deks))
@@ -260,6 +268,10 @@ func syncKeysToDatabase(
 ) error {
 	logger.Info("syncing data encryption key wrapping to database")
 	defer logger.Info("syncing data encryption key wrapping to database complete")
+
+	if err := ensureRootNamespaceUsesGlobalKey(ctx, db); err != nil {
+		return errors.Wrap(err, "failed to ensure root namespace uses global key")
+	}
 
 	if redis != nil {
 		// Redis can be skipped in test cases
