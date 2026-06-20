@@ -131,6 +131,28 @@ func TestAwsKMSKeySyncAndReencrypt(t *testing.T) {
 	require.Equal(t, plaintext, decrypted)
 }
 
+func TestAwsKMSGlobalAESKeyStartup(t *testing.T) {
+	if os.Getenv(awsKMSTestEnv) != "1" {
+		t.Skipf("%s is not set to 1", awsKMSTestEnv)
+	}
+
+	region := os.Getenv("AWS_REGION")
+	if region == "" {
+		t.Skip("AWS_REGION is not set")
+	}
+	keyID := os.Getenv(awsKMSKeyIDEnv)
+	if keyID == "" {
+		t.Skipf("%s is not set", awsKMSKeyIDEnv)
+	}
+
+	ctx := context.Background()
+	keyData := awsKMSKeyData(keyID, region)
+	env := setupWithGlobalKeyDataIntegrationTest(t, &keyData)
+	defer env.Cleanup()
+
+	requireGlobalKeyProviderRoundTrip(t, ctx, env, sconfig.ProviderTypeAwsKMS, keyID)
+}
+
 func awsKMSKeyData(keyID string, region string) sconfig.KeyData {
 	return sconfig.KeyData{
 		InnerVal: &sconfig.KeyDataAwsKMS{

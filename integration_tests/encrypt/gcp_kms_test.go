@@ -127,6 +127,21 @@ func TestGcpKMSKeySyncAndReencrypt(t *testing.T) {
 	require.Equal(t, plaintext, decrypted)
 }
 
+func TestGcpKMSGlobalAESKeyStartup(t *testing.T) {
+	if os.Getenv(gcpKMSTestEnv) != "1" {
+		t.Skipf("%s is not set to 1", gcpKMSTestEnv)
+	}
+
+	keyName := gcpKMSKeyNameFromEnv(t, "")
+
+	ctx := context.Background()
+	keyData := gcpKMSKeyData(keyName)
+	env := setupWithGlobalKeyDataIntegrationTest(t, &keyData)
+	defer env.Cleanup()
+
+	requireGlobalKeyProviderRoundTrip(t, ctx, env, sconfig.ProviderTypeGcpKMS, keyName)
+}
+
 func gcpKMSKeyData(keyName string) sconfig.KeyData {
 	return sconfig.KeyData{
 		InnerVal: &sconfig.KeyDataGcpKMS{
