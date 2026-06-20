@@ -54,8 +54,10 @@ func (s *service) CreateKey(ctx context.Context, namespace string, keyData *cfgs
 		return nil, err
 	}
 
-	// Enqueue an immediate key sync task so the new key's versions are available
-	// in the database without waiting for the next cron cycle.
+	// Enqueue immediate DEK generation so the new key can be used for
+	// encryption without waiting for the next cron cycle. The follow-up sync
+	// keeps wrapping metadata and namespace targets reconciled.
+	encrypt.EnqueueGenerateDataEncryptionKeysToDatabase(ctx, s.ac, s.logger)
 	encrypt.EnqueueForceSyncKeysToDatabase(ctx, s.r, s.ac, s.logger)
 
 	return wrapKey(*ek, s), nil
