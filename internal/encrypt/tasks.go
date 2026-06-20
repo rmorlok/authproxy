@@ -10,11 +10,12 @@ import (
 )
 
 type EncryptServiceTaskHandler struct {
-	cfg    config.C
-	db     database.DB
-	enc    E
-	redis  apredis.Client
-	logger *slog.Logger
+	cfg                        config.C
+	db                         database.DB
+	enc                        E
+	redis                      apredis.Client
+	logger                     *slog.Logger
+	dataEncryptionKeyTelemetry *DataEncryptionKeyTelemetry
 }
 
 func (h *EncryptServiceTaskHandler) RegisterTasks(mux *asynq.ServeMux) {
@@ -46,12 +47,27 @@ func NewEncryptServiceTaskHandler(
 	enc E,
 	redis apredis.Client,
 	logger *slog.Logger,
+	opts ...EncryptServiceTaskHandlerOption,
 ) *EncryptServiceTaskHandler {
-	return &EncryptServiceTaskHandler{
+	h := &EncryptServiceTaskHandler{
 		cfg:    cfg,
 		db:     db,
 		enc:    enc,
 		redis:  redis,
 		logger: logger,
+	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(h)
+		}
+	}
+	return h
+}
+
+type EncryptServiceTaskHandlerOption func(*EncryptServiceTaskHandler)
+
+func WithDataEncryptionKeyTelemetry(tel *DataEncryptionKeyTelemetry) EncryptServiceTaskHandlerOption {
+	return func(h *EncryptServiceTaskHandler) {
+		h.dataEncryptionKeyTelemetry = tel
 	}
 }
