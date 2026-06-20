@@ -10,9 +10,9 @@ import (
 // WriteError writes an *httperr.Error to the gin context with logging,
 // debug headers, and error attachment.
 func WriteError(gctx *gin.Context, logger *slog.Logger, err *httperr.Error) {
-	err.LogError(logger)
-
 	ctx := gctx.Request.Context()
+	err = err.ForContext(ctx)
+	err.LogError(logger)
 
 	if err.InternalErr != nil {
 		AddDebugHeaderError(gctx, err.InternalErr)

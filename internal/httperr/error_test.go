@@ -56,6 +56,53 @@ func TestError_ResponseMsgOrDefault(t *testing.T) {
 	}
 }
 
+func TestError_ForContext_ClientClosedRequest(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := InternalServerError(WithInternalErrorf("failed to write session to redis: %w", context.Canceled))
+
+	mapped := err.ForContext(ctx)
+
+	require.Equal(t, StatusClientClosedRequest, mapped.Status)
+	require.Equal(t, "Client Closed Request", mapped.ResponseMsgOrDefault())
+	require.Equal(t, http.StatusInternalServerError, err.Status, "must not mutate original error")
+	require.Empty(t, err.ResponseMsg, "must not mutate original response message")
+}
+
+func TestError_ForContext_DoesNotMapUnrelatedCancellation(t *testing.T) {
+	t.Run("request context still active", func(t *testing.T) {
+		err := InternalServerError(WithInternalErrorf("failed to write session to redis: %w", context.Canceled))
+
+		mapped := err.ForContext(context.Background())
+
+		require.Equal(t, http.StatusInternalServerError, mapped.Status)
+	})
+
+	t.Run("error is not context canceled", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		err := InternalServerError(WithInternalErr(errors.New("redis unavailable")))
+
+		mapped := err.ForContext(ctx)
+
+		require.Equal(t, http.StatusInternalServerError, mapped.Status)
+	})
+
+	t.Run("explicit client error", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		err := BadRequest("invalid request", WithInternalErr(context.Canceled))
+
+		mapped := err.ForContext(ctx)
+
+		require.Equal(t, http.StatusBadRequest, mapped.Status)
+		require.Equal(t, "invalid request", mapped.ResponseMsgOrDefault())
+	})
+}
+
 func TestError_WriteResponse(t *testing.T) {
 	tests := []struct {
 		name              string
@@ -95,4 +142,17 @@ func TestError_WriteResponse(t *testing.T) {
 			require.True(t, matched, "expected body to match regex %q, but got %q", tt.expectedBodyRegex, trimmedBody)
 		})
 	}
+}
+
+func TestError_WriteResponse_ClientClosedRequest(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	rec := httptest.NewRecorder()
+
+	err := InternalServerError(WithInternalErrorf("failed to write session to redis: %w", context.Canceled))
+
+	err.WriteResponse(ctx, nil, rec)
+
+	require.Equal(t, StatusClientClosedRequest, rec.Code)
+	require.Equal(t, `{"error":"Client Closed Request"}`, strings.TrimSpace(rec.Body.String()))
 }
