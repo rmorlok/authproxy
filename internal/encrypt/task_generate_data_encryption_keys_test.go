@@ -164,6 +164,28 @@ func TestGenerateDataEncryptionKeysToDatabase(t *testing.T) {
 		require.Equal(t, rootKeyID, *root.KeyId)
 	})
 
+	t.Run("returns global provider errors without creating partial dek", func(t *testing.T) {
+		sconfig.ResetKeyDataMockKMSRegistry()
+		t.Cleanup(sconfig.ResetKeyDataMockKMSRegistry)
+
+		ctx := context.Background()
+		globalKD := sconfig.NewKeyDataMockKMS("global-kms-error")
+		cfg := config.FromRoot(&sconfig.Root{
+			SystemAuth: sconfig.SystemAuth{
+				GlobalAESKey: globalKD,
+			},
+		})
+		cfg, db := database.MustApplyBlankTestDbConfig(t, cfg)
+
+		err := generateDataEncryptionKeysToDatabase(ctx, cfg, db, slog.Default(), nil)
+		require.ErrorContains(t, err, "failed to reconcile data encryption key for global key")
+		require.ErrorContains(t, err, "no current version")
+
+		globalDEKs, listErr := db.ListDataEncryptionKeysForKey(ctx, globalEncryptionKeyID)
+		require.NoError(t, listErr)
+		require.Empty(t, globalDEKs)
+	})
+
 	t.Run("creates first dek without changing wrapping sync state", func(t *testing.T) {
 		env := setupMockKMSGenerateTest(t, true)
 
@@ -276,11 +298,11 @@ func TestGenerateDataEncryptionKeysToDatabase(t *testing.T) {
 		require.Len(t, deks, 1)
 	})
 
-	t.Run("returns provider errors without creating partial dek", func(t *testing.T) {
+	t.Run("logs provider errors without creating partial dek", func(t *testing.T) {
 		env := setupMockKMSGenerateTest(t, false)
 
 		err := generateDataEncryptionKeysToDatabase(env.ctx, env.cfg, env.db, env.logger, nil)
-		require.ErrorContains(t, err, "no current version")
+		require.NoError(t, err)
 
 		deks, listErr := env.db.ListDataEncryptionKeysForKey(env.ctx, env.ekID)
 		require.NoError(t, listErr)
@@ -291,11 +313,11 @@ func TestGenerateDataEncryptionKeysToDatabase(t *testing.T) {
 		require.Len(t, globalDEKs, 1)
 	})
 
-	t.Run("returns fallback provider errors without creating partial dek", func(t *testing.T) {
+	t.Run("logs fallback provider errors without creating partial dek", func(t *testing.T) {
 		env := setupMockSecretGenerateTest(t, []byte("bad"))
 
 		err := generateDataEncryptionKeysToDatabase(env.ctx, env.cfg, env.db, env.logger, nil)
-		require.ErrorContains(t, err, "failed to create DEK wrapping cipher")
+		require.NoError(t, err)
 
 		deks, listErr := env.db.ListDataEncryptionKeysForKey(env.ctx, env.ekID)
 		require.NoError(t, listErr)

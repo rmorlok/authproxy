@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"time"
 
@@ -191,43 +190,66 @@ func generateDataEncryptionKeysToDatabase(
 			ef := key.EncryptedKeyData
 			kvi, ok := keyMaterialDataCache[ef.ID]
 			if !ok {
-				result = multierror.Append(result, fmt.Errorf("key material info not found for key ID %s key material %s", key.Id, ef.ID))
+				logger.Warn("key wrapping material not found, skipping data encryption key reconciliation",
+					"key_id", key.Id,
+					"namespace", key.Namespace,
+					"data_encryption_key_id", ef.ID,
+				)
 				continue
 			}
 
 			decodedData, err := base64.StdEncoding.DecodeString(ef.Data)
 			if err != nil {
-				result = multierror.Append(result, errors.Wrapf(err, "failed to decode base64 string for key id %s", key.Id))
+				logger.Warn("failed to decode encrypted key data, skipping data encryption key reconciliation",
+					"key_id", key.Id,
+					"namespace", key.Namespace,
+					"error", err,
+				)
 				continue
 			}
 
 			decryptedData, err := decryptWithKey(kvi.Data, decodedData)
 			if err != nil {
-				result = multierror.Append(result, errors.Wrapf(err, "failed to decrypt key id %s with key data from %s", key.Id, ef.ID))
+				logger.Warn("failed to decrypt key data, skipping data encryption key reconciliation",
+					"key_id", key.Id,
+					"namespace", key.Namespace,
+					"data_encryption_key_id", ef.ID,
+					"error", err,
+				)
 				continue
 			}
 
 			var keyData config.KeyData
 			err = json.Unmarshal(decryptedData, &keyData)
 			if err != nil {
-				result = multierror.Append(result, errors.Wrapf(err, "failed to unmarshal key data for key ID %s", key.Id))
+				logger.Warn("failed to unmarshal key data, skipping data encryption key reconciliation",
+					"key_id", key.Id,
+					"namespace", key.Namespace,
+					"error", err,
+				)
 				continue
 			}
 
 			if shouldManageDataEncryptionKeysForKey(key) {
 				generated, err := ensureDataEncryptionKeyForKey(ctx, db, policy, key.Id, &keyData)
 				if err != nil {
-					result = multierror.Append(result, errors.Wrapf(err, "failed to reconcile data encryption key for key ID %s", key.Id))
-					continue
-				}
-				if generated {
+					logger.Warn("failed to reconcile data encryption key for key",
+						"key_id", key.Id,
+						"namespace", key.Namespace,
+						"error", err,
+					)
+				} else if generated {
 					logger.Info("generated data encryption key", "key_id", key.Id)
 				}
 			}
 
 			err = cacheDataEncryptionKeysForKey(ctx, db, keyMaterialDataCache, key.Id, &keyData)
 			if err != nil {
-				result = multierror.Append(result, errors.Wrapf(err, "failed to cache data encryption keys for key ID %s", key.Id))
+				logger.Warn("failed to cache data encryption keys for key",
+					"key_id", key.Id,
+					"namespace", key.Namespace,
+					"error", err,
+				)
 				continue
 			}
 		}
