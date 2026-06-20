@@ -17,17 +17,10 @@ type DataSourceOption struct {
 // in the JS expression. The expression should return an array of objects with "value"
 // and "label" string fields.
 func TransformJSON(expression string, data any) ([]DataSourceOption, error) {
-	vm := goja.New()
+	return NewContext(nil, nil).TransformJSON(expression, data)
+}
 
-	if err := vm.Set("data", data); err != nil {
-		return nil, fmt.Errorf("failed to set data in JS runtime: %w", err)
-	}
-
-	result, err := vm.RunString(expression)
-	if err != nil {
-		return nil, fmt.Errorf("JS expression error: %w", err)
-	}
-
+func dataSourceOptionsFromValue(result goja.Value) ([]DataSourceOption, error) {
 	if goja.IsUndefined(result) || goja.IsNull(result) {
 		return nil, fmt.Errorf("JS expression returned %s", result)
 	}
