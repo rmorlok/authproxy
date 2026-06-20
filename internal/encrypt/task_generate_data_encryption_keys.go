@@ -11,6 +11,7 @@ import (
 	"github.com/go-faster/errors"
 	"github.com/hashicorp/go-multierror"
 	"github.com/hibiken/asynq"
+	"github.com/rmorlok/authproxy/internal/apasynq"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apredis"
@@ -26,6 +27,15 @@ const (
 
 func NewGenerateDataEncryptionKeysTask() *asynq.Task {
 	return asynq.NewTask(TaskTypeGenerateDataEncryptionKeys, nil)
+}
+
+// EnqueueGenerateDataEncryptionKeysToDatabase schedules immediate DEK
+// reconciliation. This is used after creating new key material so the key gets
+// a current DEK without waiting for the periodic task.
+func EnqueueGenerateDataEncryptionKeysToDatabase(ctx context.Context, ac apasynq.Client, logger *slog.Logger) {
+	if _, err := ac.EnqueueContext(ctx, NewGenerateDataEncryptionKeysTask()); err != nil {
+		logger.Warn("failed to enqueue data encryption key generation task", "error", err)
+	}
 }
 
 func createDataEncryptionKey(
