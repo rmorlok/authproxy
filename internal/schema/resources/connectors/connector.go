@@ -7,6 +7,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/apjs"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	nschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 )
@@ -67,6 +68,10 @@ type Connector struct {
 	// documentation for each struct for more details.
 	Auth *Auth `json:"auth" yaml:"auth"`
 
+	// Javascript is connector-level JavaScript that defines shared constants
+	// and functions available to connector-authored predicates and transforms.
+	Javascript string `json:"javascript,omitempty" yaml:"javascript,omitempty"`
+
 	// RateLimiting configures how 429 rate limiting responses from the 3rd party are handled.
 	// If unset, default behavior is enabled (parse Retry-After header, 60s default backoff).
 	RateLimiting *RateLimiting `json:"rate_limiting,omitempty" yaml:"rate_limiting,omitempty"`
@@ -119,6 +124,11 @@ func (c *Connector) Clone() *Connector {
 
 func (c *Connector) Validate(vc *common.ValidationContext) error {
 	result := &multierror.Error{}
+	javascript, err := apjs.CompileAndValidateLibrary(c.Javascript)
+	if err != nil {
+		result = multierror.Append(result, vc.NewErrorfForField("javascript", "invalid connector javascript: %v", err))
+		javascript = nil
+	}
 
 	if c.State != "" {
 		if c.State != "draft" && c.State != "primary" {
@@ -139,7 +149,11 @@ func (c *Connector) Validate(vc *common.ValidationContext) error {
 	}
 
 	if c.Auth != nil {
-		if av, ok := c.Auth.Inner().(AuthValidator); ok {
+		if av, ok := c.Auth.Inner().(AuthJavascriptValidator); ok {
+			if err := av.ValidateWithJavascript(vc.PushField("auth"), javascript); err != nil {
+				result = multierror.Append(result, err)
+			}
+		} else if av, ok := c.Auth.Inner().(AuthValidator); ok {
 			if err := av.Validate(vc.PushField("auth")); err != nil {
 				result = multierror.Append(result, err)
 			}
@@ -147,13 +161,13 @@ func (c *Connector) Validate(vc *common.ValidationContext) error {
 	}
 
 	for i, probe := range c.Probes {
-		if err := probe.Validate(vc.PushField("probes").PushIndex(i)); err != nil {
+		if err := probe.ValidateWithJavascript(vc.PushField("probes").PushIndex(i), javascript); err != nil {
 			result = multierror.Append(result, err)
 		}
 	}
 
 	if c.SetupFlow != nil {
-		if err := c.SetupFlow.Validate(vc.PushField("setup_flow")); err != nil {
+		if err := c.SetupFlow.ValidateWithJavascript(vc.PushField("setup_flow"), javascript); err != nil {
 			result = multierror.Append(result, err)
 		}
 	}

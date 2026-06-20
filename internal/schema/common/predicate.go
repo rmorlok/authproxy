@@ -15,6 +15,10 @@ type Predicate struct {
 }
 
 func (p *Predicate) Validate(vc *ValidationContext, vars map[string]any) error {
+	return p.ValidateWithContext(vc, apjs.NewContext(nil, vars))
+}
+
+func (p *Predicate) ValidateWithContext(vc *ValidationContext, jsctx apjs.Context) error {
 	if p == nil {
 		return nil
 	}
@@ -23,7 +27,7 @@ func (p *Predicate) Validate(vc *ValidationContext, vars map[string]any) error {
 		result = multierror.Append(result, vc.NewErrorfForField("javascript", "javascript is required"))
 		return result.ErrorOrNil()
 	}
-	if _, err := apjs.EvaluateBoolean(p.Javascript, vars); err != nil {
+	if _, err := jsctx.EvaluateBoolean(p.Javascript); err != nil {
 		result = multierror.Append(result, vc.NewErrorfForField("javascript", "javascript must evaluate to a boolean: %v", err))
 	}
 	return result.ErrorOrNil()
@@ -31,5 +35,11 @@ func (p *Predicate) Validate(vc *ValidationContext, vars map[string]any) error {
 
 // GetValue returns the boolean value by evaluating the predicate's javascript.
 func (p *Predicate) GetValue(vars map[string]any) (bool, error) {
-	return apjs.EvaluateBoolean(p.Javascript, vars)
+	return p.GetValueWithContext(apjs.NewContext(nil, vars))
+}
+
+// GetValueWithContext returns the boolean value by evaluating the predicate's
+// javascript with a prebuilt JavaScript context.
+func (p *Predicate) GetValueWithContext(jsctx apjs.Context) (bool, error) {
+	return jsctx.EvaluateBoolean(p.Javascript)
 }

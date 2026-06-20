@@ -11,6 +11,7 @@ import (
 	jsonschemav5 "github.com/santhosh-tekuri/jsonschema/v5"
 	"gopkg.in/yaml.v3"
 
+	"github.com/rmorlok/authproxy/internal/apjs"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/util"
 )
@@ -32,6 +33,10 @@ type SetupFlow struct {
 }
 
 func (sf *SetupFlow) Validate(vc *common.ValidationContext) error {
+	return sf.ValidateWithJavascript(vc, nil)
+}
+
+func (sf *SetupFlow) ValidateWithJavascript(vc *common.ValidationContext, library *apjs.Library) error {
 	if sf == nil {
 		return nil
 	}
@@ -42,13 +47,13 @@ func (sf *SetupFlow) Validate(vc *common.ValidationContext) error {
 	seenIds := make(map[string]bool)
 
 	if sf.Preconnect != nil {
-		if err := sf.Preconnect.Validate(vc.PushField("preconnect"), seenIds, false); err != nil {
+		if err := sf.Preconnect.validate(vc.PushField("preconnect"), seenIds, false, library); err != nil {
 			result = multierror.Append(result, err)
 		}
 	}
 
 	if sf.Configure != nil {
-		if err := sf.Configure.Validate(vc.PushField("configure"), seenIds, true); err != nil {
+		if err := sf.Configure.validate(vc.PushField("configure"), seenIds, true, library); err != nil {
 			result = multierror.Append(result, err)
 		}
 	}
@@ -299,6 +304,10 @@ type SetupFlowPhase struct {
 }
 
 func (p *SetupFlowPhase) Validate(vc *common.ValidationContext, seenIds map[string]bool, allowDataSources bool) error {
+	return p.validate(vc, seenIds, allowDataSources, nil)
+}
+
+func (p *SetupFlowPhase) validate(vc *common.ValidationContext, seenIds map[string]bool, allowDataSources bool, library *apjs.Library) error {
 	if p == nil {
 		return nil
 	}
@@ -311,7 +320,7 @@ func (p *SetupFlowPhase) Validate(vc *common.ValidationContext, seenIds map[stri
 
 	for i := range p.Steps {
 		step := &p.Steps[i]
-		if err := step.Validate(vc.PushField("steps").PushIndex(i), seenIds, allowDataSources); err != nil {
+		if err := step.validate(vc.PushField("steps").PushIndex(i), seenIds, allowDataSources, library); err != nil {
 			result = multierror.Append(result, err)
 		}
 	}
@@ -421,6 +430,10 @@ func (r *SetupFlowStepRedirect) Validate(vc *common.ValidationContext) error {
 }
 
 func (s *SetupFlowStep) Validate(vc *common.ValidationContext, seenIds map[string]bool, allowDataSources bool) error {
+	return s.validate(vc, seenIds, allowDataSources, nil)
+}
+
+func (s *SetupFlowStep) validate(vc *common.ValidationContext, seenIds map[string]bool, allowDataSources bool, library *apjs.Library) error {
 	result := &multierror.Error{}
 
 	if s.Id == "" {
@@ -437,7 +450,7 @@ func (s *SetupFlowStep) Validate(vc *common.ValidationContext, seenIds map[strin
 		result = multierror.Append(result, vc.NewErrorfForField("type", "type must be %q or %q (got %q)", SetupFlowStepTypeForm, SetupFlowStepTypeRedirect, s.Type))
 	}
 
-	if err := s.If.Validate(vc.PushField("if"), connectorPredicateValidationVars()); err != nil {
+	if err := s.If.ValidateWithContext(vc.PushField("if"), connectorPredicateValidationContext(library)); err != nil {
 		result = multierror.Append(result, err)
 	}
 

@@ -2,6 +2,7 @@ package connectors
 
 import (
 	"github.com/hashicorp/go-multierror"
+	"github.com/rmorlok/authproxy/internal/apjs"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/robfig/cron/v3"
 )
@@ -78,6 +79,10 @@ func (p *Probe) EffectiveRecoveryThreshold() int {
 }
 
 func (p *Probe) Validate(vc *common.ValidationContext) error {
+	return p.ValidateWithJavascript(vc, nil)
+}
+
+func (p *Probe) ValidateWithJavascript(vc *common.ValidationContext, library *apjs.Library) error {
 	result := &multierror.Error{}
 
 	typeCount := 0
@@ -92,7 +97,7 @@ func (p *Probe) Validate(vc *common.ValidationContext) error {
 		result = multierror.Append(result, vc.NewErrorf("exactly one of proxy_http or http must be defined"))
 	}
 
-	if err := p.If.Validate(vc.PushField("if"), connectorPredicateValidationVars()); err != nil {
+	if err := p.If.ValidateWithContext(vc.PushField("if"), connectorPredicateValidationContext(library)); err != nil {
 		result = multierror.Append(result, err)
 	}
 
