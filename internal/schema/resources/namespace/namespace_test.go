@@ -411,6 +411,40 @@ func TestNamespaces(t *testing.T) {
 			require.Equal(t, NamespacePathFromRoot("some-namespace"), RootNamespace+".some-namespace")
 			require.Equal(t, NamespacePathFromRoot("some-namespace", "other-namespace"), RootNamespace+".some-namespace.other-namespace")
 		})
+		t.Run("NamespaceParentPath", func(t *testing.T) {
+			tests := []struct {
+				name   string
+				path   string
+				parent string
+			}{
+				{
+					name:   "root",
+					path:   RootNamespace,
+					parent: RootNamespace,
+				},
+				{
+					name:   "single child",
+					path:   "root.child",
+					parent: RootNamespace,
+				},
+				{
+					name:   "grandchild",
+					path:   "root.child.grandchild",
+					parent: "root.child",
+				},
+				{
+					name:   "allows namespace characters",
+					path:   "root.child_1.grand-child2",
+					parent: "root.child_1",
+				},
+			}
+
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					require.Equal(t, tt.parent, NamespaceParentPath(tt.path))
+				})
+			}
+		})
 		t.Run("NamespaceIsChild", func(t *testing.T) {
 			tests := []struct {
 				name   string

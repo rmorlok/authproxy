@@ -21,8 +21,7 @@ func NewFakeEncryptService(doBase64Encode bool) E {
 	}
 }
 
-// EncryptForKey encrypts data with the current DEK of the specified key.
-func (s *fakeService) EncryptForKey(ctx context.Context, ekId apid.ID, data []byte) (encfield.EncryptedField, error) {
+func (s *fakeService) encryptForKey(ctx context.Context, ekId apid.ID, data []byte) (encfield.EncryptedField, error) {
 	return encfield.EncryptedField{
 		ID:   fakeDataEncryptionKeyId,
 		Data: string(data),
@@ -31,12 +30,12 @@ func (s *fakeService) EncryptForKey(ctx context.Context, ekId apid.ID, data []by
 
 // EncryptStringForKey encrypts a string with the current DEK of the specified key.
 func (s *fakeService) EncryptStringForKey(ctx context.Context, ekId apid.ID, data string) (encfield.EncryptedField, error) {
-	return s.EncryptForKey(ctx, ekId, []byte(data))
+	return s.encryptForKey(ctx, ekId, []byte(data))
 }
 
 // EncryptGlobal encrypts raw bytes with the current global key.
 func (s *fakeService) EncryptGlobal(ctx context.Context, data []byte) (encfield.EncryptedField, error) {
-	return s.EncryptForKey(ctx, globalEncryptionKeyID, data)
+	return s.encryptForKey(ctx, globalEncryptionKeyID, data)
 }
 
 // EncryptStringGlobal encrypts a string with the current global key.

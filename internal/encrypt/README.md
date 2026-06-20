@@ -227,9 +227,6 @@ type E interface {
     // Encrypt with the global key
     EncryptGlobal(ctx, data) (EncryptedField, error)
 
-    // Encrypt with a specific key
-    EncryptForKey(ctx, keyId, data) (EncryptedField, error)
-
     // Encrypt using the key resolved for a namespace
     EncryptForNamespace(ctx, namespacePath, data) (EncryptedField, error)
 

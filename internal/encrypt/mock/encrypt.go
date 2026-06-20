@@ -119,21 +119,6 @@ func (mr *MockEMockRecorder) EncryptForEntity(ctx, entity, data interface{}) *go
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EncryptForEntity", reflect.TypeOf((*MockE)(nil).EncryptForEntity), ctx, entity, data)
 }
 
-// EncryptForKey mocks base method.
-func (m *MockE) EncryptForKey(ctx context.Context, keyId apid.ID, data []byte) (encfield.EncryptedField, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "EncryptForKey", ctx, keyId, data)
-	ret0, _ := ret[0].(encfield.EncryptedField)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// EncryptForKey indicates an expected call of EncryptForKey.
-func (mr *MockEMockRecorder) EncryptForKey(ctx, keyId, data interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EncryptForKey", reflect.TypeOf((*MockE)(nil).EncryptForKey), ctx, keyId, data)
-}
-
 // EncryptForNamespace mocks base method.
 func (m *MockE) EncryptForNamespace(ctx context.Context, namespacePath string, data []byte) (encfield.EncryptedField, error) {
 	m.ctrl.T.Helper()

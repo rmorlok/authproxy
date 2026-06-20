@@ -469,20 +469,7 @@ func decryptWithKey(key []byte, data []byte) ([]byte, error) {
 	return decryptedData, nil
 }
 
-// decryptWithAnyKey tries to decrypt data with each key in order, returning the first success.
-func decryptWithAnyKey(keys [][]byte, data []byte) ([]byte, error) {
-	var lastErr error
-	for _, key := range keys {
-		result, err := decryptWithKey(key, data)
-		if err == nil {
-			return result, nil
-		}
-		lastErr = err
-	}
-	return nil, fmt.Errorf("decryption failed with all keys: %w", lastErr)
-}
-
-// EncryptForKey encrypts data with the current DEK of the specified key. The caller is assumed to
+// encryptForKey encrypts data with the current DEK of the specified key. The caller is assumed to
 // have validated that the cache sync has completed.
 func (s *service) encryptForKey(keyId apid.ID, data []byte) (encfield.EncryptedField, error) {
 	dekId, err := s.getCurrentDataEncryptionKeyId(keyId)
@@ -504,22 +491,12 @@ func (s *service) encryptForKey(keyId apid.ID, data []byte) (encfield.EncryptedF
 	return encfield.EncryptedField{ID: dekId, Data: encodedData}, nil
 }
 
-// EncryptForKey encrypts data with the current version of the specified key.
-func (s *service) EncryptForKey(ctx context.Context, ekId apid.ID, data []byte) (encfield.EncryptedField, error) {
+// EncryptGlobal encrypts raw bytes with the current global key.
+func (s *service) EncryptGlobal(ctx context.Context, data []byte) (encfield.EncryptedField, error) {
 	if err := s.ensureSynced(ctx); err != nil {
 		return encfield.EncryptedField{}, err
 	}
-	return s.encryptForKey(ekId, data)
-}
-
-// EncryptStringForKey encrypts a string with the current version of the specified key.
-func (s *service) EncryptStringForKey(ctx context.Context, ekId apid.ID, data string) (encfield.EncryptedField, error) {
-	return s.EncryptForKey(ctx, ekId, []byte(data))
-}
-
-// EncryptGlobal encrypts raw bytes with the current global key.
-func (s *service) EncryptGlobal(ctx context.Context, data []byte) (encfield.EncryptedField, error) {
-	return s.EncryptForKey(ctx, globalEncryptionKeyID, data)
+	return s.encryptForKey(globalEncryptionKeyID, data)
 }
 
 // EncryptStringGlobal encrypts a string with the current global key.
@@ -553,6 +530,16 @@ func (s *service) EncryptForEntity(ctx context.Context, entity NamespacedEntity,
 
 func (s *service) EncryptStringForEntity(ctx context.Context, entity NamespacedEntity, data string) (encfield.EncryptedField, error) {
 	return s.EncryptForEntity(ctx, entity, []byte(data))
+}
+
+func (s *service) EncryptKeyForNamespace(ctx context.Context, namespacePath string, keyData []byte) (encfield.EncryptedField, error) {
+	if namespacePath == namespace.RootNamespace {
+		return s.EncryptGlobal(ctx, keyData)
+	}
+
+	// Keys are always encrypted with the parent namespace key to avoid creating a dependency cycle.
+	parentNamespace := namespace.NamespaceParentPath(namespacePath)
+	return s.EncryptKeyForNamespace(ctx, parentNamespace, keyData)
 }
 
 func decryptFieldWithBytes(keyBytes []byte, ef encfield.EncryptedField) ([]byte, error) {
