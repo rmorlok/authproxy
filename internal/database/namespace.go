@@ -89,6 +89,15 @@ func (ns *Namespace) normalize() {
 	}
 
 	ns.depth = namespace.DepthOfNamespacePath(ns.Path)
+
+	if ns.Path == namespace.RootNamespace && ns.KeyId == nil {
+		ns.KeyId = rootNamespaceKeyID()
+	}
+}
+
+func rootNamespaceKeyID() *apid.ID {
+	id := GlobalKeyID
+	return &id
 }
 
 func (ns *Namespace) Validate() error {
@@ -268,6 +277,7 @@ func (s *service) validateNamespaceKeyScope(ctx context.Context, runner sq.BaseR
 }
 
 func (s *service) createNamespace(ctx context.Context, tx *sql.Tx, ns *Namespace) error {
+	ns.normalize()
 	prefixes := namespace.SplitNamespacePathToPrefixes(ns.Path)
 	state := ns.State
 

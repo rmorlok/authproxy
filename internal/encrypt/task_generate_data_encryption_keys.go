@@ -147,11 +147,15 @@ func generateDataEncryptionKeysToDatabase(
 		return errors.New("no global AES key configured")
 	}
 
+	var result *multierror.Error
+	if err := ensureRootNamespaceHasKeySet(ctx, db); err != nil {
+		result = multierror.Append(result, errors.Wrap(err, "failed to ensure root namespace uses global key"))
+	}
+
 	policy := sa.DataEncryptionKeys
 	// key material id -> plaintext DEK for decrypting child key data.
 	keyMaterialDataCache := make(map[apid.ID]config.KeyVersionInfo)
 
-	var result *multierror.Error
 	generated, err := ensureDataEncryptionKeyForKey(ctx, db, policy, globalEncryptionKeyID, sa.GlobalAESKey)
 	if err != nil {
 		result = multierror.Append(result, errors.Wrap(err, "failed to reconcile data encryption key for global key"))

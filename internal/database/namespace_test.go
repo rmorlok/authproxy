@@ -2018,6 +2018,13 @@ func TestSetNamespaceEncryptionKeyIdAncestorValidation(t *testing.T) {
 		require.Equal(t, GlobalKeyID, *ns.KeyId)
 	})
 
+	t.Run("clearing root namespace succeeds", func(t *testing.T) {
+		ns, err := db.SetNamespaceKeyId(ctx, "root", nil)
+		require.NoError(t, err)
+		require.NotNil(t, ns)
+		require.Nil(t, ns.KeyId)
+	})
+
 	t.Run("create validates key namespace", func(t *testing.T) {
 		require.NoError(t, db.CreateNamespace(ctx, &Namespace{
 			Path:  "root.parent.created",

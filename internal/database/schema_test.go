@@ -32,6 +32,13 @@ func TestKeyModelSchema(t *testing.T) {
 		requireQueryable(t, rawDb, "SELECT key_id, target_data_encryption_key_id, target_data_encryption_key_updated_at FROM namespaces LIMIT 0")
 	})
 
+	t.Run("root namespace uses global key", func(t *testing.T) {
+		var keyID string
+		err := rawDb.QueryRow("SELECT key_id FROM namespaces WHERE path = 'root'").Scan(&keyID)
+		require.NoError(t, err)
+		require.Equal(t, string(GlobalKeyID), keyID)
+	})
+
 	t.Run("data encryption keys reference keys", func(t *testing.T) {
 		requireQueryable(t, rawDb, "SELECT key_id, provider_metadata, protected_data FROM data_encryption_keys LIMIT 0")
 	})
