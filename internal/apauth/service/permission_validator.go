@@ -140,7 +140,7 @@ func (rpv *ResourcePermissionValidator) ValidateHttpStatusError(obj interface{})
 }
 
 // GetEffectiveNamespaceMatchers computes the namespace matchers that should be applied to a database query.
-// `queryMatcher` should be the namespace matcher received as a query param to an endpoint intented as filter.
+// `queryMatcher` should be the namespace matcher received as a query param to an endpoint intended as filter.
 //
 // It returns:
 // - the allowed namespaces for the resource/verb, optionally intersected with queryMatcher

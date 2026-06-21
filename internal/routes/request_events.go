@@ -791,6 +791,9 @@ func (r *RequestEventsRoutes) queryMetrics(gctx *gin.Context) {
 		responseSeries = append(responseSeries, resourceMetricsResponseSeries(series)...)
 	}
 
+	// Metrics responses are aggregate series, not resource rows, so the request is validated once all query refs are
+	// accepted and their namespace matchers are constrained by the actor's permissions.
+	val.MarkValidated()
 	gctx.PureJSON(http.StatusOK, metricsResponseFromAPIRequest(req, responseSeries))
 }
 
@@ -804,6 +807,9 @@ func (r *RequestEventsRoutes) queryMetrics(gctx *gin.Context) {
 // @Security		BearerAuth
 // @Router			/metrics/schema [get]
 func (r *RequestEventsRoutes) schema(gctx *gin.Context) {
+	val := auth.MustGetValidatorFromGinContext(gctx)
+	// The schema response is static metadata for the app-metrics API, so there are no resource rows to post-validate.
+	val.MarkValidated()
 	gctx.PureJSON(http.StatusOK, metricsSchemaResponse())
 }
 

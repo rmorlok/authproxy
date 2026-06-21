@@ -9,8 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rmorlok/authproxy/internal/apgin"
-
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
 	auth2 "github.com/rmorlok/authproxy/internal/apauth/service"
@@ -42,7 +40,7 @@ func TestRequestEventsRoutes(t *testing.T) {
 		rlr := mock.NewMockLogRetriever(ctrl)
 		rl := NewRequestEventsRoutes(cfg, auth, rlr)
 
-		r := apgin.ForTest(nil)
+		r := gin.New()
 		rl.Register(r)
 
 		return &TestSetup{
