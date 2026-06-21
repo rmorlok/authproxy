@@ -185,6 +185,7 @@ func Serve(cfg config.C) {
 		dm.GetEncryptService(),
 		dm.GetRedisClient(),
 		logger,
+		encrypt.WithDataEncryptionKeyTelemetry(dm.GetDataEncryptionKeyTelemetry()),
 	)
 	encryptTaskHandler.RegisterTasks(mux)
 

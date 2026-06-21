@@ -6,8 +6,13 @@ import (
 	"testing"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/metric/metricdata"
+
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/aptelemetry"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
@@ -164,6 +169,28 @@ func TestGenerateDataEncryptionKeysToDatabase(t *testing.T) {
 		require.Equal(t, rootKeyID, *root.KeyId)
 	})
 
+	t.Run("returns global provider errors without creating partial dek", func(t *testing.T) {
+		sconfig.ResetKeyDataMockKMSRegistry()
+		t.Cleanup(sconfig.ResetKeyDataMockKMSRegistry)
+
+		ctx := context.Background()
+		globalKD := sconfig.NewKeyDataMockKMS("global-kms-error")
+		cfg := config.FromRoot(&sconfig.Root{
+			SystemAuth: sconfig.SystemAuth{
+				GlobalAESKey: globalKD,
+			},
+		})
+		cfg, db := database.MustApplyBlankTestDbConfig(t, cfg)
+
+		err := generateDataEncryptionKeysToDatabase(ctx, cfg, db, slog.Default(), nil)
+		require.ErrorContains(t, err, "failed to reconcile data encryption key for global key")
+		require.ErrorContains(t, err, "no current version")
+
+		globalDEKs, listErr := db.ListDataEncryptionKeysForKey(ctx, globalEncryptionKeyID)
+		require.NoError(t, listErr)
+		require.Empty(t, globalDEKs)
+	})
+
 	t.Run("creates first dek without changing wrapping sync state", func(t *testing.T) {
 		env := setupMockKMSGenerateTest(t, true)
 
@@ -276,11 +303,11 @@ func TestGenerateDataEncryptionKeysToDatabase(t *testing.T) {
 		require.Len(t, deks, 1)
 	})
 
-	t.Run("returns provider errors without creating partial dek", func(t *testing.T) {
+	t.Run("logs provider errors without creating partial dek", func(t *testing.T) {
 		env := setupMockKMSGenerateTest(t, false)
 
 		err := generateDataEncryptionKeysToDatabase(env.ctx, env.cfg, env.db, env.logger, nil)
-		require.ErrorContains(t, err, "no current version")
+		require.NoError(t, err)
 
 		deks, listErr := env.db.ListDataEncryptionKeysForKey(env.ctx, env.ekID)
 		require.NoError(t, listErr)
@@ -291,14 +318,93 @@ func TestGenerateDataEncryptionKeysToDatabase(t *testing.T) {
 		require.Len(t, globalDEKs, 1)
 	})
 
-	t.Run("returns fallback provider errors without creating partial dek", func(t *testing.T) {
+	t.Run("records non-global provider errors as metrics", func(t *testing.T) {
+		env := setupMockKMSGenerateTest(t, false)
+		reader := sdkmetric.NewManualReader()
+		providers := &aptelemetry.Providers{
+			Enabled:       true,
+			MeterProvider: sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader)),
+		}
+		tel, err := NewDataEncryptionKeyTelemetry(providers, telemetryMetricsEnabledConfig())
+		require.NoError(t, err)
+
+		err = generateDataEncryptionKeysToDatabase(
+			env.ctx,
+			env.cfg,
+			env.db,
+			env.logger,
+			nil,
+			WithGenerateDataEncryptionKeysTelemetry(tel),
+		)
+		require.NoError(t, err)
+
+		rm := metricdata.ResourceMetrics{}
+		require.NoError(t, reader.Collect(env.ctx, &rm))
+		dp := requireInt64SumDataPoint(t, rm, metricDataEncryptionKeyGenerationFailures)
+		require.Equal(t, int64(1), dp.Value)
+		attrs := metricAttrMap(dp.Attributes.ToSlice())
+		require.Equal(t, dekGenerationFailureReasonReconcile, attrs[attrDEKGenerationFailureReason])
+		require.Equal(t, dekGenerationKeyScopeNonGlobal, attrs[attrDEKGenerationKeyScope])
+		require.Equal(t, string(database.KeyUsageDataEncryption), attrs[attrKeyUsage])
+		require.Equal(t, string(database.KeyMaterialTypeSymmetric), attrs[attrKeyMaterialType])
+		require.Equal(t, string(database.KeyStateActive), attrs[attrKeyState])
+		require.Equal(t, string(sconfig.ProviderTypeMockKMS), attrs[attrKeyProviderType])
+	})
+
+	t.Run("logs fallback provider errors without creating partial dek", func(t *testing.T) {
 		env := setupMockSecretGenerateTest(t, []byte("bad"))
 
 		err := generateDataEncryptionKeysToDatabase(env.ctx, env.cfg, env.db, env.logger, nil)
-		require.ErrorContains(t, err, "failed to create DEK wrapping cipher")
+		require.NoError(t, err)
 
 		deks, listErr := env.db.ListDataEncryptionKeysForKey(env.ctx, env.ekID)
 		require.NoError(t, listErr)
 		require.Empty(t, deks)
 	})
+}
+
+func telemetryMetricsEnabledConfig() *sconfig.Telemetry {
+	enabled := true
+	return &sconfig.Telemetry{
+		Enabled: &enabled,
+		Signals: &sconfig.TelemetrySignals{
+			Metrics: &enabled,
+		},
+	}
+}
+
+func requireInt64SumDataPoint(
+	t *testing.T,
+	rm metricdata.ResourceMetrics,
+	name string,
+) metricdata.DataPoint[int64] {
+	t.Helper()
+	for _, sm := range rm.ScopeMetrics {
+		for _, m := range sm.Metrics {
+			if m.Name != name {
+				continue
+			}
+			sum, ok := m.Data.(metricdata.Sum[int64])
+			require.True(t, ok, "metric %q should be int64 sum, got %T", name, m.Data)
+			require.Len(t, sum.DataPoints, 1)
+			return sum.DataPoints[0]
+		}
+	}
+
+	var names []string
+	for _, sm := range rm.ScopeMetrics {
+		for _, m := range sm.Metrics {
+			names = append(names, m.Name)
+		}
+	}
+	t.Fatalf("metric %q not emitted; got: %v", name, names)
+	return metricdata.DataPoint[int64]{}
+}
+
+func metricAttrMap(kvs []attribute.KeyValue) map[string]any {
+	out := make(map[string]any, len(kvs))
+	for _, kv := range kvs {
+		out[string(kv.Key)] = kv.Value.AsInterface()
+	}
+	return out
 }

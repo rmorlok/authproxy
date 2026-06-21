@@ -60,6 +60,10 @@ type DependencyManager struct {
 	telemetryOnce sync.Once
 	telemetryErr  error
 
+	dataEncryptionKeyTelemetry     *encrypt.DataEncryptionKeyTelemetry
+	dataEncryptionKeyTelemetryOnce sync.Once
+	dataEncryptionKeyTelemetryErr  error
+
 	rootLogger     *slog.Logger
 	rootLoggerOnce sync.Once
 
@@ -590,6 +594,26 @@ func (dm *DependencyManager) GetTelemetry() *aptelemetry.Providers {
 	return dm.telemetry
 }
 
+func (dm *DependencyManager) GetDataEncryptionKeyTelemetry() *encrypt.DataEncryptionKeyTelemetry {
+	dm.dataEncryptionKeyTelemetryOnce.Do(func() {
+		tel, err := encrypt.NewDataEncryptionKeyTelemetry(
+			dm.GetTelemetry(),
+			dm.GetConfigRoot().Telemetry,
+		)
+		if err != nil {
+			dm.dataEncryptionKeyTelemetryErr = err
+			return
+		}
+		dm.dataEncryptionKeyTelemetry = tel
+	})
+
+	if dm.dataEncryptionKeyTelemetryErr != nil {
+		panic(fmt.Errorf("failed to initialise data encryption key telemetry: %w", dm.dataEncryptionKeyTelemetryErr))
+	}
+
+	return dm.dataEncryptionKeyTelemetry
+}
+
 // ShutdownTelemetry flushes and tears down OTel providers if they were
 // initialised. Safe to call multiple times. Bounded by aptelemetry.ShutdownTimeout.
 func (dm *DependencyManager) ShutdownTelemetry() {
@@ -740,6 +764,7 @@ func (dm *DependencyManager) AutoMigrateGenerateDataEncryptionKeys() {
 		dm.GetDatabase(),
 		dm.GetLogger(),
 		dm.GetRedisClient(),
+		encrypt.WithGenerateDataEncryptionKeysTelemetry(dm.GetDataEncryptionKeyTelemetry()),
 	); err != nil {
 		panic(fmt.Errorf("failed to generate data encryption keys: %w", err))
 	}

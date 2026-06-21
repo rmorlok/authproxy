@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"time"
 
@@ -128,9 +127,11 @@ func generateDataEncryptionKeysToDatabase(
 	db database.DB,
 	logger *slog.Logger,
 	redis apredis.Client,
+	opts ...GenerateDataEncryptionKeysOption,
 ) error {
 	logger.Info("generating data encryption keys")
 	defer logger.Info("generating data encryption keys complete")
+	options := newGenerateDataEncryptionKeysOptions(opts)
 
 	if redis != nil {
 		m := apredis.NewMutex(
@@ -165,9 +166,16 @@ func generateDataEncryptionKeysToDatabase(
 	policy := sa.DataEncryptionKeys
 	// key material id -> plaintext DEK for decrypting child key data.
 	keyMaterialDataCache := make(map[apid.ID]config.KeyVersionInfo)
+	globalKey := &database.Key{
+		Id:           globalEncryptionKeyID,
+		Usage:        database.KeyUsageDataEncryption,
+		MaterialType: database.KeyMaterialTypeSymmetric,
+		State:        database.KeyStateActive,
+	}
 
 	generated, err := ensureDataEncryptionKeyForKey(ctx, db, policy, globalEncryptionKeyID, sa.GlobalAESKey)
 	if err != nil {
+		options.telemetry.recordDEKGenerationFailure(ctx, dekGenerationFailureReasonGlobalReconcile, globalKey, sa.GlobalAESKey.GetProviderType())
 		result = multierror.Append(result, errors.Wrap(err, "failed to reconcile data encryption key for global key"))
 	} else {
 		if generated {
@@ -176,6 +184,7 @@ func generateDataEncryptionKeysToDatabase(
 	}
 	err = cacheDataEncryptionKeysForKey(ctx, db, keyMaterialDataCache, globalEncryptionKeyID, sa.GlobalAESKey)
 	if err != nil {
+		options.telemetry.recordDEKGenerationFailure(ctx, dekGenerationFailureReasonGlobalCache, globalKey, sa.GlobalAESKey.GetProviderType())
 		result = multierror.Append(result, errors.Wrap(err, "failed to cache global data encryption keys"))
 	}
 
@@ -191,43 +200,72 @@ func generateDataEncryptionKeysToDatabase(
 			ef := key.EncryptedKeyData
 			kvi, ok := keyMaterialDataCache[ef.ID]
 			if !ok {
-				result = multierror.Append(result, fmt.Errorf("key material info not found for key ID %s key material %s", key.Id, ef.ID))
+				options.telemetry.recordDEKGenerationFailure(ctx, dekGenerationFailureReasonMissingWrapping, key, "")
+				logger.Warn("key wrapping material not found, skipping data encryption key reconciliation",
+					"key_id", key.Id,
+					"namespace", key.Namespace,
+					"data_encryption_key_id", ef.ID,
+				)
 				continue
 			}
 
 			decodedData, err := base64.StdEncoding.DecodeString(ef.Data)
 			if err != nil {
-				result = multierror.Append(result, errors.Wrapf(err, "failed to decode base64 string for key id %s", key.Id))
+				options.telemetry.recordDEKGenerationFailure(ctx, dekGenerationFailureReasonDecodeEncryptedKey, key, "")
+				logger.Warn("failed to decode encrypted key data, skipping data encryption key reconciliation",
+					"key_id", key.Id,
+					"namespace", key.Namespace,
+					"error", err,
+				)
 				continue
 			}
 
 			decryptedData, err := decryptWithKey(kvi.Data, decodedData)
 			if err != nil {
-				result = multierror.Append(result, errors.Wrapf(err, "failed to decrypt key id %s with key data from %s", key.Id, ef.ID))
+				options.telemetry.recordDEKGenerationFailure(ctx, dekGenerationFailureReasonDecryptKeyData, key, "")
+				logger.Warn("failed to decrypt key data, skipping data encryption key reconciliation",
+					"key_id", key.Id,
+					"namespace", key.Namespace,
+					"data_encryption_key_id", ef.ID,
+					"error", err,
+				)
 				continue
 			}
 
 			var keyData config.KeyData
 			err = json.Unmarshal(decryptedData, &keyData)
 			if err != nil {
-				result = multierror.Append(result, errors.Wrapf(err, "failed to unmarshal key data for key ID %s", key.Id))
+				options.telemetry.recordDEKGenerationFailure(ctx, dekGenerationFailureReasonUnmarshalKeyData, key, "")
+				logger.Warn("failed to unmarshal key data, skipping data encryption key reconciliation",
+					"key_id", key.Id,
+					"namespace", key.Namespace,
+					"error", err,
+				)
 				continue
 			}
 
 			if shouldManageDataEncryptionKeysForKey(key) {
 				generated, err := ensureDataEncryptionKeyForKey(ctx, db, policy, key.Id, &keyData)
 				if err != nil {
-					result = multierror.Append(result, errors.Wrapf(err, "failed to reconcile data encryption key for key ID %s", key.Id))
-					continue
-				}
-				if generated {
+					options.telemetry.recordDEKGenerationFailure(ctx, dekGenerationFailureReasonReconcile, key, keyData.GetProviderType())
+					logger.Warn("failed to reconcile data encryption key for key",
+						"key_id", key.Id,
+						"namespace", key.Namespace,
+						"error", err,
+					)
+				} else if generated {
 					logger.Info("generated data encryption key", "key_id", key.Id)
 				}
 			}
 
 			err = cacheDataEncryptionKeysForKey(ctx, db, keyMaterialDataCache, key.Id, &keyData)
 			if err != nil {
-				result = multierror.Append(result, errors.Wrapf(err, "failed to cache data encryption keys for key ID %s", key.Id))
+				options.telemetry.recordDEKGenerationFailure(ctx, dekGenerationFailureReasonCache, key, keyData.GetProviderType())
+				logger.Warn("failed to cache data encryption keys for key",
+					"key_id", key.Id,
+					"namespace", key.Namespace,
+					"error", err,
+				)
 				continue
 			}
 		}
@@ -247,7 +285,14 @@ func generateDataEncryptionKeysToDatabase(
 }
 
 func (h *EncryptServiceTaskHandler) handleGenerateDataEncryptionKeys(ctx context.Context, _ *asynq.Task) error {
-	return generateDataEncryptionKeysToDatabase(ctx, h.cfg, h.db, h.logger, h.redis)
+	return generateDataEncryptionKeysToDatabase(
+		ctx,
+		h.cfg,
+		h.db,
+		h.logger,
+		h.redis,
+		WithGenerateDataEncryptionKeysTelemetry(h.dataEncryptionKeyTelemetry),
+	)
 }
 
 // GenerateDataEncryptionKeysToDatabase reconciles current DEKs for configured
@@ -258,6 +303,7 @@ func GenerateDataEncryptionKeysToDatabase(
 	db database.DB,
 	logger *slog.Logger,
 	redis apredis.Client,
+	opts ...GenerateDataEncryptionKeysOption,
 ) error {
-	return generateDataEncryptionKeysToDatabase(ctx, cfg, db, logger, redis)
+	return generateDataEncryptionKeysToDatabase(ctx, cfg, db, logger, redis, opts...)
 }
