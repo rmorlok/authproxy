@@ -15,3 +15,4 @@ tmp
 **/.vite
 ui/*/dist
 sdks/*/dist
+plugins/grafana/authproxy-datasource/dist
