@@ -275,9 +275,11 @@ func syncKeysToDatabase(
 	db database.DB,
 	logger *slog.Logger,
 	redis apredis.Client,
+	opts ...SyncKeysOption,
 ) error {
 	logger.Info("syncing data encryption key wrapping to database")
 	defer logger.Info("syncing data encryption key wrapping to database complete")
+	options := newSyncKeysOptions(opts)
 
 	if err := ensureRootNamespaceHasKeySet(ctx, db); err != nil {
 		return errors.Wrap(err, "failed to ensure root namespace uses global key")
@@ -318,14 +320,22 @@ func syncKeysToDatabase(
 
 	// key material id -> plaintext DEK for decrypting child key data.
 	keyMaterialDataCache := make(map[apid.ID]config.KeyVersionInfo)
+	globalKey := &database.Key{
+		Id:           globalEncryptionKeyID,
+		Usage:        database.KeyUsageDataEncryption,
+		MaterialType: database.KeyMaterialTypeSymmetric,
+		State:        database.KeyStateActive,
+	}
 
 	// Manually sync the global key first because other keys depend on it.
 	err := rewrapDataEncryptionKeysForKey(ctx, db, globalEncryptionKeyID, sa.GlobalAESKey)
 	if err != nil {
+		options.telemetry.recordKeySyncFailure(ctx, keySyncFailureReasonGlobalRewrap, globalKey, sa.GlobalAESKey.GetProviderType())
 		return errors.Wrap(err, "failed to rewrap global data encryption keys")
 	}
 	err = cacheDataEncryptionKeysForKey(ctx, db, keyMaterialDataCache, globalEncryptionKeyID, sa.GlobalAESKey)
 	if err != nil {
+		options.telemetry.recordKeySyncFailure(ctx, keySyncFailureReasonGlobalCache, globalKey, sa.GlobalAESKey.GetProviderType())
 		return errors.Wrap(err, "failed to cache global data encryption keys")
 	}
 
@@ -341,38 +351,69 @@ func syncKeysToDatabase(
 			ef := key.EncryptedKeyData
 			kvi, ok := keyMaterialDataCache[ef.ID]
 			if !ok {
-				result = multierror.Append(result, fmt.Errorf("key material info not found for key ID %s key material %s", key.Id, ef.ID))
+				options.telemetry.recordKeySyncFailure(ctx, keySyncFailureReasonMissingWrapping, key, "")
+				logger.Warn("key wrapping material not found, skipping key sync",
+					"key_id", key.Id,
+					"namespace", key.Namespace,
+					"data_encryption_key_id", ef.ID,
+				)
 				continue
 			}
 
 			decodedData, err := base64.StdEncoding.DecodeString(ef.Data)
 			if err != nil {
-				result = multierror.Append(result, errors.Wrapf(err, "failed to decode base64 string for key id %s", key.Id))
+				options.telemetry.recordKeySyncFailure(ctx, keySyncFailureReasonDecodeEncryptedKey, key, "")
+				logger.Warn("failed to decode encrypted key data, skipping key sync",
+					"key_id", key.Id,
+					"namespace", key.Namespace,
+					"error", err,
+				)
 				continue
 			}
 
 			decryptedData, err := decryptWithKey(kvi.Data, decodedData)
 			if err != nil {
-				result = multierror.Append(result, errors.Wrapf(err, "failed to decrypt key id %s with key data from %s", key.Id, ef.ID))
+				options.telemetry.recordKeySyncFailure(ctx, keySyncFailureReasonDecryptKeyData, key, "")
+				logger.Warn("failed to decrypt key data, skipping key sync",
+					"key_id", key.Id,
+					"namespace", key.Namespace,
+					"data_encryption_key_id", ef.ID,
+					"error", err,
+				)
 				continue
 			}
 
 			var keyData config.KeyData
 			err = json.Unmarshal(decryptedData, &keyData)
 			if err != nil {
-				result = multierror.Append(result, errors.Wrapf(err, "failed to unmarshal key data for key ID %s", key.Id))
+				options.telemetry.recordKeySyncFailure(ctx, keySyncFailureReasonUnmarshalKeyData, key, "")
+				logger.Warn("failed to unmarshal key data, skipping key sync",
+					"key_id", key.Id,
+					"namespace", key.Namespace,
+					"error", err,
+				)
 				continue
 			}
 
 			err = rewrapDataEncryptionKeysForKey(ctx, db, key.Id, &keyData)
 			if err != nil {
-				result = multierror.Append(result, errors.Wrapf(err, "failed to rewrap data encryption keys for key ID %s", key.Id))
+				options.telemetry.recordKeySyncFailure(ctx, keySyncFailureReasonRewrap, key, keyData.GetProviderType())
+				logger.Warn("failed to rewrap data encryption keys for key, skipping key sync",
+					"key_id", key.Id,
+					"namespace", key.Namespace,
+					"error", err,
+				)
 				continue
 			}
 
 			err = cacheDataEncryptionKeysForKey(ctx, db, keyMaterialDataCache, key.Id, &keyData)
 			if err != nil {
-				result = multierror.Append(result, errors.Wrapf(err, "failed to cache data encryption keys for key ID %s", key.Id))
+				options.telemetry.recordKeySyncFailure(ctx, keySyncFailureReasonCache, key, keyData.GetProviderType())
+				logger.Warn("failed to cache data encryption keys for key, skipping key sync",
+					"key_id", key.Id,
+					"namespace", key.Namespace,
+					"error", err,
+				)
 				continue
 			}
 		}
@@ -407,8 +448,9 @@ func SyncKeysToDatabase(
 	db database.DB,
 	logger *slog.Logger,
 	redis apredis.Client,
+	opts ...SyncKeysOption,
 ) error {
-	return syncKeysToDatabase(ctx, cfg, db, logger, redis)
+	return syncKeysToDatabase(ctx, cfg, db, logger, redis, opts...)
 }
 
 func (h *EncryptServiceTaskHandler) handleSyncKeysToDatabase(ctx context.Context, task *asynq.Task) error {
@@ -417,7 +459,14 @@ func (h *EncryptServiceTaskHandler) handleSyncKeysToDatabase(ctx context.Context
 
 // doSyncKeysToDatabase delegates to the standalone function with the redis sentinel.
 func (h *EncryptServiceTaskHandler) doSyncKeysToDatabase(ctx context.Context) error {
-	return syncKeysToDatabase(ctx, h.cfg, h.db, h.logger, h.redis)
+	return syncKeysToDatabase(
+		ctx,
+		h.cfg,
+		h.db,
+		h.logger,
+		h.redis,
+		WithSyncKeysTelemetry(h.dataEncryptionKeyTelemetry),
+	)
 }
 
 // EnqueueForceSyncKeysToDatabase clears the sync sentinel and enqueues a sync task immediately.

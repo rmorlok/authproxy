@@ -16,6 +16,7 @@ const (
 	encryptTelemetryInstrumentationName = "github.com/rmorlok/authproxy/internal/encrypt"
 
 	metricDataEncryptionKeyGenerationFailures = "authproxy.encrypt.dek_generation.failures"
+	metricKeySyncFailures                     = "authproxy.encrypt.key_sync.failures"
 
 	attrDEKGenerationFailureReason = "authproxy.encrypt.failure_reason"
 	attrDEKGenerationKeyScope      = "authproxy.encrypt.key_scope"
@@ -37,6 +38,15 @@ const (
 	dekGenerationFailureReasonUnmarshalKeyData   = "unmarshal_key_data_failed"
 	dekGenerationFailureReasonReconcile          = "reconcile_dek_failed"
 	dekGenerationFailureReasonCache              = "cache_dek_failed"
+
+	keySyncFailureReasonGlobalRewrap       = "global_rewrap_failed"
+	keySyncFailureReasonGlobalCache        = "global_cache_failed"
+	keySyncFailureReasonMissingWrapping    = "missing_wrapping_material"
+	keySyncFailureReasonDecodeEncryptedKey = "decode_encrypted_key_data_failed"
+	keySyncFailureReasonDecryptKeyData     = "decrypt_key_data_failed"
+	keySyncFailureReasonUnmarshalKeyData   = "unmarshal_key_data_failed"
+	keySyncFailureReasonRewrap             = "rewrap_dek_failed"
+	keySyncFailureReasonCache              = "cache_dek_failed"
 )
 
 // DataEncryptionKeyTelemetry owns OTel metrics emitted by the encrypt package.
@@ -45,6 +55,7 @@ type DataEncryptionKeyTelemetry struct {
 	metricsEnabled bool
 
 	dekGenerationFailures metric.Int64Counter
+	keySyncFailures       metric.Int64Counter
 }
 
 func NewDataEncryptionKeyTelemetry(
@@ -68,6 +79,16 @@ func NewDataEncryptionKeyTelemetry(
 
 	t.metricsEnabled = true
 	t.dekGenerationFailures = failures
+
+	t.keySyncFailures, err = meter.Int64Counter(
+		metricKeySyncFailures,
+		metric.WithUnit("{failure}"),
+		metric.WithDescription("Number of data encryption key wrapping sync failures encountered while walking keys."),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("encrypt: create key sync failures counter: %w", err)
+	}
+
 	return t, nil
 }
 
@@ -81,7 +102,30 @@ func (t *DataEncryptionKeyTelemetry) recordDEKGenerationFailure(
 		return
 	}
 
-	t.dekGenerationFailures.Add(ctx, 1, metric.WithAttributes(
+	t.recordFailure(ctx, t.dekGenerationFailures, reason, key, provider)
+}
+
+func (t *DataEncryptionKeyTelemetry) recordKeySyncFailure(
+	ctx context.Context,
+	reason string,
+	key *database.Key,
+	provider sconfig.ProviderType,
+) {
+	if t == nil || !t.metricsEnabled {
+		return
+	}
+
+	t.recordFailure(ctx, t.keySyncFailures, reason, key, provider)
+}
+
+func (t *DataEncryptionKeyTelemetry) recordFailure(
+	ctx context.Context,
+	counter metric.Int64Counter,
+	reason string,
+	key *database.Key,
+	provider sconfig.ProviderType,
+) {
+	counter.Add(ctx, 1, metric.WithAttributes(
 		attribute.String(attrDEKGenerationFailureReason, reason),
 		attribute.String(attrDEKGenerationKeyScope, dekGenerationKeyScope(key)),
 		attribute.String(attrKeyUsage, boundedString(stringFromKey(key, func(k *database.Key) string { return string(k.Usage) }))),
@@ -133,6 +177,28 @@ func WithGenerateDataEncryptionKeysTelemetry(tel *DataEncryptionKeyTelemetry) Ge
 
 func newGenerateDataEncryptionKeysOptions(opts []GenerateDataEncryptionKeysOption) generateDataEncryptionKeysOptions {
 	var out generateDataEncryptionKeysOptions
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&out)
+		}
+	}
+	return out
+}
+
+type syncKeysOptions struct {
+	telemetry *DataEncryptionKeyTelemetry
+}
+
+type SyncKeysOption func(*syncKeysOptions)
+
+func WithSyncKeysTelemetry(tel *DataEncryptionKeyTelemetry) SyncKeysOption {
+	return func(opts *syncKeysOptions) {
+		opts.telemetry = tel
+	}
+}
+
+func newSyncKeysOptions(opts []SyncKeysOption) syncKeysOptions {
+	var out syncKeysOptions
 	for _, opt := range opts {
 		if opt != nil {
 			opt(&out)

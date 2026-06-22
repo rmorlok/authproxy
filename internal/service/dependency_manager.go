@@ -779,6 +779,7 @@ func (dm *DependencyManager) AutoMigrateSyncKeysToDatabase() {
 		dm.GetDatabase(),
 		dm.GetLogger(),
 		dm.GetRedisClient(),
+		encrypt.WithSyncKeysTelemetry(dm.GetDataEncryptionKeyTelemetry()),
 	); err != nil {
 		panic(fmt.Errorf("failed to sync keys to database: %w", err))
 	}
