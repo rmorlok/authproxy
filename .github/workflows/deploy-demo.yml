@@ -18,9 +18,6 @@ name: Deploy Demo
 #     and demo-minio-creds.
 #   - Repo secret AWS_ROLE_ARN.
 #   - Repo variables AWS_REGION, EKS_CLUSTER, and DEMO_HOSTNAME.
-#   - Optional repo variable GRAFANA_AUTHPROXY_PLUGIN_INSTALL with Grafana's
-#     GF_INSTALL_PLUGINS value. Leave unset until the AuthProxy datasource
-#     plugin has a published install URL.
 
 on:
   workflow_run:
@@ -98,6 +95,7 @@ jobs:
           images=(
             authproxy
             authproxy-demo-shell
+            authproxy-demo-grafana
           )
 
           echo "${{ secrets.GITHUB_TOKEN }}" \
@@ -244,7 +242,6 @@ jobs:
         env:
           DEMO_HOSTNAME: ${{ vars.DEMO_HOSTNAME || 'demo.authproxy.net' }}
           DEMO_CLUSTER_ISSUER: ${{ vars.DEMO_CLUSTER_ISSUER || 'letsencrypt-prod-dns01' }}
-          GRAFANA_PLUGIN_INSTALL: ${{ vars.GRAFANA_AUTHPROXY_PLUGIN_INSTALL || '' }}
           IMAGE_TAG: ${{ steps.tag.outputs.tag }}
         run: |
           set -euo pipefail
@@ -255,20 +252,17 @@ jobs:
 
           perl -0pi -e 's|(name: ghcr\.io/rmorlok/authproxy\n\s+newTag: )main|${1}$ENV{IMAGE_TAG}|g; s|(name: ghcr\.io/rmorlok/authproxy-demo-shell\n\s+newTag: )main|${1}$ENV{IMAGE_TAG}|g' \
             "${KUSTOMIZE_OVERLAY}/kustomization.yaml"
-          perl -0pi -e '$r=$ENV{GRAFANA_PLUGIN_INSTALL}; s/__GRAFANA_PLUGIN_INSTALL__/$r/g' \
-            "${KUSTOMIZE_OVERLAY}/grafana.yaml"
+          perl -0pi -e 's|(name: ghcr\.io/rmorlok/authproxy-demo-grafana\n\s+newTag: )main|${1}$ENV{IMAGE_TAG}|g' \
+            "${KUSTOMIZE_OVERLAY}/kustomization.yaml"
 
           kubectl kustomize "${KUSTOMIZE_OVERLAY}" > "${manifest}"
           echo "manifest=${manifest}" >> "$GITHUB_OUTPUT"
 
           grep -Fq "image: ghcr.io/rmorlok/authproxy:${IMAGE_TAG}" "${manifest}"
           grep -Fq "image: ghcr.io/rmorlok/authproxy-demo-shell:${IMAGE_TAG}" "${manifest}"
-          grep -Fq "image: docker.io/grafana/grafana:11.5.2" "${manifest}"
+          grep -Fq "image: ghcr.io/rmorlok/authproxy-demo-grafana:${IMAGE_TAG}" "${manifest}"
           grep -Fq "host: ${DEMO_HOSTNAME}" "${manifest}"
           grep -Fq "value: https://${DEMO_HOSTNAME}/grafana" "${manifest}"
-          if [ -n "${GRAFANA_PLUGIN_INSTALL}" ]; then
-            grep -Fq "value: ${GRAFANA_PLUGIN_INSTALL}" "${manifest}"
-          fi
 
       - name: Apply Kustomize manifest
         run: |
@@ -279,7 +273,13 @@ jobs:
             | kubectl apply -f -
           kubectl -n "${RELEASE_NS}" apply -f "${manifest}"
 
-          for deployment in "${RELEASE_NAME}-authproxy" "${RELEASE_NAME}-demo-shell" "${RELEASE_NAME}-grafana"; do
+          deployments=(
+            "${RELEASE_NAME}-authproxy"
+            "${RELEASE_NAME}-demo-shell"
+            "${RELEASE_NAME}-grafana"
+          )
+
+          for deployment in "${deployments[@]}"; do
             kubectl -n "${RELEASE_NS}" patch "deployment/${deployment}" \
               --type merge \
               -p "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"demo.authproxy.net/image-revision\":\"${{ steps.tag.outputs.sha }}\"}}}}}"
@@ -334,7 +334,6 @@ jobs:
           done
 
       - name: Wait for Grafana rollout
-        if: vars.GRAFANA_AUTHPROXY_PLUGIN_INSTALL != ''
         timeout-minutes: 10
         run: |
           set -euo pipefail
@@ -357,6 +356,18 @@ jobs:
             kubectl -n "${RELEASE_NS}" get certificate,order,challenge || true
             exit 1
           done
+
+      - name: Smoke test telemetry links
+        timeout-minutes: 2
+        env:
+          SMOKE_BASE_URL: https://${{ vars.DEMO_HOSTNAME || 'demo.authproxy.net' }}
+        run: |
+          set -euo pipefail
+          config_json="${RUNNER_TEMP}/demo-config.json"
+
+          curl -fsS "${SMOKE_BASE_URL}/config.json" -o "${config_json}"
+          grep -Fq "\"url\":\"${SMOKE_BASE_URL}/grafana\"" "${config_json}"
+          curl -fsS "${SMOKE_BASE_URL}/grafana/api/health" -o /dev/null
 
       - name: Smoke test (live service)
         id: smoke
@@ -388,7 +399,7 @@ jobs:
             echo "- Image tag:   \`${{ steps.tag.outputs.tag }}\`"
             echo "- Commit:      \`${{ steps.tag.outputs.sha }}\`"
             echo "- Hostname:    \`https://${{ vars.DEMO_HOSTNAME || 'demo.authproxy.net' }}/\`"
-            echo "- Grafana:     \`https://${{ vars.DEMO_HOSTNAME || 'demo.authproxy.net' }}/grafana\` (${{ vars.GRAFANA_AUTHPROXY_PLUGIN_INSTALL != '' && 'plugin install enabled' || 'plugin install not configured' }})"
+            echo "- Grafana:     \`https://${{ vars.DEMO_HOSTNAME || 'demo.authproxy.net' }}/grafana\` (bundled AuthProxy datasource plugin)"
             echo "- Renderer:    \`kubectl kustomize ${KUSTOMIZE_OVERLAY}\`"
             echo "- Seeding:     manual via \`Seed Demo\` workflow"
             echo "- Rollback:    rerun this workflow with a previous image tag"

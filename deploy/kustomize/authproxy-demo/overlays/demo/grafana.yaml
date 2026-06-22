@@ -60,14 +60,12 @@ spec:
     spec:
       containers:
         - name: grafana
-          image: docker.io/grafana/grafana:11.5.2
+          image: ghcr.io/rmorlok/authproxy-demo-grafana:main
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
               containerPort: 3000
           env:
-            - name: GF_INSTALL_PLUGINS
-              value: "__GRAFANA_PLUGIN_INSTALL__"
             - name: GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS
               value: rmorlok-authproxy-datasource
             - name: GF_SERVER_ROOT_URL
@@ -81,7 +79,7 @@ spec:
                   key: jwt
           readinessProbe:
             httpGet:
-              path: /api/health
+              path: /grafana/api/health
               port: http
             initialDelaySeconds: 10
             periodSeconds: 10

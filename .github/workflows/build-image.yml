@@ -94,6 +94,8 @@ jobs:
             dockerfile: demos/shell/Dockerfile
           - name: authproxy-demo-seed
             dockerfile: demos/seed/Dockerfile
+          - name: authproxy-demo-grafana
+            dockerfile: plugins/grafana/authproxy-datasource/Dockerfile
 
     steps:
       - name: Skip demo image build

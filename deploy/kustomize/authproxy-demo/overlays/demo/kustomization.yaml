@@ -28,6 +28,8 @@ images:
     newTag: main
   - name: ghcr.io/rmorlok/authproxy-demo-shell
     newTag: main
+  - name: ghcr.io/rmorlok/authproxy-demo-grafana
+    newTag: main
 
 patches:
   - path: authproxy-secrets.yaml

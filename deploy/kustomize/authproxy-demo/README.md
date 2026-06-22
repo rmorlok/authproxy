@@ -22,8 +22,8 @@ kubectl kustomize deploy/kustomize/authproxy-demo/overlays/dev
 `Deploy Demo` renders `overlays/demo`, rewrites the checked-out overlay with
 the selected image tag and configured hostname, and applies the resulting
 manifest with `kubectl apply`. The demo overlay includes Grafana at
-`https://<hostname>/grafana` with the AuthProxy datasource and sample app
-metrics dashboard provisioned from Kustomize ConfigMaps.
+`https://<hostname>/grafana` with the bundled AuthProxy datasource plugin and
+sample app metrics dashboard provisioned from Kustomize ConfigMaps.
 
 During the Helm-to-Kustomize cutover, `Deploy Demo` preserves the operator
 Secrets listed below, uninstalls any legacy `demo` / `authproxy-demo` Helm
