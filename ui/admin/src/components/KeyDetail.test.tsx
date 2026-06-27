@@ -29,6 +29,14 @@ const initialKey = {
   id: 'key_test',
   namespace: 'root.dev',
   state: KeyState.ACTIVE,
+  key_data: {
+    type: 'aws_kms',
+    fields: {
+      aws_kms_key_id: 'alias/authproxy',
+      aws_region: 'us-east-1',
+      aws_credentials_type: 'implicit',
+    },
+  },
   labels: {
     environment: 'dev',
   },
@@ -114,5 +122,40 @@ describe('KeyDetail', () => {
     });
     expect(screen.getByText('tier: internal')).toBeTruthy();
     expect(screen.getByText('rotation: manual')).toBeTruthy();
+  });
+
+  it('edits key provider configuration', async () => {
+    const user = userEvent.setup();
+    renderKeyDetail();
+
+    await screen.findByText('key_test');
+    await user.click(screen.getByRole('button', {name: 'actions'}));
+    await user.click(screen.getByRole('menuitem', {name: 'Edit...'}));
+
+    const dialog = screen.getByRole('dialog', {name: 'Edit key'});
+    const keyIdInput = within(dialog).getByLabelText('AWS KMS Key ID');
+    await user.clear(keyIdInput);
+    await user.type(keyIdInput, 'alias/authproxy-v2');
+
+    await user.click(within(dialog).getByRole('button', {name: 'Save'}));
+
+    await waitFor(() => {
+      expect(keys.update).toHaveBeenCalledWith('key_test', {
+        state: KeyState.ACTIVE,
+        key_data: {
+          aws_kms_key_id: 'alias/authproxy-v2',
+          aws_region: 'us-east-1',
+          aws_credentials: {
+            type: 'implicit',
+          },
+        },
+        labels: {
+          environment: 'dev',
+        },
+        annotations: {
+          owner: 'platform',
+        },
+      });
+    });
   });
 });

@@ -15,7 +15,8 @@ import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
-import TextField from '@mui/material/TextField';
+import Alert from '@mui/material/Alert';
+import AddIcon from '@mui/icons-material/Add';
 import {
     listKeys, KeyState, Key, ListResponse,
     ListKeysParams, namespaceAndChildren, createKey, CreateKeyRequest
@@ -25,6 +26,17 @@ import {useQueryState, parseAsInteger, parseAsStringLiteral, parseAsString} from
 import {useNavigate} from "react-router-dom";
 import {useSelector} from "react-redux";
 import {selectCurrentNamespacePath} from "../store/namespacesSlice";
+import KeyDataForm, {
+    buildKeyDataPayload,
+    createEmptyKeyDataFormState,
+    KeyDataFormState,
+    validateKeyDataFormState,
+} from '../components/KeyDataForm';
+import KeyValueRowsEditor, {
+    duplicateKeys,
+    KeyValueRow,
+    rowsToMap,
+} from '../components/KeyValueRowsEditor';
 
 function renderState(state: KeyState) {
     const colors: Record<KeyState, "default" | "success" | "error" | "info" | "warning" | "primary" | "secondary"> = {
@@ -98,16 +110,6 @@ export const columns: GridColDef<Key>[] = [
     },
 ];
 
-const keySourceTypes = [
-    { label: 'Random', value: 'random' },
-    { label: 'Value', value: 'value' },
-    { label: 'Base64', value: 'base64' },
-    { label: 'Environment Variable', value: 'env_var' },
-    { label: 'AWS Secret', value: 'aws_secret' },
-    { label: 'GCP Secret', value: 'gcp_secret' },
-    { label: 'HashiCorp Vault', value: 'hashicorp_vault' },
-];
-
 export default function Keys() {
     const defaultPageSize = 20;
     const stateOptions = useMemo(() => [
@@ -135,8 +137,9 @@ export default function Keys() {
     const [createOpen, setCreateOpen] = useState(false);
     const [createLoading, setCreateLoading] = useState(false);
     const [createError, setCreateError] = useState<string | null>(null);
-    const [keySourceType, setKeySourceType] = useState('random');
-    const [createFields, setCreateFields] = useState<Record<string, string>>({});
+    const [createKeyData, setCreateKeyData] = useState<KeyDataFormState>(createEmptyKeyDataFormState());
+    const [createLabelRows, setCreateLabelRows] = useState<KeyValueRow[]>([]);
+    const [createAnnotationRows, setCreateAnnotationRows] = useState<KeyValueRow[]>([]);
 
     const responsesCacheRef = useRef<ListResponse<Key>[]>([]);
     const pageRequestCacheRef = useRef<Set<number>>(new Set());
@@ -238,57 +241,35 @@ export default function Keys() {
         fetchPage(page);
     }, [page]);
 
-    const buildKeyData = (): Record<string, any> | undefined => {
-        switch (keySourceType) {
-            case 'random': {
-                const numBytes = parseInt(createFields['num_bytes'] || '32', 10);
-                return { random: true, num_bytes: numBytes };
-            }
-            case 'value':
-                return createFields['value'] ? { value: createFields['value'] } : undefined;
-            case 'base64':
-                return createFields['base64'] ? { base64: createFields['base64'] } : undefined;
-            case 'env_var':
-                return createFields['env_var'] ? { env_var: createFields['env_var'] } : undefined;
-            case 'aws_secret': {
-                const data: Record<string, string> = {};
-                if (createFields['aws_secret_id']) data['aws_secret_id'] = createFields['aws_secret_id'];
-                if (createFields['aws_region']) data['aws_region'] = createFields['aws_region'];
-                if (createFields['aws_secret_key']) data['aws_secret_key'] = createFields['aws_secret_key'];
-                return Object.keys(data).length > 0 ? data : undefined;
-            }
-            case 'gcp_secret': {
-                const data: Record<string, string> = {};
-                if (createFields['gcp_secret_name']) data['gcp_secret_name'] = createFields['gcp_secret_name'];
-                if (createFields['gcp_project']) data['gcp_project'] = createFields['gcp_project'];
-                if (createFields['gcp_secret_version']) data['gcp_secret_version'] = createFields['gcp_secret_version'];
-                return Object.keys(data).length > 0 ? data : undefined;
-            }
-            case 'hashicorp_vault': {
-                const data: Record<string, string> = {};
-                if (createFields['vault_address']) data['vault_address'] = createFields['vault_address'];
-                if (createFields['vault_token']) data['vault_token'] = createFields['vault_token'];
-                if (createFields['vault_path']) data['vault_path'] = createFields['vault_path'];
-                if (createFields['vault_key']) data['vault_key'] = createFields['vault_key'];
-                return Object.keys(data).length > 0 ? data : undefined;
-            }
-            default:
-                return undefined;
-        }
-    };
-
     const onCreateSubmit = async () => {
+        const duplicateLabels = duplicateKeys(createLabelRows);
+        const duplicateAnnotations = duplicateKeys(createAnnotationRows);
+        if (duplicateLabels.length > 0 || duplicateAnnotations.length > 0) {
+            const parts = [];
+            if (duplicateLabels.length > 0) parts.push(`duplicate labels: ${duplicateLabels.join(', ')}`);
+            if (duplicateAnnotations.length > 0) parts.push(`duplicate annotations: ${duplicateAnnotations.join(', ')}`);
+            setCreateError(parts.join('; '));
+            return;
+        }
+
+        const keyDataError = validateKeyDataFormState(createKeyData);
+        if (keyDataError) {
+            setCreateError(keyDataError);
+            return;
+        }
+
         setCreateLoading(true);
         setCreateError(null);
         try {
             const request: CreateKeyRequest = {
                 namespace: ns,
-                key_data: buildKeyData(),
+                key_data: buildKeyDataPayload(createKeyData),
+                labels: rowsToMap(createLabelRows),
+                annotations: rowsToMap(createAnnotationRows),
             };
             await createKey(request);
             setCreateOpen(false);
-            setKeySourceType('random');
-            setCreateFields({});
+            resetCreateDialog();
             resetPagination();
             fetchPage(1);
         } catch (err: any) {
@@ -299,138 +280,21 @@ export default function Keys() {
         }
     };
 
-    const updateField = (field: string, value: string) => {
-        setCreateFields(prev => ({ ...prev, [field]: value }));
+    const resetCreateDialog = () => {
+        setCreateError(null);
+        setCreateKeyData(createEmptyKeyDataFormState());
+        setCreateLabelRows([]);
+        setCreateAnnotationRows([]);
     };
 
-    const renderKeySourceFields = () => {
-        switch (keySourceType) {
-            case 'random':
-                return (
-                    <TextField
-                        label="Number of Bytes"
-                        type="number"
-                        fullWidth
-                        value={createFields['num_bytes'] || '32'}
-                        onChange={(e) => updateField('num_bytes', e.target.value)}
-                        helperText="Number of random bytes to generate (default: 32)"
-                        sx={{ mt: 2 }}
-                    />
-                );
-            case 'value':
-                return (
-                    <TextField
-                        label="Key Value"
-                        fullWidth
-                        value={createFields['value'] || ''}
-                        onChange={(e) => updateField('value', e.target.value)}
-                        sx={{ mt: 2 }}
-                    />
-                );
-            case 'base64':
-                return (
-                    <TextField
-                        label="Base64 Encoded Key"
-                        fullWidth
-                        value={createFields['base64'] || ''}
-                        onChange={(e) => updateField('base64', e.target.value)}
-                        sx={{ mt: 2 }}
-                    />
-                );
-            case 'env_var':
-                return (
-                    <TextField
-                        label="Environment Variable Name"
-                        fullWidth
-                        value={createFields['env_var'] || ''}
-                        onChange={(e) => updateField('env_var', e.target.value)}
-                        sx={{ mt: 2 }}
-                    />
-                );
-            case 'aws_secret':
-                return (
-                    <Stack spacing={2} sx={{ mt: 2 }}>
-                        <TextField
-                            label="AWS Secret ID (ARN)"
-                            fullWidth
-                            required
-                            value={createFields['aws_secret_id'] || ''}
-                            onChange={(e) => updateField('aws_secret_id', e.target.value)}
-                        />
-                        <TextField
-                            label="AWS Region"
-                            fullWidth
-                            value={createFields['aws_region'] || ''}
-                            onChange={(e) => updateField('aws_region', e.target.value)}
-                        />
-                        <TextField
-                            label="AWS Secret Key (optional)"
-                            fullWidth
-                            value={createFields['aws_secret_key'] || ''}
-                            onChange={(e) => updateField('aws_secret_key', e.target.value)}
-                        />
-                    </Stack>
-                );
-            case 'gcp_secret':
-                return (
-                    <Stack spacing={2} sx={{ mt: 2 }}>
-                        <TextField
-                            label="GCP Secret Name"
-                            fullWidth
-                            required
-                            value={createFields['gcp_secret_name'] || ''}
-                            onChange={(e) => updateField('gcp_secret_name', e.target.value)}
-                        />
-                        <TextField
-                            label="GCP Project (optional)"
-                            fullWidth
-                            value={createFields['gcp_project'] || ''}
-                            onChange={(e) => updateField('gcp_project', e.target.value)}
-                        />
-                        <TextField
-                            label="GCP Secret Version (optional)"
-                            fullWidth
-                            value={createFields['gcp_secret_version'] || ''}
-                            onChange={(e) => updateField('gcp_secret_version', e.target.value)}
-                        />
-                    </Stack>
-                );
-            case 'hashicorp_vault':
-                return (
-                    <Stack spacing={2} sx={{ mt: 2 }}>
-                        <TextField
-                            label="Vault Address"
-                            fullWidth
-                            required
-                            value={createFields['vault_address'] || ''}
-                            onChange={(e) => updateField('vault_address', e.target.value)}
-                        />
-                        <TextField
-                            label="Vault Token"
-                            fullWidth
-                            required
-                            value={createFields['vault_token'] || ''}
-                            onChange={(e) => updateField('vault_token', e.target.value)}
-                        />
-                        <TextField
-                            label="Vault Path"
-                            fullWidth
-                            required
-                            value={createFields['vault_path'] || ''}
-                            onChange={(e) => updateField('vault_path', e.target.value)}
-                        />
-                        <TextField
-                            label="Vault Key"
-                            fullWidth
-                            required
-                            value={createFields['vault_key'] || ''}
-                            onChange={(e) => updateField('vault_key', e.target.value)}
-                        />
-                    </Stack>
-                );
-            default:
-                return null;
-        }
+    const closeCreateDialog = () => {
+        if (createLoading) return;
+        setCreateOpen(false);
+    };
+
+    const openCreateDialog = () => {
+        resetCreateDialog();
+        setCreateOpen(true);
     };
 
     return (
@@ -439,7 +303,7 @@ export default function Keys() {
                 <Typography component="h2" variant="h6">
                     Keys
                 </Typography>
-                <Button variant="contained" size="small" onClick={() => setCreateOpen(true)}>
+                <Button variant="contained" size="small" startIcon={<AddIcon/>} onClick={openCreateDialog}>
                     Create Key
                 </Button>
             </Stack>
@@ -525,35 +389,33 @@ export default function Keys() {
             </Grid>
 
             {/* Create key dialog */}
-            <Dialog open={createOpen} onClose={() => !createLoading && setCreateOpen(false)} fullWidth maxWidth="sm">
+            <Dialog open={createOpen} onClose={closeCreateDialog} fullWidth maxWidth="md">
                 <DialogTitle>Create Key</DialogTitle>
                 <DialogContent>
                     {createError && (
-                        <Typography color="error" sx={{ mb: 2 }}>{createError}</Typography>
+                        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setCreateError(null)}>{createError}</Alert>
                     )}
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                         Namespace: {ns}
                     </Typography>
-                    <FormControl fullWidth sx={{ mt: 1 }}>
-                        <InputLabel id="key-source-type-label">Key Source</InputLabel>
-                        <Select
-                            labelId="key-source-type-label"
-                            value={keySourceType}
-                            label="Key Source"
-                            onChange={(e) => {
-                                setKeySourceType(e.target.value);
-                                setCreateFields({});
-                            }}
-                        >
-                            {keySourceTypes.map(opt => (
-                                <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
-                    {renderKeySourceFields()}
+                    <Stack spacing={3}>
+                        <KeyDataForm value={createKeyData} onChange={setCreateKeyData} disabled={createLoading}/>
+                        <KeyValueRowsEditor
+                            title="Labels"
+                            rows={createLabelRows}
+                            onChange={setCreateLabelRows}
+                            addLabel="Add label"
+                        />
+                        <KeyValueRowsEditor
+                            title="Annotations"
+                            rows={createAnnotationRows}
+                            onChange={setCreateAnnotationRows}
+                            addLabel="Add annotation"
+                        />
+                    </Stack>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setCreateOpen(false)} disabled={createLoading}>Cancel</Button>
+                    <Button onClick={closeCreateDialog} disabled={createLoading}>Cancel</Button>
                     <Button onClick={onCreateSubmit} variant="contained" disabled={createLoading}>Create</Button>
                 </DialogActions>
             </Dialog>

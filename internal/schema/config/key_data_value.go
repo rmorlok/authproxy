@@ -6,7 +6,7 @@ import (
 )
 
 type KeyDataValue struct {
-	Value string `json:"value" yaml:"value"`
+	Value string `json:"value" yaml:"value" apiredact:"secret"`
 }
 
 func (kv *KeyDataValue) GetCurrentVersion(ctx context.Context) (KeyVersionInfo, error) {

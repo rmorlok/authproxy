@@ -12,10 +12,17 @@ export interface Key {
   id: string;
   namespace: string;
   state: KeyState;
+  key_data?: KeyDataConfig;
   labels?: Record<string, string>;
   annotations?: Record<string, string>;
   created_at: string;
   updated_at: string;
+}
+
+export interface KeyDataConfig {
+    type: string;
+    fields?: Record<string, string>;
+    sensitive_fields?: string[];
 }
 
 export interface CreateKeyRequest {
@@ -27,6 +34,7 @@ export interface CreateKeyRequest {
 
 export interface UpdateKeyRequest {
     state?: KeyState;
+    key_data?: Record<string, unknown>;
     labels?: Record<string, string>;
     annotations?: Record<string, string>;
 }

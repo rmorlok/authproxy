@@ -7,7 +7,7 @@ import (
 )
 
 type KeyDataBase64Val struct {
-	Base64 string `json:"base64" yaml:"base64"`
+	Base64 string `json:"base64" yaml:"base64" apiredact:"secret"`
 }
 
 func (kb *KeyDataBase64Val) GetCurrentVersion(ctx context.Context) (KeyVersionInfo, error) {

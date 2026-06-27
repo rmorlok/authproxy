@@ -14,19 +14,29 @@ import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import Button from '@mui/material/Button';
-import TextField from '@mui/material/TextField';
 import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
 import Select from '@mui/material/Select';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import AddIcon from '@mui/icons-material/Add';
-import DeleteIcon from '@mui/icons-material/Delete';
 import dayjs from 'dayjs';
 import Tooltip from '@mui/material/Tooltip';
-import {Key, keys, KeyState} from '@authproxy/api';
+import {Key, keys, KeyState, UpdateKeyRequest} from '@authproxy/api';
 import { useNavigate } from "react-router-dom";
 import AnnotationsEditor from "./AnnotationsEditor";
+import KeyDataForm, {
+  buildKeyDataPayload,
+  createEmptyKeyDataFormState,
+  KeyDataFormState,
+  keyDataFormStateFromConfig,
+  validateKeyDataFormState,
+} from './KeyDataForm';
+import KeyValueRowsEditor, {
+  duplicateKeys,
+  KeyValueRow,
+  mapToRows,
+  rowsToMap,
+} from './KeyValueRowsEditor';
 
 function StateChip({state}: { state: KeyState }) {
   const colors: Record<KeyState, "default" | "success" | "error" | "info" | "warning" | "primary" | "secondary"> = {
@@ -34,114 +44,6 @@ function StateChip({state}: { state: KeyState }) {
     [KeyState.DISABLED]: 'default',
   };
   return <Chip label={state} color={colors[state]} size="small"/>;
-}
-
-type KeyValueRow = {
-  id: string;
-  key: string;
-  value: string;
-};
-
-let keyValueRowSequence = 0;
-
-function nextKeyValueRow(key = '', value = ''): KeyValueRow {
-  keyValueRowSequence += 1;
-  return {
-    id: `kv-${keyValueRowSequence}`,
-    key,
-    value,
-  };
-}
-
-function mapToRows(values?: Record<string, string>): KeyValueRow[] {
-  return Object.entries(values || {}).map(([key, value]) => nextKeyValueRow(key, value));
-}
-
-function rowsToMap(rows: KeyValueRow[]): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const row of rows) {
-    const key = row.key.trim();
-    if (key) out[key] = row.value;
-  }
-  return out;
-}
-
-function duplicateKeys(rows: KeyValueRow[]): string[] {
-  const seen = new Set<string>();
-  const duplicates = new Set<string>();
-  for (const row of rows) {
-    const key = row.key.trim();
-    if (!key) continue;
-    if (seen.has(key)) duplicates.add(key);
-    seen.add(key);
-  }
-  return Array.from(duplicates);
-}
-
-function KeyValueRowsEditor({
-  title,
-  rows,
-  onChange,
-  addLabel,
-}: {
-  title: string;
-  rows: KeyValueRow[];
-  onChange: (rows: KeyValueRow[]) => void;
-  addLabel: string;
-}) {
-  const updateRow = (id: string, patch: Partial<KeyValueRow>) => {
-    onChange(rows.map(row => row.id === id ? {...row, ...patch} : row));
-  };
-
-  const removeRow = (id: string) => {
-    onChange(rows.filter(row => row.id !== id));
-  };
-
-  return (
-    <Box>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{mb: 1}}>
-        <Typography variant="subtitle2" color="text.secondary">{title}</Typography>
-        <Button
-          size="small"
-          startIcon={<AddIcon/>}
-          onClick={() => onChange([...rows, nextKeyValueRow()])}
-        >
-          {addLabel}
-        </Button>
-      </Stack>
-      {rows.length === 0 ? (
-        <Typography variant="body2" color="text.secondary">None</Typography>
-      ) : (
-        <Stack spacing={1}>
-          {rows.map(row => (
-            <Stack key={row.id} direction={{xs: 'column', sm: 'row'}} spacing={1} alignItems={{xs: 'stretch', sm: 'flex-start'}}>
-              <TextField
-                size="small"
-                label="Key"
-                value={row.key}
-                onChange={(e) => updateRow(row.id, {key: e.target.value})}
-                sx={{flex: 0.45}}
-              />
-              <TextField
-                size="small"
-                label="Value"
-                value={row.value}
-                onChange={(e) => updateRow(row.id, {value: e.target.value})}
-                multiline
-                maxRows={4}
-                sx={{flex: 0.55}}
-              />
-              <Tooltip title="Remove">
-                <IconButton size="small" onClick={() => removeRow(row.id)} aria-label={`Remove ${title.toLowerCase()} row`}>
-                  <DeleteIcon fontSize="inherit"/>
-                </IconButton>
-              </Tooltip>
-            </Stack>
-          ))}
-        </Stack>
-      )}
-    </Box>
-  );
 }
 
 export default function KeyDetail({keyId}: { keyId: string }) {
@@ -155,6 +57,8 @@ export default function KeyDetail({keyId}: { keyId: string }) {
   const [editOpen, setEditOpen] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [editState, setEditState] = useState<KeyState>(KeyState.ACTIVE);
+  const [editKeyData, setEditKeyData] = useState<KeyDataFormState>(createEmptyKeyDataFormState());
+  const [editKeyDataDirty, setEditKeyDataDirty] = useState(false);
   const [editLabelRows, setEditLabelRows] = useState<KeyValueRow[]>([]);
   const [editAnnotationRows, setEditAnnotationRows] = useState<KeyValueRow[]>([]);
   const [actionLoading, setActionLoading] = useState(false);
@@ -218,6 +122,8 @@ export default function KeyDetail({keyId}: { keyId: string }) {
   const onClickEdit = () => {
     setActionError(null);
     setEditState(ek.state);
+    setEditKeyData(keyDataFormStateFromConfig(ek.key_data));
+    setEditKeyDataDirty(false);
     setEditLabelRows(mapToRows(ek.labels));
     setEditAnnotationRows(mapToRows(ek.annotations));
     closeMenu();
@@ -235,14 +141,27 @@ export default function KeyDetail({keyId}: { keyId: string }) {
       setActionError(parts.join('; '));
       return;
     }
+
+    if (editKeyDataDirty) {
+      const keyDataError = validateKeyDataFormState(editKeyData);
+      if (keyDataError) {
+        setActionError(keyDataError);
+        return;
+      }
+    }
+
     setActionError(null);
     setActionLoading(true);
     try {
-      const resp = await keys.update(ek.id, {
+      const request: UpdateKeyRequest = {
         state: editState,
         labels: rowsToMap(editLabelRows),
         annotations: rowsToMap(editAnnotationRows),
-      });
+      };
+      if (editKeyDataDirty) {
+        request.key_data = buildKeyDataPayload(editKeyData);
+      }
+      const resp = await keys.update(ek.id, request);
       setEk(resp.data);
       setEditOpen(false);
     } catch (err: any) {
@@ -332,6 +251,25 @@ export default function KeyDetail({keyId}: { keyId: string }) {
         <Typography variant="body1">{ek.namespace}</Typography>
       </Box>
 
+      <Box>
+        <Typography variant="subtitle2" color="text.secondary">Key Data</Typography>
+        {ek.key_data ? (
+          <Stack spacing={1} sx={{mt: 0.5}}>
+            <Stack direction="row" spacing={0.5} flexWrap="wrap">
+              <Chip label={ek.key_data.type} size="small" color="primary" variant="outlined"/>
+              {Object.entries(ek.key_data.fields || {}).map(([key, value]) => (
+                <Chip key={key} label={`${key}: ${value}`} size="small" variant="outlined"/>
+              ))}
+              {(ek.key_data.sensitive_fields || []).map(field => (
+                <Chip key={field} label={`${field}: configured`} size="small" variant="outlined"/>
+              ))}
+            </Stack>
+          </Stack>
+        ) : (
+          <Typography variant="body2" color="text.secondary">Not configured</Typography>
+        )}
+      </Box>
+
       <Stack direction={{xs: 'column', sm: 'row'}} spacing={4}>
         <Box>
           <Typography variant="subtitle2" color="text.secondary">Created</Typography>
@@ -387,6 +325,14 @@ export default function KeyDetail({keyId}: { keyId: string }) {
           </FormControl>
 
           <Stack spacing={3} sx={{mt: 3}}>
+            <KeyDataForm
+              value={editKeyData}
+              disabled={actionLoading}
+              onChange={(next) => {
+                setEditKeyData(next);
+                setEditKeyDataDirty(true);
+              }}
+            />
             <KeyValueRowsEditor
               title="Labels"
               rows={editLabelRows}

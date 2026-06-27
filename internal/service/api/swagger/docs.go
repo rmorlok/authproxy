@@ -4792,7 +4792,7 @@ const docTemplateApi = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.CreateKeyRequestJson"
+                            "$ref": "#/definitions/routes.OpenAPICreateKeyRequestJson"
                         }
                     }
                 ],
@@ -4800,7 +4800,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.KeyJson"
+                            "$ref": "#/definitions/routes.OpenAPIKeyJson"
                         }
                     },
                     "400": {
@@ -4855,7 +4855,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.KeyJson"
+                            "$ref": "#/definitions/routes.OpenAPIKeyJson"
                         }
                     },
                     "400": {
@@ -4973,7 +4973,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.KeyJson"
+                            "$ref": "#/definitions/routes.OpenAPIKeyJson"
                         }
                     },
                     "400": {
@@ -7820,42 +7820,6 @@ const docTemplateApi = `{
                 }
             }
         },
-        "github_com_rmorlok_authproxy_internal_schema_api.KeyJson": {
-            "description": "Key API response",
-            "type": "object",
-            "properties": {
-                "annotations": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string",
-                    "example": "key_test550e8400abcd"
-                },
-                "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "namespace": {
-                    "type": "string",
-                    "example": "root.acme"
-                },
-                "state": {
-                    "type": "string",
-                    "example": "active"
-                },
-                "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
         "github_com_rmorlok_authproxy_internal_schema_api.MetricsSchemaMetricJson": {
             "description": "Supported metric definition",
             "type": "object",
@@ -7924,9 +7888,6 @@ const docTemplateApi = `{
                     "type": "string"
                 }
             }
-        },
-        "github_com_rmorlok_authproxy_internal_schema_config.KeyData": {
-            "type": "object"
         },
         "routes.ActorJson": {
             "description": "Actor identity within a namespace",
@@ -8156,31 +8117,6 @@ const docTemplateApi = `{
                 }
             }
         },
-        "routes.CreateKeyRequestJson": {
-            "description": "Request to create a new key",
-            "type": "object",
-            "properties": {
-                "annotations": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "key_data": {
-                    "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_config.KeyData"
-                },
-                "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "namespace": {
-                    "type": "string",
-                    "example": "root.acme"
-                }
-            }
-        },
         "routes.CreateNamespaceRequestJson": {
             "description": "Namespace creation request",
             "type": "object",
@@ -8277,42 +8213,6 @@ const docTemplateApi = `{
                     "description": "The URL to return to after the connection is completed.",
                     "type": "string",
                     "example": "https://example.com/callback"
-                }
-            }
-        },
-        "routes.KeyJson": {
-            "description": "Key API response",
-            "type": "object",
-            "properties": {
-                "annotations": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string",
-                    "example": "key_test550e8400abcd"
-                },
-                "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "namespace": {
-                    "type": "string",
-                    "example": "root.acme"
-                },
-                "state": {
-                    "type": "string",
-                    "example": "active"
-                },
-                "updated_at": {
-                    "type": "string"
                 }
             }
         },
@@ -8519,6 +8419,32 @@ const docTemplateApi = `{
                 }
             }
         },
+        "routes.OpenAPICreateKeyRequestJson": {
+            "description": "Request to create a key",
+            "type": "object",
+            "properties": {
+                "annotations": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "key_data": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "labels": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "namespace": {
+                    "type": "string",
+                    "example": "root.acme"
+                }
+            }
+        },
         "routes.OpenAPICreateRateLimitRequestJson": {
             "description": "Request to create a rate limit",
             "type": "object",
@@ -8597,6 +8523,45 @@ const docTemplateApi = `{
                 }
             }
         },
+        "routes.OpenAPIKeyJson": {
+            "description": "Key API response",
+            "type": "object",
+            "properties": {
+                "annotations": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "key_test550e8400abcd"
+                },
+                "key_data": {
+                    "type": "object"
+                },
+                "labels": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "namespace": {
+                    "type": "string",
+                    "example": "root.acme"
+                },
+                "state": {
+                    "type": "string",
+                    "example": "active"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
         "routes.OpenAPIListActorsResponseJson": {
             "description": "Paginated list of actors",
             "type": "object",
@@ -8668,9 +8633,7 @@ const docTemplateApi = `{
                 },
                 "items": {
                     "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_api.KeyJson"
-                    }
+                    "items": {}
                 }
             }
         },
@@ -8921,6 +8884,10 @@ const docTemplateApi = `{
                     "additionalProperties": {
                         "type": "string"
                     }
+                },
+                "key_data": {
+                    "type": "object",
+                    "additionalProperties": true
                 },
                 "labels": {
                     "type": "object",

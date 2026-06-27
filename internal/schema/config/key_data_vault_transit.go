@@ -31,7 +31,7 @@ type vaultTransitLogicalClient interface {
 // KeyDataVaultTransit uses HashiCorp Vault Transit as a wrapping-key provider for DEKs.
 type KeyDataVaultTransit struct {
 	VaultAddress          string `json:"vault_address" yaml:"vault_address"`
-	VaultToken            string `json:"vault_token,omitempty" yaml:"vault_token,omitempty"`
+	VaultToken            string `json:"vault_token,omitempty" yaml:"vault_token,omitempty" apiredact:"secret"`
 	VaultNamespace        string `json:"vault_namespace,omitempty" yaml:"vault_namespace,omitempty"`
 	VaultTransitMountPath string `json:"vault_transit_mount_path,omitempty" yaml:"vault_transit_mount_path,omitempty"`
 	VaultTransitKeyName   string `json:"vault_transit_key_name" yaml:"vault_transit_key_name"`

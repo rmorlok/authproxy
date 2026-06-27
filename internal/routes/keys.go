@@ -10,6 +10,7 @@ import (
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/apgin"
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/apserde"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/core"
 	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
@@ -27,6 +28,8 @@ type CreateKeyRequestJson = schemaapi.CreateKeyRequestJson
 type UpdateKeyRequestJson = schemaapi.UpdateKeyRequestJson
 type ListKeysResponseJson = schemaapi.ListKeysResponseJson
 
+type OpenAPIKeyJson = schemaapiopenapi.KeyJson
+type OpenAPICreateKeyRequestJson = schemaapiopenapi.CreateKeyRequestJson
 type OpenAPIListKeysResponseJson = schemaapiopenapi.ListKeysResponseJson
 type OpenAPIUpdateKeyRequestJson = schemaapiopenapi.UpdateKeyRequestJson
 
@@ -51,6 +54,16 @@ func KeyToJson(ek coreIface.Key) KeyJson {
 	}
 }
 
+func keyToJsonWithKeyData(ctx context.Context, c coreIface.C, ek coreIface.Key) (KeyJson, error) {
+	result := KeyToJson(ek)
+	keyData, err := c.GetKeyData(ctx, ek.GetId())
+	if err != nil {
+		return result, err
+	}
+	result.KeyData = keyData
+	return result, nil
+}
+
 type KeysRoutes struct {
 	cfg           config.C
 	core          coreIface.C
@@ -65,7 +78,7 @@ type KeysRoutes struct {
 // @Accept			json
 // @Produce		json
 // @Param			id	path		string	true	"Key ID"
-// @Success		200		{object}	KeyJson
+// @Success		200		{object}	OpenAPIKeyJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		404		{object}	ErrorResponse
@@ -102,7 +115,14 @@ func (r *KeysRoutes) get(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, KeyToJson(ek))
+	resp, err := keyToJsonWithKeyData(ctx, r.core, ek)
+	if err != nil {
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+		val.MarkErrorReturn()
+		return
+	}
+
+	apgin.APIJSON(gctx, http.StatusOK, resp)
 }
 
 // @Summary		Create key
@@ -110,8 +130,8 @@ func (r *KeysRoutes) get(gctx *gin.Context) {
 // @Tags			keys
 // @Accept			json
 // @Produce		json
-// @Param			request	body		CreateKeyRequestJson	true	"Key creation request"
-// @Success		200		{object}	KeyJson
+// @Param			request	body		OpenAPICreateKeyRequestJson	true	"Key creation request"
+// @Success		200		{object}	OpenAPIKeyJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		500		{object}	ErrorResponse
@@ -123,6 +143,11 @@ func (r *KeysRoutes) create(gctx *gin.Context) {
 
 	var req CreateKeyRequestJson
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		val.MarkErrorReturn()
+		return
+	}
+	if err := apserde.ValidateNoRedactedPlaceholders(req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
@@ -171,7 +196,14 @@ func (r *KeysRoutes) create(gctx *gin.Context) {
 		}
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, KeyToJson(ek))
+	resp, err := keyToJsonWithKeyData(ctx, r.core, ek)
+	if err != nil {
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+		val.MarkErrorReturn()
+		return
+	}
+
+	apgin.APIJSON(gctx, http.StatusOK, resp)
 }
 
 // @Summary		List keys
@@ -270,7 +302,7 @@ func (r *KeysRoutes) list(gctx *gin.Context) {
 // @Produce		json
 // @Param			id		path		string								true	"Key ID"
 // @Param			request	body		OpenAPIUpdateKeyRequestJson		true	"Update request"
-// @Success		200		{object}	KeyJson
+// @Success		200		{object}	OpenAPIKeyJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		404		{object}	ErrorResponse
@@ -292,6 +324,11 @@ func (r *KeysRoutes) update(gctx *gin.Context) {
 	var req UpdateKeyRequestJson
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
+		val.MarkErrorReturn()
+		return
+	}
+	if err := apserde.ValidateNoRedactedPlaceholders(req); err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
 	}
@@ -351,6 +388,7 @@ func (r *KeysRoutes) update(gctx *gin.Context) {
 
 			apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
+			return
 		}
 	}
 
@@ -365,6 +403,7 @@ func (r *KeysRoutes) update(gctx *gin.Context) {
 
 			apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
+			return
 		}
 	}
 
@@ -379,6 +418,22 @@ func (r *KeysRoutes) update(gctx *gin.Context) {
 
 			apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
+			return
+		}
+	}
+
+	if req.KeyData != nil {
+		_, err = r.core.UpdateKeyData(ctx, id, req.KeyData)
+		if err != nil {
+			if errors.Is(err, core.ErrNotFound) {
+				apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("key '%s' not found", id), httperr.WithInternalErr(err)))
+				val.MarkErrorReturn()
+				return
+			}
+
+			apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+			val.MarkErrorReturn()
+			return
 		}
 	}
 
@@ -395,7 +450,14 @@ func (r *KeysRoutes) update(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, KeyToJson(ek))
+	resp, err := keyToJsonWithKeyData(ctx, r.core, ek)
+	if err != nil {
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+		val.MarkErrorReturn()
+		return
+	}
+
+	apgin.APIJSON(gctx, http.StatusOK, resp)
 }
 
 // @Summary		Delete key

@@ -215,6 +215,12 @@ type C interface {
 	// CreateKey creates a new key.
 	CreateKey(ctx context.Context, namespace string, keyData *cfgschema.KeyData, labels map[string]string) (Key, error)
 
+	// GetKeyData returns the decrypted provider configuration for a key.
+	GetKeyData(ctx context.Context, id apid.ID) (*cfgschema.KeyData, error)
+
+	// UpdateKeyData replaces the provider configuration for a key.
+	UpdateKeyData(ctx context.Context, id apid.ID, keyData *cfgschema.KeyData) (Key, error)
+
 	// DeleteKey soft deletes a key.
 	DeleteKey(ctx context.Context, id apid.ID) error
 
