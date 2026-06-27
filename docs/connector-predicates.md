@@ -24,6 +24,35 @@ Every connector predicate receives the same variables:
 
 There is no `attributes` alias. Use `cfg`, `labels`, and `annotations` directly.
 
+## Connector JavaScript Library
+
+A connector can define top-level shared JavaScript with the `javascript` field. Use it for helper functions and constants that are reused by predicates and configure-step data-source transforms:
+
+```yaml
+javascript: |
+  function isProductionConnection() {
+    return labels.env === "prod";
+  }
+
+  function shouldRequestDriveActivity() {
+    return cfg.sync_activity === true && isProductionConnection();
+  }
+
+auth:
+  type: OAuth2
+  scopes:
+    - id: https://www.googleapis.com/auth/drive.activity.readonly
+      if:
+        javascript: shouldRequestDriveActivity()
+      reason: We need activity access when activity sync is enabled.
+```
+
+AuthProxy compiles connector-level JavaScript once for the connector version, validates it by running top-level initialization without runtime variables, and then runs it in a fresh JavaScript VM for each predicate or transform evaluation. This means helpers can share code, but mutable globals do not carry state between evaluations.
+
+Connector-level JavaScript cannot declare the reserved runtime variables `cfg`, `labels`, `annotations`, or `data`. AuthProxy injects those names for each evaluation. Syntax errors, top-level thrown errors, and reserved-name declarations fail connector validation.
+
+The same connector-level helpers are available to setup-step predicates, OAuth scope predicates, probe predicates, and configure-step data-source transforms. Data-source transforms also receive `data`, which contains the proxied JSON response. See [Connector setup flow](connector-setup-flow.md#data-sources) for transform examples.
+
 ## Setup Steps
 
 Connector-authored setup-flow form and redirect steps support `if.javascript`. Clients only see eligible steps. See [Connector setup flow](connector-setup-flow.md#conditional-steps) for setup-step examples and behavior.
@@ -118,6 +147,6 @@ Probe behavior:
 
 ## Versioning Notes
 
-Adding, removing, or changing predicates changes the connector definition. For published connectors, publish a new connector version or rely on the normal connector-version migration path.
+Adding, removing, or changing predicates or connector-level JavaScript changes the connector definition. For published connectors, publish a new connector version or rely on the normal connector-version migration path.
 
 Existing in-flight connections are evaluated against the connector version they are using. If a predicate changes in a new version, only connections migrated to that version use the new predicate behavior.

@@ -264,6 +264,16 @@ connectors:
         - id: https://www.googleapis.com/auth/calendar.readonly
           reason: |
             We need to be able to read the calendar
+    javascript: |
+      function isPrimaryCalendar(cfg) {
+        return cfg.calendar_id === "primary";
+      }
+
+      function transformCalendarItems(items) {
+        return items.map(function(c) {
+          return { value: c.id, label: c.summary || c.id };
+        });
+      }
     setup_flow:
       configure:
         steps:
@@ -289,7 +299,23 @@ connectors:
                 proxy_request:
                   method: GET
                   url: https://www.googleapis.com/calendar/v3/users/me/calendarList
-                transform: "data.items.map(function(c) { return { value: c.id, label: c.summary || c.id }; })"
+                transform: transformCalendarItems(data.items)
+          - id: primary-calendar-options
+            title: Primary Calendar Options
+            description: Configure behavior that only applies to the primary calendar.
+            if:
+              javascript: isPrimaryCalendar(cfg)
+            json_schema:
+              type: object
+              properties:
+                include_declined:
+                  type: boolean
+                  title: Include declined events
+            ui_schema:
+              type: VerticalLayout
+              elements:
+                - type: Control
+                  scope: "#/properties/include_declined"
     probes:
       - id: example
         period: 1m
