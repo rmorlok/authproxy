@@ -791,6 +791,7 @@ func (r *RequestEventsRoutes) queryMetrics(gctx *gin.Context) {
 		responseSeries = append(responseSeries, resourceMetricsResponseSeries(series)...)
 	}
 
+	val.MarkValidated()
 	gctx.PureJSON(http.StatusOK, metricsResponseFromAPIRequest(req, responseSeries))
 }
 
@@ -804,6 +805,7 @@ func (r *RequestEventsRoutes) queryMetrics(gctx *gin.Context) {
 // @Security		BearerAuth
 // @Router			/metrics/schema [get]
 func (r *RequestEventsRoutes) schema(gctx *gin.Context) {
+	auth.MustGetValidatorFromGinContext(gctx).MarkValidated()
 	gctx.PureJSON(http.StatusOK, metricsSchemaResponse())
 }
 

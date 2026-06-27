@@ -32,6 +32,7 @@ func TestRequestEventsRoutes(t *testing.T) {
 		Gin           *gin.Engine
 		AuthUtil      *auth2.AuthTestUtil
 		MockRetriever *mock.MockLogRetriever
+		RecoveryLog   *bytes.Buffer
 	}
 
 	setup := func(t *testing.T, cfg config.C) *TestSetup {
@@ -42,14 +43,34 @@ func TestRequestEventsRoutes(t *testing.T) {
 		rlr := mock.NewMockLogRetriever(ctrl)
 		rl := NewRequestEventsRoutes(cfg, auth, rlr)
 
-		r := apgin.ForTest(nil)
+		recoveryLog := &bytes.Buffer{}
+		var r *gin.Engine
+		func() {
+			previousRecoveryWriter := gin.DefaultErrorWriter
+			gin.DefaultErrorWriter = recoveryLog
+			defer func() {
+				gin.DefaultErrorWriter = previousRecoveryWriter
+			}()
+
+			r = apgin.ForTest(nil)
+		}()
 		rl.Register(r)
 
 		return &TestSetup{
 			Gin:           r,
 			MockRetriever: rlr,
 			AuthUtil:      authUtil,
+			RecoveryLog:   recoveryLog,
 		}
+	}
+
+	serveHTTPNoRecovery := func(t *testing.T, tu *TestSetup, w *httptest.ResponseRecorder, req *http.Request) {
+		t.Helper()
+		tu.RecoveryLog.Reset()
+
+		tu.Gin.ServeHTTP(w, req)
+
+		require.Empty(t, tu.RecoveryLog.String())
 	}
 
 	t.Run("list", func(t *testing.T) {
@@ -625,7 +646,7 @@ func TestRequestEventsRoutes(t *testing.T) {
 					}, nil
 				})
 
-			tu.Gin.ServeHTTP(w, req)
+			serveHTTPNoRecovery(t, tu, w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
 			var resp sapi.MetricsQueryResponseJson
@@ -670,7 +691,7 @@ func TestRequestEventsRoutes(t *testing.T) {
 					}, nil
 				})
 
-			tu.Gin.ServeHTTP(w, req)
+			serveHTTPNoRecovery(t, tu, w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
 			var resp sapi.MetricsQueryResponseJson
@@ -694,7 +715,7 @@ func TestRequestEventsRoutes(t *testing.T) {
 					return nil, nil
 				})
 
-			tu.Gin.ServeHTTP(w, req)
+			serveHTTPNoRecovery(t, tu, w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 		})
 
@@ -776,7 +797,7 @@ func TestRequestEventsRoutes(t *testing.T) {
 			w := httptest.NewRecorder()
 			req := newSchemaRequest(t, aschema.PermissionsSingle("root.**", "app-metrics", "schema"))
 
-			tu.Gin.ServeHTTP(w, req)
+			serveHTTPNoRecovery(t, tu, w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
 			var resp sapi.MetricsSchemaResponseJson
