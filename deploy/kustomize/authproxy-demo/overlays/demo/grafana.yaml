@@ -72,6 +72,12 @@ spec:
               value: "%(protocol)s://%(domain)s/grafana/"
             - name: GF_SERVER_SERVE_FROM_SUB_PATH
               value: "true"
+            - name: GF_AUTH_ANONYMOUS_ENABLED
+              value: "true"
+            - name: GF_AUTH_ANONYMOUS_ORG_ROLE
+              value: Viewer
+            - name: GF_AUTH_DISABLE_LOGIN_FORM
+              value: "true"
             - name: AUTHPROXY_GRAFANA_JWT
               valueFrom:
                 secretKeyRef:
