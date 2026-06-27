@@ -29,13 +29,8 @@ func (p *Predicate) Validate(vc *ValidationContext, jsctx apjs.Context) error {
 	return result.ErrorOrNil()
 }
 
-// GetValue returns the boolean value by evaluating the predicate's javascript.
-func (p *Predicate) GetValue(vars map[string]any) (bool, error) {
-	return p.GetValueWithContext(apjs.NewContext(nil, vars))
-}
-
-// GetValueWithContext returns the boolean value by evaluating the predicate's
+// GetValue returns the boolean value by evaluating the predicate's
 // javascript with a prebuilt JavaScript context.
-func (p *Predicate) GetValueWithContext(jsctx apjs.Context) (bool, error) {
+func (p *Predicate) GetValue(jsctx apjs.Context) (bool, error) {
 	return jsctx.EvaluateBoolean(p.Javascript)
 }

@@ -18,14 +18,14 @@ type Scope struct {
 	Reason   string            `json:"reason" yaml:"reason"`
 }
 
-func (s *Scope) IsRequired(vars map[string]any) (bool, error) {
+func (s *Scope) IsRequired(jsctx apjs.Context) (bool, error) {
 	// If the attribute is not specified, scopes default to required.
 	if s == nil || s.Required == nil {
 		// If unspecified, assume required.
 		return true, nil
 	}
 
-	return s.Required.IsRequired(vars)
+	return s.Required.IsRequired(jsctx)
 }
 
 func (s *Scope) Validate(vc *common.ValidationContext) error {
@@ -75,7 +75,7 @@ func NewScopeRequiredPredicate(predicate *common.Predicate) *ScopeRequired {
 	return &ScopeRequired{Predicate: predicate}
 }
 
-func (r *ScopeRequired) IsRequired(vars map[string]any) (bool, error) {
+func (r *ScopeRequired) IsRequired(jsctx apjs.Context) (bool, error) {
 	if r == nil {
 		return true, nil
 	}
@@ -88,7 +88,7 @@ func (r *ScopeRequired) IsRequired(vars map[string]any) (bool, error) {
 		return false, fmt.Errorf("required must be a boolean or predicate object")
 	}
 
-	return r.Predicate.GetValue(vars)
+	return r.Predicate.GetValue(jsctx)
 }
 
 func (r *ScopeRequired) Clone() *ScopeRequired {

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/apjs"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -23,7 +24,13 @@ type ConnectorVersion struct {
 	s     *service
 	defMu sync.RWMutex
 	def   *cschema.Connector
-	l     *slog.Logger
+
+	jsMu     sync.RWMutex
+	jsLib    *apjs.Library
+	jsLibErr error
+	jsLoaded bool
+
+	l *slog.Logger
 }
 
 func wrapConnectorVersion(cv database.ConnectorVersion, s *service) *ConnectorVersion {
@@ -80,7 +87,14 @@ func (cv *ConnectorVersion) GetAnnotations() map[string]string {
 
 func (cv *ConnectorVersion) getDefinition() (*cschema.Connector, error) {
 	cv.defMu.RLock()
-	defer cv.defMu.RUnlock()
+	if cv.def != nil {
+		defer cv.defMu.RUnlock()
+		return cv.def, nil
+	}
+	cv.defMu.RUnlock()
+
+	cv.defMu.Lock()
+	defer cv.defMu.Unlock()
 	if cv.def == nil {
 		decrypted, err := cv.s.encrypt.DecryptString(context.Background(), cv.ConnectorVersion.EncryptedDefinition)
 		if err != nil {
@@ -100,22 +114,59 @@ func (cv *ConnectorVersion) getDefinition() (*cschema.Connector, error) {
 
 func (cv *ConnectorVersion) setDefinition(def *cschema.Connector) error {
 	cv.defMu.Lock()
-	defer cv.defMu.Unlock()
 
 	jsonBytes, err := json.Marshal(def)
 	if err != nil {
+		cv.defMu.Unlock()
 		return err
 	}
 
 	encrypted, err := cv.s.encrypt.EncryptStringForEntity(context.Background(), cv, string(jsonBytes))
 	if err != nil {
+		cv.defMu.Unlock()
 		return err
 	}
 	cv.Hash = def.Hash()
 	cv.ConnectorVersion.EncryptedDefinition = encrypted
 	cv.def = def
+	cv.defMu.Unlock()
+
+	cv.resetJavascriptLibrary()
 
 	return nil
+}
+
+func (c *ConnectorVersion) getJavascriptLibrary() (*apjs.Library, error) {
+	c.jsMu.RLock()
+	if c.jsLoaded {
+		defer c.jsMu.RUnlock()
+		return c.jsLib, c.jsLibErr
+	}
+	c.jsMu.RUnlock()
+
+	def, err := c.getDefinition()
+	if err != nil {
+		return nil, err
+	}
+	jsLib, jsLibErr := apjs.CompileLibrary(def.Javascript)
+
+	c.jsMu.Lock()
+	defer c.jsMu.Unlock()
+	if !c.jsLoaded {
+		c.jsLib = jsLib
+		c.jsLibErr = jsLibErr
+		c.jsLoaded = true
+	}
+
+	return c.jsLib, c.jsLibErr
+}
+
+func (c *ConnectorVersion) resetJavascriptLibrary() {
+	c.jsMu.Lock()
+	defer c.jsMu.Unlock()
+	c.jsLib = nil
+	c.jsLibErr = nil
+	c.jsLoaded = false
 }
 
 func (cv *ConnectorVersion) Logger() *slog.Logger {

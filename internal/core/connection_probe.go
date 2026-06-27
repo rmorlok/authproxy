@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/rmorlok/authproxy/internal/apjs"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
@@ -37,7 +38,7 @@ func (c *connection) GetProbes() []iface.Probe {
 
 func (c *connection) GetEnabledProbe(ctx context.Context, probeId string) (iface.Probe, error) {
 	def := c.cv.GetDefinition()
-	getVars := c.lazyProbePredicateVars(ctx)
+	getJSContext := c.lazyProbeJavascriptContext(ctx)
 
 	for i := range def.Probes {
 		probe := &def.Probes[i]
@@ -45,7 +46,7 @@ func (c *connection) GetEnabledProbe(ctx context.Context, probeId string) (iface
 			continue
 		}
 
-		enabled, err := c.isProbeEnabled(probe, getVars)
+		enabled, err := c.isProbeEnabled(probe, getJSContext)
 		if err != nil {
 			return nil, err
 		}
@@ -61,11 +62,11 @@ func (c *connection) GetEnabledProbe(ctx context.Context, probeId string) (iface
 func (c *connection) GetEnabledProbes(ctx context.Context) ([]iface.Probe, error) {
 	def := c.cv.GetDefinition()
 	probes := make([]iface.Probe, 0, len(def.Probes))
-	getVars := c.lazyProbePredicateVars(ctx)
+	getJSContext := c.lazyProbeJavascriptContext(ctx)
 
 	for i := range def.Probes {
 		probe := &def.Probes[i]
-		enabled, err := c.isProbeEnabled(probe, getVars)
+		enabled, err := c.isProbeEnabled(probe, getJSContext)
 		if err != nil {
 			return nil, err
 		}
@@ -78,34 +79,34 @@ func (c *connection) GetEnabledProbes(ctx context.Context) ([]iface.Probe, error
 	return probes, nil
 }
 
-type probePredicateVarsLoader func() (map[string]any, error)
+type probeJavascriptContextLoader func() (apjs.Context, error)
 
-func (c *connection) lazyProbePredicateVars(ctx context.Context) probePredicateVarsLoader {
+func (c *connection) lazyProbeJavascriptContext(ctx context.Context) probeJavascriptContextLoader {
 	var (
 		loaded bool
-		vars   map[string]any
+		jsctx  apjs.Context
 		err    error
 	)
-	return func() (map[string]any, error) {
+	return func() (apjs.Context, error) {
 		if !loaded {
-			vars, err = c.GetPredicateVars(ctx)
+			jsctx, err = c.GetJavascriptContext(ctx)
 			loaded = true
 		}
-		return vars, err
+		return jsctx, err
 	}
 }
 
-func (c *connection) isProbeEnabled(probe *cschema.Probe, getVars probePredicateVarsLoader) (bool, error) {
+func (c *connection) isProbeEnabled(probe *cschema.Probe, getJSContext probeJavascriptContextLoader) (bool, error) {
 	if probe == nil || probe.If == nil {
 		return true, nil
 	}
 
-	vars, err := getVars()
+	jsctx, err := getJSContext()
 	if err != nil {
-		return false, fmt.Errorf("probe %q: get predicate vars: %w", probe.Id, err)
+		return false, fmt.Errorf("probe %q: get javascript context: %w", probe.Id, err)
 	}
 
-	ok, err := probe.If.GetValue(vars)
+	ok, err := probe.If.GetValue(jsctx)
 	if err != nil {
 		return false, fmt.Errorf("probe %q if.javascript: %w", probe.Id, err)
 	}

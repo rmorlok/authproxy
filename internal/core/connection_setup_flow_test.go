@@ -16,7 +16,7 @@ func TestManifestSetupFlowIfJavascript(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	conn, _ := newTestConnectionWithSetupFlow(t, ctrl, &cschema.SetupFlow{
+	sf := &cschema.SetupFlow{
 		Configure: &cschema.SetupFlowPhase{
 			Steps: []cschema.SetupFlowStep{
 				{
@@ -27,7 +27,7 @@ func TestManifestSetupFlowIfJavascript(t *testing.T) {
 				{
 					Id:         "label_true",
 					JsonSchema: workspaceSchema,
-					If:         &common.Predicate{Javascript: `labels["apxy/cxr/type"] === "salesforce"`},
+					If:         &common.Predicate{Javascript: `isSalesforceConnection()`},
 				},
 				{
 					Id:         "annotation_true",
@@ -36,6 +36,15 @@ func TestManifestSetupFlowIfJavascript(t *testing.T) {
 				},
 			},
 		},
+	}
+	conn, _ := newTestConnectionWithSetupFlow(t, ctrl, sf)
+	conn.cv = NewTestConnectorVersion(cschema.Connector{
+		Javascript: `
+			function isSalesforceConnection() {
+				return labels["apxy/cxr/type"] === "salesforce";
+			}
+		`,
+		SetupFlow: sf,
 	})
 	setConnectionConfigFixture(t, conn, map[string]any{"region": "eu"})
 	conn.Labels = map[string]string{"apxy/cxr/type": "salesforce"}

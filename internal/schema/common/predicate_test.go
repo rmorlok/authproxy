@@ -58,36 +58,37 @@ func TestPredicateGetValue(t *testing.T) {
 			"cat": "meow",
 		},
 	}
+	jsctx := apjs.NewContext(nil, vars)
 
 	t.Run("returns true", func(t *testing.T) {
 		p := &Predicate{Javascript: `sounds.dog === 'woof'`}
-		v, err := p.GetValue(vars)
+		v, err := p.GetValue(jsctx)
 		require.NoError(t, err)
 		require.True(t, v)
 	})
 
 	t.Run("returns false", func(t *testing.T) {
 		p := &Predicate{Javascript: `sounds.dog === 'meow'`}
-		v, err := p.GetValue(vars)
+		v, err := p.GetValue(jsctx)
 		require.NoError(t, err)
 		require.False(t, v)
 	})
 
 	t.Run("errors on blank javascript", func(t *testing.T) {
 		p := &Predicate{Javascript: " \n\t "}
-		_, err := p.GetValue(vars)
+		_, err := p.GetValue(jsctx)
 		require.Error(t, err)
 	})
 
 	t.Run("errors on syntax errors", func(t *testing.T) {
 		p := &Predicate{Javascript: `sounds.dog ===`}
-		_, err := p.GetValue(vars)
+		_, err := p.GetValue(jsctx)
 		require.Error(t, err)
 	})
 
 	t.Run("errors on non boolean results", func(t *testing.T) {
 		p := &Predicate{Javascript: `sounds.dog`}
-		_, err := p.GetValue(vars)
+		_, err := p.GetValue(jsctx)
 		require.Error(t, err)
 	})
 }

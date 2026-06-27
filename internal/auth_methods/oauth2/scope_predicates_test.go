@@ -7,6 +7,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/apjs"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/config"
 	mockCore "github.com/rmorlok/authproxy/internal/core/mock"
@@ -60,15 +61,55 @@ func TestEffectiveScopes_UsesConnectionPredicateContext(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, got, 3)
 	assert.Equal(t, []string{"read", "write", "activity"}, []string{got[0].Id, got[1].Id, got[2].Id})
-	required, err := got[0].IsRequired(nil)
+	required, err := got[0].IsRequired(apjs.Context{})
 	require.NoError(t, err)
 	assert.True(t, required)
-	required, err = got[1].IsRequired(nil)
+	required, err = got[1].IsRequired(apjs.Context{})
 	require.NoError(t, err)
 	assert.True(t, required)
-	required, err = got[2].IsRequired(nil)
+	required, err = got[2].IsRequired(apjs.Context{})
 	require.NoError(t, err)
 	assert.False(t, required)
+}
+
+func TestEffectiveScopes_UsesConnectionJavascriptLibrary(t *testing.T) {
+	library, err := apjs.CompileAndValidateLibrary(`
+		function includeWriteScope() {
+			return cfg.push_files === true && labels["env"] === "prod";
+		}
+
+		function requireActivityScope() {
+			return annotations["tier"] === "gold";
+		}
+	`)
+	require.NoError(t, err)
+
+	o := &oAuth2Connection{
+		connection: &mockCore.Connection{
+			Configuration:     map[string]any{"push_files": true},
+			Labels:            map[string]string{"env": "prod"},
+			Annotations:       map[string]string{"tier": "gold"},
+			JavascriptLibrary: library,
+		},
+		auth: &sconfig.AuthOAuth2{
+			Scopes: []sconfig.Scope{
+				{Id: "read"},
+				{Id: "write", If: &common.Predicate{Javascript: `includeWriteScope()`}},
+				{
+					Id:       "activity",
+					Required: sconfig.NewScopeRequiredPredicate(&common.Predicate{Javascript: `requireActivityScope()`}),
+				},
+			},
+		},
+	}
+
+	got, err := o.effectiveScopes(context.Background())
+	require.NoError(t, err)
+	require.Len(t, got, 3)
+	assert.Equal(t, []string{"read", "write", "activity"}, []string{got[0].Id, got[1].Id, got[2].Id})
+	required, err := got[2].IsRequired(apjs.Context{})
+	require.NoError(t, err)
+	assert.True(t, required)
 }
 
 func TestEffectiveScopes_PredicateErrorIncludesScopeContext(t *testing.T) {

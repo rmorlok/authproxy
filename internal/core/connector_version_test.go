@@ -15,6 +15,7 @@ import (
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type namespaceHolder struct {
@@ -153,6 +154,29 @@ func TestConnectorVersion_SetDefinition(t *testing.T) {
 	assert.Equal(t, expectedHash, cv.Hash)
 	assert.Equal(t, newEncryptedDef, cv.EncryptedDefinition)
 	assert.Equal(t, def, cv.def)
+}
+
+func TestConnectorVersion_SetDefinitionResetsJavascriptLibrary(t *testing.T) {
+	cv := NewTestConnectorVersion(cschema.Connector{
+		Javascript: `function isUpdated() { return false; }`,
+	})
+
+	library, err := cv.getJavascriptLibrary()
+	require.NoError(t, err)
+	ok, err := library.NewContext(nil).EvaluateBoolean(`isUpdated()`)
+	require.NoError(t, err)
+	assert.False(t, ok)
+
+	err = cv.setDefinition(&cschema.Connector{
+		Javascript: `function isUpdated() { return true; }`,
+	})
+	require.NoError(t, err)
+
+	library, err = cv.getJavascriptLibrary()
+	require.NoError(t, err)
+	ok, err = library.NewContext(nil).EvaluateBoolean(`isUpdated()`)
+	require.NoError(t, err)
+	assert.True(t, ok)
 }
 
 // NewTestConnectorVersion creates a new test connector version using provided connector configuration data.

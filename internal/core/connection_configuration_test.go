@@ -370,7 +370,7 @@ func TestConnectionGetMustacheContext(t *testing.T) {
 	})
 }
 
-func TestConnectionGetPredicateVars(t *testing.T) {
+func TestConnectionGetJavascriptContext(t *testing.T) {
 	t.Run("returns cfg labels and annotations", func(t *testing.T) {
 		e := encrypt.NewFakeEncryptService(false)
 		s := &service{encrypt: e, logger: aplog.NewNoopLogger()}
@@ -382,39 +382,44 @@ func TestConnectionGetPredicateVars(t *testing.T) {
 		conn.Labels = map[string]string{"env": "prod"}
 		conn.Annotations = map[string]string{"region": "us-east"}
 
-		data, err := conn.GetPredicateVars(context.Background())
+		jsctx, err := conn.GetJavascriptContext(context.Background())
 		require.NoError(t, err)
 
-		cfg, ok := data["cfg"].(map[string]any)
-		require.True(t, ok)
-		assert.Equal(t, "acme", cfg["tenant"])
-
-		labels, ok := data["labels"].(map[string]string)
-		require.True(t, ok)
-		assert.Equal(t, "prod", labels["env"])
-
-		annotations, ok := data["annotations"].(map[string]string)
-		require.True(t, ok)
-		assert.Equal(t, "us-east", annotations["region"])
+		ok, err := jsctx.EvaluateBoolean(`cfg.tenant === "acme" && labels.env === "prod" && annotations.region === "us-east"`)
+		require.NoError(t, err)
+		assert.True(t, ok)
 	})
 
 	t.Run("returns empty maps when values are absent", func(t *testing.T) {
 		conn := newTestConnection(cschema.Connector{})
 
-		data, err := conn.GetPredicateVars(context.Background())
+		jsctx, err := conn.GetJavascriptContext(context.Background())
 		require.NoError(t, err)
 
-		cfg, ok := data["cfg"].(map[string]any)
-		require.True(t, ok)
-		assert.Empty(t, cfg)
+		ok, err := jsctx.EvaluateBoolean(`Object.keys(cfg).length === 0 && Object.keys(labels).length === 0 && Object.keys(annotations).length === 0`)
+		require.NoError(t, err)
+		assert.True(t, ok)
+	})
 
-		labels, ok := data["labels"].(map[string]string)
-		require.True(t, ok)
-		assert.Empty(t, labels)
+	t.Run("includes connector javascript helpers", func(t *testing.T) {
+		conn := newTestConnection(cschema.Connector{
+			Javascript: `
+				function isProdTenant() {
+					return cfg.tenant === "acme" &&
+						labels.env === "prod" &&
+						annotations.region === "us-east";
+				}
+			`,
+		})
+		setConnectionConfigFixture(t, conn, map[string]any{"tenant": "acme"})
+		conn.Labels = map[string]string{"env": "prod"}
+		conn.Annotations = map[string]string{"region": "us-east"}
 
-		annotations, ok := data["annotations"].(map[string]string)
-		require.True(t, ok)
-		assert.Empty(t, annotations)
+		jsctx, err := conn.GetJavascriptContext(context.Background())
+		require.NoError(t, err)
+		ok, err := jsctx.EvaluateBoolean(`isProdTenant()`)
+		require.NoError(t, err)
+		assert.True(t, ok)
 	})
 
 	t.Run("returns error on decrypt failure", func(t *testing.T) {
@@ -423,8 +428,16 @@ func TestConnectionGetPredicateVars(t *testing.T) {
 		conn := newTestConnectionWithService(s)
 		conn.EncryptedConfiguration = &encfield.EncryptedField{ID: "ekv_wrong", Data: "some-data"}
 
-		_, err := conn.GetPredicateVars(context.Background())
+		_, err := conn.GetJavascriptContext(context.Background())
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "get connection configuration")
+	})
+
+	t.Run("returns error for invalid connector javascript", func(t *testing.T) {
+		conn := newTestConnection(cschema.Connector{Javascript: `function broken(`})
+
+		_, err := conn.GetJavascriptContext(context.Background())
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "compile connector JavaScript library")
 	})
 }

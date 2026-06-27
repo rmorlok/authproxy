@@ -97,7 +97,12 @@ func (c *connection) GetDataSource(ctx context.Context, sourceId string) ([]apjs
 	}
 
 	// Run JavaScript transform
-	options, err := apjs.TransformJSON(ds.Transform, responseData)
+	jsctx, err := c.GetJavascriptContext(ctx)
+	if err != nil {
+		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to get javascript context: %w", err))
+	}
+
+	options, err := jsctx.TransformJSON(ds.Transform, responseData)
 	if err != nil {
 		return nil, httperr.InternalServerErrorMsg("failed to transform data source response", httperr.WithInternalErrorf("data source transform failed: %w", err))
 	}

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/apjs"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -100,10 +101,15 @@ func (c *connection) GetConnectorVersionEntity() iface.ConnectorVersion {
 	return c.cv
 }
 
-func (c *connection) GetPredicateVars(ctx context.Context) (map[string]any, error) {
+func (c *connection) GetJavascriptContext(ctx context.Context) (apjs.Context, error) {
+	jsLib, err := c.cv.getJavascriptLibrary()
+	if err != nil {
+		return apjs.Context{}, err
+	}
+
 	cfg, err := c.GetConfiguration(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("get connection configuration: %w", err)
+		return apjs.Context{}, fmt.Errorf("get connection configuration: %w", err)
 	}
 	if cfg == nil {
 		cfg = map[string]any{}
@@ -119,11 +125,14 @@ func (c *connection) GetPredicateVars(ctx context.Context) (map[string]any, erro
 		annotations = map[string]string{}
 	}
 
-	return map[string]any{
-		"cfg":         cfg,
-		"labels":      labels,
-		"annotations": annotations,
-	}, nil
+	return apjs.NewContext(
+		jsLib,
+		map[string]any{
+			"cfg":         cfg,
+			"labels":      labels,
+			"annotations": annotations,
+		},
+	), nil
 }
 
 func (c *connection) Logger() *slog.Logger {

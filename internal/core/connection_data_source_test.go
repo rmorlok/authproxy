@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
+	"github.com/rmorlok/authproxy/internal/core/iface"
+	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/stretchr/testify/assert"
@@ -12,6 +14,65 @@ import (
 )
 
 func TestGetDataSource(t *testing.T) {
+	t.Run("transforms response with connector javascript context", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		conn, proxy := newProbeTestConnection(t, ctrl, cschema.Connector{
+			Javascript: `
+				function workspaceOptions(items) {
+					return items.map(function(item) {
+						return {
+							value: labels.env + ":" + item.id,
+							label: cfg.region + "/" + annotations.prefix + "/" + item.summary
+						};
+					});
+				}
+			`,
+			SetupFlow: &cschema.SetupFlow{
+				Configure: &cschema.SetupFlowPhase{
+					Steps: []cschema.SetupFlowStep{
+						{
+							Id:         "workspace",
+							JsonSchema: workspaceSchema,
+							DataSources: map[string]cschema.DataSourceDef{
+								"workspaces": {
+									ProxyRequest: &cschema.DataSourceProxyRequest{
+										Method: "GET",
+										Url:    "https://api.example.com/workspaces",
+									},
+									Transform: "workspaceOptions(data.items)",
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+		step := cschema.MustNewSetupStep("workspace")
+		conn.SetupStep = &step
+		conn.s.encrypt = encrypt.NewFakeEncryptService(false)
+		setConnectionConfigFixture(t, conn, map[string]any{"region": "us-east"})
+		conn.Labels = map[string]string{"env": "prod"}
+		conn.Annotations = map[string]string{"prefix": "team"}
+		proxy.resp = &iface.ProxyResponse{
+			StatusCode: 200,
+			BodyJson: map[string]any{
+				"items": []any{
+					map[string]any{"id": "primary", "summary": "Primary"},
+				},
+			},
+		}
+
+		options, err := conn.GetDataSource(context.Background(), "workspaces")
+		require.NoError(t, err)
+		require.Len(t, options, 1)
+		assert.Equal(t, "prod:primary", options[0].Value)
+		assert.Equal(t, "us-east/team/Primary", options[0].Label)
+		require.Len(t, proxy.calls, 1)
+		assert.Equal(t, "https://api.example.com/workspaces", proxy.calls[0].URL)
+	})
+
 	t.Run("returns error when no setup step", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()

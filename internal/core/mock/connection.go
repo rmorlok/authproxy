@@ -15,20 +15,21 @@ import (
 )
 
 type Connection struct {
-	Id               apid.ID
-	Namespace        string
-	State            database.ConnectionState
-	HealthState      database.ConnectionHealthState
-	ConnectorId      apid.ID
-	ConnectorVersion uint64
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
-	DeletedAt        *time.Time
-	Labels           map[string]string
-	Annotations      map[string]string
-	SetupStep        *cschema.SetupStep
-	SetupError       *string
-	Configuration    map[string]any
+	Id                apid.ID
+	Namespace         string
+	State             database.ConnectionState
+	HealthState       database.ConnectionHealthState
+	ConnectorId       apid.ID
+	ConnectorVersion  uint64
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+	DeletedAt         *time.Time
+	Labels            map[string]string
+	Annotations       map[string]string
+	SetupStep         *cschema.SetupStep
+	SetupError        *string
+	Configuration     map[string]any
+	JavascriptLibrary *apjs.Library
 }
 
 func (m *Connection) GetId() apid.ID {
@@ -152,7 +153,7 @@ func (m *Connection) SetConfiguration(ctx context.Context, data map[string]any) 
 	return nil
 }
 
-func (m *Connection) GetPredicateVars(ctx context.Context) (map[string]any, error) {
+func (m *Connection) GetJavascriptContext(ctx context.Context) (apjs.Context, error) {
 	cfg := m.Configuration
 	if cfg == nil {
 		cfg = map[string]any{}
@@ -168,11 +169,14 @@ func (m *Connection) GetPredicateVars(ctx context.Context) (map[string]any, erro
 		annotations = map[string]string{}
 	}
 
-	return map[string]any{
-		"cfg":         cfg,
-		"labels":      labels,
-		"annotations": annotations,
-	}, nil
+	return apjs.NewContext(
+		m.JavascriptLibrary,
+		map[string]any{
+			"cfg":         cfg,
+			"labels":      labels,
+			"annotations": annotations,
+		},
+	), nil
 }
 
 func (m *Connection) GetMustacheContext(ctx context.Context) (map[string]any, error) {
