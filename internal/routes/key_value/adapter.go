@@ -143,7 +143,7 @@ func (a Adapter[ID]) HandleList(gctx *gin.Context) {
 	if values == nil {
 		values = make(map[string]string)
 	}
-	gctx.PureJSON(http.StatusOK, values)
+	apgin.APIJSON(gctx, http.StatusOK, values)
 }
 
 // HandleGet serves GET /<resource>/<id>/<segment>/<key> — returns the
@@ -177,7 +177,7 @@ func (a Adapter[ID]) HandleGet(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, KeyValueJson{Key: key, Value: value})
+	apgin.APIJSON(gctx, http.StatusOK, KeyValueJson{Key: key, Value: value})
 }
 
 // HandlePut serves PUT /<resource>/<id>/<segment>/<key> — adds or
@@ -235,7 +235,7 @@ func (a Adapter[ID]) HandlePut(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, KeyValueJson{
+	apgin.APIJSON(gctx, http.StatusOK, KeyValueJson{
 		Key:   key,
 		Value: a.Kind.Get(updated)[key],
 	})

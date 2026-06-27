@@ -111,7 +111,7 @@ func (r *NamespacesRoutes) get(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, NamespaceToJson(ns))
+	apgin.APIJSON(gctx, http.StatusOK, NamespaceToJson(ns))
 }
 
 // @Summary		Create namespace
@@ -195,7 +195,7 @@ func (r *NamespacesRoutes) create(gctx *gin.Context) {
 		}
 	}
 
-	gctx.PureJSON(http.StatusOK, NamespaceToJson(ns))
+	apgin.APIJSON(gctx, http.StatusOK, NamespaceToJson(ns))
 }
 
 // @Summary		List namespaces
@@ -300,7 +300,7 @@ func (r *NamespacesRoutes) list(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, ListNamespacesResponseJson{
+	apgin.APIJSON(gctx, http.StatusOK, ListNamespacesResponseJson{
 		Items:  util.Map(auth.FilterForValidatedResources(val, result.Results), NamespaceToJson),
 		Cursor: result.Cursor,
 	})
@@ -408,7 +408,7 @@ func (r *NamespacesRoutes) update(gctx *gin.Context) {
 		}
 	}
 
-	gctx.PureJSON(http.StatusOK, NamespaceToJson(ns))
+	apgin.APIJSON(gctx, http.StatusOK, NamespaceToJson(ns))
 }
 
 // Label and annotation handlers for namespaces delegate to a shared
@@ -574,7 +574,7 @@ func (r *NamespacesRoutes) getKey(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, NamespaceKeyJson{
+	apgin.APIJSON(gctx, http.StatusOK, NamespaceKeyJson{
 		KeyId: string(*ekId),
 	})
 }
@@ -643,7 +643,7 @@ func (r *NamespacesRoutes) setKey(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, NamespaceToJson(ns))
+	apgin.APIJSON(gctx, http.StatusOK, NamespaceToJson(ns))
 }
 
 func (r *NamespacesRoutes) clearKey(gctx *gin.Context) {

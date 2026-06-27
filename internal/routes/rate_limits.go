@@ -159,7 +159,7 @@ func (r *RateLimitsRoutes) get(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, RateLimitToJson(rl))
+	apgin.APIJSON(gctx, http.StatusOK, RateLimitToJson(rl))
 }
 
 // @Summary		Create rate limit
@@ -226,7 +226,7 @@ func (r *RateLimitsRoutes) create(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, RateLimitToJson(rl))
+	apgin.APIJSON(gctx, http.StatusOK, RateLimitToJson(rl))
 }
 
 // @Summary		List rate limits
@@ -306,7 +306,7 @@ func (r *RateLimitsRoutes) list(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, ListRateLimitsResponseJson{
+	apgin.APIJSON(gctx, http.StatusOK, ListRateLimitsResponseJson{
 		Items:  util.Map(auth.FilterForValidatedResources(val, result.Results), RateLimitToJson),
 		Cursor: result.Cursor,
 	})
@@ -418,7 +418,7 @@ func (r *RateLimitsRoutes) update(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, RateLimitToJson(rl))
+	apgin.APIJSON(gctx, http.StatusOK, RateLimitToJson(rl))
 }
 
 func (r *RateLimitsRoutes) handleMutateError(gctx *gin.Context, val *auth.ResourcePermissionValidator, id apid.ID, err error) {
@@ -532,7 +532,7 @@ func (r *RateLimitsRoutes) dryRun(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, dryRunResponseFromCore(result))
+	apgin.APIJSON(gctx, http.StatusOK, dryRunResponseFromCore(result))
 }
 
 // Label and annotation handlers delegate to the shared key_value adapter.

@@ -149,7 +149,7 @@ func (r *ActorsRoutes) list(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, ListActorsResponseJson{
+	apgin.APIJSON(gctx, http.StatusOK, ListActorsResponseJson{
 		Items:  util.Map(auth.FilterForValidatedResources(val, result.Results), DatabaseActorToJson),
 		Cursor: result.Cursor,
 	})
@@ -209,7 +209,7 @@ func (r *ActorsRoutes) get(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, DatabaseActorToJson(a))
+	apgin.APIJSON(gctx, http.StatusOK, DatabaseActorToJson(a))
 }
 
 // @Summary		Get actor by external ID
@@ -267,7 +267,7 @@ func (r *ActorsRoutes) getByExternalId(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, DatabaseActorToJson(a))
+	apgin.APIJSON(gctx, http.StatusOK, DatabaseActorToJson(a))
 }
 
 // @Summary		Delete actor by UUID
@@ -521,7 +521,7 @@ func (r *ActorsRoutes) create(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusCreated, DatabaseActorToJson(createdActor))
+	apgin.APIJSON(gctx, http.StatusCreated, DatabaseActorToJson(createdActor))
 }
 
 // @Summary		Update actor by UUID
@@ -622,7 +622,7 @@ func (r *ActorsRoutes) update(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, DatabaseActorToJson(updatedActor))
+	apgin.APIJSON(gctx, http.StatusOK, DatabaseActorToJson(updatedActor))
 }
 
 // @Summary		Update actor by external ID
@@ -724,7 +724,7 @@ func (r *ActorsRoutes) updateByExternalId(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, DatabaseActorToJson(updatedActor))
+	apgin.APIJSON(gctx, http.StatusOK, DatabaseActorToJson(updatedActor))
 }
 
 // Label and annotation handlers for actors delegate to a shared

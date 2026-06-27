@@ -11,6 +11,7 @@ import (
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/apgin"
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/apserde"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/core"
 	connIface "github.com/rmorlok/authproxy/internal/core/iface"
@@ -218,7 +219,7 @@ func (r *ConnectorsRoutes) get(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, ConnectorToJson(c))
+	apgin.APIJSON(gctx, http.StatusOK, ConnectorToJson(c))
 }
 
 // @Summary		List connectors
@@ -304,7 +305,7 @@ func (r *ConnectorsRoutes) list(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, ListConnectorsResponseJson{
+	apgin.APIJSON(gctx, http.StatusOK, ListConnectorsResponseJson{
 		Items:  util.Map(auth.FilterForValidatedResources(val, result.Results), ConnectorToJson),
 		Cursor: result.Cursor,
 	})
@@ -366,7 +367,7 @@ func (r *ConnectorsRoutes) getVersion(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, ConnectorVersionToJson(cv))
+	apgin.APIJSON(gctx, http.StatusOK, ConnectorVersionToJson(cv))
 }
 
 // @Summary		List connector versions
@@ -413,7 +414,7 @@ func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
 	if effectiveMatchers != nil && len(effectiveMatchers) == 0 {
 		// No access to any namespaces for this resource/verb
 		val.MarkValidated()
-		gctx.PureJSON(http.StatusOK, ListConnectorVersionsResponseJson{Items: []ConnectorVersionJson{}})
+		apgin.APIJSON(gctx, http.StatusOK, ListConnectorVersionsResponseJson{Items: []ConnectorVersionJson{}})
 		return
 	}
 
@@ -476,7 +477,7 @@ func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, ListConnectorVersionsResponseJson{
+	apgin.APIJSON(gctx, http.StatusOK, ListConnectorVersionsResponseJson{
 		Items:  util.Map(auth.FilterForValidatedResources(val, result.Results), ConnectorVersionToJson),
 		Cursor: result.Cursor,
 	})
@@ -501,6 +502,11 @@ func (r *ConnectorsRoutes) createConnector(gctx *gin.Context) {
 
 	var req CreateConnectorRequestJson
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
+		val.MarkErrorReturn()
+		return
+	}
+	if err := apserde.ValidateNoRedactedPlaceholders(req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
@@ -542,7 +548,7 @@ func (r *ConnectorsRoutes) createConnector(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusCreated, ConnectorVersionToJson(result))
+	apgin.APIJSON(gctx, http.StatusCreated, ConnectorVersionToJson(result))
 }
 
 // @Summary		Update connector
@@ -573,6 +579,11 @@ func (r *ConnectorsRoutes) updateConnector(gctx *gin.Context) {
 
 	var req UpdateConnectorRequestJson
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
+		val.MarkErrorReturn()
+		return
+	}
+	if err := apserde.ValidateNoRedactedPlaceholders(req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
@@ -645,7 +656,7 @@ func (r *ConnectorsRoutes) updateConnector(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, ConnectorVersionToJson(result))
+	apgin.APIJSON(gctx, http.StatusOK, ConnectorVersionToJson(result))
 }
 
 // @Summary		Create connector version
@@ -700,6 +711,11 @@ func (r *ConnectorsRoutes) createVersion(gctx *gin.Context) {
 			val.MarkErrorReturn()
 			return
 		}
+		if err := apserde.ValidateNoRedactedPlaceholders(req); err != nil {
+			apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
+			val.MarkErrorReturn()
+			return
+		}
 	}
 
 	if req.Definition != nil {
@@ -747,7 +763,7 @@ func (r *ConnectorsRoutes) createVersion(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusCreated, ConnectorVersionToJson(result))
+	apgin.APIJSON(gctx, http.StatusCreated, ConnectorVersionToJson(result))
 }
 
 // @Summary		Update connector version
@@ -782,6 +798,11 @@ func (r *ConnectorsRoutes) updateVersion(gctx *gin.Context) {
 
 	var req UpdateConnectorRequestJson
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
+		val.MarkErrorReturn()
+		return
+	}
+	if err := apserde.ValidateNoRedactedPlaceholders(req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
@@ -865,7 +886,7 @@ func (r *ConnectorsRoutes) updateVersion(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, ConnectorVersionToJson(result))
+	apgin.APIJSON(gctx, http.StatusOK, ConnectorVersionToJson(result))
 }
 
 // @Summary		Get all labels for a connector
@@ -1076,7 +1097,7 @@ func (r *ConnectorsRoutes) forceVersionState(gctx *gin.Context) {
 	}
 
 	if cv.GetState() == state {
-		gctx.PureJSON(http.StatusOK, ConnectorVersionToJson(cv))
+		apgin.APIJSON(gctx, http.StatusOK, ConnectorVersionToJson(cv))
 		return
 	}
 
@@ -1087,7 +1108,7 @@ func (r *ConnectorsRoutes) forceVersionState(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, ConnectorVersionToJson(cv))
+	apgin.APIJSON(gctx, http.StatusOK, ConnectorVersionToJson(cv))
 }
 
 func (r *ConnectorsRoutes) loadConnectorByID(ctx context.Context, connectorId apid.ID) (connIface.Connector, error) {
@@ -1154,7 +1175,7 @@ func (r *ConnectorsRoutes) writeLifecycleTaskResponse(
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, ConnectorLifecycleResponseJson{
+	apgin.APIJSON(gctx, http.StatusOK, ConnectorLifecycleResponseJson{
 		TaskId:      taskId,
 		ConnectorId: connectorID,
 	})

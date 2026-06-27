@@ -98,7 +98,7 @@ func (r *ConnectionsProxyRoutes) proxy(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(200, resp)
+	apgin.APIJSON(gctx, 200, resp)
 }
 
 func (r *ConnectionsProxyRoutes) Register(g gin.IRouter) {

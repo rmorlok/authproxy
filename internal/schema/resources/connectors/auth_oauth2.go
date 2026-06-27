@@ -52,7 +52,7 @@ type AuthOAuth2 struct {
 	// default.
 	TokenEndpointAuthMethod *TokenEndpointAuthMethod `json:"token_endpoint_auth_method,omitempty" yaml:"token_endpoint_auth_method,omitempty"`
 	ClientId                *common.StringValue      `json:"client_id,omitempty" yaml:"client_id,omitempty"`
-	ClientSecret            *common.StringValue      `json:"client_secret,omitempty" yaml:"client_secret,omitempty"`
+	ClientSecret            *common.StringValue      `json:"client_secret,omitempty" yaml:"client_secret,omitempty" apiredact:"secret"`
 	Scopes                  []Scope                  `json:"scopes" yaml:"scopes"`
 	Authorization           AuthOauth2Authorization  `json:"authorization" yaml:"authorization"`
 	Token                   AuthOauth2Token          `json:"token" yaml:"token"`

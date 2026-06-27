@@ -102,7 +102,7 @@ func (r *KeysRoutes) get(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, KeyToJson(ek))
+	apgin.APIJSON(gctx, http.StatusOK, KeyToJson(ek))
 }
 
 // @Summary		Create key
@@ -171,7 +171,7 @@ func (r *KeysRoutes) create(gctx *gin.Context) {
 		}
 	}
 
-	gctx.PureJSON(http.StatusOK, KeyToJson(ek))
+	apgin.APIJSON(gctx, http.StatusOK, KeyToJson(ek))
 }
 
 // @Summary		List keys
@@ -257,7 +257,7 @@ func (r *KeysRoutes) list(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, ListKeysResponseJson{
+	apgin.APIJSON(gctx, http.StatusOK, ListKeysResponseJson{
 		Items:  util.Map(auth.FilterForValidatedResources(val, result.Results), KeyToJson),
 		Cursor: result.Cursor,
 	})
@@ -395,7 +395,7 @@ func (r *KeysRoutes) update(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, KeyToJson(ek))
+	apgin.APIJSON(gctx, http.StatusOK, KeyToJson(ek))
 }
 
 // @Summary		Delete key

@@ -221,7 +221,7 @@ func (r *TaskMonitoringRoutes) listQueues(gctx *gin.Context) {
 		items = append(items, queueInfoToJson(qi))
 	}
 
-	gctx.PureJSON(http.StatusOK, ListQueuesResponseJson{Items: items})
+	apgin.APIJSON(gctx, http.StatusOK, ListQueuesResponseJson{Items: items})
 }
 
 func (r *TaskMonitoringRoutes) getQueueInfo(gctx *gin.Context) {
@@ -240,7 +240,7 @@ func (r *TaskMonitoringRoutes) getQueueInfo(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, queueInfoToJson(qi))
+	apgin.APIJSON(gctx, http.StatusOK, queueInfoToJson(qi))
 }
 
 func (r *TaskMonitoringRoutes) getQueueHistory(gctx *gin.Context) {
@@ -274,7 +274,7 @@ func (r *TaskMonitoringRoutes) getQueueHistory(gctx *gin.Context) {
 		result = append(result, dailyStatsToJson(s))
 	}
 
-	gctx.PureJSON(http.StatusOK, ListQueueHistoryResponseJson{Items: result})
+	apgin.APIJSON(gctx, http.StatusOK, ListQueueHistoryResponseJson{Items: result})
 }
 
 func (r *TaskMonitoringRoutes) listTasksByState(gctx *gin.Context) {
@@ -366,7 +366,7 @@ func (r *TaskMonitoringRoutes) listTasksByState(gctx *gin.Context) {
 		}
 	}
 
-	gctx.PureJSON(http.StatusOK, ListMonitoringTasksResponseJson{
+	apgin.APIJSON(gctx, http.StatusOK, ListMonitoringTasksResponseJson{
 		Items:  items,
 		Cursor: cursor,
 	})
@@ -390,7 +390,7 @@ func (r *TaskMonitoringRoutes) getTask(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, taskInfoToJson(ti))
+	apgin.APIJSON(gctx, http.StatusOK, taskInfoToJson(ti))
 }
 
 func (r *TaskMonitoringRoutes) listServers(gctx *gin.Context) {
@@ -408,7 +408,7 @@ func (r *TaskMonitoringRoutes) listServers(gctx *gin.Context) {
 		items = append(items, serverInfoToJson(s))
 	}
 
-	gctx.PureJSON(http.StatusOK, ListServersResponseJson{Items: items})
+	apgin.APIJSON(gctx, http.StatusOK, ListServersResponseJson{Items: items})
 }
 
 func (r *TaskMonitoringRoutes) listSchedulerEntries(gctx *gin.Context) {
@@ -426,7 +426,7 @@ func (r *TaskMonitoringRoutes) listSchedulerEntries(gctx *gin.Context) {
 		items = append(items, schedulerEntryToJson(e))
 	}
 
-	gctx.PureJSON(http.StatusOK, ListSchedulerEntriesResponseJson{Items: items})
+	apgin.APIJSON(gctx, http.StatusOK, ListSchedulerEntriesResponseJson{Items: items})
 }
 
 func (r *TaskMonitoringRoutes) runTask(gctx *gin.Context) {
@@ -441,7 +441,7 @@ func (r *TaskMonitoringRoutes) runTask(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, gin.H{"ok": true})
+	apgin.APIJSON(gctx, http.StatusOK, gin.H{"ok": true})
 }
 
 func (r *TaskMonitoringRoutes) archiveTask(gctx *gin.Context) {
@@ -456,7 +456,7 @@ func (r *TaskMonitoringRoutes) archiveTask(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, gin.H{"ok": true})
+	apgin.APIJSON(gctx, http.StatusOK, gin.H{"ok": true})
 }
 
 func (r *TaskMonitoringRoutes) cancelTask(gctx *gin.Context) {
@@ -470,7 +470,7 @@ func (r *TaskMonitoringRoutes) cancelTask(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, gin.H{"ok": true})
+	apgin.APIJSON(gctx, http.StatusOK, gin.H{"ok": true})
 }
 
 func (r *TaskMonitoringRoutes) deleteTask(gctx *gin.Context) {
@@ -485,7 +485,7 @@ func (r *TaskMonitoringRoutes) deleteTask(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, gin.H{"ok": true})
+	apgin.APIJSON(gctx, http.StatusOK, gin.H{"ok": true})
 }
 
 func (r *TaskMonitoringRoutes) pauseQueue(gctx *gin.Context) {
@@ -499,7 +499,7 @@ func (r *TaskMonitoringRoutes) pauseQueue(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, gin.H{"ok": true})
+	apgin.APIJSON(gctx, http.StatusOK, gin.H{"ok": true})
 }
 
 func (r *TaskMonitoringRoutes) unpauseQueue(gctx *gin.Context) {
@@ -513,7 +513,7 @@ func (r *TaskMonitoringRoutes) unpauseQueue(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, gin.H{"ok": true})
+	apgin.APIJSON(gctx, http.StatusOK, gin.H{"ok": true})
 }
 
 func (r *TaskMonitoringRoutes) runAllArchivedTasks(gctx *gin.Context) {
@@ -528,7 +528,7 @@ func (r *TaskMonitoringRoutes) runAllArchivedTasks(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, &BulkActionResponseJson{AffectedCount: count})
+	apgin.APIJSON(gctx, http.StatusOK, &BulkActionResponseJson{AffectedCount: count})
 }
 
 func (r *TaskMonitoringRoutes) runAllRetryTasks(gctx *gin.Context) {
@@ -543,7 +543,7 @@ func (r *TaskMonitoringRoutes) runAllRetryTasks(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, &BulkActionResponseJson{AffectedCount: count})
+	apgin.APIJSON(gctx, http.StatusOK, &BulkActionResponseJson{AffectedCount: count})
 }
 
 func (r *TaskMonitoringRoutes) deleteAllArchivedTasks(gctx *gin.Context) {
@@ -558,7 +558,7 @@ func (r *TaskMonitoringRoutes) deleteAllArchivedTasks(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, &BulkActionResponseJson{AffectedCount: count})
+	apgin.APIJSON(gctx, http.StatusOK, &BulkActionResponseJson{AffectedCount: count})
 }
 
 func (r *TaskMonitoringRoutes) deleteAllCompletedTasks(gctx *gin.Context) {
@@ -573,7 +573,7 @@ func (r *TaskMonitoringRoutes) deleteAllCompletedTasks(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, &BulkActionResponseJson{AffectedCount: count})
+	apgin.APIJSON(gctx, http.StatusOK, &BulkActionResponseJson{AffectedCount: count})
 }
 
 // Register registers all task monitoring routes
