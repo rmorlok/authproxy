@@ -131,6 +131,33 @@ func TestConnectionGetConfiguration(t *testing.T) {
 		assert.Equal(t, "https://acme.example.com", result["base_url"])
 	})
 
+	t.Run("caches decrypted configuration and returns copies", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		s, _, _, _, _, enc := FullMockService(t, ctrl)
+		conn := newTestConnectionWithService(s)
+		ef := encfield.EncryptedField{ID: "ekv_test", Data: "encrypted-data"}
+		conn.EncryptedConfiguration = &ef
+
+		enc.EXPECT().
+			DecryptString(gomock.Any(), ef).
+			Return(`{"tenant":"acme","nested":{"flag":true},"items":[{"id":"one"}]}`, nil).
+			Times(1)
+
+		first, err := conn.GetConfiguration(context.Background())
+		require.NoError(t, err)
+		first["tenant"] = "mutated"
+		first["nested"].(map[string]any)["flag"] = false
+		first["items"].([]any)[0].(map[string]any)["id"] = "mutated"
+
+		second, err := conn.GetConfiguration(context.Background())
+		require.NoError(t, err)
+		assert.Equal(t, "acme", second["tenant"])
+		assert.Equal(t, true, second["nested"].(map[string]any)["flag"])
+		assert.Equal(t, "one", second["items"].([]any)[0].(map[string]any)["id"])
+	})
+
 	t.Run("returns error on decrypt failure", func(t *testing.T) {
 		e := encrypt.NewFakeEncryptService(false)
 		s := &service{encrypt: e, logger: aplog.NewNoopLogger()}
@@ -258,6 +285,34 @@ func TestConnectionSetConfiguration(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "newcorp", result["tenant"])
 		assert.Equal(t, "field", result["extra"])
+	})
+
+	t.Run("updates decrypted configuration cache", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		s, db, _, _, _, enc := FullMockService(t, ctrl)
+		conn := newTestConnectionWithService(s)
+		ef := encfield.EncryptedField{ID: "ekv_test", Data: "encrypted-data"}
+
+		enc.EXPECT().
+			EncryptStringForNamespace(gomock.Any(), "root", gomock.Any()).
+			DoAndReturn(func(ctx context.Context, namespace string, data string) (encfield.EncryptedField, error) {
+				assert.JSONEq(t, `{"tenant":"acme","count":2}`, data)
+				return ef, nil
+			})
+		db.EXPECT().SetConnectionEncryptedConfiguration(gomock.Any(), conn.Id, &ef).Return(nil)
+
+		err := conn.SetConfiguration(context.Background(), map[string]any{
+			"tenant": "acme",
+			"count":  2,
+		})
+		require.NoError(t, err)
+
+		result, err := conn.GetConfiguration(context.Background())
+		require.NoError(t, err)
+		assert.Equal(t, "acme", result["tenant"])
+		assert.Equal(t, float64(2), result["count"])
 	})
 }
 

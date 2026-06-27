@@ -27,6 +27,10 @@ type connection struct {
 	cv     *ConnectorVersion
 	logger *slog.Logger
 
+	configMu     sync.Mutex
+	configLoaded bool
+	configCache  map[string]any
+
 	proxyImplOnce sync.Once
 	proxyImpl     iface.Proxy
 	proxyImplErr  error
@@ -160,7 +164,16 @@ func (c *connection) SetSetupError(ctx context.Context, setupError *string) erro
 }
 
 func (c *connection) GetConfiguration(ctx context.Context) (map[string]any, error) {
+	c.configMu.Lock()
+	defer c.configMu.Unlock()
+
+	if c.configLoaded {
+		return cloneConfiguration(c.configCache), nil
+	}
+
 	if c.EncryptedConfiguration == nil || c.EncryptedConfiguration.IsZero() {
+		c.configLoaded = true
+		c.configCache = nil
 		return nil, nil
 	}
 
@@ -174,13 +187,24 @@ func (c *connection) GetConfiguration(ctx context.Context) (map[string]any, erro
 		return nil, fmt.Errorf("failed to unmarshal connection configuration: %w", err)
 	}
 
-	return result, nil
+	c.configLoaded = true
+	c.configCache = result
+
+	return cloneConfiguration(c.configCache), nil
 }
 
 func (c *connection) SetConfiguration(ctx context.Context, data map[string]any) error {
+	c.configMu.Lock()
+	defer c.configMu.Unlock()
+
 	jsonBytes, err := json.Marshal(data)
 	if err != nil {
 		return fmt.Errorf("failed to marshal connection configuration: %w", err)
+	}
+
+	var cached map[string]any
+	if err := json.Unmarshal(jsonBytes, &cached); err != nil {
+		return fmt.Errorf("failed to normalize connection configuration: %w", err)
 	}
 
 	ef, err := c.s.encrypt.EncryptStringForNamespace(ctx, c.Namespace, string(jsonBytes))
@@ -193,7 +217,36 @@ func (c *connection) SetConfiguration(ctx context.Context, data map[string]any) 
 	}
 
 	c.EncryptedConfiguration = &ef
+	c.configCache = cached
+	c.configLoaded = true
 	return nil
+}
+
+func cloneConfiguration(cfg map[string]any) map[string]any {
+	if cfg == nil {
+		return nil
+	}
+
+	cloned := make(map[string]any, len(cfg))
+	for key, value := range cfg {
+		cloned[key] = cloneConfigurationValue(value)
+	}
+	return cloned
+}
+
+func cloneConfigurationValue(value any) any {
+	switch typed := value.(type) {
+	case map[string]any:
+		return cloneConfiguration(typed)
+	case []any:
+		cloned := make([]any, len(typed))
+		for i, item := range typed {
+			cloned[i] = cloneConfigurationValue(item)
+		}
+		return cloned
+	default:
+		return typed
+	}
 }
 
 func (c *connection) GetMustacheContext(ctx context.Context) (map[string]any, error) {
