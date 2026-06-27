@@ -220,16 +220,16 @@ jobs:
           workdir="$(mktemp -d)"
           trap 'rm -rf "${workdir}"' EXIT
 
-          kubectl -n "${RELEASE_NS}" get secret "${RELEASE_NAME}-jwt" \
-            -o jsonpath='{.data.system}' \
-            | base64 -d > "${workdir}/system.key"
-          chmod 600 "${workdir}/system.key"
+          kubectl -n "${RELEASE_NS}" get secret "${RELEASE_NAME}-demo-shell-key" \
+            -o jsonpath='{.data.private}' \
+            | base64 -d > "${workdir}/grafana-actor.key"
+          chmod 600 "${workdir}/grafana-actor.key"
 
           go run ./cmd/cli sign-jwt \
             --actorId grafana \
             --apis api,admin-api \
             --grafana-preset logs \
-            --privateKeyPath "${workdir}/system.key" \
+            --privateKeyPath "${workdir}/grafana-actor.key" \
             > "${workdir}/grafana.jwt"
 
           kubectl -n "${RELEASE_NS}" create secret generic authproxy-grafana-jwt \
