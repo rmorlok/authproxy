@@ -8,7 +8,7 @@ This directory holds long-form documentation that supplements the [main repo REA
 - **[Rate limits](rate-limits.md)** — define rate-limit resources, configure connector-level reactive 429 handling, understand the request log attribution fields.
 - **[Labels and annotations](labels.md)** — the Kubernetes-style label system, system labels under `apxy/`, carry-forward through the namespace → connector → connection hierarchy, label selectors, per-request label snapshots.
 - **[Connector setup flow](connector-setup-flow.md)** — author preconnect/configure steps, conditional `if.javascript` steps, redirect steps, and configure-time data sources.
-- **[Connector predicates](connector-predicates.md)** — condition setup steps, OAuth scopes, dynamic required OAuth scopes, and probes with JavaScript predicates over `cfg`, `labels`, and `annotations`.
+- **[Connector predicates](connector-predicates.md)** — condition setup steps, OAuth scopes, dynamic required OAuth scopes, and probes with JavaScript predicates over `cfg`, `labels`, and `annotations`, including connector-level shared JavaScript helpers.
 - **[Application metrics](app_metrics.md)** — configure the app metrics store, query request-event and resource metrics, and understand supported aggregations and dimensions.
 
 ## Operational guides
