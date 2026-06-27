@@ -242,7 +242,7 @@ func insertConnectorVersion(
 INSERT INTO connector_versions
 (id, namespace, version, state, type, encrypted_definition, hash, created_at, updated_at, deleted_at)
 VALUES
-('%s', '%s', %d, '%s', 'test', '{"id":"ekv_test","d":"encrypted-def"}', 'hash-%d', '2026-05-29 12:00:00', '2026-05-29 12:00:00', null)
+('%s', '%s', %d, '%s', 'test', '{"id":"dek_test","d":"encrypted-def"}', 'hash-%d', '2026-05-29 12:00:00', '2026-05-29 12:00:00', null)
 `, id, namespace, version, state, version))
 	require.NoError(t, err)
 }

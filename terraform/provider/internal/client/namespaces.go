@@ -7,13 +7,13 @@ import (
 )
 
 type Namespace struct {
-	Path            string            `json:"path"`
-	State           string            `json:"state"`
-	EncryptionKeyId *string           `json:"encryption_key_id,omitempty"`
-	Labels          map[string]string `json:"labels,omitempty"`
-	Annotations     map[string]string `json:"annotations,omitempty"`
-	CreatedAt       time.Time         `json:"created_at"`
-	UpdatedAt       time.Time         `json:"updated_at"`
+	Path        string            `json:"path"`
+	State       string            `json:"state"`
+	KeyId       *string           `json:"key_id,omitempty"`
+	Labels      map[string]string `json:"labels,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
+	CreatedAt   time.Time         `json:"created_at"`
+	UpdatedAt   time.Time         `json:"updated_at"`
 }
 
 type CreateNamespaceRequest struct {

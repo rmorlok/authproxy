@@ -11,13 +11,13 @@ import (
 )
 
 type Namespace struct {
-	Path            string
-	State           database.NamespaceState
-	EncryptionKeyId *apid.ID
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-	Labels          map[string]string
-	Annotations     map[string]string
+	Path        string
+	State       database.NamespaceState
+	KeyId       *apid.ID
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	Labels      map[string]string
+	Annotations map[string]string
 }
 
 func (m *Namespace) GetPath() string {
@@ -36,8 +36,8 @@ func (m *Namespace) GetUpdatedAt() time.Time {
 	return m.UpdatedAt
 }
 
-func (m *Namespace) GetEncryptionKeyId() *apid.ID {
-	return m.EncryptionKeyId
+func (m *Namespace) GetKeyId() *apid.ID {
+	return m.KeyId
 }
 
 func (m *Namespace) GetLabels() map[string]string {

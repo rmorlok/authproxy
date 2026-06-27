@@ -58,7 +58,7 @@ type DB interface {
 	EnsureNamespaceByPath(ctx context.Context, path string) error
 	DeleteNamespace(ctx context.Context, path string) error
 	SetNamespaceState(ctx context.Context, path string, state NamespaceState) error
-	SetNamespaceEncryptionKeyId(ctx context.Context, path string, ekId *apid.ID) (*Namespace, error)
+	SetNamespaceKeyId(ctx context.Context, path string, ekId *apid.ID) (*Namespace, error)
 	UpdateNamespaceLabels(ctx context.Context, path string, labels map[string]string) (*Namespace, error)
 	PutNamespaceLabels(ctx context.Context, path string, labels map[string]string) (*Namespace, error)
 	DeleteNamespaceLabels(ctx context.Context, path string, keys []string) (*Namespace, error)
@@ -69,7 +69,7 @@ type DB interface {
 	ListNamespacesFromCursor(ctx context.Context, cursor string) (ListNamespacesExecutor, error)
 	EnumerateNamespaceEncryptionTargets(
 		ctx context.Context,
-		callback func(targets []NamespaceEncryptionTarget, lastPage bool) (updates []NamespaceTargetEncryptionKeyVersionUpdate, keepGoing pagination.KeepGoing, err error),
+		callback func(targets []NamespaceEncryptionTarget, lastPage bool) (updates []NamespaceTargetDataEncryptionKeyUpdate, keepGoing pagination.KeepGoing, err error),
 	) error
 
 	/*
@@ -184,57 +184,31 @@ type DB interface {
 	CountProbeOutcomes(ctx context.Context, connectionId apid.ID, probeId string) (int, error)
 
 	/*
-	 * Encryption Keys
+	 * Keys
 	 */
 
-	GetEncryptionKey(ctx context.Context, id apid.ID) (*EncryptionKey, error)
-	CreateEncryptionKey(ctx context.Context, ek *EncryptionKey) error
-	UpdateEncryptionKey(ctx context.Context, id apid.ID, updates map[string]interface{}) (*EncryptionKey, error)
-	DeleteEncryptionKey(ctx context.Context, id apid.ID) error
-	SetEncryptionKeyState(ctx context.Context, id apid.ID, state EncryptionKeyState) error
-	UpdateEncryptionKeyLabels(ctx context.Context, id apid.ID, labels map[string]string) (*EncryptionKey, error)
-	PutEncryptionKeyLabels(ctx context.Context, id apid.ID, labels map[string]string) (*EncryptionKey, error)
-	DeleteEncryptionKeyLabels(ctx context.Context, id apid.ID, keys []string) (*EncryptionKey, error)
-	UpdateEncryptionKeyAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*EncryptionKey, error)
-	PutEncryptionKeyAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*EncryptionKey, error)
-	DeleteEncryptionKeyAnnotations(ctx context.Context, id apid.ID, keys []string) (*EncryptionKey, error)
-	ListEncryptionKeysBuilder() ListEncryptionKeysBuilder
-	ListEncryptionKeysFromCursor(ctx context.Context, cursor string) (ListEncryptionKeysExecutor, error)
+	GetKey(ctx context.Context, id apid.ID) (*Key, error)
+	CreateKey(ctx context.Context, ek *Key) error
+	UpdateKey(ctx context.Context, id apid.ID, updates map[string]interface{}) (*Key, error)
+	DeleteKey(ctx context.Context, id apid.ID) error
+	SetKeyState(ctx context.Context, id apid.ID, state KeyState) error
+	UpdateKeyLabels(ctx context.Context, id apid.ID, labels map[string]string) (*Key, error)
+	PutKeyLabels(ctx context.Context, id apid.ID, labels map[string]string) (*Key, error)
+	DeleteKeyLabels(ctx context.Context, id apid.ID, keys []string) (*Key, error)
+	UpdateKeyAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*Key, error)
+	PutKeyAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*Key, error)
+	DeleteKeyAnnotations(ctx context.Context, id apid.ID, keys []string) (*Key, error)
+	ListKeysBuilder() ListKeysBuilder
+	ListKeysFromCursor(ctx context.Context, cursor string) (ListKeysExecutor, error)
 
-	// EnumerateEncryptionKeysInDependencyOrder loads all non-deleted encryption keys and walks them
+	// EnumerateKeysInDependencyOrder loads all non-deleted keys and walks them
 	// in breadth-first order starting from the root key (the one with nil EncryptedKeyData).
 	// The callback receives one depth-level of keys at a time, with depth 0 being the root.
-	// Returns a slice of orphaned keys whose parent encryption key version could not be resolved.
-	EnumerateEncryptionKeysInDependencyOrder(
+	// Returns a slice of orphaned keys whose parent key could not be resolved.
+	EnumerateKeysInDependencyOrder(
 		ctx context.Context,
-		callback func(keys []*EncryptionKey, depth int) (keepGoing pagination.KeepGoing, err error),
-	) ([]*EncryptionKey, error)
-
-	/*
-	 * Encryption Key Versions
-	 */
-
-	CreateEncryptionKeyVersion(ctx context.Context, ekv *EncryptionKeyVersion) error
-	GetEncryptionKeyVersion(ctx context.Context, id apid.ID) (*EncryptionKeyVersion, error)
-	GetCurrentEncryptionKeyVersionForEncryptionKey(ctx context.Context, encryptionKeyId apid.ID) (*EncryptionKeyVersion, error)
-	ListEncryptionKeyVersionsForEncryptionKey(ctx context.Context, encryptionKeyId apid.ID) ([]*EncryptionKeyVersion, error)
-	GetMaxOrderedVersionForEncryptionKey(ctx context.Context, encryptionKeyId apid.ID) (int64, error)
-	ClearCurrentFlagForEncryptionKey(ctx context.Context, encryptionKeyId apid.ID) error
-	GetCurrentEncryptionKeyVersionForNamespace(ctx context.Context, namespacePath string) (*EncryptionKeyVersion, error)
-	ListEncryptionKeyVersionsForNamespace(ctx context.Context, namespacePath string) ([]*EncryptionKeyVersion, error)
-	GetMaxOrderedVersionForNamespace(ctx context.Context, namespacePath string) (int64, error)
-	ClearCurrentFlagForNamespace(ctx context.Context, namespacePath string) error
-	DeleteEncryptionKeyVersion(ctx context.Context, id apid.ID) error
-	DeleteEncryptionKeyVersionsForEncryptionKey(ctx context.Context, encryptionKeyId apid.ID) error
-	SetEncryptionKeyVersionCurrentFlag(ctx context.Context, id apid.ID, isCurrent bool) error
-
-	// EnumerateEncryptionKeyVersionsForKey enumerates all non-deleted encryption key versions for a
-	// specified key in batches.
-	EnumerateEncryptionKeyVersionsForKey(
-		ctx context.Context,
-		ekId apid.ID,
-		callback func(ekvs []*EncryptionKeyVersion, lastPage bool) (keepGoing pagination.KeepGoing, err error),
-	) error
+		callback func(keys []*Key, depth int) (keepGoing pagination.KeepGoing, err error),
+	) ([]*Key, error)
 
 	/*
 	 * Data Encryption Keys
@@ -242,7 +216,16 @@ type DB interface {
 
 	CreateDataEncryptionKey(ctx context.Context, dek *DataEncryptionKey) error
 	GetDataEncryptionKey(ctx context.Context, id apid.ID) (*DataEncryptionKey, error)
-	ListDataEncryptionKeysForEncryptionKey(ctx context.Context, encryptionKeyId apid.ID) ([]*DataEncryptionKey, error)
+	GetCurrentDataEncryptionKeyForKey(ctx context.Context, keyId apid.ID) (*DataEncryptionKey, error)
+	UpdateDataEncryptionKeyWrapping(ctx context.Context, dek *DataEncryptionKey) error
+	ClearCurrentDataEncryptionKeyFlagForKey(ctx context.Context, keyId apid.ID) error
+	SetDataEncryptionKeyCurrentFlag(ctx context.Context, id apid.ID, isCurrent bool) error
+	ListDataEncryptionKeysForKey(ctx context.Context, keyId apid.ID) ([]*DataEncryptionKey, error)
+	EnumerateDataEncryptionKeysForKey(
+		ctx context.Context,
+		keyId apid.ID,
+		callback func(deks []*DataEncryptionKey, lastPage bool) (keepGoing pagination.KeepGoing, err error),
+	) error
 
 	/*
 	 * Rate Limits

@@ -39,7 +39,7 @@ All entities use soft deletes via a nullable `deleted_at` column. Queries must i
 
 ## Encrypted Fields
 
-Tables with encrypted data use `encfield.EncryptedField` which serializes as JSON (`{"id":"ekv_xxx","d":"base64..."}`). Fields can be pointer (`*encfield.EncryptedField`) for nullable columns or value type for required columns.
+Tables with encrypted data use `encfield.EncryptedField` which serializes as JSON (`{"id":"dek_xxx","d":"base64..."}`). Fields can be pointer (`*encfield.EncryptedField`) for nullable columns or value type for required columns.
 
 The re-encryption registry (`reencrypt_registry.go`) tracks which tables/columns contain encrypted fields. When adding a new encrypted column:
 1. Add the column to both migration files
@@ -129,10 +129,10 @@ When using `rawDb.Exec()` for test setup, **do not use `?` placeholders** — th
 
 ```go
 // WRONG — fails on PostgreSQL
-rawDb.Exec(`UPDATE namespaces SET encryption_key_id = ? WHERE path = 'root'`, ekId)
+rawDb.Exec(`UPDATE namespaces SET key_id = ? WHERE path = 'root'`, ekId)
 
 // CORRECT — works on both
-rawDb.Exec(fmt.Sprintf(`UPDATE namespaces SET encryption_key_id = '%s' WHERE path = 'root'`, ekId))
+rawDb.Exec(fmt.Sprintf(`UPDATE namespaces SET key_id = '%s' WHERE path = 'root'`, ekId))
 ```
 
 ### Timezone Handling in Tests

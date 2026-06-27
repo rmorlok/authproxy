@@ -24,7 +24,7 @@ type noopEncryptor struct{}
 
 func (noopEncryptor) EncryptForNamespace(_ context.Context, _ string, data []byte) (encfield.EncryptedField, error) {
 	return encfield.EncryptedField{
-		ID:   apid.ID("ekv_noop"),
+		ID:   apid.ID("dek_noop"),
 		Data: base64.StdEncoding.EncodeToString(data),
 	}, nil
 }

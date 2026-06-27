@@ -39,19 +39,19 @@ export interface NamespaceAnnotation {
 export interface Namespace {
   path: string;
   state: NamespaceState;
-  encryption_key_id?: string;
+  key_id?: string;
   labels?: Record<string, string>;
   annotations?: Record<string, string>;
   created_at: string;
   updated_at: string;
 }
 
-export interface NamespaceEncryptionKeyResponse {
-  encryption_key_id: string;
+export interface NamespaceKeyResponse {
+  key_id: string;
 }
 
-export interface SetNamespaceEncryptionKeyRequest {
-  encryption_key_id: string;
+export interface SetNamespaceKeyRequest {
+  key_id: string;
 }
 
 export interface CreateNamespaceRequest {
@@ -148,25 +148,25 @@ export const deleteNamespaceLabel = (path: string, labelKey: string) => {
 };
 
 /**
- * Get the encryption key assigned to a namespace
+ * Get the key assigned to a namespace
  */
-export const getNamespaceEncryptionKey = (path: string) => {
-  return client.get<NamespaceEncryptionKeyResponse>(`/api/v1/namespaces/${path}/encryption-key`);
+export const getNamespaceKey = (path: string) => {
+  return client.get<NamespaceKeyResponse>(`/api/v1/namespaces/${path}/key`);
 };
 
 /**
- * Set the encryption key for a namespace
+ * Set the key for a namespace
  */
-export const setNamespaceEncryptionKey = (path: string, encryptionKeyId: string) => {
-  const request: SetNamespaceEncryptionKeyRequest = { encryption_key_id: encryptionKeyId };
-  return client.put<Namespace>(`/api/v1/namespaces/${path}/encryption-key`, request);
+export const setNamespaceKey = (path: string, keyId: string) => {
+  const request: SetNamespaceKeyRequest = { key_id: keyId };
+  return client.put<Namespace>(`/api/v1/namespaces/${path}/key`, request);
 };
 
 /**
- * Clear the encryption key for a namespace (falls back to parent)
+ * Clear the key for a namespace (falls back to parent)
  */
-export const clearNamespaceEncryptionKey = (path: string) => {
-  return client.delete(`/api/v1/namespaces/${path}/encryption-key`);
+export const clearNamespaceKey = (path: string) => {
+  return client.delete(`/api/v1/namespaces/${path}/key`);
 };
 
 /**
@@ -210,7 +210,7 @@ export const namespaces = {
   getAnnotation: getNamespaceAnnotation,
   putAnnotation: putNamespaceAnnotation,
   deleteAnnotation: deleteNamespaceAnnotation,
-  getEncryptionKey: getNamespaceEncryptionKey,
-  setEncryptionKey: setNamespaceEncryptionKey,
-  clearEncryptionKey: clearNamespaceEncryptionKey,
+  getKey: getNamespaceKey,
+  setKey: setNamespaceKey,
+  clearKey: clearNamespaceKey,
 };

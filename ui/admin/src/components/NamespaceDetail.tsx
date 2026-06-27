@@ -22,9 +22,9 @@ import {
   Namespace,
   NamespaceState,
   namespaces,
-  EncryptionKey,
-  EncryptionKeyState,
-  encryptionKeys,
+  Key,
+  KeyState,
+  keys,
   NAMESPACE_PATH_SEPARATOR,
 } from '@authproxy/api';
 import AnnotationsEditor from "./AnnotationsEditor";
@@ -53,7 +53,7 @@ export default function NamespaceDetail({namespacePath}: { namespacePath: string
   const [ns, setNs] = useState<Namespace | null>(null);
 
   const [selectorOpen, setSelectorOpen] = useState(false);
-  const [ancestorKeys, setAncestorKeys] = useState<EncryptionKey[]>([]);
+  const [ancestorKeys, setAncestorKeys] = useState<Key[]>([]);
   const [keysLoading, setKeysLoading] = useState(false);
   const [selectedKeyId, setSelectedKeyId] = useState<string>('');
   const [actionLoading, setActionLoading] = useState(false);
@@ -98,10 +98,10 @@ export default function NamespaceDetail({namespacePath}: { namespacePath: string
     try {
       const results = await Promise.all(
         ancestorPaths.map(p =>
-          encryptionKeys.list({namespace: p, state: EncryptionKeyState.ACTIVE, limit: 100})
+          keys.list({namespace: p, state: KeyState.ACTIVE, limit: 100})
         )
       );
-      const allKeys: EncryptionKey[] = [];
+      const allKeys: Key[] = [];
       for (const res of results) {
         if (res.data.items) {
           allKeys.push(...res.data.items);
@@ -109,7 +109,7 @@ export default function NamespaceDetail({namespacePath}: { namespacePath: string
       }
       setAncestorKeys(allKeys);
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err.message || 'Failed to load encryption keys';
+      const msg = err?.response?.data?.error || err.message || 'Failed to load keys';
       setActionError(msg);
     } finally {
       setKeysLoading(false);
@@ -121,11 +121,11 @@ export default function NamespaceDetail({namespacePath}: { namespacePath: string
     setActionError(null);
     setActionLoading(true);
     try {
-      await namespaces.setEncryptionKey(namespacePath, selectedKeyId);
+      await namespaces.setKey(namespacePath, selectedKeyId);
       setSelectorOpen(false);
       fetchNamespace();
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err.message || 'Failed to set encryption key';
+      const msg = err?.response?.data?.error || err.message || 'Failed to set key';
       setActionError(msg);
     } finally {
       setActionLoading(false);
@@ -136,10 +136,10 @@ export default function NamespaceDetail({namespacePath}: { namespacePath: string
     setActionError(null);
     setActionLoading(true);
     try {
-      await namespaces.clearEncryptionKey(namespacePath);
+      await namespaces.clearKey(namespacePath);
       fetchNamespace();
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err.message || 'Failed to clear encryption key';
+      const msg = err?.response?.data?.error || err.message || 'Failed to clear key';
       setActionError(msg);
     } finally {
       setActionLoading(false);
@@ -151,7 +151,7 @@ export default function NamespaceDetail({namespacePath}: { namespacePath: string
   if (!ns) return null;
 
   // Group keys by namespace for the selector
-  const keysByNamespace: Record<string, EncryptionKey[]> = {};
+  const keysByNamespace: Record<string, Key[]> = {};
   for (const ek of ancestorKeys) {
     if (!keysByNamespace[ek.namespace]) keysByNamespace[ek.namespace] = [];
     keysByNamespace[ek.namespace].push(ek);
@@ -215,15 +215,15 @@ export default function NamespaceDetail({namespacePath}: { namespacePath: string
       />
 
       <Box>
-        <Typography variant="subtitle2" color="text.secondary">Encryption Key</Typography>
-        {ns.encryption_key_id ? (
+        <Typography variant="subtitle2" color="text.secondary">Key</Typography>
+        {ns.key_id ? (
           <Stack direction="row" spacing={1} alignItems="center" sx={{mt: 0.5}}>
-            <Link component={RouterLink} to={`/encryption-keys/${ns.encryption_key_id}`}>
+            <Link component={RouterLink} to={`/keys/${ns.key_id}`}>
               <Typography variant="body1" component="code" sx={{
                 fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
                 fontSize: '0.9rem',
               }}>
-                {ns.encryption_key_id}
+                {ns.key_id}
               </Typography>
             </Link>
             <Button size="small" onClick={openSelector} disabled={actionLoading || isRoot}>Change Key</Button>
@@ -233,7 +233,7 @@ export default function NamespaceDetail({namespacePath}: { namespacePath: string
           <Stack direction="row" spacing={1} alignItems="center" sx={{mt: 0.5}}>
             <Typography variant="body2" color="text.secondary">None</Typography>
             {isRoot ? (
-              <Typography variant="body2" color="text.secondary">(root namespace cannot have an encryption key other than the global key)</Typography>
+              <Typography variant="body2" color="text.secondary">(root namespace cannot have a key other than the global key)</Typography>
             ) : (
               <Button size="small" onClick={openSelector} disabled={actionLoading}>Assign Key</Button>
             )}
@@ -241,20 +241,20 @@ export default function NamespaceDetail({namespacePath}: { namespacePath: string
         )}
       </Box>
 
-      {/* Encryption key selector dialog */}
+      {/* Key selector dialog */}
       <Dialog open={selectorOpen} onClose={() => !actionLoading && setSelectorOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Select Encryption Key</DialogTitle>
+        <DialogTitle>Select Key</DialogTitle>
         <DialogContent>
           {keysLoading ? (
             <Box sx={{display: 'flex', justifyContent: 'center', p: 2}}><CircularProgress/></Box>
           ) : ancestorKeys.length === 0 ? (
-            <Alert severity="info">No active encryption keys found in ancestor namespaces.</Alert>
+            <Alert severity="info">No active keys found in ancestor namespaces.</Alert>
           ) : (
             <FormControl fullWidth sx={{mt: 2}}>
-              <InputLabel id="select-ek-label">Encryption Key</InputLabel>
+              <InputLabel id="select-key-label">Key</InputLabel>
               <Select
-                labelId="select-ek-label"
-                label="Encryption Key"
+                labelId="select-key-label"
+                label="Key"
                 value={selectedKeyId}
                 onChange={(e) => setSelectedKeyId(e.target.value as string)}
               >

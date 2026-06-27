@@ -89,8 +89,8 @@ func TestRevokeRefreshToken(t *testing.T) {
 		MockOAuthTokenForConnection(context.Background(), db, encrypt, database.OAuth2Token{
 			Id:                    tokenId,
 			ConnectionId:          connectionId,
-			EncryptedAccessToken:  encfield.EncryptedField{ID: "ekv_test", Data: "some-access-token"},
-			EncryptedRefreshToken: encfield.EncryptedField{ID: "ekv_test", Data: "some-refresh-token"},
+			EncryptedAccessToken:  encfield.EncryptedField{ID: "dek_test", Data: "some-access-token"},
+			EncryptedRefreshToken: encfield.EncryptedField{ID: "dek_test", Data: "some-refresh-token"},
 		})
 
 		db.
@@ -128,8 +128,8 @@ func TestRevokeRefreshToken(t *testing.T) {
 		MockOAuthTokenForConnection(context.Background(), db, encrypt, database.OAuth2Token{
 			Id:                    tokenId,
 			ConnectionId:          connectionId,
-			EncryptedAccessToken:  encfield.EncryptedField{ID: "ekv_test", Data: "some-access-token"},
-			EncryptedRefreshToken: encfield.EncryptedField{ID: "ekv_test", Data: "some-refresh-token"},
+			EncryptedAccessToken:  encfield.EncryptedField{ID: "dek_test", Data: "some-access-token"},
+			EncryptedRefreshToken: encfield.EncryptedField{ID: "dek_test", Data: "some-refresh-token"},
 		})
 
 		db.

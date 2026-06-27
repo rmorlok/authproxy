@@ -22,7 +22,7 @@ resource "authproxy_namespace" "production" {
 ## Attribute Reference
 
 - `state` - The namespace state.
-- `encryption_key_id` - The ID of the encryption key associated with this namespace.
+- `key_id` - The ID of the key associated with this namespace.
 - `created_at` - Timestamp of creation.
 - `updated_at` - Timestamp of last update.
 

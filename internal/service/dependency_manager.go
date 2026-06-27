@@ -60,6 +60,10 @@ type DependencyManager struct {
 	telemetryOnce sync.Once
 	telemetryErr  error
 
+	dataEncryptionKeyTelemetry     *encrypt.DataEncryptionKeyTelemetry
+	dataEncryptionKeyTelemetryOnce sync.Once
+	dataEncryptionKeyTelemetryErr  error
+
 	rootLogger     *slog.Logger
 	rootLoggerOnce sync.Once
 
@@ -590,6 +594,26 @@ func (dm *DependencyManager) GetTelemetry() *aptelemetry.Providers {
 	return dm.telemetry
 }
 
+func (dm *DependencyManager) GetDataEncryptionKeyTelemetry() *encrypt.DataEncryptionKeyTelemetry {
+	dm.dataEncryptionKeyTelemetryOnce.Do(func() {
+		tel, err := encrypt.NewDataEncryptionKeyTelemetry(
+			dm.GetTelemetry(),
+			dm.GetConfigRoot().Telemetry,
+		)
+		if err != nil {
+			dm.dataEncryptionKeyTelemetryErr = err
+			return
+		}
+		dm.dataEncryptionKeyTelemetry = tel
+	})
+
+	if dm.dataEncryptionKeyTelemetryErr != nil {
+		panic(fmt.Errorf("failed to initialise data encryption key telemetry: %w", dm.dataEncryptionKeyTelemetryErr))
+	}
+
+	return dm.dataEncryptionKeyTelemetry
+}
+
 // ShutdownTelemetry flushes and tears down OTel providers if they were
 // initialised. Safe to call multiple times. Bounded by aptelemetry.ShutdownTimeout.
 func (dm *DependencyManager) ShutdownTelemetry() {
@@ -731,7 +755,22 @@ func (dm *DependencyManager) AutoMigratePredefinedActors() {
 	}()
 }
 
-// AutoMigrateSyncKeysToDatabase syncs encryption key versions from config into the database.
+// AutoMigrateGenerateDataEncryptionKeys ensures current DEKs exist before any
+// service constructs the runtime encryption cache.
+func (dm *DependencyManager) AutoMigrateGenerateDataEncryptionKeys() {
+	if err := encrypt.GenerateDataEncryptionKeysToDatabase(
+		context.Background(),
+		dm.GetConfig(),
+		dm.GetDatabase(),
+		dm.GetLogger(),
+		dm.GetRedisClient(),
+		encrypt.WithGenerateDataEncryptionKeysTelemetry(dm.GetDataEncryptionKeyTelemetry()),
+	); err != nil {
+		panic(fmt.Errorf("failed to generate data encryption keys: %w", err))
+	}
+}
+
+// AutoMigrateSyncKeysToDatabase syncs key wrapping state into the database.
 // Uses a Redis sentinel to avoid redundant runs across processes.
 func (dm *DependencyManager) AutoMigrateSyncKeysToDatabase() {
 	if err := encrypt.SyncKeysToDatabase(
@@ -740,15 +779,17 @@ func (dm *DependencyManager) AutoMigrateSyncKeysToDatabase() {
 		dm.GetDatabase(),
 		dm.GetLogger(),
 		dm.GetRedisClient(),
+		encrypt.WithSyncKeysTelemetry(dm.GetDataEncryptionKeyTelemetry()),
 	); err != nil {
-		panic(fmt.Errorf("failed to sync encryption keys to database: %w", err))
+		panic(fmt.Errorf("failed to sync keys to database: %w", err))
 	}
 }
 
 func (dm *DependencyManager) AutoMigrateAll() {
 	dm.AutoMigrateDatabase()
-	dm.AutoMigrateAppMetricsService()
+	dm.AutoMigrateGenerateDataEncryptionKeys()
 	dm.AutoMigrateSyncKeysToDatabase()
+	dm.AutoMigrateAppMetricsService()
 	dm.AutoMigrateCore()
 	dm.AutoMigratePredefinedActors()
 }

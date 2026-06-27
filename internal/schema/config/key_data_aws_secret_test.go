@@ -54,7 +54,7 @@ func TestKeyDataAwsSecret_GetCurrentVersion(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, []byte("my-secret-value"), info.Data)
 		assert.Equal(t, "v1", info.ProviderVersion)
-		assert.Equal(t, ProviderTypeAws, info.Provider)
+		assert.Equal(t, ProviderTypeAwsSecretsManager, info.Provider)
 		assert.Equal(t, "my-secret", info.ProviderID)
 		assert.True(t, info.IsCurrent)
 	})
@@ -515,7 +515,7 @@ func TestKeyDataAwsSecret_Caching(t *testing.T) {
 
 func TestKeyDataAwsSecret_GetProviderType(t *testing.T) {
 	ka := &KeyDataAwsSecret{}
-	assert.Equal(t, ProviderTypeAws, ka.GetProviderType())
+	assert.Equal(t, ProviderTypeAwsSecretsManager, ka.GetProviderType())
 }
 
 func TestKeyDataAwsSecret_ClientFactoryError(t *testing.T) {

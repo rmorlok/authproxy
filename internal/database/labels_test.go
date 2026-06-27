@@ -443,7 +443,7 @@ func TestApidPrefixToLabelToken(t *testing.T) {
 	require.Equal(t, "cxr", ApidPrefixToLabelToken(apid.PrefixConnectorVersion))
 	require.Equal(t, "cxn", ApidPrefixToLabelToken(apid.PrefixConnection))
 	require.Equal(t, "act", ApidPrefixToLabelToken(apid.PrefixActor))
-	require.Equal(t, "ek", ApidPrefixToLabelToken(apid.PrefixEncryptionKey))
+	require.Equal(t, "key", ApidPrefixToLabelToken(apid.PrefixKey))
 	require.Equal(t, "", ApidPrefixToLabelToken(apid.Prefix("")))
 }
 
@@ -488,10 +488,10 @@ func TestBuildCarriedLabels(t *testing.T) {
 
 	t.Run("forwards apxy/ keys as-is", func(t *testing.T) {
 		parent := Labels{
-			"pig":            "oink",
-			"apxy/ns/dog":    "woof",
-			"apxy/cxr/-/id":  "cxr_abc",
-			"apxy/cxr/-/ns":  "/foo",
+			"pig":           "oink",
+			"apxy/ns/dog":   "woof",
+			"apxy/cxr/-/id": "cxr_abc",
+			"apxy/cxr/-/ns": "/foo",
 		}
 		out := BuildCarriedLabels("cxr", parent)
 		require.Equal(t, Labels{
@@ -515,10 +515,10 @@ func TestBuildCarriedLabels(t *testing.T) {
 func TestSplitAndMergeUserAndApxyLabels(t *testing.T) {
 	t.Run("split partitions by prefix", func(t *testing.T) {
 		all := Labels{
-			"team":           "platform",
-			"env":            "prod",
-			"apxy/cxn/-/id":  "cxn_abc",
-			"apxy/cxr/type":  "google_drive",
+			"team":          "platform",
+			"env":           "prod",
+			"apxy/cxn/-/id": "cxn_abc",
+			"apxy/cxr/type": "google_drive",
 		}
 		user, apxy := SplitUserAndApxyLabels(all)
 		require.Equal(t, Labels{"team": "platform", "env": "prod"}, user)
@@ -537,8 +537,8 @@ func TestSplitAndMergeUserAndApxyLabels(t *testing.T) {
 
 	t.Run("merge round-trips", func(t *testing.T) {
 		all := Labels{
-			"team":           "platform",
-			"apxy/cxn/-/id":  "cxn_abc",
+			"team":          "platform",
+			"apxy/cxn/-/id": "cxn_abc",
 		}
 		user, apxy := SplitUserAndApxyLabels(all)
 		merged := MergeApxyAndUserLabels(user, apxy)
@@ -580,8 +580,8 @@ func TestMergeUpsertLabels(t *testing.T) {
 
 	t.Run("caller apxy labels override stored apxy labels for the same key", func(t *testing.T) {
 		caller := Labels{
-			"team":             "platform",
-			"apxy/cxr/source":  "config",
+			"team":            "platform",
+			"apxy/cxr/source": "config",
 		}
 		existing := Labels{
 			"apxy/cxr/source": "api",
@@ -664,10 +664,10 @@ func TestInjectNamespaceSelfImplicitLabels(t *testing.T) {
 func TestApplyParentCarryForward(t *testing.T) {
 	t.Run("merges user labels with parent carry-forward", func(t *testing.T) {
 		parent := Labels{
-			"type":          "google_drive",
-			"apxy/ns/-/id":  "root",
-			"apxy/ns/-/ns":  "root",
-			"apxy/ns/dog":   "woof",
+			"type":         "google_drive",
+			"apxy/ns/-/id": "root",
+			"apxy/ns/-/ns": "root",
+			"apxy/ns/dog":  "woof",
 		}
 		out := ApplyParentCarryForward(
 			Labels{"subscription_level": "pro"},

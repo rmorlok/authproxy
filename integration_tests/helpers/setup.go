@@ -105,6 +105,12 @@ type SetupOptions struct {
 	// Defaults to integration_tests/config/integration.yaml.
 	ConfigPath string
 
+	// ConfigureRoot, when non-nil, can mutate the loaded config before the
+	// dependency manager is built and before encryption DEK seeding runs. It is
+	// called after test database isolation is applied, so callers should leave
+	// the database block intact unless they intentionally need a custom DB.
+	ConfigureRoot func(root *sconfig.Root)
+
 	// Service specifies which service to start. Defaults to ServiceTypeAPI.
 	Service ServiceType
 
@@ -229,6 +235,10 @@ func Setup(t *testing.T, opts SetupOptions) *IntegrationTestEnv {
 		cfgRoot.Connectors.LoadFromList = append(cfgRoot.Connectors.LoadFromList, opts.Connectors...)
 	}
 
+	if opts.ConfigureRoot != nil {
+		opts.ConfigureRoot(cfg.GetRoot())
+	}
+
 	// Hook the log capture before the dependency manager builds its cached
 	// logger — once dm.GetLogger() runs, the logger is fixed and any later
 	// swap would only affect new builders.
@@ -278,15 +288,14 @@ func Setup(t *testing.T, opts SetupOptions) *IntegrationTestEnv {
 	dm.AutoMigrateDatabase()
 
 	// Each test gets an isolated database via pgtestdb but shares the same Redis.
-	// The Redis sentinel in SyncKeysToDatabase ("recently synced") can cause a
-	// concurrent test's sync to be skipped, leaving the new database without a
-	// global AES key. Passing nil for Redis bypasses the sentinel so this test's
-	// database is always seeded with the key, regardless of what other packages
-	// are doing concurrently.
+	// Passing nil for Redis bypasses shared locks/sentinels so this test's
+	// database is always seeded with a current DEK and then synced, regardless of
+	// what other packages are doing concurrently.
 	//
 	// This must happen before AutoMigrateAppMetricsService because that call
 	// can trigger GetEncryptService(), which starts the syncLoop goroutine that
-	// immediately tries to read the global key from the database.
+	// immediately tries to read the current global DEK from the database.
+	require.NoError(t, encrypt.GenerateDataEncryptionKeysToDatabase(context.Background(), cfg, dm.GetDatabase(), dm.GetLogger(), nil))
 	require.NoError(t, encrypt.SyncKeysToDatabase(context.Background(), cfg, dm.GetDatabase(), dm.GetLogger(), nil))
 
 	dm.AutoMigrateAppMetricsService()

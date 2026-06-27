@@ -176,33 +176,33 @@ The system supports both **actor-signed tokens** (asymmetric, using the actor's 
 
 AuthProxy employs **application-level encryption** (ALE) for all sensitive data. OAuth tokens, API keys, and connector definitions are encrypted before they reach any data store — whether that's the primary database, Redis, or object storage. Direct access to the database does not provide a path to view credentials or other sensitive data; an attacker with a database dump sees only ciphertext.
 
-All encrypted values use AES-GCM and are stored in a self-describing format that embeds the encryption key version ID alongside the ciphertext:
+All encrypted values use AES-GCM and are stored in a self-describing format that embeds the data encryption key ID alongside the ciphertext:
 
 ```json
-{"id": "ekv_abc123", "d": "base64-encoded-ciphertext"}
+{"id": "dek_abc123", "d": "base64-encoded-ciphertext"}
 ```
 
 This means the system can always determine which key encrypted a given value without external metadata.
 
 #### Namespace-Scoped Keys
 
-Encryption keys follow the same hierarchical namespace model as the rest of AuthProxy. A global AES key (configured at startup) serves as the root, and each namespace can optionally define its own encryption key. When encrypting data for a namespace, the system resolves the key by walking up the namespace tree:
+Keys used for data encryption follow the same hierarchical namespace model as the rest of AuthProxy. A global AES key (configured at startup) serves as the root, and each namespace can optionally define its own key. When encrypting data for a namespace, the system resolves the key by walking up the namespace tree:
 
 ```
 root.tenant-a.app1  →  root.tenant-a  →  root  →  global key
 ```
 
-The first namespace with an assigned encryption key is used. Child namespaces inherit their parent's key unless they explicitly set their own. This enables **per-tenant key isolation**: a customer can bring their own encryption key so that their data is cryptographically separated from other tenants, even within a shared database.
+The first namespace with an assigned key is used. Child namespaces inherit their parent's key unless they explicitly set their own. This enables **per-tenant key isolation**: a customer can bring their own key so that their data is cryptographically separated from other tenants, even within a shared database.
 
-Keys can be sourced from external secret managers including AWS Secrets Manager, GCP Secret Manager, HashiCorp Vault, environment variables, or the filesystem — allowing customers to retain control of their key material.
+Keys can be backed by external secret managers and KMS providers including AWS Secrets Manager, AWS KMS, GCP Secret Manager, Google Cloud KMS, HashiCorp Vault KV, Vault Transit, environment variables, or the filesystem — allowing customers to retain control of their key material.
 
 #### Automatic Key Rotation and Re-encryption
 
-Key rotation is fully automatic. When a key is rotated in the external provider (e.g., a new version is created in AWS Secrets Manager), AuthProxy detects the change through a periodic sync process and begins using the new version for all new encryptions immediately.
+Key rotation is fully automatic. When wrapping material is rotated in the external provider (e.g., a new version is created in AWS Secrets Manager), AuthProxy detects the change through a periodic sync process and rewraps affected DEKs. DEK rotation is managed separately by policy and determines which DEK is used for new encryptions.
 
-A background re-encryption task then scans all tables with encrypted columns, compares each field's key version against the namespace's target version, and re-encrypts any mismatched fields with the current key. This happens in batches with no downtime and no application changes required.
+A background re-encryption task scans all tables with encrypted columns, compares each field's DEK against the namespace's target DEK, and re-encrypts any mismatched fields. This happens in batches with no downtime and no application changes required.
 
-The same mechanism handles **namespace-level key changes**. If a namespace's encryption key is reassigned — for example, migrating a tenant to their own dedicated key — all data within that namespace is automatically re-encrypted with the new key. Old key versions are retained for decryption during the transition and can be removed once re-encryption is complete.
+The same mechanism handles **namespace-level key changes**. If a namespace's key is reassigned — for example, migrating a tenant to their own dedicated key — all data within that namespace is automatically re-encrypted with the new target DEK. Old DEKs are retained for decryption during the transition and can be removed once re-encryption is complete.
 
 ### Embeddable Marketplace
 

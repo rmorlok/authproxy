@@ -1,5 +1,5 @@
 # schema: https://json.schemastore.org/github-workflow.json
-name: GCP Secret Manager Integration Tests
+name: GCP Key Provider Integration Tests
 
 on:
   push:
@@ -78,7 +78,22 @@ jobs:
       env:
         GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
 
-    - name: GCP Secret Manager Integration Tests
+    - name: Check GCP key provider configuration
+      env:
+        GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+        AUTH_PROXY_GCP_KMS_TEST: ${{ vars.AUTH_PROXY_GCP_KMS_TEST }}
+        AUTH_PROXY_GCP_KMS_KEY_NAME: ${{ vars.AUTH_PROXY_GCP_KMS_KEY_NAME }}
+        AUTH_PROXY_GCP_KMS_KEY_NAME_V2: ${{ vars.AUTH_PROXY_GCP_KMS_KEY_NAME_V2 }}
+      run: |
+        : "${GCP_PROJECT_ID:?GCP_PROJECT_ID environment variable is required}"
+        : "${GOOGLE_APPLICATION_CREDENTIALS:?GOOGLE_APPLICATION_CREDENTIALS must be written by the credentials step}"
+        test -s "$GOOGLE_APPLICATION_CREDENTIALS"
+        : "${AUTH_PROXY_GCP_KMS_TEST:?AUTH_PROXY_GCP_KMS_TEST environment variable is required}"
+        : "${AUTH_PROXY_GCP_KMS_KEY_NAME:?AUTH_PROXY_GCP_KMS_KEY_NAME environment variable is required}"
+        : "${AUTH_PROXY_GCP_KMS_KEY_NAME_V2:?AUTH_PROXY_GCP_KMS_KEY_NAME_V2 environment variable is required}"
+        test "$AUTH_PROXY_GCP_KMS_TEST" = "1"
+
+    - name: GCP Key Provider Integration Tests
       working-directory: integration_tests
       env:
         AUTH_PROXY_TEST_DATABASE_PROVIDER: postgres
@@ -89,5 +104,9 @@ jobs:
         POSTGRES_TEST_DATABASE: authproxy_integration
         POSTGRES_TEST_OPTIONS: sslmode=disable
         AUTH_PROXY_GCP_SECRETS_TEST: "1"
-        GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+        AUTH_PROXY_GCP_KMS_TEST: ${{ vars.AUTH_PROXY_GCP_KMS_TEST }}
+        AUTH_PROXY_GCP_KMS_KEY_NAME: ${{ vars.AUTH_PROXY_GCP_KMS_KEY_NAME }}
+        AUTH_PROXY_GCP_KMS_KEY_NAME_V2: ${{ vars.AUTH_PROXY_GCP_KMS_KEY_NAME_V2 }}
+        AUTH_PROXY_GCP_KMS_ENDPOINT: ${{ vars.AUTH_PROXY_GCP_KMS_ENDPOINT }}
+        GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
       run: go test -tags "integration,gcp" -v -timeout 10m ./encrypt/...

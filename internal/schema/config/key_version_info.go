@@ -11,16 +11,19 @@ import (
 type ProviderType string
 
 const (
-	ProviderTypeValue          ProviderType = "value"
-	ProviderTypeBase64         ProviderType = "base64"
-	ProviderTypeEnvVar         ProviderType = "env_var"
-	ProviderTypeEnvVarBase64   ProviderType = "env_var_base64"
-	ProviderTypeFile           ProviderType = "file"
-	ProviderTypeRandom         ProviderType = "random"
-	ProviderTypeAws            ProviderType = "aws"
-	ProviderTypeGcp            ProviderType = "gcp"
-	ProviderTypeHashicorpVault ProviderType = "hashicorpvault"
-	ProviderTypeRaw            ProviderType = "raw"
+	ProviderTypeValue                 ProviderType = "value"
+	ProviderTypeBase64                ProviderType = "base64"
+	ProviderTypeEnvVar                ProviderType = "env_var"
+	ProviderTypeEnvVarBase64          ProviderType = "env_var_base64"
+	ProviderTypeFile                  ProviderType = "file"
+	ProviderTypeRandom                ProviderType = "random"
+	ProviderTypeAwsSecretsManager     ProviderType = "aws_secrets_manager"
+	ProviderTypeAwsKMS                ProviderType = "aws_kms"
+	ProviderTypeGcp                   ProviderType = "gcp"
+	ProviderTypeGcpKMS                ProviderType = "gcp_kms"
+	ProviderTypeHashicorpVault        ProviderType = "hashicorpvault"
+	ProviderTypeHashicorpVaultTransit ProviderType = "hashicorpvault_transit"
+	ProviderTypeRaw                   ProviderType = "raw"
 )
 
 // KeyVersionProtectedData stores provider-specific wrapped key material for

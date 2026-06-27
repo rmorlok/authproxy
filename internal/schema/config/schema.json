@@ -878,6 +878,50 @@
           },
           "required": ["num_bytes"],
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "aws_kms_key_id": { "type": "string" },
+            "aws_region": { "type": "string" },
+            "aws_kms_endpoint": { "type": "string" },
+            "aws_credentials": { "$ref": "#/$defs/AwsCredentials" },
+            "cache_ttl": { "type": "string" }
+          },
+          "required": ["aws_kms_key_id"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "gcp_kms_key_name": { "type": "string" },
+            "gcp_project": { "type": "string" },
+            "gcp_location": { "type": "string" },
+            "gcp_key_ring": { "type": "string" },
+            "gcp_crypto_key": { "type": "string" },
+            "gcp_kms_endpoint": { "type": "string" },
+            "gcp_credentials_file": { "type": "string" },
+            "gcp_credentials_json": { "$ref": "../common/schema.json#/$defs/StringValue" },
+            "cache_ttl": { "type": "string" }
+          },
+          "anyOf": [
+            { "required": ["gcp_kms_key_name"] },
+            { "required": ["gcp_project", "gcp_location", "gcp_key_ring", "gcp_crypto_key"] }
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "vault_address": { "type": "string" },
+            "vault_token": { "type": "string" },
+            "vault_namespace": { "type": "string" },
+            "vault_transit_mount_path": { "type": "string" },
+            "vault_transit_key_name": { "type": "string" },
+            "cache_ttl": { "type": "string" }
+          },
+          "required": ["vault_address", "vault_transit_key_name"],
+          "additionalProperties": false
         }
       ]
     },

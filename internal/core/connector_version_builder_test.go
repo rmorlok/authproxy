@@ -171,7 +171,7 @@ func TestVersionBuilder_Build_Success(t *testing.T) {
 	// Set up expectations for the encrypt service
 	mockEncrypt.EXPECT().
 		EncryptStringForEntity(gomock.Any(), gomock.Any(), gomock.Any()).
-		Return(encfield.EncryptedField{ID: "ekv_test", Data: "encrypted-data"}, nil)
+		Return(encfield.EncryptedField{ID: "dek_test", Data: "encrypted-data"}, nil)
 
 	// Test
 	cv, err := builder.Build()
@@ -182,7 +182,7 @@ func TestVersionBuilder_Build_Success(t *testing.T) {
 	assert.Equal(t, connectorID, cv.Id)
 	assert.Equal(t, uint64(1), cv.Version)
 	assert.Equal(t, c.Hash(), cv.Hash)
-	assert.Equal(t, encfield.EncryptedField{ID: "ekv_test", Data: "encrypted-data"}, cv.EncryptedDefinition)
+	assert.Equal(t, encfield.EncryptedField{ID: "dek_test", Data: "encrypted-data"}, cv.EncryptedDefinition)
 }
 
 func TestVersionBuilder_Build_NilConnector(t *testing.T) {

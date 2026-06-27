@@ -210,6 +210,36 @@ func TestSchemaDefinitions(t *testing.T) {
 					Data:  `{"test": {"num_bytes": 32}}`,
 				},
 				{
+					Name:  "aws kms",
+					Valid: true,
+					Data:  `{"test": {"aws_kms_key_id": "alias/authproxy", "aws_region": "us-east-1", "aws_kms_endpoint": "http://localhost:4566", "aws_credentials": {"type": "implicit"}, "cache_ttl": "5m"}}`,
+				},
+				{
+					Name:  "gcp kms full resource",
+					Valid: true,
+					Data:  `{"test": {"gcp_kms_key_name": "projects/test-project/locations/global/keyRings/authproxy/cryptoKeys/dek-wrapper", "gcp_kms_endpoint": "localhost:8085", "gcp_credentials_json": {"env_var": "GCP_CREDS_JSON"}, "cache_ttl": "5m"}}`,
+				},
+				{
+					Name:  "gcp kms components",
+					Valid: true,
+					Data:  `{"test": {"gcp_project": "test-project", "gcp_location": "global", "gcp_key_ring": "authproxy", "gcp_crypto_key": "dek-wrapper", "gcp_credentials_file": "/tmp/gcp-creds.json", "cache_ttl": "5m"}}`,
+				},
+				{
+					Name:  "gcp kms missing component",
+					Valid: false,
+					Data:  `{"test": {"gcp_project": "test-project", "gcp_location": "global", "gcp_crypto_key": "dek-wrapper"}}`,
+				},
+				{
+					Name:  "vault transit",
+					Valid: true,
+					Data:  `{"test": {"vault_address": "http://127.0.0.1:8200", "vault_token": "dev-only-token", "vault_namespace": "admin", "vault_transit_mount_path": "transit", "vault_transit_key_name": "authproxy", "cache_ttl": "5m"}}`,
+				},
+				{
+					Name:  "vault transit missing key name",
+					Valid: false,
+					Data:  `{"test": {"vault_address": "http://127.0.0.1:8200", "vault_transit_mount_path": "transit"}}`,
+				},
+				{
 					Name:  "empty object",
 					Valid: false,
 					Data:  `{"test": {}}`,

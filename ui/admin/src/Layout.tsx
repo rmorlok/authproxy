@@ -16,6 +16,8 @@ import {useDispatch, useSelector} from "react-redux";
 import {AppDispatch} from "./store";
 import {parseAsString, useQueryState} from "nuqs";
 import {
+    isValidNamespacePath,
+    normalizeNamespacePath,
     selectCurrentNamespacePath, selectHasInitializedNamespace,
     setCurrentNamespace
 } from "./store/namespacesSlice";
@@ -34,27 +36,41 @@ export default function Layout(_props: { disableCustomTheme?: boolean }) {
 
     useEffect(() => {
         if(!hasInitializedNs) {
-            let targetPath = ROOT_NAMESPACE_PATH;
+            const storedPath = typeof window !== 'undefined' ?
+                localStorage.getItem(NS_LOCALSTORAGE_KEY) :
+                null;
 
-            if (queryNs !== DEFAULT_NAMESPACE_PATH_QUERY_SENTINEL) {
+            let targetPath = normalizeNamespacePath(storedPath);
+
+            if (queryNs !== DEFAULT_NAMESPACE_PATH_QUERY_SENTINEL && isValidNamespacePath(queryNs)) {
                 targetPath = queryNs;
-            } else if (typeof window !== 'undefined') {
-                // Attempt to get the namespace from local storage
-                targetPath = localStorage.getItem(NS_LOCALSTORAGE_KEY) || ROOT_NAMESPACE_PATH;
             }
 
             // Start loading the information for the namespace
-            dispatch(setCurrentNamespace(targetPath))
+            dispatch(setCurrentNamespace(targetPath));
+
+            if (queryNs !== DEFAULT_NAMESPACE_PATH_QUERY_SENTINEL && queryNs !== targetPath) {
+                void setQueryNs(targetPath);
+            }
         } else {
-            if(nsPath === ROOT_NAMESPACE_PATH) {
-                void setQueryNs(DEFAULT_NAMESPACE_PATH_QUERY_SENTINEL);
-            } else {
-                void setQueryNs(nsPath);
+            const currentPath = normalizeNamespacePath(nsPath);
+
+            if (currentPath !== nsPath) {
+                dispatch(setCurrentNamespace(currentPath));
+                return;
             }
 
-            localStorage.setItem(NS_LOCALSTORAGE_KEY, nsPath);
+            if(currentPath === ROOT_NAMESPACE_PATH) {
+                void setQueryNs(DEFAULT_NAMESPACE_PATH_QUERY_SENTINEL);
+            } else {
+                void setQueryNs(currentPath);
+            }
+
+            if (typeof window !== 'undefined') {
+                localStorage.setItem(NS_LOCALSTORAGE_KEY, currentPath);
+            }
         }
-    }, [nsPath, queryNs, dispatch, setQueryNs])
+    }, [hasInitializedNs, nsPath, queryNs, dispatch, setQueryNs])
 
     if(!hasInitializedNs) {
         return (

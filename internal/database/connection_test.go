@@ -1048,7 +1048,7 @@ func TestConnections(t *testing.T) {
 		newNow := time.Date(1955, time.November, 6, 6, 29, 0, 0, time.UTC)
 		ctx = apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(newNow)).Build()
 
-		ef := &encfield.EncryptedField{ID: "ekv_test1234", Data: "encrypted-config-data"}
+		ef := &encfield.EncryptedField{ID: "dek_test1234", Data: "encrypted-config-data"}
 		err = db.SetConnectionEncryptedConfiguration(ctx, u, ef)
 		require.NoError(t, err)
 
@@ -1056,21 +1056,21 @@ func TestConnections(t *testing.T) {
 		c, err = db.GetConnection(ctx, u)
 		require.NoError(t, err)
 		require.NotNil(t, c.EncryptedConfiguration)
-		assert.Equal(t, apid.ID("ekv_test1234"), c.EncryptedConfiguration.ID)
+		assert.Equal(t, apid.ID("dek_test1234"), c.EncryptedConfiguration.ID)
 		assert.Equal(t, "encrypted-config-data", c.EncryptedConfiguration.Data)
 		require.NotNil(t, c.EncryptedAt)
 		assert.True(t, c.EncryptedAt.Equal(newNow))
 		assert.True(t, c.UpdatedAt.Equal(newNow))
 
 		// Update encrypted configuration
-		ef2 := &encfield.EncryptedField{ID: "ekv_test5678", Data: "updated-config-data"}
+		ef2 := &encfield.EncryptedField{ID: "dek_test5678", Data: "updated-config-data"}
 		err = db.SetConnectionEncryptedConfiguration(ctx, u, ef2)
 		require.NoError(t, err)
 
 		c, err = db.GetConnection(ctx, u)
 		require.NoError(t, err)
 		require.NotNil(t, c.EncryptedConfiguration)
-		assert.Equal(t, apid.ID("ekv_test5678"), c.EncryptedConfiguration.ID)
+		assert.Equal(t, apid.ID("dek_test5678"), c.EncryptedConfiguration.ID)
 		assert.Equal(t, "updated-config-data", c.EncryptedConfiguration.Data)
 	})
 
@@ -1079,7 +1079,7 @@ func TestConnections(t *testing.T) {
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		ef := &encfield.EncryptedField{ID: "ekv_test1234", Data: "encrypted-config-data"}
+		ef := &encfield.EncryptedField{ID: "dek_test1234", Data: "encrypted-config-data"}
 		err := db.SetConnectionEncryptedConfiguration(ctx, apid.New(apid.PrefixConnection), ef)
 		assert.ErrorIs(t, err, ErrNotFound)
 	})
@@ -1090,7 +1090,7 @@ func TestConnections(t *testing.T) {
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 		step := cschema.MustNewSetupStep("preconnect_0")
-		ef := encfield.EncryptedField{ID: "ekv_test1234", Data: "encrypted-config-data"}
+		ef := encfield.EncryptedField{ID: "dek_test1234", Data: "encrypted-config-data"}
 		u := apid.New(apid.PrefixConnection)
 		err := db.CreateConnection(ctx, &Connection{
 			Id:                     u,
@@ -1109,7 +1109,7 @@ func TestConnections(t *testing.T) {
 		require.NotNil(t, c.SetupStep)
 		assert.Equal(t, "preconnect_0", c.SetupStep.String())
 		require.NotNil(t, c.EncryptedConfiguration)
-		assert.Equal(t, apid.ID("ekv_test1234"), c.EncryptedConfiguration.ID)
+		assert.Equal(t, apid.ID("dek_test1234"), c.EncryptedConfiguration.ID)
 		assert.Equal(t, "encrypted-config-data", c.EncryptedConfiguration.Data)
 		require.NotNil(t, c.EncryptedAt)
 		assert.True(t, c.EncryptedAt.Equal(now))
@@ -1136,7 +1136,7 @@ func TestConnections(t *testing.T) {
 			State:               ConnectorVersionStateDraft,
 			Labels:              Labels{"type": "google-drive"},
 			Hash:                "h",
-			EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "d"},
+			EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "d"},
 		}))
 
 		// Create a connection that points at the connector version above.
@@ -1194,7 +1194,7 @@ func TestConnections(t *testing.T) {
 			State:               ConnectorVersionStateDraft,
 			Labels:              Labels{"type": "google-drive"},
 			Hash:                "h",
-			EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "d"},
+			EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "d"},
 		}))
 		cvSlack := apid.New(apid.PrefixConnectorVersion)
 		require.NoError(t, db.UpsertConnectorVersion(ctx, &ConnectorVersion{
@@ -1204,7 +1204,7 @@ func TestConnections(t *testing.T) {
 			State:               ConnectorVersionStateDraft,
 			Labels:              Labels{"type": "slack"},
 			Hash:                "h2",
-			EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000002"), Data: "d"},
+			EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000002"), Data: "d"},
 		}))
 
 		driveConn := apid.New(apid.PrefixConnection)

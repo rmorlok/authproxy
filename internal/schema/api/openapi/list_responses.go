@@ -146,12 +146,12 @@ type ConnectorLifecycleResponseJson struct {
 	ConnectorId apid.ID `json:"connector_id" swaggertype:"string" example:"cxr_test550e8400abcde"`
 }
 
-// ListEncryptionKeysResponseJson documents the paginated encryption-key list response.
+// ListKeysResponseJson documents the paginated key list response.
 //
-//	@Description	Paginated list of encryption keys
-type ListEncryptionKeysResponseJson struct {
-	Items  []schemaapi.EncryptionKeyJson `json:"items"`
-	Cursor string                        `json:"cursor,omitempty"`
+//	@Description	Paginated list of keys
+type ListKeysResponseJson struct {
+	Items  []schemaapi.KeyJson `json:"items"`
+	Cursor string              `json:"cursor,omitempty"`
 }
 
 // ListRequestEventsResponseJson documents the paginated request-events list response.
@@ -206,10 +206,10 @@ type TaskInfoJson struct {
 	UpdatedAt string `json:"updated_at,omitempty"`
 }
 
-// UpdateEncryptionKeyRequestJson documents the encryption-key update body.
+// UpdateKeyRequestJson documents the key update body.
 //
-//	@Description	Request to update an encryption key
-type UpdateEncryptionKeyRequestJson struct {
+//	@Description	Request to update a key
+type UpdateKeyRequestJson struct {
 	State       *string            `json:"state,omitempty" example:"disabled"`
 	Labels      *map[string]string `json:"labels,omitempty"`
 	Annotations *map[string]string `json:"annotations,omitempty"`

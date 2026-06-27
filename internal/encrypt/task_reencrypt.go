@@ -5,7 +5,10 @@ import (
 	"fmt"
 
 	"github.com/hibiken/asynq"
+	"github.com/rmorlok/authproxy/internal/apctx"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
@@ -30,12 +33,12 @@ func (h *EncryptServiceTaskHandler) handleReencryptAll(ctx context.Context, task
 		var updates []database.ReEncryptedFieldUpdate
 
 		for _, target := range targets {
-			newEF, reencryptErr := h.enc.ReEncryptField(ctx, target.EncryptedFieldValue, target.TargetEncryptionKeyVersionId)
+			newEF, reencryptErr := h.enc.ReEncryptField(ctx, target.EncryptedFieldValue, target.TargetDataEncryptionKeyId)
 			if reencryptErr != nil {
 				h.logger.Warn("failed to re-encrypt field, skipping",
 					"table", target.Table,
 					"field", target.FieldColumn,
-					"target_ekv", target.TargetEncryptionKeyVersionId,
+					"target_dek", target.TargetDataEncryptionKeyId,
 					"error", reencryptErr,
 				)
 				totalErrors++
@@ -72,6 +75,10 @@ func (h *EncryptServiceTaskHandler) handleReencryptAll(ctx context.Context, task
 		return fmt.Errorf("re-encryption enumeration failed: %w", err)
 	}
 
+	if err := h.reencryptKeys(ctx, &totalProcessed, &totalSkipped, &totalErrors); err != nil {
+		return fmt.Errorf("key re-encryption failed: %w", err)
+	}
+
 	h.logger.Info("re-encryption complete",
 		"total_processed", totalProcessed,
 		"total_skipped", totalSkipped,
@@ -83,4 +90,91 @@ func (h *EncryptServiceTaskHandler) handleReencryptAll(ctx context.Context, task
 	}
 
 	return nil
+}
+
+func (h *EncryptServiceTaskHandler) reencryptKeys(ctx context.Context, totalProcessed, totalSkipped, totalErrors *int) error {
+	now := apctx.GetClock(ctx).Now()
+
+	return h.db.ListKeysBuilder().
+		OrderBy(database.KeyOrderByCreatedAt, pagination.OrderByAsc).
+		Enumerate(ctx, func(page pagination.PageResult[database.Key]) (pagination.KeepGoing, error) {
+			if page.Error != nil {
+				return pagination.Stop, page.Error
+			}
+
+			for _, key := range page.Results {
+				if key.EncryptedKeyData == nil || key.EncryptedKeyData.IsZero() {
+					(*totalSkipped)++
+					continue
+				}
+
+				targetDEKID, ok, err := h.keyTargetDataEncryptionKeyID(ctx, key)
+				if err != nil {
+					h.logger.Warn("failed to resolve key re-encryption target, skipping",
+						"key_id", key.Id,
+						"namespace", key.Namespace,
+						"error", err,
+					)
+					(*totalErrors)++
+					continue
+				}
+				if !ok {
+					h.logger.Warn("key parent namespace has no target data encryption key, skipping",
+						"key_id", key.Id,
+						"namespace", key.Namespace,
+					)
+					(*totalSkipped)++
+					continue
+				}
+
+				if key.EncryptedKeyData.ID == targetDEKID {
+					(*totalSkipped)++
+					continue
+				}
+
+				newEF, err := h.enc.ReEncryptField(ctx, *key.EncryptedKeyData, targetDEKID)
+				if err != nil {
+					h.logger.Warn("failed to re-encrypt key data, skipping",
+						"key_id", key.Id,
+						"namespace", key.Namespace,
+						"target_dek", targetDEKID,
+						"error", err,
+					)
+					(*totalErrors)++
+					continue
+				}
+
+				_, err = h.db.UpdateKey(ctx, key.Id, map[string]interface{}{
+					"encrypted_key_data": newEF,
+					"encrypted_at":       now,
+				})
+				if err != nil {
+					h.logger.Warn("failed to update re-encrypted key data, skipping",
+						"key_id", key.Id,
+						"namespace", key.Namespace,
+						"target_dek", targetDEKID,
+						"error", err,
+					)
+					(*totalErrors)++
+					continue
+				}
+
+				(*totalProcessed)++
+			}
+
+			return pagination.Continue, nil
+		})
+}
+
+func (h *EncryptServiceTaskHandler) keyTargetDataEncryptionKeyID(ctx context.Context, key database.Key) (apid.ID, bool, error) {
+	parentNamespace := namespace.NamespaceParentPath(key.Namespace)
+	ns, err := h.db.GetNamespace(ctx, parentNamespace)
+	if err != nil {
+		return "", false, err
+	}
+	if ns.TargetDataEncryptionKeyId == nil {
+		return "", false, nil
+	}
+
+	return *ns.TargetDataEncryptionKeyId, true, nil
 }

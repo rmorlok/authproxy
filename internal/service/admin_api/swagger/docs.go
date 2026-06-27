@@ -4685,14 +4685,14 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "/encryption-keys": {
+        "/keys": {
             "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "List encryption keys with optional filtering and pagination",
+                "description": "List keys with optional filtering and pagination",
                 "consumes": [
                     "application/json"
                 ],
@@ -4700,9 +4700,9 @@ const docTemplateadmin_api = `{
                     "application/json"
                 ],
                 "tags": [
-                    "encryption_keys"
+                    "keys"
                 ],
-                "summary": "List encryption keys",
+                "summary": "List keys",
                 "parameters": [
                     {
                         "type": "string",
@@ -4745,7 +4745,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPIListEncryptionKeysResponseJson"
+                            "$ref": "#/definitions/routes.OpenAPIListKeysResponseJson"
                         }
                     },
                     "400": {
@@ -4774,7 +4774,7 @@ const docTemplateadmin_api = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Create a new encryption key",
+                "description": "Create a new key",
                 "consumes": [
                     "application/json"
                 ],
@@ -4782,17 +4782,17 @@ const docTemplateadmin_api = `{
                     "application/json"
                 ],
                 "tags": [
-                    "encryption_keys"
+                    "keys"
                 ],
-                "summary": "Create encryption key",
+                "summary": "Create key",
                 "parameters": [
                     {
-                        "description": "Encryption key creation request",
+                        "description": "Key creation request",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.CreateEncryptionKeyRequestJson"
+                            "$ref": "#/definitions/routes.CreateKeyRequestJson"
                         }
                     }
                 ],
@@ -4800,7 +4800,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.EncryptionKeyJson"
+                            "$ref": "#/definitions/routes.KeyJson"
                         }
                     },
                     "400": {
@@ -4824,14 +4824,14 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "/encryption-keys/{id}": {
+        "/keys/{id}": {
             "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Get a specific encryption key by ID",
+                "description": "Get a specific key by ID",
                 "consumes": [
                     "application/json"
                 ],
@@ -4839,13 +4839,13 @@ const docTemplateadmin_api = `{
                     "application/json"
                 ],
                 "tags": [
-                    "encryption_keys"
+                    "keys"
                 ],
-                "summary": "Get encryption key",
+                "summary": "Get key",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Encryption key ID",
+                        "description": "Key ID",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -4855,7 +4855,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.EncryptionKeyJson"
+                            "$ref": "#/definitions/routes.KeyJson"
                         }
                     },
                     "400": {
@@ -4890,7 +4890,7 @@ const docTemplateadmin_api = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Soft delete an encryption key",
+                "description": "Soft delete a key",
                 "consumes": [
                     "application/json"
                 ],
@@ -4898,13 +4898,13 @@ const docTemplateadmin_api = `{
                     "application/json"
                 ],
                 "tags": [
-                    "encryption_keys"
+                    "keys"
                 ],
-                "summary": "Delete encryption key",
+                "summary": "Delete key",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Encryption key ID",
+                        "description": "Key ID",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -4940,7 +4940,7 @@ const docTemplateadmin_api = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Update an encryption key's properties",
+                "description": "Update a key's properties",
                 "consumes": [
                     "application/json"
                 ],
@@ -4948,13 +4948,13 @@ const docTemplateadmin_api = `{
                     "application/json"
                 ],
                 "tags": [
-                    "encryption_keys"
+                    "keys"
                 ],
-                "summary": "Update encryption key",
+                "summary": "Update key",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Encryption key ID",
+                        "description": "Key ID",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -4965,7 +4965,7 @@ const docTemplateadmin_api = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPIUpdateEncryptionKeyRequestJson"
+                            "$ref": "#/definitions/routes.OpenAPIUpdateKeyRequestJson"
                         }
                     }
                 ],
@@ -4973,7 +4973,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.EncryptionKeyJson"
+                            "$ref": "#/definitions/routes.KeyJson"
                         }
                     },
                     "400": {
@@ -5003,25 +5003,25 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "/encryption-keys/{id}/annotations": {
+        "/keys/{id}/annotations": {
             "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Get all annotations associated with a specific encryption key",
+                "description": "Get all annotations associated with a specific key",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "encryption_keys"
+                    "keys"
                 ],
-                "summary": "Get all annotations for an encryption key",
+                "summary": "Get all annotations for a key",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Encryption key ID",
+                        "description": "Key ID",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -5064,25 +5064,25 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "/encryption-keys/{id}/annotations/{annotation}": {
+        "/keys/{id}/annotations/{annotation}": {
             "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Get a specific annotation value by key for an encryption key",
+                "description": "Get a specific annotation value by key for a key",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "encryption_keys"
+                    "keys"
                 ],
-                "summary": "Get a specific annotation for an encryption key",
+                "summary": "Get a specific annotation for a key",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Encryption key ID",
+                        "description": "Key ID",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -5134,7 +5134,7 @@ const docTemplateadmin_api = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Set or update a specific annotation value by key for an encryption key",
+                "description": "Set or update a specific annotation value by key for a key",
                 "consumes": [
                     "application/json"
                 ],
@@ -5142,13 +5142,13 @@ const docTemplateadmin_api = `{
                     "application/json"
                 ],
                 "tags": [
-                    "encryption_keys"
+                    "keys"
                 ],
-                "summary": "Set an annotation for an encryption key",
+                "summary": "Set an annotation for a key",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Encryption key ID",
+                        "description": "Key ID",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -5215,15 +5215,15 @@ const docTemplateadmin_api = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Delete a specific annotation by key from an encryption key",
+                "description": "Delete a specific annotation by key from a key",
                 "tags": [
-                    "encryption_keys"
+                    "keys"
                 ],
-                "summary": "Delete an annotation from an encryption key",
+                "summary": "Delete an annotation from a key",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Encryption key ID",
+                        "description": "Key ID",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -5267,25 +5267,25 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "/encryption-keys/{id}/labels": {
+        "/keys/{id}/labels": {
             "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Get all labels associated with a specific encryption key",
+                "description": "Get all labels associated with a specific key",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "encryption_keys"
+                    "keys"
                 ],
-                "summary": "Get all labels for an encryption key",
+                "summary": "Get all labels for a key",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Encryption key ID",
+                        "description": "Key ID",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -5328,25 +5328,25 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "/encryption-keys/{id}/labels/{label}": {
+        "/keys/{id}/labels/{label}": {
             "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Get a specific label value by key for an encryption key",
+                "description": "Get a specific label value by key for a key",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "encryption_keys"
+                    "keys"
                 ],
-                "summary": "Get a specific label for an encryption key",
+                "summary": "Get a specific label for a key",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Encryption key ID",
+                        "description": "Key ID",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -5398,7 +5398,7 @@ const docTemplateadmin_api = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Set or update a specific label value by key for an encryption key",
+                "description": "Set or update a specific label value by key for a key",
                 "consumes": [
                     "application/json"
                 ],
@@ -5406,13 +5406,13 @@ const docTemplateadmin_api = `{
                     "application/json"
                 ],
                 "tags": [
-                    "encryption_keys"
+                    "keys"
                 ],
-                "summary": "Set a label for an encryption key",
+                "summary": "Set a label for a key",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Encryption key ID",
+                        "description": "Key ID",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -5479,15 +5479,15 @@ const docTemplateadmin_api = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Delete a specific label by key from an encryption key",
+                "description": "Delete a specific label by key from a key",
                 "tags": [
-                    "encryption_keys"
+                    "keys"
                 ],
-                "summary": "Delete a label from an encryption key",
+                "summary": "Delete a label from a key",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Encryption key ID",
+                        "description": "Key ID",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -7820,8 +7820,8 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "github_com_rmorlok_authproxy_internal_schema_api.EncryptionKeyJson": {
-            "description": "Encryption key API response",
+        "github_com_rmorlok_authproxy_internal_schema_api.KeyJson": {
+            "description": "Key API response",
             "type": "object",
             "properties": {
                 "annotations": {
@@ -7835,7 +7835,7 @@ const docTemplateadmin_api = `{
                 },
                 "id": {
                     "type": "string",
-                    "example": "ek_test550e8400abcde"
+                    "example": "key_test550e8400abcd"
                 },
                 "labels": {
                     "type": "object",
@@ -7902,9 +7902,9 @@ const docTemplateadmin_api = `{
                 "created_at": {
                     "type": "string"
                 },
-                "encryption_key_id": {
+                "key_id": {
                     "type": "string",
-                    "example": "ek_test550e8400abcde"
+                    "example": "key_test550e8400abcd"
                 },
                 "labels": {
                     "type": "object",
@@ -8156,8 +8156,8 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "routes.CreateEncryptionKeyRequestJson": {
-            "description": "Request to create a new encryption key",
+        "routes.CreateKeyRequestJson": {
+            "description": "Request to create a new key",
             "type": "object",
             "properties": {
                 "annotations": {
@@ -8216,42 +8216,6 @@ const docTemplateadmin_api = `{
                     "description": "Option value.",
                     "type": "string",
                     "example": "ws-123"
-                }
-            }
-        },
-        "routes.EncryptionKeyJson": {
-            "description": "Encryption key API response",
-            "type": "object",
-            "properties": {
-                "annotations": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string",
-                    "example": "ek_test550e8400abcde"
-                },
-                "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "namespace": {
-                    "type": "string",
-                    "example": "root.acme"
-                },
-                "state": {
-                    "type": "string",
-                    "example": "active"
-                },
-                "updated_at": {
-                    "type": "string"
                 }
             }
         },
@@ -8316,6 +8280,42 @@ const docTemplateadmin_api = `{
                 }
             }
         },
+        "routes.KeyJson": {
+            "description": "Key API response",
+            "type": "object",
+            "properties": {
+                "annotations": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "key_test550e8400abcd"
+                },
+                "labels": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "namespace": {
+                    "type": "string",
+                    "example": "root.acme"
+                },
+                "state": {
+                    "type": "string",
+                    "example": "active"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
         "routes.KeyValueJson": {
             "type": "object",
             "properties": {
@@ -8342,9 +8342,9 @@ const docTemplateadmin_api = `{
                 "created_at": {
                     "type": "string"
                 },
-                "encryption_key_id": {
+                "key_id": {
                     "type": "string",
-                    "example": "ek_test550e8400abcde"
+                    "example": "key_test550e8400abcd"
                 },
                 "labels": {
                     "type": "object",
@@ -8659,8 +8659,8 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "routes.OpenAPIListEncryptionKeysResponseJson": {
-            "description": "Paginated list of encryption keys",
+        "routes.OpenAPIListKeysResponseJson": {
+            "description": "Paginated list of keys",
             "type": "object",
             "properties": {
                 "cursor": {
@@ -8669,7 +8669,7 @@ const docTemplateadmin_api = `{
                 "items": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_api.EncryptionKeyJson"
+                        "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_api.KeyJson"
                     }
                 }
             }
@@ -8912,8 +8912,8 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "routes.OpenAPIUpdateEncryptionKeyRequestJson": {
-            "description": "Request to update an encryption key",
+        "routes.OpenAPIUpdateKeyRequestJson": {
+            "description": "Request to update a key",
             "type": "object",
             "properties": {
                 "annotations": {

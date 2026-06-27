@@ -191,11 +191,11 @@ type C interface {
 	// EnsureNamespaceAncestorPath ensures that the specified namespace path exists in the database.
 	EnsureNamespaceAncestorPath(ctx context.Context, targetNamespace string, labels map[string]string) (Namespace, error)
 
-	// SetNamespaceEncryptionKey sets the encryption key for a namespace.
-	SetNamespaceEncryptionKey(ctx context.Context, path string, ekId apid.ID) (Namespace, error)
+	// SetNamespaceKey sets the key for a namespace.
+	SetNamespaceKey(ctx context.Context, path string, ekId apid.ID) (Namespace, error)
 
-	// ClearNamespaceEncryptionKey clears the encryption key for a namespace (falls back to parent).
-	ClearNamespaceEncryptionKey(ctx context.Context, path string) (Namespace, error)
+	// ClearNamespaceKey clears the key for a namespace (falls back to parent).
+	ClearNamespaceKey(ctx context.Context, path string) (Namespace, error)
 
 	// ListNamespacesBuilder returns a builder to allow the caller to list namespaces matching certain criteria.
 	ListNamespacesBuilder() ListNamespacesBuilder
@@ -205,45 +205,45 @@ type C interface {
 
 	/*
 	 *
-	 * Encryption Keys
+	 * Keys
 	 *
 	 */
 
-	// GetEncryptionKey returns an encryption key by ID.
-	GetEncryptionKey(ctx context.Context, id apid.ID) (EncryptionKey, error)
+	// GetKey returns a key by ID.
+	GetKey(ctx context.Context, id apid.ID) (Key, error)
 
-	// CreateEncryptionKey creates a new encryption key.
-	CreateEncryptionKey(ctx context.Context, namespace string, keyData *cfgschema.KeyData, labels map[string]string) (EncryptionKey, error)
+	// CreateKey creates a new key.
+	CreateKey(ctx context.Context, namespace string, keyData *cfgschema.KeyData, labels map[string]string) (Key, error)
 
-	// DeleteEncryptionKey soft deletes an encryption key.
-	DeleteEncryptionKey(ctx context.Context, id apid.ID) error
+	// DeleteKey soft deletes a key.
+	DeleteKey(ctx context.Context, id apid.ID) error
 
-	// SetEncryptionKeyState sets the state of an encryption key.
-	SetEncryptionKeyState(ctx context.Context, id apid.ID, state database.EncryptionKeyState) error
+	// SetKeyState sets the state of a key.
+	SetKeyState(ctx context.Context, id apid.ID, state database.KeyState) error
 
-	// UpdateEncryptionKeyLabels replaces all labels on an encryption key.
-	UpdateEncryptionKeyLabels(ctx context.Context, id apid.ID, labels map[string]string) (EncryptionKey, error)
+	// UpdateKeyLabels replaces all labels on an encryption key.
+	UpdateKeyLabels(ctx context.Context, id apid.ID, labels map[string]string) (Key, error)
 
-	// PutEncryptionKeyLabels adds or updates the specified labels on an encryption key.
-	PutEncryptionKeyLabels(ctx context.Context, id apid.ID, labels map[string]string) (EncryptionKey, error)
+	// PutKeyLabels adds or updates the specified labels on an encryption key.
+	PutKeyLabels(ctx context.Context, id apid.ID, labels map[string]string) (Key, error)
 
-	// DeleteEncryptionKeyLabels removes the specified label keys from an encryption key.
-	DeleteEncryptionKeyLabels(ctx context.Context, id apid.ID, keys []string) (EncryptionKey, error)
+	// DeleteKeyLabels removes the specified label keys from an encryption key.
+	DeleteKeyLabels(ctx context.Context, id apid.ID, keys []string) (Key, error)
 
-	// UpdateEncryptionKeyAnnotations replaces all annotations on an encryption key.
-	UpdateEncryptionKeyAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (EncryptionKey, error)
+	// UpdateKeyAnnotations replaces all annotations on an encryption key.
+	UpdateKeyAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (Key, error)
 
-	// PutEncryptionKeyAnnotations adds or updates the specified annotations on an encryption key.
-	PutEncryptionKeyAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (EncryptionKey, error)
+	// PutKeyAnnotations adds or updates the specified annotations on an encryption key.
+	PutKeyAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (Key, error)
 
-	// DeleteEncryptionKeyAnnotations removes the specified annotation keys from an encryption key.
-	DeleteEncryptionKeyAnnotations(ctx context.Context, id apid.ID, keys []string) (EncryptionKey, error)
+	// DeleteKeyAnnotations removes the specified annotation keys from an encryption key.
+	DeleteKeyAnnotations(ctx context.Context, id apid.ID, keys []string) (Key, error)
 
-	// ListEncryptionKeysBuilder returns a builder to allow the caller to list encryption keys matching certain criteria.
-	ListEncryptionKeysBuilder() ListEncryptionKeysBuilder
+	// ListKeysBuilder returns a builder to allow the caller to list keys matching certain criteria.
+	ListKeysBuilder() ListKeysBuilder
 
-	// ListEncryptionKeysFromCursor continues listing encryption keys from a cursor to support pagination.
-	ListEncryptionKeysFromCursor(ctx context.Context, cursor string) (ListEncryptionKeysExecutor, error)
+	// ListKeysFromCursor continues listing keys from a cursor to support pagination.
+	ListKeysFromCursor(ctx context.Context, cursor string) (ListKeysExecutor, error)
 
 	/*
 	 *

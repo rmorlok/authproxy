@@ -165,7 +165,7 @@ func GetGinServer(
 		dm.GetEncryptService(),
 		logger,
 	)
-	routesEncryptionKeys := common_routes.NewEncryptionKeysRoutes(
+	routesKeys := common_routes.NewKeysRoutes(
 		dm.GetConfig(),
 		authService,
 		dm.GetCoreService(),
@@ -196,7 +196,7 @@ func GetGinServer(
 	routesConnectors.Register(api)
 	routesConnections.Register(api)
 	routesNamespaces.Register(api)
-	routesEncryptionKeys.Register(api)
+	routesKeys.Register(api)
 	routesRateLimits.Register(api)
 	routesRequestEvents.Register(api)
 	routesActors.Register(api)

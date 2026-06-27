@@ -22,15 +22,16 @@ const NamespacesTable = "namespaces"
 
 // Namespace is the grouping of resources within AuthProxy.
 type Namespace struct {
-	Path            string
-	depth           uint64
-	State           NamespaceState
-	EncryptionKeyId *apid.ID
-	Labels          Labels
-	Annotations     Annotations
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-	DeletedAt       *time.Time
+	Path                      string
+	depth                     uint64
+	State                     NamespaceState
+	KeyId                     *apid.ID
+	TargetDataEncryptionKeyId *apid.ID
+	Labels                    Labels
+	Annotations               Annotations
+	CreatedAt                 time.Time
+	UpdatedAt                 time.Time
+	DeletedAt                 *time.Time
 }
 
 func (ns *Namespace) GetNamespace() string {
@@ -42,7 +43,8 @@ func (ns *Namespace) cols() []string {
 		"path",
 		"depth",
 		"state",
-		"encryption_key_id",
+		"key_id",
+		"target_data_encryption_key_id",
 		"labels",
 		"annotations",
 		"created_at",
@@ -56,7 +58,8 @@ func (ns *Namespace) fields() []any {
 		&ns.Path,
 		&ns.depth,
 		&ns.State,
-		&ns.EncryptionKeyId,
+		&ns.KeyId,
+		&ns.TargetDataEncryptionKeyId,
 		&ns.Labels,
 		&ns.Annotations,
 		&ns.CreatedAt,
@@ -70,7 +73,8 @@ func (ns *Namespace) values() []any {
 		ns.Path,
 		ns.depth,
 		ns.State,
-		ns.EncryptionKeyId,
+		ns.KeyId,
+		ns.TargetDataEncryptionKeyId,
 		ns.Labels,
 		ns.Annotations,
 		ns.CreatedAt,
@@ -85,6 +89,15 @@ func (ns *Namespace) normalize() {
 	}
 
 	ns.depth = namespace.DepthOfNamespacePath(ns.Path)
+
+	if ns.Path == namespace.RootNamespace && ns.KeyId == nil {
+		ns.KeyId = rootNamespaceKeyID()
+	}
+}
+
+func rootNamespaceKeyID() *apid.ID {
+	id := GlobalKeyID
+	return &id
 }
 
 func (ns *Namespace) Validate() error {
@@ -231,7 +244,40 @@ func (s *service) getNamespaceByPath(ctx context.Context, tx sq.BaseRunner, path
 	return &result, nil
 }
 
+// validateNamespaceKeyScope enforces that a namespace can only target a key
+// scoped to the namespace itself or one of its ancestors. This keeps a
+// namespace from depending on key material owned by a child or sibling
+// namespace, which could be deleted independently while the namespace still
+// references it. The seeded root key (key_global) naturally satisfies this
+// rule for root and its descendants.
+func (s *service) validateNamespaceKeyScope(ctx context.Context, runner sq.BaseRunner, path string, keyID apid.ID) error {
+	var keyNamespace string
+	err := s.sq.
+		Select("namespace").
+		From(KeysTable).
+		Where(sq.Eq{
+			"id":         keyID,
+			"deleted_at": nil,
+		}).
+		RunWith(runner).
+		QueryRow().
+		Scan(&keyNamespace)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("failed to look up encryption key: %w", ErrNotFound)
+		}
+		return fmt.Errorf("failed to look up encryption key: %w", err)
+	}
+
+	if !namespace.NamespaceIsSameOrChild(keyNamespace, path) {
+		return httperr.BadRequestf("encryption key belongs to namespace '%s' which is not the same as or an ancestor of '%s'", keyNamespace, path)
+	}
+
+	return nil
+}
+
 func (s *service) createNamespace(ctx context.Context, tx *sql.Tx, ns *Namespace) error {
+	ns.normalize()
 	prefixes := namespace.SplitNamespacePathToPrefixes(ns.Path)
 	state := ns.State
 
@@ -257,6 +303,12 @@ func (s *service) createNamespace(ctx context.Context, tx *sql.Tx, ns *Namespace
 
 	// Update the state so that we are always bound by the parent namespace state
 	ns.State = state
+
+	if ns.KeyId != nil {
+		if err := s.validateNamespaceKeyScope(ctx, tx, ns.Path, *ns.KeyId); err != nil {
+			return err
+		}
+	}
 
 	// Materialize parent-namespace carry-forward. Each ancestor namespace
 	// already stored its own ancestor chain at create time, so it suffices
@@ -388,55 +440,41 @@ func (s *service) DeleteNamespace(ctx context.Context, path string) error {
 	return nil
 }
 
-func (s *service) SetNamespaceEncryptionKeyId(ctx context.Context, path string, ekId *apid.ID) (*Namespace, error) {
-	if ekId != nil {
-		ek, err := s.GetEncryptionKey(ctx, *ekId)
-		if err != nil {
-			return nil, fmt.Errorf("failed to look up encryption key: %w", err)
-		}
-
-		prefixes := namespace.SplitNamespacePathToPrefixes(path)
-		// Strict ancestors: all prefixes except the last (self)
-		var strictAncestors []string
-		if len(prefixes) > 1 {
-			strictAncestors = prefixes[:len(prefixes)-1]
-		}
-
-		found := false
-		for _, ancestor := range strictAncestors {
-			if ek.Namespace == ancestor {
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			if len(strictAncestors) == 0 {
-				return nil, httperr.BadRequestf("cannot assign encryption key to root namespace; encryption keys must belong to a strict ancestor namespace")
-			}
-			return nil, httperr.BadRequestf("encryption key belongs to namespace '%s' which is not a strict ancestor of '%s'", ek.Namespace, path)
-		}
-	}
-
+func (s *service) SetNamespaceKeyId(ctx context.Context, path string, ekId *apid.ID) (*Namespace, error) {
 	now := apctx.GetClock(ctx).Now()
-	dbResult, err := s.sq.
-		Update(NamespacesTable).
-		Set("updated_at", now).
-		Set("encryption_key_id", ekId).
-		Where(sq.Eq{"path": path, "deleted_at": nil}).
-		RunWith(s.db).
-		Exec()
-	if err != nil {
-		return nil, fmt.Errorf("failed to set namespace encryption key: %w", err)
-	}
 
-	affected, err := dbResult.RowsAffected()
-	if err != nil {
-		return nil, fmt.Errorf("failed to set namespace encryption key: %w", err)
-	}
+	err := s.transaction(func(tx *sql.Tx) error {
+		if ekId != nil {
+			if err := s.validateNamespaceKeyScope(ctx, tx, path, *ekId); err != nil {
+				return err
+			}
+		}
 
-	if affected == 0 {
-		return nil, ErrNotFound
+		dbResult, err := s.sq.
+			Update(NamespacesTable).
+			Set("updated_at", now).
+			Set("key_id", ekId).
+			Where(sq.Eq{"path": path, "deleted_at": nil}).
+			RunWith(tx).
+			Exec()
+		if err != nil {
+			return fmt.Errorf("failed to set namespace encryption key: %w", err)
+		}
+
+		affected, err := dbResult.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("failed to set namespace encryption key: %w", err)
+		}
+
+		if affected == 0 {
+			return ErrNotFound
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
 	}
 
 	return s.GetNamespace(ctx, path)
@@ -944,31 +982,31 @@ func (s *service) DeleteNamespaceAnnotations(ctx context.Context, path string, k
 }
 
 // NamespaceEncryptionTarget holds the fields needed by the background job that computes
-// and caches the target encryption key version for each namespace.
+// and caches the target data encryption key for each namespace.
 type NamespaceEncryptionTarget struct {
-	Path                         string
-	Depth                        uint64
-	EncryptionKeyId              *apid.ID
-	TargetEncryptionKeyVersionId *apid.ID
+	Path                      string
+	Depth                     uint64
+	KeyId                     *apid.ID
+	TargetDataEncryptionKeyId *apid.ID
 }
 
-// NamespaceTargetEncryptionKeyVersionUpdate carries an update to set the target encryption
-// key version for a specific namespace.
-type NamespaceTargetEncryptionKeyVersionUpdate struct {
-	Path                         string
-	TargetEncryptionKeyVersionId apid.ID
+// NamespaceTargetDataEncryptionKeyUpdate carries an update to set the target data
+// encryption key for a specific namespace.
+type NamespaceTargetDataEncryptionKeyUpdate struct {
+	Path                      string
+	TargetDataEncryptionKeyId apid.ID
 }
 
 func (s *service) EnumerateNamespaceEncryptionTargets(
 	ctx context.Context,
-	callback func(targets []NamespaceEncryptionTarget, lastPage bool) (updates []NamespaceTargetEncryptionKeyVersionUpdate, keepGoing pagination.KeepGoing, err error),
+	callback func(targets []NamespaceEncryptionTarget, lastPage bool) (updates []NamespaceTargetDataEncryptionKeyUpdate, keepGoing pagination.KeepGoing, err error),
 ) error {
 	const pageSize = 100
 	offset := uint64(0)
 
 	for {
 		rows, err := s.sq.
-			Select("path", "depth", "encryption_key_id", "target_encryption_key_version_id").
+			Select("path", "depth", "key_id", "target_data_encryption_key_id").
 			From(NamespacesTable).
 			Where(sq.Eq{"deleted_at": nil}).
 			OrderBy("depth, path").
@@ -983,7 +1021,7 @@ func (s *service) EnumerateNamespaceEncryptionTargets(
 		var results []NamespaceEncryptionTarget
 		for rows.Next() {
 			var r NamespaceEncryptionTarget
-			if err := rows.Scan(&r.Path, &r.Depth, &r.EncryptionKeyId, &r.TargetEncryptionKeyVersionId); err != nil {
+			if err := rows.Scan(&r.Path, &r.Depth, &r.KeyId, &r.TargetDataEncryptionKeyId); err != nil {
 				rows.Close()
 				return err
 			}
@@ -1007,14 +1045,14 @@ func (s *service) EnumerateNamespaceEncryptionTargets(
 			for _, u := range updates {
 				_, err := s.sq.
 					Update(NamespacesTable).
-					Set("target_encryption_key_version_id", u.TargetEncryptionKeyVersionId).
-					Set("target_encryption_key_version_updated_at", now).
+					Set("target_data_encryption_key_id", u.TargetDataEncryptionKeyId).
+					Set("target_data_encryption_key_updated_at", now).
 					Set("updated_at", now).
 					Where(sq.Eq{"path": u.Path}).
 					RunWith(s.db).
 					Exec()
 				if err != nil {
-					return fmt.Errorf("failed to update target encryption key version for namespace '%s': %w", u.Path, err)
+					return fmt.Errorf("failed to update target data encryption key for namespace '%s': %w", u.Path, err)
 				}
 			}
 		}

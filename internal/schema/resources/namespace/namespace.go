@@ -148,6 +148,17 @@ func NamespacePathFromRoot(parts ...string) string {
 	return strings.Join(allPaths, NamespacePathSeparator)
 }
 
+// NamespaceParentPath returns the parent namespace path for a valid namespace path.
+// The parent of root is root.
+func NamespaceParentPath(path string) string {
+	i := strings.LastIndex(path, NamespacePathSeparator)
+	if i < 0 {
+		return RootNamespace
+	}
+
+	return path[:i]
+}
+
 // NamespaceIsChild returns true if the child path is a child of the parent path.
 func NamespaceIsChild(parentPath, childPath string) bool {
 	return strings.HasPrefix(childPath, parentPath+NamespacePathSeparator)

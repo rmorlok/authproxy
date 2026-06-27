@@ -12,7 +12,7 @@ type fakeService struct {
 	doBase64Encode bool
 }
 
-var fakeEncryptionKeyVersionId = apid.ID("ekv_fake")
+var fakeDataEncryptionKeyId = apid.ID("dek_fake")
 
 // NewFakeEncryptService returns an encrypt service that does not encrypt or decrypt anything.
 func NewFakeEncryptService(doBase64Encode bool) E {
@@ -21,22 +21,16 @@ func NewFakeEncryptService(doBase64Encode bool) E {
 	}
 }
 
-// EncryptForKey encrypts data with the current version of the specified key.
-func (s *fakeService) EncryptForKey(ctx context.Context, ekId apid.ID, data []byte) (encfield.EncryptedField, error) {
+func (s *fakeService) encryptForKey(ctx context.Context, ekId apid.ID, data []byte) (encfield.EncryptedField, error) {
 	return encfield.EncryptedField{
-		ID:   fakeEncryptionKeyVersionId,
+		ID:   fakeDataEncryptionKeyId,
 		Data: string(data),
 	}, nil
 }
 
-// EncryptStringForKey encrypts a string with the current version of the specified key.
-func (s *fakeService) EncryptStringForKey(ctx context.Context, ekId apid.ID, data string) (encfield.EncryptedField, error) {
-	return s.EncryptForKey(ctx, ekId, []byte(data))
-}
-
 // EncryptGlobal encrypts raw bytes with the current global key.
 func (s *fakeService) EncryptGlobal(ctx context.Context, data []byte) (encfield.EncryptedField, error) {
-	return s.EncryptForKey(ctx, globalEncryptionKeyID, data)
+	return s.encryptForKey(ctx, globalEncryptionKeyID, data)
 }
 
 // EncryptStringGlobal encrypts a string with the current global key.
@@ -52,6 +46,10 @@ func (s *fakeService) EncryptStringForNamespace(ctx context.Context, namespacePa
 	return s.EncryptForNamespace(ctx, namespacePath, []byte(data))
 }
 
+func (s *fakeService) EncryptKeyForNamespace(ctx context.Context, namespacePath string, keyData []byte) (encfield.EncryptedField, error) {
+	return s.EncryptForNamespace(ctx, namespacePath, keyData)
+}
+
 func (s *fakeService) EncryptForEntity(ctx context.Context, entity NamespacedEntity, data []byte) (encfield.EncryptedField, error) {
 	return s.EncryptForNamespace(ctx, entity.GetNamespace(), data)
 }
@@ -60,10 +58,10 @@ func (s *fakeService) EncryptStringForEntity(ctx context.Context, entity Namespa
 	return s.EncryptForEntity(ctx, entity, []byte(data))
 }
 
-// Decrypt decrypts an EncryptedField using the key ID embedded in the field.
+// Decrypt decrypts an EncryptedField using the DEK ID embedded in the field.
 func (s *fakeService) Decrypt(ctx context.Context, ef encfield.EncryptedField) ([]byte, error) {
-	if ef.ID != fakeEncryptionKeyVersionId {
-		return nil, fmt.Errorf("fake encryption service can only decrypt data encrypted with fake key version")
+	if ef.ID != fakeDataEncryptionKeyId {
+		return nil, fmt.Errorf("fake encryption service can only decrypt data encrypted with fake data encryption key")
 	}
 	return []byte(ef.Data), nil
 }
@@ -78,8 +76,8 @@ func (s *fakeService) DecryptString(ctx context.Context, ef encfield.EncryptedFi
 	return string(decryptedData), nil
 }
 
-func (s *fakeService) ReEncryptField(ctx context.Context, ef encfield.EncryptedField, targetEkvId apid.ID) (encfield.EncryptedField, error) {
-	if ef.ID == targetEkvId {
+func (s *fakeService) ReEncryptField(ctx context.Context, ef encfield.EncryptedField, targetDEKId apid.ID) (encfield.EncryptedField, error) {
+	if ef.ID == targetDEKId {
 		return ef, nil
 	}
 
@@ -88,7 +86,7 @@ func (s *fakeService) ReEncryptField(ctx context.Context, ef encfield.EncryptedF
 		return encfield.EncryptedField{}, err
 	}
 
-	return encfield.EncryptedField{ID: targetEkvId, Data: string(plaintext)}, nil
+	return encfield.EncryptedField{ID: targetDEKId, Data: string(plaintext)}, nil
 }
 
 func (s *fakeService) SyncKeysFromDbToMemory(ctx context.Context) error {

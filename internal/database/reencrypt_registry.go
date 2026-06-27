@@ -115,12 +115,12 @@ func isRegisteredEncryptedField(table, col string) bool {
 
 // ReEncryptionTarget represents one encrypted field on one row that needs re-encryption.
 type ReEncryptionTarget struct {
-	Table                        string
-	PrimaryKeyCols               []string                // column names in PK order (from registration)
-	PrimaryKeyValues             []any                   // values in PK column order
-	FieldColumn                  string                  // which encrypted column
-	EncryptedFieldValue          encfield.EncryptedField // current value (contains EKV ID)
-	TargetEncryptionKeyVersionId apid.ID                 // what it should be
+	Table                     string
+	PrimaryKeyCols            []string                // column names in PK order (from registration)
+	PrimaryKeyValues          []any                   // values in PK column order
+	FieldColumn               string                  // which encrypted column
+	EncryptedFieldValue       encfield.EncryptedField // current value (contains the active DEK ID)
+	TargetDataEncryptionKeyId apid.ID                 // target DEK for the namespace
 }
 
 // ReEncryptedFieldUpdate carries the data to update a single encrypted field after re-encryption.
@@ -181,7 +181,7 @@ func (s *service) queryReEncryptionPage(
 	pageSize uint64,
 	offset uint64,
 ) ([]ReEncryptionTarget, int, error) {
-	// Build select columns: PK cols (qualified) + encrypted cols (qualified) + target EKV ID
+	// Build select columns: PK cols (qualified) + encrypted cols (qualified) + target DEK ID.
 	var selectCols []string
 	for _, pk := range reg.PrimaryKeyCols {
 		selectCols = append(selectCols, reg.Table+"."+pk)
@@ -189,7 +189,7 @@ func (s *service) queryReEncryptionPage(
 	for _, ec := range reg.EncryptedCols {
 		selectCols = append(selectCols, reg.Table+"."+ec)
 	}
-	selectCols = append(selectCols, "namespaces.target_encryption_key_version_id")
+	selectCols = append(selectCols, "namespaces.target_data_encryption_key_id")
 
 	// Build base query
 	q := s.sq.
@@ -224,7 +224,7 @@ func (s *service) queryReEncryptionPage(
 
 	// WHERE conditions
 	q = q.Where(sq.Eq{reg.Table + ".deleted_at": nil})
-	q = q.Where(sq.NotEq{"namespaces.target_encryption_key_version_id": nil})
+	q = q.Where(sq.NotEq{"namespaces.target_data_encryption_key_id": nil})
 	q = q.Where(sq.Eq{NamespacesTable + ".deleted_at": nil})
 
 	// OR condition: at least one encrypted col doesn't match the target
@@ -238,7 +238,7 @@ func (s *service) queryReEncryptionPage(
 			jsonIdExpr = fmt.Sprintf("COALESCE(json_extract(%s, '$.id'), '')", qualifiedCol)
 		}
 		orConditions = append(orConditions, sq.Expr(
-			fmt.Sprintf("(%s != namespaces.target_encryption_key_version_id AND %s IS NOT NULL)", jsonIdExpr, qualifiedCol),
+			fmt.Sprintf("(%s != namespaces.target_data_encryption_key_id AND %s IS NOT NULL)", jsonIdExpr, qualifiedCol),
 		))
 	}
 	if len(orConditions) == 1 {
@@ -265,7 +265,7 @@ func (s *service) queryReEncryptionPage(
 	type rowData struct {
 		pkValues      []any
 		encryptedVals []encfield.EncryptedField
-		targetEKVId   apid.ID
+		targetDEKId   apid.ID
 	}
 
 	var allRows []rowData
@@ -283,7 +283,7 @@ func (s *service) queryReEncryptionPage(
 		for i := range reg.EncryptedCols {
 			scanDest = append(scanDest, &rd.encryptedVals[i])
 		}
-		scanDest = append(scanDest, &rd.targetEKVId)
+		scanDest = append(scanDest, &rd.targetDEKId)
 
 		if err := rows.Scan(scanDest...); err != nil {
 			return nil, 0, err
@@ -304,14 +304,14 @@ func (s *service) queryReEncryptionPage(
 			if ef.IsZero() {
 				continue
 			}
-			if ef.ID != rd.targetEKVId {
+			if ef.ID != rd.targetDEKId {
 				targets = append(targets, ReEncryptionTarget{
-					Table:                        reg.Table,
-					PrimaryKeyCols:               reg.PrimaryKeyCols,
-					PrimaryKeyValues:             rd.pkValues,
-					FieldColumn:                  ec,
-					EncryptedFieldValue:          ef,
-					TargetEncryptionKeyVersionId: rd.targetEKVId,
+					Table:                     reg.Table,
+					PrimaryKeyCols:            reg.PrimaryKeyCols,
+					PrimaryKeyValues:          rd.pkValues,
+					FieldColumn:               ec,
+					EncryptedFieldValue:       ef,
+					TargetDataEncryptionKeyId: rd.targetDEKId,
 				})
 			}
 		}

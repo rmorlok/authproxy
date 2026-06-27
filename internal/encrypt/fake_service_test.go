@@ -24,7 +24,7 @@ func TestFakeService(t *testing.T) {
 				State:               database.ConnectorVersionStatePrimary,
 				Labels:              map[string]string{"type": "test"},
 				Hash:                "test",
-				EncryptedDefinition: encfield.EncryptedField{ID: "ekv_test", Data: "test"},
+				EncryptedDefinition: encfield.EncryptedField{ID: "dek_test", Data: "test"},
 			}
 
 			cfg := config.FromRoot(&sconfig.Root{

@@ -12,7 +12,7 @@ import (
 type Namespace interface {
 	GetPath() string
 	GetState() database.NamespaceState
-	GetEncryptionKeyId() *apid.ID
+	GetKeyId() *apid.ID
 	GetCreatedAt() time.Time
 	GetUpdatedAt() time.Time
 	GetLabels() map[string]string

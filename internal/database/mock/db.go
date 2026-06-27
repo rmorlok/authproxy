@@ -300,32 +300,18 @@ func (mr *MockDBMockRecorder) CheckNonceValidAndMarkUsed(ctx, nonce, retainRecor
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CheckNonceValidAndMarkUsed", reflect.TypeOf((*MockDB)(nil).CheckNonceValidAndMarkUsed), ctx, nonce, retainRecordUntil)
 }
 
-// ClearCurrentFlagForEncryptionKey mocks base method.
-func (m *MockDB) ClearCurrentFlagForEncryptionKey(ctx context.Context, encryptionKeyId apid.ID) error {
+// ClearCurrentDataEncryptionKeyFlagForKey mocks base method.
+func (m *MockDB) ClearCurrentDataEncryptionKeyFlagForKey(ctx context.Context, keyId apid.ID) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ClearCurrentFlagForEncryptionKey", ctx, encryptionKeyId)
+	ret := m.ctrl.Call(m, "ClearCurrentDataEncryptionKeyFlagForKey", ctx, keyId)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// ClearCurrentFlagForEncryptionKey indicates an expected call of ClearCurrentFlagForEncryptionKey.
-func (mr *MockDBMockRecorder) ClearCurrentFlagForEncryptionKey(ctx, encryptionKeyId interface{}) *gomock.Call {
+// ClearCurrentDataEncryptionKeyFlagForKey indicates an expected call of ClearCurrentDataEncryptionKeyFlagForKey.
+func (mr *MockDBMockRecorder) ClearCurrentDataEncryptionKeyFlagForKey(ctx, keyId interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ClearCurrentFlagForEncryptionKey", reflect.TypeOf((*MockDB)(nil).ClearCurrentFlagForEncryptionKey), ctx, encryptionKeyId)
-}
-
-// ClearCurrentFlagForNamespace mocks base method.
-func (m *MockDB) ClearCurrentFlagForNamespace(ctx context.Context, namespacePath string) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ClearCurrentFlagForNamespace", ctx, namespacePath)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// ClearCurrentFlagForNamespace indicates an expected call of ClearCurrentFlagForNamespace.
-func (mr *MockDBMockRecorder) ClearCurrentFlagForNamespace(ctx, namespacePath interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ClearCurrentFlagForNamespace", reflect.TypeOf((*MockDB)(nil).ClearCurrentFlagForNamespace), ctx, namespacePath)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ClearCurrentDataEncryptionKeyFlagForKey", reflect.TypeOf((*MockDB)(nil).ClearCurrentDataEncryptionKeyFlagForKey), ctx, keyId)
 }
 
 // CountProbeOutcomes mocks base method.
@@ -385,32 +371,18 @@ func (mr *MockDBMockRecorder) CreateDataEncryptionKey(ctx, dek interface{}) *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateDataEncryptionKey", reflect.TypeOf((*MockDB)(nil).CreateDataEncryptionKey), ctx, dek)
 }
 
-// CreateEncryptionKey mocks base method.
-func (m *MockDB) CreateEncryptionKey(ctx context.Context, ek *database.EncryptionKey) error {
+// CreateKey mocks base method.
+func (m *MockDB) CreateKey(ctx context.Context, ek *database.Key) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateEncryptionKey", ctx, ek)
+	ret := m.ctrl.Call(m, "CreateKey", ctx, ek)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// CreateEncryptionKey indicates an expected call of CreateEncryptionKey.
-func (mr *MockDBMockRecorder) CreateEncryptionKey(ctx, ek interface{}) *gomock.Call {
+// CreateKey indicates an expected call of CreateKey.
+func (mr *MockDBMockRecorder) CreateKey(ctx, ek interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateEncryptionKey", reflect.TypeOf((*MockDB)(nil).CreateEncryptionKey), ctx, ek)
-}
-
-// CreateEncryptionKeyVersion mocks base method.
-func (m *MockDB) CreateEncryptionKeyVersion(ctx context.Context, ekv *database.EncryptionKeyVersion) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateEncryptionKeyVersion", ctx, ekv)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// CreateEncryptionKeyVersion indicates an expected call of CreateEncryptionKeyVersion.
-func (mr *MockDBMockRecorder) CreateEncryptionKeyVersion(ctx, ekv interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateEncryptionKeyVersion", reflect.TypeOf((*MockDB)(nil).CreateEncryptionKeyVersion), ctx, ekv)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateKey", reflect.TypeOf((*MockDB)(nil).CreateKey), ctx, ek)
 }
 
 // CreateNamespace mocks base method.
@@ -571,78 +543,6 @@ func (mr *MockDBMockRecorder) DeleteConnector(ctx, id interface{}) *gomock.Call 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteConnector", reflect.TypeOf((*MockDB)(nil).DeleteConnector), ctx, id)
 }
 
-// DeleteEncryptionKey mocks base method.
-func (m *MockDB) DeleteEncryptionKey(ctx context.Context, id apid.ID) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteEncryptionKey", ctx, id)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// DeleteEncryptionKey indicates an expected call of DeleteEncryptionKey.
-func (mr *MockDBMockRecorder) DeleteEncryptionKey(ctx, id interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteEncryptionKey", reflect.TypeOf((*MockDB)(nil).DeleteEncryptionKey), ctx, id)
-}
-
-// DeleteEncryptionKeyAnnotations mocks base method.
-func (m *MockDB) DeleteEncryptionKeyAnnotations(ctx context.Context, id apid.ID, keys []string) (*database.EncryptionKey, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteEncryptionKeyAnnotations", ctx, id, keys)
-	ret0, _ := ret[0].(*database.EncryptionKey)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// DeleteEncryptionKeyAnnotations indicates an expected call of DeleteEncryptionKeyAnnotations.
-func (mr *MockDBMockRecorder) DeleteEncryptionKeyAnnotations(ctx, id, keys interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteEncryptionKeyAnnotations", reflect.TypeOf((*MockDB)(nil).DeleteEncryptionKeyAnnotations), ctx, id, keys)
-}
-
-// DeleteEncryptionKeyLabels mocks base method.
-func (m *MockDB) DeleteEncryptionKeyLabels(ctx context.Context, id apid.ID, keys []string) (*database.EncryptionKey, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteEncryptionKeyLabels", ctx, id, keys)
-	ret0, _ := ret[0].(*database.EncryptionKey)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// DeleteEncryptionKeyLabels indicates an expected call of DeleteEncryptionKeyLabels.
-func (mr *MockDBMockRecorder) DeleteEncryptionKeyLabels(ctx, id, keys interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteEncryptionKeyLabels", reflect.TypeOf((*MockDB)(nil).DeleteEncryptionKeyLabels), ctx, id, keys)
-}
-
-// DeleteEncryptionKeyVersion mocks base method.
-func (m *MockDB) DeleteEncryptionKeyVersion(ctx context.Context, id apid.ID) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteEncryptionKeyVersion", ctx, id)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// DeleteEncryptionKeyVersion indicates an expected call of DeleteEncryptionKeyVersion.
-func (mr *MockDBMockRecorder) DeleteEncryptionKeyVersion(ctx, id interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteEncryptionKeyVersion", reflect.TypeOf((*MockDB)(nil).DeleteEncryptionKeyVersion), ctx, id)
-}
-
-// DeleteEncryptionKeyVersionsForEncryptionKey mocks base method.
-func (m *MockDB) DeleteEncryptionKeyVersionsForEncryptionKey(ctx context.Context, encryptionKeyId apid.ID) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteEncryptionKeyVersionsForEncryptionKey", ctx, encryptionKeyId)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// DeleteEncryptionKeyVersionsForEncryptionKey indicates an expected call of DeleteEncryptionKeyVersionsForEncryptionKey.
-func (mr *MockDBMockRecorder) DeleteEncryptionKeyVersionsForEncryptionKey(ctx, encryptionKeyId interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteEncryptionKeyVersionsForEncryptionKey", reflect.TypeOf((*MockDB)(nil).DeleteEncryptionKeyVersionsForEncryptionKey), ctx, encryptionKeyId)
-}
-
 // DeleteExpiredNonces mocks base method.
 func (m *MockDB) DeleteExpiredNonces(ctx context.Context) error {
 	m.ctrl.T.Helper()
@@ -655,6 +555,50 @@ func (m *MockDB) DeleteExpiredNonces(ctx context.Context) error {
 func (mr *MockDBMockRecorder) DeleteExpiredNonces(ctx interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteExpiredNonces", reflect.TypeOf((*MockDB)(nil).DeleteExpiredNonces), ctx)
+}
+
+// DeleteKey mocks base method.
+func (m *MockDB) DeleteKey(ctx context.Context, id apid.ID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteKey", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteKey indicates an expected call of DeleteKey.
+func (mr *MockDBMockRecorder) DeleteKey(ctx, id interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteKey", reflect.TypeOf((*MockDB)(nil).DeleteKey), ctx, id)
+}
+
+// DeleteKeyAnnotations mocks base method.
+func (m *MockDB) DeleteKeyAnnotations(ctx context.Context, id apid.ID, keys []string) (*database.Key, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteKeyAnnotations", ctx, id, keys)
+	ret0, _ := ret[0].(*database.Key)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DeleteKeyAnnotations indicates an expected call of DeleteKeyAnnotations.
+func (mr *MockDBMockRecorder) DeleteKeyAnnotations(ctx, id, keys interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteKeyAnnotations", reflect.TypeOf((*MockDB)(nil).DeleteKeyAnnotations), ctx, id, keys)
+}
+
+// DeleteKeyLabels mocks base method.
+func (m *MockDB) DeleteKeyLabels(ctx context.Context, id apid.ID, keys []string) (*database.Key, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteKeyLabels", ctx, id, keys)
+	ret0, _ := ret[0].(*database.Key)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DeleteKeyLabels indicates an expected call of DeleteKeyLabels.
+func (mr *MockDBMockRecorder) DeleteKeyLabels(ctx, id, keys interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteKeyLabels", reflect.TypeOf((*MockDB)(nil).DeleteKeyLabels), ctx, id, keys)
 }
 
 // DeleteNamespace mocks base method.
@@ -803,33 +747,18 @@ func (mr *MockDBMockRecorder) EnsureNamespaceByPath(ctx, path interface{}) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureNamespaceByPath", reflect.TypeOf((*MockDB)(nil).EnsureNamespaceByPath), ctx, path)
 }
 
-// EnumerateEncryptionKeyVersionsForKey mocks base method.
-func (m *MockDB) EnumerateEncryptionKeyVersionsForKey(ctx context.Context, ekId apid.ID, callback func([]*database.EncryptionKeyVersion, bool) (pagination.KeepGoing, error)) error {
+// EnumerateDataEncryptionKeysForKey mocks base method.
+func (m *MockDB) EnumerateDataEncryptionKeysForKey(ctx context.Context, keyId apid.ID, callback func([]*database.DataEncryptionKey, bool) (pagination.KeepGoing, error)) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "EnumerateEncryptionKeyVersionsForKey", ctx, ekId, callback)
+	ret := m.ctrl.Call(m, "EnumerateDataEncryptionKeysForKey", ctx, keyId, callback)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// EnumerateEncryptionKeyVersionsForKey indicates an expected call of EnumerateEncryptionKeyVersionsForKey.
-func (mr *MockDBMockRecorder) EnumerateEncryptionKeyVersionsForKey(ctx, ekId, callback interface{}) *gomock.Call {
+// EnumerateDataEncryptionKeysForKey indicates an expected call of EnumerateDataEncryptionKeysForKey.
+func (mr *MockDBMockRecorder) EnumerateDataEncryptionKeysForKey(ctx, keyId, callback interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnumerateEncryptionKeyVersionsForKey", reflect.TypeOf((*MockDB)(nil).EnumerateEncryptionKeyVersionsForKey), ctx, ekId, callback)
-}
-
-// EnumerateEncryptionKeysInDependencyOrder mocks base method.
-func (m *MockDB) EnumerateEncryptionKeysInDependencyOrder(ctx context.Context, callback func([]*database.EncryptionKey, int) (pagination.KeepGoing, error)) ([]*database.EncryptionKey, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "EnumerateEncryptionKeysInDependencyOrder", ctx, callback)
-	ret0, _ := ret[0].([]*database.EncryptionKey)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// EnumerateEncryptionKeysInDependencyOrder indicates an expected call of EnumerateEncryptionKeysInDependencyOrder.
-func (mr *MockDBMockRecorder) EnumerateEncryptionKeysInDependencyOrder(ctx, callback interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnumerateEncryptionKeysInDependencyOrder", reflect.TypeOf((*MockDB)(nil).EnumerateEncryptionKeysInDependencyOrder), ctx, callback)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnumerateDataEncryptionKeysForKey", reflect.TypeOf((*MockDB)(nil).EnumerateDataEncryptionKeysForKey), ctx, keyId, callback)
 }
 
 // EnumerateFieldsRequiringReEncryption mocks base method.
@@ -846,8 +775,23 @@ func (mr *MockDBMockRecorder) EnumerateFieldsRequiringReEncryption(ctx, callback
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnumerateFieldsRequiringReEncryption", reflect.TypeOf((*MockDB)(nil).EnumerateFieldsRequiringReEncryption), ctx, callback)
 }
 
+// EnumerateKeysInDependencyOrder mocks base method.
+func (m *MockDB) EnumerateKeysInDependencyOrder(ctx context.Context, callback func([]*database.Key, int) (pagination.KeepGoing, error)) ([]*database.Key, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "EnumerateKeysInDependencyOrder", ctx, callback)
+	ret0, _ := ret[0].([]*database.Key)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// EnumerateKeysInDependencyOrder indicates an expected call of EnumerateKeysInDependencyOrder.
+func (mr *MockDBMockRecorder) EnumerateKeysInDependencyOrder(ctx, callback interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnumerateKeysInDependencyOrder", reflect.TypeOf((*MockDB)(nil).EnumerateKeysInDependencyOrder), ctx, callback)
+}
+
 // EnumerateNamespaceEncryptionTargets mocks base method.
-func (m *MockDB) EnumerateNamespaceEncryptionTargets(ctx context.Context, callback func([]database.NamespaceEncryptionTarget, bool) ([]database.NamespaceTargetEncryptionKeyVersionUpdate, pagination.KeepGoing, error)) error {
+func (m *MockDB) EnumerateNamespaceEncryptionTargets(ctx context.Context, callback func([]database.NamespaceEncryptionTarget, bool) ([]database.NamespaceTargetDataEncryptionKeyUpdate, pagination.KeepGoing, error)) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "EnumerateNamespaceEncryptionTargets", ctx, callback)
 	ret0, _ := ret[0].(error)
@@ -1009,34 +953,19 @@ func (mr *MockDBMockRecorder) GetConnectorVersions(ctx, requested interface{}) *
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnectorVersions", reflect.TypeOf((*MockDB)(nil).GetConnectorVersions), ctx, requested)
 }
 
-// GetCurrentEncryptionKeyVersionForEncryptionKey mocks base method.
-func (m *MockDB) GetCurrentEncryptionKeyVersionForEncryptionKey(ctx context.Context, encryptionKeyId apid.ID) (*database.EncryptionKeyVersion, error) {
+// GetCurrentDataEncryptionKeyForKey mocks base method.
+func (m *MockDB) GetCurrentDataEncryptionKeyForKey(ctx context.Context, keyId apid.ID) (*database.DataEncryptionKey, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetCurrentEncryptionKeyVersionForEncryptionKey", ctx, encryptionKeyId)
-	ret0, _ := ret[0].(*database.EncryptionKeyVersion)
+	ret := m.ctrl.Call(m, "GetCurrentDataEncryptionKeyForKey", ctx, keyId)
+	ret0, _ := ret[0].(*database.DataEncryptionKey)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetCurrentEncryptionKeyVersionForEncryptionKey indicates an expected call of GetCurrentEncryptionKeyVersionForEncryptionKey.
-func (mr *MockDBMockRecorder) GetCurrentEncryptionKeyVersionForEncryptionKey(ctx, encryptionKeyId interface{}) *gomock.Call {
+// GetCurrentDataEncryptionKeyForKey indicates an expected call of GetCurrentDataEncryptionKeyForKey.
+func (mr *MockDBMockRecorder) GetCurrentDataEncryptionKeyForKey(ctx, keyId interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentEncryptionKeyVersionForEncryptionKey", reflect.TypeOf((*MockDB)(nil).GetCurrentEncryptionKeyVersionForEncryptionKey), ctx, encryptionKeyId)
-}
-
-// GetCurrentEncryptionKeyVersionForNamespace mocks base method.
-func (m *MockDB) GetCurrentEncryptionKeyVersionForNamespace(ctx context.Context, namespacePath string) (*database.EncryptionKeyVersion, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetCurrentEncryptionKeyVersionForNamespace", ctx, namespacePath)
-	ret0, _ := ret[0].(*database.EncryptionKeyVersion)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetCurrentEncryptionKeyVersionForNamespace indicates an expected call of GetCurrentEncryptionKeyVersionForNamespace.
-func (mr *MockDBMockRecorder) GetCurrentEncryptionKeyVersionForNamespace(ctx, namespacePath interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentEncryptionKeyVersionForNamespace", reflect.TypeOf((*MockDB)(nil).GetCurrentEncryptionKeyVersionForNamespace), ctx, namespacePath)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentDataEncryptionKeyForKey", reflect.TypeOf((*MockDB)(nil).GetCurrentDataEncryptionKeyForKey), ctx, keyId)
 }
 
 // GetDataEncryptionKey mocks base method.
@@ -1054,64 +983,19 @@ func (mr *MockDBMockRecorder) GetDataEncryptionKey(ctx, id interface{}) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDataEncryptionKey", reflect.TypeOf((*MockDB)(nil).GetDataEncryptionKey), ctx, id)
 }
 
-// GetEncryptionKey mocks base method.
-func (m *MockDB) GetEncryptionKey(ctx context.Context, id apid.ID) (*database.EncryptionKey, error) {
+// GetKey mocks base method.
+func (m *MockDB) GetKey(ctx context.Context, id apid.ID) (*database.Key, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetEncryptionKey", ctx, id)
-	ret0, _ := ret[0].(*database.EncryptionKey)
+	ret := m.ctrl.Call(m, "GetKey", ctx, id)
+	ret0, _ := ret[0].(*database.Key)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetEncryptionKey indicates an expected call of GetEncryptionKey.
-func (mr *MockDBMockRecorder) GetEncryptionKey(ctx, id interface{}) *gomock.Call {
+// GetKey indicates an expected call of GetKey.
+func (mr *MockDBMockRecorder) GetKey(ctx, id interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEncryptionKey", reflect.TypeOf((*MockDB)(nil).GetEncryptionKey), ctx, id)
-}
-
-// GetEncryptionKeyVersion mocks base method.
-func (m *MockDB) GetEncryptionKeyVersion(ctx context.Context, id apid.ID) (*database.EncryptionKeyVersion, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetEncryptionKeyVersion", ctx, id)
-	ret0, _ := ret[0].(*database.EncryptionKeyVersion)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetEncryptionKeyVersion indicates an expected call of GetEncryptionKeyVersion.
-func (mr *MockDBMockRecorder) GetEncryptionKeyVersion(ctx, id interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEncryptionKeyVersion", reflect.TypeOf((*MockDB)(nil).GetEncryptionKeyVersion), ctx, id)
-}
-
-// GetMaxOrderedVersionForEncryptionKey mocks base method.
-func (m *MockDB) GetMaxOrderedVersionForEncryptionKey(ctx context.Context, encryptionKeyId apid.ID) (int64, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetMaxOrderedVersionForEncryptionKey", ctx, encryptionKeyId)
-	ret0, _ := ret[0].(int64)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetMaxOrderedVersionForEncryptionKey indicates an expected call of GetMaxOrderedVersionForEncryptionKey.
-func (mr *MockDBMockRecorder) GetMaxOrderedVersionForEncryptionKey(ctx, encryptionKeyId interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMaxOrderedVersionForEncryptionKey", reflect.TypeOf((*MockDB)(nil).GetMaxOrderedVersionForEncryptionKey), ctx, encryptionKeyId)
-}
-
-// GetMaxOrderedVersionForNamespace mocks base method.
-func (m *MockDB) GetMaxOrderedVersionForNamespace(ctx context.Context, namespacePath string) (int64, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetMaxOrderedVersionForNamespace", ctx, namespacePath)
-	ret0, _ := ret[0].(int64)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetMaxOrderedVersionForNamespace indicates an expected call of GetMaxOrderedVersionForNamespace.
-func (mr *MockDBMockRecorder) GetMaxOrderedVersionForNamespace(ctx, namespacePath interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMaxOrderedVersionForNamespace", reflect.TypeOf((*MockDB)(nil).GetMaxOrderedVersionForNamespace), ctx, namespacePath)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetKey", reflect.TypeOf((*MockDB)(nil).GetKey), ctx, id)
 }
 
 // GetNamespace mocks base method.
@@ -1350,78 +1234,48 @@ func (mr *MockDBMockRecorder) ListConnectorsFromCursor(ctx, cursor interface{}) 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListConnectorsFromCursor", reflect.TypeOf((*MockDB)(nil).ListConnectorsFromCursor), ctx, cursor)
 }
 
-// ListDataEncryptionKeysForEncryptionKey mocks base method.
-func (m *MockDB) ListDataEncryptionKeysForEncryptionKey(ctx context.Context, encryptionKeyId apid.ID) ([]*database.DataEncryptionKey, error) {
+// ListDataEncryptionKeysForKey mocks base method.
+func (m *MockDB) ListDataEncryptionKeysForKey(ctx context.Context, keyId apid.ID) ([]*database.DataEncryptionKey, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListDataEncryptionKeysForEncryptionKey", ctx, encryptionKeyId)
+	ret := m.ctrl.Call(m, "ListDataEncryptionKeysForKey", ctx, keyId)
 	ret0, _ := ret[0].([]*database.DataEncryptionKey)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ListDataEncryptionKeysForEncryptionKey indicates an expected call of ListDataEncryptionKeysForEncryptionKey.
-func (mr *MockDBMockRecorder) ListDataEncryptionKeysForEncryptionKey(ctx, encryptionKeyId interface{}) *gomock.Call {
+// ListDataEncryptionKeysForKey indicates an expected call of ListDataEncryptionKeysForKey.
+func (mr *MockDBMockRecorder) ListDataEncryptionKeysForKey(ctx, keyId interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListDataEncryptionKeysForEncryptionKey", reflect.TypeOf((*MockDB)(nil).ListDataEncryptionKeysForEncryptionKey), ctx, encryptionKeyId)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListDataEncryptionKeysForKey", reflect.TypeOf((*MockDB)(nil).ListDataEncryptionKeysForKey), ctx, keyId)
 }
 
-// ListEncryptionKeyVersionsForEncryptionKey mocks base method.
-func (m *MockDB) ListEncryptionKeyVersionsForEncryptionKey(ctx context.Context, encryptionKeyId apid.ID) ([]*database.EncryptionKeyVersion, error) {
+// ListKeysBuilder mocks base method.
+func (m *MockDB) ListKeysBuilder() database.ListKeysBuilder {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListEncryptionKeyVersionsForEncryptionKey", ctx, encryptionKeyId)
-	ret0, _ := ret[0].([]*database.EncryptionKeyVersion)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ListEncryptionKeyVersionsForEncryptionKey indicates an expected call of ListEncryptionKeyVersionsForEncryptionKey.
-func (mr *MockDBMockRecorder) ListEncryptionKeyVersionsForEncryptionKey(ctx, encryptionKeyId interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListEncryptionKeyVersionsForEncryptionKey", reflect.TypeOf((*MockDB)(nil).ListEncryptionKeyVersionsForEncryptionKey), ctx, encryptionKeyId)
-}
-
-// ListEncryptionKeyVersionsForNamespace mocks base method.
-func (m *MockDB) ListEncryptionKeyVersionsForNamespace(ctx context.Context, namespacePath string) ([]*database.EncryptionKeyVersion, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListEncryptionKeyVersionsForNamespace", ctx, namespacePath)
-	ret0, _ := ret[0].([]*database.EncryptionKeyVersion)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ListEncryptionKeyVersionsForNamespace indicates an expected call of ListEncryptionKeyVersionsForNamespace.
-func (mr *MockDBMockRecorder) ListEncryptionKeyVersionsForNamespace(ctx, namespacePath interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListEncryptionKeyVersionsForNamespace", reflect.TypeOf((*MockDB)(nil).ListEncryptionKeyVersionsForNamespace), ctx, namespacePath)
-}
-
-// ListEncryptionKeysBuilder mocks base method.
-func (m *MockDB) ListEncryptionKeysBuilder() database.ListEncryptionKeysBuilder {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListEncryptionKeysBuilder")
-	ret0, _ := ret[0].(database.ListEncryptionKeysBuilder)
+	ret := m.ctrl.Call(m, "ListKeysBuilder")
+	ret0, _ := ret[0].(database.ListKeysBuilder)
 	return ret0
 }
 
-// ListEncryptionKeysBuilder indicates an expected call of ListEncryptionKeysBuilder.
-func (mr *MockDBMockRecorder) ListEncryptionKeysBuilder() *gomock.Call {
+// ListKeysBuilder indicates an expected call of ListKeysBuilder.
+func (mr *MockDBMockRecorder) ListKeysBuilder() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListEncryptionKeysBuilder", reflect.TypeOf((*MockDB)(nil).ListEncryptionKeysBuilder))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListKeysBuilder", reflect.TypeOf((*MockDB)(nil).ListKeysBuilder))
 }
 
-// ListEncryptionKeysFromCursor mocks base method.
-func (m *MockDB) ListEncryptionKeysFromCursor(ctx context.Context, cursor string) (database.ListEncryptionKeysExecutor, error) {
+// ListKeysFromCursor mocks base method.
+func (m *MockDB) ListKeysFromCursor(ctx context.Context, cursor string) (database.ListKeysExecutor, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListEncryptionKeysFromCursor", ctx, cursor)
-	ret0, _ := ret[0].(database.ListEncryptionKeysExecutor)
+	ret := m.ctrl.Call(m, "ListKeysFromCursor", ctx, cursor)
+	ret0, _ := ret[0].(database.ListKeysExecutor)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ListEncryptionKeysFromCursor indicates an expected call of ListEncryptionKeysFromCursor.
-func (mr *MockDBMockRecorder) ListEncryptionKeysFromCursor(ctx, cursor interface{}) *gomock.Call {
+// ListKeysFromCursor indicates an expected call of ListKeysFromCursor.
+func (mr *MockDBMockRecorder) ListKeysFromCursor(ctx, cursor interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListEncryptionKeysFromCursor", reflect.TypeOf((*MockDB)(nil).ListEncryptionKeysFromCursor), ctx, cursor)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListKeysFromCursor", reflect.TypeOf((*MockDB)(nil).ListKeysFromCursor), ctx, cursor)
 }
 
 // ListNamespacesBuilder mocks base method.
@@ -1615,34 +1469,34 @@ func (mr *MockDBMockRecorder) PutConnectionLabels(ctx, id, labels interface{}) *
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutConnectionLabels", reflect.TypeOf((*MockDB)(nil).PutConnectionLabels), ctx, id, labels)
 }
 
-// PutEncryptionKeyAnnotations mocks base method.
-func (m *MockDB) PutEncryptionKeyAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*database.EncryptionKey, error) {
+// PutKeyAnnotations mocks base method.
+func (m *MockDB) PutKeyAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*database.Key, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PutEncryptionKeyAnnotations", ctx, id, annotations)
-	ret0, _ := ret[0].(*database.EncryptionKey)
+	ret := m.ctrl.Call(m, "PutKeyAnnotations", ctx, id, annotations)
+	ret0, _ := ret[0].(*database.Key)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// PutEncryptionKeyAnnotations indicates an expected call of PutEncryptionKeyAnnotations.
-func (mr *MockDBMockRecorder) PutEncryptionKeyAnnotations(ctx, id, annotations interface{}) *gomock.Call {
+// PutKeyAnnotations indicates an expected call of PutKeyAnnotations.
+func (mr *MockDBMockRecorder) PutKeyAnnotations(ctx, id, annotations interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutEncryptionKeyAnnotations", reflect.TypeOf((*MockDB)(nil).PutEncryptionKeyAnnotations), ctx, id, annotations)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutKeyAnnotations", reflect.TypeOf((*MockDB)(nil).PutKeyAnnotations), ctx, id, annotations)
 }
 
-// PutEncryptionKeyLabels mocks base method.
-func (m *MockDB) PutEncryptionKeyLabels(ctx context.Context, id apid.ID, labels map[string]string) (*database.EncryptionKey, error) {
+// PutKeyLabels mocks base method.
+func (m *MockDB) PutKeyLabels(ctx context.Context, id apid.ID, labels map[string]string) (*database.Key, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PutEncryptionKeyLabels", ctx, id, labels)
-	ret0, _ := ret[0].(*database.EncryptionKey)
+	ret := m.ctrl.Call(m, "PutKeyLabels", ctx, id, labels)
+	ret0, _ := ret[0].(*database.Key)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// PutEncryptionKeyLabels indicates an expected call of PutEncryptionKeyLabels.
-func (mr *MockDBMockRecorder) PutEncryptionKeyLabels(ctx, id, labels interface{}) *gomock.Call {
+// PutKeyLabels indicates an expected call of PutKeyLabels.
+func (mr *MockDBMockRecorder) PutKeyLabels(ctx, id, labels interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutEncryptionKeyLabels", reflect.TypeOf((*MockDB)(nil).PutEncryptionKeyLabels), ctx, id, labels)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutKeyLabels", reflect.TypeOf((*MockDB)(nil).PutKeyLabels), ctx, id, labels)
 }
 
 // PutNamespaceAnnotations mocks base method.
@@ -1844,47 +1698,47 @@ func (mr *MockDBMockRecorder) SetCursorEncryptor(e interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetCursorEncryptor", reflect.TypeOf((*MockDB)(nil).SetCursorEncryptor), e)
 }
 
-// SetEncryptionKeyState mocks base method.
-func (m *MockDB) SetEncryptionKeyState(ctx context.Context, id apid.ID, state database.EncryptionKeyState) error {
+// SetDataEncryptionKeyCurrentFlag mocks base method.
+func (m *MockDB) SetDataEncryptionKeyCurrentFlag(ctx context.Context, id apid.ID, isCurrent bool) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetEncryptionKeyState", ctx, id, state)
+	ret := m.ctrl.Call(m, "SetDataEncryptionKeyCurrentFlag", ctx, id, isCurrent)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// SetEncryptionKeyState indicates an expected call of SetEncryptionKeyState.
-func (mr *MockDBMockRecorder) SetEncryptionKeyState(ctx, id, state interface{}) *gomock.Call {
+// SetDataEncryptionKeyCurrentFlag indicates an expected call of SetDataEncryptionKeyCurrentFlag.
+func (mr *MockDBMockRecorder) SetDataEncryptionKeyCurrentFlag(ctx, id, isCurrent interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetEncryptionKeyState", reflect.TypeOf((*MockDB)(nil).SetEncryptionKeyState), ctx, id, state)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDataEncryptionKeyCurrentFlag", reflect.TypeOf((*MockDB)(nil).SetDataEncryptionKeyCurrentFlag), ctx, id, isCurrent)
 }
 
-// SetEncryptionKeyVersionCurrentFlag mocks base method.
-func (m *MockDB) SetEncryptionKeyVersionCurrentFlag(ctx context.Context, id apid.ID, isCurrent bool) error {
+// SetKeyState mocks base method.
+func (m *MockDB) SetKeyState(ctx context.Context, id apid.ID, state database.KeyState) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetEncryptionKeyVersionCurrentFlag", ctx, id, isCurrent)
+	ret := m.ctrl.Call(m, "SetKeyState", ctx, id, state)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// SetEncryptionKeyVersionCurrentFlag indicates an expected call of SetEncryptionKeyVersionCurrentFlag.
-func (mr *MockDBMockRecorder) SetEncryptionKeyVersionCurrentFlag(ctx, id, isCurrent interface{}) *gomock.Call {
+// SetKeyState indicates an expected call of SetKeyState.
+func (mr *MockDBMockRecorder) SetKeyState(ctx, id, state interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetEncryptionKeyVersionCurrentFlag", reflect.TypeOf((*MockDB)(nil).SetEncryptionKeyVersionCurrentFlag), ctx, id, isCurrent)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetKeyState", reflect.TypeOf((*MockDB)(nil).SetKeyState), ctx, id, state)
 }
 
-// SetNamespaceEncryptionKeyId mocks base method.
-func (m *MockDB) SetNamespaceEncryptionKeyId(ctx context.Context, path string, ekId *apid.ID) (*database.Namespace, error) {
+// SetNamespaceKeyId mocks base method.
+func (m *MockDB) SetNamespaceKeyId(ctx context.Context, path string, ekId *apid.ID) (*database.Namespace, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetNamespaceEncryptionKeyId", ctx, path, ekId)
+	ret := m.ctrl.Call(m, "SetNamespaceKeyId", ctx, path, ekId)
 	ret0, _ := ret[0].(*database.Namespace)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// SetNamespaceEncryptionKeyId indicates an expected call of SetNamespaceEncryptionKeyId.
-func (mr *MockDBMockRecorder) SetNamespaceEncryptionKeyId(ctx, path, ekId interface{}) *gomock.Call {
+// SetNamespaceKeyId indicates an expected call of SetNamespaceKeyId.
+func (mr *MockDBMockRecorder) SetNamespaceKeyId(ctx, path, ekId interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetNamespaceEncryptionKeyId", reflect.TypeOf((*MockDB)(nil).SetNamespaceEncryptionKeyId), ctx, path, ekId)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetNamespaceKeyId", reflect.TypeOf((*MockDB)(nil).SetNamespaceKeyId), ctx, path, ekId)
 }
 
 // SetNamespaceState mocks base method.
@@ -1960,49 +1814,63 @@ func (mr *MockDBMockRecorder) UpdateConnectionLabels(ctx, id, labels interface{}
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateConnectionLabels", reflect.TypeOf((*MockDB)(nil).UpdateConnectionLabels), ctx, id, labels)
 }
 
-// UpdateEncryptionKey mocks base method.
-func (m *MockDB) UpdateEncryptionKey(ctx context.Context, id apid.ID, updates map[string]interface{}) (*database.EncryptionKey, error) {
+// UpdateDataEncryptionKeyWrapping mocks base method.
+func (m *MockDB) UpdateDataEncryptionKeyWrapping(ctx context.Context, dek *database.DataEncryptionKey) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateEncryptionKey", ctx, id, updates)
-	ret0, _ := ret[0].(*database.EncryptionKey)
+	ret := m.ctrl.Call(m, "UpdateDataEncryptionKeyWrapping", ctx, dek)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateDataEncryptionKeyWrapping indicates an expected call of UpdateDataEncryptionKeyWrapping.
+func (mr *MockDBMockRecorder) UpdateDataEncryptionKeyWrapping(ctx, dek interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateDataEncryptionKeyWrapping", reflect.TypeOf((*MockDB)(nil).UpdateDataEncryptionKeyWrapping), ctx, dek)
+}
+
+// UpdateKey mocks base method.
+func (m *MockDB) UpdateKey(ctx context.Context, id apid.ID, updates map[string]interface{}) (*database.Key, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateKey", ctx, id, updates)
+	ret0, _ := ret[0].(*database.Key)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// UpdateEncryptionKey indicates an expected call of UpdateEncryptionKey.
-func (mr *MockDBMockRecorder) UpdateEncryptionKey(ctx, id, updates interface{}) *gomock.Call {
+// UpdateKey indicates an expected call of UpdateKey.
+func (mr *MockDBMockRecorder) UpdateKey(ctx, id, updates interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateEncryptionKey", reflect.TypeOf((*MockDB)(nil).UpdateEncryptionKey), ctx, id, updates)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateKey", reflect.TypeOf((*MockDB)(nil).UpdateKey), ctx, id, updates)
 }
 
-// UpdateEncryptionKeyAnnotations mocks base method.
-func (m *MockDB) UpdateEncryptionKeyAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*database.EncryptionKey, error) {
+// UpdateKeyAnnotations mocks base method.
+func (m *MockDB) UpdateKeyAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*database.Key, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateEncryptionKeyAnnotations", ctx, id, annotations)
-	ret0, _ := ret[0].(*database.EncryptionKey)
+	ret := m.ctrl.Call(m, "UpdateKeyAnnotations", ctx, id, annotations)
+	ret0, _ := ret[0].(*database.Key)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// UpdateEncryptionKeyAnnotations indicates an expected call of UpdateEncryptionKeyAnnotations.
-func (mr *MockDBMockRecorder) UpdateEncryptionKeyAnnotations(ctx, id, annotations interface{}) *gomock.Call {
+// UpdateKeyAnnotations indicates an expected call of UpdateKeyAnnotations.
+func (mr *MockDBMockRecorder) UpdateKeyAnnotations(ctx, id, annotations interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateEncryptionKeyAnnotations", reflect.TypeOf((*MockDB)(nil).UpdateEncryptionKeyAnnotations), ctx, id, annotations)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateKeyAnnotations", reflect.TypeOf((*MockDB)(nil).UpdateKeyAnnotations), ctx, id, annotations)
 }
 
-// UpdateEncryptionKeyLabels mocks base method.
-func (m *MockDB) UpdateEncryptionKeyLabels(ctx context.Context, id apid.ID, labels map[string]string) (*database.EncryptionKey, error) {
+// UpdateKeyLabels mocks base method.
+func (m *MockDB) UpdateKeyLabels(ctx context.Context, id apid.ID, labels map[string]string) (*database.Key, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateEncryptionKeyLabels", ctx, id, labels)
-	ret0, _ := ret[0].(*database.EncryptionKey)
+	ret := m.ctrl.Call(m, "UpdateKeyLabels", ctx, id, labels)
+	ret0, _ := ret[0].(*database.Key)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// UpdateEncryptionKeyLabels indicates an expected call of UpdateEncryptionKeyLabels.
-func (mr *MockDBMockRecorder) UpdateEncryptionKeyLabels(ctx, id, labels interface{}) *gomock.Call {
+// UpdateKeyLabels indicates an expected call of UpdateKeyLabels.
+func (mr *MockDBMockRecorder) UpdateKeyLabels(ctx, id, labels interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateEncryptionKeyLabels", reflect.TypeOf((*MockDB)(nil).UpdateEncryptionKeyLabels), ctx, id, labels)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateKeyLabels", reflect.TypeOf((*MockDB)(nil).UpdateKeyLabels), ctx, id, labels)
 }
 
 // UpdateNamespaceAnnotations mocks base method.

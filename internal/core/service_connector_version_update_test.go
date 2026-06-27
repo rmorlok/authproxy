@@ -41,7 +41,7 @@ func TestUpdateDraftConnectorVersion(t *testing.T) {
 		// Build encrypts
 		e.EXPECT().
 			EncryptStringForEntity(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(encfield.EncryptedField{ID: "ekv_test", Data: "encrypted-def"}, nil)
+			Return(encfield.EncryptedField{ID: "dek_test", Data: "encrypted-def"}, nil)
 
 		// Upsert
 		db.EXPECT().
@@ -92,7 +92,7 @@ func TestUpdateDraftConnectorVersion(t *testing.T) {
 
 		e.EXPECT().
 			EncryptStringForEntity(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(encfield.EncryptedField{ID: "ekv_test", Data: "encrypted-def"}, nil)
+			Return(encfield.EncryptedField{ID: "dek_test", Data: "encrypted-def"}, nil)
 
 		db.EXPECT().
 			UpsertConnectorVersion(gomock.Any(), gomock.Any()).
@@ -185,7 +185,7 @@ func TestUpdateDraftConnectorVersion(t *testing.T) {
 
 		e.EXPECT().
 			EncryptStringForEntity(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(encfield.EncryptedField{ID: "ekv_test", Data: "encrypted"}, nil)
+			Return(encfield.EncryptedField{ID: "dek_test", Data: "encrypted"}, nil)
 
 		db.EXPECT().
 			UpsertConnectorVersion(gomock.Any(), gomock.Any()).
@@ -204,7 +204,7 @@ func TestGetOrCreateDraftConnectorVersion(t *testing.T) {
 
 		id := apid.MustParse("cxr_testcccccccccccc")
 		ctx := context.Background()
-		encryptedDef := encfield.EncryptedField{ID: "ekv_test", Data: "existing-encrypted-def"}
+		encryptedDef := encfield.EncryptedField{ID: "dek_test", Data: "existing-encrypted-def"}
 
 		existingDef := &cschema.Connector{
 			Id:          id,
@@ -241,7 +241,7 @@ func TestGetOrCreateDraftConnectorVersion(t *testing.T) {
 
 		id := apid.MustParse("cxr_testdddddddddddd")
 		ctx := context.Background()
-		encryptedDef := encfield.EncryptedField{ID: "ekv_test", Data: "latest-encrypted-def"}
+		encryptedDef := encfield.EncryptedField{ID: "dek_test", Data: "latest-encrypted-def"}
 
 		latestDef := &cschema.Connector{
 			Id:          id,
@@ -275,7 +275,7 @@ func TestGetOrCreateDraftConnectorVersion(t *testing.T) {
 		// Build encrypts the new version
 		e.EXPECT().
 			EncryptStringForEntity(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(encfield.EncryptedField{ID: "ekv_test", Data: "new-encrypted-def"}, nil)
+			Return(encfield.EncryptedField{ID: "dek_test", Data: "new-encrypted-def"}, nil)
 
 		// Upsert
 		db.EXPECT().
@@ -361,7 +361,7 @@ func TestGetOrCreateDraftConnectorVersion(t *testing.T) {
 
 		id := apid.New(apid.PrefixActor)
 		ctx := context.Background()
-		encryptedDef := encfield.EncryptedField{ID: "ekv_test", Data: "latest-encrypted-def"}
+		encryptedDef := encfield.EncryptedField{ID: "dek_test", Data: "latest-encrypted-def"}
 
 		latestDef := &cschema.Connector{
 			Id:          id,
@@ -390,7 +390,7 @@ func TestGetOrCreateDraftConnectorVersion(t *testing.T) {
 
 		e.EXPECT().
 			EncryptStringForEntity(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(encfield.EncryptedField{ID: "ekv_test", Data: "new-encrypted"}, nil)
+			Return(encfield.EncryptedField{ID: "dek_test", Data: "new-encrypted"}, nil)
 
 		db.EXPECT().
 			UpsertConnectorVersion(gomock.Any(), gomock.Any()).

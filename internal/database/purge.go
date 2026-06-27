@@ -14,8 +14,7 @@ var tablesToPurge = []string{
 	ConnectionsTable,
 	ConnectorVersionsTable,
 	DataEncryptionKeysTable,
-	EncryptionKeyVersionsTable,
-	EncryptionKeysTable,
+	KeysTable,
 	NamespacesTable,
 	OAuth2TokensTable,
 }

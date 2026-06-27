@@ -1,7 +1,7 @@
 import {createAsyncThunk, createSlice, PayloadAction} from '@reduxjs/toolkit';
 import type {RootState, AppThunk} from './store';
 import {
-    namespaces, ListNamespaceParams, Namespace, ROOT_NAMESPACE_PATH, NamespaceState,
+    namespaces, ListNamespaceParams, Namespace, NAMESPACE_PATH_SEPARATOR, ROOT_NAMESPACE_PATH, NamespaceState,
 } from '@authproxy/api';
 
 interface NamespacesState {
@@ -39,6 +39,22 @@ const initialState: NamespacesState = {
     childrenError: null,
 };
 
+const namespacePathPattern = new RegExp(
+    `^${ROOT_NAMESPACE_PATH}(?:\\${NAMESPACE_PATH_SEPARATOR}[A-Za-z0-9_][A-Za-z0-9_-]*)*$`,
+);
+
+export function isValidNamespacePath(path: string | null | undefined): path is string {
+    if (!path) {
+        return false;
+    }
+
+    return namespacePathPattern.test(path);
+}
+
+export function normalizeNamespacePath(path: string | null | undefined): string {
+    return isValidNamespacePath(path) ? path : ROOT_NAMESPACE_PATH;
+}
+
 export const loadCurrent = createAsyncThunk<
     currentState,
     string,
@@ -47,18 +63,18 @@ export const loadCurrent = createAsyncThunk<
     }
 >(
     'namespaces/loadCurrent',
-    async (_, thunkApi) => {
-        const { rejectWithValue, getState } = thunkApi;
-        const state = (getState() as RootState).namespaces;
+    async (path, thunkApi) => {
+        const { rejectWithValue } = thunkApi;
+        const currentPath = normalizeNamespacePath(path);
 
         let current: Namespace = {
-            path: state.currentPath,
+            path: currentPath,
             state: NamespaceState.ACTIVE,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
         };
 
-        const response = await namespaces.getByPath(state.currentPath);
+        const response = await namespaces.getByPath(currentPath);
         if (response.status === 200) {
             current = response.data;
         } else {
@@ -85,13 +101,13 @@ export const loadCurrentChildren = createAsyncThunk<
     }
 >(
     'namespaces/loadCurrentChildren',
-    async (_, thunkApi) => {
-        const { rejectWithValue, getState } = thunkApi;
-        const state = (getState() as RootState).namespaces;
+    async (path, thunkApi) => {
+        const { rejectWithValue } = thunkApi;
+        const currentPath = normalizeNamespacePath(path);
 
         let allItems: Namespace[] = [];
         const params: ListNamespaceParams = {
-            children_of: state.currentPath,
+            children_of: currentPath,
             limit: 100,
         };
         
@@ -132,7 +148,7 @@ export const namespacesSlice = createSlice({
     initialState,
     reducers: {
         setCurrentNamespacePath: (state, action: PayloadAction<string>) => {
-            state.currentPath = action.payload;
+            state.currentPath = normalizeNamespacePath(action.payload);
             state.hasInitialized = true;
         }
     },
@@ -171,9 +187,10 @@ export const selectNamespaceError = (state: RootState) => state.namespaces.error
 export const selectHasInitializedNamespace = (state: RootState) => state.namespaces.hasInitialized;
 
 export const setCurrentNamespace = (path: string): AppThunk => (dispatch) => {
-    dispatch(namespacesSlice.actions.setCurrentNamespacePath(path));
-    dispatch(loadCurrent(path));
-    dispatch(loadCurrentChildren(path));
+    const currentPath = normalizeNamespacePath(path);
+    dispatch(namespacesSlice.actions.setCurrentNamespacePath(currentPath));
+    dispatch(loadCurrent(currentPath));
+    dispatch(loadCurrentChildren(currentPath));
 };
 
 export default namespacesSlice.reducer;

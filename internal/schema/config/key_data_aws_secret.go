@@ -64,7 +64,7 @@ func (ka *KeyDataAwsSecret) fetchCurrentVersion(ctx context.Context) (KeyVersion
 	}
 
 	return KeyVersionInfo{
-		Provider:        ProviderTypeAws,
+		Provider:        ProviderTypeAwsSecretsManager,
 		ProviderID:      ka.providerID(),
 		ProviderVersion: version,
 		Data:            data,
@@ -79,7 +79,7 @@ func (ka *KeyDataAwsSecret) fetchVersion(ctx context.Context, version string) (K
 	}
 
 	return KeyVersionInfo{
-		Provider:        ProviderTypeAws,
+		Provider:        ProviderTypeAwsSecretsManager,
 		ProviderID:      ka.providerID(),
 		ProviderVersion: version,
 		Data:            data,
@@ -171,7 +171,7 @@ func (ka *KeyDataAwsSecret) ListVersions(ctx context.Context) ([]KeyVersionInfo,
 }
 
 func (ka *KeyDataAwsSecret) GetProviderType() ProviderType {
-	return ProviderTypeAws
+	return ProviderTypeAwsSecretsManager
 }
 
 func (ka *KeyDataAwsSecret) getClient(ctx context.Context) (awsSecretsManagerClient, error) {

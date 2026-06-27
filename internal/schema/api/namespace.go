@@ -15,13 +15,13 @@ const (
 //
 //	@Description	Namespace for organizing resources
 type NamespaceJson struct {
-	Path            string            `json:"path" yaml:"path" example:"root.acme"`
-	State           NamespaceState    `json:"state" yaml:"state" swaggertype:"string" example:"active"`
-	EncryptionKeyId *string           `json:"encryption_key_id,omitempty" yaml:"encryption_key_id,omitempty" example:"ek_test550e8400abcde"`
-	Labels          map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Annotations     map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	CreatedAt       time.Time         `json:"created_at" yaml:"created_at"`
-	UpdatedAt       time.Time         `json:"updated_at" yaml:"updated_at"`
+	Path        string            `json:"path" yaml:"path" example:"root.acme"`
+	State       NamespaceState    `json:"state" yaml:"state" swaggertype:"string" example:"active"`
+	KeyId       *string           `json:"key_id,omitempty" yaml:"key_id,omitempty" example:"key_test550e8400abcd"`
+	Labels      map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	CreatedAt   time.Time         `json:"created_at" yaml:"created_at"`
+	UpdatedAt   time.Time         `json:"updated_at" yaml:"updated_at"`
 }
 
 // CreateNamespaceRequestJson represents a request to create a namespace.
@@ -49,12 +49,12 @@ type ListNamespacesResponseJson struct {
 	Cursor string          `json:"cursor,omitempty" yaml:"cursor,omitempty"`
 }
 
-// SetNamespaceEncryptionKeyRequestJson sets the encryption key used by a namespace.
-type SetNamespaceEncryptionKeyRequestJson struct {
-	EncryptionKeyId string `json:"encryption_key_id" yaml:"encryption_key_id" example:"ek_test550e8400abcde"`
+// SetNamespaceKeyRequestJson sets the key used by a namespace.
+type SetNamespaceKeyRequestJson struct {
+	KeyId string `json:"key_id" yaml:"key_id" example:"key_test550e8400abcd"`
 }
 
-// NamespaceEncryptionKeyJson is the namespace encryption-key lookup response.
-type NamespaceEncryptionKeyJson struct {
-	EncryptionKeyId string `json:"encryption_key_id" yaml:"encryption_key_id" example:"ek_test550e8400abcde"`
+// NamespaceKeyJson is the namespace key lookup response.
+type NamespaceKeyJson struct {
+	KeyId string `json:"key_id" yaml:"key_id" example:"key_test550e8400abcd"`
 }

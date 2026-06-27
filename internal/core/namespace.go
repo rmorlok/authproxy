@@ -48,8 +48,8 @@ func (ns *Namespace) GetUpdatedAt() time.Time {
 	return ns.UpdatedAt
 }
 
-func (ns *Namespace) GetEncryptionKeyId() *apid.ID {
-	return ns.EncryptionKeyId
+func (ns *Namespace) GetKeyId() *apid.ID {
+	return ns.KeyId
 }
 
 func (ns *Namespace) GetLabels() map[string]string {

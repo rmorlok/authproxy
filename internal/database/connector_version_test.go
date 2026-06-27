@@ -25,15 +25,15 @@ func TestConnectorVersions(t *testing.T) {
 		sql := `
 INSERT INTO connector_versions
 (id,                                     version, namespace,          labels,                      state,     encrypted_definition, hash,    created_at,            updated_at,            deleted_at) VALUES
-('cxr_testgmail0000001', 1,       'root',             '{"type":"gmail"}',          'active',  '{"id":"ekv_test","d":"encrypted-def"}',      'hash1', '2023-10-01 00:00:00', '2023-10-01 00:00:00', null),
-('cxr_testgmail0000001', 2,       'root',             '{"type":"gmail"}',          'primary', '{"id":"ekv_test","d":"encrypted-def"}',      'hash2', '2023-10-10 00:00:00', '2023-10-10 00:00:00', null),
-('cxr_testgmail0000002', 1,       'root.child',       '{"type":"gmail"}',          'archived','{"id":"ekv_test","d":"encrypted-def"}',      'hash3', '2023-10-02 00:00:00', '2023-10-02 00:00:00', null),
-('cxr_testgmail0000002', 2,       'root.child',       '{"type":"gmail"}',          'primary', '{"id":"ekv_test","d":"encrypted-def"}',      'hash4', '2023-10-11 00:00:00', '2023-10-11 00:00:00', null),
-('cxr_testslack0000001', 1,       'root.child2',      '{"type":"outlook"}',        'active',  '{"id":"ekv_test","d":"encrypted-def"}',      'hash5', '2023-10-03 00:00:00', '2023-10-03 00:00:00', null),
-('cxr_testslack0000001', 2,       'root.child2',      '{"type":"outlook"}',        'primary', '{"id":"ekv_test","d":"encrypted-def"}',      'hash6', '2023-10-12 00:00:00', '2023-10-12 00:00:00', null),
-('cxr_testgmail0000003', 1,       'root.child.grand', '{"type":"google_drive"}',   'archived','{"id":"ekv_test","d":"encrypted-def"}',      'hash7', '2023-10-04 00:00:00', '2023-10-04 00:00:00', null),
-('cxr_testgmail0000003', 2,       'root.child.grand', '{"type":"google_drive"}',   'active',  '{"id":"ekv_test","d":"encrypted-def"}',      'hash8', '2023-10-13 00:00:00', '2023-10-13 00:00:00', null),
-('cxr_testgmail0000003', 3,       'root.child.grand', '{"type":"google_drive"}',   'primary', '{"id":"ekv_test","d":"encrypted-def"}',      'hash9', '2023-10-14 00:00:00', '2023-10-14 00:00:00', null);
+('cxr_testgmail0000001', 1,       'root',             '{"type":"gmail"}',          'active',  '{"id":"dek_test","d":"encrypted-def"}',      'hash1', '2023-10-01 00:00:00', '2023-10-01 00:00:00', null),
+('cxr_testgmail0000001', 2,       'root',             '{"type":"gmail"}',          'primary', '{"id":"dek_test","d":"encrypted-def"}',      'hash2', '2023-10-10 00:00:00', '2023-10-10 00:00:00', null),
+('cxr_testgmail0000002', 1,       'root.child',       '{"type":"gmail"}',          'archived','{"id":"dek_test","d":"encrypted-def"}',      'hash3', '2023-10-02 00:00:00', '2023-10-02 00:00:00', null),
+('cxr_testgmail0000002', 2,       'root.child',       '{"type":"gmail"}',          'primary', '{"id":"dek_test","d":"encrypted-def"}',      'hash4', '2023-10-11 00:00:00', '2023-10-11 00:00:00', null),
+('cxr_testslack0000001', 1,       'root.child2',      '{"type":"outlook"}',        'active',  '{"id":"dek_test","d":"encrypted-def"}',      'hash5', '2023-10-03 00:00:00', '2023-10-03 00:00:00', null),
+('cxr_testslack0000001', 2,       'root.child2',      '{"type":"outlook"}',        'primary', '{"id":"dek_test","d":"encrypted-def"}',      'hash6', '2023-10-12 00:00:00', '2023-10-12 00:00:00', null),
+('cxr_testgmail0000003', 1,       'root.child.grand', '{"type":"google_drive"}',   'archived','{"id":"dek_test","d":"encrypted-def"}',      'hash7', '2023-10-04 00:00:00', '2023-10-04 00:00:00', null),
+('cxr_testgmail0000003', 2,       'root.child.grand', '{"type":"google_drive"}',   'active',  '{"id":"dek_test","d":"encrypted-def"}',      'hash8', '2023-10-13 00:00:00', '2023-10-13 00:00:00', null),
+('cxr_testgmail0000003', 3,       'root.child.grand', '{"type":"google_drive"}',   'primary', '{"id":"dek_test","d":"encrypted-def"}',      'hash9', '2023-10-14 00:00:00', '2023-10-14 00:00:00', null);
 `
 		_, err := rawDb.Exec(sql)
 		require.NoError(t, err)
@@ -122,10 +122,10 @@ INSERT INTO connector_versions
 		sql := `
 INSERT INTO connector_versions
 (id,                                     version, namespace,            labels,                      state,     encrypted_definition, hash,    created_at,            updated_at,            deleted_at) VALUES
-('cxr_testgmail0000001', 1,       'root.prod',          '{"type":"gmail"}',          'primary', '{"id":"ekv_test","d":"encrypted-def"}',      'hash1', '2023-10-01 00:00:00', '2023-10-01 00:00:00', null),
-('cxr_testgmail0000002', 1,       'root.staging',       '{"type":"gmail"}',          'primary', '{"id":"ekv_test","d":"encrypted-def"}',      'hash3', '2023-10-02 00:00:00', '2023-10-02 00:00:00', null),
-('cxr_testslack0000001', 1,       'root.dev',           '{"type":"outlook"}',        'primary', '{"id":"ekv_test","d":"encrypted-def"}',      'hash5', '2023-10-03 00:00:00', '2023-10-03 00:00:00', null),
-('cxr_testgmail0000003', 1,       'root.prod.tenant1',  '{"type":"google_drive"}',   'primary', '{"id":"ekv_test","d":"encrypted-def"}',      'hash7', '2023-10-04 00:00:00', '2023-10-04 00:00:00', null);
+('cxr_testgmail0000001', 1,       'root.prod',          '{"type":"gmail"}',          'primary', '{"id":"dek_test","d":"encrypted-def"}',      'hash1', '2023-10-01 00:00:00', '2023-10-01 00:00:00', null),
+('cxr_testgmail0000002', 1,       'root.staging',       '{"type":"gmail"}',          'primary', '{"id":"dek_test","d":"encrypted-def"}',      'hash3', '2023-10-02 00:00:00', '2023-10-02 00:00:00', null),
+('cxr_testslack0000001', 1,       'root.dev',           '{"type":"outlook"}',        'primary', '{"id":"dek_test","d":"encrypted-def"}',      'hash5', '2023-10-03 00:00:00', '2023-10-03 00:00:00', null),
+('cxr_testgmail0000003', 1,       'root.prod.tenant1',  '{"type":"google_drive"}',   'primary', '{"id":"dek_test","d":"encrypted-def"}',      'hash7', '2023-10-04 00:00:00', '2023-10-04 00:00:00', null);
 `
 		_, err := rawDb.Exec(sql)
 		require.NoError(t, err)
@@ -194,7 +194,7 @@ INSERT INTO connector_versions
 			Namespace:           "root",
 			State:               ConnectorVersionStateDraft,
 			Hash:                "hash",
-			EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "def"},
+			EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "def"},
 		}
 		require.Error(t, cv.Validate())
 	})
@@ -214,7 +214,7 @@ INSERT INTO connector_versions
 				State:               ConnectorVersionStateDraft,
 				Labels:              Labels{"type": "test_connector"},
 				Hash:                "test_hash",
-				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "test_encrypted_definition"},
+				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "test_encrypted_definition"},
 			}
 
 			// Test
@@ -231,7 +231,7 @@ INSERT INTO connector_versions
 			assert.Equal(t, "test_connector", savedCV.Labels["type"])
 			assert.Equal(t, "root.some-namespace", savedCV.Namespace)
 			assert.Equal(t, "test_hash", savedCV.Hash)
-			assert.Equal(t, encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "test_encrypted_definition"}, savedCV.EncryptedDefinition)
+			assert.Equal(t, encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "test_encrypted_definition"}, savedCV.EncryptedDefinition)
 			require.Equal(t, 1, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_versions"))
 		})
 
@@ -250,7 +250,7 @@ INSERT INTO connector_versions
 				State:               ConnectorVersionStateActive,
 				Labels:              Labels{"type": "test_connector"},
 				Hash:                "test_hash",
-				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "test_encrypted_definition"},
+				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "test_encrypted_definition"},
 			}
 
 			// Test
@@ -279,7 +279,7 @@ INSERT INTO connector_versions
 				State:               ConnectorVersionStateDraft,
 				Labels:              Labels{"type": "test_connector"},
 				Hash:                "test_hash",
-				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "test_encrypted_definition"},
+				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "test_encrypted_definition"},
 			}
 
 			// Test
@@ -295,7 +295,7 @@ INSERT INTO connector_versions
 			assert.Equal(t, ConnectorVersionStateDraft, savedCV.State)
 			assert.Equal(t, "test_connector", savedCV.Labels["type"])
 			assert.Equal(t, "test_hash", savedCV.Hash)
-			assert.Equal(t, encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "test_encrypted_definition"}, savedCV.EncryptedDefinition)
+			assert.Equal(t, encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "test_encrypted_definition"}, savedCV.EncryptedDefinition)
 			require.Equal(t, 1, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_versions"))
 		})
 
@@ -314,7 +314,7 @@ INSERT INTO connector_versions
 				State:               ConnectorVersionStateDraft,
 				Labels:              Labels{"type": "test_connector"},
 				Hash:                "test_hash",
-				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "test_encrypted_definition"},
+				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "test_encrypted_definition"},
 			}
 
 			// Test
@@ -355,7 +355,7 @@ INSERT INTO connector_versions
 				State:               ConnectorVersionStateDraft,
 				Labels:              Labels{"type": "test_connector"},
 				Hash:                "test_hash_v1",
-				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "test_encrypted_definition_v1"},
+				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "test_encrypted_definition_v1"},
 			}
 
 			err := db.UpsertConnectorVersion(ctx, cv1)
@@ -369,7 +369,7 @@ INSERT INTO connector_versions
 				State:               ConnectorVersionStateDraft,
 				Labels:              Labels{"type": "test_connector"},
 				Hash:                "test_hash_v2",
-				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "test_encrypted_definition_v2"},
+				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "test_encrypted_definition_v2"},
 			}
 
 			err = db.UpsertConnectorVersion(ctx, cv2)
@@ -407,7 +407,7 @@ INSERT INTO connector_versions
 				State:               ConnectorVersionStatePrimary,
 				Labels:              Labels{"type": "test_connector"},
 				Hash:                "test_hash",
-				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "test_encrypted_definition"},
+				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "test_encrypted_definition"},
 			}
 
 			err := db.UpsertConnectorVersion(ctx, cv)
@@ -439,7 +439,7 @@ INSERT INTO connector_versions
 				State:               ConnectorVersionStatePrimary,
 				Labels:              Labels{"type": "test_connector"},
 				Hash:                "test_hash_v1",
-				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "test_encrypted_definition_v1"},
+				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "test_encrypted_definition_v1"},
 			}
 
 			err := db.UpsertConnectorVersion(ctx, cv1)
@@ -459,7 +459,7 @@ INSERT INTO connector_versions
 				State:               ConnectorVersionStatePrimary,
 				Labels:              Labels{"type": "test_connector"},
 				Hash:                "test_hash_v2",
-				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "test_encrypted_definition_v2"},
+				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "test_encrypted_definition_v2"},
 			}
 
 			err = db.UpsertConnectorVersion(ctx, cv2)
@@ -490,7 +490,7 @@ INSERT INTO connector_versions
 				State:               ConnectorVersionStateDraft,
 				Labels:              Labels{"type": "test_connector"},
 				Hash:                "test_hash",
-				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "test_encrypted_definition"},
+				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "test_encrypted_definition"},
 			}
 
 			err := db.UpsertConnectorVersion(ctx, cv)
@@ -508,7 +508,7 @@ INSERT INTO connector_versions
 				State:               ConnectorVersionStateDraft,
 				Labels:              Labels{"type": "updated_connector"},
 				Hash:                "new_hash",
-				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "new_encrypted_definition"},
+				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "new_encrypted_definition"},
 			}
 
 			// This will fail due to UNIQUE constraint on (id, version), which is expected —
@@ -549,7 +549,7 @@ INSERT INTO connector_versions
 				State:               ConnectorVersionStatePrimary,
 				Labels:              Labels{"type": "test_connector"},
 				Hash:                "test_hash_v1",
-				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "test_encrypted_definition_v1"},
+				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "test_encrypted_definition_v1"},
 			}
 
 			err := db.UpsertConnectorVersion(ctx, cv1)
@@ -569,7 +569,7 @@ INSERT INTO connector_versions
 				State:               ConnectorVersionStatePrimary,
 				Labels:              Labels{"type": "test_connector"},
 				Hash:                "test_hash_v2",
-				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "test_encrypted_definition_v2"},
+				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "test_encrypted_definition_v2"},
 			}
 
 			err = db.UpsertConnectorVersion(ctx, cv2)
@@ -602,7 +602,7 @@ INSERT INTO connector_versions
 				State:               ConnectorVersionStateDraft,
 				Labels:              Labels{"type": "test_connector"},
 				Hash:                "test_hash",
-				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "test_encrypted_definition"},
+				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "test_encrypted_definition"},
 			}
 
 			err := db.UpsertConnectorVersion(ctx, cv)
@@ -645,7 +645,7 @@ INSERT INTO connector_versions
 			err := db.UpsertConnectorVersion(ctx, &ConnectorVersion{
 				Id: connectorID, Version: 1, Namespace: sconfig.RootNamespace,
 				State: ConnectorVersionStatePrimary, Labels: Labels{"type": "t"},
-				Hash: "h1", EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "e1"},
+				Hash: "h1", EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "e1"},
 			})
 			require.NoError(t, err)
 
@@ -653,7 +653,7 @@ INSERT INTO connector_versions
 			err = db.UpsertConnectorVersion(ctx, &ConnectorVersion{
 				Id: connectorID, Version: 2, Namespace: sconfig.RootNamespace,
 				State: ConnectorVersionStateDraft, Labels: Labels{"type": "t"},
-				Hash: "h2", EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "e2"},
+				Hash: "h2", EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "e2"},
 			})
 			require.NoError(t, err)
 
@@ -685,7 +685,7 @@ INSERT INTO connector_versions
 				State:               ConnectorVersionStateDraft,
 				Labels:              Labels{"type": "test_connector"},
 				Hash:                "test_hash",
-				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "test_encrypted_definition"},
+				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "test_encrypted_definition"},
 			}
 
 			err := db.UpsertConnectorVersion(ctx, cv)
@@ -711,7 +711,7 @@ INSERT INTO connector_versions
 			err := db.UpsertConnectorVersion(ctx, &ConnectorVersion{
 				Id: connectorID, Version: 1, Namespace: sconfig.RootNamespace,
 				State: ConnectorVersionStatePrimary, Labels: Labels{"type": "t"},
-				Hash: "h1", EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "e1"},
+				Hash: "h1", EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "e1"},
 			})
 			require.NoError(t, err)
 
@@ -719,7 +719,7 @@ INSERT INTO connector_versions
 			err = db.UpsertConnectorVersion(ctx, &ConnectorVersion{
 				Id: connectorID, Version: 2, Namespace: sconfig.RootNamespace,
 				State: ConnectorVersionStateDraft, Labels: Labels{"type": "t"},
-				Hash: "h2", EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "e2"},
+				Hash: "h2", EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "e2"},
 			})
 			require.NoError(t, err)
 
@@ -751,14 +751,14 @@ INSERT INTO connector_versions
 			err := db.UpsertConnectorVersion(ctx, &ConnectorVersion{
 				Id: connectorID, Version: 1, Namespace: sconfig.RootNamespace,
 				State: ConnectorVersionStatePrimary, Labels: Labels{"type": "t"},
-				Hash: "h1", EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "e1"},
+				Hash: "h1", EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "e1"},
 			})
 			require.NoError(t, err)
 
 			err = db.UpsertConnectorVersion(ctx, &ConnectorVersion{
 				Id: connectorID, Version: 2, Namespace: sconfig.RootNamespace,
 				State: ConnectorVersionStateDraft, Labels: Labels{"type": "t"},
-				Hash: "h2", EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "e2"},
+				Hash: "h2", EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "e2"},
 			})
 			require.NoError(t, err)
 
@@ -795,7 +795,7 @@ INSERT INTO connector_versions
 			err := db.UpsertConnectorVersion(ctx, &ConnectorVersion{
 				Id: connectorID, Version: 1, Namespace: sconfig.RootNamespace,
 				State: ConnectorVersionStatePrimary, Labels: Labels{"type": "t"},
-				Hash: "h1", EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "e1"},
+				Hash: "h1", EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "e1"},
 			})
 			require.NoError(t, err)
 
@@ -818,14 +818,14 @@ INSERT INTO connector_versions
 			err := db.UpsertConnectorVersion(ctx, &ConnectorVersion{
 				Id: targetID, Version: 1, Namespace: sconfig.RootNamespace,
 				State: ConnectorVersionStatePrimary, Labels: Labels{"type": "t1"},
-				Hash: "h1", EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "e1"},
+				Hash: "h1", EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "e1"},
 			})
 			require.NoError(t, err)
 
 			err = db.UpsertConnectorVersion(ctx, &ConnectorVersion{
 				Id: survivorID, Version: 1, Namespace: sconfig.RootNamespace,
 				State: ConnectorVersionStatePrimary, Labels: Labels{"type": "t2"},
-				Hash: "h2", EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "e2"},
+				Hash: "h2", EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "e2"},
 			})
 			require.NoError(t, err)
 
@@ -861,7 +861,7 @@ INSERT INTO connector_versions
 					"apxy/cxr/source": "config",
 				},
 				Hash:                "h1",
-				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "e1"},
+				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "e1"},
 			})
 			require.NoError(t, err)
 
@@ -889,7 +889,7 @@ INSERT INTO connector_versions
 					"apxy/cxr/source": "api",
 				},
 				Hash:                "h1",
-				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "e1"},
+				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "e1"},
 			})
 			require.NoError(t, err)
 
@@ -902,7 +902,7 @@ INSERT INTO connector_versions
 					"apxy/cxr/source": "config",
 				},
 				Hash:                "h2",
-				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "e2"},
+				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "e2"},
 			})
 			require.NoError(t, err)
 
@@ -929,7 +929,7 @@ INSERT INTO connector_versions
 					"apxy/cxr/source": "config",
 				},
 				Hash:                "h1",
-				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "e1"},
+				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "e1"},
 			})
 			require.NoError(t, err)
 
@@ -939,7 +939,7 @@ INSERT INTO connector_versions
 				State:               ConnectorVersionStateDraft,
 				Labels:              Labels{"type": "t-changed"},
 				Hash:                "h2",
-				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "e2"},
+				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "e2"},
 			})
 			require.NoError(t, err)
 

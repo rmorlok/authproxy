@@ -63,11 +63,10 @@ func TestAwsSecretsManagerKeySyncAndReencrypt(t *testing.T) {
 	})
 
 	namespace := fmt.Sprintf("root.aws-sm-test-%d", time.Now().UnixNano())
-	ekID := apid.New(apid.PrefixEncryptionKey)
+	ekID := apid.New(apid.PrefixKey)
 
 	require.NoError(t, env.Db.CreateNamespace(ctx, &database.Namespace{
-		Path:            namespace,
-		EncryptionKeyId: &ekID,
+		Path: namespace,
 	}))
 
 	keyData := sconfig.KeyData{
@@ -82,18 +81,18 @@ func TestAwsSecretsManagerKeySyncAndReencrypt(t *testing.T) {
 	encKeyData, err := env.DM.GetEncryptService().EncryptGlobal(ctx, keyDataJSON)
 	require.NoError(t, err)
 
-	require.NoError(t, env.Db.CreateEncryptionKey(ctx, &database.EncryptionKey{
+	require.NoError(t, env.Db.CreateKey(ctx, &database.Key{
 		Id:               ekID,
 		Namespace:        namespace,
 		EncryptedKeyData: &encKeyData,
-		State:            database.EncryptionKeyStateActive,
+		State:            database.KeyStateActive,
 	}))
+	_, err = env.Db.SetNamespaceKeyId(ctx, namespace, &ekID)
+	require.NoError(t, err)
+	currentV1 := createDataEncryptionKeyForIntegrationTest(t, ctx, env.Db, ekID, &keyData)
 
 	require.NoError(t, encrypt.SyncKeysToDatabase(ctx, env.Cfg, env.Db, env.Logger, nil))
 	require.NoError(t, env.DM.GetEncryptService().SyncKeysFromDbToMemory(ctx))
-
-	currentV1, err := env.Db.GetCurrentEncryptionKeyVersionForNamespace(ctx, namespace)
-	require.NoError(t, err)
 
 	plaintext := "aws-secrets-manager-test"
 	encrypted, err := env.DM.GetEncryptService().EncryptStringForNamespace(ctx, namespace, plaintext)
@@ -118,9 +117,10 @@ func TestAwsSecretsManagerKeySyncAndReencrypt(t *testing.T) {
 	require.NoError(t, encrypt.SyncKeysToDatabase(ctx, env.Cfg, env.Db, env.Logger, nil))
 	require.NoError(t, env.DM.GetEncryptService().SyncKeysFromDbToMemory(ctx))
 
-	currentV2, err := env.Db.GetCurrentEncryptionKeyVersionForNamespace(ctx, namespace)
+	currentV2, err := env.Db.GetCurrentDataEncryptionKeyForKey(ctx, ekID)
 	require.NoError(t, err)
-	require.NotEqual(t, currentV1.Id, currentV2.Id)
+	require.Equal(t, currentV1.Id, currentV2.Id)
+	require.NotEqual(t, currentV1.ProviderVersion, currentV2.ProviderVersion)
 
 	require.NoError(t, runReencryptAll(ctx, env))
 
@@ -128,6 +128,7 @@ func TestAwsSecretsManagerKeySyncAndReencrypt(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, updated.EncryptedKey)
 	require.Equal(t, currentV2.Id, updated.EncryptedKey.ID)
+	require.Equal(t, encrypted.Data, updated.EncryptedKey.Data)
 
 	decrypted, err := env.DM.GetEncryptService().DecryptString(ctx, *updated.EncryptedKey)
 	require.NoError(t, err)

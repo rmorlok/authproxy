@@ -7,7 +7,7 @@ export * from './backoff';
 export * from './actors';
 export * from './connectors';
 export * from './connections';
-export * from './encryptionKeys';
+export * from './keys';
 export * from './metrics';
 export * from './namespaces';
 export * from './proxy';

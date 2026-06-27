@@ -28,22 +28,24 @@ const globalScope = "global"
 const memorySyncPeriod = 5 * time.Minute
 const maxInitialWait = 5 * time.Minute
 
-var globalEncryptionKeyID = database.GlobalEncryptionKeyID
+var globalEncryptionKeyID = database.GlobalKeyID
 
 type service struct {
 	cfg    config.C
 	db     database.DB
 	logger *slog.Logger
 
-	mu                         sync.RWMutex
-	ekToKeyDataCache           map[apid.ID]*sconfig.KeyData        // encryption_key_id → key data config
-	ekvToVersionInfoCache      map[apid.ID]*sconfig.KeyVersionInfo // ekv_id → key data for version
-	ekToEkvCurrentVersionCache map[apid.ID]apid.ID                 // ek → ekv (key to current version)
-	namespaceToEkCache         map[string]apid.ID                  // ek → ekv (key to current version)
+	mu                   sync.RWMutex
+	keyToKeyDataCache    map[apid.ID]*sconfig.KeyData // key_id → key data config
+	dekToBytesCache      map[apid.ID][]byte           // dek_id → plaintext DEK bytes
+	keyToCurrentDEKCache map[apid.ID]apid.ID          // key_id → current dek_id
+	namespaceToKeyCache  map[string]apid.ID           // namespace path → key_id
 
 	stopCh    chan struct{} // signal goroutine to stop
 	doneCh    chan struct{} // closed when goroutine exits
 	syncReady chan struct{} // closed after first successful sync
+
+	syncReadyOnce sync.Once
 }
 
 func NewTestEncryptService(
@@ -83,16 +85,16 @@ func NewEncryptService(
 	}
 
 	return &service{
-		cfg:                        cfg,
-		db:                         db,
-		logger:                     logger,
-		ekToKeyDataCache:           make(map[apid.ID]*sconfig.KeyData),
-		ekvToVersionInfoCache:      make(map[apid.ID]*sconfig.KeyVersionInfo),
-		ekToEkvCurrentVersionCache: make(map[apid.ID]apid.ID),
-		namespaceToEkCache:         make(map[string]apid.ID),
-		stopCh:                     make(chan struct{}),
-		doneCh:                     make(chan struct{}),
-		syncReady:                  make(chan struct{}),
+		cfg:                  cfg,
+		db:                   db,
+		logger:               logger,
+		keyToKeyDataCache:    make(map[apid.ID]*sconfig.KeyData),
+		dekToBytesCache:      make(map[apid.ID][]byte),
+		keyToCurrentDEKCache: make(map[apid.ID]apid.ID),
+		namespaceToKeyCache:  make(map[string]apid.ID),
+		stopCh:               make(chan struct{}),
+		doneCh:               make(chan struct{}),
+		syncReady:            make(chan struct{}),
 	}
 }
 
@@ -107,11 +109,11 @@ func (s *service) syncKeysFromDbToMemory(ctx context.Context) error {
 	// Re-use the existing cached data because given id can never change value,
 	// but rather than making the cache permanent we transfer every time so that
 	// any values that no longer exist in the database will be removed from memory
-	var newEkToKeyDataCache map[apid.ID]*sconfig.KeyData
-	var oldEkvToVersionInfoCache map[apid.ID]*sconfig.KeyVersionInfo
-	var newEkvToVersionInfoCache map[apid.ID]*sconfig.KeyVersionInfo
-	var newEkToEkvCurrentVersionCache map[apid.ID]apid.ID
-	var newNamespaceToEkCache map[string]apid.ID
+	var newKeyToKeyDataCache map[apid.ID]*sconfig.KeyData
+	var oldDekToBytesCache map[apid.ID][]byte
+	var newDekToBytesCache map[apid.ID][]byte
+	var newKeyToCurrentDEKCache map[apid.ID]apid.ID
+	var newNamespaceToKeyCache map[string]apid.ID
 
 	var merr *multierror.Error
 
@@ -119,18 +121,18 @@ func (s *service) syncKeysFromDbToMemory(ctx context.Context) error {
 		s.mu.Lock()
 		defer s.mu.Unlock()
 
-		newEkToKeyDataCache = make(map[apid.ID]*sconfig.KeyData, len(s.ekToKeyDataCache))
-		newEkvToVersionInfoCache = make(map[apid.ID]*sconfig.KeyVersionInfo, len(s.ekvToVersionInfoCache))
-		newEkToEkvCurrentVersionCache = make(map[apid.ID]apid.ID, len(s.ekToEkvCurrentVersionCache))
-		newNamespaceToEkCache = make(map[string]apid.ID, len(s.namespaceToEkCache))
-		oldEkvToVersionInfoCache = make(map[apid.ID]*sconfig.KeyVersionInfo, len(s.ekvToVersionInfoCache))
+		newKeyToKeyDataCache = make(map[apid.ID]*sconfig.KeyData, len(s.keyToKeyDataCache))
+		newDekToBytesCache = make(map[apid.ID][]byte, len(s.dekToBytesCache))
+		newKeyToCurrentDEKCache = make(map[apid.ID]apid.ID, len(s.keyToCurrentDEKCache))
+		newNamespaceToKeyCache = make(map[string]apid.ID, len(s.namespaceToKeyCache))
+		oldDekToBytesCache = make(map[apid.ID][]byte, len(s.dekToBytesCache))
 
-		for id, data := range s.ekvToVersionInfoCache {
-			oldEkvToVersionInfoCache[id] = data
+		for id, data := range s.dekToBytesCache {
+			oldDekToBytesCache[id] = append([]byte(nil), data...)
 		}
 	}()
 
-	_, err := s.db.EnumerateEncryptionKeysInDependencyOrder(ctx, func(keys []*database.EncryptionKey, _ int) (keepGoing pagination.KeepGoing, err error) {
+	_, err := s.db.EnumerateKeysInDependencyOrder(ctx, func(keys []*database.Key, _ int) (keepGoing pagination.KeepGoing, err error) {
 		for _, key := range keys {
 			var keyData *sconfig.KeyData
 			if key.Id == globalEncryptionKeyID {
@@ -140,17 +142,17 @@ func (s *service) syncKeysFromDbToMemory(ctx context.Context) error {
 				merr = multierror.Append(merr, fmt.Errorf("invalid encryption key data for key %q: %w", key.Id, err))
 				continue
 			} else {
-				// Because we are enumerating in dependency order, the parent key should have already been loaded.
-				// We can look up the ekv from the cache that has been stored to get the data to decrypt this key.
-				ekv, ok := newEkvToVersionInfoCache[key.EncryptedKeyData.ID]
+				// Because we are enumerating in dependency order, the parent key
+				// should have already loaded the DEK that encrypted this child key data.
+				keyBytes, ok := newDekToBytesCache[key.EncryptedKeyData.ID]
 				if !ok {
-					merr = multierror.Append(merr, fmt.Errorf("encryption key version %s not found in cache for key %q: %w", key.EncryptedKeyData.ID, key.Id, err))
+					merr = multierror.Append(merr, fmt.Errorf("key material %s not found in cache for key %q: %w", key.EncryptedKeyData.ID, key.Id, err))
 					continue
 				}
 
-				keyDataBytes, err := decryptFieldWithBytes(ekv.Data, *key.EncryptedKeyData)
+				keyDataBytes, err := decryptFieldWithBytes(keyBytes, *key.EncryptedKeyData)
 				if err != nil {
-					merr = multierror.Append(merr, fmt.Errorf("failed to decrypt encryption key %q data for with ekv %q: %w", key.Id, key.EncryptedKeyData.ID, err))
+					merr = multierror.Append(merr, fmt.Errorf("failed to decrypt encryption key %q data with key material %q: %w", key.Id, key.EncryptedKeyData.ID, err))
 					continue
 				}
 
@@ -164,36 +166,39 @@ func (s *service) syncKeysFromDbToMemory(ctx context.Context) error {
 			}
 
 			// Cache the result.
-			newEkToKeyDataCache[key.Id] = keyData
+			newKeyToKeyDataCache[key.Id] = keyData
 
-			// Now that we have the key data that can be used to pull the verion info for the key, load that version
-			// info into cache, using the database defined identifiers for those versions. Any version not enumerated
-			// in the database will be ignored as it is the database sync that defines when new versions become
-			// available.
-			_ = s.db.EnumerateEncryptionKeyVersionsForKey(ctx, key.Id,
-				func(ekvs []*database.EncryptionKeyVersion, lastPage bool) (keepGoing pagination.KeepGoing, err error) {
-					for _, ekv := range ekvs {
-						if ekv.IsCurrent {
-							newEkToEkvCurrentVersionCache[ekv.EncryptionKeyId] = ekv.Id
-						}
-
-						if vi, ok := oldEkvToVersionInfoCache[ekv.Id]; ok {
-							// The data for a given version is immutable, so we can just take old value
-							newEkvToVersionInfoCache[ekv.Id] = vi
-						} else {
-							kvi, err := s.getKeyVersionInfoForDatabaseVersion(ctx, keyData, ekv)
-							if err != nil {
-								merr = multierror.Append(merr, fmt.Errorf("failed to get key version for encryption key %q for key version id %q: %w", ekv.EncryptionKeyId, ekv.Id, err))
+			err = s.db.EnumerateDataEncryptionKeysForKey(ctx, key.Id,
+				func(deks []*database.DataEncryptionKey, lastPage bool) (keepGoing pagination.KeepGoing, err error) {
+					for _, dek := range deks {
+						dekBytes, ok := oldDekToBytesCache[dek.Id]
+						if !ok {
+							infos := dataEncryptionKeyInfos([]*database.DataEncryptionKey{dek})
+							if len(infos) != 1 {
+								merr = multierror.Append(merr, fmt.Errorf("failed to map data encryption key %q for key %q", dek.Id, key.Id))
 								continue
 							}
 
-							newEkvToVersionInfoCache[ekv.Id] = &kvi
+							dekBytes, err = keyData.UnwrapDataEncryptionKey(ctx, infos[0])
+							if err != nil {
+								merr = multierror.Append(merr, fmt.Errorf("failed to unwrap data encryption key %q for key %q: %w", dek.Id, key.Id, err))
+								continue
+							}
+						}
+
+						newDekToBytesCache[dek.Id] = append([]byte(nil), dekBytes...)
+						if dek.IsCurrent {
+							newKeyToCurrentDEKCache[dek.KeyId] = dek.Id
 						}
 					}
 
 					return pagination.Continue, nil
 				},
 			)
+			if err != nil {
+				merr = multierror.Append(merr, fmt.Errorf("failed to enumerate data encryption keys for key %q: %w", key.Id, err))
+				continue
+			}
 		}
 
 		return pagination.Continue, nil
@@ -206,8 +211,8 @@ func (s *service) syncKeysFromDbToMemory(ctx context.Context) error {
 	// Identify all the keys used for the namespaces
 	err = s.db.ListNamespacesBuilder().Enumerate(ctx, func(pr pagination.PageResult[database.Namespace]) (keepGoing pagination.KeepGoing, err error) {
 		for _, ns := range pr.Results {
-			if ns.EncryptionKeyId != nil {
-				newNamespaceToEkCache[ns.Path] = *ns.EncryptionKeyId
+			if ns.KeyId != nil {
+				newNamespaceToKeyCache[ns.Path] = *ns.KeyId
 			}
 		}
 
@@ -219,51 +224,13 @@ func (s *service) syncKeysFromDbToMemory(ctx context.Context) error {
 	}
 
 	s.mu.Lock()
-	s.ekvToVersionInfoCache = newEkvToVersionInfoCache
-	s.ekToEkvCurrentVersionCache = newEkToEkvCurrentVersionCache
-	s.namespaceToEkCache = newNamespaceToEkCache
+	s.keyToKeyDataCache = newKeyToKeyDataCache
+	s.dekToBytesCache = newDekToBytesCache
+	s.keyToCurrentDEKCache = newKeyToCurrentDEKCache
+	s.namespaceToKeyCache = newNamespaceToKeyCache
 	s.mu.Unlock()
 
 	return merr.ErrorOrNil()
-}
-
-func (s *service) getKeyVersionInfoForDatabaseVersion(
-	ctx context.Context,
-	keyData *sconfig.KeyData,
-	ekv *database.EncryptionKeyVersion,
-) (sconfig.KeyVersionInfo, error) {
-	// If this key type takes DEKs, we need to pull that data from the separate table
-	// to provide it with that context to allow it to create a key version info.
-	if keyData.RequiresDataEncryptionKeys() {
-		// Get the DEK from the database
-		dek, err := s.db.GetDataEncryptionKey(ctx, apid.ID(ekv.ProviderID))
-		if err != nil {
-			return sconfig.KeyVersionInfo{}, err
-		}
-
-		// Use the list method to get this single version
-		versions, err := keyData.ListVersionsWithDataEncryptionKeys(
-			ctx,
-			dataEncryptionKeyInfos([]*database.DataEncryptionKey{dek}),
-		)
-		if err != nil {
-			return sconfig.KeyVersionInfo{}, err
-		}
-
-		// Should be a loop of one iteration
-		for _, v := range versions {
-			if string(v.Provider) == ekv.Provider &&
-				v.ProviderID == ekv.ProviderID &&
-				v.ProviderVersion == ekv.ProviderVersion {
-				return v, nil
-			}
-		}
-
-		return sconfig.KeyVersionInfo{}, fmt.Errorf("version %q/%q/%q not returned by key data provider", ekv.Provider, ekv.ProviderID, ekv.ProviderVersion)
-	}
-
-	// Key type does not take DEKs, so we can just return the version.
-	return keyData.GetVersion(ctx, ekv.ProviderVersion)
 }
 
 // ensureSynced blocks until the background goroutine has completed its first successful sync,
@@ -284,6 +251,25 @@ func (s *service) ensureSynced(ctx context.Context) error {
 	}
 }
 
+func (s *service) markSyncReady() {
+	s.syncReadyOnce.Do(func() {
+		close(s.syncReady)
+	})
+}
+
+func (s *service) hasGlobalDataEncryptionKey() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	dekID, hasGlobal := s.keyToCurrentDEKCache[globalEncryptionKeyID]
+	if !hasGlobal {
+		return false
+	}
+
+	_, hasGlobalBytes := s.dekToBytesCache[dekID]
+	return hasGlobalBytes
+}
+
 // Start launches the background key sync goroutine.
 func (s *service) Start() {
 	go s.syncLoop()
@@ -300,15 +286,31 @@ func (s *service) Shutdown() {
 func (s *service) startForTest() {
 	ctx := context.Background()
 
-	// Sync keys from config to database
-	syncKeysVersionsToDatabase(ctx, s.cfg, s.db, s.logger, nil)
+	// Generate DEKs for tests before loading the runtime DEK cache.
+	if s.cfg != nil && s.cfg.GetRoot() != nil {
+		root := s.cfg.GetRoot()
+		originalPolicy := root.SystemAuth.DataEncryptionKeys
+		testPolicy := &sconfig.DataEncryptionKeys{}
+		if originalPolicy != nil {
+			copied := *originalPolicy
+			testPolicy = &copied
+		}
+		testPolicy.RotationInterval = &sconfig.HumanDuration{}
+		root.SystemAuth.DataEncryptionKeys = testPolicy
+		defer func() {
+			root.SystemAuth.DataEncryptionKeys = originalPolicy
+		}()
+	}
+	if err := generateDataEncryptionKeysToDatabase(ctx, s.cfg, s.db, s.logger, nil); err != nil {
+		s.logger.Warn("test encrypt service: failed to generate data encryption keys", "error", err)
+	}
 
 	// Sync keys from database to memory
 	if err := s.syncKeysFromDbToMemory(ctx); err != nil {
 		s.logger.Warn("test encrypt service: failed to sync keys from db to memory", "error", err)
 	}
 
-	close(s.syncReady)
+	s.markSyncReady()
 	close(s.doneCh) // No goroutine to wait for
 }
 
@@ -323,21 +325,13 @@ func (s *service) syncLoop() {
 	maxBackoff := 30 * time.Second
 
 	for {
-		if err := s.syncKeysFromDbToMemory(ctx); err != nil {
+		err := s.syncKeysFromDbToMemory(ctx)
+		if err != nil {
 			s.logger.Warn("encrypt service: initial key sync failed", "error", err)
 		}
 
-		hasGlobalVersion := false
-
-		// Check if global AES key is available
-		s.mu.RLock()
-		if ekv, hasGlobal := s.ekToEkvCurrentVersionCache[globalEncryptionKeyID]; hasGlobal {
-			_, hasGlobalVersion = s.ekvToVersionInfoCache[ekv]
-		}
-		s.mu.RUnlock()
-
-		if hasGlobalVersion {
-			close(s.syncReady)
+		if err == nil && s.hasGlobalDataEncryptionKey() {
+			s.markSyncReady()
 			break
 		}
 
@@ -375,8 +369,8 @@ func (s *service) syncLoop() {
 	}
 }
 
-// getKeyIdForNamespace returns the ek_ for the given namespace. If that namespace is not configured it falls
-// back to parent namespaces until reaching the global encryption key.
+// getKeyIdForNamespace returns the key_ for the given namespace. If that namespace is not configured it falls
+// back to parent namespaces until reaching the global key.
 func (s *service) getKeyIdForNamespace(namespacePath string) (apid.ID, error) {
 	paths := namespace.SplitNamespacePathToPrefixes(namespacePath)
 
@@ -384,7 +378,7 @@ func (s *service) getKeyIdForNamespace(namespacePath string) (apid.ID, error) {
 	defer s.mu.RUnlock()
 
 	for i := len(paths) - 1; i >= 0; i-- {
-		if id, ok := s.namespaceToEkCache[paths[i]]; ok {
+		if id, ok := s.namespaceToKeyCache[paths[i]]; ok {
 			return id, nil
 		}
 	}
@@ -392,40 +386,40 @@ func (s *service) getKeyIdForNamespace(namespacePath string) (apid.ID, error) {
 	return globalEncryptionKeyID, nil
 }
 
-// getCurrentEkvId return the current ekv for the given ek
-func (s *service) getCurrentEkvId(ekvId apid.ID) (apid.ID, error) {
+// getCurrentDataEncryptionKeyId returns the current DEK for the given key.
+func (s *service) getCurrentDataEncryptionKeyId(keyId apid.ID) (apid.ID, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	kevId, ok := s.ekToEkvCurrentVersionCache[ekvId]
+	dekId, ok := s.keyToCurrentDEKCache[keyId]
 	if !ok {
-		return "", fmt.Errorf("no current key for encryption key %s", ekvId)
+		return "", fmt.Errorf("no current data encryption key for key %s", keyId)
 	}
 
-	return kevId, nil
+	return dekId, nil
 }
 
-// getKeyBytes returns the key bytes for the given ekv_id, falling back to DB if not cached.
-func (s *service) getKeyVersionBytes(ekvID apid.ID) ([]byte, error) {
+// getDataEncryptionKeyBytes returns the plaintext DEK bytes for the given dek_id.
+func (s *service) getDataEncryptionKeyBytes(dekID apid.ID) ([]byte, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	vi, ok := s.ekvToVersionInfoCache[ekvID]
+	data, ok := s.dekToBytesCache[dekID]
 
 	if ok {
-		return vi.Data, nil
+		return append([]byte(nil), data...), nil
 	}
 
-	return nil, fmt.Errorf("key version %s not found in cache", ekvID)
+	return nil, fmt.Errorf("data encryption key %s not found in cache", dekID)
 }
 
-// getAllKeyBytes returns all cached key bytes for trying decryption.
+// getAllKeyBytes returns all cached DEK bytes for trying decryption.
 func (s *service) getAllKeyBytes() [][]byte {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	keys := make([][]byte, 0, len(s.ekvToVersionInfoCache))
-	for _, vi := range s.ekvToVersionInfoCache {
-		keys = append(keys, vi.Data)
+	keys := make([][]byte, 0, len(s.dekToBytesCache))
+	for _, data := range s.dekToBytesCache {
+		keys = append(keys, append([]byte(nil), data...))
 	}
 	return keys
 }
@@ -475,28 +469,15 @@ func decryptWithKey(key []byte, data []byte) ([]byte, error) {
 	return decryptedData, nil
 }
 
-// decryptWithAnyKey tries to decrypt data with each key in order, returning the first success.
-func decryptWithAnyKey(keys [][]byte, data []byte) ([]byte, error) {
-	var lastErr error
-	for _, key := range keys {
-		result, err := decryptWithKey(key, data)
-		if err == nil {
-			return result, nil
-		}
-		lastErr = err
-	}
-	return nil, fmt.Errorf("decryption failed with all keys: %w", lastErr)
-}
-
-// EncryptForKey encrypts data with the current version of the specified key. The caller is assumed to
+// encryptForKey encrypts data with the current DEK of the specified key. The caller is assumed to
 // have validated that the cache sync has completed.
-func (s *service) encryptForKey(ekId apid.ID, data []byte) (encfield.EncryptedField, error) {
-	ekvId, err := s.getCurrentEkvId(ekId)
+func (s *service) encryptForKey(keyId apid.ID, data []byte) (encfield.EncryptedField, error) {
+	dekId, err := s.getCurrentDataEncryptionKeyId(keyId)
 	if err != nil {
 		return encfield.EncryptedField{}, err
 	}
 
-	keyBytes, err := s.getKeyVersionBytes(ekvId)
+	keyBytes, err := s.getDataEncryptionKeyBytes(dekId)
 	if err != nil {
 		return encfield.EncryptedField{}, err
 	}
@@ -507,25 +488,15 @@ func (s *service) encryptForKey(ekId apid.ID, data []byte) (encfield.EncryptedFi
 	}
 
 	encodedData := base64.StdEncoding.EncodeToString(encryptedData)
-	return encfield.EncryptedField{ID: ekvId, Data: encodedData}, nil
-}
-
-// EncryptForKey encrypts data with the current version of the specified key.
-func (s *service) EncryptForKey(ctx context.Context, ekId apid.ID, data []byte) (encfield.EncryptedField, error) {
-	if err := s.ensureSynced(ctx); err != nil {
-		return encfield.EncryptedField{}, err
-	}
-	return s.encryptForKey(ekId, data)
-}
-
-// EncryptStringForKey encrypts a string with the current version of the specified key.
-func (s *service) EncryptStringForKey(ctx context.Context, ekId apid.ID, data string) (encfield.EncryptedField, error) {
-	return s.EncryptForKey(ctx, ekId, []byte(data))
+	return encfield.EncryptedField{ID: dekId, Data: encodedData}, nil
 }
 
 // EncryptGlobal encrypts raw bytes with the current global key.
 func (s *service) EncryptGlobal(ctx context.Context, data []byte) (encfield.EncryptedField, error) {
-	return s.EncryptForKey(ctx, globalEncryptionKeyID, data)
+	if err := s.ensureSynced(ctx); err != nil {
+		return encfield.EncryptedField{}, err
+	}
+	return s.encryptForKey(globalEncryptionKeyID, data)
 }
 
 // EncryptStringGlobal encrypts a string with the current global key.
@@ -561,6 +532,16 @@ func (s *service) EncryptStringForEntity(ctx context.Context, entity NamespacedE
 	return s.EncryptForEntity(ctx, entity, []byte(data))
 }
 
+func (s *service) EncryptKeyForNamespace(ctx context.Context, namespacePath string, keyData []byte) (encfield.EncryptedField, error) {
+	if namespacePath == namespace.RootNamespace {
+		return s.EncryptGlobal(ctx, keyData)
+	}
+
+	// Keys are always encrypted with the parent namespace key to avoid creating a dependency cycle.
+	parentNamespace := namespace.NamespaceParentPath(namespacePath)
+	return s.EncryptForNamespace(ctx, parentNamespace, keyData)
+}
+
 func decryptFieldWithBytes(keyBytes []byte, ef encfield.EncryptedField) ([]byte, error) {
 	decodedData, err := base64.StdEncoding.DecodeString(ef.Data)
 	if err != nil {
@@ -575,16 +556,16 @@ func decryptFieldWithBytes(keyBytes []byte, ef encfield.EncryptedField) ([]byte,
 	return decryptedData, nil
 }
 
-// Decrypt decrypts an EncryptedField using the key ID embedded in the field. It assumes that the cache
+// Decrypt decrypts an EncryptedField using the DEK ID embedded in the field. It assumes that the cache
 // sync has completed.
 func (s *service) decrypt(ef encfield.EncryptedField) ([]byte, error) {
 	if ef.IsZero() {
 		return nil, nil
 	}
 
-	keyBytes, err := s.getKeyVersionBytes(ef.ID)
+	keyBytes, err := s.getDataEncryptionKeyBytes(ef.ID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get key for ekv_id %s: %w", ef.ID, err)
+		return nil, fmt.Errorf("failed to get data encryption key %s: %w", ef.ID, err)
 	}
 
 	return decryptFieldWithBytes(keyBytes, ef)
@@ -600,14 +581,14 @@ func (s *service) Decrypt(ctx context.Context, ef encfield.EncryptedField) ([]by
 }
 
 // ReEncryptField decrypts the given encrypted field and re-encrypts it with the specified
-// target key version. If the field is already encrypted with the target version, it is
+// target DEK. If the field is already encrypted with the target DEK, it is
 // returned unchanged.
-func (s *service) ReEncryptField(ctx context.Context, ef encfield.EncryptedField, targetEkvId apid.ID) (encfield.EncryptedField, error) {
+func (s *service) ReEncryptField(ctx context.Context, ef encfield.EncryptedField, targetDEKId apid.ID) (encfield.EncryptedField, error) {
 	if err := s.ensureSynced(ctx); err != nil {
 		return encfield.EncryptedField{}, err
 	}
 
-	if ef.ID == targetEkvId {
+	if ef.ID == targetDEKId {
 		return ef, nil
 	}
 
@@ -616,7 +597,7 @@ func (s *service) ReEncryptField(ctx context.Context, ef encfield.EncryptedField
 		return encfield.EncryptedField{}, err
 	}
 
-	keyBytes, err := s.getKeyVersionBytes(targetEkvId)
+	keyBytes, err := s.getDataEncryptionKeyBytes(targetDEKId)
 	if err != nil {
 		return encfield.EncryptedField{}, err
 	}
@@ -626,12 +607,20 @@ func (s *service) ReEncryptField(ctx context.Context, ef encfield.EncryptedField
 		return encfield.EncryptedField{}, err
 	}
 
-	return encfield.EncryptedField{ID: targetEkvId, Data: base64.StdEncoding.EncodeToString(encrypted)}, nil
+	return encfield.EncryptedField{ID: targetDEKId, Data: base64.StdEncoding.EncodeToString(encrypted)}, nil
 }
 
 // SyncKeysFromDbToMemory forces a refresh of the in-memory key caches from the database.
 func (s *service) SyncKeysFromDbToMemory(ctx context.Context) error {
-	return s.syncKeysFromDbToMemory(ctx)
+	if err := s.syncKeysFromDbToMemory(ctx); err != nil {
+		return err
+	}
+
+	if s.hasGlobalDataEncryptionKey() {
+		s.markSyncReady()
+	}
+
+	return nil
 }
 
 // DecryptString decrypts an EncryptedField using the key ID embedded in the field.

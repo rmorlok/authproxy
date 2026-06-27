@@ -23,50 +23,45 @@ func (kd *KeyData) UnmarshalYAML(value *yaml.Node) error {
 	}
 
 	var keyData KeyDataType
+	keys := map[string]bool{}
 
-fieldLoop:
 	for i := 0; i < len(value.Content); i += 2 {
-		keyNode := value.Content[i]
+		keys[value.Content[i].Value] = true
+	}
 
-		switch keyNode.Value {
-		case "value":
-			keyData = &KeyDataValue{}
-			break fieldLoop
-		case "base64":
-			keyData = &KeyDataBase64Val{}
-			break fieldLoop
-		case "env_var":
-			keyData = &KeyDataEnvVar{}
-			break fieldLoop
-		case "env_var_base64":
-			keyData = &KeyDataEnvBase64Var{}
-			break fieldLoop
-		case "path":
-			keyData = &KeyDataFile{}
-			break fieldLoop
-		case "random":
-			keyData = &KeyDataRandomBytes{}
-			break fieldLoop
-		case "vault_address":
-			keyData = &KeyDataVault{}
-			break fieldLoop
-		case "aws_secret_id":
-			keyData = &KeyDataAwsSecret{}
-			break fieldLoop
-		case "gcp_secret_name":
-			keyData = &KeyDataGcpSecret{}
-			break fieldLoop
-		case "mock_id":
-			keyData = &KeyDataMock{}
-			break fieldLoop
-		case "mock_kms_id":
-			keyData = &KeyDataMockKMS{}
-			break fieldLoop
-		}
+	switch {
+	case keys["value"]:
+		keyData = &KeyDataValue{}
+	case keys["base64"]:
+		keyData = &KeyDataBase64Val{}
+	case keys["env_var"]:
+		keyData = &KeyDataEnvVar{}
+	case keys["env_var_base64"]:
+		keyData = &KeyDataEnvBase64Var{}
+	case keys["path"]:
+		keyData = &KeyDataFile{}
+	case keys["random"]:
+		keyData = &KeyDataRandomBytes{}
+	case keys["vault_transit_key_name"]:
+		keyData = &KeyDataVaultTransit{}
+	case keys["vault_address"]:
+		keyData = &KeyDataVault{}
+	case keys["aws_kms_key_id"]:
+		keyData = &KeyDataAwsKMS{}
+	case keys["aws_secret_id"]:
+		keyData = &KeyDataAwsSecret{}
+	case keys["gcp_kms_key_name"] || keys["gcp_crypto_key"]:
+		keyData = &KeyDataGcpKMS{}
+	case keys["gcp_secret_name"]:
+		keyData = &KeyDataGcpSecret{}
+	case keys["mock_id"]:
+		keyData = &KeyDataMock{}
+	case keys["mock_kms_id"]:
+		keyData = &KeyDataMockKMS{}
 	}
 
 	if keyData == nil {
-		return fmt.Errorf("invalid structure for key data type; does not match value, base64, env_var, env_var_base64, path, random, vault_address, aws_secret_id, gcp_secret_name, mock_id, mock_kms_id")
+		return fmt.Errorf("invalid structure for key data type; does not match value, base64, env_var, env_var_base64, path, random, vault_address, vault_transit_key_name, aws_kms_key_id, aws_secret_id, gcp_kms_key_name, gcp_secret_name, mock_id, mock_kms_id")
 	}
 
 	if err := value.Decode(keyData); err != nil {
