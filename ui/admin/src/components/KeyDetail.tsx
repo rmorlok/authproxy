@@ -14,12 +14,14 @@ import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import Button from '@mui/material/Button';
+import TextField from '@mui/material/TextField';
 import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
 import Select from '@mui/material/Select';
-import FormHelperText from '@mui/material/FormHelperText';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
 import dayjs from 'dayjs';
 import Tooltip from '@mui/material/Tooltip';
 import {Key, keys, KeyState} from '@authproxy/api';
@@ -34,6 +36,114 @@ function StateChip({state}: { state: KeyState }) {
   return <Chip label={state} color={colors[state]} size="small"/>;
 }
 
+type KeyValueRow = {
+  id: string;
+  key: string;
+  value: string;
+};
+
+let keyValueRowSequence = 0;
+
+function nextKeyValueRow(key = '', value = ''): KeyValueRow {
+  keyValueRowSequence += 1;
+  return {
+    id: `kv-${keyValueRowSequence}`,
+    key,
+    value,
+  };
+}
+
+function mapToRows(values?: Record<string, string>): KeyValueRow[] {
+  return Object.entries(values || {}).map(([key, value]) => nextKeyValueRow(key, value));
+}
+
+function rowsToMap(rows: KeyValueRow[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const row of rows) {
+    const key = row.key.trim();
+    if (key) out[key] = row.value;
+  }
+  return out;
+}
+
+function duplicateKeys(rows: KeyValueRow[]): string[] {
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+  for (const row of rows) {
+    const key = row.key.trim();
+    if (!key) continue;
+    if (seen.has(key)) duplicates.add(key);
+    seen.add(key);
+  }
+  return Array.from(duplicates);
+}
+
+function KeyValueRowsEditor({
+  title,
+  rows,
+  onChange,
+  addLabel,
+}: {
+  title: string;
+  rows: KeyValueRow[];
+  onChange: (rows: KeyValueRow[]) => void;
+  addLabel: string;
+}) {
+  const updateRow = (id: string, patch: Partial<KeyValueRow>) => {
+    onChange(rows.map(row => row.id === id ? {...row, ...patch} : row));
+  };
+
+  const removeRow = (id: string) => {
+    onChange(rows.filter(row => row.id !== id));
+  };
+
+  return (
+    <Box>
+      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{mb: 1}}>
+        <Typography variant="subtitle2" color="text.secondary">{title}</Typography>
+        <Button
+          size="small"
+          startIcon={<AddIcon/>}
+          onClick={() => onChange([...rows, nextKeyValueRow()])}
+        >
+          {addLabel}
+        </Button>
+      </Stack>
+      {rows.length === 0 ? (
+        <Typography variant="body2" color="text.secondary">None</Typography>
+      ) : (
+        <Stack spacing={1}>
+          {rows.map(row => (
+            <Stack key={row.id} direction={{xs: 'column', sm: 'row'}} spacing={1} alignItems={{xs: 'stretch', sm: 'flex-start'}}>
+              <TextField
+                size="small"
+                label="Key"
+                value={row.key}
+                onChange={(e) => updateRow(row.id, {key: e.target.value})}
+                sx={{flex: 0.45}}
+              />
+              <TextField
+                size="small"
+                label="Value"
+                value={row.value}
+                onChange={(e) => updateRow(row.id, {value: e.target.value})}
+                multiline
+                maxRows={4}
+                sx={{flex: 0.55}}
+              />
+              <Tooltip title="Remove">
+                <IconButton size="small" onClick={() => removeRow(row.id)} aria-label={`Remove ${title.toLowerCase()} row`}>
+                  <DeleteIcon fontSize="inherit"/>
+                </IconButton>
+              </Tooltip>
+            </Stack>
+          ))}
+        </Stack>
+      )}
+    </Box>
+  );
+}
+
 export default function KeyDetail({keyId}: { keyId: string }) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -42,9 +152,11 @@ export default function KeyDetail({keyId}: { keyId: string }) {
 
   // Actions UI state
   const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
-  const [changeStateOpen, setChangeStateOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
-  const [selectedState, setSelectedState] = useState<KeyState | ''>('');
+  const [editState, setEditState] = useState<KeyState>(KeyState.ACTIVE);
+  const [editLabelRows, setEditLabelRows] = useState<KeyValueRow[]>([]);
+  const [editAnnotationRows, setEditAnnotationRows] = useState<KeyValueRow[]>([]);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -103,27 +215,48 @@ export default function KeyDetail({keyId}: { keyId: string }) {
   const openMenu = (e: React.MouseEvent<HTMLButtonElement>) => setMenuAnchorEl(e.currentTarget);
   const closeMenu = () => setMenuAnchorEl(null);
 
-  const onClickChangeState = () => {
+  const onClickEdit = () => {
     setActionError(null);
-    setSelectedState(ek.state);
+    setEditState(ek.state);
+    setEditLabelRows(mapToRows(ek.labels));
+    setEditAnnotationRows(mapToRows(ek.annotations));
     closeMenu();
-    setChangeStateOpen(true);
+    setEditOpen(true);
   };
 
-  const onSubmitChangeState = async () => {
-    if (!ek || !selectedState) return;
+  const onSubmitEdit = async () => {
+    if (!ek) return;
+    const duplicateLabels = duplicateKeys(editLabelRows);
+    const duplicateAnnotations = duplicateKeys(editAnnotationRows);
+    if (duplicateLabels.length > 0 || duplicateAnnotations.length > 0) {
+      const parts = [];
+      if (duplicateLabels.length > 0) parts.push(`duplicate labels: ${duplicateLabels.join(', ')}`);
+      if (duplicateAnnotations.length > 0) parts.push(`duplicate annotations: ${duplicateAnnotations.join(', ')}`);
+      setActionError(parts.join('; '));
+      return;
+    }
     setActionError(null);
     setActionLoading(true);
     try {
-      await keys.update(ek.id, { state: selectedState as KeyState });
-      setChangeStateOpen(false);
-      fetchKey();
+      const resp = await keys.update(ek.id, {
+        state: editState,
+        labels: rowsToMap(editLabelRows),
+        annotations: rowsToMap(editAnnotationRows),
+      });
+      setEk(resp.data);
+      setEditOpen(false);
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err.message || 'Failed to change state';
+      const msg = err?.response?.data?.error || err.message || 'Failed to update key';
       setActionError(msg);
     } finally {
       setActionLoading(false);
     }
+  };
+
+  const closeEditDialog = () => {
+    if (actionLoading) return;
+    setActionError(null);
+    setEditOpen(false);
   };
 
   const onClickDelete = () => {
@@ -158,7 +291,7 @@ export default function KeyDetail({keyId}: { keyId: string }) {
             <MoreVertIcon/>
           </IconButton>
           <Menu anchorEl={menuAnchorEl} open={Boolean(menuAnchorEl)} onClose={closeMenu}>
-            <MenuItem onClick={onClickChangeState}>Change state...</MenuItem>
+            <MenuItem onClick={onClickEdit}>Edit...</MenuItem>
             <Divider/>
             <MenuItem onClick={onClickDelete} sx={{color: 'error.main'}}>Delete</MenuItem>
           </Menu>
@@ -235,30 +368,42 @@ export default function KeyDetail({keyId}: { keyId: string }) {
         }}
       />
 
-      {/* Change state dialog */}
-      <Dialog open={changeStateOpen} onClose={() => !actionLoading && setChangeStateOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Change key state</DialogTitle>
+      <Dialog open={editOpen} onClose={closeEditDialog} fullWidth maxWidth="md">
+        <DialogTitle>Edit key</DialogTitle>
         <DialogContent>
+          {actionError && <Alert severity="error" sx={{mt: 1, mb: 2}} onClose={() => setActionError(null)}>{actionError}</Alert>}
           <FormControl fullWidth sx={{mt: 2}}>
-            <InputLabel id="change-state-label">State</InputLabel>
+            <InputLabel id="edit-key-state-label">State</InputLabel>
             <Select
-              native
-              labelId="change-state-label"
+              labelId="edit-key-state-label"
               label="State"
-              value={selectedState || ''}
-              onChange={(e) => setSelectedState((e.target as HTMLSelectElement).value as KeyState)}
+              value={editState}
+              onChange={(e) => setEditState(e.target.value as KeyState)}
             >
-              <option aria-label="None" value="" />
               {stateOptions.map(s => (
-                <option key={s} value={s}>{s}</option>
+                <MenuItem key={s} value={s}>{s}</MenuItem>
               ))}
             </Select>
-            <FormHelperText>Select the new state for this key.</FormHelperText>
           </FormControl>
+
+          <Stack spacing={3} sx={{mt: 3}}>
+            <KeyValueRowsEditor
+              title="Labels"
+              rows={editLabelRows}
+              onChange={setEditLabelRows}
+              addLabel="Add label"
+            />
+            <KeyValueRowsEditor
+              title="Annotations"
+              rows={editAnnotationRows}
+              onChange={setEditAnnotationRows}
+              addLabel="Add annotation"
+            />
+          </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setChangeStateOpen(false)} disabled={actionLoading}>Cancel</Button>
-          <Button onClick={onSubmitChangeState} variant="contained" disabled={!selectedState || actionLoading}>Apply</Button>
+          <Button onClick={closeEditDialog} disabled={actionLoading}>Cancel</Button>
+          <Button onClick={onSubmitEdit} variant="contained" disabled={actionLoading}>Save</Button>
         </DialogActions>
       </Dialog>
 
