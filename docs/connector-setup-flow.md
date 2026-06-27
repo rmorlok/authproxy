@@ -163,8 +163,41 @@ AuthProxy applies step conditions consistently across setup APIs:
 
 If all connector-authored steps in a phase are ineligible, the runtime skips that phase. Auth-method and verification steps still run according to the connector's auth method and probe configuration.
 
+## Data Sources
+
+Configure form steps can define `data_sources` for controls that need upstream options. AuthProxy calls the `proxy_request` through the authenticated connection, exposes the JSON response as `data`, and evaluates `transform` JavaScript to produce options:
+
+```yaml
+javascript: |
+  function workspaceOptions(items) {
+    return items.map(function(w) {
+      return { value: w.id, label: w.name || w.id };
+    });
+  }
+
+setup_flow:
+  configure:
+    steps:
+      - id: workspace
+        title: Workspace
+        json_schema:
+          type: object
+          properties:
+            workspace_id:
+              type: string
+              x-data-source: workspaces
+        data_sources:
+          workspaces:
+            proxy_request:
+              method: GET
+              url: https://api.example.com/workspaces
+            transform: workspaceOptions(data.items)
+```
+
+Transforms must return an array of objects with `value` and `label` fields. They run in the same connector JavaScript context as predicates, so top-level connector helpers can read `cfg`, `labels`, and `annotations`; transforms additionally receive `data`. See [Connector predicates](connector-predicates.md#connector-javascript-library) for the shared JavaScript library contract.
+
 ## Migration Notes
 
-Adding, removing, or changing `if.javascript` changes the connector definition. For published connectors, publish a new connector version or rely on the normal connector-version migration path for configuration changes.
+Adding, removing, or changing `if.javascript`, data-source transforms, or connector-level JavaScript changes the connector definition. For published connectors, publish a new connector version or rely on the normal connector-version migration path for configuration changes.
 
 Existing in-flight connections are evaluated against the connector version they are using. If a connection resumes while its stored step is now ineligible, AuthProxy advances it to the next eligible step rather than returning the ineligible step to the client.
