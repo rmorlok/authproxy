@@ -211,7 +211,7 @@ apxy/cxr/type=salesforce
 
 ## API surface
 
-Every resource that supports labels exposes the same four sub-resource endpoints, layered on top of the resource's CRUD URLs. Substitute the resource's URL segment (e.g., `connections`, `rate-limits`, `encryption-keys`):
+Every resource that supports labels exposes the same four sub-resource endpoints, layered on top of the resource's CRUD URLs. Substitute the resource's URL segment (e.g., `connections`, `rate-limits`, `keys`):
 
 | Method + Path | Behaviour |
 |---|---|

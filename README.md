@@ -10,6 +10,7 @@ This directory holds long-form documentation that supplements the [main repo REA
 - **[Connector setup flow](connector-setup-flow.md)** — author preconnect/configure steps, conditional `if.javascript` steps, redirect steps, and configure-time data sources.
 - **[Connector predicates](connector-predicates.md)** — condition setup steps, OAuth scopes, dynamic required OAuth scopes, and probes with JavaScript predicates over `cfg`, `labels`, and `annotations`, including connector-level shared JavaScript helpers.
 - **[Application metrics](app_metrics.md)** — configure the app metrics store, query request-event and resource metrics, and understand supported aggregations and dimensions.
+- **[Unified key model migration](key-model-migration.md)** — design and operations guide for replacing encryption key versions with `keys` and `data_encryption_keys`.
 
 ## Operational guides
 
