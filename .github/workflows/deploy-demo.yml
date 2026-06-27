@@ -273,6 +273,16 @@ jobs:
             | kubectl apply -f -
           kubectl -n "${RELEASE_NS}" apply -f "${manifest}"
 
+          legacy_grafana_selector="$(
+            kubectl -n "${RELEASE_NS}" get "service/${RELEASE_NAME}-grafana" \
+              -o jsonpath='{.spec.selector.app\.kubernetes\.io/instance}'
+          )"
+          if [ -n "${legacy_grafana_selector}" ]; then
+            kubectl -n "${RELEASE_NS}" patch "service/${RELEASE_NAME}-grafana" \
+              --type json \
+              -p '[{"op":"remove","path":"/spec/selector/app.kubernetes.io~1instance"}]'
+          fi
+
           deployments=(
             "${RELEASE_NAME}-authproxy"
             "${RELEASE_NAME}-demo-shell"
