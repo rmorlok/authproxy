@@ -14,7 +14,6 @@ module.exports = {
     '@grafana/ui',
     'react',
     'react-dom',
-    'react/jsx-runtime',
   ],
   module: {
     rules: [
