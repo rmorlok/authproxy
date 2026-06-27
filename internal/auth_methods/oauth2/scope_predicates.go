@@ -15,16 +15,16 @@ func (o *oAuth2Connection) effectiveScopes(ctx context.Context) ([]sconfig.Scope
 		return nil, nil
 	}
 
-	vars, err := o.connection.GetPredicateVars(ctx)
+	jsctx, err := o.connection.GetJavascriptContext(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("get predicate vars for effective scopes: %w", err)
+		return nil, fmt.Errorf("get javascript context for effective scopes: %w", err)
 	}
 
 	scopes := make([]sconfig.Scope, 0, len(o.auth.Scopes))
 	for _, declared := range o.auth.Scopes {
 		scope := declared.Clone()
 		if scope.If != nil {
-			ok, err := scope.If.GetValue(vars)
+			ok, err := scope.If.GetValue(jsctx)
 			if err != nil {
 				return nil, fmt.Errorf("scope %q if.javascript: %w", scope.Id, err)
 			}
@@ -34,7 +34,7 @@ func (o *oAuth2Connection) effectiveScopes(ctx context.Context) ([]sconfig.Scope
 		}
 
 		if scope.Required != nil && scope.Required.Predicate != nil {
-			required, err := scope.IsRequired(vars)
+			required, err := scope.IsRequired(jsctx)
 			if err != nil {
 				return nil, fmt.Errorf("scope %q required.javascript: %w", scope.Id, err)
 			}

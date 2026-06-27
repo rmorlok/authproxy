@@ -185,12 +185,12 @@ func newSchemaStepEligibility(c iface.Connection, spec *cschema.SetupFlowStep) f
 		return nil
 	}
 	return func(ctx context.Context) (bool, error) {
-		vars, err := c.GetPredicateVars(ctx)
+		jsCtx, err := c.GetJavascriptContext(ctx)
 		if err != nil {
-			return false, fmt.Errorf("step %q: get predicate vars: %w", spec.Id, err)
+			return false, fmt.Errorf("step %q: get javascript context: %w", spec.Id, err)
 		}
 
-		ok, err := spec.If.GetValue(vars)
+		ok, err := spec.If.GetValue(jsCtx)
 		if err != nil {
 			return false, fmt.Errorf("step %q if.javascript: %w", spec.Id, err)
 		}

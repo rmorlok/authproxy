@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/rmorlok/authproxy/internal/apjs"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 )
@@ -37,9 +38,9 @@ func detectScopeMismatch(declaredEffectiveScopes []sconfig.Scope, granted string
 			continue
 		}
 
-		// We can use nil here because these are effective scopes that have
-		// had predicates resolved.
-		required, err := s.IsRequired(nil)
+		// These are effective scopes that have had predicates resolved, so an
+		// empty context is enough to read the concrete required value.
+		required, err := s.IsRequired(apjs.Context{})
 		if err != nil {
 			return scopeMismatchOutcome{}, fmt.Errorf("scope %q required: %w", s.Id, err)
 		}

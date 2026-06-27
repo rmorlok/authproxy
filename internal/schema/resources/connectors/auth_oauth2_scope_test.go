@@ -1,6 +1,7 @@
 package connectors
 
 import (
+	"github.com/rmorlok/authproxy/internal/apjs"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
@@ -23,7 +24,7 @@ reason: |
 			assert.NoError(err)
 			assert.Equal("https://www.googleapis.com/auth/drive.readonly", scope.Id)
 			assert.Equal("We need to be able to view the files\n", scope.Reason)
-			required, err := scope.IsRequired(nil)
+			required, err := scope.IsRequired(apjs.Context{})
 			assert.NoError(err)
 			assert.True(required)
 		})
@@ -37,7 +38,7 @@ reason: We need to be able to view the files
 			assert.NoError(err)
 			assert.Equal("https://www.googleapis.com/auth/drive.readonly", scope.Id)
 			assert.Equal("We need to be able to view the files", scope.Reason)
-			required, err := scope.IsRequired(nil)
+			required, err := scope.IsRequired(apjs.Context{})
 			assert.NoError(err)
 			assert.False(required)
 		})
@@ -53,14 +54,14 @@ reason: We need to be able to see what's been going on in drive
 			require.NotNil(t, scope.Required)
 			require.NotNil(t, scope.Required.Predicate)
 			assert.Equal("cfg.sync_activity === true", scope.Required.Predicate.Javascript)
-			required, err := scope.IsRequired(map[string]any{
+			required, err := scope.IsRequired(apjs.NewContext(nil, map[string]any{
 				"cfg": map[string]any{"sync_activity": true},
-			})
+			}))
 			assert.NoError(err)
 			assert.True(required)
-			required, err = scope.IsRequired(map[string]any{
+			required, err = scope.IsRequired(apjs.NewContext(nil, map[string]any{
 				"cfg": map[string]any{"sync_activity": false},
-			})
+			}))
 			assert.NoError(err)
 			assert.False(required)
 		})

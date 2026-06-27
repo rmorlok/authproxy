@@ -52,10 +52,19 @@ func newConditionalProbeTestConnection(t *testing.T) *connection {
 	t.Helper()
 
 	conn := newTestConnection(cschema.Connector{
+		Javascript: `
+			function isEuRegion() {
+				return cfg.region === "eu";
+			}
+
+			function isSalesforceConnection() {
+				return labels["apxy/cxr/type"] === "salesforce";
+			}
+		`,
 		Probes: []cschema.Probe{
 			{
 				Id: "cfg_true",
-				If: &common.Predicate{Javascript: `cfg.region === "eu"`},
+				If: &common.Predicate{Javascript: `isEuRegion()`},
 			},
 			{
 				Id: "cfg_false",
@@ -63,7 +72,7 @@ func newConditionalProbeTestConnection(t *testing.T) *connection {
 			},
 			{
 				Id: "label_true",
-				If: &common.Predicate{Javascript: `labels["apxy/cxr/type"] === "salesforce"`},
+				If: &common.Predicate{Javascript: `isSalesforceConnection()`},
 			},
 			{
 				Id: "annotation_true",

@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/go-multierror"
+	"github.com/rmorlok/authproxy/internal/apjs"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	"gopkg.in/yaml.v3"
 )
@@ -17,25 +18,30 @@ type Scope struct {
 	Reason   string            `json:"reason" yaml:"reason"`
 }
 
-func (s *Scope) IsRequired(vars map[string]any) (bool, error) {
+func (s *Scope) IsRequired(jsctx apjs.Context) (bool, error) {
 	// If the attribute is not specified, scopes default to required.
 	if s == nil || s.Required == nil {
 		// If unspecified, assume required.
 		return true, nil
 	}
 
-	return s.Required.IsRequired(vars)
+	return s.Required.IsRequired(jsctx)
 }
 
 func (s *Scope) Validate(vc *common.ValidationContext) error {
+	return s.ValidateWithJavascript(vc, nil)
+}
+
+func (s *Scope) ValidateWithJavascript(vc *common.ValidationContext, library *apjs.Library) error {
 	if s == nil {
 		return nil
 	}
 	result := &multierror.Error{}
-	if err := s.If.Validate(vc.PushField("if"), connectorPredicateValidationVars()); err != nil {
+	jsctx := connectorPredicateValidationContext(library)
+	if err := s.If.Validate(vc.PushField("if"), jsctx); err != nil {
 		result = multierror.Append(result, err)
 	}
-	if err := s.Required.Validate(vc.PushField("required")); err != nil {
+	if err := s.Required.ValidateWithJavascript(vc.PushField("required"), library); err != nil {
 		result = multierror.Append(result, err)
 	}
 	return result.ErrorOrNil()
@@ -69,7 +75,7 @@ func NewScopeRequiredPredicate(predicate *common.Predicate) *ScopeRequired {
 	return &ScopeRequired{Predicate: predicate}
 }
 
-func (r *ScopeRequired) IsRequired(vars map[string]any) (bool, error) {
+func (r *ScopeRequired) IsRequired(jsctx apjs.Context) (bool, error) {
 	if r == nil {
 		return true, nil
 	}
@@ -82,7 +88,7 @@ func (r *ScopeRequired) IsRequired(vars map[string]any) (bool, error) {
 		return false, fmt.Errorf("required must be a boolean or predicate object")
 	}
 
-	return r.Predicate.GetValue(vars)
+	return r.Predicate.GetValue(jsctx)
 }
 
 func (r *ScopeRequired) Clone() *ScopeRequired {
@@ -102,6 +108,10 @@ func (r *ScopeRequired) Clone() *ScopeRequired {
 }
 
 func (r *ScopeRequired) Validate(vc *common.ValidationContext) error {
+	return r.ValidateWithJavascript(vc, nil)
+}
+
+func (r *ScopeRequired) ValidateWithJavascript(vc *common.ValidationContext, library *apjs.Library) error {
 	// The scope will default to required.
 	if r == nil {
 		return nil
@@ -116,7 +126,7 @@ func (r *ScopeRequired) Validate(vc *common.ValidationContext) error {
 	}
 
 	if r.Predicate != nil {
-		return r.Predicate.Validate(vc, connectorPredicateValidationVars())
+		return r.Predicate.Validate(vc, connectorPredicateValidationContext(library))
 	}
 
 	return nil

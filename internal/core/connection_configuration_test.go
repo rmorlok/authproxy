@@ -131,6 +131,33 @@ func TestConnectionGetConfiguration(t *testing.T) {
 		assert.Equal(t, "https://acme.example.com", result["base_url"])
 	})
 
+	t.Run("caches decrypted configuration and returns copies", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		s, _, _, _, _, enc := FullMockService(t, ctrl)
+		conn := newTestConnectionWithService(s)
+		ef := encfield.EncryptedField{ID: "ekv_test", Data: "encrypted-data"}
+		conn.EncryptedConfiguration = &ef
+
+		enc.EXPECT().
+			DecryptString(gomock.Any(), ef).
+			Return(`{"tenant":"acme","nested":{"flag":true},"items":[{"id":"one"}]}`, nil).
+			Times(1)
+
+		first, err := conn.GetConfiguration(context.Background())
+		require.NoError(t, err)
+		first["tenant"] = "mutated"
+		first["nested"].(map[string]any)["flag"] = false
+		first["items"].([]any)[0].(map[string]any)["id"] = "mutated"
+
+		second, err := conn.GetConfiguration(context.Background())
+		require.NoError(t, err)
+		assert.Equal(t, "acme", second["tenant"])
+		assert.Equal(t, true, second["nested"].(map[string]any)["flag"])
+		assert.Equal(t, "one", second["items"].([]any)[0].(map[string]any)["id"])
+	})
+
 	t.Run("returns error on decrypt failure", func(t *testing.T) {
 		e := encrypt.NewFakeEncryptService(false)
 		s := &service{encrypt: e, logger: aplog.NewNoopLogger()}
@@ -259,6 +286,34 @@ func TestConnectionSetConfiguration(t *testing.T) {
 		assert.Equal(t, "newcorp", result["tenant"])
 		assert.Equal(t, "field", result["extra"])
 	})
+
+	t.Run("updates decrypted configuration cache", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		s, db, _, _, _, enc := FullMockService(t, ctrl)
+		conn := newTestConnectionWithService(s)
+		ef := encfield.EncryptedField{ID: "ekv_test", Data: "encrypted-data"}
+
+		enc.EXPECT().
+			EncryptStringForNamespace(gomock.Any(), "root", gomock.Any()).
+			DoAndReturn(func(ctx context.Context, namespace string, data string) (encfield.EncryptedField, error) {
+				assert.JSONEq(t, `{"tenant":"acme","count":2}`, data)
+				return ef, nil
+			})
+		db.EXPECT().SetConnectionEncryptedConfiguration(gomock.Any(), conn.Id, &ef).Return(nil)
+
+		err := conn.SetConfiguration(context.Background(), map[string]any{
+			"tenant": "acme",
+			"count":  2,
+		})
+		require.NoError(t, err)
+
+		result, err := conn.GetConfiguration(context.Background())
+		require.NoError(t, err)
+		assert.Equal(t, "acme", result["tenant"])
+		assert.Equal(t, float64(2), result["count"])
+	})
 }
 
 func TestConnectionGetMustacheContext(t *testing.T) {
@@ -370,7 +425,7 @@ func TestConnectionGetMustacheContext(t *testing.T) {
 	})
 }
 
-func TestConnectionGetPredicateVars(t *testing.T) {
+func TestConnectionGetJavascriptContext(t *testing.T) {
 	t.Run("returns cfg labels and annotations", func(t *testing.T) {
 		e := encrypt.NewFakeEncryptService(false)
 		s := &service{encrypt: e, logger: aplog.NewNoopLogger()}
@@ -382,39 +437,44 @@ func TestConnectionGetPredicateVars(t *testing.T) {
 		conn.Labels = map[string]string{"env": "prod"}
 		conn.Annotations = map[string]string{"region": "us-east"}
 
-		data, err := conn.GetPredicateVars(context.Background())
+		jsctx, err := conn.GetJavascriptContext(context.Background())
 		require.NoError(t, err)
 
-		cfg, ok := data["cfg"].(map[string]any)
-		require.True(t, ok)
-		assert.Equal(t, "acme", cfg["tenant"])
-
-		labels, ok := data["labels"].(map[string]string)
-		require.True(t, ok)
-		assert.Equal(t, "prod", labels["env"])
-
-		annotations, ok := data["annotations"].(map[string]string)
-		require.True(t, ok)
-		assert.Equal(t, "us-east", annotations["region"])
+		ok, err := jsctx.EvaluateBoolean(`cfg.tenant === "acme" && labels.env === "prod" && annotations.region === "us-east"`)
+		require.NoError(t, err)
+		assert.True(t, ok)
 	})
 
 	t.Run("returns empty maps when values are absent", func(t *testing.T) {
 		conn := newTestConnection(cschema.Connector{})
 
-		data, err := conn.GetPredicateVars(context.Background())
+		jsctx, err := conn.GetJavascriptContext(context.Background())
 		require.NoError(t, err)
 
-		cfg, ok := data["cfg"].(map[string]any)
-		require.True(t, ok)
-		assert.Empty(t, cfg)
+		ok, err := jsctx.EvaluateBoolean(`Object.keys(cfg).length === 0 && Object.keys(labels).length === 0 && Object.keys(annotations).length === 0`)
+		require.NoError(t, err)
+		assert.True(t, ok)
+	})
 
-		labels, ok := data["labels"].(map[string]string)
-		require.True(t, ok)
-		assert.Empty(t, labels)
+	t.Run("includes connector javascript helpers", func(t *testing.T) {
+		conn := newTestConnection(cschema.Connector{
+			Javascript: `
+				function isProdTenant() {
+					return cfg.tenant === "acme" &&
+						labels.env === "prod" &&
+						annotations.region === "us-east";
+				}
+			`,
+		})
+		setConnectionConfigFixture(t, conn, map[string]any{"tenant": "acme"})
+		conn.Labels = map[string]string{"env": "prod"}
+		conn.Annotations = map[string]string{"region": "us-east"}
 
-		annotations, ok := data["annotations"].(map[string]string)
-		require.True(t, ok)
-		assert.Empty(t, annotations)
+		jsctx, err := conn.GetJavascriptContext(context.Background())
+		require.NoError(t, err)
+		ok, err := jsctx.EvaluateBoolean(`isProdTenant()`)
+		require.NoError(t, err)
+		assert.True(t, ok)
 	})
 
 	t.Run("returns error on decrypt failure", func(t *testing.T) {
@@ -423,8 +483,16 @@ func TestConnectionGetPredicateVars(t *testing.T) {
 		conn := newTestConnectionWithService(s)
 		conn.EncryptedConfiguration = &encfield.EncryptedField{ID: "ekv_wrong", Data: "some-data"}
 
-		_, err := conn.GetPredicateVars(context.Background())
+		_, err := conn.GetJavascriptContext(context.Background())
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "get connection configuration")
+	})
+
+	t.Run("returns error for invalid connector javascript", func(t *testing.T) {
+		conn := newTestConnection(cschema.Connector{Javascript: `function broken(`})
+
+		_, err := conn.GetJavascriptContext(context.Background())
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "compile connector JavaScript library")
 	})
 }

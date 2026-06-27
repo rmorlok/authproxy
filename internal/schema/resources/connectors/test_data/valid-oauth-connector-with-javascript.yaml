@@ -1,0 +1,38 @@
+# $schema: ./schema.json
+
+labels:
+  type: calendar-js
+display_name: Calendar JS
+logo:
+  public_url: https://example.com/calendar-logo.png
+description: |
+  OAuth2 connector fixture with connector-level JavaScript helpers.
+auth:
+  type: OAuth2
+  client_id:
+    env_var: CALENDAR_CLIENT_ID
+  client_secret:
+    env_var: CALENDAR_CLIENT_SECRET
+  authorization:
+    endpoint: https://example.com/oauth/authorize
+  token:
+    endpoint: https://example.com/oauth/token
+  scopes:
+    - id: calendar.read
+      reason: Read calendars
+javascript: |
+  function isPersonalCalendar(cfg) {
+    return cfg.calendar_id === "personal";
+  }
+setup_flow:
+  configure:
+    steps:
+      - id: select_calendar
+        title: Select Calendar
+        json_schema:
+          type: object
+          properties:
+            calendar_id:
+              type: string
+        if:
+          javascript: isPersonalCalendar(cfg)

@@ -30,7 +30,7 @@ type Connection interface {
 	GetAnnotations() map[string]string
 	GetSetupStep() *cschema.SetupStep
 	GetSetupError() *string
-	GetPredicateVars(ctx context.Context) (map[string]any, error)
+	GetJavascriptContext(ctx context.Context) (apjs.Context, error)
 
 	/*
 	 * Nested entities

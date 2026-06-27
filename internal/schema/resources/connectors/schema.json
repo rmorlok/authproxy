@@ -283,6 +283,9 @@
         { "$ref": "#/$defs/AuthNoAuth" }
       ]
     },
+    "javascript": {
+      "type": "string"
+    },
     "probes": {
       "type": "array",
       "items": {

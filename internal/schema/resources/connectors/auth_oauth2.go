@@ -2,6 +2,7 @@ package connectors
 
 import (
 	"github.com/hashicorp/go-multierror"
+	"github.com/rmorlok/authproxy/internal/apjs"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 )
 
@@ -170,6 +171,10 @@ func (a *AuthOAuth2) Clone() AuthImpl {
 // block, and the optional token_endpoint_auth_method selector and its
 // cross-field requirements on client_secret / PKCE.
 func (a *AuthOAuth2) Validate(vc *common.ValidationContext) error {
+	return a.ValidateWithJavascript(vc, nil)
+}
+
+func (a *AuthOAuth2) ValidateWithJavascript(vc *common.ValidationContext, library *apjs.Library) error {
 	if a == nil {
 		return nil
 	}
@@ -250,7 +255,7 @@ func (a *AuthOAuth2) Validate(vc *common.ValidationContext) error {
 	}
 
 	for i := range a.Scopes {
-		if err := a.Scopes[i].Validate(vc.PushField("scopes").PushIndex(i)); err != nil {
+		if err := a.Scopes[i].ValidateWithJavascript(vc.PushField("scopes").PushIndex(i), library); err != nil {
 			result = multierror.Append(result, err)
 		}
 	}
@@ -289,3 +294,4 @@ func (a *AuthOAuth2) Validate(vc *common.ValidationContext) error {
 
 var _ AuthImpl = (*AuthOAuth2)(nil)
 var _ AuthValidator = (*AuthOAuth2)(nil)
+var _ AuthJavascriptValidator = (*AuthOAuth2)(nil)
