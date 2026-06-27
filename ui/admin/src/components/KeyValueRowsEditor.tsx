@@ -12,26 +12,34 @@ export type KeyValueRow = {
   id: string;
   key: string;
   value: string;
+  readonly?: boolean;
 };
 
 let keyValueRowSequence = 0;
 
-export function nextKeyValueRow(key = '', value = ''): KeyValueRow {
+export const SYSTEM_LABEL_PREFIX = 'apxy/';
+
+export function nextKeyValueRow(key = '', value = '', readonly = false): KeyValueRow {
   keyValueRowSequence += 1;
   return {
     id: `kv-${keyValueRowSequence}`,
     key,
     value,
+    readonly,
   };
 }
 
-export function mapToRows(values?: Record<string, string>): KeyValueRow[] {
-  return Object.entries(values || {}).map(([key, value]) => nextKeyValueRow(key, value));
+export function mapToRows(values?: Record<string, string>, options?: { readonlyKeyPrefix?: string }): KeyValueRow[] {
+  return Object.entries(values || {}).map(([key, value]) => {
+    return nextKeyValueRow(key, value, !!options?.readonlyKeyPrefix && key.startsWith(options.readonlyKeyPrefix));
+  });
 }
 
-export function rowsToMap(rows: KeyValueRow[]): Record<string, string> {
+export function rowsToMap(rows: KeyValueRow[], options?: { includeReadonly?: boolean }): Record<string, string> {
+  const includeReadonly = options?.includeReadonly ?? true;
   const out: Record<string, string> = {};
   for (const row of rows) {
+    if (row.readonly && !includeReadonly) continue;
     const key = row.key.trim();
     if (key) out[key] = row.value;
   }
@@ -48,6 +56,15 @@ export function duplicateKeys(rows: KeyValueRow[]): string[] {
     seen.add(key);
   }
   return Array.from(duplicates);
+}
+
+export function editableReservedKeys(rows: KeyValueRow[], prefix: string): string[] {
+  const reserved = new Set<string>();
+  for (const row of rows) {
+    const key = row.key.trim();
+    if (!row.readonly && key.startsWith(prefix)) reserved.add(key);
+  }
+  return Array.from(reserved);
 }
 
 export default function KeyValueRowsEditor({
@@ -92,6 +109,7 @@ export default function KeyValueRowsEditor({
                 label="Key"
                 value={row.key}
                 onChange={(e) => updateRow(row.id, {key: e.target.value})}
+                disabled={row.readonly}
                 sx={{flex: 0.45}}
               />
               <TextField
@@ -99,14 +117,22 @@ export default function KeyValueRowsEditor({
                 label="Value"
                 value={row.value}
                 onChange={(e) => updateRow(row.id, {value: e.target.value})}
+                disabled={row.readonly}
                 multiline
                 maxRows={4}
                 sx={{flex: 0.55}}
               />
-              <Tooltip title="Remove">
-                <IconButton size="small" onClick={() => removeRow(row.id)} aria-label={`Remove ${title.toLowerCase()} row`}>
-                  <DeleteIcon fontSize="inherit"/>
-                </IconButton>
+              <Tooltip title={row.readonly ? 'System-managed' : 'Remove'}>
+                <span>
+                  <IconButton
+                    size="small"
+                    onClick={() => removeRow(row.id)}
+                    aria-label={`Remove ${title.toLowerCase()} row`}
+                    disabled={row.readonly}
+                  >
+                    <DeleteIcon fontSize="inherit"/>
+                  </IconButton>
+                </span>
               </Tooltip>
             </Stack>
           ))}

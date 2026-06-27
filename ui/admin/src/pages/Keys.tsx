@@ -34,8 +34,10 @@ import KeyDataForm, {
 } from '../components/KeyDataForm';
 import KeyValueRowsEditor, {
     duplicateKeys,
+    editableReservedKeys,
     KeyValueRow,
     rowsToMap,
+    SYSTEM_LABEL_PREFIX,
 } from '../components/KeyValueRowsEditor';
 
 function renderState(state: KeyState) {
@@ -249,6 +251,12 @@ export default function Keys() {
             if (duplicateLabels.length > 0) parts.push(`duplicate labels: ${duplicateLabels.join(', ')}`);
             if (duplicateAnnotations.length > 0) parts.push(`duplicate annotations: ${duplicateAnnotations.join(', ')}`);
             setCreateError(parts.join('; '));
+            return;
+        }
+
+        const reservedLabels = editableReservedKeys(createLabelRows, SYSTEM_LABEL_PREFIX);
+        if (reservedLabels.length > 0) {
+            setCreateError(`system-managed labels cannot be edited: ${reservedLabels.join(', ')}`);
             return;
         }
 

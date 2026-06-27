@@ -33,9 +33,11 @@ import KeyDataForm, {
 } from './KeyDataForm';
 import KeyValueRowsEditor, {
   duplicateKeys,
+  editableReservedKeys,
   KeyValueRow,
   mapToRows,
   rowsToMap,
+  SYSTEM_LABEL_PREFIX,
 } from './KeyValueRowsEditor';
 
 function StateChip({state}: { state: KeyState }) {
@@ -124,7 +126,7 @@ export default function KeyDetail({keyId}: { keyId: string }) {
     setEditState(ek.state);
     setEditKeyData(keyDataFormStateFromConfig(ek.key_data));
     setEditKeyDataDirty(false);
-    setEditLabelRows(mapToRows(ek.labels));
+    setEditLabelRows(mapToRows(ek.labels, {readonlyKeyPrefix: SYSTEM_LABEL_PREFIX}));
     setEditAnnotationRows(mapToRows(ek.annotations));
     closeMenu();
     setEditOpen(true);
@@ -142,6 +144,12 @@ export default function KeyDetail({keyId}: { keyId: string }) {
       return;
     }
 
+    const reservedLabels = editableReservedKeys(editLabelRows, SYSTEM_LABEL_PREFIX);
+    if (reservedLabels.length > 0) {
+      setActionError(`system-managed labels cannot be edited: ${reservedLabels.join(', ')}`);
+      return;
+    }
+
     if (editKeyDataDirty) {
       const keyDataError = validateKeyDataFormState(editKeyData);
       if (keyDataError) {
@@ -155,7 +163,7 @@ export default function KeyDetail({keyId}: { keyId: string }) {
     try {
       const request: UpdateKeyRequest = {
         state: editState,
-        labels: rowsToMap(editLabelRows),
+        labels: rowsToMap(editLabelRows, {includeReadonly: false}),
         annotations: rowsToMap(editAnnotationRows),
       };
       if (editKeyDataDirty) {

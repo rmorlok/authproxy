@@ -158,4 +158,44 @@ describe('KeyDetail', () => {
       });
     });
   });
+
+  it('locks system-managed labels and omits them from update payloads', async () => {
+    const user = userEvent.setup();
+    vi.mocked(keys.get).mockResolvedValueOnce({
+      status: 200,
+      data: {
+        ...initialKey,
+        labels: {
+          ...initialKey.labels,
+          'apxy/key/-/id': 'key_test',
+        },
+      },
+    } as any);
+
+    renderKeyDetail();
+
+    await screen.findByText('key_test');
+    await user.click(screen.getByRole('button', {name: 'actions'}));
+    await user.click(screen.getByRole('menuitem', {name: 'Edit...'}));
+
+    const dialog = screen.getByRole('dialog', {name: 'Edit key'});
+    const systemLabelKey = within(dialog).getByDisplayValue('apxy/key/-/id') as HTMLInputElement;
+    const systemLabelValue = within(dialog).getByDisplayValue('key_test') as HTMLInputElement;
+    expect(systemLabelKey.disabled).toBe(true);
+    expect(systemLabelValue.disabled).toBe(true);
+
+    await user.click(within(dialog).getByRole('button', {name: 'Save'}));
+
+    await waitFor(() => {
+      expect(keys.update).toHaveBeenCalledWith('key_test', {
+        state: KeyState.ACTIVE,
+        labels: {
+          environment: 'dev',
+        },
+        annotations: {
+          owner: 'platform',
+        },
+      });
+    });
+  });
 });
