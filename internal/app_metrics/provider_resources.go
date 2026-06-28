@@ -993,7 +993,7 @@ func applyResourceSampleQuery(builder sq.SelectBuilder, provider config.Database
 	}
 	if len(query.NamespaceMatchers) > 0 {
 		for _, matcher := range query.NamespaceMatchers {
-			if err := namespace.ValidateNamespaceMatcher(matcher); err != nil {
+			if err := namespace.ValidateMatcher(matcher); err != nil {
 				return builder, err
 			}
 		}

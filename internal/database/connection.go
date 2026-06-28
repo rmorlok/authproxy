@@ -207,7 +207,7 @@ func (c *Connection) Validate() error {
 		result = multierror.Append(result, fmt.Errorf("invalid connection id: %w", err))
 	}
 
-	if err := namespace.ValidateNamespacePath(c.Namespace); err != nil {
+	if err := namespace.ValidatePath(c.Namespace); err != nil {
 		result = multierror.Append(result, fmt.Errorf("invalid connection namespace path: %w", err))
 	}
 
@@ -612,7 +612,7 @@ func (l *listConnectionsFilters) ForConnectorId(id apid.ID) ListConnectionsBuild
 }
 
 func (l *listConnectionsFilters) ForNamespaceMatcher(matcher string) ListConnectionsBuilder {
-	if err := namespace.ValidateNamespaceMatcher(matcher); err != nil {
+	if err := namespace.ValidateMatcher(matcher); err != nil {
 		return l.addError(err)
 	} else {
 		l.NamespaceMatchers = []string{matcher}
@@ -623,7 +623,7 @@ func (l *listConnectionsFilters) ForNamespaceMatcher(matcher string) ListConnect
 
 func (l *listConnectionsFilters) ForNamespaceMatchers(matchers []string) ListConnectionsBuilder {
 	for _, matcher := range matchers {
-		if err := namespace.ValidateNamespaceMatcher(matcher); err != nil {
+		if err := namespace.ValidateMatcher(matcher); err != nil {
 			return l.addError(err)
 		}
 	}

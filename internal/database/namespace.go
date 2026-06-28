@@ -88,9 +88,9 @@ func (ns *Namespace) normalize() {
 		ns.State = NamespaceStateActive
 	}
 
-	ns.depth = namespace.DepthOfNamespacePath(ns.Path)
+	ns.depth = namespace.DepthOfPath(ns.Path)
 
-	if ns.Path == namespace.RootNamespace && ns.KeyId == nil {
+	if ns.Path == namespace.Root && ns.KeyId == nil {
 		ns.KeyId = rootNamespaceKeyID()
 	}
 }
@@ -103,7 +103,7 @@ func rootNamespaceKeyID() *apid.ID {
 func (ns *Namespace) Validate() error {
 	result := &multierror.Error{}
 
-	if err := namespace.ValidateNamespacePath(ns.Path); err != nil {
+	if err := namespace.ValidatePath(ns.Path); err != nil {
 		result = multierror.Append(result, fmt.Errorf("invalid namespace path: %w", err))
 	}
 
@@ -269,7 +269,7 @@ func (s *service) validateNamespaceKeyScope(ctx context.Context, runner sq.BaseR
 		return fmt.Errorf("failed to look up encryption key: %w", err)
 	}
 
-	if !namespace.NamespaceIsSameOrChild(keyNamespace, path) {
+	if !namespace.IsSameOrChild(keyNamespace, path) {
 		return httperr.BadRequestf("encryption key belongs to namespace '%s' which is not the same as or an ancestor of '%s'", keyNamespace, path)
 	}
 
@@ -278,7 +278,7 @@ func (s *service) validateNamespaceKeyScope(ctx context.Context, runner sq.BaseR
 
 func (s *service) createNamespace(ctx context.Context, tx *sql.Tx, ns *Namespace) error {
 	ns.normalize()
-	prefixes := namespace.SplitNamespacePathToPrefixes(ns.Path)
+	prefixes := namespace.SplitPathToPrefixes(ns.Path)
 	state := ns.State
 
 	for i := 0; i < len(prefixes)-1; i++ {
@@ -372,12 +372,12 @@ func (s *service) CreateNamespace(ctx context.Context, ns *Namespace) error {
 // EnsureNamespaceByPath ensures that a namespace exists with the given path, creating it if necessary. It will
 // recursively create all parent namespaces if they do not exist. If any parent is not active, it will return an error.
 func (s *service) EnsureNamespaceByPath(ctx context.Context, path string) error {
-	if err := namespace.ValidateNamespacePath(path); err != nil {
+	if err := namespace.ValidatePath(path); err != nil {
 		return err
 	}
 
 	err := s.transaction(func(tx *sql.Tx) error {
-		prefixes := namespace.SplitNamespacePathToPrefixes(path)
+		prefixes := namespace.SplitPathToPrefixes(path)
 
 		for i := 0; i < len(prefixes); i++ {
 			ns, err := s.getNamespaceByPath(ctx, tx, prefixes[i])
@@ -569,10 +569,10 @@ func (l *listNamespacesFilters) ForDepth(depth uint64) ListNamespacesBuilder {
 }
 
 func (l *listNamespacesFilters) ForChildrenOf(path string) ListNamespacesBuilder {
-	if err := namespace.ValidateNamespacePath(path); err != nil {
+	if err := namespace.ValidatePath(path); err != nil {
 		return l.addError(err)
 	} else {
-		currDepth := namespace.DepthOfNamespacePath(path)
+		currDepth := namespace.DepthOfPath(path)
 		return l.
 			ForDepth(currDepth + 1).
 			ForPathPrefix(path)
@@ -580,7 +580,7 @@ func (l *listNamespacesFilters) ForChildrenOf(path string) ListNamespacesBuilder
 }
 
 func (l *listNamespacesFilters) ForNamespaceMatcher(matcher string) ListNamespacesBuilder {
-	if err := namespace.ValidateNamespaceMatcher(matcher); err != nil {
+	if err := namespace.ValidateMatcher(matcher); err != nil {
 		return l.addError(err)
 	} else {
 		l.NamespaceMatchers = []string{matcher}
@@ -591,7 +591,7 @@ func (l *listNamespacesFilters) ForNamespaceMatcher(matcher string) ListNamespac
 
 func (l *listNamespacesFilters) ForNamespaceMatchers(matchers []string) ListNamespacesBuilder {
 	for _, matcher := range matchers {
-		if err := namespace.ValidateNamespaceMatcher(matcher); err != nil {
+		if err := namespace.ValidateMatcher(matcher); err != nil {
 			return l.addError(err)
 		}
 	}
@@ -648,10 +648,10 @@ func (l *listNamespacesFilters) applyRestrictions(ctx context.Context) sq.Select
 	}
 
 	if l.PathPrefixVal != "" {
-		if len(l.PathPrefixVal) >= 2 && string(l.PathPrefixVal[len(l.PathPrefixVal)-1]) == namespace.NamespacePathSeparator {
+		if len(l.PathPrefixVal) >= 2 && string(l.PathPrefixVal[len(l.PathPrefixVal)-1]) == namespace.PathSeparator {
 			q = q.Where("(path = ? OR path LIKE ?)", l.PathPrefixVal[:len(l.PathPrefixVal)-2], l.PathPrefixVal+"%")
 		} else {
-			q = q.Where("(path = ? OR path LIKE ?)", l.PathPrefixVal, l.PathPrefixVal+namespace.NamespacePathSeparator+"%")
+			q = q.Where("(path = ? OR path LIKE ?)", l.PathPrefixVal, l.PathPrefixVal+namespace.PathSeparator+"%")
 		}
 	}
 

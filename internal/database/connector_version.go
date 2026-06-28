@@ -213,7 +213,7 @@ func (cv *ConnectorVersion) Validate() error {
 		result = multierror.Append(result, errors.New("version is required"))
 	}
 
-	if err := namespace.ValidateNamespacePath(cv.Namespace); err != nil {
+	if err := namespace.ValidatePath(cv.Namespace); err != nil {
 		result = multierror.Append(result, fmt.Errorf("invalid connector namespace path: %w", err))
 	}
 
@@ -807,7 +807,7 @@ func (l *listConnectorVersionsFilters) ForStates(states []ConnectorVersionState)
 }
 
 func (l *listConnectorVersionsFilters) ForNamespaceMatcher(matcher string) ListConnectorVersionsBuilder {
-	if err := namespace.ValidateNamespaceMatcher(matcher); err != nil {
+	if err := namespace.ValidateMatcher(matcher); err != nil {
 		return l.addError(err)
 	} else {
 		l.NamespaceMatchers = []string{matcher}
@@ -818,7 +818,7 @@ func (l *listConnectorVersionsFilters) ForNamespaceMatcher(matcher string) ListC
 
 func (l *listConnectorVersionsFilters) ForNamespaceMatchers(matchers []string) ListConnectorVersionsBuilder {
 	for _, matcher := range matchers {
-		if err := namespace.ValidateNamespaceMatcher(matcher); err != nil {
+		if err := namespace.ValidateMatcher(matcher); err != nil {
 			return l.addError(err)
 		}
 	}

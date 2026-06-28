@@ -51,7 +51,7 @@ func (a *Actor) GetLabels() map[string]string { return a.Labels }
 func (a *Actor) GetAnnotations() map[string]string { return a.Annotations }
 
 func isValidValueForNamespaceTemplating(val string) bool {
-	return val != "" && val != namespace.NamespaceWildcard
+	return val != "" && val != namespace.Wildcard
 }
 
 func filterLabelOrAnnotationForPermission(vals map[string]string) map[string]string {

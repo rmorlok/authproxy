@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNamespaceMatches(t *testing.T) {
+func TestMatches(t *testing.T) {
 	tests := []struct {
 		name      string
 		matcher   string
@@ -78,7 +78,7 @@ func TestNamespaceMatches(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := NamespaceMatches(tt.matcher, tt.namespace)
+			result := Matches(tt.matcher, tt.namespace)
 			require.Equal(t, tt.result, result)
 		})
 	}
@@ -179,14 +179,14 @@ func TestNamespaces(t *testing.T) {
 				},
 				{
 					name:      "sentinel",
-					path:      NamespaceSkipNamespacePermissionChecks,
+					path:      SkipPermissionChecks,
 					expectErr: true,
 				},
 			}
 
 			for _, tt := range tests {
 				t.Run(tt.name, func(t *testing.T) {
-					err := ValidateNamespacePath(tt.path)
+					err := ValidatePath(tt.path)
 					if tt.expectErr {
 						if err == nil {
 							t.Errorf("expected error but got nil")
@@ -294,7 +294,7 @@ func TestNamespaces(t *testing.T) {
 
 			for _, tt := range tests {
 				t.Run(tt.name, func(t *testing.T) {
-					err := ValidateNamespaceMatcher(tt.matcher)
+					err := ValidateMatcher(tt.matcher)
 					if tt.expectErr {
 						if err == nil {
 							t.Errorf("expected error but got nil")
@@ -337,7 +337,7 @@ func TestNamespaces(t *testing.T) {
 
 			for _, tt := range tests {
 				t.Run(tt.name, func(t *testing.T) {
-					prefixes := SplitNamespacePathToPrefixes(tt.path)
+					prefixes := SplitPathToPrefixes(tt.path)
 					if !reflect.DeepEqual(prefixes, tt.prefixes) {
 						t.Errorf("expected prefixes %v, got %v", tt.prefixes, prefixes)
 					}
@@ -399,19 +399,19 @@ func TestNamespaces(t *testing.T) {
 
 			for _, tt := range tests {
 				t.Run(tt.name, func(t *testing.T) {
-					prefixes := SplitNamespacePathsToPrefixes(tt.paths)
+					prefixes := SplitPathsToPrefixes(tt.paths)
 					if !reflect.DeepEqual(prefixes, tt.prefixes) {
 						t.Errorf("expected prefixes %v, got %v", tt.prefixes, prefixes)
 					}
 				})
 			}
 		})
-		t.Run("NamespacePathFromRoot", func(t *testing.T) {
-			require.Equal(t, NamespacePathFromRoot(), RootNamespace)
-			require.Equal(t, NamespacePathFromRoot("some-namespace"), RootNamespace+".some-namespace")
-			require.Equal(t, NamespacePathFromRoot("some-namespace", "other-namespace"), RootNamespace+".some-namespace.other-namespace")
+		t.Run("PathFromRoot", func(t *testing.T) {
+			require.Equal(t, PathFromRoot(), Root)
+			require.Equal(t, PathFromRoot("some-namespace"), Root+".some-namespace")
+			require.Equal(t, PathFromRoot("some-namespace", "other-namespace"), Root+".some-namespace.other-namespace")
 		})
-		t.Run("NamespaceParentPath", func(t *testing.T) {
+		t.Run("ParentPath", func(t *testing.T) {
 			tests := []struct {
 				name   string
 				path   string
@@ -419,13 +419,13 @@ func TestNamespaces(t *testing.T) {
 			}{
 				{
 					name:   "root",
-					path:   RootNamespace,
-					parent: RootNamespace,
+					path:   Root,
+					parent: Root,
 				},
 				{
 					name:   "single child",
 					path:   "root.child",
-					parent: RootNamespace,
+					parent: Root,
 				},
 				{
 					name:   "grandchild",
@@ -441,11 +441,11 @@ func TestNamespaces(t *testing.T) {
 
 			for _, tt := range tests {
 				t.Run(tt.name, func(t *testing.T) {
-					require.Equal(t, tt.parent, NamespaceParentPath(tt.path))
+					require.Equal(t, tt.parent, ParentPath(tt.path))
 				})
 			}
 		})
-		t.Run("NamespaceIsChild", func(t *testing.T) {
+		t.Run("IsChild", func(t *testing.T) {
 			tests := []struct {
 				name   string
 				parent string
@@ -498,12 +498,12 @@ func TestNamespaces(t *testing.T) {
 
 			for _, tt := range tests {
 				t.Run(tt.name, func(t *testing.T) {
-					result := NamespaceIsChild(tt.parent, tt.child)
+					result := IsChild(tt.parent, tt.child)
 					require.Equal(t, tt.result, result)
 				})
 			}
 		})
-		t.Run("NamespaceIsSameOrChild", func(t *testing.T) {
+		t.Run("IsSameOrChild", func(t *testing.T) {
 			tests := []struct {
 				name   string
 				parent string
@@ -556,13 +556,13 @@ func TestNamespaces(t *testing.T) {
 
 			for _, tt := range tests {
 				t.Run(tt.name, func(t *testing.T) {
-					result := NamespaceIsSameOrChild(tt.parent, tt.child)
+					result := IsSameOrChild(tt.parent, tt.child)
 					require.Equal(t, tt.result, result)
 				})
 			}
 		})
 	})
-	t.Run("DepthOfNamespacePath", func(t *testing.T) {
+	t.Run("DepthOfPath", func(t *testing.T) {
 		tests := []struct {
 			name  string
 			path  string
@@ -602,13 +602,13 @@ func TestNamespaces(t *testing.T) {
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				require.Equal(t, tt.depth, DepthOfNamespacePath(tt.path))
+				require.Equal(t, tt.depth, DepthOfPath(tt.path))
 			})
 		}
 	})
 }
 
-func TestNamespaceMatcherConstrained(t *testing.T) {
+func TestConstrainMatcher(t *testing.T) {
 	tests := []struct {
 		name     string
 		matcher1 string
@@ -698,11 +698,11 @@ func TestNamespaceMatcherConstrained(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, ok := NamespaceMatcherConstrained(tt.matcher1, tt.matcher2)
+			result, ok := ConstrainMatcher(tt.matcher1, tt.matcher2)
 			require.Equal(t, tt.ok, ok)
 			require.Equal(t, tt.result, result)
 
-			result, ok = NamespaceMatcherConstrained(tt.matcher2, tt.matcher1)
+			result, ok = ConstrainMatcher(tt.matcher2, tt.matcher1)
 			require.Equal(t, tt.ok, ok)
 			require.Equal(t, tt.result, result)
 		})

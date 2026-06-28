@@ -25,7 +25,7 @@ func (s *service) CreateConnection(
 		"connector_version", cv.GetVersion(),
 	)
 
-	if !ns.NamespaceIsSameOrChild(cv.GetNamespace(), namespace) {
+	if !ns.IsSameOrChild(cv.GetNamespace(), namespace) {
 		return nil, httperr.BadRequestErr(errors.New("connections must be created in the same or child namespace of the connector"))
 	}
 

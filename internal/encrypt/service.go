@@ -372,7 +372,7 @@ func (s *service) syncLoop() {
 // getKeyIdForNamespace returns the key_ for the given namespace. If that namespace is not configured it falls
 // back to parent namespaces until reaching the global key.
 func (s *service) getKeyIdForNamespace(namespacePath string) (apid.ID, error) {
-	paths := namespace.SplitNamespacePathToPrefixes(namespacePath)
+	paths := namespace.SplitPathToPrefixes(namespacePath)
 
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -533,12 +533,12 @@ func (s *service) EncryptStringForEntity(ctx context.Context, entity NamespacedE
 }
 
 func (s *service) EncryptKeyForNamespace(ctx context.Context, namespacePath string, keyData []byte) (encfield.EncryptedField, error) {
-	if namespacePath == namespace.RootNamespace {
+	if namespacePath == namespace.Root {
 		return s.EncryptGlobal(ctx, keyData)
 	}
 
 	// Keys are always encrypted with the parent namespace key to avoid creating a dependency cycle.
-	parentNamespace := namespace.NamespaceParentPath(namespacePath)
+	parentNamespace := namespace.ParentPath(namespacePath)
 	return s.EncryptForNamespace(ctx, parentNamespace, keyData)
 }
 

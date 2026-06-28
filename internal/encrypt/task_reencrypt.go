@@ -167,7 +167,7 @@ func (h *EncryptServiceTaskHandler) reencryptKeys(ctx context.Context, totalProc
 }
 
 func (h *EncryptServiceTaskHandler) keyTargetDataEncryptionKeyID(ctx context.Context, key database.Key) (apid.ID, bool, error) {
-	parentNamespace := namespace.NamespaceParentPath(key.Namespace)
+	parentNamespace := namespace.ParentPath(key.Namespace)
 	ns, err := h.db.GetNamespace(ctx, parentNamespace)
 	if err != nil {
 		return "", false, err

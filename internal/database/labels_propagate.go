@@ -114,12 +114,12 @@ func (s *service) RefreshConnectionsForConnectorVersion(ctx context.Context, id 
 // directChildNamespacePaths returns the paths of all immediate (depth+1)
 // non-deleted child namespaces of nsPath.
 func (s *service) directChildNamespacePaths(ctx context.Context, nsPath string) ([]string, error) {
-	depth := namespace.DepthOfNamespacePath(nsPath) + 1
+	depth := namespace.DepthOfPath(nsPath) + 1
 	rows, err := s.sq.
 		Select("path").
 		From(NamespacesTable).
 		Where(sq.And{
-			sq.Like{"path": nsPath + namespace.NamespacePathSeparator + "%"},
+			sq.Like{"path": nsPath + namespace.PathSeparator + "%"},
 			sq.Eq{"depth": depth, "deleted_at": nil},
 		}).
 		RunWith(s.db).
@@ -504,7 +504,7 @@ func (s *service) recomputeNamespaceLabelsTx(ctx context.Context, path string) (
 
 		userLabels, _ := SplitUserAndApxyLabels(ns.Labels)
 
-		prefixes := namespace.SplitNamespacePathToPrefixes(ns.Path)
+		prefixes := namespace.SplitPathToPrefixes(ns.Path)
 		var parentLabels Labels
 		if len(prefixes) > 1 {
 			parentLabels, err = s.fetchLabelsForCarryForward(ctx, tx, NamespacesTable, sq.Eq{

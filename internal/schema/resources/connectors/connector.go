@@ -137,7 +137,7 @@ func (c *Connector) Validate(vc *common.ValidationContext) error {
 	}
 
 	if c.Namespace != nil {
-		if err := nschema.ValidateNamespacePath(*c.Namespace); err != nil {
+		if err := nschema.ValidatePath(*c.Namespace); err != nil {
 			result = multierror.Append(result, err)
 		}
 	}
@@ -263,7 +263,7 @@ func (c *Connector) IsDraft() bool {
 // GetNamespace returns the namespace of the connector. Defaults to root if unspecified.
 func (c *Connector) GetNamespace() string {
 	if c == nil || c.Namespace == nil {
-		return nschema.RootNamespace
+		return nschema.Root
 	}
 
 	return *c.Namespace

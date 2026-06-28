@@ -19,7 +19,7 @@ var allSchemaIDs = []string{
 	common.SchemaIdCommon,
 	config.SchemaIdConfig,
 	connectors.SchemaIdConnectors,
-	namespace.SchemaIdNamespace,
+	namespace.SchemaId,
 	rate_limit.SchemaIdRateLimit,
 }
 

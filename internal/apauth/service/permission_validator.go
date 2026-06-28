@@ -144,10 +144,10 @@ func (rpv *ResourcePermissionValidator) ValidateHttpStatusError(obj interface{})
 //
 // It returns:
 // - the allowed namespaces for the resource/verb, optionally intersected with queryMatcher
-// - a slice with NamespaceNoMatchSentinel if no namespaces can be matched
+// - a slice with NoMatchSentinel if no namespaces can be matched
 func (rpv *ResourcePermissionValidator) GetEffectiveNamespaceMatchers(queryMatcher *string) []string {
 	if rpv.ra == nil || !rpv.ra.IsAuthenticated() {
-		return []string{namespace.NamespaceNoMatchSentinel} // No access if not authenticated
+		return []string{namespace.NoMatchSentinel} // No access if not authenticated
 	}
 
 	// Get the namespaces this actor can access for this resource and any of the configured verbs.
@@ -176,7 +176,7 @@ func (rpv *ResourcePermissionValidator) GetEffectiveNamespaceMatchers(queryMatch
 	// Intersect each allowed namespace with the query matcher
 	result := make([]string, 0, len(allowedNamespaces))
 	for _, allowed := range allowedNamespaces {
-		if constrained, ok := namespace.NamespaceMatcherConstrained(allowed, *queryMatcher); ok {
+		if constrained, ok := namespace.ConstrainMatcher(allowed, *queryMatcher); ok {
 			result = append(result, constrained)
 		}
 	}
@@ -184,7 +184,7 @@ func (rpv *ResourcePermissionValidator) GetEffectiveNamespaceMatchers(queryMatch
 	if len(result) == 0 {
 		// Return a set that indicates that no resources can be matched because the intersection of the allowed
 		// namespaces and the requested namespaces is an empty set.
-		return []string{namespace.NamespaceNoMatchSentinel}
+		return []string{namespace.NoMatchSentinel}
 	}
 
 	return result
@@ -316,7 +316,7 @@ func (pb *PermissionValidatorBuilder) getNamespace(c *gin.Context) string {
 	}
 
 	// Default to skipping permission check at the namespace level
-	return namespace.NamespaceSkipNamespacePermissionChecks
+	return namespace.SkipPermissionChecks
 }
 
 // getResourceId extracts the resource ID from the request if an ID field is configured.

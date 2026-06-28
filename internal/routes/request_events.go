@@ -726,7 +726,7 @@ func (r *RequestEventsRoutes) queryMetrics(gctx *gin.Context) {
 		return
 	}
 	if req.Namespace != nil {
-		if err := namespace.ValidateNamespaceMatcher(*req.Namespace); err != nil {
+		if err := namespace.ValidateMatcher(*req.Namespace); err != nil {
 			apgin.WriteError(gctx, nil, httperr.BadRequest("invalid namespace matcher", httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return

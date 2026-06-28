@@ -49,12 +49,12 @@ func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConn
 		targetNamespace = req.IntoNamespace
 	}
 
-	if err := namespace.ValidateNamespacePath(targetNamespace); err != nil {
+	if err := namespace.ValidatePath(targetNamespace); err != nil {
 		val.MarkErrorReturn()
 		return nil, httperr.BadRequest(fmt.Sprintf("invalid namespace '%s'", targetNamespace), httperr.WithInternalErr(err))
 	}
 
-	if !namespace.NamespaceIsSameOrChild(cv.GetNamespace(), targetNamespace) {
+	if !namespace.IsSameOrChild(cv.GetNamespace(), targetNamespace) {
 		val.MarkErrorReturn()
 		return nil, httperr.BadRequestf("target namespace '%s' is not a child of the connector's namespace '%s'", targetNamespace, cv.GetNamespace())
 	}
