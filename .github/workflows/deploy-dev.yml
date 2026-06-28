@@ -105,8 +105,8 @@ jobs:
               --commit "${PR_HEAD_SHA}" \
               --event pull_request \
               --json databaseId,status,conclusion \
-              --limit 1 \
-              --jq '.[0] // empty')"
+              --limit 20 \
+              --jq '[.[] | select((.conclusion // "") != "cancelled")] | .[0] // empty')"
 
             if [ -n "${run_json}" ]; then
               status="$(jq -r '.status' <<<"${run_json}")"
@@ -122,7 +122,7 @@ jobs:
                 exit 1
               fi
             else
-              echo "Build Image run for ${PR_HEAD_SHA} has not appeared yet."
+              echo "Non-cancelled Build Image run for ${PR_HEAD_SHA} has not appeared yet."
             fi
 
             if [ "${SECONDS}" -ge "${deadline}" ]; then
