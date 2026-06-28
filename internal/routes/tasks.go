@@ -235,7 +235,7 @@ func (r *TaskRoutes) get(gctx *gin.Context) {
 
 		resp := WorkflowTaskInfoToJson(encryptedTaskInfo, ti, state)
 		resp.State = WorkflowTaskInfoStateFromHistory(state, historyEvents)
-		gctx.PureJSON(http.StatusOK, resp)
+		apgin.APIJSON(gctx, http.StatusOK, resp)
 		return
 	}
 
@@ -260,7 +260,7 @@ func (r *TaskRoutes) get(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, TaskInfoToJson(encryptedTaskInfo, ati))
+	apgin.APIJSON(gctx, http.StatusOK, TaskInfoToJson(encryptedTaskInfo, ati))
 }
 
 func (r *TaskRoutes) Register(g gin.IRouter) {

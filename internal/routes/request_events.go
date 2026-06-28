@@ -572,7 +572,7 @@ func (r *RequestEventsRoutes) get(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, entry)
+	apgin.APIJSON(gctx, http.StatusOK, entry)
 }
 
 // @Summary		List request events entries
@@ -668,7 +668,7 @@ func (r *RequestEventsRoutes) list(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(200, &ListRequestEventsResponseJson{
+	apgin.APIJSON(gctx, 200, &ListRequestEventsResponseJson{
 		Items:  util.Map(auth.FilterForValidatedResources(val, result.Results), requestEventToJson),
 		Cursor: result.Cursor,
 		Total:  result.Total,
@@ -794,7 +794,7 @@ func (r *RequestEventsRoutes) queryMetrics(gctx *gin.Context) {
 	// Metrics responses are aggregate series, not resource rows, so the request is validated once all query refs are
 	// accepted and their namespace matchers are constrained by the actor's permissions.
 	val.MarkValidated()
-	gctx.PureJSON(http.StatusOK, metricsResponseFromAPIRequest(req, responseSeries))
+	apgin.APIJSON(gctx, http.StatusOK, metricsResponseFromAPIRequest(req, responseSeries))
 }
 
 // @Summary		Get application metrics schema
@@ -810,7 +810,7 @@ func (r *RequestEventsRoutes) schema(gctx *gin.Context) {
 	val := auth.MustGetValidatorFromGinContext(gctx)
 	// The schema response is static metadata for the app-metrics API, so there are no resource rows to post-validate.
 	val.MarkValidated()
-	gctx.PureJSON(http.StatusOK, metricsSchemaResponse())
+	apgin.APIJSON(gctx, http.StatusOK, metricsSchemaResponse())
 }
 
 func (r *RequestEventsRoutes) Register(g gin.IRouter) {

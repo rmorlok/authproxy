@@ -9,7 +9,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/rmorlok/authproxy/internal/apauth/core"
+	"github.com/rmorlok/authproxy/internal/apserde"
 	"github.com/rmorlok/authproxy/internal/httperr"
+	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 )
 
 // GetAuthFromGinContext returns auth info from a request. This auth info can be authenticated or unauthenticated.
@@ -33,6 +35,12 @@ func applyAuthToGinContext(c *gin.Context, ra *core.RequestAuth) {
 
 	ctx := c.Request.Context()
 	ctx = ra.ContextWith(ctx)
+	ctx = apserde.WithSecretReplay(ctx, ra.Allows(
+		namespace.NamespaceSkipNamespacePermissionChecks,
+		apserde.SecretResource,
+		apserde.SecretReplayVerb,
+		"",
+	))
 	c.Request = c.Request.WithContext(ctx)
 }
 

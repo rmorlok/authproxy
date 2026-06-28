@@ -95,7 +95,7 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, resp)
+	apgin.APIJSON(gctx, http.StatusOK, resp)
 }
 
 // @Summary		Submit connection form
@@ -154,7 +154,7 @@ func (r *ConnectionsRoutes) submit(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, resp)
+	apgin.APIJSON(gctx, http.StatusOK, resp)
 }
 
 // @Summary		Get setup step
@@ -209,7 +209,7 @@ func (r *ConnectionsRoutes) getSetupStep(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, resp)
+	apgin.APIJSON(gctx, http.StatusOK, resp)
 }
 
 // @Summary		Get data source options
@@ -271,7 +271,7 @@ func (r *ConnectionsRoutes) getDataSource(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, options)
+	apgin.APIJSON(gctx, http.StatusOK, options)
 }
 
 func ConnectionToJson(conn coreIface.Connection) ConnectionJson {
@@ -402,7 +402,7 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, ListConnectionResponseJson{
+	apgin.APIJSON(gctx, http.StatusOK, ListConnectionResponseJson{
 		Items: util.Map(auth.FilterForValidatedResources(val, result.Results), func(c coreIface.Connection) ConnectionJson {
 			return ConnectionToJson(c)
 		}),
@@ -464,7 +464,7 @@ func (r *ConnectionsRoutes) get(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, ConnectionToJson(c))
+	apgin.APIJSON(gctx, http.StatusOK, ConnectionToJson(c))
 }
 
 // @Summary		Disconnect connection
@@ -542,7 +542,7 @@ func (r *ConnectionsRoutes) disconnect(gctx *gin.Context) {
 		Connection: connJson,
 	}
 
-	gctx.PureJSON(http.StatusOK, response)
+	apgin.APIJSON(gctx, http.StatusOK, response)
 }
 
 func (r *ConnectionsRoutes) parseConnectionDisconnectRequest(gctx *gin.Context) (coreIface.ConnectionDisconnectOptions, bool) {
@@ -675,7 +675,7 @@ func (r *ConnectionsRoutes) reconfigure(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, resp)
+	apgin.APIJSON(gctx, http.StatusOK, resp)
 }
 
 // @Summary		Cancel in-flight setup
@@ -792,7 +792,7 @@ func (r *ConnectionsRoutes) retry(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, resp)
+	apgin.APIJSON(gctx, http.StatusOK, resp)
 }
 
 type ReauthConnectionRequest struct {
@@ -856,7 +856,7 @@ func (r *ConnectionsRoutes) reauth(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, resp)
+	apgin.APIJSON(gctx, http.StatusOK, resp)
 }
 
 // @Summary		Force connection state
@@ -925,7 +925,7 @@ func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 
 	state := database.ConnectionState(req.State)
 	if c.GetState() == state {
-		gctx.PureJSON(http.StatusOK, ConnectionToJson(c))
+		apgin.APIJSON(gctx, http.StatusOK, ConnectionToJson(c))
 		return
 	}
 
@@ -936,7 +936,7 @@ func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, ConnectionToJson(c))
+	apgin.APIJSON(gctx, http.StatusOK, ConnectionToJson(c))
 }
 
 // @Summary		Update connection
@@ -1021,7 +1021,7 @@ func (r *ConnectionsRoutes) update(gctx *gin.Context) {
 		}
 	}
 
-	gctx.PureJSON(http.StatusOK, ConnectionToJson(c))
+	apgin.APIJSON(gctx, http.StatusOK, ConnectionToJson(c))
 }
 
 // Label and annotation handlers for connections delegate to a shared
@@ -1227,7 +1227,7 @@ func (r *ConnectionsRoutes) getScopes(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, ConnectionScopesJson{
+	apgin.APIJSON(gctx, http.StatusOK, ConnectionScopesJson{
 		Requested: oauth2.SplitScopes(token.RequestedScopes),
 		Granted:   oauth2.SplitScopes(token.Scopes),
 	})

@@ -81,7 +81,7 @@ func (r *SessionRoutes) initiate(gctx *gin.Context) {
 	if !ra.IsAuthenticated() {
 		logger.Debug("request was not authenticated, returning redirect url")
 		apgin.AddDebugHeader(gctx, "auth not present on context")
-		gctx.PureJSON(http.StatusUnauthorized, SessionInitiateFailureResponse{
+		apgin.APIJSON(gctx, http.StatusUnauthorized, SessionInitiateFailureResponse{
 			RedirectUrl: r.sessionInitiateUrlGenerator.GetInitiateSessionUrl(req.ReturnToUrl),
 		})
 		return
@@ -100,7 +100,7 @@ func (r *SessionRoutes) initiate(gctx *gin.Context) {
 
 	a := ra.MustGetActor()
 
-	gctx.PureJSON(http.StatusOK, SessionInitiateSuccessResponse{
+	apgin.APIJSON(gctx, http.StatusOK, SessionInitiateSuccessResponse{
 		ActorId: a.Id,
 	})
 }
@@ -128,7 +128,7 @@ func (r *SessionRoutes) terminate(gctx *gin.Context) {
 	if !ra.IsAuthenticated() {
 		logger.Debug("request was already unauthenticated; ignoring")
 		apgin.AddDebugHeader(gctx, "auth not present on context")
-		gctx.PureJSON(http.StatusOK, gin.H{})
+		apgin.APIJSON(gctx, http.StatusOK, gin.H{})
 		return
 	}
 
@@ -140,7 +140,7 @@ func (r *SessionRoutes) terminate(gctx *gin.Context) {
 	}
 
 	logger.Debug("successfully terminated session")
-	gctx.PureJSON(http.StatusOK, gin.H{})
+	apgin.APIJSON(gctx, http.StatusOK, gin.H{})
 }
 
 func (r *SessionRoutes) Register(g gin.IRouter) {

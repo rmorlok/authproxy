@@ -28,6 +28,7 @@ import (
 	httpf2 "github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/routes/key_value"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/rmorlok/authproxy/internal/tasks"
@@ -117,6 +118,32 @@ func assertWorkflowTaskPolls(
 	require.NotNil(t, tu.Workflow.requestedInstance)
 	require.Equal(t, workflowInstanceID, tu.Workflow.requestedInstance.InstanceID)
 	require.Equal(t, workflowExecutionID, tu.Workflow.requestedInstance.ExecutionID)
+}
+
+func redactionTestConnector() sconfig.Connector {
+	return redactionTestConnectorWithSecret("client-secret")
+}
+
+func redactionTestConnectorWithSecret(secret string) sconfig.Connector {
+	return sconfig.Connector{
+		Id:          apid.MustParse("cxr_test0000000000001"),
+		Version:     1,
+		Namespace:   util.ToPtr("root"),
+		DisplayName: "Secret Connector",
+		Description: "Connector with a client secret",
+		Auth: &cschema.Auth{InnerVal: &cschema.AuthOAuth2{
+			Type:         cschema.AuthTypeOAuth2,
+			ClientId:     common.NewStringValueDirectInline("client-id"),
+			ClientSecret: common.NewStringValueDirectInline(secret),
+			Scopes:       []cschema.Scope{},
+			Authorization: cschema.AuthOauth2Authorization{
+				Endpoint: "https://auth.example.com/authorize",
+			},
+			Token: cschema.AuthOauth2Token{
+				Endpoint: "https://auth.example.com/token",
+			},
+		}},
+	}
 }
 
 func TestParseConnectorID(t *testing.T) {
@@ -829,6 +856,79 @@ func TestConnectors(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, apid.MustParse("cxr_test0000000000001"), resp.Id)
 			})
+
+			t.Run("redacts connector secrets by default", func(t *testing.T) {
+				tu := setup(t, config.FromRoot(&sconfig.Root{
+					Connectors: &sconfig.Connectors{
+						LoadFromList: []sconfig.Connector{
+							redactionTestConnector(),
+						},
+					},
+				}))
+
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					"/connectors/cxr_test0000000000001/versions/1",
+					nil,
+					"root",
+					"some-actor",
+					aschema.PermissionsSingle("root.**", "connectors", "list/versions"),
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusOK, w.Code)
+				require.Equal(t, "true", w.Header().Get("X-AuthProxy-Data-Redacted"))
+
+				var raw map[string]any
+				require.NoError(t, json.Unmarshal(w.Body.Bytes(), &raw))
+				definition := raw["definition"].(map[string]any)
+				auth := definition["auth"].(map[string]any)
+				require.Equal(t, "*************", auth["client_secret"])
+			})
+
+			t.Run("replays connector secrets with secret replay permission", func(t *testing.T) {
+				tu := setup(t, config.FromRoot(&sconfig.Root{
+					Connectors: &sconfig.Connectors{
+						LoadFromList: []sconfig.Connector{
+							redactionTestConnector(),
+						},
+					},
+				}))
+
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					"/connectors/cxr_test0000000000001/versions/1",
+					nil,
+					"root",
+					"some-actor",
+					[]aschema.Permission{
+						{
+							Namespace: "root.**",
+							Resources: []string{"connectors"},
+							Verbs:     []string{"list/versions"},
+						},
+						{
+							Namespace: "root.**",
+							Resources: []string{"secrets"},
+							Verbs:     []string{"replay"},
+						},
+					},
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusOK, w.Code)
+				require.Empty(t, w.Header().Get("X-AuthProxy-Data-Redacted"))
+
+				var raw map[string]any
+				require.NoError(t, json.Unmarshal(w.Body.Bytes(), &raw))
+				definition := raw["definition"].(map[string]any)
+				auth := definition["auth"].(map[string]any)
+				require.Equal(t, "client-secret", auth["client_secret"])
+			})
 		})
 
 		t.Run("list", func(t *testing.T) {
@@ -976,6 +1076,34 @@ func TestConnectors(t *testing.T) {
 
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusBadRequest, w.Code)
+		})
+
+		t.Run("rejects redacted placeholders in secret fields", func(t *testing.T) {
+			tu := setup(t, nil)
+			def := redactionTestConnectorWithSecret("***")
+			def.Id = apid.Nil
+			def.Version = 0
+			def.Namespace = nil
+			body := CreateConnectorRequestJson{
+				Namespace:  "root",
+				Definition: def,
+			}
+			jsonBody, _ := json.Marshal(body)
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost,
+				"/connectors",
+				bytes.NewReader(jsonBody),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code)
+			require.Contains(t, w.Body.String(), "redacted placeholder values")
 		})
 
 		t.Run("valid", func(t *testing.T) {

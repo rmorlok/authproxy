@@ -32,9 +32,9 @@ type fakeResource struct {
 	annotations map[string]string
 }
 
-func (f *fakeResource) GetId() apid.ID                   { return f.id }
-func (f *fakeResource) GetNamespace() string             { return f.namespace }
-func (f *fakeResource) GetLabels() map[string]string     { return f.labels }
+func (f *fakeResource) GetId() apid.ID               { return f.id }
+func (f *fakeResource) GetNamespace() string         { return f.namespace }
+func (f *fakeResource) GetLabels() map[string]string { return f.labels }
 func (f *fakeResource) GetAnnotations() map[string]string {
 	return f.annotations
 }

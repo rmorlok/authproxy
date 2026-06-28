@@ -203,7 +203,7 @@ func (r *WorkflowMonitoringRoutes) listInstances(gctx *gin.Context) {
 		}
 	}
 
-	gctx.PureJSON(http.StatusOK, ListWorkflowInstancesResponseJson{
+	apgin.APIJSON(gctx, http.StatusOK, ListWorkflowInstancesResponseJson{
 		Items:  workflowInstanceRefsToJson(items),
 		Cursor: cursor,
 	})
@@ -235,7 +235,7 @@ func (r *WorkflowMonitoringRoutes) getInstance(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, &WorkflowInstanceInfoJson{
+	apgin.APIJSON(gctx, http.StatusOK, &WorkflowInstanceInfoJson{
 		WorkflowInstanceRefJson: workflowInstanceRefToJson(instanceRef),
 		History:                 workflowHistoryEventsToJson(historyEvents),
 	})
@@ -267,7 +267,7 @@ func (r *WorkflowMonitoringRoutes) getHistory(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, ListWorkflowHistoryResponseJson{Items: workflowHistoryEventsToJson(historyEvents)})
+	apgin.APIJSON(gctx, http.StatusOK, ListWorkflowHistoryResponseJson{Items: workflowHistoryEventsToJson(historyEvents)})
 }
 
 func (r *WorkflowMonitoringRoutes) getTree(gctx *gin.Context) {
@@ -290,7 +290,7 @@ func (r *WorkflowMonitoringRoutes) getTree(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, workflowInstanceTreeToJson(tree))
+	apgin.APIJSON(gctx, http.StatusOK, workflowInstanceTreeToJson(tree))
 }
 
 func (r *WorkflowMonitoringRoutes) cancelInstance(gctx *gin.Context) {
@@ -308,7 +308,7 @@ func (r *WorkflowMonitoringRoutes) cancelInstance(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, gin.H{"ok": true})
+	apgin.APIJSON(gctx, http.StatusOK, gin.H{"ok": true})
 }
 
 func (r *WorkflowMonitoringRoutes) removeInstance(gctx *gin.Context) {
@@ -326,7 +326,7 @@ func (r *WorkflowMonitoringRoutes) removeInstance(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, gin.H{"ok": true})
+	apgin.APIJSON(gctx, http.StatusOK, gin.H{"ok": true})
 }
 
 func (r *WorkflowMonitoringRoutes) Register(g gin.IRouter) {
