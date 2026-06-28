@@ -5,7 +5,7 @@ import InputLabel from '@mui/material/InputLabel';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import Typography from '@mui/material/Typography';
-import {KeyDataConfig} from '@authproxy/api';
+import {KeyData} from '@authproxy/api';
 
 export type KeySourceType =
   | 'random'
@@ -42,6 +42,41 @@ export const keySourceTypes: { label: string; value: KeySourceType }[] = [
 ];
 
 const supportedKeySourceTypes = new Set(keySourceTypes.map(opt => opt.value));
+const keySourceTypeLabels = new Map(keySourceTypes.map(opt => [opt.value, opt.label]));
+
+const providerFieldNames = [
+  'num_bytes',
+  'value',
+  'base64',
+  'env_var',
+  'env_var_base64',
+  'path',
+  'aws_secret_id',
+  'aws_secret_key',
+  'aws_region',
+  'aws_kms_key_id',
+  'aws_kms_endpoint',
+  'cache_ttl',
+  'gcp_secret_name',
+  'gcp_project',
+  'gcp_secret_version',
+  'gcp_kms_key_name',
+  'gcp_location',
+  'gcp_key_ring',
+  'gcp_crypto_key',
+  'gcp_kms_endpoint',
+  'gcp_credentials_file',
+  'gcp_credentials_json',
+  'vault_address',
+  'vault_token',
+  'vault_path',
+  'vault_key',
+  'vault_namespace',
+  'vault_transit_mount_path',
+  'vault_transit_key_name',
+];
+
+const displayFieldNames = providerFieldNames.filter(key => key !== 'num_bytes');
 
 function stringField(fields: Record<string, string>, key: string): string {
   return fields[key]?.trim() || '';
@@ -60,11 +95,65 @@ function compact(values: Record<string, unknown>): Record<string, unknown> {
   return out;
 }
 
-function keySourceTypeFromConfig(config?: KeyDataConfig): KeySourceType {
-  if (!config?.type || !supportedKeySourceTypes.has(config.type as KeySourceType)) {
-    return 'random';
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  if (value == null || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  return value as Record<string, unknown>;
+}
+
+function hasOwn(record: Record<string, unknown>, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(record, key);
+}
+
+function valueToString(value: unknown): string {
+  if (value == null) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+
+  const record = asRecord(value);
+  if (!record) return '';
+  for (const key of ['value', 'base64', 'env_var', 'env_var_base64', 'path']) {
+    if (hasOwn(record, key)) return valueToString(record[key]);
   }
-  return config.type as KeySourceType;
+  return '';
+}
+
+function setStringField(fields: Record<string, string>, key: string, value: unknown) {
+  const str = valueToString(value);
+  if (str !== '') fields[key] = str;
+}
+
+export function isRedactedPlaceholder(value?: string): boolean {
+  const trimmed = value?.trim() || '';
+  return trimmed.length > 0 && trimmed.split('').every(ch => ch === '*');
+}
+
+function secretPayloadValue(value?: string): string | undefined {
+  const trimmed = value?.trim() || '';
+  if (!trimmed || isRedactedPlaceholder(trimmed)) return undefined;
+  return trimmed;
+}
+
+function keySourceTypeFromConfig(config?: KeyData): KeySourceType {
+  const data = asRecord(config);
+  if (!data) return 'random';
+
+  if (hasOwn(data, 'value')) return 'value';
+  if (hasOwn(data, 'base64')) return 'base64';
+  if (hasOwn(data, 'env_var')) return 'env_var';
+  if (hasOwn(data, 'env_var_base64')) return 'env_var_base64';
+  if (hasOwn(data, 'path')) return 'file';
+  if (hasOwn(data, 'vault_transit_key_name')) return 'hashicorp_vault_transit';
+  if (hasOwn(data, 'vault_address')) return 'hashicorp_vault';
+  if (hasOwn(data, 'aws_kms_key_id')) return 'aws_kms';
+  if (hasOwn(data, 'aws_secret_id')) return 'aws_secret';
+  if (hasOwn(data, 'gcp_kms_key_name') || hasOwn(data, 'gcp_crypto_key')) return 'gcp_kms';
+  if (hasOwn(data, 'gcp_secret_name')) return 'gcp_secret';
+  return 'random';
+}
+
+export function keyDataSourceLabel(config?: KeyData): string {
+  const type = keySourceTypeFromConfig(config);
+  return keySourceTypeLabels.get(type) || type;
 }
 
 export function createEmptyKeyDataFormState(): KeyDataFormState {
@@ -77,17 +166,44 @@ export function createEmptyKeyDataFormState(): KeyDataFormState {
   };
 }
 
-export function keyDataFormStateFromConfig(config?: KeyDataConfig): KeyDataFormState {
+export function keyDataFormStateFromConfig(config?: KeyData): KeyDataFormState {
   const state = createEmptyKeyDataFormState();
-  if (!config) return state;
+  const data = asRecord(config);
+  if (!data) return state;
+
+  const fields = {...state.fields};
+  for (const field of providerFieldNames) {
+    setStringField(fields, field, data[field]);
+  }
+
+  const awsCredentials = asRecord(data.aws_credentials);
+  if (awsCredentials) {
+    setStringField(fields, 'aws_credentials_type', awsCredentials.type);
+    setStringField(fields, 'aws_access_key_id', awsCredentials.access_key_id);
+    setStringField(fields, 'aws_secret_access_key', awsCredentials.secret_access_key);
+  }
 
   return {
     type: keySourceTypeFromConfig(config),
-    fields: {
-      ...state.fields,
-      ...(config.fields || {}),
-    },
+    fields,
   };
+}
+
+export function keyDataDisplayFields(config?: KeyData): { key: string; value: string }[] {
+  const state = keyDataFormStateFromConfig(config);
+  const entries: { key: string; value: string }[] = [];
+  for (const field of displayFieldNames) {
+    const value = state.fields[field];
+    if (!value) continue;
+    entries.push({
+      key: field,
+      value: isRedactedPlaceholder(value) ? 'configured' : value,
+    });
+  }
+  if (state.fields.aws_credentials_type && state.fields.aws_credentials_type !== 'implicit') {
+    entries.push({key: 'aws_credentials_type', value: state.fields.aws_credentials_type});
+  }
+  return entries;
 }
 
 export function buildKeyDataPayload(state: KeyDataFormState): Record<string, unknown> | undefined {
@@ -103,9 +219,9 @@ export function buildKeyDataPayload(state: KeyDataFormState): Record<string, unk
       };
     }
     case 'value':
-      return compact({value: fields.value});
+      return compact({value: secretPayloadValue(fields.value)});
     case 'base64':
-      return compact({base64: fields.base64});
+      return compact({base64: secretPayloadValue(fields.base64)});
     case 'env_var':
       return compact({env_var: fields.env_var});
     case 'env_var_base64':
@@ -142,13 +258,13 @@ export function buildKeyDataPayload(state: KeyDataFormState): Record<string, unk
         gcp_crypto_key: fields.gcp_crypto_key,
         gcp_kms_endpoint: fields.gcp_kms_endpoint,
         gcp_credentials_file: fields.gcp_credentials_file,
-        gcp_credentials_json: fields.gcp_credentials_json,
+        gcp_credentials_json: secretPayloadValue(fields.gcp_credentials_json),
         cache_ttl: fields.cache_ttl,
       });
     case 'hashicorp_vault':
       return compact({
         vault_address: fields.vault_address,
-        vault_token: fields.vault_token,
+        vault_token: secretPayloadValue(fields.vault_token),
         vault_path: fields.vault_path,
         vault_key: fields.vault_key,
         cache_ttl: fields.cache_ttl,
@@ -156,7 +272,7 @@ export function buildKeyDataPayload(state: KeyDataFormState): Record<string, unk
     case 'hashicorp_vault_transit':
       return compact({
         vault_address: fields.vault_address,
-        vault_token: fields.vault_token,
+        vault_token: secretPayloadValue(fields.vault_token),
         vault_namespace: fields.vault_namespace,
         vault_transit_mount_path: fields.vault_transit_mount_path,
         vault_transit_key_name: fields.vault_transit_key_name,
@@ -172,8 +288,8 @@ function withAwsCredentials(payload: Record<string, unknown>, fields: Record<str
   if (credentialsType === 'access_key') {
     payload.aws_credentials = compact({
       type: 'access_key',
-      access_key_id: fields.aws_access_key_id,
-      secret_access_key: fields.aws_secret_access_key,
+      access_key_id: secretPayloadValue(fields.aws_access_key_id),
+      secret_access_key: secretPayloadValue(fields.aws_secret_access_key),
     });
   } else if (credentialsType === 'implicit') {
     payload.aws_credentials = {type: 'implicit'};
@@ -186,10 +302,17 @@ export function validateKeyDataFormState(state: KeyDataFormState): string | null
   const required = (field: string, label: string): string | null => {
     return stringField(fields, field) ? null : `${label} is required`;
   };
+  const requiredSecret = (field: string, label: string): string | null => {
+    if (!stringField(fields, field)) return `${label} is required`;
+    return isRedactedPlaceholder(fields[field]) ? `${label} must be re-entered to update key data` : null;
+  };
+  const optionalSecret = (field: string, label: string): string | null => {
+    return isRedactedPlaceholder(fields[field]) ? `${label} must be re-entered or cleared to update key data` : null;
+  };
   const awsCredentialsError = (): string | null => {
     if (stringField(fields, 'aws_credentials_type') !== 'access_key') return null;
-    return required('aws_access_key_id', 'AWS Access Key ID') ||
-      required('aws_secret_access_key', 'AWS Secret Access Key');
+    return requiredSecret('aws_access_key_id', 'AWS Access Key ID') ||
+      requiredSecret('aws_secret_access_key', 'AWS Secret Access Key');
   };
 
   switch (state.type) {
@@ -198,9 +321,9 @@ export function validateKeyDataFormState(state: KeyDataFormState): string | null
       return Number.isFinite(numBytes) && numBytes > 0 ? null : 'Number of Bytes must be greater than zero';
     }
     case 'value':
-      return required('value', 'Key Value');
+      return requiredSecret('value', 'Key Value');
     case 'base64':
-      return required('base64', 'Base64 Encoded Key');
+      return requiredSecret('base64', 'Base64 Encoded Key');
     case 'env_var':
       return required('env_var', 'Environment Variable Name');
     case 'env_var_base64':
@@ -214,6 +337,8 @@ export function validateKeyDataFormState(state: KeyDataFormState): string | null
     case 'gcp_secret':
       return required('gcp_secret_name', 'GCP Secret Name');
     case 'gcp_kms': {
+      const credentialsJSONError = optionalSecret('gcp_credentials_json', 'GCP Credentials JSON');
+      if (credentialsJSONError) return credentialsJSONError;
       if (stringField(fields, 'gcp_kms_key_name')) return null;
       return required('gcp_project', 'GCP Project') ||
         required('gcp_location', 'GCP Location') ||
@@ -222,12 +347,15 @@ export function validateKeyDataFormState(state: KeyDataFormState): string | null
     }
     case 'hashicorp_vault':
       return required('vault_address', 'Vault Address') ||
-        required('vault_token', 'Vault Token') ||
+        requiredSecret('vault_token', 'Vault Token') ||
         required('vault_path', 'Vault Path') ||
         required('vault_key', 'Vault Key');
-    case 'hashicorp_vault_transit':
+    case 'hashicorp_vault_transit': {
+      const vaultTokenError = optionalSecret('vault_token', 'Vault Token');
+      if (vaultTokenError) return vaultTokenError;
       return required('vault_address', 'Vault Address') ||
         required('vault_transit_key_name', 'Vault Transit Key Name');
+    }
     default:
       return 'Unsupported key source';
   }

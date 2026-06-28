@@ -27,7 +27,9 @@ import AnnotationsEditor from "./AnnotationsEditor";
 import KeyDataForm, {
   buildKeyDataPayload,
   createEmptyKeyDataFormState,
+  keyDataDisplayFields,
   KeyDataFormState,
+  keyDataSourceLabel,
   keyDataFormStateFromConfig,
   validateKeyDataFormState,
 } from './KeyDataForm';
@@ -264,12 +266,9 @@ export default function KeyDetail({keyId}: { keyId: string }) {
         {ek.key_data ? (
           <Stack spacing={1} sx={{mt: 0.5}}>
             <Stack direction="row" spacing={0.5} flexWrap="wrap">
-              <Chip label={ek.key_data.type} size="small" color="primary" variant="outlined"/>
-              {Object.entries(ek.key_data.fields || {}).map(([key, value]) => (
+              <Chip label={keyDataSourceLabel(ek.key_data)} size="small" color="primary" variant="outlined"/>
+              {keyDataDisplayFields(ek.key_data).map(({key, value}) => (
                 <Chip key={key} label={`${key}: ${value}`} size="small" variant="outlined"/>
-              ))}
-              {(ek.key_data.sensitive_fields || []).map(field => (
-                <Chip key={field} label={`${field}: configured`} size="small" variant="outlined"/>
               ))}
             </Stack>
           </Stack>

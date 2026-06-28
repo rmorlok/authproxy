@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import * as React from 'react';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import {cleanup, render, screen, waitFor, within} from '@testing-library/react';
+import {cleanup, fireEvent, render, screen, waitFor, within} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {MemoryRouter} from 'react-router-dom';
 import KeyDetail from './KeyDetail';
@@ -30,11 +30,10 @@ const initialKey = {
   namespace: 'root.dev',
   state: KeyState.ACTIVE,
   key_data: {
-    type: 'aws_kms',
-    fields: {
-      aws_kms_key_id: 'alias/authproxy',
-      aws_region: 'us-east-1',
-      aws_credentials_type: 'implicit',
+    aws_kms_key_id: 'alias/authproxy',
+    aws_region: 'us-east-1',
+    aws_credentials: {
+      type: 'implicit',
     },
   },
   labels: {
@@ -97,10 +96,10 @@ describe('KeyDetail', () => {
 
     const keyInputs = within(dialog).getAllByLabelText('Key');
     const valueInputs = within(dialog).getAllByLabelText('Value');
-    await user.type(keyInputs[1], 'tier');
-    await user.type(valueInputs[1], 'internal');
-    await user.type(keyInputs[3], 'rotation');
-    await user.type(valueInputs[3], 'manual');
+    fireEvent.change(keyInputs[1], {target: {value: 'tier'}});
+    fireEvent.change(valueInputs[1], {target: {value: 'internal'}});
+    fireEvent.change(keyInputs[3], {target: {value: 'rotation'}});
+    fireEvent.change(valueInputs[3], {target: {value: 'manual'}});
 
     await user.click(within(dialog).getByRole('button', {name: 'Save'}));
 
@@ -134,8 +133,7 @@ describe('KeyDetail', () => {
 
     const dialog = screen.getByRole('dialog', {name: 'Edit key'});
     const keyIdInput = within(dialog).getByLabelText('AWS KMS Key ID');
-    await user.clear(keyIdInput);
-    await user.type(keyIdInput, 'alias/authproxy-v2');
+    fireEvent.change(keyIdInput, {target: {value: 'alias/authproxy-v2'}});
 
     await user.click(within(dialog).getByRole('button', {name: 'Save'}));
 

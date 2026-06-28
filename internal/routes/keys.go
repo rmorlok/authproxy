@@ -148,7 +148,7 @@ func (r *KeysRoutes) create(gctx *gin.Context) {
 		return
 	}
 	if err := apserde.ValidateNoRedactedPlaceholders(req); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -328,7 +328,7 @@ func (r *KeysRoutes) update(gctx *gin.Context) {
 		return
 	}
 	if err := apserde.ValidateNoRedactedPlaceholders(req); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}

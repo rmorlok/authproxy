@@ -64,24 +64,38 @@ describe('KeyDataForm helpers', () => {
     });
   });
 
-  it('round-trips API summaries into editable state', () => {
+  it('round-trips API key data into editable state', () => {
     expect(keyDataFormStateFromConfig({
-      type: 'aws_kms',
-      fields: {
-        aws_kms_key_id: 'alias/authproxy',
-        aws_region: 'us-east-1',
-        aws_credentials_type: 'implicit',
+      aws_kms_key_id: 'alias/authproxy',
+      aws_region: 'us-east-1',
+      aws_credentials: {
+        type: 'access_key',
+        access_key_id: '***************',
+        secret_access_key: '***************',
       },
-      sensitive_fields: ['aws_access_key_id', 'aws_secret_access_key'],
     })).toEqual({
       type: 'aws_kms',
       fields: {
         num_bytes: '32',
-        aws_credentials_type: 'implicit',
+        aws_credentials_type: 'access_key',
         aws_kms_key_id: 'alias/authproxy',
         aws_region: 'us-east-1',
+        aws_access_key_id: '***************',
+        aws_secret_access_key: '***************',
       },
     });
+  });
+
+  it('requires redacted secrets to be re-entered before saving key data', () => {
+    expect(validateKeyDataFormState({
+      type: 'aws_kms',
+      fields: {
+        aws_kms_key_id: 'alias/authproxy',
+        aws_credentials_type: 'access_key',
+        aws_access_key_id: '***************',
+        aws_secret_access_key: '***************',
+      },
+    })).toBe('AWS Access Key ID must be re-entered to update key data');
   });
 
   it('validates cloud provider required fields', () => {
