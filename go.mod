@@ -71,6 +71,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.41.0
 	golang.org/x/crypto v0.47.0
 	golang.org/x/time v0.12.0
+	golang.org/x/tools v0.40.0
 	google.golang.org/api v0.247.0
 	gopkg.in/h2non/gentleman-mock.v2 v2.0.0
 	gopkg.in/h2non/gentleman.v2 v2.0.5
@@ -203,7 +204,6 @@ require (
 	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.40.0 // indirect
 	golang.org/x/text v0.33.0 // indirect
-	golang.org/x/tools v0.40.0 // indirect
 	google.golang.org/genproto v0.0.0-20250603155806-513f23925822 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250929231259-57b25ae835d4 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250929231259-57b25ae835d4 // indirect
