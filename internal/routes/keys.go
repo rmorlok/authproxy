@@ -19,7 +19,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/routes/key_value"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	schemaapiopenapi "github.com/rmorlok/authproxy/internal/schema/api/openapi"
-	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
@@ -42,26 +41,22 @@ type ListKeysRequestQueryParams struct {
 	OrderByVal    *string            `form:"order_by"`
 }
 
-func KeyToJson(ek coreIface.Key) KeyJson {
+func KeyToJson(ctx context.Context, c coreIface.C, ek coreIface.Key) (KeyJson, error) {
+	keyData, err := c.GetKeyData(ctx, ek.GetId())
+	if err != nil {
+		return KeyJson{}, err
+	}
+
 	return KeyJson{
 		Id:          ek.GetId(),
 		Namespace:   ek.GetNamespace(),
 		State:       schemaapi.KeyState(ek.GetState()),
+		KeyData:     keyData,
 		Labels:      ek.GetLabels(),
 		Annotations: ek.GetAnnotations(),
 		CreatedAt:   ek.GetCreatedAt(),
 		UpdatedAt:   ek.GetUpdatedAt(),
-	}
-}
-
-func keyToJsonWithKeyData(ctx context.Context, c coreIface.C, ek coreIface.Key) (KeyJson, error) {
-	result := KeyToJson(ek)
-	keyData, err := c.GetKeyData(ctx, ek.GetId())
-	if err != nil {
-		return result, err
-	}
-	result.KeyData = keyData
-	return result, nil
+	}, nil
 }
 
 type KeysRoutes struct {
@@ -115,7 +110,7 @@ func (r *KeysRoutes) get(gctx *gin.Context) {
 		return
 	}
 
-	resp, err := keyToJsonWithKeyData(ctx, r.core, ek)
+	resp, err := KeyToJson(ctx, r.core, ek)
 	if err != nil {
 		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
@@ -196,7 +191,7 @@ func (r *KeysRoutes) create(gctx *gin.Context) {
 		}
 	}
 
-	resp, err := keyToJsonWithKeyData(ctx, r.core, ek)
+	resp, err := KeyToJson(ctx, r.core, ek)
 	if err != nil {
 		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
@@ -289,8 +284,21 @@ func (r *KeysRoutes) list(gctx *gin.Context) {
 		return
 	}
 
+	validated := auth.FilterForValidatedResources(val, result.Results)
+	jsonKeys := make([]KeyJson, 0, len(validated))
+
+	for _, ek := range validated {
+		resp, err := KeyToJson(ctx, r.core, ek)
+		if err != nil {
+			apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+			val.MarkErrorReturn()
+			return
+		}
+		jsonKeys = append(jsonKeys, resp)
+	}
+
 	apgin.APIJSON(gctx, http.StatusOK, ListKeysResponseJson{
-		Items:  util.Map(auth.FilterForValidatedResources(val, result.Results), KeyToJson),
+		Items:  jsonKeys,
 		Cursor: result.Cursor,
 	})
 }
@@ -450,7 +458,7 @@ func (r *KeysRoutes) update(gctx *gin.Context) {
 		return
 	}
 
-	resp, err := keyToJsonWithKeyData(ctx, r.core, ek)
+	resp, err := KeyToJson(ctx, r.core, ek)
 	if err != nil {
 		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
