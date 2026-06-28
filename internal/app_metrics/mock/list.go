@@ -96,7 +96,11 @@ func (l *MockListRequestBuilderExecutor) ForStatusCodeRangeInclusive(start, end 
 }
 
 func (l *MockListRequestBuilderExecutor) ForParsedStatusCodeRange(r string) (app_metrics.ListRequestBuilder, error) {
-	// No op
+	start, end, err := util.ParseHTTPStatusCodeRange(r)
+	if err != nil {
+		return nil, err
+	}
+	l.StatusCodeRangeInclusive = []int{start, end}
 	return l, nil
 }
 

@@ -107,6 +107,53 @@ func TestRequestEventsRoutes(t *testing.T) {
 			require.Len(t, resp.Items, 0)
 		})
 
+		t.Run("status code range shorthand", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/metrics/request-events?status_code_range=5xx",
+				nil,
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "request-events", "list"),
+			)
+			require.NoError(t, err)
+
+			b := mock.MockListRequestBuilderExecutor{
+				ReturnResults: pagination.PageResult[*app_metrics.LogRecord]{},
+			}
+
+			tu.MockRetriever.EXPECT().
+				NewListRequestsBuilder().
+				Return(&b)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+			require.Equal(t, []int{500, 599}, b.StatusCodeRangeInclusive)
+		})
+
+		t.Run("bad status code range", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/metrics/request-events?status_code_range=$status",
+				nil,
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "request-events", "list"),
+			)
+			require.NoError(t, err)
+
+			b := mock.MockListRequestBuilderExecutor{}
+
+			tu.MockRetriever.EXPECT().
+				NewListRequestsBuilder().
+				Return(&b)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code)
+		})
+
 		t.Run("results", func(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(

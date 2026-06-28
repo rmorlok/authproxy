@@ -484,7 +484,7 @@ func (l *sqlListRequestsBuilder) ForStatusCodeRangeInclusive(start, end int) Lis
 }
 
 func (l *sqlListRequestsBuilder) ForParsedStatusCodeRange(r string) (ListRequestBuilder, error) {
-	start, end, err := util.ParseIntegerRange(r, 100, 999)
+	start, end, err := util.ParseHTTPStatusCodeRange(r)
 	if err != nil {
 		return nil, err
 	}

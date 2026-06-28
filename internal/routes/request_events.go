@@ -104,14 +104,14 @@ func (q *ListRequestEventsQuery) ApplyToBuilder(
 	if q.StatusCodeRangeInclusive != nil {
 		b, err = b.ForParsedStatusCodeRange(*q.StatusCodeRangeInclusive)
 		if err != nil {
-			return nil, err
+			return nil, httperr.BadRequest("invalid status_code_range", httperr.WithInternalErr(err))
 		}
 	}
 
 	if q.TimestampRange != nil {
 		b, err = b.ForParsedTimestampRange(*q.TimestampRange)
 		if err != nil {
-			return nil, err
+			return nil, httperr.BadRequest("invalid timestamp_range", httperr.WithInternalErr(err))
 		}
 	}
 
@@ -126,14 +126,14 @@ func (q *ListRequestEventsQuery) ApplyToBuilder(
 	if q.PathRegex != nil {
 		b, err = b.ForPathRegex(*q.PathRegex)
 		if err != nil {
-			return nil, err
+			return nil, httperr.BadRequest("invalid path_regex", httperr.WithInternalErr(err))
 		}
 	}
 
 	if q.LabelSelector != nil {
 		b, err = b.ForLabelSelector(*q.LabelSelector)
 		if err != nil {
-			return nil, err
+			return nil, httperr.BadRequest("invalid label_selector", httperr.WithInternalErr(err))
 		}
 	}
 
