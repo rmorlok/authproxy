@@ -41,6 +41,9 @@ say "Checking integration_tests module (go list -mod=readonly)"
 say "Checking workflow guardrails"
 "$ROOT_DIR/scripts/check-workflows.sh" >/dev/null
 
+say "Checking route JSON rendering guardrails"
+go run ./tools/check-gin-json-rendering >/dev/null
+
 say "Checking schema package layout"
 "$ROOT_DIR/scripts/check-schema-layout.sh" >/dev/null
 
