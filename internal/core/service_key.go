@@ -73,7 +73,7 @@ func (s *service) GetKeyData(ctx context.Context, id apid.ID) (*cfgschema.KeyDat
 	}
 
 	if ek.EncryptedKeyData == nil || ek.EncryptedKeyData.IsZero() {
-		return nil, errors.New("key data is not configured")
+		return nil, ErrKeyDataNotConfigured
 	}
 
 	keyDataBytes, err := s.encrypt.Decrypt(ctx, *ek.EncryptedKeyData)

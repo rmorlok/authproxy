@@ -783,7 +783,11 @@ func (r *ConnectionsRoutes) retry(gctx *gin.Context) {
 
 	var req RetryConnectionRequest
 	// Body is optional — return_to_url is only needed when the connector has no preconnect steps.
-	_ = gctx.ShouldBindBodyWithJSON(&req)
+	if err := bindOptionalJSONBody(gctx, &req); err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
+		val.MarkErrorReturn()
+		return
+	}
 
 	resp, err := r.core.RetryConnectionSetup(ctx, id, req.ReturnToUrl)
 	if err != nil {
@@ -847,7 +851,11 @@ func (r *ConnectionsRoutes) reauth(gctx *gin.Context) {
 
 	var req ReauthConnectionRequest
 	// Body is optional — return_to_url is only needed for OAuth2 connectors with no preconnect steps.
-	_ = gctx.ShouldBindBodyWithJSON(&req)
+	if err := bindOptionalJSONBody(gctx, &req); err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
+		val.MarkErrorReturn()
+		return
+	}
 
 	resp, err := r.core.ReauthConnection(ctx, id, req.ReturnToUrl)
 	if err != nil {

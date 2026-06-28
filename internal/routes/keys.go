@@ -42,21 +42,41 @@ type ListKeysRequestQueryParams struct {
 }
 
 func KeyToJson(ctx context.Context, c coreIface.C, ek coreIface.Key) (KeyJson, error) {
+	return keyToJson(ctx, c, ek, false)
+}
+
+func KeyToJsonOmitUnconfiguredData(ctx context.Context, c coreIface.C, ek coreIface.Key) (KeyJson, error) {
+	resp, err := keyToJson(ctx, c, ek, true)
+	if errors.Is(err, core.ErrKeyDataNotConfigured) {
+		return keyMetadataToJson(ek), nil
+	}
+	return resp, err
+}
+
+func keyToJson(ctx context.Context, c coreIface.C, ek coreIface.Key, allowUnconfiguredKeyData bool) (KeyJson, error) {
 	keyData, err := c.GetKeyData(ctx, ek.GetId())
 	if err != nil {
+		if allowUnconfiguredKeyData && errors.Is(err, core.ErrKeyDataNotConfigured) {
+			return keyMetadataToJson(ek), nil
+		}
 		return KeyJson{}, err
 	}
 
+	resp := keyMetadataToJson(ek)
+	resp.KeyData = keyData
+	return resp, nil
+}
+
+func keyMetadataToJson(ek coreIface.Key) KeyJson {
 	return KeyJson{
 		Id:          ek.GetId(),
 		Namespace:   ek.GetNamespace(),
 		State:       schemaapi.KeyState(ek.GetState()),
-		KeyData:     keyData,
 		Labels:      ek.GetLabels(),
 		Annotations: ek.GetAnnotations(),
 		CreatedAt:   ek.GetCreatedAt(),
 		UpdatedAt:   ek.GetUpdatedAt(),
-	}, nil
+	}
 }
 
 type KeysRoutes struct {
@@ -288,7 +308,7 @@ func (r *KeysRoutes) list(gctx *gin.Context) {
 	jsonKeys := make([]KeyJson, 0, len(validated))
 
 	for _, ek := range validated {
-		resp, err := KeyToJson(ctx, r.core, ek)
+		resp, err := KeyToJsonOmitUnconfiguredData(ctx, r.core, ek)
 		if err != nil {
 			apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
