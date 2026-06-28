@@ -17,7 +17,7 @@ func LoadConfig(path string) (C, error) {
 		return nil, err
 	}
 
-	schema, err := schema.CompileSchema(schema.SchemaIdConfig)
+	compiledSchema, err := schema.CompileSchema(sconfig.SchemaIdConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config schema: %w", err)
 	}
@@ -32,7 +32,7 @@ func LoadConfig(path string) (C, error) {
 		return nil, fmt.Errorf("failed to unmarshal config JSON for config schema validation: %w", err)
 	}
 
-	if err := schema.Validate(configAsParsedJson); err != nil {
+	if err := compiledSchema.Validate(configAsParsedJson); err != nil {
 		return nil, fmt.Errorf("config schema validation failed: %w", err)
 	}
 
