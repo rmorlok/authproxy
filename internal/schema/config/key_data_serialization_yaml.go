@@ -40,7 +40,7 @@ func (kd *KeyData) UnmarshalYAML(value *yaml.Node) error {
 		keyData = &KeyDataEnvBase64Var{}
 	case keys["path"]:
 		keyData = &KeyDataFile{}
-	case keys["random"]:
+	case keys["random"] || keys["num_bytes"]:
 		keyData = &KeyDataRandomBytes{}
 	case keys["vault_transit_key_name"]:
 		keyData = &KeyDataVaultTransit{}
@@ -61,7 +61,7 @@ func (kd *KeyData) UnmarshalYAML(value *yaml.Node) error {
 	}
 
 	if keyData == nil {
-		return fmt.Errorf("invalid structure for key data type; does not match value, base64, env_var, env_var_base64, path, random, vault_address, vault_transit_key_name, aws_kms_key_id, aws_secret_id, gcp_kms_key_name, gcp_secret_name, mock_id, mock_kms_id")
+		return fmt.Errorf("invalid structure for key data type; does not match value, base64, env_var, env_var_base64, path, random, num_bytes, vault_address, vault_transit_key_name, aws_kms_key_id, aws_secret_id, gcp_kms_key_name, gcp_secret_name, mock_id, mock_kms_id")
 	}
 
 	if err := value.Decode(keyData); err != nil {
