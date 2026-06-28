@@ -1,3 +1,4 @@
+import React from 'react';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import FormControl from '@mui/material/FormControl';
@@ -41,7 +42,6 @@ export const keySourceTypes: { label: string; value: KeySourceType }[] = [
   {label: 'HashiCorp Vault Transit', value: 'hashicorp_vault_transit'},
 ];
 
-const supportedKeySourceTypes = new Set(keySourceTypes.map(opt => opt.value));
 const keySourceTypeLabels = new Map(keySourceTypes.map(opt => [opt.value, opt.label]));
 
 const providerFieldNames = [
