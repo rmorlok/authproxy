@@ -157,6 +157,8 @@ func TestResolveBuilderWithGrafanaPreset(t *testing.T) {
 		Resources: []string{"request-events"},
 		Verbs:     []string{"list"},
 	})
+	require.True(t, claims.ActorSigned)
+	require.False(t, claims.SystemSigned)
 }
 
 func TestResolveBuilderNoExpiryOverridesGrafanaDefault(t *testing.T) {
