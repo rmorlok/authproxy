@@ -585,7 +585,7 @@ func (l *listRateLimitsFilters) Limit(limit int32) ListRateLimitsBuilder {
 }
 
 func (l *listRateLimitsFilters) ForNamespaceMatcher(matcher string) ListRateLimitsBuilder {
-	if err := namespace.ValidateNamespaceMatcher(matcher); err != nil {
+	if err := namespace.ValidateMatcher(matcher); err != nil {
 		return l.addError(err)
 	}
 	l.NamespaceMatchers = []string{matcher}
@@ -594,7 +594,7 @@ func (l *listRateLimitsFilters) ForNamespaceMatcher(matcher string) ListRateLimi
 
 func (l *listRateLimitsFilters) ForNamespaceMatchers(matchers []string) ListRateLimitsBuilder {
 	for _, matcher := range matchers {
-		if err := namespace.ValidateNamespaceMatcher(matcher); err != nil {
+		if err := namespace.ValidateMatcher(matcher); err != nil {
 			return l.addError(err)
 		}
 	}

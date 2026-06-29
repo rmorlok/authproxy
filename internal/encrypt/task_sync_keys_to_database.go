@@ -35,7 +35,7 @@ func NewSyncKeysToDatabaseTask() *asynq.Task {
 // ensureRootNamespaceHasKeySet makes sure the root namespace has a key set. If it does not, it sets
 // it to the global key. If it has a key, it leaves it unchanged.
 func ensureRootNamespaceHasKeySet(ctx context.Context, db database.DB) error {
-	rootNamespace, err := db.GetNamespace(ctx, namespace.RootNamespace)
+	rootNamespace, err := db.GetNamespace(ctx, namespace.Root)
 	if errors.Is(err, database.ErrNotFound) {
 		return nil
 	}
@@ -46,7 +46,7 @@ func ensureRootNamespaceHasKeySet(ctx context.Context, db database.DB) error {
 		return nil
 	}
 
-	_, err = db.SetNamespaceKeyId(ctx, namespace.RootNamespace, &globalEncryptionKeyID)
+	_, err = db.SetNamespaceKeyId(ctx, namespace.Root, &globalEncryptionKeyID)
 	return err
 }
 
@@ -225,7 +225,7 @@ func reconcileNamespaceEncryptionTargets(
 					resolvedDEKID = currentDEK.Id
 				} else {
 					// Inherit from nearest ancestor with a resolved DEK.
-					prefixes := namespace.SplitNamespacePathToPrefixes(target.Path)
+					prefixes := namespace.SplitPathToPrefixes(target.Path)
 					found := false
 					for i := len(prefixes) - 2; i >= 0; i-- {
 						if dekID, ok := effectiveDEK[prefixes[i]]; ok {

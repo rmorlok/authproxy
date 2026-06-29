@@ -272,7 +272,7 @@ func TestGetEffectiveNamespaceMatchers(t *testing.T) {
 			resource:      "connections",
 			verb:          "list",
 			queryMatcher:  nil,
-			expected:      []string{namespace.NamespaceNoMatchSentinel},
+			expected:      []string{namespace.NoMatchSentinel},
 		},
 		{
 			name:          "authenticated with no matching permissions returns empty",
@@ -338,7 +338,7 @@ func TestGetEffectiveNamespaceMatchers(t *testing.T) {
 			resource:      "connections",
 			verb:          "list",
 			queryMatcher:  strPtr("root.staging"),
-			expected:      []string{namespace.NamespaceNoMatchSentinel},
+			expected:      []string{namespace.NoMatchSentinel},
 		},
 		{
 			name:          "wildcard resource permission",

@@ -100,7 +100,7 @@ func TestSchema(t *testing.T) {
 		t.Run(entity.name, func(t *testing.T) {
 			c := jsonschemav5.NewCompiler()
 			sid := loadSchema(t, c, "./schema.json")
-			require.Equal(t, SchemaIdNamespace, sid, "schema ID should be the same as the one in the schema")
+			require.Equal(t, SchemaId, sid, "schema ID should be the same as the one in the schema")
 
 			const testSchemaID = "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/schema/resources/namespace/test.json"
 			err := c.AddResource(testSchemaID, strings.NewReader(strings.TrimSpace(`{

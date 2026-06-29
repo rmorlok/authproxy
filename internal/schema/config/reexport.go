@@ -24,21 +24,21 @@ type (
 	StringValueFile         = common.StringValueFile
 )
 
-// Re-export functions from the common sub-package
+// Re-export functions from the common and namespace sub-packages
 var (
 	KindToString                 = common.KindToString
 	MarshalToYamlString          = common.MarshalToYamlString
 	MustMarshalToYamlString      = common.MustMarshalToYamlString
 	NewStringValueDirect         = common.NewStringValueDirect
 	NewStringValueDirectInline   = common.NewStringValueDirectInline
-	ValidateNamespacePath        = nschema.ValidateNamespacePath
-	SplitNamespacePathToPrefixes = nschema.SplitNamespacePathToPrefixes
-	NamespacePathFromRoot        = nschema.NamespacePathFromRoot
+	ValidateNamespacePath        = nschema.ValidatePath
+	SplitNamespacePathToPrefixes = nschema.SplitPathToPrefixes
+	NamespacePathFromRoot        = nschema.PathFromRoot
 )
 
-// Re-export constants from the connectors sub-package
+// Re-export constants from the namespace sub-package
 var (
-	RootNamespace = nschema.RootNamespace
+	RootNamespace = nschema.Root
 )
 
 // Re-export types from the connectors sub-package

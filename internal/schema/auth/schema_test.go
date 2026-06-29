@@ -34,7 +34,7 @@ func TestSchema(t *testing.T) {
 	c := jsonschemav5.NewCompiler()
 
 	nsid := loadSchema(t, c, "../resources/namespace/schema.json")
-	require.Equal(t, nschema.SchemaIdNamespace, nsid)
+	require.Equal(t, nschema.SchemaId, nsid)
 
 	sid := loadSchema(t, c, "./schema.json")
 	require.Equal(t, SchemaIdAuth, sid, "schema ID should be the same as the one in the schema")

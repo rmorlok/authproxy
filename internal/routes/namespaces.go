@@ -138,7 +138,7 @@ func (r *NamespacesRoutes) create(gctx *gin.Context) {
 		return
 	}
 
-	if err := namespace.ValidateNamespacePath(req.Path); err != nil {
+	if err := namespace.ValidatePath(req.Path); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid namespace path '%s': %s", req.Path, err.Error()))
 		val.MarkErrorReturn()
 		return
@@ -249,7 +249,7 @@ func (r *NamespacesRoutes) list(gctx *gin.Context) {
 		}
 
 		if req.ChildrenOf != nil {
-			if err := namespace.ValidateNamespacePath(*req.ChildrenOf); err != nil {
+			if err := namespace.ValidatePath(*req.ChildrenOf); err != nil {
 				apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid children_of namespace '%s': %s", *req.ChildrenOf, err.Error()))
 				val.MarkErrorReturn()
 				return
@@ -259,7 +259,7 @@ func (r *NamespacesRoutes) list(gctx *gin.Context) {
 		}
 
 		if req.NamespaceVal != nil {
-			if err := namespace.ValidateNamespaceMatcher(*req.NamespaceVal); err != nil {
+			if err := namespace.ValidateMatcher(*req.NamespaceVal); err != nil {
 				apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid namespace matcher '%s': %s", *req.NamespaceVal, err.Error()))
 				val.MarkErrorReturn()
 				return

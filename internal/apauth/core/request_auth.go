@@ -136,7 +136,7 @@ func (ra *RequestAuth) GetNamespacesAllowed(resource, verb string) []string {
 				}
 
 				for _, candidateNamespace := range candidateNamespaces {
-					if restricted, ok := namespace.NamespaceMatcherConstrained(restrictionNamespace, candidateNamespace); ok {
+					if restricted, ok := namespace.ConstrainMatcher(restrictionNamespace, candidateNamespace); ok {
 						finalNamespaces = append(finalNamespaces, restricted)
 					}
 				}

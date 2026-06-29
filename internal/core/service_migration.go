@@ -47,7 +47,7 @@ func (s *service) Migrate(ctx context.Context) error {
 }
 
 func (s *service) MigrateNamespaces(ctx context.Context) error {
-	namespaces := []string{namespace.RootNamespace}
+	namespaces := []string{namespace.Root}
 
 	cfgRoot := s.cfg.GetRoot()
 	if cfgRoot == nil {
@@ -58,7 +58,7 @@ func (s *service) MigrateNamespaces(ctx context.Context) error {
 		namespaces = append(namespaces, configConnector.GetNamespace())
 	}
 
-	prefixOrderedList := namespace.SplitNamespacePathsToPrefixes(namespaces)
+	prefixOrderedList := namespace.SplitPathsToPrefixes(namespaces)
 
 	// Because prefixOrderedList is in the appropriate order, this list will also be in the appropriate order
 	toCreatePaths := make([]string, 0)

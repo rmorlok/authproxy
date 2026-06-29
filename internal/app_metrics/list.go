@@ -136,7 +136,7 @@ func (l *ListFilters) SetOrderBy(field RequestOrderByField, by pagination.OrderB
 }
 
 func (l *ListFilters) SetNamespaceMatcher(matcher string) error {
-	if err := namespace.ValidateNamespaceMatcher(matcher); err != nil {
+	if err := namespace.ValidateMatcher(matcher); err != nil {
 		return err
 	}
 	l.NamespaceMatchers = []string{matcher}
@@ -145,7 +145,7 @@ func (l *ListFilters) SetNamespaceMatcher(matcher string) error {
 
 func (l *ListFilters) SetNamespaceMatchers(matchers []string) error {
 	for _, matcher := range matchers {
-		if err := namespace.ValidateNamespaceMatcher(matcher); err != nil {
+		if err := namespace.ValidateMatcher(matcher); err != nil {
 			return err
 		}
 	}

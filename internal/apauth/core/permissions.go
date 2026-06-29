@@ -52,7 +52,7 @@ func matchesNamespace(actor *Actor, p aschema.Permission, targetNamespace string
 		return false
 	}
 
-	if targetNamespace == namespace.NamespaceSkipNamespacePermissionChecks {
+	if targetNamespace == namespace.SkipPermissionChecks {
 		return true
 	}
 
@@ -61,7 +61,7 @@ func matchesNamespace(actor *Actor, p aschema.Permission, targetNamespace string
 		return false
 	}
 
-	return namespace.NamespaceMatches(matcher, targetNamespace)
+	return namespace.Matches(matcher, targetNamespace)
 }
 
 // renderPermissionNamespace applies templating to a given namespace string and returns
@@ -93,7 +93,7 @@ func renderValidPermissionNamespace(actor *Actor, ns string) (string, bool) {
 		return "", false
 	}
 
-	if err := namespace.ValidateNamespaceMatcher(rendered); err != nil {
+	if err := namespace.ValidateMatcher(rendered); err != nil {
 		return "", false
 	}
 

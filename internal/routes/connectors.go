@@ -512,7 +512,7 @@ func (r *ConnectorsRoutes) createConnector(gctx *gin.Context) {
 		return
 	}
 
-	if err := namespace.ValidateNamespacePath(req.Namespace); err != nil {
+	if err := namespace.ValidatePath(req.Namespace); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid namespace '%s': %s", req.Namespace, err.Error()))
 		val.MarkErrorReturn()
 		return

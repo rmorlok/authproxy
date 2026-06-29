@@ -35,7 +35,7 @@ func (icr *InitiateConnectionRequest) Validate() error {
 	}
 
 	if icr.HasIntoNamespace() {
-		if err := nschema.ValidateNamespacePath(icr.IntoNamespace); err != nil {
+		if err := nschema.ValidatePath(icr.IntoNamespace); err != nil {
 			result = multierror.Append(result, err)
 		}
 	}

@@ -107,7 +107,7 @@ func (l *listConnectorsFilters) ForStates(states []ConnectorVersionState) ListCo
 }
 
 func (l *listConnectorsFilters) ForNamespaceMatcher(matcher string) ListConnectorsBuilder {
-	if err := namespace.ValidateNamespaceMatcher(matcher); err != nil {
+	if err := namespace.ValidateMatcher(matcher); err != nil {
 		return l.addError(err)
 	} else {
 		l.NamespaceMatchers = []string{matcher}
@@ -118,7 +118,7 @@ func (l *listConnectorsFilters) ForNamespaceMatcher(matcher string) ListConnecto
 
 func (l *listConnectorsFilters) ForNamespaceMatchers(matchers []string) ListConnectorsBuilder {
 	for _, matcher := range matchers {
-		if err := namespace.ValidateNamespaceMatcher(matcher); err != nil {
+		if err := namespace.ValidateMatcher(matcher); err != nil {
 			return l.addError(err)
 		}
 	}

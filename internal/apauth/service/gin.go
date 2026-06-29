@@ -36,7 +36,7 @@ func applyAuthToGinContext(c *gin.Context, ra *core.RequestAuth) {
 	ctx := c.Request.Context()
 	ctx = ra.ContextWith(ctx)
 	ctx = apserde.WithSecretReplay(ctx, ra.Allows(
-		namespace.NamespaceSkipNamespacePermissionChecks,
+		namespace.SkipPermissionChecks,
 		apserde.SecretResource,
 		apserde.SecretReplayVerb,
 		"",

@@ -440,7 +440,7 @@ func (r *ActorsRoutes) create(gctx *gin.Context) {
 	}
 
 	// Validate namespace path
-	if err := namespace.ValidateNamespacePath(req.Namespace); err != nil {
+	if err := namespace.ValidatePath(req.Namespace); err != nil {
 		apgin.WriteError(gctx, r.logger, httperr.BadRequest(fmt.Sprintf("invalid namespace '%s': %s", req.Namespace, err.Error()), httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return

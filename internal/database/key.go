@@ -725,7 +725,7 @@ func (l *listKeysFilters) ForState(state KeyState) ListKeysBuilder {
 }
 
 func (l *listKeysFilters) ForNamespaceMatcher(matcher string) ListKeysBuilder {
-	if err := namespace.ValidateNamespaceMatcher(matcher); err != nil {
+	if err := namespace.ValidateMatcher(matcher); err != nil {
 		return l.addError(err)
 	}
 	l.NamespaceMatchers = []string{matcher}
@@ -734,7 +734,7 @@ func (l *listKeysFilters) ForNamespaceMatcher(matcher string) ListKeysBuilder {
 
 func (l *listKeysFilters) ForNamespaceMatchers(matchers []string) ListKeysBuilder {
 	for _, matcher := range matchers {
-		if err := namespace.ValidateNamespaceMatcher(matcher); err != nil {
+		if err := namespace.ValidateMatcher(matcher); err != nil {
 			return l.addError(err)
 		}
 	}

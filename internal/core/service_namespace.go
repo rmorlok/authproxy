@@ -30,13 +30,13 @@ func (s *service) enqueueNamespaceLabelPropagation(ctx context.Context, nsPath s
 }
 
 func (s *service) EnsureNamespaceAncestorPath(ctx context.Context, targetNamespace string, labels map[string]string) (iface.Namespace, error) {
-	if err := namespace.ValidateNamespacePath(targetNamespace); err != nil {
+	if err := namespace.ValidatePath(targetNamespace); err != nil {
 		return nil, err
 	}
 
 	var err error
 	var final *database.Namespace
-	for _, ns := range namespace.SplitNamespacePathToPrefixes(targetNamespace) {
+	for _, ns := range namespace.SplitPathToPrefixes(targetNamespace) {
 		final, err = s.db.GetNamespace(ctx, ns)
 		if err != nil {
 			if errors.Is(err, database.ErrNotFound) {
