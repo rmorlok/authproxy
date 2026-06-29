@@ -187,12 +187,17 @@ rollouts and catalog refreshes can be run independently. One-time setup:
    | `AWS_REGION`    | `us-east-1`      |
    | `EKS_CLUSTER`   | `authproxy-eks`  |
    | `DEMO_HOSTNAME` | `demo.authproxy.net` |
+   | `DEMO_GRAFANA_ADMIN_USER` | `admin` |
 
    (The Let's Encrypt email is configured on the bootstrap chart's
    ClusterIssuer at install time — see Section 1.8 — and isn't
    re-passed per deploy.)
 
    `AWS_ROLE_ARN` should already be set as a Secret from Section 1.6.
+   Set `DEMO_GRAFANA_ADMIN_PASSWORD` as an optional Secret when you want a
+   known Grafana admin password. If it is absent, `Deploy Demo` generates a
+   random password on the first deploy and reuses the resulting
+   `authproxy-grafana-admin` Kubernetes Secret.
 
 3. **Confirm the `gha-eks` environment** (from Section 1.6) exists.
    No required reviewers = fully automatic deploys; add reviewers in

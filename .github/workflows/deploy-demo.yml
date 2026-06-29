@@ -18,6 +18,9 @@ name: Deploy Demo
 #     and demo-minio-creds.
 #   - Repo secret AWS_ROLE_ARN.
 #   - Repo variables AWS_REGION, EKS_CLUSTER, and DEMO_HOSTNAME.
+#   - Optional: repo variable DEMO_GRAFANA_ADMIN_USER and repo secret
+#     DEMO_GRAFANA_ADMIN_PASSWORD. If unset, the workflow generates and
+#     preserves random Grafana admin credentials in the cluster.
 
 on:
   workflow_run:
@@ -237,6 +240,31 @@ jobs:
             --dry-run=client -o yaml \
             | kubectl apply -f -
 
+      - name: Provision Grafana admin credentials
+        env:
+          GRAFANA_ADMIN_USER: ${{ vars.DEMO_GRAFANA_ADMIN_USER || 'admin' }}
+          GRAFANA_ADMIN_PASSWORD: ${{ secrets.DEMO_GRAFANA_ADMIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          username="${GRAFANA_ADMIN_USER:-admin}"
+          password="${GRAFANA_ADMIN_PASSWORD:-}"
+
+          if [ -z "${password}" ] && kubectl -n "${RELEASE_NS}" get secret authproxy-grafana-admin >/dev/null 2>&1; then
+            echo "Reusing authproxy-grafana-admin"
+            exit 0
+          fi
+
+          if [ -z "${password}" ]; then
+            password="$(openssl rand -base64 32)"
+          fi
+
+          kubectl -n "${RELEASE_NS}" create secret generic authproxy-grafana-admin \
+            --from-literal=username="${username}" \
+            --from-literal=password="${password}" \
+            --dry-run=client -o yaml \
+            | kubectl apply -f -
+
       - name: Render Kustomize overlay
         id: render
         env:
@@ -263,6 +291,10 @@ jobs:
           grep -Fq "image: ghcr.io/rmorlok/authproxy-demo-grafana:${IMAGE_TAG}" "${manifest}"
           grep -Fq "host: ${DEMO_HOSTNAME}" "${manifest}"
           grep -Fq "value: https://${DEMO_HOSTNAME}/grafana" "${manifest}"
+          perl -0ne 'exit(/name: GF_AUTH_DISABLE_LOGIN_FORM\s*\n\s*value: "false"/ ? 0 : 1)' "${manifest}"
+          grep -Fq "name: GF_SECURITY_ADMIN_USER" "${manifest}"
+          grep -Fq "name: GF_SECURITY_ADMIN_PASSWORD" "${manifest}"
+          grep -Fq "name: authproxy-grafana-admin" "${manifest}"
 
       - name: Apply Kustomize manifest
         run: |
@@ -368,6 +400,20 @@ jobs:
           curl -fsS "${SMOKE_BASE_URL}/config.json" -o "${config_json}"
           grep -Fq "\"url\":\"${SMOKE_BASE_URL}/grafana\"" "${config_json}"
           curl -fsS "${SMOKE_BASE_URL}/grafana/api/health" -o /dev/null
+
+          grafana_user="$(kubectl -n "${RELEASE_NS}" get secret authproxy-grafana-admin -o jsonpath='{.data.username}' | base64 -d)"
+          grafana_password="$(kubectl -n "${RELEASE_NS}" get secret authproxy-grafana-admin -o jsonpath='{.data.password}' | base64 -d)"
+          jq -n \
+            --arg user "${grafana_user}" \
+            --arg password "${grafana_password}" \
+            '{user: $user, password: $password}' \
+            > "${RUNNER_TEMP}/grafana-login.json"
+          curl -fsS \
+            -c "${RUNNER_TEMP}/grafana.cookies" \
+            -H 'Content-Type: application/json' \
+            --data-binary @"${RUNNER_TEMP}/grafana-login.json" \
+            "${SMOKE_BASE_URL}/grafana/login" \
+            -o /dev/null
 
       - name: Smoke test (live service)
         id: smoke
