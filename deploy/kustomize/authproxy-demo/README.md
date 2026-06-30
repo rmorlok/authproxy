@@ -41,6 +41,14 @@ that match the existing release convention after `namePrefix` is applied:
 - `<env>-demo-shell-key`
 - `<env>-db` and `<env>-redis-creds` for the demo overlay
 
+The demo Grafana deployment keeps anonymous viewer access enabled, but also
+allows username/password login for admin exploration. `Deploy Demo` creates or
+reuses the unprefixed `authproxy-grafana-admin` Secret in the demo namespace.
+Set the `DEMO_GRAFANA_ADMIN_USER` repo variable and
+`DEMO_GRAFANA_ADMIN_PASSWORD` repo secret to control those credentials; if the
+password is unset, the first deploy generates a random password and stores it
+in the cluster Secret.
+
 Seeding is intentionally not part of the Kustomize deployment apply. Run the
 `Seed Demo` GitHub Actions workflow to reseed the persistent demo environment
 on demand; it renders `overlays/demo/seed` and applies the resulting Job.
