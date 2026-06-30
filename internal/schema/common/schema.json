@@ -264,6 +264,30 @@
       ],
       "description": "A integer value used in configuration that can be expressed in on of several ways."
     },
+    "AwsCredentialsAccessKey": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "access_key" },
+        "access_key_id": { "$ref": "#/$defs/StringValue" },
+        "secret_access_key": { "$ref": "#/$defs/StringValue" }
+      },
+      "required": ["type", "access_key_id", "secret_access_key"],
+      "additionalProperties": false
+    },
+    "AwsCredentialsImplicit": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "implicit" }
+      },
+      "required": ["type"],
+      "additionalProperties": false
+    },
+    "AwsCredentials": {
+      "oneOf": [
+        { "$ref": "#/$defs/AwsCredentialsAccessKey" },
+        { "$ref": "#/$defs/AwsCredentialsImplicit" }
+      ]
+    },
     "StringValueBool": {
       "oneOf": [
         { "$ref": "#/$defs/StringValueInlineBool" },

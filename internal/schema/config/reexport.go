@@ -3,6 +3,7 @@ package config
 import (
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	keyschema "github.com/rmorlok/authproxy/internal/schema/resources/key"
 	nschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 )
 
@@ -22,6 +23,11 @@ type (
 	StringValueEnvVar       = common.StringValueEnvVar
 	StringValueEnvVarBase64 = common.StringValueEnvVarBase64
 	StringValueFile         = common.StringValueFile
+	AwsCredentials          = common.AwsCredentials
+	AwsCredentialsImpl      = common.AwsCredentialsImpl
+	AwsCredentialsType      = common.AwsCredentialsType
+	AwsCredentialsAccessKey = common.AwsCredentialsAccessKey
+	AwsCredentialsImplicit  = common.AwsCredentialsImplicit
 )
 
 // Re-export functions from the common and namespace sub-packages
@@ -86,4 +92,77 @@ const (
 	TokenEndpointAuthClientSecretPost  = connectors.TokenEndpointAuthClientSecretPost
 	TokenEndpointAuthClientSecretBasic = connectors.TokenEndpointAuthClientSecretBasic
 	TokenEndpointAuthNone              = connectors.TokenEndpointAuthNone
+)
+
+// Re-export types from the key resource sub-package
+type (
+	Key                                = keyschema.Key
+	KeyType                            = keyschema.KeyType
+	KeyShared                          = keyschema.KeyShared
+	KeyPublicPrivate                   = keyschema.KeyPublicPrivate
+	KeyData                            = keyschema.KeyData
+	KeyDataType                        = keyschema.KeyDataType
+	KeyDataValue                       = keyschema.KeyDataValue
+	KeyDataBase64Val                   = keyschema.KeyDataBase64Val
+	KeyDataEnvVar                      = keyschema.KeyDataEnvVar
+	KeyDataEnvBase64Var                = keyschema.KeyDataEnvBase64Var
+	KeyDataFile                        = keyschema.KeyDataFile
+	KeyDataRandomBytes                 = keyschema.KeyDataRandomBytes
+	KeyDataAwsSecret                   = keyschema.KeyDataAwsSecret
+	KeyDataAwsKMS                      = keyschema.KeyDataAwsKMS
+	KeyDataGcpSecret                   = keyschema.KeyDataGcpSecret
+	KeyDataGcpKMS                      = keyschema.KeyDataGcpKMS
+	KeyDataVault                       = keyschema.KeyDataVault
+	KeyDataVaultTransit                = keyschema.KeyDataVaultTransit
+	KeyDataMock                        = keyschema.KeyDataMock
+	KeyDataMockKMS                     = keyschema.KeyDataMockKMS
+	KeyDataRawVal                      = keyschema.KeyDataRawVal
+	ProviderType                       = keyschema.ProviderType
+	KeyVersionProtectedData            = keyschema.KeyVersionProtectedData
+	KeyVersionInfo                     = keyschema.KeyVersionInfo
+	DataEncryptionKeyInfo              = keyschema.DataEncryptionKeyInfo
+	KeyWrappingKeyInfo                 = keyschema.KeyWrappingKeyInfo
+	GeneratedDataEncryptionKey         = keyschema.GeneratedDataEncryptionKey
+	KeyDataRequiresDataEncryptionKeys  = keyschema.KeyDataRequiresDataEncryptionKeys
+	KeyDataWrapsDataEncryptionKeys     = keyschema.KeyDataWrapsDataEncryptionKeys
+	KeyDataGeneratesDataEncryptionKeys = keyschema.KeyDataGeneratesDataEncryptionKeys
+)
+
+var (
+	DataHash                    = keyschema.DataHash
+	NewKeyDataRandomBytes       = keyschema.NewKeyDataRandomBytes
+	ResetKeyDataMockRegistry    = keyschema.ResetKeyDataMockRegistry
+	NewKeyDataMock              = keyschema.NewKeyDataMock
+	KeyDataMockAddVersion       = keyschema.KeyDataMockAddVersion
+	KeyDataMockSetVersions      = keyschema.KeyDataMockSetVersions
+	KeyDataMockRemoveVersion    = keyschema.KeyDataMockRemoveVersion
+	ResetKeyDataMockKMSRegistry = keyschema.ResetKeyDataMockKMSRegistry
+	NewKeyDataMockKMS           = keyschema.NewKeyDataMockKMS
+	KeyDataMockKMSAddVersion    = keyschema.KeyDataMockKMSAddVersion
+	KeyDataMockKMSWrap          = keyschema.KeyDataMockKMSWrap
+)
+
+// Re-export constants from the common and key resource sub-packages
+const (
+	AwsCredentialsTypeAccessKey = common.AwsCredentialsTypeAccessKey
+	AwsCredentialsTypeImplicit  = common.AwsCredentialsTypeImplicit
+
+	ProviderTypeValue                 = keyschema.ProviderTypeValue
+	ProviderTypeBase64                = keyschema.ProviderTypeBase64
+	ProviderTypeEnvVar                = keyschema.ProviderTypeEnvVar
+	ProviderTypeEnvVarBase64          = keyschema.ProviderTypeEnvVarBase64
+	ProviderTypeFile                  = keyschema.ProviderTypeFile
+	ProviderTypeRandom                = keyschema.ProviderTypeRandom
+	ProviderTypeAwsSecretsManager     = keyschema.ProviderTypeAwsSecretsManager
+	ProviderTypeAwsKMS                = keyschema.ProviderTypeAwsKMS
+	ProviderTypeGcp                   = keyschema.ProviderTypeGcp
+	ProviderTypeGcpKMS                = keyschema.ProviderTypeGcpKMS
+	ProviderTypeHashicorpVault        = keyschema.ProviderTypeHashicorpVault
+	ProviderTypeHashicorpVaultTransit = keyschema.ProviderTypeHashicorpVaultTransit
+	ProviderTypeRaw                   = keyschema.ProviderTypeRaw
+	ProviderTypeMock                  = keyschema.ProviderTypeMock
+	ProviderTypeMockKMS               = keyschema.ProviderTypeMockKMS
+
+	DataEncryptionKeySize                      = keyschema.DataEncryptionKeySize
+	KeyVersionProtectedDataTypeAuthProxyAESGCM = keyschema.KeyVersionProtectedDataTypeAuthProxyAESGCM
 )

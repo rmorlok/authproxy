@@ -37,6 +37,7 @@ func compileRefSchema(t *testing.T, ref string) *jsonschemav5.Schema {
 	_ = loadSchema(t, c, "../resources/namespace/schema.json")
 	_ = loadSchema(t, c, "../resources/connectors/schema-oauth.json")
 	_ = loadSchema(t, c, "../resources/connectors/schema.json")
+	_ = loadSchema(t, c, "../resources/key/schema.json")
 	_ = loadSchema(t, c, "../resources/rate_limit/schema.json")
 	sid := loadSchema(t, c, "./schema.json")
 	require.Equal(t, SchemaIdAPI, sid)
