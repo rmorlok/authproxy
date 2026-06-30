@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/apid"
-	cfgschema "github.com/rmorlok/authproxy/internal/schema/config"
+	keyschema "github.com/rmorlok/authproxy/internal/schema/resources/key"
 )
 
 // KeyState is the API-visible lifecycle state of a key.
@@ -22,7 +22,7 @@ type KeyJson struct {
 	Id          apid.ID            `json:"id" yaml:"id" swaggertype:"string" example:"key_test550e8400abcd"`
 	Namespace   string             `json:"namespace" yaml:"namespace" example:"root.acme"`
 	State       KeyState           `json:"state" yaml:"state" swaggertype:"string" example:"active"`
-	KeyData     *cfgschema.KeyData `json:"key_data,omitempty" yaml:"key_data,omitempty"`
+	KeyData     *keyschema.KeyData `json:"key_data,omitempty" yaml:"key_data,omitempty"`
 	Labels      map[string]string  `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Annotations map[string]string  `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	CreatedAt   time.Time          `json:"created_at" yaml:"created_at"`
@@ -39,7 +39,7 @@ type ListKeysResponseJson struct {
 //	@Description	Request to create a new key
 type CreateKeyRequestJson struct {
 	Namespace   string             `json:"namespace" yaml:"namespace" example:"root.acme"`
-	KeyData     *cfgschema.KeyData `json:"key_data,omitempty" yaml:"key_data,omitempty"`
+	KeyData     *keyschema.KeyData `json:"key_data,omitempty" yaml:"key_data,omitempty"`
 	Labels      map[string]string  `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Annotations map[string]string  `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 }
@@ -49,7 +49,7 @@ type CreateKeyRequestJson struct {
 //	@Description	Request to update a key
 type UpdateKeyRequestJson struct {
 	State       *KeyState          `json:"state,omitempty" yaml:"state,omitempty"`
-	KeyData     *cfgschema.KeyData `json:"key_data,omitempty" yaml:"key_data,omitempty"`
+	KeyData     *keyschema.KeyData `json:"key_data,omitempty" yaml:"key_data,omitempty"`
 	Labels      *map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Annotations *map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 }
