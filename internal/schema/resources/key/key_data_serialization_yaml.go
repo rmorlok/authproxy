@@ -43,8 +43,6 @@ func (kd *KeyData) UnmarshalYAML(value *yaml.Node) error {
 		keyData = &KeyDataFile{}
 	case keys["random"] || keys["num_bytes"]:
 		keyData = &KeyDataRandomBytes{}
-	case keys["num_bytes"]:
-		keyData = &KeyDataRandomBytes{}
 	case keys["vault_transit_key_name"]:
 		keyData = &KeyDataVaultTransit{}
 	case keys["vault_address"]:
