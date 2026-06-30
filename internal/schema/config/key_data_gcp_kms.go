@@ -41,7 +41,7 @@ type KeyDataGcpKMS struct {
 	GcpCryptoKey       string       `json:"gcp_crypto_key,omitempty" yaml:"gcp_crypto_key,omitempty"`
 	GcpKMSEndpoint     string       `json:"gcp_kms_endpoint,omitempty" yaml:"gcp_kms_endpoint,omitempty"`
 	GcpCredentialsFile string       `json:"gcp_credentials_file,omitempty" yaml:"gcp_credentials_file,omitempty"`
-	GcpCredentialsJSON *StringValue `json:"gcp_credentials_json,omitempty" yaml:"gcp_credentials_json,omitempty"`
+	GcpCredentialsJSON *StringValue `json:"gcp_credentials_json,omitempty" yaml:"gcp_credentials_json,omitempty" apiredact:"secret"`
 	CacheTTL           string       `json:"cache_ttl,omitempty" yaml:"cache_ttl,omitempty"`
 
 	cache keyDataCache

@@ -146,12 +146,36 @@ type ConnectorLifecycleResponseJson struct {
 	ConnectorId apid.ID `json:"connector_id" swaggertype:"string" example:"cxr_test550e8400abcde"`
 }
 
+// KeyJson documents a managed key response.
+//
+//	@Description	Key API response
+type KeyJson struct {
+	Id          apid.ID                `json:"id" swaggertype:"string" example:"key_test550e8400abcd"`
+	Namespace   string                 `json:"namespace" example:"root.acme"`
+	State       string                 `json:"state" example:"active"`
+	KeyData     map[string]interface{} `json:"key_data,omitempty" swaggertype:"object"`
+	Labels      map[string]string      `json:"labels,omitempty"`
+	Annotations map[string]string      `json:"annotations,omitempty"`
+	CreatedAt   time.Time              `json:"created_at"`
+	UpdatedAt   time.Time              `json:"updated_at"`
+}
+
+// CreateKeyRequestJson documents the key creation body.
+//
+//	@Description	Request to create a key
+type CreateKeyRequestJson struct {
+	Namespace   string                 `json:"namespace" example:"root.acme"`
+	KeyData     map[string]interface{} `json:"key_data,omitempty"`
+	Labels      map[string]string      `json:"labels,omitempty"`
+	Annotations map[string]string      `json:"annotations,omitempty"`
+}
+
 // ListKeysResponseJson documents the paginated key list response.
 //
 //	@Description	Paginated list of keys
 type ListKeysResponseJson struct {
-	Items  []schemaapi.KeyJson `json:"items"`
-	Cursor string              `json:"cursor,omitempty"`
+	Items  []interface{} `json:"items"`
+	Cursor string        `json:"cursor,omitempty"`
 }
 
 // ListRequestEventsResponseJson documents the paginated request-events list response.
@@ -210,9 +234,10 @@ type TaskInfoJson struct {
 //
 //	@Description	Request to update a key
 type UpdateKeyRequestJson struct {
-	State       *string            `json:"state,omitempty" example:"disabled"`
-	Labels      *map[string]string `json:"labels,omitempty"`
-	Annotations *map[string]string `json:"annotations,omitempty"`
+	State       *string                 `json:"state,omitempty" example:"disabled"`
+	KeyData     *map[string]interface{} `json:"key_data,omitempty"`
+	Labels      *map[string]string      `json:"labels,omitempty"`
+	Annotations *map[string]string      `json:"annotations,omitempty"`
 }
 
 // RateLimitJson documents a rate-limit response while keeping the definition

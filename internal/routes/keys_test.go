@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -22,6 +23,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/apredis/mock"
+	"github.com/rmorlok/authproxy/internal/apserde"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/core"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -181,6 +183,28 @@ func TestKeys(t *testing.T) {
 			require.Equal(t, "root", resp.Namespace)
 			require.Equal(t, schemaapi.KeyStateActive, resp.State)
 			require.Equal(t, "test", resp.Labels["env"])
+		})
+
+		t.Run("redacts key data by default", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				fmt.Sprintf("/keys/%s", created.Id),
+				nil,
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "keys", "get"),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+			require.Equal(t, "true", w.Header().Get(apserde.RedactedHeader))
+
+			var raw map[string]any
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &raw))
+			keyData := raw["key_data"].(map[string]any)
+			require.Equal(t, strings.Repeat("*", len("test-key-data-value")), keyData["value"])
 		})
 
 		t.Run("allowed with matching resource id permission", func(t *testing.T) {
@@ -588,6 +612,25 @@ func TestKeys(t *testing.T) {
 
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusBadRequest, w.Code)
+		})
+
+		t.Run("bad request - redacted key data placeholder", func(t *testing.T) {
+			body := `{"key_data": {"value": "***"}}`
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPatch,
+				fmt.Sprintf("/keys/%s", created.Id),
+				bytes.NewBufferString(body),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code)
+			require.Contains(t, w.Body.String(), "redacted placeholder values")
 		})
 
 		t.Run("success - update state", func(t *testing.T) {

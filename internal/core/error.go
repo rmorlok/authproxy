@@ -9,4 +9,5 @@ var ErrConnectionNotFound = iface.ErrConnectionNotFound
 var ErrProtected = iface.ErrProtected
 var ErrDraftAlreadyExists = iface.ErrDraftAlreadyExists
 var ErrNotDraft = iface.ErrNotDraft
+var ErrKeyDataNotConfigured = iface.ErrKeyDataNotConfigured
 var ErrInvalidArgument = iface.ErrInvalidArgument

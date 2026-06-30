@@ -63,6 +63,73 @@ func (s *service) CreateKey(ctx context.Context, namespace string, keyData *cfgs
 	return wrapKey(*ek, s), nil
 }
 
+func (s *service) GetKeyData(ctx context.Context, id apid.ID) (*cfgschema.KeyData, error) {
+	ek, err := s.db.GetKey(ctx, id)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+
+	if ek.EncryptedKeyData == nil || ek.EncryptedKeyData.IsZero() {
+		return nil, ErrKeyDataNotConfigured
+	}
+
+	keyDataBytes, err := s.encrypt.Decrypt(ctx, *ek.EncryptedKeyData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt key data: %w", err)
+	}
+
+	var keyData cfgschema.KeyData
+	if err := json.Unmarshal(keyDataBytes, &keyData); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal key data: %w", err)
+	}
+
+	return &keyData, nil
+}
+
+func (s *service) UpdateKeyData(ctx context.Context, id apid.ID, keyData *cfgschema.KeyData) (iface.Key, error) {
+	if keyData == nil {
+		return nil, errors.New("key data cannot be nil")
+	}
+
+	ek, err := s.db.GetKey(ctx, id)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+
+	keyDataBytes, err := json.Marshal(keyData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal key data to JSON: %w", err)
+	}
+
+	ef, err := s.encrypt.EncryptKeyForNamespace(ctx, ek.Namespace, keyDataBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encrypt key data: %w", err)
+	}
+
+	updated, err := s.db.UpdateKey(ctx, id, map[string]interface{}{
+		"encrypted_key_data": ef,
+	})
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+
+	// A provider config replacement may change how DEKs are generated or
+	// wrapped, so reconcile immediately rather than waiting for the cron.
+	encrypt.EnqueueGenerateDataEncryptionKeysToDatabase(ctx, s.ac, s.logger)
+	encrypt.EnqueueForceSyncKeysToDatabase(ctx, s.r, s.ac, s.logger)
+
+	return wrapKey(*updated, s), nil
+}
+
 func (s *service) DeleteKey(ctx context.Context, id apid.ID) error {
 	err := s.db.DeleteKey(ctx, id)
 	if err != nil {

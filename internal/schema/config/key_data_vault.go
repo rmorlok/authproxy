@@ -16,7 +16,7 @@ import (
 // KeyDataVault retrieves an AES key from HashiCorp Vault.
 type KeyDataVault struct {
 	VaultAddress string `json:"vault_address" yaml:"vault_address"`
-	VaultToken   string `json:"vault_token" yaml:"vault_token"`
+	VaultToken   string `json:"vault_token" yaml:"vault_token" apiredact:"secret"`
 	VaultPath    string `json:"vault_path" yaml:"vault_path"`
 	VaultKey     string `json:"vault_key" yaml:"vault_key"`
 	CacheTTL     string `json:"cache_ttl,omitempty" yaml:"cache_ttl,omitempty"`
