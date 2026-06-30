@@ -1,0 +1,210 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/schema/resources/key/schema.json",
+  "$defs": {
+    "Key": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "public_key": { "$ref": "#/$defs/KeyData" },
+            "private_key": { "$ref": "#/$defs/KeyData" }
+          },
+          "anyOf": [
+            { "required": ["public_key"] },
+            { "required": ["private_key"] }
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "shared_key": { "$ref": "#/$defs/KeyData" }
+          },
+          "required": ["shared_key"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "KeyDataValue": {
+      "type": "object",
+      "properties": {
+        "value": { "type": "string" }
+      },
+      "required": ["value"],
+      "additionalProperties": false
+    },
+    "KeyDataBase64": {
+      "type": "object",
+      "properties": {
+        "base64": { "type": "string" }
+      },
+      "required": ["base64"],
+      "additionalProperties": false
+    },
+    "KeyDataEnvVar": {
+      "type": "object",
+      "properties": {
+        "env_var": { "type": "string" }
+      },
+      "required": ["env_var"],
+      "additionalProperties": false
+    },
+    "KeyDataEnvVarBase64": {
+      "type": "object",
+      "properties": {
+        "env_var_base64": { "type": "string" }
+      },
+      "required": ["env_var_base64"],
+      "additionalProperties": false
+    },
+    "KeyDataFile": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string" }
+      },
+      "required": ["path"],
+      "additionalProperties": false
+    },
+    "KeyDataRandomBytes": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "num_bytes": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "required": ["num_bytes"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "random": { "const": true },
+            "num_bytes": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "required": ["random"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "KeyDataAwsKMS": {
+      "type": "object",
+      "properties": {
+        "aws_kms_key_id": { "type": "string" },
+        "aws_region": { "type": "string" },
+        "aws_kms_endpoint": { "type": "string" },
+        "aws_credentials": { "$ref": "../../common/schema.json#/$defs/AwsCredentials" },
+        "cache_ttl": { "type": "string" }
+      },
+      "required": ["aws_kms_key_id"],
+      "additionalProperties": false
+    },
+    "KeyDataAwsSecret": {
+      "type": "object",
+      "properties": {
+        "aws_secret_id": { "type": "string" },
+        "aws_secret_key": { "type": "string" },
+        "aws_region": { "type": "string" },
+        "aws_credentials": { "$ref": "../../common/schema.json#/$defs/AwsCredentials" },
+        "cache_ttl": { "type": "string" }
+      },
+      "required": ["aws_secret_id"],
+      "additionalProperties": false
+    },
+    "KeyDataGcpKMS": {
+      "type": "object",
+      "properties": {
+        "gcp_kms_key_name": { "type": "string" },
+        "gcp_project": { "type": "string" },
+        "gcp_location": { "type": "string" },
+        "gcp_key_ring": { "type": "string" },
+        "gcp_crypto_key": { "type": "string" },
+        "gcp_kms_endpoint": { "type": "string" },
+        "gcp_credentials_file": { "type": "string" },
+        "gcp_credentials_json": { "$ref": "../../common/schema.json#/$defs/StringValue" },
+        "cache_ttl": { "type": "string" }
+      },
+      "anyOf": [
+        { "required": ["gcp_kms_key_name"] },
+        { "required": ["gcp_project", "gcp_location", "gcp_key_ring", "gcp_crypto_key"] }
+      ],
+      "additionalProperties": false
+    },
+    "KeyDataGcpSecret": {
+      "type": "object",
+      "properties": {
+        "gcp_secret_name": { "type": "string" },
+        "gcp_project": { "type": "string" },
+        "gcp_secret_version": { "type": "string" },
+        "cache_ttl": { "type": "string" }
+      },
+      "required": ["gcp_secret_name"],
+      "additionalProperties": false
+    },
+    "KeyDataVault": {
+      "type": "object",
+      "properties": {
+        "vault_address": { "type": "string" },
+        "vault_token": { "type": "string" },
+        "vault_path": { "type": "string" },
+        "vault_key": { "type": "string" },
+        "cache_ttl": { "type": "string" }
+      },
+      "required": ["vault_address", "vault_path"],
+      "additionalProperties": false
+    },
+    "KeyDataVaultTransit": {
+      "type": "object",
+      "properties": {
+        "vault_address": { "type": "string" },
+        "vault_token": { "type": "string" },
+        "vault_namespace": { "type": "string" },
+        "vault_transit_mount_path": { "type": "string" },
+        "vault_transit_key_name": { "type": "string" },
+        "cache_ttl": { "type": "string" }
+      },
+      "required": ["vault_address", "vault_transit_key_name"],
+      "additionalProperties": false
+    },
+    "KeyDataMock": {
+      "type": "object",
+      "properties": {
+        "mock_id": { "type": "string" }
+      },
+      "required": ["mock_id"],
+      "additionalProperties": false
+    },
+    "KeyDataMockKMS": {
+      "type": "object",
+      "properties": {
+        "mock_kms_id": { "type": "string" }
+      },
+      "required": ["mock_kms_id"],
+      "additionalProperties": false
+    },
+    "KeyData": {
+      "oneOf": [
+        { "$ref": "#/$defs/KeyDataValue" },
+        { "$ref": "#/$defs/KeyDataBase64" },
+        { "$ref": "#/$defs/KeyDataEnvVar" },
+        { "$ref": "#/$defs/KeyDataEnvVarBase64" },
+        { "$ref": "#/$defs/KeyDataFile" },
+        { "$ref": "#/$defs/KeyDataRandomBytes" },
+        { "$ref": "#/$defs/KeyDataAwsKMS" },
+        { "$ref": "#/$defs/KeyDataAwsSecret" },
+        { "$ref": "#/$defs/KeyDataGcpKMS" },
+        { "$ref": "#/$defs/KeyDataGcpSecret" },
+        { "$ref": "#/$defs/KeyDataVault" },
+        { "$ref": "#/$defs/KeyDataVaultTransit" },
+        { "$ref": "#/$defs/KeyDataMock" },
+        { "$ref": "#/$defs/KeyDataMockKMS" }
+      ]
+    }
+  }
+}

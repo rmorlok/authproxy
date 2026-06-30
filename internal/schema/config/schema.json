@@ -7,7 +7,7 @@
       "properties": {
         "username": { "type": "string" },
         "email": { "type": "string" },
-        "key": { "$ref": "#/$defs/Key" },
+        "key": { "$ref": "../resources/key/schema.json#/$defs/Key" },
         "permissions": {
           "type": "array",
           "items": { "$ref": "../auth/schema.json#/$defs/Permission" }
@@ -539,30 +539,6 @@
         { "$ref": "#/$defs/RedisMiniredis" }
       ]
     },
-    "AwsCredentialsAccessKey": {
-      "type": "object",
-      "properties": {
-        "type": { "const": "access_key" },
-        "access_key_id": { "$ref": "../common/schema.json#/$defs/StringValue" },
-        "secret_access_key": { "$ref": "../common/schema.json#/$defs/StringValue" }
-      },
-      "required": ["type", "access_key_id", "secret_access_key"],
-      "additionalProperties": false
-    },
-    "AwsCredentialsImplicit": {
-      "type": "object",
-      "properties": {
-        "type": { "const": "implicit" }
-      },
-      "required": ["type"],
-      "additionalProperties": false
-    },
-    "AwsCredentials": {
-      "oneOf": [
-        { "$ref": "#/$defs/AwsCredentialsAccessKey" },
-        { "$ref": "#/$defs/AwsCredentialsImplicit" }
-      ]
-    },
     "BlobStorageS3": {
       "type": "object",
       "properties": {
@@ -570,7 +546,7 @@
         "endpoint": { "type": "string" },
         "region": { "type": "string" },
         "bucket": { "type": "string" },
-        "credentials": { "$ref": "#/$defs/AwsCredentials" },
+        "credentials": { "$ref": "../common/schema.json#/$defs/AwsCredentials" },
         "force_path_style": { "type": "boolean" },
         "prefix": { "type": "string" }
       },
@@ -782,7 +758,7 @@
     },
     "SystemAuth": {
       "properties": {
-        "jwt_signing_key": { "$ref": "#/$defs/Key" },
+        "jwt_signing_key": { "$ref": "../resources/key/schema.json#/$defs/Key" },
         "jwt_issuer": {
           "type": "string"
         },
@@ -793,7 +769,7 @@
           "type": "boolean"
         },
         "actors": { "$ref": "#/$defs/ConfiguredActors" },
-        "global_aes_key": { "$ref": "#/$defs/KeyData" },
+        "global_aes_key": { "$ref": "../resources/key/schema.json#/$defs/KeyData" },
         "data_encryption_keys": { "$ref": "#/$defs/DataEncryptionKeys" }
       },
       "additionalProperties": false,
@@ -809,129 +785,13 @@
       },
       "additionalProperties": false
     },
-    "Key": {
-      "oneOf": [
-        {
-          "type": "object",
-          "properties": {
-            "public_key": { "$ref": "#/$defs/KeyData" },
-            "private_key": { "$ref": "#/$defs/KeyData" }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "shared_key": { "$ref": "#/$defs/KeyData" }
-          },
-          "required": ["shared_key"],
-          "additionalProperties": false
-        }
-      ]
-    },
-    "KeyData": {
-      "oneOf": [
-        {
-          "type": "object",
-          "properties": {
-            "value": { "type": "string" }
-          },
-          "required": ["value"],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "base64": { "type": "string" }
-          },
-          "required": ["base64"],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "env_var": { "type": "string" }
-          },
-          "required": ["env_var"],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "env_var_base64": { "type": "string" }
-          },
-          "required": ["env_var_base64"],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "path": { "type": "string" }
-          },
-          "required": ["path"],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "num_bytes": { "type": "integer" }
-          },
-          "required": ["num_bytes"],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "aws_kms_key_id": { "type": "string" },
-            "aws_region": { "type": "string" },
-            "aws_kms_endpoint": { "type": "string" },
-            "aws_credentials": { "$ref": "#/$defs/AwsCredentials" },
-            "cache_ttl": { "type": "string" }
-          },
-          "required": ["aws_kms_key_id"],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "gcp_kms_key_name": { "type": "string" },
-            "gcp_project": { "type": "string" },
-            "gcp_location": { "type": "string" },
-            "gcp_key_ring": { "type": "string" },
-            "gcp_crypto_key": { "type": "string" },
-            "gcp_kms_endpoint": { "type": "string" },
-            "gcp_credentials_file": { "type": "string" },
-            "gcp_credentials_json": { "$ref": "../common/schema.json#/$defs/StringValue" },
-            "cache_ttl": { "type": "string" }
-          },
-          "anyOf": [
-            { "required": ["gcp_kms_key_name"] },
-            { "required": ["gcp_project", "gcp_location", "gcp_key_ring", "gcp_crypto_key"] }
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "vault_address": { "type": "string" },
-            "vault_token": { "type": "string" },
-            "vault_namespace": { "type": "string" },
-            "vault_transit_mount_path": { "type": "string" },
-            "vault_transit_key_name": { "type": "string" },
-            "cache_ttl": { "type": "string" }
-          },
-          "required": ["vault_address", "vault_transit_key_name"],
-          "additionalProperties": false
-        }
-      ]
-    },
     "TlsConfig": {
       "oneOf": [
         {
           "type": "object",
           "properties": {
-            "cert": { "$ref": "#/$defs/KeyData" },
-            "key": { "$ref": "#/$defs/KeyData" }
+            "cert": { "$ref": "../resources/key/schema.json#/$defs/KeyData" },
+            "key": { "$ref": "../resources/key/schema.json#/$defs/KeyData" }
           },
           "required": ["cert", "key"],
           "additionalProperties": false
@@ -967,7 +827,7 @@
       "type": "object",
       "properties": {
         "external_id": { "type": "string" },
-        "key": { "$ref": "#/$defs/Key" },
+        "key": { "$ref": "../resources/key/schema.json#/$defs/Key" },
         "permissions": {
           "type": "array",
           "items": { "$ref": "../auth/schema.json#/$defs/Permission" }

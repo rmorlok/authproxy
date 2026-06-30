@@ -807,6 +807,44 @@ func TestSchema(t *testing.T) {
 				},
 			},
 		},
+		{
+			Name: "AwsCredentials",
+			Schema: `
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/schema/common/test.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["test"],
+  "properties": {
+	"test": {
+		"$ref": "./schema.json#/$defs/AwsCredentials"
+    }
+  }
+}`,
+			Tests: []test{
+				{
+					Name:  "implicit",
+					Valid: true,
+					Data:  `{"test": {"type": "implicit"}}`,
+				},
+				{
+					Name:  "access key",
+					Valid: true,
+					Data:  `{"test": {"type": "access_key", "access_key_id": {"env_var": "AWS_ACCESS_KEY_ID"}, "secret_access_key": {"env_var": "AWS_SECRET_ACCESS_KEY"}}}`,
+				},
+				{
+					Name:  "access key missing secret",
+					Valid: false,
+					Data:  `{"test": {"type": "access_key", "access_key_id": {"env_var": "AWS_ACCESS_KEY_ID"}}}`,
+				},
+				{
+					Name:  "unknown type",
+					Valid: false,
+					Data:  `{"test": {"type": "profile"}}`,
+				},
+			},
+		},
 	}
 
 	for _, entity := range entities {
