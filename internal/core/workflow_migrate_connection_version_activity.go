@@ -25,12 +25,20 @@ func (s *service) applyMigrateConnectionVersionV1(
 	logger.Info("connection version migration apply activity started")
 	defer logger.Info("connection version migration apply activity completed")
 
-	candidate, err := s.buildConnectionMigrationCandidate(ctx, connectionID, targetVersion)
+	candidate, err := s.buildConnectionMigrationCandidate(
+		ctx,
+		connectionID,
+		targetVersion,
+	)
 	if err != nil {
 		return err
 	}
 
-	encryptedConfig, err := s.encryptMigrationConfig(ctx, candidate.Connection.Namespace, candidate.Config)
+	encryptedConfig, err := s.encryptMigrationConfig(
+		ctx,
+		candidate.Connection.Namespace,
+		candidate.Config,
+	)
 	if err != nil {
 		return err
 	}
@@ -39,17 +47,20 @@ func (s *service) applyMigrateConnectionVersionV1(
 	if health == "" {
 		health = candidate.Connection.GetHealthState()
 	}
-	updated, err := s.db.UpdateConnectionForVersionMigration(ctx, database.ConnectionVersionMigrationUpdate{
-		Id:                     connectionID,
-		ConnectorId:            candidate.Connection.ConnectorId,
-		ConnectorVersion:       targetVersion,
-		EncryptedConfiguration: encryptedConfig,
-		UserLabels:             candidate.UserLabels,
-		Annotations:            candidate.Annotations,
-		SetupStep:              candidate.SetupStep,
-		SetupError:             candidate.SetupError,
-		HealthState:            &health,
-	})
+	updated, err := s.db.UpdateConnectionForVersionMigration(
+		ctx,
+		database.ConnectionVersionMigrationUpdate{
+			Id:                     connectionID,
+			ConnectorId:            candidate.Connection.ConnectorId,
+			ConnectorVersion:       targetVersion,
+			EncryptedConfiguration: encryptedConfig,
+			UserLabels:             candidate.UserLabels,
+			Annotations:            candidate.Annotations,
+			SetupStep:              candidate.SetupStep,
+			SetupError:             candidate.SetupError,
+			HealthState:            &health,
+		},
+	)
 	if err != nil {
 		return err
 	}
@@ -57,7 +68,9 @@ func (s *service) applyMigrateConnectionVersionV1(
 	if candidate.RefreshAuth {
 		if err := s.refreshAuthAfterConnectionMigration(ctx, updated, candidate); err != nil {
 			candidate.HealthState = database.ConnectionHealthStateUnhealthy
-			s.addMigrationSystemNotification(candidate, database.NotificationLevelWarning,
+			s.addMigrationSystemNotification(
+				candidate,
+				database.NotificationLevelWarning,
 				"Connection requires re-authentication",
 				"An upgrade to the connector changed OAuth settings and credentials could not be refreshed automatically.",
 				fmt.Sprintf("target:%d:oauth:refresh_failed", candidate.Target.Version),
@@ -70,7 +83,8 @@ func (s *service) applyMigrateConnectionVersionV1(
 					"refresh_error":    err.Error(),
 					"requires_reauth":  true,
 					"auth_method_type": string(cschema.AuthTypeOAuth2),
-				})
+				},
+			)
 			if markErr := s.db.SetConnectionHealthState(ctx, connectionID, database.ConnectionHealthStateUnhealthy); markErr != nil {
 				return markErr
 			}
