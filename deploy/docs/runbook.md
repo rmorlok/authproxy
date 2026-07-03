@@ -179,6 +179,9 @@ rollouts and catalog refreshes can be run independently. One-time setup:
    `demo-actors` already exist in the `demo` namespace. Persistent
    backing-store Secrets (`demo-db`, `demo-redis-creds`, and
    `demo-minio-creds`) are also preserved across Kustomize applies.
+   The demo observability backend (`demo-otel-lgtm`) is created by the
+   Kustomize overlay and receives AuthProxy OTLP telemetry for Prometheus,
+   Tempo, and Loki.
 
 2. **Set repo Variables** (Settings → Variables → Actions):
 

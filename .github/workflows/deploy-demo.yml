@@ -289,12 +289,18 @@ jobs:
           grep -Fq "image: ghcr.io/rmorlok/authproxy:${IMAGE_TAG}" "${manifest}"
           grep -Fq "image: ghcr.io/rmorlok/authproxy-demo-shell:${IMAGE_TAG}" "${manifest}"
           grep -Fq "image: ghcr.io/rmorlok/authproxy-demo-grafana:${IMAGE_TAG}" "${manifest}"
+          grep -Fq "image: docker.io/grafana/otel-lgtm:0.8.6" "${manifest}"
           grep -Fq "host: ${DEMO_HOSTNAME}" "${manifest}"
           grep -Fq "value: https://${DEMO_HOSTNAME}/grafana" "${manifest}"
           perl -0ne 'exit(/name: GF_AUTH_DISABLE_LOGIN_FORM\s*\n\s*value: "false"/ ? 0 : 1)' "${manifest}"
           grep -Fq "name: GF_SECURITY_ADMIN_USER" "${manifest}"
           grep -Fq "name: GF_SECURITY_ADMIN_PASSWORD" "${manifest}"
           grep -Fq "name: authproxy-grafana-admin" "${manifest}"
+          grep -Fq "name: demo-otel-lgtm" "${manifest}"
+          grep -Fq "endpoint: http://demo-otel-lgtm:4317" "${manifest}"
+          grep -Fq "uid: prometheus" "${manifest}"
+          grep -Fq "uid: tempo" "${manifest}"
+          grep -Fq "uid: loki" "${manifest}"
 
       - name: Apply Kustomize manifest
         run: |
@@ -309,6 +315,7 @@ jobs:
             "${RELEASE_NAME}-authproxy"
             "${RELEASE_NAME}-demo-shell"
             "${RELEASE_NAME}-grafana"
+            "${RELEASE_NAME}-otel-lgtm"
           )
 
           for deployment in "${deployments[@]}"; do
@@ -333,12 +340,13 @@ jobs:
             "${RELEASE_NAME}-redis-master" \
             "${RELEASE_NAME}-minio" \
             "${RELEASE_NAME}-grafana" \
+            "${RELEASE_NAME}-otel-lgtm" \
           ; do
             kubectl -n "${RELEASE_NS}" describe "deployment/$d"
             echo
           done
           echo "## Recent pod logs"
-          for selector in authproxy demo-shell go-oauth2-server grafana; do
+          for selector in authproxy demo-shell go-oauth2-server grafana otel-lgtm; do
             kubectl -n "${RELEASE_NS}" logs \
               -l "app.kubernetes.io/name=${selector}" \
               --all-containers --tail=120
@@ -357,6 +365,7 @@ jobs:
             "${RELEASE_NAME}-postgresql" \
             "${RELEASE_NAME}-redis-master" \
             "${RELEASE_NAME}-minio" \
+            "${RELEASE_NAME}-otel-lgtm" \
             "${RELEASE_NAME}-authproxy" \
             "${RELEASE_NAME}-demo-shell" \
             "${RELEASE_NAME}-go-oauth2-server" \
@@ -396,10 +405,15 @@ jobs:
         run: |
           set -euo pipefail
           config_json="${RUNNER_TEMP}/demo-config.json"
+          datasources_json="${RUNNER_TEMP}/grafana-datasources.json"
 
           curl -fsS "${SMOKE_BASE_URL}/config.json" -o "${config_json}"
           grep -Fq "\"url\":\"${SMOKE_BASE_URL}/grafana\"" "${config_json}"
           curl -fsS "${SMOKE_BASE_URL}/grafana/api/health" -o /dev/null
+          curl -fsS "${SMOKE_BASE_URL}/grafana/api/datasources" -o "${datasources_json}"
+          jq -e 'any(.[]; .uid == "prometheus" and .type == "prometheus")' "${datasources_json}" >/dev/null
+          jq -e 'any(.[]; .uid == "tempo" and .type == "tempo")' "${datasources_json}" >/dev/null
+          jq -e 'any(.[]; .uid == "loki" and .type == "loki")' "${datasources_json}" >/dev/null
 
           grafana_user="$(kubectl -n "${RELEASE_NS}" get secret authproxy-grafana-admin -o jsonpath='{.data.username}' | base64 -d)"
           grafana_password="$(kubectl -n "${RELEASE_NS}" get secret authproxy-grafana-admin -o jsonpath='{.data.password}' | base64 -d)"
