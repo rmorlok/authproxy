@@ -135,6 +135,7 @@ type Notification struct {
 	ResourceType      string
 	ResourceId        apid.ID
 	Namespace         string
+	Labels            Labels
 	Title             string
 	Message           string
 	ActionUrl         *string
@@ -157,6 +158,7 @@ func (n *Notification) cols() []string {
 		"resource_type",
 		"resource_id",
 		"namespace",
+		"labels",
 		"title",
 		"message",
 		"action_url",
@@ -180,6 +182,7 @@ func (n *Notification) fields() []any {
 		&n.ResourceType,
 		&n.ResourceId,
 		&n.Namespace,
+		&n.Labels,
 		&n.Title,
 		&n.Message,
 		&n.ActionUrl,
@@ -203,6 +206,7 @@ func (n *Notification) values() []any {
 		n.ResourceType,
 		n.ResourceId,
 		n.Namespace,
+		n.Labels,
 		n.Title,
 		n.Message,
 		n.ActionUrl,
@@ -251,6 +255,9 @@ func (n *Notification) Validate() error {
 	if err := namespace.ValidatePath(n.Namespace); err != nil {
 		result = multierror.Append(result, fmt.Errorf("invalid notification namespace: %w", err))
 	}
+	if err := ValidateLabels(n.Labels); err != nil {
+		result = multierror.Append(result, fmt.Errorf("invalid notification labels: %w", err))
+	}
 	if n.Title == "" {
 		result = multierror.Append(result, errors.New("notification title is required"))
 	}
@@ -276,6 +283,7 @@ type NotificationUpsert struct {
 	ResourceType      string
 	ResourceId        apid.ID
 	Namespace         string
+	Labels            map[string]string
 	Title             string
 	Message           string
 	ActionUrl         *string
@@ -286,13 +294,15 @@ type NotificationUpsert struct {
 }
 
 type ListNotificationsOptions struct {
-	States        []NotificationState
-	ResourceType  string
-	ResourceId    apid.ID
-	Source        string
-	Limit         uint64
-	IncludeViewed bool
-	ActorId       apid.ID
+	States            []NotificationState
+	ResourceType      string
+	ResourceId        apid.ID
+	Source            string
+	NamespaceMatchers []string
+	LabelSelector     *string
+	Limit             uint64
+	IncludeViewed     bool
+	ActorId           apid.ID
 }
 
 func (s *service) UpsertNotification(ctx context.Context, upsert NotificationUpsert) (*Notification, error) {
@@ -305,6 +315,7 @@ func (s *service) UpsertNotification(ctx context.Context, upsert NotificationUps
 		ResourceType:      upsert.ResourceType,
 		ResourceId:        upsert.ResourceId,
 		Namespace:         upsert.Namespace,
+		Labels:            Labels(upsert.Labels),
 		Title:             upsert.Title,
 		Message:           upsert.Message,
 		ActionUrl:         upsert.ActionUrl,
@@ -346,6 +357,7 @@ func (s *service) UpsertNotification(ctx context.Context, upsert NotificationUps
 			Set("resource_type", n.ResourceType).
 			Set("resource_id", n.ResourceId).
 			Set("namespace", n.Namespace).
+			Set("labels", n.Labels).
 			Set("title", n.Title).
 			Set("message", n.Message).
 			Set("action_url", n.ActionUrl).
@@ -373,6 +385,7 @@ func (s *service) UpsertNotification(ctx context.Context, upsert NotificationUps
 		existing.ResourceType = n.ResourceType
 		existing.ResourceId = n.ResourceId
 		existing.Namespace = n.Namespace
+		existing.Labels = n.Labels
 		existing.Title = n.Title
 		existing.Message = n.Message
 		existing.ActionUrl = n.ActionUrl
@@ -446,6 +459,21 @@ func (s *service) ListNotifications(ctx context.Context, opts ListNotificationsO
 	}
 	if opts.Source != "" {
 		query = query.Where(sq.Eq{"source": opts.Source})
+	}
+	if len(opts.NamespaceMatchers) > 0 {
+		for _, matcher := range opts.NamespaceMatchers {
+			if err := namespace.ValidateMatcher(matcher); err != nil {
+				return nil, err
+			}
+		}
+		query = restrictToNamespaceMatchers(query, "namespace", opts.NamespaceMatchers)
+	}
+	if opts.LabelSelector != nil {
+		selector, err := ParseLabelSelector(*opts.LabelSelector)
+		if err != nil {
+			return nil, err
+		}
+		query = selector.ApplyToSqlBuilderWithProvider(query, "labels", s.cfg.GetProvider())
 	}
 	if opts.ActorId != apid.Nil && !opts.IncludeViewed {
 		query = query.

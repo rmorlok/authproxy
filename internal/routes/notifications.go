@@ -3,7 +3,6 @@ package routes
 import (
 	"errors"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -16,6 +15,7 @@ import (
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	schemaapiopenapi "github.com/rmorlok/authproxy/internal/schema/api/openapi"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
+	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 )
 
 type NotificationsRoutes struct {
@@ -27,6 +27,14 @@ type NotificationJson = schemaapi.NotificationJson
 type ListNotificationsResponseJson = schemaapi.ListNotificationsResponseJson
 type OpenAPIListNotificationsResponseJson = schemaapiopenapi.ListNotificationsResponseJson
 
+type ListNotificationsRequestQuery struct {
+	LimitVal      *uint64 `form:"limit"`
+	IncludeViewed *bool   `form:"include_viewed"`
+	State         *string `form:"state"`
+	NamespaceVal  *string `form:"namespace"`
+	LabelSelector *string `form:"label_selector"`
+}
+
 // @Summary		List notifications
 // @Description	List active actor-visible notifications
 // @Tags			notifications
@@ -34,6 +42,8 @@ type OpenAPIListNotificationsResponseJson = schemaapiopenapi.ListNotificationsRe
 // @Param			limit			query		int		false	"Maximum number of notifications to return"
 // @Param			include_viewed	query		bool	false	"Include notifications the actor has already viewed"
 // @Param			state			query		string	false	"Notification state; defaults to active"
+// @Param			namespace		query		string	false	"Filter by namespace"
+// @Param			label_selector	query		string	false	"Filter by denormalized resource label selector"
 // @Success		200				{object}	OpenAPIListNotificationsResponseJson
 // @Failure		400				{object}	ErrorResponse
 // @Failure		401				{object}	ErrorResponse
@@ -44,19 +54,24 @@ func (r *NotificationsRoutes) list(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	ra := auth.MustGetAuthFromGinContext(gctx)
 
+	var req ListNotificationsRequestQuery
+	if err := gctx.ShouldBindQuery(&req); err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
+		return
+	}
+
 	limit := uint64(100)
-	if raw := gctx.Query("limit"); raw != "" {
-		parsed, err := strconv.ParseUint(raw, 10, 64)
-		if err != nil || parsed == 0 {
+	if req.LimitVal != nil {
+		if *req.LimitVal == 0 {
 			apgin.WriteError(gctx, nil, httperr.BadRequest("limit must be a positive integer"))
 			return
 		}
-		limit = parsed
+		limit = *req.LimitVal
 	}
 
 	state := database.NotificationStateActive
-	if raw := gctx.Query("state"); raw != "" {
-		state = database.NotificationState(raw)
+	if req.State != nil {
+		state = database.NotificationState(*req.State)
 		if !database.IsValidNotificationState(state) {
 			apgin.WriteError(gctx, nil, httperr.BadRequest("invalid state"))
 			return
@@ -64,21 +79,33 @@ func (r *NotificationsRoutes) list(gctx *gin.Context) {
 	}
 
 	includeViewed := false
-	if raw := gctx.Query("include_viewed"); raw != "" {
-		parsed, err := strconv.ParseBool(raw)
-		if err != nil {
-			apgin.WriteError(gctx, nil, httperr.BadRequest("include_viewed must be a boolean"))
+	if req.IncludeViewed != nil {
+		includeViewed = *req.IncludeViewed
+	}
+
+	var namespaceMatchers []string
+	if req.NamespaceVal != nil {
+		if err := namespace.ValidateMatcher(*req.NamespaceVal); err != nil {
+			apgin.WriteError(gctx, nil, httperr.BadRequest("invalid namespace", httperr.WithInternalErr(err)))
 			return
 		}
-		includeViewed = parsed
+		namespaceMatchers = []string{*req.NamespaceVal}
+	}
+	if req.LabelSelector != nil {
+		if _, err := database.ParseLabelSelector(*req.LabelSelector); err != nil {
+			apgin.WriteError(gctx, nil, httperr.BadRequest("invalid label_selector", httperr.WithInternalErr(err)))
+			return
+		}
 	}
 
 	actor := ra.MustGetActor()
 	notifications, err := r.db.ListNotifications(ctx, database.ListNotificationsOptions{
-		States:        []database.NotificationState{state},
-		Limit:         limit,
-		ActorId:       actor.GetId(),
-		IncludeViewed: includeViewed,
+		States:            []database.NotificationState{state},
+		NamespaceMatchers: namespaceMatchers,
+		LabelSelector:     req.LabelSelector,
+		Limit:             limit,
+		ActorId:           actor.GetId(),
+		IncludeViewed:     includeViewed,
 	})
 	if err != nil {
 		apgin.WriteErr(gctx, nil, err)

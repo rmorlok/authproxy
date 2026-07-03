@@ -5395,6 +5395,14 @@ paths:
         in: query
         name: state
         type: string
+      - description: Filter by namespace
+        in: query
+        name: namespace
+        type: string
+      - description: Filter by denormalized resource label selector
+        in: query
+        name: label_selector
+        type: string
       produces:
       - application/json
       responses:

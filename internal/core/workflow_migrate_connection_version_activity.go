@@ -96,6 +96,7 @@ func (s *service) applyMigrateConnectionVersionV1(
 		return err
 	}
 	for _, notification := range candidate.Notifications {
+		notification.Labels = map[string]string(updated.Labels)
 		if _, err := s.db.UpsertNotification(ctx, notification); err != nil {
 			return err
 		}

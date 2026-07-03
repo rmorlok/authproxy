@@ -6759,6 +6759,18 @@ const docTemplateadmin_api = `{
                         "description": "Notification state; defaults to active",
                         "name": "state",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by namespace",
+                        "name": "namespace",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by denormalized resource label selector",
+                        "name": "label_selector",
+                        "in": "query"
                     }
                 ],
                 "responses": {

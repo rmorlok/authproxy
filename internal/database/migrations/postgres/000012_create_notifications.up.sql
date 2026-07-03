@@ -7,6 +7,7 @@ create table notifications
     resource_type      text not null,
     resource_id        text not null,
     namespace          text not null,
+    labels             jsonb,
     title              text not null,
     message            text not null,
     action_url         text,
