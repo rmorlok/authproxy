@@ -11,7 +11,11 @@ import (
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
 
-func (s *service) applyMigrateConnectionVersionV1(ctx context.Context, connectionID apid.ID, targetVersion uint64) error {
+func (s *service) applyMigrateConnectionVersionV1(
+	ctx context.Context,
+	connectionID apid.ID,
+	targetVersion uint64,
+) error {
 	logger := s.logger.With(
 		"workflow", WorkflowNameMigrateConnectionVersionV1,
 		"activity", ActivityNameMigrateConnectionVersionApplyV1,
@@ -55,7 +59,7 @@ func (s *service) applyMigrateConnectionVersionV1(ctx context.Context, connectio
 			candidate.HealthState = database.ConnectionHealthStateUnhealthy
 			s.addMigrationSystemNotification(candidate, database.NotificationLevelWarning,
 				"Connection requires re-authentication",
-				"The target connector version changed OAuth settings and AuthProxy could not refresh credentials automatically.",
+				"An upgrade to the connector changed OAuth settings and credentials could not be refreshed automatically.",
 				fmt.Sprintf("target:%d:oauth:refresh_failed", candidate.Target.Version),
 				"reauth",
 				map[string]any{
@@ -72,7 +76,9 @@ func (s *service) applyMigrateConnectionVersionV1(ctx context.Context, connectio
 			}
 		}
 	}
-	if len(candidate.ProbeIdsToRun) > 0 && candidate.SetupStep == nil && candidate.HealthState != database.ConnectionHealthStateUnhealthy {
+	if len(candidate.ProbeIdsToRun) > 0 &&
+		candidate.SetupStep == nil &&
+		candidate.HealthState != database.ConnectionHealthStateUnhealthy {
 		for _, probeID := range candidate.ProbeIdsToRun {
 			if err := s.RunProbe(ctx, connectionID, probeID); err != nil {
 				logger.Warn("new target probe failed after migration", "probe_id", probeID, "error", err)
@@ -80,7 +86,13 @@ func (s *service) applyMigrateConnectionVersionV1(ctx context.Context, connectio
 		}
 	}
 
-	if err := s.db.ResolveNotificationsForResource(ctx, "connection", connectionID, connectionMigrationNotificationSource, candidate.NotificationKeys); err != nil {
+	if err := s.db.ResolveNotificationsForResource(
+		ctx,
+		"connection", // resource type
+		connectionID,
+		connectionMigrationNotificationSource,
+		candidate.NotificationKeys,
+	); err != nil {
 		return err
 	}
 	for _, notification := range candidate.Notifications {
@@ -97,33 +109,46 @@ func (s *service) applyMigrateConnectionVersionV1(ctx context.Context, connectio
 	return nil
 }
 
-func (s *service) refreshAuthAfterConnectionMigration(ctx context.Context, updated *database.Connection, candidate *connectionMigrationCandidate) error {
+func (s *service) refreshAuthAfterConnectionMigration(
+	ctx context.Context,
+	updated *database.Connection,
+	candidate *connectionMigrationCandidate,
+) error {
 	conn, err := s.getConnectionForDb(ctx, updated)
 	if err != nil {
 		return err
 	}
+
 	factory := s.getAuthMethodFactory(candidate.Target.GetDefinition())
 	if factory == nil {
 		return fmt.Errorf("auth method factory is not configured")
 	}
+
 	authenticator := factory.NewAuthenticator(conn)
 	if authenticator == nil {
 		return fmt.Errorf("authenticator is not configured")
 	}
+
 	return authenticator.RecoverFrom401(ctx)
 }
 
-func (s *service) encryptMigrationConfig(ctx context.Context, namespace string, cfg map[string]any) (*encfield.EncryptedField, error) {
+func (s *service) encryptMigrationConfig(
+	ctx context.Context,
+	namespace string, cfg map[string]any,
+) (*encfield.EncryptedField, error) {
 	if cfg == nil {
 		return nil, nil
 	}
+
 	jsonBytes, err := json.Marshal(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("marshal migrated connection configuration: %w", err)
 	}
+
 	encrypted, err := s.encrypt.EncryptStringForNamespace(ctx, namespace, string(jsonBytes))
 	if err != nil {
 		return nil, fmt.Errorf("encrypt migrated connection configuration: %w", err)
 	}
+
 	return &encrypted, nil
 }
