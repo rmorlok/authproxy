@@ -12,19 +12,26 @@ import (
 func (s *service) applyProbeMigrationAnalysis(candidate *connectionMigrationCandidate) {
 	sourceDef := candidate.Connection.cv.GetDefinition()
 	targetDef := candidate.Target.GetDefinition()
+
 	if sourceDef == nil || targetDef == nil {
 		return
 	}
+
 	sourceProbeIDs := map[string]bool{}
 	for _, probe := range sourceDef.Probes {
 		sourceProbeIDs[probe.Id] = true
 	}
+
 	for _, probe := range targetDef.Probes {
 		if probe.Id == "" || sourceProbeIDs[probe.Id] {
+			// The probe was run previously on the original connector version.
 			continue
 		}
+
 		candidate.ProbeIdsToRun = append(candidate.ProbeIdsToRun, probe.Id)
-		s.addMigrationSystemNotification(candidate, database.NotificationLevelInfo,
+		s.addMigrationSystemNotification(
+			candidate,
+			database.NotificationLevelInfo,
 			fmt.Sprintf("New connection health probe %q will run", probe.Id),
 			"The target connector version adds a new health probe. AuthProxy will run it once after migration if no user action is required.",
 			fmt.Sprintf("target:%d:probe:%s:added", candidate.Target.Version, probe.Id),
@@ -34,7 +41,8 @@ func (s *service) applyProbeMigrationAnalysis(candidate *connectionMigrationCand
 				"target_version":  candidate.Target.Version,
 				"probe_id":        probe.Id,
 				"migration_event": "probe_added",
-			})
+			},
+		)
 	}
 }
 
