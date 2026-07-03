@@ -54,9 +54,8 @@ func CompileAndValidateLibrary(source string) (*Library, error) {
 }
 
 // ValidateExpressionSyntax parses a connector-authored expression without
-// executing it. This is used for migration hooks, which often depend on
-// runtime connection configuration and cannot be safely executed while the
-// connector definition is being validated.
+// executing it. This is useful for expressions that depend on runtime variables
+// and cannot be safely evaluated while the connector definition is validated.
 func ValidateExpressionSyntax(expression string) error {
 	if strings.TrimSpace(expression) == "" {
 		return fmt.Errorf("expression is required")

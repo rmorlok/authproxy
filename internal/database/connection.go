@@ -532,6 +532,10 @@ func (s *service) SetConnectionEncryptedConfiguration(ctx context.Context, id ap
 	return nil
 }
 
+// ConnectionVersionMigrationUpdate is the complete connection row replacement
+// produced by a connector-version migration. The database layer applies it in a
+// single transaction so the target version, encrypted configuration, labels,
+// annotations, setup state, and health state cannot be partially persisted.
 type ConnectionVersionMigrationUpdate struct {
 	Id                     apid.ID
 	ConnectorId            apid.ID

@@ -69,8 +69,8 @@ func (c Context) TransformJSON(expression string, data any) ([]DataSourceOption,
 }
 
 // EvaluateObject runs a JavaScript expression and exports its result as a
-// JSON-like object. Undefined/null are treated as an empty object so migration
-// hooks can no-op by returning nothing.
+// JSON-like object. Undefined/null are treated as an empty object for callers
+// where an omitted result means no changes.
 func (c Context) EvaluateObject(expression string) (map[string]any, error) {
 	result, err := c.runExpression(expression)
 	if err != nil {
