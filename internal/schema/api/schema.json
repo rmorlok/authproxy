@@ -844,7 +844,7 @@
       "type": "object",
       "properties": {
         "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
-        "key_data": { "$ref": "../config/schema.json#/$defs/KeyData" },
+        "key_data": { "$ref": "../resources/key/schema.json#/$defs/KeyData" },
         "labels": { "$ref": "#/$defs/StringMap" },
         "annotations": { "$ref": "#/$defs/StringMap" }
       },
