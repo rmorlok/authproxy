@@ -24,6 +24,18 @@ type ConnectionDisconnectOptions struct {
 	Timeout time.Duration
 }
 
+type ConnectionMigrationOptions struct {
+	TargetVersion uint64
+	Timeout       time.Duration
+}
+
+type ConnectionMigrationTask struct {
+	TaskInfo      *tasks.TaskInfo
+	ConnectionID  apid.ID
+	SourceVersion uint64
+	TargetVersion uint64
+}
+
 // C is the interface for the core service that implements primary business logic and binds the system together.
 type C interface {
 	/*
@@ -99,6 +111,10 @@ type C interface {
 	// DisconnectConnection disconnects a connection. This is a state transition that queues work to do any cleanup
 	// with the 3rd party.
 	DisconnectConnection(ctx context.Context, id apid.ID, opts ConnectionDisconnectOptions) (taskInfo *tasks.TaskInfo, err error)
+
+	// MigrateConnectionVersion starts a durable workflow that migrates a single connection to another version of the
+	// same connector.
+	MigrateConnectionVersion(ctx context.Context, id apid.ID, opts ConnectionMigrationOptions) (*ConnectionMigrationTask, error)
 
 	// AbortConnection aborts an in-progress connection setup, revoking any credentials and deleting the connection.
 	// Only valid for connections with a non-null setup_step.

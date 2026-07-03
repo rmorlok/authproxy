@@ -1,0 +1,30 @@
+labels:
+  type: migration-test
+display_name: Migration Test
+logo:
+  public_url: https://example.com/logo.png
+description: Tests connector version migration hooks
+auth:
+  type: no-auth
+javascript: |
+  function migrateUp() {
+    return {
+      config: {
+        set: {
+          migrated: true
+        }
+      }
+    };
+  }
+  function migrateDown() {
+    return {
+      config: {
+        unset: ["migrated"]
+      }
+    };
+  }
+migrations:
+  up:
+    javascript: migrateUp()
+  down:
+    javascript: migrateDown()

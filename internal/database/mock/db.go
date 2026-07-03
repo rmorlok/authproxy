@@ -1013,6 +1013,21 @@ func (mr *MockDBMockRecorder) GetNamespace(ctx, path interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNamespace", reflect.TypeOf((*MockDB)(nil).GetNamespace), ctx, path)
 }
 
+// GetNotification mocks base method.
+func (m *MockDB) GetNotification(ctx context.Context, id apid.ID) (*database.Notification, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNotification", ctx, id)
+	ret0, _ := ret[0].(*database.Notification)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetNotification indicates an expected call of GetNotification.
+func (mr *MockDBMockRecorder) GetNotification(ctx, id interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNotification", reflect.TypeOf((*MockDB)(nil).GetNotification), ctx, id)
+}
+
 // GetOAuth2Token mocks base method.
 func (m *MockDB) GetOAuth2Token(ctx context.Context, connectionId apid.ID) (*database.OAuth2Token, error) {
 	m.ctrl.T.Helper()
@@ -1307,6 +1322,21 @@ func (mr *MockDBMockRecorder) ListNamespacesFromCursor(ctx, cursor interface{}) 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListNamespacesFromCursor", reflect.TypeOf((*MockDB)(nil).ListNamespacesFromCursor), ctx, cursor)
 }
 
+// ListNotifications mocks base method.
+func (m *MockDB) ListNotifications(ctx context.Context, opts database.ListNotificationsOptions) ([]database.Notification, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListNotifications", ctx, opts)
+	ret0, _ := ret[0].([]database.Notification)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListNotifications indicates an expected call of ListNotifications.
+func (mr *MockDBMockRecorder) ListNotifications(ctx, opts interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListNotifications", reflect.TypeOf((*MockDB)(nil).ListNotifications), ctx, opts)
+}
+
 // ListRateLimitsBuilder mocks base method.
 func (m *MockDB) ListRateLimitsBuilder() database.ListRateLimitsBuilder {
 	m.ctrl.T.Helper()
@@ -1334,6 +1364,20 @@ func (m *MockDB) ListRateLimitsFromCursor(ctx context.Context, cursor string) (d
 func (mr *MockDBMockRecorder) ListRateLimitsFromCursor(ctx, cursor interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRateLimitsFromCursor", reflect.TypeOf((*MockDB)(nil).ListRateLimitsFromCursor), ctx, cursor)
+}
+
+// MarkNotificationViewed mocks base method.
+func (m *MockDB) MarkNotificationViewed(ctx context.Context, notificationID, actorID apid.ID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MarkNotificationViewed", ctx, notificationID, actorID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// MarkNotificationViewed indicates an expected call of MarkNotificationViewed.
+func (mr *MockDBMockRecorder) MarkNotificationViewed(ctx, notificationID, actorID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkNotificationViewed", reflect.TypeOf((*MockDB)(nil).MarkNotificationViewed), ctx, notificationID, actorID)
 }
 
 // Migrate mocks base method.
@@ -1378,6 +1422,21 @@ func (m *MockDB) NewestPublishedConnectorVersionForId(ctx context.Context, id ap
 func (mr *MockDBMockRecorder) NewestPublishedConnectorVersionForId(ctx, id interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewestPublishedConnectorVersionForId", reflect.TypeOf((*MockDB)(nil).NewestPublishedConnectorVersionForId), ctx, id)
+}
+
+// NotificationViewedMap mocks base method.
+func (m *MockDB) NotificationViewedMap(ctx context.Context, actorID apid.ID, ids []apid.ID) (map[apid.ID]time.Time, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NotificationViewedMap", ctx, actorID, ids)
+	ret0, _ := ret[0].(map[apid.ID]time.Time)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// NotificationViewedMap indicates an expected call of NotificationViewedMap.
+func (mr *MockDBMockRecorder) NotificationViewedMap(ctx, actorID, ids interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NotificationViewedMap", reflect.TypeOf((*MockDB)(nil).NotificationViewedMap), ctx, actorID, ids)
 }
 
 // Ping mocks base method.
@@ -1602,6 +1661,20 @@ func (mr *MockDBMockRecorder) RefreshNamespaceLabelsCarryForward(ctx, nsPath int
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RefreshNamespaceLabelsCarryForward", reflect.TypeOf((*MockDB)(nil).RefreshNamespaceLabelsCarryForward), ctx, nsPath)
 }
 
+// ResolveNotificationsForResource mocks base method.
+func (m *MockDB) ResolveNotificationsForResource(ctx context.Context, resourceType string, resourceID apid.ID, source string, keepKeys []string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ResolveNotificationsForResource", ctx, resourceType, resourceID, source, keepKeys)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ResolveNotificationsForResource indicates an expected call of ResolveNotificationsForResource.
+func (mr *MockDBMockRecorder) ResolveNotificationsForResource(ctx, resourceType, resourceID, source, keepKeys interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResolveNotificationsForResource", reflect.TypeOf((*MockDB)(nil).ResolveNotificationsForResource), ctx, resourceType, resourceID, source, keepKeys)
+}
+
 // SetConnectionEncryptedConfiguration mocks base method.
 func (m *MockDB) SetConnectionEncryptedConfiguration(ctx context.Context, id apid.ID, encryptedConfig *encfield.EncryptedField) error {
 	m.ctrl.T.Helper()
@@ -1799,6 +1872,21 @@ func (mr *MockDBMockRecorder) UpdateConnectionAnnotations(ctx, id, annotations i
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateConnectionAnnotations", reflect.TypeOf((*MockDB)(nil).UpdateConnectionAnnotations), ctx, id, annotations)
 }
 
+// UpdateConnectionForVersionMigration mocks base method.
+func (m *MockDB) UpdateConnectionForVersionMigration(ctx context.Context, update database.ConnectionVersionMigrationUpdate) (*database.Connection, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateConnectionForVersionMigration", ctx, update)
+	ret0, _ := ret[0].(*database.Connection)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateConnectionForVersionMigration indicates an expected call of UpdateConnectionForVersionMigration.
+func (mr *MockDBMockRecorder) UpdateConnectionForVersionMigration(ctx, update interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateConnectionForVersionMigration", reflect.TypeOf((*MockDB)(nil).UpdateConnectionForVersionMigration), ctx, update)
+}
+
 // UpdateConnectionLabels mocks base method.
 func (m *MockDB) UpdateConnectionLabels(ctx context.Context, id apid.ID, labels map[string]string) (*database.Connection, error) {
 	m.ctrl.T.Helper()
@@ -1975,4 +2063,19 @@ func (m *MockDB) UpsertConnectorVersion(ctx context.Context, cv *database.Connec
 func (mr *MockDBMockRecorder) UpsertConnectorVersion(ctx, cv interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpsertConnectorVersion", reflect.TypeOf((*MockDB)(nil).UpsertConnectorVersion), ctx, cv)
+}
+
+// UpsertNotification mocks base method.
+func (m *MockDB) UpsertNotification(ctx context.Context, upsert database.NotificationUpsert) (*database.Notification, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpsertNotification", ctx, upsert)
+	ret0, _ := ret[0].(*database.Notification)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpsertNotification indicates an expected call of UpsertNotification.
+func (mr *MockDBMockRecorder) UpsertNotification(ctx, upsert interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpsertNotification", reflect.TypeOf((*MockDB)(nil).UpsertNotification), ctx, upsert)
 }

@@ -1,0 +1,23 @@
+{
+  "items": [
+    {
+      "id": "ntf_test550e8400abcde",
+      "key": "connector_migration:cxn_test550e8400abcde:reauth",
+      "level": "warning",
+      "state": "active",
+      "resource_type": "connection",
+      "resource_id": "cxn_test550e8400abcde",
+      "namespace": "root.acme",
+      "title": "Connection requires re-authentication",
+      "message": "The target connector version requires the user to re-authenticate.",
+      "action_url": "/connections/cxn_test550e8400abcde?action=reauth",
+      "can_action": true,
+      "viewed": false,
+      "metadata": {
+        "target_version": 3
+      },
+      "created_at": "2026-07-03T12:00:00Z",
+      "updated_at": "2026-07-03T12:00:00Z"
+    }
+  ]
+}

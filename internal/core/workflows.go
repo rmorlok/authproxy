@@ -16,6 +16,7 @@ func (s *service) RegisterWorkflows(worker *apworkflows.Worker) error {
 		s.registerDisconnectConnectionWorkflow,
 		s.registerDisconnectConnectorConnectionsWorkflow,
 		s.registerArchiveConnectorWorkflow,
+		s.registerMigrateConnectionVersionWorkflow,
 	}
 
 	for _, registerFn := range registerFns {

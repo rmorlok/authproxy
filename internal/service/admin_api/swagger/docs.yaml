@@ -673,6 +673,15 @@ definitions:
           $ref: '#/definitions/github_com_rmorlok_authproxy_internal_schema_api.NamespaceJson'
         type: array
     type: object
+  routes.OpenAPIListNotificationsResponseJson:
+    description: Paginated list of actor-visible notifications
+    properties:
+      cursor:
+        type: string
+      items:
+        items: {}
+        type: array
+    type: object
   routes.OpenAPIListRateLimitsResponseJson:
     description: Paginated list of rate limits
     properties:
@@ -700,6 +709,31 @@ definitions:
         items:
           $ref: '#/definitions/github_com_rmorlok_authproxy_internal_schema_api.MetricsSchemaMetricJson'
         type: array
+    type: object
+  routes.OpenAPIMigrateConnectionVersionRequestJson:
+    description: Request body for connection connector-version migration operations
+    properties:
+      target_version:
+        example: 3
+        type: integer
+      timeout_seconds:
+        example: 600
+        type: integer
+    type: object
+  routes.OpenAPIMigrateConnectionVersionResponseJson:
+    description: Response for connection connector-version migration operation
+    properties:
+      connection_id:
+        example: cxn_test550e8400abcde
+        type: string
+      source_version:
+        example: 1
+        type: integer
+      target_version:
+        example: 3
+        type: integer
+      task_id:
+        type: string
     type: object
   routes.OpenAPIProxyResponseJson:
     description: Response from a proxied HTTP request
@@ -2053,6 +2087,56 @@ paths:
       security:
       - BearerAuth: []
       summary: Force connection state
+      tags:
+      - connections
+  /connections/{id}/_migrate_version:
+    post:
+      consumes:
+      - application/json
+      description: Start a workflow that migrates an existing connection to another
+        version of the same connector
+      parameters:
+      - description: Connection UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Migration options
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.OpenAPIMigrateConnectionVersionRequestJson'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.OpenAPIMigrateConnectionVersionResponseJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Migrate connection connector version
       tags:
       - connections
   /connections/{id}/_proxy:
@@ -5295,6 +5379,85 @@ paths:
       summary: Set a label for a namespace
       tags:
       - namespaces
+  /notifications:
+    get:
+      description: List active actor-visible notifications
+      parameters:
+      - description: Maximum number of notifications to return
+        in: query
+        name: limit
+        type: integer
+      - description: Include notifications the actor has already viewed
+        in: query
+        name: include_viewed
+        type: boolean
+      - description: Notification state; defaults to active
+        in: query
+        name: state
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.OpenAPIListNotificationsResponseJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List notifications
+      tags:
+      - notifications
+  /notifications/{id}/_viewed:
+    post:
+      description: Mark a notification viewed for the authenticated actor
+      parameters:
+      - description: Notification ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Mark notification viewed
+      tags:
+      - notifications
   /rate-limits:
     get:
       consumes:

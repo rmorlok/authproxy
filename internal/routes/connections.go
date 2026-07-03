@@ -53,6 +53,8 @@ type ConnectionJson = schemaapi.ConnectionJson
 type ListConnectionResponseJson = schemaapi.ListConnectionResponseJson
 type DisconnectConnectionRequestJson = schemaapi.DisconnectConnectionRequestJson
 type DisconnectResponseJson = schemaapi.DisconnectResponseJson
+type MigrateConnectionVersionRequestJson = schemaapi.MigrateConnectionVersionRequestJson
+type MigrateConnectionVersionResponseJson = schemaapi.MigrateConnectionVersionResponseJson
 type ForceStateRequestJson = schemaapi.ForceConnectionStateRequestJson
 type UpdateConnectionRequestJson = schemaapi.UpdateConnectionRequestJson
 type ProxyResponse = schemaapi.ProxyResponseJson
@@ -61,6 +63,8 @@ type OpenAPIConnectionJson = schemaapiopenapi.ConnectionJson
 type OpenAPIListConnectionResponseJson = schemaapiopenapi.ListConnectionResponseJson
 type OpenAPIDisconnectConnectionRequestJson = schemaapiopenapi.DisconnectConnectionRequestJson
 type OpenAPIDisconnectResponseJson = schemaapiopenapi.DisconnectResponseJson
+type OpenAPIMigrateConnectionVersionRequestJson = schemaapiopenapi.MigrateConnectionVersionRequestJson
+type OpenAPIMigrateConnectionVersionResponseJson = schemaapiopenapi.MigrateConnectionVersionResponseJson
 type ProxyRequest = schemaapiopenapi.ProxyRequestJson
 type OpenAPIProxyResponseJson = schemaapiopenapi.ProxyResponseJson
 
@@ -568,6 +572,109 @@ func (r *ConnectionsRoutes) parseConnectionDisconnectRequest(gctx *gin.Context) 
 	}
 
 	return coreIface.ConnectionDisconnectOptions{Timeout: timeout}, true
+}
+
+// @Summary		Migrate connection connector version
+// @Description	Start a workflow that migrates an existing connection to another version of the same connector
+// @Tags			connections
+// @Accept			json
+// @Produce		json
+// @Param			id		path		string										true	"Connection UUID"
+// @Param			request	body		OpenAPIMigrateConnectionVersionRequestJson	true	"Migration options"
+// @Success		200		{object}	OpenAPIMigrateConnectionVersionResponseJson
+// @Failure		400		{object}	ErrorResponse
+// @Failure		401		{object}	ErrorResponse
+// @Failure		403		{object}	ErrorResponse
+// @Failure		404		{object}	ErrorResponse
+// @Failure		500		{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/connections/{id}/_migrate_version [post]
+func (r *ConnectionsRoutes) migrateVersion(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	id, err := apid.Parse(gctx.Param("id"))
+	if err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
+		val.MarkErrorReturn()
+		return
+	}
+	if id == apid.Nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
+		val.MarkErrorReturn()
+		return
+	}
+
+	c, err := r.core.GetConnection(ctx, id)
+	if err != nil {
+		apgin.WriteErr(gctx, nil, err)
+		val.MarkErrorReturn()
+		return
+	}
+	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
+		apgin.WriteError(gctx, nil, httpErr)
+		return
+	}
+
+	opts, ok := r.parseConnectionMigrationRequest(gctx)
+	if !ok {
+		return
+	}
+
+	task, err := r.core.MigrateConnectionVersion(ctx, id, opts)
+	if err != nil {
+		apgin.WriteErr(gctx, nil, err)
+		val.MarkErrorReturn()
+		return
+	}
+
+	ra := auth.MustGetAuthFromGinContext(gctx)
+	taskId, err := task.TaskInfo.
+		BindToActor(ra.MustGetActor()).
+		ToSecureEncryptedString(ctx, r.encrypt)
+	if err != nil {
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+		val.MarkErrorReturn()
+		return
+	}
+
+	apgin.APIJSON(gctx, http.StatusOK, MigrateConnectionVersionResponseJson{
+		TaskId:        taskId,
+		ConnectionId:  task.ConnectionID,
+		SourceVersion: task.SourceVersion,
+		TargetVersion: task.TargetVersion,
+	})
+}
+
+func (r *ConnectionsRoutes) parseConnectionMigrationRequest(gctx *gin.Context) (coreIface.ConnectionMigrationOptions, bool) {
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	req := MigrateConnectionVersionRequestJson{}
+	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		val.MarkErrorReturn()
+		return coreIface.ConnectionMigrationOptions{}, false
+	}
+	if req.TargetVersion == 0 {
+		apgin.WriteError(gctx, nil, httperr.BadRequest("target_version is required"))
+		val.MarkErrorReturn()
+		return coreIface.ConnectionMigrationOptions{}, false
+	}
+
+	timeout := defaultConnectorLifecycleTimeout
+	if req.TimeoutSeconds != nil {
+		if *req.TimeoutSeconds <= 0 {
+			apgin.WriteError(gctx, nil, httperr.BadRequest("timeout_seconds must be greater than zero"))
+			val.MarkErrorReturn()
+			return coreIface.ConnectionMigrationOptions{}, false
+		}
+		timeout = time.Duration(*req.TimeoutSeconds) * time.Second
+	}
+
+	return coreIface.ConnectionMigrationOptions{
+		TargetVersion: req.TargetVersion,
+		Timeout:       timeout,
+	}, true
 }
 
 // @Summary		Abort connection setup
@@ -1320,6 +1427,15 @@ func (r *ConnectionsRoutes) Register(g gin.IRouter) {
 			ForIdField("id").
 			Build(),
 		r.reconfigure,
+	)
+	g.POST(
+		"/connections/:id/_migrate_version",
+		r.auth.NewRequiredBuilder().
+			ForResource("connections").
+			ForVerb("update").
+			ForIdField("id").
+			Build(),
+		r.migrateVersion,
 	)
 	g.POST(
 		"/connections/:id/_cancel_setup",

@@ -22,6 +22,14 @@
       "type": "string",
       "enum": ["healthy", "unhealthy"]
     },
+    "NotificationLevel": {
+      "type": "string",
+      "enum": ["info", "warning", "error"]
+    },
+    "NotificationState": {
+      "type": "string",
+      "enum": ["active", "resolved"]
+    },
     "KeyState": {
       "type": "string",
       "enum": ["active", "disabled"]
@@ -204,6 +212,38 @@
       "required": ["task_id", "connection"],
       "additionalProperties": false
     },
+    "MigrateConnectionVersionRequest": {
+      "type": "object",
+      "properties": {
+        "target_version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": ["target_version"],
+      "additionalProperties": false
+    },
+    "MigrateConnectionVersionResponse": {
+      "type": "object",
+      "properties": {
+        "task_id": { "type": "string" },
+        "connection_id": { "type": "string" },
+        "source_version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "target_version": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": ["task_id", "connection_id", "source_version", "target_version"],
+      "additionalProperties": false
+    },
     "ForceConnectionStateRequest": {
       "type": "object",
       "properties": {
@@ -232,6 +272,64 @@
         "body_json": {}
       },
       "required": ["status_code"],
+      "additionalProperties": false
+    },
+    "Notification": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "key": { "type": "string" },
+        "level": { "$ref": "#/$defs/NotificationLevel" },
+        "state": { "$ref": "#/$defs/NotificationState" },
+        "resource_type": { "type": "string" },
+        "resource_id": { "type": "string" },
+        "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "action_url": { "type": "string" },
+        "can_action": { "type": "boolean" },
+        "viewed": { "type": "boolean" },
+        "metadata": { "type": "object" },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "resolved_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "key",
+        "level",
+        "state",
+        "resource_type",
+        "resource_id",
+        "namespace",
+        "title",
+        "message",
+        "can_action",
+        "viewed",
+        "created_at",
+        "updated_at"
+      ],
+      "additionalProperties": false
+    },
+    "ListNotificationsResponse": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Notification" }
+        },
+        "cursor": { "type": "string" }
+      },
+      "required": ["items"],
       "additionalProperties": false
     },
     "Namespace": {

@@ -126,8 +126,19 @@ type DB interface {
 	UpdateConnectionAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*Connection, error)
 	PutConnectionAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*Connection, error)
 	DeleteConnectionAnnotations(ctx context.Context, id apid.ID, keys []string) (*Connection, error)
+	UpdateConnectionForVersionMigration(ctx context.Context, update ConnectionVersionMigrationUpdate) (*Connection, error)
 	ListConnectionsBuilder() ListConnectionsBuilder
 	ListConnectionsFromCursor(ctx context.Context, cursor string) (ListConnectionsExecutor, error)
+
+	/*
+	 * Notifications
+	 */
+	UpsertNotification(ctx context.Context, upsert NotificationUpsert) (*Notification, error)
+	GetNotification(ctx context.Context, id apid.ID) (*Notification, error)
+	ListNotifications(ctx context.Context, opts ListNotificationsOptions) ([]Notification, error)
+	MarkNotificationViewed(ctx context.Context, notificationID apid.ID, actorID apid.ID) error
+	NotificationViewedMap(ctx context.Context, actorID apid.ID, ids []apid.ID) (map[apid.ID]time.Time, error)
+	ResolveNotificationsForResource(ctx context.Context, resourceType string, resourceID apid.ID, source string, keepKeys []string) error
 
 	/*
 	 * OAuth2 tokens

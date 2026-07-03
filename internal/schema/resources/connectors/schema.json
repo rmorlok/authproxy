@@ -69,6 +69,29 @@
       "additionalProperties": false,
       "type": "object"
     },
+    "MigrationHook": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["javascript"],
+      "properties": {
+        "javascript": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "Migrations": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "up": {
+          "$ref": "#/$defs/MigrationHook"
+        },
+        "down": {
+          "$ref": "#/$defs/MigrationHook"
+        }
+      }
+    },
     "Probe": {
       "oneOf": [
         {
@@ -285,6 +308,9 @@
     },
     "javascript": {
       "type": "string"
+    },
+    "migrations": {
+      "$ref": "#/$defs/Migrations"
     },
     "probes": {
       "type": "array",

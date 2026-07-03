@@ -103,6 +103,54 @@ type DisconnectConnectionRequestJson struct {
 	TimeoutSeconds *int64 `json:"timeout_seconds,omitempty" example:"600"`
 }
 
+// MigrateConnectionVersionRequestJson documents connection version migration operation bodies.
+//
+//	@Description	Request body for connection connector-version migration operations
+type MigrateConnectionVersionRequestJson struct {
+	TargetVersion  uint64 `json:"target_version" example:"3"`
+	TimeoutSeconds *int64 `json:"timeout_seconds,omitempty" example:"600"`
+}
+
+// MigrateConnectionVersionResponseJson documents the connection version migration response.
+//
+//	@Description	Response for connection connector-version migration operation
+type MigrateConnectionVersionResponseJson struct {
+	TaskId        string  `json:"task_id"`
+	ConnectionId  apid.ID `json:"connection_id" swaggertype:"string" example:"cxn_test550e8400abcde"`
+	SourceVersion uint64  `json:"source_version" example:"1"`
+	TargetVersion uint64  `json:"target_version" example:"3"`
+}
+
+// NotificationJson documents actor-visible notifications.
+//
+//	@Description	Actor-visible notification
+type NotificationJson struct {
+	Id           apid.ID                `json:"id" swaggertype:"string" example:"ntf_test550e8400abcde"`
+	Key          string                 `json:"key"`
+	Level        string                 `json:"level" example:"warning"`
+	State        string                 `json:"state" example:"active"`
+	ResourceType string                 `json:"resource_type" example:"connection"`
+	ResourceId   apid.ID                `json:"resource_id" swaggertype:"string" example:"cxn_test550e8400abcde"`
+	Namespace    string                 `json:"namespace" example:"root.acme"`
+	Title        string                 `json:"title"`
+	Message      string                 `json:"message"`
+	ActionUrl    string                 `json:"action_url,omitempty"`
+	CanAction    bool                   `json:"can_action"`
+	Viewed       bool                   `json:"viewed"`
+	Metadata     map[string]interface{} `json:"metadata,omitempty"`
+	CreatedAt    time.Time              `json:"created_at"`
+	UpdatedAt    time.Time              `json:"updated_at"`
+	ResolvedAt   *time.Time             `json:"resolved_at,omitempty"`
+}
+
+// ListNotificationsResponseJson documents the paginated notification list response.
+//
+//	@Description	Paginated list of actor-visible notifications
+type ListNotificationsResponseJson struct {
+	Items  []interface{} `json:"items"`
+	Cursor string        `json:"cursor,omitempty"`
+}
+
 // CreateConnectorRequestJson documents the connector creation body.
 //
 //	@Description	Request to create a new connector
