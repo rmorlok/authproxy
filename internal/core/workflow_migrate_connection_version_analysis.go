@@ -29,20 +29,6 @@ func (s *service) applyProbeMigrationAnalysis(candidate *connectionMigrationCand
 		}
 
 		candidate.ProbeIdsToRun = append(candidate.ProbeIdsToRun, probe.Id)
-		s.addMigrationSystemNotification(
-			candidate,
-			database.NotificationLevelInfo,
-			fmt.Sprintf("New connection health probe %q will run", probe.Id),
-			"The target connector version adds a new health probe. AuthProxy will run it once after migration if no user action is required.",
-			fmt.Sprintf("target:%d:probe:%s:added", candidate.Target.Version, probe.Id),
-			"", map[string]any{
-				"connector_id":    candidate.Connection.ConnectorId.String(),
-				"source_version":  candidate.Connection.ConnectorVersion,
-				"target_version":  candidate.Target.Version,
-				"probe_id":        probe.Id,
-				"migration_event": "probe_added",
-			},
-		)
 	}
 }
 

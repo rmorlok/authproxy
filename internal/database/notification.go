@@ -128,25 +128,58 @@ func (m *NotificationMetadata) Scan(value interface{}) error {
 }
 
 type Notification struct {
-	Id                apid.ID
-	Key               string
-	Level             NotificationLevel
-	State             NotificationState
-	ResourceType      string
-	ResourceId        apid.ID
-	Namespace         string
-	Labels            Labels
-	Title             string
-	Message           string
-	ActionUrl         *string
-	ViewPermissions   NotificationPermissions
+	// Id is the stable AuthProxy notification id, e.g. "ntf_...".
+	Id apid.ID
+	// Key is the deterministic dedupe key for the notification condition.
+	// Reusing the same key upserts the active row instead of creating another
+	// notification; for example:
+	// "connector_migration:cxn_...:target:3:setup:configure:api_key:required".
+	Key string
+	// Level describes severity for presentation, such as "info" or "warning".
+	Level NotificationLevel
+	// State is "active" while the notification is visible and "resolved" once
+	// the underlying condition no longer applies.
+	State NotificationState
+	// ResourceType names the resource that owns this notification, e.g.
+	// "connection".
+	ResourceType string
+	// ResourceId is the owning resource id, e.g. a "cxn_..." connection id.
+	ResourceId apid.ID
+	// Namespace is the owning resource namespace used for list filtering and
+	// permission checks, e.g. "root.acme".
+	Namespace string
+	// Labels is a denormalized snapshot of the owning resource labels so
+	// notification lists can use label selectors such as "env=prod".
+	Labels Labels
+	// Title is the short user-facing summary shown in notification lists.
+	Title string
+	// Message is the longer user-facing explanation shown in detail surfaces.
+	Message string
+	// ActionUrl is the relative route for the suggested action, e.g.
+	// "/connections/cxn_...?action=reauth"; it is only returned to actors that
+	// satisfy ActionPermissions.
+	ActionUrl *string
+	// ViewPermissions are the stored permissions an actor must satisfy before
+	// seeing the notification, usually a resource "get" permission.
+	ViewPermissions NotificationPermissions
+	// ActionPermissions are the stored permissions an actor must satisfy before
+	// receiving ActionUrl/can_action=true, usually a resource "update"
+	// permission.
 	ActionPermissions NotificationPermissions
-	Source            *string
-	Metadata          NotificationMetadata
-	ResolvedAt        *time.Time
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
-	DeletedAt         *time.Time
+	// Source identifies the producer for group resolution and cleanup, e.g.
+	// "connector_migration".
+	Source *string
+	// Metadata is producer-specific structured context for debugging or UI
+	// hints, e.g. {"target_version": 3, "requires_reauth": true}.
+	Metadata NotificationMetadata
+	// ResolvedAt is set when State transitions to resolved.
+	ResolvedAt *time.Time
+	// CreatedAt is when the notification row was first inserted.
+	CreatedAt time.Time
+	// UpdatedAt is when the notification was last changed or reactivated.
+	UpdatedAt time.Time
+	// DeletedAt is reserved for soft deletion; non-nil rows are excluded.
+	DeletedAt *time.Time
 }
 
 func (n *Notification) cols() []string {
