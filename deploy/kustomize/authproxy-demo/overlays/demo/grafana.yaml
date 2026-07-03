@@ -18,6 +18,34 @@ data:
           baseUrl: http://demo-authproxy:8081
         secureJsonData:
           jwt: ${AUTHPROXY_GRAFANA_JWT}
+      - name: Prometheus
+        uid: prometheus
+        type: prometheus
+        access: proxy
+        editable: true
+        url: http://demo-otel-lgtm:9090
+      - name: Tempo
+        uid: tempo
+        type: tempo
+        access: proxy
+        editable: true
+        url: http://demo-otel-lgtm:3200
+        jsonData:
+          nodeGraph:
+            enabled: true
+          serviceMap:
+            datasourceUid: prometheus
+          tracesToLogsV2:
+            datasourceUid: loki
+            filterByTraceID: true
+          tracesToMetrics:
+            datasourceUid: prometheus
+      - name: Loki
+        uid: loki
+        type: loki
+        access: proxy
+        editable: true
+        url: http://demo-otel-lgtm:3100
 ---
 apiVersion: v1
 kind: ConfigMap

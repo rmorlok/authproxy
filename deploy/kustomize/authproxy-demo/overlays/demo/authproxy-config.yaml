@@ -42,6 +42,34 @@ app_metrics:
     path: /tmp/authproxy-app-metrics.db
   request_events:
     full_request_recording: never
+telemetry:
+  enabled: true
+  exporter:
+    protocol: grpc
+    endpoint: http://demo-otel-lgtm:4317
+    insecure: true
+  resource:
+    service_name_prefix: authproxy-demo
+    attributes:
+      deployment.environment: demo
+  sampling:
+    ratio: 1.0
+  signals:
+    traces: true
+    metrics: true
+    logs: true
+  http:
+    excluded_paths:
+      - /ping
+      - /healthz
+  proxy:
+    span_attribute_labels:
+      - type
+      - demo
+    metric_dimension_labels:
+      - type
+      - demo
+    metric_dimension_value_cap: 50
 system_auth:
   jwt_signing_key:
     public_key:
