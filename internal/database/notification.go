@@ -305,7 +305,10 @@ type ListNotificationsOptions struct {
 	ActorId           apid.ID
 }
 
-func (s *service) UpsertNotification(ctx context.Context, upsert NotificationUpsert) (*Notification, error) {
+func (s *service) UpsertNotification(
+	ctx context.Context,
+	upsert NotificationUpsert,
+) (*Notification, error) {
 	now := apctx.GetClock(ctx).Now()
 	n := &Notification{
 		Id:                apid.New(apid.PrefixNotification),
@@ -373,13 +376,17 @@ func (s *service) UpsertNotification(ctx context.Context, upsert NotificationUps
 		if err != nil {
 			return err
 		}
+
 		affected, err := dbResult.RowsAffected()
 		if err != nil {
 			return err
 		}
+
 		if affected != 1 {
 			return fmt.Errorf("notification upsert updated %d rows: %w", affected, ErrViolation)
 		}
+
+		// Update from the result in the database
 		existing.Level = n.Level
 		existing.State = NotificationStateActive
 		existing.ResourceType = n.ResourceType
@@ -396,12 +403,17 @@ func (s *service) UpsertNotification(ctx context.Context, upsert NotificationUps
 		existing.ResolvedAt = nil
 		existing.UpdatedAt = now
 		result = existing
+
 		return nil
 	})
 	return result, err
 }
 
-func (s *service) getNotificationByKeyTx(ctx context.Context, tx *sql.Tx, key string) (*Notification, error) {
+func (s *service) getNotificationByKeyTx(
+	ctx context.Context,
+	tx *sql.Tx,
+	key string,
+) (*Notification, error) {
 	var result Notification
 	err := s.sq.
 		Select(result.cols()...).
@@ -416,10 +428,14 @@ func (s *service) getNotificationByKeyTx(ctx context.Context, tx *sql.Tx, key st
 		}
 		return nil, err
 	}
+
 	return &result, nil
 }
 
-func (s *service) GetNotification(ctx context.Context, id apid.ID) (*Notification, error) {
+func (s *service) GetNotification(
+	ctx context.Context,
+	id apid.ID,
+) (*Notification, error) {
 	var result Notification
 	err := s.sq.
 		Select(result.cols()...).
@@ -437,7 +453,10 @@ func (s *service) GetNotification(ctx context.Context, id apid.ID) (*Notificatio
 	return &result, nil
 }
 
-func (s *service) ListNotifications(ctx context.Context, opts ListNotificationsOptions) ([]Notification, error) {
+func (s *service) ListNotifications(
+	ctx context.Context,
+	opts ListNotificationsOptions,
+) ([]Notification, error) {
 	limit := opts.Limit
 	if limit == 0 {
 		limit = 100
@@ -477,11 +496,20 @@ func (s *service) ListNotifications(ctx context.Context, opts ListNotificationsO
 	}
 	if opts.ActorId != apid.Nil && !opts.IncludeViewed {
 		query = query.
-			LeftJoin(fmt.Sprintf("%s nv ON nv.notification_id = %s.id AND nv.actor_id = ?", NotificationViewsTable, NotificationsTable), opts.ActorId).
+			LeftJoin(
+				fmt.Sprintf(
+					"%s nv ON nv.notification_id = %s.id AND nv.actor_id = ?",
+					NotificationViewsTable,
+					NotificationsTable,
+				),
+				opts.ActorId,
+			).
 			Where("nv.notification_id IS NULL")
 	}
 
-	rows, err := query.RunWith(s.db).QueryContext(ctx)
+	rows, err := query.
+		RunWith(s.db).
+		QueryContext(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -495,10 +523,15 @@ func (s *service) ListNotifications(ctx context.Context, opts ListNotificationsO
 		}
 		results = append(results, n)
 	}
+
 	return results, rows.Err()
 }
 
-func (s *service) MarkNotificationViewed(ctx context.Context, notificationID apid.ID, actorID apid.ID) error {
+func (s *service) MarkNotificationViewed(
+	ctx context.Context,
+	notificationID apid.ID,
+	actorID apid.ID,
+) error {
 	if notificationID == apid.Nil {
 		return errors.New("notification id is required")
 	}
@@ -511,11 +544,15 @@ func (s *service) MarkNotificationViewed(ctx context.Context, notificationID api
 	if err := actorID.ValidatePrefix(apid.PrefixActor); err != nil {
 		return err
 	}
-	now := apctx.GetClock(ctx).Now()
+
+	// Check that the notification exists
 	_, err := s.GetNotification(ctx, notificationID)
 	if err != nil {
 		return err
 	}
+
+	// Insert a viewed record or update the viewed at time if already exists
+	now := apctx.GetClock(ctx).Now()
 	_, err = s.sq.
 		Insert(NotificationViewsTable).
 		Columns("notification_id", "actor_id", "viewed_at", "created_at", "updated_at").
@@ -526,11 +563,19 @@ func (s *service) MarkNotificationViewed(ctx context.Context, notificationID api
 	return err
 }
 
-func (s *service) NotificationViewedMap(ctx context.Context, actorID apid.ID, ids []apid.ID) (map[apid.ID]time.Time, error) {
+// NotificationViewedMap returns a map of notification IDs to
+// viewed at times for the given actor ID and notification IDs.
+func (s *service) NotificationViewedMap(
+	ctx context.Context,
+	actorID apid.ID, // actor ID to check viewed at times for
+	ids []apid.ID, // notification IDs
+) (map[apid.ID]time.Time, error) {
 	result := make(map[apid.ID]time.Time)
+
 	if actorID == apid.Nil || len(ids) == 0 {
 		return result, nil
 	}
+
 	rows, err := s.sq.
 		Select("notification_id", "viewed_at").
 		From(NotificationViewsTable).
@@ -540,6 +585,7 @@ func (s *service) NotificationViewedMap(ctx context.Context, actorID apid.ID, id
 	if err != nil {
 		return nil, err
 	}
+
 	defer rows.Close()
 	for rows.Next() {
 		var id apid.ID
@@ -549,10 +595,17 @@ func (s *service) NotificationViewedMap(ctx context.Context, actorID apid.ID, id
 		}
 		result[id] = viewedAt
 	}
+
 	return result, rows.Err()
 }
 
-func (s *service) ResolveNotificationsForResource(ctx context.Context, resourceType string, resourceID apid.ID, source string, keepKeys []string) error {
+func (s *service) ResolveNotificationsForResource(
+	ctx context.Context,
+	resourceType string,
+	resourceID apid.ID,
+	source string,
+	keepKeys []string,
+) error {
 	if resourceType == "" {
 		return errors.New("resource type is required")
 	}
@@ -572,12 +625,17 @@ func (s *service) ResolveNotificationsForResource(ctx context.Context, resourceT
 			"state":         NotificationStateActive,
 			"deleted_at":    nil,
 		})
+
 	if source != "" {
 		query = query.Where(sq.Eq{"source": source})
 	}
+
 	if len(keepKeys) > 0 {
 		query = query.Where(sq.NotEq{"key": keepKeys})
 	}
-	_, err := query.RunWith(s.db).ExecContext(ctx)
+
+	_, err := query.
+		RunWith(s.db).
+		ExecContext(ctx)
 	return err
 }
