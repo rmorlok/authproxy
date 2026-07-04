@@ -85,6 +85,54 @@ func TestNotifications(t *testing.T) {
 	require.NotNil(t, resolved.ResolvedAt)
 }
 
+func TestResolveNotificationsForResourceKeys(t *testing.T) {
+	_, db := MustApplyBlankTestDbConfig(t, nil)
+	ctx := apctx.NewBuilderBackground().
+		WithClock(clock.NewFakeClock(time.Date(2026, time.July, 3, 12, 0, 0, 0, time.UTC))).
+		Build()
+
+	connID := apid.New(apid.PrefixConnection)
+	source := "connection_connector_notice"
+	first, err := db.UpsertNotification(ctx, NotificationUpsert{
+		Key:          "connection:" + connID.String() + ":connector_notice:first",
+		Level:        NotificationLevelInfo,
+		ResourceType: "connection",
+		ResourceId:   connID,
+		Namespace:    "root",
+		Title:        "First",
+		Message:      "First message",
+		Source:       &source,
+	})
+	require.NoError(t, err)
+	second, err := db.UpsertNotification(ctx, NotificationUpsert{
+		Key:          "connection:" + connID.String() + ":connector_notice:second",
+		Level:        NotificationLevelInfo,
+		ResourceType: "connection",
+		ResourceId:   connID,
+		Namespace:    "root",
+		Title:        "Second",
+		Message:      "Second message",
+		Source:       &source,
+	})
+	require.NoError(t, err)
+
+	require.NoError(t, db.ResolveNotificationsForResourceKeys(
+		ctx,
+		"connection",
+		connID,
+		source,
+		[]string{first.Key},
+	))
+
+	resolved, err := db.GetNotification(ctx, first.Id)
+	require.NoError(t, err)
+	require.Equal(t, NotificationStateResolved, resolved.State)
+
+	active, err := db.GetNotification(ctx, second.Id)
+	require.NoError(t, err)
+	require.Equal(t, NotificationStateActive, active.State)
+}
+
 func TestListNotificationsFiltersNamespaceAndLabels(t *testing.T) {
 	_, db := MustApplyBlankTestDbConfig(t, nil)
 	ctx := apctx.NewBuilderBackground().

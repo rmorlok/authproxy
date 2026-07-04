@@ -87,19 +87,23 @@ func (s *service) applyMigrateConnectionVersionV1(
 		}
 	}
 
-	for _, source := range []string{
+	if err := s.db.ResolveNotificationsForResource(
+		ctx,
+		"connection", // resource type
+		connectionID,
 		connectionRequiredActionNotificationSource,
+		candidate.NotificationKeys,
+	); err != nil {
+		return err
+	}
+	if err := s.db.ResolveNotificationsForResourceKeys(
+		ctx,
+		"connection", // resource type
+		connectionID,
 		connectionConnectorNoticeNotificationSource,
-	} {
-		if err := s.db.ResolveNotificationsForResource(
-			ctx,
-			"connection", // resource type
-			connectionID,
-			source,
-			candidate.NotificationKeys,
-		); err != nil {
-			return err
-		}
+		candidate.NotificationUnsetKeys,
+	); err != nil {
+		return err
 	}
 	for _, notification := range candidate.Notifications {
 		notification.Labels = map[string]string(updated.Labels)

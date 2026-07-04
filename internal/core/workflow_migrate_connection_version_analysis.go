@@ -295,6 +295,7 @@ func setCandidateNotification(candidate *connectionMigrationCandidate, rank int,
 	candidate.NotificationRank = rank
 	candidate.Notifications = []database.NotificationUpsert{upsert}
 	candidate.NotificationKeys = []string{upsert.Key}
+	candidate.NotificationUnsetKeys = removeString(candidate.NotificationUnsetKeys, upsert.Key)
 }
 
 func connectionNotificationKey(candidate *connectionMigrationCandidate, keyPart string) string {

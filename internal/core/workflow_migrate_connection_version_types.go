@@ -12,7 +12,7 @@ type migrationHookPatch struct {
 	Config        migrationAnyPatch          `json:"config"`
 	Labels        migrationStringPatch       `json:"labels"`
 	Annotations   migrationStringPatch       `json:"annotations"`
-	Notifications []migrationNotificationDef `json:"notifications"`
+	Notifications migrationNotificationPatch `json:"notifications"`
 }
 
 // migrationAnyPatch describes set/unset operations for JSON-like maps such as
@@ -30,12 +30,17 @@ type migrationStringPatch struct {
 	Unset []string          `json:"unset"`
 }
 
+// migrationNotificationPatch describes set/unset operations for
+// connector-authored connection notices. Unset entries only use Key.
+type migrationNotificationPatch struct {
+	Set   []migrationNotificationDef `json:"set"`
+	Unset []migrationNotificationDef `json:"unset"`
+}
+
 // migrationNotificationDef is the connector-authored notification payload that
 // a hook can queue for users after the connection version changes.
 type migrationNotificationDef struct {
-	// Key is connector-authored context for dedupe/auditing within the hook
-	// result. It is stored as metadata; connection notification keys remain
-	// high-level condition keys.
+	// Key is the connector-authored condition key used for dedupe and unsets.
 	Key       string         `json:"key"`
 	Level     string         `json:"level"`
 	Title     string         `json:"title"`
@@ -48,17 +53,18 @@ type migrationNotificationDef struct {
 // execution and automatic migration analysis before the workflow writes the
 // connection update and notification changes to persistent storage.
 type connectionMigrationCandidate struct {
-	Connection       *connection
-	Target           *ConnectorVersion
-	Config           map[string]any
-	UserLabels       map[string]string
-	Annotations      map[string]string
-	SetupStep        *cschema.SetupStep
-	SetupError       *string
-	HealthState      database.ConnectionHealthState
-	RefreshAuth      bool
-	ProbeIdsToRun    []string
-	Notifications    []database.NotificationUpsert
-	NotificationKeys []string
-	NotificationRank int
+	Connection            *connection
+	Target                *ConnectorVersion
+	Config                map[string]any
+	UserLabels            map[string]string
+	Annotations           map[string]string
+	SetupStep             *cschema.SetupStep
+	SetupError            *string
+	HealthState           database.ConnectionHealthState
+	RefreshAuth           bool
+	ProbeIdsToRun         []string
+	Notifications         []database.NotificationUpsert
+	NotificationKeys      []string
+	NotificationUnsetKeys []string
+	NotificationRank      int
 }

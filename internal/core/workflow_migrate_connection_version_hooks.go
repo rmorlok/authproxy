@@ -1,6 +1,7 @@
 package core
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -83,6 +84,30 @@ func decodeMigrationHookPatch(raw map[string]any) (migrationHookPatch, error) {
 	return patch, nil
 }
 
+// UnmarshalJSON accepts the current notifications patch shape and the older
+// bare array form, which is treated as a set-only patch.
+func (p *migrationNotificationPatch) UnmarshalJSON(b []byte) error {
+	b = bytes.TrimSpace(b)
+	if len(b) == 0 || bytes.Equal(b, []byte("null")) {
+		return nil
+	}
+	if b[0] == '[' {
+		var set []migrationNotificationDef
+		if err := json.Unmarshal(b, &set); err != nil {
+			return err
+		}
+		p.Set = set
+		return nil
+	}
+	type alias migrationNotificationPatch
+	var decoded alias
+	if err := json.Unmarshal(b, &decoded); err != nil {
+		return err
+	}
+	*p = migrationNotificationPatch(decoded)
+	return nil
+}
+
 // applyMigrationHookPatch applies the migration hook patch to the connection
 // migration candidate. It applies validation logic on th values to be updated
 // on the candidate and errors on invalid values.
@@ -130,12 +155,17 @@ func applyMigrationHookPatch(
 	}
 
 	// Update the notifications
-	for _, n := range patch.Notifications {
+	for _, n := range patch.Notifications.Set {
 		upsert, rank, err := migrationNotificationUpsert(candidate, n)
 		if err != nil {
 			return err
 		}
 		setCandidateNotification(candidate, rank, upsert)
+	}
+	for _, n := range patch.Notifications.Unset {
+		if err := unsetMigrationNotification(candidate, n); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -158,7 +188,10 @@ func migrationNotificationUpsert(
 		return database.NotificationUpsert{}, 0, fmt.Errorf("invalid migration notification level %q", def.Level)
 	}
 
-	key := connectionNotificationKey(candidate, "connector_notice")
+	key, err := migrationNotificationKey(candidate, def)
+	if err != nil {
+		return database.NotificationUpsert{}, 0, err
+	}
 	var actionURL *string
 	if def.ActionURL != "" {
 		actionURL = &def.ActionURL
@@ -200,4 +233,50 @@ func migrationNotificationUpsert(
 		Source:            &source,
 		Metadata:          metadata,
 	}, migrationNotificationRankForLevel(level), nil
+}
+
+func unsetMigrationNotification(
+	candidate *connectionMigrationCandidate,
+	def migrationNotificationDef,
+) error {
+	key, err := migrationNotificationKey(candidate, def)
+	if err != nil {
+		return err
+	}
+	candidate.NotificationUnsetKeys = appendUniqueString(candidate.NotificationUnsetKeys, key)
+	if len(candidate.Notifications) == 1 && candidate.Notifications[0].Key == key {
+		candidate.Notifications = nil
+		candidate.NotificationKeys = removeString(candidate.NotificationKeys, key)
+		candidate.NotificationRank = 0
+	}
+	return nil
+}
+
+func migrationNotificationKey(
+	candidate *connectionMigrationCandidate,
+	def migrationNotificationDef,
+) (string, error) {
+	if def.Key == "" {
+		return "", errors.New("migration notification key is required")
+	}
+	return connectionNotificationKey(candidate, "connector_notice:"+def.Key), nil
+}
+
+func appendUniqueString(values []string, value string) []string {
+	for _, existing := range values {
+		if existing == value {
+			return values
+		}
+	}
+	return append(values, value)
+}
+
+func removeString(values []string, value string) []string {
+	result := values[:0]
+	for _, existing := range values {
+		if existing != value {
+			result = append(result, existing)
+		}
+	}
+	return result
 }

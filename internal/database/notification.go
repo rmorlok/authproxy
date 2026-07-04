@@ -684,3 +684,44 @@ func (s *service) ResolveNotificationsForResource(
 		ExecContext(ctx)
 	return err
 }
+
+func (s *service) ResolveNotificationsForResourceKeys(
+	ctx context.Context,
+	resourceType string,
+	resourceID apid.ID,
+	source string,
+	keys []string,
+) error {
+	if len(keys) == 0 {
+		return nil
+	}
+	if resourceType == "" {
+		return errors.New("resource type is required")
+	}
+	if resourceID == apid.Nil {
+		return errors.New("resource id is required")
+	}
+
+	now := apctx.GetClock(ctx).Now()
+	query := s.sq.
+		Update(NotificationsTable).
+		Set("state", NotificationStateResolved).
+		Set("resolved_at", now).
+		Set("updated_at", now).
+		Where(sq.Eq{
+			"resource_type": resourceType,
+			"resource_id":   resourceID,
+			"key":           keys,
+			"state":         NotificationStateActive,
+			"deleted_at":    nil,
+		})
+
+	if source != "" {
+		query = query.Where(sq.Eq{"source": source})
+	}
+
+	_, err := query.
+		RunWith(s.db).
+		ExecContext(ctx)
+	return err
+}
