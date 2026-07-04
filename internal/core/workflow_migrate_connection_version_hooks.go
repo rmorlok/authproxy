@@ -12,6 +12,10 @@ import (
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
 
+// applyMigrationHookForVersion applies the javascript upgrade/downgrade hook,
+// if one exists, for a connection version migration. This may modify the
+// candidate by changing the config, user labels, and annotations, and/or
+// adding/removing notifications.
 func (s *service) applyMigrationHookForVersion(
 	ctx context.Context,
 	candidate *connectionMigrationCandidate,
@@ -51,28 +55,42 @@ func (s *service) applyMigrationHookForVersion(
 	if err != nil {
 		return fmt.Errorf("decode migration hook for version %d: %w", version.Version, err)
 	}
-	if err := applyMigrationHookPatch(candidate, version, sourceVersion, targetVersion, patch); err != nil {
+	if err := applyMigrationHookPatch(candidate, patch); err != nil {
 		return fmt.Errorf("apply migration hook for version %d: %w", version.Version, err)
 	}
 	return nil
 }
 
+// decodeMigrationHookPatch decodes a migration hook patch from a
+// map[string]any to the strongly typed migrationHookPatch. This
+// is accomplished by unmarshalling the raw map into a
+// migrationHookPatch.
 func decodeMigrationHookPatch(raw map[string]any) (migrationHookPatch, error) {
 	if len(raw) == 0 {
 		return migrationHookPatch{}, nil
 	}
+
 	b, err := json.Marshal(raw)
 	if err != nil {
 		return migrationHookPatch{}, err
 	}
+
 	var patch migrationHookPatch
 	if err := json.Unmarshal(b, &patch); err != nil {
 		return migrationHookPatch{}, err
 	}
+
 	return patch, nil
 }
 
-func applyMigrationHookPatch(candidate *connectionMigrationCandidate, version *ConnectorVersion, sourceVersion, targetVersion uint64, patch migrationHookPatch) error {
+// applyMigrationHookPatch applies the migration hook patch to the connection
+// migration candidate. It applies validation logic on th values to be updated
+// on the candidate and errors on invalid values.
+func applyMigrationHookPatch(
+	candidate *connectionMigrationCandidate,
+	patch migrationHookPatch,
+) error {
+	// Update the config settings
 	for key, value := range patch.Config.Set {
 		candidate.Config[key] = value
 	}
@@ -80,6 +98,7 @@ func applyMigrationHookPatch(candidate *connectionMigrationCandidate, version *C
 		delete(candidate.Config, key)
 	}
 
+	// Update the user labels
 	for key, value := range patch.Labels.Set {
 		if err := database.ValidateUserLabelKey(key); err != nil {
 			return err
@@ -96,6 +115,7 @@ func applyMigrationHookPatch(candidate *connectionMigrationCandidate, version *C
 		delete(candidate.UserLabels, key)
 	}
 
+	// Update the annotations
 	for key, value := range patch.Annotations.Set {
 		if err := database.ValidateAnnotationKey(key); err != nil {
 			return err
@@ -109,8 +129,9 @@ func applyMigrationHookPatch(candidate *connectionMigrationCandidate, version *C
 		delete(candidate.Annotations, key)
 	}
 
-	for i, n := range patch.Notifications {
-		upsert, rank, err := migrationNotificationUpsert(candidate, version, sourceVersion, targetVersion, i, n)
+	// Update the notifications
+	for _, n := range patch.Notifications {
+		upsert, rank, err := migrationNotificationUpsert(candidate, n)
 		if err != nil {
 			return err
 		}
@@ -121,10 +142,6 @@ func applyMigrationHookPatch(candidate *connectionMigrationCandidate, version *C
 
 func migrationNotificationUpsert(
 	candidate *connectionMigrationCandidate,
-	_ *ConnectorVersion,
-	_ uint64,
-	_ uint64,
-	_ int,
 	def migrationNotificationDef,
 ) (database.NotificationUpsert, int, error) {
 	if def.Title == "" {
