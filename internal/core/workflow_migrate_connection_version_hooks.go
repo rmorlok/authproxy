@@ -12,7 +12,13 @@ import (
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
 
-func (s *service) applyMigrationHookForVersion(ctx context.Context, candidate *connectionMigrationCandidate, version *ConnectorVersion, sourceVersion, targetVersion uint64) error {
+func (s *service) applyMigrationHookForVersion(
+	ctx context.Context,
+	candidate *connectionMigrationCandidate,
+	version *ConnectorVersion,
+	sourceVersion,
+	targetVersion uint64,
+) error {
 	def := version.GetDefinition()
 	if def == nil || def.Migrations == nil {
 		return nil

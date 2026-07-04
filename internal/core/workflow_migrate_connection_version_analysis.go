@@ -3,13 +3,19 @@ package core
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 
 	"github.com/rmorlok/authproxy/internal/database"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	"github.com/rmorlok/authproxy/internal/util"
 )
 
-func (s *service) applyProbeMigrationAnalysis(candidate *connectionMigrationCandidate) {
+// applyProbeMigrationAnalysis computes the set of probes that should be run on
+// the candidate based on the set of probes that have already run on the source
+// compared to the set of probes needed by the target. It only sets only the
+// delta to run.
+func applyProbeMigrationAnalysis(candidate *connectionMigrationCandidate) {
 	sourceDef := candidate.Connection.cv.GetDefinition()
 	targetDef := candidate.Target.GetDefinition()
 
@@ -32,7 +38,10 @@ func (s *service) applyProbeMigrationAnalysis(candidate *connectionMigrationCand
 	}
 }
 
-func (s *service) applyAuthMigrationAnalysis(candidate *connectionMigrationCandidate) error {
+// applyAuthMigrationAnalysis decides if auth should be refreshed after the
+// upgrade. Currently it applies a naive comparison of the auth definition
+// to see if there are any changes and refreshes if any are detected.
+func applyAuthMigrationAnalysis(log *slog.Logger, candidate *connectionMigrationCandidate) error {
 	sourceDef := candidate.Connection.cv.GetDefinition()
 	targetDef := candidate.Target.GetDefinition()
 	if sourceDef == nil || targetDef == nil || targetDef.Auth == nil {
@@ -46,45 +55,47 @@ func (s *service) applyAuthMigrationAnalysis(candidate *connectionMigrationCandi
 	if err != nil {
 		return err
 	}
+
 	targetJSON, err := json.Marshal(targetDef.Auth)
 	if err != nil {
 		return err
 	}
+
 	if string(sourceJSON) != string(targetJSON) {
+		log.Info("detected auth migration; will trigger refresh after migration")
 		candidate.RefreshAuth = true
-		s.addMigrationSystemNotification(candidate, database.NotificationLevelInfo,
-			"Connection credentials will be refreshed",
-			"The target connector version changes OAuth settings, so AuthProxy will refresh credentials after migration.",
-			fmt.Sprintf("target:%d:oauth:refresh_required", candidate.Target.Version),
-			"", map[string]any{
-				"connector_id":     candidate.Connection.ConnectorId.String(),
-				"source_version":   candidate.Connection.ConnectorVersion,
-				"target_version":   candidate.Target.Version,
-				"migration_event":  "oauth_refresh_required",
-				"auth_method_type": string(cschema.AuthTypeOAuth2),
-			})
 	}
+
 	return nil
 }
 
-func (s *service) applySetupFlowMigrationAnalysis(candidate *connectionMigrationCandidate) error {
+func applySetupFlowMigrationAnalysis(
+	log *slog.Logger,
+	candidate *connectionMigrationCandidate,
+) error {
+	// Get the connector definition from where we start and end
 	sourceDef := candidate.Connection.cv.GetDefinition()
 	targetDef := candidate.Target.GetDefinition()
 	if targetDef == nil || targetDef.SetupFlow == nil {
 		return nil
 	}
 
+	// Get the field names from the setup flow for where we started
 	sourceFields := map[string]bool{}
 	if sourceDef != nil && sourceDef.SetupFlow != nil {
 		sourceFields = sourceDef.SetupFlow.AllConfigFieldNames()
 	}
 
+	// If where we are going has preconnect, we need to make sure all those
+	// fields are present already, or transition the connection.
 	if targetDef.SetupFlow.Preconnect != nil {
+		// Get the needed fields
 		fields, err := targetDef.SetupFlow.Preconnect.SetupFields()
 		if err != nil {
 			return fmt.Errorf("inspect target preconnect setup fields: %w", err)
 		}
-		if err := s.applySetupFieldMigrationAnalysis(candidate, "preconnect", fields, sourceFields); err != nil {
+
+		if err := applySetupFieldMigrationAnalysis(log, candidate, "preconnect", fields, sourceFields); err != nil {
 			return err
 		}
 	}
@@ -94,27 +105,32 @@ func (s *service) applySetupFlowMigrationAnalysis(candidate *connectionMigration
 		if err != nil {
 			return fmt.Errorf("inspect target configure setup fields: %w", err)
 		}
-		if err := s.applySetupFieldMigrationAnalysis(candidate, "configure", fields, sourceFields); err != nil {
+		if err := applySetupFieldMigrationAnalysis(log, candidate, "configure", fields, sourceFields); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (s *service) applySetupFieldMigrationAnalysis(
-	candidate *connectionMigrationCandidate,
-	phase string,
-	fields []cschema.SetupField,
-	sourceFields map[string]bool,
+func applySetupFieldMigrationAnalysis(
+	log *slog.Logger,
+	candidate *connectionMigrationCandidate, // the candidate connection migration
+	phase string, // what phase is this (preconnect or configure)
+	fields []cschema.SetupField, // the fields we need on the target version
+	sourceFields map[string]bool, // the set of fields that are present on the source version
 ) error {
 	for _, field := range fields {
 		if sourceFields[field.Name] {
-			continue
-		}
-		if _, ok := candidate.Config[field.Name]; ok {
+			// We already have the field; good 👍
 			continue
 		}
 
+		if _, ok := candidate.Config[field.Name]; ok {
+			// The migration covered populating this field; good 👍
+			continue
+		}
+
+		// Metadata just tracks information about what triggered a notification
 		metadata := map[string]any{
 			"connector_id":    candidate.Connection.ConnectorId.String(),
 			"source_version":  candidate.Connection.ConnectorVersion,
@@ -127,22 +143,23 @@ func (s *service) applySetupFieldMigrationAnalysis(
 
 		if field.HasDefault {
 			candidate.Config[field.Name] = field.Default
-			s.addMigrationSystemNotification(candidate, database.NotificationLevelInfo,
-				fmt.Sprintf("Connection setting %q defaulted", field.Name),
-				fmt.Sprintf("The connector version migration added the new %s setting %q using the connector default.", phase, field.Name),
-				fmt.Sprintf("target:%d:setup:%s:%s:default", candidate.Target.Version, phase, field.Name),
-				"", metadata)
+			log.Info("detected setup field added; setting to default", "field", field.Name)
 			continue
 		}
 
 		if field.Required {
 			if phase == "preconnect" {
+				log.Info("required preconnection field missing; marking connection as needing reauth", "field", field.Name)
 				candidate.HealthState = database.ConnectionHealthStateUnhealthy
-				s.addMigrationSystemNotification(candidate, database.NotificationLevelWarning,
+				addMigrationSystemNotification(
+					candidate,
+					database.NotificationLevelWarning,
 					"Connection requires re-authentication",
-					fmt.Sprintf("The target connector version requires new preconnect setting %q before credentials can be refreshed.", field.Name),
-					fmt.Sprintf("target:%d:setup:%s:%s:required", candidate.Target.Version, phase, field.Name),
-					"reauth", metadata)
+					"The connection requires additional configuration to continue operating.",
+					database.NotificationKeyAuthRequired,
+					"reauth",
+					metadata,
+				)
 				continue
 			}
 
@@ -153,7 +170,7 @@ func (s *service) applySetupFieldMigrationAnalysis(
 				}
 				candidate.SetupStep = &step
 			}
-			s.addMigrationSystemNotification(candidate, database.NotificationLevelWarning,
+			addMigrationSystemNotification(candidate, database.NotificationLevelWarning,
 				"Connection requires configuration",
 				fmt.Sprintf("The target connector version requires new configuration setting %q.", field.Name),
 				fmt.Sprintf("target:%d:setup:%s:%s:required", candidate.Target.Version, phase, field.Name),
@@ -161,7 +178,7 @@ func (s *service) applySetupFieldMigrationAnalysis(
 			continue
 		}
 
-		s.addMigrationSystemNotification(candidate, database.NotificationLevelInfo,
+		addMigrationSystemNotification(candidate, database.NotificationLevelInfo,
 			fmt.Sprintf("New optional connection setting %q is available", field.Name),
 			fmt.Sprintf("The target connector version adds optional %s setting %q.", phase, field.Name),
 			fmt.Sprintf("target:%d:setup:%s:%s:optional", candidate.Target.Version, phase, field.Name),
@@ -170,7 +187,7 @@ func (s *service) applySetupFieldMigrationAnalysis(
 	return nil
 }
 
-func (s *service) addMigrationSystemNotification(
+func addMigrationSystemNotification(
 	candidate *connectionMigrationCandidate,
 	level database.NotificationLevel,
 	title string,
@@ -185,10 +202,7 @@ func (s *service) addMigrationSystemNotification(
 	if action != "" {
 		actionURL = fmt.Sprintf("/connections/%s?action=%s", candidate.Connection.Id, action)
 	}
-	var actionURLPtr *string
-	if actionURL != "" {
-		actionURLPtr = &actionURL
-	}
+
 	actionPermissions := aschema.NoPermissions()
 	if action != "" {
 		actionPermissions = aschema.PermissionsSingleWithResourceIds(
@@ -198,6 +212,7 @@ func (s *service) addMigrationSystemNotification(
 			candidate.Connection.Id.String(),
 		)
 	}
+
 	upsert := database.NotificationUpsert{
 		Key:          key,
 		Level:        level,
@@ -206,7 +221,7 @@ func (s *service) addMigrationSystemNotification(
 		Namespace:    candidate.Connection.Namespace,
 		Title:        title,
 		Message:      message,
-		ActionUrl:    actionURLPtr,
+		ActionUrl:    util.ToPtrNonZero(actionURL),
 		ViewPermissions: aschema.PermissionsSingleWithResourceIds(
 			candidate.Connection.Namespace,
 			"connections",
@@ -217,6 +232,7 @@ func (s *service) addMigrationSystemNotification(
 		Source:            &source,
 		Metadata:          metadata,
 	}
+
 	candidate.Notifications = append(candidate.Notifications, upsert)
 	candidate.NotificationKeys = append(candidate.NotificationKeys, upsert.Key)
 }

@@ -25,6 +25,14 @@ const (
 	NotificationLevelError   NotificationLevel = "error"
 )
 
+const (
+	// NotificationKeyAuthRequired is the key when a connection moves to unhealthy state
+	NotificationKeyAuthRequired = "auth_required"
+
+	// NotificationKeySetupRequired is the key when a connection is missing setup information after migration
+	NotificationKeySetupRequired = "setup_required"
+)
+
 func IsValidNotificationLevel[T string | NotificationLevel](level T) bool {
 	switch NotificationLevel(level) {
 	case NotificationLevelInfo, NotificationLevelWarning, NotificationLevelError:
