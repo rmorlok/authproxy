@@ -110,48 +110,60 @@ func applyMigrationHookPatch(candidate *connectionMigrationCandidate, version *C
 	}
 
 	for i, n := range patch.Notifications {
-		upsert, err := migrationNotificationUpsert(candidate, version, sourceVersion, targetVersion, i, n)
+		upsert, rank, err := migrationNotificationUpsert(candidate, version, sourceVersion, targetVersion, i, n)
 		if err != nil {
 			return err
 		}
-		candidate.Notifications = append(candidate.Notifications, upsert)
-		candidate.NotificationKeys = append(candidate.NotificationKeys, upsert.Key)
+		setCandidateNotification(candidate, rank, upsert)
 	}
 	return nil
 }
 
 func migrationNotificationUpsert(
 	candidate *connectionMigrationCandidate,
-	version *ConnectorVersion,
-	sourceVersion uint64,
-	targetVersion uint64,
-	index int,
+	_ *ConnectorVersion,
+	_ uint64,
+	_ uint64,
+	_ int,
 	def migrationNotificationDef,
-) (database.NotificationUpsert, error) {
+) (database.NotificationUpsert, int, error) {
 	if def.Title == "" {
-		return database.NotificationUpsert{}, errors.New("migration notification title is required")
+		return database.NotificationUpsert{}, 0, errors.New("migration notification title is required")
 	}
 	if def.Message == "" {
-		return database.NotificationUpsert{}, errors.New("migration notification message is required")
+		return database.NotificationUpsert{}, 0, errors.New("migration notification message is required")
 	}
 	level := database.NotificationLevel(def.Level)
 	if level == "" {
 		level = database.NotificationLevelInfo
 	}
 	if !database.IsValidNotificationLevel(level) {
-		return database.NotificationUpsert{}, fmt.Errorf("invalid migration notification level %q", def.Level)
+		return database.NotificationUpsert{}, 0, fmt.Errorf("invalid migration notification level %q", def.Level)
 	}
 
-	keyPart := def.Key
-	if keyPart == "" {
-		keyPart = fmt.Sprintf("v%d:%d", version.Version, index)
-	}
-	key := fmt.Sprintf("%s:%s:%d:%d:%s", connectionMigrationNotificationSource, candidate.Connection.Id, sourceVersion, targetVersion, keyPart)
+	key := connectionNotificationKey(candidate, "connector_notice")
 	var actionURL *string
 	if def.ActionURL != "" {
 		actionURL = &def.ActionURL
 	}
-	source := connectionMigrationNotificationSource
+	actionPermissions := aschema.NoPermissions()
+	if actionURL != nil {
+		actionPermissions = aschema.PermissionsSingleWithResourceIds(
+			candidate.Connection.Namespace,
+			"connections",
+			"update",
+			candidate.Connection.Id.String(),
+		)
+	}
+	source := connectionConnectorNoticeNotificationSource
+	metadata := def.Metadata
+	if def.Key != "" {
+		metadata = map[string]any{}
+		for k, v := range def.Metadata {
+			metadata[k] = v
+		}
+		metadata["connector_notice_key"] = def.Key
+	}
 	return database.NotificationUpsert{
 		Key:          key,
 		Level:        level,
@@ -167,13 +179,8 @@ func migrationNotificationUpsert(
 			"get",
 			candidate.Connection.Id.String(),
 		),
-		ActionPermissions: aschema.PermissionsSingleWithResourceIds(
-			candidate.Connection.Namespace,
-			"connections",
-			"update",
-			candidate.Connection.Id.String(),
-		),
-		Source:   &source,
-		Metadata: def.Metadata,
-	}, nil
+		ActionPermissions: actionPermissions,
+		Source:            &source,
+		Metadata:          metadata,
+	}, migrationNotificationRankForLevel(level), nil
 }

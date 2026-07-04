@@ -8,7 +8,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encfield"
-	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
 
 func (s *service) applyMigrateConnectionVersionV1(
@@ -67,23 +66,11 @@ func (s *service) applyMigrateConnectionVersionV1(
 
 	if candidate.RefreshAuth {
 		if err := s.refreshAuthAfterConnectionMigration(ctx, updated, candidate); err != nil {
+			logger.Info("auth refresh after migration failed; marking connection as needing reauth", "error", err)
 			candidate.HealthState = database.ConnectionHealthStateUnhealthy
-			s.addMigrationSystemNotification(
+			addAuthRequiredNotification(
 				candidate,
-				database.NotificationLevelWarning,
-				"Connection requires re-authentication",
-				"An upgrade to the connector changed OAuth settings and credentials could not be refreshed automatically.",
-				fmt.Sprintf("target:%d:oauth:refresh_failed", candidate.Target.Version),
-				"reauth",
-				map[string]any{
-					"connector_id":     candidate.Connection.ConnectorId.String(),
-					"source_version":   candidate.Connection.ConnectorVersion,
-					"target_version":   candidate.Target.Version,
-					"migration_event":  "oauth_refresh_failed",
-					"refresh_error":    err.Error(),
-					"requires_reauth":  true,
-					"auth_method_type": string(cschema.AuthTypeOAuth2),
-				},
+				migrationNotificationMetadata(candidate, "oauth_refresh_failed"),
 			)
 			if markErr := s.db.SetConnectionHealthState(ctx, connectionID, database.ConnectionHealthStateUnhealthy); markErr != nil {
 				return markErr
@@ -100,14 +87,19 @@ func (s *service) applyMigrateConnectionVersionV1(
 		}
 	}
 
-	if err := s.db.ResolveNotificationsForResource(
-		ctx,
-		"connection", // resource type
-		connectionID,
-		connectionMigrationNotificationSource,
-		candidate.NotificationKeys,
-	); err != nil {
-		return err
+	for _, source := range []string{
+		connectionRequiredActionNotificationSource,
+		connectionConnectorNoticeNotificationSource,
+	} {
+		if err := s.db.ResolveNotificationsForResource(
+			ctx,
+			"connection", // resource type
+			connectionID,
+			source,
+			candidate.NotificationKeys,
+		); err != nil {
+			return err
+		}
 	}
 	for _, notification := range candidate.Notifications {
 		notification.Labels = map[string]string(updated.Labels)

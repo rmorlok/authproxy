@@ -21,8 +21,8 @@ func TestToPtrNonZero(t *testing.T) {
 	require.Equal(t, &x, ToPtrNonZero(x))
 
 	y := ""
-	require.Nil(t, ToPtr(y))
+	require.Nil(t, ToPtrNonZero(y))
 
 	z := 0
-	require.Nil(t, ToPtr(z))
+	require.Nil(t, ToPtrNonZero(z))
 }

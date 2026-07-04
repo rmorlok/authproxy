@@ -26,10 +26,14 @@ const (
 )
 
 const (
-	// NotificationKeyAuthRequired is the key when a connection moves to unhealthy state
+	// NotificationKeyAuthRequired is the condition key suffix used when a
+	// connection requires the actor to re-authenticate, e.g.
+	// "connection:cxn_...:auth_required".
 	NotificationKeyAuthRequired = "auth_required"
 
-	// NotificationKeySetupRequired is the key when a connection is missing setup information after migration
+	// NotificationKeySetupRequired is the condition key suffix used when a
+	// connection requires additional setup, e.g.
+	// "connection:cxn_...:setup_required".
 	NotificationKeySetupRequired = "setup_required"
 )
 
@@ -136,12 +140,12 @@ func (m *NotificationMetadata) Scan(value interface{}) error {
 }
 
 type Notification struct {
-	// Id is the stable AuthProxy notification id, e.g. "ntf_...".
+	// Id is the stable notification id, e.g. "ntf_...".
 	Id apid.ID
 	// Key is the deterministic dedupe key for the notification condition.
 	// Reusing the same key upserts the active row instead of creating another
 	// notification; for example:
-	// "connector_migration:cxn_...:target:3:setup:configure:api_key:required".
+	// "connection:cxn_...:auth_required".
 	Key string
 	// Level describes severity for presentation, such as "info" or "warning".
 	Level NotificationLevel
@@ -175,7 +179,7 @@ type Notification struct {
 	// permission.
 	ActionPermissions NotificationPermissions
 	// Source identifies the producer for group resolution and cleanup, e.g.
-	// "connector_migration".
+	// "connection_required_action".
 	Source *string
 	// Metadata is producer-specific structured context for debugging or UI
 	// hints, e.g. {"target_version": 3, "requires_reauth": true}.

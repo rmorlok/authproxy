@@ -33,6 +33,9 @@ type migrationStringPatch struct {
 // migrationNotificationDef is the connector-authored notification payload that
 // a hook can queue for users after the connection version changes.
 type migrationNotificationDef struct {
+	// Key is connector-authored context for dedupe/auditing within the hook
+	// result. It is stored as metadata; connection notification keys remain
+	// high-level condition keys.
 	Key       string         `json:"key"`
 	Level     string         `json:"level"`
 	Title     string         `json:"title"`
@@ -57,4 +60,5 @@ type connectionMigrationCandidate struct {
 	ProbeIdsToRun    []string
 	Notifications    []database.NotificationUpsert
 	NotificationKeys []string
+	NotificationRank int
 }

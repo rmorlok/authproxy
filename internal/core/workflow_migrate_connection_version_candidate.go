@@ -97,7 +97,7 @@ func (s *service) buildConnectionMigrationCandidate(ctx context.Context, connect
 
 	// Update the candidate based on if auth has changed to flag that auth
 	// be refreshed after upgrade
-	if err := applyAuthMigrationAnalysis(candidate); err != nil {
+	if err := applyAuthMigrationAnalysis(log, candidate); err != nil {
 		return nil, err
 	}
 
@@ -108,6 +108,7 @@ func (s *service) buildConnectionMigrationCandidate(ctx context.Context, connect
 	if err := applySetupFlowMigrationAnalysis(log, candidate); err != nil {
 		return nil, err
 	}
+	applyRequiredActionNotification(candidate)
 
 	return candidate, nil
 }

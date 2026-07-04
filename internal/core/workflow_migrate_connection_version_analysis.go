@@ -8,7 +8,14 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
-	"github.com/rmorlok/authproxy/internal/util"
+)
+
+const (
+	migrationNotificationRankHookInfo = iota + 1
+	migrationNotificationRankHookWarning
+	migrationNotificationRankHookError
+	migrationNotificationRankSetupRequired
+	migrationNotificationRankAuthRequired
 )
 
 // applyProbeMigrationAnalysis computes the set of probes that should be run on
@@ -130,35 +137,28 @@ func applySetupFieldMigrationAnalysis(
 			continue
 		}
 
-		// Metadata just tracks information about what triggered a notification
-		metadata := map[string]any{
-			"connector_id":    candidate.Connection.ConnectorId.String(),
-			"source_version":  candidate.Connection.ConnectorVersion,
-			"target_version":  candidate.Target.Version,
-			"setup_phase":     phase,
-			"setup_step_id":   field.StepId,
-			"config_field":    field.Name,
-			"migration_event": "setup_field_added",
-		}
-
 		if field.HasDefault {
 			candidate.Config[field.Name] = field.Default
-			log.Info("detected setup field added; setting to default", "field", field.Name)
+			log.Info(
+				"detected setup field added; setting to default",
+				"phase", phase,
+				"field", field.Name,
+				"setup_step_id", field.StepId,
+			)
 			continue
 		}
 
 		if field.Required {
 			if phase == "preconnect" {
-				log.Info("required preconnection field missing; marking connection as needing reauth", "field", field.Name)
+				log.Info(
+					"required preconnection field missing; marking connection as needing reauth",
+					"field", field.Name,
+					"setup_step_id", field.StepId,
+				)
 				candidate.HealthState = database.ConnectionHealthStateUnhealthy
-				addMigrationSystemNotification(
+				addAuthRequiredNotification(
 					candidate,
-					database.NotificationLevelWarning,
-					"Connection requires re-authentication",
-					"The connection requires additional configuration to continue operating.",
-					database.NotificationKeyAuthRequired,
-					"reauth",
-					metadata,
+					migrationNotificationMetadata(candidate, "required_preconnect_field_missing"),
 				)
 				continue
 			}
@@ -170,37 +170,89 @@ func applySetupFieldMigrationAnalysis(
 				}
 				candidate.SetupStep = &step
 			}
-			addMigrationSystemNotification(candidate, database.NotificationLevelWarning,
-				"Connection requires configuration",
-				fmt.Sprintf("The target connector version requires new configuration setting %q.", field.Name),
-				fmt.Sprintf("target:%d:setup:%s:%s:required", candidate.Target.Version, phase, field.Name),
-				"configure", metadata)
+			log.Info(
+				"required configuration field missing; marking connection as needing setup",
+				"field", field.Name,
+				"setup_step_id", field.StepId,
+			)
+			addSetupRequiredNotification(
+				candidate,
+				migrationNotificationMetadata(candidate, "required_configure_field_missing"),
+			)
 			continue
 		}
 
-		addMigrationSystemNotification(candidate, database.NotificationLevelInfo,
-			fmt.Sprintf("New optional connection setting %q is available", field.Name),
-			fmt.Sprintf("The target connector version adds optional %s setting %q.", phase, field.Name),
-			fmt.Sprintf("target:%d:setup:%s:%s:optional", candidate.Target.Version, phase, field.Name),
-			"configure", metadata)
+		log.Info(
+			"optional setup field added; no user notification queued",
+			"phase", phase,
+			"field", field.Name,
+			"setup_step_id", field.StepId,
+		)
 	}
 	return nil
 }
 
-func addMigrationSystemNotification(
+func applyRequiredActionNotification(candidate *connectionMigrationCandidate) {
+	if candidate.HealthState == database.ConnectionHealthStateUnhealthy {
+		addAuthRequiredNotification(
+			candidate,
+			migrationNotificationMetadata(candidate, "connection_requires_reauth"),
+		)
+		return
+	}
+	if candidate.SetupStep != nil {
+		addSetupRequiredNotification(
+			candidate,
+			migrationNotificationMetadata(candidate, "connection_requires_setup"),
+		)
+	}
+}
+
+func addAuthRequiredNotification(candidate *connectionMigrationCandidate, metadata map[string]any) {
+	addConnectionRequiredActionNotification(
+		candidate,
+		migrationNotificationRankAuthRequired,
+		database.NotificationKeyAuthRequired,
+		database.NotificationLevelWarning,
+		"Connection requires re-authentication",
+		"Reconnect this connection to continue using it.",
+		"reauth",
+		metadata,
+	)
+}
+
+func addSetupRequiredNotification(candidate *connectionMigrationCandidate, metadata map[string]any) {
+	addConnectionRequiredActionNotification(
+		candidate,
+		migrationNotificationRankSetupRequired,
+		database.NotificationKeySetupRequired,
+		database.NotificationLevelWarning,
+		"Connection requires setup",
+		"Review this connection's setup before using it.",
+		"configure",
+		metadata,
+	)
+}
+
+func addConnectionRequiredActionNotification(
 	candidate *connectionMigrationCandidate,
+	rank int,
+	keyPart string,
 	level database.NotificationLevel,
 	title string,
 	message string,
-	keyPart string,
 	action string,
 	metadata map[string]any,
 ) {
-	key := fmt.Sprintf("%s:%s:%s", connectionMigrationNotificationSource, candidate.Connection.Id, keyPart)
-	source := connectionMigrationNotificationSource
+	key := connectionNotificationKey(candidate, keyPart)
+	source := connectionRequiredActionNotificationSource
 	actionURL := ""
 	if action != "" {
 		actionURL = fmt.Sprintf("/connections/%s?action=%s", candidate.Connection.Id, action)
+	}
+	var actionURLPtr *string
+	if actionURL != "" {
+		actionURLPtr = &actionURL
 	}
 
 	actionPermissions := aschema.NoPermissions()
@@ -221,7 +273,7 @@ func addMigrationSystemNotification(
 		Namespace:    candidate.Connection.Namespace,
 		Title:        title,
 		Message:      message,
-		ActionUrl:    util.ToPtrNonZero(actionURL),
+		ActionUrl:    actionURLPtr,
 		ViewPermissions: aschema.PermissionsSingleWithResourceIds(
 			candidate.Connection.Namespace,
 			"connections",
@@ -233,6 +285,38 @@ func addMigrationSystemNotification(
 		Metadata:          metadata,
 	}
 
-	candidate.Notifications = append(candidate.Notifications, upsert)
-	candidate.NotificationKeys = append(candidate.NotificationKeys, upsert.Key)
+	setCandidateNotification(candidate, rank, upsert)
+}
+
+func setCandidateNotification(candidate *connectionMigrationCandidate, rank int, upsert database.NotificationUpsert) {
+	if rank <= candidate.NotificationRank {
+		return
+	}
+	candidate.NotificationRank = rank
+	candidate.Notifications = []database.NotificationUpsert{upsert}
+	candidate.NotificationKeys = []string{upsert.Key}
+}
+
+func connectionNotificationKey(candidate *connectionMigrationCandidate, keyPart string) string {
+	return fmt.Sprintf("connection:%s:%s", candidate.Connection.Id, keyPart)
+}
+
+func migrationNotificationMetadata(candidate *connectionMigrationCandidate, event string) map[string]any {
+	return map[string]any{
+		"connector_id":    candidate.Connection.ConnectorId.String(),
+		"source_version":  candidate.Connection.ConnectorVersion,
+		"target_version":  candidate.Target.Version,
+		"migration_event": event,
+	}
+}
+
+func migrationNotificationRankForLevel(level database.NotificationLevel) int {
+	switch level {
+	case database.NotificationLevelError:
+		return migrationNotificationRankHookError
+	case database.NotificationLevelWarning:
+		return migrationNotificationRankHookWarning
+	default:
+		return migrationNotificationRankHookInfo
+	}
 }

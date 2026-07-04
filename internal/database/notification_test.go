@@ -17,10 +17,10 @@ func TestNotifications(t *testing.T) {
 	ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 	connID := apid.New(apid.PrefixConnection)
-	source := "connector_migration"
+	source := "connection_required_action"
 	actionURL := "/connections/" + connID.String() + "?action=reauth"
 	notification, err := db.UpsertNotification(ctx, NotificationUpsert{
-		Key:          "connector_migration:" + connID.String() + ":reauth",
+		Key:          "connection:" + connID.String() + ":auth_required",
 		Level:        NotificationLevelWarning,
 		ResourceType: "connection",
 		ResourceId:   connID,
