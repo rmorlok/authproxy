@@ -1,7 +1,6 @@
 package core
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -82,30 +81,6 @@ func decodeMigrationHookPatch(raw map[string]any) (migrationHookPatch, error) {
 	}
 
 	return patch, nil
-}
-
-// UnmarshalJSON accepts the current notifications patch shape and the older
-// bare array form, which is treated as a set-only patch.
-func (p *migrationNotificationPatch) UnmarshalJSON(b []byte) error {
-	b = bytes.TrimSpace(b)
-	if len(b) == 0 || bytes.Equal(b, []byte("null")) {
-		return nil
-	}
-	if b[0] == '[' {
-		var set []migrationNotificationDef
-		if err := json.Unmarshal(b, &set); err != nil {
-			return err
-		}
-		p.Set = set
-		return nil
-	}
-	type alias migrationNotificationPatch
-	var decoded alias
-	if err := json.Unmarshal(b, &decoded); err != nil {
-		return err
-	}
-	*p = migrationNotificationPatch(decoded)
-	return nil
 }
 
 // applyMigrationHookPatch applies the migration hook patch to the connection

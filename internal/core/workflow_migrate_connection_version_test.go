@@ -128,6 +128,18 @@ func TestDecodeMigrationHookPatchNotificationSetUnset(t *testing.T) {
 	require.Equal(t, "old-heads-up", patch.Notifications.Unset[0].Key)
 }
 
+func TestDecodeMigrationHookPatchRejectsBareNotificationArray(t *testing.T) {
+	_, err := decodeMigrationHookPatch(map[string]any{
+		"notifications": []any{map[string]any{
+			"key":     "heads-up",
+			"level":   "info",
+			"title":   "Heads up",
+			"message": "Something changed.",
+		}},
+	})
+	require.Error(t, err)
+}
+
 func TestRequiredActionNotificationPrefersAuthOverSetup(t *testing.T) {
 	connID := apid.New(apid.PrefixConnection)
 	connectorID := apid.New(apid.PrefixConnectorVersion)
