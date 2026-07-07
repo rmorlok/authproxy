@@ -20,8 +20,8 @@ const (
 
 // applyProbeMigrationAnalysis computes the set of probes that should be run on
 // the candidate based on the set of probes that have already run on the source
-// compared to the set of probes needed by the target. It only sets only the
-// delta to run.
+// compared to the set of probes needed by the target. It only sets the delta
+// to run.
 func applyProbeMigrationAnalysis(candidate *connectionMigrationCandidate) {
 	sourceDef := candidate.Connection.cv.GetDefinition()
 	targetDef := candidate.Target.GetDefinition()
@@ -255,7 +255,6 @@ func addConnectionRequiredActionNotification(
 	metadata map[string]any,
 ) {
 	key := connectionNotificationKey(candidate, keyPart)
-	source := connectionRequiredActionNotificationSource
 	actionURL := ""
 	if action != "" {
 		actionURL = fmt.Sprintf("/connections/%s?action=%s", candidate.Connection.Id, action)
@@ -291,7 +290,6 @@ func addConnectionRequiredActionNotification(
 			candidate.Connection.Id.String(),
 		),
 		ActionPermissions: actionPermissions,
-		Source:            &source,
 		Metadata:          metadata,
 	}
 

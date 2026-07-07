@@ -180,7 +180,6 @@ func migrationNotificationUpsert(
 			candidate.Connection.Id.String(),
 		)
 	}
-	source := connectionConnectorNoticeNotificationSource
 	metadata := def.Metadata
 	if def.Key != "" {
 		metadata = map[string]any{}
@@ -205,7 +204,6 @@ func migrationNotificationUpsert(
 			candidate.Connection.Id.String(),
 		),
 		ActionPermissions: actionPermissions,
-		Source:            &source,
 		Metadata:          metadata,
 	}, migrationNotificationRankForLevel(level), nil
 }
@@ -244,6 +242,15 @@ func appendUniqueString(values []string, value string) []string {
 		}
 	}
 	return append(values, value)
+}
+
+func containsString(values []string, value string) bool {
+	for _, existing := range values {
+		if existing == value {
+			return true
+		}
+	}
+	return false
 }
 
 func removeString(values []string, value string) []string {

@@ -138,8 +138,7 @@ type DB interface {
 	ListNotifications(ctx context.Context, opts ListNotificationsOptions) ([]Notification, error)
 	MarkNotificationViewed(ctx context.Context, notificationID apid.ID, actorID apid.ID) error
 	NotificationViewedMap(ctx context.Context, actorID apid.ID, ids []apid.ID) (map[apid.ID]time.Time, error)
-	ResolveNotificationsForResource(ctx context.Context, resourceType string, resourceID apid.ID, source string, keepKeys []string) error
-	ResolveNotificationsForResourceKeys(ctx context.Context, resourceType string, resourceID apid.ID, source string, keys []string) error
+	ResolveNotificationsForResourceKeys(ctx context.Context, resourceType string, resourceID apid.ID, keys []string) error
 
 	/*
 	 * OAuth2 tokens

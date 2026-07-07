@@ -66,13 +66,20 @@ func (s *service) applyMigrateConnectionVersionV1(
 
 	if candidate.RefreshAuth {
 		if err := s.refreshAuthAfterConnectionMigration(ctx, updated, candidate); err != nil {
-			logger.Info("auth refresh after migration failed; marking connection as needing reauth", "error", err)
+			logger.Info(
+				"auth refresh after migration failed; marking connection as needing reauth",
+				"error", err,
+			)
 			candidate.HealthState = database.ConnectionHealthStateUnhealthy
 			addAuthRequiredNotification(
 				candidate,
 				migrationNotificationMetadata(candidate, "oauth_refresh_failed"),
 			)
-			if markErr := s.db.SetConnectionHealthState(ctx, connectionID, database.ConnectionHealthStateUnhealthy); markErr != nil {
+			if markErr := s.db.SetConnectionHealthState(
+				ctx,
+				connectionID,
+				database.ConnectionHealthStateUnhealthy,
+			); markErr != nil {
 				return markErr
 			}
 		}
@@ -82,31 +89,24 @@ func (s *service) applyMigrateConnectionVersionV1(
 		candidate.HealthState != database.ConnectionHealthStateUnhealthy {
 		for _, probeID := range candidate.ProbeIdsToRun {
 			if err := s.RunProbe(ctx, connectionID, probeID); err != nil {
-				logger.Warn("new target probe failed after migration", "probe_id", probeID, "error", err)
+				logger.Warn(
+					"new target probe failed after migration",
+					"probe_id", probeID, "error", err,
+				)
 			}
 		}
 	}
 
-	if err := s.db.ResolveNotificationsForResource(
-		ctx,
-		"connection", // resource type
-		connectionID,
-		connectionRequiredActionNotificationSource,
-		candidate.NotificationKeys,
-	); err != nil {
-		return err
-	}
 	if err := s.db.ResolveNotificationsForResourceKeys(
 		ctx,
 		"connection", // resource type
 		connectionID,
-		connectionConnectorNoticeNotificationSource,
-		candidate.NotificationUnsetKeys,
+		candidate.NotificationKeysToResolve(),
 	); err != nil {
 		return err
 	}
 	for _, notification := range candidate.Notifications {
-		notification.Labels = map[string]string(updated.Labels)
+		notification.Labels = updated.Labels
 		if _, err := s.db.UpsertNotification(ctx, notification); err != nil {
 			return err
 		}

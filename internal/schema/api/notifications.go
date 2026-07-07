@@ -62,6 +62,5 @@ type NotificationUpsertJson struct {
 	ActionUrl         string               `json:"action_url,omitempty" yaml:"action_url,omitempty"`
 	ViewPermissions   []aschema.Permission `json:"view_permissions,omitempty" yaml:"view_permissions,omitempty"`
 	ActionPermissions []aschema.Permission `json:"action_permissions,omitempty" yaml:"action_permissions,omitempty"`
-	Source            string               `json:"source,omitempty" yaml:"source,omitempty"`
 	Metadata          map[string]any       `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 }

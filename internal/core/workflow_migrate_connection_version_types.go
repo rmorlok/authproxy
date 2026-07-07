@@ -68,3 +68,16 @@ type connectionMigrationCandidate struct {
 	NotificationUnsetKeys []string
 	NotificationRank      int
 }
+
+func (c *connectionMigrationCandidate) NotificationKeysToResolve() []string {
+	keys := append([]string{}, c.NotificationUnsetKeys...)
+	for _, key := range []string{
+		connectionNotificationKey(c, database.NotificationKeyAuthRequired),
+		connectionNotificationKey(c, database.NotificationKeySetupRequired),
+	} {
+		if !containsString(c.NotificationKeys, key) {
+			keys = appendUniqueString(keys, key)
+		}
+	}
+	return keys
+}

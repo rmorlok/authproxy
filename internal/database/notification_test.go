@@ -17,7 +17,6 @@ func TestNotifications(t *testing.T) {
 	ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 	connID := apid.New(apid.PrefixConnection)
-	source := "connection_required_action"
 	actionURL := "/connections/" + connID.String() + "?action=reauth"
 	notification, err := db.UpsertNotification(ctx, NotificationUpsert{
 		Key:          "connection:" + connID.String() + ":auth_required",
@@ -40,7 +39,6 @@ func TestNotifications(t *testing.T) {
 			"update",
 			connID.String(),
 		),
-		Source: &source,
 		Metadata: map[string]any{
 			"target_version": float64(2),
 		},
@@ -57,7 +55,6 @@ func TestNotifications(t *testing.T) {
 		Namespace:    "root",
 		Title:        "Still required",
 		Message:      "Please reconnect this connection again.",
-		Source:       &source,
 	})
 	require.NoError(t, err)
 	require.Equal(t, notification.Id, updated.Id)
@@ -78,7 +75,7 @@ func TestNotifications(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, viewed, updated.Id)
 
-	require.NoError(t, db.ResolveNotificationsForResource(ctx, "connection", connID, source, nil))
+	require.NoError(t, db.ResolveNotificationsForResourceKeys(ctx, "connection", connID, []string{updated.Key}))
 	resolved, err := db.GetNotification(ctx, updated.Id)
 	require.NoError(t, err)
 	require.Equal(t, NotificationStateResolved, resolved.State)
@@ -92,7 +89,6 @@ func TestResolveNotificationsForResourceKeys(t *testing.T) {
 		Build()
 
 	connID := apid.New(apid.PrefixConnection)
-	source := "connection_connector_notice"
 	first, err := db.UpsertNotification(ctx, NotificationUpsert{
 		Key:          "connection:" + connID.String() + ":connector_notice:first",
 		Level:        NotificationLevelInfo,
@@ -101,7 +97,6 @@ func TestResolveNotificationsForResourceKeys(t *testing.T) {
 		Namespace:    "root",
 		Title:        "First",
 		Message:      "First message",
-		Source:       &source,
 	})
 	require.NoError(t, err)
 	second, err := db.UpsertNotification(ctx, NotificationUpsert{
@@ -112,7 +107,6 @@ func TestResolveNotificationsForResourceKeys(t *testing.T) {
 		Namespace:    "root",
 		Title:        "Second",
 		Message:      "Second message",
-		Source:       &source,
 	})
 	require.NoError(t, err)
 
@@ -120,7 +114,6 @@ func TestResolveNotificationsForResourceKeys(t *testing.T) {
 		ctx,
 		"connection",
 		connID,
-		source,
 		[]string{first.Key},
 	))
 

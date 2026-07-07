@@ -13,7 +13,6 @@ create table notifications
     action_url         text,
     view_permissions   text,
     action_permissions text,
-    source             text,
     metadata           text,
     resolved_at        datetime,
     created_at         datetime not null,

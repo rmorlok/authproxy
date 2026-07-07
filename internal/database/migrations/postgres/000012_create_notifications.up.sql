@@ -13,7 +13,6 @@ create table notifications
     action_url         text,
     view_permissions   jsonb,
     action_permissions jsonb,
-    source             text,
     metadata           jsonb,
     resolved_at        timestamptz,
     created_at         timestamptz not null,

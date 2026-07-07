@@ -17,9 +17,6 @@ const (
 	WorkflowNameMigrateConnectionVersionV1 = "core.connection.migrate_version.v1"
 
 	ActivityNameMigrateConnectionVersionApplyV1 = "core.connection.migrate_version.apply.v1"
-
-	connectionRequiredActionNotificationSource  = "connection_required_action"
-	connectionConnectorNoticeNotificationSource = "connection_connector_notice"
 )
 
 type migrateConnectionVersionWorkflowInputV1 struct {

@@ -191,10 +191,6 @@ type Notification struct {
 	// permission.
 	ActionPermissions NotificationPermissions
 
-	// Source identifies the producer for group resolution and cleanup, e.g.
-	// "connection_required_action".
-	Source *string
-
 	// Metadata is producer-specific structured context for debugging or UI
 	// hints, e.g. {"target_version": 3, "requires_reauth": true}.
 	Metadata NotificationMetadata
@@ -227,7 +223,6 @@ func (n *Notification) cols() []string {
 		"action_url",
 		"view_permissions",
 		"action_permissions",
-		"source",
 		"metadata",
 		"resolved_at",
 		"created_at",
@@ -251,7 +246,6 @@ func (n *Notification) fields() []any {
 		&n.ActionUrl,
 		&n.ViewPermissions,
 		&n.ActionPermissions,
-		&n.Source,
 		&n.Metadata,
 		&n.ResolvedAt,
 		&n.CreatedAt,
@@ -275,7 +269,6 @@ func (n *Notification) values() []any {
 		n.ActionUrl,
 		n.ViewPermissions,
 		n.ActionPermissions,
-		n.Source,
 		n.Metadata,
 		n.ResolvedAt,
 		n.CreatedAt,
@@ -352,7 +345,6 @@ type NotificationUpsert struct {
 	ActionUrl         *string
 	ViewPermissions   []aschema.Permission
 	ActionPermissions []aschema.Permission
-	Source            *string
 	Metadata          map[string]any
 }
 
@@ -360,7 +352,6 @@ type ListNotificationsOptions struct {
 	States            []NotificationState
 	ResourceType      string
 	ResourceId        apid.ID
-	Source            string
 	NamespaceMatchers []string
 	LabelSelector     *string
 	Limit             uint64
@@ -387,7 +378,6 @@ func (s *service) UpsertNotification(
 		ActionUrl:         upsert.ActionUrl,
 		ViewPermissions:   NotificationPermissions(upsert.ViewPermissions),
 		ActionPermissions: NotificationPermissions(upsert.ActionPermissions),
-		Source:            upsert.Source,
 		Metadata:          NotificationMetadata(upsert.Metadata),
 		CreatedAt:         now,
 		UpdatedAt:         now,
@@ -429,7 +419,6 @@ func (s *service) UpsertNotification(
 			Set("action_url", n.ActionUrl).
 			Set("view_permissions", n.ViewPermissions).
 			Set("action_permissions", n.ActionPermissions).
-			Set("source", n.Source).
 			Set("metadata", n.Metadata).
 			Set("resolved_at", nil).
 			Set("updated_at", now).
@@ -461,7 +450,6 @@ func (s *service) UpsertNotification(
 		existing.ActionUrl = n.ActionUrl
 		existing.ViewPermissions = n.ViewPermissions
 		existing.ActionPermissions = n.ActionPermissions
-		existing.Source = n.Source
 		existing.Metadata = n.Metadata
 		existing.ResolvedAt = nil
 		existing.UpdatedAt = now
@@ -538,9 +526,6 @@ func (s *service) ListNotifications(
 	}
 	if opts.ResourceId != apid.Nil {
 		query = query.Where(sq.Eq{"resource_id": opts.ResourceId})
-	}
-	if opts.Source != "" {
-		query = query.Where(sq.Eq{"source": opts.Source})
 	}
 	if len(opts.NamespaceMatchers) > 0 {
 		for _, matcher := range opts.NamespaceMatchers {
@@ -662,52 +647,10 @@ func (s *service) NotificationViewedMap(
 	return result, rows.Err()
 }
 
-func (s *service) ResolveNotificationsForResource(
-	ctx context.Context,
-	resourceType string,
-	resourceID apid.ID,
-	source string,
-	keepKeys []string,
-) error {
-	if resourceType == "" {
-		return errors.New("resource type is required")
-	}
-	if resourceID == apid.Nil {
-		return errors.New("resource id is required")
-	}
-
-	now := apctx.GetClock(ctx).Now()
-	query := s.sq.
-		Update(NotificationsTable).
-		Set("state", NotificationStateResolved).
-		Set("resolved_at", now).
-		Set("updated_at", now).
-		Where(sq.Eq{
-			"resource_type": resourceType,
-			"resource_id":   resourceID,
-			"state":         NotificationStateActive,
-			"deleted_at":    nil,
-		})
-
-	if source != "" {
-		query = query.Where(sq.Eq{"source": source})
-	}
-
-	if len(keepKeys) > 0 {
-		query = query.Where(sq.NotEq{"key": keepKeys})
-	}
-
-	_, err := query.
-		RunWith(s.db).
-		ExecContext(ctx)
-	return err
-}
-
 func (s *service) ResolveNotificationsForResourceKeys(
 	ctx context.Context,
 	resourceType string,
 	resourceID apid.ID,
-	source string,
 	keys []string,
 ) error {
 	if len(keys) == 0 {
@@ -733,10 +676,6 @@ func (s *service) ResolveNotificationsForResourceKeys(
 			"state":         NotificationStateActive,
 			"deleted_at":    nil,
 		})
-
-	if source != "" {
-		query = query.Where(sq.Eq{"source": source})
-	}
 
 	_, err := query.
 		RunWith(s.db).
