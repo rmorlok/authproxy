@@ -24,6 +24,12 @@ func (s *service) applyMigrateConnectionVersionV1(
 	logger.Info("connection version migration apply activity started")
 	defer logger.Info("connection version migration apply activity completed")
 
+	// Compute the set of changes that are needed to move the connection from
+	// the current version to the taget version. This call is the primary
+	// operation of the migration, as it computes the changes to the config
+	// labels, annotations, and other fields like connection state as well
+	// as computes notifications. The output candidate object is the migration
+	// that will be performed.
 	candidate, err := s.buildConnectionMigrationCandidate(
 		ctx,
 		connectionID,
@@ -33,6 +39,7 @@ func (s *service) applyMigrateConnectionVersionV1(
 		return err
 	}
 
+	// Encrypt the computed updated configuration
 	encryptedConfig, err := s.encryptMigrationConfig(
 		ctx,
 		candidate.Connection.Namespace,
@@ -42,10 +49,14 @@ func (s *service) applyMigrateConnectionVersionV1(
 		return err
 	}
 
+	// If health state wasn't supplied as part of the candidate update, it
+	// should remain the same from the current state of the connection.
 	health := candidate.HealthState
 	if health == "" {
 		health = candidate.Connection.GetHealthState()
 	}
+
+	// Apply the migration to the actual data in the databse
 	updated, err := s.db.UpdateConnectionForVersionMigration(
 		ctx,
 		database.ConnectionVersionMigrationUpdate{
@@ -65,6 +76,10 @@ func (s *service) applyMigrateConnectionVersionV1(
 	}
 
 	if candidate.RefreshAuth {
+		// Based on the transition (e.g. changing scopes, changing oauth
+		// credentials), the connection was flagged for needing to refresh the
+		// auth credentials to quickly expose any changes that might require
+		// the connection to require re-authentication.
 		if err := s.refreshAuthAfterConnectionMigration(ctx, updated, candidate); err != nil {
 			logger.Info(
 				"auth refresh after migration failed; marking connection as needing reauth",
@@ -84,6 +99,7 @@ func (s *service) applyMigrateConnectionVersionV1(
 			}
 		}
 	}
+	
 	if len(candidate.ProbeIdsToRun) > 0 &&
 		candidate.SetupStep == nil &&
 		candidate.HealthState != database.ConnectionHealthStateUnhealthy {
