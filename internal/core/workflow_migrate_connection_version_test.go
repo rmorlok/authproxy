@@ -5,6 +5,7 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
+	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/stretchr/testify/require"
 )
 
@@ -191,4 +192,66 @@ func TestNotificationKeysToResolveSkipsQueuedNotification(t *testing.T) {
 		"connection:" + connID.String() + ":connector_notice:obsolete",
 		"connection:" + connID.String() + ":setup_required",
 	}, candidate.NotificationKeysToResolve())
+}
+
+func TestTargetProbeIDsReturnsAllTargetProbes(t *testing.T) {
+	ids := targetProbeIDs(&cschema.Connector{
+		Probes: []cschema.Probe{
+			{Id: "existing"},
+			{Id: "added"},
+			{},
+		},
+	})
+
+	require.Equal(t, []string{"existing", "added"}, ids)
+	require.Nil(t, targetProbeIDs(nil))
+}
+
+func TestShouldRunMigrationProbesRequiresHealthyMigratedConnection(t *testing.T) {
+	step := cschema.MustNewSetupStep("configure")
+
+	tests := []struct {
+		name        string
+		probeIDs    []string
+		setupStep   *cschema.SetupStep
+		healthState database.ConnectionHealthState
+		want        bool
+	}{
+		{
+			name:        "healthy migrated connection runs probes",
+			probeIDs:    []string{"ping"},
+			healthState: database.ConnectionHealthStateHealthy,
+			want:        true,
+		},
+		{
+			name:        "skips when no probes were selected",
+			healthState: database.ConnectionHealthStateHealthy,
+			want:        false,
+		},
+		{
+			name:        "skips when setup is pending",
+			probeIDs:    []string{"ping"},
+			setupStep:   &step,
+			healthState: database.ConnectionHealthStateHealthy,
+			want:        false,
+		},
+		{
+			name:        "skips when migration made the connection unhealthy",
+			probeIDs:    []string{"ping"},
+			healthState: database.ConnectionHealthStateUnhealthy,
+			want:        false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			candidate := &connectionMigrationCandidate{
+				ProbeIdsToRun: tt.probeIDs,
+				SetupStep:     tt.setupStep,
+				HealthState:   tt.healthState,
+			}
+
+			require.Equal(t, tt.want, shouldRunMigrationProbes(candidate))
+		})
+	}
 }

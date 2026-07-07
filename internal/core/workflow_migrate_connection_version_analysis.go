@@ -18,31 +18,23 @@ const (
 	migrationNotificationRankAuthRequired
 )
 
-// applyProbeMigrationAnalysis computes the set of probes that should be run on
-// the candidate based on the set of probes that have already run on the source
-// compared to the set of probes needed by the target. It only sets the delta
-// to run.
-func applyProbeMigrationAnalysis(candidate *connectionMigrationCandidate) {
-	sourceDef := candidate.Connection.cv.GetDefinition()
-	targetDef := candidate.Target.GetDefinition()
-
-	if sourceDef == nil || targetDef == nil {
-		return
+// targetProbeIDs returns every named probe on the target connector. A migration
+// reruns the full target probe set because config, auth, labels, and
+// annotations can change outcomes for probes that existed on the source
+// version too.
+func targetProbeIDs(def *cschema.Connector) []string {
+	if def == nil {
+		return nil
 	}
 
-	sourceProbeIDs := map[string]bool{}
-	for _, probe := range sourceDef.Probes {
-		sourceProbeIDs[probe.Id] = true
-	}
-
-	for _, probe := range targetDef.Probes {
-		if probe.Id == "" || sourceProbeIDs[probe.Id] {
-			// The probe was run previously on the original connector version.
+	ids := []string{}
+	for _, probe := range def.Probes {
+		if probe.Id == "" {
 			continue
 		}
-
-		candidate.ProbeIdsToRun = append(candidate.ProbeIdsToRun, probe.Id)
+		ids = append(ids, probe.Id)
 	}
+	return ids
 }
 
 // applyAuthMigrationAnalysis decides if auth should be refreshed after the

@@ -99,14 +99,12 @@ func (s *service) applyMigrateConnectionVersionV1(
 			}
 		}
 	}
-	
-	if len(candidate.ProbeIdsToRun) > 0 &&
-		candidate.SetupStep == nil &&
-		candidate.HealthState != database.ConnectionHealthStateUnhealthy {
+
+	if shouldRunMigrationProbes(candidate) {
 		for _, probeID := range candidate.ProbeIdsToRun {
 			if err := s.RunProbe(ctx, connectionID, probeID); err != nil {
 				logger.Warn(
-					"new target probe failed after migration",
+					"target probe failed after migration",
 					"probe_id", probeID, "error", err,
 				)
 			}
@@ -134,6 +132,12 @@ func (s *service) applyMigrateConnectionVersionV1(
 		"target_version", updated.ConnectorVersion,
 	)
 	return nil
+}
+
+func shouldRunMigrationProbes(candidate *connectionMigrationCandidate) bool {
+	return len(candidate.ProbeIdsToRun) > 0 &&
+		candidate.SetupStep == nil &&
+		candidate.HealthState == database.ConnectionHealthStateHealthy
 }
 
 func (s *service) refreshAuthAfterConnectionMigration(

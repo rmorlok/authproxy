@@ -105,9 +105,9 @@ func (s *service) buildConnectionMigrationCandidate(
 		return nil, err
 	}
 
-	// Analyze the probes on the start versus end of the migration to see
-	// what delta set of probes should be run.
-	applyProbeMigrationAnalysis(candidate)
+	// Run the target probe set after migration. Probes that existed on the
+	// source version can still change outcome after config/auth/label updates.
+	candidate.ProbeIdsToRun = targetProbeIDs(target.GetDefinition())
 
 	if err := applySetupFlowMigrationAnalysis(log, candidate); err != nil {
 		return nil, err
