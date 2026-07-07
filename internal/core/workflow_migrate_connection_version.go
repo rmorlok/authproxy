@@ -25,12 +25,21 @@ type migrateConnectionVersionWorkflowInputV1 struct {
 	Timeout       time.Duration `json:"timeout"`
 }
 
-func migrateConnectionVersionWorkflowV1(ctx wflib.Context, input migrateConnectionVersionWorkflowInputV1) error {
+// migrateConnectionVersionWorkflowV1 is the workflow definition to migration a
+// given connection from its current connector version to the target version.
+func migrateConnectionVersionWorkflowV1(
+	ctx wflib.Context,
+	input migrateConnectionVersionWorkflowInputV1,
+) error {
 	activityCtx, cancelActivities := wflib.WithCancel(ctx)
 	defer cancelActivities()
 
 	timerCtx, cancelTimer := wflib.WithCancel(ctx)
-	timer := wflib.ScheduleTimer(timerCtx, input.Timeout, wflib.WithTimerName("migration-timeout"))
+	timer := wflib.ScheduleTimer(
+		timerCtx,
+		input.Timeout,
+		wflib.WithTimerName("migration-timeout"),
+	)
 	defer cancelTimer()
 
 	applyFuture := wflib.ExecuteActivity[any](
@@ -63,7 +72,9 @@ func migrateConnectionVersionWorkflowV1(ctx wflib.Context, input migrateConnecti
 	return nil
 }
 
-func (s *service) registerMigrateConnectionVersionWorkflow(worker workflowRegistrar) error {
+func (s *service) registerMigrateConnectionVersionWorkflow(
+	worker workflowRegistrar,
+) error {
 	if err := worker.RegisterWorkflow(
 		migrateConnectionVersionWorkflowV1,
 		registry.WithName(WorkflowNameMigrateConnectionVersionV1),
@@ -76,7 +87,9 @@ func (s *service) registerMigrateConnectionVersionWorkflow(worker workflowRegist
 	)
 }
 
-func migrateConnectionVersionWorkflowInstanceID(connectionID apid.ID) string {
+func migrateConnectionVersionWorkflowInstanceID(
+	connectionID apid.ID,
+) string {
 	return fmt.Sprintf("%s:%s", WorkflowNameMigrateConnectionVersionV1, connectionID)
 }
 
