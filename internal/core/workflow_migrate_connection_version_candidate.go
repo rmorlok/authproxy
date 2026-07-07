@@ -8,7 +8,11 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 )
 
-func (s *service) buildConnectionMigrationCandidate(ctx context.Context, connectionID apid.ID, targetVersion uint64) (*connectionMigrationCandidate, error) {
+func (s *service) buildConnectionMigrationCandidate(
+	ctx context.Context,
+	connectionID apid.ID,
+	targetVersion uint64,
+) (*connectionMigrationCandidate, error) {
 	// Get the connection to be migrated
 	conn, err := s.getConnection(ctx, connectionID)
 	if err != nil {

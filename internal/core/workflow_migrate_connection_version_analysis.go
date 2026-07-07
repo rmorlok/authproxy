@@ -76,6 +76,10 @@ func applyAuthMigrationAnalysis(log *slog.Logger, candidate *connectionMigration
 	return nil
 }
 
+// applySetupFlowMigrationAnalysis updates the candidate based on setup field
+// gaps between the source and target connection definitions. It covers both
+// preconnect and configure steps. It updates the candidate state and sets
+// notifications.
 func applySetupFlowMigrationAnalysis(
 	log *slog.Logger,
 	candidate *connectionMigrationCandidate,
@@ -119,6 +123,11 @@ func applySetupFlowMigrationAnalysis(
 	return nil
 }
 
+// applySetupFieldMigrationAnalysis analyzes the delta between the setup fields
+// from the source connection to the migrated version, and identifies gaps. If
+// gaps are found, the candidate is updated to target the setup step required
+// for update. It also adds notifications to the candidate for the
+// configuration required.
 func applySetupFieldMigrationAnalysis(
 	log *slog.Logger,
 	candidate *connectionMigrationCandidate, // the candidate connection migration
@@ -189,6 +198,7 @@ func applySetupFieldMigrationAnalysis(
 			"setup_step_id", field.StepId,
 		)
 	}
+
 	return nil
 }
 
