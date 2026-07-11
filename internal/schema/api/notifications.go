@@ -49,6 +49,10 @@ type ListNotificationsResponseJson struct {
 	Cursor string             `json:"cursor,omitempty" yaml:"cursor,omitempty"`
 }
 
+type MarkNotificationsViewedRequestJson struct {
+	Ids []apid.ID `json:"ids" yaml:"ids" swaggertype:"array,string" example:"ntf_test550e8400abcde"`
+}
+
 // NotificationUpsertJson is an internal service shape used by migration hooks
 // and core code when creating deterministic notifications.
 type NotificationUpsertJson struct {

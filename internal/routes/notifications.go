@@ -1,30 +1,28 @@
 package routes
 
 import (
-	"errors"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
-	authcore "github.com/rmorlok/authproxy/internal/apauth/core"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/apgin"
 	"github.com/rmorlok/authproxy/internal/apid"
+	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httperr"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	schemaapiopenapi "github.com/rmorlok/authproxy/internal/schema/api/openapi"
-	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 )
 
 type NotificationsRoutes struct {
 	auth auth.A
-	db   database.DB
+	core coreIface.C
 }
 
 type NotificationJson = schemaapi.NotificationJson
 type ListNotificationsResponseJson = schemaapi.ListNotificationsResponseJson
+type MarkNotificationsViewedRequestJson = schemaapi.MarkNotificationsViewedRequestJson
 type OpenAPIListNotificationsResponseJson = schemaapiopenapi.ListNotificationsResponseJson
 
 type ListNotificationsRequestQuery struct {
@@ -98,13 +96,11 @@ func (r *NotificationsRoutes) list(gctx *gin.Context) {
 		}
 	}
 
-	actor := ra.MustGetActor()
-	notifications, err := r.db.ListNotifications(ctx, database.ListNotificationsOptions{
+	notifications, err := r.core.ListActorNotifications(ctx, ra, database.ListNotificationsOptions{
 		States:            []database.NotificationState{state},
 		NamespaceMatchers: namespaceMatchers,
 		LabelSelector:     req.LabelSelector,
 		Limit:             limit,
-		ActorId:           actor.GetId(),
 		IncludeViewed:     includeViewed,
 	})
 	if err != nil {
@@ -112,26 +108,43 @@ func (r *NotificationsRoutes) list(gctx *gin.Context) {
 		return
 	}
 
-	ids := make([]apid.ID, 0, len(notifications))
-	for _, n := range notifications {
-		ids = append(ids, n.Id)
-	}
-	viewed, err := r.db.NotificationViewedMap(ctx, actor.GetId(), ids)
-	if err != nil {
-		apgin.WriteErr(gctx, nil, err)
-		return
-	}
-
 	items := make([]NotificationJson, 0, len(notifications))
 	for _, n := range notifications {
-		if !notificationPermissionsAllow(ra, n.ViewPermissions, n) {
-			continue
-		}
-		item := notificationToJSON(ra, n, viewed)
-		items = append(items, item)
+		items = append(items, notificationToJSON(n))
 	}
 
 	apgin.APIJSON(gctx, http.StatusOK, ListNotificationsResponseJson{Items: items})
+}
+
+// @Summary		Mark notifications viewed
+// @Description	Mark multiple notifications viewed for the authenticated actor
+// @Tags			notifications
+// @Accept			json
+// @Produce		json
+// @Param			request	body	MarkNotificationsViewedRequestJson	true	"Notification IDs"
+// @Success		204
+// @Failure		400	{object}	ErrorResponse
+// @Failure		401	{object}	ErrorResponse
+// @Failure		403	{object}	ErrorResponse
+// @Failure		404	{object}	ErrorResponse
+// @Failure		500	{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/notifications/_viewed [post]
+func (r *NotificationsRoutes) markViewedBatch(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	ra := auth.MustGetAuthFromGinContext(gctx)
+
+	var req MarkNotificationsViewedRequestJson
+	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		return
+	}
+
+	if err := r.core.MarkActorNotificationsViewed(ctx, ra, req.Ids); err != nil {
+		apgin.WriteErr(gctx, nil, err)
+		return
+	}
+	gctx.Status(http.StatusNoContent)
 }
 
 // @Summary		Mark notification viewed
@@ -165,38 +178,23 @@ func (r *NotificationsRoutes) markViewed(gctx *gin.Context) {
 		return
 	}
 
-	notification, err := r.db.GetNotification(ctx, id)
-	if err != nil {
-		if errors.Is(err, database.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFound("notification not found"))
-		} else {
-			apgin.WriteErr(gctx, nil, err)
-		}
-		return
-	}
-	if !notificationPermissionsAllow(ra, notification.ViewPermissions, *notification) {
-		apgin.WriteError(gctx, nil, httperr.Forbidden("permission denied"))
-		return
-	}
-
-	if err := r.db.MarkNotificationViewed(ctx, id, ra.MustGetActor().GetId()); err != nil {
+	if err := r.core.MarkActorNotificationViewed(ctx, ra, id); err != nil {
 		apgin.WriteErr(gctx, nil, err)
 		return
 	}
 	gctx.Status(http.StatusNoContent)
 }
 
-func notificationToJSON(ra *authcore.RequestAuth, n database.Notification, viewed map[apid.ID]time.Time) NotificationJson {
-	canAction := notificationPermissionsAllow(ra, n.ActionPermissions, n)
+func notificationToJSON(actorNotification coreIface.ActorNotification) NotificationJson {
+	n := actorNotification.Notification
 	actionURL := ""
-	if canAction && n.ActionUrl != nil {
+	if actorNotification.CanAction && n.ActionUrl != nil {
 		actionURL = *n.ActionUrl
 	}
 	metadata := map[string]any(n.Metadata)
 	if len(metadata) == 0 {
 		metadata = nil
 	}
-	_, isViewed := viewed[n.Id]
 	return NotificationJson{
 		Id:           n.Id,
 		Key:          n.Key,
@@ -208,8 +206,8 @@ func notificationToJSON(ra *authcore.RequestAuth, n database.Notification, viewe
 		Title:        n.Title,
 		Message:      n.Message,
 		ActionUrl:    actionURL,
-		CanAction:    canAction,
-		Viewed:       isViewed,
+		CanAction:    actorNotification.CanAction,
+		Viewed:       actorNotification.Viewed,
 		Metadata:     metadata,
 		CreatedAt:    n.CreatedAt,
 		UpdatedAt:    n.UpdatedAt,
@@ -217,44 +215,15 @@ func notificationToJSON(ra *authcore.RequestAuth, n database.Notification, viewe
 	}
 }
 
-func notificationPermissionsAllow(ra *authcore.RequestAuth, permissions []aschema.Permission, n database.Notification) bool {
-	if ra == nil || !ra.IsAuthenticated() || len(permissions) == 0 {
-		return false
-	}
-	for _, p := range permissions {
-		resources := p.Resources
-		if len(resources) == 0 {
-			resources = []string{n.ResourceType}
-		}
-		verbs := p.Verbs
-		if len(verbs) == 0 {
-			verbs = []string{"get"}
-		}
-		resourceIds := p.ResourceIds
-		if len(resourceIds) == 0 {
-			resourceIds = []string{n.ResourceId.String()}
-		}
-		for _, resource := range resources {
-			for _, verb := range verbs {
-				for _, resourceId := range resourceIds {
-					if ra.Allows(n.Namespace, resource, verb, resourceId) {
-						return true
-					}
-				}
-			}
-		}
-	}
-	return false
-}
-
 func (r *NotificationsRoutes) Register(g gin.IRouter) {
 	g.GET("/notifications", r.auth.Required(), r.list)
+	g.POST("/notifications/_viewed", r.auth.Required(), r.markViewedBatch)
 	g.POST("/notifications/:id/_viewed", r.auth.Required(), r.markViewed)
 }
 
-func NewNotificationsRoutes(authService auth.A, db database.DB) *NotificationsRoutes {
+func NewNotificationsRoutes(authService auth.A, core coreIface.C) *NotificationsRoutes {
 	return &NotificationsRoutes{
 		auth: authService,
-		db:   db,
+		core: core,
 	}
 }

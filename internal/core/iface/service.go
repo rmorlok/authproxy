@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/hibiken/asynq"
+	authcore "github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
 	cfgschema "github.com/rmorlok/authproxy/internal/schema/config"
@@ -34,6 +35,12 @@ type ConnectionMigrationTask struct {
 	ConnectionID  apid.ID
 	SourceVersion uint64
 	TargetVersion uint64
+}
+
+type ActorNotification struct {
+	Notification database.Notification
+	Viewed       bool
+	CanAction    bool
 }
 
 // C is the interface for the core service that implements primary business logic and binds the system together.
@@ -173,6 +180,28 @@ type C interface {
 	// defined, otherwise re-initiates the OAuth redirect. The connection's State remains Ready
 	// throughout; only setup_step is reset and re-driven.
 	ReauthConnection(ctx context.Context, id apid.ID, returnToUrl string) (ConnectionSetupResponse, error)
+
+	/*
+	 *
+	 * Notifications
+	 *
+	 */
+
+	// ListActorNotifications returns actor-visible notifications with actor-specific
+	// viewed/action state. Results are cached by actor and permission fingerprint.
+	ListActorNotifications(
+		ctx context.Context,
+		ra *authcore.RequestAuth,
+		opts database.ListNotificationsOptions,
+	) ([]ActorNotification, error)
+
+	// MarkActorNotificationViewed records viewed state for the authenticated
+	// actor after checking that the actor can see the notification.
+	MarkActorNotificationViewed(ctx context.Context, ra *authcore.RequestAuth, id apid.ID) error
+
+	// MarkActorNotificationsViewed records viewed state for multiple
+	// authenticated-actor-visible notifications.
+	MarkActorNotificationsViewed(ctx context.Context, ra *authcore.RequestAuth, ids []apid.ID) error
 
 	/*
 	 *

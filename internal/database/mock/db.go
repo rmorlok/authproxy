@@ -1380,6 +1380,20 @@ func (mr *MockDBMockRecorder) MarkNotificationViewed(ctx, notificationID, actorI
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkNotificationViewed", reflect.TypeOf((*MockDB)(nil).MarkNotificationViewed), ctx, notificationID, actorID)
 }
 
+// MarkNotificationsViewed mocks base method.
+func (m *MockDB) MarkNotificationsViewed(ctx context.Context, notificationIDs []apid.ID, actorID apid.ID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MarkNotificationsViewed", ctx, notificationIDs, actorID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// MarkNotificationsViewed indicates an expected call of MarkNotificationsViewed.
+func (mr *MockDBMockRecorder) MarkNotificationsViewed(ctx, notificationIDs, actorID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkNotificationsViewed", reflect.TypeOf((*MockDB)(nil).MarkNotificationsViewed), ctx, notificationIDs, actorID)
+}
+
 // Migrate mocks base method.
 func (m *MockDB) Migrate(ctx context.Context) error {
 	m.ctrl.T.Helper()

@@ -126,6 +126,45 @@ func TestResolveNotificationsForResourceKeys(t *testing.T) {
 	require.Equal(t, NotificationStateActive, active.State)
 }
 
+func TestMarkNotificationsViewedBatch(t *testing.T) {
+	_, db := MustApplyBlankTestDbConfig(t, nil)
+	ctx := apctx.NewBuilderBackground().
+		WithClock(clock.NewFakeClock(time.Date(2026, time.July, 3, 12, 0, 0, 0, time.UTC))).
+		Build()
+
+	connID := apid.New(apid.PrefixConnection)
+	first, err := db.UpsertNotification(ctx, NotificationUpsert{
+		Key:          "connection:" + connID.String() + ":auth_required",
+		Level:        NotificationLevelWarning,
+		ResourceType: "connection",
+		ResourceId:   connID,
+		Namespace:    "root",
+		Title:        "Auth required",
+		Message:      "Please reconnect.",
+	})
+	require.NoError(t, err)
+	second, err := db.UpsertNotification(ctx, NotificationUpsert{
+		Key:          "connection:" + connID.String() + ":setup_required",
+		Level:        NotificationLevelWarning,
+		ResourceType: "connection",
+		ResourceId:   connID,
+		Namespace:    "root",
+		Title:        "Setup required",
+		Message:      "Please finish setup.",
+	})
+	require.NoError(t, err)
+
+	actorID := apid.New(apid.PrefixActor)
+	require.NoError(t, db.MarkNotificationsViewed(ctx, []apid.ID{first.Id, second.Id, first.Id}, actorID))
+
+	viewed, err := db.NotificationViewedMap(ctx, actorID, []apid.ID{first.Id, second.Id})
+	require.NoError(t, err)
+	require.Contains(t, viewed, first.Id)
+	require.Contains(t, viewed, second.Id)
+
+	require.ErrorIs(t, db.MarkNotificationsViewed(ctx, []apid.ID{apid.New(apid.PrefixNotification)}, actorID), ErrNotFound)
+}
+
 func TestListNotificationsFiltersNamespaceAndLabels(t *testing.T) {
 	_, db := MustApplyBlankTestDbConfig(t, nil)
 	ctx := apctx.NewBuilderBackground().
