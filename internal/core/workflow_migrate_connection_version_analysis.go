@@ -40,7 +40,10 @@ func targetProbeIDs(def *cschema.Connector) []string {
 // applyAuthMigrationAnalysis decides if auth should be refreshed after the
 // upgrade. Currently it applies a naive comparison of the auth definition
 // to see if there are any changes and refreshes if any are detected.
-func applyAuthMigrationAnalysis(log *slog.Logger, candidate *connectionMigrationCandidate) error {
+func applyAuthMigrationAnalysis(
+	log *slog.Logger,
+	candidate *connectionMigrationCandidate,
+) error {
 	sourceDef := candidate.Connection.cv.GetDefinition()
 	targetDef := candidate.Target.GetDefinition()
 	if sourceDef == nil || targetDef == nil || targetDef.Auth == nil {
@@ -194,6 +197,9 @@ func applySetupFieldMigrationAnalysis(
 	return nil
 }
 
+// applyRequiredActionNotification adds notifications to the candidate based on
+// the current state of the candidate. I.e. if reauth is required, add
+// notification for reauth.
 func applyRequiredActionNotification(candidate *connectionMigrationCandidate) {
 	if candidate.HealthState == database.ConnectionHealthStateUnhealthy {
 		addAuthRequiredNotification(
@@ -210,7 +216,11 @@ func applyRequiredActionNotification(candidate *connectionMigrationCandidate) {
 	}
 }
 
-func addAuthRequiredNotification(candidate *connectionMigrationCandidate, metadata map[string]any) {
+// addAuthRequiredNotification adds a required notification to a candidate.
+func addAuthRequiredNotification(
+	candidate *connectionMigrationCandidate,
+	metadata map[string]any,
+) {
 	addConnectionRequiredActionNotification(
 		candidate,
 		migrationNotificationRankAuthRequired,
@@ -223,7 +233,12 @@ func addAuthRequiredNotification(candidate *connectionMigrationCandidate, metada
 	)
 }
 
-func addSetupRequiredNotification(candidate *connectionMigrationCandidate, metadata map[string]any) {
+// addSetupRequiredNotification adds a setup required notification to a
+// candidate.
+func addSetupRequiredNotification(
+	candidate *connectionMigrationCandidate,
+	metadata map[string]any,
+) {
 	addConnectionRequiredActionNotification(
 		candidate,
 		migrationNotificationRankSetupRequired,
@@ -236,6 +251,10 @@ func addSetupRequiredNotification(candidate *connectionMigrationCandidate, metad
 	)
 }
 
+// addConnectionRequiredActionNotification adds a required action notification
+// to a candidate. This is the primary wrapper method that constructs the
+// different attributes of the notification conditionally based on what is
+// supplied.
 func addConnectionRequiredActionNotification(
 	candidate *connectionMigrationCandidate,
 	rank int,
@@ -288,7 +307,18 @@ func addConnectionRequiredActionNotification(
 	setCandidateNotification(candidate, rank, upsert)
 }
 
-func setCandidateNotification(candidate *connectionMigrationCandidate, rank int, upsert database.NotificationUpsert) {
+// setCandidateNotification sets the notification on the candidate if
+// the rank is higher than the current notification rank on the candidate. This
+// method should only be used for the internally generated notifications for a
+// connection, not the notifications that are generated from the upgrade hooks.
+// The purpose here is that things like setup require should not be shown if
+// the connection requires auth as well (only one notification for problems
+// per connection).
+func setCandidateNotification(
+	candidate *connectionMigrationCandidate,
+	rank int,
+	upsert database.NotificationUpsert,
+) {
 	if rank <= candidate.NotificationRank {
 		return
 	}
@@ -298,11 +328,22 @@ func setCandidateNotification(candidate *connectionMigrationCandidate, rank int,
 	candidate.NotificationUnsetKeys = removeString(candidate.NotificationUnsetKeys, upsert.Key)
 }
 
-func connectionNotificationKey(candidate *connectionMigrationCandidate, keyPart string) string {
+// connectionNotificationKey constructs a notification key for a connection
+// using a standardized format so that notifications are connection specific
+// but ladder up to a standard key that will override across migrations.
+func connectionNotificationKey(
+	candidate *connectionMigrationCandidate,
+	keyPart string,
+) string {
 	return fmt.Sprintf("connection:%s:%s", candidate.Connection.Id, keyPart)
 }
 
-func migrationNotificationMetadata(candidate *connectionMigrationCandidate, event string) map[string]any {
+// migrationNotificationMetadata constructs standard notification metadata for
+// a connection notification.
+func migrationNotificationMetadata(
+	candidate *connectionMigrationCandidate,
+	event string,
+) map[string]any {
 	return map[string]any{
 		"connector_id":    candidate.Connection.ConnectorId.String(),
 		"source_version":  candidate.Connection.ConnectorVersion,
@@ -311,6 +352,9 @@ func migrationNotificationMetadata(candidate *connectionMigrationCandidate, even
 	}
 }
 
+// migrationNotificationRankForLevel translates from a notification level
+// stored in the database to value that can be used to rank so that lower
+// priority notifications are overridden by higher priority notifications.
 func migrationNotificationRankForLevel(level database.NotificationLevel) int {
 	switch level {
 	case database.NotificationLevelError:
