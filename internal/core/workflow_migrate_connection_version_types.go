@@ -69,6 +69,11 @@ type connectionMigrationCandidate struct {
 	NotificationRank      int
 }
 
+// NotificationKeysToResolve returns the notification keys that need to be
+// resolved for the connection migration candidate. This isn't based on
+// knowing the notifications for the connection, but rather if the candidate
+// isn't putting the connection in an auth required or setup required state,
+// any notifications around those states should be resolved.
 func (c *connectionMigrationCandidate) NotificationKeysToResolve() []string {
 	keys := append([]string{}, c.NotificationUnsetKeys...)
 	for _, key := range []string{

@@ -103,6 +103,9 @@ func (s *service) applyMigrateConnectionVersionV1(
 	if shouldRunMigrationProbes(candidate) {
 		for _, probeID := range candidate.ProbeIdsToRun {
 			if err := s.RunProbe(ctx, connectionID, probeID); err != nil {
+				// Probe failures aren't blocking on migration, but they will
+				// count against the connection transitioning to unhealthy if
+				// they fail.
 				logger.Warn(
 					"target probe failed after migration",
 					"probe_id", probeID, "error", err,
@@ -111,6 +114,7 @@ func (s *service) applyMigrateConnectionVersionV1(
 		}
 	}
 
+	// Resolve any notifications that are no longer applicable.
 	if err := s.db.ResolveNotificationsForResourceKeys(
 		ctx,
 		"connection", // resource type
@@ -119,6 +123,8 @@ func (s *service) applyMigrateConnectionVersionV1(
 	); err != nil {
 		return err
 	}
+
+	// Add newly generated notifications
 	for _, notification := range candidate.Notifications {
 		notification.Labels = updated.Labels
 		if _, err := s.db.UpsertNotification(ctx, notification); err != nil {
@@ -134,6 +140,9 @@ func (s *service) applyMigrateConnectionVersionV1(
 	return nil
 }
 
+// shouldRunMigrationProbes returns true if the migration candidate should run
+// probes. It checks if there are probes to run and if the connection doesn't
+// require configuration and is in a healthy state.
 func shouldRunMigrationProbes(candidate *connectionMigrationCandidate) bool {
 	return len(candidate.ProbeIdsToRun) > 0 &&
 		candidate.SetupStep == nil &&
