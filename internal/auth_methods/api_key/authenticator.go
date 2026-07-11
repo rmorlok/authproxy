@@ -35,6 +35,12 @@ func (a *apiKeyConnection) RecoverFrom401(ctx context.Context) error {
 	return auth_methods.ErrCannotRecover
 }
 
+// Refresh is a no-op for api-key connections. API keys are static secrets;
+// "nothing to refresh" is successful for migration and maintenance callers.
+func (a *apiKeyConnection) Refresh(ctx context.Context) error {
+	return nil
+}
+
 // SupportsRevoke returns false — an api key is a static secret with no
 // "revoke" call against the 3rd party. Rotation happens by issuing a new
 // key in the provider's console and re-running the connection setup.

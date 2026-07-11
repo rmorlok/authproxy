@@ -53,8 +53,9 @@ func (a *fakeAuth) RecoverFrom401(ctx context.Context) error {
 	return nil
 }
 
-func (a *fakeAuth) SupportsRevoke() bool          { return false }
-func (a *fakeAuth) Revoke(ctx context.Context) error { return nil }
+func (a *fakeAuth) Refresh(ctx context.Context) error { return nil }
+func (a *fakeAuth) SupportsRevoke() bool              { return false }
+func (a *fakeAuth) Revoke(ctx context.Context) error  { return nil }
 
 // stubHttpf returns a single supplied http.Client through NewHTTPClient,
 // ignoring all chain methods. Sufficient for testing the orchestrator —
@@ -67,14 +68,14 @@ func (s *stubHttpf) New() *gentleman.Client { return gentleman.New() }
 func (s *stubHttpf) NewHTTPClient() *http.Client {
 	return s.client
 }
-func (s *stubHttpf) ForRequestInfo(httpf.RequestInfo) httpf.F      { return s }
-func (s *stubHttpf) ForRequestType(httpf.RequestType) httpf.F      { return s }
+func (s *stubHttpf) ForRequestInfo(httpf.RequestInfo) httpf.F { return s }
+func (s *stubHttpf) ForRequestType(httpf.RequestType) httpf.F { return s }
 func (s *stubHttpf) ForConnectorVersion(httpf.ConnectorVersion) httpf.F {
 	return s
 }
-func (s *stubHttpf) ForConnection(httpf.Connection) httpf.F        { return s }
-func (s *stubHttpf) ForActor(httpf.Actor) httpf.F                  { return s }
-func (s *stubHttpf) ForLabels(map[string]string) httpf.F           { return s }
+func (s *stubHttpf) ForConnection(httpf.Connection) httpf.F { return s }
+func (s *stubHttpf) ForActor(httpf.Actor) httpf.F           { return s }
+func (s *stubHttpf) ForLabels(map[string]string) httpf.F    { return s }
 
 func newRawTestProxy(t *testing.T, h http.Handler, auth *fakeAuth) (iface.Proxy, *httptest.Server) {
 	t.Helper()

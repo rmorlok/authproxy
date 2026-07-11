@@ -169,7 +169,7 @@ func (s *service) refreshAuthAfterConnectionMigration(
 		return fmt.Errorf("authenticator is not configured")
 	}
 
-	return authenticator.RecoverFrom401(ctx)
+	return authenticator.Refresh(ctx)
 }
 
 func (s *service) encryptMigrationConfig(

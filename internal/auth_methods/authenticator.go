@@ -29,10 +29,11 @@ type AuthApplication struct {
 // orchestrator. Each auth method (oauth2, api_key, no_auth) exposes one
 // implementation per connection.
 //
-// The split between Resolve and RecoverFrom401 mirrors the retry-once-
-// after-refresh semantics already exercised by OAuth2: build the request
-// with the freshly resolved credential, send it, and if the upstream
-// rejects it with 401, recover (refresh) and retry exactly once.
+// Resolve and RecoverFrom401 mirror the retry-once-after-refresh semantics
+// already exercised by OAuth2: build the request with the freshly resolved
+// credential, send it, and if the upstream rejects it with 401, recover
+// (refresh) and retry exactly once. Refresh exposes the maintenance refresh
+// operation directly for callers that are not responding to a request failure.
 type Authenticator interface {
 	// Resolve loads the active credential (refreshing automatically if
 	// it is locally known to be expired) and returns the application to
@@ -47,6 +48,11 @@ type Authenticator interface {
 	// returns ErrCannotRecover and the orchestrator surfaces the
 	// upstream 401 unchanged.
 	RecoverFrom401(ctx context.Context) error
+
+	// Refresh attempts to refresh stored credentials outside of a
+	// request-retry path. Auth methods that cannot or do not need to
+	// refresh credentials return nil; "nothing to refresh" is successful.
+	Refresh(ctx context.Context) error
 
 	// SupportsRevoke reports whether the auth method can revoke the
 	// credentials it has stored for this connection. OAuth2 returns true

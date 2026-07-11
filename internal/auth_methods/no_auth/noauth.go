@@ -28,6 +28,12 @@ func (n *noAuthAuthenticator) RecoverFrom401(ctx context.Context) error {
 	return auth_methods.ErrCannotRecover
 }
 
+// Refresh is a no-op for no-auth connections. There are no credentials to
+// refresh, which is successful for migration and maintenance callers.
+func (n *noAuthAuthenticator) Refresh(ctx context.Context) error {
+	return nil
+}
+
 // SupportsRevoke returns false — there is no credential to revoke.
 func (n *noAuthAuthenticator) SupportsRevoke() bool {
 	return false

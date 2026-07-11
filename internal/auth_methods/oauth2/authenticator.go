@@ -32,10 +32,19 @@ func (o *oAuth2Connection) Resolve(ctx context.Context) (auth_methods.AuthApplic
 	}, nil
 }
 
-// RecoverFrom401 forces a refresh of the access token. The new token is
-// persisted to the database by refreshAccessToken; the orchestrator's
-// next Resolve call will read it back. Mirrors the retry-once-after-401
-// branch of the previous in-package ProxyRequest.
+// Refresh forces a refresh of the access token. The new token is persisted to
+// the database by refreshAccessToken; the next Resolve call will read it back.
+func (o *oAuth2Connection) Refresh(ctx context.Context) error {
+	token, err := o.db.GetOAuth2Token(ctx, o.connection.GetId())
+	if err != nil {
+		return err
+	}
+	_, err = o.refreshAccessToken(ctx, token, refreshModeAlways)
+	return err
+}
+
+// RecoverFrom401 forces a refresh of the access token. Mirrors the
+// retry-once-after-401 branch of the previous in-package ProxyRequest.
 //
 // If the refresh fails (transient or permanent) the error is returned;
 // the orchestrator falls back to surfacing the original 401 unchanged,
@@ -43,12 +52,7 @@ func (o *oAuth2Connection) Resolve(ctx context.Context) (auth_methods.AuthApplic
 // this retry path. The refresh failure was already classified and (if
 // permanent) flipped the connection unhealthy by refreshAccessToken.
 func (o *oAuth2Connection) RecoverFrom401(ctx context.Context) error {
-	token, err := o.db.GetOAuth2Token(ctx, o.connection.GetId())
-	if err != nil {
-		return err
-	}
-	_, err = o.refreshAccessToken(ctx, token, refreshModeAlways)
-	return err
+	return o.Refresh(ctx)
 }
 
 var _ auth_methods.Authenticator = (*oAuth2Connection)(nil)
