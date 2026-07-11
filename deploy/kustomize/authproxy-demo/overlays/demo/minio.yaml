@@ -32,6 +32,8 @@ spec:
                 secretKeyRef:
                   name: demo-minio-creds
                   key: root-password
+            - name: MINIO_DEFAULT_BUCKETS
+              value: authproxy-request-logs
 ---
 apiVersion: v1
 kind: Service

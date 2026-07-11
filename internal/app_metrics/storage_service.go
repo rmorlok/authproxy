@@ -2,6 +2,7 @@ package app_metrics
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -113,7 +114,15 @@ func (ss *StorageService) GetFullLog(ctx context.Context, id apid.ID) (*FullLog,
 		return nil, err
 	}
 
-	return ss.fullStore.GetFullLog(ctx, log.Namespace, id)
+	fullLog, err := ss.fullStore.GetFullLog(ctx, log.Namespace, id)
+	if err != nil {
+		if errors.Is(err, apblob.ErrBlobNotFound) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+
+	return fullLog, nil
 }
 
 // Ping checks if the storage backends are reachable.

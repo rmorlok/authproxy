@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -18,6 +19,59 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type recordRetrieverStub struct {
+	record *LogRecord
+	err    error
+}
+
+func (r *recordRetrieverStub) GetRecord(_ context.Context, _ apid.ID) (*LogRecord, error) {
+	return r.record, r.err
+}
+
+func (r *recordRetrieverStub) NewListRequestsBuilder() ListRequestBuilder {
+	panic("not implemented")
+}
+
+func (r *recordRetrieverStub) ListRequestsFromCursor(context.Context, string) (ListRequestExecutor, error) {
+	panic("not implemented")
+}
+
+func (r *recordRetrieverStub) QueryRequestEventMetrics(context.Context, []RequestEventMetricsQuery) ([]RequestEventMetricSeries, error) {
+	panic("not implemented")
+}
+
+func (r *recordRetrieverStub) QueryResourceMetrics(context.Context, []ResourceMetricsQuery) ([]ResourceMetricSeries, error) {
+	panic("not implemented")
+}
+
+type errorEncryptor struct {
+	err error
+}
+
+func (e errorEncryptor) EncryptForNamespace(context.Context, string, []byte) (encfield.EncryptedField, error) {
+	return encfield.EncryptedField{}, e.err
+}
+
+func (e errorEncryptor) Decrypt(context.Context, encfield.EncryptedField) ([]byte, error) {
+	return nil, e.err
+}
+
+type errorBlobClient struct {
+	err error
+}
+
+func (c errorBlobClient) Put(context.Context, apblob.PutInput) error {
+	return c.err
+}
+
+func (c errorBlobClient) Get(context.Context, string) ([]byte, error) {
+	return nil, c.err
+}
+
+func (c errorBlobClient) Delete(context.Context, string) error {
+	return c.err
+}
 
 // noopEncryptor implements Encryptor using base64 encoding (no real encryption).
 type noopEncryptor struct{}
@@ -293,6 +347,86 @@ func TestGetFullLog_BlobStore(t *testing.T) {
 	require.Equal(t, original.Request.URL, result.Request.URL)
 	require.Equal(t, original.Request.Method, result.Request.Method)
 	require.Equal(t, original.Response.StatusCode, result.Response.StatusCode)
+}
+
+func TestBlobStoreStore_ReturnsEncryptError(t *testing.T) {
+	fullStore := NewBlobStore(apblob.NewMemoryClient(), errorEncryptor{err: errors.New("encrypt failed")}, newNoopLogger())
+
+	err := fullStore.Store(context.Background(), &FullLog{
+		Id:        apid.New(apid.PrefixRequestEvents),
+		Namespace: "root",
+	})
+
+	require.ErrorContains(t, err, "encrypt full HTTP log entry")
+	require.ErrorContains(t, err, "encrypt failed")
+}
+
+func TestBlobStoreStore_ReturnsBlobPutError(t *testing.T) {
+	fullStore := NewBlobStore(errorBlobClient{err: errors.New("disk full")}, noopEncryptor{}, newNoopLogger())
+
+	err := fullStore.Store(context.Background(), &FullLog{
+		Id:        apid.New(apid.PrefixRequestEvents),
+		Namespace: "root",
+	})
+
+	require.ErrorContains(t, err, "store full HTTP log entry in blob storage")
+	require.ErrorContains(t, err, "disk full")
+}
+
+func TestGetFullLog_MissingBlobReturnsNotFound(t *testing.T) {
+	testId := apid.New(apid.PrefixRequestEvents)
+	ts := time.Now().UTC().Truncate(time.Millisecond)
+	record := &LogRecord{
+		RequestId:           testId,
+		Namespace:           "root",
+		CorrelationId:       "corr-test",
+		Timestamp:           ts,
+		MillisecondDuration: MillisecondDuration(250 * time.Millisecond),
+		Method:              "POST",
+		Scheme:              "https",
+		Host:                "api.example.com",
+		Path:                "/v1/oauth/tokens",
+		RequestHttpVersion:  "HTTP/1.1",
+		RequestSizeBytes:    123,
+		RequestMimeType:     "application/json",
+		ResponseHttpVersion: "HTTP/2.0",
+		ResponseStatusCode:  http.StatusOK,
+		ResponseSizeBytes:   456,
+		ResponseMimeType:    "application/json",
+		FullRequestRecorded: false,
+		RequestBodySkipped:  BodySkippedStreaming,
+		ResponseBodySkipped: BodySkippedTooLarge,
+		InternalTimeout:     true,
+		RequestCancelled:    true,
+	}
+	fullStore := newMockFullStore()
+	fullStore.getErr = apblob.ErrBlobNotFound
+	ss := &StorageService{
+		logger:    newNoopLogger(),
+		retriever: &recordRetrieverStub{record: record},
+		fullStore: fullStore,
+	}
+
+	_, err := ss.GetFullLog(context.Background(), testId)
+	require.ErrorIs(t, err, ErrNotFound)
+}
+
+func TestGetFullLog_ReturnsNonMissingBlobError(t *testing.T) {
+	testId := apid.New(apid.PrefixRequestEvents)
+	record := &LogRecord{
+		RequestId: testId,
+		Namespace: "root",
+	}
+	fullStore := newMockFullStore()
+	fullStore.getErr = errors.New("decrypt full log")
+	ss := &StorageService{
+		logger:    newNoopLogger(),
+		retriever: &recordRetrieverStub{record: record},
+		fullStore: fullStore,
+	}
+
+	_, err := ss.GetFullLog(context.Background(), testId)
+	require.ErrorContains(t, err, "decrypt full log")
 }
 
 // RoundTripperFunc is an adapter to allow the use of ordinary functions as http.RoundTripper.

@@ -498,16 +498,6 @@ export default function Requests() {
                     {(() => {
                         const rec = rows.find(r => r.request_id === requestId);
                         if (!requestId) return null;
-                        if (rec && rec.full_request_recorded === false) {
-                            return (
-                                <Box sx={{p: 2}}>
-                                    <Typography variant="h6" sx={{mb: 1}}>Request Details</Typography>
-                                    <Typography variant="body2" color="text.secondary">
-                                        Full request/response was not recorded for this entry.
-                                    </Typography>
-                                </Box>
-                            );
-                        }
                         return (
                             <RequestDetail
                                 requestId={requestId}
