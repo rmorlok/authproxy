@@ -1,0 +1,18 @@
+replicaCount: 1
+
+services:
+  worker:
+    enabled: true
+
+worker:
+  workflowPollers: 8
+  activityPollers: 16
+  maxParallelWorkflowTasks: 32
+  maxParallelActivityTasks: 64
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    memory: 1Gi

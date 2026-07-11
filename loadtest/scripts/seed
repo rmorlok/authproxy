@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+source "$SCRIPT_DIR/lib/loadtest.sh"
+
+profile=${1:-${LOADTEST_PROFILE:-smoke}}
+profile_file=$(loadtest_profile_path "$profile")
+profile_name=$(loadtest_profile_name "$profile_file")
+namespace=$(loadtest_namespace "$profile_file")
+run_dir=$(loadtest_init_run_dir "$profile_name" "$profile_file" "$namespace" seed)
+
+mkdir -p "$run_dir/datasets"
+
+cat > "$run_dir/seed-plan.txt" <<'EOF'
+The environment harness is ready, but large-state seeding is implemented in
+the next workstream (#718).
+
+This command exists now so the end-to-end load-test flow is stable:
+
+  up -> seed -> run -> collect -> down
+
+For the smoke profile, no AuthProxy resources are required because the k6
+scenario only checks service health and provider reachability.
+EOF
+
+printf "connection_id\n" > "$run_dir/datasets/connections.csv"
+
+loadtest_log "seed step recorded for profile $profile_name"
+loadtest_log "run artifacts: $run_dir"
