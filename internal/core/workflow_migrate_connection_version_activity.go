@@ -149,6 +149,9 @@ func shouldRunMigrationProbes(candidate *connectionMigrationCandidate) bool {
 		candidate.HealthState == database.ConnectionHealthStateHealthy
 }
 
+// refreshAuthAfterConnectionMigration refreshes the authentication method
+// after a connection version migration. Not all connection types implement
+// refresh and for some this may be a noop.
 func (s *service) refreshAuthAfterConnectionMigration(
 	ctx context.Context,
 	updated *database.Connection,
@@ -172,9 +175,13 @@ func (s *service) refreshAuthAfterConnectionMigration(
 	return authenticator.Refresh(ctx)
 }
 
+// encryptMigrationConfig encrypts the connection configuration after a
+// migration. It's simple wrapper around the data serialization and encryption
+// logic.
 func (s *service) encryptMigrationConfig(
 	ctx context.Context,
-	namespace string, cfg map[string]any,
+	namespace string,
+	cfg map[string]any,
 ) (*encfield.EncryptedField, error) {
 	if cfg == nil {
 		return nil, nil
