@@ -1,4 +1,4 @@
-import dayjs from 'dayjs';
+import dayjs, {Dayjs} from 'dayjs';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
 import type {ManipulateType, OpUnitType} from 'dayjs';
 import type {MetricsRange} from '@authproxy/api';
@@ -19,6 +19,8 @@ export interface ResolvedDashboardTimeRange {
     range: MetricsRange;
     durationMs: number;
 }
+
+export type DashboardCalendarRange = [Dayjs | null, Dayjs | null];
 
 export const DEFAULT_DASHBOARD_TIME_RANGE: DashboardTimeRange = {
     from: 'now-24h',
@@ -167,6 +169,28 @@ export function rangesEqual(a: DashboardTimeRange, b: DashboardTimeRange): boole
 export function browserTimeZoneLabel(): string {
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Browser time';
     return `${timeZone} ${formatUtcOffset(new Date())}`;
+}
+
+export function calendarRangeFromDashboardRange(
+    range: DashboardTimeRange,
+    referenceDate: Date = new Date(),
+): DashboardCalendarRange {
+    try {
+        return [
+            parseTimeExpression(range.from, referenceDate, 'From').startOf('day'),
+            parseTimeExpression(range.to, referenceDate, 'To').startOf('day'),
+        ];
+    } catch (_err) {
+        return [null, null];
+    }
+}
+
+export function formatCalendarRangeStart(date: Dayjs): string {
+    return date.startOf('day').format('YYYY-MM-DD HH:mm:ss');
+}
+
+export function formatCalendarRangeEnd(date: Dayjs): string {
+    return date.endOf('day').format('YYYY-MM-DD HH:mm:ss');
 }
 
 function parseGrafanaTimeRangeJson(input: string): DashboardTimeRange | null {

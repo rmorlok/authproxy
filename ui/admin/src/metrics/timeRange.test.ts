@@ -1,8 +1,11 @@
 import dayjs from 'dayjs';
 import {describe, expect, it} from 'vitest';
 import {
+    calendarRangeFromDashboardRange,
     DEFAULT_DASHBOARD_TIME_RANGE,
     describeDashboardTimeRange,
+    formatCalendarRangeEnd,
+    formatCalendarRangeStart,
     formatStepLabel,
     parseGrafanaTimeRange,
     resolveDashboardTimeRange,
@@ -56,6 +59,18 @@ describe('dashboard time range helpers', () => {
         expect(dayjs(resolved.range.start).format('YYYY-MM-DD HH:mm:ss')).toEqual('2026-07-17 00:00:00');
         expect(dayjs(resolved.range.end).format('YYYY-MM-DD HH:mm:ss')).toEqual('2026-07-17 23:59:59');
         expect(resolved.range.step).toEqual('15m');
+    });
+
+    it('formats selected calendar ranges as full-day Grafana absolute values', () => {
+        const [from, to] = calendarRangeFromDashboardRange(
+            {from: 'now-1d', to: 'now'},
+            new Date('2026-07-17T12:00:00.000Z'),
+        );
+
+        expect(from).not.toBeNull();
+        expect(to).not.toBeNull();
+        expect(formatCalendarRangeStart(from!)).toEqual('2026-07-16 00:00:00');
+        expect(formatCalendarRangeEnd(to!)).toEqual('2026-07-17 23:59:59');
     });
 
     it('describes quick ranges and step labels', () => {

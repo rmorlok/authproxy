@@ -1,34 +1,49 @@
 import * as React from 'react';
+import dayjs, {Dayjs} from 'dayjs';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import ButtonBase from '@mui/material/ButtonBase';
 import Divider from '@mui/material/Divider';
+import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
 import List from '@mui/material/List';
 import ListItemButton from '@mui/material/ListItemButton';
 import Popover from '@mui/material/Popover';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import AccessTimeRoundedIcon from '@mui/icons-material/AccessTimeRounded';
+import CalendarTodayRoundedIcon from '@mui/icons-material/CalendarTodayRounded';
+import ChevronLeftRoundedIcon from '@mui/icons-material/ChevronLeftRounded';
+import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded';
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import ContentPasteIcon from '@mui/icons-material/ContentPaste';
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import {
     browserTimeZoneLabel,
+    calendarRangeFromDashboardRange,
     describeDashboardTimeRange,
+    formatCalendarRangeEnd,
+    formatCalendarRangeStart,
     parseGrafanaTimeRange,
     QUICK_DASHBOARD_TIME_RANGES,
     rangesEqual,
     serializeGrafanaTimeRange,
     timeRangeValidationError,
 } from '../metrics/timeRange';
-import type {DashboardTimeRange} from '../metrics/timeRange';
+import type {DashboardCalendarRange, DashboardTimeRange} from '../metrics/timeRange';
+
+type RangePosition = 'start' | 'end';
 
 interface HomeTimeRangePickerProps {
     value: DashboardTimeRange;
     onApply: (range: DashboardTimeRange) => void;
 }
+
+const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 export default function HomeTimeRangePicker({value, onApply}: HomeTimeRangePickerProps) {
     const [anchorEl, setAnchorEl] = React.useState<HTMLElement | null>(null);
@@ -37,6 +52,14 @@ export default function HomeTimeRangePicker({value, onApply}: HomeTimeRangePicke
     const [search, setSearch] = React.useState('');
     const [error, setError] = React.useState<string | null>(null);
     const [status, setStatus] = React.useState<string | null>(null);
+    const [calendarOpen, setCalendarOpen] = React.useState(false);
+    const [calendarRange, setCalendarRange] = React.useState<DashboardCalendarRange>(
+        () => calendarRangeFromDashboardRange(value),
+    );
+    const [rangePosition, setRangePosition] = React.useState<RangePosition>('start');
+    const [calendarMonth, setCalendarMonth] = React.useState(() => calendarMonthForRange(
+        calendarRangeFromDashboardRange(value),
+    ));
     const open = Boolean(anchorEl);
     const draftRange = React.useMemo(
         () => ({from: draftFrom.trim(), to: draftTo.trim()}),
@@ -47,6 +70,7 @@ export default function HomeTimeRangePicker({value, onApply}: HomeTimeRangePicke
     const filteredQuickRanges = QUICK_DASHBOARD_TIME_RANGES.filter((item) => (
         item.label.toLowerCase().includes(search.trim().toLowerCase())
     ));
+    const calendarDays = React.useMemo(() => calendarGridDays(calendarMonth), [calendarMonth]);
 
     React.useEffect(() => {
         if (open) {
@@ -55,10 +79,62 @@ export default function HomeTimeRangePicker({value, onApply}: HomeTimeRangePicke
             setSearch('');
             setError(null);
             setStatus(null);
+            setCalendarOpen(false);
+            const nextCalendarRange = calendarRangeFromDashboardRange(value);
+            setCalendarRange(nextCalendarRange);
+            setCalendarMonth(calendarMonthForRange(nextCalendarRange));
+            setRangePosition('start');
         }
     }, [open, value]);
 
-    const close = () => setAnchorEl(null);
+    const close = () => {
+        setAnchorEl(null);
+        setCalendarOpen(false);
+    };
+
+    const openCalendar = (position: RangePosition) => {
+        const nextCalendarRange = calendarRangeFromDashboardRange(draftRange);
+        setCalendarRange(nextCalendarRange);
+        setCalendarMonth(calendarMonthForRange(nextCalendarRange, position));
+        setRangePosition(position);
+        setCalendarOpen(true);
+        setError(null);
+        setStatus(null);
+    };
+
+    const updateDraftFromCalendar = (nextRange: DashboardCalendarRange) => {
+        setCalendarRange(nextRange);
+        setError(null);
+        setStatus(null);
+
+        const [from, to] = nextRange;
+        if (from) {
+            setDraftFrom(formatCalendarRangeStart(from));
+        }
+        if (to) {
+            setDraftTo(formatCalendarRangeEnd(to));
+        }
+    };
+
+    const selectCalendarDay = (day: Dayjs) => {
+        const [currentFrom, currentTo] = calendarRange;
+        let nextRange: DashboardCalendarRange;
+
+        if (rangePosition === 'start') {
+            nextRange = currentTo && !day.isAfter(currentTo, 'day')
+                ? [day, currentTo]
+                : [day, day];
+            setRangePosition('end');
+        } else if (currentFrom && day.isBefore(currentFrom, 'day')) {
+            nextRange = [day, currentFrom];
+            setRangePosition('start');
+        } else {
+            nextRange = [currentFrom ?? day, day];
+            setRangePosition('start');
+        }
+
+        updateDraftFromCalendar(nextRange);
+    };
 
     const applyRange = (nextRange: DashboardTimeRange, closeAfterApply = true) => {
         const validationError = timeRangeValidationError(nextRange);
@@ -99,6 +175,9 @@ export default function HomeTimeRangePicker({value, onApply}: HomeTimeRangePicke
             }
             setDraftFrom(parsed.from);
             setDraftTo(parsed.to);
+            const nextCalendarRange = calendarRangeFromDashboardRange(parsed);
+            setCalendarRange(nextCalendarRange);
+            setCalendarMonth(calendarMonthForRange(nextCalendarRange));
             setStatus('Pasted');
             setError(null);
         } catch (err) {
@@ -139,7 +218,7 @@ export default function HomeTimeRangePicker({value, onApply}: HomeTimeRangePicke
                 transformOrigin={{vertical: 'top', horizontal: 'right'}}
                 PaperProps={{
                     sx: {
-                        width: {xs: 'calc(100vw - 32px)', sm: 780},
+                        width: {xs: 'calc(100vw - 32px)', md: calendarOpen ? 1180 : 780},
                         maxWidth: 'calc(100vw - 32px)',
                         mt: 1,
                         overflow: 'hidden',
@@ -151,6 +230,94 @@ export default function HomeTimeRangePicker({value, onApply}: HomeTimeRangePicke
                     divider={<Divider orientation="vertical" flexItem />}
                     onKeyDown={handleKeyDown}
                 >
+                    {calendarOpen && (
+                        <Stack spacing={1.5} sx={{p: 2.5, flex: '0 0 340px', minWidth: 0}}>
+                            <Stack direction="row" sx={{alignItems: 'center', justifyContent: 'space-between'}}>
+                                <Typography variant="h6" component="h3">
+                                    Select a time range
+                                </Typography>
+                                <Tooltip title="Close calendar">
+                                    <IconButton
+                                        aria-label="Close calendar"
+                                        size="small"
+                                        onClick={() => setCalendarOpen(false)}
+                                    >
+                                        <CloseRoundedIcon fontSize="small" />
+                                    </IconButton>
+                                </Tooltip>
+                            </Stack>
+                            <Stack spacing={1.5}>
+                                <Stack direction="row" sx={{alignItems: 'center', justifyContent: 'space-between'}}>
+                                    <IconButton
+                                        aria-label="Previous month"
+                                        size="small"
+                                        onClick={() => setCalendarMonth((month) => month.subtract(1, 'month'))}
+                                    >
+                                        <ChevronLeftRoundedIcon />
+                                    </IconButton>
+                                    <Typography variant="subtitle1" sx={{fontWeight: 700}}>
+                                        {calendarMonth.format('MMMM YYYY')}
+                                    </Typography>
+                                    <IconButton
+                                        aria-label="Next month"
+                                        size="small"
+                                        onClick={() => setCalendarMonth((month) => month.add(1, 'month'))}
+                                    >
+                                        <ChevronRightRoundedIcon />
+                                    </IconButton>
+                                </Stack>
+                                <Box
+                                    sx={{
+                                        display: 'grid',
+                                        gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
+                                        gap: 0.5,
+                                    }}
+                                >
+                                    {WEEKDAYS.map((weekday) => (
+                                        <Typography
+                                            key={weekday}
+                                            variant="caption"
+                                            color="primary"
+                                            sx={{textAlign: 'center', fontWeight: 700}}
+                                        >
+                                            {weekday}
+                                        </Typography>
+                                    ))}
+                                    {calendarDays.map((day) => {
+                                        const isOutsideMonth = !day.isSame(calendarMonth, 'month');
+                                        const isRangeStart = isSameCalendarDay(day, calendarRange[0]);
+                                        const isRangeEnd = isSameCalendarDay(day, calendarRange[1]);
+                                        const isInRange = isDayInCalendarRange(day, calendarRange);
+                                        const isSelected = isRangeStart || isRangeEnd;
+
+                                        return (
+                                            <ButtonBase
+                                                key={day.format('YYYY-MM-DD')}
+                                                aria-label={`Select ${day.format('MMM D, YYYY')}`}
+                                                onClick={() => selectCalendarDay(day)}
+                                                sx={{
+                                                    height: 40,
+                                                    borderRadius: isSelected ? 5 : 1,
+                                                    color: isOutsideMonth ? 'text.disabled' : 'text.primary',
+                                                    bgcolor: isSelected
+                                                        ? 'primary.main'
+                                                        : isInRange
+                                                            ? 'action.selected'
+                                                            : 'transparent',
+                                                    fontWeight: isSelected ? 700 : 500,
+                                                    '&:hover': {
+                                                        bgcolor: isSelected ? 'primary.dark' : 'action.hover',
+                                                    },
+                                                }}
+                                            >
+                                                {day.date()}
+                                            </ButtonBase>
+                                        );
+                                    })}
+                                </Box>
+                            </Stack>
+                        </Stack>
+                    )}
                     <Stack spacing={2} sx={{p: 2.5, flex: '1 1 56%', minWidth: 0}}>
                         <Typography variant="h6" component="h3">
                             Absolute time range
@@ -162,6 +329,22 @@ export default function HomeTimeRangePicker({value, onApply}: HomeTimeRangePicke
                             size="small"
                             fullWidth
                             autoFocus
+                            InputProps={{
+                                endAdornment: (
+                                    <InputAdornment position="end">
+                                        <Tooltip title="Select from calendar">
+                                            <IconButton
+                                                aria-label="Select From date range"
+                                                edge="end"
+                                                onMouseDown={(event) => event.preventDefault()}
+                                                onClick={() => openCalendar('start')}
+                                            >
+                                                <CalendarTodayRoundedIcon fontSize="small" />
+                                            </IconButton>
+                                        </Tooltip>
+                                    </InputAdornment>
+                                ),
+                            }}
                         />
                         <TextField
                             label="To"
@@ -169,6 +352,22 @@ export default function HomeTimeRangePicker({value, onApply}: HomeTimeRangePicke
                             onChange={(event) => setDraftTo(event.target.value)}
                             size="small"
                             fullWidth
+                            InputProps={{
+                                endAdornment: (
+                                    <InputAdornment position="end">
+                                        <Tooltip title="Select from calendar">
+                                            <IconButton
+                                                aria-label="Select To date range"
+                                                edge="end"
+                                                onMouseDown={(event) => event.preventDefault()}
+                                                onClick={() => openCalendar('end')}
+                                            >
+                                                <CalendarTodayRoundedIcon fontSize="small" />
+                                            </IconButton>
+                                        </Tooltip>
+                                    </InputAdornment>
+                                ),
+                            }}
                         />
                         <Stack direction="row" spacing={1} sx={{alignItems: 'center', flexWrap: 'wrap'}}>
                             <Button
@@ -247,5 +446,36 @@ export default function HomeTimeRangePicker({value, onApply}: HomeTimeRangePicke
                 </Box>
             </Popover>
         </>
+    );
+}
+
+function calendarMonthForRange(range: DashboardCalendarRange, position: RangePosition = 'start'): Dayjs {
+    const preferredDate = position === 'end' ? range[1] ?? range[0] : range[0] ?? range[1];
+    return (preferredDate ?? dayjs()).startOf('month');
+}
+
+function calendarGridDays(month: Dayjs): Dayjs[] {
+    const firstVisibleDay = startOfMondayWeek(month.startOf('month'));
+    return Array.from({length: 42}, (_, index) => firstVisibleDay.add(index, 'day'));
+}
+
+function startOfMondayWeek(date: Dayjs): Dayjs {
+    const daysSinceMonday = (date.day() + 6) % 7;
+    return date.subtract(daysSinceMonday, 'day').startOf('day');
+}
+
+function isSameCalendarDay(a: Dayjs, b: Dayjs | null): boolean {
+    return Boolean(b?.isSame(a, 'day'));
+}
+
+function isDayInCalendarRange(day: Dayjs, range: DashboardCalendarRange): boolean {
+    const [from, to] = range;
+    if (!from || !to) {
+        return false;
+    }
+    return (
+        day.isSame(from, 'day') ||
+        day.isSame(to, 'day') ||
+        (day.isAfter(from, 'day') && day.isBefore(to, 'day'))
     );
 }
