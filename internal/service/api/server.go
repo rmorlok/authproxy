@@ -148,6 +148,10 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 		authService,
 		dm.GetCoreService(),
 	)
+	routesNotifications := common_routes.NewNotificationsRoutes(
+		authService,
+		dm.GetDatabase(),
+	)
 
 	api := server.Group("/api/v1")
 
@@ -159,6 +163,7 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 	routesRequestEvents.Register(api)
 	routesActors.Register(api)
 	routesRateLimits.Register(api)
+	routesNotifications.Register(api)
 
 	return service.GetServerAndHealthChecker(server, healthChecker)
 }

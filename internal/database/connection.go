@@ -532,6 +532,147 @@ func (s *service) SetConnectionEncryptedConfiguration(ctx context.Context, id ap
 	return nil
 }
 
+// ConnectionVersionMigrationUpdate is the complete connection row replacement
+// produced by a connector-version migration. The database layer applies it in a
+// single transaction so the target version, encrypted configuration, labels,
+// annotations, setup state, and health state cannot be partially persisted.
+type ConnectionVersionMigrationUpdate struct {
+	Id                     apid.ID
+	ConnectorId            apid.ID
+	ConnectorVersion       uint64
+	EncryptedConfiguration *encfield.EncryptedField
+	UserLabels             map[string]string
+	Annotations            map[string]string
+	SetupStep              *cschema.SetupStep
+	SetupError             *string
+	HealthState            *ConnectionHealthState
+}
+
+func (u ConnectionVersionMigrationUpdate) validate() error {
+	result := &multierror.Error{}
+	if u.Id == apid.Nil {
+		result = multierror.Append(result, errors.New("connection id is required"))
+	}
+	if err := u.Id.ValidatePrefix(apid.PrefixConnection); err != nil {
+		result = multierror.Append(result, fmt.Errorf("invalid connection id: %w", err))
+	}
+	if u.ConnectorId == apid.Nil {
+		result = multierror.Append(result, errors.New("connector id is required"))
+	}
+	if err := u.ConnectorId.ValidatePrefix(apid.PrefixConnectorVersion); err != nil {
+		result = multierror.Append(result, fmt.Errorf("invalid connector id: %w", err))
+	}
+	if u.ConnectorVersion == 0 {
+		result = multierror.Append(result, errors.New("connector version is required"))
+	}
+	if err := ValidateUserLabels(u.UserLabels); err != nil {
+		result = multierror.Append(result, fmt.Errorf("invalid migration labels: %w", err))
+	}
+	if err := ValidateAnnotations(u.Annotations); err != nil {
+		result = multierror.Append(result, fmt.Errorf("invalid migration annotations: %w", err))
+	}
+	if u.HealthState != nil && !IsValidConnectionHealthState(*u.HealthState) {
+		result = multierror.Append(result, errors.New("invalid connection health state"))
+	}
+	return result.ErrorOrNil()
+}
+
+func (s *service) UpdateConnectionForVersionMigration(ctx context.Context, update ConnectionVersionMigrationUpdate) (*Connection, error) {
+	if err := update.validate(); err != nil {
+		return nil, err
+	}
+
+	var result *Connection
+	err := s.transaction(func(tx *sql.Tx) error {
+		var existing Connection
+		err := s.sq.
+			Select(existing.cols()...).
+			From(ConnectionsTable).
+			Where(sq.Eq{"id": update.Id, "deleted_at": nil}).
+			RunWith(tx).
+			QueryRow().
+			Scan(existing.fields()...)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrNotFound
+			}
+			return err
+		}
+
+		cvLabels, err := s.fetchLabelsForCarryForward(ctx, tx, ConnectorVersionsTable, sq.Eq{
+			"id":         update.ConnectorId,
+			"version":    update.ConnectorVersion,
+			"deleted_at": nil,
+		})
+		if err != nil {
+			return err
+		}
+		nsLabels, err := s.fetchLabelsForCarryForward(ctx, tx, NamespacesTable, sq.Eq{
+			"path":       existing.Namespace,
+			"deleted_at": nil,
+		})
+		if err != nil {
+			return err
+		}
+
+		newLabels := ApplyParentCarryForward(
+			Labels(update.UserLabels),
+			ParentCarryForward{Rt: ApidPrefixToLabelToken(apid.PrefixConnectorVersion), Labels: cvLabels},
+			ParentCarryForward{Rt: NamespaceLabelToken, Labels: nsLabels},
+		)
+		newLabels = InjectSelfImplicitLabels(update.Id, existing.Namespace, newLabels)
+
+		now := apctx.GetClock(ctx).Now()
+		healthState := existing.HealthState
+		if update.HealthState != nil {
+			healthState = *update.HealthState
+		}
+
+		dbResult, err := s.sq.
+			Update(ConnectionsTable).
+			Set("connector_id", update.ConnectorId).
+			Set("connector_version", update.ConnectorVersion).
+			Set("labels", newLabels).
+			Set("annotations", Annotations(update.Annotations)).
+			Set("encrypted_configuration", update.EncryptedConfiguration).
+			Set("encrypted_at", &now).
+			Set("setup_step_id", update.SetupStep).
+			Set("setup_error", update.SetupError).
+			Set("health_state", healthState).
+			Set("updated_at", now).
+			Where(sq.Eq{"id": update.Id, "deleted_at": nil}).
+			RunWith(tx).
+			Exec()
+		if err != nil {
+			return err
+		}
+		affected, err := dbResult.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if affected == 0 {
+			return ErrNotFound
+		}
+		if affected > 1 {
+			return fmt.Errorf("multiple connections updated during migration: %w", ErrViolation)
+		}
+
+		existing.ConnectorId = update.ConnectorId
+		existing.ConnectorVersion = update.ConnectorVersion
+		existing.Labels = newLabels
+		existing.Annotations = Annotations(update.Annotations)
+		existing.EncryptedConfiguration = update.EncryptedConfiguration
+		existing.EncryptedAt = &now
+		existing.SetupStep = update.SetupStep
+		existing.SetupError = update.SetupError
+		existing.HealthState = healthState
+		existing.UpdatedAt = now
+		result = &existing
+		return nil
+	})
+	return result, err
+}
+
 type ConnectionOrderByField string
 
 const (

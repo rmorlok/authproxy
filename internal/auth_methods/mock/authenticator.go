@@ -49,6 +49,20 @@ func (mr *MockAuthenticatorMockRecorder) RecoverFrom401(ctx interface{}) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecoverFrom401", reflect.TypeOf((*MockAuthenticator)(nil).RecoverFrom401), ctx)
 }
 
+// Refresh mocks base method.
+func (m *MockAuthenticator) Refresh(ctx context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Refresh", ctx)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Refresh indicates an expected call of Refresh.
+func (mr *MockAuthenticatorMockRecorder) Refresh(ctx interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Refresh", reflect.TypeOf((*MockAuthenticator)(nil).Refresh), ctx)
+}
+
 // Resolve mocks base method.
 func (m *MockAuthenticator) Resolve(ctx context.Context) (auth_methods.AuthApplication, error) {
 	m.ctrl.T.Helper()

@@ -189,6 +189,12 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 		)
 		routesConnections.Register(api)
 
+		routesNotifications := common_routes.NewNotificationsRoutes(
+			authService,
+			dm.GetDatabase(),
+		)
+		routesNotifications.Register(api)
+
 		routesTasks := common_routes.NewTaskRoutes(
 			dm.GetConfig(),
 			authService,

@@ -53,6 +53,24 @@ type DisconnectResponseJson struct {
 	Connection ConnectionJson `json:"connection" yaml:"connection"`
 }
 
+// MigrateConnectionVersionRequestJson is the request body for POST /connections/:id/_migrate_version.
+//
+//	@Description	Request to migrate a connection to another connector version
+type MigrateConnectionVersionRequestJson struct {
+	TargetVersion  uint64 `json:"target_version" yaml:"target_version" example:"3"`
+	TimeoutSeconds *int64 `json:"timeout_seconds,omitempty" yaml:"timeout_seconds,omitempty" example:"600"`
+}
+
+// MigrateConnectionVersionResponseJson is returned when a connection-version migration workflow starts.
+//
+//	@Description	Response returned after starting a connection connector-version migration workflow
+type MigrateConnectionVersionResponseJson struct {
+	TaskId        string  `json:"task_id" yaml:"task_id"`
+	ConnectionId  apid.ID `json:"connection_id" yaml:"connection_id" swaggertype:"string" example:"cxn_test550e8400abcde"`
+	SourceVersion uint64  `json:"source_version" yaml:"source_version" example:"1"`
+	TargetVersion uint64  `json:"target_version" yaml:"target_version" example:"3"`
+}
+
 // DisconnectConnectionRequestJson is the optional request body for POST /connections/:id/_disconnect.
 //
 //	@Description	Request to disconnect a connection

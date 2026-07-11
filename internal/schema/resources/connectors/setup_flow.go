@@ -582,6 +582,63 @@ func extractSchemaPropertyNames(schema json.RawMessage) (map[string]bool, error)
 	return result, nil
 }
 
+// SetupField describes a top-level field in a setup form JSON Schema.
+type SetupField struct {
+	Name       string
+	StepId     string
+	Required   bool
+	HasDefault bool
+	Default    any
+}
+
+// SetupFields extracts top-level setup fields in user-authored order. It only
+// inspects form-kind steps because redirect steps do not collect config data.
+func (p *SetupFlowPhase) SetupFields() ([]SetupField, error) {
+	if p == nil {
+		return nil, nil
+	}
+
+	var result []SetupField
+	for i := range p.Steps {
+		step := &p.Steps[i]
+		if step.Type.Normalized() != SetupFlowStepTypeForm || step.JsonSchema.IsEmpty() {
+			continue
+		}
+		var parsed struct {
+			Properties map[string]json.RawMessage `json:"properties"`
+			Required   []string                   `json:"required"`
+		}
+		if err := json.Unmarshal(json.RawMessage(step.JsonSchema), &parsed); err != nil {
+			return nil, err
+		}
+		required := make(map[string]bool, len(parsed.Required))
+		for _, name := range parsed.Required {
+			required[name] = true
+		}
+		for name, rawProperty := range parsed.Properties {
+			var property struct {
+				Default json.RawMessage `json:"default"`
+			}
+			if err := json.Unmarshal(rawProperty, &property); err != nil {
+				return nil, err
+			}
+			field := SetupField{
+				Name:     name,
+				StepId:   step.Id,
+				Required: required[name],
+			}
+			if len(property.Default) > 0 {
+				field.HasDefault = true
+				if err := json.Unmarshal(property.Default, &field.Default); err != nil {
+					return nil, err
+				}
+			}
+			result = append(result, field)
+		}
+	}
+	return result, nil
+}
+
 // PreconnectFieldNames returns the union of top-level property names defined across
 // all preconnect steps' JSON schemas. These are the cfg fields available before the
 // auth flow runs. Steps with malformed JSON schemas are silently skipped — those are

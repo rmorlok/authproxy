@@ -53,6 +53,19 @@ func CompileAndValidateLibrary(source string) (*Library, error) {
 	return library, nil
 }
 
+// ValidateExpressionSyntax parses a connector-authored expression without
+// executing it. This is useful for expressions that depend on runtime variables
+// and cannot be safely evaluated while the connector definition is validated.
+func ValidateExpressionSyntax(expression string) error {
+	if strings.TrimSpace(expression) == "" {
+		return fmt.Errorf("expression is required")
+	}
+	if _, err := goja.Compile("expression.js", expression, false); err != nil {
+		return fmt.Errorf("compile JavaScript expression: %w", err)
+	}
+	return nil
+}
+
 // Source returns the source JavaScript used to compile the library.
 func (l *Library) Source() string {
 	if l == nil {

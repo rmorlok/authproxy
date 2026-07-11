@@ -1681,6 +1681,82 @@ const docTemplateadmin_api = `{
                 }
             }
         },
+        "/connections/{id}/_migrate_version": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Start a workflow that migrates an existing connection to another version of the same connector",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "connections"
+                ],
+                "summary": "Migrate connection connector version",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Connection UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Migration options",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/routes.OpenAPIMigrateConnectionVersionRequestJson"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/routes.OpenAPIMigrateConnectionVersionResponseJson"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/connections/{id}/_proxy": {
             "post": {
                 "security": [
@@ -6650,6 +6726,142 @@ const docTemplateadmin_api = `{
                 }
             }
         },
+        "/notifications": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "List active actor-visible notifications",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "notifications"
+                ],
+                "summary": "List notifications",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Maximum number of notifications to return",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Include notifications the actor has already viewed",
+                        "name": "include_viewed",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Notification state; defaults to active",
+                        "name": "state",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by namespace",
+                        "name": "namespace",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by denormalized resource label selector",
+                        "name": "label_selector",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/routes.OpenAPIListNotificationsResponseJson"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/notifications/{id}/_viewed": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Mark a notification viewed for the authenticated actor",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "notifications"
+                ],
+                "summary": "Mark notification viewed",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Notification ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/rate-limits": {
             "get": {
                 "security": [
@@ -8654,6 +8866,19 @@ const docTemplateadmin_api = `{
                 }
             }
         },
+        "routes.OpenAPIListNotificationsResponseJson": {
+            "description": "Paginated list of actor-visible notifications",
+            "type": "object",
+            "properties": {
+                "cursor": {
+                    "type": "string"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {}
+                }
+            }
+        },
         "routes.OpenAPIListRateLimitsResponseJson": {
             "description": "Paginated list of rate limits",
             "type": "object",
@@ -8692,6 +8917,41 @@ const docTemplateadmin_api = `{
                     "items": {
                         "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_api.MetricsSchemaMetricJson"
                     }
+                }
+            }
+        },
+        "routes.OpenAPIMigrateConnectionVersionRequestJson": {
+            "description": "Request body for connection connector-version migration operations",
+            "type": "object",
+            "properties": {
+                "target_version": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "timeout_seconds": {
+                    "type": "integer",
+                    "example": 600
+                }
+            }
+        },
+        "routes.OpenAPIMigrateConnectionVersionResponseJson": {
+            "description": "Response for connection connector-version migration operation",
+            "type": "object",
+            "properties": {
+                "connection_id": {
+                    "type": "string",
+                    "example": "cxn_test550e8400abcde"
+                },
+                "source_version": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "target_version": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "task_id": {
+                    "type": "string"
                 }
             }
         },

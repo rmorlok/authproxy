@@ -72,6 +72,11 @@ type Connector struct {
 	// and functions available to connector-authored predicates and transforms.
 	Javascript string `json:"javascript,omitempty" yaml:"javascript,omitempty"`
 
+	// Migrations are optional connector-authored hooks used to migrate an
+	// existing connection's stored configuration, labels, and annotations
+	// between connector versions.
+	Migrations *Migrations `json:"migrations,omitempty" yaml:"migrations,omitempty"`
+
 	// RateLimiting configures how 429 rate limiting responses from the 3rd party are handled.
 	// If unset, default behavior is enabled (parse Retry-After header, 60s default backoff).
 	RateLimiting *RateLimiting `json:"rate_limiting,omitempty" yaml:"rate_limiting,omitempty"`
@@ -110,6 +115,10 @@ func (c *Connector) Clone() *Connector {
 		clone.RateLimiting = c.RateLimiting.Clone()
 	}
 
+	if c.Migrations != nil {
+		clone.Migrations = c.Migrations.Clone()
+	}
+
 	if c.Labels != nil {
 		clone.Labels = make(map[string]string, len(c.Labels))
 		for k, v := range c.Labels {
@@ -144,6 +153,12 @@ func (c *Connector) Validate(vc *common.ValidationContext) error {
 
 	if c.RateLimiting != nil {
 		if err := c.RateLimiting.Validate(vc.PushField("rate_limiting")); err != nil {
+			result = multierror.Append(result, err)
+		}
+	}
+
+	if c.Migrations != nil {
+		if err := c.Migrations.Validate(vc.PushField("migrations")); err != nil {
 			result = multierror.Append(result, err)
 		}
 	}

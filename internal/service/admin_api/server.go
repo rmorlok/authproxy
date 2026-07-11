@@ -190,6 +190,10 @@ func GetGinServer(
 		workflowDiagnostics,
 		dm.GetEncryptService(),
 	)
+	routesNotifications := common_routes.NewNotificationsRoutes(
+		authService,
+		dm.GetDatabase(),
+	)
 
 	api := server.Group("/api/v1")
 
@@ -202,6 +206,7 @@ func GetGinServer(
 	routesActors.Register(api)
 	routesTaskMonitoring.Register(api)
 	routesWorkflowMonitoring.Register(api)
+	routesNotifications.Register(api)
 
 	if service.SupportsSession() && service.SupportsUi() {
 		routesSession := common_routes.NewSessionRoutes(

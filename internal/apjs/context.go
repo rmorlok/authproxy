@@ -68,6 +68,26 @@ func (c Context) TransformJSON(expression string, data any) ([]DataSourceOption,
 	return c.WithVar("data", data).TransformOptions(expression)
 }
 
+// EvaluateObject runs a JavaScript expression and exports its result as a
+// JSON-like object. Undefined/null are treated as an empty object for callers
+// where an omitted result means no changes.
+func (c Context) EvaluateObject(expression string) (map[string]any, error) {
+	result, err := c.runExpression(expression)
+	if err != nil {
+		return nil, err
+	}
+	if goja.IsUndefined(result) || goja.IsNull(result) {
+		return map[string]any{}, nil
+	}
+
+	exported := result.Export()
+	obj, ok := exported.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("JS expression must return an object, got %T", exported)
+	}
+	return obj, nil
+}
+
 func (c Context) runExpression(expression string) (goja.Value, error) {
 	vm := goja.New()
 
