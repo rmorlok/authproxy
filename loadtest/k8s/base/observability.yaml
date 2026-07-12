@@ -1,0 +1,110 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: otel-lgtm
+  labels:
+    app.kubernetes.io/name: otel-lgtm
+    app.kubernetes.io/component: observability
+    loadtest.authproxy.io/component: dependency
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: otel-lgtm
+      app.kubernetes.io/component: observability
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: otel-lgtm
+        app.kubernetes.io/component: observability
+        loadtest.authproxy.io/component: dependency
+    spec:
+      containers:
+        - name: otel-lgtm
+          image: docker.io/grafana/otel-lgtm:0.8.6
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: grafana
+              containerPort: 3000
+            - name: loki
+              containerPort: 3100
+            - name: tempo
+              containerPort: 3200
+            - name: otel-grpc
+              containerPort: 4317
+            - name: otel-http
+              containerPort: 4318
+            - name: prometheus
+              containerPort: 9090
+          readinessProbe:
+            exec:
+              command:
+                - cat
+                - /tmp/ready
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              memory: 2Gi
+          volumeMounts:
+            - name: tempo-data
+              mountPath: /data/tempo
+            - name: grafana-data
+              mountPath: /data/grafana
+            - name: loki-data
+              mountPath: /data/loki
+            - name: loki-storage
+              mountPath: /loki
+            - name: prometheus-storage
+              mountPath: /data/prometheus
+            - name: pyroscope-storage
+              mountPath: /data/pyroscope
+      volumes:
+        - name: tempo-data
+          emptyDir: {}
+        - name: grafana-data
+          emptyDir: {}
+        - name: loki-data
+          emptyDir: {}
+        - name: loki-storage
+          emptyDir: {}
+        - name: prometheus-storage
+          emptyDir: {}
+        - name: pyroscope-storage
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: otel-lgtm
+  labels:
+    app.kubernetes.io/name: otel-lgtm
+    app.kubernetes.io/component: observability
+    loadtest.authproxy.io/component: dependency
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: otel-lgtm
+    app.kubernetes.io/component: observability
+  ports:
+    - name: grafana
+      port: 3000
+      targetPort: grafana
+    - name: loki
+      port: 3100
+      targetPort: loki
+    - name: tempo
+      port: 3200
+      targetPort: tempo
+    - name: otel-grpc
+      port: 4317
+      targetPort: otel-grpc
+    - name: otel-http
+      port: 4318
+      targetPort: otel-http
+    - name: prometheus
+      port: 9090
+      targetPort: prometheus

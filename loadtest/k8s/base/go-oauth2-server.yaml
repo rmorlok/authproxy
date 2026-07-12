@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: go-oauth2-server
+  labels:
+    app.kubernetes.io/name: go-oauth2-server
+    app.kubernetes.io/component: provider
+    loadtest.authproxy.io/component: provider
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: go-oauth2-server
+      app.kubernetes.io/component: provider
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: go-oauth2-server
+        app.kubernetes.io/component: provider
+        loadtest.authproxy.io/component: provider
+    spec:
+      containers:
+        - name: go-oauth2-server
+          image: ghcr.io/rmorlok/go-oauth2-server@sha256:d1e5bdae007259b0c02255f26efce595f23eb2142e7da8caa3dac544dd445cb3
+          imagePullPolicy: IfNotPresent
+          command:
+            - go-oauth2-server
+          args:
+            - runserver
+            - --test-mode
+            - --test-port
+            - "8080"
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /test/health
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: go-oauth2-server
+  labels:
+    app.kubernetes.io/name: go-oauth2-server
+    app.kubernetes.io/component: provider
+    loadtest.authproxy.io/component: provider
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: go-oauth2-server
+    app.kubernetes.io/component: provider
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

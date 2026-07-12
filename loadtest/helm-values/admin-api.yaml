@@ -1,0 +1,21 @@
+replicaCount: 1
+
+services:
+  adminApi:
+    enabled: true
+
+database:
+  autoMigrate: true
+
+connectors:
+  autoMigrate: true
+
+appMetrics:
+  autoMigrate: true
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 512Mi
