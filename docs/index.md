@@ -24,6 +24,7 @@ AuthProxy acts as an HTTP proxy between your application and external APIs. When
 * [Marketplace UI Storybook](./storybook/marketplace/)
 * [Admin UI Storybook](./storybook/admin/)
 * [Application Metrics](./app_metrics.md)
+* [Connector Version Migrations](./connector-version-migrations.md)
 * [Workflow Versioning](./workflows.md)
 
 ## Architecture Diagrams

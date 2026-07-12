@@ -81,6 +81,7 @@ func (s *service) listActorNotificationsFromDB(
 	for _, n := range notifications {
 		ids = append(ids, n.Id)
 	}
+
 	viewed, err := s.db.NotificationViewedMap(ctx, ra.MustGetActor().GetId(), ids)
 	if err != nil {
 		return nil, err
@@ -174,25 +175,32 @@ func (s *service) resolveNotificationsForResourceKeys(
 	return nil
 }
 
+// normalizeActorNotificationIDs validates that the appropriate types of ids are
+// being used, and dedupes the set of ids.
 func normalizeActorNotificationIDs(ids []apid.ID) ([]apid.ID, error) {
 	if len(ids) == 0 {
 		return nil, httperr.BadRequest("ids are required")
 	}
 	result := make([]apid.ID, 0, len(ids))
 	seen := make(map[apid.ID]struct{}, len(ids))
+
 	for _, id := range ids {
 		if id == apid.Nil {
 			return nil, httperr.BadRequest("notification id is required")
 		}
+
 		if err := id.ValidatePrefix(apid.PrefixNotification); err != nil {
 			return nil, httperr.BadRequest("invalid notification id", httperr.WithInternalErr(err))
 		}
+
 		if _, ok := seen[id]; ok {
 			continue
 		}
+
 		seen[id] = struct{}{}
 		result = append(result, id)
 	}
+
 	return result, nil
 }
 

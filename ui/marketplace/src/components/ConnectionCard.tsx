@@ -121,11 +121,6 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection, highlightNe
     });
   };
 
-  // Reauth is meaningful only on Configured connections (any state earlier is still
-  // in initial setup; later states are tearing down). Visibility itself is the
-  // signal — when health is unhealthy the button is emphasized.
-  const canReauth = connection.state === ConnectionState.CONFIGURED;
-  const canReconfigure = connection.state === ConnectionState.CONFIGURED && connector?.has_configure;
   const {
     isHealthyConfigured,
     isUnhealthy,
@@ -136,6 +131,10 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection, highlightNe
     statusDotColor,
     statusText,
   } = getConnectionStatusPresentation(connection);
+  // Reauth is meaningful on configured connections unless healthy setup is the
+  // only outstanding action. If health is unhealthy, reauth remains primary.
+  const canReauth = connection.state === ConnectionState.CONFIGURED && (requiresReconnection || !requiresSetup);
+  const canReconfigure = connection.state === ConnectionState.CONFIGURED && connector?.has_configure && !requiresSetup;
 
   const handleActionsMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setActionsAnchorEl(event.currentTarget);

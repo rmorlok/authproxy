@@ -198,6 +198,6 @@ Transforms must return an array of objects with `value` and `label` fields. They
 
 ## Migration Notes
 
-Adding, removing, or changing `if.javascript`, data-source transforms, or connector-level JavaScript changes the connector definition. For published connectors, publish a new connector version or rely on the normal connector-version migration path for configuration changes.
+Adding, removing, or changing `if.javascript`, data-source transforms, or connector-level JavaScript changes the connector definition. For published connectors, publish a new connector version and migrate existing connections with the [connector version migration workflow](connector-version-migrations.md).
 
 Existing in-flight connections are evaluated against the connector version they are using. If a connection resumes while its stored step is now ineligible, AuthProxy advances it to the next eligible step rather than returning the ineligible step to the client.

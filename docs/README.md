@@ -9,6 +9,7 @@ This directory holds long-form documentation that supplements the [main repo REA
 - **[Labels and annotations](labels.md)** — the Kubernetes-style label system, system labels under `apxy/`, carry-forward through the namespace → connector → connection hierarchy, label selectors, per-request label snapshots.
 - **[Connector setup flow](connector-setup-flow.md)** — author preconnect/configure steps, conditional `if.javascript` steps, redirect steps, and configure-time data sources.
 - **[Connector predicates](connector-predicates.md)** — condition setup steps, OAuth scopes, dynamic required OAuth scopes, and probes with JavaScript predicates over `cfg`, `labels`, and `annotations`, including connector-level shared JavaScript helpers.
+- **[Connector version migrations](connector-version-migrations.md)** — move connections between connector versions, write up/down hooks, understand automatic setup/auth analysis, rollback, and notifications.
 - **[Application metrics](app_metrics.md)** — configure the app metrics store, query request-event and resource metrics, and understand supported aggregations and dimensions.
 - **[Unified key model migration](key-model-migration.md)** — design and operations guide for replacing encryption key versions with `keys` and `data_encryption_keys`.
 

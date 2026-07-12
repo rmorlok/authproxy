@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   Alert,
@@ -67,6 +67,7 @@ interface ConnectionDetailProps {
 const ConnectionDetail: React.FC<ConnectionDetailProps> = ({ connectionId: providedConnectionId }) => {
   const dispatch = useDispatch<AppDispatch>();
   const params = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const connectionId = providedConnectionId ?? params.connectionId;
   const connections = useSelector(selectConnections);
   const status = useSelector(selectConnectionsStatus);
@@ -76,6 +77,7 @@ const ConnectionDetail: React.FC<ConnectionDetailProps> = ({ connectionId: provi
   const formSubmitError = useSelector(selectFormSubmitError);
   const [openDisconnectDialog, setOpenDisconnectDialog] = useState(false);
   const [isResumingSetup, setIsResumingSetup] = useState(false);
+  const handledActionRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (status === 'idle') {
@@ -89,17 +91,19 @@ const ConnectionDetail: React.FC<ConnectionDetailProps> = ({ connectionId: provi
 
   const connector = connection?.connector;
   const presentation = connection ? getConnectionStatusPresentation(connection) : null;
-  const canReauth = connection?.state === ConnectionState.CONFIGURED;
-  const canReconfigure = connection?.state === ConnectionState.CONFIGURED && connector?.has_configure;
+  const canReauth =
+    connection?.state === ConnectionState.CONFIGURED &&
+    (presentation?.requiresReconnection || !presentation?.requiresSetup);
+  const canReconfigure = connection?.state === ConnectionState.CONFIGURED && connector?.has_configure && !presentation?.requiresSetup;
   const canDisconnect = connection ? canBeDisconnected(connection) : false;
   const body = connector?.description || connector?.highlight || '';
 
-  const handleReconfigureClick = () => {
+  const handleReconfigureClick = useCallback(() => {
     if (!connection) return;
     dispatch(reconfigureConnectionAsync(connection.id));
-  };
+  }, [connection, dispatch]);
 
-  const handleResumeSetupClick = () => {
+  const handleResumeSetupClick = useCallback(() => {
     if (!connection) return;
     setIsResumingSetup(true);
     dispatch(getSetupStepAsync({
@@ -118,9 +122,9 @@ const ConnectionDetail: React.FC<ConnectionDetailProps> = ({ connectionId: provi
       }
       setIsResumingSetup(false);
     });
-  };
+  }, [connection, dispatch]);
 
-  const handleReauthClick = () => {
+  const handleReauthClick = useCallback(() => {
     if (!connection) return;
     dispatch(reauthConnectionAsync({
       connectionId: connection.id,
@@ -133,7 +137,51 @@ const ConnectionDetail: React.FC<ConnectionDetailProps> = ({ connectionId: provi
         }
       }
     });
-  };
+  }, [connection, dispatch]);
+
+  useEffect(() => {
+    if (!connection) {
+      return;
+    }
+
+    const action = searchParams.get('action');
+    if (action !== 'reauth' && action !== 'configure') {
+      return;
+    }
+
+    const actionKey = `${connection.id}:${action}`;
+    if (handledActionRef.current === actionKey) {
+      return;
+    }
+    handledActionRef.current = actionKey;
+
+    const nextSearchParams = new URLSearchParams(searchParams);
+    nextSearchParams.delete('action');
+    setSearchParams(nextSearchParams, { replace: true });
+
+    if (action === 'reauth') {
+      if (canReauth) {
+        handleReauthClick();
+      }
+      return;
+    }
+
+    if (presentation?.requiresSetup) {
+      handleResumeSetupClick();
+    } else if (canReconfigure) {
+      handleReconfigureClick();
+    }
+  }, [
+    canReauth,
+    canReconfigure,
+    connection,
+    handleReauthClick,
+    handleReconfigureClick,
+    handleResumeSetupClick,
+    presentation?.requiresSetup,
+    searchParams,
+    setSearchParams,
+  ]);
 
   const handleDisconnectConfirm = async () => {
     if (!connection) return;
