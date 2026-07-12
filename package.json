@@ -1,10 +1,16 @@
 {
   "private": true,
   "workspaces": [
+    "docs",
     "ui/*",
     "sdks/js",
     "demos/*/frontend"
   ],
+  "scripts": {
+    "docs:build": "yarn workspace @authproxy/docs build",
+    "docs:dev": "yarn workspace @authproxy/docs dev",
+    "docs:preview": "yarn workspace @authproxy/docs preview"
+  },
   "packageManager": "yarn@4.11.0",
   "volta": {
     "node": "24.13.1",

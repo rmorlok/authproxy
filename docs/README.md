@@ -1,35 +1,59 @@
-# AuthProxy Documentation
+# AuthProxy documentation source
 
-This directory holds long-form documentation that supplements the [main repo README](../README.md). The main README has the conceptual overview and getting-started material; the pages here go deep on specific features and operational topics.
+This directory is the Starlight project that builds
+[docs.authproxy.net](https://docs.authproxy.net). Public pages live in
+[`src/content/docs/`](src/content/docs/); this README is source-only and is not
+published as a second home page.
 
-## Feature guides
+## Run the site locally
 
-- **[CLI (`ap`)](cli.md)** — config file shape (`~/.authproxy.yaml`), RS256 vs HS256 signing keys, every command (list, sign-jwt / verify-jwt, signing-proxy, the connection-scoped streaming `proxy` with `curl`/`wget` modes, marketplace helpers).
-- **[Rate limits](rate-limits.md)** — define rate-limit resources, configure connector-level reactive 429 handling, understand the request log attribution fields.
-- **[Labels and annotations](labels.md)** — the Kubernetes-style label system, system labels under `apxy/`, carry-forward through the namespace → connector → connection hierarchy, label selectors, per-request label snapshots.
-- **[Connector setup flow](connector-setup-flow.md)** — author preconnect/configure steps, conditional `if.javascript` steps, redirect steps, and configure-time data sources.
-- **[Connector predicates](connector-predicates.md)** — condition setup steps, OAuth scopes, dynamic required OAuth scopes, and probes with JavaScript predicates over `cfg`, `labels`, and `annotations`, including connector-level shared JavaScript helpers.
-- **[Application metrics](app_metrics.md)** — configure the app metrics store, query request-event and resource metrics, and understand supported aggregations and dimensions.
-- **[Unified key model migration](key-model-migration.md)** — design and operations guide for replacing encryption key versions with `keys` and `data_encryption_keys`.
+From the repository root:
 
-## Operational guides
+```bash
+yarn install
+yarn docs:dev
+```
 
-- **[Telemetry](telemetry.md)** — OpenTelemetry traces / metrics / logs across all services, OTLP exporter configuration, label projection, the metrics catalog, and the local Grafana + Tempo + Loki + Prometheus dev stack under `docker compose --profile observability`.
-- **[Background tasks](background_tasks.md)** — running the worker, monitoring queues with Asynqmon.
-- **[Connector lifecycle operations](connector-lifecycle.md)** — disconnect-all and archive workflows, task polling, timeout semantics, and workflow names.
-- **[Workflow versioning](workflows.md)** — naming and evolution conventions for go-workflows-backed background work.
-- **[Blob storage](blob_storage.md)** — viewing data stored in MinIO / S3 (full request bodies, etc.).
-- **[Redis insight](redis_insight.md)** — viewing data stored in Redis (rate-limit counters, session state, etc.).
-- **[EKS deployment runbook](../deploy/docs/runbook.md)** — cluster setup, deploy workflows, per-branch dev environments, slim storage verification, and recovery operations.
+Build and preview the production output with:
 
-## Architecture diagrams
+```bash
+yarn docs:build
+yarn docs:preview
+```
 
-- **[OAuth connection flow](oauth_flow.mmd)** — Mermaid diagram of the OAuth2 authorization-code lifecycle.
-- **[Marketplace portal session flow](marketplace_portal.mmd)** — Mermaid diagram of the embeddable marketplace's session handshake.
+## Information architecture
 
-## Where else docs live
+| Section | Audience and purpose |
+|---|---|
+| [`getting-started/`](src/content/docs/getting-started/) | Demo and first-run paths for every audience |
+| [`concepts/`](src/content/docs/concepts/) | Stable product vocabulary and mental models |
+| [`integration/`](src/content/docs/integration/) | Host application and connector-authoring guides |
+| [`sdks/`](src/content/docs/sdks/) | Proxy request patterns, client SDKs, and API use |
+| [`deployment/`](src/content/docs/deployment/) | Installation, packaging, and infrastructure |
+| [`operations/`](src/content/docs/operations/) | Day-2 behavior, monitoring, and lifecycle actions |
+| [`security/`](src/content/docs/security/) | Trust, authorization, encryption, and review guidance |
+| [`development/`](src/content/docs/development/) | Local development, testing, and codebase internals |
+| [`reference/`](src/content/docs/reference/) | Generated-reference entry points and comparative material |
 
-- **[Main README](../README.md)** — overview, core concepts, running locally, testing, UI, CLI.
-- **[RELATED.md](../RELATED.md)** — related products in the API integration space.
-- **[Terraform provider docs](../terraform/provider/docs/resources/)** — generated reference for each `authproxy_*` Terraform resource.
-- **[Terraform examples](../terraform/provider/examples/resources/)** — runnable HCL examples per resource.
+Package-level READMEs remain next to code when they explain implementation
+details. Public explanations belong in the Starlight content collection and
+should link to source code only when a reader needs contributor-level detail.
+
+## Authoring conventions
+
+- Add the required `title` and, for landing and task pages, a concise
+  `description` in page frontmatter.
+- Give each page one audience and one outcome.
+- Lead with the shortest working example, then explain it.
+- Use website routes such as `/concepts/core-model/` for links between pages.
+- Use absolute GitHub URLs for repository files outside the documentation site.
+- Keep images beside the content they support and use relative image paths.
+- Use fenced `mermaid` blocks for diagrams; the site renders them in light and
+  dark themes.
+- Distinguish shipped behavior from proposals and historical design notes.
+- Avoid claims that depend on a hand-maintained connector count, benchmark, or
+  hosted-demo state unless the page says how and when it was verified.
+
+Navigation is defined in [`astro.config.mjs`](astro.config.mjs). When adding or
+moving a public page, update the sidebar and run `yarn docs:build` before
+submitting the change.
