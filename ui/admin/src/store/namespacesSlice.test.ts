@@ -3,6 +3,7 @@ import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {NamespaceState, namespaces, ROOT_NAMESPACE_PATH} from '@authproxy/api';
 import namespaceReducer, {
     isValidNamespacePath,
+    loadCurrentChildren,
     normalizeNamespacePath,
     setCurrentNamespace,
 } from './namespacesSlice';
@@ -75,5 +76,24 @@ describe('namespacesSlice namespace path handling', () => {
             children_of: ROOT_NAMESPACE_PATH,
             limit: 100,
         });
+    });
+
+    it('loads only the first 100-row child page and records that more results exist', async () => {
+        const store = createStore();
+        const child = {...rootNamespace, path: 'root.team-a'};
+        vi.mocked(namespaces.list).mockResolvedValue({
+            status: 200,
+            data: {items: [child], cursor: 'next-page'},
+        } as any);
+
+        await store.dispatch(loadCurrentChildren(ROOT_NAMESPACE_PATH) as any);
+
+        expect(namespaces.list).toHaveBeenCalledTimes(1);
+        expect(namespaces.list).toHaveBeenCalledWith({
+            children_of: ROOT_NAMESPACE_PATH,
+            limit: 100,
+        });
+        expect(store.getState().namespaces.children).toEqual([child]);
+        expect(store.getState().namespaces.childrenHasMore).toBe(true);
     });
 });

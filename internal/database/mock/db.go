@@ -1675,6 +1675,21 @@ func (mr *MockDBMockRecorder) ResolveNotificationsForResourceKeys(ctx, resourceT
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResolveNotificationsForResourceKeys", reflect.TypeOf((*MockDB)(nil).ResolveNotificationsForResourceKeys), ctx, resourceType, resourceID, keys)
 }
 
+// SearchResources mocks base method.
+func (m *MockDB) SearchResources(ctx context.Context, params database.SearchResourcesParams) (database.SearchResourcesResult, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SearchResources", ctx, params)
+	ret0, _ := ret[0].(database.SearchResourcesResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SearchResources indicates an expected call of SearchResources.
+func (mr *MockDBMockRecorder) SearchResources(ctx, params interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SearchResources", reflect.TypeOf((*MockDB)(nil).SearchResources), ctx, params)
+}
+
 // SetConnectionEncryptedConfiguration mocks base method.
 func (m *MockDB) SetConnectionEncryptedConfiguration(ctx context.Context, id apid.ID, encryptedConfig *encfield.EncryptedField) error {
 	m.ctrl.T.Helper()

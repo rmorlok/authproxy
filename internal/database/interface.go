@@ -48,6 +48,7 @@ type DB interface {
 	SetCursorEncryptor(e pagination.CursorEncryptor)
 	Migrate(ctx context.Context) error
 	Ping(ctx context.Context) bool
+	SearchResources(ctx context.Context, params SearchResourcesParams) (SearchResourcesResult, error)
 
 	/*
 	 *  Namespaces

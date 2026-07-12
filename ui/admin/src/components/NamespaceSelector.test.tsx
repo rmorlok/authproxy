@@ -12,6 +12,12 @@ import NamespaceSelector, {
 } from './NamespaceSelector';
 import {NamespaceState, namespaces, ROOT_NAMESPACE_PATH} from '@authproxy/api';
 
+const openCommandPalette = vi.hoisted(() => vi.fn());
+
+vi.mock('../search/CommandPalette', () => ({
+    useCommandPalette: () => ({open: openCommandPalette}),
+}));
+
 vi.mock('@authproxy/api', () => {
     const apiNamespaces = {
         create: vi.fn(),
@@ -38,7 +44,7 @@ const rootNamespace = {
     updated_at: '2026-06-20T00:00:00.000Z',
 };
 
-function renderSelector() {
+function renderSelector({childrenHasMore = false}: {childrenHasMore?: boolean} = {}) {
     const store = configureStore({
         reducer: {
             namespaces: namespaceReducer,
@@ -51,6 +57,7 @@ function renderSelector() {
                 status: 'succeeded' as const,
                 error: null,
                 children: [],
+                childrenHasMore,
                 childrenStatus: 'succeeded' as const,
                 childrenError: null,
             },
@@ -106,5 +113,15 @@ describe('NamespaceSelector', () => {
         expect(validateNamespaceLeafName('')).toBe('Name is required');
         expect(validateNamespaceLeafName('team.alpha')).toBe('Enter only the child namespace name');
         expect(validateNamespaceLeafName('-team')).toBe('Use letters, numbers, underscores, and hyphens');
+    });
+
+    it('hands off to namespace search when the child page is truncated', async () => {
+        const user = userEvent.setup();
+        renderSelector({childrenHasMore: true});
+
+        await user.click(screen.getByRole('combobox', {name: 'Select namespace'}));
+        await user.click(await screen.findByText('Search more namespaces'));
+
+        expect(openCommandPalette).toHaveBeenCalledWith('type:namespace scope:current ');
     });
 });

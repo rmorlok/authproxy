@@ -23,6 +23,7 @@ import {
 } from "./store/namespacesSlice";
 import {useEffect} from "react";
 import CircularProgress from "@mui/material/CircularProgress";
+import {CommandPaletteProvider} from "./search/CommandPalette";
 
 const NS_LOCALSTORAGE_KEY = 'ns';
 const DEFAULT_NAMESPACE_PATH_QUERY_SENTINEL = ROOT_NAMESPACE_PATH;
@@ -81,7 +82,7 @@ export default function Layout(_props: { disableCustomTheme?: boolean }) {
     }
 
     return (
-        <>
+        <CommandPaletteProvider>
             <Box sx={{ display: 'flex' }}>
                 <SideMenu />
                 <AppNavbar />
@@ -111,6 +112,6 @@ export default function Layout(_props: { disableCustomTheme?: boolean }) {
                     </Stack>
                 </Box>
             </Box>
-        </>
+        </CommandPaletteProvider>
     );
 }

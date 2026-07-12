@@ -13,6 +13,7 @@ export * from './namespaces';
 export * from './proxy';
 export * from './rateLimits';
 export * from './requestEvents';
+export * from './search';
 export * from './session';
 export * from './tasks';
 export * from './taskMonitoring';

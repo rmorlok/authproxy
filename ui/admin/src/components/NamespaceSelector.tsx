@@ -21,10 +21,12 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ErrorIcon from '@mui/icons-material/Error';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import FolderIcon from '@mui/icons-material/Folder';
+import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import {useDispatch, useSelector} from "react-redux";
 import {
     selectCurrentNamespace,
     selectCurrentNamespaceChildren,
+    selectCurrentNamespaceChildrenHasMore,
     selectNamespaceChildrenStatus,
     selectNamespaceStatus, setCurrentNamespace
 } from "../store/namespacesSlice";
@@ -32,6 +34,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 import {AppDispatch} from "../store";
 import {useEffect} from "react";
 import {NAMESPACE_PATH_SEPARATOR, namespaces, ROOT_NAMESPACE_PATH} from "@authproxy/api";
+import {useCommandPalette} from '../search/CommandPalette';
 
 const ACTION_ADD = "...action.add";
 const ACTION_CHILDREN = "...action.children";
@@ -39,6 +42,7 @@ const ACTION_LOADING_NAMESPACE = "...action.loading-ns";
 const ACTION_NAVIGATE_PARENT = "...action.navigate-parent";
 const ACTION_NAVIGATE_ROOT = "...action.navigate-root";
 const ACTION_REFRESH = "...action.refresh";
+const ACTION_SEARCH_CHILDREN = "...action.search-children";
 const ACTION_PREFIX = "...action.";
 const NAMESPACE_LEAF_REGEX = /^[A-Za-z0-9_][A-Za-z0-9_-]*$/;
 
@@ -116,6 +120,8 @@ export default function NamespaceSelector() {
     const childLoadingStatus = useSelector(selectNamespaceChildrenStatus);
     const ns = useSelector(selectCurrentNamespace);
     const children = useSelector(selectCurrentNamespaceChildren);
+    const childrenHasMore = useSelector(selectCurrentNamespaceChildrenHasMore);
+    const commandPalette = useCommandPalette();
     const [val, setVal] = React.useState("");
     const [createOpen, setCreateOpen] = React.useState(false);
     const [createName, setCreateName] = React.useState("");
@@ -155,6 +161,11 @@ export default function NamespaceSelector() {
 
         if (path === ACTION_REFRESH) {
             refreshList();
+            return;
+        }
+
+        if (path === ACTION_SEARCH_CHILDREN) {
+            commandPalette.open('type:namespace scope:current ');
             return;
         }
 
@@ -267,6 +278,23 @@ export default function NamespaceSelector() {
 
             return items;
         });
+
+        if (childrenHasMore) {
+            if (childNamespaceItems.length > 0) {
+                childNamespaceItems.push(<Divider key="search-children-divider" />);
+            }
+            childNamespaceItems.push(
+                <MenuItem key={ACTION_SEARCH_CHILDREN} value={ACTION_SEARCH_CHILDREN}>
+                    <ListItemIcon>
+                        <SearchRoundedIcon />
+                    </ListItemIcon>
+                    <ListItemText
+                        primary="Search more namespaces"
+                        secondary="Search this namespace and its descendants"
+                    />
+                </MenuItem>,
+            );
+        }
     } else if(childLoadingStatus === 'failed') {
         childNamespaceItems = [(
             <MenuItem key="child-error" value="" disabled={true}>

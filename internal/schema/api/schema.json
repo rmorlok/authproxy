@@ -40,6 +40,57 @@
         "type": "string"
       }
     },
+    "SearchResourceType": {
+      "type": "string",
+      "enum": ["actor", "connection", "connector", "namespace", "key", "rate_limit"]
+    },
+    "SearchLabelMatch": {
+      "type": "object",
+      "properties": {
+        "key": { "type": "string" },
+        "value": { "type": "string" }
+      },
+      "required": ["key", "value"],
+      "additionalProperties": false
+    },
+    "SearchResourceSummary": {
+      "type": "object",
+      "properties": {
+        "resource_type": { "$ref": "#/$defs/SearchResourceType" },
+        "resource_id": { "type": "string" },
+        "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
+        "labels": { "$ref": "#/$defs/StringMap" },
+        "matched_labels": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SearchLabelMatch" }
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["resource_type", "resource_id", "namespace", "labels", "matched_labels", "updated_at"],
+      "additionalProperties": false
+    },
+    "SearchResourcesResponse": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SearchResourceSummary" }
+        },
+        "truncated_types": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SearchResourceType" }
+        },
+        "incomplete_types": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SearchResourceType" }
+        }
+      },
+      "required": ["items", "truncated_types", "incomplete_types"],
+      "additionalProperties": false
+    },
     "HeadersVal": {
       "oneOf": [
         { "type": "string" },
