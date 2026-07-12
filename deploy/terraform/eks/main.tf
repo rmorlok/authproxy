@@ -20,6 +20,9 @@ data "aws_caller_identity" "current" {}
 locals {
   azs = slice(data.aws_availability_zones.available.names, 0, var.az_count)
 
+  github_owner        = split("/", var.github_repository)[0]
+  github_pages_domain = "${local.github_owner}.github.io"
+
   # Subnets carved out of the VPC CIDR. /16 split into:
   #   - private: 10.0.0.0/19, 10.0.32.0/19, 10.0.64.0/19    (nodes)
   #   - public:  10.0.96.0/20, 10.0.112.0/20, 10.0.128.0/20 (LB, NAT)
