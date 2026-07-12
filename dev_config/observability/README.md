@@ -80,7 +80,7 @@ connector + connection + a `POST /connections/:id/_proxy`). With just
 control-plane API traffic they stay at "No data" — the wiring is in
 place, waiting for proxy calls.
 
-![Proxy RED panels](../../docs/observability/grafana-dashboard-top.png)
+![Proxy RED panels](../../docs/src/content/docs/observability/grafana-dashboard-top.png)
 
 ### Dashboard (bottom)
 
@@ -89,7 +89,7 @@ histogram from [#231](https://github.com/rmorlok/authproxy/issues/231),
 so it populates from any HTTP traffic hitting AuthProxy — control-plane
 calls, health probes, etc.
 
-![Inbound HTTP panels](../../docs/observability/grafana-dashboard-inbound.png)
+![Inbound HTTP panels](../../docs/src/content/docs/observability/grafana-dashboard-inbound.png)
 
 ### Explore → Prometheus
 
@@ -97,7 +97,7 @@ Verifying metric series directly: rate of inbound HTTP requests broken
 out by `authproxy_service` (api / admin-api / public / worker) and
 status code class.
 
-![Explore Prometheus](../../docs/observability/grafana-explore-prometheus.png)
+![Explore Prometheus](../../docs/src/content/docs/observability/grafana-explore-prometheus.png)
 
 ### Explore → Tempo
 
@@ -105,7 +105,7 @@ TraceQL search over the past 5 minutes for spans from `authproxy-api`.
 Both `HTTP GET` (Gin server spans from #231) and `sql.conn.query` /
 `sql.rows` (otelsql spans from #234) show up.
 
-![Explore Tempo](../../docs/observability/grafana-explore-tempo.png)
+![Explore Tempo](../../docs/src/content/docs/observability/grafana-explore-tempo.png)
 
 ### Trace detail — inbound HTTP
 
@@ -113,14 +113,14 @@ A 401 on `GET /api/v1/connectors`, ~86µs end-to-end. Span attributes
 include `http.method`, `http.status_code`, `http.route`, plus the
 AuthProxy resource attributes (`service.name=authproxy-api`).
 
-![HTTP trace detail](../../docs/observability/grafana-trace-http-detail.png)
+![HTTP trace detail](../../docs/src/content/docs/observability/grafana-trace-http-detail.png)
 
 ### Trace detail — DB query
 
 A `sql.conn.query` span emitted by the otelsql-instrumented Postgres
 driver: 1.83ms, single-span trace for an internal worker query.
 
-![SQL trace detail](../../docs/observability/grafana-trace-detail.png)
+![SQL trace detail](../../docs/src/content/docs/observability/grafana-trace-detail.png)
 
 ## Limitations
 

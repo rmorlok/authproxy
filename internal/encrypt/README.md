@@ -187,7 +187,8 @@ Operational guardrails:
 - Rotating wrapping material alone should not change encrypted field ids.
 - Rotating DEKs should change namespace targets first, then encrypted field ids as the re-encryption task processes rows.
 
-The full migration and operator guide lives in [docs/key-model-migration.md](../../docs/key-model-migration.md).
+The full migration and operator guide lives in
+[the unified key-model design note](../../docs/src/content/docs/development/design/key-model-migration.md).
 
 ## Automatic Re-encryption
 

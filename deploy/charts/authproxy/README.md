@@ -104,5 +104,5 @@ at chart-release time. Override per-deploy with `--set image.tag=<tag>`.
 ## Development
 
 For chart-on-source-tree work (running CI locally, iterating on templates),
-see [`AGENTS.md`](../../AGENTS.md) at the repo root and the chart-testing
+see [`AGENTS.md`](../../../AGENTS.md) at the repo root and the chart-testing
 CI workflow under `.github/workflows/helm-chart-ci.yml`.

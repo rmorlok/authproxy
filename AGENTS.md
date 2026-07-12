@@ -142,7 +142,7 @@ Schema ownership lives under `internal/schema`; read `internal/schema/AGENTS.md`
 
 ### Telemetry conventions
 
-Full reference: [`docs/telemetry.md`](docs/telemetry.md). Day-to-day rules when adding instrumentation:
+Full reference: [`docs/src/content/docs/operations/telemetry.md`](docs/src/content/docs/operations/telemetry.md). Day-to-day rules when adding instrumentation:
 
 - **Config lives in one place.** The `telemetry:` block in `internal/schema/config` is the only knob — there is no per-package toggle. It is **off by default**, endpoint-gated (an empty `exporter.endpoint` falls through to no-op providers), and signals can be toggled independently under `telemetry.signals`.
 - **Use the existing instrumented wrappers** rather than wiring providers yourself:
@@ -158,7 +158,7 @@ Full reference: [`docs/telemetry.md`](docs/telemetry.md). Day-to-day rules when 
 
 ## Client configuration
 
-Full CLI reference: [`docs/cli.md`](docs/cli.md). The short version: the CLI looks for `~/.authproxy.yaml`:
+Full CLI reference: [`docs/src/content/docs/development/cli.md`](docs/src/content/docs/development/cli.md). The short version: the CLI looks for `~/.authproxy.yaml`:
 
 ```yaml
 admin_username: bobdole
