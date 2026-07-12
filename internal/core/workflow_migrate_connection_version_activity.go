@@ -115,7 +115,7 @@ func (s *service) applyMigrateConnectionVersionV1(
 	}
 
 	// Resolve any notifications that are no longer applicable.
-	if err := s.db.ResolveNotificationsForResourceKeys(
+	if err := s.resolveNotificationsForResourceKeys(
 		ctx,
 		"connection", // resource type
 		connectionID,
@@ -127,7 +127,7 @@ func (s *service) applyMigrateConnectionVersionV1(
 	// Add newly generated notifications
 	for _, notification := range candidate.Notifications {
 		notification.Labels = updated.Labels
-		if _, err := s.db.UpsertNotification(ctx, notification); err != nil {
+		if _, err := s.upsertNotification(ctx, notification); err != nil {
 			return err
 		}
 	}

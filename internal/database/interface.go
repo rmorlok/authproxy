@@ -137,6 +137,7 @@ type DB interface {
 	GetNotification(ctx context.Context, id apid.ID) (*Notification, error)
 	ListNotifications(ctx context.Context, opts ListNotificationsOptions) ([]Notification, error)
 	MarkNotificationViewed(ctx context.Context, notificationID apid.ID, actorID apid.ID) error
+	MarkNotificationsViewed(ctx context.Context, notificationIDs []apid.ID, actorID apid.ID) error
 	NotificationViewedMap(ctx context.Context, actorID apid.ID, ids []apid.ID) (map[apid.ID]time.Time, error)
 	ResolveNotificationsForResourceKeys(ctx context.Context, resourceType string, resourceID apid.ID, keys []string) error
 
