@@ -143,7 +143,8 @@ For local UI sign-in, source-mode development, alternate data stores, tests,
 and observability, continue with the
 [development quick start](http://docs.authproxy.net/development/quick-start/).
 
-License
+## License
+
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 Built with ❤️ by [Ryan Morlok](https://github.com/rmorlok)
