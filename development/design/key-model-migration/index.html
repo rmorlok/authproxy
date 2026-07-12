@@ -1,0 +1,473 @@
+<!DOCTYPE html><html lang="en" dir="ltr" data-theme="dark" data-has-toc data-has-sidebar class="astro-s76yvztf"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>Unified key model migration (historical) | AuthProxy</title><link rel="canonical" href="https://docs.authproxy.net/development/design/key-model-migration/"/><link rel="sitemap" href="/sitemap-index.xml"/><link rel="shortcut icon" href="/favicon.svg" type="image/svg+xml"/><meta name="generator" content="Astro v7.0.7"/><meta name="generator" content="Starlight v0.41.3"/><meta property="og:title" content="Unified key model migration (historical)"/><meta property="og:type" content="article"/><meta property="og:url" content="https://docs.authproxy.net/development/design/key-model-migration/"/><meta property="og:locale" content="en"/><meta property="og:description" content="Historical design and rollout record for AuthProxy's unified key and data-encryption-key model."/><meta property="og:site_name" content="AuthProxy"/><meta name="twitter:card" content="summary_large_image"/><meta name="description" content="Historical design and rollout record for AuthProxy's unified key and data-encryption-key model."/><script>
+	window.StarlightThemeProvider = (() => {
+		const storedTheme =
+			typeof localStorage !== 'undefined' && localStorage.getItem('starlight-theme');
+		const theme =
+			storedTheme ||
+			(window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+		document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark';
+		return {
+			updatePickers(theme = storedTheme || 'auto') {
+				document.querySelectorAll('starlight-theme-select').forEach((picker) => {
+					const select = picker.querySelector('select');
+					if (select) select.value = theme;
+					/** @type {HTMLTemplateElement | null} */
+					const tmpl = document.querySelector(`#theme-icons`);
+					const newIcon = tmpl && tmpl.content.querySelector('.' + theme);
+					if (newIcon) {
+						const oldIcon = picker.querySelector('svg.label-icon');
+						if (oldIcon) {
+							oldIcon.replaceChildren(...newIcon.cloneNode(true).childNodes);
+						}
+					}
+				});
+			},
+		};
+	})();
+</script><template id="theme-icons"><svg aria-hidden="true" class="light astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M5 12a1 1 0 0 0-1-1H3a1 1 0 0 0 0 2h1a1 1 0 0 0 1-1Zm.64 5-.71.71a1 1 0 0 0 0 1.41 1 1 0 0 0 1.41 0l.71-.71A1 1 0 0 0 5.64 17ZM12 5a1 1 0 0 0 1-1V3a1 1 0 0 0-2 0v1a1 1 0 0 0 1 1Zm5.66 2.34a1 1 0 0 0 .7-.29l.71-.71a1 1 0 1 0-1.41-1.41l-.66.71a1 1 0 0 0 0 1.41 1 1 0 0 0 .66.29Zm-12-.29a1 1 0 0 0 1.41 0 1 1 0 0 0 0-1.41l-.71-.71a1.004 1.004 0 1 0-1.43 1.41l.73.71ZM21 11h-1a1 1 0 0 0 0 2h1a1 1 0 0 0 0-2Zm-2.64 6A1 1 0 0 0 17 18.36l.71.71a1 1 0 0 0 1.41 0 1 1 0 0 0 0-1.41l-.76-.66ZM12 6.5a5.5 5.5 0 1 0 5.5 5.5A5.51 5.51 0 0 0 12 6.5Zm0 9a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Zm0 3.5a1 1 0 0 0-1 1v1a1 1 0 0 0 2 0v-1a1 1 0 0 0-1-1Z"/></svg><svg aria-hidden="true" class="dark astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21.64 13a1 1 0 0 0-1.05-.14 8.049 8.049 0 0 1-3.37.73 8.15 8.15 0 0 1-8.14-8.1 8.59 8.59 0 0 1 .25-2A1 1 0 0 0 8 2.36a10.14 10.14 0 1 0 14 11.69 1 1 0 0 0-.36-1.05Zm-9.5 6.69A8.14 8.14 0 0 1 7.08 5.22v.27a10.15 10.15 0 0 0 10.14 10.14 9.784 9.784 0 0 0 2.1-.22 8.11 8.11 0 0 1-7.18 4.32v-.04Z"/></svg><svg aria-hidden="true" class="auto astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg></template><link rel="stylesheet" href="/_astro/print.ehPL0gv-.css" media="print"><link rel="stylesheet" href="/_astro/common.BWFm95dk.css"><style>@layer starlight.components{.card-grid:where(.astro-xglws247){grid-template-columns:100%;gap:1rem;display:grid}.card-grid:where(.astro-xglws247)>*{margin-top:0!important}@media (width>=50rem){.card-grid:where(.astro-xglws247){grid-template-columns:1fr 1fr;gap:1.5rem}.stagger:where(.astro-xglws247){--stagger-height:5rem;padding-bottom:var(--stagger-height)}.stagger:where(.astro-xglws247)>:nth-child(2n){transform:translateY(var(--stagger-height))}}.sl-link-card:where(.astro-qs5jmmrk){border:1px solid var(--sl-color-gray-5);box-shadow:var(--sl-shadow-sm);border-radius:.5rem;grid-template-columns:1fr auto;gap:.5rem;padding:1rem;display:grid;position:relative}a:where(.astro-qs5jmmrk){line-height:var(--sl-line-height-headings);text-decoration:none}a:where(.astro-qs5jmmrk):before{content:"";position:absolute;inset:0}.stack:where(.astro-qs5jmmrk){flex-direction:column;gap:.5rem}.title:where(.astro-qs5jmmrk){color:var(--sl-color-white);font-weight:600;font-size:var(--sl-text-lg)}.description:where(.astro-qs5jmmrk){color:var(--sl-color-gray-3);line-height:1.5}.icon:where(.astro-qs5jmmrk){color:var(--sl-color-gray-3)}.sl-link-card:where(.astro-qs5jmmrk):hover{background:var(--sl-color-gray-7,var(--sl-color-gray-6));border-color:var(--sl-color-gray-2)}.sl-link-card:where(.astro-qs5jmmrk):hover .icon:where(.astro-qs5jmmrk){color:var(--sl-color-white)}}
+@layer starlight.components{svg:where(.astro-qa7dmyhc){color:var(--sl-icon-color);font-size:var(--sl-icon-size,1em);width:1em;height:1em}}
+</style><script type="module" src="/_astro/page.Bkmrpiyw.js"></script></head><body class="astro-s76yvztf"><a class="sl-skip-link astro-jueewyqi" href="#_top">Skip to content</a><div class="page sl-flex astro-q25odsi5"><header class="header astro-q25odsi5"><div class="header astro-u5sis26u"><div class="title-wrapper sl-flex astro-u5sis26u"><a href="/" class="site-title sl-flex astro-fb6jnt5f"><span class="astro-fb6jnt5f" translate="no">AuthProxy</span></a></div><div class="sl-flex print:hidden astro-u5sis26u"><site-search class="astro-u5sis26u astro-lx5wy5l3" data-translations="{&quot;placeholder&quot;:&quot;Search&quot;}"><button data-open-modal disabled aria-label="Search" aria-keyshortcuts="Control+K" class="astro-lx5wy5l3"><svg aria-hidden="true" class="astro-lx5wy5l3 astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21.71 20.29 18 16.61A9 9 0 1 0 16.61 18l3.68 3.68a.999.999 0 0 0 1.42 0 1 1 0 0 0 0-1.39ZM11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Z"/></svg><span class="sl-hidden md:sl-block astro-lx5wy5l3" aria-hidden="true">Search</span><kbd class="sl-hidden md:sl-flex astro-lx5wy5l3" style="display: none;"><kbd class="astro-lx5wy5l3">Ctrl</kbd><kbd class="astro-lx5wy5l3">K</kbd></kbd></button><dialog style="padding:0" aria-label="Search" class="astro-lx5wy5l3"><div class="dialog-frame sl-flex astro-lx5wy5l3"><button data-close-modal class="sl-flex md:sl-hidden astro-lx5wy5l3">Cancel</button><div class="search-container astro-lx5wy5l3"><div id="starlight__search" class="astro-lx5wy5l3"></div></div></div></dialog></site-search><script>
+	(() => {
+		const openBtn = document.querySelector('button[data-open-modal]');
+		const shortcut = openBtn?.querySelector('kbd');
+		if (!openBtn || !(shortcut instanceof HTMLElement)) return;
+		const platformKey = shortcut.querySelector('kbd');
+		if (platformKey && /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform)) {
+			platformKey.textContent = '⌘';
+			openBtn.setAttribute('aria-keyshortcuts', 'Meta+K');
+		}
+		shortcut.style.display = '';
+	})();
+</script><script type="module" src="/_astro/Search.astro_astro_type_script_index_0_lang.CM1HKbUQ.js"></script></div><div class="sl-hidden md:sl-flex print:hidden right-group astro-u5sis26u"><div class="sl-flex social-icons astro-u5sis26u"><a href="https://github.com/rmorlok/authproxy" rel="me" class="sl-flex astro-ftf4y5zb"><span class="sr-only astro-ftf4y5zb">GitHub</span><svg aria-hidden="true" class="astro-ftf4y5zb astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z"/></svg></a></div><starlight-theme-select><label style="--sl-select-width: 6.25em" class="astro-benwhybl"><span class="sr-only astro-benwhybl">Select theme</span><svg aria-hidden="true" class="icon label-icon astro-benwhybl astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg><select autocomplete="off" class="astro-benwhybl"><option value="dark" class="astro-benwhybl">Dark</option><option value="light" class="astro-benwhybl">Light</option><option value="auto" selected class="astro-benwhybl">Auto</option></select><svg aria-hidden="true" class="icon caret astro-benwhybl astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-theme-select><script>
+	StarlightThemeProvider.updatePickers();
+</script><script type="module">var e=`starlight-theme`,t=e=>e===`auto`||e===`dark`||e===`light`?e:`auto`,n=()=>t(typeof localStorage<`u`&&localStorage.getItem(e));function r(t){typeof localStorage<`u`&&localStorage.setItem(e,t===`light`||t===`dark`?t:``)}var i=()=>matchMedia(`(prefers-color-scheme: light)`).matches?`light`:`dark`;function a(e){StarlightThemeProvider.updatePickers(e),document.documentElement.dataset.theme=e===`auto`?i():e,r(e)}matchMedia(`(prefers-color-scheme: light)`).addEventListener(`change`,()=>{n()===`auto`&&a(`auto`)});var o=class extends HTMLElement{constructor(){super(),a(n()),this.querySelector(`select`)?.addEventListener(`change`,e=>{e.currentTarget instanceof HTMLSelectElement&&a(t(e.currentTarget.value))})}};customElements.define(`starlight-theme-select`,o);</script><script type="module">var e=class extends HTMLElement{constructor(){super();let e=this.querySelector(`select`);e&&(e.addEventListener(`change`,e=>{e.currentTarget instanceof HTMLSelectElement&&(window.location.pathname=e.currentTarget.value)}),window.addEventListener(`pageshow`,t=>{if(!t.persisted)return;let n=e.querySelector(`option[selected]`)?.index;n!==e.selectedIndex&&(e.selectedIndex=n??0)}))}};customElements.define(`starlight-lang-select`,e);</script></div></div></header><nav class="sidebar print:hidden astro-q25odsi5" aria-label="Main"><starlight-menu-button class="print:hidden astro-ujvxkxqt"><button aria-expanded="false" aria-label="Menu" aria-controls="starlight__sidebar" class="sl-flex md:sl-hidden astro-ujvxkxqt"><svg aria-hidden="true" class="open-menu astro-ujvxkxqt astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M3 8h18a1 1 0 1 0 0-2H3a1 1 0 0 0 0 2Zm18 8H3a1 1 0 0 0 0 2h18a1 1 0 0 0 0-2Zm0-5H3a1 1 0 0 0 0 2h18a1 1 0 0 0 0-2Z"/></svg><svg aria-hidden="true" class="close-menu astro-ujvxkxqt astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="m13.41 12 6.3-6.29a1.004 1.004 0 1 0-1.42-1.42L12 10.59l-6.29-6.3a1.004 1.004 0 0 0-1.42 1.42l6.3 6.29-6.3 6.29a1 1 0 0 0 0 1.42.998.998 0 0 0 1.42 0l6.29-6.3 6.29 6.3a.999.999 0 0 0 1.42 0 1 1 0 0 0 0-1.42L13.41 12Z"/></svg></button></starlight-menu-button><script type="module">var e=class extends HTMLElement{btn=this.querySelector(`button`);constructor(){super(),this.btn.addEventListener(`click`,()=>this.toggleExpanded());let e=this.closest(`nav`);e&&e.addEventListener(`keyup`,e=>this.closeOnEscape(e)),matchMedia(`(min-width: 50em)`).addEventListener(`change`,()=>this.setExpanded(!1))}setExpanded(e){this.setAttribute(`aria-expanded`,String(e)),document.body.toggleAttribute(`data-mobile-menu-expanded`,e),document.querySelectorAll(`.main-frame, .sl-skip-link`).forEach(t=>{t.toggleAttribute(`inert`,e)})}toggleExpanded(){this.setExpanded(this.getAttribute(`aria-expanded`)!==`true`)}closeOnEscape(e){e.code===`Escape`&&(this.setExpanded(!1),this.btn.focus())}};customElements.define(`starlight-menu-button`,e);</script><div id="starlight__sidebar" class="sidebar-pane astro-q25odsi5"><div class="sidebar-content sl-flex astro-q25odsi5"><sl-sidebar-state-persist data-hash="1vo1oxd" class="astro-6swq5fot"><script aria-hidden="true">
+		(() => {
+			try {
+				if (!matchMedia('(min-width: 50em)').matches) return;
+				/** @type {HTMLElement | null} */
+				const target = document.querySelector('sl-sidebar-state-persist');
+				const state = JSON.parse(sessionStorage.getItem('sl-sidebar-state') || '0');
+				if (!target || !state || target.dataset.hash !== state.hash) return;
+				window._starlightScrollRestore = state.scroll;
+				customElements.define(
+					'sl-sidebar-restore',
+					class SidebarRestore extends HTMLElement {
+						connectedCallback() {
+							try {
+								const idx = parseInt(this.dataset.index || '');
+								const details = this.closest('details');
+								if (details && typeof state.open[idx] === 'boolean') details.open = state.open[idx];
+							} catch {}
+						}
+					}
+				);
+			} catch {}
+		})();
+	</script><ul class="top-level astro-6v36i77p"><li class="astro-6v36i77p"><details open class="astro-6v36i77p"><summary class="astro-6v36i77p"><span class="group-label astro-6v36i77p"><span class="large astro-6v36i77p">Get started</span></span><svg aria-hidden="true" class="caret astro-6v36i77p astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="0"></sl-sidebar-restore><ul class="astro-6v36i77p"><li class="astro-6v36i77p"><a href="/" class="astro-6v36i77p"><span class="astro-6v36i77p">Documentation home</span></a></li><li class="astro-6v36i77p"><a href="/getting-started/demo/" class="astro-6v36i77p"><span class="astro-6v36i77p">Try the hosted demo</span></a></li><li class="astro-6v36i77p"><a href="/development/quick-start/" class="astro-6v36i77p"><span class="astro-6v36i77p">Development quick start</span></a></li></ul></details></li><li class="astro-6v36i77p"><details open class="astro-6v36i77p"><summary class="astro-6v36i77p"><span class="group-label astro-6v36i77p"><span class="large astro-6v36i77p">Concepts</span></span><svg aria-hidden="true" class="caret astro-6v36i77p astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="1"></sl-sidebar-restore><ul class="astro-6v36i77p"><li class="astro-6v36i77p"><a href="/concepts/" class="astro-6v36i77p"><span class="astro-6v36i77p">AuthProxy concepts</span></a></li><li class="astro-6v36i77p"><a href="/concepts/core-model/" class="astro-6v36i77p"><span class="astro-6v36i77p">The core resource model</span></a></li><li class="astro-6v36i77p"><a href="/concepts/labels-and-annotations/" class="astro-6v36i77p"><span class="astro-6v36i77p">Labels and Annotations</span></a></li></ul></details></li><li class="astro-6v36i77p"><details open class="astro-6v36i77p"><summary class="astro-6v36i77p"><span class="group-label astro-6v36i77p"><span class="large astro-6v36i77p">Integrate</span></span><svg aria-hidden="true" class="caret astro-6v36i77p astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="2"></sl-sidebar-restore><ul class="astro-6v36i77p"><li class="astro-6v36i77p"><a href="/integration/" class="astro-6v36i77p"><span class="astro-6v36i77p">Integrating AuthProxy</span></a></li><li class="astro-6v36i77p"><a href="/integration/host-application/" class="astro-6v36i77p"><span class="astro-6v36i77p">Host application integration</span></a></li><li class="astro-6v36i77p"><a href="/integration/marketplace/" class="astro-6v36i77p"><span class="astro-6v36i77p">Marketplace integration</span></a></li><li class="astro-6v36i77p"><a href="/integration/connector-setup-flow/" class="astro-6v36i77p"><span class="astro-6v36i77p">Connector Setup Flow</span></a></li><li class="astro-6v36i77p"><a href="/integration/connector-predicates/" class="astro-6v36i77p"><span class="astro-6v36i77p">Connector Predicates</span></a></li></ul></details></li><li class="astro-6v36i77p"><details open class="astro-6v36i77p"><summary class="astro-6v36i77p"><span class="group-label astro-6v36i77p"><span class="large astro-6v36i77p">SDKs &amp; API</span></span><svg aria-hidden="true" class="caret astro-6v36i77p astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="3"></sl-sidebar-restore><ul class="astro-6v36i77p"><li class="astro-6v36i77p"><a href="/sdks/" class="astro-6v36i77p"><span class="astro-6v36i77p">SDKs and API Clients</span></a></li><li class="astro-6v36i77p"><a href="/sdks/proxying/" class="astro-6v36i77p"><span class="astro-6v36i77p">Proxying Requests</span></a></li><li class="astro-6v36i77p"><a href="/sdks/javascript/" class="astro-6v36i77p"><span class="astro-6v36i77p">JavaScript and TypeScript SDK</span></a></li><li class="astro-6v36i77p"><a href="/development/cli/" class="astro-6v36i77p"><span class="astro-6v36i77p">Command-line interface (ap)</span></a></li><li class="astro-6v36i77p"><a href="/reference/api/" class="astro-6v36i77p"><span class="astro-6v36i77p">API reference</span></a></li></ul></details></li><li class="astro-6v36i77p"><details open class="astro-6v36i77p"><summary class="astro-6v36i77p"><span class="group-label astro-6v36i77p"><span class="large astro-6v36i77p">Deploy</span></span><svg aria-hidden="true" class="caret astro-6v36i77p astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="4"></sl-sidebar-restore><ul class="astro-6v36i77p"><li class="astro-6v36i77p"><a href="/deployment/" class="astro-6v36i77p"><span class="astro-6v36i77p">Deploy AuthProxy</span></a></li><li class="astro-6v36i77p"><a href="/deployment/helm/" class="astro-6v36i77p"><span class="astro-6v36i77p">Install AuthProxy with Helm</span></a></li><li class="astro-6v36i77p"><a href="/deployment/kustomize/" class="astro-6v36i77p"><span class="astro-6v36i77p">Demo Kustomize deployments</span></a></li><li class="astro-6v36i77p"><a href="/deployment/container-images/" class="astro-6v36i77p"><span class="astro-6v36i77p">Container images and registries</span></a></li><li class="astro-6v36i77p"><a href="/deployment/eks-runbook/" class="astro-6v36i77p"><span class="astro-6v36i77p">AuthProxy EKS Runbook</span></a></li></ul></details></li><li class="astro-6v36i77p"><details open class="astro-6v36i77p"><summary class="astro-6v36i77p"><span class="group-label astro-6v36i77p"><span class="large astro-6v36i77p">Operate</span></span><svg aria-hidden="true" class="caret astro-6v36i77p astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="5"></sl-sidebar-restore><ul class="astro-6v36i77p"><li class="astro-6v36i77p"><a href="/operations/" class="astro-6v36i77p"><span class="astro-6v36i77p">Operate AuthProxy</span></a></li><li class="astro-6v36i77p"><a href="/operations/telemetry/" class="astro-6v36i77p"><span class="astro-6v36i77p">Telemetry</span></a></li><li class="astro-6v36i77p"><a href="/operations/app-metrics/" class="astro-6v36i77p"><span class="astro-6v36i77p">Application Metrics</span></a></li><li class="astro-6v36i77p"><a href="/operations/rate-limits/" class="astro-6v36i77p"><span class="astro-6v36i77p">Rate Limits</span></a></li><li class="astro-6v36i77p"><a href="/operations/background-tasks/" class="astro-6v36i77p"><span class="astro-6v36i77p">View background tasks</span></a></li><li class="astro-6v36i77p"><a href="/operations/connector-lifecycle/" class="astro-6v36i77p"><span class="astro-6v36i77p">Connector Lifecycle Operations</span></a></li><li class="astro-6v36i77p"><a href="/operations/blob-storage/" class="astro-6v36i77p"><span class="astro-6v36i77p">Viewing Blob Storage Data in MinIO</span></a></li><li class="astro-6v36i77p"><a href="/operations/redis-insight/" class="astro-6v36i77p"><span class="astro-6v36i77p">Viewing Redis Data</span></a></li></ul></details></li><li class="astro-6v36i77p"><details open class="astro-6v36i77p"><summary class="astro-6v36i77p"><span class="group-label astro-6v36i77p"><span class="large astro-6v36i77p">Security</span></span><svg aria-hidden="true" class="caret astro-6v36i77p astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="6"></sl-sidebar-restore><ul class="astro-6v36i77p"><li class="astro-6v36i77p"><a href="/security/" class="astro-6v36i77p"><span class="astro-6v36i77p">Security Overview</span></a></li><li class="astro-6v36i77p"><a href="/security/authentication-and-authorization/" class="astro-6v36i77p"><span class="astro-6v36i77p">Authentication and Authorization</span></a></li><li class="astro-6v36i77p"><a href="/security/encryption/" class="astro-6v36i77p"><span class="astro-6v36i77p">Encryption</span></a></li></ul></details></li><li class="astro-6v36i77p"><details open class="astro-6v36i77p"><summary class="astro-6v36i77p"><span class="group-label astro-6v36i77p"><span class="large astro-6v36i77p">Develop</span></span><svg aria-hidden="true" class="caret astro-6v36i77p astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="7"></sl-sidebar-restore><ul class="astro-6v36i77p"><li class="astro-6v36i77p"><a href="/development/" class="astro-6v36i77p"><span class="astro-6v36i77p">Develop AuthProxy</span></a></li><li class="astro-6v36i77p"><a href="/development/local-development/" class="astro-6v36i77p"><span class="astro-6v36i77p">Local development</span></a></li><li class="astro-6v36i77p"><a href="/development/codebase/" class="astro-6v36i77p"><span class="astro-6v36i77p">Codebase layout</span></a></li><li class="astro-6v36i77p"><a href="/development/workflows/" class="astro-6v36i77p"><span class="astro-6v36i77p">Workflow Versioning</span></a></li><li class="astro-6v36i77p"><details open class="astro-6v36i77p"><summary class="astro-6v36i77p"><span class="group-label astro-6v36i77p"><span class="large astro-6v36i77p">Design notes</span></span><svg aria-hidden="true" class="caret astro-6v36i77p astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="8"></sl-sidebar-restore><ul class="astro-6v36i77p"><li class="astro-6v36i77p"><a href="/development/design/" class="astro-6v36i77p"><span class="astro-6v36i77p">Design notes</span></a></li><li class="astro-6v36i77p"><a href="/development/design/key-model-migration/" aria-current="page" class="astro-6v36i77p"><span class="astro-6v36i77p">Unified key model migration (historical)</span></a></li><li class="astro-6v36i77p"><a href="/development/design/oauth-provider-identity/" class="astro-6v36i77p"><span class="astro-6v36i77p">OAuth provider identity changes</span></a></li></ul></details></li></ul></details></li><li class="astro-6v36i77p"><details class="astro-6v36i77p"><summary class="astro-6v36i77p"><span class="group-label astro-6v36i77p"><span class="large astro-6v36i77p">Reference</span></span><svg aria-hidden="true" class="caret astro-6v36i77p astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="9"></sl-sidebar-restore><ul class="astro-6v36i77p"><li class="astro-6v36i77p"><a href="/reference/" class="astro-6v36i77p"><span class="astro-6v36i77p">Reference</span></a></li><li class="astro-6v36i77p"><a href="/reference/configuration/" class="astro-6v36i77p"><span class="astro-6v36i77p">Configuration reference</span></a></li><li class="astro-6v36i77p"><a href="/reference/related-projects/" class="astro-6v36i77p"><span class="astro-6v36i77p">Related projects</span></a></li></ul></details></li></ul><script aria-hidden="true">
+		(() => {
+			const scroller = document.getElementById('starlight__sidebar');
+			if (!window._starlightScrollRestore || !scroller) return;
+			scroller.scrollTop = window._starlightScrollRestore;
+			delete window._starlightScrollRestore;
+		})();
+	</script></sl-sidebar-state-persist><div class="md:sl-hidden"><div class="mobile-preferences sl-flex astro-3nxx6iak"><div class="social-icons astro-3nxx6iak"><a href="https://github.com/rmorlok/authproxy" rel="me" class="sl-flex astro-ftf4y5zb"><span class="sr-only astro-ftf4y5zb">GitHub</span><svg aria-hidden="true" class="astro-ftf4y5zb astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z"/></svg></a></div><starlight-theme-select><label style="--sl-select-width: 6.25em" class="astro-benwhybl"><span class="sr-only astro-benwhybl">Select theme</span><svg aria-hidden="true" class="icon label-icon astro-benwhybl astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg><select autocomplete="off" class="astro-benwhybl"><option value="dark" class="astro-benwhybl">Dark</option><option value="light" class="astro-benwhybl">Light</option><option value="auto" selected class="astro-benwhybl">Auto</option></select><svg aria-hidden="true" class="icon caret astro-benwhybl astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-theme-select><script>
+	StarlightThemeProvider.updatePickers();
+</script></div></div></div></div></nav><div class="main-frame astro-q25odsi5"><script type="module">var e=document.getElementById(`starlight__sidebar`),t=e?.querySelector(`sl-sidebar-state-persist`),n=`sl-sidebar-state`,r=()=>{let r=[],i=t?.dataset.hash||``;try{let e=sessionStorage.getItem(n),t=JSON.parse(e||`{}`);Array.isArray(t.open)&&t.hash===i&&(r=t.open)}catch{}return{hash:i,open:r,scroll:e?.scrollTop||0}},i=e=>{try{sessionStorage.setItem(n,JSON.stringify(e))}catch{}},a=()=>i(r()),o=(e,t)=>{let n=r();n.open[t]=e,i(n)};t?.addEventListener(`click`,e=>{if(!(e.target instanceof Element))return;let t=e.target.closest(`summary`)?.closest(`details`);if(!t)return;let n=t.querySelector(`sl-sidebar-restore`),r=parseInt(n?.dataset.index||``);isNaN(r)||o(!t.open,r)}),addEventListener(`visibilitychange`,()=>{document.visibilityState===`hidden`&&a()}),addEventListener(`pageHide`,a);</script><div class="lg:sl-flex astro-oygnnaui"><aside class="right-sidebar-container print:hidden astro-oygnnaui"><div class="right-sidebar astro-oygnnaui"><div class="lg:sl-hidden astro-5uyk3jmj"><mobile-starlight-toc data-min-h="2" data-max-h="3" class="astro-dqlgw6rx"><nav aria-labelledby="starlight__on-this-page--mobile" class="astro-dqlgw6rx"><details id="starlight__mobile-toc" class="astro-dqlgw6rx"><summary id="starlight__on-this-page--mobile" class="sl-flex astro-dqlgw6rx"><span class="toggle sl-flex astro-dqlgw6rx">On this page<svg aria-hidden="true" class="caret astro-dqlgw6rx astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></span><span class="display-current astro-dqlgw6rx"></span></summary><div class="dropdown astro-dqlgw6rx"><ul class="isMobile astro-ow5mdmq5" style="--depth: 0;"><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#_top" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Overview</span></a></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#historical-branching-plan" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Historical branching plan</span></a></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#migration-stance" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Migration Stance</span></a></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#why-the-model-changes" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Why The Model Changes</span></a></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#terminology" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Terminology</span></a></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#target-data-model" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Target Data Model</span></a><ul class="isMobile astro-ow5mdmq5" style="--depth: 1;"><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#keys" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">keys</span></a></li><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#data_encryption_keys" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">data_encryption_keys</span></a></li><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#removed-table" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Removed Table</span></a></li></ul></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#encrypted-field-format" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Encrypted Field Format</span></a></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#namespace-resolution" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Namespace Resolution</span></a></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#provider-model" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Provider Model</span></a></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#dek-lifecycle" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">DEK Lifecycle</span></a><ul class="isMobile astro-ow5mdmq5" style="--depth: 1;"><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#generation-and-rotation" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Generation And Rotation</span></a></li><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#rewrap-sync" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Rewrap Sync</span></a></li><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#cache-sync" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Cache Sync</span></a></li></ul></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#operating-the-model" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Operating The Model</span></a><ul class="isMobile astro-ow5mdmq5" style="--depth: 1;"><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#rotating-wrapping-keys" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Rotating Wrapping Keys</span></a></li><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#rotating-deks" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Rotating DEKs</span></a></li><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#namespace-key-changes" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Namespace Key Changes</span></a></li><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#operational-checks" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Operational Checks</span></a></li></ul></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#api-and-generated-artifacts" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">API And Generated Artifacts</span></a></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#integration-testing" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Integration Testing</span></a></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#superseded-kms-project" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Superseded KMS Project</span></a></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#implementation-order" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Implementation Order</span></a></li></ul></div></details></nav></mobile-starlight-toc><script type="module" src="/_astro/MobileTableOfContents.astro_astro_type_script_index_0_lang.BcSo_yiZ.js"></script></div><div class="right-sidebar-panel sl-hidden lg:sl-block astro-5uyk3jmj"><div class="sl-container astro-5uyk3jmj"><starlight-toc data-min-h="2" data-max-h="3"><nav aria-labelledby="starlight__on-this-page"><h2 id="starlight__on-this-page">On this page</h2><ul class="astro-ow5mdmq5" style="--depth: 0;"><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#_top" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Overview</span></a></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#historical-branching-plan" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Historical branching plan</span></a></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#migration-stance" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Migration Stance</span></a></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#why-the-model-changes" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Why The Model Changes</span></a></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#terminology" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Terminology</span></a></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#target-data-model" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Target Data Model</span></a><ul class="astro-ow5mdmq5" style="--depth: 1;"><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#keys" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">keys</span></a></li><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#data_encryption_keys" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">data_encryption_keys</span></a></li><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#removed-table" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Removed Table</span></a></li></ul></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#encrypted-field-format" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Encrypted Field Format</span></a></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#namespace-resolution" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Namespace Resolution</span></a></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#provider-model" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Provider Model</span></a></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#dek-lifecycle" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">DEK Lifecycle</span></a><ul class="astro-ow5mdmq5" style="--depth: 1;"><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#generation-and-rotation" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Generation And Rotation</span></a></li><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#rewrap-sync" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Rewrap Sync</span></a></li><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#cache-sync" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Cache Sync</span></a></li></ul></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#operating-the-model" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Operating The Model</span></a><ul class="astro-ow5mdmq5" style="--depth: 1;"><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#rotating-wrapping-keys" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Rotating Wrapping Keys</span></a></li><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#rotating-deks" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Rotating DEKs</span></a></li><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#namespace-key-changes" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Namespace Key Changes</span></a></li><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#operational-checks" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Operational Checks</span></a></li></ul></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#api-and-generated-artifacts" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">API And Generated Artifacts</span></a></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#integration-testing" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Integration Testing</span></a></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#superseded-kms-project" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Superseded KMS Project</span></a></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#implementation-order" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Implementation Order</span></a></li></ul></nav></starlight-toc><script type="module" src="/_astro/TableOfContents.astro_astro_type_script_index_0_lang.Csloo1VZ.js"></script></div></div></div></aside><div class="main-pane astro-oygnnaui"><main class="astro-s76yvztf" lang="en" dir="ltr"><div class="sl-banner astro-aiuewg3j" data-pagefind-ignore>This is a historical migration record, not current deployment guidance.</div><div class="content-panel astro-pm66xhbs"><div class="sl-container astro-pm66xhbs"><h1 id="_top" class="astro-3nltkhw2">Unified key model migration (historical)</h1></div></div><div class="content-panel astro-pm66xhbs"><div class="sl-container astro-pm66xhbs"><div class="sl-markdown-content"><p>This document preserves the design and rollout contract used for the key model
+migration tracked by <a href="https://github.com/rmorlok/authproxy/issues/605">#605</a>.
+The unified <code dir="auto">keys</code> and <code dir="auto">data_encryption_keys</code> model described here is now in the
+main codebase; branch names and sequencing below are retained only to explain
+how the migration was delivered.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="historical-branching-plan">Historical branching plan</h2><a class="sl-anchor-link" href="#historical-branching-plan"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Historical branching plan”</span></a></div>
+<ul>
+<li>The long-lived branch is <code dir="auto">codex/key-model-migration</code>.</li>
+<li>The long-lived PR targets <code dir="auto">main</code> and stays in draft until the migration is complete.</li>
+<li>Child PRs branch from <code dir="auto">codex/key-model-migration</code> and target <code dir="auto">codex/key-model-migration</code>.</li>
+<li>After all child PRs land and the full migration is validated, the long-lived PR merges to <code dir="auto">main</code>.</li>
+</ul>
+<div class="sl-heading-wrapper level-h2"><h2 id="migration-stance">Migration Stance</h2><a class="sl-anchor-link" href="#migration-stance"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Migration Stance”</span></a></div>
+<p>This migration is not backwards compatible. No production environment is running
+the current encryption model, so implementation PRs may use forward migrations to
+rename, drop, or recreate tables. Demo and development environments can be
+destroyed and recreated when this branch merges.</p>
+<p>For demo and development environments, the expected rollout is:</p>
+<ol>
+<li>Destroy the existing database and Redis state.</li>
+<li>Recreate the environment from the merged branch.</li>
+<li>Let startup migrations create <code dir="auto">keys</code>, <code dir="auto">data_encryption_keys</code>, and namespace
+target DEK columns from scratch.</li>
+<li>Let startup key sync generate the first current DEK for each active
+data-encryption key before serving encrypted-data paths.</li>
+</ol>
+<p>Do not attempt to preserve old <code dir="auto">encryption_keys</code> or <code dir="auto">encryption_key_versions</code>
+rows in those environments.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="why-the-model-changes">Why The Model Changes</h2><a class="sl-anchor-link" href="#why-the-model-changes"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Why The Model Changes”</span></a></div>
+<p>The legacy model evolved from one global AES key into three database layers:</p>
+<ul>
+<li><code dir="auto">encryption_keys</code></li>
+<li><code dir="auto">encryption_key_versions</code></li>
+<li><code dir="auto">data_encryption_keys</code></li>
+</ul>
+<p>That shape makes cloud KMS support look like a special case of key versions. The
+target model is a simpler envelope-encryption model:</p>
+<ul>
+<li><code dir="auto">keys</code> tracks the logical keys AuthProxy knows about.</li>
+<li><code dir="auto">data_encryption_keys</code> tracks the DEKs that encrypt stored application data.</li>
+<li>Provider versions remain provider metadata on DEKs, not database rows.</li>
+</ul>
+<div class="sl-heading-wrapper level-h2"><h2 id="terminology">Terminology</h2><a class="sl-anchor-link" href="#terminology"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Terminology”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Key</td>
+<td>A logical key record in <code dir="auto">keys</code>, using a <code dir="auto">key_</code> id.</td>
+</tr>
+<tr>
+<td>DEK</td>
+<td>A data encryption key in <code dir="auto">data_encryption_keys</code>, using a <code dir="auto">dek_</code> id.</td>
+</tr>
+<tr>
+<td>Wrapping key</td>
+<td>Provider-managed material used to protect a DEK. It may live in KMS, a secret manager, an environment variable, a file, or config.</td>
+</tr>
+<tr>
+<td>Provider version</td>
+<td>Version metadata from the wrapping provider. It is stored on the DEK so AuthProxy can detect stale wrapping.</td>
+</tr>
+<tr>
+<td>Target DEK</td>
+<td>The current DEK a namespace should use for new writes and re-encryption.</td>
+</tr>
+</tbody>
+</table>
+<div class="sl-heading-wrapper level-h2"><h2 id="target-data-model">Target Data Model</h2><a class="sl-anchor-link" href="#target-data-model"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Target Data Model”</span></a></div>
+<pre dir="ltr" class="mermaid">erDiagram
+    keys ||--o{ data_encryption_keys : owns
+    keys ||--o{ namespaces : selected_by
+    data_encryption_keys ||--o{ namespaces : target_for
+    data_encryption_keys ||--o{ encrypted_fields : referenced_by
+
+    keys {
+        string id &quot;key_...&quot;
+        string namespace
+        string usage
+        string material_type
+        string state
+        json encrypted_key_data
+        json labels
+        json annotations
+        timestamp encrypted_at
+        timestamp created_at
+        timestamp updated_at
+        timestamp deleted_at
+    }
+
+    data_encryption_keys {
+        string id &quot;dek_...&quot;
+        string key_id
+        string provider
+        string provider_id
+        string provider_version
+        json provider_metadata
+        json protected_data
+        bool is_current
+        timestamp created_at
+        timestamp updated_at
+        timestamp deleted_at
+    }
+
+    namespaces {
+        string path
+        string key_id
+        string target_data_encryption_key_id
+    }
+
+    encrypted_fields {
+        string id &quot;dek_...&quot;
+        string d &quot;ciphertext&quot;
+    }</pre>
+<div class="sl-heading-wrapper level-h3"><h3 id="keys"><code dir="auto">keys</code></h3><a class="sl-anchor-link" href="#keys"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “keys”</span></a></div>
+<p><code dir="auto">keys</code> replaces <code dir="auto">encryption_keys</code> as the general key registry. It is not limited
+to data encryption; future key usages can include public keys used to validate
+JWT signatures.</p>
+<p>Initial required fields:</p>
+<ul>
+<li><code dir="auto">id</code>: uses the <code dir="auto">key_</code> prefix. The global key becomes <code dir="auto">key_global</code>.</li>
+<li><code dir="auto">namespace</code>: namespace ownership and inheritance boundary.</li>
+<li><code dir="auto">usage</code>: why the key exists. The initial usage is data encryption.</li>
+<li><code dir="auto">material_type</code>: the kind of backing material, such as symmetric, public,
+private, or external provider-managed material.</li>
+<li><code dir="auto">state</code>: lifecycle state, initially active or disabled.</li>
+<li><code dir="auto">encrypted_key_data</code>: encrypted provider configuration for data-encryption
+wrapping keys. Future non-secret public-key records do not need to use this
+field if their material is intentionally public.</li>
+</ul>
+<p>The migration should rename API, core, SDK, Terraform, and route language from
+<code dir="auto">encryption_key</code> to <code dir="auto">key</code>.</p>
+<div class="sl-heading-wrapper level-h3"><h3 id="data_encryption_keys"><code dir="auto">data_encryption_keys</code></h3><a class="sl-anchor-link" href="#data_encryption_keys"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “data_encryption_keys”</span></a></div>
+<p><code dir="auto">data_encryption_keys</code> becomes the runtime encryption material table. A DEK is
+the key used by AES-GCM to encrypt application data in the database.</p>
+<p>Each DEK belongs to exactly one <code dir="auto">keys.id</code> through <code dir="auto">key_id</code>. The DEK row stores
+the protected key material and enough provider metadata to determine whether it
+is still wrapped with the latest provider material.</p>
+<p>Required behavior:</p>
+<ul>
+<li><code dir="auto">id</code> uses the <code dir="auto">dek_</code> prefix.</li>
+<li><code dir="auto">key_id</code> references <code dir="auto">keys.id</code>.</li>
+<li><code dir="auto">protected_data</code> stores wrapped or encrypted DEK material, never plaintext.</li>
+<li><code dir="auto">provider</code>, <code dir="auto">provider_id</code>, <code dir="auto">provider_version</code>, and <code dir="auto">provider_metadata</code> record
+the wrapping provider state used to protect the DEK.</li>
+<li><code dir="auto">is_current</code> selects the DEK used for new writes under that key.</li>
+</ul>
+<p>Plaintext DEKs may be cached in memory by the encrypt service, but plaintext DEK
+material must not be stored in the database.</p>
+<div class="sl-heading-wrapper level-h3"><h3 id="removed-table">Removed Table</h3><a class="sl-anchor-link" href="#removed-table"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Removed Table”</span></a></div>
+<p><code dir="auto">encryption_key_versions</code> goes away. Provider versions are not AuthProxy key
+versions. They are wrapping metadata on each DEK.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="encrypted-field-format">Encrypted Field Format</h2><a class="sl-anchor-link" href="#encrypted-field-format"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Encrypted Field Format”</span></a></div>
+<p><code dir="auto">encfield.EncryptedField</code> keeps the same JSON shape:</p>
+<div class="expressive-code"><link rel="stylesheet" href="/_astro/ec.v4551.css"><script type="module" src="/_astro/ec.0vx5m.js"></script><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="json"><code><div class="ec-line"><div class="code"><span style="--0:#D6DEEB;--1:#403F53">{</span><span style="--0:#7FDBCA;--1:#096E72">"id"</span><span style="--0:#D6DEEB;--1:#403F53">:</span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#C789D6;--1:#7C5686">dek_abc123</span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#D6DEEB;--1:#403F53">,</span><span style="--0:#7FDBCA;--1:#096E72">"d"</span><span style="--0:#D6DEEB;--1:#403F53">:</span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#C789D6;--1:#7C5686">base64-encoded-ciphertext</span><span style="--0:#D9F5DD;--1:#111111">"</span><span style="--0:#D6DEEB;--1:#403F53">}</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="{&quot;id&quot;:&quot;dek_abc123&quot;,&quot;d&quot;:&quot;base64-encoded-ciphertext&quot;}"><div></div></button></div></figure></div>
+<p>The meaning of <code dir="auto">id</code> changes:</p>
+<ul>
+<li>Removed model: <code dir="auto">id</code> was an <code dir="auto">encryption_key_versions.id</code> value, usually <code dir="auto">ekv_...</code>.</li>
+<li>Target model: <code dir="auto">id</code> is a <code dir="auto">data_encryption_keys.id</code> value, always <code dir="auto">dek_...</code>.</li>
+</ul>
+<p>This keeps encrypted fields self-describing while making the database DEK row the
+unit of encryption, cache lookup, and re-encryption.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="namespace-resolution">Namespace Resolution</h2><a class="sl-anchor-link" href="#namespace-resolution"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Namespace Resolution”</span></a></div>
+<p>Namespaces continue to choose a logical key by inheritance, but the column names
+change:</p>
+<ul>
+<li><code dir="auto">encryption_key_id</code> becomes <code dir="auto">key_id</code>.</li>
+<li><code dir="auto">target_encryption_key_version_id</code> becomes <code dir="auto">target_data_encryption_key_id</code>.</li>
+</ul>
+<p>Resolution flow:</p>
+<pre dir="ltr" class="mermaid">flowchart TD
+    A[&quot;Write data for namespace&quot;] --&gt; B[&quot;Walk namespace path to find nearest key_id&quot;]
+    B --&gt; C[&quot;Load current DEK for key_id&quot;]
+    C --&gt; D[&quot;Encrypt with plaintext DEK&quot;]
+    D --&gt; E[&quot;Store EncryptedField.ID as dek_id&quot;]
+
+    F[&quot;Re-encryption task&quot;] --&gt; G[&quot;Load namespace target_data_encryption_key_id&quot;]
+    G --&gt; H[&quot;Scan registered encrypted fields&quot;]
+    H --&gt; I{&quot;EncryptedField.ID matches target DEK?&quot;}
+    I -- &quot;yes&quot; --&gt; J[&quot;Leave row unchanged&quot;]
+    I -- &quot;no&quot; --&gt; K[&quot;Decrypt with old DEK, encrypt with target DEK&quot;]</pre>
+<p>Changing a namespace target DEK drives the same re-encryption behavior that key
+versions drive today: rows in that namespace are checked and moved to the target
+DEK when needed.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="provider-model">Provider Model</h2><a class="sl-anchor-link" href="#provider-model"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Provider Model”</span></a></div>
+<p>The provider abstraction should separate logical key metadata from DEK
+generation and wrapping:</p>
+<ul>
+<li>Secret-backed providers can expose wrapping material to AuthProxy. AuthProxy
+generates a strong random DEK, wraps or encrypts it with that provider-backed
+material, and stores the protected DEK.</li>
+<li>KMS-style providers keep wrapping material outside AuthProxy. AuthProxy asks
+the provider to generate a DEK when the provider has a native data-key API.</li>
+<li>When a provider cannot generate data keys, AuthProxy generates a strong random
+DEK and asks the provider to wrap or encrypt it.</li>
+<li>All providers must be able to unwrap or decrypt an existing DEK so AuthProxy
+can decrypt data and rewrap stale DEKs.</li>
+</ul>
+<p>The provider interface introduced by implementation PRs should support these
+operations:</p>
+<ul>
+<li>Describe the latest wrapping metadata for a key.</li>
+<li>Generate a DEK using provider-native data-key generation when available.</li>
+<li>Wrap an AuthProxy-generated DEK when native generation is unavailable.</li>
+<li>Unwrap an existing protected DEK.</li>
+<li>Report enough metadata to decide whether an existing DEK is wrapped by the
+latest provider material.</li>
+</ul>
+<div class="sl-heading-wrapper level-h2"><h2 id="dek-lifecycle">DEK Lifecycle</h2><a class="sl-anchor-link" href="#dek-lifecycle"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “DEK Lifecycle”</span></a></div>
+<div class="sl-heading-wrapper level-h3"><h3 id="generation-and-rotation">Generation And Rotation</h3><a class="sl-anchor-link" href="#generation-and-rotation"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Generation And Rotation”</span></a></div>
+<p>A dedicated DEK generation process owns creating new DEKs. It walks active data
+encryption keys and applies the configured DEK rotation policy.</p>
+<p>Required behavior:</p>
+<ul>
+<li>Ensure each active data-encryption key has a current DEK.</li>
+<li>Rotate DEKs according to configuration.</li>
+<li>Prefer provider-native DEK generation when supported.</li>
+<li>Fall back to AuthProxy-generated strong randomness when native generation is
+unavailable.</li>
+<li>Mark the generated DEK current and leave older DEKs available for decryption.</li>
+</ul>
+<div class="sl-heading-wrapper level-h3"><h3 id="rewrap-sync">Rewrap Sync</h3><a class="sl-anchor-link" href="#rewrap-sync"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Rewrap Sync”</span></a></div>
+<p>The old “sync key versions to the database” task changes purpose. It no longer
+manifests provider versions as rows. Instead, it inspects DEKs and checks whether
+each current and retained DEK is wrapped using the latest provider material.</p>
+<p>Required behavior:</p>
+<ul>
+<li>Load DEKs for each key.</li>
+<li>Compare stored provider metadata against the provider’s latest wrapping
+metadata.</li>
+<li>If a DEK is stale, unwrap it, rewrap it with latest provider material, and save
+the updated protected data and metadata.</li>
+<li>Keep the DEK id stable during rewrap so encrypted fields do not need to change.</li>
+</ul>
+<div class="sl-heading-wrapper level-h3"><h3 id="cache-sync">Cache Sync</h3><a class="sl-anchor-link" href="#cache-sync"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Cache Sync”</span></a></div>
+<p>The encrypt service cache continues to exist, keyed by DEK id.</p>
+<p>Cache entries should map:</p>
+<div class="expressive-code"><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="text"><code><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">dek_id -&gt; plaintext DEK bytes and metadata needed for encryption/decryption</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="dek_id -> plaintext DEK bytes and metadata needed for encryption/decryption"><div></div></button></div></figure></div>
+<div class="sl-heading-wrapper level-h2"><h2 id="operating-the-model">Operating The Model</h2><a class="sl-anchor-link" href="#operating-the-model"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Operating The Model”</span></a></div>
+<p>There are two independent rotation workflows. Keeping them separate is the point
+of the unified model:</p>
+<ul>
+<li><strong>Wrapping-key rotation</strong> changes the provider-managed key encryption key
+(KEK) or secret value that protects DEKs. The DEK ids stay the same.</li>
+<li><strong>DEK rotation</strong> creates a new <code dir="auto">dek_...</code> row and makes it current for future
+writes. Existing encrypted fields are moved to that DEK by re-encryption.</li>
+</ul>
+<div class="sl-heading-wrapper level-h3"><h3 id="rotating-wrapping-keys">Rotating Wrapping Keys</h3><a class="sl-anchor-link" href="#rotating-wrapping-keys"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Rotating Wrapping Keys”</span></a></div>
+<p>Use this workflow when rotating AWS KMS keys, Google Cloud KMS CryptoKeys,
+HashiCorp Vault Transit keys, secret-manager versions, environment-backed
+secrets, or file-backed wrapping material.</p>
+<ol>
+<li>Rotate or update the wrapping material in the provider.</li>
+<li>Keep old provider material available for decrypt or unwrap until AuthProxy has
+rewrapped every retained DEK.</li>
+<li>Run or wait for <code dir="auto">encrypt:sync_keys_to_database</code>.</li>
+<li>Confirm <code dir="auto">data_encryption_keys.provider_version</code> and
+<code dir="auto">data_encryption_keys.provider_metadata</code> reflect the latest provider material.</li>
+<li>After all DEKs for the logical key are rewrapped, retire the old provider
+material according to the provider’s own recovery/deletion policy.</li>
+</ol>
+<p>Wrapping-key rotation should not change <code dir="auto">data_encryption_keys.id</code> and should not
+trigger application-data re-encryption by itself. The sync task unwraps each
+stale DEK, wraps the same plaintext DEK with current provider material, and saves
+updated wrapping metadata on the same row.</p>
+<p>Provider notes:</p>
+<ul>
+<li>AWS KMS uses <code dir="auto">GenerateDataKey</code> for new DEKs and KMS <code dir="auto">Encrypt</code> / <code dir="auto">Decrypt</code> for
+explicit wrap and unwrap. AWS KMS keys have delayed deletion windows; use a
+new key or alias when testing key advancement.</li>
+<li>Google Cloud KMS uses <code dir="auto">GenerateRandomBytes</code> for provider-generated DEK bytes,
+then wraps with <code dir="auto">Encrypt</code>. The stored metadata includes the CryptoKeyVersion
+used for wrapping.</li>
+<li>Vault Transit uses <code dir="auto">datakey/plaintext</code> for new DEKs and Transit
+<code dir="auto">encrypt</code> / <code dir="auto">decrypt</code> for explicit wrap and unwrap. Rotate the Transit key
+with <code dir="auto">transit/keys/&lt;name&gt;/rotate</code>.</li>
+<li>Secret-backed providers expose wrapping bytes to AuthProxy. Keep the old
+secret version readable until sync has rewrapped retained DEKs.</li>
+</ul>
+<div class="sl-heading-wrapper level-h3"><h3 id="rotating-deks">Rotating DEKs</h3><a class="sl-anchor-link" href="#rotating-deks"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Rotating DEKs”</span></a></div>
+<p>Use this workflow when the actual data-encryption key should change, such as a
+routine cryptoperiod rotation or a tenant isolation change.</p>
+<p>Configure policy under <code dir="auto">system_auth.data_encryption_keys</code>:</p>
+<div class="expressive-code"><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="yaml"><code><div class="ec-line"><div class="code"><span style="--0:#7FDBCA;--1:#111111">system_auth</span><span style="--0:#D6DEEB;--1:#403F53">:</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#7FDBCA;--1:#111111">data_encryption_keys</span><span style="--0:#D6DEEB;--1:#403F53">:</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#7FDBCA;--1:#111111">ensure_current</span><span style="--0:#D6DEEB;--1:#403F53">: </span><span style="--0:#FF6A83;--1:#A24848">true</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#7FDBCA;--1:#111111">rotation_interval</span><span style="--0:#D6DEEB;--1:#403F53">: </span><span style="--0:#ECC48D;--1:#3B61B0">2160h</span><span style="--0:#D6DEEB;--1:#403F53"> </span><span style="--0:#919F9F;--1:#5F636F"># 90 days</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="system_auth:  data_encryption_keys:    ensure_current: true    rotation_interval: 2160h # 90 days"><div></div></button></div></figure></div>
+<p>Operational steps:</p>
+<ol>
+<li>Set <code dir="auto">ensure_current</code> to <code dir="auto">true</code> so every active data-encryption key has a
+current DEK.</li>
+<li>Set <code dir="auto">rotation_interval</code> to the desired cryptoperiod. The default is 90 days;
+<code dir="auto">0</code> disables age-based rotation.</li>
+<li>Run or wait for <code dir="auto">encrypt:generate_data_encryption_keys</code>.</li>
+<li>Run or wait for <code dir="auto">encrypt:sync_keys_to_database</code> so namespace
+<code dir="auto">target_data_encryption_key_id</code> values advance by inheritance.</li>
+<li>Run or wait for <code dir="auto">encrypt:reencrypt_all</code> to move stored application fields to
+the namespace target DEK.</li>
+<li>Retain old DEKs until scans show no encrypted fields reference their <code dir="auto">dek_</code>
+ids. Removing retired DEKs before that point makes those fields
+undecryptable.</li>
+</ol>
+<p>The normal worker schedule runs DEK generation and key sync every 15 minutes,
+and full re-encryption every 30 minutes.</p>
+<div class="sl-heading-wrapper level-h3"><h3 id="namespace-key-changes">Namespace Key Changes</h3><a class="sl-anchor-link" href="#namespace-key-changes"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Namespace Key Changes”</span></a></div>
+<p>Changing a namespace’s <code dir="auto">key_id</code> changes which logical key owns future
+encryption. After sync resolves a new <code dir="auto">target_data_encryption_key_id</code>, the
+re-encryption task decrypts fields that still reference an older DEK and writes
+them with the namespace target DEK. Child namespaces inherit the nearest
+ancestor <code dir="auto">key_id</code> unless they set their own.</p>
+<div class="sl-heading-wrapper level-h3"><h3 id="operational-checks">Operational Checks</h3><a class="sl-anchor-link" href="#operational-checks"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Operational Checks”</span></a></div>
+<p>For a healthy deployment:</p>
+<ul>
+<li>Every active data-encryption key has exactly one current DEK.</li>
+<li>Every namespace resolves to a non-deleted <code dir="auto">target_data_encryption_key_id</code>.</li>
+<li>Encrypted fields store <code dir="auto">{"id":"dek_...","d":"..."}</code> and no longer reference
+<code dir="auto">ekv_...</code> ids.</li>
+<li>Provider-backed DEKs retain provider metadata sufficient for unwrap and stale
+wrapping detection.</li>
+<li>Old wrapping material and old DEKs remain available until rewrap and
+re-encryption are complete.</li>
+</ul>
+<div class="sl-heading-wrapper level-h2"><h2 id="api-and-generated-artifacts">API And Generated Artifacts</h2><a class="sl-anchor-link" href="#api-and-generated-artifacts"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “API And Generated Artifacts”</span></a></div>
+<p>Public naming changes from encryption keys to keys:</p>
+<ul>
+<li>Route family: <code dir="auto">/encryption-keys</code> becomes <code dir="auto">/keys</code>.</li>
+<li>Request and response fields: <code dir="auto">encryption_key_id</code> becomes <code dir="auto">key_id</code>.</li>
+<li>Namespace fields: <code dir="auto">target_encryption_key_version_id</code> becomes
+<code dir="auto">target_data_encryption_key_id</code>.</li>
+<li>JS SDK, Terraform provider, OpenAPI, generated docs, and tests follow the new
+names.</li>
+</ul>
+<div class="sl-heading-wrapper level-h2"><h2 id="integration-testing">Integration Testing</h2><a class="sl-anchor-link" href="#integration-testing"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Integration Testing”</span></a></div>
+<p>Provider implementation PRs must add integration tests for the KMS providers in
+the project:</p>
+<ul>
+<li>AWS KMS</li>
+<li>Google Cloud KMS</li>
+<li>HashiCorp Vault Transit</li>
+</ul>
+<p>The provider tests should prove:</p>
+<ul>
+<li>DEK creation works using provider-native generation when available.</li>
+<li>Fallback generation plus provider wrapping works when native generation is not
+available.</li>
+<li>Existing DEKs can be unwrapped for decryption.</li>
+<li>A stale DEK can be rewrapped with updated provider metadata while keeping the
+same <code dir="auto">dek_</code> id.</li>
+<li>Encrypted application data uses <code dir="auto">dek_</code> ids and remains decryptable after
+provider rotation and DEK rewrap.</li>
+</ul>
+<p>AWS KMS integration tests require an existing symmetric KMS key because KMS keys
+cannot be deleted immediately after creation. Set <code dir="auto">AUTH_PROXY_AWS_KMS_KEY_ID_V2</code>
+to a second accessible key ID or alias to exercise metadata advancement and
+rewrap under new provider material.</p>
+<p>Google Cloud KMS integration tests require an existing symmetric encryption
+CryptoKey. Google Cloud KMS does not expose an AWS-style <code dir="auto">GenerateDataKey</code> API,
+so AuthProxy uses <code dir="auto">GenerateRandomBytes</code> for provider-generated DEK bytes and
+then wraps the DEK with <code dir="auto">Encrypt</code>; the DEK row stores the CryptoKeyVersion used
+for wrapping.</p>
+<p>HashiCorp Vault Transit integration tests run against a Vault server with a
+Transit mount. The test creates a unique Transit key, generates a DEK with
+<code dir="auto">datakey/plaintext</code>, rotates the Transit key, verifies that sync rewraps the same
+DEK id, and verifies decrypt through a fresh encrypt-service cache.</p>
+<p>See <a href="https://github.com/rmorlok/authproxy/blob/main/integration_tests/README.md">integration_tests/README.md</a> for provider
+credentials, IAM/policy requirements, and focused run commands.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="superseded-kms-project">Superseded KMS Project</h2><a class="sl-anchor-link" href="#superseded-kms-project"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Superseded KMS Project”</span></a></div>
+<p>The older <code dir="auto">project:kms</code> issue set is closed and superseded by this migration:</p>
+<ul>
+<li><a href="https://github.com/rmorlok/authproxy/issues/100">#100</a> - original KMS support
+request</li>
+<li><a href="https://github.com/rmorlok/authproxy/issues/581">#581</a> - generalized KMS key
+protection</li>
+<li><a href="https://github.com/rmorlok/authproxy/issues/582">#582</a> - AWS KMS support</li>
+<li><a href="https://github.com/rmorlok/authproxy/issues/583">#583</a> - Google Cloud KMS
+support</li>
+<li><a href="https://github.com/rmorlok/authproxy/issues/584">#584</a> - Vault Transit support</li>
+<li><a href="https://github.com/rmorlok/authproxy/issues/585">#585</a> - KMS operations docs</li>
+<li><a href="https://github.com/rmorlok/authproxy/issues/598">#598</a> - DEK generation and
+rotation policy</li>
+</ul>
+<p>Use <a href="https://github.com/rmorlok/authproxy/issues/605">#605</a> and its child issues
+as the source of truth for the unified key model.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="implementation-order">Implementation Order</h2><a class="sl-anchor-link" href="#implementation-order"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Implementation Order”</span></a></div>
+<p>The child issues under #605 are intended to land in this rough order:</p>
+<ol>
+<li>Establish the branch and this design contract.</li>
+<li>Replace the database schema and core naming from encryption keys to keys.</li>
+<li>Make DEKs the runtime encryption material.</li>
+<li>Introduce provider generation, wrap, unwrap, and metadata abstractions.</li>
+<li>Move encrypt service caching, namespace targeting, and re-encryption to DEKs.</li>
+<li>Replace key-version sync with DEK rewrap sync.</li>
+<li>Remove all remaining key-version code and generated artifacts.</li>
+<li>Add KMS provider implementations and integration tests.</li>
+<li>Update operational docs.</li>
+</ol>
+</div><footer class="sl-flex astro-nntpd7kr"><div class="meta sl-flex astro-nntpd7kr"><a href="https://github.com/rmorlok/authproxy/edit/main/docs/src/content/docs/development/design/key-model-migration.md" class="sl-flex print:hidden astro-56gmmyul"><svg aria-hidden="true" class="astro-56gmmyul astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.2em;"><path d="M22 7.24a1 1 0 0 0-.29-.71l-4.24-4.24a1 1 0 0 0-1.1-.22 1 1 0 0 0-.32.22l-2.83 2.83L2.29 16.05a1 1 0 0 0-.29.71V21a1 1 0 0 0 1 1h4.24a1 1 0 0 0 .76-.29l10.87-10.93L21.71 8c.1-.1.17-.2.22-.33a1 1 0 0 0 0-.24v-.14l.07-.05ZM6.83 20H4v-2.83l9.93-9.93 2.83 2.83L6.83 20ZM18.17 8.66l-2.83-2.83 1.42-1.41 2.82 2.82-1.41 1.42Z"/></svg>Edit page</a><p>Last updated: <time datetime="2026-07-12T11:56:47.000Z">Jul 12, 2026</time></p></div><div class="pagination-links print:hidden astro-anvk7qgk" dir="ltr"><a href="/development/design/" rel="prev" class="astro-anvk7qgk"><svg aria-hidden="true" class="astro-anvk7qgk astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17 11H9.41l3.3-3.29a1.004 1.004 0 1 0-1.42-1.42l-5 5a1 1 0 0 0-.21.33 1 1 0 0 0 0 .76 1 1 0 0 0 .21.33l5 5a1.002 1.002 0 0 0 1.639-.325 1 1 0 0 0-.219-1.095L9.41 13H17a1 1 0 0 0 0-2Z"/></svg><span class="astro-anvk7qgk">Previous<br class="astro-anvk7qgk"><span class="link-title astro-anvk7qgk">Design notes</span></span></a><a href="/development/design/oauth-provider-identity/" rel="next" class="astro-anvk7qgk"><svg aria-hidden="true" class="astro-anvk7qgk astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17.92 11.62a1.001 1.001 0 0 0-.21-.33l-5-5a1.003 1.003 0 1 0-1.42 1.42l3.3 3.29H7a1 1 0 0 0 0 2h7.59l-3.3 3.29a1.002 1.002 0 0 0 .325 1.639 1 1 0 0 0 1.095-.219l5-5a1 1 0 0 0 .21-.33 1 1 0 0 0 0-.76Z"/></svg><span class="astro-anvk7qgk">Next<br class="astro-anvk7qgk"><span class="link-title astro-anvk7qgk">OAuth provider identity changes</span></span></a></div></footer></div></div></main></div></div></div></div></body></html>

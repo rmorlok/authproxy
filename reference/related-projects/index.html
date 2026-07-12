@@ -1,0 +1,623 @@
+<!DOCTYPE html><html lang="en" dir="ltr" data-theme="dark" data-has-toc data-has-sidebar class="astro-s76yvztf"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>Related projects | AuthProxy</title><link rel="canonical" href="https://docs.authproxy.net/reference/related-projects/"/><link rel="sitemap" href="/sitemap-index.xml"/><link rel="shortcut icon" href="/favicon.svg" type="image/svg+xml"/><meta name="generator" content="Astro v7.0.7"/><meta name="generator" content="Starlight v0.41.3"/><meta property="og:title" content="Related projects"/><meta property="og:type" content="article"/><meta property="og:url" content="https://docs.authproxy.net/reference/related-projects/"/><meta property="og:locale" content="en"/><meta property="og:description" content="Compare AuthProxy with unified APIs, embedded iPaaS products, workflow platforms, and open-source integration frameworks."/><meta property="og:site_name" content="AuthProxy"/><meta name="twitter:card" content="summary_large_image"/><meta name="description" content="Compare AuthProxy with unified APIs, embedded iPaaS products, workflow platforms, and open-source integration frameworks."/><script>
+	window.StarlightThemeProvider = (() => {
+		const storedTheme =
+			typeof localStorage !== 'undefined' && localStorage.getItem('starlight-theme');
+		const theme =
+			storedTheme ||
+			(window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+		document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark';
+		return {
+			updatePickers(theme = storedTheme || 'auto') {
+				document.querySelectorAll('starlight-theme-select').forEach((picker) => {
+					const select = picker.querySelector('select');
+					if (select) select.value = theme;
+					/** @type {HTMLTemplateElement | null} */
+					const tmpl = document.querySelector(`#theme-icons`);
+					const newIcon = tmpl && tmpl.content.querySelector('.' + theme);
+					if (newIcon) {
+						const oldIcon = picker.querySelector('svg.label-icon');
+						if (oldIcon) {
+							oldIcon.replaceChildren(...newIcon.cloneNode(true).childNodes);
+						}
+					}
+				});
+			},
+		};
+	})();
+</script><template id="theme-icons"><svg aria-hidden="true" class="light astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M5 12a1 1 0 0 0-1-1H3a1 1 0 0 0 0 2h1a1 1 0 0 0 1-1Zm.64 5-.71.71a1 1 0 0 0 0 1.41 1 1 0 0 0 1.41 0l.71-.71A1 1 0 0 0 5.64 17ZM12 5a1 1 0 0 0 1-1V3a1 1 0 0 0-2 0v1a1 1 0 0 0 1 1Zm5.66 2.34a1 1 0 0 0 .7-.29l.71-.71a1 1 0 1 0-1.41-1.41l-.66.71a1 1 0 0 0 0 1.41 1 1 0 0 0 .66.29Zm-12-.29a1 1 0 0 0 1.41 0 1 1 0 0 0 0-1.41l-.71-.71a1.004 1.004 0 1 0-1.43 1.41l.73.71ZM21 11h-1a1 1 0 0 0 0 2h1a1 1 0 0 0 0-2Zm-2.64 6A1 1 0 0 0 17 18.36l.71.71a1 1 0 0 0 1.41 0 1 1 0 0 0 0-1.41l-.76-.66ZM12 6.5a5.5 5.5 0 1 0 5.5 5.5A5.51 5.51 0 0 0 12 6.5Zm0 9a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Zm0 3.5a1 1 0 0 0-1 1v1a1 1 0 0 0 2 0v-1a1 1 0 0 0-1-1Z"/></svg><svg aria-hidden="true" class="dark astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21.64 13a1 1 0 0 0-1.05-.14 8.049 8.049 0 0 1-3.37.73 8.15 8.15 0 0 1-8.14-8.1 8.59 8.59 0 0 1 .25-2A1 1 0 0 0 8 2.36a10.14 10.14 0 1 0 14 11.69 1 1 0 0 0-.36-1.05Zm-9.5 6.69A8.14 8.14 0 0 1 7.08 5.22v.27a10.15 10.15 0 0 0 10.14 10.14 9.784 9.784 0 0 0 2.1-.22 8.11 8.11 0 0 1-7.18 4.32v-.04Z"/></svg><svg aria-hidden="true" class="auto astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg></template><link rel="stylesheet" href="/_astro/print.ehPL0gv-.css" media="print"><link rel="stylesheet" href="/_astro/common.BWFm95dk.css"><style>@layer starlight.components{.card-grid:where(.astro-xglws247){grid-template-columns:100%;gap:1rem;display:grid}.card-grid:where(.astro-xglws247)>*{margin-top:0!important}@media (width>=50rem){.card-grid:where(.astro-xglws247){grid-template-columns:1fr 1fr;gap:1.5rem}.stagger:where(.astro-xglws247){--stagger-height:5rem;padding-bottom:var(--stagger-height)}.stagger:where(.astro-xglws247)>:nth-child(2n){transform:translateY(var(--stagger-height))}}.sl-link-card:where(.astro-qs5jmmrk){border:1px solid var(--sl-color-gray-5);box-shadow:var(--sl-shadow-sm);border-radius:.5rem;grid-template-columns:1fr auto;gap:.5rem;padding:1rem;display:grid;position:relative}a:where(.astro-qs5jmmrk){line-height:var(--sl-line-height-headings);text-decoration:none}a:where(.astro-qs5jmmrk):before{content:"";position:absolute;inset:0}.stack:where(.astro-qs5jmmrk){flex-direction:column;gap:.5rem}.title:where(.astro-qs5jmmrk){color:var(--sl-color-white);font-weight:600;font-size:var(--sl-text-lg)}.description:where(.astro-qs5jmmrk){color:var(--sl-color-gray-3);line-height:1.5}.icon:where(.astro-qs5jmmrk){color:var(--sl-color-gray-3)}.sl-link-card:where(.astro-qs5jmmrk):hover{background:var(--sl-color-gray-7,var(--sl-color-gray-6));border-color:var(--sl-color-gray-2)}.sl-link-card:where(.astro-qs5jmmrk):hover .icon:where(.astro-qs5jmmrk){color:var(--sl-color-white)}}
+@layer starlight.components{svg:where(.astro-qa7dmyhc){color:var(--sl-icon-color);font-size:var(--sl-icon-size,1em);width:1em;height:1em}}
+</style><script type="module" src="/_astro/page.Bkmrpiyw.js"></script></head><body class="astro-s76yvztf"><a class="sl-skip-link astro-jueewyqi" href="#_top">Skip to content</a><div class="page sl-flex astro-q25odsi5"><header class="header astro-q25odsi5"><div class="header astro-u5sis26u"><div class="title-wrapper sl-flex astro-u5sis26u"><a href="/" class="site-title sl-flex astro-fb6jnt5f"><span class="astro-fb6jnt5f" translate="no">AuthProxy</span></a></div><div class="sl-flex print:hidden astro-u5sis26u"><site-search class="astro-u5sis26u astro-lx5wy5l3" data-translations="{&quot;placeholder&quot;:&quot;Search&quot;}"><button data-open-modal disabled aria-label="Search" aria-keyshortcuts="Control+K" class="astro-lx5wy5l3"><svg aria-hidden="true" class="astro-lx5wy5l3 astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21.71 20.29 18 16.61A9 9 0 1 0 16.61 18l3.68 3.68a.999.999 0 0 0 1.42 0 1 1 0 0 0 0-1.39ZM11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Z"/></svg><span class="sl-hidden md:sl-block astro-lx5wy5l3" aria-hidden="true">Search</span><kbd class="sl-hidden md:sl-flex astro-lx5wy5l3" style="display: none;"><kbd class="astro-lx5wy5l3">Ctrl</kbd><kbd class="astro-lx5wy5l3">K</kbd></kbd></button><dialog style="padding:0" aria-label="Search" class="astro-lx5wy5l3"><div class="dialog-frame sl-flex astro-lx5wy5l3"><button data-close-modal class="sl-flex md:sl-hidden astro-lx5wy5l3">Cancel</button><div class="search-container astro-lx5wy5l3"><div id="starlight__search" class="astro-lx5wy5l3"></div></div></div></dialog></site-search><script>
+	(() => {
+		const openBtn = document.querySelector('button[data-open-modal]');
+		const shortcut = openBtn?.querySelector('kbd');
+		if (!openBtn || !(shortcut instanceof HTMLElement)) return;
+		const platformKey = shortcut.querySelector('kbd');
+		if (platformKey && /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform)) {
+			platformKey.textContent = '⌘';
+			openBtn.setAttribute('aria-keyshortcuts', 'Meta+K');
+		}
+		shortcut.style.display = '';
+	})();
+</script><script type="module" src="/_astro/Search.astro_astro_type_script_index_0_lang.CM1HKbUQ.js"></script></div><div class="sl-hidden md:sl-flex print:hidden right-group astro-u5sis26u"><div class="sl-flex social-icons astro-u5sis26u"><a href="https://github.com/rmorlok/authproxy" rel="me" class="sl-flex astro-ftf4y5zb"><span class="sr-only astro-ftf4y5zb">GitHub</span><svg aria-hidden="true" class="astro-ftf4y5zb astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z"/></svg></a></div><starlight-theme-select><label style="--sl-select-width: 6.25em" class="astro-benwhybl"><span class="sr-only astro-benwhybl">Select theme</span><svg aria-hidden="true" class="icon label-icon astro-benwhybl astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg><select autocomplete="off" class="astro-benwhybl"><option value="dark" class="astro-benwhybl">Dark</option><option value="light" class="astro-benwhybl">Light</option><option value="auto" selected class="astro-benwhybl">Auto</option></select><svg aria-hidden="true" class="icon caret astro-benwhybl astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-theme-select><script>
+	StarlightThemeProvider.updatePickers();
+</script><script type="module">var e=`starlight-theme`,t=e=>e===`auto`||e===`dark`||e===`light`?e:`auto`,n=()=>t(typeof localStorage<`u`&&localStorage.getItem(e));function r(t){typeof localStorage<`u`&&localStorage.setItem(e,t===`light`||t===`dark`?t:``)}var i=()=>matchMedia(`(prefers-color-scheme: light)`).matches?`light`:`dark`;function a(e){StarlightThemeProvider.updatePickers(e),document.documentElement.dataset.theme=e===`auto`?i():e,r(e)}matchMedia(`(prefers-color-scheme: light)`).addEventListener(`change`,()=>{n()===`auto`&&a(`auto`)});var o=class extends HTMLElement{constructor(){super(),a(n()),this.querySelector(`select`)?.addEventListener(`change`,e=>{e.currentTarget instanceof HTMLSelectElement&&a(t(e.currentTarget.value))})}};customElements.define(`starlight-theme-select`,o);</script><script type="module">var e=class extends HTMLElement{constructor(){super();let e=this.querySelector(`select`);e&&(e.addEventListener(`change`,e=>{e.currentTarget instanceof HTMLSelectElement&&(window.location.pathname=e.currentTarget.value)}),window.addEventListener(`pageshow`,t=>{if(!t.persisted)return;let n=e.querySelector(`option[selected]`)?.index;n!==e.selectedIndex&&(e.selectedIndex=n??0)}))}};customElements.define(`starlight-lang-select`,e);</script></div></div></header><nav class="sidebar print:hidden astro-q25odsi5" aria-label="Main"><starlight-menu-button class="print:hidden astro-ujvxkxqt"><button aria-expanded="false" aria-label="Menu" aria-controls="starlight__sidebar" class="sl-flex md:sl-hidden astro-ujvxkxqt"><svg aria-hidden="true" class="open-menu astro-ujvxkxqt astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M3 8h18a1 1 0 1 0 0-2H3a1 1 0 0 0 0 2Zm18 8H3a1 1 0 0 0 0 2h18a1 1 0 0 0 0-2Zm0-5H3a1 1 0 0 0 0 2h18a1 1 0 0 0 0-2Z"/></svg><svg aria-hidden="true" class="close-menu astro-ujvxkxqt astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="m13.41 12 6.3-6.29a1.004 1.004 0 1 0-1.42-1.42L12 10.59l-6.29-6.3a1.004 1.004 0 0 0-1.42 1.42l6.3 6.29-6.3 6.29a1 1 0 0 0 0 1.42.998.998 0 0 0 1.42 0l6.29-6.3 6.29 6.3a.999.999 0 0 0 1.42 0 1 1 0 0 0 0-1.42L13.41 12Z"/></svg></button></starlight-menu-button><script type="module">var e=class extends HTMLElement{btn=this.querySelector(`button`);constructor(){super(),this.btn.addEventListener(`click`,()=>this.toggleExpanded());let e=this.closest(`nav`);e&&e.addEventListener(`keyup`,e=>this.closeOnEscape(e)),matchMedia(`(min-width: 50em)`).addEventListener(`change`,()=>this.setExpanded(!1))}setExpanded(e){this.setAttribute(`aria-expanded`,String(e)),document.body.toggleAttribute(`data-mobile-menu-expanded`,e),document.querySelectorAll(`.main-frame, .sl-skip-link`).forEach(t=>{t.toggleAttribute(`inert`,e)})}toggleExpanded(){this.setExpanded(this.getAttribute(`aria-expanded`)!==`true`)}closeOnEscape(e){e.code===`Escape`&&(this.setExpanded(!1),this.btn.focus())}};customElements.define(`starlight-menu-button`,e);</script><div id="starlight__sidebar" class="sidebar-pane astro-q25odsi5"><div class="sidebar-content sl-flex astro-q25odsi5"><sl-sidebar-state-persist data-hash="1vo1oxd" class="astro-6swq5fot"><script aria-hidden="true">
+		(() => {
+			try {
+				if (!matchMedia('(min-width: 50em)').matches) return;
+				/** @type {HTMLElement | null} */
+				const target = document.querySelector('sl-sidebar-state-persist');
+				const state = JSON.parse(sessionStorage.getItem('sl-sidebar-state') || '0');
+				if (!target || !state || target.dataset.hash !== state.hash) return;
+				window._starlightScrollRestore = state.scroll;
+				customElements.define(
+					'sl-sidebar-restore',
+					class SidebarRestore extends HTMLElement {
+						connectedCallback() {
+							try {
+								const idx = parseInt(this.dataset.index || '');
+								const details = this.closest('details');
+								if (details && typeof state.open[idx] === 'boolean') details.open = state.open[idx];
+							} catch {}
+						}
+					}
+				);
+			} catch {}
+		})();
+	</script><ul class="top-level astro-6v36i77p"><li class="astro-6v36i77p"><details open class="astro-6v36i77p"><summary class="astro-6v36i77p"><span class="group-label astro-6v36i77p"><span class="large astro-6v36i77p">Get started</span></span><svg aria-hidden="true" class="caret astro-6v36i77p astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="0"></sl-sidebar-restore><ul class="astro-6v36i77p"><li class="astro-6v36i77p"><a href="/" class="astro-6v36i77p"><span class="astro-6v36i77p">Documentation home</span></a></li><li class="astro-6v36i77p"><a href="/getting-started/demo/" class="astro-6v36i77p"><span class="astro-6v36i77p">Try the hosted demo</span></a></li><li class="astro-6v36i77p"><a href="/development/quick-start/" class="astro-6v36i77p"><span class="astro-6v36i77p">Development quick start</span></a></li></ul></details></li><li class="astro-6v36i77p"><details open class="astro-6v36i77p"><summary class="astro-6v36i77p"><span class="group-label astro-6v36i77p"><span class="large astro-6v36i77p">Concepts</span></span><svg aria-hidden="true" class="caret astro-6v36i77p astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="1"></sl-sidebar-restore><ul class="astro-6v36i77p"><li class="astro-6v36i77p"><a href="/concepts/" class="astro-6v36i77p"><span class="astro-6v36i77p">AuthProxy concepts</span></a></li><li class="astro-6v36i77p"><a href="/concepts/core-model/" class="astro-6v36i77p"><span class="astro-6v36i77p">The core resource model</span></a></li><li class="astro-6v36i77p"><a href="/concepts/labels-and-annotations/" class="astro-6v36i77p"><span class="astro-6v36i77p">Labels and Annotations</span></a></li></ul></details></li><li class="astro-6v36i77p"><details open class="astro-6v36i77p"><summary class="astro-6v36i77p"><span class="group-label astro-6v36i77p"><span class="large astro-6v36i77p">Integrate</span></span><svg aria-hidden="true" class="caret astro-6v36i77p astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="2"></sl-sidebar-restore><ul class="astro-6v36i77p"><li class="astro-6v36i77p"><a href="/integration/" class="astro-6v36i77p"><span class="astro-6v36i77p">Integrating AuthProxy</span></a></li><li class="astro-6v36i77p"><a href="/integration/host-application/" class="astro-6v36i77p"><span class="astro-6v36i77p">Host application integration</span></a></li><li class="astro-6v36i77p"><a href="/integration/marketplace/" class="astro-6v36i77p"><span class="astro-6v36i77p">Marketplace integration</span></a></li><li class="astro-6v36i77p"><a href="/integration/connector-setup-flow/" class="astro-6v36i77p"><span class="astro-6v36i77p">Connector Setup Flow</span></a></li><li class="astro-6v36i77p"><a href="/integration/connector-predicates/" class="astro-6v36i77p"><span class="astro-6v36i77p">Connector Predicates</span></a></li></ul></details></li><li class="astro-6v36i77p"><details open class="astro-6v36i77p"><summary class="astro-6v36i77p"><span class="group-label astro-6v36i77p"><span class="large astro-6v36i77p">SDKs &amp; API</span></span><svg aria-hidden="true" class="caret astro-6v36i77p astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="3"></sl-sidebar-restore><ul class="astro-6v36i77p"><li class="astro-6v36i77p"><a href="/sdks/" class="astro-6v36i77p"><span class="astro-6v36i77p">SDKs and API Clients</span></a></li><li class="astro-6v36i77p"><a href="/sdks/proxying/" class="astro-6v36i77p"><span class="astro-6v36i77p">Proxying Requests</span></a></li><li class="astro-6v36i77p"><a href="/sdks/javascript/" class="astro-6v36i77p"><span class="astro-6v36i77p">JavaScript and TypeScript SDK</span></a></li><li class="astro-6v36i77p"><a href="/development/cli/" class="astro-6v36i77p"><span class="astro-6v36i77p">Command-line interface (ap)</span></a></li><li class="astro-6v36i77p"><a href="/reference/api/" class="astro-6v36i77p"><span class="astro-6v36i77p">API reference</span></a></li></ul></details></li><li class="astro-6v36i77p"><details open class="astro-6v36i77p"><summary class="astro-6v36i77p"><span class="group-label astro-6v36i77p"><span class="large astro-6v36i77p">Deploy</span></span><svg aria-hidden="true" class="caret astro-6v36i77p astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="4"></sl-sidebar-restore><ul class="astro-6v36i77p"><li class="astro-6v36i77p"><a href="/deployment/" class="astro-6v36i77p"><span class="astro-6v36i77p">Deploy AuthProxy</span></a></li><li class="astro-6v36i77p"><a href="/deployment/helm/" class="astro-6v36i77p"><span class="astro-6v36i77p">Install AuthProxy with Helm</span></a></li><li class="astro-6v36i77p"><a href="/deployment/kustomize/" class="astro-6v36i77p"><span class="astro-6v36i77p">Demo Kustomize deployments</span></a></li><li class="astro-6v36i77p"><a href="/deployment/container-images/" class="astro-6v36i77p"><span class="astro-6v36i77p">Container images and registries</span></a></li><li class="astro-6v36i77p"><a href="/deployment/eks-runbook/" class="astro-6v36i77p"><span class="astro-6v36i77p">AuthProxy EKS Runbook</span></a></li></ul></details></li><li class="astro-6v36i77p"><details open class="astro-6v36i77p"><summary class="astro-6v36i77p"><span class="group-label astro-6v36i77p"><span class="large astro-6v36i77p">Operate</span></span><svg aria-hidden="true" class="caret astro-6v36i77p astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="5"></sl-sidebar-restore><ul class="astro-6v36i77p"><li class="astro-6v36i77p"><a href="/operations/" class="astro-6v36i77p"><span class="astro-6v36i77p">Operate AuthProxy</span></a></li><li class="astro-6v36i77p"><a href="/operations/telemetry/" class="astro-6v36i77p"><span class="astro-6v36i77p">Telemetry</span></a></li><li class="astro-6v36i77p"><a href="/operations/app-metrics/" class="astro-6v36i77p"><span class="astro-6v36i77p">Application Metrics</span></a></li><li class="astro-6v36i77p"><a href="/operations/rate-limits/" class="astro-6v36i77p"><span class="astro-6v36i77p">Rate Limits</span></a></li><li class="astro-6v36i77p"><a href="/operations/background-tasks/" class="astro-6v36i77p"><span class="astro-6v36i77p">View background tasks</span></a></li><li class="astro-6v36i77p"><a href="/operations/connector-lifecycle/" class="astro-6v36i77p"><span class="astro-6v36i77p">Connector Lifecycle Operations</span></a></li><li class="astro-6v36i77p"><a href="/operations/blob-storage/" class="astro-6v36i77p"><span class="astro-6v36i77p">Viewing Blob Storage Data in MinIO</span></a></li><li class="astro-6v36i77p"><a href="/operations/redis-insight/" class="astro-6v36i77p"><span class="astro-6v36i77p">Viewing Redis Data</span></a></li></ul></details></li><li class="astro-6v36i77p"><details open class="astro-6v36i77p"><summary class="astro-6v36i77p"><span class="group-label astro-6v36i77p"><span class="large astro-6v36i77p">Security</span></span><svg aria-hidden="true" class="caret astro-6v36i77p astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="6"></sl-sidebar-restore><ul class="astro-6v36i77p"><li class="astro-6v36i77p"><a href="/security/" class="astro-6v36i77p"><span class="astro-6v36i77p">Security Overview</span></a></li><li class="astro-6v36i77p"><a href="/security/authentication-and-authorization/" class="astro-6v36i77p"><span class="astro-6v36i77p">Authentication and Authorization</span></a></li><li class="astro-6v36i77p"><a href="/security/encryption/" class="astro-6v36i77p"><span class="astro-6v36i77p">Encryption</span></a></li></ul></details></li><li class="astro-6v36i77p"><details open class="astro-6v36i77p"><summary class="astro-6v36i77p"><span class="group-label astro-6v36i77p"><span class="large astro-6v36i77p">Develop</span></span><svg aria-hidden="true" class="caret astro-6v36i77p astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="7"></sl-sidebar-restore><ul class="astro-6v36i77p"><li class="astro-6v36i77p"><a href="/development/" class="astro-6v36i77p"><span class="astro-6v36i77p">Develop AuthProxy</span></a></li><li class="astro-6v36i77p"><a href="/development/local-development/" class="astro-6v36i77p"><span class="astro-6v36i77p">Local development</span></a></li><li class="astro-6v36i77p"><a href="/development/codebase/" class="astro-6v36i77p"><span class="astro-6v36i77p">Codebase layout</span></a></li><li class="astro-6v36i77p"><a href="/development/workflows/" class="astro-6v36i77p"><span class="astro-6v36i77p">Workflow Versioning</span></a></li><li class="astro-6v36i77p"><details class="astro-6v36i77p"><summary class="astro-6v36i77p"><span class="group-label astro-6v36i77p"><span class="large astro-6v36i77p">Design notes</span></span><svg aria-hidden="true" class="caret astro-6v36i77p astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="8"></sl-sidebar-restore><ul class="astro-6v36i77p"><li class="astro-6v36i77p"><a href="/development/design/" class="astro-6v36i77p"><span class="astro-6v36i77p">Design notes</span></a></li><li class="astro-6v36i77p"><a href="/development/design/key-model-migration/" class="astro-6v36i77p"><span class="astro-6v36i77p">Unified key model migration (historical)</span></a></li><li class="astro-6v36i77p"><a href="/development/design/oauth-provider-identity/" class="astro-6v36i77p"><span class="astro-6v36i77p">OAuth provider identity changes</span></a></li></ul></details></li></ul></details></li><li class="astro-6v36i77p"><details open class="astro-6v36i77p"><summary class="astro-6v36i77p"><span class="group-label astro-6v36i77p"><span class="large astro-6v36i77p">Reference</span></span><svg aria-hidden="true" class="caret astro-6v36i77p astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="9"></sl-sidebar-restore><ul class="astro-6v36i77p"><li class="astro-6v36i77p"><a href="/reference/" class="astro-6v36i77p"><span class="astro-6v36i77p">Reference</span></a></li><li class="astro-6v36i77p"><a href="/reference/configuration/" class="astro-6v36i77p"><span class="astro-6v36i77p">Configuration reference</span></a></li><li class="astro-6v36i77p"><a href="/reference/related-projects/" aria-current="page" class="astro-6v36i77p"><span class="astro-6v36i77p">Related projects</span></a></li></ul></details></li></ul><script aria-hidden="true">
+		(() => {
+			const scroller = document.getElementById('starlight__sidebar');
+			if (!window._starlightScrollRestore || !scroller) return;
+			scroller.scrollTop = window._starlightScrollRestore;
+			delete window._starlightScrollRestore;
+		})();
+	</script></sl-sidebar-state-persist><div class="md:sl-hidden"><div class="mobile-preferences sl-flex astro-3nxx6iak"><div class="social-icons astro-3nxx6iak"><a href="https://github.com/rmorlok/authproxy" rel="me" class="sl-flex astro-ftf4y5zb"><span class="sr-only astro-ftf4y5zb">GitHub</span><svg aria-hidden="true" class="astro-ftf4y5zb astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z"/></svg></a></div><starlight-theme-select><label style="--sl-select-width: 6.25em" class="astro-benwhybl"><span class="sr-only astro-benwhybl">Select theme</span><svg aria-hidden="true" class="icon label-icon astro-benwhybl astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg><select autocomplete="off" class="astro-benwhybl"><option value="dark" class="astro-benwhybl">Dark</option><option value="light" class="astro-benwhybl">Light</option><option value="auto" selected class="astro-benwhybl">Auto</option></select><svg aria-hidden="true" class="icon caret astro-benwhybl astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-theme-select><script>
+	StarlightThemeProvider.updatePickers();
+</script></div></div></div></div></nav><div class="main-frame astro-q25odsi5"><script type="module">var e=document.getElementById(`starlight__sidebar`),t=e?.querySelector(`sl-sidebar-state-persist`),n=`sl-sidebar-state`,r=()=>{let r=[],i=t?.dataset.hash||``;try{let e=sessionStorage.getItem(n),t=JSON.parse(e||`{}`);Array.isArray(t.open)&&t.hash===i&&(r=t.open)}catch{}return{hash:i,open:r,scroll:e?.scrollTop||0}},i=e=>{try{sessionStorage.setItem(n,JSON.stringify(e))}catch{}},a=()=>i(r()),o=(e,t)=>{let n=r();n.open[t]=e,i(n)};t?.addEventListener(`click`,e=>{if(!(e.target instanceof Element))return;let t=e.target.closest(`summary`)?.closest(`details`);if(!t)return;let n=t.querySelector(`sl-sidebar-restore`),r=parseInt(n?.dataset.index||``);isNaN(r)||o(!t.open,r)}),addEventListener(`visibilitychange`,()=>{document.visibilityState===`hidden`&&a()}),addEventListener(`pageHide`,a);</script><div class="lg:sl-flex astro-oygnnaui"><aside class="right-sidebar-container print:hidden astro-oygnnaui"><div class="right-sidebar astro-oygnnaui"><div class="lg:sl-hidden astro-5uyk3jmj"><mobile-starlight-toc data-min-h="2" data-max-h="3" class="astro-dqlgw6rx"><nav aria-labelledby="starlight__on-this-page--mobile" class="astro-dqlgw6rx"><details id="starlight__mobile-toc" class="astro-dqlgw6rx"><summary id="starlight__on-this-page--mobile" class="sl-flex astro-dqlgw6rx"><span class="toggle sl-flex astro-dqlgw6rx">On this page<svg aria-hidden="true" class="caret astro-dqlgw6rx astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></span><span class="display-current astro-dqlgw6rx"></span></summary><div class="dropdown astro-dqlgw6rx"><ul class="isMobile astro-ow5mdmq5" style="--depth: 0;"><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#_top" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Overview</span></a></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#where-authproxy-fits" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Where AuthProxy fits</span></a></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#unified-apis" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Unified APIs</span></a><ul class="isMobile astro-ow5mdmq5" style="--depth: 1;"><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#unified-api-product-notes" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Unified API product notes</span></a></li></ul></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#embedded-ipaas-customer-facing-integrations" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Embedded iPaaS (customer-facing integrations)</span></a><ul class="isMobile astro-ow5mdmq5" style="--depth: 1;"><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#embedded-ipaas-product-notes" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Embedded iPaaS product notes</span></a></li></ul></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#traditional-ipaas--workflow-automation" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Traditional iPaaS / workflow automation</span></a><ul class="isMobile astro-ow5mdmq5" style="--depth: 1;"><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#traditional-ipaas-product-notes" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Traditional iPaaS product notes</span></a></li></ul></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#ai--agent-integration-gateways" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">AI / agent integration gateways</span></a><ul class="isMobile astro-ow5mdmq5" style="--depth: 1;"><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#ai--agent-product-notes" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">AI / agent product notes</span></a></li></ul></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#open-source-frameworks--building-blocks" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Open-source frameworks / building blocks</span></a><ul class="isMobile astro-ow5mdmq5" style="--depth: 1;"><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#framework-notes" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Framework notes</span></a></li></ul></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#quick-comparison-high-level" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Quick Comparison (High-Level)</span></a></li></ul></div></details></nav></mobile-starlight-toc><script type="module" src="/_astro/MobileTableOfContents.astro_astro_type_script_index_0_lang.BcSo_yiZ.js"></script></div><div class="right-sidebar-panel sl-hidden lg:sl-block astro-5uyk3jmj"><div class="sl-container astro-5uyk3jmj"><starlight-toc data-min-h="2" data-max-h="3"><nav aria-labelledby="starlight__on-this-page"><h2 id="starlight__on-this-page">On this page</h2><ul class="astro-ow5mdmq5" style="--depth: 0;"><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#_top" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Overview</span></a></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#where-authproxy-fits" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Where AuthProxy fits</span></a></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#unified-apis" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Unified APIs</span></a><ul class="astro-ow5mdmq5" style="--depth: 1;"><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#unified-api-product-notes" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Unified API product notes</span></a></li></ul></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#embedded-ipaas-customer-facing-integrations" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Embedded iPaaS (customer-facing integrations)</span></a><ul class="astro-ow5mdmq5" style="--depth: 1;"><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#embedded-ipaas-product-notes" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Embedded iPaaS product notes</span></a></li></ul></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#traditional-ipaas--workflow-automation" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Traditional iPaaS / workflow automation</span></a><ul class="astro-ow5mdmq5" style="--depth: 1;"><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#traditional-ipaas-product-notes" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Traditional iPaaS product notes</span></a></li></ul></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#ai--agent-integration-gateways" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">AI / agent integration gateways</span></a><ul class="astro-ow5mdmq5" style="--depth: 1;"><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#ai--agent-product-notes" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">AI / agent product notes</span></a></li></ul></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#open-source-frameworks--building-blocks" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Open-source frameworks / building blocks</span></a><ul class="astro-ow5mdmq5" style="--depth: 1;"><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#framework-notes" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Framework notes</span></a></li></ul></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#quick-comparison-high-level" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Quick Comparison (High-Level)</span></a></li></ul></nav></starlight-toc><script type="module" src="/_astro/TableOfContents.astro_astro_type_script_index_0_lang.Csloo1VZ.js"></script></div></div></div></aside><div class="main-pane astro-oygnnaui"><main data-pagefind-body class="astro-s76yvztf" lang="en" dir="ltr"><div class="content-panel astro-pm66xhbs"><div class="sl-container astro-pm66xhbs"><h1 id="_top" class="astro-3nltkhw2">Related projects</h1></div></div><div class="content-panel astro-pm66xhbs"><div class="sl-container astro-pm66xhbs"><div class="sl-markdown-content"><p>This is a research index for products adjacent to AuthProxy. Vendor packaging,
+self-hosting terms, and connector counts change frequently; verify the linked
+vendor sources before using the tables for a procurement decision.</p>
+<p>The landscape splits into a few overlapping domains:</p>
+<ul>
+<li><strong>Unified APIs</strong>: Normalize a vertical (e.g., HRIS/ATS/Accounting) behind a single data model and endpoint set.</li>
+<li><strong>Embedded iPaaS</strong>: Integration infrastructure designed to be embedded into your SaaS product for customer-facing integrations.</li>
+<li><strong>Traditional iPaaS / Workflow Automation</strong>: Internal automation platforms with large connector catalogs and visual builders.</li>
+<li><strong>AI / Agent Integration Gateways</strong>: Tool-calling, MCP servers, or AI gateways that broker auth + actions to many services.</li>
+<li><strong>Open-source Frameworks / Building Blocks</strong>: Libraries or frameworks for teams that want full control.</li>
+</ul>
+<p>Below are summaries and comparison tables for the projects in this repo’s list. Connector counts are taken from the vendors’ public catalogs or docs when available; when not available, it’s noted explicitly.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="where-authproxy-fits">Where AuthProxy fits</h2><a class="sl-anchor-link" href="#where-authproxy-fits"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Where AuthProxy fits”</span></a></div>
+<p>AuthProxy is a strong fit when a team wants to keep using native third-party
+APIs, run the credential data plane in infrastructure it controls, and reuse a
+connection lifecycle across many integrations. It provides embedded connection
+and administration UIs, but the host application keeps its own business logic
+and provider-specific requests.</p>
+<p>That produces different tradeoffs from adjacent categories:</p>
+<ul>
+<li>A <strong>unified API</strong> reduces provider differences but introduces a normalized
+data model. AuthProxy preserves the provider’s full native surface.</li>
+<li>A <strong>managed embedded iPaaS</strong> can provide a larger maintained catalog and
+hosted operations. AuthProxy provides source access and deployment control,
+while the adopting team owns its connectors and environment.</li>
+<li>A <strong>workflow automation system</strong> owns orchestration and transformations.
+AuthProxy focuses on connections, authentication, proxying, and governance;
+application code still owns the workflow.</li>
+<li>A <strong>secret manager or credential proxy</strong> protects secret access. AuthProxy
+adds OAuth callbacks and refresh, user-facing setup, connector versions,
+health, rate limits, and request-event context.</li>
+</ul>
+<p>The relevant build-versus-buy question is therefore not only connector count.
+It is whether the team wants to own provider-specific integration behavior and
+its deployment in exchange for native API access, extensibility, and control of
+credential and request data.</p>
+<hr>
+<div class="sl-heading-wrapper level-h2"><h2 id="unified-apis">Unified APIs</h2><a class="sl-anchor-link" href="#unified-apis"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Unified APIs”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Product</th>
+<th>Commercial / OSS</th>
+<th>Traditional vs Embedded</th>
+<th>Connector Count</th>
+<th>Self-hosting</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://www.merge.dev/">Merge</a></td>
+<td>Commercial</td>
+<td>Primarily embedded (customer-facing)</td>
+<td>220+ integrations</td>
+<td>Yes (paid option; details not public)</td>
+<td>Unified APIs across HRIS, ATS, CRM, Accounting, Ticketing, etc.</td>
+</tr>
+<tr>
+<td><a href="https://www.kombo.dev/">Kombo</a></td>
+<td>Commercial</td>
+<td>Embedded</td>
+<td>250+ integrations</td>
+<td>No public self-host option; regional SaaS (EU/US)</td>
+<td>Unified API focused on HRIS/ATS/LMS/Payroll.</td>
+</tr>
+</tbody>
+</table>
+<div class="sl-heading-wrapper level-h3"><h3 id="unified-api-product-notes">Unified API product notes</h3><a class="sl-anchor-link" href="#unified-api-product-notes"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Unified API product notes”</span></a></div>
+<ul>
+<li><strong>Merge</strong>: Provides unified APIs across multiple verticals plus a hosted platform that manages auth, maintenance, and monitoring. Connector count published in their integrations catalog. Supports webhooks and standard API patterns in docs. Code-first via REST APIs, with SDKs and platform tooling. Pricing indicates a self-hosted option available for purchase. See: <a href="https://www.merge.dev/integrations">https://www.merge.dev/integrations</a>, <a href="https://docs.merge.dev/">https://docs.merge.dev/</a>, and <a href="https://www.merge.dev/pricing">https://www.merge.dev/pricing</a>.</li>
+<li><strong>Kombo</strong>: Unified API focused on HR/ATS/LMS/Payroll. Connector counts published in their integrations catalog and category pages. Built for embedding into SaaS products. Docs describe EU/US regional hosting, with no self-host option mentioned. See: <a href="https://www.kombo.dev/integrations">https://www.kombo.dev/integrations</a> and <a href="https://docs.kombo.dev/data-residency-compliance">https://docs.kombo.dev/data-residency-compliance</a>.</li>
+</ul>
+<hr>
+<div class="sl-heading-wrapper level-h2"><h2 id="embedded-ipaas-customer-facing-integrations">Embedded iPaaS (customer-facing integrations)</h2><a class="sl-anchor-link" href="#embedded-ipaas-customer-facing-integrations"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Embedded iPaaS (customer-facing integrations)”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Product</th>
+<th>Commercial / OSS</th>
+<th>Traditional vs Embedded</th>
+<th>Connector Count</th>
+<th>Self-hosting</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://www.useparagon.com/">Paragon</a></td>
+<td>Commercial</td>
+<td>Embedded</td>
+<td>130+ native connectors</td>
+<td>Yes (managed or unmanaged on-prem)</td>
+<td>Embedded SDK, white-labeled UI, auth, logs, multi-tenant.</td>
+</tr>
+<tr>
+<td><a href="https://prismatic.io/">Prismatic</a></td>
+<td>Commercial</td>
+<td>Embedded</td>
+<td>190+ connectors</td>
+<td>Partial (on-prem agent for private resources)</td>
+<td>Low-code + code SDK, integration marketplace tooling.</td>
+</tr>
+<tr>
+<td><a href="https://www.workato.com/">Workato</a></td>
+<td>Commercial</td>
+<td>Traditional iPaaS w/ embedded option</td>
+<td>1,000+ connectors</td>
+<td>Partial (on-prem agent for private systems)</td>
+<td>Enterprise automation platform; embedded option exists.</td>
+</tr>
+<tr>
+<td><a href="https://tray.io/">Tray.io</a></td>
+<td>Commercial</td>
+<td>Traditional + embedded offering</td>
+<td>Not publicly stated</td>
+<td>Partial (on-prem agent for private systems)</td>
+<td>Visual workflow builder + embedded product.</td>
+</tr>
+<tr>
+<td><a href="https://cyclr.com/">Cyclr</a></td>
+<td>Commercial</td>
+<td>Embedded</td>
+<td>600+ applications</td>
+<td>Yes (self-hosted private cloud)</td>
+<td>Embedded integration platform and connector library.</td>
+</tr>
+<tr>
+<td><a href="https://www.pandium.com/">Pandium</a></td>
+<td>Commercial</td>
+<td>Embedded</td>
+<td>200+ connectors (docs mention 210)</td>
+<td>No public self-host option; managed infrastructure</td>
+<td>Code-first, connectors focus on auth + webhooks.</td>
+</tr>
+<tr>
+<td><a href="https://www.withampersand.com/">Ampersand</a></td>
+<td>Commercial + OSS connectors</td>
+<td>Embedded</td>
+<td>Not publicly stated</td>
+<td>No public self-host for platform; OSS connectors library</td>
+<td>Declarative, code-first integrations; open connectors repo.</td>
+</tr>
+<tr>
+<td><a href="https://nango.dev/">Nango</a></td>
+<td>Commercial + OSS (Elastic License)</td>
+<td>Embedded / integration infrastructure</td>
+<td>500-700+ APIs (varies by page)</td>
+<td>Yes (limited free self-host; enterprise self-host)</td>
+<td>Code-first integration platform with auth, sync, webhooks.</td>
+</tr>
+<tr>
+<td><a href="https://friggframework.org/">Frigg</a></td>
+<td>Open Source</td>
+<td>Embedded framework</td>
+<td>Not publicly stated</td>
+<td>Yes (runs in your cloud)</td>
+<td>OSS framework for building integrations in your own cloud.</td>
+</tr>
+</tbody>
+</table>
+<div class="sl-heading-wrapper level-h3"><h3 id="embedded-ipaas-product-notes">Embedded iPaaS product notes</h3><a class="sl-anchor-link" href="#embedded-ipaas-product-notes"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Embedded iPaaS product notes”</span></a></div>
+<ul>
+<li><strong>Paragon</strong>: Embedded integration platform with 130+ native connectors plus a custom integration builder, white-labeled connect portal, multi-tenant auth, and logs. Paragon supports cloud, managed on-prem, and unmanaged on-prem deployments. See: <a href="https://docs.useparagon.com/overview">https://docs.useparagon.com/overview</a> and <a href="https://docs.useparagon.com/on-premise/choosing-a-hosting-solution">https://docs.useparagon.com/on-premise/choosing-a-hosting-solution</a>.</li>
+<li><strong>Prismatic</strong>: Embedded iPaaS with built-in connectors and SDK for custom ones; integration marketplace tooling. Connectors page lists 190+ built-in connectors. An on-prem agent (Docker container) can run in a private network to access private resources. See: <a href="https://prismatic.io/connectors/">https://prismatic.io/connectors/</a> and <a href="https://prismatic.io/docs/integrations/connections/on-prem-agent/">https://prismatic.io/docs/integrations/connections/on-prem-agent/</a>.</li>
+<li><strong>Workato</strong>: Traditional enterprise iPaaS with an embedded option; docs list 1,000+ connectors. On-premise agents provide secure access to private systems. See: <a href="https://docs.workato.com/connectors">https://docs.workato.com/connectors</a> and <a href="https://docs.workato.com/on-prem/agents">https://docs.workato.com/on-prem/agents</a>.</li>
+<li><strong>Tray.io</strong>: Traditional iPaaS with an embedded product; public connector count not clearly stated in official docs. Tray provides an on-prem agent that runs on your infrastructure to connect to private systems. See: <a href="https://developer.tray.ai/openapi/trayapi/tag/connectors/">https://developer.tray.ai/openapi/trayapi/tag/connectors/</a> and <a href="https://docs.tray.ai/tray-uac/connecting-to-on-premise-systems/on-prem-agent/getting-started/">https://docs.tray.ai/tray-uac/connecting-to-on-premise-systems/on-prem-agent/getting-started/</a>.</li>
+<li><strong>Cyclr</strong>: Embedded iPaaS; marketing page claims 600+ applications supported. See: <a href="https://cyclr.com/application-connectors">https://cyclr.com/application-connectors</a>.</li>
+<li><strong>Pandium</strong>: Embedded iPaaS emphasizing code-first integrations; marketing lists 200+ connectors; docs note "210" connectors. Pandium emphasizes managed infrastructure for running integrations, with no self-host option mentioned. See: <a href="https://www.pandium.com/connectors">https://www.pandium.com/connectors</a> and <a href="https://docs.pandium.com/connectors/connectors-101">https://docs.pandium.com/connectors/connectors-101</a>.</li>
+<li><strong>Ampersand</strong>: Code-first embedded integration platform; open-source connectors library on GitHub. Connector count not publicly stated. Ampersand docs describe the Ampersand server as a managed service; connectors library is open source. See: <a href="https://github.com/amp-labs/connectors">https://github.com/amp-labs/connectors</a> and <a href="https://docs.withampersand.com/">https://docs.withampersand.com/</a>.</li>
+<li><strong>Nango</strong>: Code-first integration infrastructure with auth, sync, webhooks, and managed execution. Open-source core uses the Elastic License. Connector counts vary across pages: 500+ to 700+ depending on page (catalog and homepage). Nango offers a limited free self-hosted option plus an enterprise self-hosted edition. See: <a href="https://github.com/NangoHQ/nango">https://github.com/NangoHQ/nango</a>, <a href="https://nango.dev/">https://nango.dev/</a>, <a href="https://www.nango.dev/api-integrations">https://www.nango.dev/api-integrations</a>, and <a href="https://nango.dev/docs/guides/platform/self-hosting">https://nango.dev/docs/guides/platform/self-hosting</a>.</li>
+<li><strong>Frigg</strong>: Open-source framework for building customer-facing integrations that runs in your cloud; provides an API module library, but no published connector count. See: <a href="https://lefthook.com/frigg/">https://lefthook.com/frigg/</a> and <a href="https://docs.friggframework.org/">https://docs.friggframework.org/</a>.</li>
+</ul>
+<hr>
+<div class="sl-heading-wrapper level-h2"><h2 id="traditional-ipaas--workflow-automation">Traditional iPaaS / workflow automation</h2><a class="sl-anchor-link" href="#traditional-ipaas--workflow-automation"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Traditional iPaaS / workflow automation”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Product</th>
+<th>Commercial / OSS</th>
+<th>Traditional vs Embedded</th>
+<th>Connector Count</th>
+<th>Self-hosting</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://n8n.io/">n8n</a></td>
+<td>Open source + commercial hosting</td>
+<td>Traditional iPaaS</td>
+<td>1,000+ apps</td>
+<td>Yes (self-hosted editions)</td>
+<td>Visual workflow automation, self-hostable.</td>
+</tr>
+<tr>
+<td><a href="https://pipedream.com/">Pipedream</a></td>
+<td>Commercial (free tier)</td>
+<td>Traditional iPaaS</td>
+<td>"Thousands of apps"</td>
+<td>No (publicly stated no self-host option)</td>
+<td>Code-first workflows with triggers/actions and webhook support.</td>
+</tr>
+<tr>
+<td><a href="https://www.workato.com/">Workato</a></td>
+<td>Commercial</td>
+<td>Traditional iPaaS</td>
+<td>1,000+ connectors</td>
+<td>Partial (on-prem agent for private systems)</td>
+<td>Enterprise automation, recipe-based workflows.</td>
+</tr>
+<tr>
+<td><a href="https://tray.io/">Tray.io</a></td>
+<td>Commercial</td>
+<td>Traditional iPaaS</td>
+<td>Not publicly stated</td>
+<td>Partial (on-prem agent for private systems)</td>
+<td>Visual workflow builder with strong API tooling.</td>
+</tr>
+<tr>
+<td><a href="https://camel.apache.org/">Apache Camel</a></td>
+<td>Open Source (Apache-2.0)</td>
+<td>Integration framework; adjacent to traditional iPaaS via Camel K / Karavan</td>
+<td>370 non-core components (plus core components and Kamelets)</td>
+<td>Yes (library/runtime you operate; Camel K runs on Kubernetes)</td>
+<td>Enterprise Integration Patterns, route DSLs, components, Kamelets, and low-code/Kubernetes tooling.</td>
+</tr>
+</tbody>
+</table>
+<div class="sl-heading-wrapper level-h3"><h3 id="traditional-ipaas-product-notes">Traditional iPaaS product notes</h3><a class="sl-anchor-link" href="#traditional-ipaas-product-notes"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Traditional iPaaS product notes”</span></a></div>
+<ul>
+<li><strong>n8n</strong>: OSS workflow automation with a very large app catalog; their integrations pages note 1,000+ apps. Docs explicitly support self-hosted editions. See: <a href="https://n8n.io/integrations/">https://n8n.io/integrations/</a> and <a href="https://docs.n8n.io/choose-n8n/">https://docs.n8n.io/choose-n8n/</a>.</li>
+<li><strong>Pipedream</strong>: Developer-first automation platform with triggers/actions and code steps; docs describe integrations as "thousands of apps." Pipedream staff state there is no self-host option at this time. See: <a href="https://pipedream.com/docs/apps">https://pipedream.com/docs/apps</a>, <a href="https://pipedream.com/docs/workflows/building-workflows/triggers/">https://pipedream.com/docs/workflows/building-workflows/triggers/</a>, and <a href="https://pipedream.com/community/t/how-can-i-self-host-pipedream-on-my-development-machine-and-ec2-instance/4978">https://pipedream.com/community/t/how-can-i-self-host-pipedream-on-my-development-machine-and-ec2-instance/4978</a>.</li>
+<li><strong>Workato</strong> and <strong>Tray.io</strong>: included above; widely used enterprise iPaaS tools with large connector libraries and visual builders.</li>
+<li><strong>Apache Camel</strong>: Long-running open-source integration framework based on Enterprise Integration Patterns. Camel Core is a small embeddable Java library with DSLs for routes, URI-addressed endpoints, data formats, and a large component catalog; the current component reference lists 370 non-core components. It is not an embedded SaaS integration product by itself: teams operate it inside their own applications or infrastructure. Related projects make it more platform-like: Camel K runs Camel integrations natively on Kubernetes, Karavan provides a low-code UI for designing/configuring routes with Kamelets and components, and Kamelets package source/sink connector snippets behind simpler interfaces. Compared with AuthProxy, Camel is much broader for routing, transformation, and message mediation, but does not primarily focus on customer-facing connection lifecycle, tenant-scoped OAuth/API-key credential storage, or authenticating proxy behavior. See: <a href="https://camel.apache.org/manual/faq/what-is-camel.html">https://camel.apache.org/manual/faq/what-is-camel.html</a>, <a href="https://camel.apache.org/components/4.18.x/index.html">https://camel.apache.org/components/4.18.x/index.html</a>, <a href="https://camel.apache.org/docs/">https://camel.apache.org/docs/</a>, and <a href="https://camel.apache.org/">https://camel.apache.org/</a>.</li>
+</ul>
+<hr>
+<div class="sl-heading-wrapper level-h2"><h2 id="ai--agent-integration-gateways">AI / agent integration gateways</h2><a class="sl-anchor-link" href="#ai--agent-integration-gateways"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “AI / agent integration gateways”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Product</th>
+<th>Commercial / OSS</th>
+<th>Traditional vs Embedded</th>
+<th>Connector Count</th>
+<th>Self-hosting</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://composio.dev">Composio</a></td>
+<td>Commercial</td>
+<td>Embedded for AI agents</td>
+<td>900-1000+ toolkits (500+ apps)</td>
+<td>Not stated in docs</td>
+<td>Managed auth, triggers, MCP servers.</td>
+</tr>
+<tr>
+<td><a href="https://metorial.com/">Metorial</a></td>
+<td>OSS + commercial hosting</td>
+<td>Embedded for AI agents</td>
+<td>600+ MCP servers</td>
+<td>Yes (open source; self-hostable)</td>
+<td>MCP-native integration platform and observability.</td>
+</tr>
+<tr>
+<td><a href="https://picaos.com">Pica</a></td>
+<td>Commercial</td>
+<td>Embedded for AI + SaaS</td>
+<td>200+ integrations</td>
+<td>No public self-host option; SaaS with API key</td>
+<td>AuthKit + Passthrough API with 25k+ actions.</td>
+</tr>
+<tr>
+<td><a href="https://airweave.ai/">Airweave</a></td>
+<td>Open source + hosted</td>
+<td>Embedded for AI (data ingestion)</td>
+<td>50+ data sources</td>
+<td>Yes (open source; self-host or hosted)</td>
+<td>Unified retrieval layer for agents.</td>
+</tr>
+<tr>
+<td><a href="https://www.litellm.ai/">LiteLLM</a></td>
+<td>Open source + commercial</td>
+<td>AI gateway</td>
+<td>100+ providers</td>
+<td>Yes (OSS self-host; cloud option)</td>
+<td>LLM gateway with auth, quotas, and routing.</td>
+</tr>
+<tr>
+<td><a href="https://docs.getbifrost.ai/">Bifrost</a></td>
+<td>Open source + commercial</td>
+<td>AI gateway</td>
+<td>20+ providers</td>
+<td>Yes (self-hostable gateway)</td>
+<td>OpenAI-compatible gateway with governance and routing.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/Infisical/agent-vault">Agent Vault</a></td>
+<td>Open source (MIT) + commercial</td>
+<td>Credential proxy for AI agents</td>
+<td>Any HTTPS service (no connector catalog)</td>
+<td>Yes (binary, Docker, from source)</td>
+<td>Infisical’s HTTP credential broker; injects credentials at the network layer so agents never see secrets.</td>
+</tr>
+</tbody>
+</table>
+<div class="sl-heading-wrapper level-h3"><h3 id="ai--agent-product-notes">AI / agent product notes</h3><a class="sl-anchor-link" href="#ai--agent-product-notes"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “AI / agent product notes”</span></a></div>
+<ul>
+<li><strong>Composio</strong>: Managed auth and tool execution for AI agents. Docs mention 1000+ toolkits; the toolkits catalog shows ~900 toolkits; other pages reference 500+ apps. No self-host option is documented. See: <a href="https://docs.composio.dev/">https://docs.composio.dev/</a>, <a href="https://docs.composio.dev/toolkits">https://docs.composio.dev/toolkits</a>, and <a href="https://docs.composio.dev/toolkits/introduction">https://docs.composio.dev/toolkits/introduction</a>.</li>
+<li><strong>Metorial</strong>: Open-source MCP integration platform; GitHub repo states it is open source and self-hostable, with a hosted option available. See: <a href="https://github.com/metorial/metorial">https://github.com/metorial/metorial</a>.</li>
+<li><strong>Pica</strong>: Integration infrastructure for SaaS + AI; AuthKit handles OAuth/token refresh and multi-tenant auth. Docs require a Pica account and API key, implying hosted service. See: <a href="https://docs.picaos.com/authkit/setup">https://docs.picaos.com/authkit/setup</a> and <a href="https://docs.picaos.com/authkit">https://docs.picaos.com/authkit</a>.</li>
+<li><strong>Airweave</strong>: Open-source context retrieval layer with 50+ prebuilt connectors; focuses on ingestion and unified search for agents. Site FAQ says it is open source and can be self-hosted or used via hosted platform. See: <a href="https://airweave.ai/">https://airweave.ai/</a> and <a href="https://docs.airweave.ai/">https://docs.airweave.ai/</a>.</li>
+<li><strong>LiteLLM</strong>: Open-source LLM gateway supporting 100+ provider integrations, with spend tracking and routing. OSS page highlights self-hosting with no data sent to LiteLLM servers; docs show running the proxy via Docker or CLI. See: <a href="https://www.litellm.ai/oss">https://www.litellm.ai/oss</a> and <a href="https://docs.litellm.ai/">https://docs.litellm.ai/</a>.</li>
+<li><strong>Bifrost</strong>: Open-source AI gateway with 20+ providers and OpenAI-compatible APIs; supports routing, failover, and governance. GitHub repo is Apache-2.0 and docs show local deployment via Docker or NPX. See: <a href="https://github.com/maximhq/bifrost">https://github.com/maximhq/bifrost</a> and <a href="https://docs.getbifrost.ai/">https://docs.getbifrost.ai/</a>.</li>
+<li><strong>Agent Vault</strong>: Open-source HTTP credential proxy by Infisical, purpose-built for AI agents. Agents get a scoped session and a local <code dir="auto">HTTPS_PROXY</code>; Agent Vault injects the credential at the network layer so credentials are never returned to the agent. Works with any HTTP-speaking agent (Claude Code, Cursor, Codex, custom Python/TypeScript, sandboxed processes) and any HTTPS API — there is no prebuilt connector catalog; you register your own services and credentials. Ships as a binary, Docker image, or from source; MIT-licensed with a separate <code dir="auto">ee/</code> directory for enterprise features. Offers a container-sandbox mode (iptables-locked egress through the proxy) and an SDK for orchestrating sandboxed agents (Docker/Daytona/E2B). See: <a href="https://github.com/Infisical/agent-vault">https://github.com/Infisical/agent-vault</a>, <a href="https://docs.agent-vault.dev">https://docs.agent-vault.dev</a>, and <a href="https://infisical.com/blog/agent-vault-the-open-source-credential-proxy-and-vault-for-agents">https://infisical.com/blog/agent-vault-the-open-source-credential-proxy-and-vault-for-agents</a>.</li>
+</ul>
+<hr>
+<div class="sl-heading-wrapper level-h2"><h2 id="open-source-frameworks--building-blocks">Open-source frameworks / building blocks</h2><a class="sl-anchor-link" href="#open-source-frameworks--building-blocks"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Open-source frameworks / building blocks”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Project</th>
+<th>Commercial / OSS</th>
+<th>Traditional vs Embedded</th>
+<th>Connector Count</th>
+<th>Self-hosting</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://friggframework.org/">Frigg</a></td>
+<td>Open Source</td>
+<td>Embedded framework</td>
+<td>Not publicly stated</td>
+<td>Yes (runs in your cloud)</td>
+<td>Serverless framework + API modules library.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/amp-labs/connectors">Ampersand Connectors</a></td>
+<td>Open Source</td>
+<td>Embedded building blocks</td>
+<td>Not publicly stated</td>
+<td>Yes (library you run yourself)</td>
+<td>OSS connector library used by Ampersand.</td>
+</tr>
+<tr>
+<td><a href="https://camel.apache.org/">Apache Camel</a></td>
+<td>Open Source (Apache-2.0)</td>
+<td>Integration framework / building block</td>
+<td>370 non-core components (plus core components and Kamelets)</td>
+<td>Yes (library/runtime you operate)</td>
+<td>EIP-based routing and mediation framework with route DSLs, components, data formats, Camel K, and Karavan.</td>
+</tr>
+</tbody>
+</table>
+<div class="sl-heading-wrapper level-h3"><h3 id="framework-notes">Framework notes</h3><a class="sl-anchor-link" href="#framework-notes"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Framework notes”</span></a></div>
+<ul>
+<li><strong>Frigg</strong>: OSS framework for teams that want to own infrastructure and build embedded integrations; provides a modular API library and serverless architecture, and runs in your cloud. See: <a href="https://lefthook.com/frigg/">https://lefthook.com/frigg/</a> and <a href="https://docs.friggframework.org/">https://docs.friggframework.org/</a>.</li>
+<li><strong>Ampersand Connectors</strong>: OSS connector library used by Ampersand; useful for teams building their own integration infrastructure. See: <a href="https://github.com/amp-labs/connectors">https://github.com/amp-labs/connectors</a>.</li>
+<li><strong>Apache Camel</strong>: OSS integration building block for teams that want full control over routes, transports, and deployment. It is strongest when the problem is message routing, mediation, protocol bridging, transformation, or running integration logic inside Java/Spring Boot/Quarkus/Kubernetes environments. It is less directly comparable to embedded iPaaS products because it does not provide a hosted multi-tenant connection UI, unified API model, or credential lifecycle out of the box. See: <a href="https://camel.apache.org/manual/faq/what-is-camel.html">https://camel.apache.org/manual/faq/what-is-camel.html</a> and <a href="https://camel.apache.org/docs/">https://camel.apache.org/docs/</a>.</li>
+</ul>
+<hr>
+<div class="sl-heading-wrapper level-h2"><h2 id="quick-comparison-high-level">Quick Comparison (High-Level)</h2><a class="sl-anchor-link" href="#quick-comparison-high-level"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Quick Comparison (High-Level)”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Product</th>
+<th>Primary Use Case</th>
+<th>Code vs UI</th>
+<th>Eventing/Webhooks</th>
+<th>Connector Definition</th>
+<th>Self-hosting</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>AuthProxy</strong></td>
+<td>Embedded connection lifecycle and authenticating proxy</td>
+<td>Code-first with embedded Marketplace and Admin UIs</td>
+<td>Not a workflow or event platform</td>
+<td>Declarative, versioned definitions maintained by the adopting team</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Merge</td>
+<td>Unified API for B2B SaaS data</td>
+<td>API-first (code)</td>
+<td>Webhooks supported</td>
+<td>Vendor-defined connectors maintained by Merge</td>
+<td>Yes (paid option)</td>
+</tr>
+<tr>
+<td>Kombo</td>
+<td>Unified HR/ATS/LMS/Payroll</td>
+<td>API-first (code)</td>
+<td>Webhooks supported</td>
+<td>Vendor-defined connectors maintained by Kombo</td>
+<td>No public self-host option</td>
+</tr>
+<tr>
+<td>Paragon</td>
+<td>Embedded integrations for SaaS</td>
+<td>Hybrid (SDK + UI)</td>
+<td>Webhooks + workflow triggers</td>
+<td>Prebuilt + custom connector builder</td>
+<td>Yes (managed or unmanaged on-prem)</td>
+</tr>
+<tr>
+<td>Prismatic</td>
+<td>Embedded iPaaS</td>
+<td>Hybrid</td>
+<td>Webhooks + workflows</td>
+<td>Prebuilt + SDK</td>
+<td>Partial (on-prem agent)</td>
+</tr>
+<tr>
+<td>Workato</td>
+<td>Traditional enterprise iPaaS</td>
+<td>UI-heavy</td>
+<td>Triggers + actions</td>
+<td>Prebuilt + custom connectors</td>
+<td>Partial (on-prem agent)</td>
+</tr>
+<tr>
+<td>Tray.io</td>
+<td>Traditional + embedded iPaaS</td>
+<td>UI-heavy</td>
+<td>Triggers + actions</td>
+<td>Prebuilt + custom connector SDK</td>
+<td>Partial (on-prem agent)</td>
+</tr>
+<tr>
+<td>Cyclr</td>
+<td>Embedded iPaaS</td>
+<td>UI-heavy</td>
+<td>Triggers + actions</td>
+<td>Prebuilt + custom connector tools</td>
+<td>Yes (self-hosted private cloud)</td>
+</tr>
+<tr>
+<td>Pandium</td>
+<td>Embedded iPaaS (code-first)</td>
+<td>Code-first</td>
+<td>Webhooks supported</td>
+<td>Auth-focused connectors + code integrations</td>
+<td>No public self-host option</td>
+</tr>
+<tr>
+<td>Ampersand</td>
+<td>Embedded iPaaS (code-first)</td>
+<td>Code-first</td>
+<td>Subscribe to events</td>
+<td>Declarative YAML + OSS connectors</td>
+<td>No public self-host option (platform)</td>
+</tr>
+<tr>
+<td>Nango</td>
+<td>Integration infrastructure</td>
+<td>Code-first</td>
+<td>Webhooks + syncs</td>
+<td>Prebuilt auth + custom integrations</td>
+<td>Yes (limited free self-host; enterprise self-host)</td>
+</tr>
+<tr>
+<td>n8n</td>
+<td>Workflow automation</td>
+<td>UI-heavy + code nodes</td>
+<td>Webhooks + triggers</td>
+<td>Community + core nodes</td>
+<td>Yes (self-hosted editions)</td>
+</tr>
+<tr>
+<td>Pipedream</td>
+<td>Workflow automation</td>
+<td>Code-first + UI</td>
+<td>Webhooks + triggers</td>
+<td>App actions + custom code</td>
+<td>No (publicly stated)</td>
+</tr>
+<tr>
+<td>Composio</td>
+<td>AI agent tool access</td>
+<td>Code-first</td>
+<td>Triggers supported</td>
+<td>Toolkits + MCP servers</td>
+<td>Not stated in docs</td>
+</tr>
+<tr>
+<td>Metorial</td>
+<td>MCP integration platform</td>
+<td>Code-first</td>
+<td>N/A (agent tool calls)</td>
+<td>MCP servers (hosted or OSS)</td>
+<td>Yes (open source; self-hostable)</td>
+</tr>
+<tr>
+<td>Pica</td>
+<td>Auth + actions for AI &amp; SaaS</td>
+<td>Code-first + embeddable UI</td>
+<td>Webhooks supported</td>
+<td>AuthKit + Passthrough API</td>
+<td>No public self-host option</td>
+</tr>
+<tr>
+<td>Airweave</td>
+<td>Agent data ingestion</td>
+<td>Code-first</td>
+<td>Sync + retrieval</td>
+<td>Connectors for data sources</td>
+<td>Yes (open source; self-host or hosted)</td>
+</tr>
+<tr>
+<td>LiteLLM</td>
+<td>LLM gateway</td>
+<td>Code-first</td>
+<td>N/A</td>
+<td>Provider integrations</td>
+<td>Yes (OSS self-host; cloud option)</td>
+</tr>
+<tr>
+<td>Bifrost</td>
+<td>LLM gateway</td>
+<td>Code-first</td>
+<td>N/A</td>
+<td>Provider integrations</td>
+<td>Yes (self-hostable gateway)</td>
+</tr>
+<tr>
+<td>Agent Vault</td>
+<td>Credential brokerage for AI agents</td>
+<td>Code-first (CLI + SDK)</td>
+<td>N/A (network-layer proxy)</td>
+<td>User-registered services + credentials; no prebuilt connectors</td>
+<td>Yes (OSS MIT; binary or Docker)</td>
+</tr>
+<tr>
+<td>Apache Camel</td>
+<td>Routing, mediation, and protocol integration framework</td>
+<td>Code-first DSLs + Karavan low-code tooling</td>
+<td>Routes, timers, polling, messaging components, Kamelets</td>
+<td>Components, route DSLs, Kamelets</td>
+<td>Yes (OSS library/runtime; Camel K on Kubernetes)</td>
+</tr>
+</tbody>
+</table>
+</div><footer class="sl-flex astro-nntpd7kr"><div class="meta sl-flex astro-nntpd7kr"><a href="https://github.com/rmorlok/authproxy/edit/main/docs/src/content/docs/reference/related-projects.md" class="sl-flex print:hidden astro-56gmmyul"><svg aria-hidden="true" class="astro-56gmmyul astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.2em;"><path d="M22 7.24a1 1 0 0 0-.29-.71l-4.24-4.24a1 1 0 0 0-1.1-.22 1 1 0 0 0-.32.22l-2.83 2.83L2.29 16.05a1 1 0 0 0-.29.71V21a1 1 0 0 0 1 1h4.24a1 1 0 0 0 .76-.29l10.87-10.93L21.71 8c.1-.1.17-.2.22-.33a1 1 0 0 0 0-.24v-.14l.07-.05ZM6.83 20H4v-2.83l9.93-9.93 2.83 2.83L6.83 20ZM18.17 8.66l-2.83-2.83 1.42-1.41 2.82 2.82-1.41 1.42Z"/></svg>Edit page</a><p>Last updated: <time datetime="2026-07-12T11:56:47.000Z">Jul 12, 2026</time></p></div><div class="pagination-links print:hidden astro-anvk7qgk" dir="ltr"><a href="/reference/configuration/" rel="prev" class="astro-anvk7qgk"><svg aria-hidden="true" class="astro-anvk7qgk astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17 11H9.41l3.3-3.29a1.004 1.004 0 1 0-1.42-1.42l-5 5a1 1 0 0 0-.21.33 1 1 0 0 0 0 .76 1 1 0 0 0 .21.33l5 5a1.002 1.002 0 0 0 1.639-.325 1 1 0 0 0-.219-1.095L9.41 13H17a1 1 0 0 0 0-2Z"/></svg><span class="astro-anvk7qgk">Previous<br class="astro-anvk7qgk"><span class="link-title astro-anvk7qgk">Configuration reference</span></span></a></div></footer></div></div></main></div></div></div></div></body></html>
