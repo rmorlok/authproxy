@@ -46,8 +46,8 @@ AuthProxy is useful when you want to:
 
 AuthProxy focuses on authentication, connection lifecycle, proxying, and
 governance. It is not a workflow builder or a replacement for the business
-logic in your application. See the [core concepts](docs/src/content/docs/concepts/index.md)
-and [comparison with related projects](docs/src/content/docs/reference/related-projects.md) for
+logic in your application. See the [core concepts](http://docs.authproxy.net/concepts/)
+and [comparison with related projects](http://docs.authproxy.net/reference/related-projects/) for
 more detail.
 
 ## Demos
@@ -78,7 +78,7 @@ sequenceDiagram
 The demo is public and shared, so its contents may change or be reset. Do not
 enter real credentials or private data.
 
-### Marketplace
+### Connector Marketplace
 
 ![Create a connection in the AuthProxy Marketplace](docs/src/content/docs/images/marketplace-connect.gif)
 
@@ -141,4 +141,9 @@ docker compose --profile server down
 
 For local UI sign-in, source-mode development, alternate data stores, tests,
 and observability, continue with the
-[development quick start](docs/src/content/docs/development/quick-start.md).
+[development quick start](http://docs.authproxy.net/development/quick-start/).
+
+License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+Built with ❤️ by [Ryan Morlok](https://github.com/rmorlok)
