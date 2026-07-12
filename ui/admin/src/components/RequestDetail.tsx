@@ -28,7 +28,45 @@ import {Duration, HttpStatusChip} from '../util'
 import {getRequestEvent, RequestEvent, RequestEventRecord} from '@authproxy/api';
 import Chip from "@mui/material/Chip";
 
-function useRequest(id: string | undefined) {
+function requestEventFromRecord(record: RequestEventRecord): RequestEvent {
+    const reqHeaders: Record<string, string[]> = {};
+    if (record.request_mime_type) {
+        reqHeaders['Content-Type'] = [record.request_mime_type];
+    }
+
+    const resHeaders: Record<string, string[]> = {};
+    if (record.response_mime_type) {
+        resHeaders['Content-Type'] = [record.response_mime_type];
+    }
+
+    const url = record.host ? `${record.scheme || 'https'}://${record.host}${record.path || ''}` : (record.path || '');
+
+    return {
+        id: record.request_id,
+        ns: record.namespace,
+        cid: record.correlation_id || '',
+        ts: record.timestamp,
+        dur: record.duration,
+        full: false,
+        req: {
+            u: url,
+            v: record.request_http_version || '',
+            m: record.method || '',
+            h: reqHeaders,
+            cl: record.request_size_bytes,
+            b: '',
+        },
+        res: {
+            v: record.response_http_version || '',
+            sc: record.response_status_code || 0,
+            h: resHeaders,
+            cl: record.response_size_bytes,
+            err: record.response_error,
+        },
+    };
+}
+
+function useRequest(id: string | undefined, fallbackRecord?: RequestEventRecord) {
     const [data, setData] = useState<RequestEvent | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -40,14 +78,20 @@ function useRequest(id: string | undefined) {
             if (!id) return;
             setLoading(true);
             setError(null);
+            setData(null);
             try {
                 const resp = await getRequestEvent(id);
                 if (!active) return;
                 if (resp.status === 200) setData(resp.data);
+                else if (resp.status === 404 && fallbackRecord) setData(requestEventFromRecord(fallbackRecord));
                 else setError('Failed to load request');
             } catch (e: any) {
                 if (!active) return;
-                setError(e?.message || 'Failed to load request');
+                if (e?.response?.status === 404 && fallbackRecord) {
+                    setData(requestEventFromRecord(fallbackRecord));
+                } else {
+                    setError(e?.message || 'Failed to load request');
+                }
             } finally {
                 if (active) setLoading(false);
             }
@@ -57,7 +101,7 @@ function useRequest(id: string | undefined) {
         return () => {
             active = false;
         };
-    }, [id]);
+    }, [id, fallbackRecord]);
 
     return {data, loading, error};
 }
@@ -320,7 +364,7 @@ export interface RequestDetailProps {
 }
 
 export default function RequestDetail({requestId, record, onClose, showOpenFullPage}: RequestDetailProps) {
-    const {data, loading, error} = useRequest(requestId);
+    const {data, loading, error} = useRequest(requestId, record);
     const [tab, setTab] = useState(0);
     const [pretty, setPretty] = useState(true);
 
