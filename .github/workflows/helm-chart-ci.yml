@@ -74,6 +74,37 @@ jobs:
         if: steps.changed.outputs.found == 'true'
         run: ct lint --config .github/ct.yaml --target-branch main
 
+      - name: Verify AuthProxy autoscaling render
+        if: steps.changed.outputs.found == 'true'
+        run: |
+          set -euo pipefail
+
+          disabled_manifest="$(mktemp)"
+          enabled_manifest="$(mktemp)"
+
+          helm template authproxy deploy/charts/authproxy \
+            -f deploy/charts/authproxy/ci/sqlite-redis-values.yaml \
+            >"${disabled_manifest}"
+          if grep -q "kind: HorizontalPodAutoscaler" "${disabled_manifest}"; then
+            echo "HPA rendered even though autoscaling.enabled is false" >&2
+            exit 1
+          fi
+
+          helm template authproxy deploy/charts/authproxy \
+            -f deploy/charts/authproxy/ci/sqlite-redis-values.yaml \
+            -f deploy/charts/authproxy/ci/autoscaling-values.yaml \
+            >"${enabled_manifest}"
+          grep -q "apiVersion: autoscaling/v2" "${enabled_manifest}"
+          grep -q "kind: HorizontalPodAutoscaler" "${enabled_manifest}"
+          grep -q "name: authproxy_asynq_queue_size" "${enabled_manifest}"
+
+          awk '
+            /^kind: Deployment$/ { in_deployment=1; next }
+            /^---$/ { in_deployment=0 }
+            in_deployment && /^[[:space:]]+replicas:/ { found=1 }
+            END { exit found ? 1 : 0 }
+          ' "${enabled_manifest}"
+
       - name: Verify Kustomize demo/dev renders
         run: |
           set -euo pipefail
