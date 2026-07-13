@@ -6,6 +6,15 @@ This file provides guidance to coding agents when working with code in this repo
 
 AuthProxy is an open-source, embeddable integration platform-as-a-service (iPaaS). It manages the connection lifecycle to 3rd party systems, allowing applications to call those systems through an authenticating proxy.
 
+## Documentation
+
+Read [`docs/AGENTS.md`](docs/AGENTS.md) before changing the root README or any
+public documentation. The root `README.md` is a concise project landing page;
+keep its substantive content focused on what AuthProxy is and why to use it,
+the hosted demos, and the shortest developer quick start. Put conceptual,
+integration, SDK, deployment, operations, security, reference, and detailed
+development material in the Starlight site under `docs/src/content/docs/`.
+
 ## Workflow
 
 ### Preflight (required before commit)
