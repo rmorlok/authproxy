@@ -84,6 +84,7 @@ export default defineConfig({
             'operations/rate-limits',
             'operations/background-tasks',
             'operations/connector-lifecycle',
+            'operations/connector-version-migrations',
             'operations/blob-storage',
             'operations/redis-insight',
           ],

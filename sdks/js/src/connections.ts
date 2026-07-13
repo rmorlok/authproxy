@@ -165,6 +165,18 @@ export interface DisconnectResponseJson {
     connection: Connection;
 }
 
+export interface MigrateConnectionVersionRequest {
+    target_version: number;
+    timeout_seconds?: number;
+}
+
+export interface MigrateConnectionVersionResponseJson {
+    task_id: string;
+    connection_id: string;
+    source_version: number;
+    target_version: number;
+}
+
 export interface ForceConnectionStateRequest {
     state: ConnectionState;
 }
@@ -244,6 +256,16 @@ export const submitConnection = (
 export const disconnectConnection = (id: string, request?: DisconnectConnectionRequest) => {
     return client.post<DisconnectResponseJson>(
         `/api/v1/connections/${id}/_disconnect`,
+        request
+    );
+};
+
+/**
+ * Migrate a connection to another version of the same connector.
+ */
+export const migrateConnectionVersion = (id: string, request: MigrateConnectionVersionRequest) => {
+    return client.post<MigrateConnectionVersionResponseJson>(
+        `/api/v1/connections/${id}/_migrate_version`,
         request
     );
 };
@@ -398,6 +420,7 @@ export const connections = {
     initiate: initiateConnection,
     submit: submitConnection,
     disconnect: disconnectConnection,
+    migrateVersion: migrateConnectionVersion,
     abort: abortConnection,
     force_state: forceConnectionState,
     update: updateConnection,

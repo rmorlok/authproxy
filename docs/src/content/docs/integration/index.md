@@ -70,6 +70,7 @@ Keep reusable provider behavior in the connector:
 - API-key placement
 - setup forms and provider redirects
 - health probes and connector-specific 429 handling
+- version migration hooks that adapt stored connection configuration
 
 Keep product behavior in the host:
 
@@ -88,6 +89,9 @@ predicates](/integration/connector-predicates/). Full setup-flow authoring is co
   resources and request events to host entities.
 - Use [application metrics](/operations/app-metrics/) for request-event
   queries and dashboards.
+- Use [connector version migrations](/operations/connector-version-migrations/)
+  when a new connector version requires stored connection data, labels, or user
+  action to change.
 - Use [telemetry](/operations/telemetry/) for infrastructure traces,
   metrics, and logs.
 - Add product-side protection with [rate limits](/operations/rate-limits/).

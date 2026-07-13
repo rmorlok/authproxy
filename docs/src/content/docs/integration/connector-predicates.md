@@ -149,6 +149,6 @@ Probe behavior:
 
 ## Versioning Notes
 
-Adding, removing, or changing predicates or connector-level JavaScript changes the connector definition. For published connectors, publish a new connector version or rely on the normal connector-version migration path.
+Adding, removing, or changing predicates or connector-level JavaScript changes the connector definition. For published connectors, publish a new connector version and migrate existing connections with the [connector version migration workflow](/operations/connector-version-migrations/).
 
 Existing in-flight connections are evaluated against the connector version they are using. If a predicate changes in a new version, only connections migrated to that version use the new predicate behavior.
