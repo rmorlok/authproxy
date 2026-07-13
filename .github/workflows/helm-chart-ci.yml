@@ -92,7 +92,7 @@ jobs:
 
           helm template authproxy deploy/charts/authproxy \
             -f deploy/charts/authproxy/ci/sqlite-redis-values.yaml \
-            -f deploy/charts/authproxy/ci/autoscaling-values.yaml \
+            -f deploy/charts/authproxy/ci/autoscaling-render.yaml \
             >"${enabled_manifest}"
           grep -q "apiVersion: autoscaling/v2" "${enabled_manifest}"
           grep -q "kind: HorizontalPodAutoscaler" "${enabled_manifest}"
@@ -274,12 +274,10 @@ jobs:
 
       - name: ct install
         if: steps.changed.outputs.found == 'true'
-        # authproxy-bootstrap can't be functionally installed in kind
-        # (AWS LB, Route53, Let's Encrypt — none of it works). The
-        # chart's ci/all-disabled-values.yaml turns every subchart and
-        # the ClusterIssuer template off, so `ct install` exercises the
-        # rendering + enable-toggle paths and produces an empty release
-        # rather than a real one.
+        # chart-testing auto-installs each chart once per
+        # <chart>/ci/*-values.yaml file. AuthProxy's sqlite/redis CI
+        # values point at the local image loaded above and provide the
+        # minimum config needed for the runtime validator.
         run: |
           ct install \
             --config .github/ct.yaml \
