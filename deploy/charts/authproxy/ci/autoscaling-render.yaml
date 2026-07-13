@@ -1,10 +1,11 @@
-replicaCount: 1
+# Render-only values used by helm-chart-ci to exercise autoscaling/v2 output.
 
 autoscaling:
   enabled: true
-  minReplicas: 1
+  minReplicas: 2
   maxReplicas: 8
-  targetCPUUtilizationPercentage: 75
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
   metrics:
     - type: Pods
       pods:
@@ -15,7 +16,7 @@ autoscaling:
           averageValue: "100"
   behavior:
     scaleUp:
-      stabilizationWindowSeconds: 30
+      stabilizationWindowSeconds: 60
       policies:
         - type: Percent
           value: 100
@@ -26,20 +27,3 @@ autoscaling:
         - type: Percent
           value: 50
           periodSeconds: 60
-
-services:
-  worker:
-    enabled: true
-
-worker:
-  workflowPollers: 8
-  activityPollers: 16
-  maxParallelWorkflowTasks: 32
-  maxParallelActivityTasks: 64
-
-resources:
-  requests:
-    cpu: 250m
-    memory: 512Mi
-  limits:
-    memory: 1Gi

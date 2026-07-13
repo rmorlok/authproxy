@@ -74,6 +74,37 @@ jobs:
         if: steps.changed.outputs.found == 'true'
         run: ct lint --config .github/ct.yaml --target-branch main
 
+      - name: Verify AuthProxy autoscaling render
+        if: steps.changed.outputs.found == 'true'
+        run: |
+          set -euo pipefail
+
+          disabled_manifest="$(mktemp)"
+          enabled_manifest="$(mktemp)"
+
+          helm template authproxy deploy/charts/authproxy \
+            -f deploy/charts/authproxy/ci/sqlite-redis-values.yaml \
+            >"${disabled_manifest}"
+          if grep -q "kind: HorizontalPodAutoscaler" "${disabled_manifest}"; then
+            echo "HPA rendered even though autoscaling.enabled is false" >&2
+            exit 1
+          fi
+
+          helm template authproxy deploy/charts/authproxy \
+            -f deploy/charts/authproxy/ci/sqlite-redis-values.yaml \
+            -f deploy/charts/authproxy/ci/autoscaling-render.yaml \
+            >"${enabled_manifest}"
+          grep -q "apiVersion: autoscaling/v2" "${enabled_manifest}"
+          grep -q "kind: HorizontalPodAutoscaler" "${enabled_manifest}"
+          grep -q "name: authproxy_asynq_queue_size" "${enabled_manifest}"
+
+          awk '
+            /^kind: Deployment$/ { in_deployment=1; next }
+            /^---$/ { in_deployment=0 }
+            in_deployment && /^[[:space:]]+replicas:/ { found=1 }
+            END { exit found ? 1 : 0 }
+          ' "${enabled_manifest}"
+
       - name: Verify Kustomize demo/dev renders
         run: |
           set -euo pipefail
@@ -243,12 +274,10 @@ jobs:
 
       - name: ct install
         if: steps.changed.outputs.found == 'true'
-        # authproxy-bootstrap can't be functionally installed in kind
-        # (AWS LB, Route53, Let's Encrypt — none of it works). The
-        # chart's ci/all-disabled-values.yaml turns every subchart and
-        # the ClusterIssuer template off, so `ct install` exercises the
-        # rendering + enable-toggle paths and produces an empty release
-        # rather than a real one.
+        # chart-testing auto-installs each chart once per
+        # <chart>/ci/*-values.yaml file. AuthProxy's sqlite/redis CI
+        # values point at the local image loaded above and provide the
+        # minimum config needed for the runtime validator.
         run: |
           ct install \
             --config .github/ct.yaml \

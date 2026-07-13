@@ -1,7 +1,7 @@
 # Default values for the authproxy chart.
 #
 # Section guide:
-#   image / serviceAccount / replicaCount / resources / ...  — standard pod knobs
+#   image / serviceAccount / replicaCount / autoscaling / resources / ... — pod knobs
 #   services.<id>.enabled                                     — toggle individual services
 #   ports                                                     — container port assignments
 #   ingress                                                   — single Ingress, port-name backends
@@ -40,6 +40,25 @@ serviceAccount:
 # independent scaling per service, install the chart multiple times with
 # different `services` blocks (see chart README for examples).
 replicaCount: 1
+
+# -- HorizontalPodAutoscaler configuration. Disabled by default so existing
+# installs keep using `replicaCount`. When enabled, the Deployment omits
+# `spec.replicas` and the HPA owns the desired replica count. Install this
+# chart once per service role for independent autoscaling.
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 10
+  # -- CPU average utilization target. Set to null to omit the CPU metric.
+  targetCPUUtilizationPercentage: 80
+  # -- Memory average utilization target. Set to a number to add memory
+  # utilization as a second resource metric.
+  targetMemoryUtilizationPercentage: null
+  # -- Additional autoscaling/v2 metrics, such as Pods/Object/External metrics
+  # supplied by a custom metrics adapter.
+  metrics: []
+  # -- Optional autoscaling/v2 HPA behavior block.
+  behavior: {}
 
 # -- Annotations applied to each pod.
 podAnnotations: {}

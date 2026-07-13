@@ -85,9 +85,9 @@ The smoke environment installs:
 - `go-oauth2-server` in test mode.
 - Four separate AuthProxy Helm releases:
   - `authproxy-admin-api`
-  - `authproxy-api`
+  - `authproxy-api` with HPA enabled for CPU-based proxy scaling
   - `authproxy-public`
-  - `authproxy-worker`
+  - `authproxy-worker` with HPA enabled for CPU and queue-depth metric examples
 
 The chart's current model is one Deployment per release. Installing separate
 releases lets later issues add independent autoscaling and per-service resource

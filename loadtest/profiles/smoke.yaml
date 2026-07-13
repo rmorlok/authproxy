@@ -9,7 +9,7 @@ objects:
   oauth_tokens_expiring_percent: 0
   periodic_probe_percent: 0
 authproxy:
-  api_replicas: 1
+  api_replicas: 2
   worker_replicas: 1
   public_replicas: 1
   admin_api_replicas: 1
