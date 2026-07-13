@@ -1,0 +1,33 @@
+:root {
+  --sl-font: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+:root[data-theme='dark'] {
+  --sl-color-accent-low: #172554;
+  --sl-color-accent: #93c5fd;
+  --sl-color-accent-high: #dbeafe;
+}
+
+:root[data-theme='light'] {
+  --sl-color-accent-low: #dbeafe;
+  --sl-color-accent: #3157d5;
+  --sl-color-accent-high: #10245f;
+}
+
+.hero {
+  padding-block: clamp(3rem, 8vw, 7rem);
+}
+
+.hero .tagline {
+  max-width: 48rem;
+}
+
+.sl-markdown-content img {
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 0.75rem;
+}
+
+.sl-markdown-content .mermaid {
+  overflow-x: auto;
+  padding: 1rem;
+}

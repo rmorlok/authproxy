@@ -1,0 +1,101 @@
+image:
+  repository: ghcr.io/rmorlok/authproxy
+  tag: main
+  pullPolicy: IfNotPresent
+
+serviceAccount:
+  create: true
+
+services:
+  api:
+    enabled: false
+  adminApi:
+    enabled: false
+    ui:
+      enabled: false
+    static:
+      enabled: false
+  public:
+    enabled: false
+    enableProxy: false
+    static:
+      enabled: false
+  worker:
+    enabled: false
+
+database:
+  provider: postgres
+  host: postgresql
+  port: 5432
+  database: authproxy
+  user: authproxy
+  sslmode: disable
+  autoMigrate: false
+  existingSecret: authproxy-load-db
+
+redis:
+  provider: redis
+  address: redis-master:6379
+  db: 0
+  existingSecret: authproxy-load-redis
+
+jwt:
+  existingSecret: authproxy-load-jwt
+
+encryptionKeys:
+  existingSecret: authproxy-load-encryption
+
+actors:
+  existingSecret: authproxy-load-actors
+  permissions:
+    - namespace: root.**
+      resources:
+        - "*"
+      verbs:
+        - "*"
+
+hostApplication:
+  initiateSessionUrl: http://authproxy-admin-api:8082/login
+
+blobStorage:
+  provider: filesystem
+  filesystem:
+    path: /tmp/authproxy-blobs
+    emptyDir: true
+
+connectors:
+  autoMigrate: false
+  loadFromList: []
+
+appMetrics:
+  shareMainDatabase: true
+  autoMigrate: false
+  fullRequestRecording: never
+
+config:
+  telemetry:
+    enabled: true
+    exporter:
+      protocol: grpc
+      endpoint: http://otel-lgtm:4317
+      insecure: true
+    resource:
+      service_name_prefix: authproxy-load
+      attributes:
+        deployment.environment: loadtest
+    sampling:
+      ratio: 1.0
+    signals:
+      traces: true
+      metrics: true
+      logs: true
+    http:
+      excluded_paths:
+        - /ping
+        - /healthz
+    proxy:
+      span_attribute_labels:
+        - loadtest
+      metric_dimension_labels:
+        - loadtest
+      metric_dimension_value_cap: 25

@@ -1,6 +1,6 @@
 # Migrations
 
-AuthProxy uses [golang-migrate](github.com/golang-migrate/migrate) for migrations. To add a new migration,
+AuthProxy uses [golang-migrate](https://github.com/golang-migrate/migrate) for migrations. To add a new migration,
 use the following command:
 
 ```bash

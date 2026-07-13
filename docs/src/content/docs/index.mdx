@@ -1,0 +1,78 @@
+---
+title: AuthProxy documentation
+description: Build and operate secure third-party API integrations without owning every authentication flow and credential lifecycle.
+template: splash
+hero:
+  title: Integrations without the authentication plumbing
+  tagline: AuthProxy gives your application one place to create, secure, use, and operate connections to third-party APIs.
+  actions:
+    - text: Try the live demo
+      link: /getting-started/demo/
+      icon: right-arrow
+      variant: primary
+    - text: Run it locally
+      link: /development/quick-start/
+      icon: rocket
+      variant: minimal
+---
+
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+## One integration boundary
+
+```mermaid
+flowchart LR
+    Host["Your application"] -->|Actor and namespace context| AP["AuthProxy"]
+    AP -->|OAuth, API key, or no-auth request| APIs["Third-party APIs"]
+    Admin["Your operators"] -->|Configure and monitor| AP
+```
+
+## Choose your path
+
+<CardGrid>
+  <LinkCard
+    title="Add integrations"
+    href="/integration/"
+    description="Map host users and tenants, embed the Marketplace, and make proxied requests."
+  />
+  <LinkCard
+    title="Deploy and operate"
+    href="/deployment/"
+    description="Install AuthProxy, configure its dependencies, and monitor production traffic."
+  />
+  <LinkCard
+    title="Review security"
+    href="/security/"
+    description="Evaluate trust boundaries, permissions, encrypted credentials, and logging risk."
+  />
+  <LinkCard
+    title="Evaluate the architecture"
+    href="/concepts/"
+    description="Understand connectors, connections, actors, namespaces, and the build-versus-buy boundary."
+  />
+</CardGrid>
+
+## Start with a working system
+
+<CardGrid>
+  <LinkCard
+    title="Explore the hosted demo"
+    href="/getting-started/demo/"
+    description="Use fake accounts, connect an app, inspect the Admin UI, and explore Grafana."
+  />
+  <LinkCard
+    title="Run AuthProxy locally"
+    href="/development/quick-start/"
+    description="Clone the repository and start the full stack with Docker Compose."
+  />
+  <LinkCard
+    title="Make a proxied request"
+    href="/sdks/proxying/"
+    description="Send an authenticated request through a connection without handling its credentials."
+  />
+  <LinkCard
+    title="Install with Helm"
+    href="/deployment/helm/"
+    description="Deploy AuthProxy to Kubernetes and connect production dependencies."
+  />
+</CardGrid>

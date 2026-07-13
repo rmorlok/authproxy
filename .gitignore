@@ -33,6 +33,8 @@ tmp
 .junie
 .yarn
 node_modules
+docs/.astro/
+docs/dist/
 plugins/grafana/*/dist/
 
 # Built UI artifacts — embedded at compile time via //go:embed.

@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+source "$SCRIPT_DIR/lib/loadtest.sh"
+
+profile=${1:-${LOADTEST_PROFILE:-smoke}}
+delete_namespace=false
+if [[ "${2:-}" == "--delete-namespace" ]]; then
+  delete_namespace=true
+fi
+
+profile_file=$(loadtest_profile_path "$profile")
+profile_name=$(loadtest_profile_name "$profile_file")
+namespace=$(loadtest_namespace "$profile_file")
+run_dir=$(loadtest_init_run_dir "$profile_name" "$profile_file" "$namespace" down)
+
+loadtest_require_cmd kubectl
+loadtest_require_cmd helm
+
+for release in "${LOADTEST_AUTH_PROXY_RELEASES[@]}"; do
+  loadtest_log "uninstalling $release"
+  helm -n "$namespace" uninstall "$release" >/dev/null 2>&1 || true
+done
+
+kubectl -n "$namespace" delete job authproxy-smoke-k6 --ignore-not-found=true >/dev/null 2>&1 || true
+kubectl -n "$namespace" delete configmap authproxy-loadtest-k6 --ignore-not-found=true >/dev/null 2>&1 || true
+kubectl -n "$namespace" delete testrun authproxy-smoke --ignore-not-found=true >/dev/null 2>&1 || true
+
+for manifest in "$LOADTEST_ROOT"/k8s/base/*.yaml; do
+  kubectl -n "$namespace" delete -f "$manifest" --ignore-not-found=true >/dev/null 2>&1 || true
+done
+
+kubectl -n "$namespace" delete secret \
+  authproxy-load-db \
+  authproxy-load-redis \
+  authproxy-load-clickhouse \
+  authproxy-load-jwt \
+  authproxy-load-actors \
+  authproxy-load-encryption \
+  --ignore-not-found=true >/dev/null 2>&1 || true
+
+if [[ "$delete_namespace" == "true" ]]; then
+  loadtest_log "deleting namespace $namespace"
+  kubectl delete namespace "$namespace" --ignore-not-found=true
+fi
+
+loadtest_log "environment removed for profile $profile_name"
+loadtest_log "run artifacts: $run_dir"
