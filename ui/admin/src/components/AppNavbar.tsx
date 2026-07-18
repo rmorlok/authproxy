@@ -11,6 +11,8 @@ import DashboardRoundedIcon from '@mui/icons-material/DashboardRounded';
 import SideMenuMobile from './SideMenuMobile';
 import MenuButton from './MenuButton';
 import ColorModeIconDropdown from './ColorModeIconDropdown';
+import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
+import {useCommandPalette} from '../search/CommandPalette';
 
 const Toolbar = styled(MuiToolbar)({
   width: '100%',
@@ -30,6 +32,7 @@ const Toolbar = styled(MuiToolbar)({
 
 export default function AppNavbar() {
   const [open, setOpen] = React.useState(false);
+  const commandPalette = useCommandPalette();
 
   const toggleDrawer = (newOpen: boolean) => () => {
     setOpen(newOpen);
@@ -68,6 +71,9 @@ export default function AppNavbar() {
               Dashboard
             </Typography>
           </Stack>
+          <MenuButton aria-label="Open resource search" onClick={() => commandPalette.open()}>
+            <SearchRoundedIcon />
+          </MenuButton>
           <ColorModeIconDropdown />
           <MenuButton aria-label="menu" onClick={toggleDrawer(true)}>
             <MenuRoundedIcon />

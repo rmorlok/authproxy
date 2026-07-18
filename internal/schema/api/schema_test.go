@@ -79,6 +79,7 @@ func TestSchemaSamples(t *testing.T) {
 		{name: "update connection", ref: "./schema.json#/$defs/UpdateConnectionRequest", file: "valid-update-connection.json"},
 		{name: "proxy response", ref: "./schema.json#/$defs/ProxyResponse", file: "valid-proxy-response.json"},
 		{name: "list notifications", ref: "./schema.json#/$defs/ListNotificationsResponse", file: "valid-list-notifications.json"},
+		{name: "search resources", ref: "./schema.json#/$defs/SearchResourcesResponse", file: "valid-search-resources.json"},
 		{name: "namespace", ref: "./schema.json#/$defs/Namespace", file: "valid-namespace.json"},
 		{name: "create namespace", ref: "./schema.json#/$defs/CreateNamespaceRequest", file: "valid-create-namespace.json"},
 		{name: "update namespace", ref: "./schema.json#/$defs/UpdateNamespaceRequest", file: "valid-update-namespace.json"},

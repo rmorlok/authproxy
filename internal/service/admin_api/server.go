@@ -194,6 +194,11 @@ func GetGinServer(
 		authService,
 		dm.GetCoreService(),
 	)
+	routesResourceSearch := common_routes.NewResourceSearchRoutes(
+		authService,
+		dm.GetDatabase(),
+		logger,
+	)
 
 	api := server.Group("/api/v1")
 
@@ -207,6 +212,7 @@ func GetGinServer(
 	routesTaskMonitoring.Register(api)
 	routesWorkflowMonitoring.Register(api)
 	routesNotifications.Register(api)
+	routesResourceSearch.Register(api)
 
 	if service.SupportsSession() && service.SupportsUi() {
 		routesSession := common_routes.NewSessionRoutes(

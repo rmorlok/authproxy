@@ -7837,6 +7837,91 @@ const docTemplateApi = `{
                 }
             }
         },
+        "/search/resources": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Search durable resources by label value and exact label selector, or seed a bounded recent-resource cache",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "search"
+                ],
+                "summary": "Search Admin resources",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Search mode: query or seed",
+                        "name": "mode",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "multi",
+                        "description": "Resource types; may be repeated",
+                        "name": "resource_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Case-insensitive literal label-value substring (minimum 3 characters)",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Exact Kubernetes-style label selector",
+                        "name": "label_selector",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Namespace matcher",
+                        "name": "namespace",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Maximum results (query) or results per type (seed), up to 50",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/routes.OpenAPISearchResourcesResponseJson"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/session/_initiate": {
             "post": {
                 "description": "Initiate or establish a session with the server. If successful, returns actor info. If not authenticated, returns a redirect URL for authentication.",
@@ -9174,6 +9259,69 @@ const docTemplateApi = `{
                 "type": {
                     "type": "string",
                     "example": "proxy"
+                }
+            }
+        },
+        "routes.OpenAPISearchResourcesResponseJson": {
+            "type": "object",
+            "properties": {
+                "incomplete_types": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "items": {
+                    "description": "This anonymous shape mirrors schemaapi.SearchResourceSummaryJson while\navoiding swaggo's inability to resolve same-package nested named types.",
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "labels": {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": "string"
+                                }
+                            },
+                            "matched_labels": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "key": {
+                                            "type": "string",
+                                            "example": "name"
+                                        },
+                                        "value": {
+                                            "type": "string",
+                                            "example": "payments-production"
+                                        }
+                                    }
+                                }
+                            },
+                            "namespace": {
+                                "type": "string",
+                                "example": "root.acme"
+                            },
+                            "resource_id": {
+                                "type": "string",
+                                "example": "cxn_test550e8400abcde"
+                            },
+                            "resource_type": {
+                                "type": "string",
+                                "example": "connection"
+                            },
+                            "updated_at": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "truncated_types": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },

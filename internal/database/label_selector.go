@@ -43,7 +43,7 @@ func ParseLabelSelector(selector string) (LabelSelector, error) {
 	for _, part := range parts {
 		part = strings.TrimSpace(part)
 		if part == "" {
-			continue
+			return nil, fmt.Errorf("label selector contains an empty requirement")
 		}
 
 		if strings.Contains(part, "!=") {
@@ -53,7 +53,7 @@ func ParseLabelSelector(selector string) (LabelSelector, error) {
 			if err := ValidateLabelKey(key); err != nil {
 				return nil, fmt.Errorf("invalid label key in selector %q: %w", part, err)
 			}
-			if err := ValidateLabelValue(val); err != nil {
+			if err := validateValueForKey(key, val); err != nil {
 				return nil, fmt.Errorf("invalid label value in selector %q: %w", part, err)
 			}
 			requirements = append(requirements, LabelRequirement{
@@ -68,7 +68,7 @@ func ParseLabelSelector(selector string) (LabelSelector, error) {
 			if err := ValidateLabelKey(key); err != nil {
 				return nil, fmt.Errorf("invalid label key in selector %q: %w", part, err)
 			}
-			if err := ValidateLabelValue(val); err != nil {
+			if err := validateValueForKey(key, val); err != nil {
 				return nil, fmt.Errorf("invalid label value in selector %q: %w", part, err)
 			}
 			requirements = append(requirements, LabelRequirement{
@@ -83,7 +83,7 @@ func ParseLabelSelector(selector string) (LabelSelector, error) {
 			if err := ValidateLabelKey(key); err != nil {
 				return nil, fmt.Errorf("invalid label key in selector %q: %w", part, err)
 			}
-			if err := ValidateLabelValue(val); err != nil {
+			if err := validateValueForKey(key, val); err != nil {
 				return nil, fmt.Errorf("invalid label value in selector %q: %w", part, err)
 			}
 			requirements = append(requirements, LabelRequirement{

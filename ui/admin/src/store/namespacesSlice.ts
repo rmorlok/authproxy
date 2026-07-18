@@ -21,12 +21,13 @@ interface NamespacesState {
     //
 
     children: Namespace[];
+    childrenHasMore: boolean;
     childrenStatus: 'idle' | 'loading' | 'succeeded' | 'failed';
     childrenError: string | null;
 }
 
 type currentState = Pick<NamespacesState, 'current' | 'status' | 'error'>
-type childrenState = Pick<NamespacesState, 'children' | 'childrenStatus' | 'childrenError'>
+type childrenState = Pick<NamespacesState, 'children' | 'childrenHasMore' | 'childrenStatus' | 'childrenError'>
 
 const initialState: NamespacesState = {
     currentPath: ROOT_NAMESPACE_PATH,
@@ -35,6 +36,7 @@ const initialState: NamespacesState = {
     status: 'loading',
     error: null,
     children: [],
+    childrenHasMore: false,
     childrenStatus: 'loading',
     childrenError: null,
 };
@@ -105,41 +107,27 @@ export const loadCurrentChildren = createAsyncThunk<
         const { rejectWithValue } = thunkApi;
         const currentPath = normalizeNamespacePath(path);
 
-        let allItems: Namespace[] = [];
         const params: ListNamespaceParams = {
             children_of: currentPath,
             limit: 100,
         };
-        
-        let response = await namespaces.list(params);
+
+        const response = await namespaces.list(params);
         if (response.status === 200 && response.data.items) {
-            allItems = allItems.concat(response.data.items);
+            return {
+                childrenStatus: 'succeeded',
+                children: response.data.items,
+                childrenHasMore: Boolean(response.data.cursor),
+                childrenError: null,
+            };
         } else {
             return rejectWithValue({
                 childrenStatus: 'failed',
-                children: allItems,
+                children: [],
+                childrenHasMore: false,
                 childrenError: "failed to load namespace children",
             });
         }
-
-        while (response.data.cursor && response.data.cursor !== "") {
-            response = await namespaces.list({cursor: response.data.cursor});
-            if (response.status === 200) {
-                allItems = allItems.concat(response.data.items);
-            } else {
-                return rejectWithValue({
-                    childrenStatus: 'failed',
-                    children: allItems,
-                    childrenError: "failed to load namespace children",
-                });
-            }
-        }
-
-        return {
-            childrenStatus: 'succeeded',
-            children: allItems,
-            childrenError: null,
-        };
     }
 );
 
@@ -166,12 +154,14 @@ export const namespacesSlice = createSlice({
             })
             .addCase(loadCurrentChildren.pending, (state) => {
                 state.childrenStatus = 'loading';
+                state.childrenHasMore = false;
             })
             .addCase(loadCurrentChildren.fulfilled, (state, action) => {
                 Object.assign(state, action.payload)
             })
             .addCase(loadCurrentChildren.rejected, (state, action) => {
                 state.childrenStatus = 'failed';
+                state.childrenHasMore = false;
                 state.childrenError = action.error.message || 'Failed to fetch namespace children';
             });
     },
@@ -181,6 +171,7 @@ export const namespacesSlice = createSlice({
 export const selectCurrentNamespacePath = (state: RootState) => state.namespaces.currentPath;
 export const selectCurrentNamespace = (state: RootState) => state.namespaces.current;
 export const selectCurrentNamespaceChildren = (state: RootState) => state.namespaces.children;
+export const selectCurrentNamespaceChildrenHasMore = (state: RootState) => state.namespaces.childrenHasMore;
 export const selectNamespaceStatus = (state: RootState) => state.namespaces.status;
 export const selectNamespaceChildrenStatus = (state: RootState) => state.namespaces.childrenStatus;
 export const selectNamespaceError = (state: RootState) => state.namespaces.error;

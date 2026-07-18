@@ -844,6 +844,51 @@ definitions:
         example: proxy
         type: string
     type: object
+  routes.OpenAPISearchResourcesResponseJson:
+    properties:
+      incomplete_types:
+        items:
+          type: string
+        type: array
+      items:
+        description: |-
+          This anonymous shape mirrors schemaapi.SearchResourceSummaryJson while
+          avoiding swaggo's inability to resolve same-package nested named types.
+        items:
+          properties:
+            labels:
+              additionalProperties:
+                type: string
+              type: object
+            matched_labels:
+              items:
+                properties:
+                  key:
+                    example: name
+                    type: string
+                  value:
+                    example: payments-production
+                    type: string
+                type: object
+              type: array
+            namespace:
+              example: root.acme
+              type: string
+            resource_id:
+              example: cxn_test550e8400abcde
+              type: string
+            resource_type:
+              example: connection
+              type: string
+            updated_at:
+              type: string
+          type: object
+        type: array
+      truncated_types:
+        items:
+          type: string
+        type: array
+    type: object
   routes.OpenAPITaskInfoJson:
     description: Background task status
     properties:
@@ -6106,6 +6151,62 @@ paths:
       summary: Set a label for a rate limit
       tags:
       - rate_limits
+  /search/resources:
+    get:
+      description: Search durable resources by label value and exact label selector,
+        or seed a bounded recent-resource cache
+      parameters:
+      - description: 'Search mode: query or seed'
+        in: query
+        name: mode
+        type: string
+      - collectionFormat: multi
+        description: Resource types; may be repeated
+        in: query
+        items:
+          type: string
+        name: resource_type
+        type: array
+      - description: Case-insensitive literal label-value substring (minimum 3 characters)
+        in: query
+        name: q
+        type: string
+      - description: Exact Kubernetes-style label selector
+        in: query
+        name: label_selector
+        type: string
+      - description: Namespace matcher
+        in: query
+        name: namespace
+        type: string
+      - description: Maximum results (query) or results per type (seed), up to 50
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.OpenAPISearchResourcesResponseJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Search Admin resources
+      tags:
+      - search
   /session/_initiate:
     post:
       consumes:

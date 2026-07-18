@@ -1,0 +1,21 @@
+{
+  "items": [
+    {
+      "resource_type": "connection",
+      "resource_id": "cxn_test550e8400abcde",
+      "namespace": "root.acme",
+      "labels": {
+        "team": "payments"
+      },
+      "matched_labels": [
+        {
+          "key": "team",
+          "value": "payments"
+        }
+      ],
+      "updated_at": "2026-07-12T12:00:00Z"
+    }
+  ],
+  "truncated_types": ["connection"],
+  "incomplete_types": []
+}

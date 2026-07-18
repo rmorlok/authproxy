@@ -6,62 +6,45 @@ import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import Stack from '@mui/material/Stack';
 import { Link, useLocation } from 'react-router-dom';
-import HomeRoundedIcon from '@mui/icons-material/HomeRounded';
-import PowerRoundedIcon from '@mui/icons-material/Power';
-import LinkRoundedIcon from '@mui/icons-material/Link';
-import HttpRoundedIcon from '@mui/icons-material/Http';
-import PeopleRoundedIcon from '@mui/icons-material/PeopleRounded';
-import AssignmentRoundedIcon from '@mui/icons-material/AssignmentRounded';
-import KeyRoundedIcon from '@mui/icons-material/KeyRounded';
-import SpeedRoundedIcon from '@mui/icons-material/SpeedRounded';
-import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded';
-import AccountTreeRoundedIcon from '@mui/icons-material/AccountTreeRounded';
-import InfoRoundedIcon from '@mui/icons-material/InfoRounded';
-import HelpRoundedIcon from '@mui/icons-material/HelpRounded';
+import {adminNavigationItems, type AdminNavigationItem} from '../search/navigation';
 
-const mainListItems = [
-  { text: 'Home', icon: <HomeRoundedIcon />, link: '/home' },
-  { text: 'Namespace', icon: <AccountTreeRoundedIcon />, link: '/namespace' },
-  { text: 'Connectors', icon: <PowerRoundedIcon />, link: '/connectors' },
-  { text: 'Connections', icon: <LinkRoundedIcon />, link: '/connections' },
-  { text: 'Requests', icon: <HttpRoundedIcon />, link: '/requests' },
-  { text: 'Tasks', icon: <AssignmentRoundedIcon />, link: '/tasks' },
-  { text: 'Workflows', icon: <AccountTreeRoundedIcon />, link: '/workflows' },
-  { text: 'Keys', icon: <KeyRoundedIcon />, link: '/keys' },
-  { text: 'Rate Limits', icon: <SpeedRoundedIcon />, link: '/rate-limits' },
-  { text: 'Actors', icon: <PeopleRoundedIcon />, link: '/actors' },
-];
+const mainListItems = adminNavigationItems.filter((item) => item.section === 'main');
+const secondaryListItems = adminNavigationItems.filter((item) => item.section === 'secondary');
 
-const secondaryListItems = [
-  { text: 'Settings', icon: <SettingsRoundedIcon />, link: '/settings'},
-  { text: 'About', icon: <InfoRoundedIcon />, link: '/about' },
-  { text: 'Feedback', icon: <HelpRoundedIcon />, link: 'https://github.com/rmorlok/authproxy/issues' },
-];
+function NavigationListItem({item}: {item: AdminNavigationItem}) {
+  const location = useLocation();
+  const Icon = item.icon;
+  const selected = !item.external && location.pathname.startsWith(item.path);
+  const content = (
+    <>
+      <ListItemIcon><Icon /></ListItemIcon>
+      <ListItemText primary={item.label} />
+    </>
+  );
+
+  return (
+    <ListItem disablePadding sx={{display: 'block'}}>
+      {item.external ? (
+        <ListItemButton component="a" href={item.path} target="_blank" rel="noreferrer">
+          {content}
+        </ListItemButton>
+      ) : (
+        <ListItemButton selected={selected} component={Link} to={item.path}>
+          {content}
+        </ListItemButton>
+      )}
+    </ListItem>
+  );
+}
 
 export default function MenuContent() {
-    const location = useLocation();
-
     return (
     <Stack sx={{ flexGrow: 1, p: 1, justifyContent: 'space-between' }}>
       <List dense>
-        {mainListItems.map((item, index) => (
-          <ListItem key={index} disablePadding sx={{ display: 'block' }}>
-            <ListItemButton selected={location.pathname.startsWith(item.link)} component={Link} to={item.link}>
-              <ListItemIcon>{item.icon}</ListItemIcon>
-              <ListItemText primary={item.text} />
-            </ListItemButton>
-          </ListItem>
-        ))}
+        {mainListItems.map((item) => <NavigationListItem key={item.path} item={item} />)}
       </List>
       <List dense>
-        {secondaryListItems.map((item, index) => (
-          <ListItem key={index} disablePadding sx={{ display: 'block' }}>
-            <ListItemButton selected={location.pathname.startsWith(item.link)}  component={Link} to={item.link}>
-              <ListItemIcon>{item.icon}</ListItemIcon>
-              <ListItemText primary={item.text} />
-            </ListItemButton>
-          </ListItem>
-        ))}
+        {secondaryListItems.map((item) => <NavigationListItem key={item.path} item={item} />)}
       </List>
     </Stack>
   );

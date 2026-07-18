@@ -91,6 +91,18 @@ func TestParseLabelSelector(t *testing.T) {
 			expected: nil,
 			wantErr:  true,
 		},
+		{
+			name:     "empty requirements",
+			selector: ",",
+			expected: nil,
+			wantErr:  true,
+		},
+		{
+			name:     "trailing empty requirement",
+			selector: "app=web,",
+			expected: nil,
+			wantErr:  true,
+		},
 	}
 
 	for _, tt := range tests {
