@@ -1,9 +1,9 @@
 # AuthProxy Load-Test Harness
 
 This directory contains the Kubernetes harness for the AuthProxy load-test
-project tracked by #711 and #717. It is intentionally split from product
+project tracked by #711. It is intentionally split from product
 optimizations: this first slice gives us repeatable environment setup, smoke
-traffic, and artifact capture. The large-state seeder, proxy-QPS scenarios, and
+traffic, state seeding, and artifact capture. The proxy-QPS scenarios and
 background-job suites build on this foundation in follow-up issues.
 
 ## Prerequisites
@@ -27,7 +27,9 @@ capacity.
 # AuthProxy admin/api/public/worker releases into authproxy-load.
 ./loadtest/scripts/up smoke
 
-# No-op for now except for artifact metadata; #718 fills in real state seeding.
+# Seed namespaces, actors, a synthetic OAuth2 connector, connections, OAuth2
+# tokens, and k6-ready datasets. With no config override this uses an
+# ephemeral SQLite/miniredis AuthProxy config under the run directory.
 ./loadtest/scripts/seed smoke
 
 # Run a small k6 smoke test against AuthProxy health endpoints and provider
@@ -55,9 +57,9 @@ Profiles live in `profiles/`:
 - `250k.yaml` targets 250,000 connections and 100,000+ namespaces.
 - `500k.yaml` is the stretch profile.
 
-The current scripts use the profile for run metadata and namespace selection.
-Future seeding and k6 issues will consume the object-count and traffic sections
-directly.
+The seed script consumes the object-count section directly. The k6 and
+background-job scenario issues will consume the generated datasets and traffic
+sections.
 
 ## Environment Variables
 
@@ -69,6 +71,10 @@ directly.
 - `K6_IMAGE`: defaults to `grafana/k6:0.54.0`.
 - `LOADTEST_K6_MODE`: `job` (default) or `operator`.
 - `LOADTEST_K6_TIMEOUT`: defaults to `5m`.
+- `LOADTEST_AUTHPROXY_CONFIG`: AuthProxy config used by `seed`. When unset,
+  `seed` generates a local SQLite/miniredis config in the run directory.
+- `LOADTEST_PROVIDER_BASE_URL`: provider URL written into seeded connector
+  definitions; defaults to `http://go-oauth2-server:8080`.
 - `LOADTEST_INSTALL_K6_OPERATOR=true`: install or upgrade the k6 Operator with
   Helm during `up`.
 - `LOADTEST_INSTALL_KEDA=true`: install or upgrade KEDA with Helm during `up`.
@@ -103,6 +109,15 @@ Each script writes or appends to a run directory containing:
 - `kubernetes/`: resource snapshots, events, and rollout summaries.
 - `helm/`: `helm list`, rendered values, and manifest snapshots.
 - `k6/`: k6 logs and summary JSON when available.
+
+The `seed` step also writes:
+
+- `datasets/connections.csv`: connection IDs and metadata for k6 scenarios.
+- `datasets/namespaces.csv`: generated tenant namespaces.
+- `datasets/actors.csv`: generated tenant actors.
+- `seed-summary.json`: machine-readable counts, selected percentages, and
+  verified samples.
+- `seed-plan.txt`: human-readable seed summary.
 
 These artifacts are the handoff point for follow-up optimization work such as DB
 indexes, keyset pagination, request-event buffering, or worker tuning.
