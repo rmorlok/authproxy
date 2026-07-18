@@ -11,6 +11,8 @@ import {
   ConnectionState,
   Connector,
   ConnectorVersionState,
+  NotificationLevel,
+  NotificationState,
 } from '@authproxy/api';
 import theme from '../theme';
 import Layout from '../components/Layout';
@@ -20,6 +22,7 @@ import ConnectionList from '../components/ConnectionList';
 import authReducer from '../store/sessionSlice';
 import connectorsReducer from '../store/connectorsSlice';
 import connectionsReducer from '../store/connectionsSlice';
+import notificationsReducer from '../store/notificationsSlice';
 import toastsReducer from '../store/toastsSlice';
 
 const logoDataUri = (label: string, background: string, foreground = '#ffffff') => {
@@ -199,28 +202,40 @@ const baseConnectionsState = {
   verifyingConnectionId: null,
   verifyError: null,
   retryingConnection: false,
+  recentlyCompletedConnectionId: null,
+};
+
+const baseNotificationsState = {
+  items: [],
+  status: 'succeeded',
+  error: null,
+  markingViewed: false,
 };
 
 function MarketplaceStory({
   route,
   connectorsState = { items: connectors, status: 'succeeded', error: null },
   connectionsState = baseConnectionsState,
+  notificationsState = baseNotificationsState,
 }: {
   route: '/connectors' | '/connector-detail' | '/connections';
   connectorsState?: Record<string, unknown>;
   connectionsState?: Record<string, unknown>;
+  notificationsState?: Record<string, unknown>;
 }) {
   const store = configureStore({
     reducer: combineReducers({
       auth: authReducer,
       connectors: connectorsReducer,
       connections: connectionsReducer,
+      notifications: notificationsReducer,
       toasts: toastsReducer,
     }),
     preloadedState: {
       auth: { actor_id: 'actor_storybook', status: 'authenticated' },
       connectors: connectorsState,
       connections: connectionsState,
+      notifications: notificationsState,
       toasts: { items: [] },
     },
   });
@@ -326,6 +341,44 @@ export const ConnectionsNeedsAttention: Story = {
         connectionFor(connectors[2], {
           health_state: ConnectionHealthState.UNHEALTHY,
         }),
+      ],
+    },
+  },
+};
+
+export const ConnectionsWithNotifications: Story = {
+  args: {
+    route: '/connections',
+    connectionsState: {
+      ...baseConnectionsState,
+      items: [
+        connectionFor(connectors[2], {
+          health_state: ConnectionHealthState.UNHEALTHY,
+        }),
+        connectionFor(connectors[5], {
+          setup_step_id: 'select-workspace',
+        }),
+      ],
+    },
+    notificationsState: {
+      ...baseNotificationsState,
+      items: [
+        {
+          id: 'ntf_reauth',
+          key: 'connection:cxn_google-calendar:auth_required',
+          level: NotificationLevel.WARNING,
+          state: NotificationState.ACTIVE,
+          resource_type: 'connection',
+          resource_id: 'cxn_google-calendar',
+          namespace: 'root',
+          title: 'Connection requires re-authentication',
+          message: 'Reconnect this connection to continue using it.',
+          action_url: '/connections/cxn_google-calendar?action=reauth',
+          can_action: true,
+          viewed: false,
+          created_at: '2026-07-12T12:00:00Z',
+          updated_at: '2026-07-12T12:00:00Z',
+        },
       ],
     },
   },

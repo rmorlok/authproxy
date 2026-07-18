@@ -135,7 +135,7 @@ oauth:
 #   export AUTHPROXY_OTEL_ENDPOINT=http://localhost:4317
 #
 # then start the AuthProxy services. Telemetry flows into the bundled
-# Grafana at http://localhost:3000 (no login). See docs/telemetry.md for
+# Grafana at http://localhost:3000 (no login). See docs/src/content/docs/operations/telemetry.md for
 # the full reference.
 telemetry:
   enabled: true

@@ -192,7 +192,7 @@ func GetGinServer(
 	)
 	routesNotifications := common_routes.NewNotificationsRoutes(
 		authService,
-		dm.GetDatabase(),
+		dm.GetCoreService(),
 	)
 	routesResourceSearch := common_routes.NewResourceSearchRoutes(
 		authService,

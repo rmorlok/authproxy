@@ -3,6 +3,7 @@ package app_metrics
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 
 	"github.com/rmorlok/authproxy/internal/apblob"
@@ -48,13 +49,13 @@ func (s *blobStore) Store(ctx context.Context, log *FullLog) error {
 	jsonData, err := json.Marshal(log)
 	if err != nil {
 		s.logger.Error("error serializing entry to JSON", "error", err, "record_id", log.Id.String())
-		return nil
+		return fmt.Errorf("serialize full HTTP log entry: %w", err)
 	}
 
 	ef, err := s.encryptor.EncryptForNamespace(ctx, log.Namespace, jsonData)
 	if err != nil {
 		s.logger.Error("error encrypting full HTTP log entry", "error", err, "record_id", log.Id.String())
-		return nil
+		return fmt.Errorf("encrypt full HTTP log entry: %w", err)
 	}
 
 	if err := s.client.Put(
@@ -65,6 +66,7 @@ func (s *blobStore) Store(ctx context.Context, log *FullLog) error {
 			ContentType: util.ToPtr("application/octet-stream"),
 		}); err != nil {
 		s.logger.Error("error storing full HTTP log entry in blob storage", "error", err, "record_id", log.Id.String())
+		return fmt.Errorf("store full HTTP log entry in blob storage: %w", err)
 	}
 
 	return nil

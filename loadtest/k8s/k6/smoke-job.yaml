@@ -1,0 +1,59 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: authproxy-smoke-k6
+  labels:
+    app.kubernetes.io/name: k6
+    app.kubernetes.io/component: load-generator
+    loadtest.authproxy.io/scenario: smoke
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: k6
+        app.kubernetes.io/component: load-generator
+        loadtest.authproxy.io/scenario: smoke
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: k6
+          image: grafana/k6:0.54.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - run
+            - /scripts/smoke.js
+            - --summary-export
+            - /artifacts/summary.json
+          env:
+            - name: AUTHPROXY_PUBLIC_URL
+              value: http://authproxy-public:8080
+            - name: AUTHPROXY_API_URL
+              value: http://authproxy-api:8081
+            - name: AUTHPROXY_ADMIN_API_URL
+              value: http://authproxy-admin-api:8082
+            - name: AUTHPROXY_WORKER_URL
+              value: http://authproxy-worker:8083
+            - name: GO_OAUTH2_SERVER_URL
+              value: http://go-oauth2-server
+            - name: K6_RATE
+              value: "2"
+            - name: K6_DURATION
+              value: 30s
+            - name: K6_PRE_ALLOCATED_VUS
+              value: "4"
+            - name: K6_MAX_VUS
+              value: "16"
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+              readOnly: true
+            - name: artifacts
+              mountPath: /artifacts
+      volumes:
+        - name: scripts
+          configMap:
+            name: authproxy-loadtest-k6
+        - name: artifacts
+          emptyDir: {}

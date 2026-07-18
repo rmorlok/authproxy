@@ -60,6 +60,7 @@ The chart exposes typed values for the common connectivity blocks. See
 |------------------|----------------------------------------------------------------------|
 | `image`          | Container image repository, tag, pull policy                         |
 | `services.*`     | Per-service enable toggles (`api`, `adminApi`, `public`, `worker`)   |
+| `autoscaling`    | Optional autoscaling/v2 HPA for the chart release                    |
 | `ports`          | Container port assignments                                            |
 | `ingress`        | Single Ingress with path → port-name routing                          |
 | `database`       | Postgres or SQLite connectivity (+ `existingSecret` for credentials)  |
@@ -92,6 +93,61 @@ For disposable environments, set `blobStorage.provider=filesystem`; the chart
 mounts an `emptyDir` at `blobStorage.filesystem.path` by default. Persistent
 deployments should continue to use S3-compatible storage.
 
+## Independent Service Scaling
+
+The chart renders one Deployment for the enabled service set. For production or
+load-test environments that need independent scale curves, install the chart
+multiple times with different `services` toggles:
+
+```bash
+helm upgrade --install authproxy-api oci://ghcr.io/rmorlok/charts/authproxy \
+  -f common-values.yaml \
+  --set services.api.enabled=true \
+  --set services.adminApi.enabled=false \
+  --set services.public.enabled=false \
+  --set services.worker.enabled=false \
+  --set autoscaling.enabled=true \
+  --set autoscaling.minReplicas=2 \
+  --set autoscaling.maxReplicas=16 \
+  --set autoscaling.targetCPUUtilizationPercentage=70
+
+helm upgrade --install authproxy-worker oci://ghcr.io/rmorlok/charts/authproxy \
+  -f common-values.yaml \
+  --set services.api.enabled=false \
+  --set services.adminApi.enabled=false \
+  --set services.public.enabled=false \
+  --set services.worker.enabled=true \
+  --set autoscaling.enabled=true \
+  --set autoscaling.minReplicas=1 \
+  --set autoscaling.maxReplicas=8
+```
+
+`autoscaling.enabled=false` preserves the legacy `replicaCount` behavior. When
+autoscaling is enabled, the Deployment omits `spec.replicas` and the
+HorizontalPodAutoscaler owns the desired replica count.
+
+### Custom Metrics
+
+`autoscaling.metrics` accepts raw Kubernetes `autoscaling/v2` metric entries.
+For example, a worker release can scale on queue depth if your cluster exposes
+an adapter metric such as `authproxy_asynq_queue_size`:
+
+```yaml
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 8
+  targetCPUUtilizationPercentage: 75
+  metrics:
+    - type: Pods
+      pods:
+        metric:
+          name: authproxy_asynq_queue_size
+        target:
+          type: AverageValue
+          averageValue: "100"
+```
+
 ## Compatibility
 
 | Chart version | App version (`appVersion`) |
@@ -104,5 +160,5 @@ at chart-release time. Override per-deploy with `--set image.tag=<tag>`.
 ## Development
 
 For chart-on-source-tree work (running CI locally, iterating on templates),
-see [`AGENTS.md`](../../AGENTS.md) at the repo root and the chart-testing
+see [`AGENTS.md`](../../../AGENTS.md) at the repo root and the chart-testing
 CI workflow under `.github/workflows/helm-chart-ci.yml`.

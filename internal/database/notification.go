@@ -580,12 +580,14 @@ func (s *service) MarkNotificationViewed(
 	notificationID apid.ID,
 	actorID apid.ID,
 ) error {
-	if notificationID == apid.Nil {
-		return errors.New("notification id is required")
-	}
-	if err := notificationID.ValidatePrefix(apid.PrefixNotification); err != nil {
-		return err
-	}
+	return s.MarkNotificationsViewed(ctx, []apid.ID{notificationID}, actorID)
+}
+
+func (s *service) MarkNotificationsViewed(
+	ctx context.Context,
+	notificationIDs []apid.ID,
+	actorID apid.ID,
+) error {
 	if actorID == apid.Nil {
 		return errors.New("actor id is required")
 	}
@@ -593,22 +595,80 @@ func (s *service) MarkNotificationViewed(
 		return err
 	}
 
-	// Check that the notification exists
-	_, err := s.GetNotification(ctx, notificationID)
+	ids, err := normalizeNotificationIDs(notificationIDs)
 	if err != nil {
 		return err
 	}
 
-	// Insert a viewed record or update the viewed at time if already exists
+	existing, err := s.existingNotificationIDs(ctx, ids)
+	if err != nil {
+		return err
+	}
+	if len(existing) != len(ids) {
+		return ErrNotFound
+	}
+
+	// Insert viewed records or update viewed_at when already present.
 	now := apctx.GetClock(ctx).Now()
-	_, err = s.sq.
+	query := s.sq.
 		Insert(NotificationViewsTable).
-		Columns("notification_id", "actor_id", "viewed_at", "created_at", "updated_at").
-		Values(notificationID, actorID, now, now, now).
+		Columns("notification_id", "actor_id", "viewed_at", "created_at", "updated_at")
+	for _, id := range ids {
+		query = query.Values(id, actorID, now, now, now)
+	}
+	_, err = query.
 		Suffix("ON CONFLICT(notification_id, actor_id) DO UPDATE SET viewed_at = ?, updated_at = ?", now, now).
 		RunWith(s.db).
 		ExecContext(ctx)
 	return err
+}
+
+func normalizeNotificationIDs(ids []apid.ID) ([]apid.ID, error) {
+	if len(ids) == 0 {
+		return nil, errors.New("notification ids are required")
+	}
+	result := make([]apid.ID, 0, len(ids))
+	seen := make(map[apid.ID]struct{}, len(ids))
+	for _, id := range ids {
+		if id == apid.Nil {
+			return nil, errors.New("notification id is required")
+		}
+		if err := id.ValidatePrefix(apid.PrefixNotification); err != nil {
+			return nil, err
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		result = append(result, id)
+	}
+	return result, nil
+}
+
+func (s *service) existingNotificationIDs(
+	ctx context.Context,
+	ids []apid.ID,
+) (map[apid.ID]struct{}, error) {
+	rows, err := s.sq.
+		Select("id").
+		From(NotificationsTable).
+		Where(sq.Eq{"id": ids, "deleted_at": nil}).
+		RunWith(s.db).
+		QueryContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make(map[apid.ID]struct{}, len(ids))
+	for rows.Next() {
+		var id apid.ID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		result[id] = struct{}{}
+	}
+	return result, rows.Err()
 }
 
 // NotificationViewedMap returns a map of notification IDs to

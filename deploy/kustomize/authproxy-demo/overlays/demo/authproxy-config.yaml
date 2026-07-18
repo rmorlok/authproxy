@@ -40,6 +40,17 @@ app_metrics:
   database:
     provider: sqlite
     path: /tmp/authproxy-app-metrics.db
+  blob_storage:
+    provider: s3
+    endpoint: http://demo-minio:9000
+    region: us-east-1
+    bucket: authproxy-request-logs
+    credentials:
+      type: access_key
+      access_key_id: authproxy
+      secret_access_key:
+        env_var: MINIO_ROOT_PASSWORD
+    force_path_style: true
   request_events:
     full_request_recording: never
 telemetry:

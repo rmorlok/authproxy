@@ -19,6 +19,7 @@ import {LineChart} from '@mui/x-charts/LineChart';
 import {SparkLineChart} from '@mui/x-charts/SparkLineChart';
 import dayjs from 'dayjs';
 import type {MetricsQueryRef} from '@authproxy/api';
+import HomeTimeRangePicker from '../components/HomeTimeRangePicker';
 import {useMetricsQuery} from '../metrics';
 import {
     chartTimestamps,
@@ -33,8 +34,13 @@ import {
     totalValuesByTimestamp,
     valuesForTimestamps,
 } from '../metrics/dashboardMetrics';
-
-const RANGE_HOURS = 24;
+import {
+    DEFAULT_DASHBOARD_TIME_RANGE,
+    describeDashboardTimeRange,
+    formatStepLabel,
+    resolveDashboardTimeRange,
+} from '../metrics/timeRange';
+import type {DashboardTimeRange} from '../metrics/timeRange';
 
 const queries: MetricsQueryRef[] = [
     {
@@ -71,12 +77,13 @@ const queries: MetricsQueryRef[] = [
 ];
 
 export default function Home() {
-    const [rangeEnd, setRangeEnd] = React.useState(() => new Date());
-    const range = React.useMemo(() => ({
-        start: dayjs(rangeEnd).subtract(RANGE_HOURS, 'hour').toISOString(),
-        end: dayjs(rangeEnd).toISOString(),
-        step: '15m',
-    }), [rangeEnd]);
+    const [timeRange, setTimeRange] = React.useState<DashboardTimeRange>(DEFAULT_DASHBOARD_TIME_RANGE);
+    const [rangeResolvedAt, setRangeResolvedAt] = React.useState(() => new Date());
+    const resolvedTimeRange = React.useMemo(
+        () => resolveDashboardTimeRange(timeRange, rangeResolvedAt),
+        [timeRange, rangeResolvedAt],
+    );
+    const range = resolvedTimeRange.range;
 
     const {
         loading,
@@ -107,8 +114,13 @@ export default function Home() {
     const hasRequestSeries = requestTimestamps.length > 0 && sumTotalValue(requestEvents) > 0;
 
     const refresh = () => {
-        setRangeEnd(new Date());
+        setRangeResolvedAt(new Date());
         reload();
+    };
+
+    const applyTimeRange = (nextRange: DashboardTimeRange) => {
+        setTimeRange(nextRange);
+        setRangeResolvedAt(new Date());
     };
 
     return (
@@ -123,16 +135,19 @@ export default function Home() {
                         Overview
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                        Last {RANGE_HOURS} hours · 15-minute intervals
+                        {describeDashboardTimeRange(timeRange)} · {formatStepLabel(range.step)}
                     </Typography>
                 </Box>
-                <Tooltip title="Refresh metrics">
-                    <span>
-                        <IconButton aria-label="Refresh metrics" onClick={refresh} disabled={loading}>
-                            {loading ? <CircularProgress size={20} /> : <RefreshIcon />}
-                        </IconButton>
-                    </span>
-                </Tooltip>
+                <Stack direction="row" spacing={1} sx={{alignItems: 'center', width: {xs: '100%', sm: 'auto'}}}>
+                    <HomeTimeRangePicker value={timeRange} onApply={applyTimeRange} />
+                    <Tooltip title="Refresh metrics">
+                        <span>
+                            <IconButton aria-label="Refresh metrics" onClick={refresh} disabled={loading}>
+                                {loading ? <CircularProgress size={20} /> : <RefreshIcon />}
+                            </IconButton>
+                        </span>
+                    </Tooltip>
+                </Stack>
             </Stack>
 
             {error && (

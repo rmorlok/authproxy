@@ -1,0 +1,34 @@
+name: 100k
+namespace: authproxy-load
+description: Baseline high-cardinality target profile.
+cluster:
+  target: real-cluster
+objects:
+  namespaces_min: 50000
+  namespaces_max: 100000
+  connections: 100000
+  oauth_tokens_expiring_percent:
+    - 10
+    - 50
+    - 100
+  periodic_probe_percent:
+    - 1
+    - 10
+    - 100
+authproxy:
+  api_replicas: 2
+  worker_replicas: 2
+  public_replicas: 1
+  admin_api_replicas: 1
+k6:
+  mode: operator
+  scenario: proxy-raw
+  scale_replicas:
+    - 2
+    - 4
+    - 8
+    - 16
+acceptance:
+  max_5xx_rate: 0.001
+  p95_latency_target: profile-configured
+  refresh_sweep_must_drain_before_next_cron: true

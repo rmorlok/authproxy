@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+source "$SCRIPT_DIR/lib/loadtest.sh"
+
+profile=${1:-${LOADTEST_PROFILE:-smoke}}
+scenario=${2:-smoke}
+profile_file=$(loadtest_profile_path "$profile")
+profile_name=$(loadtest_profile_name "$profile_file")
+namespace=$(loadtest_namespace "$profile_file")
+run_dir=$(loadtest_init_run_dir "$profile_name" "$profile_file" "$namespace" run)
+
+loadtest_require_cmd kubectl
+
+[[ "$scenario" == "smoke" ]] || loadtest_die "unsupported scenario in this slice: $scenario"
+
+k6_mode=${LOADTEST_K6_MODE:-job}
+k6_timeout=${LOADTEST_K6_TIMEOUT:-5m}
+k6_image=${K6_IMAGE:-grafana/k6:0.54.0}
+
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+
+kubectl -n "$namespace" create configmap authproxy-loadtest-k6 \
+  --from-file=smoke.js="$LOADTEST_ROOT/k6/smoke.js" \
+  --dry-run=client -o yaml > "$tmp/k6-configmap.yaml"
+kubectl -n "$namespace" apply -f "$tmp/k6-configmap.yaml"
+
+if [[ "$k6_mode" == "operator" ]]; then
+  if ! kubectl get crd testruns.k6.io >/dev/null 2>&1; then
+    loadtest_die "LOADTEST_K6_MODE=operator requested, but testruns.k6.io is not installed"
+  fi
+
+  loadtest_log "applying k6 TestRun"
+  kubectl -n "$namespace" delete testrun authproxy-smoke --ignore-not-found=true >/dev/null 2>&1 || true
+  kubectl -n "$namespace" apply -f "$LOADTEST_ROOT/k8s/k6/smoke-testrun.yaml"
+  loadtest_log "TestRun submitted; use collect to capture status and runner logs"
+else
+  loadtest_log "running k6 smoke Job"
+  kubectl -n "$namespace" delete job authproxy-smoke-k6 --ignore-not-found=true >/dev/null 2>&1 || true
+  kubectl -n "$namespace" apply -f "$LOADTEST_ROOT/k8s/k6/smoke-job.yaml"
+  kubectl -n "$namespace" set image job/authproxy-smoke-k6 "k6=$k6_image"
+  kubectl -n "$namespace" wait --for=condition=complete job/authproxy-smoke-k6 "--timeout=$k6_timeout"
+  kubectl -n "$namespace" logs job/authproxy-smoke-k6 > "$run_dir/k6/smoke.log" 2>&1 || true
+
+  pod=$(kubectl -n "$namespace" get pod -l job-name=authproxy-smoke-k6 -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+  if [[ -n "$pod" ]]; then
+    kubectl -n "$namespace" cp "$pod:/artifacts/summary.json" "$run_dir/k6/summary.json" >/dev/null 2>&1 || true
+  fi
+fi
+
+loadtest_capture_cluster_snapshot "$namespace" "$run_dir"
+loadtest_capture_helm_snapshot "$namespace" "$run_dir"
+
+loadtest_log "scenario complete: $scenario"
+loadtest_log "run artifacts: $run_dir"

@@ -2,6 +2,7 @@ import {configureStore, ThunkAction, Action} from '@reduxjs/toolkit';
 import authReducer from './sessionSlice';
 import connectorsReducer from './connectorsSlice';
 import connectionsReducer from './connectionsSlice';
+import notificationsReducer from './notificationsSlice';
 import toastsReducer from './toastsSlice';
 
 export const store = configureStore({
@@ -9,6 +10,7 @@ export const store = configureStore({
         auth: authReducer,
         connectors: connectorsReducer,
         connections: connectionsReducer,
+        notifications: notificationsReducer,
         toasts: toastsReducer,
     },
 });

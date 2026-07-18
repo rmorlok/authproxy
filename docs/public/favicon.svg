@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="AuthProxy">
+  <rect width="64" height="64" rx="12" fill="#111827"/>
+  <path d="M18 34c0-8.8 5.6-16 14-16s14 7.2 14 16v12h-8V34c0-4.5-2.3-8-6-8s-6 3.5-6 8v12h-8V34Z" fill="#38bdf8"/>
+  <path d="M24 40h16v8H24z" fill="#f9fafb"/>
+  <circle cx="32" cy="44" r="2.5" fill="#111827"/>
+</svg>

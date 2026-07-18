@@ -36,6 +36,22 @@
     },
 
     "replicaCount":     { "type": "integer", "minimum": 1 },
+    "autoscaling": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "minReplicas": { "type": "integer", "minimum": 1 },
+        "maxReplicas": { "type": "integer", "minimum": 1 },
+        "targetCPUUtilizationPercentage": { "$ref": "#/definitions/nullablePositiveInteger" },
+        "targetMemoryUtilizationPercentage": { "$ref": "#/definitions/nullablePositiveInteger" },
+        "metrics": {
+          "type": "array",
+          "items": { "type": "object" }
+        },
+        "behavior": { "type": "object" }
+      }
+    },
     "podAnnotations":   { "type": "object", "additionalProperties": { "type": "string" } },
     "podLabels":        { "type": "object", "additionalProperties": { "type": "string" } },
     "podSecurityContext": { "type": "object" },
@@ -326,6 +342,12 @@
       "anyOf": [
         { "type": "string" },
         { "type": "integer" }
+      ]
+    },
+    "nullablePositiveInteger": {
+      "anyOf": [
+        { "type": "integer", "minimum": 1 },
+        { "type": "null" }
       ]
     }
   }

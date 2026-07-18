@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clickhouse
+  labels:
+    app.kubernetes.io/name: clickhouse
+    app.kubernetes.io/component: app-metrics
+    loadtest.authproxy.io/component: dependency
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: clickhouse
+      app.kubernetes.io/component: app-metrics
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: clickhouse
+        app.kubernetes.io/component: app-metrics
+        loadtest.authproxy.io/component: dependency
+    spec:
+      containers:
+        - name: clickhouse
+          image: docker.io/clickhouse/clickhouse-server:24.8
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8123
+            - name: native
+              containerPort: 9000
+          env:
+            - name: CLICKHOUSE_DB
+              value: authproxy_app_metrics
+            - name: CLICKHOUSE_USER
+              value: authproxy
+            - name: CLICKHOUSE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: authproxy-load-clickhouse
+                  key: CLICKHOUSE_PASSWORD
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: clickhouse
+  labels:
+    app.kubernetes.io/name: clickhouse
+    app.kubernetes.io/component: app-metrics
+    loadtest.authproxy.io/component: dependency
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: clickhouse
+    app.kubernetes.io/component: app-metrics
+  ports:
+    - name: http
+      port: 8123
+      targetPort: http
+    - name: native
+      port: 9000
+      targetPort: native

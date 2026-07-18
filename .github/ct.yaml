@@ -10,6 +10,6 @@ check-version-increment: false
 # Skip maintainers-must-match-a-known-user check; the chart only lists me
 # and gating CI on GH user existence is brittle.
 validate-maintainers: false
-# Use a per-PR-scoped values file via --helm-extra-set-args for sqlite + redis.
-# ct also auto-picks up `<chart>/ci/*-values.yaml` files and runs an install
-# per file — we ship one here for the minimum-deps profile.
+# ct auto-picks up `<chart>/ci/*-values.yaml` files and runs an install per
+# file. Keep render-only overlays out of that glob so they are not installed as
+# standalone runtime profiles.

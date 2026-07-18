@@ -374,6 +374,15 @@ definitions:
         example: production
         type: string
     type: object
+  routes.MarkNotificationsViewedRequestJson:
+    properties:
+      ids:
+        example:
+        - ntf_test550e8400abcde
+        items:
+          type: string
+        type: array
+    type: object
   routes.NamespaceJson:
     description: Namespace for organizing resources
     properties:
@@ -5470,6 +5479,48 @@ paths:
       security:
       - BearerAuth: []
       summary: List notifications
+      tags:
+      - notifications
+  /notifications/_viewed:
+    post:
+      consumes:
+      - application/json
+      description: Mark multiple notifications viewed for the authenticated actor
+      parameters:
+      - description: Notification IDs
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.MarkNotificationsViewedRequestJson'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Mark notifications viewed
       tags:
       - notifications
   /notifications/{id}/_viewed:

@@ -14,24 +14,26 @@ export interface ConnectionStatusPresentation {
 
 export const getConnectionStatusPresentation = (connection: Connection): ConnectionStatusPresentation => {
   const createdDate = new Date(connection.created_at).toLocaleDateString();
+  const hasPendingSetup = Boolean(connection.setup_step_id);
   const isUnhealthy =
     connection.state === ConnectionState.CONFIGURED &&
     connection.health_state === ConnectionHealthState.UNHEALTHY;
   const isHealthyConfigured =
     connection.state === ConnectionState.CONFIGURED &&
-    !isUnhealthy;
-  const requiresSetup = connection.state === ConnectionState.SETUP;
+    !isUnhealthy &&
+    !hasPendingSetup;
+  const requiresSetup = connection.state === ConnectionState.SETUP || hasPendingSetup;
   const requiresReconnection = isUnhealthy || connection.state === ConnectionState.DISABLED;
-  const statusBadgeLabel = requiresSetup
-    ? 'Requires setup'
-    : requiresReconnection
-      ? 'Requires reconnection'
+  const statusBadgeLabel = requiresReconnection
+    ? 'Requires reconnection'
+    : requiresSetup
+      ? 'Requires setup'
       : null;
   const statusBadgeColor: 'warning' | 'error' = requiresReconnection ? 'error' : 'warning';
-  const statusText = requiresSetup
-    ? 'Setup required'
-    : requiresReconnection
-      ? 'Reconnection required'
+  const statusText = requiresReconnection
+    ? 'Reconnection required'
+    : requiresSetup
+      ? 'Setup required'
       : connection.state === ConnectionState.DISCONNECTING
         ? 'Disconnecting'
         : connection.state === ConnectionState.DISCONNECTED

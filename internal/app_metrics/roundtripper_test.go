@@ -51,10 +51,12 @@ func (m *mockRecordStore) getRecords() []*LogRecord {
 
 // mockFullStore captures Store calls for test assertions.
 type mockFullStore struct {
-	mu   sync.Mutex
-	logs []*FullLog
-	err  error
-	done chan struct{}
+	mu     sync.Mutex
+	logs   []*FullLog
+	err    error
+	getLog *FullLog
+	getErr error
+	done   chan struct{}
 }
 
 func newMockFullStore() *mockFullStore {
@@ -70,7 +72,7 @@ func (m *mockFullStore) Store(_ context.Context, log *FullLog) error {
 }
 
 func (m *mockFullStore) GetFullLog(_ context.Context, _ string, _ apid.ID) (*FullLog, error) {
-	return nil, nil
+	return m.getLog, m.getErr
 }
 
 func (m *mockFullStore) getLogs() []*FullLog {
@@ -91,7 +93,6 @@ func (m *mockFullStore) waitForStore(t *testing.T, timeout time.Duration) {
 }
 
 func TestRoundTripper_RoundTrip(t *testing.T) {
-	mockTransport := &mockRoundTripper{}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 	tests := []struct {
@@ -450,9 +451,10 @@ func TestRoundTripper_RoundTrip(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			mockTransport.reset()
-			mockTransport.response = test.response
-			mockTransport.err = test.roundTripErr
+			mockTransport := &mockRoundTripper{
+				response: test.response,
+				err:      test.roundTripErr,
+			}
 			store := &mockRecordStore{}
 			fullStore := newMockFullStore()
 
@@ -737,9 +739,4 @@ type mockRoundTripper struct {
 func (m *mockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	io.ReadAll(req.Body) // Simulate request being consumed
 	return m.response, m.err
-}
-
-func (m *mockRoundTripper) reset() {
-	m.response = nil
-	m.err = nil
 }

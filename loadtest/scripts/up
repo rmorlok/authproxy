@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+source "$SCRIPT_DIR/lib/loadtest.sh"
+
+profile=${1:-${LOADTEST_PROFILE:-smoke}}
+profile_file=$(loadtest_profile_path "$profile")
+profile_name=$(loadtest_profile_name "$profile_file")
+namespace=$(loadtest_namespace "$profile_file")
+run_dir=$(loadtest_init_run_dir "$profile_name" "$profile_file" "$namespace" up)
+
+loadtest_require_cmd kubectl
+loadtest_require_cmd helm
+loadtest_require_cmd openssl
+
+authproxy_repo=${AUTHPROXY_IMAGE_REPOSITORY:-ghcr.io/rmorlok/authproxy}
+authproxy_tag=${AUTHPROXY_IMAGE_TAG:-main}
+provider_image=${GO_OAUTH2_SERVER_IMAGE:-ghcr.io/rmorlok/go-oauth2-server@sha256:d1e5bdae007259b0c02255f26efce595f23eb2142e7da8caa3dac544dd445cb3}
+helm_timeout=${LOADTEST_HELM_TIMEOUT:-5m}
+
+loadtest_log "profile: $profile_name"
+loadtest_log "namespace: $namespace"
+loadtest_log "artifacts: $run_dir"
+
+loadtest_ensure_namespace "$namespace"
+loadtest_ensure_generated_secrets "$namespace"
+
+if [[ "${LOADTEST_INSTALL_K6_OPERATOR:-false}" == "true" ]]; then
+  loadtest_log "installing k6 Operator"
+  helm repo add grafana https://grafana.github.io/helm-charts >/dev/null
+  helm repo update grafana >/dev/null
+  helm upgrade --install k6-operator grafana/k6-operator \
+    --namespace "$namespace" \
+    --wait \
+    "--timeout=$helm_timeout"
+fi
+
+if [[ "${LOADTEST_INSTALL_KEDA:-false}" == "true" ]]; then
+  loadtest_log "installing KEDA"
+  helm repo add kedacore https://kedacore.github.io/charts >/dev/null
+  helm repo update kedacore >/dev/null
+  helm upgrade --install keda kedacore/keda \
+    --namespace "$namespace" \
+    --wait \
+    "--timeout=$helm_timeout"
+fi
+
+loadtest_apply_manifest_dir "$namespace" "$LOADTEST_ROOT/k8s/base"
+
+kubectl -n "$namespace" set image deployment/go-oauth2-server "go-oauth2-server=$provider_image"
+
+loadtest_wait_for_deployment "$namespace" postgresql "$helm_timeout"
+loadtest_wait_for_deployment "$namespace" redis-master "$helm_timeout"
+loadtest_wait_for_deployment "$namespace" clickhouse "$helm_timeout"
+loadtest_wait_for_deployment "$namespace" otel-lgtm "$helm_timeout"
+loadtest_wait_for_deployment "$namespace" go-oauth2-server "$helm_timeout"
+
+chart="$REPO_ROOT/deploy/charts/authproxy"
+common_values="$LOADTEST_ROOT/helm-values/common.yaml"
+
+install_release() {
+  local release=$1
+  local values_file=$2
+
+  loadtest_log "installing $release"
+  helm upgrade --install "$release" "$chart" \
+    --namespace "$namespace" \
+    --wait \
+    "--timeout=$helm_timeout" \
+    -f "$common_values" \
+    -f "$values_file" \
+    --set "image.repository=$authproxy_repo" \
+    --set "image.tag=$authproxy_tag"
+}
+
+install_release authproxy-admin-api "$LOADTEST_ROOT/helm-values/admin-api.yaml"
+install_release authproxy-api "$LOADTEST_ROOT/helm-values/api.yaml"
+install_release authproxy-public "$LOADTEST_ROOT/helm-values/public.yaml"
+install_release authproxy-worker "$LOADTEST_ROOT/helm-values/worker.yaml"
+
+loadtest_capture_cluster_snapshot "$namespace" "$run_dir"
+loadtest_capture_helm_snapshot "$namespace" "$run_dir"
+
+loadtest_log "environment ready"
+loadtest_log "run artifacts: $run_dir"

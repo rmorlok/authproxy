@@ -87,7 +87,7 @@ const baseConnectionsState = {
   recentlyCompletedConnectionId: null,
 };
 
-function renderConnectionDetail(preloadedState: any = {}) {
+function renderConnectionDetail(preloadedState: any = {}, initialEntry = '/connections/c-gmail') {
   const store = configureStore({
     reducer: combineReducers({
       auth: authReducer,
@@ -105,7 +105,7 @@ function renderConnectionDetail(preloadedState: any = {}) {
   });
 
   render(
-    <MemoryRouter initialEntries={['/connections/c-gmail']}>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <Provider store={store}>
         <Routes>
           <Route path="/connections/:connectionId" element={<ConnectionDetail />} />
@@ -202,6 +202,32 @@ describe('ConnectionDetail', () => {
 
     await waitFor(() => {
       expect(connections.getSetupStep).toHaveBeenCalledWith(setupConnection.id, window.location.href);
+    });
+  });
+
+  test('runs re-authentication from notification action URL', async () => {
+    renderConnectionDetail({}, '/connections/c-gmail?action=reauth');
+
+    await waitFor(() => {
+      expect(connections.reauth).toHaveBeenCalledWith(connection.id, window.location.href);
+    });
+  });
+
+  test('resumes pending setup from notification action URL', async () => {
+    const pendingSetupConnection = {
+      ...connection,
+      setup_step_id: 'workspace',
+    };
+
+    renderConnectionDetail({
+      connections: {
+        ...baseConnectionsState,
+        items: [pendingSetupConnection],
+      },
+    }, '/connections/c-gmail?action=configure');
+
+    await waitFor(() => {
+      expect(connections.getSetupStep).toHaveBeenCalledWith(pendingSetupConnection.id, window.location.href);
     });
   });
 });

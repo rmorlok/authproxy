@@ -6,6 +6,15 @@ This file provides guidance to coding agents when working with code in this repo
 
 AuthProxy is an open-source, embeddable integration platform-as-a-service (iPaaS). It manages the connection lifecycle to 3rd party systems, allowing applications to call those systems through an authenticating proxy.
 
+## Documentation
+
+Read [`docs/AGENTS.md`](docs/AGENTS.md) before changing the root README or any
+public documentation. The root `README.md` is a concise project landing page;
+keep its substantive content focused on what AuthProxy is and why to use it,
+the hosted demos, and the shortest developer quick start. Put conceptual,
+integration, SDK, deployment, operations, security, reference, and detailed
+development material in the Starlight site under `docs/src/content/docs/`.
+
 ## Workflow
 
 ### Preflight (required before commit)
@@ -142,7 +151,7 @@ Schema ownership lives under `internal/schema`; read `internal/schema/AGENTS.md`
 
 ### Telemetry conventions
 
-Full reference: [`docs/telemetry.md`](docs/telemetry.md). Day-to-day rules when adding instrumentation:
+Full reference: [`docs/src/content/docs/operations/telemetry.md`](docs/src/content/docs/operations/telemetry.md). Day-to-day rules when adding instrumentation:
 
 - **Config lives in one place.** The `telemetry:` block in `internal/schema/config` is the only knob — there is no per-package toggle. It is **off by default**, endpoint-gated (an empty `exporter.endpoint` falls through to no-op providers), and signals can be toggled independently under `telemetry.signals`.
 - **Use the existing instrumented wrappers** rather than wiring providers yourself:
@@ -158,7 +167,7 @@ Full reference: [`docs/telemetry.md`](docs/telemetry.md). Day-to-day rules when 
 
 ## Client configuration
 
-Full CLI reference: [`docs/cli.md`](docs/cli.md). The short version: the CLI looks for `~/.authproxy.yaml`:
+Full CLI reference: [`docs/src/content/docs/development/cli.md`](docs/src/content/docs/development/cli.md). The short version: the CLI looks for `~/.authproxy.yaml`:
 
 ```yaml
 admin_username: bobdole

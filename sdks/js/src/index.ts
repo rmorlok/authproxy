@@ -10,6 +10,7 @@ export * from './connections';
 export * from './keys';
 export * from './metrics';
 export * from './namespaces';
+export * from './notifications';
 export * from './proxy';
 export * from './rateLimits';
 export * from './requestEvents';

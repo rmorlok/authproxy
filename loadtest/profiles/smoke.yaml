@@ -1,0 +1,25 @@
+name: smoke
+namespace: authproxy-load
+description: Minimal Kubernetes smoke test for the load-test harness.
+cluster:
+  target: local-or-small-cluster
+objects:
+  namespaces: 10
+  connections: 10
+  oauth_tokens_expiring_percent: 0
+  periodic_probe_percent: 0
+authproxy:
+  api_replicas: 2
+  worker_replicas: 1
+  public_replicas: 1
+  admin_api_replicas: 1
+k6:
+  mode: job
+  scenario: smoke
+  rate: 2
+  duration: 30s
+  pre_allocated_vus: 4
+  max_vus: 16
+acceptance:
+  max_5xx_rate: 0.001
+  p95_latency_target: 500ms

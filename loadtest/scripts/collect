@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+source "$SCRIPT_DIR/lib/loadtest.sh"
+
+profile=${1:-${LOADTEST_PROFILE:-smoke}}
+profile_file=$(loadtest_profile_path "$profile")
+profile_name=$(loadtest_profile_name "$profile_file")
+namespace=$(loadtest_namespace "$profile_file")
+run_dir=$(loadtest_init_run_dir "$profile_name" "$profile_file" "$namespace" collect)
+
+loadtest_require_cmd kubectl
+loadtest_require_cmd helm
+
+loadtest_capture_cluster_snapshot "$namespace" "$run_dir"
+loadtest_capture_helm_snapshot "$namespace" "$run_dir"
+
+kubectl -n "$namespace" get jobs -o wide > "$run_dir/kubernetes/jobs.txt" 2>&1 || true
+kubectl -n "$namespace" get configmaps -o wide > "$run_dir/kubernetes/configmaps.txt" 2>&1 || true
+kubectl -n "$namespace" get secrets -o name > "$run_dir/kubernetes/secrets.txt" 2>&1 || true
+kubectl -n "$namespace" get testruns.k6.io -o yaml > "$run_dir/k6/testruns.yaml" 2>&1 || true
+kubectl -n "$namespace" logs job/authproxy-smoke-k6 > "$run_dir/k6/smoke.log" 2>&1 || true
+
+pod=$(kubectl -n "$namespace" get pod -l job-name=authproxy-smoke-k6 -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+if [[ -n "$pod" ]]; then
+  kubectl -n "$namespace" cp "$pod:/artifacts/summary.json" "$run_dir/k6/summary.json" >/dev/null 2>&1 || true
+fi
+
+loadtest_log "collected artifacts for profile $profile_name"
+loadtest_log "run artifacts: $run_dir"
