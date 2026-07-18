@@ -1,6 +1,6 @@
 ---
 title: Related projects
-description: Compare AuthProxy with unified APIs, embedded iPaaS products, workflow platforms, and open-source integration frameworks.
+description: Compare AuthProxy with unified APIs, embedded iPaaS products, webhook gateways, workflow platforms, and open-source integration frameworks.
 ---
 
 This is a research index for products adjacent to AuthProxy. Vendor packaging,
@@ -12,6 +12,7 @@ The landscape splits into a few overlapping domains:
 - **Unified APIs**: Normalize a vertical (e.g., HRIS/ATS/Accounting) behind a single data model and endpoint set.
 - **Embedded iPaaS**: Integration infrastructure designed to be embedded into your SaaS product for customer-facing integrations.
 - **Traditional iPaaS / Workflow Automation**: Internal automation platforms with large connector catalogs and visual builders.
+- **Webhook / Event Gateways**: Reliability infrastructure for receiving, routing, observing, replaying, and delivering asynchronous events.
 - **AI / Agent Integration Gateways**: Tool-calling, MCP servers, or AI gateways that broker auth + actions to many services.
 - **Open-source Frameworks / Building Blocks**: Libraries or frameworks for teams that want full control.
 
@@ -35,6 +36,10 @@ That produces different tradeoffs from adjacent categories:
 - A **workflow automation system** owns orchestration and transformations.
   AuthProxy focuses on connections, authentication, proxying, and governance;
   application code still owns the workflow.
+- A **webhook or event gateway** makes asynchronous event ingress or egress
+  reliable with queues, retries, replay, routing, and delivery logs. AuthProxy
+  manages credentials and authenticated synchronous API calls; it does not
+  replace durable webhook delivery infrastructure.
 - A **secret manager or credential proxy** protects secret access. AuthProxy
   adds OAuth callbacks and refresh, user-facing setup, connector versions,
   health, rate limits, and request-event context.
@@ -107,6 +112,37 @@ credential and request data.
 
 ---
 
+## Webhook / event gateways
+
+Webhook gateways are a distinct, narrower integration-infrastructure category.
+They sit between an event producer and one or more consumers, adding durable
+ingress or delivery, retries, rate control, routing, replay, signing, and
+operational visibility. Unlike an iPaaS, they generally do not provide a large
+catalog of authenticated API actions or own application workflows.
+
+| Product | Direction | Packaging / license | Self-hosting | Notes |
+| --- | --- | --- | --- | --- |
+| [Hookdeck](https://hookdeck.com/) | Inbound and outbound | Commercial Event Gateway; Apache-2.0 Outpost runtime | Outbound: yes; inbound: no public self-host option | Event Gateway receives, queues, filters, transforms, routes, observes, and replays external events. Outpost provides multi-tenant outbound webhooks and event destinations. |
+| [Svix](https://www.svix.com/) | Primarily outbound | Commercial hosting + open-source server (MIT) | Yes | Webhooks-as-a-service focused on delivery, signing, retries, monitoring, and an application portal. |
+| [Convoy](https://www.getconvoy.io/) | Inbound and outbound | Commercial + source-available server (Elastic License 2.0) | Yes | Webhook gateway with routing, persistence, retries, rate limiting, circuit breaking, and an operator dashboard. |
+| [Hook0](https://www.hook0.com/) | Outbound | Commercial hosting + source-available server (SSPL-1.0) | Yes | Multi-tenant webhook sending with subscriptions, signatures, retries, delivery logs, and replay. |
+
+### Webhook gateway product notes
+
+- **Hookdeck** spans both sides of the boundary. Its managed Event Gateway is an inbound proxy and asynchronous API gateway for accepting third-party events before they reach an application, with filtering, transformations, rate control, observability, and replay. Hookdeck Outpost handles outbound delivery to customer-managed webhooks, queues, brokers, and event buses. Outpost is Apache-2.0 and can be self-hosted; Hookdeck does not publish a self-hosted edition of the inbound Event Gateway. See: https://hookdeck.com/, https://hookdeck.com/docs, and https://github.com/hookdeck/outpost.
+- **Svix** is the closest permissively licensed outbound alternative. Its hosted service and MIT-licensed self-hosted server accept one publish call and handle endpoint management, signing, retries, and delivery observability. Svix's consumer tooling also helps recipients verify and debug messages, but the core product is outbound delivery rather than a general inbound proxy. See: https://www.svix.com/ and https://github.com/svix/svix-webhooks.
+- **Convoy** is a bidirectional, self-hostable gateway that can ingest provider webhooks and deliver application events to customer endpoints. Its repository is publicly available under Elastic License 2.0, which permits self-hosting but is source-available rather than OSI open source. See: https://github.com/frain-dev/convoy and https://www.getconvoy.io/core-gateway.
+- **Hook0** focuses on providing outbound webhooks to a SaaS product's users. It is self-hostable and publishes its server and UI source under SSPL-1.0; that license is source-available rather than an OSI-approved open-source license. See: https://www.hook0.com/ and https://github.com/hook0/hook0.
+
+For AuthProxy, these systems are complementary more often than substitutes. A
+host application can use AuthProxy to manage a tenant's authenticated calls to
+a provider and place a webhook gateway at its event boundary. The overlap is
+limited to adjacent concerns such as tenant isolation, request observability,
+and proxying; webhook gateways do not generally own OAuth connection setup,
+token refresh, or arbitrary authenticated access to a provider's native API.
+
+---
+
 ## AI / agent integration gateways
 
 | Product | Commercial / OSS | Traditional vs Embedded | Connector Count | Self-hosting | Notes |
@@ -137,12 +173,16 @@ credential and request data.
 | --- | --- | --- | --- | --- | --- |
 | [Frigg](https://friggframework.org/) | Open Source | Embedded framework | Not publicly stated | Yes (runs in your cloud) | Serverless framework + API modules library. |
 | [Ampersand Connectors](https://github.com/amp-labs/connectors) | Open Source | Embedded building blocks | Not publicly stated | Yes (library you run yourself) | OSS connector library used by Ampersand. |
+| [Hookdeck Outpost](https://github.com/hookdeck/outpost) | Open Source (Apache-2.0) | Outbound event-delivery infrastructure | N/A (destination types, not API connectors) | Yes | Multi-tenant webhooks and event destinations with retries, fan-out, observability, and a user portal. |
+| [Svix Webhooks](https://github.com/svix/svix-webhooks) | Open Source (MIT) | Outbound webhook-delivery infrastructure | N/A (webhook endpoints, not API connectors) | Yes | Self-hostable webhook sending server with retries, signatures, and delivery controls. |
 | [Apache Camel](https://camel.apache.org/) | Open Source (Apache-2.0) | Integration framework / building block | 370 non-core components (plus core components and Kamelets) | Yes (library/runtime you operate) | EIP-based routing and mediation framework with route DSLs, components, data formats, Camel K, and Karavan. |
 
 ### Framework notes
 
 - **Frigg**: OSS framework for teams that want to own infrastructure and build embedded integrations; provides a modular API library and serverless architecture, and runs in your cloud. See: https://lefthook.com/frigg/ and https://docs.friggframework.org/.
 - **Ampersand Connectors**: OSS connector library used by Ampersand; useful for teams building their own integration infrastructure. See: https://github.com/amp-labs/connectors.
+- **Hookdeck Outpost**: Apache-2.0 outbound event-delivery runtime. It supports multi-tenant webhooks plus destinations such as SQS, Kafka, RabbitMQ, EventBridge, and Pub/Sub, and includes retries, fan-out, OpenTelemetry, and an end-user portal. See: https://github.com/hookdeck/outpost.
+- **Svix Webhooks**: MIT-licensed server behind Svix's outbound webhook service. It is the other permissively licensed, self-hostable alternative in this comparison. See: https://github.com/svix/svix-webhooks.
 - **Apache Camel**: OSS integration building block for teams that want full control over routes, transports, and deployment. It is strongest when the problem is message routing, mediation, protocol bridging, transformation, or running integration logic inside Java/Spring Boot/Quarkus/Kubernetes environments. It is less directly comparable to embedded iPaaS products because it does not provide a hosted multi-tenant connection UI, unified API model, or credential lifecycle out of the box. See: https://camel.apache.org/manual/faq/what-is-camel.html and https://camel.apache.org/docs/.
 
 ---
@@ -164,6 +204,10 @@ credential and request data.
 | Nango | Integration infrastructure | Code-first | Webhooks + syncs | Prebuilt auth + custom integrations | Yes (limited free self-host; enterprise self-host) |
 | n8n | Workflow automation | UI-heavy + code nodes | Webhooks + triggers | Community + core nodes | Yes (self-hosted editions) |
 | Pipedream | Workflow automation | Code-first + UI | Webhooks + triggers | App actions + custom code | No (publicly stated) |
+| Hookdeck | Inbound event gateway + outbound delivery | Hybrid (API + UI + CLI) | Core product | Sources, routing connections, destinations, and delivery policies | Outbound Outpost only (Apache-2.0) |
+| Svix | Outbound webhook delivery | API-first + application portal | Core product | Applications, endpoints, event types, and delivery policies | Yes (MIT server) |
+| Convoy | Bidirectional webhook gateway | API + operator UI | Core product | Sources, subscriptions, endpoints, and delivery policies | Yes (Elastic License 2.0) |
+| Hook0 | Outbound webhook delivery | API + UI | Core product | Applications, event types, subscriptions, and endpoints | Yes (SSPL-1.0) |
 | Composio | AI agent tool access | Code-first | Triggers supported | Toolkits + MCP servers | Not stated in docs |
 | Metorial | MCP integration platform | Code-first | N/A (agent tool calls) | MCP servers (hosted or OSS) | Yes (open source; self-hostable) |
 | Pica | Auth + actions for AI & SaaS | Code-first + embeddable UI | Webhooks supported | AuthKit + Passthrough API | No public self-host option |
