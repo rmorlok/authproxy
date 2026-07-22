@@ -49,7 +49,7 @@ func (r *connectorDisconnectAllRig) archive(t *testing.T, connectorID apid.ID, t
 	require.Equal(t, connectorID, body.ConnectorId)
 	require.NotEmpty(t, body.TaskId)
 
-	requireWorkflowTaskCompleted(t, r.env, body.TaskId, "test-actor", time.Duration(timeoutSeconds+5)*time.Second)
+	helpers.RequireWorkflowTaskCompleted(t, r.env, body.TaskId, time.Duration(timeoutSeconds+5)*time.Second)
 }
 
 func createArchiveVersionShape(t *testing.T, rig *connectorDisconnectAllRig, connector connectorDisconnectAllConnector) []uint64 {
@@ -106,7 +106,7 @@ func TestConnectorArchive_ArchivesVersionsAndDisconnectsConnections(t *testing.T
 	requireConnectionAvailable(t, rig, connectionID)
 	versions := createArchiveVersionShape(t, rig, rig.connectors[0])
 
-	startCoreWorkflowWorker(t, rig.env)
+	helpers.StartCoreWorkflowWorker(t, rig.env)
 	rig.archive(t, rig.connectors[0].id, 20)
 
 	requireConnectorVersionsArchived(t, rig.env.Db, rig.connectors[0].id, versions)
@@ -133,7 +133,7 @@ func TestConnectorArchive_RevocationFailureStillArchives(t *testing.T) {
 		FailCount: 10,
 	})
 
-	startCoreWorkflowWorker(t, rig.env)
+	helpers.StartCoreWorkflowWorker(t, rig.env)
 	rig.archive(t, rig.connectors[0].id, 20)
 
 	requireConnectorVersionsArchived(t, rig.env.Db, rig.connectors[0].id, versions)

@@ -13,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	workflowworker "github.com/cschleiden/go-workflows/worker"
 	"github.com/rmorlok/authproxy/integration_tests/helpers"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -21,7 +20,6 @@ import (
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
-	apworkflows "github.com/rmorlok/authproxy/internal/workflows"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -155,101 +153,11 @@ func (r *disconnectRevocationRig) disconnect(t *testing.T, connectionID string) 
 	assert.Equal(t, string(database.ConnectionStateDisconnecting), body.Connection.State)
 	assert.NotEmpty(t, body.TaskID)
 
-	requireWorkflowTaskCompleted(t, r.env, body.TaskID, "test-actor", 15*time.Second)
-}
-
-func requireWorkflowTaskCompleted(
-	t *testing.T,
-	env *helpers.IntegrationTestEnv,
-	taskID string,
-	actorExternalID string,
-	timeout time.Duration,
-) {
-	t.Helper()
-
-	var lastStatus int
-	var lastBody string
-	var lastState schemaapi.TaskState
-	require.Eventually(t, func() bool {
-		req, err := env.ApiAuthUtil.NewSignedRequestForActorExternalId(
-			http.MethodGet,
-			"/api/v1/tasks/"+taskID,
-			nil,
-			sconfig.RootNamespace,
-			actorExternalID,
-			aschema.NoPermissions(),
-		)
-		require.NoError(t, err)
-
-		w := httptest.NewRecorder()
-		env.ApiGin.ServeHTTP(w, req)
-		lastStatus = w.Code
-		lastBody = w.Body.String()
-		if w.Code != http.StatusOK {
-			return false
-		}
-
-		var body schemaapi.TaskInfoJson
-		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
-		lastState = body.State
-		require.Equal(t, taskID, body.Id)
-
-		switch body.State {
-		case schemaapi.TaskStateCompleted:
-			return true
-		case schemaapi.TaskStateFailed:
-			t.Fatalf("disconnect workflow task failed: %s", w.Body.String())
-		}
-		return false
-	}, timeout, 100*time.Millisecond,
-		"disconnect workflow task should complete; last status=%d state=%s body=%s",
-		lastStatus,
-		lastState,
-		lastBody,
-	)
+	helpers.RequireWorkflowTaskCompleted(t, r.env, body.TaskID, 15*time.Second)
 }
 
 func int64Ptr(v int64) *int64 {
 	return &v
-}
-
-func startCoreWorkflowWorker(t *testing.T, env *helpers.IntegrationTestEnv) {
-	t.Helper()
-
-	workflowRuntime := env.DM.GetWorkflowRuntime()
-	workflowWorker, err := apworkflows.NewWorker(workflowRuntime, &workflowworker.Options{
-		WorkflowWorkerOptions: workflowworker.WorkflowWorkerOptions{
-			WorkflowPollers:          2,
-			MaxParallelWorkflowTasks: 1,
-		},
-		ActivityWorkerOptions: workflowworker.ActivityWorkerOptions{
-			ActivityPollers:          2,
-			MaxParallelActivityTasks: 1,
-		},
-	})
-	require.NoError(t, err)
-	require.NoError(t, env.Core.RegisterWorkflows(workflowWorker))
-
-	ctx, cancel := context.WithCancel(context.Background())
-	errCh := make(chan error, 1)
-
-	go func() {
-		if err := workflowWorker.Start(ctx); err != nil {
-			errCh <- err
-			return
-		}
-		errCh <- workflowWorker.WaitForCompletion()
-	}()
-
-	t.Cleanup(func() {
-		cancel()
-		select {
-		case err := <-errCh:
-			require.NoError(t, err)
-		case <-time.After(5 * time.Second):
-			t.Fatal("workflow worker did not stop")
-		}
-	})
 }
 
 func requireConnectionDeleted(t *testing.T, rig *disconnectRevocationRig, connectionID string) {
@@ -295,7 +203,7 @@ func TestDisconnectRevocation_RevokesProviderTokensAndBlocksFutureProxy(t *testi
 	w := rig.env.DoProxyRequest(t, connID, rig.provider.ResourceURL("/echo"), http.MethodGet)
 	require.Equal(t, http.StatusOK, parseRevocationProxyResponse(t, w).StatusCode)
 
-	startCoreWorkflowWorker(t, rig.env)
+	helpers.StartCoreWorkflowWorker(t, rig.env)
 	rig.disconnect(t, connID)
 	requireConnectionDeleted(t, rig, connID)
 
@@ -324,7 +232,7 @@ func TestDisconnectRevocation_RevocationFailureStillCompletesDisconnect(t *testi
 		FailCount: 10,
 	})
 
-	startCoreWorkflowWorker(t, rig.env)
+	helpers.StartCoreWorkflowWorker(t, rig.env)
 	rig.disconnect(t, connID)
 	requireConnectionDeleted(t, rig, connID)
 	requireProxyBlockedAfterDisconnect(t, rig, connID)

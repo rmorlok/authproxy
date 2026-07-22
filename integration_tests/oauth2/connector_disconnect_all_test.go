@@ -164,7 +164,7 @@ func (r *connectorDisconnectAllRig) disconnectAll(t *testing.T, connectorID apid
 	require.Equal(t, connectorID, body.ConnectorId)
 	require.NotEmpty(t, body.TaskId)
 
-	requireWorkflowTaskCompleted(t, r.env, body.TaskId, "test-actor", time.Duration(timeoutSeconds+5)*time.Second)
+	helpers.RequireWorkflowTaskCompleted(t, r.env, body.TaskId, time.Duration(timeoutSeconds+5)*time.Second)
 }
 
 func requireConnectionDeletedByID(t *testing.T, env *helpers.IntegrationTestEnv, connectionID string) {
@@ -205,7 +205,7 @@ func TestConnectorDisconnectAll_DisconnectsTargetConnectionsOnly(t *testing.T) {
 	requireConnectionAvailable(t, rig, targetConnection2)
 	requireConnectionAvailable(t, rig, otherConnection)
 
-	startCoreWorkflowWorker(t, rig.env)
+	helpers.StartCoreWorkflowWorker(t, rig.env)
 	rig.disconnectAll(t, rig.connectors[0].id, 20)
 
 	requireConnectionDeletedByID(t, rig.env, targetConnection1)
@@ -238,7 +238,7 @@ func TestConnectorDisconnectAll_RevocationFailureStillCompletes(t *testing.T) {
 		FailCount: 10,
 	})
 
-	startCoreWorkflowWorker(t, rig.env)
+	helpers.StartCoreWorkflowWorker(t, rig.env)
 	rig.disconnectAll(t, rig.connectors[0].id, 20)
 
 	requireConnectionDeletedByID(t, rig.env, connectionID)
