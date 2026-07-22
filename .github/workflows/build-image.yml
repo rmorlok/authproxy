@@ -20,6 +20,7 @@ concurrency:
 
 env:
   REGISTRY: ghcr.io
+  DOCKER_METADATA_SHORT_SHA_LENGTH: 8
 
 jobs:
   build-authproxy:

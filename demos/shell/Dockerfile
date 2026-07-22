@@ -22,6 +22,7 @@ RUN corepack enable
 COPY package.json yarn.lock .yarnrc.yml ./
 # All declared workspaces must exist on disk for `yarn install --immutable`
 # to succeed — copy them all even though we only build one here.
+COPY docs/package.json docs/package.json
 COPY ui ui
 COPY sdks sdks
 COPY demos demos
