@@ -27,6 +27,7 @@ func TestOnVerifyPassed(t *testing.T) {
 		verify := cschema.SetupStepVerify
 		conn.SetupStep = &verify
 
+		expectResolveRequiredActionNotification(db, conn.Id, database.NotificationKeyAuthRequired)
 		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewSetupStep("workspace"))).Return(nil)
 
 		err := conn.onVerifyPassed(context.Background())
@@ -45,8 +46,10 @@ func TestOnVerifyPassed(t *testing.T) {
 		verify := cschema.SetupStepVerify
 		conn.SetupStep = &verify
 
+		expectResolveRequiredActionNotification(db, conn.Id, database.NotificationKeyAuthRequired)
 		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, (*cschema.SetupStep)(nil)).Return(nil)
 		db.EXPECT().SetConnectionState(gomock.Any(), conn.Id, database.ConnectionStateConfigured).Return(nil)
+		expectResolveRequiredActionNotification(db, conn.Id, database.NotificationKeySetupRequired)
 
 		err := conn.onVerifyPassed(context.Background())
 		require.NoError(t, err)
@@ -64,8 +67,10 @@ func TestOnVerifyPassed(t *testing.T) {
 		conn.SetupStep = &verify
 
 		db.EXPECT().SetConnectionHealthState(gomock.Any(), conn.Id, database.ConnectionHealthStateHealthy).Return(nil)
+		expectResolveRequiredActionNotification(db, conn.Id, database.NotificationKeyAuthRequired)
 		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, (*cschema.SetupStep)(nil)).Return(nil)
 		db.EXPECT().SetConnectionState(gomock.Any(), conn.Id, database.ConnectionStateConfigured).Return(nil)
+		expectResolveRequiredActionNotification(db, conn.Id, database.NotificationKeySetupRequired)
 
 		err := conn.onVerifyPassed(context.Background())
 		require.NoError(t, err)

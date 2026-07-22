@@ -101,6 +101,7 @@ func TestHandleCredentialsEstablished(t *testing.T) {
 		current := cschema.MustNewSetupStep(oauth2.OAuth2AuthorizeStepId)
 		conn.SetupStep = &current
 
+		expectResolveRequiredActionNotification(db, conn.Id, database.NotificationKeyAuthRequired)
 		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewSetupStep("workspace"))).Return(nil)
 
 		outcome, err := conn.HandleCredentialsEstablished(context.Background())
@@ -136,6 +137,7 @@ func TestHandleCredentialsEstablished(t *testing.T) {
 		current := cschema.MustNewSetupStep(oauth2.OAuth2AuthorizeStepId)
 		conn.SetupStep = &current
 
+		expectResolveRequiredActionNotification(db, conn.Id, database.NotificationKeyAuthRequired)
 		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewSetupStep("workspace"))).Return(nil)
 		// No EnqueueContext expectation — disabled probes must skip verify.
 
@@ -161,6 +163,8 @@ func TestHandleCredentialsEstablished(t *testing.T) {
 
 		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, (*cschema.SetupStep)(nil)).Return(nil)
 		db.EXPECT().SetConnectionState(gomock.Any(), conn.Id, database.ConnectionStateConfigured).Return(nil)
+		expectResolveRequiredActionNotification(db, conn.Id, database.NotificationKeySetupRequired)
+		expectResolveRequiredActionNotification(db, conn.Id, database.NotificationKeyAuthRequired)
 
 		outcome, err := conn.HandleCredentialsEstablished(context.Background())
 		require.NoError(t, err)

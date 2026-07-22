@@ -51,6 +51,7 @@ func newTestConnectionWithSetupFlowAndAsynq(t *testing.T, ctrl *gomock.Controlle
 	e := encrypt.NewFakeEncryptService(false)
 	s, db, _, _, ac, _ := FullMockService(t, ctrl)
 	s.encrypt = e
+	s.r = nil
 
 	connector := cschema.Connector{
 		SetupFlow: sf,
@@ -202,6 +203,7 @@ func TestSubmitForm(t *testing.T) {
 		db.EXPECT().SetConnectionEncryptedConfiguration(gomock.Any(), conn.Id, gomock.Any()).Return(nil)
 		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, (*cschema.SetupStep)(nil)).Return(nil)
 		db.EXPECT().SetConnectionState(gomock.Any(), conn.Id, database.ConnectionStateConfigured).Return(nil)
+		expectResolveRequiredActionNotification(db, conn.Id, database.NotificationKeySetupRequired)
 
 		resp, err := conn.SubmitForm(context.Background(), iface.SubmitConnectionRequest{
 			StepId: "workspace",
@@ -292,6 +294,7 @@ func TestSubmitForm(t *testing.T) {
 		db.EXPECT().SetConnectionEncryptedConfiguration(gomock.Any(), conn.Id, gomock.Any()).Return(nil)
 		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, (*cschema.SetupStep)(nil)).Return(nil)
 		db.EXPECT().SetConnectionState(gomock.Any(), conn.Id, database.ConnectionStateConfigured).Return(nil)
+		expectResolveRequiredActionNotification(db, conn.Id, database.NotificationKeySetupRequired)
 
 		resp, err = conn.SubmitForm(context.Background(), iface.SubmitConnectionRequest{
 			StepId: "step2",
