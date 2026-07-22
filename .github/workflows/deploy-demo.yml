@@ -80,9 +80,9 @@ jobs:
           if [ -n "${{ inputs.image_tag }}" ]; then
             tag="${{ inputs.image_tag }}"
           elif [ "${{ github.event_name }}" = "workflow_run" ]; then
-            tag="sha-$(printf '%s' "${DEPLOY_SHA}" | cut -c1-7)"
+            tag="sha-$(printf '%s' "${DEPLOY_SHA}" | cut -c1-8)"
           else
-            tag="sha-$(git rev-parse --short HEAD)"
+            tag="sha-$(git rev-parse --short=8 HEAD)"
           fi
 
           echo "sha=${DEPLOY_SHA}" >> "$GITHUB_OUTPUT"

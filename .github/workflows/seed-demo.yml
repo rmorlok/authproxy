@@ -62,7 +62,7 @@ jobs:
           if [ -n "${{ inputs.image_tag }}" ]; then
             tag="${{ inputs.image_tag }}"
           else
-            tag="sha-$(git rev-parse --short HEAD)"
+            tag="sha-$(git rev-parse --short=8 HEAD)"
           fi
 
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
