@@ -2,8 +2,8 @@
 
 This directory contains the Kubernetes harness for the AuthProxy load-test
 project tracked by #711. It is intentionally split from product
-optimizations: this first slice gives us repeatable environment setup, smoke
-traffic, state seeding, and artifact capture. The proxy-QPS scenarios and
+optimizations: the harness gives us repeatable environment setup, smoke
+traffic, state seeding, proxy-QPS scenarios, and artifact capture. The
 background-job suites build on this foundation in follow-up issues.
 
 ## Prerequisites
@@ -36,6 +36,14 @@ capacity.
 # health. Uses a Kubernetes Job unless LOADTEST_K6_MODE=operator is set.
 ./loadtest/scripts/run smoke
 
+# Run proxy-QPS scenarios against seeded connections. The high-cardinality
+# profiles default to k6 Operator mode for distributed runs.
+./loadtest/scripts/run 100k proxy-raw
+./loadtest/scripts/run 100k proxy-wrapped
+./loadtest/scripts/run 100k proxy-scale
+./loadtest/scripts/run 100k proxy-soak
+./loadtest/scripts/run 100k proxy-spike
+
 # Capture pods, deployments, services, Helm values, logs, and k6 summary JSON.
 ./loadtest/scripts/collect smoke
 
@@ -57,9 +65,50 @@ Profiles live in `profiles/`:
 - `250k.yaml` targets 250,000 connections and 100,000+ namespaces.
 - `500k.yaml` is the stretch profile.
 
-The seed script consumes the object-count section directly. The k6 and
-background-job scenario issues will consume the generated datasets and traffic
-sections.
+The seed script consumes the object-count section directly. Proxy-QPS scenarios
+consume the generated `datasets/connections.csv`, compact it to the columns k6
+needs, and reuse that same sampled dataset across raw, wrapped, spike, soak,
+and scale runs.
+
+## k6 Proxy Scenarios
+
+`./loadtest/scripts/run <profile> <scenario>` supports:
+
+- `smoke`: low-rate health checks for the deployed services.
+- `proxy-raw`: constant-arrival-rate traffic against
+  `/api/v1/connections/{id}/_proxy_raw`.
+- `proxy-wrapped`: constant-arrival-rate comparison traffic against
+  `/api/v1/connections/{id}/_proxy`.
+- `proxy-scale`: sequentially fixes `authproxy-api` replicas to the profile's
+  `k6.scale_replicas` entries and runs `LOADTEST_PROXY_SCALE_SCENARIO`
+  (`proxy-raw` by default) at each size.
+- `proxy-soak`: long constant-arrival-rate run using `k6.soak_duration`.
+- `proxy-spike`: ramping-arrival-rate run using the profile's spike knobs.
+
+The proxy script calls the go-oauth2-server load sink under
+`/test/load/resource/proxy/{connection_id}` and expects the provider to accept
+seeded bearer tokens with the `at_` prefix. Override the sink behavior with
+`K6_UPSTREAM_STATUS`, `K6_UPSTREAM_BYTES`, `K6_UPSTREAM_DELAY_MS`,
+`K6_UPSTREAM_JITTER_MS`, and `K6_UPSTREAM_BEARER_PREFIX`.
+
+The runner mints a scoped `connections:proxy` token from the generated
+`authproxy-load-actors` secret. Set `LOADTEST_AUTHPROXY_BEARER_TOKEN` or
+`AUTHPROXY_BEARER_TOKEN` to provide a token yourself.
+
+k6 thresholds fail runs when:
+
+- `http_req_duration` p95 exceeds `K6_P95_THRESHOLD_MS`.
+- `http_req_failed`, `proxy_5xx_rate`, or `proxy_upstream_5xx_rate` exceed the
+  configured rate.
+- k6 drops iterations or observes any unexpected upstream status.
+
+ConfigMap-backed k6 Operator scripts have a Kubernetes size ceiling, so the
+runner defaults to a compact sample of 10,000 seeded connections. Tune that with
+`LOADTEST_K6_CONNECTION_ROWS` or `k6.connection_rows`; use `all` only when the
+generated ConfigMap remains below `LOADTEST_K6_CONFIGMAP_MAX_BYTES`. Grafana's
+k6 Operator docs recommend a PVC or local-file based runner image for larger
+multi-file suites:
+https://grafana.com/docs/k6/latest/set-up/set-up-distributed-k6/usage/executing-k6-scripts-with-testrun-crd/
 
 ## Environment Variables
 
@@ -67,10 +116,21 @@ sections.
 - `LOADTEST_RUN_DIR`: writes artifacts to a fixed directory.
 - `AUTHPROXY_IMAGE_REPOSITORY`: defaults to `ghcr.io/rmorlok/authproxy`.
 - `AUTHPROXY_IMAGE_TAG`: defaults to `main`.
-- `GO_OAUTH2_SERVER_IMAGE`: defaults to the current demo provider image.
+- `GO_OAUTH2_SERVER_IMAGE`: defaults to `ghcr.io/rmorlok/go-oauth2-server:master`;
+  pin this to a digest for reproducible capacity runs.
 - `K6_IMAGE`: defaults to `grafana/k6:0.54.0`.
 - `LOADTEST_K6_MODE`: `job` (default) or `operator`.
 - `LOADTEST_K6_TIMEOUT`: defaults to `5m`.
+- `LOADTEST_K6_WAIT=true`: wait for k6 Operator `TestRun` completion. `proxy-scale`
+  enables this automatically so replica measurements run sequentially.
+- `LOADTEST_K6_CONNECTIONS_CSV`: explicit seeded `connections.csv` path for proxy
+  runs. Defaults to the latest seed artifacts for the profile.
+- `LOADTEST_K6_CONNECTION_ROWS`: number of seeded rows to compact into the k6
+  dataset, or `all`.
+- `LOADTEST_PROXY_MODE`: override proxy mode for soak/spike runs (`raw` or
+  `wrapped`).
+- `LOADTEST_PROXY_SCALE_SCENARIO`: scenario to run for each replica count in
+  `proxy-scale`; defaults to `proxy-raw`.
 - `LOADTEST_AUTHPROXY_CONFIG`: AuthProxy config used by `seed`. When unset,
   `seed` generates a local SQLite/miniredis config in the run directory.
 - `LOADTEST_PROVIDER_BASE_URL`: provider URL written into seeded connector
@@ -108,7 +168,8 @@ Each script writes or appends to a run directory containing:
 - `helm-values/`: the value overlays used by `up`.
 - `kubernetes/`: resource snapshots, events, and rollout summaries.
 - `helm/`: `helm list`, rendered values, and manifest snapshots.
-- `k6/`: k6 logs and summary JSON when available.
+- `k6/`: k6 logs, generated TestRun manifests, environment snapshots, summary
+  JSON when available, and `scale-results.tsv` for Job-backed replica sweeps.
 
 The `seed` step also writes:
 
@@ -134,11 +195,14 @@ Then run:
 
 ```bash
 LOADTEST_K6_MODE=operator ./loadtest/scripts/run smoke
+LOADTEST_K6_MODE=operator ./loadtest/scripts/run 100k proxy-raw
 ```
 
-The script creates the k6 script ConfigMap and applies
-`k8s/k6/smoke-testrun.yaml`. The default Job mode is kept so smoke tests work on
-clusters where the operator CRDs are not installed.
+The script creates the k6 script ConfigMap and applies a `TestRun`. Proxy
+scenarios set `parallelism` from the profile or `K6_PARALLELISM`, and `proxy-scale`
+waits for each distributed run to finish before moving to the next API replica
+count. The default Job mode is kept so smoke tests and smaller proxy checks work
+on clusters where the operator CRDs are not installed.
 
 ## Optional KEDA
 
