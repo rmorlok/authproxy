@@ -75,6 +75,23 @@ func TestNotifications(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, viewed, updated.Id)
 
+	unviewedItems, err := db.ListNotifications(ctx, ListNotificationsOptions{
+		States:  []NotificationState{NotificationStateActive},
+		Limit:   10,
+		ActorId: actorID,
+	})
+	require.NoError(t, err)
+	require.Empty(t, unviewedItems)
+
+	unviewedForOtherActor, err := db.ListNotifications(ctx, ListNotificationsOptions{
+		States:  []NotificationState{NotificationStateActive},
+		Limit:   10,
+		ActorId: apid.New(apid.PrefixActor),
+	})
+	require.NoError(t, err)
+	require.Len(t, unviewedForOtherActor, 1)
+	require.Equal(t, updated.Id, unviewedForOtherActor[0].Id)
+
 	require.NoError(t, db.ResolveNotificationsForResourceKeys(ctx, "connection", connID, []string{updated.Key}))
 	resolved, err := db.GetNotification(ctx, updated.Id)
 	require.NoError(t, err)

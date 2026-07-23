@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/rmorlok/authproxy/internal/core/iface"
+	"github.com/rmorlok/authproxy/internal/database"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
 
@@ -33,6 +34,9 @@ func (c *connection) HandleCredentialsEstablished(ctx context.Context) (iface.Po
 		if _, err := c.completeFlow(ctx); err != nil {
 			return iface.PostAuthOutcome{}, err
 		}
+		if err := c.resolveRequiredActionNotifications(ctx, database.NotificationKeyAuthRequired); err != nil {
+			return iface.PostAuthOutcome{}, fmt.Errorf("failed to resolve auth-required notification after credentials were established: %w", err)
+		}
 		return iface.PostAuthOutcome{SetupPending: false}, nil
 	}
 
@@ -44,6 +48,8 @@ func (c *connection) HandleCredentialsEstablished(ctx context.Context) (iface.Po
 		if err := c.s.EnqueueVerifyConnection(ctx, c.GetId()); err != nil {
 			return iface.PostAuthOutcome{}, fmt.Errorf("failed to enqueue verify connection task: %w", err)
 		}
+	} else if err := c.resolveRequiredActionNotifications(ctx, database.NotificationKeyAuthRequired); err != nil {
+		return iface.PostAuthOutcome{}, fmt.Errorf("failed to resolve auth-required notification after credentials were established: %w", err)
 	}
 	return iface.PostAuthOutcome{SetupPending: true}, nil
 }

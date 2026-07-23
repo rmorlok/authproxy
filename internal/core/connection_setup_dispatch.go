@@ -82,6 +82,9 @@ func (c *connection) completeFlow(ctx context.Context) (iface.ConnectionSetupRes
 			return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to set connection state to configured: %w", err))
 		}
 	}
+	if err := c.resolveRequiredActionNotifications(ctx, database.NotificationKeySetupRequired); err != nil {
+		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to resolve setup-required notification: %w", err))
+	}
 	return &iface.ConnectionSetupComplete{
 		Id:   c.GetId(),
 		Type: iface.ConnectionSetupResponseTypeComplete,
@@ -193,4 +196,41 @@ func ensureStepMatches(setupStep *cschema.SetupStep, reqStepId string) error {
 		return httperr.BadRequest(fmt.Sprintf("step_id %q does not match current step %q", reqStepId, setupStep.Id()))
 	}
 	return nil
+}
+
+// resolveAuthRequiredIfCredentialsEstablished resolves the high-level
+// auth_required notification after a credential-establishing auth-method step
+// has been successfully submitted and the flow is not handing off to verify.
+// It applies to auth methods such as API key forms that can finish credential
+// establishment from SubmitForm; OAuth callbacks and verify success resolve the
+// same notification through their own completion paths.
+func (c *connection) resolveAuthRequiredIfCredentialsEstablished(
+	ctx context.Context,
+	current iface.ManifestSetupStep,
+	next iface.ManifestSetupStep,
+) error {
+	if current == nil || !c.isAuthMethodSetupStep(current.Id()) {
+		return nil
+	}
+	if next != nil && next.Type() == iface.ManifestStepTypeVerify {
+		return nil
+	}
+	if err := c.resolveRequiredActionNotifications(ctx, database.NotificationKeyAuthRequired); err != nil {
+		return httperr.InternalServerError(httperr.WithInternalErrorf("failed to resolve auth-required notification: %w", err))
+	}
+	return nil
+}
+
+// isAuthMethodSetupStep returns true when a manifest step came from the auth
+// method rather than the connector YAML setup_flow. The connector SetupFlow only
+// contains user-authored preconnect and configure steps; auth methods inject
+// their own runtime steps between those phases, and apxy:* pseudo-steps are
+// handled by the caller before this helper resolves notifications.
+func (c *connection) isAuthMethodSetupStep(stepID string) bool {
+	connector := c.cv.GetDefinition()
+	if connector == nil || connector.SetupFlow == nil {
+		return true
+	}
+	_, found := connector.SetupFlow.FindStepById(stepID)
+	return !found
 }

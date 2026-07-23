@@ -20,6 +20,9 @@ func (c *connection) onVerifyPassed(ctx context.Context) error {
 	if err := c.MarkHealthState(ctx, database.ConnectionHealthStateHealthy, "verify_passed"); err != nil {
 		return fmt.Errorf("failed to mark connection healthy after verify: %w", err)
 	}
+	if err := c.resolveRequiredActionNotifications(ctx, database.NotificationKeyAuthRequired); err != nil {
+		return fmt.Errorf("failed to resolve auth-required notification after verify: %w", err)
+	}
 
 	flow := c.s.buildManifestSetupFlow(c)
 	next, hasNext, err := flow.NextStep(ctx, cschema.SetupStepVerify.Id())

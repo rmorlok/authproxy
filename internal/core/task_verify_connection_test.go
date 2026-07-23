@@ -105,6 +105,8 @@ func TestRunVerifyConnection_NoProbes_AdvancesToReady(t *testing.T) {
 	db.EXPECT().
 		SetConnectionState(gomock.Any(), connectionId, database.ConnectionStateConfigured).
 		Return(nil)
+	expectResolveRequiredActionNotification(db, connectionId, database.NotificationKeyAuthRequired)
+	expectResolveRequiredActionNotification(db, connectionId, database.NotificationKeySetupRequired)
 
 	require.NoError(t, svc.RunVerifyConnection(context.Background(), connectionId))
 }
@@ -145,6 +147,8 @@ func TestRunVerifyConnection_AllProbesDisabled_AdvancesToReady(t *testing.T) {
 	db.EXPECT().
 		SetConnectionState(gomock.Any(), connectionId, database.ConnectionStateConfigured).
 		Return(nil)
+	expectResolveRequiredActionNotification(db, connectionId, database.NotificationKeyAuthRequired)
+	expectResolveRequiredActionNotification(db, connectionId, database.NotificationKeySetupRequired)
 
 	require.NoError(t, svc.RunVerifyConnection(context.Background(), connectionId))
 }
@@ -197,6 +201,8 @@ func TestRunVerifyConnection_MixedProbePredicates_RunOnlyEnabled(t *testing.T) {
 	db.EXPECT().
 		SetConnectionState(gomock.Any(), connectionId, database.ConnectionStateConfigured).
 		Return(nil)
+	expectResolveRequiredActionNotification(db, connectionId, database.NotificationKeyAuthRequired)
+	expectResolveRequiredActionNotification(db, connectionId, database.NotificationKeySetupRequired)
 
 	require.NoError(t, svc.RunVerifyConnection(context.Background(), connectionId))
 }

@@ -39,6 +39,7 @@ func newTestApiKeyConnection(
 	// plaintext JSON (rather than the production-style ciphertext that the
 	// mock encrypt service in FullMockService would produce).
 	s.encrypt = e
+	s.r = nil
 	s.authMethodFactories[cschema.AuthTypeAPIKey] = api_key.NewFactory(db, e, s.httpf, s.logger)
 
 	connector := cschema.Connector{
@@ -113,6 +114,8 @@ func TestApiKeySubmit_BearerPersistsCredentialAndAdvancesToReady(t *testing.T) {
 		Return(&database.ApiKeyCredential{Id: apid.New(apid.PrefixApiKeyCredential)}, nil)
 	db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, (*cschema.SetupStep)(nil)).Return(nil)
 	db.EXPECT().SetConnectionState(gomock.Any(), conn.Id, database.ConnectionStateConfigured).Return(nil)
+	expectResolveRequiredActionNotification(db, conn.Id, database.NotificationKeySetupRequired)
+	expectResolveRequiredActionNotification(db, conn.Id, database.NotificationKeyAuthRequired)
 
 	resp, err := conn.SubmitForm(ctx, iface.SubmitConnectionRequest{
 		StepId: api_key.SynthesizedApiKeyCredentialsStepId,
@@ -148,6 +151,8 @@ func TestApiKeySubmit_BasicPersistsBothCredentialFields(t *testing.T) {
 		Return(&database.ApiKeyCredential{Id: apid.New(apid.PrefixApiKeyCredential)}, nil)
 	db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, (*cschema.SetupStep)(nil)).Return(nil)
 	db.EXPECT().SetConnectionState(gomock.Any(), conn.Id, database.ConnectionStateConfigured).Return(nil)
+	expectResolveRequiredActionNotification(db, conn.Id, database.NotificationKeySetupRequired)
+	expectResolveRequiredActionNotification(db, conn.Id, database.NotificationKeyAuthRequired)
 
 	resp, err := conn.SubmitForm(ctx, iface.SubmitConnectionRequest{
 		StepId: api_key.SynthesizedApiKeyCredentialsStepId,
@@ -208,6 +213,8 @@ func TestApiKeySubmit_NoReplay_PriorCredentialNeverDecryptedIntoForm(t *testing.
 		Return(&database.ApiKeyCredential{Id: apid.New(apid.PrefixApiKeyCredential)}, nil)
 	db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, (*cschema.SetupStep)(nil)).Return(nil)
 	db.EXPECT().SetConnectionState(gomock.Any(), conn.Id, database.ConnectionStateConfigured).Return(nil)
+	expectResolveRequiredActionNotification(db, conn.Id, database.NotificationKeySetupRequired)
+	expectResolveRequiredActionNotification(db, conn.Id, database.NotificationKeyAuthRequired)
 
 	// CRITICAL: GetActiveApiKeyCredential must NOT be called during submit.
 	// gomock fails ctrl.Finish() if submit reads the prior credential.
@@ -246,6 +253,7 @@ func TestApiKeySubmit_PreconnectFieldNamedApiKeyIsNotTreatedAsCredential(t *test
 	e := encrypt.NewFakeEncryptService(false)
 	s, db, _, _, _, _ := FullMockService(t, ctrl)
 	s.encrypt = e
+	s.r = nil
 	s.authMethodFactories[cschema.AuthTypeAPIKey] = api_key.NewFactory(db, e, s.httpf, s.logger)
 
 	connector := cschema.Connector{
@@ -314,6 +322,7 @@ func TestApiKeySubmit_TransitionsToConfigureWhenNoProbes(t *testing.T) {
 	e := encrypt.NewFakeEncryptService(false)
 	s, db, _, _, _, _ := FullMockService(t, ctrl)
 	s.encrypt = e
+	s.r = nil
 	s.authMethodFactories[cschema.AuthTypeAPIKey] = api_key.NewFactory(db, e, s.httpf, s.logger)
 
 	configureStep := cschema.SetupFlowStep{
@@ -353,6 +362,7 @@ func TestApiKeySubmit_TransitionsToConfigureWhenNoProbes(t *testing.T) {
 		Return(&database.ApiKeyCredential{Id: apid.New(apid.PrefixApiKeyCredential)}, nil)
 	// Single transition: dispatcher advances to the first configure step after
 	// PersistCredentials returns. The render-form path is read-only.
+	expectResolveRequiredActionNotification(db, conn.Id, database.NotificationKeyAuthRequired)
 	db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, &configureFirst).Return(nil)
 
 	resp, err := conn.SubmitForm(ctx, iface.SubmitConnectionRequest{

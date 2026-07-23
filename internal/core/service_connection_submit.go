@@ -43,7 +43,17 @@ func (c *connection) SubmitForm(ctx context.Context, req iface.SubmitConnectionR
 		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to evaluate setup flow: %w", err))
 	}
 	if !hasNext {
-		return c.completeFlow(ctx)
+		resp, err := c.completeFlow(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if err := c.resolveAuthRequiredIfCredentialsEstablished(ctx, current, nil); err != nil {
+			return nil, err
+		}
+		return resp, nil
+	}
+	if err := c.resolveAuthRequiredIfCredentialsEstablished(ctx, current, next); err != nil {
+		return nil, err
 	}
 	return c.advanceToStep(ctx, next, flow, req.ReturnToUrl)
 }

@@ -15,6 +15,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
+	"github.com/rmorlok/authproxy/internal/util"
 )
 
 type NotificationLevel string
@@ -513,19 +514,19 @@ func (s *service) ListNotifications(
 		limit = 100
 	}
 	query := s.sq.
-		Select((&Notification{}).cols()...).
-		From(NotificationsTable).
-		Where(sq.Eq{"deleted_at": nil}).
-		OrderBy("created_at desc", "id desc").
+		Select(util.PrependAll("n.", (&Notification{}).cols())...).
+		From(NotificationsTable+" AS n").
+		Where(sq.Eq{"n.deleted_at": nil}).
+		OrderBy("n.created_at desc", "n.id desc").
 		Limit(limit)
 	if len(opts.States) > 0 {
-		query = query.Where(sq.Eq{"state": opts.States})
+		query = query.Where(sq.Eq{"n.state": opts.States})
 	}
 	if opts.ResourceType != "" {
-		query = query.Where(sq.Eq{"resource_type": opts.ResourceType})
+		query = query.Where(sq.Eq{"n.resource_type": opts.ResourceType})
 	}
 	if opts.ResourceId != apid.Nil {
-		query = query.Where(sq.Eq{"resource_id": opts.ResourceId})
+		query = query.Where(sq.Eq{"n.resource_id": opts.ResourceId})
 	}
 	if len(opts.NamespaceMatchers) > 0 {
 		for _, matcher := range opts.NamespaceMatchers {
@@ -533,22 +534,21 @@ func (s *service) ListNotifications(
 				return nil, err
 			}
 		}
-		query = restrictToNamespaceMatchers(query, "namespace", opts.NamespaceMatchers)
+		query = restrictToNamespaceMatchers(query, "n.namespace", opts.NamespaceMatchers)
 	}
 	if opts.LabelSelector != nil {
 		selector, err := ParseLabelSelector(*opts.LabelSelector)
 		if err != nil {
 			return nil, err
 		}
-		query = selector.ApplyToSqlBuilderWithProvider(query, "labels", s.cfg.GetProvider())
+		query = selector.ApplyToSqlBuilderWithProvider(query, "n.labels", s.cfg.GetProvider())
 	}
 	if opts.ActorId != apid.Nil && !opts.IncludeViewed {
 		query = query.
 			LeftJoin(
 				fmt.Sprintf(
-					"%s nv ON nv.notification_id = %s.id AND nv.actor_id = ?",
+					"%s nv ON nv.notification_id = n.id AND nv.actor_id = ?",
 					NotificationViewsTable,
-					NotificationsTable,
 				),
 				opts.ActorId,
 			).

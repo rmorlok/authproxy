@@ -335,7 +335,7 @@ func connectionNotificationKey(
 	candidate *connectionMigrationCandidate,
 	keyPart string,
 ) string {
-	return fmt.Sprintf("connection:%s:%s", candidate.Connection.Id, keyPart)
+	return connectionRequiredActionNotificationKey(candidate.Connection.Id, keyPart)
 }
 
 // migrationNotificationMetadata constructs standard notification metadata for
