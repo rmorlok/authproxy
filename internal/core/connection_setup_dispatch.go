@@ -198,6 +198,12 @@ func ensureStepMatches(setupStep *cschema.SetupStep, reqStepId string) error {
 	return nil
 }
 
+// resolveAuthRequiredIfCredentialsEstablished resolves the high-level
+// auth_required notification after a credential-establishing auth-method step
+// has been successfully submitted and the flow is not handing off to verify.
+// It applies to auth methods such as API key forms that can finish credential
+// establishment from SubmitForm; OAuth callbacks and verify success resolve the
+// same notification through their own completion paths.
 func (c *connection) resolveAuthRequiredIfCredentialsEstablished(
 	ctx context.Context,
 	current iface.ManifestSetupStep,
@@ -215,6 +221,11 @@ func (c *connection) resolveAuthRequiredIfCredentialsEstablished(
 	return nil
 }
 
+// isAuthMethodSetupStep returns true when a manifest step came from the auth
+// method rather than the connector YAML setup_flow. The connector SetupFlow only
+// contains user-authored preconnect and configure steps; auth methods inject
+// their own runtime steps between those phases, and apxy:* pseudo-steps are
+// handled by the caller before this helper resolves notifications.
 func (c *connection) isAuthMethodSetupStep(stepID string) bool {
 	connector := c.cv.GetDefinition()
 	if connector == nil || connector.SetupFlow == nil {
