@@ -156,11 +156,15 @@ func cmdReencrypt() *cobra.Command {
 }
 
 func main() {
+	newRootCommand().Execute()
+}
+
+func newRootCommand() *cobra.Command {
 	// Optionally load environment variables from .env files walking up
 	// from the current working directory.
 	util.LoadDotEnv()
 
-	var rootCmd = &cobra.Command{
+	rootCmd := &cobra.Command{
 		Use: "authproxy",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return loadConfig()
@@ -172,7 +176,5 @@ func main() {
 	rootCmd.AddCommand(cmdRoutes())
 	rootCmd.AddCommand(cmdServe())
 	rootCmd.AddCommand(cmdReencrypt())
-	rootCmd.AddCommand(cmdLoadtestSeed())
-	rootCmd.AddCommand(cmdLoadtestBackground())
-	rootCmd.Execute()
+	return rootCmd
 }
