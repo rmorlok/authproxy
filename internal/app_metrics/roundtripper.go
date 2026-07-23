@@ -123,8 +123,9 @@ func (t *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	// If there was an error, log it
 	if err != nil {
+		requestErr := err
 		full_log.Response.StatusCode = http.StatusInternalServerError
-		full_log.Response.Err = err.Error()
+		full_log.Response.Err = requestErr.Error()
 
 		// Store the full_log in Redis asynchronously
 		go func() {
@@ -146,21 +147,19 @@ func (t *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 			SetLogRecordFieldsFromRequestInfo(record, t.requestInfo)
 			ApplyAttributionToLogRecord(record, ctx)
 
-			err = t.store.StoreRecord(asyncCtx, record)
-			if err != nil {
-				t.logger.Error("error storing HTTP log record", "error", err, "entry_id", full_log.Id.String(), "correlation_id", full_log.CorrelationID)
+			if storeErr := t.store.StoreRecord(asyncCtx, record); storeErr != nil {
+				t.logger.Error("error storing HTTP log record", "error", storeErr, "entry_id", full_log.Id.String(), "correlation_id", full_log.CorrelationID)
 				return
 			}
 
 			if t.fullStore != nil {
-				err = t.fullStore.Store(asyncCtx, full_log)
-				if err != nil {
-					t.logger.Error("error storing full HTTP log in blob storage", "error", err, "entry_id", full_log.Id.String())
+				if storeErr := t.fullStore.Store(asyncCtx, full_log); storeErr != nil {
+					t.logger.Error("error storing full HTTP log in blob storage", "error", storeErr, "entry_id", full_log.Id.String())
 				}
 			}
 		}()
 
-		return resp, err
+		return resp, requestErr
 	}
 
 	// Copy response data
