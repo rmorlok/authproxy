@@ -24,16 +24,17 @@ const (
 )
 
 type Options struct {
-	Profile              Profile
-	DB                   database.DB
-	Encrypt              encrypt.E
-	ProviderBaseURL      string
-	OAuthExpiringPercent *int
-	PeriodicProbePercent *int
-	VerifySamples        int
-	ProgressEvery        int
-	Now                  time.Time
-	Logf                 func(format string, args ...any)
+	Profile               Profile
+	DB                    database.DB
+	Encrypt               encrypt.E
+	ProviderBaseURL       string
+	OAuthExpiringPercent  *int
+	PeriodicProbePercent  *int
+	StaleSetupConnections *int
+	VerifySamples         int
+	ProgressEvery         int
+	Now                   time.Time
+	Logf                  func(format string, args ...any)
 }
 
 type Result struct {
@@ -44,6 +45,7 @@ type Result struct {
 	ConnectorVersion          uint64             `json:"connector_version"`
 	RequestedTenantNamespaces int                `json:"requested_tenant_namespaces"`
 	RequestedConnections      int                `json:"requested_connections"`
+	RequestedStaleSetups      int                `json:"requested_stale_setup_connections"`
 	OAuthExpiringPercent      int                `json:"oauth_expiring_percent"`
 	PeriodicProbePercent      int                `json:"periodic_probe_percent"`
 	StartedAt                 time.Time          `json:"started_at"`
@@ -52,12 +54,15 @@ type Result struct {
 	UpsertedActors            int                `json:"upserted_actors"`
 	CreatedConnections        int                `json:"created_connections"`
 	ExistingConnections       int                `json:"existing_connections"`
+	CreatedStaleSetups        int                `json:"created_stale_setup_connections"`
+	ExistingStaleSetups       int                `json:"existing_stale_setup_connections"`
 	UpsertedOAuthTokens       int                `json:"upserted_oauth_tokens"`
 	ProbeEnabledConnections   int                `json:"probe_enabled_connections"`
 	VerifiedSamples           []VerifiedSample   `json:"verified_samples"`
 	Namespaces                []NamespaceRecord  `json:"namespaces"`
 	Actors                    []ActorRecord      `json:"actors"`
 	Connections               []ConnectionRecord `json:"connections"`
+	StaleSetups               []ConnectionRecord `json:"stale_setup_connections"`
 }
 
 type NamespaceRecord struct {
@@ -119,6 +124,13 @@ func Seed(ctx context.Context, opts Options) (*Result, error) {
 		periodicProbePercent = *opts.PeriodicProbePercent
 	}
 	periodicProbePercent = clampPercent(periodicProbePercent)
+	staleSetupConnections := opts.Profile.Objects.StaleSetupConnections
+	if opts.StaleSetupConnections != nil {
+		staleSetupConnections = *opts.StaleSetupConnections
+	}
+	if staleSetupConnections < 0 {
+		staleSetupConnections = 0
+	}
 	verifySamples := opts.VerifySamples
 	if verifySamples < 0 {
 		verifySamples = 0
@@ -145,6 +157,7 @@ func Seed(ctx context.Context, opts Options) (*Result, error) {
 		ConnectorVersion:          connectorVersion,
 		RequestedTenantNamespaces: tenantCount,
 		RequestedConnections:      connectionCount,
+		RequestedStaleSetups:      staleSetupConnections,
 		OAuthExpiringPercent:      oauthExpiringPercent,
 		PeriodicProbePercent:      periodicProbePercent,
 		StartedAt:                 now,
@@ -201,7 +214,7 @@ func Seed(ctx context.Context, opts Options) (*Result, error) {
 	result.UpsertedActors = len(actors)
 
 	logf("upserting load-test OAuth2 connector %s", connectorID)
-	connectorDef := connectorDefinition(connectorID, connectorVersion, baseNamespace, opts.Profile.Name, providerBaseURL, periodicProbePercent > 0)
+	connectorDef := connectorDefinition(connectorID, connectorVersion, baseNamespace, opts.Profile.Name, providerBaseURL)
 	connectorJSON, err := json.Marshal(connectorDef)
 	if err != nil {
 		return nil, fmt.Errorf("marshal connector definition: %w", err)
@@ -239,6 +252,9 @@ func Seed(ctx context.Context, opts Options) (*Result, error) {
 	if connectionCount > 0 && len(tenantNamespaces) == 0 {
 		return nil, fmt.Errorf("profile requests connections but no namespaces")
 	}
+	if staleSetupConnections > 0 && len(tenantNamespaces) == 0 {
+		return nil, fmt.Errorf("profile requests stale setup connections but no namespaces")
+	}
 
 	logf("seeding %d connections", connectionCount)
 	for i := 1; i <= connectionCount; i++ {
@@ -273,6 +289,9 @@ func Seed(ctx context.Context, opts Options) (*Result, error) {
 			}
 			result.CreatedConnections++
 		} else {
+			if _, err := opts.DB.UpdateConnectionLabels(ctx, connectionID, connection.Labels); err != nil {
+				return nil, fmt.Errorf("update connection labels %s: %w", connectionID, err)
+			}
 			result.ExistingConnections++
 		}
 
@@ -320,6 +339,60 @@ func Seed(ctx context.Context, opts Options) (*Result, error) {
 
 		if i%progressEvery == 0 {
 			logf("seeded %d/%d connections", i, connectionCount)
+		}
+	}
+
+	if staleSetupConnections > 0 {
+		logf("seeding %d stale setup connections", staleSetupConnections)
+	}
+	for i := 1; i <= staleSetupConnections; i++ {
+		ns := tenantNamespaces[(i-1)%len(tenantNamespaces)]
+		actor := actors[(i-1)%len(actors)]
+		connectionID := apid.ID(fmt.Sprintf("%slt_%s_stale_%09d", apid.PrefixConnection, slug, i))
+		setupStep := cschema.MustNewSetupStep("loadtest_stale_setup")
+		connection := &database.Connection{
+			Id:               connectionID,
+			Namespace:        ns,
+			State:            database.ConnectionStateSetup,
+			HealthState:      database.ConnectionHealthStateHealthy,
+			ConnectorId:      connectorID,
+			ConnectorVersion: connectorVersion,
+			SetupStep:        &setupStep,
+			Labels:           staleSetupConnectionLabels(opts.Profile.Name, i),
+			Annotations: database.Annotations{
+				"loadtest.authproxy.io/generated-by": "loadtest-seeder",
+				"loadtest.authproxy.io/scenario":     "stale-setup-cleanup",
+			},
+		}
+		existing, err := opts.DB.GetConnection(ctx, connectionID)
+		if err != nil && !errors.Is(err, database.ErrNotFound) {
+			return nil, fmt.Errorf("get stale setup connection %s: %w", connectionID, err)
+		}
+		if existing == nil {
+			if err := opts.DB.CreateConnection(ctx, connection); err != nil {
+				return nil, fmt.Errorf("create stale setup connection %s: %w", connectionID, err)
+			}
+			result.CreatedStaleSetups++
+		} else {
+			if _, err := opts.DB.UpdateConnectionLabels(ctx, connectionID, connection.Labels); err != nil {
+				return nil, fmt.Errorf("update stale setup connection labels %s: %w", connectionID, err)
+			}
+			if err := opts.DB.SetConnectionSetupStep(ctx, connectionID, &setupStep); err != nil {
+				return nil, fmt.Errorf("update stale setup step %s: %w", connectionID, err)
+			}
+			result.ExistingStaleSetups++
+		}
+		result.StaleSetups = append(result.StaleSetups, ConnectionRecord{
+			ConnectionID:     connectionID,
+			Namespace:        ns,
+			ActorID:          actor.ActorID,
+			ConnectorID:      connectorID,
+			ConnectorVersion: connectorVersion,
+			ProbeEnabled:     false,
+		})
+
+		if i%progressEvery == 0 {
+			logf("seeded %d/%d stale setup connections", i, staleSetupConnections)
 		}
 	}
 
@@ -386,7 +459,7 @@ func sampleIndexes(length, requested int) []int {
 	return indexes
 }
 
-func connectorDefinition(id apid.ID, version uint64, namespace, profileName, providerBaseURL string, includeProbe bool) *cschema.Connector {
+func connectorDefinition(id apid.ID, version uint64, namespace, profileName, providerBaseURL string) *cschema.Connector {
 	refreshInBackground := true
 	def := &cschema.Connector{
 		Id:          id,
@@ -414,17 +487,18 @@ func connectorDefinition(id apid.ID, version uint64, namespace, profileName, pro
 		}},
 		Labels: baseLabels(profileName),
 	}
-	if includeProbe {
-		def.Probes = []cschema.Probe{
-			{
-				Id:     "load-sink",
-				Period: &common.HumanDuration{Duration: 5 * time.Minute},
-				ProxyHttp: &cschema.ProbeHttp{
-					Method: "GET",
-					URL:    providerBaseURL + "/test/load/resource/probe",
-				},
+	def.Probes = []cschema.Probe{
+		{
+			Id:     "load-sink",
+			Period: &common.HumanDuration{Duration: 5 * time.Minute},
+			If: &common.Predicate{
+				Javascript: `labels["loadtest.authproxy.io/probe"] === "true"`,
 			},
-		}
+			ProxyHttp: &cschema.ProbeHttp{
+				Method: "GET",
+				URL:    providerBaseURL + "/test/load/resource/probe",
+			},
+		},
 	}
 	return def
 }
@@ -445,6 +519,14 @@ func connectionLabels(profileName string, index int, probeEnabled bool) database
 	} else {
 		labels["loadtest.authproxy.io/probe"] = "false"
 	}
+	return labels
+}
+
+func staleSetupConnectionLabels(profileName string, index int) database.Labels {
+	labels := baseLabels(profileName)
+	labels["loadtest.authproxy.io/connection-index"] = fmt.Sprintf("stale-%d", index)
+	labels["loadtest.authproxy.io/probe"] = "false"
+	labels["loadtest.authproxy.io/stale-setup"] = "true"
 	return labels
 }
 

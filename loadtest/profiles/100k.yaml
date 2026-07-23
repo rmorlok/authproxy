@@ -7,6 +7,7 @@ objects:
   namespaces_min: 50000
   namespaces_max: 100000
   connections: 100000
+  stale_setup_connections: 1000
   oauth_tokens_expiring_percent:
     - 10
     - 50

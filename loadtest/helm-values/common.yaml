@@ -73,6 +73,10 @@ appMetrics:
   fullRequestRecording: never
 
 config:
+  connections:
+    setup_ttl: 1s
+  tasks:
+    default_retention: 24h
   telemetry:
     enabled: true
     exporter:

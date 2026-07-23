@@ -19,6 +19,7 @@ type ProfileObjects struct {
 	NamespacesMin          int         `yaml:"namespaces_min" json:"namespaces_min,omitempty"`
 	NamespacesMax          int         `yaml:"namespaces_max" json:"namespaces_max,omitempty"`
 	Connections            int         `yaml:"connections" json:"connections"`
+	StaleSetupConnections  int         `yaml:"stale_setup_connections" json:"stale_setup_connections,omitempty"`
 	OAuthTokensExpiringPct PercentList `yaml:"oauth_tokens_expiring_percent" json:"oauth_tokens_expiring_percent,omitempty"`
 	PeriodicProbePct       PercentList `yaml:"periodic_probe_percent" json:"periodic_probe_percent,omitempty"`
 }
@@ -61,6 +62,9 @@ func LoadProfile(path string) (Profile, error) {
 	}
 	if profile.Objects.Connections < 0 {
 		return Profile{}, fmt.Errorf("profile connections must be non-negative")
+	}
+	if profile.Objects.StaleSetupConnections < 0 {
+		return Profile{}, fmt.Errorf("profile stale setup connections must be non-negative")
 	}
 	if profile.Namespace == "" {
 		profile.Namespace = "authproxy-load"

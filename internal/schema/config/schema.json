@@ -61,6 +61,15 @@
       "additionalProperties": false,
       "type": "object"
     },
+    "Connections": {
+      "properties": {
+        "setup_ttl": {
+          "$ref": "../common/schema.json#/$defs/HumanDuration"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
     "CookieConfig": {
       "properties": {
         "domain": {
@@ -903,6 +912,9 @@
     },
     "app_metrics": {
       "$ref": "#/$defs/AppMetrics"
+    },
+    "connections": {
+      "$ref": "#/$defs/Connections"
     },
     "tasks": {
       "$ref": "#/$defs/Tasks"

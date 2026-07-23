@@ -22,6 +22,12 @@ if [[ -z "$config_file" ]]; then
 host_application:
   initiate_session_url: http://placeholder.invalid/login
 
+connections:
+  setup_ttl: 1s
+
+tasks:
+  default_retention: 24h
+
 database:
   provider: sqlite
   auto_migrate: true

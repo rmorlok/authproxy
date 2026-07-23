@@ -127,6 +127,15 @@ func Test_SchemaAppMetricsShape(t *testing.T) {
 			"full_request_recording": "always",
 		},
 	}))
+
+	require.NoError(t, schema.Validate(map[string]any{
+		"connections": map[string]any{
+			"setup_ttl": "1s",
+		},
+		"tasks": map[string]any{
+			"default_retention": "24h",
+		},
+	}))
 }
 
 type test struct {

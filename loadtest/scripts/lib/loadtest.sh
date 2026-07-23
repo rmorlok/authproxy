@@ -138,6 +138,10 @@ loadtest_yaml_section_list() {
           }
           exit
         }
+        if (value != "") {
+          print value
+          exit
+        }
         in_list = 1
         key_indent = current_indent
       }

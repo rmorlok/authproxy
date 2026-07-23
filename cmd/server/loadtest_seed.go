@@ -21,6 +21,7 @@ func cmdLoadtestSeed() *cobra.Command {
 	var progressEvery int
 	var oauthExpiringPercent int
 	var periodicProbePercent int
+	var staleSetupConnections int
 
 	cmd := &cobra.Command{
 		Use:   "loadtest-seed",
@@ -76,17 +77,22 @@ func cmdLoadtestSeed() *cobra.Command {
 			if cmd.Flags().Changed("periodic-probe-percent") {
 				probeOverride = &periodicProbePercent
 			}
+			var staleSetupOverride *int
+			if cmd.Flags().Changed("stale-setup-connections") {
+				staleSetupOverride = &staleSetupConnections
+			}
 
 			result, err := seeder.Seed(ctx, seeder.Options{
-				Profile:              profile,
-				DB:                   dm.GetDatabase(),
-				Encrypt:              enc,
-				ProviderBaseURL:      providerBaseURL,
-				OAuthExpiringPercent: oauthOverride,
-				PeriodicProbePercent: probeOverride,
-				VerifySamples:        verifySamples,
-				ProgressEvery:        progressEvery,
-				Now:                  time.Now().UTC(),
+				Profile:               profile,
+				DB:                    dm.GetDatabase(),
+				Encrypt:               enc,
+				ProviderBaseURL:       providerBaseURL,
+				OAuthExpiringPercent:  oauthOverride,
+				PeriodicProbePercent:  probeOverride,
+				StaleSetupConnections: staleSetupOverride,
+				VerifySamples:         verifySamples,
+				ProgressEvery:         progressEvery,
+				Now:                   time.Now().UTC(),
 				Logf: func(format string, args ...any) {
 					fmt.Printf("[loadtest-seed] "+format+"\n", args...)
 				},
@@ -123,6 +129,7 @@ func cmdLoadtestSeed() *cobra.Command {
 	cmd.Flags().IntVar(&progressEvery, "progress-every", 1000, "log progress every N connections")
 	cmd.Flags().IntVar(&oauthExpiringPercent, "oauth-expiring-percent", 0, "override percent of tokens expiring inside the refresh window")
 	cmd.Flags().IntVar(&periodicProbePercent, "periodic-probe-percent", 0, "override percent of connections marked for periodic probes")
+	cmd.Flags().IntVar(&staleSetupConnections, "stale-setup-connections", 0, "override number of setup-state connections to seed for stale cleanup runs")
 
 	return cmd
 }
