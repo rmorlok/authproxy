@@ -16,7 +16,7 @@ loadtest_require_cmd openssl
 
 authproxy_repo=${AUTHPROXY_IMAGE_REPOSITORY:-ghcr.io/rmorlok/authproxy}
 authproxy_tag=${AUTHPROXY_IMAGE_TAG:-main}
-provider_image=${GO_OAUTH2_SERVER_IMAGE:-ghcr.io/rmorlok/go-oauth2-server@sha256:d1e5bdae007259b0c02255f26efce595f23eb2142e7da8caa3dac544dd445cb3}
+provider_image=${GO_OAUTH2_SERVER_IMAGE:-ghcr.io/rmorlok/go-oauth2-server:master}
 helm_timeout=${LOADTEST_HELM_TIMEOUT:-5m}
 
 loadtest_log "profile: $profile_name"

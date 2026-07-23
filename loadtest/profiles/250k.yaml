@@ -22,6 +22,29 @@ authproxy:
 k6:
   mode: operator
   scenario: proxy-raw
+  rate: 1000
+  duration: 10m
+  time_unit: 1s
+  connection_rows: 10000
+  parallelism: 8
+  pre_allocated_vus: 500
+  max_vus: 4000
+  request_timeout: 30s
+  p95_latency_ms: 1000
+  max_failed_rate: 0.001
+  upstream_status: 200
+  upstream_bytes: 256
+  upstream_delay_ms: 0
+  upstream_jitter_ms: 0
+  upstream_bearer_prefix: at_
+  upstream_path_prefix: /test/load/resource/proxy
+  soak_duration: 2h
+  spike_base_rate: 1000
+  spike_rate: 3000
+  spike_ramp_up: 2m
+  spike_hold: 5m
+  spike_ramp_down: 2m
+  spike_recovery: 5m
   scale_replicas:
     - 4
     - 8

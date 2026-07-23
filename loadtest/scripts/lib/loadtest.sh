@@ -52,6 +52,99 @@ loadtest_yaml_top_value() {
   ' "$file"
 }
 
+loadtest_yaml_section_value() {
+  local file=$1
+  local section=$2
+  local key=$3
+  awk -v section="$section" -v key="$key" '
+    function indent(line, copy) {
+      copy = line
+      sub(/[^ ].*$/, "", copy)
+      return length(copy)
+    }
+    function clean_value(value) {
+      sub(/^[^:]*:[[:space:]]*/, "", value)
+      sub(/[[:space:]]+#.*$/, "", value)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+      gsub(/^["\047]|["\047]$/, "", value)
+      return value
+    }
+    /^[[:space:]]*($|#)/ { next }
+    indent($0) == 0 && $0 ~ "^" section ":[[:space:]]*($|#)" {
+      in_section = 1
+      section_indent = indent($0)
+      next
+    }
+    in_section {
+      current_indent = indent($0)
+      if (current_indent <= section_indent) {
+        exit
+      }
+      if (current_indent == section_indent + 2 && $0 ~ "^[[:space:]]*" key ":") {
+        print clean_value($0)
+        exit
+      }
+    }
+  ' "$file"
+}
+
+loadtest_yaml_section_list() {
+  local file=$1
+  local section=$2
+  local key=$3
+  awk -v section="$section" -v key="$key" '
+    function indent(line, copy) {
+      copy = line
+      sub(/[^ ].*$/, "", copy)
+      return length(copy)
+    }
+    function trim(value) {
+      sub(/[[:space:]]+#.*$/, "", value)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+      gsub(/^["\047]|["\047]$/, "", value)
+      return value
+    }
+    /^[[:space:]]*($|#)/ { next }
+    indent($0) == 0 && $0 ~ "^" section ":[[:space:]]*($|#)" {
+      in_section = 1
+      section_indent = indent($0)
+      next
+    }
+    in_section {
+      current_indent = indent($0)
+      if (current_indent <= section_indent) {
+        exit
+      }
+      if (in_list) {
+        if (current_indent <= key_indent) {
+          exit
+        }
+        if ($0 ~ "^[[:space:]]*-[[:space:]]*") {
+          value = $0
+          sub(/^[[:space:]]*-[[:space:]]*/, "", value)
+          print trim(value)
+        }
+        next
+      }
+      if (current_indent == section_indent + 2 && $0 ~ "^[[:space:]]*" key ":") {
+        value = $0
+        sub(/^[^:]*:[[:space:]]*/, "", value)
+        value = trim(value)
+        if (value ~ /^\[/) {
+          gsub(/^\[|\]$/, "", value)
+          n = split(value, parts, ",")
+          for (idx = 1; idx <= n; idx++) {
+            print trim(parts[idx])
+          }
+          exit
+        }
+        in_list = 1
+        key_indent = current_indent
+      }
+    }
+  ' "$file"
+}
+
 loadtest_profile_name() {
   local profile_file=$1
   local name
@@ -68,6 +161,34 @@ loadtest_namespace() {
 
 loadtest_timestamp() {
   date -u "+%Y%m%dT%H%M%SZ"
+}
+
+loadtest_sanitize_k8s_name() {
+  printf "%s\n" "$1" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9-]+/-/g; s/^-+//; s/-+$//; s/-+/-/g' | cut -c 1-50 | sed -E 's/-+$//'
+}
+
+loadtest_latest_seed_dataset() {
+  local profile_name=$1
+  local latest=""
+  local candidate
+
+  shopt -s nullglob
+  for candidate in "$LOADTEST_ROOT"/runs/*-"$profile_name"-seed/datasets/connections.csv; do
+    latest=$candidate
+  done
+  shopt -u nullglob
+
+  if [[ -n "$latest" ]]; then
+    printf "%s\n" "$latest"
+  fi
+}
+
+loadtest_base64_decode() {
+  if base64 --help 2>&1 | grep -q -- "--decode"; then
+    base64 --decode
+  else
+    base64 -D
+  fi
 }
 
 loadtest_init_run_dir() {
@@ -91,7 +212,7 @@ loadtest_init_run_dir() {
     printf "namespace=%s\n" "$namespace"
     printf "authproxy_image_repository=%s\n" "${AUTHPROXY_IMAGE_REPOSITORY:-ghcr.io/rmorlok/authproxy}"
     printf "authproxy_image_tag=%s\n" "${AUTHPROXY_IMAGE_TAG:-main}"
-    printf "go_oauth2_server_image=%s\n" "${GO_OAUTH2_SERVER_IMAGE:-ghcr.io/rmorlok/go-oauth2-server@sha256:d1e5bdae007259b0c02255f26efce595f23eb2142e7da8caa3dac544dd445cb3}"
+    printf "go_oauth2_server_image=%s\n" "${GO_OAUTH2_SERVER_IMAGE:-ghcr.io/rmorlok/go-oauth2-server:master}"
     printf "k6_image=%s\n" "${K6_IMAGE:-grafana/k6:0.54.0}"
     printf "install_k6_operator=%s\n" "${LOADTEST_INSTALL_K6_OPERATOR:-false}"
     printf "install_keda=%s\n" "${LOADTEST_INSTALL_KEDA:-false}"

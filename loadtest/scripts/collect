@@ -17,15 +17,24 @@ loadtest_capture_cluster_snapshot "$namespace" "$run_dir"
 loadtest_capture_helm_snapshot "$namespace" "$run_dir"
 
 kubectl -n "$namespace" get jobs -o wide > "$run_dir/kubernetes/jobs.txt" 2>&1 || true
+kubectl -n "$namespace" get jobs -l app.kubernetes.io/name=k6 -o yaml > "$run_dir/k6/jobs.yaml" 2>&1 || true
+kubectl -n "$namespace" get pods -l app.kubernetes.io/name=k6 -o yaml > "$run_dir/k6/pods.yaml" 2>&1 || true
 kubectl -n "$namespace" get configmaps -o wide > "$run_dir/kubernetes/configmaps.txt" 2>&1 || true
+kubectl -n "$namespace" get configmaps -l app.kubernetes.io/name=k6 -o yaml > "$run_dir/k6/configmaps.yaml" 2>&1 || true
 kubectl -n "$namespace" get secrets -o name > "$run_dir/kubernetes/secrets.txt" 2>&1 || true
 kubectl -n "$namespace" get testruns.k6.io -o yaml > "$run_dir/k6/testruns.yaml" 2>&1 || true
-kubectl -n "$namespace" logs job/authproxy-smoke-k6 > "$run_dir/k6/smoke.log" 2>&1 || true
 
-pod=$(kubectl -n "$namespace" get pod -l job-name=authproxy-smoke-k6 -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
-if [[ -n "$pod" ]]; then
-  kubectl -n "$namespace" cp "$pod:/artifacts/summary.json" "$run_dir/k6/summary.json" >/dev/null 2>&1 || true
-fi
+while IFS= read -r job; do
+  [[ -n "$job" ]] || continue
+  kubectl -n "$namespace" logs "job/$job" > "$run_dir/k6/${job}.log" 2>&1 || true
+done < <(kubectl -n "$namespace" get jobs -l app.kubernetes.io/name=k6 -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)
+
+while IFS= read -r pod; do
+  [[ -n "$pod" ]] || continue
+  kubectl -n "$namespace" logs "$pod" > "$run_dir/k6/${pod}.log" 2>&1 || true
+  kubectl -n "$namespace" cp "$pod:/artifacts/summary.json" "$run_dir/k6/${pod}-summary.json" >/dev/null 2>&1 || true
+  kubectl -n "$namespace" cp "$pod:/tmp/summary.json" "$run_dir/k6/${pod}-summary.json" >/dev/null 2>&1 || true
+done < <(kubectl -n "$namespace" get pods -l app.kubernetes.io/name=k6 -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)
 
 loadtest_log "collected artifacts for profile $profile_name"
 loadtest_log "run artifacts: $run_dir"

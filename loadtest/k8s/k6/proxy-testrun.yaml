@@ -1,0 +1,33 @@
+apiVersion: k6.io/v1alpha1
+kind: TestRun
+metadata:
+  name: authproxy-proxy
+  labels:
+    app.kubernetes.io/name: k6
+    app.kubernetes.io/component: load-generator
+    loadtest.authproxy.io/scenario: proxy
+spec:
+  parallelism: 1
+  arguments: --summary-export /tmp/summary.json
+  script:
+    configMap:
+      name: authproxy-loadtest-k6
+      file: proxy.js
+  runner:
+    image: grafana/k6:0.54.0
+    metadata:
+      labels:
+        app.kubernetes.io/name: k6
+        app.kubernetes.io/component: load-generator
+        loadtest.authproxy.io/scenario: proxy
+    env:
+      - name: AUTHPROXY_BEARER_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: authproxy-loadtest-k6-auth
+            key: AUTHPROXY_BEARER_TOKEN
+      - name: K6_CONNECTIONS_FILE
+        value: ./connections.csv
+    envFrom:
+      - configMapRef:
+          name: authproxy-loadtest-k6-env

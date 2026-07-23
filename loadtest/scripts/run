@@ -5,50 +5,526 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 source "$SCRIPT_DIR/lib/loadtest.sh"
 
 profile=${1:-${LOADTEST_PROFILE:-smoke}}
-scenario=${2:-smoke}
 profile_file=$(loadtest_profile_path "$profile")
 profile_name=$(loadtest_profile_name "$profile_file")
 namespace=$(loadtest_namespace "$profile_file")
+default_scenario=$(loadtest_yaml_section_value "$profile_file" k6 scenario)
+scenario=${2:-${LOADTEST_SCENARIO:-${default_scenario:-smoke}}}
 run_dir=$(loadtest_init_run_dir "$profile_name" "$profile_file" "$namespace" run)
 
 loadtest_require_cmd kubectl
 
-[[ "$scenario" == "smoke" ]] || loadtest_die "unsupported scenario in this slice: $scenario"
-
-k6_mode=${LOADTEST_K6_MODE:-job}
-k6_timeout=${LOADTEST_K6_TIMEOUT:-5m}
+profile_k6_mode=$(loadtest_yaml_section_value "$profile_file" k6 mode)
+k6_mode=${LOADTEST_K6_MODE:-${profile_k6_mode:-job}}
+k6_timeout=${LOADTEST_K6_TIMEOUT:-10m}
 k6_image=${K6_IMAGE:-grafana/k6:0.54.0}
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
-kubectl -n "$namespace" create configmap authproxy-loadtest-k6 \
-  --from-file=smoke.js="$LOADTEST_ROOT/k6/smoke.js" \
-  --dry-run=client -o yaml > "$tmp/k6-configmap.yaml"
-kubectl -n "$namespace" apply -f "$tmp/k6-configmap.yaml"
+k6_profile_value() {
+  local key=$1
+  local default_value=$2
+  local value
+  value=$(loadtest_yaml_section_value "$profile_file" k6 "$key")
+  printf "%s\n" "${value:-$default_value}"
+}
 
-if [[ "$k6_mode" == "operator" ]]; then
-  if ! kubectl get crd testruns.k6.io >/dev/null 2>&1; then
-    loadtest_die "LOADTEST_K6_MODE=operator requested, but testruns.k6.io is not installed"
+k6_env_or_profile() {
+  local env_name=$1
+  local key=$2
+  local default_value=$3
+  local value=${!env_name:-}
+  if [[ -z "$value" ]]; then
+    value=$(k6_profile_value "$key" "$default_value")
+  fi
+  printf "%s\n" "$value"
+}
+
+k6_p95_threshold_ms() {
+  local value=${K6_P95_THRESHOLD_MS:-}
+  if [[ -z "$value" ]]; then
+    value=$(loadtest_yaml_section_value "$profile_file" k6 p95_latency_ms)
+  fi
+  if [[ -z "$value" ]]; then
+    value=$(loadtest_yaml_section_value "$profile_file" acceptance p95_latency_target)
   fi
 
-  loadtest_log "applying k6 TestRun"
-  kubectl -n "$namespace" delete testrun authproxy-smoke --ignore-not-found=true >/dev/null 2>&1 || true
-  kubectl -n "$namespace" apply -f "$LOADTEST_ROOT/k8s/k6/smoke-testrun.yaml"
-  loadtest_log "TestRun submitted; use collect to capture status and runner logs"
-else
-  loadtest_log "running k6 smoke Job"
-  kubectl -n "$namespace" delete job authproxy-smoke-k6 --ignore-not-found=true >/dev/null 2>&1 || true
-  kubectl -n "$namespace" apply -f "$LOADTEST_ROOT/k8s/k6/smoke-job.yaml"
-  kubectl -n "$namespace" set image job/authproxy-smoke-k6 "k6=$k6_image"
-  kubectl -n "$namespace" wait --for=condition=complete job/authproxy-smoke-k6 "--timeout=$k6_timeout"
-  kubectl -n "$namespace" logs job/authproxy-smoke-k6 > "$run_dir/k6/smoke.log" 2>&1 || true
+  case "$value" in
+    "")
+      printf "1000\n"
+      ;;
+    profile-configured)
+      printf "1000\n"
+      ;;
+    *ms)
+      printf "%s\n" "${value%ms}"
+      ;;
+    *s)
+      printf "%s\n" "$(( ${value%s} * 1000 ))"
+      ;;
+    *)
+      printf "%s\n" "$value"
+      ;;
+  esac
+}
 
-  pod=$(kubectl -n "$namespace" get pod -l job-name=authproxy-smoke-k6 -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
-  if [[ -n "$pod" ]]; then
-    kubectl -n "$namespace" cp "$pod:/artifacts/summary.json" "$run_dir/k6/summary.json" >/dev/null 2>&1 || true
+proxy_mode_for_scenario() {
+  if [[ -n "${LOADTEST_PROXY_MODE:-}" ]]; then
+    printf "%s\n" "$LOADTEST_PROXY_MODE"
+    return
   fi
-fi
+
+  case "$1" in
+    proxy-wrapped)
+      printf "wrapped\n"
+      ;;
+    *)
+      printf "raw\n"
+      ;;
+  esac
+}
+
+shape_for_scenario() {
+  case "$1" in
+    proxy-spike)
+      printf "spike\n"
+      ;;
+    *)
+      printf "constant\n"
+      ;;
+  esac
+}
+
+duration_for_scenario() {
+  case "$1" in
+    proxy-soak)
+      k6_env_or_profile LOADTEST_K6_SOAK_DURATION soak_duration 2h
+      ;;
+    *)
+      k6_env_or_profile K6_DURATION duration 5m
+      ;;
+  esac
+}
+
+max_5xx_rate() {
+  local value=${K6_MAX_5XX_RATE:-}
+  if [[ -z "$value" ]]; then
+    value=$(loadtest_yaml_section_value "$profile_file" acceptance max_5xx_rate)
+  fi
+  printf "%s\n" "${value:-0.001}"
+}
+
+prepare_connections_dataset() {
+  local source=${LOADTEST_K6_CONNECTIONS_CSV:-${LOADTEST_CONNECTIONS_CSV:-}}
+  if [[ -z "$source" ]]; then
+    source=$(loadtest_latest_seed_dataset "$profile_name")
+  fi
+  [[ -n "$source" ]] || loadtest_die "no seeded connections.csv found for profile $profile_name; run seed first or set LOADTEST_K6_CONNECTIONS_CSV"
+  [[ -f "$source" ]] || loadtest_die "connections dataset does not exist: $source"
+
+  local rows
+  rows=$(k6_env_or_profile LOADTEST_K6_CONNECTION_ROWS connection_rows 10000)
+  if [[ "$rows" != "all" && ! "$rows" =~ ^[0-9]+$ ]]; then
+    loadtest_die "LOADTEST_K6_CONNECTION_ROWS must be numeric or all"
+  fi
+
+  local target="$tmp/connections.csv"
+  awk -v limit="$rows" -F, '
+    BEGIN { OFS = "," }
+    NR == 1 {
+      for (idx = 1; idx <= NF; idx++) {
+        if ($idx == "connection_id") {
+          connection_col = idx
+        }
+        if ($idx == "connector_id") {
+          connector_col = idx
+        }
+      }
+      if (connection_col == 0) {
+        exit 2
+      }
+      print "connection_id", "connector_id"
+      next
+    }
+    limit != "all" && written >= limit {
+      exit
+    }
+    {
+      connector = connector_col == 0 ? "" : $connector_col
+      print $connection_col, connector
+      written++
+    }
+  ' "$source" > "$target" || loadtest_die "failed to build compact k6 dataset from $source"
+
+  local row_count
+  row_count=$(awk 'NR > 1 { count++ } END { print count + 0 }' "$target")
+  [[ "$row_count" -gt 0 ]] || loadtest_die "compact k6 dataset is empty: $source"
+  loadtest_log "using $row_count k6 connection rows from $source" >&2
+  printf "%s\n" "$target"
+}
+
+apply_k6_script_configmap() {
+  local connections_csv=$1
+  local bundle_bytes
+  bundle_bytes=$(
+    (
+      wc -c < "$LOADTEST_ROOT/k6/smoke.js"
+      wc -c < "$LOADTEST_ROOT/k6/proxy.js"
+      wc -c < "$connections_csv"
+    ) | awk '{ total += $1 } END { print total + 0 }'
+  )
+
+  local max_bytes=${LOADTEST_K6_CONFIGMAP_MAX_BYTES:-900000}
+  if [[ "${LOADTEST_K6_ALLOW_LARGE_CONFIGMAP:-false}" != "true" && "$bundle_bytes" -gt "$max_bytes" ]]; then
+    loadtest_die "k6 ConfigMap bundle is ${bundle_bytes} bytes, above ${max_bytes}; lower LOADTEST_K6_CONNECTION_ROWS or set LOADTEST_K6_ALLOW_LARGE_CONFIGMAP=true"
+  fi
+
+  kubectl -n "$namespace" create configmap authproxy-loadtest-k6 \
+    --from-file=smoke.js="$LOADTEST_ROOT/k6/smoke.js" \
+    --from-file=proxy.js="$LOADTEST_ROOT/k6/proxy.js" \
+    --from-file=connections.csv="$connections_csv" \
+    --dry-run=client -o yaml > "$tmp/k6-configmap.yaml"
+  kubectl -n "$namespace" apply -f "$tmp/k6-configmap.yaml"
+}
+
+mint_proxy_token() {
+  local token=${LOADTEST_AUTHPROXY_BEARER_TOKEN:-${AUTHPROXY_BEARER_TOKEN:-}}
+  if [[ -n "$token" ]]; then
+    printf "%s\n" "$token"
+    return
+  fi
+
+  loadtest_require_cmd go
+
+  local key_path="$tmp/loadtest-admin"
+  kubectl -n "$namespace" get secret authproxy-load-actors \
+    -o go-template='{{ index .data "loadtest-admin" }}' | loadtest_base64_decode > "$key_path"
+  chmod 600 "$key_path"
+
+  cat > "$tmp/proxy-permissions.yaml" <<'YAML'
+- namespace: root.**
+  resources:
+    - connections
+  verbs:
+    - proxy
+YAML
+
+  (
+    cd "$REPO_ROOT"
+    go run ./cmd/cli sign-jwt \
+      --actorId loadtest-admin \
+      --privateKeyPath "$key_path" \
+      --apis api \
+      --expires-in "${LOADTEST_K6_TOKEN_EXPIRES_IN:-4h}" \
+      --permissions-file "$tmp/proxy-permissions.yaml"
+  )
+}
+
+apply_k6_auth_secret() {
+  local token=$1
+  kubectl -n "$namespace" create secret generic authproxy-loadtest-k6-auth \
+    --from-literal=AUTHPROXY_BEARER_TOKEN="$token" \
+    --dry-run=client -o yaml > "$tmp/k6-auth.yaml"
+  kubectl -n "$namespace" apply -f "$tmp/k6-auth.yaml"
+}
+
+apply_k6_env_configmap() {
+  local scenario_name=$1
+  local proxy_mode=$2
+  local shape=$3
+  local api_replicas=$4
+  local configmap_name=${5:-authproxy-loadtest-k6-env}
+
+  local env_file="$run_dir/k6/${scenario_name}.env"
+  {
+    printf "AUTHPROXY_API_URL=%s\n" "${AUTHPROXY_API_URL:-http://authproxy-api:8081}"
+    printf "GO_OAUTH2_SERVER_URL=%s\n" "${GO_OAUTH2_SERVER_URL:-http://go-oauth2-server}"
+    printf "K6_PROXY_MODE=%s\n" "$proxy_mode"
+    printf "K6_SCENARIO_NAME=%s\n" "$scenario_name"
+    printf "K6_SCENARIO_SHAPE=%s\n" "$shape"
+    printf "K6_API_REPLICAS=%s\n" "$api_replicas"
+    printf "K6_RATE=%s\n" "$(k6_env_or_profile K6_RATE rate 100)"
+    printf "K6_DURATION=%s\n" "$(duration_for_scenario "$scenario_name")"
+    printf "K6_TIME_UNIT=%s\n" "$(k6_env_or_profile K6_TIME_UNIT time_unit 1s)"
+    printf "K6_PRE_ALLOCATED_VUS=%s\n" "$(k6_env_or_profile K6_PRE_ALLOCATED_VUS pre_allocated_vus 100)"
+    printf "K6_MAX_VUS=%s\n" "$(k6_env_or_profile K6_MAX_VUS max_vus 1000)"
+    printf "K6_REQUEST_TIMEOUT=%s\n" "$(k6_env_or_profile K6_REQUEST_TIMEOUT request_timeout 30s)"
+    printf "K6_P95_THRESHOLD_MS=%s\n" "$(k6_p95_threshold_ms)"
+    printf "K6_MAX_FAILED_RATE=%s\n" "$(k6_env_or_profile K6_MAX_FAILED_RATE max_failed_rate "$(max_5xx_rate)")"
+    printf "K6_MAX_5XX_RATE=%s\n" "$(max_5xx_rate)"
+    printf "K6_UPSTREAM_STATUS=%s\n" "$(k6_env_or_profile K6_UPSTREAM_STATUS upstream_status 200)"
+    printf "K6_UPSTREAM_BYTES=%s\n" "$(k6_env_or_profile K6_UPSTREAM_BYTES upstream_bytes 256)"
+    printf "K6_UPSTREAM_DELAY_MS=%s\n" "$(k6_env_or_profile K6_UPSTREAM_DELAY_MS upstream_delay_ms 0)"
+    printf "K6_UPSTREAM_JITTER_MS=%s\n" "$(k6_env_or_profile K6_UPSTREAM_JITTER_MS upstream_jitter_ms 0)"
+    printf "K6_UPSTREAM_BEARER_PREFIX=%s\n" "$(k6_env_or_profile K6_UPSTREAM_BEARER_PREFIX upstream_bearer_prefix at_)"
+    printf "K6_UPSTREAM_PATH_PREFIX=%s\n" "$(k6_env_or_profile K6_UPSTREAM_PATH_PREFIX upstream_path_prefix /test/load/resource/proxy)"
+    printf "K6_PROXY_METHOD=%s\n" "$(k6_env_or_profile K6_PROXY_METHOD proxy_method GET)"
+    printf "K6_SPIKE_BASE_RATE=%s\n" "$(k6_env_or_profile K6_SPIKE_BASE_RATE spike_base_rate "$(k6_env_or_profile K6_RATE rate 100)")"
+    printf "K6_SPIKE_RATE=%s\n" "$(k6_env_or_profile K6_SPIKE_RATE spike_rate 300)"
+    printf "K6_SPIKE_RAMP_UP=%s\n" "$(k6_env_or_profile K6_SPIKE_RAMP_UP spike_ramp_up 1m)"
+    printf "K6_SPIKE_HOLD=%s\n" "$(k6_env_or_profile K6_SPIKE_HOLD spike_hold 3m)"
+    printf "K6_SPIKE_RAMP_DOWN=%s\n" "$(k6_env_or_profile K6_SPIKE_RAMP_DOWN spike_ramp_down 1m)"
+    printf "K6_SPIKE_RECOVERY=%s\n" "$(k6_env_or_profile K6_SPIKE_RECOVERY spike_recovery 3m)"
+  } > "$env_file"
+
+  kubectl -n "$namespace" create configmap "$configmap_name" \
+    --from-env-file="$env_file" \
+    --dry-run=client -o yaml > "$tmp/k6-env.yaml"
+  kubectl -n "$namespace" apply -f "$tmp/k6-env.yaml"
+  kubectl -n "$namespace" label configmap "$configmap_name" \
+    app.kubernetes.io/name=k6 \
+    app.kubernetes.io/component=load-generator \
+    --overwrite >/dev/null
+}
+
+render_proxy_testrun() {
+  local name=$1
+  local parallelism=$2
+  local env_configmap=$3
+  cat > "$tmp/${name}.yaml" <<YAML
+apiVersion: k6.io/v1alpha1
+kind: TestRun
+metadata:
+  name: $name
+  labels:
+    app.kubernetes.io/name: k6
+    app.kubernetes.io/component: load-generator
+    loadtest.authproxy.io/scenario: proxy
+spec:
+  parallelism: $parallelism
+  arguments: --summary-export /tmp/summary.json
+  script:
+    configMap:
+      name: authproxy-loadtest-k6
+      file: proxy.js
+  runner:
+    image: $k6_image
+    metadata:
+      labels:
+        app.kubernetes.io/name: k6
+        app.kubernetes.io/component: load-generator
+        loadtest.authproxy.io/scenario: proxy
+    env:
+      - name: AUTHPROXY_BEARER_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: authproxy-loadtest-k6-auth
+            key: AUTHPROXY_BEARER_TOKEN
+      - name: K6_CONNECTIONS_FILE
+        value: ./connections.csv
+    envFrom:
+      - configMapRef:
+          name: $env_configmap
+YAML
+  printf "%s\n" "$tmp/${name}.yaml"
+}
+
+run_smoke() {
+  local connections_csv="$tmp/connections.csv"
+  printf "connection_id,connector_id\nsmoke,smoke\n" > "$connections_csv"
+  apply_k6_script_configmap "$connections_csv"
+
+  if [[ "$k6_mode" == "operator" ]]; then
+    if ! kubectl get crd testruns.k6.io >/dev/null 2>&1; then
+      loadtest_die "LOADTEST_K6_MODE=operator requested, but testruns.k6.io is not installed"
+    fi
+
+    loadtest_log "applying k6 smoke TestRun"
+    kubectl -n "$namespace" delete testrun authproxy-smoke --ignore-not-found=true >/dev/null 2>&1 || true
+    kubectl -n "$namespace" apply -f "$LOADTEST_ROOT/k8s/k6/smoke-testrun.yaml"
+    loadtest_log "TestRun submitted; use collect to capture status and runner logs"
+  else
+    loadtest_log "running k6 smoke Job"
+    kubectl -n "$namespace" delete job authproxy-smoke-k6 --ignore-not-found=true >/dev/null 2>&1 || true
+    kubectl -n "$namespace" apply -f "$LOADTEST_ROOT/k8s/k6/smoke-job.yaml"
+    kubectl -n "$namespace" set image job/authproxy-smoke-k6 "k6=$k6_image"
+    if ! kubectl -n "$namespace" wait --for=condition=complete job/authproxy-smoke-k6 "--timeout=$k6_timeout"; then
+      kubectl -n "$namespace" logs job/authproxy-smoke-k6 > "$run_dir/k6/smoke.log" 2>&1 || true
+      loadtest_die "k6 smoke Job did not complete within $k6_timeout"
+    fi
+    kubectl -n "$namespace" logs job/authproxy-smoke-k6 > "$run_dir/k6/smoke.log" 2>&1 || true
+
+    local pod
+    pod=$(kubectl -n "$namespace" get pod -l job-name=authproxy-smoke-k6 -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+    if [[ -n "$pod" ]]; then
+      kubectl -n "$namespace" cp "$pod:/artifacts/summary.json" "$run_dir/k6/summary.json" >/dev/null 2>&1 || true
+    fi
+  fi
+}
+
+wait_for_testrun() {
+  local name=$1
+  local timeout_seconds=${LOADTEST_K6_OPERATOR_WAIT_SECONDS:-3600}
+  local deadline=$((SECONDS + timeout_seconds))
+  local stage=""
+
+  loadtest_log "waiting for TestRun $name to finish"
+  while [[ "$SECONDS" -lt "$deadline" ]]; do
+    stage=$(kubectl -n "$namespace" get testrun "$name" -o jsonpath='{.status.stage}' 2>/dev/null || true)
+    case "$stage" in
+      finished)
+        kubectl -n "$namespace" get testrun "$name" -o yaml > "$run_dir/k6/${name}-status.yaml" 2>&1 || true
+        return
+        ;;
+      error)
+        kubectl -n "$namespace" get testrun "$name" -o yaml > "$run_dir/k6/${name}-status.yaml" 2>&1 || true
+        loadtest_die "TestRun $name entered error stage"
+        ;;
+    esac
+    sleep 10
+  done
+
+  kubectl -n "$namespace" get testrun "$name" -o yaml > "$run_dir/k6/${name}-status.yaml" 2>&1 || true
+  loadtest_die "TestRun $name did not finish within ${timeout_seconds}s; last stage: ${stage:-unknown}"
+}
+
+run_proxy_once() {
+  local scenario_name=$1
+  local api_replicas=${2:-configured}
+  local proxy_mode
+  local shape
+  local run_name
+
+  proxy_mode=$(proxy_mode_for_scenario "$scenario_name")
+  shape=$(shape_for_scenario "$scenario_name")
+  run_name=$(loadtest_sanitize_k8s_name "authproxy-${scenario_name}-${api_replicas}")
+
+  if [[ "$k6_mode" == "operator" ]]; then
+    if ! kubectl get crd testruns.k6.io >/dev/null 2>&1; then
+      loadtest_die "LOADTEST_K6_MODE=operator requested, but testruns.k6.io is not installed"
+    fi
+
+    local parallelism
+    local env_configmap
+    parallelism=$(k6_env_or_profile K6_PARALLELISM parallelism 1)
+    env_configmap=$(loadtest_sanitize_k8s_name "authproxy-loadtest-k6-env-${run_name}")
+    apply_k6_env_configmap "$scenario_name" "$proxy_mode" "$shape" "$api_replicas" "$env_configmap"
+    local testrun_manifest
+    testrun_manifest=$(render_proxy_testrun "$run_name" "$parallelism" "$env_configmap")
+    loadtest_log "submitting k6 TestRun $run_name with parallelism=$parallelism"
+    kubectl -n "$namespace" delete testrun "$run_name" --ignore-not-found=true >/dev/null 2>&1 || true
+    kubectl -n "$namespace" apply -f "$testrun_manifest"
+    cp "$testrun_manifest" "$run_dir/k6/${run_name}.yaml"
+    if [[ "${LOADTEST_K6_WAIT:-false}" == "true" ]]; then
+      wait_for_testrun "$run_name"
+    fi
+    loadtest_log "TestRun submitted; use collect to capture status and runner logs"
+  else
+    apply_k6_env_configmap "$scenario_name" "$proxy_mode" "$shape" "$api_replicas"
+    loadtest_log "running k6 proxy Job for $scenario_name"
+    kubectl -n "$namespace" delete job authproxy-proxy-k6 --ignore-not-found=true >/dev/null 2>&1 || true
+    kubectl -n "$namespace" apply -f "$LOADTEST_ROOT/k8s/k6/proxy-job.yaml"
+    kubectl -n "$namespace" set image job/authproxy-proxy-k6 "k6=$k6_image"
+    if ! kubectl -n "$namespace" wait --for=condition=complete job/authproxy-proxy-k6 "--timeout=$k6_timeout"; then
+      kubectl -n "$namespace" logs job/authproxy-proxy-k6 > "$run_dir/k6/${run_name}.log" 2>&1 || true
+      loadtest_die "k6 proxy Job did not complete within $k6_timeout"
+    fi
+    kubectl -n "$namespace" logs job/authproxy-proxy-k6 > "$run_dir/k6/${run_name}.log" 2>&1 || true
+
+    local pod
+    pod=$(kubectl -n "$namespace" get pod -l job-name=authproxy-proxy-k6 -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+    if [[ -n "$pod" ]]; then
+      kubectl -n "$namespace" cp "$pod:/artifacts/summary.json" "$run_dir/k6/${run_name}-summary.json" >/dev/null 2>&1 || true
+      record_scale_result "$api_replicas" "$scenario_name" "$run_dir/k6/${run_name}-summary.json" "$run_dir/k6/${run_name}.log"
+    fi
+  fi
+}
+
+record_scale_result() {
+  local replicas=$1
+  local scenario_name=$2
+  local summary_file=$3
+  local log_file=$4
+  local results_file="$run_dir/k6/scale-results.tsv"
+
+  if [[ ! -f "$results_file" ]]; then
+    printf "api_replicas\tscenario\titerations_per_second\thttp_req_duration_p95_ms\thttp_req_failed_rate\tdropped_iterations\tmax_vus\tlog_file\tsummary_file\n" > "$results_file"
+  fi
+
+  if command -v jq >/dev/null 2>&1 && [[ -f "$summary_file" ]]; then
+    jq -r \
+      --arg replicas "$replicas" \
+      --arg scenario "$scenario_name" \
+      --arg log "$log_file" \
+      --arg summary "$summary_file" '
+        [
+          $replicas,
+          $scenario,
+          (.metrics.iterations.rate // .metrics.iterations.values.rate // ""),
+          (.metrics.http_req_duration.values["p(95)"] // .metrics.http_req_duration["p(95)"] // ""),
+          (.metrics.http_req_failed.rate // .metrics.http_req_failed.values.rate // ""),
+          (.metrics.dropped_iterations.count // .metrics.dropped_iterations.values.count // 0),
+          (.metrics.vus_max.max // .metrics.vus_max.values.max // ""),
+          $log,
+          $summary
+        ] | @tsv
+      ' "$summary_file" >> "$results_file" || printf "%s\t%s\t\t\t\t\t\t%s\t%s\n" "$replicas" "$scenario_name" "$log_file" "$summary_file" >> "$results_file"
+  else
+    printf "%s\t%s\t\t\t\t\t\t%s\t%s\n" "$replicas" "$scenario_name" "$log_file" "$summary_file" >> "$results_file"
+  fi
+}
+
+set_api_replicas() {
+  local replicas=$1
+  local timeout=${LOADTEST_SCALE_TIMEOUT:-5m}
+
+  loadtest_log "setting authproxy-api replicas to $replicas"
+  if kubectl -n "$namespace" get hpa authproxy-api >/dev/null 2>&1; then
+    kubectl -n "$namespace" patch hpa authproxy-api --type merge -p "{\"spec\":{\"minReplicas\":$replicas,\"maxReplicas\":$replicas}}"
+  else
+    kubectl -n "$namespace" scale deployment/authproxy-api "--replicas=$replicas"
+  fi
+  kubectl -n "$namespace" rollout status deployment/authproxy-api "--timeout=$timeout"
+}
+
+run_proxy_suite() {
+  local connections_csv
+  local token
+  connections_csv=$(prepare_connections_dataset)
+  apply_k6_script_configmap "$connections_csv"
+  token=$(mint_proxy_token)
+  apply_k6_auth_secret "$token"
+
+  case "$scenario" in
+    proxy-raw|proxy-wrapped|proxy-soak|proxy-spike)
+      run_proxy_once "$scenario"
+      ;;
+    proxy-scale)
+      local scale_scenario=${LOADTEST_PROXY_SCALE_SCENARIO:-proxy-raw}
+      local -a replicas=()
+      local replica_count
+      while IFS= read -r replica_count; do
+        [[ -n "$replica_count" ]] && replicas+=("$replica_count")
+      done < <(loadtest_yaml_section_list "$profile_file" k6 scale_replicas)
+      if [[ "${#replicas[@]}" -eq 0 ]]; then
+        loadtest_die "profile $profile_name has no k6.scale_replicas entries"
+      fi
+      if [[ "$k6_mode" == "operator" && -z "${LOADTEST_K6_WAIT:-}" ]]; then
+        export LOADTEST_K6_WAIT=true
+      fi
+      for replica_count in "${replicas[@]}"; do
+        set_api_replicas "$replica_count"
+        run_proxy_once "$scale_scenario" "$replica_count"
+      done
+      ;;
+    *)
+      loadtest_die "unsupported proxy scenario: $scenario"
+      ;;
+  esac
+}
+
+case "$scenario" in
+  smoke)
+    run_smoke
+    ;;
+  proxy-raw|proxy-wrapped|proxy-scale|proxy-soak|proxy-spike)
+    run_proxy_suite
+    ;;
+  *)
+    loadtest_die "unsupported scenario: $scenario"
+    ;;
+esac
 
 loadtest_capture_cluster_snapshot "$namespace" "$run_dir"
 loadtest_capture_helm_snapshot "$namespace" "$run_dir"
