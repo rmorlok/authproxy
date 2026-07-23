@@ -6,6 +6,7 @@ cluster:
 objects:
   namespaces_min: 200000
   connections: 500000
+  stale_setup_connections: 5000
   oauth_tokens_expiring_percent:
     - 10
     - 50

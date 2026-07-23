@@ -6,6 +6,7 @@ cluster:
 objects:
   namespaces: 10
   connections: 10
+  stale_setup_connections: 2
   oauth_tokens_expiring_percent: 0
   periodic_probe_percent: 0
 authproxy:

@@ -4,7 +4,8 @@ This directory contains the Kubernetes harness for the AuthProxy load-test
 project tracked by #711. It is intentionally split from product
 optimizations: the harness gives us repeatable environment setup, smoke
 traffic, state seeding, proxy-QPS scenarios, and artifact capture. The
-background-job suites build on this foundation in follow-up issues.
+background-job suite adds repeatable refresh, scheduler, resource snapshot, and
+cleanup pressure runs against the same seeded profiles.
 
 ## Prerequisites
 
@@ -44,6 +45,10 @@ capacity.
 ./loadtest/scripts/run 100k proxy-soak
 ./loadtest/scripts/run 100k proxy-spike
 
+# Run background-job scenarios. Enqueue/drain scenarios need a config that
+# points at the same Postgres/Redis/app-metrics stores as running workers.
+LOADTEST_AUTHPROXY_CONFIG=/path/to/loadtest-authproxy.yaml ./loadtest/scripts/background 100k all
+
 # Capture pods, deployments, services, Helm values, logs, and k6 summary JSON.
 ./loadtest/scripts/collect smoke
 
@@ -69,6 +74,29 @@ The seed script consumes the object-count section directly. Proxy-QPS scenarios
 consume the generated `datasets/connections.csv`, compact it to the columns k6
 needs, and reuse that same sampled dataset across raw, wrapped, spike, soak,
 and scale runs.
+
+## Background Scenarios
+
+`./loadtest/scripts/background <profile> <scenario>` supports:
+
+- `all`: refresh sweeps, scheduler sync, resource snapshot, and stale setup
+  cleanup.
+- `refresh-sweep`: seeds each `objects.oauth_tokens_expiring_percent` value
+  and enqueues the OAuth refresh sweep task.
+- `scheduler-sync`: seeds each `objects.periodic_probe_percent` value and
+  measures the periodic scheduler's connection walk without needing a worker.
+- `resource-snapshot`: enqueues the app-metrics resource snapshot task.
+- `stale-setup-cleanup`: seeds `objects.stale_setup_connections`, waits for the
+  load-test setup TTL, then enqueues stale setup cleanup.
+- `probe-outcome-cleanup`: optional cleanup-task walk over probe-enabled
+  connections.
+
+Refresh, resource snapshot, stale setup cleanup, and probe outcome cleanup are
+queue-drain tests: they require `LOADTEST_AUTHPROXY_CONFIG` or
+`AUTHPROXY_CONFIG` to point at stores shared with a running worker. If no config
+is set, the script can still run `scheduler-sync` with a generated local
+SQLite config; set `LOADTEST_BACKGROUND_WAIT_DRAIN=false` only when you want to
+record enqueue/queue state without waiting for worker processing.
 
 ## k6 Proxy Scenarios
 
@@ -135,6 +163,20 @@ https://grafana.com/docs/k6/latest/set-up/set-up-distributed-k6/usage/executing-
   `seed` generates a local SQLite/miniredis config in the run directory.
 - `LOADTEST_PROVIDER_BASE_URL`: provider URL written into seeded connector
   definitions; defaults to `http://go-oauth2-server:8080`.
+- `LOADTEST_BACKGROUND_SCENARIO`: default background scenario for
+  `scripts/background`.
+- `LOADTEST_BACKGROUND_QUEUE`: Asynq queue to enqueue to and inspect; defaults
+  to `default`.
+- `LOADTEST_BACKGROUND_DRAIN_TIMEOUT`: maximum time to wait for queue drain;
+  defaults to `30m`.
+- `LOADTEST_BACKGROUND_POLL_INTERVAL`: queue sampling interval; defaults to
+  `5s`.
+- `LOADTEST_BACKGROUND_WAIT_DRAIN=false`: record enqueue/queue state without
+  waiting for workers.
+- `LOADTEST_BACKGROUND_SEED=false`: skip the per-scenario seed step when the
+  target DB is already prepared.
+- `LOADTEST_STALE_SETUP_CONNECTIONS`: override the profile's stale setup count
+  for `stale-setup-cleanup`.
 - `LOADTEST_INSTALL_K6_OPERATOR=true`: install or upgrade the k6 Operator with
   Helm during `up`.
 - `LOADTEST_INSTALL_KEDA=true`: install or upgrade KEDA with Helm during `up`.
@@ -174,11 +216,25 @@ Each script writes or appends to a run directory containing:
 The `seed` step also writes:
 
 - `datasets/connections.csv`: connection IDs and metadata for k6 scenarios.
+- `datasets/stale_setup_connections.csv`: setup-state rows used by stale
+  cleanup scenarios.
 - `datasets/namespaces.csv`: generated tenant namespaces.
 - `datasets/actors.csv`: generated tenant actors.
 - `seed-summary.json`: machine-readable counts, selected percentages, and
   verified samples.
 - `seed-plan.txt`: human-readable seed summary.
+
+The `background` step writes one directory per variant, plus
+`background-runs.tsv` at the top level. Each variant contains its seed artifacts
+and:
+
+- `background/background-summary.json`: timing, enqueue/drain deltas, expected
+  expiring-token counts, scheduler task counts, memory snapshots, and artifact
+  paths.
+- `background/queue-samples.tsv`: sampled queue size, pending/active/retry
+  counts, totals, latency, and Redis memory usage.
+- `background/scheduler-task-configs.tsv`: scheduler task counts by task type
+  and cronspec for `scheduler-sync`.
 
 These artifacts are the handoff point for follow-up optimization work such as DB
 indexes, keyset pagination, request-event buffering, or worker tuning.

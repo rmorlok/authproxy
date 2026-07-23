@@ -1,0 +1,304 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+source "$SCRIPT_DIR/lib/loadtest.sh"
+
+profile=${1:-${LOADTEST_PROFILE:-smoke}}
+if [[ $# -gt 0 ]]; then
+  shift
+fi
+
+scenario=${1:-${LOADTEST_BACKGROUND_SCENARIO:-all}}
+if [[ $# -gt 0 ]]; then
+  shift
+fi
+extra_background_args=("$@")
+
+profile_file=$(loadtest_profile_path "$profile")
+profile_name=$(loadtest_profile_name "$profile_file")
+namespace=$(loadtest_namespace "$profile_file")
+run_dir=$(loadtest_init_run_dir "$profile_name" "$profile_file" "$namespace" background)
+index_file="$run_dir/background-runs.tsv"
+
+provider_base_url=${LOADTEST_PROVIDER_BASE_URL:-http://go-oauth2-server:8080}
+queue=${LOADTEST_BACKGROUND_QUEUE:-default}
+drain_timeout=${LOADTEST_BACKGROUND_DRAIN_TIMEOUT:-30m}
+poll_interval=${LOADTEST_BACKGROUND_POLL_INTERVAL:-5s}
+wait_drain=${LOADTEST_BACKGROUND_WAIT_DRAIN:-true}
+seed_enabled=${LOADTEST_BACKGROUND_SEED:-true}
+verify_samples=${LOADTEST_BACKGROUND_VERIFY_SAMPLES:-3}
+progress_every=${LOADTEST_BACKGROUND_PROGRESS_EVERY:-1000}
+stale_settle=${LOADTEST_BACKGROUND_STALE_SETTLE:-2s}
+
+config_file=${LOADTEST_AUTHPROXY_CONFIG:-${AUTHPROXY_CONFIG:-}}
+generated_local_config=false
+
+generate_local_config() {
+  local path=$1
+  local sqlite_path=$2
+
+  loadtest_log "generating local SQLite/miniredis background config: $path"
+  cat > "$path" <<EOF
+host_application:
+  initiate_session_url: http://placeholder.invalid/login
+
+connections:
+  setup_ttl: 1s
+
+tasks:
+  default_retention: 24h
+
+database:
+  provider: sqlite
+  auto_migrate: true
+  path: $sqlite_path
+
+redis:
+  provider: miniredis
+
+system_auth:
+  jwt_signing_key:
+    public_key:
+      path: $REPO_ROOT/dev_config/system.pub
+    private_key:
+      path: $REPO_ROOT/dev_config/system
+  actors:
+    keys_path: $REPO_ROOT/dev_config/keys/admin
+    permissions:
+      - namespace: root.**
+        resources:
+          - "*"
+        verbs:
+          - "*"
+  global_aes_key:
+    path: $REPO_ROOT/dev_config/keys/global_aes.key
+
+connectors:
+  auto_migrate: false
+  load_from_list: []
+
+app_metrics:
+  auto_migrate: false
+  database:
+    provider: sqlite
+    path: $sqlite_path
+
+logging:
+  type: none
+EOF
+}
+
+scenario_requires_worker() {
+  case "$1" in
+    all|refresh-sweep|resource-snapshot|stale-setup-cleanup|probe-outcome-cleanup)
+      return 0
+      ;;
+    scheduler-sync)
+      return 1
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+if [[ -z "$config_file" ]]; then
+  config_file="$run_dir/authproxy-background.yaml"
+  sqlite_path="$run_dir/authproxy-background.sqlite3"
+  generate_local_config "$config_file" "$sqlite_path"
+  generated_local_config=true
+fi
+
+if [[ "$generated_local_config" == "true" && "$wait_drain" != "false" ]] && scenario_requires_worker "$scenario"; then
+  loadtest_die "background enqueue scenarios need LOADTEST_AUTHPROXY_CONFIG/AUTHPROXY_CONFIG pointing at shared load-test stores with a running worker, or set LOADTEST_BACKGROUND_WAIT_DRAIN=false"
+fi
+
+printf "variant\tscenario\tpercent\tseed_dir\tbackground_dir\n" > "$index_file"
+
+run_authproxy() {
+  if [[ -n "${LOADTEST_AUTHPROXY_BIN:-}" ]]; then
+    "$LOADTEST_AUTHPROXY_BIN" --config "$config_file" "$@"
+    return
+  fi
+
+  (
+    cd "$REPO_ROOT"
+    go run ./cmd/server --config "$config_file" "$@"
+  )
+}
+
+append_index() {
+  local variant=$1
+  local scenario_name=$2
+  local percent=${3:-}
+  local seed_dir=$4
+  local background_dir=$5
+
+  printf "%s\t%s\t%s\t%s\t%s\n" "$variant" "$scenario_name" "$percent" "$seed_dir" "$background_dir" >> "$index_file"
+}
+
+seed_variant() {
+  local variant=$1
+  shift
+
+  local seed_dir="$run_dir/$variant/seed"
+  mkdir -p "$seed_dir"
+
+  if [[ "$seed_enabled" == "false" ]]; then
+    loadtest_log "skipping seed for $variant"
+    return
+  fi
+
+  loadtest_log "seeding $variant"
+  run_authproxy \
+    loadtest-seed \
+    --profile "$profile_file" \
+    --run-dir "$seed_dir" \
+    --provider-base-url "$provider_base_url" \
+    --verify-samples "$verify_samples" \
+    --progress-every "$progress_every" \
+    "$@"
+}
+
+run_background_scenario() {
+  local variant=$1
+  local scenario_name=$2
+  local percent=${3:-}
+
+  local seed_dir="$run_dir/$variant/seed"
+  local background_dir="$run_dir/$variant/background"
+  mkdir -p "$background_dir"
+
+  local args=(
+    loadtest-background
+    --profile "$profile_file"
+    --run-dir "$background_dir"
+    --scenario "$scenario_name"
+    --queue "$queue"
+    --drain-timeout "$drain_timeout"
+    --poll-interval "$poll_interval"
+  )
+
+  if [[ -n "$percent" ]]; then
+    args+=(--percent "$percent")
+  fi
+  if [[ "$wait_drain" == "false" ]]; then
+    args+=(--wait-drain=false)
+  fi
+
+  loadtest_log "running $scenario_name for $variant"
+  if [[ ${#extra_background_args[@]} -gt 0 ]]; then
+    run_authproxy "${args[@]}" "${extra_background_args[@]}"
+  else
+    run_authproxy "${args[@]}"
+  fi
+  append_index "$variant" "$scenario_name" "$percent" "$seed_dir" "$background_dir"
+}
+
+profile_percent_values() {
+  local key=$1
+  local found=false
+  while IFS= read -r value; do
+    [[ -n "$value" ]] || continue
+    found=true
+    printf "%s\n" "$value"
+  done < <(loadtest_yaml_section_list "$profile_file" objects "$key")
+
+  if [[ "$found" == "false" ]]; then
+    printf "0\n"
+  fi
+}
+
+run_refresh_sweep() {
+  local pct
+  while IFS= read -r pct; do
+    [[ -n "$pct" ]] || continue
+    local variant="refresh-${pct}pct"
+    seed_variant "$variant" \
+      --oauth-expiring-percent "$pct" \
+      --periodic-probe-percent 0 \
+      --stale-setup-connections 0
+    run_background_scenario "$variant" refresh-sweep "$pct"
+  done < <(profile_percent_values oauth_tokens_expiring_percent)
+}
+
+run_scheduler_sync() {
+  local pct
+  while IFS= read -r pct; do
+    [[ -n "$pct" ]] || continue
+    local variant="probe-${pct}pct"
+    seed_variant "$variant" \
+      --oauth-expiring-percent 0 \
+      --periodic-probe-percent "$pct" \
+      --stale-setup-connections 0
+    run_background_scenario "$variant" scheduler-sync "$pct"
+  done < <(profile_percent_values periodic_probe_percent)
+}
+
+run_resource_snapshot() {
+  local variant="resource-snapshot"
+  seed_variant "$variant" \
+    --oauth-expiring-percent 0 \
+    --periodic-probe-percent 0 \
+    --stale-setup-connections 0
+  run_background_scenario "$variant" resource-snapshot
+}
+
+run_stale_setup_cleanup() {
+  local variant="stale-setup-cleanup"
+  local stale_count
+  stale_count=$(loadtest_yaml_section_value "$profile_file" objects stale_setup_connections)
+  stale_count=${LOADTEST_STALE_SETUP_CONNECTIONS:-${stale_count:-0}}
+
+  seed_variant "$variant" \
+    --oauth-expiring-percent 0 \
+    --periodic-probe-percent 0 \
+    --stale-setup-connections "$stale_count"
+
+  if [[ "$stale_count" != "0" && "$stale_settle" != "0" && "$seed_enabled" != "false" ]]; then
+    loadtest_log "waiting $stale_settle for setup TTL before stale cleanup"
+    sleep "$stale_settle"
+  fi
+
+  run_background_scenario "$variant" stale-setup-cleanup
+}
+
+run_probe_outcome_cleanup() {
+  local variant="probe-outcome-cleanup"
+  seed_variant "$variant" \
+    --oauth-expiring-percent 0 \
+    --periodic-probe-percent 100 \
+    --stale-setup-connections 0
+  run_background_scenario "$variant" probe-outcome-cleanup
+}
+
+case "$scenario" in
+  all)
+    run_refresh_sweep
+    run_scheduler_sync
+    run_resource_snapshot
+    run_stale_setup_cleanup
+    ;;
+  refresh-sweep)
+    run_refresh_sweep
+    ;;
+  scheduler-sync)
+    run_scheduler_sync
+    ;;
+  resource-snapshot)
+    run_resource_snapshot
+    ;;
+  stale-setup-cleanup)
+    run_stale_setup_cleanup
+    ;;
+  probe-outcome-cleanup)
+    run_probe_outcome_cleanup
+    ;;
+  *)
+    loadtest_die "unknown background scenario: $scenario"
+    ;;
+esac
+
+loadtest_log "background scenarios recorded for profile $profile_name"
+loadtest_log "run artifacts: $run_dir"

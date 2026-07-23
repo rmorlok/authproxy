@@ -25,6 +25,9 @@ func WriteArtifacts(runDir string, result *Result) error {
 	if err := writeConnectionsCSV(filepath.Join(datasetsDir, "connections.csv"), result.Connections); err != nil {
 		return err
 	}
+	if err := writeConnectionsCSV(filepath.Join(datasetsDir, "stale_setup_connections.csv"), result.StaleSetups); err != nil {
+		return err
+	}
 	if err := writeNamespacesCSV(filepath.Join(datasetsDir, "namespaces.csv"), result.Namespaces); err != nil {
 		return err
 	}
@@ -51,6 +54,9 @@ Tenant namespaces requested: %d
 Connections requested: %d
 Connections created: %d
 Connections already present: %d
+Stale setup connections requested: %d
+Stale setup connections created: %d
+Stale setup connections already present: %d
 OAuth2 tokens upserted: %d
 OAuth expiring percent: %d
 Periodic probe percent: %d
@@ -59,6 +65,7 @@ Verified samples: %d
 
 Datasets:
   datasets/connections.csv
+  datasets/stale_setup_connections.csv
   datasets/namespaces.csv
   datasets/actors.csv
 `,
@@ -71,6 +78,9 @@ Datasets:
 		result.RequestedConnections,
 		result.CreatedConnections,
 		result.ExistingConnections,
+		result.RequestedStaleSetups,
+		result.CreatedStaleSetups,
+		result.ExistingStaleSetups,
 		result.UpsertedOAuthTokens,
 		result.OAuthExpiringPercent,
 		result.PeriodicProbePercent,
