@@ -145,6 +145,7 @@ func newOAuthMigrationRig(t *testing.T, name string) *oauthMigrationRig {
 
 	created := env.CreateConnector(t, rig.connectorDefinition(name+"-v1", []string{"read"}), nil, nil)
 	require.Equal(t, uint64(1), created.Version)
+	rig.connectorID = created.Id
 	primary := env.ForceConnectorVersionState(t, created.Id, created.Version, schemaapi.ConnectorVersionStatePrimary)
 	require.Equal(t, schemaapi.ConnectorVersionStatePrimary, primary.State)
 
