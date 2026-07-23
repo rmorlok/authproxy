@@ -159,6 +159,24 @@ func TestApplyRequiredActionNotificationPrefersAuthOverSetup(t *testing.T) {
 	require.Equal(t, "/connections/"+candidate.Connection.Id.String()+"?action=reauth", *candidate.Notifications[0].ActionUrl)
 }
 
+func TestApplySuccessfulMigrationAuthRefreshClearsStaleAuthNotification(t *testing.T) {
+	candidate := newMigrationTestCandidate(t)
+	candidate.HealthState = database.ConnectionHealthStateUnhealthy
+	addAuthRequiredNotification(candidate, migrationNotificationMetadata(candidate, "connection_requires_reauth"))
+
+	applySuccessfulMigrationAuthRefresh(candidate)
+
+	require.Equal(t, database.ConnectionHealthStateHealthy, candidate.HealthState)
+	require.Empty(t, candidate.Notifications)
+	require.Empty(t, candidate.NotificationKeys)
+	require.Zero(t, candidate.NotificationRank)
+	require.Contains(
+		t,
+		candidate.NotificationKeysToResolve(),
+		connectionNotificationKey(candidate, database.NotificationKeyAuthRequired),
+	)
+}
+
 func TestSetCandidateNotificationRankAndUnsetHandling(t *testing.T) {
 	candidate := newMigrationTestCandidate(t)
 	authKey := connectionNotificationKey(candidate, database.NotificationKeyAuthRequired)
