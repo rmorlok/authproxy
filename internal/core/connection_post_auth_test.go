@@ -173,6 +173,32 @@ func TestHandleCredentialsEstablished(t *testing.T) {
 		assert.Equal(t, database.ConnectionStateConfigured, conn.GetState())
 	})
 
+	t.Run("restores health after credential establishment without probes", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		conn, db := newTestConnectionWithSetupFlow(t, ctrl, &cschema.SetupFlow{})
+		conn.cv = NewTestConnectorVersion(cschema.Connector{
+			Auth: &cschema.Auth{InnerVal: &cschema.AuthOAuth2{Type: cschema.AuthTypeOAuth2}},
+		})
+		conn.ConnectorId = conn.cv.GetId()
+		conn.ConnectorVersion = conn.cv.GetVersion()
+		conn.HealthState = database.ConnectionHealthStateUnhealthy
+		current := cschema.MustNewSetupStep(oauth2.OAuth2AuthorizeStepId)
+		conn.SetupStep = &current
+
+		db.EXPECT().SetConnectionHealthState(gomock.Any(), conn.Id, database.ConnectionHealthStateHealthy).Return(nil)
+		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, (*cschema.SetupStep)(nil)).Return(nil)
+		db.EXPECT().SetConnectionState(gomock.Any(), conn.Id, database.ConnectionStateConfigured).Return(nil)
+		expectResolveRequiredActionNotification(db, conn.Id, database.NotificationKeySetupRequired)
+		expectResolveRequiredActionNotification(db, conn.Id, database.NotificationKeyAuthRequired)
+
+		outcome, err := conn.HandleCredentialsEstablished(context.Background())
+		require.NoError(t, err)
+		assert.False(t, outcome.SetupPending)
+		assert.Equal(t, database.ConnectionHealthStateHealthy, conn.GetHealthState())
+	})
+
 	t.Run("rejects call when connection has no active setup step", func(t *testing.T) {
 		// The OAuth2 callback path always sets setup_step before invoking
 		// HandleCredentialsEstablished. A nil step is a programmer error.

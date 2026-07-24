@@ -97,6 +97,8 @@ func (s *service) applyMigrateConnectionVersionV1(
 			); markErr != nil {
 				return markErr
 			}
+		} else {
+			applySuccessfulMigrationAuthRefresh(candidate)
 		}
 	}
 

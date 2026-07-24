@@ -25,6 +25,13 @@ func (c *connection) HandleCredentialsEstablished(ctx context.Context) (iface.Po
 		return iface.PostAuthOutcome{}, fmt.Errorf("connection has no active setup step")
 	}
 
+	// A successful credential exchange proves the auth requirement has been
+	// satisfied even when this connector has no probes. This also restores a
+	// connection made unhealthy by a migration-time refresh failure.
+	if err := c.MarkHealthState(ctx, database.ConnectionHealthStateHealthy, "credentials_established"); err != nil {
+		return iface.PostAuthOutcome{}, fmt.Errorf("failed to mark connection healthy after credentials were established: %w", err)
+	}
+
 	flow := c.s.buildManifestSetupFlow(c)
 	next, hasNext, err := flow.NextStep(ctx, current.Id())
 	if err != nil {

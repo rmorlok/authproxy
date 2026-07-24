@@ -254,6 +254,36 @@ func (env *IntegrationTestEnv) InitiateOAuth2Connection(t *testing.T, connectorI
 	return resp.Id.String(), resp.RedirectUrl
 }
 
+// ReauthOAuth2Connection starts an OAuth2 reauthorization flow for an
+// existing connection and returns the proxy redirect URL. The supplied
+// return-to URL is carried through the OAuth callback after successful token
+// exchange.
+func (env *IntegrationTestEnv) ReauthOAuth2Connection(t *testing.T, connectionID, returnToUrl string, opts ...OAuth2Option) string {
+	t.Helper()
+
+	body, err := jsonMarshal(struct {
+		ReturnToUrl string `json:"return_to_url,omitempty"`
+	}{
+		ReturnToUrl: returnToUrl,
+	})
+	require.NoError(t, err)
+
+	w := env.doSignedRequest(
+		t,
+		http.MethodPost,
+		"/api/v1/connections/"+connectionID+"/_reauth",
+		body,
+		env.resolveOAuth2Options(opts),
+	)
+	require.Equalf(t, http.StatusOK, w.Code, "reauth failed: %s", w.Body.String())
+
+	var resp coreIface.ConnectionSetupRedirect
+	require.NoErrorf(t, jsonUnmarshal(w.Body.Bytes(), &resp), "decode reauth response: %s", w.Body.String())
+	require.Equal(t, coreIface.ConnectionSetupResponseTypeRedirect, resp.Type)
+	require.NotEmpty(t, resp.RedirectUrl)
+	return resp.RedirectUrl
+}
+
 // FollowOAuth2Redirect issues an in-process GET to the public service's
 // `/oauth2/redirect` endpoint with the same state_id and signed JWT the user's
 // browser would carry, and returns the Location header — the URL of the OAuth

@@ -233,6 +233,22 @@ func addAuthRequiredNotification(
 	)
 }
 
+// applySuccessfulMigrationAuthRefresh updates migration state after a target
+// auth refresh succeeds. Candidate analysis runs before the refresh, so it may
+// still contain a stale reauthentication notice from the source version.
+func applySuccessfulMigrationAuthRefresh(candidate *connectionMigrationCandidate) {
+	candidate.HealthState = database.ConnectionHealthStateHealthy
+
+	authKey := connectionNotificationKey(candidate, database.NotificationKeyAuthRequired)
+	if len(candidate.Notifications) != 1 || candidate.Notifications[0].Key != authKey {
+		return
+	}
+
+	candidate.Notifications = nil
+	candidate.NotificationKeys = removeString(candidate.NotificationKeys, authKey)
+	candidate.NotificationRank = 0
+}
+
 // addSetupRequiredNotification adds a setup required notification to a
 // candidate.
 func addSetupRequiredNotification(
