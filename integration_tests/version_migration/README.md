@@ -12,6 +12,4 @@ Scenario files:
 - API-key preconnect migration: [api_key_preconnect_change_test.md](api_key_preconnect_change_test.md).
 - OAuth required-scope reauth migration: [oauth_scope_expansion_reauth_test.md](oauth_scope_expansion_reauth_test.md).
 - OAuth required-scope rollback migration: [oauth_scope_expansion_rollback_test.md](oauth_scope_expansion_rollback_test.md).
-- No-auth defaults and probe migration: tracked by #741.
-
-Shared harness work is tracked by #738.
+- No-auth defaults and target probe migration: [no_auth_defaults_and_probes_test.md](no_auth_defaults_and_probes_test.md).
