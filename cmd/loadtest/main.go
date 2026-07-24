@@ -36,10 +36,6 @@ func loadConfig() error {
 }
 
 func main() {
-	newRootCommand().Execute()
-}
-
-func newRootCommand() *cobra.Command {
 	// Load .env files for parity with the production server command.
 	util.LoadDotEnv()
 
@@ -53,5 +49,5 @@ func newRootCommand() *cobra.Command {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file; may also be specified in AUTHPROXY_CONFIG")
 	rootCmd.AddCommand(cmdSeed())
 	rootCmd.AddCommand(cmdBackground())
-	return rootCmd
+	rootCmd.Execute()
 }
