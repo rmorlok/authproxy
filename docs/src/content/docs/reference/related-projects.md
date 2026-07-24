@@ -1,6 +1,6 @@
 ---
 title: Related projects
-description: Compare AuthProxy with unified APIs, embedded iPaaS products, webhook gateways, workflow platforms, and open-source integration frameworks.
+description: Compare AuthProxy with unified APIs, embedded iPaaS products, API and MCP gateways, workflow platforms, and open-source integration frameworks.
 ---
 
 This is a research index for products adjacent to AuthProxy. Vendor packaging,
@@ -13,7 +13,7 @@ The landscape splits into a few overlapping domains:
 - **Embedded iPaaS**: Integration infrastructure designed to be embedded into your SaaS product for customer-facing integrations.
 - **Traditional iPaaS / Workflow Automation**: Internal automation platforms with large connector catalogs and visual builders.
 - **Webhook / Event Gateways**: Reliability infrastructure for receiving, routing, observing, replaying, and delivering asynchronous events.
-- **AI / Agent Integration Gateways**: Tool-calling, MCP servers, or AI gateways that broker auth + actions to many services.
+- **API, AI, and MCP Gateways**: Traffic policy, model routing, tool aggregation, or identity-aware access for APIs and agent infrastructure.
 - **Open-source Frameworks / Building Blocks**: Libraries or frameworks for teams that want full control.
 
 Below are summaries and comparison tables for the projects in this repo's list. Connector counts are taken from the vendors' public catalogs or docs when available; when not available, it's noted explicitly.
@@ -40,6 +40,10 @@ That produces different tradeoffs from adjacent categories:
   reliable with queues, retries, replay, routing, and delivery logs. AuthProxy
   manages credentials and authenticated synchronous API calls; it does not
   replace durable webhook delivery infrastructure.
+- An **API or MCP traffic gateway** applies authentication, authorization,
+  rate limits, routing, and observability at a shared network boundary.
+  AuthProxy instead owns each application's tenant-facing connection setup,
+  provider credential lifecycle, and authenticated native-API forwarding.
 - A **secret manager or credential proxy** protects secret access. AuthProxy
   adds OAuth callbacks and refresh, user-facing setup, connector versions,
   health, rate limits, and request-event context.
@@ -143,27 +147,59 @@ token refresh, or arbitrary authenticated access to a provider's native API.
 
 ---
 
-## AI / agent integration gateways
+## API, AI, and MCP gateways
 
-| Product | Commercial / OSS | Traditional vs Embedded | Connector Count | Self-hosting | Notes |
+“MCP gateway” is not one product category with a settled scope. Current
+products use the term for at least three different boundaries:
+
+- A **protocol and traffic gateway** fronts MCP servers, converts APIs into MCP
+  tools, and applies authentication, access policy, rate limits, and telemetry.
+  Kong follows this model.
+- A **tool aggregation and execution gateway** connects to MCP servers,
+  controls which tools a model can discover or execute, and can expose the
+  combined tools as another MCP server. Bifrost follows this model alongside
+  its LLM gateway.
+- An **identity-aware access proxy** enrolls existing MCP servers and governs
+  which humans or agents can reach them, with RBAC and audit trails. Teleport
+  follows this model.
+
+These are worth tracking because they can sit next to AuthProxy in an agent
+architecture, and some are beginning to overlap with credential lifecycle.
+They do not all provide customer-facing API integrations.
+
+| Product | Primary gateway role | API / tool coverage | Credential model | Self-hosting | Notes |
 | --- | --- | --- | --- | --- | --- |
-| [Composio](https://composio.dev) | Commercial | Embedded for AI agents | 900-1000+ toolkits (500+ apps) | Not stated in docs | Managed auth, triggers, MCP servers. |
-| [Metorial](https://metorial.com/) | OSS + commercial hosting | Embedded for AI agents | 600+ MCP servers | Yes (open source; self-hostable) | MCP-native integration platform and observability. |
-| [Pica](https://picaos.com) | Commercial | Embedded for AI + SaaS | 200+ integrations | No public self-host option; SaaS with API key | AuthKit + Passthrough API with 25k+ actions. |
-| [Airweave](https://airweave.ai/) | Open source + hosted | Embedded for AI (data ingestion) | 50+ data sources | Yes (open source; self-host or hosted) | Unified retrieval layer for agents. |
-| [LiteLLM](https://www.litellm.ai/) | Open source + commercial | AI gateway | 100+ providers | Yes (OSS self-host; cloud option) | LLM gateway with auth, quotas, and routing. |
-| [Bifrost](https://docs.getbifrost.ai/) | Open source + commercial | AI gateway | 20+ providers | Yes (self-hostable gateway) | OpenAI-compatible gateway with governance and routing. |
-| [Agent Vault](https://github.com/Infisical/agent-vault) | Open source (MIT) + commercial | Credential proxy for AI agents | Any HTTPS service (no connector catalog) | Yes (binary, Docker, from source) | Infisical's HTTP credential broker; injects credentials at the network layer so agents never see secrets. |
+| [Composio](https://composio.dev) | Agent tool integration | 900-1000+ toolkits (500+ apps) | Managed application auth | Not stated in docs | Managed auth, triggers, tools, and MCP servers. |
+| [Metorial](https://metorial.com/) | MCP integration platform | 600+ MCP servers | Managed integration auth | Yes (open source; self-hostable) | MCP server catalog, deployment, and observability. |
+| [Pica](https://picaos.com) | Auth and tool-action gateway | 200+ integrations | Managed AuthKit connections | No public self-host option | AuthKit plus a passthrough API with 25k+ actions. |
+| [Airweave](https://airweave.ai/) | Agent data-ingestion gateway | 50+ data sources | Source connection credentials | Yes (open source; self-host or hosted) | Unified retrieval layer for agents. |
+| [LiteLLM](https://www.litellm.ai/) | LLM inference gateway | 100+ model providers | Centrally managed provider credentials | Yes (OSS self-host; cloud option) | Model routing, auth, quotas, and spend controls; not an MCP tool gateway. |
+| [Bifrost](https://docs.getbifrost.ai/) | LLM inference + MCP tool gateway | 20+ model providers; arbitrary MCP servers | Provider keys; shared or per-user MCP OAuth | Yes (open source; Apache-2.0) | Acts as an MCP client and server, filters tools, and gates execution or autonomous agent mode. |
+| [Kong](https://konghq.com/) | API, AI, and MCP traffic gateway | User-managed APIs and MCP servers | Gateway auth; OAuth or credential pass-through for MCP | Yes (Apache-2.0 core; commercial editions) | Proxies APIs and MCP servers, converts REST operations into tools, aggregates tools, and applies traffic policy. MCP proxy features require AI Gateway Enterprise. |
+| [Teleport](https://goteleport.com/use-cases/secure-model-context-protocol/) | Identity-aware infrastructure and MCP access proxy | Enrolled MCP servers and infrastructure resources | Short-lived user/workload identity; optional signed JWT to upstream | Yes (AGPL-3.0 source; restricted Community binaries; commercial editions) | RBAC/ABAC, JIT access, per-tool audit events, and session recording for existing MCP servers. |
+| [Agent Vault](https://github.com/Infisical/agent-vault) | Credential proxy for AI agents | Any HTTPS service (no connector catalog) | User-registered credentials injected at the network layer | Yes (open source; MIT) | Keeps credentials out of agent processes and constrains network access. |
 
-### AI / agent product notes
+### API, AI, and MCP gateway product notes
 
 - **Composio**: Managed auth and tool execution for AI agents. Docs mention 1000+ toolkits; the toolkits catalog shows ~900 toolkits; other pages reference 500+ apps. No self-host option is documented. See: https://docs.composio.dev/, https://docs.composio.dev/toolkits, and https://docs.composio.dev/toolkits/introduction.
 - **Metorial**: Open-source MCP integration platform; GitHub repo states it is open source and self-hostable, with a hosted option available. See: https://github.com/metorial/metorial.
 - **Pica**: Integration infrastructure for SaaS + AI; AuthKit handles OAuth/token refresh and multi-tenant auth. Docs require a Pica account and API key, implying hosted service. See: https://docs.picaos.com/authkit/setup and https://docs.picaos.com/authkit.
 - **Airweave**: Open-source context retrieval layer with 50+ prebuilt connectors; focuses on ingestion and unified search for agents. Site FAQ says it is open source and can be self-hosted or used via hosted platform. See: https://airweave.ai/ and https://docs.airweave.ai/.
 - **LiteLLM**: Open-source LLM gateway supporting 100+ provider integrations, with spend tracking and routing. OSS page highlights self-hosting with no data sent to LiteLLM servers; docs show running the proxy via Docker or CLI. See: https://www.litellm.ai/oss and https://docs.litellm.ai/.
-- **Bifrost**: Open-source AI gateway with 20+ providers and OpenAI-compatible APIs; supports routing, failover, and governance. GitHub repo is Apache-2.0 and docs show local deployment via Docker or NPX. See: https://github.com/maximhq/bifrost and https://docs.getbifrost.ai/.
+- **Bifrost**: Apache-2.0 AI gateway with OpenAI-compatible APIs and routing across 20+ model providers. Its MCP subsystem connects to STDIO, HTTP, or SSE servers, exposes aggregated tools through an MCP Gateway URL, filters tools per request, client, or virtual key, and separates tool suggestions from explicit execution by default. It also supports shared OAuth with automatic refresh and per-user OAuth for upstream MCP servers. This overlaps AuthProxy's token lifecycle for MCP-native integrations, but Bifrost is centered on model requests and MCP tool execution rather than embedded setup for arbitrary native APIs. See: https://github.com/maximhq/bifrost, https://docs.getbifrost.ai/mcp/overview, and https://docs.getbifrost.ai/mcp/connecting-to-servers.
+- **Kong**: General-purpose API gateway available as an Apache-2.0 core, commercial self-managed editions, and the Konnect managed control plane. Kong centralizes routing and plugins for authentication, authorization, rate limiting, transformations, and observability across APIs. Its enterprise AI MCP Proxy can front existing MCP servers, convert OpenAPI-described REST operations into MCP tools, aggregate tool sets, and apply per-tool ACLs and standard Kong policies. This is a traffic and protocol control plane, not a tenant connection lifecycle: upstream APIs, MCP servers, identities, and credentials must still be provisioned. See: https://github.com/Kong/kong, https://developer.konghq.com/mcp/, and https://developer.konghq.com/plugins/ai-mcp-proxy/.
+- **Teleport**: Infrastructure identity platform that treats MCP servers as protected resources alongside databases, Kubernetes clusters, applications, and other infrastructure. Teleport enrolls existing STDIO, SSE, or streamable-HTTP MCP servers, authenticates users and workloads, applies RBAC/ABAC and JIT access, and emits per-tool audit events and session recordings. It can pass Teleport-signed JWT identity to an upstream MCP server, but it does not create tools, translate REST APIs into MCP, or manage each end user's third-party OAuth connection. MCP enrollment, proxying, identity controls, and per-tool audit are listed for Community and Enterprise editions. The repository source is AGPL-3.0, while distributed Community binaries use a commercial license with company-size and revenue restrictions. See: https://goteleport.com/use-cases/secure-model-context-protocol/, https://goteleport.com/docs/enroll-resources/mcp-access/, and https://goteleport.com/docs/feature-matrix/.
 - **Agent Vault**: Open-source HTTP credential proxy by Infisical, purpose-built for AI agents. Agents get a scoped session and a local `HTTPS_PROXY`; Agent Vault injects the credential at the network layer so credentials are never returned to the agent. Works with any HTTP-speaking agent (Claude Code, Cursor, Codex, custom Python/TypeScript, sandboxed processes) and any HTTPS API — there is no prebuilt connector catalog; you register your own services and credentials. Ships as a binary, Docker image, or from source; MIT-licensed with a separate `ee/` directory for enterprise features. Offers a container-sandbox mode (iptables-locked egress through the proxy) and an SDK for orchestrating sandboxed agents (Docker/Daytona/E2B). See: https://github.com/Infisical/agent-vault, https://docs.agent-vault.dev, and https://infisical.com/blog/agent-vault-the-open-source-credential-proxy-and-vault-for-agents.
+
+For AuthProxy, the most direct MCP-gateway overlap is Bifrost's per-user OAuth
+and token refresh for upstream MCP servers. Kong overlaps at the authenticated
+proxy and policy layer, while Teleport overlaps in identity, authorization, and
+audit. AuthProxy remains distinct when the product needs an embeddable
+connection UI, versioned connector definitions, health and lifecycle
+management, and unrestricted forwarding to each provider's native API. An MCP
+gateway could consume tools backed by AuthProxy connections, or AuthProxy could
+sit behind Kong or Teleport when broader traffic or infrastructure policy is
+required.
 
 ---
 
@@ -213,6 +249,8 @@ token refresh, or arbitrary authenticated access to a provider's native API.
 | Pica | Auth + actions for AI & SaaS | Code-first + embeddable UI | Webhooks supported | AuthKit + Passthrough API | No public self-host option |
 | Airweave | Agent data ingestion | Code-first | Sync + retrieval | Connectors for data sources | Yes (open source; self-host or hosted) |
 | LiteLLM | LLM gateway | Code-first | N/A | Provider integrations | Yes (OSS self-host; cloud option) |
-| Bifrost | LLM gateway | Code-first | N/A | Provider integrations | Yes (self-hostable gateway) |
+| Bifrost | LLM and MCP tool gateway | Code-first + management UI | MCP client/server and tool execution | Model providers + upstream MCP servers | Yes (Apache-2.0) |
+| Kong | API, AI, and MCP traffic gateway | API/declarative config + management UI | Proxies, converts, and aggregates MCP tools | User-managed APIs, services, and MCP servers | Yes (Apache-2.0 core; MCP proxy is Enterprise) |
+| Teleport | Identity-aware infrastructure and MCP access | CLI/config + management UI | Proxies and audits MCP tool access | Enrolled MCP servers and infrastructure resources | Yes (AGPL-3.0 source; restricted Community binaries; commercial editions) |
 | Agent Vault | Credential brokerage for AI agents | Code-first (CLI + SDK) | N/A (network-layer proxy) | User-registered services + credentials; no prebuilt connectors | Yes (OSS MIT; binary or Docker) |
 | Apache Camel | Routing, mediation, and protocol integration framework | Code-first DSLs + Karavan low-code tooling | Routes, timers, polling, messaging components, Kamelets | Components, route DSLs, Kamelets | Yes (OSS library/runtime; Camel K on Kubernetes) |
