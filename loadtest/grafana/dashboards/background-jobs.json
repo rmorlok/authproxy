@@ -1,0 +1,79 @@
+{
+  "annotations": { "list": [] },
+  "description": "OAuth refresh sweeps, Asynq task handling, queue depth, and worker scaling during cardinality runs.",
+  "editable": true,
+  "panels": [
+    {
+      "datasource": { "type": "prometheus", "uid": "loadtest-prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "id": 1,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "sum by (messaging_destination_name) (authproxy_asynq_queue_size)", "legendFormat": "{{messaging_destination_name}}", "refId": "A" }
+      ],
+      "title": "Asynq queue depth",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "loadtest-prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "id": 2,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "sum by (authproxy_asynq_task_type,authproxy_asynq_result) (rate(authproxy_asynq_task_duration_seconds_count[1m]))", "legendFormat": "{{authproxy_asynq_task_type}} {{authproxy_asynq_result}}", "refId": "A" }
+      ],
+      "title": "Asynq task completion rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "loadtest-prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "id": 3,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "histogram_quantile(0.95, sum by (le,authproxy_asynq_task_type) (rate(authproxy_asynq_task_duration_seconds_bucket[5m])))", "legendFormat": "{{authproxy_asynq_task_type}} p95", "refId": "A" }
+      ],
+      "title": "Asynq task p95 duration",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "loadtest-prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "id": 4,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "sum by (authproxy_oauth2_result) (rate(authproxy_oauth2_refresh_attempts_total[1m]))", "legendFormat": "attempt {{authproxy_oauth2_result}}", "refId": "A" },
+        { "expr": "sum by (authproxy_oauth2_reason) (rate(authproxy_oauth2_refresh_failures_total[1m]))", "legendFormat": "failure {{authproxy_oauth2_reason}}", "refId": "B" }
+      ],
+      "title": "OAuth refresh attempts and failures",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "loadtest-prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "id": 5,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "kube_horizontalpodautoscaler_status_current_replicas{horizontalpodautoscaler=\"authproxy-worker\"}", "legendFormat": "worker current", "refId": "A" },
+        { "expr": "kube_horizontalpodautoscaler_status_desired_replicas{horizontalpodautoscaler=\"authproxy-worker\"}", "legendFormat": "worker desired", "refId": "B" },
+        { "expr": "kube_deployment_status_replicas_available{deployment=\"authproxy-worker\"}", "legendFormat": "worker available", "refId": "C" }
+      ],
+      "title": "Worker autoscaling",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": [ "authproxy", "loadtest", "background" ],
+  "templating": { "list": [] },
+  "time": { "from": "now-30m", "to": "now" },
+  "timezone": "browser",
+  "title": "AuthProxy Load Test - Background Jobs",
+  "uid": "authproxy-loadtest-background",
+  "version": 1
+}

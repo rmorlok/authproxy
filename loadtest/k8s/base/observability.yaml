@@ -50,6 +50,17 @@ spec:
             limits:
               memory: 2Gi
           volumeMounts:
+            - name: grafana-provisioning
+              mountPath: /etc/grafana/provisioning/datasources/loadtest.yaml
+              subPath: datasources.yaml
+              readOnly: true
+            - name: grafana-provisioning
+              mountPath: /etc/grafana/provisioning/dashboards/loadtest.yaml
+              subPath: dashboards.yaml
+              readOnly: true
+            - name: grafana-dashboards
+              mountPath: /var/lib/grafana/dashboards
+              readOnly: true
             - name: tempo-data
               mountPath: /data/tempo
             - name: grafana-data
@@ -63,6 +74,12 @@ spec:
             - name: pyroscope-storage
               mountPath: /data/pyroscope
       volumes:
+        - name: grafana-provisioning
+          configMap:
+            name: authproxy-loadtest-grafana-provisioning
+        - name: grafana-dashboards
+          configMap:
+            name: authproxy-loadtest-grafana-dashboards
         - name: tempo-data
           emptyDir: {}
         - name: grafana-data

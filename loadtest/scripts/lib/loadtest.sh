@@ -216,9 +216,22 @@ loadtest_init_run_dir() {
   now=$(loadtest_timestamp)
 
   local run_dir="${LOADTEST_RUN_DIR:-$LOADTEST_ROOT/runs/${now}-${profile_name}-${command_name}}"
-  mkdir -p "$run_dir/helm-values" "$run_dir/kubernetes" "$run_dir/helm" "$run_dir/k6"
+  mkdir -p \
+    "$run_dir/helm-values" \
+    "$run_dir/kubernetes" \
+    "$run_dir/helm" \
+    "$run_dir/k6" \
+    "$run_dir/observability/dashboards" \
+    "$run_dir/prometheus/queries" \
+    "$run_dir/db-explain/sql"
   cp "$profile_file" "$run_dir/profile.yaml"
   cp "$LOADTEST_ROOT"/helm-values/*.yaml "$run_dir/helm-values/"
+  cp "$LOADTEST_ROOT/grafana/dashboards.yaml" "$run_dir/observability/"
+  cp "$LOADTEST_ROOT/grafana/datasources.yaml" "$run_dir/observability/"
+  cp "$LOADTEST_ROOT/grafana/dashboards"/*.json "$run_dir/observability/dashboards/"
+  cp "$LOADTEST_ROOT/prometheus/alerts.yaml" "$run_dir/prometheus/"
+  cp "$LOADTEST_ROOT/prometheus/queries.tsv" "$run_dir/prometheus/"
+  cp "$LOADTEST_ROOT/sql"/*.sql "$run_dir/db-explain/sql/"
 
   {
     printf "command=%s\n" "$command_name"
@@ -230,11 +243,69 @@ loadtest_init_run_dir() {
     printf "authproxy_image_tag=%s\n" "${AUTHPROXY_IMAGE_TAG:-main}"
     printf "go_oauth2_server_image=%s\n" "${GO_OAUTH2_SERVER_IMAGE:-ghcr.io/rmorlok/go-oauth2-server:master}"
     printf "k6_image=%s\n" "${K6_IMAGE:-grafana/k6:0.54.0}"
+    printf "prometheus_url=%s\n" "${LOADTEST_PROMETHEUS_URL:-service/prometheus-loadtest}"
     printf "install_k6_operator=%s\n" "${LOADTEST_INSTALL_K6_OPERATOR:-false}"
     printf "install_keda=%s\n" "${LOADTEST_INSTALL_KEDA:-false}"
   } > "$run_dir/metadata.env"
 
   printf "%s\n" "$run_dir"
+}
+
+loadtest_profile_p95_seconds() {
+  local profile_file=$1
+  local value
+  value=$(loadtest_yaml_section_value "$profile_file" k6 p95_latency_ms)
+  if [[ -z "$value" ]]; then
+    value=$(loadtest_yaml_section_value "$profile_file" acceptance p95_latency_target)
+  fi
+
+  case "$value" in
+    ""|profile-configured)
+      printf "1\n"
+      ;;
+    *ms)
+      awk -v milliseconds="${value%ms}" 'BEGIN { printf "%.6f\n", milliseconds / 1000 }'
+      ;;
+    *s)
+      printf "%s\n" "${value%s}"
+      ;;
+    *)
+      awk -v milliseconds="$value" 'BEGIN { printf "%.6f\n", milliseconds / 1000 }'
+      ;;
+  esac
+}
+
+loadtest_apply_observability_assets() {
+  local namespace=$1
+  local profile_file=$2
+  local run_dir=$3
+  local tmp
+  local proxy_p95_seconds
+  tmp=$(mktemp -d)
+  proxy_p95_seconds=$(loadtest_profile_p95_seconds "$profile_file")
+
+  kubectl -n "$namespace" create configmap authproxy-loadtest-grafana-provisioning \
+    --from-file=datasources.yaml="$LOADTEST_ROOT/grafana/datasources.yaml" \
+    --from-file=dashboards.yaml="$LOADTEST_ROOT/grafana/dashboards.yaml" \
+    --dry-run=client -o yaml > "$tmp/grafana-provisioning.yaml"
+  kubectl -n "$namespace" apply -f "$tmp/grafana-provisioning.yaml"
+
+  kubectl -n "$namespace" create configmap authproxy-loadtest-grafana-dashboards \
+    --from-file="$LOADTEST_ROOT/grafana/dashboards" \
+    --dry-run=client -o yaml > "$tmp/grafana-dashboards.yaml"
+  kubectl -n "$namespace" apply -f "$tmp/grafana-dashboards.yaml"
+
+  sed "s/> 1 # LOADTEST_PROXY_P95_SECONDS/> $proxy_p95_seconds/" \
+    "$LOADTEST_ROOT/prometheus/alerts.yaml" > "$tmp/alerts.yaml"
+  cp "$tmp/alerts.yaml" "$run_dir/prometheus/alerts.rendered.yaml"
+  printf "proxy_p95_target_seconds=%s\n" "$proxy_p95_seconds" >> "$run_dir/metadata.env"
+
+  kubectl -n "$namespace" create configmap authproxy-loadtest-prometheus-rules \
+    --from-file=alerts.yaml="$tmp/alerts.yaml" \
+    --dry-run=client -o yaml > "$tmp/prometheus-rules.yaml"
+  kubectl -n "$namespace" apply -f "$tmp/prometheus-rules.yaml"
+
+  rm -rf "$tmp"
 }
 
 loadtest_ensure_namespace() {
@@ -319,12 +390,34 @@ loadtest_ensure_generated_secrets() {
 loadtest_capture_cluster_snapshot() {
   local namespace=$1
   local run_dir=$2
+  local captured_at
+  captured_at=$(loadtest_timestamp)
 
   kubectl -n "$namespace" get pods -o wide > "$run_dir/kubernetes/pods.txt" 2>&1 || true
+  kubectl -n "$namespace" get pods -o yaml > "$run_dir/kubernetes/pods.yaml" 2>&1 || true
   kubectl -n "$namespace" get deployments -o wide > "$run_dir/kubernetes/deployments.txt" 2>&1 || true
+  kubectl -n "$namespace" get deployments -o yaml > "$run_dir/kubernetes/deployments.yaml" 2>&1 || true
   kubectl -n "$namespace" get services -o wide > "$run_dir/kubernetes/services.txt" 2>&1 || true
   kubectl -n "$namespace" get hpa -o yaml > "$run_dir/kubernetes/hpa.yaml" 2>&1 || true
   kubectl -n "$namespace" get events --sort-by=.lastTimestamp > "$run_dir/kubernetes/events.txt" 2>&1 || true
+  kubectl -n "$namespace" get replicasets -o wide > "$run_dir/kubernetes/replicasets.txt" 2>&1 || true
+  kubectl -n "$namespace" top pods > "$run_dir/kubernetes/pod-resource-usage.txt" 2>&1 || true
+
+  if [[ ! -s "$run_dir/kubernetes/hpa-timeline.tsv" ]]; then
+    printf "captured_at\tnamespace\thpa\tmin_replicas\tcurrent_replicas\tdesired_replicas\tmax_replicas\n" > "$run_dir/kubernetes/hpa-timeline.tsv"
+  fi
+  kubectl -n "$namespace" get hpa \
+    -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.minReplicas}{"\t"}{.status.currentReplicas}{"\t"}{.status.desiredReplicas}{"\t"}{.spec.maxReplicas}{"\n"}{end}' \
+    2>/dev/null | awk -v captured_at="$captured_at" -v namespace="$namespace" 'BEGIN { OFS="\t" } NF { print captured_at, namespace, $0 }' \
+    >> "$run_dir/kubernetes/hpa-timeline.tsv" || true
+
+  if [[ ! -s "$run_dir/kubernetes/image-shas.tsv" ]]; then
+    printf "captured_at\tnamespace\tpod\tcontainer\timage\timage_id\trestarts\n" > "$run_dir/kubernetes/image-shas.tsv"
+  fi
+  kubectl -n "$namespace" get pods \
+    -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{range .status.containerStatuses[*]}{.name}{"\t"}{.image}{"\t"}{.imageID}{"\t"}{.restartCount}{"\n"}{end}{end}' \
+    2>/dev/null | awk -v captured_at="$captured_at" -v namespace="$namespace" 'BEGIN { OFS="\t" } NF { print captured_at, namespace, $0 }' \
+    >> "$run_dir/kubernetes/image-shas.tsv" || true
 }
 
 loadtest_capture_helm_snapshot() {
@@ -336,5 +429,72 @@ loadtest_capture_helm_snapshot() {
   for release in "${LOADTEST_AUTH_PROXY_RELEASES[@]}"; do
     helm -n "$namespace" get values "$release" --all > "$run_dir/helm/${release}-values.yaml" 2>&1 || true
     helm -n "$namespace" get manifest "$release" > "$run_dir/helm/${release}-manifest.yaml" 2>&1 || true
+  done
+}
+
+loadtest_capture_prometheus_snapshot() {
+  local namespace=$1
+  local run_dir=$2
+  local snapshot_dir="$run_dir/prometheus"
+  local url=${LOADTEST_PROMETHEUS_URL:-}
+  local port_forward_pid=""
+  local port=${LOADTEST_PROMETHEUS_PORT:-19090}
+  local port_forward_log="$snapshot_dir/port-forward.log"
+
+  mkdir -p "$snapshot_dir/queries"
+
+  if [[ -z "$url" ]]; then
+    kubectl -n "$namespace" port-forward service/prometheus-loadtest "$port:9090" > "$port_forward_log" 2>&1 &
+    port_forward_pid=$!
+    url="http://127.0.0.1:$port"
+
+    local attempt
+    for attempt in $(seq 1 20); do
+      if curl --connect-timeout 1 --max-time 3 -fsS "$url/-/ready" >/dev/null 2>&1; then
+        break
+      fi
+      sleep 1
+    done
+  fi
+
+  if curl --connect-timeout 2 --max-time 10 -fsS "$url/-/ready" >/dev/null 2>&1; then
+    printf "url=%s\ncaptured_at=%s\n" "$url" "$(loadtest_timestamp)" > "$snapshot_dir/metadata.env"
+    curl --connect-timeout 2 --max-time 30 -fsS "$url/api/v1/status/buildinfo" > "$snapshot_dir/buildinfo.json" 2>&1 || true
+    curl --connect-timeout 2 --max-time 30 -fsS "$url/api/v1/targets" > "$snapshot_dir/targets.json" 2>&1 || true
+    curl --connect-timeout 2 --max-time 30 -fsS "$url/api/v1/rules" > "$snapshot_dir/rules.json" 2>&1 || true
+    curl --connect-timeout 2 --max-time 30 -fsS "$url/api/v1/alerts" > "$snapshot_dir/alerts.json" 2>&1 || true
+    curl --connect-timeout 2 --max-time 30 -fsS "$url/api/v1/label/__name__/values" > "$snapshot_dir/metric-names.json" 2>&1 || true
+
+    local query_name
+    local query
+    while IFS=$'\t' read -r query_name query; do
+      [[ -n "$query_name" ]] || continue
+      [[ "$query_name" == \#* ]] && continue
+      curl --connect-timeout 2 --max-time 30 -fsSG "$url/api/v1/query" \
+        --data-urlencode "query=$query" > "$snapshot_dir/queries/${query_name}.json" 2>&1 || true
+    done < "$LOADTEST_ROOT/prometheus/queries.tsv"
+  else
+    printf "Prometheus was not ready at %s\n" "$url" > "$snapshot_dir/error.txt"
+  fi
+
+  if [[ -n "$port_forward_pid" ]]; then
+    kill "$port_forward_pid" >/dev/null 2>&1 || true
+    wait "$port_forward_pid" 2>/dev/null || true
+  fi
+}
+
+loadtest_capture_postgres_explain() {
+  local namespace=$1
+  local run_dir=$2
+  local sql_file
+  local name
+  local output
+
+  for sql_file in "$LOADTEST_ROOT"/sql/*.sql; do
+    name=$(basename "$sql_file" .sql)
+    output="$run_dir/db-explain/${name}.txt"
+    kubectl -n "$namespace" exec -i deployment/postgresql -- \
+      sh -c 'PGPASSWORD="$POSTGRESQL_PASSWORD" psql -U authproxy -d authproxy -v ON_ERROR_STOP=1' \
+      < "$sql_file" > "$output" 2>&1 || true
   done
 }

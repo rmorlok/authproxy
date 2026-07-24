@@ -1,0 +1,16 @@
+# name<TAB>instant PromQL query. The collector stores each response under prometheus/queries/.
+proxy-request-rate	sum(rate(authproxy_client_request_duration_seconds_count{authproxy_request_type="proxy"}[5m]))
+proxy-5xx-rate	sum(rate(authproxy_client_request_duration_seconds_count{authproxy_request_type="proxy",http_response_status_code=~"5.."}[5m])) / clamp_min(sum(rate(authproxy_client_request_duration_seconds_count{authproxy_request_type="proxy"}[5m])), 1)
+proxy-p95-seconds	histogram_quantile(0.95, sum by (le) (rate(authproxy_client_request_duration_seconds_bucket{authproxy_request_type="proxy"}[5m])))
+k6-http-request-rate	sum(rate(k6_http_reqs_total[5m]))
+k6-dropped-iterations	sum(k6_dropped_iterations_total)
+oauth-refresh-attempt-rate	sum(rate(authproxy_oauth2_refresh_attempts_total[5m]))
+oauth-refresh-failure-rate	sum(rate(authproxy_oauth2_refresh_failures_total[5m]))
+asynq-queue-size	max(authproxy_asynq_queue_size)
+asynq-task-p95-seconds	histogram_quantile(0.95, sum by (le) (rate(authproxy_asynq_task_duration_seconds_bucket[5m])))
+api-hpa-current-replicas	kube_horizontalpodautoscaler_status_current_replicas{horizontalpodautoscaler="authproxy-api"}
+api-hpa-desired-replicas	kube_horizontalpodautoscaler_status_desired_replicas{horizontalpodautoscaler="authproxy-api"}
+postgres-connections	pg_stat_database_numbackends{datname="authproxy"}
+sql-p95-seconds	histogram_quantile(0.95, sum by (le) (rate(db_sql_latency_milliseconds_bucket[5m]))) / 1000
+redis-command-p95-seconds	histogram_quantile(0.95, sum by (le) (rate(db_client_connections_use_time_milliseconds_bucket{type="command"}[5m]))) / 1000
+redis-memory-bytes	redis_memory_used_bytes
