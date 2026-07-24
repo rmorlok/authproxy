@@ -117,15 +117,7 @@ fi
 printf "variant\tscenario\tpercent\tseed_dir\tbackground_dir\n" > "$index_file"
 
 run_authproxy() {
-  if [[ -n "${LOADTEST_AUTHPROXY_BIN:-}" ]]; then
-    "$LOADTEST_AUTHPROXY_BIN" --config "$config_file" "$@"
-    return
-  fi
-
-  (
-    cd "$REPO_ROOT"
-    go run ./cmd/server --config "$config_file" "$@"
-  )
+  loadtest_run_cli --config "$config_file" "$@"
 }
 
 append_index() {
@@ -152,7 +144,7 @@ seed_variant() {
 
   loadtest_log "seeding $variant"
   run_authproxy \
-    loadtest-seed \
+    seed \
     --profile "$profile_file" \
     --run-dir "$seed_dir" \
     --provider-base-url "$provider_base_url" \
@@ -171,7 +163,7 @@ run_background_scenario() {
   mkdir -p "$background_dir"
 
   local args=(
-    loadtest-background
+    background
     --profile "$profile_file"
     --run-dir "$background_dir"
     --scenario "$scenario_name"

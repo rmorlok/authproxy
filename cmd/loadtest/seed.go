@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func cmdLoadtestSeed() *cobra.Command {
+func cmdSeed() *cobra.Command {
 	var profilePath string
 	var runDir string
 	var providerBaseURL string
@@ -24,7 +24,7 @@ func cmdLoadtestSeed() *cobra.Command {
 	var staleSetupConnections int
 
 	cmd := &cobra.Command{
-		Use:   "loadtest-seed",
+		Use:   "seed",
 		Short: "Seed AuthProxy resources for load-test profiles",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if profilePath == "" {

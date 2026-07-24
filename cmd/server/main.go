@@ -172,7 +172,5 @@ func main() {
 	rootCmd.AddCommand(cmdRoutes())
 	rootCmd.AddCommand(cmdServe())
 	rootCmd.AddCommand(cmdReencrypt())
-	rootCmd.AddCommand(cmdLoadtestSeed())
-	rootCmd.AddCommand(cmdLoadtestBackground())
 	rootCmd.Execute()
 }

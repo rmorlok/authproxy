@@ -92,7 +92,7 @@ type loadtestMemorySnapshot struct {
 	NumGC           uint32 `json:"num_gc"`
 }
 
-func cmdLoadtestBackground() *cobra.Command {
+func cmdBackground() *cobra.Command {
 	var profilePath string
 	var runDir string
 	var scenario string
@@ -104,7 +104,7 @@ func cmdLoadtestBackground() *cobra.Command {
 	var taskRetention time.Duration
 
 	cmd := &cobra.Command{
-		Use:   "loadtest-background",
+		Use:   "background",
 		Short: "Run AuthProxy load-test background job scenarios",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if scenario == "" {

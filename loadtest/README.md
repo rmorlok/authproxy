@@ -161,6 +161,9 @@ https://grafana.com/docs/k6/latest/set-up/set-up-distributed-k6/usage/executing-
   `proxy-scale`; defaults to `proxy-raw`.
 - `LOADTEST_AUTHPROXY_CONFIG`: AuthProxy config used by `seed`. When unset,
   `seed` generates a local SQLite/miniredis config in the run directory.
+- `LOADTEST_CLI_BIN`: path to a prebuilt `authproxy-loadtest` binary. When
+  unset, the harness invokes `go run ./cmd/loadtest`; load-test controls are
+  intentionally not included in the production `authproxy` server binary.
 - `LOADTEST_PROVIDER_BASE_URL`: provider URL written into seeded connector
   definitions; defaults to `http://go-oauth2-server:8080`.
 - `LOADTEST_BACKGROUND_SCENARIO`: default background scenario for

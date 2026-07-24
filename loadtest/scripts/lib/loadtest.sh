@@ -27,6 +27,18 @@ loadtest_require_cmd() {
   command -v "$cmd" >/dev/null 2>&1 || loadtest_die "required command not found: $cmd"
 }
 
+loadtest_run_cli() {
+  if [[ -n "${LOADTEST_CLI_BIN:-}" ]]; then
+    "$LOADTEST_CLI_BIN" "$@"
+    return
+  fi
+
+  (
+    cd "$REPO_ROOT"
+    go run ./cmd/loadtest "$@"
+  )
+}
+
 loadtest_profile_path() {
   local profile=$1
   if [[ -f "$profile" ]]; then
