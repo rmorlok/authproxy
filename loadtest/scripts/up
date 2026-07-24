@@ -25,6 +25,7 @@ loadtest_log "artifacts: $run_dir"
 
 loadtest_ensure_namespace "$namespace"
 loadtest_ensure_generated_secrets "$namespace"
+loadtest_apply_observability_assets "$namespace" "$profile_file" "$run_dir"
 
 if [[ "${LOADTEST_INSTALL_K6_OPERATOR:-false}" == "true" ]]; then
   loadtest_log "installing k6 Operator"
@@ -54,6 +55,10 @@ loadtest_wait_for_deployment "$namespace" postgresql "$helm_timeout"
 loadtest_wait_for_deployment "$namespace" redis-master "$helm_timeout"
 loadtest_wait_for_deployment "$namespace" clickhouse "$helm_timeout"
 loadtest_wait_for_deployment "$namespace" otel-lgtm "$helm_timeout"
+loadtest_wait_for_deployment "$namespace" prometheus-loadtest "$helm_timeout"
+loadtest_wait_for_deployment "$namespace" kube-state-metrics "$helm_timeout"
+loadtest_wait_for_deployment "$namespace" postgres-exporter "$helm_timeout"
+loadtest_wait_for_deployment "$namespace" redis-exporter "$helm_timeout"
 loadtest_wait_for_deployment "$namespace" go-oauth2-server "$helm_timeout"
 
 chart="$REPO_ROOT/deploy/charts/authproxy"

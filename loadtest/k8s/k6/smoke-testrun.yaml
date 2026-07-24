@@ -8,6 +8,7 @@ metadata:
     loadtest.authproxy.io/scenario: smoke
 spec:
   parallelism: 1
+  arguments: --summary-export /tmp/summary.json --out experimental-prometheus-rw
   script:
     configMap:
       name: authproxy-loadtest-k6
@@ -33,3 +34,5 @@ spec:
         value: "4"
       - name: K6_MAX_VUS
         value: "16"
+      - name: K6_PROMETHEUS_RW_SERVER_URL
+        value: http://prometheus-loadtest:9090/api/v1/write

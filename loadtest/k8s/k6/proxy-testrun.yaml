@@ -8,7 +8,7 @@ metadata:
     loadtest.authproxy.io/scenario: proxy
 spec:
   parallelism: 1
-  arguments: --summary-export /tmp/summary.json
+  arguments: --summary-export /tmp/summary.json --out experimental-prometheus-rw
   script:
     configMap:
       name: authproxy-loadtest-k6
@@ -28,6 +28,8 @@ spec:
             key: AUTHPROXY_BEARER_TOKEN
       - name: K6_CONNECTIONS_FILE
         value: ./connections.csv
+      - name: K6_PROMETHEUS_RW_SERVER_URL
+        value: http://prometheus-loadtest:9090/api/v1/write
     envFrom:
       - configMapRef:
           name: authproxy-loadtest-k6-env

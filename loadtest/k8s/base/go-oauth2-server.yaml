@@ -30,6 +30,15 @@ spec:
             - --test-mode
             - --test-port
             - "8080"
+          env:
+            # The test-mode server honors standard OTel settings when its
+            # telemetry support is enabled; production manifests omit them.
+            - name: OTEL_SERVICE_NAME
+              value: go-oauth2-server-loadtest
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://otel-lgtm:4318
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: http/protobuf
           ports:
             - name: http
               containerPort: 8080
