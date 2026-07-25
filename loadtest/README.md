@@ -214,7 +214,8 @@ The smoke environment installs:
   - `authproxy-admin-api`
   - `authproxy-api` with HPA enabled for CPU-based proxy scaling
   - `authproxy-public`
-  - `authproxy-worker` with HPA enabled for CPU and queue-depth metric examples
+  - `authproxy-worker` with CPU-based HPA; queue-depth scaling requires a
+    custom-metrics adapter or KEDA
 
 The chart's current model is one Deployment per release. Installing separate
 releases lets later issues add independent autoscaling and per-service resource

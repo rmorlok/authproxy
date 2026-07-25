@@ -44,14 +44,14 @@ type Telemetry struct {
 
 	taskDuration metric.Float64Histogram
 
-	inspector *asynq.Inspector
+	inspector Inspector
 }
 
 // NewTelemetry constructs a Telemetry surface from the providers + config.
 // providers being nil or in no-op mode, or both signals being off, produces
 // a Telemetry whose methods are inert — callers don't need to gate on this
 // themselves.
-func NewTelemetry(providers *aptelemetry.Providers, cfg *sconfig.Telemetry, inspector *asynq.Inspector) (*Telemetry, error) {
+func NewTelemetry(providers *aptelemetry.Providers, cfg *sconfig.Telemetry, inspector Inspector) (*Telemetry, error) {
 	t := &Telemetry{inspector: inspector}
 
 	if providers == nil || !providers.Enabled {
@@ -221,7 +221,7 @@ func (t *Telemetry) StartQueueDepthGauge(queues []string) (stop func(), err erro
 				}
 				observer.ObserveInt64(
 					gauge,
-					int64(info.Size),
+					int64(info.Pending),
 					metric.WithAttributes(attribute.String("messaging.destination.name", q)),
 				)
 			}

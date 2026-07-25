@@ -5,14 +5,9 @@ autoscaling:
   minReplicas: 1
   maxReplicas: 8
   targetCPUUtilizationPercentage: 75
-  metrics:
-    - type: Pods
-      pods:
-        metric:
-          name: authproxy_asynq_queue_size
-        target:
-          type: AverageValue
-          averageValue: "100"
+  # Queue-depth scaling requires a custom-metrics adapter or KEDA. The
+  # baseline profile uses CPU scaling until that dependency is configured.
+  metrics: []
   behavior:
     scaleUp:
       stabilizationWindowSeconds: 30

@@ -10,7 +10,7 @@
       "id": 1,
       "options": { "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
       "targets": [
-        { "expr": "sum by (messaging_destination_name) (authproxy_asynq_queue_size)", "legendFormat": "{{messaging_destination_name}}", "refId": "A" }
+        { "expr": "max by (messaging_destination_name) (authproxy_asynq_queue_size)", "legendFormat": "{{messaging_destination_name}}", "refId": "A" }
       ],
       "title": "Asynq queue depth",
       "type": "timeseries"

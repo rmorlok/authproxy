@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	"github.com/hibiken/asynq"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/codes"
@@ -14,6 +15,7 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
+	apasynqmock "github.com/rmorlok/authproxy/internal/apasynq/mock"
 	"github.com/rmorlok/authproxy/internal/aptelemetry"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 )
@@ -196,6 +198,39 @@ func TestAsynqTelemetry_SchedulerSyncErrorMarksSpan(t *testing.T) {
 	gotSpans := fx.spans.Ended()
 	require.Len(t, gotSpans, 1)
 	require.Equal(t, codes.Error, gotSpans[0].Status().Code)
+}
+
+func TestAsynqTelemetry_QueueDepthGaugeReportsPendingTasks(t *testing.T) {
+	fx := newAsynqTelemetryFixture(t)
+	ctrl := gomock.NewController(t)
+	inspector := apasynqmock.NewMockInspector(ctrl)
+	inspector.EXPECT().
+		GetQueueInfo("default").
+		Return(&asynq.QueueInfo{Queue: "default", Size: 20_000, Pending: 0}, nil).
+		AnyTimes()
+
+	tel, err := NewTelemetry(fx.providers, &sconfig.Telemetry{Enabled: enabledPtr(true)}, inspector)
+	require.NoError(t, err)
+
+	stop, err := tel.StartQueueDepthGauge([]string{"default"})
+	require.NoError(t, err)
+	t.Cleanup(stop)
+
+	rm := fx.readMetrics(t)
+	for _, sm := range rm.ScopeMetrics {
+		for _, m := range sm.Metrics {
+			if m.Name != "authproxy.asynq.queue.size" {
+				continue
+			}
+
+			gauge, ok := m.Data.(metricdata.Gauge[int64])
+			require.True(t, ok)
+			require.Len(t, gauge.DataPoints, 1)
+			require.EqualValues(t, 0, gauge.DataPoints[0].Value)
+			return
+		}
+	}
+	t.Fatal("queue depth gauge was not emitted")
 }
 
 // --- helpers ----------------------------------------------------------------
