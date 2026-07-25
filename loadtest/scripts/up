@@ -33,6 +33,7 @@ if [[ "${LOADTEST_INSTALL_K6_OPERATOR:-false}" == "true" ]]; then
   helm repo update grafana >/dev/null
   helm upgrade --install k6-operator grafana/k6-operator \
     --namespace "$namespace" \
+    --set namespace.create=false \
     --wait \
     "--timeout=$helm_timeout"
 fi
@@ -63,10 +64,42 @@ loadtest_wait_for_deployment "$namespace" go-oauth2-server "$helm_timeout"
 
 chart="$REPO_ROOT/deploy/charts/authproxy"
 common_values="$LOADTEST_ROOT/helm-values/common.yaml"
+profile_values_dir="$run_dir/helm-values/profile-overrides"
+mkdir -p "$profile_values_dir"
+
+profile_replica_count() {
+  local service=$1
+  local value
+  value=$(loadtest_yaml_section_value "$profile_file" authproxy "${service}_replicas")
+  [[ "$value" =~ ^[0-9]+$ ]] || loadtest_die "authproxy.${service}_replicas must be a non-negative integer"
+  printf "%s\n" "$value"
+}
+
+write_profile_values() {
+  local service=$1
+  local replicas=$2
+  local autoscale=$3
+  local output="$profile_values_dir/${service}.yaml"
+
+  {
+    printf "replicaCount: %s\n" "$replicas"
+    if [[ "$autoscale" == "true" ]]; then
+      printf "\nautoscaling:\n  minReplicas: %s\n" "$replicas"
+    fi
+  } > "$output"
+  printf "%s\n" "$output"
+}
+
+admin_api_profile_values=$(write_profile_values admin_api "$(profile_replica_count admin_api)" false)
+api_profile_values=$(write_profile_values api "$(profile_replica_count api)" true)
+public_replicas=$(profile_replica_count public)
+public_profile_values=$(write_profile_values public "$public_replicas" false)
+worker_profile_values=$(write_profile_values worker "$(profile_replica_count worker)" true)
 
 install_release() {
   local release=$1
   local values_file=$2
+  local profile_values=$3
 
   loadtest_log "installing $release"
   helm upgrade --install "$release" "$chart" \
@@ -75,14 +108,20 @@ install_release() {
     "--timeout=$helm_timeout" \
     -f "$common_values" \
     -f "$values_file" \
+    -f "$profile_values" \
     --set "image.repository=$authproxy_repo" \
     --set "image.tag=$authproxy_tag"
 }
 
-install_release authproxy-admin-api "$LOADTEST_ROOT/helm-values/admin-api.yaml"
-install_release authproxy-api "$LOADTEST_ROOT/helm-values/api.yaml"
-install_release authproxy-public "$LOADTEST_ROOT/helm-values/public.yaml"
-install_release authproxy-worker "$LOADTEST_ROOT/helm-values/worker.yaml"
+install_release authproxy-admin-api "$LOADTEST_ROOT/helm-values/admin-api.yaml" "$admin_api_profile_values"
+install_release authproxy-api "$LOADTEST_ROOT/helm-values/api.yaml" "$api_profile_values"
+if (( public_replicas > 0 )); then
+  install_release authproxy-public "$LOADTEST_ROOT/helm-values/public.yaml" "$public_profile_values"
+else
+  loadtest_log "public service disabled for this profile"
+  helm uninstall authproxy-public --namespace "$namespace" --ignore-not-found
+fi
+install_release authproxy-worker "$LOADTEST_ROOT/helm-values/worker.yaml" "$worker_profile_values"
 
 loadtest_capture_cluster_snapshot "$namespace" "$run_dir"
 loadtest_capture_helm_snapshot "$namespace" "$run_dir"

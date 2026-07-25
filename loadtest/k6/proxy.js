@@ -7,35 +7,36 @@ import { SharedArray } from 'k6/data';
 const apiUrl = trimTrailingSlash(__ENV.AUTHPROXY_API_URL || 'http://authproxy-api:8081');
 const providerUrl = trimTrailingSlash(__ENV.GO_OAUTH2_SERVER_URL || 'http://go-oauth2-server');
 const bearerToken = __ENV.AUTHPROXY_BEARER_TOKEN || '';
-const proxyMode = (__ENV.K6_PROXY_MODE || 'raw').toLowerCase();
-const scenarioName = __ENV.K6_SCENARIO_NAME || `proxy-${proxyMode}`;
-const scenarioShape = (__ENV.K6_SCENARIO_SHAPE || 'constant').toLowerCase();
-const apiReplicas = __ENV.K6_API_REPLICAS || 'unspecified';
-const connectionsFile = __ENV.K6_CONNECTIONS_FILE || './connections.csv';
+const proxyMode = (__ENV.LOADTEST_K6_PROXY_MODE || 'raw').toLowerCase();
+const scenarioName = __ENV.LOADTEST_K6_SCENARIO_NAME || `proxy-${proxyMode}`;
+const scenarioShape = (__ENV.LOADTEST_K6_SCENARIO_SHAPE || 'constant').toLowerCase();
+const apiReplicas = __ENV.LOADTEST_K6_API_REPLICAS || 'unspecified';
+const connectionsFile = __ENV.LOADTEST_K6_CONNECTIONS_FILE || './connections.csv';
 
-const rate = numberEnv('K6_RATE', 100);
-const timeUnit = __ENV.K6_TIME_UNIT || '1s';
-const duration = __ENV.K6_DURATION || '5m';
-const preAllocatedVUs = numberEnv('K6_PRE_ALLOCATED_VUS', 100);
-const maxVUs = numberEnv('K6_MAX_VUS', 1000);
-const requestTimeout = __ENV.K6_REQUEST_TIMEOUT || '30s';
+const rate = numberEnv('LOADTEST_K6_RATE', 100);
+const timeUnit = __ENV.LOADTEST_K6_TIME_UNIT || '1s';
+const duration = __ENV.LOADTEST_K6_DURATION || '5m';
+const preAllocatedVUs = numberEnv('LOADTEST_K6_PRE_ALLOCATED_VUS', 100);
+const maxVUs = numberEnv('LOADTEST_K6_MAX_VUS', 1000);
+const requestTimeout = __ENV.LOADTEST_K6_REQUEST_TIMEOUT || '30s';
 
-const p95ThresholdMs = numberEnv('K6_P95_THRESHOLD_MS', 1000);
-const maxFailedRate = numberEnv('K6_MAX_FAILED_RATE', 0.001);
-const max5xxRate = numberEnv('K6_MAX_5XX_RATE', 0.001);
+const p95ThresholdMs = numberEnv('LOADTEST_K6_P95_THRESHOLD_MS', 1000);
+const maxFailedRate = numberEnv('LOADTEST_K6_MAX_FAILED_RATE', 0.001);
+const max5xxRate = numberEnv('LOADTEST_K6_MAX_5XX_RATE', 0.001);
 
-const upstreamStatus = numberEnv('K6_UPSTREAM_STATUS', 200);
-const upstreamBytes = numberEnv('K6_UPSTREAM_BYTES', 256);
-const upstreamDelayMs = numberEnv('K6_UPSTREAM_DELAY_MS', 0);
-const upstreamJitterMs = numberEnv('K6_UPSTREAM_JITTER_MS', 0);
-const upstreamBearerPrefix = __ENV.K6_UPSTREAM_BEARER_PREFIX || 'at_';
-const upstreamPathPrefix = trimSlashes(__ENV.K6_UPSTREAM_PATH_PREFIX || '/test/load/resource/proxy');
-const proxyMethod = (__ENV.K6_PROXY_METHOD || 'GET').toUpperCase();
+const upstreamStatus = numberEnv('LOADTEST_K6_UPSTREAM_STATUS', 200);
+const upstreamBytes = numberEnv('LOADTEST_K6_UPSTREAM_BYTES', 256);
+const upstreamDelayMs = numberEnv('LOADTEST_K6_UPSTREAM_DELAY_MS', 0);
+const upstreamJitterMs = numberEnv('LOADTEST_K6_UPSTREAM_JITTER_MS', 0);
+const upstreamBearerPrefix = __ENV.LOADTEST_K6_UPSTREAM_BEARER_PREFIX || 'at_';
+const upstreamPathPrefix = trimSlashes(__ENV.LOADTEST_K6_UPSTREAM_PATH_PREFIX || '/test/load/resource/proxy');
+const proxyMethod = (__ENV.LOADTEST_K6_PROXY_METHOD || 'GET').toUpperCase();
 
 const proxyRequests = new Counter('proxy_requests');
 const proxyUnexpectedStatus = new Counter('proxy_unexpected_status');
 const proxy5xxRate = new Rate('proxy_5xx_rate');
 const proxyUpstream5xxRate = new Rate('proxy_upstream_5xx_rate');
+const summaryMarker = '__AUTHPROXY_LOADTEST_K6_SUMMARY__';
 
 const connections = new SharedArray('connections', () => parseConnections(open(connectionsFile)));
 
@@ -71,6 +72,12 @@ export function setup() {
     time_unit: timeUnit,
     duration,
   }));
+}
+
+export function handleSummary(data) {
+  return {
+    stdout: `${summaryMarker}${JSON.stringify(data)}\n`,
+  };
 }
 
 export default function () {
@@ -161,15 +168,15 @@ function buildScenario() {
   if (scenarioShape === 'spike') {
     return {
       executor: 'ramping-arrival-rate',
-      startRate: numberEnv('K6_SPIKE_BASE_RATE', rate),
+      startRate: numberEnv('LOADTEST_K6_SPIKE_BASE_RATE', rate),
       timeUnit,
       preAllocatedVUs,
       maxVUs,
       stages: [
-        { target: numberEnv('K6_SPIKE_BASE_RATE', rate), duration: __ENV.K6_SPIKE_RAMP_UP || '1m' },
-        { target: numberEnv('K6_SPIKE_RATE', rate * 3), duration: __ENV.K6_SPIKE_HOLD || '3m' },
-        { target: numberEnv('K6_SPIKE_BASE_RATE', rate), duration: __ENV.K6_SPIKE_RAMP_DOWN || '1m' },
-        { target: numberEnv('K6_SPIKE_BASE_RATE', rate), duration: __ENV.K6_SPIKE_RECOVERY || '3m' },
+        { target: numberEnv('LOADTEST_K6_SPIKE_BASE_RATE', rate), duration: __ENV.LOADTEST_K6_SPIKE_RAMP_UP || '1m' },
+        { target: numberEnv('LOADTEST_K6_SPIKE_RATE', rate * 3), duration: __ENV.LOADTEST_K6_SPIKE_HOLD || '3m' },
+        { target: numberEnv('LOADTEST_K6_SPIKE_BASE_RATE', rate), duration: __ENV.LOADTEST_K6_SPIKE_RAMP_DOWN || '1m' },
+        { target: numberEnv('LOADTEST_K6_SPIKE_BASE_RATE', rate), duration: __ENV.LOADTEST_K6_SPIKE_RECOVERY || '3m' },
       ],
     };
   }

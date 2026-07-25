@@ -22,7 +22,7 @@ spec:
       containers:
         - name: go-oauth2-server
           image: ghcr.io/rmorlok/go-oauth2-server:master
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           command:
             - go-oauth2-server
           args:

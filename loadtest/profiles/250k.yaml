@@ -18,7 +18,8 @@ objects:
 authproxy:
   api_replicas: 4
   worker_replicas: 4
-  public_replicas: 1
+  # Public OAuth callbacks are not exercised by this proxy/cardinality profile.
+  public_replicas: 0
   admin_api_replicas: 1
 k6:
   mode: operator

@@ -43,7 +43,7 @@ k6_env_or_profile() {
 }
 
 k6_p95_threshold_ms() {
-  local value=${K6_P95_THRESHOLD_MS:-}
+  local value=${LOADTEST_K6_P95_THRESHOLD_MS:-}
   if [[ -z "$value" ]]; then
     value=$(loadtest_yaml_section_value "$profile_file" k6 p95_latency_ms)
   fi
@@ -103,13 +103,13 @@ duration_for_scenario() {
       k6_env_or_profile LOADTEST_K6_SOAK_DURATION soak_duration 2h
       ;;
     *)
-      k6_env_or_profile K6_DURATION duration 5m
+      k6_env_or_profile LOADTEST_K6_DURATION duration 5m
       ;;
   esac
 }
 
 max_5xx_rate() {
-  local value=${K6_MAX_5XX_RATE:-}
+  local value=${LOADTEST_K6_MAX_5XX_RATE:-}
   if [[ -z "$value" ]]; then
     value=$(loadtest_yaml_section_value "$profile_file" acceptance max_5xx_rate)
   fi
@@ -241,32 +241,32 @@ apply_k6_env_configmap() {
   {
     printf "AUTHPROXY_API_URL=%s\n" "${AUTHPROXY_API_URL:-http://authproxy-api:8081}"
     printf "GO_OAUTH2_SERVER_URL=%s\n" "${GO_OAUTH2_SERVER_URL:-http://go-oauth2-server}"
-    printf "K6_PROXY_MODE=%s\n" "$proxy_mode"
-    printf "K6_SCENARIO_NAME=%s\n" "$scenario_name"
-    printf "K6_SCENARIO_SHAPE=%s\n" "$shape"
-    printf "K6_API_REPLICAS=%s\n" "$api_replicas"
-    printf "K6_RATE=%s\n" "$(k6_env_or_profile K6_RATE rate 100)"
-    printf "K6_DURATION=%s\n" "$(duration_for_scenario "$scenario_name")"
-    printf "K6_TIME_UNIT=%s\n" "$(k6_env_or_profile K6_TIME_UNIT time_unit 1s)"
-    printf "K6_PRE_ALLOCATED_VUS=%s\n" "$(k6_env_or_profile K6_PRE_ALLOCATED_VUS pre_allocated_vus 100)"
-    printf "K6_MAX_VUS=%s\n" "$(k6_env_or_profile K6_MAX_VUS max_vus 1000)"
-    printf "K6_REQUEST_TIMEOUT=%s\n" "$(k6_env_or_profile K6_REQUEST_TIMEOUT request_timeout 30s)"
-    printf "K6_P95_THRESHOLD_MS=%s\n" "$(k6_p95_threshold_ms)"
-    printf "K6_MAX_FAILED_RATE=%s\n" "$(k6_env_or_profile K6_MAX_FAILED_RATE max_failed_rate "$(max_5xx_rate)")"
-    printf "K6_MAX_5XX_RATE=%s\n" "$(max_5xx_rate)"
-    printf "K6_UPSTREAM_STATUS=%s\n" "$(k6_env_or_profile K6_UPSTREAM_STATUS upstream_status 200)"
-    printf "K6_UPSTREAM_BYTES=%s\n" "$(k6_env_or_profile K6_UPSTREAM_BYTES upstream_bytes 256)"
-    printf "K6_UPSTREAM_DELAY_MS=%s\n" "$(k6_env_or_profile K6_UPSTREAM_DELAY_MS upstream_delay_ms 0)"
-    printf "K6_UPSTREAM_JITTER_MS=%s\n" "$(k6_env_or_profile K6_UPSTREAM_JITTER_MS upstream_jitter_ms 0)"
-    printf "K6_UPSTREAM_BEARER_PREFIX=%s\n" "$(k6_env_or_profile K6_UPSTREAM_BEARER_PREFIX upstream_bearer_prefix at_)"
-    printf "K6_UPSTREAM_PATH_PREFIX=%s\n" "$(k6_env_or_profile K6_UPSTREAM_PATH_PREFIX upstream_path_prefix /test/load/resource/proxy)"
-    printf "K6_PROXY_METHOD=%s\n" "$(k6_env_or_profile K6_PROXY_METHOD proxy_method GET)"
-    printf "K6_SPIKE_BASE_RATE=%s\n" "$(k6_env_or_profile K6_SPIKE_BASE_RATE spike_base_rate "$(k6_env_or_profile K6_RATE rate 100)")"
-    printf "K6_SPIKE_RATE=%s\n" "$(k6_env_or_profile K6_SPIKE_RATE spike_rate 300)"
-    printf "K6_SPIKE_RAMP_UP=%s\n" "$(k6_env_or_profile K6_SPIKE_RAMP_UP spike_ramp_up 1m)"
-    printf "K6_SPIKE_HOLD=%s\n" "$(k6_env_or_profile K6_SPIKE_HOLD spike_hold 3m)"
-    printf "K6_SPIKE_RAMP_DOWN=%s\n" "$(k6_env_or_profile K6_SPIKE_RAMP_DOWN spike_ramp_down 1m)"
-    printf "K6_SPIKE_RECOVERY=%s\n" "$(k6_env_or_profile K6_SPIKE_RECOVERY spike_recovery 3m)"
+    printf "LOADTEST_K6_PROXY_MODE=%s\n" "$proxy_mode"
+    printf "LOADTEST_K6_SCENARIO_NAME=%s\n" "$scenario_name"
+    printf "LOADTEST_K6_SCENARIO_SHAPE=%s\n" "$shape"
+    printf "LOADTEST_K6_API_REPLICAS=%s\n" "$api_replicas"
+    printf "LOADTEST_K6_RATE=%s\n" "$(k6_env_or_profile LOADTEST_K6_RATE rate 100)"
+    printf "LOADTEST_K6_DURATION=%s\n" "$(duration_for_scenario "$scenario_name")"
+    printf "LOADTEST_K6_TIME_UNIT=%s\n" "$(k6_env_or_profile LOADTEST_K6_TIME_UNIT time_unit 1s)"
+    printf "LOADTEST_K6_PRE_ALLOCATED_VUS=%s\n" "$(k6_env_or_profile LOADTEST_K6_PRE_ALLOCATED_VUS pre_allocated_vus 100)"
+    printf "LOADTEST_K6_MAX_VUS=%s\n" "$(k6_env_or_profile LOADTEST_K6_MAX_VUS max_vus 1000)"
+    printf "LOADTEST_K6_REQUEST_TIMEOUT=%s\n" "$(k6_env_or_profile LOADTEST_K6_REQUEST_TIMEOUT request_timeout 30s)"
+    printf "LOADTEST_K6_P95_THRESHOLD_MS=%s\n" "$(k6_p95_threshold_ms)"
+    printf "LOADTEST_K6_MAX_FAILED_RATE=%s\n" "$(k6_env_or_profile LOADTEST_K6_MAX_FAILED_RATE max_failed_rate "$(max_5xx_rate)")"
+    printf "LOADTEST_K6_MAX_5XX_RATE=%s\n" "$(max_5xx_rate)"
+    printf "LOADTEST_K6_UPSTREAM_STATUS=%s\n" "$(k6_env_or_profile LOADTEST_K6_UPSTREAM_STATUS upstream_status 200)"
+    printf "LOADTEST_K6_UPSTREAM_BYTES=%s\n" "$(k6_env_or_profile LOADTEST_K6_UPSTREAM_BYTES upstream_bytes 256)"
+    printf "LOADTEST_K6_UPSTREAM_DELAY_MS=%s\n" "$(k6_env_or_profile LOADTEST_K6_UPSTREAM_DELAY_MS upstream_delay_ms 0)"
+    printf "LOADTEST_K6_UPSTREAM_JITTER_MS=%s\n" "$(k6_env_or_profile LOADTEST_K6_UPSTREAM_JITTER_MS upstream_jitter_ms 0)"
+    printf "LOADTEST_K6_UPSTREAM_BEARER_PREFIX=%s\n" "$(k6_env_or_profile LOADTEST_K6_UPSTREAM_BEARER_PREFIX upstream_bearer_prefix at_)"
+    printf "LOADTEST_K6_UPSTREAM_PATH_PREFIX=%s\n" "$(k6_env_or_profile LOADTEST_K6_UPSTREAM_PATH_PREFIX upstream_path_prefix /test/load/resource/proxy)"
+    printf "LOADTEST_K6_PROXY_METHOD=%s\n" "$(k6_env_or_profile LOADTEST_K6_PROXY_METHOD proxy_method GET)"
+    printf "LOADTEST_K6_SPIKE_BASE_RATE=%s\n" "$(k6_env_or_profile LOADTEST_K6_SPIKE_BASE_RATE spike_base_rate "$(k6_env_or_profile LOADTEST_K6_RATE rate 100)")"
+    printf "LOADTEST_K6_SPIKE_RATE=%s\n" "$(k6_env_or_profile LOADTEST_K6_SPIKE_RATE spike_rate 300)"
+    printf "LOADTEST_K6_SPIKE_RAMP_UP=%s\n" "$(k6_env_or_profile LOADTEST_K6_SPIKE_RAMP_UP spike_ramp_up 1m)"
+    printf "LOADTEST_K6_SPIKE_HOLD=%s\n" "$(k6_env_or_profile LOADTEST_K6_SPIKE_HOLD spike_hold 3m)"
+    printf "LOADTEST_K6_SPIKE_RAMP_DOWN=%s\n" "$(k6_env_or_profile LOADTEST_K6_SPIKE_RAMP_DOWN spike_ramp_down 1m)"
+    printf "LOADTEST_K6_SPIKE_RECOVERY=%s\n" "$(k6_env_or_profile LOADTEST_K6_SPIKE_RECOVERY spike_recovery 3m)"
   } > "$env_file"
 
   kubectl -n "$namespace" create configmap "$configmap_name" \
@@ -312,7 +312,7 @@ spec:
           secretKeyRef:
             name: authproxy-loadtest-k6-auth
             key: AUTHPROXY_BEARER_TOKEN
-      - name: K6_CONNECTIONS_FILE
+      - name: LOADTEST_K6_CONNECTIONS_FILE
         value: ./connections.csv
       - name: K6_PROMETHEUS_RW_SERVER_URL
         value: http://prometheus-loadtest:9090/api/v1/write
@@ -347,12 +347,7 @@ run_smoke() {
       loadtest_die "k6 smoke Job did not complete within $k6_timeout"
     fi
     kubectl -n "$namespace" logs job/authproxy-smoke-k6 > "$run_dir/k6/smoke.log" 2>&1 || true
-
-    local pod
-    pod=$(kubectl -n "$namespace" get pod -l job-name=authproxy-smoke-k6 -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
-    if [[ -n "$pod" ]]; then
-      kubectl -n "$namespace" cp "$pod:/artifacts/summary.json" "$run_dir/k6/summary.json" >/dev/null 2>&1 || true
-    fi
+    loadtest_extract_k6_summary "$run_dir/k6/smoke.log" "$run_dir/k6/summary.json" || true
   fi
 }
 
@@ -424,13 +419,8 @@ run_proxy_once() {
       loadtest_die "k6 proxy Job did not complete within $k6_timeout"
     fi
     kubectl -n "$namespace" logs job/authproxy-proxy-k6 > "$run_dir/k6/${run_name}.log" 2>&1 || true
-
-    local pod
-    pod=$(kubectl -n "$namespace" get pod -l job-name=authproxy-proxy-k6 -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
-    if [[ -n "$pod" ]]; then
-      kubectl -n "$namespace" cp "$pod:/artifacts/summary.json" "$run_dir/k6/${run_name}-summary.json" >/dev/null 2>&1 || true
-      record_scale_result "$api_replicas" "$scenario_name" "$run_dir/k6/${run_name}-summary.json" "$run_dir/k6/${run_name}.log"
-    fi
+    loadtest_extract_k6_summary "$run_dir/k6/${run_name}.log" "$run_dir/k6/${run_name}-summary.json" || true
+    record_scale_result "$api_replicas" "$scenario_name" "$run_dir/k6/${run_name}-summary.json" "$run_dir/k6/${run_name}.log"
   fi
 
   loadtest_capture_cluster_snapshot "$namespace" "$run_dir"

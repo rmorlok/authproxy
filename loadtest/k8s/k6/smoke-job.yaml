@@ -39,13 +39,13 @@ spec:
               value: http://authproxy-worker:8083
             - name: GO_OAUTH2_SERVER_URL
               value: http://go-oauth2-server
-            - name: K6_RATE
+            - name: LOADTEST_K6_RATE
               value: "2"
-            - name: K6_DURATION
+            - name: LOADTEST_K6_DURATION
               value: 30s
-            - name: K6_PRE_ALLOCATED_VUS
+            - name: LOADTEST_K6_PRE_ALLOCATED_VUS
               value: "4"
-            - name: K6_MAX_VUS
+            - name: LOADTEST_K6_MAX_VUS
               value: "16"
             - name: K6_PROMETHEUS_RW_SERVER_URL
               value: http://prometheus-loadtest:9090/api/v1/write

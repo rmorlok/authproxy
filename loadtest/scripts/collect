@@ -30,13 +30,13 @@ kubectl -n "$namespace" get testruns.k6.io -o yaml > "$run_dir/k6/testruns.yaml"
 while IFS= read -r job; do
   [[ -n "$job" ]] || continue
   kubectl -n "$namespace" logs "job/$job" > "$run_dir/k6/${job}.log" 2>&1 || true
+  loadtest_extract_k6_summary "$run_dir/k6/${job}.log" "$run_dir/k6/${job}-summary.json" || true
 done < <(kubectl -n "$namespace" get jobs -l app.kubernetes.io/name=k6 -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)
 
 while IFS= read -r pod; do
   [[ -n "$pod" ]] || continue
   kubectl -n "$namespace" logs "$pod" > "$run_dir/k6/${pod}.log" 2>&1 || true
-  kubectl -n "$namespace" cp "$pod:/artifacts/summary.json" "$run_dir/k6/${pod}-summary.json" >/dev/null 2>&1 || true
-  kubectl -n "$namespace" cp "$pod:/tmp/summary.json" "$run_dir/k6/${pod}-summary.json" >/dev/null 2>&1 || true
+  loadtest_extract_k6_summary "$run_dir/k6/${pod}.log" "$run_dir/k6/${pod}-summary.json" || true
 done < <(kubectl -n "$namespace" get pods -l app.kubernetes.io/name=k6 -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)
 
 loadtest_log "collected artifacts for profile $profile_name"

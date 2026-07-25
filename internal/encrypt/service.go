@@ -208,16 +208,19 @@ func (s *service) syncKeysFromDbToMemory(ctx context.Context) error {
 		merr = multierror.Append(merr, err)
 	}
 
-	// Identify all the keys used for the namespaces
-	err = s.db.ListNamespacesBuilder().Enumerate(ctx, func(pr pagination.PageResult[database.Namespace]) (keepGoing pagination.KeepGoing, err error) {
-		for _, ns := range pr.Results {
-			if ns.KeyId != nil {
-				newNamespaceToKeyCache[ns.Path] = *ns.KeyId
+	// Do not use ListNamespacesBuilder here: its pagination cursor is encrypted
+	// by this service, which is not ready until this initial synchronization ends.
+	err = s.db.EnumerateNamespaceEncryptionTargets(ctx,
+		func(targets []database.NamespaceEncryptionTarget, _ bool) ([]database.NamespaceTargetDataEncryptionKeyUpdate, pagination.KeepGoing, error) {
+			for _, target := range targets {
+				if target.KeyId != nil {
+					newNamespaceToKeyCache[target.Path] = *target.KeyId
+				}
 			}
-		}
 
-		return pagination.Continue, nil
-	})
+			return nil, pagination.Continue, nil
+		},
+	)
 
 	if err != nil {
 		merr = multierror.Append(merr, err)

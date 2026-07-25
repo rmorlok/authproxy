@@ -340,6 +340,35 @@ loadtest_wait_for_deployment() {
 
 loadtest_ensure_generated_secrets() {
   local namespace=$1
+  local -a secrets=(
+    authproxy-load-db
+    authproxy-load-redis
+    authproxy-load-clickhouse
+    authproxy-load-jwt
+    authproxy-load-actors
+    authproxy-load-encryption
+  )
+  local -a present=()
+  local -a missing=()
+  local secret
+
+  for secret in "${secrets[@]}"; do
+    if kubectl -n "$namespace" get secret "$secret" >/dev/null 2>&1; then
+      present+=("$secret")
+    else
+      missing+=("$secret")
+    fi
+  done
+
+  if [[ "${#missing[@]}" -eq 0 ]]; then
+    loadtest_log "preserving generated fixture secrets"
+    return
+  fi
+
+  if [[ "${#present[@]}" -gt 0 ]]; then
+    loadtest_die "fixture secrets are only partially present in $namespace; remove the load-test environment before recreating it"
+  fi
+
   local tmp
   tmp=$(mktemp -d)
 
@@ -348,41 +377,29 @@ loadtest_ensure_generated_secrets() {
   local clickhouse_password=${LOADTEST_CLICKHOUSE_PASSWORD:-authproxy-load}
 
   kubectl -n "$namespace" create secret generic authproxy-load-db \
-    --from-literal=AUTHPROXY_DB_PASSWORD="$db_password" \
-    --dry-run=client -o yaml > "$tmp/db.yaml"
-  kubectl -n "$namespace" apply -f "$tmp/db.yaml"
+    --from-literal=AUTHPROXY_DB_PASSWORD="$db_password"
 
   kubectl -n "$namespace" create secret generic authproxy-load-redis \
-    --from-literal=AUTHPROXY_REDIS_PASSWORD="$redis_password" \
-    --dry-run=client -o yaml > "$tmp/redis.yaml"
-  kubectl -n "$namespace" apply -f "$tmp/redis.yaml"
+    --from-literal=AUTHPROXY_REDIS_PASSWORD="$redis_password"
 
   kubectl -n "$namespace" create secret generic authproxy-load-clickhouse \
-    --from-literal=CLICKHOUSE_PASSWORD="$clickhouse_password" \
-    --dry-run=client -o yaml > "$tmp/clickhouse.yaml"
-  kubectl -n "$namespace" apply -f "$tmp/clickhouse.yaml"
+    --from-literal=CLICKHOUSE_PASSWORD="$clickhouse_password"
 
   openssl genrsa -out "$tmp/system" 2048 >/dev/null 2>&1
   openssl rsa -in "$tmp/system" -pubout -out "$tmp/system.pub" >/dev/null 2>&1
   kubectl -n "$namespace" create secret generic authproxy-load-jwt \
     --from-file=system="$tmp/system" \
-    --from-file=system.pub="$tmp/system.pub" \
-    --dry-run=client -o yaml > "$tmp/jwt.yaml"
-  kubectl -n "$namespace" apply -f "$tmp/jwt.yaml"
+    --from-file=system.pub="$tmp/system.pub"
 
   openssl genrsa -out "$tmp/loadtest-admin" 2048 >/dev/null 2>&1
   openssl rsa -in "$tmp/loadtest-admin" -pubout -out "$tmp/loadtest-admin.pub" >/dev/null 2>&1
   kubectl -n "$namespace" create secret generic authproxy-load-actors \
     --from-file=loadtest-admin="$tmp/loadtest-admin" \
-    --from-file=loadtest-admin.pub="$tmp/loadtest-admin.pub" \
-    --dry-run=client -o yaml > "$tmp/actors.yaml"
-  kubectl -n "$namespace" apply -f "$tmp/actors.yaml"
+    --from-file=loadtest-admin.pub="$tmp/loadtest-admin.pub"
 
   openssl rand -out "$tmp/global_aes.key" 32
   kubectl -n "$namespace" create secret generic authproxy-load-encryption \
-    --from-file=global_aes.key="$tmp/global_aes.key" \
-    --dry-run=client -o yaml > "$tmp/encryption.yaml"
-  kubectl -n "$namespace" apply -f "$tmp/encryption.yaml"
+    --from-file=global_aes.key="$tmp/global_aes.key"
 
   rm -rf "$tmp"
 }
@@ -430,6 +447,24 @@ loadtest_capture_helm_snapshot() {
     helm -n "$namespace" get values "$release" --all > "$run_dir/helm/${release}-values.yaml" 2>&1 || true
     helm -n "$namespace" get manifest "$release" > "$run_dir/helm/${release}-manifest.yaml" 2>&1 || true
   done
+}
+
+loadtest_extract_k6_summary() {
+  local log_file=$1
+  local summary_file=$2
+  local marker='__AUTHPROXY_LOADTEST_K6_SUMMARY__'
+
+  awk -v marker="$marker" '
+    index($0, marker) {
+      print substr($0, index($0, marker) + length(marker))
+      exit
+    }
+  ' "$log_file" > "$summary_file"
+
+  if [[ ! -s "$summary_file" ]]; then
+    rm -f "$summary_file"
+    return 1
+  fi
 }
 
 loadtest_capture_prometheus_snapshot() {
