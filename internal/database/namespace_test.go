@@ -1828,6 +1828,35 @@ INSERT INTO namespaces
 			require.Len(t, lastPageValues, 1)
 			require.True(t, lastPageValues[0])
 		})
+
+		t.Run("paginates with an ordered keyset", func(t *testing.T) {
+			_, db, _ := MustApplyBlankTestDbConfigRaw(t, nil)
+			ctx := apctx.NewBuilderBackground().Build()
+
+			for i := 0; i < 205; i++ {
+				require.NoError(t, db.CreateNamespace(ctx, &Namespace{
+					Path: fmt.Sprintf("root.keyset-%03d", i),
+				}))
+			}
+
+			var paths []string
+			var lastPageValues []bool
+			err := db.EnumerateNamespaceEncryptionTargets(ctx,
+				func(targets []NamespaceEncryptionTarget, lastPage bool) ([]NamespaceTargetDataEncryptionKeyUpdate, pagination.KeepGoing, error) {
+					for _, target := range targets {
+						paths = append(paths, target.Path)
+					}
+					lastPageValues = append(lastPageValues, lastPage)
+					return nil, pagination.Continue, nil
+				},
+			)
+			require.NoError(t, err)
+			require.Len(t, paths, 206)
+			require.Equal(t, []bool{false, false, true}, lastPageValues)
+			require.Equal(t, "root", paths[0])
+			require.Equal(t, "root.keyset-000", paths[1])
+			require.Equal(t, "root.keyset-204", paths[len(paths)-1])
+		})
 	})
 
 	t.Run("Labels", func(t *testing.T) {

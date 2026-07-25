@@ -1,0 +1,1 @@
+DROP INDEX idx_namespaces_active_depth_path;
