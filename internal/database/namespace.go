@@ -1002,18 +1002,28 @@ func (s *service) EnumerateNamespaceEncryptionTargets(
 	callback func(targets []NamespaceEncryptionTarget, lastPage bool) (updates []NamespaceTargetDataEncryptionKeyUpdate, keepGoing pagination.KeepGoing, err error),
 ) error {
 	const pageSize = 100
-	offset := uint64(0)
+	var lastDepth uint64
+	var lastPath string
+	hasCursor := false
 
 	for {
-		rows, err := s.sq.
+		query := s.sq.
 			Select("path", "depth", "key_id", "target_data_encryption_key_id").
 			From(NamespacesTable).
 			Where(sq.Eq{"deleted_at": nil}).
 			OrderBy("depth, path").
-			Limit(pageSize + 1).
-			Offset(offset).
-			RunWith(s.db).
-			Query()
+			Limit(pageSize + 1)
+		if hasCursor {
+			query = query.Where(sq.Or{
+				sq.Gt{"depth": lastDepth},
+				sq.And{
+					sq.Eq{"depth": lastDepth},
+					sq.Gt{"path": lastPath},
+				},
+			})
+		}
+
+		rows, err := query.RunWith(s.db).Query()
 		if err != nil {
 			return err
 		}
@@ -1061,7 +1071,10 @@ func (s *service) EnumerateNamespaceEncryptionTargets(
 			break
 		}
 
-		offset += pageSize
+		last := results[len(results)-1]
+		lastDepth = last.Depth
+		lastPath = last.Path
+		hasCursor = true
 	}
 
 	return nil
