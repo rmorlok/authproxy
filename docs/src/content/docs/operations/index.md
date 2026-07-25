@@ -20,6 +20,8 @@ flowchart LR
 
 ## Observability and audit
 
+- [Load testing](/operations/load-testing/) - run repeatable cardinality,
+  background-job, proxy-throughput, soak, and autoscaling capacity tests.
 - [Application metrics](/operations/app-metrics/) — request-event metadata, resource
   snapshots, query dimensions, and aggregations.
 - [Telemetry](/operations/telemetry/) — OpenTelemetry traces, metrics, logs, sampling,
