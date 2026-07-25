@@ -26,7 +26,7 @@ spec:
           secretKeyRef:
             name: authproxy-loadtest-k6-auth
             key: AUTHPROXY_BEARER_TOKEN
-      - name: K6_CONNECTIONS_FILE
+      - name: LOADTEST_K6_CONNECTIONS_FILE
         value: ./connections.csv
       - name: K6_PROMETHEUS_RW_SERVER_URL
         value: http://prometheus-loadtest:9090/api/v1/write

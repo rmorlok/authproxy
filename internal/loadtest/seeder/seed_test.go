@@ -2,6 +2,9 @@ package seeder
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -9,6 +12,7 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
+	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -112,6 +116,7 @@ func TestSeedWritesArtifactsAndIsConnectionIdempotent(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 2, first.CreatedConnections)
 	assert.Equal(t, 1, first.CreatedStaleSetups)
+	assert.Equal(t, "http://go-oauth2-server", first.ProviderBaseURL)
 
 	second, err := Seed(context.Background(), Options{
 		Profile:       profile,
@@ -147,4 +152,43 @@ func TestSeedWritesArtifactsAndIsConnectionIdempotent(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(plan), "AuthProxy load-test seed summary")
 	assert.Contains(t, string(plan), "datasets/stale_setup_connections.csv")
+}
+
+func TestConnectorDefinitionUsesProviderTokenEndpoint(t *testing.T) {
+	connector := connectorDefinition("con_loadtest", 1, "root", "smoke", "http://go-oauth2-server")
+	oauth, ok := connector.Auth.InnerVal.(*cschema.AuthOAuth2)
+	require.True(t, ok)
+
+	assert.Equal(t, "http://go-oauth2-server/v1/oauth/tokens", oauth.Token.Endpoint)
+	assert.Equal(t, cschema.TokenEndpointAuthClientSecretBasic, oauth.GetTokenEndpointAuthMethodOrDefault())
+}
+
+func TestEnsureProviderLoadtestClient(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/test/clients", r.URL.Path)
+		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
+
+		var request providerClientRequest
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&request))
+		assert.Equal(t, providerClientRequest{
+			Key:                     loadtestProviderClientID,
+			Secret:                  loadtestProviderClientSecret,
+			Scope:                   loadtestProviderClientScope,
+			TokenEndpointAuthMethod: "client_secret_basic",
+		}, request)
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer server.Close()
+
+	require.NoError(t, ensureProviderLoadtestClient(context.Background(), server.Client(), server.URL))
+}
+
+func TestEnsureProviderLoadtestClientAcceptsExistingClient(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "Client ID taken", http.StatusBadRequest)
+	}))
+	defer server.Close()
+
+	require.NoError(t, ensureProviderLoadtestClient(context.Background(), server.Client(), server.URL))
 }

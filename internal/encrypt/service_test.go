@@ -2,6 +2,7 @@ package encrypt
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"testing"
 	"time"
@@ -243,6 +244,33 @@ func TestServiceStartSyncLoop(t *testing.T) {
 	decrypted, err := s.DecryptString(syncCtx, encrypted)
 	require.NoError(t, err)
 	require.Equal(t, "from background sync", decrypted)
+}
+
+func TestServiceStartSyncLoopWithPagedNamespaces(t *testing.T) {
+	ctx := context.Background()
+	cfg := config.FromRoot(&sconfig.Root{
+		SystemAuth: sconfig.SystemAuth{
+			GlobalAESKey: sconfig.NewKeyDataRandomBytes(),
+		},
+	})
+	cfg, db := database.MustApplyBlankTestDbConfig(t, cfg)
+	createDataEncryptionKeyForTest(t, ctx, db, globalEncryptionKeyID, cfg.GetRoot().SystemAuth.GlobalAESKey)
+
+	for i := 0; i < 101; i++ {
+		require.NoError(t, db.CreateNamespace(ctx, &database.Namespace{
+			Path: fmt.Sprintf("root.paged-namespace-%03d", i),
+		}))
+	}
+
+	s := NewEncryptService(cfg, db, slog.Default())
+	s.Start()
+	t.Cleanup(s.Shutdown)
+
+	syncCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+
+	_, err := s.EncryptStringGlobal(syncCtx, "paged namespace sync")
+	require.NoError(t, err)
 }
 
 func TestServiceSyncKeysFromDbToMemoryRefreshesNamespaceKey(t *testing.T) {

@@ -35,8 +35,7 @@ spec:
             - name: metrics
               containerPort: 9187
           readinessProbe:
-            httpGet:
-              path: /metrics
+            tcpSocket:
               port: metrics
             initialDelaySeconds: 5
             periodSeconds: 5

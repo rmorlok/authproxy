@@ -48,14 +48,14 @@ spec:
               cpu: 250m
               memory: 512Mi
             limits:
-              memory: 2Gi
+              memory: 4Gi
           volumeMounts:
             - name: grafana-provisioning
-              mountPath: /etc/grafana/provisioning/datasources/loadtest.yaml
+              mountPath: /otel-lgtm/grafana/conf/provisioning/datasources/loadtest.yaml
               subPath: datasources.yaml
               readOnly: true
             - name: grafana-provisioning
-              mountPath: /etc/grafana/provisioning/dashboards/loadtest.yaml
+              mountPath: /otel-lgtm/grafana/conf/provisioning/dashboards/loadtest.yaml
               subPath: dashboards.yaml
               readOnly: true
             - name: grafana-dashboards

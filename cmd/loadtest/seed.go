@@ -83,16 +83,17 @@ func cmdSeed() *cobra.Command {
 			}
 
 			result, err := seeder.Seed(ctx, seeder.Options{
-				Profile:               profile,
-				DB:                    dm.GetDatabase(),
-				Encrypt:               enc,
-				ProviderBaseURL:       providerBaseURL,
-				OAuthExpiringPercent:  oauthOverride,
-				PeriodicProbePercent:  probeOverride,
-				StaleSetupConnections: staleSetupOverride,
-				VerifySamples:         verifySamples,
-				ProgressEvery:         progressEvery,
-				Now:                   time.Now().UTC(),
+				Profile:                 profile,
+				DB:                      dm.GetDatabase(),
+				Encrypt:                 enc,
+				ProviderBaseURL:         providerBaseURL,
+				ProviderClientBootstrap: true,
+				OAuthExpiringPercent:    oauthOverride,
+				PeriodicProbePercent:    probeOverride,
+				StaleSetupConnections:   staleSetupOverride,
+				VerifySamples:           verifySamples,
+				ProgressEvery:           progressEvery,
+				Now:                     time.Now().UTC(),
 				Logf: func(format string, args ...any) {
 					fmt.Printf("[loadtest-seed] "+format+"\n", args...)
 				},

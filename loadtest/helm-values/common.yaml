@@ -90,7 +90,7 @@ config:
     sampling:
       ratio: 1.0
     signals:
-      traces: true
+      traces: false
       metrics: true
       logs: true
     http:
