@@ -68,8 +68,17 @@ connectors:
   loadFromList: []
 
 appMetrics:
-  shareMainDatabase: true
-  autoMigrate: false
+  shareMainDatabase: false
+  autoMigrate: true
+  existingSecret: authproxy-load-clickhouse
+  database:
+    provider: clickhouse
+    addresses:
+      - clickhouse:8123
+    database: authproxy_app_metrics
+    user: authproxy
+    password:
+      env_var: CLICKHOUSE_PASSWORD
   fullRequestRecording: never
 
 config:
