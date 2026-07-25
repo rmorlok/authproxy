@@ -13,6 +13,7 @@ scenario=${2:-${LOADTEST_SCENARIO:-${default_scenario:-smoke}}}
 run_dir=$(loadtest_init_run_dir "$profile_name" "$profile_file" "$namespace" run)
 
 loadtest_require_cmd kubectl
+loadtest_capture_cluster_snapshot "$namespace" "$run_dir"
 
 profile_k6_mode=$(loadtest_yaml_section_value "$profile_file" k6 mode)
 k6_mode=${LOADTEST_K6_MODE:-${profile_k6_mode:-job}}
@@ -293,7 +294,7 @@ metadata:
     loadtest.authproxy.io/scenario: proxy
 spec:
   parallelism: $parallelism
-  arguments: --summary-export /tmp/summary.json
+  arguments: --summary-export /tmp/summary.json --out experimental-prometheus-rw
   script:
     configMap:
       name: authproxy-loadtest-k6
@@ -313,6 +314,8 @@ spec:
             key: AUTHPROXY_BEARER_TOKEN
       - name: K6_CONNECTIONS_FILE
         value: ./connections.csv
+      - name: K6_PROMETHEUS_RW_SERVER_URL
+        value: http://prometheus-loadtest:9090/api/v1/write
     envFrom:
       - configMapRef:
           name: $env_configmap
@@ -429,6 +432,8 @@ run_proxy_once() {
       record_scale_result "$api_replicas" "$scenario_name" "$run_dir/k6/${run_name}-summary.json" "$run_dir/k6/${run_name}.log"
     fi
   fi
+
+  loadtest_capture_cluster_snapshot "$namespace" "$run_dir"
 }
 
 record_scale_result() {
@@ -476,6 +481,7 @@ set_api_replicas() {
     kubectl -n "$namespace" scale deployment/authproxy-api "--replicas=$replicas"
   fi
   kubectl -n "$namespace" rollout status deployment/authproxy-api "--timeout=$timeout"
+  loadtest_capture_cluster_snapshot "$namespace" "$run_dir"
 }
 
 run_proxy_suite() {

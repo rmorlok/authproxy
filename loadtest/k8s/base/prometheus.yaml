@@ -1,0 +1,119 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-loadtest-config
+  labels:
+    app.kubernetes.io/name: prometheus-loadtest
+    app.kubernetes.io/component: observability
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+      scrape_timeout: 10s
+    rule_files:
+      - /etc/prometheus/rules/*.yaml
+    scrape_configs:
+      - job_name: otel-lgtm-federate
+        honor_labels: true
+        metrics_path: /federate
+        params:
+          match[]:
+            - '{__name__=~".+"}'
+        static_configs:
+          - targets:
+              - otel-lgtm:9090
+      - job_name: kube-state-metrics
+        static_configs:
+          - targets:
+              - kube-state-metrics:8080
+      - job_name: postgres-exporter
+        static_configs:
+          - targets:
+              - postgres-exporter:9187
+      - job_name: redis-exporter
+        static_configs:
+          - targets:
+              - redis-exporter:9121
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus-loadtest
+  labels:
+    app.kubernetes.io/name: prometheus-loadtest
+    app.kubernetes.io/component: observability
+    loadtest.authproxy.io/component: dependency
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus-loadtest
+      app.kubernetes.io/component: observability
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: prometheus-loadtest
+        app.kubernetes.io/component: observability
+        loadtest.authproxy.io/component: dependency
+    spec:
+      containers:
+        - name: prometheus
+          image: docker.io/prom/prometheus:v2.54.1
+          imagePullPolicy: IfNotPresent
+          args:
+            - --config.file=/etc/prometheus/prometheus.yml
+            - --storage.tsdb.path=/prometheus
+            - --web.enable-lifecycle
+            - --web.enable-remote-write-receiver
+          ports:
+            - name: http
+              containerPort: 9090
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 1Gi
+          volumeMounts:
+            - name: config
+              mountPath: /etc/prometheus/prometheus.yml
+              subPath: prometheus.yml
+              readOnly: true
+            - name: rules
+              mountPath: /etc/prometheus/rules
+              readOnly: true
+            - name: storage
+              mountPath: /prometheus
+      volumes:
+        - name: config
+          configMap:
+            name: prometheus-loadtest-config
+        - name: rules
+          configMap:
+            name: authproxy-loadtest-prometheus-rules
+        - name: storage
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-loadtest
+  labels:
+    app.kubernetes.io/name: prometheus-loadtest
+    app.kubernetes.io/component: observability
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: prometheus-loadtest
+    app.kubernetes.io/component: observability
+  ports:
+    - name: http
+      port: 9090
+      targetPort: http

@@ -1,0 +1,84 @@
+{
+  "annotations": { "list": [] },
+  "description": "Postgres, Redis, and AuthProxy client instrumentation for identifying datastore limits during load tests.",
+  "editable": true,
+  "panels": [
+    {
+      "datasource": { "type": "prometheus", "uid": "loadtest-prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "id": 1,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "sum by (status) (db_sql_connection_open)", "legendFormat": "SQL {{status}}", "refId": "A" },
+        { "expr": "sum(db_sql_connection_max_open)", "legendFormat": "SQL maximum", "refId": "B" },
+        { "expr": "pg_stat_database_numbackends{datname=\"authproxy\"}", "legendFormat": "Postgres backends", "refId": "C" }
+      ],
+      "title": "Postgres connection pressure",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "loadtest-prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "id": 2,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "histogram_quantile(0.95, sum by (le) (rate(db_sql_latency_milliseconds_bucket[5m]))) / 1000", "legendFormat": "SQL p95", "refId": "A" },
+        { "expr": "histogram_quantile(0.95, sum by (le) (rate(db_client_connections_use_time_milliseconds_bucket{type=\"command\"}[5m]))) / 1000", "legendFormat": "Redis command p95", "refId": "B" }
+      ],
+      "title": "SQL and Redis client p95 latency",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "loadtest-prometheus" },
+      "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "id": 3,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "redis_memory_used_bytes", "legendFormat": "used", "refId": "A" },
+        { "expr": "redis_memory_max_bytes", "legendFormat": "max", "refId": "B" },
+        { "expr": "redis_connected_clients", "legendFormat": "clients", "refId": "C" }
+      ],
+      "title": "Redis memory and client count",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "loadtest-prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "id": 4,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "sum(rate(pg_stat_database_tup_inserted{datname=\"authproxy\"}[1m]))", "legendFormat": "Postgres inserts/s", "refId": "A" },
+        { "expr": "sum(rate(redis_commands_processed_total[1m]))", "legendFormat": "Redis commands/s", "refId": "B" },
+        { "expr": "sum(rate(db_sql_latency_milliseconds_count[1m]))", "legendFormat": "AuthProxy SQL operations/s", "refId": "C" }
+      ],
+      "title": "Datastore write and operation pressure",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "loadtest-prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "id": 5,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "sum(pg_locks_count) by (mode)", "legendFormat": "{{mode}}", "refId": "A" },
+        { "expr": "sum by (pod) (kube_pod_container_status_restarts_total{pod=~\"(postgresql|redis-master|clickhouse)-.*\"})", "legendFormat": "{{pod}} restarts", "refId": "B" }
+      ],
+      "title": "Database locks and datastore pod restarts",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": [ "authproxy", "loadtest", "datastores" ],
+  "templating": { "list": [] },
+  "time": { "from": "now-30m", "to": "now" },
+  "timezone": "browser",
+  "title": "AuthProxy Load Test - Datastores",
+  "uid": "authproxy-loadtest-datastores",
+  "version": 1
+}

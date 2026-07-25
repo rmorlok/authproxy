@@ -1,0 +1,67 @@
+{
+  "annotations": { "list": [] },
+  "description": "Receiving go-oauth2-server behavior. It is intentionally independent from AuthProxy so an upstream bottleneck is visible during proxy QPS scaling.",
+  "editable": true,
+  "panels": [
+    {
+      "datasource": { "type": "prometheus", "uid": "loadtest-prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "id": 1,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "sum by (http_response_status_code) (rate(http_server_request_duration_seconds_count{service_name=~\"go-oauth2-server.*\"}[1m]))", "legendFormat": "{{http_response_status_code}}", "refId": "A" }
+      ],
+      "title": "Provider request rate by status",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "loadtest-prometheus" },
+      "fieldConfig": { "defaults": { "unit": "percentunit" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "id": 2,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "sum(rate(http_server_request_duration_seconds_count{service_name=~\"go-oauth2-server.*\",http_response_status_code=~\"5..\"}[5m])) / clamp_min(sum(rate(http_server_request_duration_seconds_count{service_name=~\"go-oauth2-server.*\"}[5m])), 1)", "legendFormat": "provider 5xx", "refId": "A" }
+      ],
+      "title": "Provider 5xx rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "loadtest-prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "id": 3,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_name=~\"go-oauth2-server.*\"}[5m])))", "legendFormat": "p50", "refId": "A" },
+        { "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_name=~\"go-oauth2-server.*\"}[5m])))", "legendFormat": "p95", "refId": "B" },
+        { "expr": "histogram_quantile(0.99, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_name=~\"go-oauth2-server.*\"}[5m])))", "legendFormat": "p99", "refId": "C" }
+      ],
+      "title": "Provider HTTP latency",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "loadtest-prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "id": 4,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "kube_deployment_status_replicas_available{deployment=\"go-oauth2-server\"}", "legendFormat": "available", "refId": "A" },
+        { "expr": "kube_pod_container_status_restarts_total{container=\"go-oauth2-server\"}", "legendFormat": "{{pod}} restarts", "refId": "B" }
+      ],
+      "title": "Provider capacity and restarts",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": [ "authproxy", "loadtest", "provider" ],
+  "templating": { "list": [] },
+  "time": { "from": "now-30m", "to": "now" },
+  "timezone": "browser",
+  "title": "AuthProxy Load Test - Upstream Provider",
+  "uid": "authproxy-loadtest-provider",
+  "version": 1
+}

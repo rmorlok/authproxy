@@ -1,0 +1,9 @@
+apiVersion: 1
+datasources:
+  - name: AuthProxy Load Test Prometheus
+    uid: loadtest-prometheus
+    type: prometheus
+    access: proxy
+    editable: true
+    isDefault: true
+    url: http://prometheus-loadtest:9090

@@ -12,9 +12,12 @@ run_dir=$(loadtest_init_run_dir "$profile_name" "$profile_file" "$namespace" col
 
 loadtest_require_cmd kubectl
 loadtest_require_cmd helm
+loadtest_require_cmd curl
 
 loadtest_capture_cluster_snapshot "$namespace" "$run_dir"
 loadtest_capture_helm_snapshot "$namespace" "$run_dir"
+loadtest_capture_prometheus_snapshot "$namespace" "$run_dir"
+loadtest_capture_postgres_explain "$namespace" "$run_dir"
 
 kubectl -n "$namespace" get jobs -o wide > "$run_dir/kubernetes/jobs.txt" 2>&1 || true
 kubectl -n "$namespace" get jobs -l app.kubernetes.io/name=k6 -o yaml > "$run_dir/k6/jobs.yaml" 2>&1 || true

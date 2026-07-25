@@ -1,0 +1,84 @@
+{
+  "annotations": { "list": [] },
+  "description": "Proxy throughput, latency, error rate, and AuthProxy API scaling for the load-test namespace.",
+  "editable": true,
+  "panels": [
+    {
+      "datasource": { "type": "prometheus", "uid": "loadtest-prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "id": 1,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "sum(rate(authproxy_client_request_duration_seconds_count{authproxy_request_type=\"proxy\"}[1m]))", "legendFormat": "upstream proxy RPS", "refId": "A" },
+        { "expr": "sum(rate(http_server_request_duration_seconds_count{authproxy_service=\"api\"}[1m]))", "legendFormat": "API inbound RPS", "refId": "B" },
+        { "expr": "sum(rate(k6_http_reqs_total[1m]))", "legendFormat": "k6 achieved RPS", "refId": "C" }
+      ],
+      "title": "Proxy throughput",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "loadtest-prometheus" },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 0.001 } ] } }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "id": 2,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "sum(rate(authproxy_client_request_duration_seconds_count{authproxy_request_type=\"proxy\",http_response_status_code=~\"5..\"}[5m])) / clamp_min(sum(rate(authproxy_client_request_duration_seconds_count{authproxy_request_type=\"proxy\"}[5m])), 1)", "legendFormat": "upstream 5xx", "refId": "A" },
+        { "expr": "sum(rate(http_server_request_duration_seconds_count{authproxy_service=\"api\",http_response_status_code=~\"5..\"}[5m])) / clamp_min(sum(rate(http_server_request_duration_seconds_count{authproxy_service=\"api\"}[5m])), 1)", "legendFormat": "API 5xx", "refId": "B" }
+      ],
+      "title": "5xx rate (initial gate: < 0.1%)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "loadtest-prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "id": 3,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum by (le) (rate(authproxy_client_request_duration_seconds_bucket{authproxy_request_type=\"proxy\"}[5m])))", "legendFormat": "p50", "refId": "A" },
+        { "expr": "histogram_quantile(0.95, sum by (le) (rate(authproxy_client_request_duration_seconds_bucket{authproxy_request_type=\"proxy\"}[5m])))", "legendFormat": "p95", "refId": "B" },
+        { "expr": "histogram_quantile(0.99, sum by (le) (rate(authproxy_client_request_duration_seconds_bucket{authproxy_request_type=\"proxy\"}[5m])))", "legendFormat": "p99", "refId": "C" }
+      ],
+      "title": "Outbound proxy latency",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "loadtest-prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "id": 4,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "kube_horizontalpodautoscaler_status_current_replicas{horizontalpodautoscaler=\"authproxy-api\"}", "legendFormat": "current", "refId": "A" },
+        { "expr": "kube_horizontalpodautoscaler_status_desired_replicas{horizontalpodautoscaler=\"authproxy-api\"}", "legendFormat": "desired", "refId": "B" },
+        { "expr": "kube_deployment_status_replicas_available{deployment=\"authproxy-api\"}", "legendFormat": "available", "refId": "C" }
+      ],
+      "title": "AuthProxy API replicas",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "loadtest-prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "id": 5,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{container!=\"\",pod=~\"authproxy-api-.*\"}[5m]))", "legendFormat": "{{pod}} CPU cores", "refId": "A" },
+        { "expr": "sum by (pod) (container_memory_working_set_bytes{container!=\"\",pod=~\"authproxy-api-.*\"})", "legendFormat": "{{pod}} memory", "refId": "B" }
+      ],
+      "title": "API pod resource pressure (cluster metrics when available)",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": [ "authproxy", "loadtest", "proxy" ],
+  "templating": { "list": [] },
+  "time": { "from": "now-30m", "to": "now" },
+  "timezone": "browser",
+  "title": "AuthProxy Load Test - Proxy and Autoscaling",
+  "uid": "authproxy-loadtest-proxy",
+  "version": 1
+}

@@ -26,6 +26,8 @@ spec:
             - /scripts/smoke.js
             - --summary-export
             - /artifacts/summary.json
+            - --out
+            - experimental-prometheus-rw
           env:
             - name: AUTHPROXY_PUBLIC_URL
               value: http://authproxy-public:8080
@@ -45,6 +47,8 @@ spec:
               value: "4"
             - name: K6_MAX_VUS
               value: "16"
+            - name: K6_PROMETHEUS_RW_SERVER_URL
+              value: http://prometheus-loadtest:9090/api/v1/write
           volumeMounts:
             - name: scripts
               mountPath: /scripts

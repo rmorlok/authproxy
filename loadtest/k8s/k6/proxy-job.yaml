@@ -26,6 +26,8 @@ spec:
             - /scripts/proxy.js
             - --summary-export
             - /artifacts/summary.json
+            - --out
+            - experimental-prometheus-rw
           env:
             - name: AUTHPROXY_BEARER_TOKEN
               valueFrom:
@@ -34,6 +36,8 @@ spec:
                   key: AUTHPROXY_BEARER_TOKEN
             - name: K6_CONNECTIONS_FILE
               value: /scripts/connections.csv
+            - name: K6_PROMETHEUS_RW_SERVER_URL
+              value: http://prometheus-loadtest:9090/api/v1/write
           envFrom:
             - configMapRef:
                 name: authproxy-loadtest-k6-env

@@ -1,0 +1,91 @@
+groups:
+  - name: authproxy-loadtest-proxy
+    rules:
+      - record: authproxy_loadtest:proxy_request_rate:5m
+        expr: sum(rate(authproxy_client_request_duration_seconds_count{authproxy_request_type="proxy"}[5m]))
+      - record: authproxy_loadtest:proxy_5xx_rate:5m
+        expr: |
+          sum(rate(authproxy_client_request_duration_seconds_count{authproxy_request_type="proxy",http_response_status_code=~"5.."}[5m]))
+          / clamp_min(sum(rate(authproxy_client_request_duration_seconds_count{authproxy_request_type="proxy"}[5m])), 1)
+      - record: authproxy_loadtest:proxy_p95_seconds:5m
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(authproxy_client_request_duration_seconds_bucket{authproxy_request_type="proxy"}[5m])))
+      - alert: AuthProxyLoadTestProxy5xxRateHigh
+        expr: |
+          sum(rate(authproxy_client_request_duration_seconds_count{authproxy_request_type="proxy",http_response_status_code=~"5.."}[5m]))
+          / clamp_min(sum(rate(authproxy_client_request_duration_seconds_count{authproxy_request_type="proxy"}[5m])), 1) > 0.001
+        for: 2m
+        labels:
+          severity: warning
+          component: proxy
+        annotations:
+          summary: AuthProxy proxy 5xx rate is above the 0.1% load-test gate.
+          runbook: Inspect the Proxy and Autoscaling dashboard and the k6 summary artifact.
+      - alert: AuthProxyLoadTestProxyP95High
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(authproxy_client_request_duration_seconds_bucket{authproxy_request_type="proxy"}[5m]))) > 1 # LOADTEST_PROXY_P95_SECONDS
+        for: 5m
+        labels:
+          severity: warning
+          component: proxy
+        annotations:
+          summary: AuthProxy outbound proxy p95 is above the selected profile target.
+          runbook: Compare the profile-specific p95 target with the Proxy and Autoscaling dashboard.
+  - name: authproxy-loadtest-background
+    rules:
+      - record: authproxy_loadtest:asynq_queue_size:max
+        expr: max(authproxy_asynq_queue_size)
+      - record: authproxy_loadtest:oauth_refresh_failure_rate:5m
+        expr: sum(rate(authproxy_oauth2_refresh_failures_total[5m]))
+      - alert: AuthProxyLoadTestQueueBacklog
+        expr: max(authproxy_asynq_queue_size) > 1000
+        for: 5m
+        labels:
+          severity: warning
+          component: worker
+        annotations:
+          summary: AuthProxy Asynq queue has remained above 1,000 tasks.
+          runbook: Inspect worker replicas, task duration, and queue samples before changing the threshold for a profile.
+      - alert: AuthProxyLoadTestRefreshFailures
+        expr: sum(rate(authproxy_oauth2_refresh_failures_total[5m])) > 0
+        for: 2m
+        labels:
+          severity: warning
+          component: oauth2
+        annotations:
+          summary: OAuth refresh failures are occurring during a load test.
+          runbook: Inspect failure reason labels and the upstream provider dashboard.
+  - name: authproxy-loadtest-datastores
+    rules:
+      - record: authproxy_loadtest:sql_p95_seconds:5m
+        expr: histogram_quantile(0.95, sum by (le) (rate(db_sql_latency_milliseconds_bucket[5m]))) / 1000
+      - record: authproxy_loadtest:redis_command_p95_seconds:5m
+        expr: histogram_quantile(0.95, sum by (le) (rate(db_client_connections_use_time_milliseconds_bucket{type="command"}[5m]))) / 1000
+      - alert: AuthProxyLoadTestDBPoolWait
+        expr: sum(rate(db_sql_connection_wait_total[5m])) > 0
+        for: 5m
+        labels:
+          severity: warning
+          component: postgres
+        annotations:
+          summary: AuthProxy SQL clients are waiting for database connections.
+          runbook: Inspect connection pressure, lock counts, and query plans in the run artifacts.
+      - alert: AuthProxyLoadTestRedisClientP95High
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(db_client_connections_use_time_milliseconds_bucket{type="command"}[5m]))) > 50
+        for: 5m
+        labels:
+          severity: warning
+          component: redis
+        annotations:
+          summary: Redis client p95 latency is above 50 milliseconds.
+          runbook: Inspect Redis memory, command rate, and worker queue depth.
+      - alert: AuthProxyLoadTestPodRestarted
+        expr: increase(kube_pod_container_status_restarts_total[15m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          component: kubernetes
+        annotations:
+          summary: A load-test workload container restarted in the last 15 minutes.
+          runbook: Inspect pod events and the datastore or provider dashboard for the affected pod.

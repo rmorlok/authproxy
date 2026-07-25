@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-exporter
+  labels:
+    app.kubernetes.io/name: postgres-exporter
+    app.kubernetes.io/component: observability
+    loadtest.authproxy.io/component: dependency
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgres-exporter
+      app.kubernetes.io/component: observability
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgres-exporter
+        app.kubernetes.io/component: observability
+        loadtest.authproxy.io/component: dependency
+    spec:
+      containers:
+        - name: postgres-exporter
+          image: quay.io/prometheuscommunity/postgres-exporter:v0.15.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: authproxy-load-db
+                  key: AUTHPROXY_DB_PASSWORD
+            - name: DATA_SOURCE_NAME
+              value: postgresql://authproxy:$(POSTGRES_PASSWORD)@postgresql:5432/authproxy?sslmode=disable
+          ports:
+            - name: metrics
+              containerPort: 9187
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: metrics
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-exporter
+  labels:
+    app.kubernetes.io/name: postgres-exporter
+    app.kubernetes.io/component: observability
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: postgres-exporter
+    app.kubernetes.io/component: observability
+  ports:
+    - name: metrics
+      port: 9187
+      targetPort: metrics

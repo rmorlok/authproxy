@@ -27,6 +27,11 @@ kubectl -n "$namespace" delete jobs -l app.kubernetes.io/name=k6 --ignore-not-fo
 kubectl -n "$namespace" delete configmaps -l app.kubernetes.io/name=k6 --ignore-not-found=true >/dev/null 2>&1 || true
 kubectl -n "$namespace" delete configmap authproxy-loadtest-k6 authproxy-loadtest-k6-env --ignore-not-found=true >/dev/null 2>&1 || true
 kubectl -n "$namespace" delete secret authproxy-loadtest-k6-auth --ignore-not-found=true >/dev/null 2>&1 || true
+kubectl -n "$namespace" delete configmap \
+  authproxy-loadtest-grafana-provisioning \
+  authproxy-loadtest-grafana-dashboards \
+  authproxy-loadtest-prometheus-rules \
+  --ignore-not-found=true >/dev/null 2>&1 || true
 kubectl -n "$namespace" delete testruns.k6.io -l app.kubernetes.io/name=k6 --ignore-not-found=true >/dev/null 2>&1 || true
 kubectl -n "$namespace" delete testrun authproxy-smoke authproxy-proxy --ignore-not-found=true >/dev/null 2>&1 || true
 

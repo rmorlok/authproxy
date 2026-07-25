@@ -12,6 +12,7 @@ cleanup pressure runs against the same seeded profiles.
 - `kubectl` pointed at the target cluster.
 - `helm` for installing AuthProxy from the local chart.
 - `openssl` for disposable JWT, actor, and AES keys.
+- `curl` for Prometheus snapshots during `collect`.
 - Metrics Server in the cluster when validating HPA behavior.
 - k6 Operator installed when using `LOADTEST_K6_MODE=operator`; the default
   smoke path runs k6 as a plain Kubernetes Job.
@@ -49,7 +50,8 @@ capacity.
 # points at the same Postgres/Redis/app-metrics stores as running workers.
 LOADTEST_AUTHPROXY_CONFIG=/path/to/loadtest-authproxy.yaml ./loadtest/scripts/background 100k all
 
-# Capture pods, deployments, services, Helm values, logs, and k6 summary JSON.
+# Capture Kubernetes/HPA state, image digests, Prometheus alert/query snapshots,
+# Postgres EXPLAIN plans, logs, and k6 summary JSON.
 ./loadtest/scripts/collect smoke
 
 # Remove Helm releases and load-test manifests. The namespace is kept by default.
@@ -183,6 +185,10 @@ https://grafana.com/docs/k6/latest/set-up/set-up-distributed-k6/usage/executing-
 - `LOADTEST_INSTALL_K6_OPERATOR=true`: install or upgrade the k6 Operator with
   Helm during `up`.
 - `LOADTEST_INSTALL_KEDA=true`: install or upgrade KEDA with Helm during `up`.
+- `LOADTEST_PROMETHEUS_URL`: use an externally reachable Prometheus URL instead
+  of a temporary port-forward during collection.
+- `LOADTEST_PROMETHEUS_PORT`: local port for that temporary port-forward;
+  defaults to `19090`.
 
 ## What `up` Deploys
 
@@ -193,6 +199,13 @@ The smoke environment installs:
 - ClickHouse as a placeholder app-metrics backend for future pressure tests.
 - Grafana's `otel-lgtm` image for local OTel, Prometheus, Grafana, Tempo, and
   Loki endpoints.
+- A dedicated Prometheus instance that federates the OTel-LGTM metrics,
+  receives k6 remote-write metrics, evaluates the load-test alert and recording
+  rules, and serves the provisioned Grafana dashboards.
+- Namespace-scoped kube-state-metrics plus Postgres and Redis exporters. These
+  expose the HPA/deployment state, pod restarts, database connection/lock
+  pressure, and Redis memory/command pressure that application metrics alone
+  cannot show.
 - `go-oauth2-server` in test mode.
 - Four separate AuthProxy Helm releases:
   - `authproxy-admin-api`
@@ -215,6 +228,21 @@ Each script writes or appends to a run directory containing:
 - `helm/`: `helm list`, rendered values, and manifest snapshots.
 - `k6/`: k6 logs, generated TestRun manifests, environment snapshots, summary
   JSON when available, and `scale-results.tsv` for Job-backed replica sweeps.
+- `observability/`: the exact Grafana dashboards, datasource definition, and
+  alerting configuration provisioned for the run.
+- `prometheus/`: targets, active alerts, loaded rules, metric-name inventory,
+  and responses to the standard proxy, k6, worker, HPA, Postgres, and Redis
+  queries. k6 sends live metrics through its Prometheus remote-write output in
+  addition to preserving its JSON summary.
+- `db-explain/`: `EXPLAIN (ANALYZE, BUFFERS)` output for the OAuth refresh
+  token walk, periodic scheduler connection walk, and stale-setup cleanup
+  walk, their exact source SQL, and a Postgres activity/lock/size snapshot.
+  Collection leaves an error artifact when the target database has not been
+  migrated rather than hiding the missing measurement.
+- `kubernetes/hpa-timeline.tsv`: HPA desired/current replica samples from
+  environment setup, traffic-run start/end, and explicit collection. The same
+  directory contains `image-shas.tsv`, pod resource usage, pod/deployment
+  YAML, events, and rollout state.
 
 The `seed` step also writes:
 
@@ -241,6 +269,28 @@ and:
 
 These artifacts are the handoff point for follow-up optimization work such as DB
 indexes, keyset pagination, request-event buffering, or worker tuning.
+
+## Monitoring and Gates
+
+Grafana provisions four dashboards under **AuthProxy Load Test**:
+
+- **Proxy and Autoscaling**: upstream and inbound RPS, 5xx rate, proxy latency,
+  k6 achieved rate, and API HPA/deployment state.
+- **Background Jobs**: queue depth, task duration/completion rate, OAuth refresh
+  results, and worker scaling.
+- **Upstream Provider**: go-oauth2-server request rate, latency, 5xx rate, and
+  restarts, so provider saturation is not mistaken for proxy capacity.
+- **Datastores**: SQL pool pressure, Postgres connections/locks/writes, Redis
+  memory and command rate, and instrumented client latency.
+
+The Prometheus rules record the proxy request rate, 5xx rate, p95 duration,
+queue depth, refresh-failure rate, and datastore p95. Alerts flag the initial
+proxy 0.1% 5xx gate, the selected profile's proxy p95, sustained queue depth
+above 1,000, refresh failures, SQL pool waits, Redis command p95 above 50ms,
+and container restarts. The rendered rule file is saved with the run artifacts.
+The k6 profile's own failure thresholds remain the source of truth for a
+profile-specific acceptance decision; adjust them in the profile or with the
+documented `K6_*` overrides.
 
 ## Optional k6 Operator Mode
 
