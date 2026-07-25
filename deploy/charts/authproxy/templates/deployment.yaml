@@ -59,7 +59,7 @@ spec:
               protocol: TCP
             {{- end }}
           {{- end }}
-          {{- if or .Values.database.existingSecret .Values.redis.existingSecret .Values.s3.existingSecret }}
+          {{- if or .Values.database.existingSecret .Values.redis.existingSecret .Values.appMetrics.existingSecret .Values.s3.existingSecret }}
           envFrom:
             {{- /*
               `tpl` re-renders the value as a template using the root
@@ -72,6 +72,10 @@ spec:
                 name: {{ tpl . $ }}
             {{- end }}
             {{- with .Values.redis.existingSecret }}
+            - secretRef:
+                name: {{ tpl . $ }}
+            {{- end }}
+            {{- with .Values.appMetrics.existingSecret }}
             - secretRef:
                 name: {{ tpl . $ }}
             {{- end }}

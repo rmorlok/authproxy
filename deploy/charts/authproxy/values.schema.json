@@ -273,6 +273,7 @@
         "shareMainDatabase":    { "type": "boolean" },
         "autoMigrate":          { "type": "boolean" },
         "database":             { "type": "object" },
+        "existingSecret":       { "type": "string" },
         "fullRequestRecording": { "type": "string", "enum": ["never", "always"] }
       }
     },

@@ -290,6 +290,11 @@ appMetrics:
   # `shareMainDatabase` is false. Same field shape as the top-level
   # `database` block (provider, host, port, etc.).
   database: {}
+  # -- Secret whose values are exposed to the AuthProxy container for a
+  # dedicated app-metrics database. The rendered app-metrics config can
+  # reference a value with `{ env_var: NAME }` without storing credentials in
+  # the ConfigMap.
+  existingSecret: ""
   # -- Full request/response recording mode (`never` or `always`).
   # Lives under `request_events` in the rendered server config.
   fullRequestRecording: never
