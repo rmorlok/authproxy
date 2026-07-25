@@ -119,11 +119,12 @@ func TestSeedWritesArtifactsAndIsConnectionIdempotent(t *testing.T) {
 	assert.Equal(t, "http://go-oauth2-server", first.ProviderBaseURL)
 
 	second, err := Seed(context.Background(), Options{
-		Profile:       profile,
-		DB:            db,
-		Encrypt:       enc,
-		VerifySamples: 2,
-		Now:           time.Date(2026, 7, 13, 12, 30, 0, 0, time.UTC),
+		Profile:             profile,
+		DB:                  db,
+		Encrypt:             enc,
+		SkipNamespaceEnsure: true,
+		VerifySamples:       2,
+		Now:                 time.Date(2026, 7, 13, 12, 30, 0, 0, time.UTC),
 	})
 	require.NoError(t, err)
 	assert.Equal(t, 0, second.CreatedConnections)
