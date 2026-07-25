@@ -22,10 +22,37 @@ import MoreVertIcon from '@mui/icons-material/MoreVert';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import dayjs from 'dayjs';
 import Tooltip from '@mui/material/Tooltip';
-import {Connection, connections, ConnectionState, ConnectionHealthState, canBeDisconnected} from '@authproxy/api';
+import {
+  Connection,
+  connections,
+  ConnectionState,
+  ConnectionHealthState,
+  ConnectorVersion,
+  ConnectorVersionState,
+  connectors,
+  PollForTaskResult,
+  TaskInfoJson,
+  tasks,
+  TaskState,
+  canBeDisconnected,
+} from '@authproxy/api';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import { Link } from "react-router-dom";
 import AnnotationsEditor from "./AnnotationsEditor";
+
+const CONNECTION_MIGRATION_TIMEOUT_SECONDS = 600;
+
+type MigrationAction = 'migrate' | 'rollback';
+
+interface MigrationStatus {
+  action: MigrationAction;
+  state: 'starting' | 'polling' | 'completed' | 'failed';
+  targetVersion: number;
+  taskId?: string;
+  task?: TaskInfoJson;
+  message?: string;
+}
 
 function StateChip({state}: { state: ConnectionState }) {
   const colors: Record<ConnectionState, "default" | "success" | "error" | "info" | "warning" | "primary" | "secondary"> = {
@@ -67,6 +94,12 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
   const [selectedState, setSelectedState] = useState<ConnectionState | ''>('');
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [migrationOpen, setMigrationOpen] = useState(false);
+  const [migrationVersions, setMigrationVersions] = useState<ConnectorVersion[]>([]);
+  const [migrationVersionsLoading, setMigrationVersionsLoading] = useState(false);
+  const [migrationVersionsError, setMigrationVersionsError] = useState<string | null>(null);
+  const [selectedMigrationVersion, setSelectedMigrationVersion] = useState<number | ''>('');
+  const [migrationStatus, setMigrationStatus] = useState<MigrationStatus | null>(null);
 
   // Copy-to-clipboard UI state for connection ID
   const [copied, setCopied] = useState(false);
@@ -81,6 +114,20 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
   };
 
   const stateOptions = useMemo(() => Object.values(ConnectionState), []);
+  const eligibleMigrationVersions = useMemo(() => {
+    if (!conn) {
+      return [];
+    }
+    return migrationVersions.filter((version) =>
+      version.version !== conn.connector.version &&
+      (version.state === ConnectorVersionState.PRIMARY || version.state === ConnectorVersionState.ACTIVE),
+    );
+  }, [conn, migrationVersions]);
+  const selectedMigrationTarget = useMemo(
+    () => eligibleMigrationVersions.find((version) => version.version === selectedMigrationVersion),
+    [eligibleMigrationVersions, selectedMigrationVersion],
+  );
+  const migrationInProgress = migrationStatus?.state === 'starting' || migrationStatus?.state === 'polling';
 
   const fetchConnection = () => {
     setLoading(true);
@@ -168,6 +215,111 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
     }
   };
 
+  const onClickMigration = async () => {
+    if (!conn) return;
+
+    setActionError(null);
+    setMigrationStatus(null);
+    setMigrationVersions([]);
+    setMigrationVersionsError(null);
+    setSelectedMigrationVersion('');
+    closeMenu();
+    setMigrationOpen(true);
+    setMigrationVersionsLoading(true);
+
+    try {
+      const response = await connectors.listVersions(conn.connector.id, {
+        limit: 100,
+        order_by: 'version desc',
+      });
+      const eligible = response.data.items.filter((version) =>
+        version.version !== conn.connector.version &&
+        (version.state === ConnectorVersionState.PRIMARY || version.state === ConnectorVersionState.ACTIVE),
+      );
+      setMigrationVersions(response.data.items);
+      setSelectedMigrationVersion(
+        eligible.find((version) => version.state === ConnectorVersionState.PRIMARY)?.version ??
+        eligible[0]?.version ??
+        '',
+      );
+    } catch (err: any) {
+      setMigrationVersionsError(err?.response?.data?.error || err.message || 'Failed to load connector versions');
+    } finally {
+      setMigrationVersionsLoading(false);
+    }
+  };
+
+  const onConfirmMigration = async () => {
+    if (!conn || !selectedMigrationTarget) return;
+
+    const action: MigrationAction = selectedMigrationTarget.version < conn.connector.version ? 'rollback' : 'migrate';
+    setActionError(null);
+    setActionLoading(true);
+    setMigrationOpen(false);
+    setMigrationStatus({
+      action,
+      state: 'starting',
+      targetVersion: selectedMigrationTarget.version,
+    });
+
+    try {
+      const response = await connections.migrateVersion(conn.id, {
+        target_version: selectedMigrationTarget.version,
+        timeout_seconds: CONNECTION_MIGRATION_TIMEOUT_SECONDS,
+      });
+      setMigrationStatus({
+        action,
+        state: 'polling',
+        targetVersion: selectedMigrationTarget.version,
+        taskId: response.data.task_id,
+      });
+
+      const result = await tasks.pollForTaskFinalized(response.data.task_id, {
+        initialDelay: 1000,
+        maxDelay: 5000,
+        maxAttempts: 140,
+        backoffFactor: 1.4,
+      });
+      if (result.result !== PollForTaskResult.FINALIZED || result.taskInfo?.state !== TaskState.COMPLETED) {
+        setMigrationStatus({
+          action,
+          state: 'failed',
+          targetVersion: selectedMigrationTarget.version,
+          taskId: response.data.task_id,
+          task: result.taskInfo,
+          message: result.taskInfo?.state === TaskState.FAILED
+            ? 'Migration workflow failed before completing.'
+            : 'Task polling ended before the migration completed.',
+        });
+        fetchConnection();
+        return;
+      }
+
+      setMigrationStatus({
+        action,
+        state: 'completed',
+        targetVersion: selectedMigrationTarget.version,
+        taskId: response.data.task_id,
+        task: result.taskInfo,
+      });
+      fetchConnection();
+    } catch (err: any) {
+      setMigrationStatus({
+        action,
+        state: 'failed',
+        targetVersion: selectedMigrationTarget.version,
+        message: err?.response?.data?.error || err.message || 'Failed to start connection migration.',
+      });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const migrationActionLabel = migrationStatus?.action === 'rollback' ? 'Rollback' : 'Migration';
+  const selectedMigrationActionLabel = selectedMigrationTarget && selectedMigrationTarget.version < conn.connector.version
+    ? 'Rollback'
+    : 'Migrate';
+
   return (
     <Stack spacing={2} sx={{p: 2}}>
       <Stack direction="row" justifyContent="space-between" alignItems="center">
@@ -179,14 +331,49 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
             <MoreVertIcon/>
           </IconButton>
           <Menu anchorEl={menuAnchorEl} open={Boolean(menuAnchorEl)} onClose={closeMenu}>
-            <MenuItem onClick={onClickDisconnect} disabled={!canBeDisconnected(conn)}>Disconnect</MenuItem>
+            <MenuItem onClick={onClickDisconnect} disabled={!canBeDisconnected(conn) || actionLoading || migrationInProgress}>Disconnect</MenuItem>
+            <MenuItem onClick={onClickMigration} disabled={actionLoading || migrationInProgress}>Change version…</MenuItem>
             <Divider/>
-            <MenuItem onClick={onClickForceState}>Force state…</MenuItem>
+            <MenuItem onClick={onClickForceState} disabled={actionLoading || migrationInProgress}>Force state…</MenuItem>
           </Menu>
         </Stack>
       </Stack>
 
       {actionError && <Alert severity="error">{actionError}</Alert>}
+
+      {migrationStatus && (
+        <Alert
+          severity={
+            migrationStatus.state === 'completed'
+              ? 'success'
+              : migrationStatus.state === 'failed'
+                ? 'error'
+                : 'info'
+          }
+        >
+          {migrationStatus.state === 'starting' && `${migrationActionLabel} to v${migrationStatus.targetVersion} is starting...`}
+          {migrationStatus.state === 'polling' && `${migrationActionLabel} to v${migrationStatus.targetVersion} is running.`}
+          {migrationStatus.state === 'completed' && `${migrationActionLabel} to v${migrationStatus.targetVersion} completed.`}
+          {migrationStatus.state === 'failed' && (migrationStatus.message || `${migrationActionLabel} failed.`)}
+          {migrationStatus.taskId && (
+            <Typography component="div" variant="caption" sx={{mt: 0.5, wordBreak: 'break-all'}}>
+              Task: {migrationStatus.taskId}
+              {migrationStatus.task?.state ? ` (${migrationStatus.task.state})` : ''}
+            </Typography>
+          )}
+        </Alert>
+      )}
+
+      {conn.health_state === ConnectionHealthState.UNHEALTHY && (
+        <Alert severity="warning">
+          This connection requires re-authentication before it can be used.
+        </Alert>
+      )}
+      {conn.health_state !== ConnectionHealthState.UNHEALTHY && conn.setup_step_id && (
+        <Alert severity="warning">
+          This connection requires setup at {conn.setup_step_id} before it can be used.
+        </Alert>
+      )}
 
       <Box>
         <Typography variant="subtitle2" color="text.secondary">Connection ID</Typography>
@@ -323,6 +510,67 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
         <DialogActions>
           <Button onClick={() => setForceStateOpen(false)} disabled={actionLoading}>Cancel</Button>
           <Button onClick={onSubmitForceState} variant="contained" disabled={!selectedState || actionLoading}>Apply</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={migrationOpen} onClose={() => !actionLoading && setMigrationOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Change connection version</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            Move this connection from v{conn.connector.version} to an eligible version of the same connector.
+          </Typography>
+          {migrationVersionsError && <Alert severity="error" sx={{mt: 2}}>{migrationVersionsError}</Alert>}
+          {migrationVersionsLoading && (
+            <Box sx={{display: 'flex', justifyContent: 'center', py: 3}}>
+              <CircularProgress size={24}/>
+            </Box>
+          )}
+          {!migrationVersionsLoading && !migrationVersionsError && (
+            <FormControl fullWidth sx={{mt: 2}}>
+              <InputLabel id="target-version-label" htmlFor="target-version">Target version</InputLabel>
+              <Select
+                native
+                inputProps={{
+                  id: 'target-version',
+                  'aria-labelledby': 'target-version-label',
+                }}
+                labelId="target-version-label"
+                label="Target version"
+                value={selectedMigrationVersion}
+                onChange={(event) => {
+                  const value = String(event.target.value);
+                  setSelectedMigrationVersion(value === '' ? '' : Number(value));
+                }}
+              >
+                <option aria-label="None" value="" />
+                {eligibleMigrationVersions.map((version) => (
+                  <option key={version.version} value={version.version}>
+                    v{version.version} ({version.state})
+                  </option>
+                ))}
+              </Select>
+              {eligibleMigrationVersions.length === 0 ? (
+                <FormHelperText>No other active or primary versions are available.</FormHelperText>
+              ) : (
+                <FormHelperText>
+                  {selectedMigrationActionLabel === 'Rollback'
+                    ? 'An earlier target version rolls this connection back.'
+                    : 'The migration can require setup or re-authentication after it completes.'}
+                </FormHelperText>
+              )}
+            </FormControl>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setMigrationOpen(false)} disabled={actionLoading}>Cancel</Button>
+          <Button
+            variant="contained"
+            startIcon={actionLoading ? <CircularProgress size={16}/> : <SwapHorizIcon/>}
+            disabled={!selectedMigrationTarget || migrationVersionsLoading || actionLoading}
+            onClick={() => void onConfirmMigration()}
+          >
+            {selectedMigrationTarget ? `${selectedMigrationActionLabel} to v${selectedMigrationTarget.version}` : 'Change version'}
+          </Button>
         </DialogActions>
       </Dialog>
     </Stack>
