@@ -51,7 +51,11 @@ type Telemetry struct {
 // providers being nil or in no-op mode, or both signals being off, produces
 // a Telemetry whose methods are inert — callers don't need to gate on this
 // themselves.
-func NewTelemetry(providers *aptelemetry.Providers, cfg *sconfig.Telemetry, inspector Inspector) (*Telemetry, error) {
+func NewTelemetry(
+	providers *aptelemetry.Providers,
+	cfg *sconfig.Telemetry,
+	inspector Inspector,
+) (*Telemetry, error) {
 	t := &Telemetry{inspector: inspector}
 
 	if providers == nil || !providers.Enabled {
