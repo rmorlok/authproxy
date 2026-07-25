@@ -79,6 +79,7 @@ export default defineConfig({
           label: 'Operate',
           items: [
             'operations',
+            'operations/load-testing',
             'operations/telemetry',
             'operations/app-metrics',
             'operations/rate-limits',

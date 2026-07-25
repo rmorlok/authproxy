@@ -7,6 +7,9 @@ traffic, state seeding, proxy-QPS scenarios, and artifact capture. The
 background-job suite adds repeatable refresh, scheduler, resource snapshot, and
 cleanup pressure runs against the same seeded profiles.
 
+For profile selection, the end-to-end runbook, acceptance gates, and failure
+diagnosis, see [Load testing](https://docs.authproxy.net/operations/load-testing/).
+
 ## Prerequisites
 
 - `kubectl` pointed at the target cluster.
