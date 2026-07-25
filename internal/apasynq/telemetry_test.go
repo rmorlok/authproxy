@@ -7,6 +7,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/hibiken/asynq"
+	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
@@ -61,8 +62,6 @@ func (f *asynqTelemetryFixture) readMetrics(t *testing.T) metricdata.ResourceMet
 	return rm
 }
 
-func enabledPtr(b bool) *bool { return &b }
-
 // runHandlerThroughMiddleware executes a handler (success or failure) through
 // the telemetry middleware to produce span + metric output. No real asynq
 // server / queue is involved — the middleware sees only the *asynq.Task and
@@ -75,7 +74,7 @@ func runHandlerThroughMiddleware(t *testing.T, tel *Telemetry, handler asynq.Han
 
 func TestAsynqTelemetry_HandlerEmitsSpanAndMetric(t *testing.T) {
 	fx := newAsynqTelemetryFixture(t)
-	tel, err := NewTelemetry(fx.providers, &sconfig.Telemetry{Enabled: enabledPtr(true)}, nil)
+	tel, err := NewTelemetry(fx.providers, &sconfig.Telemetry{Enabled: util.ToPtr(true)}, nil)
 	require.NoError(t, err)
 
 	require.NoError(t, runHandlerThroughMiddleware(t, tel, func(_ context.Context, _ *asynq.Task) error {
@@ -95,7 +94,7 @@ func TestAsynqTelemetry_HandlerEmitsSpanAndMetric(t *testing.T) {
 
 func TestAsynqTelemetry_HandlerErrorMarksSpanErrored(t *testing.T) {
 	fx := newAsynqTelemetryFixture(t)
-	tel, err := NewTelemetry(fx.providers, &sconfig.Telemetry{Enabled: enabledPtr(true)}, nil)
+	tel, err := NewTelemetry(fx.providers, &sconfig.Telemetry{Enabled: util.ToPtr(true)}, nil)
 	require.NoError(t, err)
 
 	wantErr := errors.New("handler blew up")
@@ -114,7 +113,7 @@ func TestAsynqTelemetry_HandlerErrorMarksSpanErrored(t *testing.T) {
 
 func TestAsynqTelemetry_NoOpWhenProvidersDisabled(t *testing.T) {
 	fx := newAsynqTelemetryFixture(t)
-	tel, err := NewTelemetry(aptelemetry.NoopProviders(), &sconfig.Telemetry{Enabled: enabledPtr(true)}, nil)
+	tel, err := NewTelemetry(aptelemetry.NoopProviders(), &sconfig.Telemetry{Enabled: util.ToPtr(true)}, nil)
 	require.NoError(t, err)
 
 	require.NoError(t, runHandlerThroughMiddleware(t, tel, func(_ context.Context, _ *asynq.Task) error {
@@ -167,7 +166,7 @@ func TestAsynqTelemetry_NilTelemetryIsSafe(t *testing.T) {
 
 func TestAsynqTelemetry_SchedulerSyncSpan(t *testing.T) {
 	fx := newAsynqTelemetryFixture(t)
-	tel, err := NewTelemetry(fx.providers, &sconfig.Telemetry{Enabled: enabledPtr(true)}, nil)
+	tel, err := NewTelemetry(fx.providers, &sconfig.Telemetry{Enabled: util.ToPtr(true)}, nil)
 	require.NoError(t, err)
 
 	configs, err := tel.WithSchedulerSyncSpan(context.Background(), func() ([]*asynq.PeriodicTaskConfig, error) {
@@ -186,7 +185,7 @@ func TestAsynqTelemetry_SchedulerSyncSpan(t *testing.T) {
 
 func TestAsynqTelemetry_SchedulerSyncErrorMarksSpan(t *testing.T) {
 	fx := newAsynqTelemetryFixture(t)
-	tel, err := NewTelemetry(fx.providers, &sconfig.Telemetry{Enabled: enabledPtr(true)}, nil)
+	tel, err := NewTelemetry(fx.providers, &sconfig.Telemetry{Enabled: util.ToPtr(true)}, nil)
 	require.NoError(t, err)
 
 	wantErr := errors.New("registrar fetch failed")
@@ -209,7 +208,7 @@ func TestAsynqTelemetry_QueueDepthGaugeReportsPendingTasks(t *testing.T) {
 		Return(&asynq.QueueInfo{Queue: "default", Size: 20_000, Pending: 0}, nil).
 		AnyTimes()
 
-	tel, err := NewTelemetry(fx.providers, &sconfig.Telemetry{Enabled: enabledPtr(true)}, inspector)
+	tel, err := NewTelemetry(fx.providers, &sconfig.Telemetry{Enabled: util.ToPtr(true)}, inspector)
 	require.NoError(t, err)
 
 	stop, err := tel.StartQueueDepthGauge([]string{"default"})
