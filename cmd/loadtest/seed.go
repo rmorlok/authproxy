@@ -19,6 +19,7 @@ func cmdSeed() *cobra.Command {
 	var distributedMigrationLocks bool
 	var verifySamples int
 	var progressEvery int
+	var skipNamespaceEnsure bool
 	var oauthExpiringPercent int
 	var periodicProbePercent int
 	var staleSetupConnections int
@@ -88,6 +89,7 @@ func cmdSeed() *cobra.Command {
 				Encrypt:                 enc,
 				ProviderBaseURL:         providerBaseURL,
 				ProviderClientBootstrap: true,
+				SkipNamespaceEnsure:     skipNamespaceEnsure,
 				OAuthExpiringPercent:    oauthOverride,
 				PeriodicProbePercent:    probeOverride,
 				StaleSetupConnections:   staleSetupOverride,
@@ -128,6 +130,7 @@ func cmdSeed() *cobra.Command {
 	cmd.Flags().BoolVar(&distributedMigrationLocks, "distributed-migration-locks", false, "use Redis-backed distributed migration locks")
 	cmd.Flags().IntVar(&verifySamples, "verify-samples", 3, "number of seeded connections to verify through AuthProxy internals")
 	cmd.Flags().IntVar(&progressEvery, "progress-every", 1000, "log progress every N connections")
+	cmd.Flags().BoolVar(&skipNamespaceEnsure, "skip-namespace-ensure", false, "reuse the profile namespace tree from a prior checkpointed seed")
 	cmd.Flags().IntVar(&oauthExpiringPercent, "oauth-expiring-percent", 0, "override percent of tokens expiring inside the refresh window")
 	cmd.Flags().IntVar(&periodicProbePercent, "periodic-probe-percent", 0, "override percent of connections marked for periodic probes")
 	cmd.Flags().IntVar(&staleSetupConnections, "stale-setup-connections", 0, "override number of setup-state connections to seed for stale cleanup runs")

@@ -30,6 +30,7 @@ type Options struct {
 	ProviderBaseURL         string
 	ProviderClientBootstrap bool
 	ProviderHTTPClient      HTTPClient
+	SkipNamespaceEnsure     bool
 	OAuthExpiringPercent    *int
 	PeriodicProbePercent    *int
 	StaleSetupConnections   *int
@@ -170,16 +171,22 @@ func Seed(ctx context.Context, opts Options) (*Result, error) {
 		logf = func(string, ...any) {}
 	}
 
-	logf("ensuring namespace tree under %s", baseNamespace)
-	if err := opts.DB.EnsureNamespaceByPath(ctx, baseNamespace); err != nil {
-		return nil, fmt.Errorf("ensure base namespace: %w", err)
+	if opts.SkipNamespaceEnsure {
+		logf("reusing namespace tree under %s", baseNamespace)
+	} else {
+		logf("ensuring namespace tree under %s", baseNamespace)
+		if err := opts.DB.EnsureNamespaceByPath(ctx, baseNamespace); err != nil {
+			return nil, fmt.Errorf("ensure base namespace: %w", err)
+		}
 	}
 
 	tenantNamespaces := make([]string, 0, tenantCount)
 	for i := 1; i <= tenantCount; i++ {
 		ns := fmt.Sprintf("%s.tenant%06d", baseNamespace, i)
-		if err := opts.DB.EnsureNamespaceByPath(ctx, ns); err != nil {
-			return nil, fmt.Errorf("ensure tenant namespace %s: %w", ns, err)
+		if !opts.SkipNamespaceEnsure {
+			if err := opts.DB.EnsureNamespaceByPath(ctx, ns); err != nil {
+				return nil, fmt.Errorf("ensure tenant namespace %s: %w", ns, err)
+			}
 		}
 		tenantNamespaces = append(tenantNamespaces, ns)
 		result.Namespaces = append(result.Namespaces, NamespaceRecord{Namespace: ns})
