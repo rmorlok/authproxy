@@ -68,19 +68,21 @@ jobs:
           helm repo add jetstack       https://charts.jetstack.io
           helm repo add external-dns   https://kubernetes-sigs.github.io/external-dns/
           helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
+          helm repo add kedacore       https://kedacore.github.io/charts
           helm repo update
 
       - name: ct lint
         if: steps.changed.outputs.found == 'true'
         run: ct lint --config .github/ct.yaml --target-branch main
 
-      - name: Verify AuthProxy autoscaling render
+      - name: Verify AuthProxy autoscaling renders
         if: steps.changed.outputs.found == 'true'
         run: |
           set -euo pipefail
 
           disabled_manifest="$(mktemp)"
-          enabled_manifest="$(mktemp)"
+          native_hpa_manifest="$(mktemp)"
+          keda_manifest="$(mktemp)"
 
           helm template authproxy deploy/charts/authproxy \
             -f deploy/charts/authproxy/ci/sqlite-redis-values.yaml \
@@ -92,18 +94,40 @@ jobs:
 
           helm template authproxy deploy/charts/authproxy \
             -f deploy/charts/authproxy/ci/sqlite-redis-values.yaml \
-            -f deploy/charts/authproxy/ci/autoscaling-render.yaml \
-            >"${enabled_manifest}"
-          grep -q "apiVersion: autoscaling/v2" "${enabled_manifest}"
-          grep -q "kind: HorizontalPodAutoscaler" "${enabled_manifest}"
-          grep -q "name: authproxy_asynq_queue_size" "${enabled_manifest}"
+            --set keda.enabled=false \
+            --set autoscaling.enabled=true \
+            --set autoscaling.minReplicas=2 \
+            --set autoscaling.maxReplicas=8 \
+            >"${native_hpa_manifest}"
+          grep -q "apiVersion: autoscaling/v2" "${native_hpa_manifest}"
+          grep -q "kind: HorizontalPodAutoscaler" "${native_hpa_manifest}"
 
-          awk '
-            /^kind: Deployment$/ { in_deployment=1; next }
-            /^---$/ { in_deployment=0 }
-            in_deployment && /^[[:space:]]+replicas:/ { found=1 }
-            END { exit found ? 1 : 0 }
-          ' "${enabled_manifest}"
+          helm template authproxy deploy/charts/authproxy \
+            -f deploy/charts/authproxy/ci/sqlite-redis-values.yaml \
+            -f deploy/charts/authproxy/ci/autoscaling-render.yaml \
+            >"${keda_manifest}"
+          grep -q "apiVersion: keda.sh/v1alpha1" "${keda_manifest}"
+          grep -q "kind: ScaledObject" "${keda_manifest}"
+          grep -q "name: authproxy-queue" "${keda_manifest}"
+          grep -q 'serverAddress: "http://prometheus.monitoring.svc:9090"' "${keda_manifest}"
+          grep -q 'query: "max(authproxy_asynq_queue_size{messaging_destination_name=\\\"default\\\"})"' "${keda_manifest}"
+
+          if grep -q "kind: HorizontalPodAutoscaler" "${keda_manifest}"; then
+            echo "built-in HPA rendered together with a KEDA ScaledObject" >&2
+            exit 1
+          fi
+
+          for manifest in "${native_hpa_manifest}" "${keda_manifest}"; do
+            if awk '
+              /^kind: Deployment$/ { in_deployment=1; next }
+              /^---$/ { in_deployment=0 }
+              in_deployment && /^[[:space:]]+replicas:/ { found=1 }
+              END { exit found ? 0 : 1 }
+            ' "${manifest}"; then
+              echo "an autoscaled Deployment rendered a fixed replicas value" >&2
+              exit 1
+            fi
+          done
 
       - name: Verify Kustomize demo/dev renders
         run: |
@@ -164,6 +188,7 @@ jobs:
           helm repo add jetstack       https://charts.jetstack.io
           helm repo add external-dns   https://kubernetes-sigs.github.io/external-dns/
           helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
+          helm repo add kedacore       https://kedacore.github.io/charts
           helm repo update
 
       - name: Set up Docker Buildx
@@ -284,3 +309,9 @@ jobs:
             --target-branch main \
             --namespace authproxy-ct \
             --helm-extra-args "--timeout=5m"
+
+      - name: Verify bundled KEDA controller
+        if: steps.changed.outputs.found == 'true'
+        run: |
+          kubectl get crd scaledobjects.keda.sh
+          kubectl -n authproxy-ct rollout status deployment/keda-operator --timeout=5m

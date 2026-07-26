@@ -1,19 +1,25 @@
-# Render-only values used by helm-chart-ci to exercise autoscaling/v2 output.
+# Render-only values used by helm-chart-ci to exercise KEDA worker scaling.
 
 autoscaling:
+  enabled: false
+
+keda:
+  enabled: false
+
+queueAutoscaling:
   enabled: true
   minReplicas: 2
   maxReplicas: 8
-  targetCPUUtilizationPercentage: 70
-  targetMemoryUtilizationPercentage: 80
-  metrics:
-    - type: Pods
-      pods:
-        metric:
-          name: authproxy_asynq_queue_size
-        target:
-          type: AverageValue
-          averageValue: "100"
+  pollingInterval: 15
+  cooldownPeriod: 300
+  prometheus:
+    serverAddress: http://prometheus.monitoring.svc:9090
+    query: 'max(authproxy_asynq_queue_size{messaging_destination_name="default"})'
+    threshold: "100"
+    activationThreshold: "1"
+  cpu:
+    enabled: true
+    targetUtilizationPercentage: 70
   behavior:
     scaleUp:
       stabilizationWindowSeconds: 60

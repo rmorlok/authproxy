@@ -19,7 +19,9 @@ diagnosis, see [Load testing](https://docs.authproxy.net/operations/load-testing
 - Metrics Server in the cluster when validating HPA behavior.
 - k6 Operator installed when using `LOADTEST_K6_MODE=operator`; the default
   smoke path runs k6 as a plain Kubernetes Job.
-- KEDA installed only for future queue/custom-metric scaling profiles.
+- Permission to install cluster-scoped KEDA resources when the platform does
+  not already provide KEDA. `up` ensures the worker's queue and CPU scaler is
+  available either way.
 
 Local kind or minikube is suitable for the `smoke` profile. The `100k`, `250k`,
 and `500k` profiles are capacity targets for a real cluster with enough node
@@ -187,7 +189,6 @@ https://grafana.com/docs/k6/latest/set-up/set-up-distributed-k6/usage/executing-
   for `stale-setup-cleanup`.
 - `LOADTEST_INSTALL_K6_OPERATOR=true`: install or upgrade the k6 Operator with
   Helm during `up`.
-- `LOADTEST_INSTALL_KEDA=true`: install or upgrade KEDA with Helm during `up`.
 - `LOADTEST_PROMETHEUS_URL`: use an externally reachable Prometheus URL instead
   of a temporary port-forward during collection.
 - `LOADTEST_PROMETHEUS_PORT`: local port for that temporary port-forward;
@@ -214,8 +215,10 @@ The smoke environment installs:
   - `authproxy-admin-api`
   - `authproxy-api` with HPA enabled for CPU-based proxy scaling
   - `authproxy-public`
-  - `authproxy-worker` with CPU-based HPA; queue-depth scaling requires a
-    custom-metrics adapter or KEDA
+  - `authproxy-worker` with a KEDA-owned HPA combining CPU utilization and the
+    global pending-Asynq queue depth
+  - a cluster-level KEDA controller, installed once when the platform does not
+    already provide one
 
 The chart's current model is one Deployment per release. Installing separate
 releases lets later issues add independent autoscaling and per-service resource
@@ -317,14 +320,26 @@ waits for each distributed run to finish before moving to the next API replica
 count. The default Job mode is kept so smoke tests and smaller proxy checks work
 on clusters where the operator CRDs are not installed.
 
-## Optional KEDA
+## KEDA Worker Scaling
 
-KEDA is not needed for the smoke profile, but future worker queue and custom
-metric scaling tests can install it during environment setup:
+Every `up` run ensures that a cluster-level KEDA controller is available. The
+worker release uses a KEDA `ScaledObject` with both CPU utilization and the
+global pending-Asynq-queue Prometheus query. It deliberately uses
+`max(authproxy_asynq_queue_size{messaging_destination_name="default"})`:
+every worker observes the same Redis-global queue, so summing pod reports
+would overstate work.
+
+`up` reuses a controller the cluster platform already manages. Otherwise it
+installs the pinned KEDA chart in the `keda` namespace. Override that namespace
+or release name only when the cluster's KEDA policy requires it:
 
 ```bash
-LOADTEST_INSTALL_KEDA=true ./loadtest/scripts/up smoke
+LOADTEST_KEDA_NAMESPACE=keda LOADTEST_KEDA_RELEASE=authproxy-loadtest-keda \
+  ./loadtest/scripts/up smoke
 ```
+
+`down` removes only workload-local load-test resources. It intentionally leaves
+the cluster-level KEDA controller installed for subsequent runs.
 
 ## Cleanup
 

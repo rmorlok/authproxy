@@ -1,0 +1,50 @@
+{{- if .Values.queueAutoscaling.enabled -}}
+{{- if not .Values.services.worker.enabled -}}
+{{- fail "queueAutoscaling.enabled requires services.worker.enabled=true" -}}
+{{- end -}}
+{{- if .Values.autoscaling.enabled -}}
+{{- fail "queueAutoscaling.enabled requires autoscaling.enabled=false because KEDA owns the worker HPA" -}}
+{{- end -}}
+{{- if lt (int .Values.queueAutoscaling.maxReplicas) (int .Values.queueAutoscaling.minReplicas) -}}
+{{- fail "queueAutoscaling.maxReplicas must be greater than or equal to queueAutoscaling.minReplicas" -}}
+{{- end -}}
+{{- $serverAddress := required "queueAutoscaling.prometheus.serverAddress is required when queueAutoscaling.enabled=true" (tpl .Values.queueAutoscaling.prometheus.serverAddress .) -}}
+{{- $query := required "queueAutoscaling.prometheus.query is required when queueAutoscaling.enabled=true" (tpl .Values.queueAutoscaling.prometheus.query .) -}}
+{{- $scaledObjectName := printf "%s-queue" (include "authproxy.fullname" .) | trunc 54 | trimSuffix "-" -}}
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ $scaledObjectName }}
+  labels:
+    {{- include "authproxy.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "authproxy.fullname" . }}
+  pollingInterval: {{ .Values.queueAutoscaling.pollingInterval }}
+  cooldownPeriod: {{ .Values.queueAutoscaling.cooldownPeriod }}
+  minReplicaCount: {{ .Values.queueAutoscaling.minReplicas }}
+  maxReplicaCount: {{ .Values.queueAutoscaling.maxReplicas }}
+  advanced:
+    horizontalPodAutoscalerConfig:
+      name: keda-hpa-{{ $scaledObjectName }}
+      {{- with .Values.queueAutoscaling.behavior }}
+      behavior:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  triggers:
+    {{- if .Values.queueAutoscaling.cpu.enabled }}
+    - type: cpu
+      metricType: Utilization
+      metadata:
+        value: {{ .Values.queueAutoscaling.cpu.targetUtilizationPercentage | quote }}
+    {{- end }}
+    - type: prometheus
+      metricType: AverageValue
+      metadata:
+        serverAddress: {{ $serverAddress | quote }}
+        query: {{ $query | quote }}
+        threshold: {{ .Values.queueAutoscaling.prometheus.threshold | quote }}
+        activationThreshold: {{ .Values.queueAutoscaling.prometheus.activationThreshold | quote }}
+{{- end }}

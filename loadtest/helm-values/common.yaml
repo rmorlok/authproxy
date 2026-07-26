@@ -6,6 +6,11 @@ image:
 serviceAccount:
   create: true
 
+# `up` installs or reuses one cluster-level KEDA controller before these role
+# releases. Do not render a controller for each independently scaled release.
+keda:
+  enabled: false
+
 services:
   api:
     enabled: false

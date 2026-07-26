@@ -59,8 +59,8 @@
       "id": 5,
       "options": { "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
       "targets": [
-        { "expr": "kube_horizontalpodautoscaler_status_current_replicas{horizontalpodautoscaler=\"authproxy-worker\"}", "legendFormat": "worker current", "refId": "A" },
-        { "expr": "kube_horizontalpodautoscaler_status_desired_replicas{horizontalpodautoscaler=\"authproxy-worker\"}", "legendFormat": "worker desired", "refId": "B" },
+        { "expr": "kube_horizontalpodautoscaler_status_current_replicas{horizontalpodautoscaler=\"keda-hpa-authproxy-worker-queue\"}", "legendFormat": "worker current", "refId": "A" },
+        { "expr": "kube_horizontalpodautoscaler_status_desired_replicas{horizontalpodautoscaler=\"keda-hpa-authproxy-worker-queue\"}", "legendFormat": "worker desired", "refId": "B" },
         { "expr": "kube_deployment_status_replicas_available{deployment=\"authproxy-worker\"}", "legendFormat": "worker available", "refId": "C" }
       ],
       "title": "Worker autoscaling",

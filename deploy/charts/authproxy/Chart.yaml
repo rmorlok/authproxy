@@ -5,7 +5,7 @@ type: application
 
 # Chart version follows its own semver, independent of the application image
 # version below. Bumped on every chart change.
-version: 0.1.0
+version: 0.1.1
 
 # Application version this chart was last validated against. Pinned to a
 # specific image tag here; downstream values can override `image.tag`.
@@ -29,3 +29,12 @@ keywords:
 annotations:
   # category hint surfaced by some chart UIs (Artifact Hub, Rancher, etc.)
   category: Integration
+
+# KEDA owns the external-metric HPA used by the worker queue scaler. It is
+# bundled for the standard all-in-one release; independently deployed service
+# roles should enable it only for the one release that owns KEDA in the cluster.
+dependencies:
+  - name: keda
+    version: 2.20.1
+    repository: https://kedacore.github.io/charts
+    condition: keda.enabled

@@ -40,14 +40,14 @@ application version (`image.tag`).
 
 ```bash
 # Inspect available versions:
-helm show chart oci://ghcr.io/rmorlok/charts/authproxy --version 0.1.0
+helm show chart oci://ghcr.io/rmorlok/charts/authproxy --version 0.1.1
 
 # Pull a tarball locally:
-helm pull oci://ghcr.io/rmorlok/charts/authproxy --version 0.1.0
+helm pull oci://ghcr.io/rmorlok/charts/authproxy --version 0.1.1
 
 # Install:
 helm install authproxy oci://ghcr.io/rmorlok/charts/authproxy \
-  --version 0.1.0 \
+  --version 0.1.1 \
   -f my-values.yaml
 ```
 
@@ -60,7 +60,9 @@ The chart exposes typed values for the common connectivity blocks. See
 |------------------|----------------------------------------------------------------------|
 | `image`          | Container image repository, tag, pull policy                         |
 | `services.*`     | Per-service enable toggles (`api`, `adminApi`, `public`, `worker`)   |
-| `autoscaling`    | Optional autoscaling/v2 HPA for the chart release                    |
+| `autoscaling`    | Optional native autoscaling/v2 HPA for the chart release             |
+| `keda`           | KEDA controller dependency; enabled for the standard all-in-one chart |
+| `queueAutoscaling` | KEDA worker scaler using CPU plus global pending Asynq queue depth  |
 | `ports`          | Container port assignments                                            |
 | `ingress`        | Single Ingress with path → port-name routing                          |
 | `database`       | Postgres or SQLite connectivity (+ `existingSecret` for credentials)  |
@@ -106,6 +108,7 @@ helm upgrade --install authproxy-api oci://ghcr.io/rmorlok/charts/authproxy \
   --set services.adminApi.enabled=false \
   --set services.public.enabled=false \
   --set services.worker.enabled=false \
+  --set keda.enabled=false \
   --set autoscaling.enabled=true \
   --set autoscaling.minReplicas=2 \
   --set autoscaling.maxReplicas=16 \
@@ -117,20 +120,67 @@ helm upgrade --install authproxy-worker oci://ghcr.io/rmorlok/charts/authproxy \
   --set services.adminApi.enabled=false \
   --set services.public.enabled=false \
   --set services.worker.enabled=true \
-  --set autoscaling.enabled=true \
-  --set autoscaling.minReplicas=1 \
-  --set autoscaling.maxReplicas=8
+  --set autoscaling.enabled=false \
+  --set queueAutoscaling.enabled=true \
+  --set queueAutoscaling.minReplicas=1 \
+  --set queueAutoscaling.maxReplicas=8 \
+  --set resources.requests.cpu=250m \
+  --set queueAutoscaling.prometheus.serverAddress=http://prometheus.monitoring.svc:9090
 ```
 
-`autoscaling.enabled=false` preserves the legacy `replicaCount` behavior. When
-autoscaling is enabled, the Deployment omits `spec.replicas` and the
-HorizontalPodAutoscaler owns the desired replica count.
+With both scalers disabled, the legacy `replicaCount` controls the Deployment.
+When either scaler is enabled, the Deployment omits `spec.replicas` and its HPA
+owns the desired replica count.
 
-### Custom Metrics
+### KEDA Worker Queue Scaling
 
-`autoscaling.metrics` accepts raw Kubernetes `autoscaling/v2` metric entries.
-For example, a worker release can scale on queue depth if your cluster exposes
-an adapter metric such as `authproxy_asynq_queue_size`:
+The standard all-in-one chart installs the pinned KEDA controller and CRDs.
+KEDA is cluster-scoped, so independently deployed service roles must set
+`keda.enabled=false` on every release except the worker release, or on all of
+them when a cluster platform release already manages KEDA.
+
+Enable `queueAutoscaling` only on a worker release. It requires a Prometheus
+endpoint that the KEDA controller can reach and a query that returns one global
+numeric result. The default query uses `max`, not `sum`, because every worker
+reports the same Redis-global queue depth. KEDA creates the only HPA for that
+Deployment, combining the pending-queue trigger with CPU utilization. The CPU
+trigger requires `resources.requests.cpu` on the worker Deployment.
+
+```yaml
+autoscaling:
+  enabled: false
+
+queueAutoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 8
+  pollingInterval: 15
+  cooldownPeriod: 300
+  prometheus:
+    serverAddress: http://prometheus.monitoring.svc:9090
+    query: 'max(authproxy_asynq_queue_size{messaging_destination_name="default"})'
+    threshold: "100"
+    activationThreshold: "1"
+  cpu:
+    enabled: true
+    targetUtilizationPercentage: 75
+
+resources:
+  requests:
+    cpu: 250m
+```
+
+AuthProxy must export the queue metric to that Prometheus server. Configure an
+OTLP collector and Prometheus pipeline through the chart's `config.telemetry`
+overlay; the chart intentionally does not assume or deploy a production
+observability stack.
+
+### Native HPA Custom Metrics
+
+`autoscaling.metrics` remains available for clusters that already expose a
+Kubernetes custom-metrics adapter. It cannot be enabled together with
+`queueAutoscaling`, because both paths would otherwise create an HPA for the
+same Deployment.
 
 ```yaml
 autoscaling:
