@@ -122,8 +122,8 @@ func (env *reencryptTestEnv) createConnection(t *testing.T, namespace string) ap
 	connectorId := apid.New(apid.PrefixConnectorVersion)
 	now := apctx.GetClock(env.ctx).Now().Format(time.RFC3339)
 	_, err := env.rawDb.Exec(fmt.Sprintf(
-		`INSERT INTO connections (id, namespace, state, connector_id, connector_version, created_at, updated_at) VALUES ('%s', '%s', 'ready', '%s', 1, '%s', '%s')`,
-		string(connId), namespace, string(connectorId), now, now,
+		`INSERT INTO connections (id, name, namespace, state, connector_id, connector_version, created_at, updated_at) VALUES ('%s', '%s', '%s', 'ready', '%s', 1, '%s', '%s')`,
+		string(connId), string(connId), namespace, string(connectorId), now, now,
 	))
 	require.NoError(t, err)
 	return connId

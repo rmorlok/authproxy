@@ -44,6 +44,32 @@ type entities struct {
 func TestSchema(t *testing.T) {
 	entities := []entities{
 		{
+			Name: "ResourceName",
+			Schema: `
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/schema/common/test.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["test"],
+  "properties": {
+    "test": {
+      "$ref": "./schema.json#/$defs/ResourceName"
+    }
+  }
+}`,
+			Tests: []test{
+				{Name: "generated id", Valid: true, Data: `{"test": "act_01jz6y5ke2nq9gc0fj8x7r3d4m"}`},
+				{Name: "label punctuation", Valid: true, Data: `{"test": "Prod.us_east-1"}`},
+				{Name: "empty", Valid: false, Data: `{"test": ""}`},
+				{Name: "leading punctuation", Valid: false, Data: `{"test": "-invalid"}`},
+				{Name: "trailing punctuation", Valid: false, Data: `{"test": "invalid_"}`},
+				{Name: "whitespace", Valid: false, Data: `{"test": "not valid"}`},
+				{Name: "slash", Valid: false, Data: `{"test": "not/valid"}`},
+				{Name: "too long", Valid: false, Data: `{"test": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`},
+			},
+		},
+		{
 			Name: "UUID",
 			Schema: `
 {

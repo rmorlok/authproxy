@@ -30,6 +30,7 @@ func TestActor(t *testing.T) {
 	t.Run("Validation", func(t *testing.T) {
 		require.NoError(t, util.ToPtr(Actor{
 			Id:         apid.New(apid.PrefixActor),
+			Name:       "valid",
 			Namespace:  "root",
 			ExternalId: "1234567890",
 		}).validate())
@@ -192,10 +193,12 @@ func TestActor(t *testing.T) {
 			})
 			require.NoError(t, err)
 			require.Equal(t, externalId, actor.ExternalId)
+			require.Equal(t, actor.Id.String(), string(actor.Name))
 
 			retrieved, err := db.GetActorByExternalId(ctx, "root", externalId)
 			require.NoError(t, err)
 			require.Equal(t, actor.Id, retrieved.Id)
+			require.Equal(t, actor.Name, retrieved.Name)
 		})
 
 		t.Run("updates existing", func(t *testing.T) {
@@ -655,16 +658,19 @@ func TestActor(t *testing.T) {
 			t.Run("valid paths", func(t *testing.T) {
 				require.NoError(t, util.ToPtr(Actor{
 					Id:         apid.New(apid.PrefixActor),
+					Name:       "valid",
 					Namespace:  "root",
 					ExternalId: "test",
 				}).validate())
 				require.NoError(t, util.ToPtr(Actor{
 					Id:         apid.New(apid.PrefixActor),
+					Name:       "valid",
 					Namespace:  "root.tenant1",
 					ExternalId: "test",
 				}).validate())
 				require.NoError(t, util.ToPtr(Actor{
 					Id:         apid.New(apid.PrefixActor),
+					Name:       "valid",
 					Namespace:  "root.tenant1.subtenant",
 					ExternalId: "test",
 				}).validate())

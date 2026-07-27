@@ -18,11 +18,12 @@ func TestKeyModelSchema(t *testing.T) {
 	})
 
 	t.Run("global key uses key prefix and target defaults", func(t *testing.T) {
-		var id, usage, materialType, state string
-		err := rawDb.QueryRow("SELECT id, usage, material_type, state FROM keys WHERE id = 'key_global'").
-			Scan(&id, &usage, &materialType, &state)
+		var id, name, usage, materialType, state string
+		err := rawDb.QueryRow("SELECT id, name, usage, material_type, state FROM keys WHERE id = 'key_global'").
+			Scan(&id, &name, &usage, &materialType, &state)
 		require.NoError(t, err)
 		require.Equal(t, "key_global", id)
+		require.Equal(t, "key_global", name)
 		require.Equal(t, string(KeyUsageDataEncryption), usage)
 		require.Equal(t, string(KeyMaterialTypeSymmetric), materialType)
 		require.Equal(t, string(KeyStateActive), state)

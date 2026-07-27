@@ -12,6 +12,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/encfield"
+	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -97,6 +98,7 @@ func IsValidKeyOrderByField[T string | KeyOrderByField](field T) bool {
 // Key represents a user-managed key configuration.
 type Key struct {
 	Id           apid.ID
+	Name         scommon.ResourceName
 	Namespace    string
 	Usage        KeyUsage
 	MaterialType KeyMaterialType
@@ -131,6 +133,7 @@ func (ek *Key) cols() []string {
 		"updated_at",
 		"encrypted_at",
 		"deleted_at",
+		"name",
 	}
 }
 
@@ -148,6 +151,7 @@ func (ek *Key) fields() []any {
 		&ek.UpdatedAt,
 		&ek.EncryptedAt,
 		&ek.DeletedAt,
+		&ek.Name,
 	}
 }
 
@@ -165,10 +169,14 @@ func (ek *Key) values() []any {
 		ek.UpdatedAt,
 		ek.EncryptedAt,
 		ek.DeletedAt,
+		ek.Name,
 	}
 }
 
 func (ek *Key) normalize() {
+	if ek.Name == "" && !ek.Id.IsNil() {
+		ek.Name = scommon.ResourceName(ek.Id.String())
+	}
 	if ek.Usage == "" {
 		ek.Usage = KeyUsageDataEncryption
 	}
@@ -187,6 +195,10 @@ func (ek *Key) Validate() error {
 		result = multierror.Append(result, errors.New("id is required"))
 	} else if err := ek.Id.ValidatePrefix(apid.PrefixKey); err != nil {
 		result = multierror.Append(result, err)
+	}
+
+	if err := ek.Name.Validate(); err != nil {
+		result = multierror.Append(result, fmt.Errorf("invalid key name: %w", err))
 	}
 
 	if ek.Namespace == "" {

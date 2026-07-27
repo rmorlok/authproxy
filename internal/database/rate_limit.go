@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
+	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 	"github.com/rmorlok/authproxy/internal/util"
@@ -25,6 +26,7 @@ const RateLimitsTable = "rate_limits"
 // holds the JSON-serialised configuration (mode, selector, bucket, algorithm).
 type RateLimit struct {
 	Id          apid.ID
+	Name        scommon.ResourceName
 	Namespace   string
 	Definition  rlschema.RateLimit
 	Labels      Labels
@@ -48,6 +50,7 @@ func (rl *RateLimit) cols() []string {
 		"created_at",
 		"updated_at",
 		"deleted_at",
+		"name",
 	}
 }
 
@@ -61,6 +64,7 @@ func (rl *RateLimit) fields() []any {
 		&rl.CreatedAt,
 		&rl.UpdatedAt,
 		&rl.DeletedAt,
+		&rl.Name,
 	}
 }
 
@@ -74,6 +78,13 @@ func (rl *RateLimit) values() []any {
 		rl.CreatedAt,
 		rl.UpdatedAt,
 		rl.DeletedAt,
+		rl.Name,
+	}
+}
+
+func (rl *RateLimit) normalize() {
+	if rl.Name == "" && !rl.Id.IsNil() {
+		rl.Name = scommon.ResourceName(rl.Id.String())
 	}
 }
 
@@ -107,6 +118,10 @@ func (rl *RateLimit) Validate() error {
 		result = multierror.Append(result, errors.New("id is required"))
 	} else if err := rl.Id.ValidatePrefix(apid.PrefixRateLimit); err != nil {
 		result = multierror.Append(result, err)
+	}
+
+	if err := rl.Name.Validate(); err != nil {
+		result = multierror.Append(result, fmt.Errorf("invalid rate limit name: %w", err))
 	}
 
 	if rl.Namespace == "" {
@@ -149,6 +164,8 @@ func (s *service) GetRateLimit(ctx context.Context, id apid.ID) (*RateLimit, err
 }
 
 func (s *service) CreateRateLimit(ctx context.Context, rl *RateLimit) error {
+	rl.normalize()
+
 	if err := rl.Validate(); err != nil {
 		return err
 	}
