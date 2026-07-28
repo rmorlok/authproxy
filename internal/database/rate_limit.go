@@ -26,8 +26,8 @@ const RateLimitsTable = "rate_limits"
 // holds the JSON-serialised configuration (mode, selector, bucket, algorithm).
 type RateLimit struct {
 	Id          apid.ID
-	Name        scommon.ResourceName
 	Namespace   string
+	Name        scommon.ResourceName
 	Definition  rlschema.RateLimit
 	Labels      Labels
 	Annotations Annotations
@@ -44,13 +44,13 @@ func (rl *RateLimit) cols() []string {
 	return []string{
 		"id",
 		"namespace",
+		"name",
 		"definition",
 		"labels",
 		"annotations",
 		"created_at",
 		"updated_at",
 		"deleted_at",
-		"name",
 	}
 }
 
@@ -58,13 +58,13 @@ func (rl *RateLimit) fields() []any {
 	return []any{
 		&rl.Id,
 		&rl.Namespace,
+		&rl.Name,
 		(*rateLimitDefDB)(&rl.Definition),
 		&rl.Labels,
 		&rl.Annotations,
 		&rl.CreatedAt,
 		&rl.UpdatedAt,
 		&rl.DeletedAt,
-		&rl.Name,
 	}
 }
 
@@ -72,13 +72,13 @@ func (rl *RateLimit) values() []any {
 	return []any{
 		rl.Id,
 		rl.Namespace,
+		rl.Name,
 		rateLimitDefDB(rl.Definition),
 		rl.Labels,
 		rl.Annotations,
 		rl.CreatedAt,
 		rl.UpdatedAt,
 		rl.DeletedAt,
-		rl.Name,
 	}
 }
 

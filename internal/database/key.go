@@ -98,8 +98,8 @@ func IsValidKeyOrderByField[T string | KeyOrderByField](field T) bool {
 // Key represents a user-managed key configuration.
 type Key struct {
 	Id           apid.ID
-	Name         scommon.ResourceName
 	Namespace    string
+	Name         scommon.ResourceName
 	Usage        KeyUsage
 	MaterialType KeyMaterialType
 	// Key provider configuration is encrypted at rest, but it is not registered
@@ -123,6 +123,7 @@ func (ek *Key) cols() []string {
 	return []string{
 		"id",
 		"namespace",
+		"name",
 		"usage",
 		"material_type",
 		"encrypted_key_data",
@@ -133,7 +134,6 @@ func (ek *Key) cols() []string {
 		"updated_at",
 		"encrypted_at",
 		"deleted_at",
-		"name",
 	}
 }
 
@@ -141,6 +141,7 @@ func (ek *Key) fields() []any {
 	return []any{
 		&ek.Id,
 		&ek.Namespace,
+		&ek.Name,
 		&ek.Usage,
 		&ek.MaterialType,
 		&ek.EncryptedKeyData,
@@ -151,7 +152,6 @@ func (ek *Key) fields() []any {
 		&ek.UpdatedAt,
 		&ek.EncryptedAt,
 		&ek.DeletedAt,
-		&ek.Name,
 	}
 }
 
@@ -159,6 +159,7 @@ func (ek *Key) values() []any {
 	return []any{
 		ek.Id,
 		ek.Namespace,
+		ek.Name,
 		ek.Usage,
 		ek.MaterialType,
 		ek.EncryptedKeyData,
@@ -169,7 +170,6 @@ func (ek *Key) values() []any {
 		ek.UpdatedAt,
 		ek.EncryptedAt,
 		ek.DeletedAt,
-		ek.Name,
 	}
 }
 

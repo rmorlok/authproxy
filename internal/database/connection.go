@@ -86,8 +86,8 @@ const ConnectionsTable = "connections"
 
 type Connection struct {
 	Id                     apid.ID
-	Name                   scommon.ResourceName
 	Namespace              string
+	Name                   scommon.ResourceName
 	State                  ConnectionState
 	HealthState            ConnectionHealthState
 	ConnectorId            apid.ID
@@ -107,6 +107,7 @@ func (c *Connection) cols() []string {
 	return []string{
 		"id",
 		"namespace",
+		"name",
 		"state",
 		"health_state",
 		"connector_id",
@@ -120,7 +121,6 @@ func (c *Connection) cols() []string {
 		"created_at",
 		"updated_at",
 		"deleted_at",
-		"name",
 	}
 }
 
@@ -128,6 +128,7 @@ func (c *Connection) fields() []any {
 	return []any{
 		&c.Id,
 		&c.Namespace,
+		&c.Name,
 		&c.State,
 		&c.HealthState,
 		&c.ConnectorId,
@@ -141,7 +142,6 @@ func (c *Connection) fields() []any {
 		&c.CreatedAt,
 		&c.UpdatedAt,
 		&c.DeletedAt,
-		&c.Name,
 	}
 }
 
@@ -149,6 +149,7 @@ func (c *Connection) values() []any {
 	return []any{
 		c.Id,
 		c.Namespace,
+		c.Name,
 		c.State,
 		c.healthStateForInsert(),
 		c.ConnectorId,
@@ -162,7 +163,6 @@ func (c *Connection) values() []any {
 		c.CreatedAt,
 		c.UpdatedAt,
 		c.DeletedAt,
-		c.Name,
 	}
 }
 

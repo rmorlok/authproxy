@@ -93,8 +93,8 @@ const ActorTable = "actors"
 // Actor is some entity taking action within the system.
 type Actor struct {
 	Id           apid.ID
-	Name         scommon.ResourceName
 	Namespace    string
+	Name         scommon.ResourceName
 	ExternalId   string
 	Permissions  Permissions
 	Labels       Labels
@@ -126,6 +126,7 @@ func (a *Actor) cols() []string {
 	return []string{
 		"id",
 		"namespace",
+		"name",
 		"external_id",
 		"permissions",
 		"labels",
@@ -135,7 +136,6 @@ func (a *Actor) cols() []string {
 		"updated_at",
 		"encrypted_at",
 		"deleted_at",
-		"name",
 	}
 }
 
@@ -143,6 +143,7 @@ func (a *Actor) fields() []any {
 	return []any{
 		&a.Id,
 		&a.Namespace,
+		&a.Name,
 		&a.ExternalId,
 		&a.Permissions,
 		&a.Labels,
@@ -152,7 +153,6 @@ func (a *Actor) fields() []any {
 		&a.UpdatedAt,
 		&a.EncryptedAt,
 		&a.DeletedAt,
-		&a.Name,
 	}
 }
 
@@ -160,6 +160,7 @@ func (a *Actor) values() []any {
 	return []any{
 		a.Id,
 		a.Namespace,
+		a.Name,
 		a.ExternalId,
 		a.Permissions,
 		a.Labels,
@@ -169,7 +170,6 @@ func (a *Actor) values() []any {
 		a.UpdatedAt,
 		a.EncryptedAt,
 		a.DeletedAt,
-		a.Name,
 	}
 }
 
