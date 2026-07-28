@@ -16,6 +16,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/encfield"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
+	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -93,6 +94,7 @@ const ActorTable = "actors"
 type Actor struct {
 	Id           apid.ID
 	Namespace    string
+	Name         scommon.ResourceName
 	ExternalId   string
 	Permissions  Permissions
 	Labels       Labels
@@ -124,6 +126,7 @@ func (a *Actor) cols() []string {
 	return []string{
 		"id",
 		"namespace",
+		"name",
 		"external_id",
 		"permissions",
 		"labels",
@@ -140,6 +143,7 @@ func (a *Actor) fields() []any {
 	return []any{
 		&a.Id,
 		&a.Namespace,
+		&a.Name,
 		&a.ExternalId,
 		&a.Permissions,
 		&a.Labels,
@@ -156,6 +160,7 @@ func (a *Actor) values() []any {
 	return []any{
 		a.Id,
 		a.Namespace,
+		a.Name,
 		a.ExternalId,
 		a.Permissions,
 		a.Labels,
@@ -254,7 +259,9 @@ func (a *Actor) GetEncryptedKey() *encfield.EncryptedField {
 }
 
 func (a *Actor) normalize() {
-	// No actions currently
+	if a.Name == "" && !a.Id.IsNil() {
+		a.Name = scommon.ResourceName(a.Id.String())
+	}
 }
 
 func (a *Actor) validate() error {
@@ -266,6 +273,10 @@ func (a *Actor) validate() error {
 
 	if err := a.Id.ValidatePrefix(apid.PrefixActor); err != nil {
 		result = multierror.Append(result, fmt.Errorf("invalid actor id: %w", err))
+	}
+
+	if err := a.Name.Validate(); err != nil {
+		result = multierror.Append(result, fmt.Errorf("invalid actor name: %w", err))
 	}
 
 	if err := namespace.ValidatePath(a.Namespace); err != nil {

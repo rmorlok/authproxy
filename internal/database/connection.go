@@ -12,6 +12,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/encfield"
+	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/util"
@@ -86,6 +87,7 @@ const ConnectionsTable = "connections"
 type Connection struct {
 	Id                     apid.ID
 	Namespace              string
+	Name                   scommon.ResourceName
 	State                  ConnectionState
 	HealthState            ConnectionHealthState
 	ConnectorId            apid.ID
@@ -105,6 +107,7 @@ func (c *Connection) cols() []string {
 	return []string{
 		"id",
 		"namespace",
+		"name",
 		"state",
 		"health_state",
 		"connector_id",
@@ -125,6 +128,7 @@ func (c *Connection) fields() []any {
 	return []any{
 		&c.Id,
 		&c.Namespace,
+		&c.Name,
 		&c.State,
 		&c.HealthState,
 		&c.ConnectorId,
@@ -145,6 +149,7 @@ func (c *Connection) values() []any {
 	return []any{
 		c.Id,
 		c.Namespace,
+		c.Name,
 		c.State,
 		c.healthStateForInsert(),
 		c.ConnectorId,
@@ -158,6 +163,12 @@ func (c *Connection) values() []any {
 		c.CreatedAt,
 		c.UpdatedAt,
 		c.DeletedAt,
+	}
+}
+
+func (c *Connection) normalize() {
+	if c.Name == "" && !c.Id.IsNil() {
+		c.Name = scommon.ResourceName(c.Id.String())
 	}
 }
 
@@ -207,6 +218,10 @@ func (c *Connection) Validate() error {
 		result = multierror.Append(result, fmt.Errorf("invalid connection id: %w", err))
 	}
 
+	if err := c.Name.Validate(); err != nil {
+		result = multierror.Append(result, fmt.Errorf("invalid connection name: %w", err))
+	}
+
 	if err := namespace.ValidatePath(c.Namespace); err != nil {
 		result = multierror.Append(result, fmt.Errorf("invalid connection namespace path: %w", err))
 	}
@@ -246,6 +261,8 @@ func (s *service) CreateConnection(ctx context.Context, c *Connection) error {
 	if c == nil {
 		return errors.New("connection is required")
 	}
+
+	c.normalize()
 
 	if err := c.Validate(); err != nil {
 		return err

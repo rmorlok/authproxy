@@ -2,6 +2,13 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/schema/common/schema.json",
   "$defs": {
+    "ResourceName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 63,
+      "pattern": "^[A-Za-z0-9]([A-Za-z0-9._-]{0,61}[A-Za-z0-9])?$",
+      "description": "A mutable, case-sensitive AuthProxy resource name that is compatible with Kubernetes label values."
+    },
     "HumanByteSize": {
       "type": "string",
       "pattern": "(?i)^[0-9]+\\s?(b|kb|mb|gb|tb|pb|eb|kib|mib|gib|tib|pib|eib)$",

@@ -19,11 +19,11 @@ func TestSearchResourcesRanksAndBoundsActorLabelMatches(t *testing.T) {
 	deletedID := apid.New(apid.PrefixActor)
 
 	inserts := []string{
-		fmt.Sprintf(`INSERT INTO actors (id, namespace, labels, external_id, created_at, updated_at) VALUES ('%s', 'root', '{"team":"acme","literal":"has_value","percent":"rate%%value","slash":"path\\value","apxy/act/-/id":"%s"}', 'exact', CURRENT_TIMESTAMP, '2024-01-01T00:00:00Z')`, exactID, exactID),
-		fmt.Sprintf(`INSERT INTO actors (id, namespace, labels, external_id, created_at, updated_at) VALUES ('%s', 'root', '{"team":"acme-prod"}', 'prefix', CURRENT_TIMESTAMP, '2025-01-01T00:00:00Z')`, prefixID),
-		fmt.Sprintf(`INSERT INTO actors (id, namespace, labels, external_id, created_at, updated_at) VALUES ('%s', 'root', '{"team":"west-acme"}', 'substring', CURRENT_TIMESTAMP, '2026-01-01T00:00:00Z')`, substringID),
-		fmt.Sprintf(`INSERT INTO actors (id, namespace, labels, external_id, created_at, updated_at) VALUES ('%s', 'root', '{"apxy/ns/-/ns":"root.acme"}', 'system-only', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`, systemOnlyID),
-		fmt.Sprintf(`INSERT INTO actors (id, namespace, labels, external_id, created_at, updated_at, deleted_at) VALUES ('%s', 'root', '{"team":"acme"}', 'deleted', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`, deletedID),
+		fmt.Sprintf(`INSERT INTO actors (id, name, namespace, labels, external_id, created_at, updated_at) VALUES ('%s', '%s', 'root', '{"team":"acme","literal":"has_value","percent":"rate%%value","slash":"path\\value","apxy/act/-/id":"%s"}', 'exact', CURRENT_TIMESTAMP, '2024-01-01T00:00:00Z')`, exactID, exactID, exactID),
+		fmt.Sprintf(`INSERT INTO actors (id, name, namespace, labels, external_id, created_at, updated_at) VALUES ('%s', '%s', 'root', '{"team":"acme-prod"}', 'prefix', CURRENT_TIMESTAMP, '2025-01-01T00:00:00Z')`, prefixID, prefixID),
+		fmt.Sprintf(`INSERT INTO actors (id, name, namespace, labels, external_id, created_at, updated_at) VALUES ('%s', '%s', 'root', '{"team":"west-acme"}', 'substring', CURRENT_TIMESTAMP, '2026-01-01T00:00:00Z')`, substringID, substringID),
+		fmt.Sprintf(`INSERT INTO actors (id, name, namespace, labels, external_id, created_at, updated_at) VALUES ('%s', '%s', 'root', '{"apxy/ns/-/ns":"root.acme"}', 'system-only', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`, systemOnlyID, systemOnlyID),
+		fmt.Sprintf(`INSERT INTO actors (id, name, namespace, labels, external_id, created_at, updated_at, deleted_at) VALUES ('%s', '%s', 'root', '{"team":"acme"}', 'deleted', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`, deletedID, deletedID),
 	}
 	for _, statement := range inserts {
 		_, err := raw.Exec(statement)
@@ -67,9 +67,9 @@ func TestSearchResourcesCombinesTextSelectorAndNamespace(t *testing.T) {
 	wrongLabelID := apid.New(apid.PrefixConnection)
 	wrongNamespaceID := apid.New(apid.PrefixConnection)
 	for _, statement := range []string{
-		fmt.Sprintf(`INSERT INTO connections (id, namespace, labels, state, connector_id, connector_version, created_at, updated_at) VALUES ('%s', 'root.team', '{"name":"payments-api","env":"prod"}', 'configured', 'cxr_test', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`, matchID),
-		fmt.Sprintf(`INSERT INTO connections (id, namespace, labels, state, connector_id, connector_version, created_at, updated_at) VALUES ('%s', 'root.team', '{"name":"payments-api","env":"dev"}', 'configured', 'cxr_test', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`, wrongLabelID),
-		fmt.Sprintf(`INSERT INTO connections (id, namespace, labels, state, connector_id, connector_version, created_at, updated_at) VALUES ('%s', 'root.other', '{"name":"payments-api","env":"prod"}', 'configured', 'cxr_test', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`, wrongNamespaceID),
+		fmt.Sprintf(`INSERT INTO connections (id, name, namespace, labels, state, connector_id, connector_version, created_at, updated_at) VALUES ('%s', '%s', 'root.team', '{"name":"payments-api","env":"prod"}', 'configured', 'cxr_test', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`, matchID, matchID),
+		fmt.Sprintf(`INSERT INTO connections (id, name, namespace, labels, state, connector_id, connector_version, created_at, updated_at) VALUES ('%s', '%s', 'root.team', '{"name":"payments-api","env":"dev"}', 'configured', 'cxr_test', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`, wrongLabelID, wrongLabelID),
+		fmt.Sprintf(`INSERT INTO connections (id, name, namespace, labels, state, connector_id, connector_version, created_at, updated_at) VALUES ('%s', '%s', 'root.other', '{"name":"payments-api","env":"prod"}', 'configured', 'cxr_test', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`, wrongNamespaceID, wrongNamespaceID),
 	} {
 		_, err := raw.Exec(statement)
 		require.NoError(t, err)
@@ -125,7 +125,7 @@ func TestSearchResourcesCollapsesConnectorVersionsDeterministically(t *testing.T
 func TestSearchResourcesEmptyNamespaceMatchersNeverMeansUnrestricted(t *testing.T) {
 	_, db, raw := MustApplyBlankTestDbConfigRaw(t, nil)
 	id := apid.New(apid.PrefixActor)
-	_, err := raw.Exec(fmt.Sprintf(`INSERT INTO actors (id, namespace, labels, external_id, created_at, updated_at) VALUES ('%s', 'root', '{"name":"visible"}', 'actor', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`, id))
+	_, err := raw.Exec(fmt.Sprintf(`INSERT INTO actors (id, name, namespace, labels, external_id, created_at, updated_at) VALUES ('%s', '%s', 'root', '{"name":"visible"}', 'actor', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`, id, id))
 	require.NoError(t, err)
 
 	result, err := db.SearchResources(t.Context(), SearchResourcesParams{
@@ -145,8 +145,8 @@ func TestSearchResourcesSeedCoversNamespaceKeyAndRateLimit(t *testing.T) {
 	rateLimitID := apid.New(apid.PrefixRateLimit)
 	for _, statement := range []string{
 		`INSERT INTO namespaces (path, depth, state, labels, created_at, updated_at) VALUES ('root.seed', 1, 'active', '{"name":"seed namespace","apxy/ns/-/ns":"root.seed"}', CURRENT_TIMESTAMP, '2024-01-01T00:00:00Z')`,
-		fmt.Sprintf(`INSERT INTO keys (id, namespace, usage, material_type, state, labels, created_at, updated_at) VALUES ('%s', 'root.seed', 'data_encryption', 'symmetric', 'active', '{"name":"seed key","apxy/key/-/id":"%s"}', CURRENT_TIMESTAMP, '2025-01-01T00:00:00Z')`, keyID, keyID),
-		fmt.Sprintf(`INSERT INTO rate_limits (id, namespace, definition, labels, created_at, updated_at) VALUES ('%s', 'root.seed', '{}', '{"name":"seed rate limit","apxy/rl/-/id":"%s"}', CURRENT_TIMESTAMP, '2026-01-01T00:00:00Z')`, rateLimitID, rateLimitID),
+		fmt.Sprintf(`INSERT INTO keys (id, name, namespace, usage, material_type, state, labels, created_at, updated_at) VALUES ('%s', '%s', 'root.seed', 'data_encryption', 'symmetric', 'active', '{"name":"seed key","apxy/key/-/id":"%s"}', CURRENT_TIMESTAMP, '2025-01-01T00:00:00Z')`, keyID, keyID, keyID),
+		fmt.Sprintf(`INSERT INTO rate_limits (id, name, namespace, definition, labels, created_at, updated_at) VALUES ('%s', '%s', 'root.seed', '{}', '{"name":"seed rate limit","apxy/rl/-/id":"%s"}', CURRENT_TIMESTAMP, '2026-01-01T00:00:00Z')`, rateLimitID, rateLimitID, rateLimitID),
 	} {
 		_, err := raw.Exec(statement)
 		require.NoError(t, err)

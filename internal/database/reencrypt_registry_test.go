@@ -129,8 +129,8 @@ func TestReEncryptRegistry(t *testing.T) {
 		connectorId := apid.New(apid.PrefixConnectorVersion)
 		nowStr := now.Format(time.RFC3339)
 		_, err = rawDb.Exec(fmt.Sprintf(
-			`INSERT INTO connections (id, namespace, state, connector_id, connector_version, created_at, updated_at) VALUES ('%s', 'root', 'ready', '%s', 1, '%s', '%s')`,
-			string(connId), string(connectorId), nowStr, nowStr,
+			`INSERT INTO connections (id, name, namespace, state, connector_id, connector_version, created_at, updated_at) VALUES ('%s', '%s', 'root', 'ready', '%s', 1, '%s', '%s')`,
+			string(connId), string(connId), string(connectorId), nowStr, nowStr,
 		))
 		require.NoError(t, err)
 
@@ -171,8 +171,8 @@ func TestReEncryptRegistry(t *testing.T) {
 		connectorId := apid.New(apid.PrefixConnectorVersion)
 		nowStr := now.Format(time.RFC3339)
 		_, err = rawDb.Exec(fmt.Sprintf(
-			`INSERT INTO connections (id, namespace, state, connector_id, connector_version, created_at, updated_at) VALUES ('%s', 'root', 'ready', '%s', 1, '%s', '%s')`,
-			string(connId), string(connectorId), nowStr, nowStr,
+			`INSERT INTO connections (id, name, namespace, state, connector_id, connector_version, created_at, updated_at) VALUES ('%s', '%s', 'root', 'ready', '%s', 1, '%s', '%s')`,
+			string(connId), string(connId), string(connectorId), nowStr, nowStr,
 		))
 		require.NoError(t, err)
 
@@ -218,8 +218,8 @@ func TestReEncryptRegistry(t *testing.T) {
 		connectorId := apid.New(apid.PrefixConnectorVersion)
 		nowStr := now.Format(time.RFC3339)
 		_, err = rawDb.Exec(fmt.Sprintf(
-			`INSERT INTO connections (id, namespace, state, connector_id, connector_version, created_at, updated_at) VALUES ('%s', 'root', 'ready', '%s', 1, '%s', '%s')`,
-			string(connId), string(connectorId), nowStr, nowStr,
+			`INSERT INTO connections (id, name, namespace, state, connector_id, connector_version, created_at, updated_at) VALUES ('%s', '%s', 'root', 'ready', '%s', 1, '%s', '%s')`,
+			string(connId), string(connId), string(connectorId), nowStr, nowStr,
 		))
 		require.NoError(t, err)
 

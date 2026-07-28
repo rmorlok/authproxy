@@ -20,25 +20,27 @@ func BenchmarkSearchResourcesAt100K(b *testing.B) {
 	cfg, db, raw := MustApplyBlankTestDbConfigRaw(b, nil)
 	require.NoError(b, db.EnsureNamespaceByPath(b.Context(), "root.search-load"))
 
-	placeholders := "?, ?, ?, ?, CURRENT_TIMESTAMP, ?"
+	placeholders := "?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?"
 	if cfg.GetRoot().Database.GetProvider() == config.DatabaseProviderPostgres {
-		placeholders = "$1, $2, $3, $4, CURRENT_TIMESTAMP, $5"
+		placeholders = "$1, $2, $3, $4, $5, CURRENT_TIMESTAMP, $6"
 	}
 	tx, err := raw.BeginTx(b.Context(), nil)
 	require.NoError(b, err)
 	statement, err := tx.PrepareContext(b.Context(), fmt.Sprintf(
-		"INSERT INTO actors (id, namespace, labels, external_id, created_at, updated_at) VALUES (%s)",
+		"INSERT INTO actors (id, name, namespace, labels, external_id, created_at, updated_at) VALUES (%s)",
 		placeholders,
 	))
 	require.NoError(b, err)
 	for i := 0; i < 100_000; i++ {
+		id := fmt.Sprintf("act_searchload%013d", i)
 		label := fmt.Sprintf(`{"name":"resource-%06d"}`, i)
 		if i == 99_999 {
 			label = `{"name":"bounded-search-needle"}`
 		}
 		_, err = statement.ExecContext(
 			b.Context(),
-			fmt.Sprintf("act_searchload%013d", i),
+			id,
+			id,
 			"root.search-load",
 			label,
 			fmt.Sprintf("search-load-%06d", i),

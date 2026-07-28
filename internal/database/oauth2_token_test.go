@@ -653,6 +653,7 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 				dbRaw := db.(*service)
 
 				for _, connection := range connections {
+					connection.normalize()
 					_, err := dbRaw.sq.
 						Insert(ConnectionsTable).
 						Columns(connection.cols()...).

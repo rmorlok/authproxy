@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
+	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 	"github.com/rmorlok/authproxy/internal/util"
@@ -26,6 +27,7 @@ const RateLimitsTable = "rate_limits"
 type RateLimit struct {
 	Id          apid.ID
 	Namespace   string
+	Name        scommon.ResourceName
 	Definition  rlschema.RateLimit
 	Labels      Labels
 	Annotations Annotations
@@ -42,6 +44,7 @@ func (rl *RateLimit) cols() []string {
 	return []string{
 		"id",
 		"namespace",
+		"name",
 		"definition",
 		"labels",
 		"annotations",
@@ -55,6 +58,7 @@ func (rl *RateLimit) fields() []any {
 	return []any{
 		&rl.Id,
 		&rl.Namespace,
+		&rl.Name,
 		(*rateLimitDefDB)(&rl.Definition),
 		&rl.Labels,
 		&rl.Annotations,
@@ -68,12 +72,19 @@ func (rl *RateLimit) values() []any {
 	return []any{
 		rl.Id,
 		rl.Namespace,
+		rl.Name,
 		rateLimitDefDB(rl.Definition),
 		rl.Labels,
 		rl.Annotations,
 		rl.CreatedAt,
 		rl.UpdatedAt,
 		rl.DeletedAt,
+	}
+}
+
+func (rl *RateLimit) normalize() {
+	if rl.Name == "" && !rl.Id.IsNil() {
+		rl.Name = scommon.ResourceName(rl.Id.String())
 	}
 }
 
@@ -107,6 +118,10 @@ func (rl *RateLimit) Validate() error {
 		result = multierror.Append(result, errors.New("id is required"))
 	} else if err := rl.Id.ValidatePrefix(apid.PrefixRateLimit); err != nil {
 		result = multierror.Append(result, err)
+	}
+
+	if err := rl.Name.Validate(); err != nil {
+		result = multierror.Append(result, fmt.Errorf("invalid rate limit name: %w", err))
 	}
 
 	if rl.Namespace == "" {
@@ -149,6 +164,8 @@ func (s *service) GetRateLimit(ctx context.Context, id apid.ID) (*RateLimit, err
 }
 
 func (s *service) CreateRateLimit(ctx context.Context, rl *RateLimit) error {
+	rl.normalize()
+
 	if err := rl.Validate(); err != nil {
 		return err
 	}
