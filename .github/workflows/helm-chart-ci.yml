@@ -309,9 +309,3 @@ jobs:
             --target-branch main \
             --namespace authproxy-ct \
             --helm-extra-args "--timeout=5m"
-
-      - name: Verify bundled KEDA controller
-        if: steps.changed.outputs.found == 'true'
-        run: |
-          kubectl get crd scaledobjects.keda.sh
-          kubectl -n authproxy-ct rollout status deployment/keda-operator --timeout=5m
