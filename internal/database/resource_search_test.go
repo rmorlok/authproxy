@@ -94,9 +94,10 @@ func TestSearchResourcesCollapsesConnectorVersionsDeterministically(t *testing.T
 
 	connectorID := apid.New(apid.PrefixConnectorVersion)
 	for _, statement := range []string{
-		fmt.Sprintf(`INSERT INTO connector_versions (id, version, namespace, labels, state, type, created_at, updated_at) VALUES ('%s', 1, 'root', '{"name":"old-primary"}', 'primary', 'test', CURRENT_TIMESTAMP, '2024-01-01T00:00:00Z')`, connectorID),
-		fmt.Sprintf(`INSERT INTO connector_versions (id, version, namespace, labels, state, type, created_at, updated_at) VALUES ('%s', 2, 'root', '{"name":"new-primary"}', 'primary', 'test', CURRENT_TIMESTAMP, '2025-01-01T00:00:00Z')`, connectorID),
-		fmt.Sprintf(`INSERT INTO connector_versions (id, version, namespace, labels, state, type, created_at, updated_at) VALUES ('%s', 3, 'root', '{"name":"draft-match"}', 'draft', 'test', CURRENT_TIMESTAMP, '2026-01-01T00:00:00Z')`, connectorID),
+		fmt.Sprintf(`INSERT INTO connectors (id, namespace, name, created_at, updated_at) VALUES ('%s', 'root', '%s', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`, connectorID, connectorID),
+		fmt.Sprintf(`INSERT INTO connector_versions (id, version, labels, state, type, created_at, updated_at) VALUES ('%s', 1, '{"name":"old-primary"}', 'primary', 'test', CURRENT_TIMESTAMP, '2024-01-01T00:00:00Z')`, connectorID),
+		fmt.Sprintf(`INSERT INTO connector_versions (id, version, labels, state, type, created_at, updated_at) VALUES ('%s', 2, '{"name":"new-primary"}', 'primary', 'test', CURRENT_TIMESTAMP, '2025-01-01T00:00:00Z')`, connectorID),
+		fmt.Sprintf(`INSERT INTO connector_versions (id, version, labels, state, type, created_at, updated_at) VALUES ('%s', 3, '{"name":"draft-match"}', 'draft', 'test', CURRENT_TIMESTAMP, '2026-01-01T00:00:00Z')`, connectorID),
 	} {
 		_, err := raw.Exec(statement)
 		require.NoError(t, err)

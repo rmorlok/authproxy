@@ -239,11 +239,16 @@ func insertConnectorVersion(
 ) {
 	t.Helper()
 	_, err := rawDB.Exec(fmt.Sprintf(`
-INSERT INTO connector_versions
-(id, namespace, version, state, type, encrypted_definition, hash, created_at, updated_at, deleted_at)
+INSERT INTO connectors
+(id, namespace, name, created_at, updated_at)
 VALUES
-('%s', '%s', %d, '%s', 'test', '{"id":"dek_test","d":"encrypted-def"}', 'hash-%d', '2026-05-29 12:00:00', '2026-05-29 12:00:00', null)
-`, id, namespace, version, state, version))
+('%s', '%s', '%s', '2026-05-29 12:00:00', '2026-05-29 12:00:00');
+
+INSERT INTO connector_versions
+(id, version, state, type, encrypted_definition, hash, created_at, updated_at, deleted_at)
+VALUES
+('%s', %d, '%s', 'test', '{"id":"dek_test","d":"encrypted-def"}', 'hash-%d', '2026-05-29 12:00:00', '2026-05-29 12:00:00', null)
+`, id, namespace, id, id, version, state, version))
 	require.NoError(t, err)
 }
 

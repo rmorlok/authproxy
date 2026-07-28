@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/rmorlok/authproxy/internal/apid"
 	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/stretchr/testify/require"
@@ -235,7 +233,7 @@ func TestResourceNameDatabaseRejectsEmptyValues(t *testing.T) {
 func TestResourceNameMigrationBackfillsExistingRows(t *testing.T) {
 	_, db, rawDB := MustApplyBlankTestDbConfigRaw(t, nil)
 	service := db.(*service)
-	migrateResourceNamesBySteps(t, service, -1)
+	migrateDatabaseToVersion(t, service, 14)
 
 	_, err := rawDB.Exec(`
 		INSERT INTO actors (id, namespace, external_id)
@@ -268,7 +266,7 @@ func TestResourceNameMigrationBackfillsExistingRows(t *testing.T) {
 	`)
 	require.NoError(t, err)
 
-	migrateResourceNamesBySteps(t, service, 1)
+	migrateDatabaseToVersion(t, service, 15)
 
 	for table, id := range map[string]string{
 		ActorTable:       "act_migration",
@@ -291,24 +289,6 @@ func TestResourceNameMigrationBackfillsExistingRows(t *testing.T) {
 		"SELECT name FROM keys WHERE id = 'key_global'",
 	).Scan(&globalKeyName))
 	require.Equal(t, "key_global", globalKeyName)
-}
 
-func migrateResourceNamesBySteps(t *testing.T, service *service, steps int) {
-	t.Helper()
-
-	source, err := iofs.New(
-		migrationsFs,
-		fmt.Sprintf("migrations/%s", service.cfg.GetProvider()),
-	)
-	require.NoError(t, err)
-
-	migrator, err := migrate.NewWithSourceInstance("iofs", source, service.cfg.GetUri())
-	require.NoError(t, err)
-	defer func() {
-		sourceErr, databaseErr := migrator.Close()
-		require.NoError(t, sourceErr)
-		require.NoError(t, databaseErr)
-	}()
-
-	require.NoError(t, migrator.Steps(steps))
+	migrateDatabaseToVersion(t, service, 16)
 }

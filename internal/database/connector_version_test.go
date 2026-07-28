@@ -23,17 +23,24 @@ func TestConnectorVersions(t *testing.T) {
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 		sql := `
+INSERT INTO connectors
+(id,                         namespace,          name,                       created_at,            updated_at,            deleted_at) VALUES
+('cxr_testgmail0000001',     'root',             'cxr_testgmail0000001',     '2023-10-01 00:00:00', '2023-10-10 00:00:00', null),
+('cxr_testgmail0000002',     'root.child',       'cxr_testgmail0000002',     '2023-10-02 00:00:00', '2023-10-11 00:00:00', null),
+('cxr_testslack0000001',     'root.child2',      'cxr_testslack0000001',     '2023-10-03 00:00:00', '2023-10-12 00:00:00', null),
+('cxr_testgmail0000003',     'root.child.grand', 'cxr_testgmail0000003',     '2023-10-04 00:00:00', '2023-10-14 00:00:00', null);
+
 INSERT INTO connector_versions
-(id,                                     version, namespace,          labels,                      state,     encrypted_definition, hash,    created_at,            updated_at,            deleted_at) VALUES
-('cxr_testgmail0000001', 1,       'root',             '{"type":"gmail"}',          'active',  '{"id":"dek_test","d":"encrypted-def"}',      'hash1', '2023-10-01 00:00:00', '2023-10-01 00:00:00', null),
-('cxr_testgmail0000001', 2,       'root',             '{"type":"gmail"}',          'primary', '{"id":"dek_test","d":"encrypted-def"}',      'hash2', '2023-10-10 00:00:00', '2023-10-10 00:00:00', null),
-('cxr_testgmail0000002', 1,       'root.child',       '{"type":"gmail"}',          'archived','{"id":"dek_test","d":"encrypted-def"}',      'hash3', '2023-10-02 00:00:00', '2023-10-02 00:00:00', null),
-('cxr_testgmail0000002', 2,       'root.child',       '{"type":"gmail"}',          'primary', '{"id":"dek_test","d":"encrypted-def"}',      'hash4', '2023-10-11 00:00:00', '2023-10-11 00:00:00', null),
-('cxr_testslack0000001', 1,       'root.child2',      '{"type":"outlook"}',        'active',  '{"id":"dek_test","d":"encrypted-def"}',      'hash5', '2023-10-03 00:00:00', '2023-10-03 00:00:00', null),
-('cxr_testslack0000001', 2,       'root.child2',      '{"type":"outlook"}',        'primary', '{"id":"dek_test","d":"encrypted-def"}',      'hash6', '2023-10-12 00:00:00', '2023-10-12 00:00:00', null),
-('cxr_testgmail0000003', 1,       'root.child.grand', '{"type":"google_drive"}',   'archived','{"id":"dek_test","d":"encrypted-def"}',      'hash7', '2023-10-04 00:00:00', '2023-10-04 00:00:00', null),
-('cxr_testgmail0000003', 2,       'root.child.grand', '{"type":"google_drive"}',   'active',  '{"id":"dek_test","d":"encrypted-def"}',      'hash8', '2023-10-13 00:00:00', '2023-10-13 00:00:00', null),
-('cxr_testgmail0000003', 3,       'root.child.grand', '{"type":"google_drive"}',   'primary', '{"id":"dek_test","d":"encrypted-def"}',      'hash9', '2023-10-14 00:00:00', '2023-10-14 00:00:00', null);
+(id,                         version, labels,                    state,      encrypted_definition,                         hash,    created_at,            updated_at,            deleted_at) VALUES
+('cxr_testgmail0000001',     1,       '{"type":"gmail"}',        'active',   '{"id":"dek_test","d":"encrypted-def"}',      'hash1', '2023-10-01 00:00:00', '2023-10-01 00:00:00', null),
+('cxr_testgmail0000001',     2,       '{"type":"gmail"}',        'primary',  '{"id":"dek_test","d":"encrypted-def"}',      'hash2', '2023-10-10 00:00:00', '2023-10-10 00:00:00', null),
+('cxr_testgmail0000002',     1,       '{"type":"gmail"}',        'archived', '{"id":"dek_test","d":"encrypted-def"}',      'hash3', '2023-10-02 00:00:00', '2023-10-02 00:00:00', null),
+('cxr_testgmail0000002',     2,       '{"type":"gmail"}',        'primary',  '{"id":"dek_test","d":"encrypted-def"}',      'hash4', '2023-10-11 00:00:00', '2023-10-11 00:00:00', null),
+('cxr_testslack0000001',     1,       '{"type":"outlook"}',      'active',   '{"id":"dek_test","d":"encrypted-def"}',      'hash5', '2023-10-03 00:00:00', '2023-10-03 00:00:00', null),
+('cxr_testslack0000001',     2,       '{"type":"outlook"}',      'primary',  '{"id":"dek_test","d":"encrypted-def"}',      'hash6', '2023-10-12 00:00:00', '2023-10-12 00:00:00', null),
+('cxr_testgmail0000003',     1,       '{"type":"google_drive"}', 'archived', '{"id":"dek_test","d":"encrypted-def"}',      'hash7', '2023-10-04 00:00:00', '2023-10-04 00:00:00', null),
+('cxr_testgmail0000003',     2,       '{"type":"google_drive"}', 'active',   '{"id":"dek_test","d":"encrypted-def"}',      'hash8', '2023-10-13 00:00:00', '2023-10-13 00:00:00', null),
+('cxr_testgmail0000003',     3,       '{"type":"google_drive"}', 'primary',  '{"id":"dek_test","d":"encrypted-def"}',      'hash9', '2023-10-14 00:00:00', '2023-10-14 00:00:00', null);
 `
 		_, err := rawDb.Exec(sql)
 		require.NoError(t, err)
@@ -120,12 +127,19 @@ INSERT INTO connector_versions
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 		sql := `
+INSERT INTO connectors
+(id,                         namespace,           name,                       created_at,            updated_at,            deleted_at) VALUES
+('cxr_testgmail0000001',     'root.prod',         'cxr_testgmail0000001',     '2023-10-01 00:00:00', '2023-10-01 00:00:00', null),
+('cxr_testgmail0000002',     'root.staging',      'cxr_testgmail0000002',     '2023-10-02 00:00:00', '2023-10-02 00:00:00', null),
+('cxr_testslack0000001',     'root.dev',          'cxr_testslack0000001',     '2023-10-03 00:00:00', '2023-10-03 00:00:00', null),
+('cxr_testgmail0000003',     'root.prod.tenant1', 'cxr_testgmail0000003',     '2023-10-04 00:00:00', '2023-10-04 00:00:00', null);
+
 INSERT INTO connector_versions
-(id,                                     version, namespace,            labels,                      state,     encrypted_definition, hash,    created_at,            updated_at,            deleted_at) VALUES
-('cxr_testgmail0000001', 1,       'root.prod',          '{"type":"gmail"}',          'primary', '{"id":"dek_test","d":"encrypted-def"}',      'hash1', '2023-10-01 00:00:00', '2023-10-01 00:00:00', null),
-('cxr_testgmail0000002', 1,       'root.staging',       '{"type":"gmail"}',          'primary', '{"id":"dek_test","d":"encrypted-def"}',      'hash3', '2023-10-02 00:00:00', '2023-10-02 00:00:00', null),
-('cxr_testslack0000001', 1,       'root.dev',           '{"type":"outlook"}',        'primary', '{"id":"dek_test","d":"encrypted-def"}',      'hash5', '2023-10-03 00:00:00', '2023-10-03 00:00:00', null),
-('cxr_testgmail0000003', 1,       'root.prod.tenant1',  '{"type":"google_drive"}',   'primary', '{"id":"dek_test","d":"encrypted-def"}',      'hash7', '2023-10-04 00:00:00', '2023-10-04 00:00:00', null);
+(id,                         version, labels,                    state,     encrypted_definition,                         hash,    created_at,            updated_at,            deleted_at) VALUES
+('cxr_testgmail0000001',     1,       '{"type":"gmail"}',        'primary', '{"id":"dek_test","d":"encrypted-def"}',      'hash1', '2023-10-01 00:00:00', '2023-10-01 00:00:00', null),
+('cxr_testgmail0000002',     1,       '{"type":"gmail"}',        'primary', '{"id":"dek_test","d":"encrypted-def"}',      'hash3', '2023-10-02 00:00:00', '2023-10-02 00:00:00', null),
+('cxr_testslack0000001',     1,       '{"type":"outlook"}',      'primary', '{"id":"dek_test","d":"encrypted-def"}',      'hash5', '2023-10-03 00:00:00', '2023-10-03 00:00:00', null),
+('cxr_testgmail0000003',     1,       '{"type":"google_drive"}', 'primary', '{"id":"dek_test","d":"encrypted-def"}',      'hash7', '2023-10-04 00:00:00', '2023-10-04 00:00:00', null);
 `
 		_, err := rawDb.Exec(sql)
 		require.NoError(t, err)

@@ -258,6 +258,12 @@ func TestMigration(t *testing.T) {
 				err := service.MigrateConnectors(context.Background())
 				require.NoError(t, err)
 
+				require.NoError(t, db.UpdateConnectorName(
+					context.Background(),
+					apid.MustParse("cxr_test0000000000001"),
+					"renamed",
+				))
+
 				cfg.GetRoot().Connectors.LoadFromList[0].Version = 2
 				cfg.GetRoot().Connectors.LoadFromList[0].DisplayName = "changed"
 
@@ -287,6 +293,12 @@ func TestMigration(t *testing.T) {
 						DisplayName: "changed",
 					},
 				})
+
+				var logicalName string
+				require.NoError(t, rawDb.QueryRow(`
+					SELECT name FROM connectors WHERE id = 'cxr_test0000000000001'
+				`).Scan(&logicalName))
+				require.Equal(t, "renamed", logicalName)
 			})
 
 			t.Run("add draft version", func(t *testing.T) {

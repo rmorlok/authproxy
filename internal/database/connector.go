@@ -184,6 +184,7 @@ func (l *listConnectorsFilters) fetchPage(ctx context.Context) pagination.PageRe
             ROW_NUMBER() OVER (
                 PARTITION BY id
                 ORDER BY
+                    CASE WHEN deleted_at IS NULL THEN 0 ELSE 1 END,
                     CASE state
                         WHEN 'primary' THEN 1
                         WHEN 'draft' THEN 2
@@ -210,8 +211,9 @@ func (l *listConnectorsFilters) fetchPage(ctx context.Context) pagination.PageRe
     `, aggregateStatesExpr, ConnectorVersionsTable)
 
 	q := l.s.sq.Select(`
-rr.id as id,
-rr.namespace as namespace,
+c.id as id,
+c.namespace as namespace,
+c.name as name,
 rr.labels as labels,
 rr.annotations as annotations,
 rr.version as version,
@@ -225,7 +227,8 @@ cvc.versions as total_versions
 `).
 		With("ranked_rows", sq.Expr(rankedRowsCTE)).
 		With("connector_version_counts", sq.Expr(connectorVersionCountsCTE)).
-		From("ranked_rows rr").
+		From(ConnectorsTable+" c").
+		Join("ranked_rows rr ON rr.id = c.id").
 		Join("connector_version_counts cvc ON cvc.id = rr.id").
 		Where("rr.row_num = ?", 1)
 
@@ -234,7 +237,7 @@ cvc.versions as total_versions
 	}
 
 	if len(l.IdsVal) > 0 {
-		q = q.Where(sq.Eq{"rr.id": l.IdsVal})
+		q = q.Where(sq.Eq{"c.id": l.IdsVal})
 	}
 
 	if len(l.StatesVal) > 0 {
@@ -242,7 +245,7 @@ cvc.versions as total_versions
 	}
 
 	if len(l.NamespaceMatchers) > 0 {
-		q = restrictToNamespaceMatchers(q, "rr.namespace", l.NamespaceMatchers)
+		q = restrictToNamespaceMatchers(q, "c.namespace", l.NamespaceMatchers)
 	}
 
 	if l.LabelSelectorVal != nil {
@@ -255,7 +258,7 @@ cvc.versions as total_versions
 	}
 
 	if !l.IncludeDeletedVal {
-		q = q.Where(sq.Eq{"rr.deleted_at": nil})
+		q = q.Where(sq.Eq{"rr.deleted_at": nil, "c.deleted_at": nil})
 	}
 
 	// Always limit to one more than limit to check if there are more records
@@ -285,6 +288,7 @@ cvc.versions as total_versions
 		err := rows.Scan(
 			&c.Id,
 			&c.Namespace,
+			&c.Name,
 			&c.Labels,
 			&c.Annotations,
 			&c.Version,

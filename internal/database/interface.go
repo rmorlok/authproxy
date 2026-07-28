@@ -7,6 +7,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/encfield"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
+	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -103,6 +104,7 @@ type DB interface {
 	NewestPublishedConnectorVersionForId(ctx context.Context, id apid.ID) (*ConnectorVersion, error)
 	UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersion) error
 	SetConnectorVersionState(ctx context.Context, id apid.ID, version uint64, state ConnectorVersionState) error
+	UpdateConnectorName(ctx context.Context, id apid.ID, name scommon.ResourceName) error
 	DeleteConnector(ctx context.Context, id apid.ID) error
 	ListConnectorVersionsBuilder() ListConnectorVersionsBuilder
 	ListConnectorVersionsFromCursor(ctx context.Context, cursor string) (ListConnectorVersionsExecutor, error)

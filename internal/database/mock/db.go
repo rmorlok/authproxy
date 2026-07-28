@@ -14,6 +14,7 @@ import (
 	database "github.com/rmorlok/authproxy/internal/database"
 	encfield "github.com/rmorlok/authproxy/internal/encfield"
 	auth "github.com/rmorlok/authproxy/internal/schema/auth"
+	common "github.com/rmorlok/authproxy/internal/schema/common"
 	connectors "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	rate_limit "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 	pagination "github.com/rmorlok/authproxy/internal/util/pagination"
@@ -1929,6 +1930,20 @@ func (m *MockDB) UpdateConnectionLabels(ctx context.Context, id apid.ID, labels 
 func (mr *MockDBMockRecorder) UpdateConnectionLabels(ctx, id, labels interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateConnectionLabels", reflect.TypeOf((*MockDB)(nil).UpdateConnectionLabels), ctx, id, labels)
+}
+
+// UpdateConnectorName mocks base method.
+func (m *MockDB) UpdateConnectorName(ctx context.Context, id apid.ID, name common.ResourceName) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateConnectorName", ctx, id, name)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateConnectorName indicates an expected call of UpdateConnectorName.
+func (mr *MockDBMockRecorder) UpdateConnectorName(ctx, id, name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateConnectorName", reflect.TypeOf((*MockDB)(nil).UpdateConnectorName), ctx, id, name)
 }
 
 // UpdateDataEncryptionKeyWrapping mocks base method.

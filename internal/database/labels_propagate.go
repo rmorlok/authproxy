@@ -217,9 +217,10 @@ func (s *service) refreshRateLimitsInNamespace(ctx context.Context, nsPath strin
 
 func (s *service) refreshConnectorVersionsInNamespace(ctx context.Context, nsPath string) error {
 	rows, err := s.sq.
-		Select("id", "version").
-		From(ConnectorVersionsTable).
-		Where(sq.Eq{"namespace": nsPath, "deleted_at": nil}).
+		Select("cv.id", "cv.version").
+		From(ConnectorVersionsTable + " cv").
+		Join(ConnectorsTable + " c ON c.id = cv.id").
+		Where(sq.Eq{"c.namespace": nsPath, "cv.deleted_at": nil, "c.deleted_at": nil}).
 		RunWith(s.db).
 		Query()
 	if err != nil {
@@ -441,10 +442,8 @@ func (s *service) recomputeConnectorVersionLabelsTx(ctx context.Context, id apid
 	var corrected bool
 	err := s.transaction(func(tx *sql.Tx) error {
 		var cv ConnectorVersion
-		err := s.sq.
-			Select(cv.cols()...).
-			From(ConnectorVersionsTable).
-			Where(sq.Eq{"id": id, "version": version, "deleted_at": nil}).
+		err := s.selectConnectorVersions().
+			Where(sq.Eq{"cv.id": id, "cv.version": version, "cv.deleted_at": nil, "c.deleted_at": nil}).
 			RunWith(tx).
 			QueryRow().
 			Scan(cv.fields()...)
