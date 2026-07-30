@@ -18,6 +18,8 @@ authproxy_repo=${AUTHPROXY_IMAGE_REPOSITORY:-ghcr.io/rmorlok/authproxy}
 authproxy_tag=${AUTHPROXY_IMAGE_TAG:-main}
 provider_image=${GO_OAUTH2_SERVER_IMAGE:-ghcr.io/rmorlok/go-oauth2-server:master}
 helm_timeout=${LOADTEST_HELM_TIMEOUT:-5m}
+keda_namespace=${LOADTEST_KEDA_NAMESPACE:-keda}
+keda_release=${LOADTEST_KEDA_RELEASE:-authproxy-loadtest-keda}
 
 loadtest_log "profile: $profile_name"
 loadtest_log "namespace: $namespace"
@@ -27,6 +29,34 @@ loadtest_ensure_namespace "$namespace"
 loadtest_ensure_generated_secrets "$namespace"
 loadtest_apply_observability_assets "$namespace" "$profile_file" "$run_dir"
 
+# KEDA is a cluster add-on, not a workload-local dependency. Reuse an existing
+# controller when the cluster platform already provides one; otherwise install
+# the pinned chart once before rendering the worker ScaledObject.
+keda_operator_namespace=$(kubectl get deployments --all-namespaces \
+  -l app.kubernetes.io/name=keda-operator \
+  -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null || true)
+keda_operator_name=$(kubectl get deployments --all-namespaces \
+  -l app.kubernetes.io/name=keda-operator \
+  -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+if [[ -z "$keda_operator_namespace" || -z "$keda_operator_name" ]]; then
+  loadtest_log "installing KEDA"
+  helm repo add kedacore https://kedacore.github.io/charts >/dev/null
+  helm repo update kedacore >/dev/null
+  helm upgrade --install "$keda_release" kedacore/keda \
+    --namespace "$keda_namespace" \
+    --create-namespace \
+    --version 2.20.1 \
+    --wait \
+    "--timeout=$helm_timeout"
+  keda_operator_namespace="$keda_namespace"
+  keda_operator_name="keda-operator"
+else
+  loadtest_log "using existing KEDA controller $keda_operator_namespace/$keda_operator_name"
+fi
+
+kubectl wait --for=condition=Established crd/scaledobjects.keda.sh "--timeout=$helm_timeout"
+kubectl -n "$keda_operator_namespace" rollout status "deployment/$keda_operator_name" "--timeout=$helm_timeout"
+
 if [[ "${LOADTEST_INSTALL_K6_OPERATOR:-false}" == "true" ]]; then
   loadtest_log "installing k6 Operator"
   helm repo add grafana https://grafana.github.io/helm-charts >/dev/null
@@ -34,16 +64,6 @@ if [[ "${LOADTEST_INSTALL_K6_OPERATOR:-false}" == "true" ]]; then
   helm upgrade --install k6-operator grafana/k6-operator \
     --namespace "$namespace" \
     --set namespace.create=false \
-    --wait \
-    "--timeout=$helm_timeout"
-fi
-
-if [[ "${LOADTEST_INSTALL_KEDA:-false}" == "true" ]]; then
-  loadtest_log "installing KEDA"
-  helm repo add kedacore https://kedacore.github.io/charts >/dev/null
-  helm repo update kedacore >/dev/null
-  helm upgrade --install keda kedacore/keda \
-    --namespace "$namespace" \
     --wait \
     "--timeout=$helm_timeout"
 fi
@@ -83,7 +103,9 @@ write_profile_values() {
 
   {
     printf "replicaCount: %s\n" "$replicas"
-    if [[ "$autoscale" == "true" ]]; then
+    if [[ "$autoscale" == "true" && "$service" == "worker" ]]; then
+      printf "\nqueueAutoscaling:\n  minReplicas: %s\n" "$replicas"
+    elif [[ "$autoscale" == "true" ]]; then
       printf "\nautoscaling:\n  minReplicas: %s\n" "$replicas"
     fi
   } > "$output"
@@ -122,6 +144,11 @@ else
   helm uninstall authproxy-public --namespace "$namespace" --ignore-not-found
 fi
 install_release authproxy-worker "$LOADTEST_ROOT/helm-values/worker.yaml" "$worker_profile_values"
+loadtest_log "waiting for the worker KEDA scaler"
+kubectl -n "$namespace" wait \
+  --for=condition=Ready \
+  scaledobject/authproxy-worker-queue \
+  "--timeout=$helm_timeout"
 
 loadtest_capture_cluster_snapshot "$namespace" "$run_dir"
 loadtest_capture_helm_snapshot "$namespace" "$run_dir"

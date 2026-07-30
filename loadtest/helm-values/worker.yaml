@@ -1,13 +1,22 @@
 replicaCount: 1
 
 autoscaling:
+  enabled: false
+
+queueAutoscaling:
   enabled: true
   minReplicas: 1
   maxReplicas: 8
-  targetCPUUtilizationPercentage: 75
-  # Queue-depth scaling requires a custom-metrics adapter or KEDA. The
-  # baseline profile uses CPU scaling until that dependency is configured.
-  metrics: []
+  pollingInterval: 15
+  cooldownPeriod: 300
+  prometheus:
+    serverAddress: http://prometheus-loadtest:9090
+    query: 'max(authproxy_asynq_queue_size{messaging_destination_name="default"})'
+    threshold: "100"
+    activationThreshold: "1"
+  cpu:
+    enabled: true
+    targetUtilizationPercentage: 75
   behavior:
     scaleUp:
       stabilizationWindowSeconds: 30

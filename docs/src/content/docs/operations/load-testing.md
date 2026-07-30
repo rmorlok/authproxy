@@ -58,8 +58,9 @@ Before a run, verify:
   `up` can install it with `LOADTEST_INSTALL_K6_OPERATOR=true`.
 - The cluster can schedule the largest requested k6 parallelism and the API
   HPA maximum without unschedulable Pods.
-- KEDA is optional. Install it with `LOADTEST_INSTALL_KEDA=true` only when
-  evaluating queue or other custom-metric worker scaling.
+- KEDA is part of the standard load-test path. `up` reuses a cluster-managed
+  controller when one exists, or installs the pinned KEDA chart in the `keda`
+  namespace before deploying the worker `ScaledObject`.
 - The target AuthProxy database, Redis, app-metrics store, encryption key, and
   actor signing keys used by the seeder are the same ones used by the deployed
   AuthProxy releases. Keep this environment isolated from production data.

@@ -1,3 +1,6 @@
+{{- if and .Values.autoscaling.enabled .Values.queueAutoscaling.enabled -}}
+{{- fail "autoscaling.enabled and queueAutoscaling.enabled cannot both be true; KEDA owns the worker HPA when queue autoscaling is enabled" -}}
+{{- end -}}
 {{- if .Values.autoscaling.enabled -}}
 {{- if lt (int .Values.autoscaling.maxReplicas) (int .Values.autoscaling.minReplicas) -}}
 {{- fail "autoscaling.maxReplicas must be greater than or equal to autoscaling.minReplicas" -}}

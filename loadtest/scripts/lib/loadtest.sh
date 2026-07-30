@@ -245,7 +245,9 @@ loadtest_init_run_dir() {
     printf "k6_image=%s\n" "${K6_IMAGE:-grafana/k6:0.54.0}"
     printf "prometheus_url=%s\n" "${LOADTEST_PROMETHEUS_URL:-service/prometheus-loadtest}"
     printf "install_k6_operator=%s\n" "${LOADTEST_INSTALL_K6_OPERATOR:-false}"
-    printf "install_keda=%s\n" "${LOADTEST_INSTALL_KEDA:-false}"
+    printf "keda_required=true\n"
+    printf "keda_namespace=%s\n" "${LOADTEST_KEDA_NAMESPACE:-keda}"
+    printf "keda_release=%s\n" "${LOADTEST_KEDA_RELEASE:-authproxy-loadtest-keda}"
   } > "$run_dir/metadata.env"
 
   printf "%s\n" "$run_dir"
@@ -416,6 +418,8 @@ loadtest_capture_cluster_snapshot() {
   kubectl -n "$namespace" get deployments -o yaml > "$run_dir/kubernetes/deployments.yaml" 2>&1 || true
   kubectl -n "$namespace" get services -o wide > "$run_dir/kubernetes/services.txt" 2>&1 || true
   kubectl -n "$namespace" get hpa -o yaml > "$run_dir/kubernetes/hpa.yaml" 2>&1 || true
+  kubectl -n "$namespace" get scaledobjects.keda.sh -o yaml > "$run_dir/kubernetes/scaledobjects.yaml" 2>&1 || true
+  kubectl get deployments --all-namespaces -l app.kubernetes.io/name=keda-operator -o yaml > "$run_dir/kubernetes/keda-operator.yaml" 2>&1 || true
   kubectl -n "$namespace" get events --sort-by=.lastTimestamp > "$run_dir/kubernetes/events.txt" 2>&1 || true
   kubectl -n "$namespace" get replicasets -o wide > "$run_dir/kubernetes/replicasets.txt" 2>&1 || true
   kubectl -n "$namespace" top pods > "$run_dir/kubernetes/pod-resource-usage.txt" 2>&1 || true
@@ -441,12 +445,18 @@ loadtest_capture_helm_snapshot() {
   local namespace=$1
   local run_dir=$2
   local release
+  local keda_namespace=${LOADTEST_KEDA_NAMESPACE:-keda}
+  local keda_release=${LOADTEST_KEDA_RELEASE:-authproxy-loadtest-keda}
 
   helm -n "$namespace" list > "$run_dir/helm/list.txt" 2>&1 || true
   for release in "${LOADTEST_AUTH_PROXY_RELEASES[@]}"; do
     helm -n "$namespace" get values "$release" --all > "$run_dir/helm/${release}-values.yaml" 2>&1 || true
     helm -n "$namespace" get manifest "$release" > "$run_dir/helm/${release}-manifest.yaml" 2>&1 || true
   done
+
+  helm -n "$keda_namespace" list > "$run_dir/helm/keda-list.txt" 2>&1 || true
+  helm -n "$keda_namespace" get values "$keda_release" --all > "$run_dir/helm/keda-values.yaml" 2>&1 || true
+  helm -n "$keda_namespace" get manifest "$keda_release" > "$run_dir/helm/keda-manifest.yaml" 2>&1 || true
 }
 
 loadtest_extract_k6_summary() {

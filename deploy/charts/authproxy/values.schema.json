@@ -52,6 +52,43 @@
         "behavior": { "type": "object" }
       }
     },
+    "keda": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "enabled": { "type": "boolean" }
+      }
+    },
+    "queueAutoscaling": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "minReplicas": { "type": "integer", "minimum": 0 },
+        "maxReplicas": { "type": "integer", "minimum": 1 },
+        "pollingInterval": { "type": "integer", "minimum": 1 },
+        "cooldownPeriod": { "type": "integer", "minimum": 0 },
+        "prometheus": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "serverAddress": { "type": "string" },
+            "query": { "type": "string" },
+            "threshold": { "type": "string", "minLength": 1 },
+            "activationThreshold": { "type": "string", "minLength": 1 }
+          }
+        },
+        "cpu": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "targetUtilizationPercentage": { "type": "integer", "minimum": 1, "maximum": 100 }
+          }
+        },
+        "behavior": { "type": "object" }
+      }
+    },
     "podAnnotations":   { "type": "object", "additionalProperties": { "type": "string" } },
     "podLabels":        { "type": "object", "additionalProperties": { "type": "string" } },
     "podSecurityContext": { "type": "object" },

@@ -44,7 +44,8 @@ replicaCount: 1
 # -- HorizontalPodAutoscaler configuration. Disabled by default so existing
 # installs keep using `replicaCount`. When enabled, the Deployment omits
 # `spec.replicas` and the HPA owns the desired replica count. Install this
-# chart once per service role for independent autoscaling.
+# chart once per service role for independent autoscaling. Do not enable this
+# together with `queueAutoscaling`: KEDA owns the worker HPA in that mode.
 autoscaling:
   enabled: false
   minReplicas: 1
@@ -59,6 +60,49 @@ autoscaling:
   metrics: []
   # -- Optional autoscaling/v2 HPA behavior block.
   behavior: {}
+
+# -- Install the bundled KEDA controller and its CRDs. Disabled by default so
+# the chart reuses the cluster-managed KEDA controller. Enable on exactly one
+# release only when the cluster does not already manage KEDA.
+keda:
+  enabled: false
+
+# -- Worker autoscaling based on the global pending Asynq queue. KEDA creates
+# the HPA, combining this Prometheus trigger with the optional CPU trigger.
+# The generic chart does not deploy Prometheus, so an operator must supply its
+# reachable HTTP endpoint before enabling this block.
+queueAutoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 10
+  pollingInterval: 15
+  cooldownPeriod: 300
+  prometheus:
+    # -- Prometheus HTTP endpoint reachable from the KEDA operator.
+    serverAddress: ""
+    # -- Must return one global scalar/vector result. `max` collapses the
+    # identical Redis-global queue depth reported by every worker pod.
+    query: 'max(authproxy_asynq_queue_size{messaging_destination_name="default"})'
+    # -- Pending tasks each worker replica should absorb before scale-out.
+    threshold: "100"
+    activationThreshold: "1"
+  cpu:
+    # -- CPU utilization requires `resources.requests.cpu` on the worker.
+    enabled: true
+    targetUtilizationPercentage: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
 
 # -- Annotations applied to each pod.
 podAnnotations: {}
