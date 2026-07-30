@@ -1,0 +1,77 @@
+---
+import { render, type CollectionEntry } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getPostSlug, getPublishedPosts, postUrl } from '../../lib/posts';
+
+export async function getStaticPaths() {
+  const posts = await getPublishedPosts();
+  return posts.map((post) => ({
+    params: { slug: getPostSlug(post) },
+    props: { post },
+  }));
+}
+
+interface Props {
+  post: CollectionEntry<'posts'>;
+}
+
+const { post } = Astro.props;
+const { Content } = await render(post);
+const { data } = post;
+const structuredData = {
+  '@context': 'https://schema.org',
+  '@type': 'BlogPosting',
+  headline: data.title,
+  description: data.description,
+  datePublished: data.publishedAt.toISOString(),
+  dateModified: (data.updatedAt ?? data.publishedAt).toISOString(),
+  author: {
+    '@type': 'Organization',
+    name: data.author,
+  },
+  publisher: {
+    '@type': 'Organization',
+    name: 'AuthProxy',
+    url: 'https://authproxy.net',
+  },
+  mainEntityOfPage: `https://blog.authproxy.net${postUrl(post)}`,
+  image: data.cover ? `https://blog.authproxy.net${data.cover.src}` : 'https://blog.authproxy.net/social-card.svg',
+};
+---
+
+<BaseLayout
+  title={data.title}
+  description={data.description}
+  canonicalPath={postUrl(post)}
+  image={data.cover?.src}
+  article
+  publishedAt={data.publishedAt}
+  updatedAt={data.updatedAt}
+  tags={data.tags}
+  noindex={data.draft}
+>
+  <Fragment slot="head">
+    <script type="application/ld+json" set:html={JSON.stringify(structuredData)}></script>
+  </Fragment>
+  <article class="post">
+    <header class="post-header">
+      <p class="eyebrow">{data.tags.join(' · ')}</p>
+      <h1>{data.title}</h1>
+      <p class="post-description">{data.description}</p>
+      <div class="post-meta">
+        <time datetime={data.publishedAt.toISOString()}>
+          {data.publishedAt.toLocaleDateString('en-US', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+            timeZone: 'UTC',
+          })}
+        </time>
+        <span aria-hidden="true">·</span>
+        <span>{data.author}</span>
+        {data.draft && <span class="draft-badge">Draft</span>}
+      </div>
+    </header>
+    <div class="prose"><Content /></div>
+  </article>
+</BaseLayout>

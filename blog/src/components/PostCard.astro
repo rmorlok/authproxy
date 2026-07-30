@@ -1,0 +1,42 @@
+---
+import { Image } from 'astro:assets';
+import type { Post } from '../lib/posts';
+import { postUrl } from '../lib/posts';
+
+interface Props {
+  post: Post;
+}
+
+const { post } = Astro.props;
+const { data } = post;
+---
+
+<article class="post-card">
+  {
+    data.cover && (
+      <a class="post-card-cover" href={postUrl(post)} tabindex="-1" aria-hidden="true">
+        <Image src={data.cover} alt={data.coverAlt ?? ''} widths={[480, 800]} sizes="(min-width: 54rem) 45vw, 100vw" />
+      </a>
+    )
+  }
+  <div class="post-card-body">
+    <div class="post-meta">
+      <time datetime={data.publishedAt.toISOString()}>
+        {data.publishedAt.toLocaleDateString('en-US', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+          timeZone: 'UTC',
+        })}
+      </time>
+      <span aria-hidden="true">·</span>
+      <span>{data.author}</span>
+      {data.draft && <span class="draft-badge">Draft</span>}
+    </div>
+    <h2><a href={postUrl(post)}>{data.title}</a></h2>
+    <p>{data.description}</p>
+    <ul class="tag-list" aria-label="Post tags">
+      {data.tags.map((tag) => <li><a href={`/tags/${tag}/`}>{tag}</a></li>)}
+    </ul>
+  </div>
+</article>

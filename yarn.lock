@@ -379,6 +379,17 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@authproxy/blog@workspace:blog":
+  version: 0.0.0-use.local
+  resolution: "@authproxy/blog@workspace:blog"
+  dependencies:
+    "@astrojs/sitemap": "npm:^3.7.2"
+    astro: "npm:^7.0.7"
+    astro-mermaid: "npm:^2.1.0"
+    mermaid: "npm:^11.16.0"
+  languageName: unknown
+  linkType: soft
+
 "@authproxy/demo-shell@workspace:demos/shell/frontend":
   version: 0.0.0-use.local
   resolution: "@authproxy/demo-shell@workspace:demos/shell/frontend"

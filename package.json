@@ -1,12 +1,16 @@
 {
   "private": true,
   "workspaces": [
+    "blog",
     "docs",
     "ui/*",
     "sdks/js",
     "demos/*/frontend"
   ],
   "scripts": {
+    "blog:build": "yarn workspace @authproxy/blog build",
+    "blog:dev": "yarn workspace @authproxy/blog dev",
+    "blog:preview": "yarn workspace @authproxy/blog preview",
     "docs:build": "yarn workspace @authproxy/docs build",
     "docs:dev": "yarn workspace @authproxy/docs dev",
     "docs:preview": "yarn workspace @authproxy/docs preview"

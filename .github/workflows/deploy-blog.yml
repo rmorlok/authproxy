@@ -1,0 +1,99 @@
+# schema: https://json.schemastore.org/github-workflow.json
+name: Deploy Blog
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'blog/**'
+      - 'package.json'
+      - 'yarn.lock'
+      - '.github/workflows/deploy-blog.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'blog/**'
+      - 'package.json'
+      - 'yarn.lock'
+      - '.github/workflows/deploy-blog.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-blog-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build blog
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Volta
+        uses: volta-cli/action@v4
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Build blog
+        run: yarn blog:build
+
+      - name: Upload static site
+        uses: actions/upload-artifact@v4
+        with:
+          name: authproxy-blog-${{ github.sha }}
+          path: blog/dist
+          if-no-files-found: error
+          retention-days: 1
+
+  deploy:
+    name: Publish blog
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: blog-production
+      url: https://blog.authproxy.net
+    permissions:
+      contents: read
+      id-token: write
+    timeout-minutes: 15
+    steps:
+      - name: Download static site
+        uses: actions/download-artifact@v4
+        with:
+          name: authproxy-blog-${{ github.sha }}
+          path: blog/dist
+
+      - name: Assume the blog deployment role
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_BLOG_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Upload static site
+        env:
+          BLOG_BUCKET: ${{ vars.BLOG_BUCKET }}
+        run: |
+          set -euo pipefail
+          test -n "${BLOG_BUCKET}"
+          aws s3 sync blog/dist "s3://${BLOG_BUCKET}" \
+            --delete \
+            --cache-control 'public, max-age=300, must-revalidate'
+          aws s3 cp blog/dist/_astro "s3://${BLOG_BUCKET}/_astro" \
+            --recursive \
+            --cache-control 'public, max-age=31536000, immutable'
+
+      - name: Invalidate CloudFront
+        env:
+          DISTRIBUTION_ID: ${{ vars.BLOG_CLOUDFRONT_DISTRIBUTION_ID }}
+        run: |
+          set -euo pipefail
+          test -n "${DISTRIBUTION_ID}"
+          aws cloudfront create-invalidation \
+            --distribution-id "${DISTRIBUTION_ID}" \
+            --paths '/*'

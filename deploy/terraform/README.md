@@ -1,17 +1,19 @@
 # Terraform: AuthProxy AWS infrastructure
 
-Two-module layout for the EKS deployment pipeline:
+Three-module layout for AWS infrastructure:
 
 ```
 deploy/terraform/
 ├── bootstrap/   # S3 state bucket + DynamoDB lock table (local state, one-time)
-└── eks/        # VPC, EKS, IAM OIDC, Route53 (S3 remote state)
+├── eks/         # VPC, EKS, IAM OIDC, Route53 (S3 remote state)
+└── blog/       # Private S3 + CloudFront blog, Route53 records, GH deploy role
 ```
 
 | Module        | Backend          | Apply order | Why                                            |
 |---------------|------------------|-------------|------------------------------------------------|
 | `bootstrap/`  | local            | First       | Creates the resources the eks/ backend uses    |
 | `eks/`        | S3 (from bootstrap) | Second   | The main infrastructure                        |
+| `blog/`       | S3 (from bootstrap) | After EKS | Static blog; reads the existing Route53 zone and GitHub OIDC provider |
 
 See each module's README for details. This file covers the cross-module
 apply procedure and one-time manual steps. For ongoing operations
