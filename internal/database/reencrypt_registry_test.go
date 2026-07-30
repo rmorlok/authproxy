@@ -256,16 +256,15 @@ func TestReEncryptRegistry(t *testing.T) {
 		require.NoError(t, err)
 
 		cvId := apid.New(apid.PrefixConnectorVersion)
-		cv := &ConnectorVersion{
+		cv := &ConnectorWithDefinition{
 			Id:                  cvId,
 			Version:             1,
 			Namespace:           "root",
-			State:               ConnectorVersionStateDraft,
-			Hash:                "abc123",
+			State:               ConnectorDefinitionVersionStateDraft,
 			EncryptedDefinition: encfield.EncryptedField{ID: oldEKVId, Data: "ZGVm"},
 			Labels:              Labels{},
 		}
-		err = db.UpsertConnectorVersion(ctx, cv)
+		err = db.UpsertConnectorDefinitionVersion(ctx, cv)
 		require.NoError(t, err)
 
 		var cvTargets []ReEncryptionTarget

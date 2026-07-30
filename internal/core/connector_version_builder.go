@@ -51,7 +51,7 @@ func (b *connectorVersionBuilder) WithId(id apid.ID) *connectorVersionBuilder {
 	return b
 }
 
-func (b *connectorVersionBuilder) WithState(state database.ConnectorVersionState) *connectorVersionBuilder {
+func (b *connectorVersionBuilder) WithState(state database.ConnectorDefinitionVersionState) *connectorVersionBuilder {
 	b.versionSetters = append(b.versionSetters,
 		func(v *ConnectorVersion) {
 			v.State = state

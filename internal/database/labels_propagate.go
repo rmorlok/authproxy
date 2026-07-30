@@ -22,7 +22,7 @@ import (
 // helpers that do that work.
 //
 // All public entry points (RefreshNamespaceLabelsCarryForward,
-// RefreshConnectionsForConnectorVersion) drive the walk WITHOUT holding a
+// RefreshConnectionsForConnector) drive the walk WITHOUT holding a
 // long-running transaction — each row's update runs in its own short
 // transaction so concurrent reads are not blocked. Some intermediate state
 // drift between rows during a propagation pass is acceptable; the daily
@@ -72,10 +72,10 @@ func (s *service) RefreshNamespaceLabelsCarryForward(ctx context.Context, nsPath
 	return nil
 }
 
-// RefreshConnectionsForConnectorVersion re-derives the materialized apxy/
+// RefreshConnectionsForConnector re-derives the materialized apxy/
 // portion of every connection pointing at the logical connector. Labels are
 // connector-owned, so a change applies across every definition version.
-func (s *service) RefreshConnectionsForConnectorVersion(ctx context.Context, id apid.ID, _ uint64) error {
+func (s *service) RefreshConnectionsForConnector(ctx context.Context, id apid.ID) error {
 	rows, err := s.sq.
 		Select("id").
 		From(ConnectionsTable).
@@ -415,7 +415,7 @@ func (s *service) recomputeRateLimitLabelsTx(ctx context.Context, id apid.ID) (b
 func (s *service) recomputeConnectorLabelsTx(ctx context.Context, id apid.ID) (bool, error) {
 	var corrected bool
 	err := s.transaction(func(tx *sql.Tx) error {
-		var connector connectorResource
+		var connector Connector
 		err := s.sq.
 			Select(connector.cols()...).
 			From(ConnectorsTable).
@@ -623,7 +623,7 @@ func (s *service) reconcileConnectors(ctx context.Context, batchSize int32, limi
 		ctx,
 		s.ListConnectorsBuilder().Limit(batchSize).Enumerate,
 		limiter,
-		func(connector Connector) error {
+		func(connector ConnectorWithDefinition) error {
 			wasCorrected, err := s.recomputeConnectorLabelsTx(ctx, connector.Id)
 			if err != nil {
 				return err

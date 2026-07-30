@@ -17,28 +17,24 @@ const (
 	ConnectorVersionStateArchived ConnectorVersionState = "archived"
 )
 
-type ConnectorVersionStates []ConnectorVersionState
-
 // ConnectorJson represents the API summary projection of a connector version.
 //
 //	@Description	Connector API summary response
 type ConnectorJson struct {
-	Id            apid.ID                `json:"id" yaml:"id" swaggertype:"string" example:"cxr_test550e8400abcde"`
-	Version       uint64                 `json:"version" yaml:"version" example:"1"`
-	Namespace     string                 `json:"namespace" yaml:"namespace" example:"root.acme"`
-	State         ConnectorVersionState  `json:"state" yaml:"state" swaggertype:"string" example:"primary"`
-	DisplayName   string                 `json:"display_name" yaml:"display_name" example:"Salesforce"`
-	Highlight     string                 `json:"highlight,omitempty" yaml:"highlight,omitempty" example:"CRM platform"`
-	Description   string                 `json:"description" yaml:"description" example:"Salesforce CRM integration"`
-	StatusPageUrl string                 `json:"status_page_url,omitempty" yaml:"status_page_url,omitempty" example:"https://status.salesforce.com"`
-	Logo          string                 `json:"logo" yaml:"logo" example:"https://example.com/logo.png"`
-	HasConfigure  bool                   `json:"has_configure" yaml:"has_configure" example:"false"`
-	Labels        map[string]string      `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Annotations   map[string]string      `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	CreatedAt     time.Time              `json:"created_at" yaml:"created_at"`
-	UpdatedAt     time.Time              `json:"updated_at" yaml:"updated_at"`
-	Versions      int64                  `json:"versions,omitempty" yaml:"versions,omitempty" example:"2"`
-	States        ConnectorVersionStates `json:"states,omitempty" yaml:"states,omitempty" swaggertype:"array,string"`
+	Id            apid.ID               `json:"id" yaml:"id" swaggertype:"string" example:"cxr_test550e8400abcde"`
+	Version       uint64                `json:"version" yaml:"version" example:"1"`
+	Namespace     string                `json:"namespace" yaml:"namespace" example:"root.acme"`
+	State         ConnectorVersionState `json:"state" yaml:"state" swaggertype:"string" example:"primary"`
+	DisplayName   string                `json:"display_name" yaml:"display_name" example:"Salesforce"`
+	Highlight     string                `json:"highlight,omitempty" yaml:"highlight,omitempty" example:"CRM platform"`
+	Description   string                `json:"description" yaml:"description" example:"Salesforce CRM integration"`
+	StatusPageUrl string                `json:"status_page_url,omitempty" yaml:"status_page_url,omitempty" example:"https://status.salesforce.com"`
+	Logo          string                `json:"logo" yaml:"logo" example:"https://example.com/logo.png"`
+	HasConfigure  bool                  `json:"has_configure" yaml:"has_configure" example:"false"`
+	Labels        map[string]string     `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Annotations   map[string]string     `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	CreatedAt     time.Time             `json:"created_at" yaml:"created_at"`
+	UpdatedAt     time.Time             `json:"updated_at" yaml:"updated_at"`
 }
 
 type ListConnectorsResponseJson struct {

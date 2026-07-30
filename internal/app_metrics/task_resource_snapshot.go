@@ -8,6 +8,7 @@ import (
 
 	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/internal/apctx"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -183,10 +184,14 @@ func (h *ResourceSnapshotTaskHandler) snapshotConnectors(ctx context.Context, sa
 	total := 0
 	err := h.db.ListConnectorsBuilder().
 		Limit(resourceSnapshotBatchSize).
-		Enumerate(ctx, func(page pagination.PageResult[database.Connector]) (pagination.KeepGoing, error) {
+		Enumerate(ctx, func(page pagination.PageResult[database.ConnectorWithDefinition]) (pagination.KeepGoing, error) {
 			samples := make([]*ConnectorResourceSample, 0, len(page.Results))
 			for _, connector := range page.Results {
 				connector := connector
+				totalVersions, err := h.countConnectorDefinitionVersions(ctx, connector.Id)
+				if err != nil {
+					return pagination.Stop, err
+				}
 				samples = append(samples, &ConnectorResourceSample{
 					SampledAt:         sampledAt,
 					ResourceType:      ResourceTypeConnector,
@@ -195,7 +200,7 @@ func (h *ResourceSnapshotTaskHandler) snapshotConnectors(ctx context.Context, sa
 					Labels:            connector.Labels,
 					State:             connector.State,
 					ConnectorVersion:  connector.Version,
-					TotalVersions:     connector.TotalVersions,
+					TotalVersions:     totalVersions,
 					ResourceCreatedAt: connector.CreatedAt,
 					ResourceUpdatedAt: connector.UpdatedAt,
 					ResourceDeletedAt: connector.DeletedAt,
@@ -213,11 +218,26 @@ func (h *ResourceSnapshotTaskHandler) snapshotConnectors(ctx context.Context, sa
 	return total, nil
 }
 
+func (h *ResourceSnapshotTaskHandler) countConnectorDefinitionVersions(ctx context.Context, connectorID apid.ID) (int64, error) {
+	var total int64
+	err := h.db.ListConnectorDefinitionVersionsBuilder().
+		ForId(connectorID).
+		Limit(resourceSnapshotBatchSize).
+		Enumerate(ctx, func(page pagination.PageResult[database.ConnectorWithDefinition]) (pagination.KeepGoing, error) {
+			total += int64(len(page.Results))
+			return pagination.Continue, nil
+		})
+	if err != nil {
+		return 0, fmt.Errorf("failed to count definition versions for connector %s: %w", connectorID, err)
+	}
+	return total, nil
+}
+
 func (h *ResourceSnapshotTaskHandler) snapshotConnectorVersions(ctx context.Context, sampledAt time.Time) (int, error) {
 	total := 0
-	err := h.db.ListConnectorVersionsBuilder().
+	err := h.db.ListConnectorDefinitionVersionsBuilder().
 		Limit(resourceSnapshotBatchSize).
-		Enumerate(ctx, func(page pagination.PageResult[database.ConnectorVersion]) (pagination.KeepGoing, error) {
+		Enumerate(ctx, func(page pagination.PageResult[database.ConnectorWithDefinition]) (pagination.KeepGoing, error) {
 			samples := make([]*ConnectorVersionResourceSample, 0, len(page.Results))
 			for _, connectorVersion := range page.Results {
 				connectorVersion := connectorVersion

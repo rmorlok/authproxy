@@ -73,7 +73,7 @@ type ConnectorResourceSample struct {
 	ResourceID        apid.ID
 	Namespace         string
 	Labels            database.Labels
-	State             database.ConnectorVersionState
+	State             database.ConnectorDefinitionVersionState
 	ConnectorVersion  uint64
 	TotalVersions     int64
 	ResourceCreatedAt time.Time
@@ -89,7 +89,7 @@ type ConnectorVersionResourceSample struct {
 	ResourceID        apid.ID
 	Namespace         string
 	Labels            database.Labels
-	State             database.ConnectorVersionState
+	State             database.ConnectorDefinitionVersionState
 	ConnectorVersion  uint64
 	ResourceCreatedAt time.Time
 	ResourceUpdatedAt time.Time

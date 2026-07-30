@@ -13,12 +13,12 @@ type ConnectorVersion interface {
 	GetId() apid.ID
 	GetNamespace() string
 	GetVersion() uint64
-	GetState() database.ConnectorVersionState
+	GetState() database.ConnectorDefinitionVersionState
 	GetHash() string
 	GetCreatedAt() time.Time
 	GetUpdatedAt() time.Time
 	GetLabels() map[string]string
 	GetAnnotations() map[string]string
 	GetDefinition() *cschema.Connector
-	SetState(ctx context.Context, state database.ConnectorVersionState) error
+	SetState(ctx context.Context, state database.ConnectorDefinitionVersionState) error
 }

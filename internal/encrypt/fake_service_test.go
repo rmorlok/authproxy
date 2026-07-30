@@ -18,12 +18,11 @@ func TestFakeService(t *testing.T) {
 	someString := "some string"
 	for _, doBase64 := range []bool{true, false} {
 		t.Run(fmt.Sprintf("doBase64=%v", doBase64), func(t *testing.T) {
-			connectorVersion := database.ConnectorVersion{
+			connectorVersion := database.ConnectorWithDefinition{
 				Id:                  apid.New(apid.PrefixConnectorVersion),
 				Version:             1,
-				State:               database.ConnectorVersionStatePrimary,
+				State:               database.ConnectorDefinitionVersionStatePrimary,
 				Labels:              map[string]string{"type": "test"},
-				Hash:                "test",
 				EncryptedDefinition: encfield.EncryptedField{ID: "dek_test", Data: "test"},
 			}
 

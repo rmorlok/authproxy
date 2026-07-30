@@ -879,79 +879,79 @@ func (mr *MockDBMockRecorder) GetConnection(ctx, id interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnection", reflect.TypeOf((*MockDB)(nil).GetConnection), ctx, id)
 }
 
-// GetConnectorVersion mocks base method.
-func (m *MockDB) GetConnectorVersion(ctx context.Context, id apid.ID, version uint64) (*database.ConnectorVersion, error) {
+// GetConnectorDefinitionVersion mocks base method.
+func (m *MockDB) GetConnectorDefinitionVersion(ctx context.Context, id apid.ID, version uint64) (*database.ConnectorWithDefinition, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetConnectorVersion", ctx, id, version)
-	ret0, _ := ret[0].(*database.ConnectorVersion)
+	ret := m.ctrl.Call(m, "GetConnectorDefinitionVersion", ctx, id, version)
+	ret0, _ := ret[0].(*database.ConnectorWithDefinition)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetConnectorVersion indicates an expected call of GetConnectorVersion.
-func (mr *MockDBMockRecorder) GetConnectorVersion(ctx, id, version interface{}) *gomock.Call {
+// GetConnectorDefinitionVersion indicates an expected call of GetConnectorDefinitionVersion.
+func (mr *MockDBMockRecorder) GetConnectorDefinitionVersion(ctx, id, version interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnectorVersion", reflect.TypeOf((*MockDB)(nil).GetConnectorVersion), ctx, id, version)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnectorDefinitionVersion", reflect.TypeOf((*MockDB)(nil).GetConnectorDefinitionVersion), ctx, id, version)
 }
 
-// GetConnectorVersionForLabels mocks base method.
-func (m *MockDB) GetConnectorVersionForLabels(ctx context.Context, labelSelector string) (*database.ConnectorVersion, error) {
+// GetConnectorDefinitionVersionForLabels mocks base method.
+func (m *MockDB) GetConnectorDefinitionVersionForLabels(ctx context.Context, labelSelector string) (*database.ConnectorWithDefinition, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetConnectorVersionForLabels", ctx, labelSelector)
-	ret0, _ := ret[0].(*database.ConnectorVersion)
+	ret := m.ctrl.Call(m, "GetConnectorDefinitionVersionForLabels", ctx, labelSelector)
+	ret0, _ := ret[0].(*database.ConnectorWithDefinition)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetConnectorVersionForLabels indicates an expected call of GetConnectorVersionForLabels.
-func (mr *MockDBMockRecorder) GetConnectorVersionForLabels(ctx, labelSelector interface{}) *gomock.Call {
+// GetConnectorDefinitionVersionForLabels indicates an expected call of GetConnectorDefinitionVersionForLabels.
+func (mr *MockDBMockRecorder) GetConnectorDefinitionVersionForLabels(ctx, labelSelector interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnectorVersionForLabels", reflect.TypeOf((*MockDB)(nil).GetConnectorVersionForLabels), ctx, labelSelector)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnectorDefinitionVersionForLabels", reflect.TypeOf((*MockDB)(nil).GetConnectorDefinitionVersionForLabels), ctx, labelSelector)
 }
 
-// GetConnectorVersionForLabelsAndVersion mocks base method.
-func (m *MockDB) GetConnectorVersionForLabelsAndVersion(ctx context.Context, labelSelector string, version uint64) (*database.ConnectorVersion, error) {
+// GetConnectorDefinitionVersionForLabelsAndVersion mocks base method.
+func (m *MockDB) GetConnectorDefinitionVersionForLabelsAndVersion(ctx context.Context, labelSelector string, version uint64) (*database.ConnectorWithDefinition, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetConnectorVersionForLabelsAndVersion", ctx, labelSelector, version)
-	ret0, _ := ret[0].(*database.ConnectorVersion)
+	ret := m.ctrl.Call(m, "GetConnectorDefinitionVersionForLabelsAndVersion", ctx, labelSelector, version)
+	ret0, _ := ret[0].(*database.ConnectorWithDefinition)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetConnectorVersionForLabelsAndVersion indicates an expected call of GetConnectorVersionForLabelsAndVersion.
-func (mr *MockDBMockRecorder) GetConnectorVersionForLabelsAndVersion(ctx, labelSelector, version interface{}) *gomock.Call {
+// GetConnectorDefinitionVersionForLabelsAndVersion indicates an expected call of GetConnectorDefinitionVersionForLabelsAndVersion.
+func (mr *MockDBMockRecorder) GetConnectorDefinitionVersionForLabelsAndVersion(ctx, labelSelector, version interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnectorVersionForLabelsAndVersion", reflect.TypeOf((*MockDB)(nil).GetConnectorVersionForLabelsAndVersion), ctx, labelSelector, version)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnectorDefinitionVersionForLabelsAndVersion", reflect.TypeOf((*MockDB)(nil).GetConnectorDefinitionVersionForLabelsAndVersion), ctx, labelSelector, version)
 }
 
-// GetConnectorVersionForState mocks base method.
-func (m *MockDB) GetConnectorVersionForState(ctx context.Context, id apid.ID, state database.ConnectorVersionState) (*database.ConnectorVersion, error) {
+// GetConnectorDefinitionVersionForState mocks base method.
+func (m *MockDB) GetConnectorDefinitionVersionForState(ctx context.Context, id apid.ID, state database.ConnectorDefinitionVersionState) (*database.ConnectorWithDefinition, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetConnectorVersionForState", ctx, id, state)
-	ret0, _ := ret[0].(*database.ConnectorVersion)
+	ret := m.ctrl.Call(m, "GetConnectorDefinitionVersionForState", ctx, id, state)
+	ret0, _ := ret[0].(*database.ConnectorWithDefinition)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetConnectorVersionForState indicates an expected call of GetConnectorVersionForState.
-func (mr *MockDBMockRecorder) GetConnectorVersionForState(ctx, id, state interface{}) *gomock.Call {
+// GetConnectorDefinitionVersionForState indicates an expected call of GetConnectorDefinitionVersionForState.
+func (mr *MockDBMockRecorder) GetConnectorDefinitionVersionForState(ctx, id, state interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnectorVersionForState", reflect.TypeOf((*MockDB)(nil).GetConnectorVersionForState), ctx, id, state)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnectorDefinitionVersionForState", reflect.TypeOf((*MockDB)(nil).GetConnectorDefinitionVersionForState), ctx, id, state)
 }
 
-// GetConnectorVersions mocks base method.
-func (m *MockDB) GetConnectorVersions(ctx context.Context, requested []database.ConnectorVersionId) (map[database.ConnectorVersionId]*database.ConnectorVersion, error) {
+// GetConnectorDefinitionVersions mocks base method.
+func (m *MockDB) GetConnectorDefinitionVersions(ctx context.Context, requested []database.ConnectorDefinitionVersionId) (map[database.ConnectorDefinitionVersionId]*database.ConnectorWithDefinition, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetConnectorVersions", ctx, requested)
-	ret0, _ := ret[0].(map[database.ConnectorVersionId]*database.ConnectorVersion)
+	ret := m.ctrl.Call(m, "GetConnectorDefinitionVersions", ctx, requested)
+	ret0, _ := ret[0].(map[database.ConnectorDefinitionVersionId]*database.ConnectorWithDefinition)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetConnectorVersions indicates an expected call of GetConnectorVersions.
-func (mr *MockDBMockRecorder) GetConnectorVersions(ctx, requested interface{}) *gomock.Call {
+// GetConnectorDefinitionVersions indicates an expected call of GetConnectorDefinitionVersions.
+func (mr *MockDBMockRecorder) GetConnectorDefinitionVersions(ctx, requested interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnectorVersions", reflect.TypeOf((*MockDB)(nil).GetConnectorVersions), ctx, requested)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnectorDefinitionVersions", reflect.TypeOf((*MockDB)(nil).GetConnectorDefinitionVersions), ctx, requested)
 }
 
 // GetCurrentDataEncryptionKeyForKey mocks base method.
@@ -1192,33 +1192,33 @@ func (mr *MockDBMockRecorder) ListConnectionsFromCursor(ctx, cursor interface{})
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListConnectionsFromCursor", reflect.TypeOf((*MockDB)(nil).ListConnectionsFromCursor), ctx, cursor)
 }
 
-// ListConnectorVersionsBuilder mocks base method.
-func (m *MockDB) ListConnectorVersionsBuilder() database.ListConnectorVersionsBuilder {
+// ListConnectorDefinitionVersionsBuilder mocks base method.
+func (m *MockDB) ListConnectorDefinitionVersionsBuilder() database.ListConnectorDefinitionVersionsBuilder {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListConnectorVersionsBuilder")
-	ret0, _ := ret[0].(database.ListConnectorVersionsBuilder)
+	ret := m.ctrl.Call(m, "ListConnectorDefinitionVersionsBuilder")
+	ret0, _ := ret[0].(database.ListConnectorDefinitionVersionsBuilder)
 	return ret0
 }
 
-// ListConnectorVersionsBuilder indicates an expected call of ListConnectorVersionsBuilder.
-func (mr *MockDBMockRecorder) ListConnectorVersionsBuilder() *gomock.Call {
+// ListConnectorDefinitionVersionsBuilder indicates an expected call of ListConnectorDefinitionVersionsBuilder.
+func (mr *MockDBMockRecorder) ListConnectorDefinitionVersionsBuilder() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListConnectorVersionsBuilder", reflect.TypeOf((*MockDB)(nil).ListConnectorVersionsBuilder))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListConnectorDefinitionVersionsBuilder", reflect.TypeOf((*MockDB)(nil).ListConnectorDefinitionVersionsBuilder))
 }
 
-// ListConnectorVersionsFromCursor mocks base method.
-func (m *MockDB) ListConnectorVersionsFromCursor(ctx context.Context, cursor string) (database.ListConnectorVersionsExecutor, error) {
+// ListConnectorDefinitionVersionsFromCursor mocks base method.
+func (m *MockDB) ListConnectorDefinitionVersionsFromCursor(ctx context.Context, cursor string) (database.ListConnectorDefinitionVersionsExecutor, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListConnectorVersionsFromCursor", ctx, cursor)
-	ret0, _ := ret[0].(database.ListConnectorVersionsExecutor)
+	ret := m.ctrl.Call(m, "ListConnectorDefinitionVersionsFromCursor", ctx, cursor)
+	ret0, _ := ret[0].(database.ListConnectorDefinitionVersionsExecutor)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ListConnectorVersionsFromCursor indicates an expected call of ListConnectorVersionsFromCursor.
-func (mr *MockDBMockRecorder) ListConnectorVersionsFromCursor(ctx, cursor interface{}) *gomock.Call {
+// ListConnectorDefinitionVersionsFromCursor indicates an expected call of ListConnectorDefinitionVersionsFromCursor.
+func (mr *MockDBMockRecorder) ListConnectorDefinitionVersionsFromCursor(ctx, cursor interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListConnectorVersionsFromCursor", reflect.TypeOf((*MockDB)(nil).ListConnectorVersionsFromCursor), ctx, cursor)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListConnectorDefinitionVersionsFromCursor", reflect.TypeOf((*MockDB)(nil).ListConnectorDefinitionVersionsFromCursor), ctx, cursor)
 }
 
 // ListConnectorsBuilder mocks base method.
@@ -1409,34 +1409,34 @@ func (mr *MockDBMockRecorder) Migrate(ctx interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Migrate", reflect.TypeOf((*MockDB)(nil).Migrate), ctx)
 }
 
-// NewestConnectorVersionForId mocks base method.
-func (m *MockDB) NewestConnectorVersionForId(ctx context.Context, id apid.ID) (*database.ConnectorVersion, error) {
+// NewestConnectorDefinitionVersionForId mocks base method.
+func (m *MockDB) NewestConnectorDefinitionVersionForId(ctx context.Context, id apid.ID) (*database.ConnectorWithDefinition, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NewestConnectorVersionForId", ctx, id)
-	ret0, _ := ret[0].(*database.ConnectorVersion)
+	ret := m.ctrl.Call(m, "NewestConnectorDefinitionVersionForId", ctx, id)
+	ret0, _ := ret[0].(*database.ConnectorWithDefinition)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// NewestConnectorVersionForId indicates an expected call of NewestConnectorVersionForId.
-func (mr *MockDBMockRecorder) NewestConnectorVersionForId(ctx, id interface{}) *gomock.Call {
+// NewestConnectorDefinitionVersionForId indicates an expected call of NewestConnectorDefinitionVersionForId.
+func (mr *MockDBMockRecorder) NewestConnectorDefinitionVersionForId(ctx, id interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewestConnectorVersionForId", reflect.TypeOf((*MockDB)(nil).NewestConnectorVersionForId), ctx, id)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewestConnectorDefinitionVersionForId", reflect.TypeOf((*MockDB)(nil).NewestConnectorDefinitionVersionForId), ctx, id)
 }
 
-// NewestPublishedConnectorVersionForId mocks base method.
-func (m *MockDB) NewestPublishedConnectorVersionForId(ctx context.Context, id apid.ID) (*database.ConnectorVersion, error) {
+// NewestPublishedConnectorDefinitionVersionForId mocks base method.
+func (m *MockDB) NewestPublishedConnectorDefinitionVersionForId(ctx context.Context, id apid.ID) (*database.ConnectorWithDefinition, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NewestPublishedConnectorVersionForId", ctx, id)
-	ret0, _ := ret[0].(*database.ConnectorVersion)
+	ret := m.ctrl.Call(m, "NewestPublishedConnectorDefinitionVersionForId", ctx, id)
+	ret0, _ := ret[0].(*database.ConnectorWithDefinition)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// NewestPublishedConnectorVersionForId indicates an expected call of NewestPublishedConnectorVersionForId.
-func (mr *MockDBMockRecorder) NewestPublishedConnectorVersionForId(ctx, id interface{}) *gomock.Call {
+// NewestPublishedConnectorDefinitionVersionForId indicates an expected call of NewestPublishedConnectorDefinitionVersionForId.
+func (mr *MockDBMockRecorder) NewestPublishedConnectorDefinitionVersionForId(ctx, id interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewestPublishedConnectorVersionForId", reflect.TypeOf((*MockDB)(nil).NewestPublishedConnectorVersionForId), ctx, id)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewestPublishedConnectorDefinitionVersionForId", reflect.TypeOf((*MockDB)(nil).NewestPublishedConnectorDefinitionVersionForId), ctx, id)
 }
 
 // NotificationViewedMap mocks base method.
@@ -1648,18 +1648,18 @@ func (mr *MockDBMockRecorder) ReconcileCarryForwardLabels(ctx, batchSize, limite
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReconcileCarryForwardLabels", reflect.TypeOf((*MockDB)(nil).ReconcileCarryForwardLabels), ctx, batchSize, limiter)
 }
 
-// RefreshConnectionsForConnectorVersion mocks base method.
-func (m *MockDB) RefreshConnectionsForConnectorVersion(ctx context.Context, id apid.ID, version uint64) error {
+// RefreshConnectionsForConnector mocks base method.
+func (m *MockDB) RefreshConnectionsForConnector(ctx context.Context, id apid.ID) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RefreshConnectionsForConnectorVersion", ctx, id, version)
+	ret := m.ctrl.Call(m, "RefreshConnectionsForConnector", ctx, id)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// RefreshConnectionsForConnectorVersion indicates an expected call of RefreshConnectionsForConnectorVersion.
-func (mr *MockDBMockRecorder) RefreshConnectionsForConnectorVersion(ctx, id, version interface{}) *gomock.Call {
+// RefreshConnectionsForConnector indicates an expected call of RefreshConnectionsForConnector.
+func (mr *MockDBMockRecorder) RefreshConnectionsForConnector(ctx, id interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RefreshConnectionsForConnectorVersion", reflect.TypeOf((*MockDB)(nil).RefreshConnectionsForConnectorVersion), ctx, id, version)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RefreshConnectionsForConnector", reflect.TypeOf((*MockDB)(nil).RefreshConnectionsForConnector), ctx, id)
 }
 
 // RefreshNamespaceLabelsCarryForward mocks base method.
@@ -1775,18 +1775,18 @@ func (mr *MockDBMockRecorder) SetConnectionState(ctx, id, state interface{}) *go
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetConnectionState", reflect.TypeOf((*MockDB)(nil).SetConnectionState), ctx, id, state)
 }
 
-// SetConnectorVersionState mocks base method.
-func (m *MockDB) SetConnectorVersionState(ctx context.Context, id apid.ID, version uint64, state database.ConnectorVersionState) error {
+// SetConnectorDefinitionVersionState mocks base method.
+func (m *MockDB) SetConnectorDefinitionVersionState(ctx context.Context, id apid.ID, version uint64, state database.ConnectorDefinitionVersionState) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetConnectorVersionState", ctx, id, version, state)
+	ret := m.ctrl.Call(m, "SetConnectorDefinitionVersionState", ctx, id, version, state)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// SetConnectorVersionState indicates an expected call of SetConnectorVersionState.
-func (mr *MockDBMockRecorder) SetConnectorVersionState(ctx, id, version, state interface{}) *gomock.Call {
+// SetConnectorDefinitionVersionState indicates an expected call of SetConnectorDefinitionVersionState.
+func (mr *MockDBMockRecorder) SetConnectorDefinitionVersionState(ctx, id, version, state interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetConnectorVersionState", reflect.TypeOf((*MockDB)(nil).SetConnectorVersionState), ctx, id, version, state)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetConnectorDefinitionVersionState", reflect.TypeOf((*MockDB)(nil).SetConnectorDefinitionVersionState), ctx, id, version, state)
 }
 
 // SetCursorEncryptor mocks base method.
@@ -2095,18 +2095,18 @@ func (mr *MockDBMockRecorder) UpsertActor(ctx, actor interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpsertActor", reflect.TypeOf((*MockDB)(nil).UpsertActor), ctx, actor)
 }
 
-// UpsertConnectorVersion mocks base method.
-func (m *MockDB) UpsertConnectorVersion(ctx context.Context, cv *database.ConnectorVersion) error {
+// UpsertConnectorDefinitionVersion mocks base method.
+func (m *MockDB) UpsertConnectorDefinitionVersion(ctx context.Context, cv *database.ConnectorWithDefinition) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpsertConnectorVersion", ctx, cv)
+	ret := m.ctrl.Call(m, "UpsertConnectorDefinitionVersion", ctx, cv)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// UpsertConnectorVersion indicates an expected call of UpsertConnectorVersion.
-func (mr *MockDBMockRecorder) UpsertConnectorVersion(ctx, cv interface{}) *gomock.Call {
+// UpsertConnectorDefinitionVersion indicates an expected call of UpsertConnectorDefinitionVersion.
+func (mr *MockDBMockRecorder) UpsertConnectorDefinitionVersion(ctx, cv interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpsertConnectorVersion", reflect.TypeOf((*MockDB)(nil).UpsertConnectorVersion), ctx, cv)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpsertConnectorDefinitionVersion", reflect.TypeOf((*MockDB)(nil).UpsertConnectorDefinitionVersion), ctx, cv)
 }
 
 // UpsertNotification mocks base method.

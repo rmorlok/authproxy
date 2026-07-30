@@ -38,12 +38,11 @@ func TestWrapConnectorVersion(t *testing.T) {
 	}
 
 	connectorId := apid.New(apid.PrefixActor)
-	dbConnectorVersion := database.ConnectorVersion{
+	dbConnectorVersion := database.ConnectorWithDefinition{
 		Id:                  connectorId,
 		Version:             1,
 		Labels:              map[string]string{"type": "test-connector"},
-		State:               database.ConnectorVersionStateDraft,
-		Hash:                "some-hash",
+		State:               database.ConnectorDefinitionVersionStateDraft,
 		EncryptedDefinition: encfield.EncryptedField{ID: "dek_test", Data: "encrypted-data"},
 	}
 
@@ -51,7 +50,7 @@ func TestWrapConnectorVersion(t *testing.T) {
 	cv := wrapConnectorVersion(dbConnectorVersion, s)
 
 	// Verify
-	assert.Equal(t, dbConnectorVersion, cv.ConnectorVersion)
+	assert.Equal(t, dbConnectorVersion, cv.ConnectorWithDefinition)
 	assert.Equal(t, s, cv.s)
 	assert.Nil(t, cv.def)
 }
@@ -68,12 +67,11 @@ func TestConnectorVersion_GetDefinition(t *testing.T) {
 	}
 
 	connectorId := apid.New(apid.PrefixActor)
-	dbConnectorVersion := database.ConnectorVersion{
+	dbConnectorVersion := database.ConnectorWithDefinition{
 		Id:                  connectorId,
 		Version:             1,
 		Labels:              map[string]string{"type": "test-connector"},
-		State:               database.ConnectorVersionStateDraft,
-		Hash:                "some-hash",
+		State:               database.ConnectorDefinitionVersionStateDraft,
 		EncryptedDefinition: encfield.EncryptedField{ID: "dek_test", Data: "encrypted-data"},
 	}
 
@@ -119,8 +117,8 @@ func TestConnectorVersion_GetHashDerivesFromEncryptedDefinition(t *testing.T) {
 		DecryptString(gomock.Any(), encryptedDefinition).
 		Return(string(defJSON), nil)
 
-	cv := wrapConnectorVersion(database.ConnectorVersion{
-		Id:                  apid.New(apid.PrefixConnector),
+	cv := wrapConnectorVersion(database.ConnectorWithDefinition{
+		Id:                  apid.New(apid.PrefixConnectorVersion),
 		Version:             1,
 		EncryptedDefinition: encryptedDefinition,
 	}, &service{encrypt: mockEncrypt, logger: aplog.NewNoopLogger()})
@@ -140,12 +138,11 @@ func TestConnectorVersion_SetDefinition(t *testing.T) {
 	}
 
 	connectorId := apid.New(apid.PrefixActor)
-	dbConnectorVersion := database.ConnectorVersion{
+	dbConnectorVersion := database.ConnectorWithDefinition{
 		Id:                  connectorId,
 		Version:             1,
 		Labels:              map[string]string{"type": "test-connector"},
-		State:               database.ConnectorVersionStateDraft,
-		Hash:                "some-hash",
+		State:               database.ConnectorDefinitionVersionStateDraft,
 		EncryptedDefinition: encfield.EncryptedField{ID: "dek_test", Data: "encrypted-data"},
 	}
 
@@ -214,21 +211,20 @@ func NewTestConnectorVersion(c cschema.Connector) *ConnectorVersion {
 	if c.Version != 0 {
 		version = c.Version
 	}
-	state := database.ConnectorVersionStatePrimary
+	state := database.ConnectorDefinitionVersionStatePrimary
 	if c.State != "" {
-		state = database.ConnectorVersionState(c.State)
+		state = database.ConnectorDefinitionVersionState(c.State)
 	}
 	encryptedDefinition, err := e.EncryptStringForEntity(context.Background(), &namespaceHolder{namespace: "root"}, string(util.Must(json.Marshal(c))))
 	if err != nil {
 		panic(err)
 	}
 
-	dbConnectorVersion := database.ConnectorVersion{
+	dbConnectorVersion := database.ConnectorWithDefinition{
 		Id:                  connectorId,
 		Version:             version,
 		Labels:              map[string]string{"type": "test-connector"},
 		State:               state,
-		Hash:                "some-hash",
 		EncryptedDefinition: encryptedDefinition,
 	}
 

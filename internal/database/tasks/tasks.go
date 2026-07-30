@@ -39,7 +39,7 @@ func (th *taskHandler) RegisterTasks(mux *asynq.ServeMux) {
 	mux.HandleFunc(taskTypePurgeSoftDeleted, th.purgeSoftDeletedRecords)
 	mux.HandleFunc(taskTypeCleanupStaleConnections, th.cleanupStaleConnections)
 	mux.HandleFunc(taskTypePropagateNamespaceLabels, th.propagateNamespaceLabels)
-	mux.HandleFunc(taskTypePropagateConnectorVersionLabels, th.propagateConnectorVersionLabels)
+	mux.HandleFunc(taskTypePropagateConnectorLabels, th.propagateConnectorLabels)
 	mux.HandleFunc(taskTypeReconcileCarryForwardLabels, th.reconcileCarryForwardLabels)
 }
 

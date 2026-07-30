@@ -170,7 +170,7 @@ func TestResourceSamples_AdditionalSamples_IdempotentAndQueryable(t *testing.T) 
 			ResourceID:        connectorID,
 			Namespace:         "root.acme",
 			Labels:            database.Labels{"env": "prod", "kind": "connector"},
-			State:             database.ConnectorVersionStateDraft,
+			State:             database.ConnectorDefinitionVersionStateDraft,
 			ConnectorVersion:  1,
 			TotalVersions:     1,
 			ResourceCreatedAt: createdAt,
@@ -183,7 +183,7 @@ func TestResourceSamples_AdditionalSamples_IdempotentAndQueryable(t *testing.T) 
 			ResourceID:        connectorID,
 			Namespace:         "root.acme",
 			Labels:            database.Labels{"env": "prod", "kind": "connector"},
-			State:             database.ConnectorVersionStatePrimary,
+			State:             database.ConnectorDefinitionVersionStatePrimary,
 			ConnectorVersion:  2,
 			TotalVersions:     2,
 			ResourceCreatedAt: createdAt,
@@ -198,7 +198,7 @@ func TestResourceSamples_AdditionalSamples_IdempotentAndQueryable(t *testing.T) 
 	require.NoError(t, err)
 	require.Len(t, connectorSamples, 1)
 	require.Equal(t, ResourceTypeConnector, connectorSamples[0].ResourceType)
-	require.Equal(t, database.ConnectorVersionStatePrimary, connectorSamples[0].State)
+	require.Equal(t, database.ConnectorDefinitionVersionStatePrimary, connectorSamples[0].State)
 	require.Equal(t, uint64(2), connectorSamples[0].ConnectorVersion)
 	require.Equal(t, int64(2), connectorSamples[0].TotalVersions)
 
@@ -208,7 +208,7 @@ func TestResourceSamples_AdditionalSamples_IdempotentAndQueryable(t *testing.T) 
 			ResourceID:        connectorID,
 			Namespace:         "root.acme",
 			Labels:            database.Labels{"env": "prod", "kind": "connector-version"},
-			State:             database.ConnectorVersionStatePrimary,
+			State:             database.ConnectorDefinitionVersionStatePrimary,
 			ConnectorVersion:  2,
 			ResourceCreatedAt: createdAt,
 			ResourceUpdatedAt: updatedAt,
@@ -221,7 +221,7 @@ func TestResourceSamples_AdditionalSamples_IdempotentAndQueryable(t *testing.T) 
 	require.NoError(t, err)
 	require.Len(t, connectorVersionSamples, 1)
 	require.Equal(t, ResourceTypeConnectorVersion, connectorVersionSamples[0].ResourceType)
-	require.Equal(t, database.ConnectorVersionStatePrimary, connectorVersionSamples[0].State)
+	require.Equal(t, database.ConnectorDefinitionVersionStatePrimary, connectorVersionSamples[0].State)
 	require.Equal(t, uint64(2), connectorVersionSamples[0].ConnectorVersion)
 
 	require.NoError(t, resourceStore.StoreNamespaceResourceSamples(ctx, []*NamespaceResourceSample{

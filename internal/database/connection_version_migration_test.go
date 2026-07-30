@@ -24,22 +24,20 @@ func TestUpdateConnectionForVersionMigration(t *testing.T) {
 	}))
 
 	connectorID := apid.New(apid.PrefixConnectorVersion)
-	require.NoError(t, db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+	require.NoError(t, db.UpsertConnectorDefinitionVersion(ctx, &ConnectorWithDefinition{
 		Id:                  connectorID,
 		Version:             1,
 		Namespace:           "root.tenant",
-		State:               ConnectorVersionStateDraft,
+		State:               ConnectorDefinitionVersionStateDraft,
 		Labels:              Labels{"type": "v1"},
-		Hash:                "h1",
 		EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "d1"},
 	}))
-	require.NoError(t, db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+	require.NoError(t, db.UpsertConnectorDefinitionVersion(ctx, &ConnectorWithDefinition{
 		Id:                  connectorID,
 		Version:             2,
 		Namespace:           "root.tenant",
-		State:               ConnectorVersionStatePrimary,
+		State:               ConnectorDefinitionVersionStatePrimary,
 		Labels:              Labels{"type": "v2"},
-		Hash:                "h2",
 		EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000002"), Data: "d2"},
 	}))
 

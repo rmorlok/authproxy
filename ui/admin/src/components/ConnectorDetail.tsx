@@ -126,6 +126,7 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
   };
 
   const selected = useMemo<ConnectorVersion | undefined>(() => versions.find(v => v.version === selectedVersion), [versions, selectedVersion]);
+  const availableStates = useMemo(() => Array.from(new Set(versions.map(v => v.state))), [versions]);
 
   const refreshConnectorData = useCallback(() => {
     fetchConnector();
@@ -302,12 +303,12 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
         <Box>
           <Typography variant="subtitle2" color="text.secondary">Available States</Typography>
           <Stack direction="row" spacing={1} sx={{mt: 0.5}}>
-            {conn.states?.map(s => <StateChip key={s} state={s} />)}
+            {availableStates.map(s => <StateChip key={s} state={s} />)}
           </Stack>
         </Box>
         <Box>
           <Typography variant="subtitle2" color="text.secondary">Versions</Typography>
-          <Typography variant="body1">{conn.versions}</Typography>
+          <Typography variant="body1">{versions.length}</Typography>
         </Box>
       </Stack>
 
@@ -316,7 +317,7 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
         {versionsError && <Alert severity="error">{versionsError}</Alert>}
         <Stack spacing={1}>
           {versions.map(v => (
-            <Box key={v.id} sx={{border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 1.5}}>
+            <Box key={`${v.id}:${v.version}`} sx={{border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 1.5}}>
               <Stack direction={{xs: 'column', sm: 'row'}} spacing={1} alignItems={{sm: 'center'}} justifyContent="space-between">
                 <Stack direction="row" spacing={1} alignItems="center">
                   <Typography variant="body1">v{v.version}</Typography>

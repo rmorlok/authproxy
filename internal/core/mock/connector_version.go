@@ -15,7 +15,7 @@ type ConnectorVersion struct {
 	Id          apid.ID
 	Namespace   string
 	Version     uint64
-	State       database.ConnectorVersionState
+	State       database.ConnectorDefinitionVersionState
 	Type        string
 	Hash        string
 	CreatedAt   time.Time
@@ -37,7 +37,7 @@ func (m *ConnectorVersion) GetVersion() uint64 {
 	return m.Version
 }
 
-func (m *ConnectorVersion) GetState() database.ConnectorVersionState {
+func (m *ConnectorVersion) GetState() database.ConnectorDefinitionVersionState {
 	return m.State
 }
 
@@ -69,7 +69,7 @@ func (m *ConnectorVersion) GetDefinition() *cschema.Connector {
 	return m.Definition
 }
 
-func (m *ConnectorVersion) SetState(_ context.Context, state database.ConnectorVersionState) error {
+func (m *ConnectorVersion) SetState(_ context.Context, state database.ConnectorDefinitionVersionState) error {
 	m.State = state
 	return nil
 }

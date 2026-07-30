@@ -9,11 +9,9 @@ import (
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
-func wrapConnector(c database.Connector, s *service) *Connector {
+func wrapConnector(c database.ConnectorWithDefinition, s *service) *Connector {
 	return &Connector{
-		ConnectorVersion: *wrapConnectorVersion(c.ConnectorVersion, s),
-		TotalVersions:    c.TotalVersions,
-		States:           c.States,
+		ConnectorVersion: *wrapConnectorVersion(c, s),
 	}
 }
 
@@ -23,7 +21,7 @@ type listConnectorWrapper struct {
 	s *service
 }
 
-func (l *listConnectorWrapper) convertPageResult(result pagination.PageResult[database.Connector]) pagination.PageResult[iface.Connector] {
+func (l *listConnectorWrapper) convertPageResult(result pagination.PageResult[database.ConnectorWithDefinition]) pagination.PageResult[iface.Connector] {
 	if result.Error != nil {
 		return pagination.PageResult[iface.Connector]{Error: result.Error}
 	}
@@ -54,7 +52,7 @@ func (l *listConnectorWrapper) FetchPage(ctx context.Context) pagination.PageRes
 }
 
 func (l *listConnectorWrapper) Enumerate(ctx context.Context, callback pagination.EnumerateCallback[iface.Connector]) error {
-	return l.executor().Enumerate(ctx, func(result pagination.PageResult[database.Connector]) (keepGoing pagination.KeepGoing, err error) {
+	return l.executor().Enumerate(ctx, func(result pagination.PageResult[database.ConnectorWithDefinition]) (keepGoing pagination.KeepGoing, err error) {
 		return callback(l.convertPageResult(result))
 	})
 }
@@ -80,14 +78,14 @@ func (l *listConnectorWrapper) ForId(id apid.ID) iface.ListConnectorsBuilder {
 	}
 }
 
-func (l *listConnectorWrapper) ForState(s database.ConnectorVersionState) iface.ListConnectorsBuilder {
+func (l *listConnectorWrapper) ForState(s database.ConnectorDefinitionVersionState) iface.ListConnectorsBuilder {
 	return &listConnectorWrapper{
 		l: l.l.ForState(s),
 		s: l.s,
 	}
 }
 
-func (l *listConnectorWrapper) ForStates(states []database.ConnectorVersionState) iface.ListConnectorsBuilder {
+func (l *listConnectorWrapper) ForStates(states []database.ConnectorDefinitionVersionState) iface.ListConnectorsBuilder {
 	return &listConnectorWrapper{
 		l: l.l.ForStates(states),
 		s: l.s,

@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -15,27 +14,26 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/encfield"
-	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/sqlh"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
-type ConnectorVersionState string
+type ConnectorDefinitionVersionState string
 
-type ConnectorVersionId struct {
+type ConnectorDefinitionVersionId struct {
 	Id      apid.ID
 	Version uint64
 }
 
-// Value implements the driver.Valuer interface for ConnectorVersionState
-func (s ConnectorVersionState) Value() (driver.Value, error) {
+// Value implements the driver.Valuer interface for ConnectorDefinitionVersionState
+func (s ConnectorDefinitionVersionState) Value() (driver.Value, error) {
 	return string(s), nil
 }
 
-// Scan implements the sql.Scanner interface for ConnectorVersionState
-func (s *ConnectorVersionState) Scan(value interface{}) error {
+// Scan implements the sql.Scanner interface for ConnectorDefinitionVersionState
+func (s *ConnectorDefinitionVersionState) Scan(value interface{}) error {
 	if value == nil {
 		*s = ""
 		return nil
@@ -43,67 +41,38 @@ func (s *ConnectorVersionState) Scan(value interface{}) error {
 
 	strVal, ok := value.(string)
 	if !ok {
-		return fmt.Errorf("cannot convert %T to ConnectorVersionState", value)
+		return fmt.Errorf("cannot convert %T to ConnectorDefinitionVersionState", value)
 	}
 
-	*s = ConnectorVersionState(strVal)
+	*s = ConnectorDefinitionVersionState(strVal)
 	return nil
 }
 
-// ConnectorVersionStates is a custom type for a slice of ConnectorVersionState
-type ConnectorVersionStates []ConnectorVersionState
-
-// Value implements the driver.Valuer interface for ConnectorVersionStates
-func (s ConnectorVersionStates) Value() (driver.Value, error) {
-	if len(s) == 0 {
-		return nil, nil
-	}
-
-	return json.Marshal(s)
-}
-
-// Scan implements the sql.Scanner interface for ConnectorVersionStates
-func (s *ConnectorVersionStates) Scan(value interface{}) error {
-	if value == nil {
-		*s = nil
-		return nil
-	}
-
-	switch v := value.(type) {
-	case string:
-		return json.Unmarshal([]byte(v), s)
-	case []byte:
-		return json.Unmarshal(v, s)
-	default:
-		return fmt.Errorf("cannot convert %T to ConnectorVersionStates", value)
-	}
-}
-
 const (
-	// ConnectorVersionStateDraft means the connector definition is being worked on and new users should not connect to
+	// ConnectorDefinitionVersionStateDraft means the connector definition is being worked on and new users should not connect to
 	// this version and existing users should not be upgraded to this version
-	ConnectorVersionStateDraft ConnectorVersionState = "draft"
+	ConnectorDefinitionVersionStateDraft ConnectorDefinitionVersionState = "draft"
 
-	// ConnectorVersionStatePrimary means that the version has been published and this should be the version used for
+	// ConnectorDefinitionVersionStatePrimary means that the version has been published and this should be the version used for
 	// new connections. Existing connections of this connector will be upgraded to this version if possible, or
 	// transitioned to a state where action is required to complete the upgrade.
-	ConnectorVersionStatePrimary ConnectorVersionState = "primary"
+	ConnectorDefinitionVersionStatePrimary ConnectorDefinitionVersionState = "primary"
 
-	// ConnectorVersionStateActive means that a newer version of the connector has been published, but connections
+	// ConnectorDefinitionVersionStateActive means that a newer version of the connector has been published, but connections
 	// still exist on this version that have not been upgraded.
-	ConnectorVersionStateActive ConnectorVersionState = "active"
+	ConnectorDefinitionVersionStateActive ConnectorDefinitionVersionState = "active"
 
-	// ConnectorVersionStateArchived means that this is an old version of the connect that does not have any active
+	// ConnectorDefinitionVersionStateArchived means that this is an old version of the connect that does not have any active
 	// connections running on the version.
-	ConnectorVersionStateArchived ConnectorVersionState = "archived"
+	ConnectorDefinitionVersionStateArchived ConnectorDefinitionVersionState = "archived"
 )
 
-func IsValidConnectorVersionState[T string | ConnectorVersionState](state T) bool {
-	switch ConnectorVersionState(state) {
-	case ConnectorVersionStateDraft,
-		ConnectorVersionStatePrimary,
-		ConnectorVersionStateActive,
-		ConnectorVersionStateArchived:
+func IsValidConnectorDefinitionVersionState[T string | ConnectorDefinitionVersionState](state T) bool {
+	switch ConnectorDefinitionVersionState(state) {
+	case ConnectorDefinitionVersionStateDraft,
+		ConnectorDefinitionVersionStatePrimary,
+		ConnectorDefinitionVersionStateActive,
+		ConnectorDefinitionVersionStateArchived:
 		return true
 	default:
 		return false
@@ -125,24 +94,18 @@ func init() {
 
 const ConnectorDefinitionVersionsTable = "connector_definition_versions"
 
-type ConnectorVersion struct {
-	Id                  apid.ID // Logical connector ID (cxr_).
-	Namespace           string
-	Name                scommon.ResourceName
-	DefinitionVersionId apid.ID // Physical definition-version row ID (cvd_).
+// ConnectorDefinitionVersion is the database representation of a single row
+// in connector_definition_versions.
+type ConnectorDefinitionVersion struct {
+	Id                  apid.ID
+	ConnectorId         apid.ID
 	Version             uint64
-	State               ConnectorVersionState
-	Hash                string // Derived from the decrypted definition; not persisted.
+	State               ConnectorDefinitionVersionState
 	EncryptedDefinition encfield.EncryptedField
-	Labels              Labels
-	Annotations         Annotations
-	CreatedAt           time.Time
-	UpdatedAt           time.Time
 	EncryptedAt         *time.Time
-	DeletedAt           *time.Time
 }
 
-func (cv *ConnectorVersion) versionCols() []string {
+func (cv *ConnectorDefinitionVersion) cols() []string {
 	return []string{
 		"id",
 		"connector_id",
@@ -153,28 +116,21 @@ func (cv *ConnectorVersion) versionCols() []string {
 	}
 }
 
-func (cv *ConnectorVersion) fields() []any {
+func (cv *ConnectorDefinitionVersion) fields() []any {
 	return []any{
 		&cv.Id,
-		&cv.Namespace,
-		&cv.Name,
-		&cv.DefinitionVersionId,
+		&cv.ConnectorId,
 		&cv.Version,
 		&cv.State,
 		&cv.EncryptedDefinition,
-		&cv.Labels,
-		&cv.Annotations,
-		&cv.CreatedAt,
-		&cv.UpdatedAt,
 		&cv.EncryptedAt,
-		&cv.DeletedAt,
 	}
 }
 
-func (cv *ConnectorVersion) versionValues() []any {
+func (cv *ConnectorDefinitionVersion) values() []any {
 	return []any{
-		cv.DefinitionVersionId,
 		cv.Id,
+		cv.ConnectorId,
 		cv.Version,
 		cv.State,
 		cv.EncryptedDefinition,
@@ -182,75 +138,37 @@ func (cv *ConnectorVersion) versionValues() []any {
 	}
 }
 
-func connectorVersionSelectCols() []string {
-	return []string{
-		"c.id",
-		"c.namespace",
-		"c.name",
-		"dv.id",
-		"dv.version",
-		"dv.state",
-		"dv.encrypted_definition",
-		"c.labels",
-		"c.annotations",
-		"c.created_at",
-		"c.updated_at",
-		"dv.encrypted_at",
-		"c.deleted_at",
-	}
-}
-
-func (s *service) selectConnectorVersions() sq.SelectBuilder {
+func (s *service) selectConnectorDefinitionVersions() sq.SelectBuilder {
 	return s.sq.
-		Select(connectorVersionSelectCols()...).
+		Select(connectorWithDefinitionSelectCols()...).
 		From(ConnectorDefinitionVersionsTable + " dv").
 		Join(ConnectorsTable + " c ON c.id = dv.connector_id")
 }
 
-func (cv *ConnectorVersion) GetId() apid.ID {
-	return cv.Id
-}
-
-func (cv *ConnectorVersion) GetNamespace() string {
-	return cv.Namespace
-}
-
-func (cv *ConnectorVersion) GetVersion() uint64 {
-	return cv.Version
-}
-
-func (cv *ConnectorVersion) Validate() error {
+func (cv *ConnectorDefinitionVersion) Validate() error {
 	result := &multierror.Error{}
 
 	if cv.Id == apid.Nil {
 		result = multierror.Append(result, errors.New("id is required"))
 	}
 
-	if err := cv.Id.ValidatePrefix(apid.PrefixConnectorVersion); err != nil {
-		result = multierror.Append(result, fmt.Errorf("invalid connector version id: %w", err))
+	if err := cv.Id.ValidatePrefix(apid.PrefixConnectorDefinitionVersion); err != nil {
+		result = multierror.Append(result, fmt.Errorf("invalid connector definition version id: %w", err))
 	}
 
-	if !cv.DefinitionVersionId.IsNil() {
-		if err := cv.DefinitionVersionId.ValidatePrefix(apid.PrefixConnectorDefinitionVersion); err != nil {
-			result = multierror.Append(result, fmt.Errorf("invalid connector definition version id: %w", err))
-		}
+	if cv.ConnectorId == apid.Nil {
+		result = multierror.Append(result, errors.New("connector id is required"))
+	}
+
+	if err := cv.ConnectorId.ValidatePrefix(apid.PrefixConnector); err != nil {
+		result = multierror.Append(result, fmt.Errorf("invalid connector id: %w", err))
 	}
 
 	if cv.Version == 0 {
 		result = multierror.Append(result, errors.New("version is required"))
 	}
 
-	if err := namespace.ValidatePath(cv.Namespace); err != nil {
-		result = multierror.Append(result, fmt.Errorf("invalid connector namespace path: %w", err))
-	}
-
-	if cv.Name != "" {
-		if err := cv.Name.Validate(); err != nil {
-			result = multierror.Append(result, fmt.Errorf("invalid connector name: %w", err))
-		}
-	}
-
-	if !IsValidConnectorVersionState(cv.State) {
+	if !IsValidConnectorDefinitionVersionState(cv.State) {
 		result = multierror.Append(result, errors.New("invalid connector version state"))
 	}
 
@@ -258,20 +176,12 @@ func (cv *ConnectorVersion) Validate() error {
 		result = multierror.Append(result, errors.New("encrypted definition is required"))
 	}
 
-	if err := cv.Labels.Validate(); err != nil {
-		result = multierror.Append(result, fmt.Errorf("invalid connector version labels: %w", err))
-	}
-
-	if err := cv.Annotations.Validate(); err != nil {
-		result = multierror.Append(result, fmt.Errorf("invalid connector version annotations: %w", err))
-	}
-
 	return result.ErrorOrNil()
 }
 
-func (s *service) GetConnectorVersion(ctx context.Context, id apid.ID, version uint64) (*ConnectorVersion, error) {
-	var result ConnectorVersion
-	err := s.selectConnectorVersions().
+func (s *service) GetConnectorDefinitionVersion(ctx context.Context, id apid.ID, version uint64) (*ConnectorWithDefinition, error) {
+	var result ConnectorWithDefinition
+	err := s.selectConnectorDefinitionVersions().
 		Where(sq.Eq{
 			"dv.connector_id": id,
 			"dv.version":      version,
@@ -291,24 +201,24 @@ func (s *service) GetConnectorVersion(ctx context.Context, id apid.ID, version u
 	return &result, nil
 }
 
-func (s *service) GetConnectorVersions(
+func (s *service) GetConnectorDefinitionVersions(
 	ctx context.Context,
-	requested []ConnectorVersionId,
-) (map[ConnectorVersionId]*ConnectorVersion, error) {
+	requested []ConnectorDefinitionVersionId,
+) (map[ConnectorDefinitionVersionId]*ConnectorWithDefinition, error) {
 	if len(requested) == 0 {
 		return nil, nil
 	}
 
-	ids := make(map[ConnectorVersionId]struct{}, len(requested))
+	ids := make(map[ConnectorDefinitionVersionId]struct{}, len(requested))
 	for _, id := range requested {
 		ids[id] = struct{}{}
 	}
 
-	versionConditions := util.Map(requested, func(id ConnectorVersionId) sq.Sqlizer {
+	versionConditions := util.Map(requested, func(id ConnectorDefinitionVersionId) sq.Sqlizer {
 		return sq.Eq{"dv.connector_id": id.Id, "dv.version": id.Version}
 	})
 
-	rows, err := s.selectConnectorVersions().
+	rows, err := s.selectConnectorDefinitionVersions().
 		Where(sq.And{
 			sq.Eq{"c.deleted_at": nil},
 			sq.Or(versionConditions),
@@ -320,9 +230,9 @@ func (s *service) GetConnectorVersions(
 	}
 	defer rows.Close()
 
-	var versions []ConnectorVersion
+	var versions []ConnectorWithDefinition
 	for rows.Next() {
-		var r ConnectorVersion
+		var r ConnectorWithDefinition
 		err := rows.Scan(r.fields()...)
 		if err != nil {
 			return nil, err
@@ -330,9 +240,9 @@ func (s *service) GetConnectorVersions(
 		versions = append(versions, r)
 	}
 
-	versionMap := make(map[ConnectorVersionId]*ConnectorVersion, len(versions))
+	versionMap := make(map[ConnectorDefinitionVersionId]*ConnectorWithDefinition, len(versions))
 	for i := range versions {
-		id := ConnectorVersionId{
+		id := ConnectorDefinitionVersionId{
 			Id:      versions[i].Id,
 			Version: versions[i].Version,
 		}
@@ -344,13 +254,7 @@ func (s *service) GetConnectorVersions(
 	return versionMap, nil
 }
 
-type UpsertConnectorVersionResult struct {
-	ConnectorVersion *ConnectorVersion
-	State            ConnectorVersionState
-	Version          uint64
-}
-
-func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersion) error {
+func (s *service) UpsertConnectorDefinitionVersion(ctx context.Context, cv *ConnectorWithDefinition) error {
 	if cv == nil {
 		return errors.New("connector version is nil")
 	}
@@ -365,14 +269,14 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 		return validationErr
 	}
 
-	if cv.State != ConnectorVersionStateDraft && cv.State != ConnectorVersionStatePrimary {
+	if cv.State != ConnectorDefinitionVersionStateDraft && cv.State != ConnectorDefinitionVersionStatePrimary {
 		return errors.New("can only upsert connector version as draft or primary")
 	}
 
 	return s.transaction(func(tx *sql.Tx) error {
 		sqb := s.sq.RunWith(tx)
 
-		if err := s.ensureConnectorResourceForVersion(ctx, tx, cv); err != nil {
+		if err := s.ensureConnectorForDefinition(ctx, tx, cv); err != nil {
 			return err
 		}
 
@@ -381,7 +285,7 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 			From(ConnectorDefinitionVersionsTable).
 			Where(sq.Eq{"connector_id": cv.Id, "version": cv.Version}).
 			QueryRowContext(ctx),
-			ConnectorVersionStateDraft)
+			ConnectorDefinitionVersionStateDraft)
 
 		existingRow := !defaultUsed
 		if err != nil {
@@ -389,7 +293,7 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 		}
 
 		if existingRow {
-			if exitingState != ConnectorVersionStateDraft {
+			if exitingState != ConnectorDefinitionVersionStateDraft {
 				logger.Error("cannot modify non-draft connector", "existing_state", exitingState)
 				return errors.New("cannot modify non-draft connector")
 			}
@@ -397,6 +301,7 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 			result, err := sqb.Update(ConnectorDefinitionVersionsTable).
 				Set("state", cv.State).
 				Set("encrypted_definition", cv.EncryptedDefinition).
+				Set("encrypted_at", cv.EncryptedAt).
 				Where(sq.Eq{"connector_id": cv.Id, "version": cv.Version}).
 				Exec()
 			if err != nil {
@@ -431,29 +336,32 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 				return errors.New("cannot insert connector version at non-sequential version")
 			}
 
-			cpy := *cv
-			if cpy.DefinitionVersionId.IsNil() {
-				cpy.DefinitionVersionId = apid.New(apid.PrefixConnectorDefinitionVersion)
+			definitionVersion := cv.definitionVersion()
+			if definitionVersion.Id.IsNil() {
+				definitionVersion.Id = apid.New(apid.PrefixConnectorDefinitionVersion)
+			}
+			if err := definitionVersion.Validate(); err != nil {
+				return err
 			}
 
 			_, err = sqb.Insert(ConnectorDefinitionVersionsTable).
-				Columns(cpy.versionCols()...).
-				Values(cpy.versionValues()...).
+				Columns(definitionVersion.cols()...).
+				Values(definitionVersion.values()...).
 				Exec()
 			if err != nil {
 				return err
 			}
-			cv.DefinitionVersionId = cpy.DefinitionVersionId
+			cv.DefinitionVersionId = definitionVersion.Id
 		}
 
-		if cv.State == ConnectorVersionStatePrimary {
+		if cv.State == ConnectorDefinitionVersionStatePrimary {
 			// New primary version, update any previous primary to active
 			result, err := sqb.Update(ConnectorDefinitionVersionsTable).
-				Set("state", ConnectorVersionStateActive).
+				Set("state", ConnectorDefinitionVersionStateActive).
 				Where(sq.And{
 					sq.Eq{
 						"connector_id": cv.Id,
-						"state":        ConnectorVersionStatePrimary,
+						"state":        ConnectorDefinitionVersionStatePrimary,
 					},
 					sq.NotEq{"version": cv.Version},
 				}).
@@ -473,12 +381,12 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 	})
 }
 
-func (s *service) SetConnectorVersionState(ctx context.Context, id apid.ID, version uint64, state ConnectorVersionState) error {
+func (s *service) SetConnectorDefinitionVersionState(ctx context.Context, id apid.ID, version uint64, state ConnectorDefinitionVersionState) error {
 	if id == apid.Nil {
 		return errors.New("connector version id is required")
 	}
 
-	if !IsValidConnectorVersionState(state) {
+	if !IsValidConnectorDefinitionVersionState(state) {
 		return errors.New("invalid connector version state")
 	}
 
@@ -525,12 +433,12 @@ func (s *service) SetConnectorVersionState(ctx context.Context, id apid.ID, vers
 			return fmt.Errorf("multiple connector versions had state updated: %w", ErrViolation)
 		}
 
-		if state == ConnectorVersionStatePrimary {
+		if state == ConnectorDefinitionVersionStatePrimary {
 			// Ensure only one primary: transition any other primary version to active
 			_, err := sqb.Update(ConnectorDefinitionVersionsTable).
-				Set("state", ConnectorVersionStateActive).
+				Set("state", ConnectorDefinitionVersionStateActive).
 				Where(sq.And{
-					sq.Eq{"connector_id": id, "state": ConnectorVersionStatePrimary},
+					sq.Eq{"connector_id": id, "state": ConnectorDefinitionVersionStatePrimary},
 					sq.NotEq{"version": version},
 				}).
 				Exec()
@@ -539,12 +447,12 @@ func (s *service) SetConnectorVersionState(ctx context.Context, id apid.ID, vers
 			}
 		}
 
-		if state == ConnectorVersionStateDraft {
+		if state == ConnectorDefinitionVersionStateDraft {
 			// Ensure only one draft: transition any other draft version to archived
 			_, err := sqb.Update(ConnectorDefinitionVersionsTable).
-				Set("state", ConnectorVersionStateArchived).
+				Set("state", ConnectorDefinitionVersionStateArchived).
 				Where(sq.And{
-					sq.Eq{"connector_id": id, "state": ConnectorVersionStateDraft},
+					sq.Eq{"connector_id": id, "state": ConnectorDefinitionVersionStateDraft},
 					sq.NotEq{"version": version},
 				}).
 				Exec()
@@ -593,15 +501,15 @@ func (s *service) DeleteConnector(ctx context.Context, id apid.ID) error {
 	})
 }
 
-// GetConnectorVersionForLabels finds the newest connector version matching the label selector.
-func (s *service) GetConnectorVersionForLabels(ctx context.Context, labelSelector string) (*ConnectorVersion, error) {
+// GetConnectorDefinitionVersionForLabels finds the newest connector version matching the label selector.
+func (s *service) GetConnectorDefinitionVersionForLabels(ctx context.Context, labelSelector string) (*ConnectorWithDefinition, error) {
 	selector, err := ParseLabelSelector(labelSelector)
 	if err != nil {
 		return nil, err
 	}
 
-	var result ConnectorVersion
-	q := s.selectConnectorVersions().
+	var result ConnectorWithDefinition
+	q := s.selectConnectorDefinitionVersions().
 		Where(sq.Eq{"c.deleted_at": nil})
 
 	q = selector.ApplyToSqlBuilderWithProvider(q, "c.labels", s.cfg.GetProvider())
@@ -621,15 +529,15 @@ func (s *service) GetConnectorVersionForLabels(ctx context.Context, labelSelecto
 	return &result, nil
 }
 
-// GetConnectorVersionForLabelsAndVersion finds a connector version by labels + specific version.
-func (s *service) GetConnectorVersionForLabelsAndVersion(ctx context.Context, labelSelector string, version uint64) (*ConnectorVersion, error) {
+// GetConnectorDefinitionVersionForLabelsAndVersion finds a connector version by labels + specific version.
+func (s *service) GetConnectorDefinitionVersionForLabelsAndVersion(ctx context.Context, labelSelector string, version uint64) (*ConnectorWithDefinition, error) {
 	selector, err := ParseLabelSelector(labelSelector)
 	if err != nil {
 		return nil, err
 	}
 
-	var result ConnectorVersion
-	q := s.selectConnectorVersions().
+	var result ConnectorWithDefinition
+	q := s.selectConnectorDefinitionVersions().
 		Where(sq.Eq{"dv.version": version, "c.deleted_at": nil})
 
 	q = selector.ApplyToSqlBuilderWithProvider(q, "c.labels", s.cfg.GetProvider())
@@ -649,9 +557,9 @@ func (s *service) GetConnectorVersionForLabelsAndVersion(ctx context.Context, la
 	return &result, nil
 }
 
-func (s *service) GetConnectorVersionForState(ctx context.Context, id apid.ID, state ConnectorVersionState) (*ConnectorVersion, error) {
-	var result ConnectorVersion
-	err := s.selectConnectorVersions().
+func (s *service) GetConnectorDefinitionVersionForState(ctx context.Context, id apid.ID, state ConnectorDefinitionVersionState) (*ConnectorWithDefinition, error) {
+	var result ConnectorWithDefinition
+	err := s.selectConnectorDefinitionVersions().
 		Where(sq.Eq{
 			"dv.connector_id": id,
 			"dv.state":        state,
@@ -674,9 +582,9 @@ func (s *service) GetConnectorVersionForState(ctx context.Context, id apid.ID, s
 	return &result, nil
 }
 
-func (s *service) NewestConnectorVersionForId(ctx context.Context, id apid.ID) (*ConnectorVersion, error) {
-	var result ConnectorVersion
-	err := s.selectConnectorVersions().
+func (s *service) NewestConnectorDefinitionVersionForId(ctx context.Context, id apid.ID) (*ConnectorWithDefinition, error) {
+	var result ConnectorWithDefinition
+	err := s.selectConnectorDefinitionVersions().
 		Where(sq.Eq{
 			"dv.connector_id": id,
 			"c.deleted_at":    nil,
@@ -698,12 +606,12 @@ func (s *service) NewestConnectorVersionForId(ctx context.Context, id apid.ID) (
 	return &result, nil
 }
 
-func (s *service) NewestPublishedConnectorVersionForId(ctx context.Context, id apid.ID) (*ConnectorVersion, error) {
-	var result ConnectorVersion
-	err := s.selectConnectorVersions().
+func (s *service) NewestPublishedConnectorDefinitionVersionForId(ctx context.Context, id apid.ID) (*ConnectorWithDefinition, error) {
+	var result ConnectorWithDefinition
+	err := s.selectConnectorDefinitionVersions().
 		Where(sq.Eq{
 			"dv.connector_id": id,
-			"dv.state":        []ConnectorVersionState{ConnectorVersionStatePrimary, ConnectorVersionStateActive},
+			"dv.state":        []ConnectorDefinitionVersionState{ConnectorDefinitionVersionStatePrimary, ConnectorDefinitionVersionStateActive},
 			"c.deleted_at":    nil,
 		}).
 		OrderBy("dv.version DESC").
@@ -723,84 +631,84 @@ func (s *service) NewestPublishedConnectorVersionForId(ctx context.Context, id a
 	return &result, nil
 }
 
-type ConnectorVersionOrderByField string
+type ConnectorDefinitionVersionOrderByField string
 
 const (
-	ConnectorVersionOrderById        ConnectorVersionOrderByField = "id"
-	ConnectorVersionOrderByVersion   ConnectorVersionOrderByField = "version"
-	ConnectorVersionOrderByState     ConnectorVersionOrderByField = "state"
-	ConnectorVersionOrderByCreatedAt ConnectorVersionOrderByField = "created_at"
-	ConnectorVersionOrderByUpdatedAt ConnectorVersionOrderByField = "updated_at"
+	ConnectorDefinitionVersionOrderById        ConnectorDefinitionVersionOrderByField = "id"
+	ConnectorDefinitionVersionOrderByVersion   ConnectorDefinitionVersionOrderByField = "version"
+	ConnectorDefinitionVersionOrderByState     ConnectorDefinitionVersionOrderByField = "state"
+	ConnectorDefinitionVersionOrderByCreatedAt ConnectorDefinitionVersionOrderByField = "created_at"
+	ConnectorDefinitionVersionOrderByUpdatedAt ConnectorDefinitionVersionOrderByField = "updated_at"
 )
 
-func IsValidConnectorVersionOrderByField[T string | ConnectorVersionOrderByField](field T) bool {
-	switch ConnectorVersionOrderByField(field) {
-	case ConnectorVersionOrderById,
-		ConnectorVersionOrderByVersion,
-		ConnectorVersionOrderByState,
-		ConnectorVersionOrderByCreatedAt,
-		ConnectorVersionOrderByUpdatedAt:
+func IsValidConnectorDefinitionVersionOrderByField[T string | ConnectorDefinitionVersionOrderByField](field T) bool {
+	switch ConnectorDefinitionVersionOrderByField(field) {
+	case ConnectorDefinitionVersionOrderById,
+		ConnectorDefinitionVersionOrderByVersion,
+		ConnectorDefinitionVersionOrderByState,
+		ConnectorDefinitionVersionOrderByCreatedAt,
+		ConnectorDefinitionVersionOrderByUpdatedAt:
 		return true
 	default:
 		return false
 	}
 }
 
-type ListConnectorVersionsExecutor interface {
-	FetchPage(context.Context) pagination.PageResult[ConnectorVersion]
-	Enumerate(context.Context, pagination.EnumerateCallback[ConnectorVersion]) error
+type ListConnectorDefinitionVersionsExecutor interface {
+	FetchPage(context.Context) pagination.PageResult[ConnectorWithDefinition]
+	Enumerate(context.Context, pagination.EnumerateCallback[ConnectorWithDefinition]) error
 }
 
-type ListConnectorVersionsBuilder interface {
-	ListConnectorVersionsExecutor
-	Limit(int32) ListConnectorVersionsBuilder
-	ForId(apid.ID) ListConnectorVersionsBuilder
-	ForVersion(uint64) ListConnectorVersionsBuilder
-	ForState(ConnectorVersionState) ListConnectorVersionsBuilder
-	ForStates([]ConnectorVersionState) ListConnectorVersionsBuilder
-	ForNamespaceMatcher(string) ListConnectorVersionsBuilder
-	ForNamespaceMatchers([]string) ListConnectorVersionsBuilder
-	OrderBy(ConnectorVersionOrderByField, pagination.OrderBy) ListConnectorVersionsBuilder
-	IncludeDeleted() ListConnectorVersionsBuilder
-	ForLabelSelector(selector string) ListConnectorVersionsBuilder
+type ListConnectorDefinitionVersionsBuilder interface {
+	ListConnectorDefinitionVersionsExecutor
+	Limit(int32) ListConnectorDefinitionVersionsBuilder
+	ForId(apid.ID) ListConnectorDefinitionVersionsBuilder
+	ForVersion(uint64) ListConnectorDefinitionVersionsBuilder
+	ForState(ConnectorDefinitionVersionState) ListConnectorDefinitionVersionsBuilder
+	ForStates([]ConnectorDefinitionVersionState) ListConnectorDefinitionVersionsBuilder
+	ForNamespaceMatcher(string) ListConnectorDefinitionVersionsBuilder
+	ForNamespaceMatchers([]string) ListConnectorDefinitionVersionsBuilder
+	OrderBy(ConnectorDefinitionVersionOrderByField, pagination.OrderBy) ListConnectorDefinitionVersionsBuilder
+	IncludeDeleted() ListConnectorDefinitionVersionsBuilder
+	ForLabelSelector(selector string) ListConnectorDefinitionVersionsBuilder
 }
 
-type listConnectorVersionsFilters struct {
-	s                 *service                      `json:"-"`
-	LimitVal          uint64                        `json:"limit"`
-	Offset            uint64                        `json:"offset"`
-	StatesVal         []ConnectorVersionState       `json:"states,omitempty"`
-	NamespaceMatchers []string                      `json:"namespace_matchers,omitempty"`
-	IdsVal            []apid.ID                     `json:"ids,omitempty"`
-	VersionsVal       []uint64                      `json:"versions,omitempty"`
-	OrderByFieldVal   *ConnectorVersionOrderByField `json:"order_by_field"`
-	OrderByVal        *pagination.OrderBy           `json:"order_by"`
-	IncludeDeletedVal bool                          `json:"include_deleted,omitempty"`
-	LabelSelectorVal  *string                       `json:"label_selector,omitempty"`
-	Errors            *multierror.Error             `json:"-"`
+type listConnectorDefinitionVersionsFilters struct {
+	s                 *service                                `json:"-"`
+	LimitVal          uint64                                  `json:"limit"`
+	Offset            uint64                                  `json:"offset"`
+	StatesVal         []ConnectorDefinitionVersionState       `json:"states,omitempty"`
+	NamespaceMatchers []string                                `json:"namespace_matchers,omitempty"`
+	IdsVal            []apid.ID                               `json:"ids,omitempty"`
+	VersionsVal       []uint64                                `json:"versions,omitempty"`
+	OrderByFieldVal   *ConnectorDefinitionVersionOrderByField `json:"order_by_field"`
+	OrderByVal        *pagination.OrderBy                     `json:"order_by"`
+	IncludeDeletedVal bool                                    `json:"include_deleted,omitempty"`
+	LabelSelectorVal  *string                                 `json:"label_selector,omitempty"`
+	Errors            *multierror.Error                       `json:"-"`
 }
 
-func (l *listConnectorVersionsFilters) addError(e error) ListConnectorVersionsBuilder {
+func (l *listConnectorDefinitionVersionsFilters) addError(e error) ListConnectorDefinitionVersionsBuilder {
 	l.Errors = multierror.Append(l.Errors, e)
 	return l
 }
 
-func (l *listConnectorVersionsFilters) Limit(limit int32) ListConnectorVersionsBuilder {
+func (l *listConnectorDefinitionVersionsFilters) Limit(limit int32) ListConnectorDefinitionVersionsBuilder {
 	l.LimitVal = uint64(limit)
 	return l
 }
 
-func (l *listConnectorVersionsFilters) ForState(state ConnectorVersionState) ListConnectorVersionsBuilder {
-	l.StatesVal = []ConnectorVersionState{state}
+func (l *listConnectorDefinitionVersionsFilters) ForState(state ConnectorDefinitionVersionState) ListConnectorDefinitionVersionsBuilder {
+	l.StatesVal = []ConnectorDefinitionVersionState{state}
 	return l
 }
 
-func (l *listConnectorVersionsFilters) ForStates(states []ConnectorVersionState) ListConnectorVersionsBuilder {
+func (l *listConnectorDefinitionVersionsFilters) ForStates(states []ConnectorDefinitionVersionState) ListConnectorDefinitionVersionsBuilder {
 	l.StatesVal = states
 	return l
 }
 
-func (l *listConnectorVersionsFilters) ForNamespaceMatcher(matcher string) ListConnectorVersionsBuilder {
+func (l *listConnectorDefinitionVersionsFilters) ForNamespaceMatcher(matcher string) ListConnectorDefinitionVersionsBuilder {
 	if err := namespace.ValidateMatcher(matcher); err != nil {
 		return l.addError(err)
 	} else {
@@ -810,7 +718,7 @@ func (l *listConnectorVersionsFilters) ForNamespaceMatcher(matcher string) ListC
 	return l
 }
 
-func (l *listConnectorVersionsFilters) ForNamespaceMatchers(matchers []string) ListConnectorVersionsBuilder {
+func (l *listConnectorDefinitionVersionsFilters) ForNamespaceMatchers(matchers []string) ListConnectorDefinitionVersionsBuilder {
 	for _, matcher := range matchers {
 		if err := namespace.ValidateMatcher(matcher); err != nil {
 			return l.addError(err)
@@ -820,37 +728,37 @@ func (l *listConnectorVersionsFilters) ForNamespaceMatchers(matchers []string) L
 	return l
 }
 
-func (l *listConnectorVersionsFilters) ForId(id apid.ID) ListConnectorVersionsBuilder {
+func (l *listConnectorDefinitionVersionsFilters) ForId(id apid.ID) ListConnectorDefinitionVersionsBuilder {
 	l.IdsVal = []apid.ID{id}
 	return l
 }
 
-func (l *listConnectorVersionsFilters) ForVersion(version uint64) ListConnectorVersionsBuilder {
+func (l *listConnectorDefinitionVersionsFilters) ForVersion(version uint64) ListConnectorDefinitionVersionsBuilder {
 	l.VersionsVal = []uint64{version}
 	return l
 }
 
-func (l *listConnectorVersionsFilters) OrderBy(field ConnectorVersionOrderByField, by pagination.OrderBy) ListConnectorVersionsBuilder {
-	if IsValidConnectorVersionOrderByField(field) {
+func (l *listConnectorDefinitionVersionsFilters) OrderBy(field ConnectorDefinitionVersionOrderByField, by pagination.OrderBy) ListConnectorDefinitionVersionsBuilder {
+	if IsValidConnectorDefinitionVersionOrderByField(field) {
 		l.OrderByFieldVal = &field
 		l.OrderByVal = &by
 	}
 	return l
 }
 
-func (l *listConnectorVersionsFilters) IncludeDeleted() ListConnectorVersionsBuilder {
+func (l *listConnectorDefinitionVersionsFilters) IncludeDeleted() ListConnectorDefinitionVersionsBuilder {
 	l.IncludeDeletedVal = true
 	return l
 }
 
-func (l *listConnectorVersionsFilters) ForLabelSelector(selector string) ListConnectorVersionsBuilder {
+func (l *listConnectorDefinitionVersionsFilters) ForLabelSelector(selector string) ListConnectorDefinitionVersionsBuilder {
 	l.LabelSelectorVal = &selector
 	return l
 }
 
-func (l *listConnectorVersionsFilters) FromCursor(ctx context.Context, cursor string) (ListConnectorVersionsExecutor, error) {
+func (l *listConnectorDefinitionVersionsFilters) FromCursor(ctx context.Context, cursor string) (ListConnectorDefinitionVersionsExecutor, error) {
 	s := l.s
-	parsed, err := pagination.ParseCursor[listConnectorVersionsFilters](ctx, s.cursorEncryptor, cursor)
+	parsed, err := pagination.ParseCursor[listConnectorDefinitionVersionsFilters](ctx, s.cursorEncryptor, cursor)
 
 	if err != nil {
 		return nil, err
@@ -862,8 +770,8 @@ func (l *listConnectorVersionsFilters) FromCursor(ctx context.Context, cursor st
 	return l, nil
 }
 
-func (l *listConnectorVersionsFilters) applyRestrictions(ctx context.Context) sq.SelectBuilder {
-	q := l.s.selectConnectorVersions()
+func (l *listConnectorDefinitionVersionsFilters) applyRestrictions(ctx context.Context) sq.SelectBuilder {
+	q := l.s.selectConnectorDefinitionVersions()
 
 	if l.LabelSelectorVal != nil {
 		selector, err := ParseLabelSelector(*l.LabelSelectorVal)
@@ -904,16 +812,16 @@ func (l *listConnectorVersionsFilters) applyRestrictions(ctx context.Context) sq
 	if l.OrderByFieldVal != nil {
 		orderCol := "dv." + string(*l.OrderByFieldVal)
 		switch *l.OrderByFieldVal {
-		case ConnectorVersionOrderById:
+		case ConnectorDefinitionVersionOrderById:
 			orderCol = "c.id"
-		case ConnectorVersionOrderByCreatedAt, ConnectorVersionOrderByUpdatedAt:
+		case ConnectorDefinitionVersionOrderByCreatedAt, ConnectorDefinitionVersionOrderByUpdatedAt:
 			orderCol = "c." + string(*l.OrderByFieldVal)
 		}
 		q = q.OrderBy(fmt.Sprintf("%s %s", orderCol, l.OrderByVal.String()))
-		if *l.OrderByFieldVal != ConnectorVersionOrderById {
+		if *l.OrderByFieldVal != ConnectorDefinitionVersionOrderById {
 			q = q.OrderBy(fmt.Sprintf("c.id %s", l.OrderByVal.String()))
 		}
-		if *l.OrderByFieldVal != ConnectorVersionOrderByVersion {
+		if *l.OrderByFieldVal != ConnectorDefinitionVersionOrderByVersion {
 			q = q.OrderBy(fmt.Sprintf("dv.version %s", l.OrderByVal.String()))
 		}
 	}
@@ -921,27 +829,27 @@ func (l *listConnectorVersionsFilters) applyRestrictions(ctx context.Context) sq
 	return q
 }
 
-func (l *listConnectorVersionsFilters) fetchPage(ctx context.Context) pagination.PageResult[ConnectorVersion] {
+func (l *listConnectorDefinitionVersionsFilters) fetchPage(ctx context.Context) pagination.PageResult[ConnectorWithDefinition] {
 	var err error
 
 	if err = l.Errors.ErrorOrNil(); err != nil {
-		return pagination.PageResult[ConnectorVersion]{Error: err}
+		return pagination.PageResult[ConnectorWithDefinition]{Error: err}
 	}
 
 	rows, err := l.applyRestrictions(ctx).
 		RunWith(l.s.db).
 		Query()
 	if err != nil {
-		return pagination.PageResult[ConnectorVersion]{Error: err}
+		return pagination.PageResult[ConnectorWithDefinition]{Error: err}
 	}
 	defer rows.Close()
 
-	var results []ConnectorVersion
+	var results []ConnectorWithDefinition
 	for rows.Next() {
-		var r ConnectorVersion
+		var r ConnectorWithDefinition
 		err := rows.Scan(r.fields()...)
 		if err != nil {
-			return pagination.PageResult[ConnectorVersion]{Error: err}
+			return pagination.PageResult[ConnectorWithDefinition]{Error: err}
 		}
 		results = append(results, r)
 	}
@@ -953,22 +861,22 @@ func (l *listConnectorVersionsFilters) fetchPage(ctx context.Context) pagination
 	if hasMore {
 		cursor, err = pagination.MakeCursor(ctx, l.s.cursorEncryptor, l)
 		if err != nil {
-			return pagination.PageResult[ConnectorVersion]{Error: err}
+			return pagination.PageResult[ConnectorWithDefinition]{Error: err}
 		}
 	}
 
-	return pagination.PageResult[ConnectorVersion]{
+	return pagination.PageResult[ConnectorWithDefinition]{
 		HasMore: hasMore,
 		Results: results[:util.MinUint64(l.LimitVal, uint64(len(results)))],
 		Cursor:  cursor,
 	}
 }
 
-func (l *listConnectorVersionsFilters) FetchPage(ctx context.Context) pagination.PageResult[ConnectorVersion] {
+func (l *listConnectorDefinitionVersionsFilters) FetchPage(ctx context.Context) pagination.PageResult[ConnectorWithDefinition] {
 	return l.fetchPage(ctx)
 }
 
-func (l *listConnectorVersionsFilters) Enumerate(ctx context.Context, callback pagination.EnumerateCallback[ConnectorVersion]) error {
+func (l *listConnectorDefinitionVersionsFilters) Enumerate(ctx context.Context, callback pagination.EnumerateCallback[ConnectorWithDefinition]) error {
 	var err error
 	keepGoing := pagination.Continue
 	hasMore := true
@@ -986,15 +894,15 @@ func (l *listConnectorVersionsFilters) Enumerate(ctx context.Context, callback p
 	return err
 }
 
-func (s *service) ListConnectorVersionsBuilder() ListConnectorVersionsBuilder {
-	return &listConnectorVersionsFilters{
+func (s *service) ListConnectorDefinitionVersionsBuilder() ListConnectorDefinitionVersionsBuilder {
+	return &listConnectorDefinitionVersionsFilters{
 		s:        s,
 		LimitVal: 100,
 	}
 }
 
-func (s *service) ListConnectorVersionsFromCursor(ctx context.Context, cursor string) (ListConnectorVersionsExecutor, error) {
-	b := &listConnectorVersionsFilters{
+func (s *service) ListConnectorDefinitionVersionsFromCursor(ctx context.Context, cursor string) (ListConnectorDefinitionVersionsExecutor, error) {
+	b := &listConnectorDefinitionVersionsFilters{
 		s:        s,
 		LimitVal: 100,
 	}

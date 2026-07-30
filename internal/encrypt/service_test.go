@@ -72,16 +72,15 @@ func TestService(t *testing.T) {
 	}
 	require.NoError(t, db.CreateConnection(context.Background(), &connection))
 
-	connectorVersion := database.ConnectorVersion{
+	connectorVersion := database.ConnectorWithDefinition{
 		Id:                  apid.New(apid.PrefixConnectorVersion),
 		Version:             1,
 		Namespace:           "root.some-namespace",
-		State:               database.ConnectorVersionStatePrimary,
+		State:               database.ConnectorDefinitionVersionStatePrimary,
 		Labels:              map[string]string{"type": "test"},
-		Hash:                "test",
 		EncryptedDefinition: encfield.EncryptedField{ID: "dek_test", Data: "test"},
 	}
-	require.NoError(t, db.UpsertConnectorVersion(context.Background(), &connectorVersion))
+	require.NoError(t, db.UpsertConnectorDefinitionVersion(context.Background(), &connectorVersion))
 
 	t.Run("string", func(t *testing.T) {
 		t.Run("roundtrip global", func(t *testing.T) {

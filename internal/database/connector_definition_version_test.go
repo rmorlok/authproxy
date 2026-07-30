@@ -16,7 +16,7 @@ import (
 	clock "k8s.io/utils/clock/testing"
 )
 
-func TestConnectorVersions(t *testing.T) {
+func TestConnectorDefinitionVersions(t *testing.T) {
 	t.Run("basic", func(t *testing.T) {
 		_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
@@ -45,52 +45,52 @@ INSERT INTO connector_definition_versions
 		_, err := rawDb.Exec(sql)
 		require.NoError(t, err)
 
-		v, err := db.GetConnectorVersion(ctx, apid.MustParse("cxr_testgmail0000001"), 1)
+		v, err := db.GetConnectorDefinitionVersion(ctx, apid.MustParse("cxr_testgmail0000001"), 1)
 		require.NoError(t, err)
 		require.Equal(t, "gmail", v.Labels["type"])
-		require.Equal(t, ConnectorVersionStateActive, v.State)
+		require.Equal(t, ConnectorDefinitionVersionStateActive, v.State)
 
-		results, err := db.GetConnectorVersions(ctx, []ConnectorVersionId{
+		results, err := db.GetConnectorDefinitionVersions(ctx, []ConnectorDefinitionVersionId{
 			{apid.MustParse("cxr_testgmail0000001"), 1},
 		})
 		require.NoError(t, err)
 		require.Len(t, results, 1)
-		require.Equal(t, "gmail", results[ConnectorVersionId{apid.MustParse("cxr_testgmail0000001"), 1}].Labels["type"])
-		require.Equal(t, ConnectorVersionStateActive, results[ConnectorVersionId{apid.MustParse("cxr_testgmail0000001"), 1}].State)
+		require.Equal(t, "gmail", results[ConnectorDefinitionVersionId{apid.MustParse("cxr_testgmail0000001"), 1}].Labels["type"])
+		require.Equal(t, ConnectorDefinitionVersionStateActive, results[ConnectorDefinitionVersionId{apid.MustParse("cxr_testgmail0000001"), 1}].State)
 
-		results, err = db.GetConnectorVersions(ctx, []ConnectorVersionId{
+		results, err = db.GetConnectorDefinitionVersions(ctx, []ConnectorDefinitionVersionId{
 			{apid.MustParse("cxr_testgmail0000001"), 1},
 			{apid.MustParse("cxr_testgmail0000002"), 2},
 		})
 		require.NoError(t, err)
 		require.Len(t, results, 2)
-		require.Equal(t, "gmail", results[ConnectorVersionId{apid.MustParse("cxr_testgmail0000001"), 1}].Labels["type"])
-		require.Equal(t, ConnectorVersionStateActive, results[ConnectorVersionId{apid.MustParse("cxr_testgmail0000001"), 1}].State)
-		require.Equal(t, "gmail", results[ConnectorVersionId{apid.MustParse("cxr_testgmail0000002"), 2}].Labels["type"])
-		require.Equal(t, ConnectorVersionStatePrimary, results[ConnectorVersionId{apid.MustParse("cxr_testgmail0000002"), 2}].State)
+		require.Equal(t, "gmail", results[ConnectorDefinitionVersionId{apid.MustParse("cxr_testgmail0000001"), 1}].Labels["type"])
+		require.Equal(t, ConnectorDefinitionVersionStateActive, results[ConnectorDefinitionVersionId{apid.MustParse("cxr_testgmail0000001"), 1}].State)
+		require.Equal(t, "gmail", results[ConnectorDefinitionVersionId{apid.MustParse("cxr_testgmail0000002"), 2}].Labels["type"])
+		require.Equal(t, ConnectorDefinitionVersionStatePrimary, results[ConnectorDefinitionVersionId{apid.MustParse("cxr_testgmail0000002"), 2}].State)
 
 		// Version doesn't exist
-		v, err = db.GetConnectorVersion(ctx, apid.MustParse("cxr_testgmail0000001"), 99)
+		v, err = db.GetConnectorDefinitionVersion(ctx, apid.MustParse("cxr_testgmail0000001"), 99)
 		require.ErrorIs(t, err, ErrNotFound)
 		require.Nil(t, v)
 
 		// UUID doesn't exist
-		v, err = db.GetConnectorVersion(ctx, apid.MustParse("cxr_testnotfound0001"), 1)
+		v, err = db.GetConnectorDefinitionVersion(ctx, apid.MustParse("cxr_testnotfound0001"), 1)
 		require.ErrorIs(t, err, ErrNotFound)
 		require.Nil(t, v)
 
-		v, err = db.GetConnectorVersionForState(ctx, apid.MustParse("cxr_testslack0000001"), ConnectorVersionStatePrimary)
+		v, err = db.GetConnectorDefinitionVersionForState(ctx, apid.MustParse("cxr_testslack0000001"), ConnectorDefinitionVersionStatePrimary)
 		require.NoError(t, err)
 		require.Equal(t, "outlook", v.Labels["type"])
-		require.Equal(t, ConnectorVersionStatePrimary, v.State)
+		require.Equal(t, ConnectorDefinitionVersionStatePrimary, v.State)
 
-		v, err = db.GetConnectorVersionForState(ctx, apid.MustParse("cxr_testslack0000001"), ConnectorVersionStateArchived)
+		v, err = db.GetConnectorDefinitionVersionForState(ctx, apid.MustParse("cxr_testslack0000001"), ConnectorDefinitionVersionStateArchived)
 		require.ErrorIs(t, err, ErrNotFound)
 		require.Nil(t, v)
 
-		pr := db.ListConnectorVersionsBuilder().
+		pr := db.ListConnectorDefinitionVersionsBuilder().
 			ForLabelSelector("type=gmail").
-			OrderBy(ConnectorVersionOrderByCreatedAt, pagination.OrderByDesc).
+			OrderBy(ConnectorDefinitionVersionOrderByCreatedAt, pagination.OrderByDesc).
 			FetchPage(ctx)
 		require.NoError(t, pr.Error)
 		require.Len(t, pr.Results, 4)
@@ -103,9 +103,9 @@ INSERT INTO connector_definition_versions
 		require.Equal(t, pr.Results[3].Id, apid.MustParse("cxr_testgmail0000001"))
 		require.Equal(t, uint64(1), pr.Results[3].Version)
 
-		pr = db.ListConnectorVersionsBuilder().
+		pr = db.ListConnectorDefinitionVersionsBuilder().
 			ForNamespaceMatcher("root.child.**").
-			OrderBy(ConnectorVersionOrderByCreatedAt, pagination.OrderByAsc).
+			OrderBy(ConnectorDefinitionVersionOrderByCreatedAt, pagination.OrderByAsc).
 			FetchPage(ctx)
 		require.NoError(t, pr.Error)
 		require.Len(t, pr.Results, 5)
@@ -145,16 +145,16 @@ INSERT INTO connector_definition_versions
 		require.NoError(t, err)
 
 		t.Run("empty matchers returns all", func(t *testing.T) {
-			pr := db.ListConnectorVersionsBuilder().
+			pr := db.ListConnectorDefinitionVersionsBuilder().
 				ForNamespaceMatchers([]string{}).
-				OrderBy(ConnectorVersionOrderByCreatedAt, pagination.OrderByAsc).
+				OrderBy(ConnectorDefinitionVersionOrderByCreatedAt, pagination.OrderByAsc).
 				FetchPage(ctx)
 			require.NoError(t, pr.Error)
 			require.Len(t, pr.Results, 4)
 		})
 
 		t.Run("single exact matcher", func(t *testing.T) {
-			pr := db.ListConnectorVersionsBuilder().
+			pr := db.ListConnectorDefinitionVersionsBuilder().
 				ForNamespaceMatchers([]string{"root.prod"}).
 				FetchPage(ctx)
 			require.NoError(t, pr.Error)
@@ -163,9 +163,9 @@ INSERT INTO connector_definition_versions
 		})
 
 		t.Run("single wildcard matcher", func(t *testing.T) {
-			pr := db.ListConnectorVersionsBuilder().
+			pr := db.ListConnectorDefinitionVersionsBuilder().
 				ForNamespaceMatchers([]string{"root.prod.**"}).
-				OrderBy(ConnectorVersionOrderByCreatedAt, pagination.OrderByAsc).
+				OrderBy(ConnectorDefinitionVersionOrderByCreatedAt, pagination.OrderByAsc).
 				FetchPage(ctx)
 			require.NoError(t, pr.Error)
 			require.Len(t, pr.Results, 2)
@@ -174,9 +174,9 @@ INSERT INTO connector_definition_versions
 		})
 
 		t.Run("multiple exact matchers (OR logic)", func(t *testing.T) {
-			pr := db.ListConnectorVersionsBuilder().
+			pr := db.ListConnectorDefinitionVersionsBuilder().
 				ForNamespaceMatchers([]string{"root.prod", "root.staging"}).
-				OrderBy(ConnectorVersionOrderByCreatedAt, pagination.OrderByAsc).
+				OrderBy(ConnectorDefinitionVersionOrderByCreatedAt, pagination.OrderByAsc).
 				FetchPage(ctx)
 			require.NoError(t, pr.Error)
 			require.Len(t, pr.Results, 2)
@@ -185,16 +185,16 @@ INSERT INTO connector_definition_versions
 		})
 
 		t.Run("multiple wildcard matchers (OR logic)", func(t *testing.T) {
-			pr := db.ListConnectorVersionsBuilder().
+			pr := db.ListConnectorDefinitionVersionsBuilder().
 				ForNamespaceMatchers([]string{"root.prod.**", "root.staging.**"}).
-				OrderBy(ConnectorVersionOrderByCreatedAt, pagination.OrderByAsc).
+				OrderBy(ConnectorDefinitionVersionOrderByCreatedAt, pagination.OrderByAsc).
 				FetchPage(ctx)
 			require.NoError(t, pr.Error)
 			require.Len(t, pr.Results, 3)
 		})
 
 		t.Run("no matching namespaces", func(t *testing.T) {
-			pr := db.ListConnectorVersionsBuilder().
+			pr := db.ListConnectorDefinitionVersionsBuilder().
 				ForNamespaceMatchers([]string{"root.nonexistent"}).
 				FetchPage(ctx)
 			require.NoError(t, pr.Error)
@@ -202,17 +202,16 @@ INSERT INTO connector_definition_versions
 		})
 	})
 	t.Run("validation rejects wrong prefix on id", func(t *testing.T) {
-		cv := &ConnectorVersion{
+		cv := &ConnectorWithDefinition{
 			Id:                  apid.New(apid.PrefixActor), // wrong prefix
 			Version:             1,
 			Namespace:           "root",
-			State:               ConnectorVersionStateDraft,
-			Hash:                "hash",
+			State:               ConnectorDefinitionVersionStateDraft,
 			EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "def"},
 		}
 		require.Error(t, cv.Validate())
 	})
-	t.Run("UpsertConnectorVersion", func(t *testing.T) {
+	t.Run("UpsertConnectorDefinitionVersion", func(t *testing.T) {
 		t.Run("creates a new connector version", func(t *testing.T) {
 			// Setup
 			_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
@@ -221,27 +220,26 @@ INSERT INTO connector_definition_versions
 
 			// Create a new connector version
 			connectorID := apid.New(apid.PrefixConnectorVersion)
-			cv := &ConnectorVersion{
+			cv := &ConnectorWithDefinition{
 				Id:                  connectorID,
 				Version:             1,
 				Namespace:           "root.some-namespace",
-				State:               ConnectorVersionStateDraft,
+				State:               ConnectorDefinitionVersionStateDraft,
 				Labels:              Labels{"type": "test_connector"},
-				Hash:                "test_hash",
 				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "test_encrypted_definition"},
 			}
 
 			// Test
-			err := db.UpsertConnectorVersion(ctx, cv)
+			err := db.UpsertConnectorDefinitionVersion(ctx, cv)
 			require.NoError(t, err)
 
 			// Verify
-			savedCV, err := db.GetConnectorVersion(ctx, connectorID, 1)
+			savedCV, err := db.GetConnectorDefinitionVersion(ctx, connectorID, 1)
 			require.NoError(t, err)
 			require.NotNil(t, savedCV)
 			assert.Equal(t, connectorID, savedCV.Id)
 			assert.Equal(t, uint64(1), savedCV.Version)
-			assert.Equal(t, ConnectorVersionStateDraft, savedCV.State)
+			assert.Equal(t, ConnectorDefinitionVersionStateDraft, savedCV.State)
 			assert.Equal(t, "test_connector", savedCV.Labels["type"])
 			assert.Equal(t, "root.some-namespace", savedCV.Namespace)
 			require.True(t, savedCV.DefinitionVersionId.HasPrefix(apid.PrefixConnectorDefinitionVersion))
@@ -257,23 +255,22 @@ INSERT INTO connector_definition_versions
 
 			// Create a new connector version
 			connectorID := apid.New(apid.PrefixConnectorVersion)
-			cv := &ConnectorVersion{
+			cv := &ConnectorWithDefinition{
 				Id:                  connectorID,
 				Version:             1,
 				Namespace:           "root.some-namespace",
-				State:               ConnectorVersionStateActive,
+				State:               ConnectorDefinitionVersionStateActive,
 				Labels:              Labels{"type": "test_connector"},
-				Hash:                "test_hash",
 				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "test_encrypted_definition"},
 			}
 
 			// Test
-			err := db.UpsertConnectorVersion(ctx, cv)
+			err := db.UpsertConnectorDefinitionVersion(ctx, cv)
 			require.Error(t, err) // Cannot create active directly (must be primary)
 			require.Equal(t, 0, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_definition_versions"))
 
-			cv.State = ConnectorVersionStateArchived
-			err = db.UpsertConnectorVersion(ctx, cv)
+			cv.State = ConnectorDefinitionVersionStateArchived
+			err = db.UpsertConnectorDefinitionVersion(ctx, cv)
 			require.Error(t, err) // Cannot create archived directly (must be primary)
 			require.Equal(t, 0, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_definition_versions"))
 		})
@@ -286,27 +283,26 @@ INSERT INTO connector_definition_versions
 
 			// Create a new connector version
 			connectorID := apid.New(apid.PrefixConnectorVersion)
-			cv := &ConnectorVersion{
+			cv := &ConnectorWithDefinition{
 				Id:                  connectorID,
 				Version:             1,
 				Namespace:           sconfig.RootNamespace,
-				State:               ConnectorVersionStateDraft,
+				State:               ConnectorDefinitionVersionStateDraft,
 				Labels:              Labels{"type": "test_connector"},
-				Hash:                "test_hash",
 				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "test_encrypted_definition"},
 			}
 
 			// Test
-			err := db.UpsertConnectorVersion(ctx, cv)
+			err := db.UpsertConnectorDefinitionVersion(ctx, cv)
 			require.NoError(t, err)
 
 			// Verify
-			savedCV, err := db.GetConnectorVersion(ctx, connectorID, 1)
+			savedCV, err := db.GetConnectorDefinitionVersion(ctx, connectorID, 1)
 			require.NoError(t, err)
 			require.NotNil(t, savedCV)
 			assert.Equal(t, connectorID, savedCV.Id)
 			assert.Equal(t, uint64(1), savedCV.Version)
-			assert.Equal(t, ConnectorVersionStateDraft, savedCV.State)
+			assert.Equal(t, ConnectorDefinitionVersionStateDraft, savedCV.State)
 			assert.Equal(t, "test_connector", savedCV.Labels["type"])
 			assert.Equal(t, encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "test_encrypted_definition"}, savedCV.EncryptedDefinition)
 			require.Equal(t, 1, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_definition_versions"))
@@ -320,32 +316,31 @@ INSERT INTO connector_definition_versions
 
 			// Create a new connector version
 			connectorID := apid.New(apid.PrefixConnectorVersion)
-			cv := &ConnectorVersion{
+			cv := &ConnectorWithDefinition{
 				Id:                  connectorID,
 				Version:             1,
 				Namespace:           sconfig.RootNamespace,
-				State:               ConnectorVersionStateDraft,
+				State:               ConnectorDefinitionVersionStateDraft,
 				Labels:              Labels{"type": "test_connector"},
-				Hash:                "test_hash",
 				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "test_encrypted_definition"},
 			}
 
 			// Test
-			err := db.UpsertConnectorVersion(ctx, cv)
+			err := db.UpsertConnectorDefinitionVersion(ctx, cv)
 			require.NoError(t, err)
 
 			// Verify
-			savedCV, err := db.GetConnectorVersion(ctx, connectorID, 1)
+			savedCV, err := db.GetConnectorDefinitionVersion(ctx, connectorID, 1)
 			require.NoError(t, err)
 			assert.Equal(t, sconfig.RootNamespace, savedCV.Namespace)
 
 			// Try to change namespace
 			cv.Namespace = "root.some-other-namespace"
-			err = db.UpsertConnectorVersion(ctx, cv)
+			err = db.UpsertConnectorDefinitionVersion(ctx, cv)
 			require.Error(t, err)
 
 			// Verify unchanged
-			savedCV, err = db.GetConnectorVersion(ctx, connectorID, 1)
+			savedCV, err = db.GetConnectorDefinitionVersion(ctx, connectorID, 1)
 			require.NoError(t, err)
 			assert.Equal(t, sconfig.RootNamespace, savedCV.Namespace)
 			require.Equal(t, 1, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_definition_versions"))
@@ -361,37 +356,35 @@ INSERT INTO connector_definition_versions
 			connectorID := apid.New(apid.PrefixConnectorVersion)
 
 			// Create version 1
-			cv1 := &ConnectorVersion{
+			cv1 := &ConnectorWithDefinition{
 				Id:                  connectorID,
 				Version:             1,
 				Namespace:           sconfig.RootNamespace,
-				State:               ConnectorVersionStateDraft,
+				State:               ConnectorDefinitionVersionStateDraft,
 				Labels:              Labels{"type": "test_connector_v1"},
 				Annotations:         Annotations{"owner": "v1"},
-				Hash:                "test_hash_v1",
 				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "test_encrypted_definition_v1"},
 			}
 
-			err := db.UpsertConnectorVersion(ctx, cv1)
+			err := db.UpsertConnectorDefinitionVersion(ctx, cv1)
 			require.NoError(t, err)
 
 			// Create version 2
-			cv2 := &ConnectorVersion{
+			cv2 := &ConnectorWithDefinition{
 				Id:                  connectorID,
 				Version:             2,
 				Namespace:           sconfig.RootNamespace,
-				State:               ConnectorVersionStateDraft,
+				State:               ConnectorDefinitionVersionStateDraft,
 				Labels:              Labels{"type": "test_connector_v2"},
 				Annotations:         Annotations{"owner": "v2"},
-				Hash:                "test_hash_v2",
 				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "test_encrypted_definition_v2"},
 			}
 
-			err = db.UpsertConnectorVersion(ctx, cv2)
+			err = db.UpsertConnectorDefinitionVersion(ctx, cv2)
 			require.NoError(t, err)
 
 			// Verify version 1
-			savedCV1, err := db.GetConnectorVersion(ctx, connectorID, 1)
+			savedCV1, err := db.GetConnectorDefinitionVersion(ctx, connectorID, 1)
 			require.NoError(t, err)
 			require.NotNil(t, savedCV1)
 			assert.Equal(t, uint64(1), savedCV1.Version)
@@ -399,7 +392,7 @@ INSERT INTO connector_definition_versions
 			assert.Equal(t, "v2", savedCV1.Annotations["owner"])
 
 			// Verify version 2
-			savedCV2, err := db.GetConnectorVersion(ctx, connectorID, 2)
+			savedCV2, err := db.GetConnectorDefinitionVersion(ctx, connectorID, 2)
 			require.NoError(t, err)
 			require.NotNil(t, savedCV2)
 			assert.Equal(t, uint64(2), savedCV2.Version)
@@ -421,28 +414,27 @@ INSERT INTO connector_definition_versions
 			connectorID := apid.New(apid.PrefixConnectorVersion)
 
 			// Create a primary connector version
-			cv := &ConnectorVersion{
+			cv := &ConnectorWithDefinition{
 				Id:                  connectorID,
 				Version:             1,
 				Namespace:           sconfig.RootNamespace,
-				State:               ConnectorVersionStatePrimary,
+				State:               ConnectorDefinitionVersionStatePrimary,
 				Labels:              Labels{"type": "test_connector"},
-				Hash:                "test_hash",
 				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "test_encrypted_definition"},
 			}
 
-			err := db.UpsertConnectorVersion(ctx, cv)
+			err := db.UpsertConnectorDefinitionVersion(ctx, cv)
 			require.NoError(t, err)
 
 			// Verify
-			savedCV, err := db.GetConnectorVersion(ctx, connectorID, 1)
+			savedCV, err := db.GetConnectorDefinitionVersion(ctx, connectorID, 1)
 			require.NoError(t, err)
 			require.NotNil(t, savedCV)
-			assert.Equal(t, ConnectorVersionStatePrimary, savedCV.State)
+			assert.Equal(t, ConnectorDefinitionVersionStatePrimary, savedCV.State)
 		})
 
 		t.Run("creates multiple primary versions and updates previous primary to active", func(t *testing.T) {
-			// This test simulates what UpsertConnectorVersion does when setting a new primary version
+			// This test simulates what UpsertConnectorDefinitionVersion does when setting a new primary version
 
 			// Setup
 			_, db := MustApplyBlankTestDbConfig(t, nil)
@@ -453,50 +445,48 @@ INSERT INTO connector_definition_versions
 			connectorID := apid.New(apid.PrefixConnectorVersion)
 
 			// Create version 1 as primary
-			cv1 := &ConnectorVersion{
+			cv1 := &ConnectorWithDefinition{
 				Id:                  connectorID,
 				Version:             1,
 				Namespace:           sconfig.RootNamespace,
-				State:               ConnectorVersionStatePrimary,
+				State:               ConnectorDefinitionVersionStatePrimary,
 				Labels:              Labels{"type": "test_connector"},
-				Hash:                "test_hash_v1",
 				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "test_encrypted_definition_v1"},
 			}
 
-			err := db.UpsertConnectorVersion(ctx, cv1)
+			err := db.UpsertConnectorDefinitionVersion(ctx, cv1)
 			require.NoError(t, err)
 
 			// Verify version 1 is primary
-			savedCV1, err := db.GetConnectorVersion(ctx, connectorID, 1)
+			savedCV1, err := db.GetConnectorDefinitionVersion(ctx, connectorID, 1)
 			require.NoError(t, err)
 			require.NotNil(t, savedCV1)
-			assert.Equal(t, ConnectorVersionStatePrimary, savedCV1.State)
+			assert.Equal(t, ConnectorDefinitionVersionStatePrimary, savedCV1.State)
 
 			// Create version 2 as primary
-			cv2 := &ConnectorVersion{
+			cv2 := &ConnectorWithDefinition{
 				Id:                  connectorID,
 				Version:             2,
 				Namespace:           sconfig.RootNamespace,
-				State:               ConnectorVersionStatePrimary,
+				State:               ConnectorDefinitionVersionStatePrimary,
 				Labels:              Labels{"type": "test_connector"},
-				Hash:                "test_hash_v2",
 				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "test_encrypted_definition_v2"},
 			}
 
-			err = db.UpsertConnectorVersion(ctx, cv2)
+			err = db.UpsertConnectorDefinitionVersion(ctx, cv2)
 			require.NoError(t, err)
 
 			// Verify version 2 is primary
-			savedCV2, err := db.GetConnectorVersion(ctx, connectorID, 2)
+			savedCV2, err := db.GetConnectorDefinitionVersion(ctx, connectorID, 2)
 			require.NoError(t, err)
 			require.NotNil(t, savedCV2)
-			assert.Equal(t, ConnectorVersionStatePrimary, savedCV2.State)
+			assert.Equal(t, ConnectorDefinitionVersionStatePrimary, savedCV2.State)
 
 			// Verify version 1 is now active
-			savedCV1, err = db.GetConnectorVersion(ctx, connectorID, 1)
+			savedCV1, err = db.GetConnectorDefinitionVersion(ctx, connectorID, 1)
 			require.NoError(t, err)
 			require.NotNil(t, savedCV1)
-			assert.Equal(t, ConnectorVersionStateActive, savedCV1.State)
+			assert.Equal(t, ConnectorDefinitionVersionStateActive, savedCV1.State)
 		})
 		t.Run("upsert does not resurrect a soft-deleted connector", func(t *testing.T) {
 			_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
@@ -504,32 +494,30 @@ INSERT INTO connector_definition_versions
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 			connectorID := apid.New(apid.PrefixConnectorVersion)
-			cv := &ConnectorVersion{
+			cv := &ConnectorWithDefinition{
 				Id:                  connectorID,
 				Version:             1,
 				Namespace:           sconfig.RootNamespace,
-				State:               ConnectorVersionStateDraft,
+				State:               ConnectorDefinitionVersionStateDraft,
 				Labels:              Labels{"type": "test_connector"},
-				Hash:                "test_hash",
 				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "test_encrypted_definition"},
 			}
 
-			err := db.UpsertConnectorVersion(ctx, cv)
+			err := db.UpsertConnectorDefinitionVersion(ctx, cv)
 			require.NoError(t, err)
 
 			require.NoError(t, db.DeleteConnector(ctx, connectorID))
 
-			cv2 := &ConnectorVersion{
+			cv2 := &ConnectorWithDefinition{
 				Id:                  connectorID,
 				Version:             1,
 				Namespace:           sconfig.RootNamespace,
-				State:               ConnectorVersionStateDraft,
+				State:               ConnectorDefinitionVersionStateDraft,
 				Labels:              Labels{"type": "updated_connector"},
-				Hash:                "new_hash",
 				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "new_encrypted_definition"},
 			}
 
-			err = db.UpsertConnectorVersion(ctx, cv2)
+			err = db.UpsertConnectorDefinitionVersion(ctx, cv2)
 			require.Error(t, err)
 
 			var encrypted encfield.EncryptedField
@@ -542,7 +530,7 @@ INSERT INTO connector_definition_versions
 		})
 
 		t.Run("refuses to skip version numbers", func(t *testing.T) {
-			// This test simulates what UpsertConnectorVersion does when setting a new primary version
+			// This test simulates what UpsertConnectorDefinitionVersion does when setting a new primary version
 
 			// Setup
 			_, db := MustApplyBlankTestDbConfig(t, nil)
@@ -553,78 +541,75 @@ INSERT INTO connector_definition_versions
 			connectorID := apid.New(apid.PrefixConnectorVersion)
 
 			// Create version 1 as primary
-			cv1 := &ConnectorVersion{
+			cv1 := &ConnectorWithDefinition{
 				Id:                  connectorID,
 				Version:             1,
 				Namespace:           sconfig.RootNamespace,
-				State:               ConnectorVersionStatePrimary,
+				State:               ConnectorDefinitionVersionStatePrimary,
 				Labels:              Labels{"type": "test_connector"},
-				Hash:                "test_hash_v1",
 				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "test_encrypted_definition_v1"},
 			}
 
-			err := db.UpsertConnectorVersion(ctx, cv1)
+			err := db.UpsertConnectorDefinitionVersion(ctx, cv1)
 			require.NoError(t, err)
 
 			// Verify version 1 is primary
-			savedCV1, err := db.GetConnectorVersion(ctx, connectorID, 1)
+			savedCV1, err := db.GetConnectorDefinitionVersion(ctx, connectorID, 1)
 			require.NoError(t, err)
 			require.NotNil(t, savedCV1)
-			assert.Equal(t, ConnectorVersionStatePrimary, savedCV1.State)
+			assert.Equal(t, ConnectorDefinitionVersionStatePrimary, savedCV1.State)
 
 			// Create version 2 as primary
-			cv2 := &ConnectorVersion{
+			cv2 := &ConnectorWithDefinition{
 				Id:                  connectorID,
 				Version:             3,
 				Namespace:           sconfig.RootNamespace,
-				State:               ConnectorVersionStatePrimary,
+				State:               ConnectorDefinitionVersionStatePrimary,
 				Labels:              Labels{"type": "test_connector"},
-				Hash:                "test_hash_v2",
 				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "test_encrypted_definition_v2"},
 			}
 
-			err = db.UpsertConnectorVersion(ctx, cv2)
+			err = db.UpsertConnectorDefinitionVersion(ctx, cv2)
 			require.Error(t, err)
 
 			// Verify version 1 is primary
-			savedCV2, err := db.GetConnectorVersion(ctx, connectorID, 1)
+			savedCV2, err := db.GetConnectorDefinitionVersion(ctx, connectorID, 1)
 			require.NoError(t, err)
 			require.NotNil(t, savedCV2)
-			assert.Equal(t, ConnectorVersionStatePrimary, savedCV2.State)
+			assert.Equal(t, ConnectorDefinitionVersionStatePrimary, savedCV2.State)
 
 			// Verify version wasn't created
-			savedCV1, err = db.GetConnectorVersion(ctx, connectorID, 3)
+			savedCV1, err = db.GetConnectorDefinitionVersion(ctx, connectorID, 3)
 			require.ErrorIs(t, err, ErrNotFound)
 			require.Nil(t, savedCV1)
 		})
 	})
 
-	t.Run("SetConnectorVersionState", func(t *testing.T) {
+	t.Run("SetConnectorDefinitionVersionState", func(t *testing.T) {
 		t.Run("sets state successfully", func(t *testing.T) {
 			_, db := MustApplyBlankTestDbConfig(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 			connectorID := apid.New(apid.PrefixConnectorVersion)
-			cv := &ConnectorVersion{
+			cv := &ConnectorWithDefinition{
 				Id:                  connectorID,
 				Version:             1,
 				Namespace:           sconfig.RootNamespace,
-				State:               ConnectorVersionStateDraft,
+				State:               ConnectorDefinitionVersionStateDraft,
 				Labels:              Labels{"type": "test_connector"},
-				Hash:                "test_hash",
 				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "test_encrypted_definition"},
 			}
 
-			err := db.UpsertConnectorVersion(ctx, cv)
+			err := db.UpsertConnectorDefinitionVersion(ctx, cv)
 			require.NoError(t, err)
 
-			err = db.SetConnectorVersionState(ctx, connectorID, 1, ConnectorVersionStatePrimary)
+			err = db.SetConnectorDefinitionVersionState(ctx, connectorID, 1, ConnectorDefinitionVersionStatePrimary)
 			require.NoError(t, err)
 
-			saved, err := db.GetConnectorVersion(ctx, connectorID, 1)
+			saved, err := db.GetConnectorDefinitionVersion(ctx, connectorID, 1)
 			require.NoError(t, err)
-			assert.Equal(t, ConnectorVersionStatePrimary, saved.State)
+			assert.Equal(t, ConnectorDefinitionVersionStatePrimary, saved.State)
 		})
 
 		t.Run("returns not found for nonexistent version", func(t *testing.T) {
@@ -632,7 +617,7 @@ INSERT INTO connector_definition_versions
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-			err := db.SetConnectorVersionState(ctx, apid.New(apid.PrefixConnectorVersion), 1, ConnectorVersionStatePrimary)
+			err := db.SetConnectorDefinitionVersionState(ctx, apid.New(apid.PrefixConnectorVersion), 1, ConnectorDefinitionVersionStatePrimary)
 			require.ErrorIs(t, err, ErrNotFound)
 		})
 
@@ -641,7 +626,7 @@ INSERT INTO connector_definition_versions
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-			err := db.SetConnectorVersionState(ctx, apid.New(apid.PrefixConnectorVersion), 1, ConnectorVersionState("invalid"))
+			err := db.SetConnectorDefinitionVersionState(ctx, apid.New(apid.PrefixConnectorVersion), 1, ConnectorDefinitionVersionState("invalid"))
 			require.Error(t, err)
 		})
 
@@ -653,34 +638,34 @@ INSERT INTO connector_definition_versions
 			connectorID := apid.New(apid.PrefixConnectorVersion)
 
 			// Create v1 as primary
-			err := db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+			err := db.UpsertConnectorDefinitionVersion(ctx, &ConnectorWithDefinition{
 				Id: connectorID, Version: 1, Namespace: sconfig.RootNamespace,
-				State: ConnectorVersionStatePrimary, Labels: Labels{"type": "t"},
-				Hash: "h1", EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "e1"},
+				State: ConnectorDefinitionVersionStatePrimary, Labels: Labels{"type": "t"},
+				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "e1"},
 			})
 			require.NoError(t, err)
 
 			// Create v2 as draft
-			err = db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+			err = db.UpsertConnectorDefinitionVersion(ctx, &ConnectorWithDefinition{
 				Id: connectorID, Version: 2, Namespace: sconfig.RootNamespace,
-				State: ConnectorVersionStateDraft, Labels: Labels{"type": "t"},
-				Hash: "h2", EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "e2"},
+				State: ConnectorDefinitionVersionStateDraft, Labels: Labels{"type": "t"},
+				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "e2"},
 			})
 			require.NoError(t, err)
 
 			// Force v2 to primary
-			err = db.SetConnectorVersionState(ctx, connectorID, 2, ConnectorVersionStatePrimary)
+			err = db.SetConnectorDefinitionVersionState(ctx, connectorID, 2, ConnectorDefinitionVersionStatePrimary)
 			require.NoError(t, err)
 
 			// v2 should be primary
-			v2, err := db.GetConnectorVersion(ctx, connectorID, 2)
+			v2, err := db.GetConnectorDefinitionVersion(ctx, connectorID, 2)
 			require.NoError(t, err)
-			assert.Equal(t, ConnectorVersionStatePrimary, v2.State)
+			assert.Equal(t, ConnectorDefinitionVersionStatePrimary, v2.State)
 
 			// v1 should have been demoted to active
-			v1, err := db.GetConnectorVersion(ctx, connectorID, 1)
+			v1, err := db.GetConnectorDefinitionVersion(ctx, connectorID, 1)
 			require.NoError(t, err)
-			assert.Equal(t, ConnectorVersionStateActive, v1.State)
+			assert.Equal(t, ConnectorDefinitionVersionStateActive, v1.State)
 		})
 
 		t.Run("returns not found for a version of a soft-deleted connector", func(t *testing.T) {
@@ -689,22 +674,21 @@ INSERT INTO connector_definition_versions
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 			connectorID := apid.New(apid.PrefixConnectorVersion)
-			cv := &ConnectorVersion{
+			cv := &ConnectorWithDefinition{
 				Id:                  connectorID,
 				Version:             1,
 				Namespace:           sconfig.RootNamespace,
-				State:               ConnectorVersionStateDraft,
+				State:               ConnectorDefinitionVersionStateDraft,
 				Labels:              Labels{"type": "test_connector"},
-				Hash:                "test_hash",
 				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "test_encrypted_definition"},
 			}
 
-			err := db.UpsertConnectorVersion(ctx, cv)
+			err := db.UpsertConnectorDefinitionVersion(ctx, cv)
 			require.NoError(t, err)
 
 			require.NoError(t, db.DeleteConnector(ctx, connectorID))
 
-			err = db.SetConnectorVersionState(ctx, connectorID, 1, ConnectorVersionStatePrimary)
+			err = db.SetConnectorDefinitionVersionState(ctx, connectorID, 1, ConnectorDefinitionVersionStatePrimary)
 			require.ErrorIs(t, err, ErrNotFound)
 		})
 
@@ -716,34 +700,34 @@ INSERT INTO connector_definition_versions
 			connectorID := apid.New(apid.PrefixConnectorVersion)
 
 			// Create v1 as primary
-			err := db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+			err := db.UpsertConnectorDefinitionVersion(ctx, &ConnectorWithDefinition{
 				Id: connectorID, Version: 1, Namespace: sconfig.RootNamespace,
-				State: ConnectorVersionStatePrimary, Labels: Labels{"type": "t"},
-				Hash: "h1", EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "e1"},
+				State: ConnectorDefinitionVersionStatePrimary, Labels: Labels{"type": "t"},
+				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "e1"},
 			})
 			require.NoError(t, err)
 
 			// Create v2 as draft
-			err = db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+			err = db.UpsertConnectorDefinitionVersion(ctx, &ConnectorWithDefinition{
 				Id: connectorID, Version: 2, Namespace: sconfig.RootNamespace,
-				State: ConnectorVersionStateDraft, Labels: Labels{"type": "t"},
-				Hash: "h2", EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "e2"},
+				State: ConnectorDefinitionVersionStateDraft, Labels: Labels{"type": "t"},
+				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "e2"},
 			})
 			require.NoError(t, err)
 
 			// Force v1 to draft
-			err = db.SetConnectorVersionState(ctx, connectorID, 1, ConnectorVersionStateDraft)
+			err = db.SetConnectorDefinitionVersionState(ctx, connectorID, 1, ConnectorDefinitionVersionStateDraft)
 			require.NoError(t, err)
 
 			// v1 should be draft
-			v1, err := db.GetConnectorVersion(ctx, connectorID, 1)
+			v1, err := db.GetConnectorDefinitionVersion(ctx, connectorID, 1)
 			require.NoError(t, err)
-			assert.Equal(t, ConnectorVersionStateDraft, v1.State)
+			assert.Equal(t, ConnectorDefinitionVersionStateDraft, v1.State)
 
 			// v2 should have been archived
-			v2, err := db.GetConnectorVersion(ctx, connectorID, 2)
+			v2, err := db.GetConnectorDefinitionVersion(ctx, connectorID, 2)
 			require.NoError(t, err)
-			assert.Equal(t, ConnectorVersionStateArchived, v2.State)
+			assert.Equal(t, ConnectorDefinitionVersionStateArchived, v2.State)
 		})
 	})
 
@@ -756,17 +740,17 @@ INSERT INTO connector_definition_versions
 
 			connectorID := apid.New(apid.PrefixConnectorVersion)
 
-			err := db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+			err := db.UpsertConnectorDefinitionVersion(ctx, &ConnectorWithDefinition{
 				Id: connectorID, Version: 1, Namespace: sconfig.RootNamespace,
-				State: ConnectorVersionStatePrimary, Labels: Labels{"type": "t"},
-				Hash: "h1", EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "e1"},
+				State: ConnectorDefinitionVersionStatePrimary, Labels: Labels{"type": "t"},
+				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "e1"},
 			})
 			require.NoError(t, err)
 
-			err = db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+			err = db.UpsertConnectorDefinitionVersion(ctx, &ConnectorWithDefinition{
 				Id: connectorID, Version: 2, Namespace: sconfig.RootNamespace,
-				State: ConnectorVersionStateDraft, Labels: Labels{"type": "t"},
-				Hash: "h2", EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "e2"},
+				State: ConnectorDefinitionVersionStateDraft, Labels: Labels{"type": "t"},
+				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "e2"},
 			})
 			require.NoError(t, err)
 
@@ -780,9 +764,9 @@ INSERT INTO connector_definition_versions
 			require.Equal(t, 0, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connectors WHERE deleted_at IS NULL"))
 			require.Equal(t, 1, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connectors WHERE deleted_at IS NOT NULL"))
 
-			_, err = db.GetConnectorVersion(ctx, connectorID, 1)
+			_, err = db.GetConnectorDefinitionVersion(ctx, connectorID, 1)
 			require.ErrorIs(t, err, ErrNotFound)
-			_, err = db.GetConnectorVersion(ctx, connectorID, 2)
+			_, err = db.GetConnectorDefinitionVersion(ctx, connectorID, 2)
 			require.ErrorIs(t, err, ErrNotFound)
 		})
 
@@ -802,10 +786,10 @@ INSERT INTO connector_definition_versions
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 			connectorID := apid.New(apid.PrefixConnectorVersion)
-			err := db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+			err := db.UpsertConnectorDefinitionVersion(ctx, &ConnectorWithDefinition{
 				Id: connectorID, Version: 1, Namespace: sconfig.RootNamespace,
-				State: ConnectorVersionStatePrimary, Labels: Labels{"type": "t"},
-				Hash: "h1", EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "e1"},
+				State: ConnectorDefinitionVersionStatePrimary, Labels: Labels{"type": "t"},
+				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "e1"},
 			})
 			require.NoError(t, err)
 
@@ -825,24 +809,24 @@ INSERT INTO connector_definition_versions
 			targetID := apid.New(apid.PrefixConnectorVersion)
 			survivorID := apid.New(apid.PrefixConnectorVersion)
 
-			err := db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+			err := db.UpsertConnectorDefinitionVersion(ctx, &ConnectorWithDefinition{
 				Id: targetID, Version: 1, Namespace: sconfig.RootNamespace,
-				State: ConnectorVersionStatePrimary, Labels: Labels{"type": "t1"},
-				Hash: "h1", EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "e1"},
+				State: ConnectorDefinitionVersionStatePrimary, Labels: Labels{"type": "t1"},
+				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "e1"},
 			})
 			require.NoError(t, err)
 
-			err = db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+			err = db.UpsertConnectorDefinitionVersion(ctx, &ConnectorWithDefinition{
 				Id: survivorID, Version: 1, Namespace: sconfig.RootNamespace,
-				State: ConnectorVersionStatePrimary, Labels: Labels{"type": "t2"},
-				Hash: "h2", EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "e2"},
+				State: ConnectorDefinitionVersionStatePrimary, Labels: Labels{"type": "t2"},
+				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "e2"},
 			})
 			require.NoError(t, err)
 
 			err = db.DeleteConnector(ctx, targetID)
 			require.NoError(t, err)
 
-			survivor, err := db.GetConnectorVersion(ctx, survivorID, 1)
+			survivor, err := db.GetConnectorDefinitionVersion(ctx, survivorID, 1)
 			require.NoError(t, err)
 			require.Equal(t, survivorID, survivor.Id)
 
@@ -857,26 +841,25 @@ INSERT INTO connector_definition_versions
 		})
 	})
 
-	t.Run("UpsertConnectorVersion apxy label semantics", func(t *testing.T) {
+	t.Run("UpsertConnectorDefinitionVersion apxy label semantics", func(t *testing.T) {
 		t.Run("caller-supplied apxy labels persist on insert", func(t *testing.T) {
 			_, db := MustApplyBlankTestDbConfig(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 			connectorID := apid.New(apid.PrefixConnectorVersion)
-			err := db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+			err := db.UpsertConnectorDefinitionVersion(ctx, &ConnectorWithDefinition{
 				Id: connectorID, Version: 1, Namespace: sconfig.RootNamespace,
-				State: ConnectorVersionStatePrimary,
+				State: ConnectorDefinitionVersionStatePrimary,
 				Labels: Labels{
 					"type":            "t",
 					"apxy/cxr/source": "config",
 				},
-				Hash:                "h1",
 				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "e1"},
 			})
 			require.NoError(t, err)
 
-			saved, err := db.GetConnectorVersion(ctx, connectorID, 1)
+			saved, err := db.GetConnectorDefinitionVersion(ctx, connectorID, 1)
 			require.NoError(t, err)
 			require.Equal(t, "config", saved.Labels["apxy/cxr/source"])
 			require.Equal(t, "t", saved.Labels["type"])
@@ -892,32 +875,30 @@ INSERT INTO connector_definition_versions
 			connectorID := apid.New(apid.PrefixConnectorVersion)
 
 			// Insert as draft with one apxy value.
-			err := db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+			err := db.UpsertConnectorDefinitionVersion(ctx, &ConnectorWithDefinition{
 				Id: connectorID, Version: 1, Namespace: sconfig.RootNamespace,
-				State: ConnectorVersionStateDraft,
+				State: ConnectorDefinitionVersionStateDraft,
 				Labels: Labels{
 					"type":            "t",
 					"apxy/cxr/source": "api",
 				},
-				Hash:                "h1",
 				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "e1"},
 			})
 			require.NoError(t, err)
 
 			// Update the draft with a different apxy value for the same key.
-			err = db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+			err = db.UpsertConnectorDefinitionVersion(ctx, &ConnectorWithDefinition{
 				Id: connectorID, Version: 1, Namespace: sconfig.RootNamespace,
-				State: ConnectorVersionStateDraft,
+				State: ConnectorDefinitionVersionStateDraft,
 				Labels: Labels{
 					"type":            "t",
 					"apxy/cxr/source": "config",
 				},
-				Hash:                "h2",
 				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "e2"},
 			})
 			require.NoError(t, err)
 
-			saved, err := db.GetConnectorVersion(ctx, connectorID, 1)
+			saved, err := db.GetConnectorDefinitionVersion(ctx, connectorID, 1)
 			require.NoError(t, err)
 			require.Equal(t, "config", saved.Labels["apxy/cxr/source"], "caller's apxy value must override stored")
 			// self-implicit labels stay intact
@@ -932,29 +913,27 @@ INSERT INTO connector_definition_versions
 			connectorID := apid.New(apid.PrefixConnectorVersion)
 
 			// Insert as draft with an apxy value the caller will not pass on update.
-			err := db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+			err := db.UpsertConnectorDefinitionVersion(ctx, &ConnectorWithDefinition{
 				Id: connectorID, Version: 1, Namespace: sconfig.RootNamespace,
-				State: ConnectorVersionStateDraft,
+				State: ConnectorDefinitionVersionStateDraft,
 				Labels: Labels{
 					"type":            "t",
 					"apxy/cxr/source": "config",
 				},
-				Hash:                "h1",
 				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "e1"},
 			})
 			require.NoError(t, err)
 
 			// Update with only user labels — stored apxy/cxr/source must survive.
-			err = db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+			err = db.UpsertConnectorDefinitionVersion(ctx, &ConnectorWithDefinition{
 				Id: connectorID, Version: 1, Namespace: sconfig.RootNamespace,
-				State:               ConnectorVersionStateDraft,
+				State:               ConnectorDefinitionVersionStateDraft,
 				Labels:              Labels{"type": "t-changed"},
-				Hash:                "h2",
 				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "e2"},
 			})
 			require.NoError(t, err)
 
-			saved, err := db.GetConnectorVersion(ctx, connectorID, 1)
+			saved, err := db.GetConnectorDefinitionVersion(ctx, connectorID, 1)
 			require.NoError(t, err)
 			require.Equal(t, "config", saved.Labels["apxy/cxr/source"], "stored apxy label must survive an update that omits it")
 			require.Equal(t, "t-changed", saved.Labels["type"])

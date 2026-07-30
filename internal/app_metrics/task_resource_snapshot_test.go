@@ -46,7 +46,7 @@ func TestResourceSnapshotTask_CreatesSamplesAndIsIdempotent(t *testing.T) {
 	}))
 
 	connectorResourceID := apid.New(apid.PrefixConnectorVersion)
-	insertConnectorVersion(t, rawDB, connectorResourceID, "root.metrics", 1, database.ConnectorVersionStatePrimary)
+	insertConnectorVersion(t, rawDB, connectorResourceID, "root.metrics", 1, database.ConnectorDefinitionVersionStatePrimary)
 
 	rateLimitID := apid.New(apid.PrefixRateLimit)
 	require.NoError(t, mainDB.CreateRateLimit(ctx, &database.RateLimit{
@@ -83,7 +83,7 @@ func TestResourceSnapshotTask_CreatesSamplesAndIsIdempotent(t *testing.T) {
 	require.Equal(t, connectorResourceID, connectorSamples[0].ResourceID)
 	require.Equal(t, sampledAt, connectorSamples[0].SampledAt)
 	require.Equal(t, "root.metrics", connectorSamples[0].Namespace)
-	require.Equal(t, database.ConnectorVersionStatePrimary, connectorSamples[0].State)
+	require.Equal(t, database.ConnectorDefinitionVersionStatePrimary, connectorSamples[0].State)
 	require.Equal(t, uint64(1), connectorSamples[0].ConnectorVersion)
 	require.Equal(t, int64(1), connectorSamples[0].TotalVersions)
 
@@ -91,7 +91,7 @@ func TestResourceSnapshotTask_CreatesSamplesAndIsIdempotent(t *testing.T) {
 	require.Len(t, connectorVersionSamples, 1)
 	require.Equal(t, connectorResourceID, connectorVersionSamples[0].ResourceID)
 	require.Equal(t, uint64(1), connectorVersionSamples[0].ConnectorVersion)
-	require.Equal(t, database.ConnectorVersionStatePrimary, connectorVersionSamples[0].State)
+	require.Equal(t, database.ConnectorDefinitionVersionStatePrimary, connectorVersionSamples[0].State)
 
 	namespaceSamples := listNamespaceSamples(t, retriever, ctx, sampledAt)
 	require.Contains(t, namespaceSampleIDs(namespaceSamples), "root.metrics")
@@ -130,7 +130,7 @@ func TestResourceSnapshotTask_DeletedResourcesDoNotAppearInLaterSlices(t *testin
 	}))
 
 	connectorResourceID := apid.New(apid.PrefixConnectorVersion)
-	insertConnectorVersion(t, rawDB, connectorResourceID, "root.metrics", 1, database.ConnectorVersionStatePrimary)
+	insertConnectorVersion(t, rawDB, connectorResourceID, "root.metrics", 1, database.ConnectorDefinitionVersionStatePrimary)
 
 	require.NoError(t, mainDB.EnsureNamespaceByPath(ctx, "root.metrics.deleted"))
 
@@ -235,7 +235,7 @@ func insertConnectorVersion(
 	id apid.ID,
 	namespace string,
 	version uint64,
-	state database.ConnectorVersionState,
+	state database.ConnectorDefinitionVersionState,
 ) {
 	t.Helper()
 	definitionID := apid.New(apid.PrefixConnectorDefinitionVersion)

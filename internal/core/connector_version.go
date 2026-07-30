@@ -21,7 +21,8 @@ import (
 // ConnectorVersion is a wrapper for the lower level database equivalent that handles things like decrypting the
 // configuration, checking upgradability, etc.
 type ConnectorVersion struct {
-	database.ConnectorVersion
+	database.ConnectorWithDefinition
+	Hash string
 
 	s     *service
 	defMu sync.RWMutex
@@ -35,10 +36,10 @@ type ConnectorVersion struct {
 	l *slog.Logger
 }
 
-func wrapConnectorVersion(cv database.ConnectorVersion, s *service) *ConnectorVersion {
+func wrapConnectorVersion(cv database.ConnectorWithDefinition, s *service) *ConnectorVersion {
 	return &ConnectorVersion{
-		ConnectorVersion: cv,
-		s:                s,
+		ConnectorWithDefinition: cv,
+		s:                       s,
 		l: aplog.NewBuilder(s.logger).
 			WithNamespace(cv.Namespace).
 			WithConnectorId(cv.Id).
@@ -48,19 +49,19 @@ func wrapConnectorVersion(cv database.ConnectorVersion, s *service) *ConnectorVe
 }
 
 func (cv *ConnectorVersion) GetId() apid.ID {
-	return cv.ConnectorVersion.Id
+	return cv.ConnectorWithDefinition.Id
 }
 
 func (cv *ConnectorVersion) GetNamespace() string {
-	return cv.ConnectorVersion.Namespace
+	return cv.ConnectorWithDefinition.Namespace
 }
 
 func (cv *ConnectorVersion) GetVersion() uint64 {
-	return cv.ConnectorVersion.Version
+	return cv.ConnectorWithDefinition.Version
 }
 
-func (cv *ConnectorVersion) GetState() database.ConnectorVersionState {
-	return cv.ConnectorVersion.State
+func (cv *ConnectorVersion) GetState() database.ConnectorDefinitionVersionState {
+	return cv.ConnectorWithDefinition.State
 }
 
 func (cv *ConnectorVersion) GetHash() string {
@@ -72,19 +73,19 @@ func (cv *ConnectorVersion) GetDefinition() *cschema.Connector {
 }
 
 func (cv *ConnectorVersion) GetCreatedAt() time.Time {
-	return cv.ConnectorVersion.CreatedAt
+	return cv.ConnectorWithDefinition.CreatedAt
 }
 
 func (cv *ConnectorVersion) GetUpdatedAt() time.Time {
-	return cv.ConnectorVersion.UpdatedAt
+	return cv.ConnectorWithDefinition.UpdatedAt
 }
 
 func (cv *ConnectorVersion) GetLabels() map[string]string {
-	return cv.ConnectorVersion.Labels
+	return cv.ConnectorWithDefinition.Labels
 }
 
 func (cv *ConnectorVersion) GetAnnotations() map[string]string {
-	return cv.ConnectorVersion.Annotations
+	return cv.ConnectorWithDefinition.Annotations
 }
 
 func (cv *ConnectorVersion) getDefinition() (*cschema.Connector, error) {
@@ -98,7 +99,7 @@ func (cv *ConnectorVersion) getDefinition() (*cschema.Connector, error) {
 	cv.defMu.Lock()
 	defer cv.defMu.Unlock()
 	if cv.def == nil {
-		decrypted, err := cv.s.encrypt.DecryptString(context.Background(), cv.ConnectorVersion.EncryptedDefinition)
+		decrypted, err := cv.s.encrypt.DecryptString(context.Background(), cv.ConnectorWithDefinition.EncryptedDefinition)
 		if err != nil {
 			return nil, err
 		}
@@ -115,10 +116,10 @@ func (cv *ConnectorVersion) getDefinition() (*cschema.Connector, error) {
 }
 
 func (cv *ConnectorVersion) getHash() (string, error) {
-	if cv.ConnectorVersion.Hash != "" {
-		return cv.ConnectorVersion.Hash, nil
+	if cv.Hash != "" {
+		return cv.Hash, nil
 	}
-	decrypted, err := cv.s.encrypt.DecryptString(context.Background(), cv.ConnectorVersion.EncryptedDefinition)
+	decrypted, err := cv.s.encrypt.DecryptString(context.Background(), cv.ConnectorWithDefinition.EncryptedDefinition)
 	if err != nil {
 		return "", err
 	}
@@ -141,7 +142,7 @@ func (cv *ConnectorVersion) setDefinition(def *cschema.Connector) error {
 		return err
 	}
 	cv.Hash = def.Hash()
-	cv.ConnectorVersion.EncryptedDefinition = encrypted
+	cv.ConnectorWithDefinition.EncryptedDefinition = encrypted
 	cv.def = def
 	cv.defMu.Unlock()
 

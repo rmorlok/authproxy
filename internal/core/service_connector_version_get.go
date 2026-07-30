@@ -16,7 +16,7 @@ func (s *service) GetConnectorVersion(ctx context.Context, id apid.ID, version u
 }
 
 func (s *service) getConnectorVersion(ctx context.Context, id apid.ID, version uint64) (*ConnectorVersion, error) {
-	cv, err := s.db.GetConnectorVersion(ctx, id, version)
+	cv, err := s.db.GetConnectorDefinitionVersion(ctx, id, version)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
 			return nil, ErrNotFound
@@ -36,7 +36,7 @@ func (s *service) getConnectorVersion(ctx context.Context, id apid.ID, version u
 }
 
 func (s *service) getConnectorVersions(ctx context.Context, requested []iface.ConnectorVersionId) (map[iface.ConnectorVersionId]*ConnectorVersion, error) {
-	results, err := s.db.GetConnectorVersions(ctx, requested)
+	results, err := s.db.GetConnectorDefinitionVersions(ctx, requested)
 	if err != nil {
 		return nil, err
 	}
@@ -75,8 +75,8 @@ func (s *service) GetConnectorVersions(ctx context.Context, requested []iface.Co
 	return wrappedResults, nil
 }
 
-func (s *service) GetConnectorVersionForState(ctx context.Context, id apid.ID, state database.ConnectorVersionState) (iface.ConnectorVersion, error) {
-	cv, err := s.db.GetConnectorVersionForState(ctx, id, state)
+func (s *service) GetConnectorVersionForState(ctx context.Context, id apid.ID, state database.ConnectorDefinitionVersionState) (iface.ConnectorVersion, error) {
+	cv, err := s.db.GetConnectorDefinitionVersionForState(ctx, id, state)
 	if err != nil {
 		return nil, err
 	}

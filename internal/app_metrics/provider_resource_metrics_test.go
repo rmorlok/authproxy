@@ -190,7 +190,7 @@ func TestResourceMetrics_AdditionalResourceCounts(t *testing.T) {
 			ResourceID:        connectorID,
 			Namespace:         "root.acme",
 			Labels:            database.Labels{"env": "prod"},
-			State:             database.ConnectorVersionStatePrimary,
+			State:             database.ConnectorDefinitionVersionStatePrimary,
 			ConnectorVersion:  2,
 			TotalVersions:     2,
 			ResourceCreatedAt: start.Add(-time.Hour),
@@ -203,7 +203,7 @@ func TestResourceMetrics_AdditionalResourceCounts(t *testing.T) {
 			ResourceID:        connectorID,
 			Namespace:         "root.acme",
 			Labels:            database.Labels{"env": "prod"},
-			State:             database.ConnectorVersionStatePrimary,
+			State:             database.ConnectorDefinitionVersionStatePrimary,
 			ConnectorVersion:  2,
 			ResourceCreatedAt: start.Add(-time.Hour),
 			ResourceUpdatedAt: start,
@@ -280,7 +280,7 @@ func TestResourceMetrics_AdditionalResourceCounts(t *testing.T) {
 	require.Equal(t, "connectors", series[0].RefID)
 	require.Equal(t, map[string]string{
 		"connector_version": "2",
-		"state":             string(database.ConnectorVersionStatePrimary),
+		"state":             string(database.ConnectorDefinitionVersionStatePrimary),
 	}, series[0].Labels)
 	require.Equal(t, []ResourceMetricPoint{{Timestamp: start, Value: 1}, {Timestamp: start.Add(15 * time.Minute), Value: 0}}, series[0].Points)
 

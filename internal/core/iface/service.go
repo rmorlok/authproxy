@@ -15,7 +15,7 @@ import (
 	apworkflows "github.com/rmorlok/authproxy/internal/workflows"
 )
 
-type ConnectorVersionId = database.ConnectorVersionId
+type ConnectorVersionId = database.ConnectorDefinitionVersionId
 
 type ConnectorLifecycleOptions struct {
 	Timeout time.Duration
@@ -75,7 +75,7 @@ type C interface {
 	GetConnectorVersions(ctx context.Context, requested []ConnectorVersionId) (map[ConnectorVersionId]ConnectorVersion, error)
 
 	// GetConnectorVersionForState returns the most recent version of the connector for the specified state.
-	GetConnectorVersionForState(ctx context.Context, id apid.ID, state database.ConnectorVersionState) (ConnectorVersion, error)
+	GetConnectorVersionForState(ctx context.Context, id apid.ID, state database.ConnectorDefinitionVersionState) (ConnectorVersion, error)
 
 	// ListConnectorsBuilder returns a builder to allow the caller to list connectors matching certain criteria.
 	ListConnectorsBuilder() ListConnectorsBuilder

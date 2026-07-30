@@ -1138,7 +1138,7 @@ func TestConnectors(t *testing.T) {
 			require.NotEqual(t, apid.Nil, resp.Id)
 			require.Equal(t, uint64(1), resp.Version)
 			require.Equal(t, "root", resp.Namespace)
-			require.Equal(t, string(database.ConnectorVersionStateDraft), string(resp.State))
+			require.Equal(t, string(database.ConnectorDefinitionVersionStateDraft), string(resp.State))
 			require.Equal(t, "New Connector", resp.Definition.DisplayName)
 			require.Equal(t, "A brand new connector", resp.Definition.Description)
 			require.Equal(t, "test", resp.Labels["env"])
@@ -1264,7 +1264,7 @@ func TestConnectors(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, connectorId, resp.Id)
 			require.Equal(t, uint64(2), resp.Version) // New draft version
-			require.Equal(t, string(database.ConnectorVersionStateDraft), string(resp.State))
+			require.Equal(t, string(database.ConnectorDefinitionVersionStateDraft), string(resp.State))
 			require.Equal(t, "Updated Connector", resp.Definition.DisplayName)
 		})
 
@@ -1349,7 +1349,7 @@ func TestConnectors(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, connectorId, resp.Id)
 			require.Equal(t, uint64(2), resp.Version)
-			require.Equal(t, string(database.ConnectorVersionStateDraft), string(resp.State))
+			require.Equal(t, string(database.ConnectorDefinitionVersionStateDraft), string(resp.State))
 			require.Equal(t, "Test ConnectorJson", resp.Definition.DisplayName)
 		})
 
@@ -1595,7 +1595,7 @@ func TestConnectors(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, connectorId, resp.Id)
 			require.Equal(t, draftVersion, resp.Version)
-			require.Equal(t, string(database.ConnectorVersionStateDraft), string(resp.State))
+			require.Equal(t, string(database.ConnectorDefinitionVersionStateDraft), string(resp.State))
 			require.Equal(t, "Updated Draft", resp.Definition.DisplayName)
 		})
 	})
@@ -2137,7 +2137,7 @@ func TestConnectors(t *testing.T) {
 			req, err := http.NewRequest(
 				http.MethodPut,
 				fmt.Sprintf("/connectors/%s/versions/1/_force_state", connectorId),
-				util.JsonToReader(ForceConnectorVersionStateRequestJson{State: string(database.ConnectorVersionStateArchived)}),
+				util.JsonToReader(ForceConnectorVersionStateRequestJson{State: string(database.ConnectorDefinitionVersionStateArchived)}),
 			)
 			require.NoError(t, err)
 			tu.Gin.ServeHTTP(w, req)
@@ -2150,7 +2150,7 @@ func TestConnectors(t *testing.T) {
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
 				"/connectors/bad-uuid/versions/1/_force_state",
-				util.JsonToReader(ForceConnectorVersionStateRequestJson{State: string(database.ConnectorVersionStateArchived)}),
+				util.JsonToReader(ForceConnectorVersionStateRequestJson{State: string(database.ConnectorDefinitionVersionStateArchived)}),
 				"root",
 				"some-actor",
 				aschema.AllPermissions(),
@@ -2166,7 +2166,7 @@ func TestConnectors(t *testing.T) {
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
 				fmt.Sprintf("/connectors/%s/versions/99/_force_state", connectorId),
-				util.JsonToReader(ForceConnectorVersionStateRequestJson{State: string(database.ConnectorVersionStateArchived)}),
+				util.JsonToReader(ForceConnectorVersionStateRequestJson{State: string(database.ConnectorDefinitionVersionStateArchived)}),
 				"root",
 				"some-actor",
 				aschema.AllPermissions(),
@@ -2182,7 +2182,7 @@ func TestConnectors(t *testing.T) {
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
 				fmt.Sprintf("/connectors/%s/versions/1/_force_state", connectorId),
-				util.JsonToReader(ForceConnectorVersionStateRequestJson{State: string(database.ConnectorVersionStateArchived)}),
+				util.JsonToReader(ForceConnectorVersionStateRequestJson{State: string(database.ConnectorDefinitionVersionStateArchived)}),
 				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.**", "connectors", "force_state"),
@@ -2194,7 +2194,7 @@ func TestConnectors(t *testing.T) {
 			var resp ConnectorVersionJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
-			require.Equal(t, string(database.ConnectorVersionStateArchived), string(resp.State))
+			require.Equal(t, string(database.ConnectorDefinitionVersionStateArchived), string(resp.State))
 		})
 
 		t.Run("already in desired state", func(t *testing.T) {
@@ -2204,7 +2204,7 @@ func TestConnectors(t *testing.T) {
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
 				fmt.Sprintf("/connectors/%s/versions/1/_force_state", connectorId),
-				util.JsonToReader(ForceConnectorVersionStateRequestJson{State: string(database.ConnectorVersionStatePrimary)}),
+				util.JsonToReader(ForceConnectorVersionStateRequestJson{State: string(database.ConnectorDefinitionVersionStatePrimary)}),
 				"root",
 				"some-actor",
 				aschema.AllPermissions(),
@@ -2216,7 +2216,7 @@ func TestConnectors(t *testing.T) {
 			var resp ConnectorVersionJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
-			require.Equal(t, string(database.ConnectorVersionStatePrimary), string(resp.State))
+			require.Equal(t, string(database.ConnectorDefinitionVersionStatePrimary), string(resp.State))
 		})
 	})
 
@@ -2307,7 +2307,7 @@ func TestConnectors(t *testing.T) {
 				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
 					http.MethodPut,
 					fmt.Sprintf("/connectors/%s/versions/%d/_force_state", created.Id, created.Version),
-					util.JsonToReader(ForceConnectorVersionStateRequestJson{State: string(database.ConnectorVersionStatePrimary)}),
+					util.JsonToReader(ForceConnectorVersionStateRequestJson{State: string(database.ConnectorDefinitionVersionStatePrimary)}),
 					"root",
 					"some-actor",
 					aschema.AllPermissions(),

@@ -29,8 +29,6 @@ export interface Connector {
     annotations?: Record<string, string>;
     created_at: string;
     updated_at: string;
-    versions: number;
-    states: ConnectorVersionState[];
 }
 
 export interface PutConnectorAnnotationRequest {

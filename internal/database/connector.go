@@ -2,383 +2,228 @@ package database
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
+	"time"
 
 	sq "github.com/Masterminds/squirrel"
-	"github.com/hashicorp/go-multierror"
+	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
-	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
+	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
-	"github.com/rmorlok/authproxy/internal/util"
-	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
-/*
- * This file deals with listing connectors collapsed from multiple versions. Most logic is connector version specific.
- */
+const ConnectorsTable = "connectors"
 
-// Connector object is returned from queries for connectors, with one record per id. It aggregates some information
-// across all versions for a connector.
+// Connector is the database representation of a logical connector. Definition
+// versions are stored separately in connector_definition_versions.
 type Connector struct {
-	ConnectorVersion
-	TotalVersions int64
-	States        ConnectorVersionStates
+	Id          apid.ID
+	Namespace   string
+	Name        scommon.ResourceName
+	Labels      Labels
+	Annotations Annotations
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	DeletedAt   *time.Time
 }
 
-type ConnectorOrderByField string
-
-const (
-	ConnectorOrderById        ConnectorOrderByField = "id"
-	ConnectorOrderByVersion   ConnectorOrderByField = "version"
-	ConnectorOrderByNamespace ConnectorOrderByField = "namespace"
-	ConnectorOrderByState     ConnectorOrderByField = "state"
-	ConnectorOrderByCreatedAt ConnectorOrderByField = "created_at"
-	ConnectorOrderByUpdatedAt ConnectorOrderByField = "updated_at"
-	ConnectorOrderByType      ConnectorOrderByField = "type"
-)
-
-func IsValidConnectorOrderByField[T string | ConnectorOrderByField](field T) bool {
-	switch ConnectorOrderByField(field) {
-	case ConnectorOrderById,
-		ConnectorOrderByVersion,
-		ConnectorOrderByNamespace,
-		ConnectorOrderByState,
-		ConnectorOrderByCreatedAt,
-		ConnectorOrderByUpdatedAt,
-		ConnectorOrderByType:
-		return true
-	default:
-		return false
+func (c *Connector) cols() []string {
+	return []string{
+		"id",
+		"namespace",
+		"name",
+		"labels",
+		"annotations",
+		"created_at",
+		"updated_at",
+		"deleted_at",
 	}
 }
 
-type ListConnectorsExecutor interface {
-	FetchPage(context.Context) pagination.PageResult[Connector]
-	Enumerate(context.Context, pagination.EnumerateCallback[Connector]) error
+func (c *Connector) fields() []any {
+	return []any{
+		&c.Id,
+		&c.Namespace,
+		&c.Name,
+		&c.Labels,
+		&c.Annotations,
+		&c.CreatedAt,
+		&c.UpdatedAt,
+		&c.DeletedAt,
+	}
 }
 
-type ListConnectorsBuilder interface {
-	ListConnectorsExecutor
-	Limit(int32) ListConnectorsBuilder
-	ForType(string) ListConnectorsBuilder
-	ForId(apid.ID) ListConnectorsBuilder
-	ForNamespaceMatcher(string) ListConnectorsBuilder
-	ForNamespaceMatchers([]string) ListConnectorsBuilder
-	ForState(ConnectorVersionState) ListConnectorsBuilder
-	ForStates([]ConnectorVersionState) ListConnectorsBuilder
-	OrderBy(ConnectorOrderByField, pagination.OrderBy) ListConnectorsBuilder
-	IncludeDeleted() ListConnectorsBuilder
-	ForLabelSelector(selector string) ListConnectorsBuilder
+func (c *Connector) values() []any {
+	return []any{
+		c.Id,
+		c.Namespace,
+		c.Name,
+		c.Labels,
+		c.Annotations,
+		c.CreatedAt,
+		c.UpdatedAt,
+		c.DeletedAt,
+	}
 }
 
-type listConnectorsFilters struct {
-	s                 *service                `json:"-"`
-	LimitVal          uint64                  `json:"limit"`
-	Offset            uint64                  `json:"offset"`
-	StatesVal         []ConnectorVersionState `json:"states,omitempty"`
-	NamespaceMatchers []string                `json:"namespace_matchers,omitempty"`
-	TypeVal           []string                `json:"types,omitempty"`
-	IdsVal            []apid.ID               `json:"ids,omitempty"`
-	OrderByFieldVal   *ConnectorOrderByField  `json:"order_by_field"`
-	OrderByVal        *pagination.OrderBy     `json:"order_by"`
-	IncludeDeletedVal bool                    `json:"include_deleted,omitempty"`
-	LabelSelectorVal  *string                 `json:"label_selector,omitempty"`
-	Errors            *multierror.Error       `json:"-"`
+func (c *Connector) Validate() error {
+	if c.Id.IsNil() {
+		return errors.New("connector id is required")
+	}
+	if err := c.Id.ValidatePrefix(apid.PrefixConnector); err != nil {
+		return fmt.Errorf("invalid connector id: %w", err)
+	}
+	if err := namespace.ValidatePath(c.Namespace); err != nil {
+		return fmt.Errorf("invalid connector namespace: %w", err)
+	}
+	if err := c.Name.Validate(); err != nil {
+		return fmt.Errorf("invalid connector name: %w", err)
+	}
+	if err := c.Labels.Validate(); err != nil {
+		return fmt.Errorf("invalid connector labels: %w", err)
+	}
+	if err := c.Annotations.Validate(); err != nil {
+		return fmt.Errorf("invalid connector annotations: %w", err)
+	}
+	return nil
 }
 
-func (l *listConnectorsFilters) addError(e error) ListConnectorsBuilder {
-	l.Errors = multierror.Append(l.Errors, e)
-	return l
-}
-
-func (l *listConnectorsFilters) Limit(limit int32) ListConnectorsBuilder {
-	l.LimitVal = uint64(limit)
-	return l
-}
-
-func (l *listConnectorsFilters) ForState(state ConnectorVersionState) ListConnectorsBuilder {
-	l.StatesVal = []ConnectorVersionState{state}
-	return l
-}
-
-func (l *listConnectorsFilters) ForStates(states []ConnectorVersionState) ListConnectorsBuilder {
-	l.StatesVal = states
-	return l
-}
-
-func (l *listConnectorsFilters) ForNamespaceMatcher(matcher string) ListConnectorsBuilder {
-	if err := namespace.ValidateMatcher(matcher); err != nil {
-		return l.addError(err)
-	} else {
-		l.NamespaceMatchers = []string{matcher}
+func (s *service) ensureConnectorForDefinition(
+	ctx context.Context,
+	tx *sql.Tx,
+	cv *ConnectorWithDefinition,
+) error {
+	sqb := s.sq.RunWith(tx)
+	var existing Connector
+	err := sqb.
+		Select(existing.cols()...).
+		From(ConnectorsTable).
+		Where(sq.Eq{"id": cv.Id, "deleted_at": nil}).
+		QueryRowContext(ctx).
+		Scan(existing.fields()...)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return err
 	}
 
-	return l
-}
-
-func (l *listConnectorsFilters) ForNamespaceMatchers(matchers []string) ListConnectorsBuilder {
-	for _, matcher := range matchers {
-		if err := namespace.ValidateMatcher(matcher); err != nil {
-			return l.addError(err)
+	if err == nil {
+		if existing.Namespace != cv.Namespace {
+			return errors.New("cannot modify connector namespace through a connector version")
 		}
+		if cv.Name != "" && cv.Name != existing.Name {
+			return errors.New("cannot modify connector name through a connector version")
+		}
+
+		labels := existing.Labels
+		if cv.Labels != nil {
+			labels = MergeUpsertLabels(cv.Labels, existing.Labels)
+			labels = InjectSelfImplicitLabels(existing.Id, existing.Namespace, labels)
+		}
+		annotations := existing.Annotations
+		if cv.Annotations != nil {
+			annotations = cv.Annotations
+		}
+		now := apctx.GetClock(ctx).Now()
+		_, err = sqb.
+			Update(ConnectorsTable).
+			Set("labels", labels).
+			Set("annotations", annotations).
+			Set("updated_at", now).
+			Where(sq.Eq{"id": existing.Id, "deleted_at": nil}).
+			ExecContext(ctx)
+		if err != nil {
+			return err
+		}
+
+		cv.Name = existing.Name
+		cv.Labels = labels
+		cv.Annotations = annotations
+		cv.CreatedAt = existing.CreatedAt
+		cv.UpdatedAt = now
+		cv.DeletedAt = existing.DeletedAt
+		return nil
 	}
-	l.NamespaceMatchers = matchers
-	return l
-}
 
-func (l *listConnectorsFilters) ForType(t string) ListConnectorsBuilder {
-	l.TypeVal = []string{t}
-	return l
-}
-
-func (l *listConnectorsFilters) ForId(id apid.ID) ListConnectorsBuilder {
-	l.IdsVal = []apid.ID{id}
-	return l
-}
-
-func (l *listConnectorsFilters) OrderBy(field ConnectorOrderByField, by pagination.OrderBy) ListConnectorsBuilder {
-	if IsValidConnectorOrderByField(field) {
-		l.OrderByFieldVal = &field
-		l.OrderByVal = &by
+	name := cv.Name
+	if name == "" {
+		name = scommon.ResourceName(cv.Id.String())
 	}
-	return l
-}
-
-func (l *listConnectorsFilters) IncludeDeleted() ListConnectorsBuilder {
-	l.IncludeDeletedVal = true
-	return l
-}
-
-func (l *listConnectorsFilters) ForLabelSelector(selector string) ListConnectorsBuilder {
-	l.LabelSelectorVal = &selector
-	return l
-}
-
-func (l *listConnectorsFilters) FromCursor(ctx context.Context, cursor string) (ListConnectorsExecutor, error) {
-	s := l.s
-	parsed, err := pagination.ParseCursor[listConnectorsFilters](ctx, s.cursorEncryptor, cursor)
-
+	nsLabels, err := s.fetchLabelsForCarryForward(ctx, tx, NamespacesTable, sq.Eq{
+		"path":       cv.Namespace,
+		"deleted_at": nil,
+	})
 	if err != nil {
-		return nil, err
+		return err
+	}
+	labels := ApplyParentCarryForward(
+		cv.Labels,
+		ParentCarryForward{Rt: NamespaceLabelToken, Labels: nsLabels},
+	)
+	labels = InjectSelfImplicitLabels(cv.Id, cv.Namespace, labels)
+
+	now := apctx.GetClock(ctx).Now()
+	connector := Connector{
+		Id:          cv.Id,
+		Namespace:   cv.Namespace,
+		Name:        name,
+		Labels:      labels,
+		Annotations: cv.Annotations,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	if err := connector.Validate(); err != nil {
+		return err
 	}
 
-	*l = *parsed
-	l.s = s
-
-	return l, nil
-}
-
-func (l *listConnectorsFilters) fetchPage(ctx context.Context) pagination.PageResult[Connector] {
-	if l.LimitVal <= 0 {
-		l.LimitVal = 100
-	}
-
-	if err := l.Errors.ErrorOrNil(); err != nil {
-		return pagination.PageResult[Connector]{Error: err}
-	}
-
-	// Picks out the row that will be returned as primary based on a ranked priority of the states
-	rankedRowsCTE := fmt.Sprintf(`
-        SELECT
-            *,
-            ROW_NUMBER() OVER (
-                PARTITION BY connector_id
-                ORDER BY
-                    CASE state
-                        WHEN 'primary' THEN 1
-                        WHEN 'draft' THEN 2
-                        WHEN 'active' THEN 3
-                        WHEN 'archived' THEN 4
-                        ELSE 5
-                    END,
-                    version DESC
-            ) AS row_num
-        FROM %s
-    `, ConnectorDefinitionVersionsTable)
-
-	// Compute the aggregate state for the connector across all versions
-	aggregateStatesExpr := "json_group_array(distinct state)"
-	if l.s.cfg.GetProvider() == sconfig.DatabaseProviderPostgres {
-		aggregateStatesExpr = "json_agg(distinct state)"
-	}
-	connectorVersionCountsCTE := fmt.Sprintf(`
-        SELECT
-            connector_id,
-            %s as states,
-            count(*) as versions
-        FROM %s
-        GROUP BY connector_id
-    `, aggregateStatesExpr, ConnectorDefinitionVersionsTable)
-
-	q := l.s.sq.Select(`
-c.id as id,
-c.namespace as namespace,
-c.name as name,
-c.labels as labels,
-c.annotations as annotations,
-rr.id as definition_version_id,
-rr.version as version,
-rr.state as state,
-rr.encrypted_definition as encrypted_definition,
-rr.encrypted_at as encrypted_at,
-c.created_at as created_at,
-c.updated_at as updated_at,
-c.deleted_at as deleted_at,
-cvc.states as states,
-cvc.versions as total_versions
-`).
-		With("ranked_rows", sq.Expr(rankedRowsCTE)).
-		With("connector_version_counts", sq.Expr(connectorVersionCountsCTE)).
-		From(ConnectorsTable+" c").
-		Join("ranked_rows rr ON rr.connector_id = c.id").
-		Join("connector_version_counts cvc ON cvc.connector_id = rr.connector_id").
-		Where("rr.row_num = ?", 1)
-
-	if len(l.TypeVal) > 0 {
-		typeExpr := "json_extract(c.labels, '$.type')"
-		if l.s.cfg.GetProvider() == sconfig.DatabaseProviderPostgres {
-			typeExpr = "c.labels ->> 'type'"
-		}
-		q = q.Where(sq.Eq{typeExpr: l.TypeVal})
-	}
-
-	if len(l.IdsVal) > 0 {
-		q = q.Where(sq.Eq{"c.id": l.IdsVal})
-	}
-
-	if len(l.StatesVal) > 0 {
-		q = q.Where(sq.Eq{"rr.state": l.StatesVal})
-	}
-
-	if len(l.NamespaceMatchers) > 0 {
-		q = restrictToNamespaceMatchers(q, "c.namespace", l.NamespaceMatchers)
-	}
-
-	if l.LabelSelectorVal != nil {
-		selector, err := ParseLabelSelector(*l.LabelSelectorVal)
-		if err != nil {
-			return pagination.PageResult[Connector]{Error: err}
-		}
-
-		q = selector.ApplyToSqlBuilderWithProvider(q, "c.labels", l.s.cfg.GetProvider())
-	}
-
-	if !l.IncludeDeletedVal {
-		q = q.Where(sq.Eq{"c.deleted_at": nil})
-	}
-
-	// Always limit to one more than limit to check if there are more records
-	q = q.Limit(l.LimitVal + 1).Offset(l.Offset)
-
-	if l.OrderByFieldVal != nil {
-		orderCol := string(*l.OrderByFieldVal)
-		switch *l.OrderByFieldVal {
-		case ConnectorOrderByVersion, ConnectorOrderByState:
-			orderCol = "rr." + orderCol
-		case ConnectorOrderByType:
-			orderCol = "json_extract(c.labels, '$.type')"
-			if l.s.cfg.GetProvider() == sconfig.DatabaseProviderPostgres {
-				orderCol = "c.labels ->> 'type'"
-			}
-		default:
-			orderCol = "c." + orderCol
-		}
-		q = q.OrderBy(fmt.Sprintf("%s %s", orderCol, l.OrderByVal.String()))
-	}
-
-	sqlStr, sqlArgs, sqlErr := q.ToSql()
-	rows, err := q.RunWith(l.s.db).Query()
-
+	_, err = sqb.
+		Insert(ConnectorsTable).
+		Columns(connector.cols()...).
+		Values(connector.values()...).
+		ExecContext(ctx)
 	if err != nil {
-		if sqlErr == nil {
-			l.s.logger.Error("list connectors query failed", "sql", sqlStr, "args", sqlArgs, "error", err)
-		} else {
-			l.s.logger.Error("list connectors query failed", "error", err, "sql_error", sqlErr)
-		}
-		return pagination.PageResult[Connector]{Error: err}
+		return err
 	}
-
-	var connectors []Connector
-	for rows.Next() {
-		var c Connector
-
-		// Scan all fields except States
-		err := rows.Scan(
-			&c.Id,
-			&c.Namespace,
-			&c.Name,
-			&c.Labels,
-			&c.Annotations,
-			&c.DefinitionVersionId,
-			&c.Version,
-			&c.State,
-			&c.EncryptedDefinition,
-			&c.EncryptedAt,
-			&c.CreatedAt,
-			&c.UpdatedAt,
-			&c.DeletedAt,
-			&c.States,
-			&c.TotalVersions,
-		)
-		if err != nil {
-			return pagination.PageResult[Connector]{Error: err}
-		}
-
-		connectors = append(connectors, c)
-	}
-
-	l.Offset = l.Offset + uint64(len(connectors)) - 1 // we request one more than the page size we return
-
-	cursor := ""
-	hasMore := uint64(len(connectors)) > l.LimitVal
-	if hasMore {
-		cursor, err = pagination.MakeCursor(ctx, l.s.cursorEncryptor, l)
-		if err != nil {
-			return pagination.PageResult[Connector]{Error: err}
-		}
-	}
-
-	return pagination.PageResult[Connector]{
-		HasMore: hasMore,
-		Results: connectors[:util.MinUint64(l.LimitVal, uint64(len(connectors)))],
-		Cursor:  cursor,
-	}
+	cv.Name = connector.Name
+	cv.Labels = connector.Labels
+	cv.Annotations = connector.Annotations
+	cv.CreatedAt = connector.CreatedAt
+	cv.UpdatedAt = connector.UpdatedAt
+	return nil
 }
 
-func (l *listConnectorsFilters) FetchPage(ctx context.Context) pagination.PageResult[Connector] {
-	return l.fetchPage(ctx)
-}
-
-func (l *listConnectorsFilters) Enumerate(ctx context.Context, callback pagination.EnumerateCallback[Connector]) error {
-	var err error
-	keepGoing := pagination.Continue
-	hasMore := true
-
-	for err == nil && hasMore && bool(keepGoing) {
-		result := l.FetchPage(ctx)
-		hasMore = result.HasMore
-
-		if result.Error != nil {
-			return result.Error
-		}
-		keepGoing, err = callback(result)
+// UpdateConnectorName renames one live logical connector without changing any
+// immutable connector-version definition rows.
+func (s *service) UpdateConnectorName(ctx context.Context, id apid.ID, name scommon.ResourceName) error {
+	if id.IsNil() {
+		return errors.New("connector id is required")
+	}
+	if err := id.ValidatePrefix(apid.PrefixConnector); err != nil {
+		return fmt.Errorf("invalid connector id: %w", err)
+	}
+	if err := name.Validate(); err != nil {
+		return fmt.Errorf("invalid connector name: %w", err)
 	}
 
-	return err
-}
-
-func (s *service) ListConnectorsBuilder() ListConnectorsBuilder {
-	return &listConnectorsFilters{
-		s:        s,
-		LimitVal: 100,
+	result, err := s.sq.
+		Update(ConnectorsTable).
+		Set("name", name).
+		Set("updated_at", apctx.GetClock(ctx).Now()).
+		Where(sq.Eq{"id": id, "deleted_at": nil}).
+		RunWith(s.db).
+		ExecContext(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to update connector name: %w", err)
 	}
-}
-
-func (s *service) ListConnectorsFromCursor(ctx context.Context, cursor string) (ListConnectorsExecutor, error) {
-	b := &listConnectorsFilters{
-		s:        s,
-		LimitVal: 100,
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to update connector name: %w", err)
 	}
-
-	return b.FromCursor(ctx, cursor)
+	if affected == 0 {
+		return ErrNotFound
+	}
+	if affected > 1 {
+		return fmt.Errorf("multiple connectors were renamed: %w", ErrViolation)
+	}
+	return nil
 }

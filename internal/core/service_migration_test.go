@@ -1708,12 +1708,11 @@ func TestMigration(t *testing.T) {
 				// Insert a connector version directly via the database, simulating
 				// an API-driven create. It carries no apxy/cxr/source label.
 				apiId := apid.MustParse("cxr_test0000000000099")
-				err = db.UpsertConnectorVersion(context.Background(), &database.ConnectorVersion{
+				err = db.UpsertConnectorDefinitionVersion(context.Background(), &database.ConnectorWithDefinition{
 					Id:                  apiId,
 					Version:             1,
 					Namespace:           "root",
-					State:               database.ConnectorVersionStatePrimary,
-					Hash:                "api-created-hash",
+					State:               database.ConnectorDefinitionVersionStatePrimary,
 					EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "api-created"},
 					Labels:              database.Labels{"type": "api-only"},
 				})

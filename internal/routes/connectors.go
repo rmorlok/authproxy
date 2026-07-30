@@ -51,10 +51,7 @@ type OpenAPIConnectorLifecycleRequestJson = schemaapiopenapi.ConnectorLifecycleR
 type OpenAPIConnectorLifecycleResponseJson = schemaapiopenapi.ConnectorLifecycleResponseJson
 
 func ConnectorToJson(c connIface.Connector) ConnectorJson {
-	result := ConnectorVersionToConnectorJson(c)
-	result.Versions = c.GetTotalVersions()
-	result.States = connectorVersionStatesToAPI(c.GetStates())
-	return result
+	return ConnectorVersionToConnectorJson(c)
 }
 
 func ConnectorVersionToConnectorJson(cv connIface.ConnectorVersion) ConnectorJson {
@@ -83,12 +80,12 @@ func ConnectorVersionToConnectorJson(cv connIface.ConnectorVersion) ConnectorJso
 }
 
 type ListConnectorsRequestQueryParams struct {
-	Cursor        *string                         `form:"cursor"`
-	LimitVal      *int32                          `form:"limit"`
-	StateVal      *database.ConnectorVersionState `form:"state"`
-	NamespaceVal  *string                         `form:"namespace"`
-	LabelSelector *string                         `form:"label_selector"`
-	OrderByVal    *string                         `form:"order_by"`
+	Cursor        *string                                   `form:"cursor"`
+	LimitVal      *int32                                    `form:"limit"`
+	StateVal      *database.ConnectorDefinitionVersionState `form:"state"`
+	NamespaceVal  *string                                   `form:"namespace"`
+	LabelSelector *string                                   `form:"label_selector"`
+	OrderByVal    *string                                   `form:"order_by"`
 }
 
 func ConnectorVersionToJson(cv connIface.ConnectorVersion) ConnectorVersionJson {
@@ -108,12 +105,12 @@ func ConnectorVersionToJson(cv connIface.ConnectorVersion) ConnectorVersionJson 
 }
 
 type ListConnectorVersionsRequestQueryParams struct {
-	Cursor        *string                         `form:"cursor"`
-	LimitVal      *int32                          `form:"limit"`
-	StateVal      *database.ConnectorVersionState `form:"state"`
-	NamespaceVal  *string                         `form:"namespace"`
-	LabelSelector *string                         `form:"label_selector"`
-	OrderByVal    *string                         `form:"order_by"`
+	Cursor        *string                                   `form:"cursor"`
+	LimitVal      *int32                                    `form:"limit"`
+	StateVal      *database.ConnectorDefinitionVersionState `form:"state"`
+	NamespaceVal  *string                                   `form:"namespace"`
+	LabelSelector *string                                   `form:"label_selector"`
+	OrderByVal    *string                                   `form:"order_by"`
 }
 
 // connectorVersionID is the composite identifier used by the version-level
@@ -165,17 +162,6 @@ func parseConnectorVersionID(gctx *gin.Context) (connectorVersionID, *httperr.Er
 		return connectorVersionID{}, httperr.BadRequest("failed to parse version as an integer")
 	}
 	return connectorVersionID{ConnectorID: id, Version: version}, nil
-}
-
-func connectorVersionStatesToAPI(states database.ConnectorVersionStates) schemaapi.ConnectorVersionStates {
-	if states == nil {
-		return nil
-	}
-	result := make(schemaapi.ConnectorVersionStates, len(states))
-	for i, state := range states {
-		result[i] = schemaapi.ConnectorVersionState(state)
-	}
-	return result
 }
 
 // @Summary		Get connector
@@ -450,14 +436,14 @@ func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
 		}
 
 		if req.OrderByVal != nil {
-			field, order, err := pagination.SplitOrderByParam[database.ConnectorVersionOrderByField](*req.OrderByVal)
+			field, order, err := pagination.SplitOrderByParam[database.ConnectorDefinitionVersionOrderByField](*req.OrderByVal)
 			if err != nil {
 				apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
 				val.MarkErrorReturn()
 				return
 			}
 
-			if !database.IsValidConnectorVersionOrderByField(field) {
+			if !database.IsValidConnectorDefinitionVersionOrderByField(field) {
 				apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid sort field '%s'", field))
 				val.MarkErrorReturn()
 				return
@@ -841,7 +827,7 @@ func (r *ConnectorsRoutes) updateVersion(gctx *gin.Context) {
 		return
 	}
 
-	if existing.GetState() != database.ConnectorVersionStateDraft {
+	if existing.GetState() != database.ConnectorDefinitionVersionStateDraft {
 		apgin.WriteError(gctx, nil, httperr.Conflictf("connector version '%s:%d' is not a draft", connectorId, version))
 		val.MarkErrorReturn()
 		return
@@ -1071,8 +1057,8 @@ func (r *ConnectorsRoutes) forceVersionState(gctx *gin.Context) {
 		return
 	}
 
-	state := database.ConnectorVersionState(req.State)
-	if !database.IsValidConnectorVersionState(state) {
+	state := database.ConnectorDefinitionVersionState(req.State)
+	if !database.IsValidConnectorDefinitionVersionState(state) {
 		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid connector version state '%s'", req.State))
 		val.MarkErrorReturn()
 		return
@@ -1802,7 +1788,7 @@ func NewConnectorsRoutes(cfg config.C, authService auth.A, c connIface.C, e encr
 			}
 			return nil, err
 		}
-		if cv.GetState() != database.ConnectorVersionStateDraft {
+		if cv.GetState() != database.ConnectorDefinitionVersionStateDraft {
 			return nil, httperr.Conflictf("connector version '%s:%d' is not a draft", id.ConnectorID, id.Version)
 		}
 		merged := make(map[string]string)
@@ -1823,7 +1809,7 @@ func NewConnectorsRoutes(cfg config.C, authService auth.A, c connIface.C, e encr
 			}
 			return nil, err
 		}
-		if cv.GetState() != database.ConnectorVersionStateDraft {
+		if cv.GetState() != database.ConnectorDefinitionVersionStateDraft {
 			return nil, httperr.Conflictf("connector version '%s:%d' is not a draft", id.ConnectorID, id.Version)
 		}
 		merged := make(map[string]string)
@@ -1844,7 +1830,7 @@ func NewConnectorsRoutes(cfg config.C, authService auth.A, c connIface.C, e encr
 			}
 			return nil, err
 		}
-		if cv.GetState() != database.ConnectorVersionStateDraft {
+		if cv.GetState() != database.ConnectorDefinitionVersionStateDraft {
 			return nil, httperr.Conflictf("connector version '%s:%d' is not a draft", id.ConnectorID, id.Version)
 		}
 		merged := make(map[string]string)
@@ -1865,7 +1851,7 @@ func NewConnectorsRoutes(cfg config.C, authService auth.A, c connIface.C, e encr
 			}
 			return nil, err
 		}
-		if cv.GetState() != database.ConnectorVersionStateDraft {
+		if cv.GetState() != database.ConnectorDefinitionVersionStateDraft {
 			return nil, httperr.Conflictf("connector version '%s:%d' is not a draft", id.ConnectorID, id.Version)
 		}
 		merged := make(map[string]string)

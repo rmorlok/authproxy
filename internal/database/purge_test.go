@@ -126,13 +126,13 @@ func TestPurgeSoftDeletedRecords(t *testing.T) {
 		_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
 		clk := clock.NewFakeClock(start)
 		ctx := apctx.NewBuilderBackground().WithClock(clk).Build()
-		connectorID := apid.New(apid.PrefixConnector)
+		connectorID := apid.New(apid.PrefixConnectorVersion)
 
-		require.NoError(t, db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+		require.NoError(t, db.UpsertConnectorDefinitionVersion(ctx, &ConnectorWithDefinition{
 			Id:        connectorID,
 			Namespace: "root",
 			Version:   1,
-			State:     ConnectorVersionStatePrimary,
+			State:     ConnectorDefinitionVersionStatePrimary,
 			Labels:    Labels{"type": "test"},
 			EncryptedDefinition: encfield.EncryptedField{
 				ID:   apid.New(apid.PrefixDataEncryptionKey),

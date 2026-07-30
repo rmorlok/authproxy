@@ -23,8 +23,6 @@ const baseConnection: Connection = {
     highlight: 'Respond to email automatically.',
     logo: gmailLogo,
     has_configure: true,
-    versions: 1,
-    states: [ConnectorVersionState.ACTIVE],
     created_at: '2023-04-01T12:00:00Z',
     updated_at: '2023-04-01T12:00:00Z',
   },

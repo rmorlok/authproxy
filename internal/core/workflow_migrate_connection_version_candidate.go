@@ -42,8 +42,8 @@ func (s *service) buildConnectionMigrationCandidate(
 	// Must be primary or active. If the old version had previously been
 	// archived, the connector needs to have its state manually set prior
 	// to a rollback.
-	if target.State != database.ConnectorVersionStatePrimary &&
-		target.State != database.ConnectorVersionStateActive {
+	if target.State != database.ConnectorDefinitionVersionStatePrimary &&
+		target.State != database.ConnectorDefinitionVersionStateActive {
 		return nil, fmt.Errorf("target connector version must be primary or active")
 	}
 

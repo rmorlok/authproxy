@@ -20,22 +20,22 @@ func (s *service) CreateConnectorVersion(ctx context.Context, namespace string, 
 	def.Id = id
 	def.Version = 1
 	def.Namespace = util.ToPtr(namespace)
-	def.State = string(database.ConnectorVersionStateDraft)
+	def.State = string(database.ConnectorDefinitionVersionStateDraft)
 
 	cv, err := newConnectorVersionBuilder(s).
 		WithConfig(def).
 		WithId(id).
 		WithVersion(1).
-		WithState(database.ConnectorVersionStateDraft).
+		WithState(database.ConnectorDefinitionVersionStateDraft).
 		Build()
 	if err != nil {
 		return nil, fmt.Errorf("failed to build connector version: %w", err)
 	}
 
-	cv.ConnectorVersion.Labels = labels
-	cv.ConnectorVersion.Annotations = annotations
+	cv.ConnectorWithDefinition.Labels = labels
+	cv.ConnectorWithDefinition.Annotations = annotations
 
-	if err := s.db.UpsertConnectorVersion(ctx, &cv.ConnectorVersion); err != nil {
+	if err := s.db.UpsertConnectorDefinitionVersion(ctx, &cv.ConnectorWithDefinition); err != nil {
 		return nil, fmt.Errorf("failed to upsert connector version: %w", err)
 	}
 
@@ -44,7 +44,7 @@ func (s *service) CreateConnectorVersion(ctx context.Context, namespace string, 
 
 func (s *service) CreateDraftConnectorVersion(ctx context.Context, id apid.ID, definition *cschema.Connector, labels map[string]string, annotations map[string]string) (iface.ConnectorVersion, error) {
 	// Check for existing draft
-	existingDraft, err := s.db.GetConnectorVersionForState(ctx, id, database.ConnectorVersionStateDraft)
+	existingDraft, err := s.db.GetConnectorDefinitionVersionForState(ctx, id, database.ConnectorDefinitionVersionStateDraft)
 	if err != nil && !errors.Is(err, database.ErrNotFound) {
 		return nil, fmt.Errorf("failed to check for existing draft: %w", err)
 	}
@@ -53,7 +53,7 @@ func (s *service) CreateDraftConnectorVersion(ctx context.Context, id apid.ID, d
 	}
 
 	// Get the latest version to determine the next version number
-	latest, err := s.db.NewestConnectorVersionForId(ctx, id)
+	latest, err := s.db.NewestConnectorDefinitionVersionForId(ctx, id)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
 			return nil, ErrNotFound
@@ -79,31 +79,31 @@ func (s *service) CreateDraftConnectorVersion(ctx context.Context, id apid.ID, d
 	def.Id = id
 	def.Version = newVersion
 	def.Namespace = util.ToPtr(latest.Namespace)
-	def.State = string(database.ConnectorVersionStateDraft)
+	def.State = string(database.ConnectorDefinitionVersionStateDraft)
 
 	cv, err := newConnectorVersionBuilder(s).
 		WithConfig(def).
 		WithId(id).
 		WithVersion(newVersion).
-		WithState(database.ConnectorVersionStateDraft).
+		WithState(database.ConnectorDefinitionVersionStateDraft).
 		Build()
 	if err != nil {
 		return nil, fmt.Errorf("failed to build connector version: %w", err)
 	}
 
 	if labels != nil {
-		cv.ConnectorVersion.Labels = labels
+		cv.ConnectorWithDefinition.Labels = labels
 	} else {
-		cv.ConnectorVersion.Labels = latest.Labels
+		cv.ConnectorWithDefinition.Labels = latest.Labels
 	}
 
 	if annotations != nil {
-		cv.ConnectorVersion.Annotations = annotations
+		cv.ConnectorWithDefinition.Annotations = annotations
 	} else {
-		cv.ConnectorVersion.Annotations = latest.Annotations
+		cv.ConnectorWithDefinition.Annotations = latest.Annotations
 	}
 
-	if err := s.db.UpsertConnectorVersion(ctx, &cv.ConnectorVersion); err != nil {
+	if err := s.db.UpsertConnectorDefinitionVersion(ctx, &cv.ConnectorWithDefinition); err != nil {
 		return nil, fmt.Errorf("failed to upsert connector version: %w", err)
 	}
 

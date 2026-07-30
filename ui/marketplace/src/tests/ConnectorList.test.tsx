@@ -53,8 +53,6 @@ const connector: Connector = {
     highlight: 'Calendar highlight',
     logo: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg"/%3E',
     has_configure: false,
-    versions: 1,
-    states: [ConnectorVersionState.ACTIVE],
     created_at: '2023-04-01T12:00:00Z',
     updated_at: '2023-04-01T12:00:00Z',
 };

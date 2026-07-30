@@ -31,7 +31,7 @@ func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConn
 	if req.HasVersion() {
 		cv, err = s.GetConnectorVersion(ctx, req.ConnectorId, req.ConnectorVersion)
 	} else {
-		cv, err = s.GetConnectorVersionForState(ctx, req.ConnectorId, database.ConnectorVersionStatePrimary)
+		cv, err = s.GetConnectorVersionForState(ctx, req.ConnectorId, database.ConnectorDefinitionVersionStatePrimary)
 	}
 
 	if err != nil {

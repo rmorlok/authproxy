@@ -100,8 +100,6 @@ describe('ConnectionCard', () => {
         highlight: undefined,
         logo: 'https://example.com/google-calendar-logo.png',
         has_configure: false,
-        versions: 1,
-        states: [ConnectorVersionState.ACTIVE],
         created_at: '2023-04-01T12:00:00Z',
         updated_at: '2023-04-01T12:00:00Z',
     };

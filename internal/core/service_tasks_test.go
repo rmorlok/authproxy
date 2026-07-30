@@ -62,12 +62,11 @@ func TestGetCronTasks_SchedulesOnlyEnabledPeriodicProbes(t *testing.T) {
 		ListConnectionsBuilder().
 		Return(&staticListConnectionsBuilder{connections: []database.Connection{conn}})
 	db.EXPECT().
-		GetConnectorVersion(gomock.Any(), connector.Id, connector.Version).
-		Return(&database.ConnectorVersion{
+		GetConnectorDefinitionVersion(gomock.Any(), connector.Id, connector.Version).
+		Return(&database.ConnectorWithDefinition{
 			Id:                  connector.Id,
 			Version:             connector.Version,
-			State:               database.ConnectorVersionStatePrimary,
-			Hash:                "hash",
+			State:               database.ConnectorDefinitionVersionStatePrimary,
 			EncryptedDefinition: encryptedDef,
 		}, nil)
 	encrypt.EXPECT().
