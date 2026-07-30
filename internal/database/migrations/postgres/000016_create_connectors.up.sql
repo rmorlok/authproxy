@@ -1,15 +1,20 @@
 create table connectors
 (
-    id         text primary key,
-    namespace  text not null,
-    name       text not null check (name <> ''),
-    created_at timestamptz not null,
-    updated_at timestamptz not null,
-    deleted_at timestamptz
+    id          text primary key,
+    namespace   text not null,
+    name        text not null check (name <> ''),
+    labels      jsonb,
+    annotations jsonb,
+    created_at  timestamptz not null,
+    updated_at  timestamptz not null,
+    deleted_at  timestamptz
 );
 
 create index idx_connectors_deleted_at
     on connectors (deleted_at);
+
+create index idx_connectors_resource_search
+    on connectors (deleted_at, updated_at desc, id);
 
 create unique index idx_connectors_live_namespace_name
     on connectors (namespace, name)
@@ -19,11 +24,20 @@ with ranked as (
     select
         id,
         namespace,
+        labels,
+        annotations,
         row_number() over (
             partition by id
             order by
                 case when deleted_at is null then 0 else 1 end,
-                version
+                case state
+                    when 'primary' then 1
+                    when 'draft' then 2
+                    when 'active' then 3
+                    when 'archived' then 4
+                    else 5
+                end,
+                version desc
         ) as row_num,
         min(created_at) over (partition by id) as earliest_created_at,
         max(updated_at) over (partition by id) as latest_updated_at,
@@ -35,6 +49,8 @@ insert into connectors (
     id,
     namespace,
     name,
+    labels,
+    annotations,
     created_at,
     updated_at,
     deleted_at
@@ -43,10 +59,43 @@ select
     id,
     namespace,
     id,
+    labels,
+    annotations,
     coalesce(earliest_created_at, current_timestamp),
     coalesce(latest_updated_at, earliest_created_at, current_timestamp),
     case when live_versions > 0 then null else latest_deleted_at end
 from ranked
 where row_num = 1;
 
-alter table connector_versions drop column namespace;
+create table connector_definition_versions
+(
+    id                   text primary key,
+    connector_id         text not null references connectors (id) on delete cascade,
+    version              bigint not null,
+    state                text not null,
+    encrypted_definition jsonb not null,
+    encrypted_at         timestamptz,
+    unique (connector_id, version)
+);
+
+create index idx_connector_definition_versions_connector_state
+    on connector_definition_versions (connector_id, state);
+
+insert into connector_definition_versions (
+    id,
+    connector_id,
+    version,
+    state,
+    encrypted_definition,
+    encrypted_at
+)
+select
+    'cvd_' || substr(id, 5) || '_' || version::text,
+    id,
+    version,
+    state,
+    encrypted_definition,
+    encrypted_at
+from connector_versions;
+
+drop table connector_versions;

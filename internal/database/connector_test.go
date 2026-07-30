@@ -19,23 +19,23 @@ func TestConnectors(t *testing.T) {
 
 		sql := `
 INSERT INTO connectors
-(id,                         namespace,          name,                       created_at,            updated_at,            deleted_at) VALUES
-('cxr_testgmail0000001',     'root',             'cxr_testgmail0000001',     '2023-10-01 00:00:00', '2023-10-10 00:00:00', null),
-('cxr_testgmail0000002',     'root.child',       'cxr_testgmail0000002',     '2023-10-02 00:00:00', '2023-10-11 00:00:00', null),
-('cxr_testslack0000001',     'root.child2',      'cxr_testslack0000001',     '2023-10-03 00:00:00', '2023-10-12 00:00:00', null),
-('cxr_testgmail0000003',     'root.child.grand', 'cxr_testgmail0000003',     '2023-10-04 00:00:00', '2023-10-14 00:00:00', null);
+(id,                         namespace,          name,                       labels,                    created_at,            updated_at,            deleted_at) VALUES
+('cxr_testgmail0000001',     'root',             'cxr_testgmail0000001',     '{"type":"gmail"}',        '2023-10-01 00:00:00', '2023-10-10 00:00:00', null),
+('cxr_testgmail0000002',     'root.child',       'cxr_testgmail0000002',     '{"type":"gmail"}',        '2023-10-02 00:00:00', '2023-10-11 00:00:00', null),
+('cxr_testslack0000001',     'root.child2',      'cxr_testslack0000001',     '{"type":"outlook"}',      '2023-10-03 00:00:00', '2023-10-12 00:00:00', null),
+('cxr_testgmail0000003',     'root.child.grand', 'cxr_testgmail0000003',     '{"type":"google_drive"}', '2023-10-04 00:00:00', '2023-10-14 00:00:00', null);
 
-INSERT INTO connector_versions
-(id,                         version, state,      type,           encrypted_definition,                         hash,    created_at,            updated_at,            deleted_at) VALUES
-('cxr_testgmail0000001',     1,       'active',   'gmail',        '{"id":"dek_test","d":"encrypted-def"}',      'hash1', '2023-10-01 00:00:00', '2023-10-01 00:00:00', null),
-('cxr_testgmail0000001',     2,       'primary',  'gmail',        '{"id":"dek_test","d":"encrypted-def"}',      'hash2', '2023-10-10 00:00:00', '2023-10-10 00:00:00', null),
-('cxr_testgmail0000002',     1,       'archived', 'gmail',        '{"id":"dek_test","d":"encrypted-def"}',      'hash3', '2023-10-02 00:00:00', '2023-10-02 00:00:00', null),
-('cxr_testgmail0000002',     2,       'primary',  'gmail',        '{"id":"dek_test","d":"encrypted-def"}',      'hash4', '2023-10-11 00:00:00', '2023-10-11 00:00:00', null),
-('cxr_testslack0000001',     1,       'active',   'outlook',      '{"id":"dek_test","d":"encrypted-def"}',      'hash5', '2023-10-03 00:00:00', '2023-10-03 00:00:00', null),
-('cxr_testslack0000001',     2,       'primary',  'outlook',      '{"id":"dek_test","d":"encrypted-def"}',      'hash6', '2023-10-12 00:00:00', '2023-10-12 00:00:00', null),
-('cxr_testgmail0000003',     1,       'archived', 'google_drive', '{"id":"dek_test","d":"encrypted-def"}',      'hash7', '2023-10-04 00:00:00', '2023-10-04 00:00:00', null),
-('cxr_testgmail0000003',     2,       'active',   'google_drive', '{"id":"dek_test","d":"encrypted-def"}',      'hash8', '2023-10-13 00:00:00', '2023-10-13 00:00:00', null),
-('cxr_testgmail0000003',     3,       'primary',  'google_drive', '{"id":"dek_test","d":"encrypted-def"}',      'hash9', '2023-10-14 00:00:00', '2023-10-14 00:00:00', null);
+INSERT INTO connector_definition_versions
+(id,                         connector_id,                version, state,      encrypted_definition) VALUES
+('cvd_testgmail0000011',     'cxr_testgmail0000001',      1,       'active',   '{"id":"dek_test","d":"encrypted-def"}'),
+('cvd_testgmail0000012',     'cxr_testgmail0000001',      2,       'primary',  '{"id":"dek_test","d":"encrypted-def"}'),
+('cvd_testgmail0000021',     'cxr_testgmail0000002',      1,       'archived', '{"id":"dek_test","d":"encrypted-def"}'),
+('cvd_testgmail0000022',     'cxr_testgmail0000002',      2,       'primary',  '{"id":"dek_test","d":"encrypted-def"}'),
+('cvd_testslack0000011',     'cxr_testslack0000001',      1,       'active',   '{"id":"dek_test","d":"encrypted-def"}'),
+('cvd_testslack0000012',     'cxr_testslack0000001',      2,       'primary',  '{"id":"dek_test","d":"encrypted-def"}'),
+('cvd_testgmail0000031',     'cxr_testgmail0000003',      1,       'archived', '{"id":"dek_test","d":"encrypted-def"}'),
+('cvd_testgmail0000032',     'cxr_testgmail0000003',      2,       'active',   '{"id":"dek_test","d":"encrypted-def"}'),
+('cvd_testgmail0000033',     'cxr_testgmail0000003',      3,       'primary',  '{"id":"dek_test","d":"encrypted-def"}');
 `
 		_, err := rawDb.Exec(sql)
 		require.NoError(t, err)
@@ -66,18 +66,18 @@ INSERT INTO connector_versions
 
 		sql := `
 INSERT INTO connectors
-(id,                         namespace,           name,                       created_at,            updated_at,            deleted_at) VALUES
-('cxr_testgmail0000001',     'root.prod',         'cxr_testgmail0000001',     '2023-10-01 00:00:00', '2023-10-01 00:00:00', null),
-('cxr_testgmail0000002',     'root.staging',      'cxr_testgmail0000002',     '2023-10-02 00:00:00', '2023-10-02 00:00:00', null),
-('cxr_testslack0000001',     'root.dev',          'cxr_testslack0000001',     '2023-10-03 00:00:00', '2023-10-03 00:00:00', null),
-('cxr_testgmail0000003',     'root.prod.tenant1', 'cxr_testgmail0000003',     '2023-10-04 00:00:00', '2023-10-04 00:00:00', null);
+(id,                         namespace,           name,                       labels,                    created_at,            updated_at,            deleted_at) VALUES
+('cxr_testgmail0000001',     'root.prod',         'cxr_testgmail0000001',     '{"type":"gmail"}',        '2023-10-01 00:00:00', '2023-10-01 00:00:00', null),
+('cxr_testgmail0000002',     'root.staging',      'cxr_testgmail0000002',     '{"type":"gmail"}',        '2023-10-02 00:00:00', '2023-10-02 00:00:00', null),
+('cxr_testslack0000001',     'root.dev',          'cxr_testslack0000001',     '{"type":"outlook"}',      '2023-10-03 00:00:00', '2023-10-03 00:00:00', null),
+('cxr_testgmail0000003',     'root.prod.tenant1', 'cxr_testgmail0000003',     '{"type":"google_drive"}', '2023-10-04 00:00:00', '2023-10-04 00:00:00', null);
 
-INSERT INTO connector_versions
-(id,                         version, state,     type,           encrypted_definition,                         hash,    created_at,            updated_at,            deleted_at) VALUES
-('cxr_testgmail0000001',     1,       'primary', 'gmail',        '{"id":"dek_test","d":"encrypted-def"}',      'hash1', '2023-10-01 00:00:00', '2023-10-01 00:00:00', null),
-('cxr_testgmail0000002',     1,       'primary', 'gmail',        '{"id":"dek_test","d":"encrypted-def"}',      'hash3', '2023-10-02 00:00:00', '2023-10-02 00:00:00', null),
-('cxr_testslack0000001',     1,       'primary', 'outlook',      '{"id":"dek_test","d":"encrypted-def"}',      'hash5', '2023-10-03 00:00:00', '2023-10-03 00:00:00', null),
-('cxr_testgmail0000003',     1,       'primary', 'google_drive', '{"id":"dek_test","d":"encrypted-def"}',      'hash7', '2023-10-04 00:00:00', '2023-10-04 00:00:00', null);
+INSERT INTO connector_definition_versions
+(id,                         connector_id,                version, state,     encrypted_definition) VALUES
+('cvd_testgmail0000011',     'cxr_testgmail0000001',      1,       'primary', '{"id":"dek_test","d":"encrypted-def"}'),
+('cvd_testgmail0000021',     'cxr_testgmail0000002',      1,       'primary', '{"id":"dek_test","d":"encrypted-def"}'),
+('cvd_testslack0000011',     'cxr_testslack0000001',      1,       'primary', '{"id":"dek_test","d":"encrypted-def"}'),
+('cvd_testgmail0000031',     'cxr_testgmail0000003',      1,       'primary', '{"id":"dek_test","d":"encrypted-def"}');
 `
 		_, err := rawDb.Exec(sql)
 		require.NoError(t, err)

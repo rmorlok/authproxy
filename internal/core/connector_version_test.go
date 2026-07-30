@@ -104,6 +104,30 @@ func TestConnectorVersion_GetDefinition(t *testing.T) {
 	assert.Equal(t, result, result2)
 }
 
+func TestConnectorVersion_GetHashDerivesFromEncryptedDefinition(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockEncrypt := encryptmock.NewMockE(ctrl)
+	encryptedDefinition := encfield.EncryptedField{ID: "dek_test", Data: "encrypted-data"}
+	def := &cschema.Connector{
+		Labels:      map[string]string{"type": "test-connector"},
+		DisplayName: "Test Connector",
+	}
+	defJSON := util.Must(json.Marshal(def))
+	mockEncrypt.EXPECT().
+		DecryptString(gomock.Any(), encryptedDefinition).
+		Return(string(defJSON), nil)
+
+	cv := wrapConnectorVersion(database.ConnectorVersion{
+		Id:                  apid.New(apid.PrefixConnector),
+		Version:             1,
+		EncryptedDefinition: encryptedDefinition,
+	}, &service{encrypt: mockEncrypt, logger: aplog.NewNoopLogger()})
+
+	require.Equal(t, def.Hash(), cv.GetHash())
+}
+
 func TestConnectorVersion_SetDefinition(t *testing.T) {
 	// Setup
 	ctrl := gomock.NewController(t)

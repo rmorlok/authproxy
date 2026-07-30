@@ -182,19 +182,19 @@ func (l *listConnectorsFilters) fetchPage(ctx context.Context) pagination.PageRe
         SELECT
             *,
             ROW_NUMBER() OVER (
-                PARTITION BY id
+                PARTITION BY connector_id
                 ORDER BY
-                    CASE WHEN deleted_at IS NULL THEN 0 ELSE 1 END,
                     CASE state
                         WHEN 'primary' THEN 1
                         WHEN 'draft' THEN 2
                         WHEN 'active' THEN 3
                         WHEN 'archived' THEN 4
                         ELSE 5
-                    END
+                    END,
+                    version DESC
             ) AS row_num
         FROM %s
-    `, ConnectorVersionsTable)
+    `, ConnectorDefinitionVersionsTable)
 
 	// Compute the aggregate state for the connector across all versions
 	aggregateStatesExpr := "json_group_array(distinct state)"
@@ -203,37 +203,43 @@ func (l *listConnectorsFilters) fetchPage(ctx context.Context) pagination.PageRe
 	}
 	connectorVersionCountsCTE := fmt.Sprintf(`
         SELECT
-            id,
+            connector_id,
             %s as states,
             count(*) as versions
         FROM %s
-        GROUP BY id
-    `, aggregateStatesExpr, ConnectorVersionsTable)
+        GROUP BY connector_id
+    `, aggregateStatesExpr, ConnectorDefinitionVersionsTable)
 
 	q := l.s.sq.Select(`
 c.id as id,
 c.namespace as namespace,
 c.name as name,
-rr.labels as labels,
-rr.annotations as annotations,
+c.labels as labels,
+c.annotations as annotations,
+rr.id as definition_version_id,
 rr.version as version,
 rr.state as state,
 rr.encrypted_definition as encrypted_definition,
-rr.created_at as created_at,
-rr.updated_at as updated_at,
-rr.deleted_at as deleted_at,
+rr.encrypted_at as encrypted_at,
+c.created_at as created_at,
+c.updated_at as updated_at,
+c.deleted_at as deleted_at,
 cvc.states as states,
 cvc.versions as total_versions
 `).
 		With("ranked_rows", sq.Expr(rankedRowsCTE)).
 		With("connector_version_counts", sq.Expr(connectorVersionCountsCTE)).
 		From(ConnectorsTable+" c").
-		Join("ranked_rows rr ON rr.id = c.id").
-		Join("connector_version_counts cvc ON cvc.id = rr.id").
+		Join("ranked_rows rr ON rr.connector_id = c.id").
+		Join("connector_version_counts cvc ON cvc.connector_id = rr.connector_id").
 		Where("rr.row_num = ?", 1)
 
 	if len(l.TypeVal) > 0 {
-		q = q.Where(sq.Eq{"rr.type": l.TypeVal})
+		typeExpr := "json_extract(c.labels, '$.type')"
+		if l.s.cfg.GetProvider() == sconfig.DatabaseProviderPostgres {
+			typeExpr = "c.labels ->> 'type'"
+		}
+		q = q.Where(sq.Eq{typeExpr: l.TypeVal})
 	}
 
 	if len(l.IdsVal) > 0 {
@@ -254,18 +260,30 @@ cvc.versions as total_versions
 			return pagination.PageResult[Connector]{Error: err}
 		}
 
-		q = selector.ApplyToSqlBuilderWithProvider(q, "rr.labels", l.s.cfg.GetProvider())
+		q = selector.ApplyToSqlBuilderWithProvider(q, "c.labels", l.s.cfg.GetProvider())
 	}
 
 	if !l.IncludeDeletedVal {
-		q = q.Where(sq.Eq{"rr.deleted_at": nil, "c.deleted_at": nil})
+		q = q.Where(sq.Eq{"c.deleted_at": nil})
 	}
 
 	// Always limit to one more than limit to check if there are more records
 	q = q.Limit(l.LimitVal + 1).Offset(l.Offset)
 
 	if l.OrderByFieldVal != nil {
-		q = q.OrderBy(fmt.Sprintf("%s %s", *l.OrderByFieldVal, l.OrderByVal.String()))
+		orderCol := string(*l.OrderByFieldVal)
+		switch *l.OrderByFieldVal {
+		case ConnectorOrderByVersion, ConnectorOrderByState:
+			orderCol = "rr." + orderCol
+		case ConnectorOrderByType:
+			orderCol = "json_extract(c.labels, '$.type')"
+			if l.s.cfg.GetProvider() == sconfig.DatabaseProviderPostgres {
+				orderCol = "c.labels ->> 'type'"
+			}
+		default:
+			orderCol = "c." + orderCol
+		}
+		q = q.OrderBy(fmt.Sprintf("%s %s", orderCol, l.OrderByVal.String()))
 	}
 
 	sqlStr, sqlArgs, sqlErr := q.ToSql()
@@ -291,9 +309,11 @@ cvc.versions as total_versions
 			&c.Name,
 			&c.Labels,
 			&c.Annotations,
+			&c.DefinitionVersionId,
 			&c.Version,
 			&c.State,
 			&c.EncryptedDefinition,
+			&c.EncryptedAt,
 			&c.CreatedAt,
 			&c.UpdatedAt,
 			&c.DeletedAt,

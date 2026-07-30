@@ -26,7 +26,7 @@ func TestReEncryptRegistry(t *testing.T) {
 		}
 		require.True(t, tableNames[ActorTable])
 		require.True(t, tableNames[ConnectionsTable])
-		require.True(t, tableNames[ConnectorVersionsTable])
+		require.True(t, tableNames[ConnectorDefinitionVersionsTable])
 		require.True(t, tableNames[ConnectionCredentialsTable])
 		require.True(t, tableNames[OAuth2TokensTable])
 		require.False(t, tableNames[KeysTable])
@@ -244,7 +244,7 @@ func TestReEncryptRegistry(t *testing.T) {
 		require.True(t, found, "oauth2 token should resolve namespace via connections JOIN")
 	})
 
-	t.Run("composite PK connector_versions", func(t *testing.T) {
+	t.Run("connector definition version public row ID", func(t *testing.T) {
 		_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
 		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
@@ -271,8 +271,8 @@ func TestReEncryptRegistry(t *testing.T) {
 		var cvTargets []ReEncryptionTarget
 		err = db.EnumerateFieldsRequiringReEncryption(ctx, func(targets []ReEncryptionTarget, lastPage bool) (keepGoing pagination.KeepGoing, err error) {
 			for _, tgt := range targets {
-				if tgt.Table == ConnectorVersionsTable {
-					if id, ok := tgt.PrimaryKeyValues[0].(string); ok && apid.ID(id) == cvId {
+				if tgt.Table == ConnectorDefinitionVersionsTable {
+					if id, ok := tgt.PrimaryKeyValues[0].(string); ok && apid.ID(id) == cv.DefinitionVersionId {
 						cvTargets = append(cvTargets, tgt)
 					}
 				}
@@ -281,7 +281,8 @@ func TestReEncryptRegistry(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.Len(t, cvTargets, 1)
-		require.Len(t, cvTargets[0].PrimaryKeyValues, 2, "composite PK should have 2 values")
+		require.Len(t, cvTargets[0].PrimaryKeyValues, 1)
+		require.Equal(t, apid.PrefixConnectorDefinitionVersion, cv.DefinitionVersionId.Prefix())
 	})
 
 	t.Run("nullable encrypted field skipped", func(t *testing.T) {

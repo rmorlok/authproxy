@@ -67,7 +67,7 @@ func TestConnectorResourceRenameDoesNotRewriteVersions(t *testing.T) {
 	require.NoError(t, db.UpsertConnectorVersion(ctx, testConnectorVersion(id, "root", "original", 1)))
 	require.NoError(t, db.UpsertConnectorVersion(ctx, testConnectorVersion(id, "root", "", 2)))
 
-	originalHashes := connectorVersionHashes(t, rawDB, id)
+	originalDefinitions := connectorDefinitionPayloads(t, rawDB, id)
 
 	require.NoError(t, db.UpdateConnectorName(ctx, id, "renamed"))
 	for _, version := range []uint64{1, 2} {
@@ -76,8 +76,8 @@ func TestConnectorResourceRenameDoesNotRewriteVersions(t *testing.T) {
 		require.Equal(t, scommon.ResourceName("renamed"), projected.Name)
 	}
 
-	renamedHashes := connectorVersionHashes(t, rawDB, id)
-	require.Equal(t, originalHashes, renamedHashes)
+	renamedDefinitions := connectorDefinitionPayloads(t, rawDB, id)
+	require.Equal(t, originalDefinitions, renamedDefinitions)
 	require.Equal(t, 2, sqlhMustCountConnectorVersions(t, rawDB, id))
 
 	err := db.UpsertConnectorVersion(ctx, testConnectorVersion(id, "root", "forked", 3))
@@ -151,28 +151,30 @@ func TestConnectorResourceMigrationBackfillsDeterministically(t *testing.T) {
 	deletedID := apid.New(apid.PrefixConnectorVersion)
 	_, err := rawDB.Exec(fmt.Sprintf(`
 		INSERT INTO connector_versions (
-			id, version, namespace, state, hash, encrypted_definition,
+			id, version, namespace, labels, annotations, state, hash, encrypted_definition,
 			created_at, updated_at, deleted_at
 		) VALUES
-		('%s', 1, 'root.old', 'archived', 'old', '{"id":"dek_old","d":"old"}',
+		('%s', 1, 'root.old', '{"selected":"no"}', '{"selected":"no"}', 'archived', 'old', '{"id":"dek_old","d":"old"}',
 		 '2024-01-01T00:00:00Z', '2024-01-02T00:00:00Z', '2024-02-01T00:00:00Z'),
-		('%s', 2, 'root.live', 'primary', 'live', '{"id":"dek_live","d":"live"}',
+		('%s', 2, 'root.live', '{"selected":"yes"}', '{"selected":"yes"}', 'primary', 'live', '{"id":"dek_live","d":"live"}',
 		 '2024-03-01T00:00:00Z', '2024-03-02T00:00:00Z', NULL),
-		('%s', 1, 'root.deleted', 'archived', 'deleted', '{"id":"dek_deleted","d":"deleted"}',
+		('%s', 1, 'root.deleted', '{"deleted":"yes"}', '{"deleted":"yes"}', 'archived', 'deleted', '{"id":"dek_deleted","d":"deleted"}',
 		 '2024-04-01T00:00:00Z', '2024-04-02T00:00:00Z', '2024-05-01T00:00:00Z')
 	`, liveID, liveID, deletedID))
 	require.NoError(t, err)
 
 	migrateDatabaseToVersion(t, service, 16)
 
-	var liveNamespace, liveName string
+	var liveNamespace, liveName, liveLabels, liveAnnotations string
 	var liveDeletedAt any
 	require.NoError(t, rawDB.QueryRow(fmt.Sprintf(
-		"SELECT namespace, name, deleted_at FROM connectors WHERE id = '%s'",
+		"SELECT namespace, name, labels, annotations, deleted_at FROM connectors WHERE id = '%s'",
 		liveID,
-	)).Scan(&liveNamespace, &liveName, &liveDeletedAt))
+	)).Scan(&liveNamespace, &liveName, &liveLabels, &liveAnnotations, &liveDeletedAt))
 	require.Equal(t, "root.live", liveNamespace)
 	require.Equal(t, liveID.String(), liveName)
+	require.JSONEq(t, `{"selected":"yes"}`, liveLabels)
+	require.JSONEq(t, `{"selected":"yes"}`, liveAnnotations)
 	require.Nil(t, liveDeletedAt)
 
 	var deletedName string
@@ -184,8 +186,46 @@ func TestConnectorResourceMigrationBackfillsDeterministically(t *testing.T) {
 	require.Equal(t, deletedID.String(), deletedName)
 	require.NotNil(t, deletedAt)
 
-	_, err = rawDB.Query("SELECT namespace FROM connector_versions")
+	_, err = rawDB.Query("SELECT namespace FROM connector_definition_versions")
 	require.Error(t, err)
+	_, err = rawDB.Query("SELECT labels FROM connector_definition_versions")
+	require.Error(t, err)
+	_, err = rawDB.Query("SELECT annotations FROM connector_definition_versions")
+	require.Error(t, err)
+	_, err = rawDB.Query("SELECT hash FROM connector_definition_versions")
+	require.Error(t, err)
+	_, err = rawDB.Query("SELECT type FROM connector_definition_versions")
+	require.Error(t, err)
+	_, err = rawDB.Query("SELECT created_at FROM connector_definition_versions")
+	require.Error(t, err)
+	_, err = rawDB.Query("SELECT deleted_at FROM connector_definition_versions")
+	require.Error(t, err)
+
+	rows, err := rawDB.Query(fmt.Sprintf(
+		"SELECT id FROM connector_definition_versions WHERE connector_id = '%s' ORDER BY version",
+		liveID,
+	))
+	require.NoError(t, err)
+	var definitionIDs []apid.ID
+	for rows.Next() {
+		var definitionID apid.ID
+		require.NoError(t, rows.Scan(&definitionID))
+		definitionIDs = append(definitionIDs, definitionID)
+	}
+	require.NoError(t, rows.Close())
+	require.Len(t, definitionIDs, 2)
+	for _, definitionID := range definitionIDs {
+		require.Equal(t, apid.PrefixConnectorDefinitionVersion, definitionID.Prefix())
+	}
+
+	_, err = rawDB.Exec(fmt.Sprintf(`
+		INSERT INTO connector_definition_versions (
+			id, connector_id, version, state, encrypted_definition
+		) VALUES (
+			'cvd_duplicate', '%s', 2, 'draft', '{"id":"dek_duplicate","d":"duplicate"}'
+		)
+	`, liveID))
+	require.Error(t, err, "(connector_id, version) must be unique")
 
 	projected, err := db.GetConnectorVersion(context.Background(), liveID, 2)
 	require.NoError(t, err)
@@ -193,7 +233,7 @@ func TestConnectorResourceMigrationBackfillsDeterministically(t *testing.T) {
 	require.Equal(t, scommon.ResourceName(liveID.String()), projected.Name)
 
 	migrateDatabaseToVersion(t, service, 15)
-	rows, err := rawDB.Query(fmt.Sprintf(
+	rows, err = rawDB.Query(fmt.Sprintf(
 		"SELECT DISTINCT namespace FROM connector_versions WHERE id = '%s'",
 		liveID,
 	))
@@ -215,27 +255,27 @@ func sqlhMustCountConnectorVersions(t *testing.T, rawDB *sql.DB, id apid.ID) int
 	t.Helper()
 	var count int
 	require.NoError(t, rawDB.QueryRow(fmt.Sprintf(
-		"SELECT COUNT(*) FROM connector_versions WHERE id = '%s'",
+		"SELECT COUNT(*) FROM connector_definition_versions WHERE connector_id = '%s'",
 		id,
 	)).Scan(&count))
 	return count
 }
 
-func connectorVersionHashes(t *testing.T, rawDB *sql.DB, id apid.ID) []string {
+func connectorDefinitionPayloads(t *testing.T, rawDB *sql.DB, id apid.ID) []string {
 	t.Helper()
 	rows, err := rawDB.Query(fmt.Sprintf(
-		"SELECT hash FROM connector_versions WHERE id = '%s' ORDER BY version",
+		"SELECT encrypted_definition FROM connector_definition_versions WHERE connector_id = '%s' ORDER BY version",
 		id,
 	))
 	require.NoError(t, err)
 	defer rows.Close()
 
-	var hashes []string
+	var definitions []string
 	for rows.Next() {
-		var hash string
-		require.NoError(t, rows.Scan(&hash))
-		hashes = append(hashes, hash)
+		var definition string
+		require.NoError(t, rows.Scan(&definition))
+		definitions = append(definitions, definition)
 	}
 	require.NoError(t, rows.Err())
-	return hashes
+	return definitions
 }

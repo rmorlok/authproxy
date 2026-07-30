@@ -6,6 +6,7 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/encfield"
 	"github.com/rmorlok/authproxy/internal/sqlh"
 	"github.com/stretchr/testify/require"
 	clock "k8s.io/utils/clock/testing"
@@ -119,5 +120,35 @@ func TestPurgeSoftDeletedRecords(t *testing.T) {
 		deleted, err := db.PurgeSoftDeletedRecords(ctx, clk.Now())
 		require.NoError(t, err)
 		require.Equal(t, int64(0), deleted)
+	})
+
+	t.Run("purging a connector cascades to its definition versions", func(t *testing.T) {
+		_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
+		clk := clock.NewFakeClock(start)
+		ctx := apctx.NewBuilderBackground().WithClock(clk).Build()
+		connectorID := apid.New(apid.PrefixConnector)
+
+		require.NoError(t, db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+			Id:        connectorID,
+			Namespace: "root",
+			Version:   1,
+			State:     ConnectorVersionStatePrimary,
+			Labels:    Labels{"type": "test"},
+			EncryptedDefinition: encfield.EncryptedField{
+				ID:   apid.New(apid.PrefixDataEncryptionKey),
+				Data: "encrypted",
+			},
+		}))
+		require.NoError(t, db.DeleteConnector(ctx, connectorID))
+		require.Equal(t, 1, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_definition_versions"))
+
+		clk.Step(31 * 24 * time.Hour)
+		deleted, err := db.PurgeSoftDeletedRecords(
+			apctx.NewBuilderBackground().WithClock(clk).Build(),
+			clk.Now().Add(-30*24*time.Hour),
+		)
+		require.NoError(t, err)
+		require.Equal(t, int64(1), deleted)
+		require.Equal(t, 0, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_definition_versions"))
 	})
 }

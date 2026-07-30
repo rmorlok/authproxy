@@ -19,12 +19,14 @@ const ConnectorsTable = "connectors"
 // connectorResource is the single source of truth for a logical connector's
 // stable identity. Version rows contain only version-specific definition data.
 type connectorResource struct {
-	Id        apid.ID
-	Namespace string
-	Name      scommon.ResourceName
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	DeletedAt *time.Time
+	Id          apid.ID
+	Namespace   string
+	Name        scommon.ResourceName
+	Labels      Labels
+	Annotations Annotations
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	DeletedAt   *time.Time
 }
 
 func (c *connectorResource) cols() []string {
@@ -32,6 +34,8 @@ func (c *connectorResource) cols() []string {
 		"id",
 		"namespace",
 		"name",
+		"labels",
+		"annotations",
 		"created_at",
 		"updated_at",
 		"deleted_at",
@@ -43,6 +47,8 @@ func (c *connectorResource) fields() []any {
 		&c.Id,
 		&c.Namespace,
 		&c.Name,
+		&c.Labels,
+		&c.Annotations,
 		&c.CreatedAt,
 		&c.UpdatedAt,
 		&c.DeletedAt,
@@ -54,6 +60,8 @@ func (c *connectorResource) values() []any {
 		c.Id,
 		c.Namespace,
 		c.Name,
+		c.Labels,
+		c.Annotations,
 		c.CreatedAt,
 		c.UpdatedAt,
 		c.DeletedAt,
@@ -72,6 +80,12 @@ func (c *connectorResource) validate() error {
 	}
 	if err := c.Name.Validate(); err != nil {
 		return fmt.Errorf("invalid connector name: %w", err)
+	}
+	if err := c.Labels.Validate(); err != nil {
+		return fmt.Errorf("invalid connector labels: %w", err)
+	}
+	if err := c.Annotations.Validate(); err != nil {
+		return fmt.Errorf("invalid connector annotations: %w", err)
 	}
 	return nil
 }
@@ -100,7 +114,34 @@ func (s *service) ensureConnectorResourceForVersion(
 		if cv.Name != "" && cv.Name != existing.Name {
 			return errors.New("cannot modify connector name through a connector version")
 		}
+
+		labels := existing.Labels
+		if cv.Labels != nil {
+			labels = MergeUpsertLabels(cv.Labels, existing.Labels)
+			labels = InjectSelfImplicitLabels(existing.Id, existing.Namespace, labels)
+		}
+		annotations := existing.Annotations
+		if cv.Annotations != nil {
+			annotations = cv.Annotations
+		}
+		now := apctx.GetClock(ctx).Now()
+		_, err = sqb.
+			Update(ConnectorsTable).
+			Set("labels", labels).
+			Set("annotations", annotations).
+			Set("updated_at", now).
+			Where(sq.Eq{"id": existing.Id, "deleted_at": nil}).
+			ExecContext(ctx)
+		if err != nil {
+			return err
+		}
+
 		cv.Name = existing.Name
+		cv.Labels = labels
+		cv.Annotations = annotations
+		cv.CreatedAt = existing.CreatedAt
+		cv.UpdatedAt = now
+		cv.DeletedAt = existing.DeletedAt
 		return nil
 	}
 
@@ -108,13 +149,28 @@ func (s *service) ensureConnectorResourceForVersion(
 	if name == "" {
 		name = scommon.ResourceName(cv.Id.String())
 	}
+	nsLabels, err := s.fetchLabelsForCarryForward(ctx, tx, NamespacesTable, sq.Eq{
+		"path":       cv.Namespace,
+		"deleted_at": nil,
+	})
+	if err != nil {
+		return err
+	}
+	labels := ApplyParentCarryForward(
+		cv.Labels,
+		ParentCarryForward{Rt: NamespaceLabelToken, Labels: nsLabels},
+	)
+	labels = InjectSelfImplicitLabels(cv.Id, cv.Namespace, labels)
+
 	now := apctx.GetClock(ctx).Now()
 	resource := connectorResource{
-		Id:        cv.Id,
-		Namespace: cv.Namespace,
-		Name:      name,
-		CreatedAt: now,
-		UpdatedAt: now,
+		Id:          cv.Id,
+		Namespace:   cv.Namespace,
+		Name:        name,
+		Labels:      labels,
+		Annotations: cv.Annotations,
+		CreatedAt:   now,
+		UpdatedAt:   now,
 	}
 	if err := resource.validate(); err != nil {
 		return err
@@ -129,6 +185,10 @@ func (s *service) ensureConnectorResourceForVersion(
 		return err
 	}
 	cv.Name = resource.Name
+	cv.Labels = resource.Labels
+	cv.Annotations = resource.Annotations
+	cv.CreatedAt = resource.CreatedAt
+	cv.UpdatedAt = resource.UpdatedAt
 	return nil
 }
 

@@ -24,23 +24,23 @@ func TestConnectorVersions(t *testing.T) {
 
 		sql := `
 INSERT INTO connectors
-(id,                         namespace,          name,                       created_at,            updated_at,            deleted_at) VALUES
-('cxr_testgmail0000001',     'root',             'cxr_testgmail0000001',     '2023-10-01 00:00:00', '2023-10-10 00:00:00', null),
-('cxr_testgmail0000002',     'root.child',       'cxr_testgmail0000002',     '2023-10-02 00:00:00', '2023-10-11 00:00:00', null),
-('cxr_testslack0000001',     'root.child2',      'cxr_testslack0000001',     '2023-10-03 00:00:00', '2023-10-12 00:00:00', null),
-('cxr_testgmail0000003',     'root.child.grand', 'cxr_testgmail0000003',     '2023-10-04 00:00:00', '2023-10-14 00:00:00', null);
+(id,                         namespace,          name,                       labels,                    created_at,            updated_at,            deleted_at) VALUES
+('cxr_testgmail0000001',     'root',             'cxr_testgmail0000001',     '{"type":"gmail"}',        '2023-10-01 00:00:00', '2023-10-10 00:00:00', null),
+('cxr_testgmail0000002',     'root.child',       'cxr_testgmail0000002',     '{"type":"gmail"}',        '2023-10-02 00:00:00', '2023-10-11 00:00:00', null),
+('cxr_testslack0000001',     'root.child2',      'cxr_testslack0000001',     '{"type":"outlook"}',      '2023-10-03 00:00:00', '2023-10-12 00:00:00', null),
+('cxr_testgmail0000003',     'root.child.grand', 'cxr_testgmail0000003',     '{"type":"google_drive"}', '2023-10-04 00:00:00', '2023-10-14 00:00:00', null);
 
-INSERT INTO connector_versions
-(id,                         version, labels,                    state,      encrypted_definition,                         hash,    created_at,            updated_at,            deleted_at) VALUES
-('cxr_testgmail0000001',     1,       '{"type":"gmail"}',        'active',   '{"id":"dek_test","d":"encrypted-def"}',      'hash1', '2023-10-01 00:00:00', '2023-10-01 00:00:00', null),
-('cxr_testgmail0000001',     2,       '{"type":"gmail"}',        'primary',  '{"id":"dek_test","d":"encrypted-def"}',      'hash2', '2023-10-10 00:00:00', '2023-10-10 00:00:00', null),
-('cxr_testgmail0000002',     1,       '{"type":"gmail"}',        'archived', '{"id":"dek_test","d":"encrypted-def"}',      'hash3', '2023-10-02 00:00:00', '2023-10-02 00:00:00', null),
-('cxr_testgmail0000002',     2,       '{"type":"gmail"}',        'primary',  '{"id":"dek_test","d":"encrypted-def"}',      'hash4', '2023-10-11 00:00:00', '2023-10-11 00:00:00', null),
-('cxr_testslack0000001',     1,       '{"type":"outlook"}',      'active',   '{"id":"dek_test","d":"encrypted-def"}',      'hash5', '2023-10-03 00:00:00', '2023-10-03 00:00:00', null),
-('cxr_testslack0000001',     2,       '{"type":"outlook"}',      'primary',  '{"id":"dek_test","d":"encrypted-def"}',      'hash6', '2023-10-12 00:00:00', '2023-10-12 00:00:00', null),
-('cxr_testgmail0000003',     1,       '{"type":"google_drive"}', 'archived', '{"id":"dek_test","d":"encrypted-def"}',      'hash7', '2023-10-04 00:00:00', '2023-10-04 00:00:00', null),
-('cxr_testgmail0000003',     2,       '{"type":"google_drive"}', 'active',   '{"id":"dek_test","d":"encrypted-def"}',      'hash8', '2023-10-13 00:00:00', '2023-10-13 00:00:00', null),
-('cxr_testgmail0000003',     3,       '{"type":"google_drive"}', 'primary',  '{"id":"dek_test","d":"encrypted-def"}',      'hash9', '2023-10-14 00:00:00', '2023-10-14 00:00:00', null);
+INSERT INTO connector_definition_versions
+(id,                         connector_id,                version, state,      encrypted_definition) VALUES
+('cvd_testgmail0000011',     'cxr_testgmail0000001',      1,       'active',   '{"id":"dek_test","d":"encrypted-def"}'),
+('cvd_testgmail0000012',     'cxr_testgmail0000001',      2,       'primary',  '{"id":"dek_test","d":"encrypted-def"}'),
+('cvd_testgmail0000021',     'cxr_testgmail0000002',      1,       'archived', '{"id":"dek_test","d":"encrypted-def"}'),
+('cvd_testgmail0000022',     'cxr_testgmail0000002',      2,       'primary',  '{"id":"dek_test","d":"encrypted-def"}'),
+('cvd_testslack0000011',     'cxr_testslack0000001',      1,       'active',   '{"id":"dek_test","d":"encrypted-def"}'),
+('cvd_testslack0000012',     'cxr_testslack0000001',      2,       'primary',  '{"id":"dek_test","d":"encrypted-def"}'),
+('cvd_testgmail0000031',     'cxr_testgmail0000003',      1,       'archived', '{"id":"dek_test","d":"encrypted-def"}'),
+('cvd_testgmail0000032',     'cxr_testgmail0000003',      2,       'active',   '{"id":"dek_test","d":"encrypted-def"}'),
+('cvd_testgmail0000033',     'cxr_testgmail0000003',      3,       'primary',  '{"id":"dek_test","d":"encrypted-def"}');
 `
 		_, err := rawDb.Exec(sql)
 		require.NoError(t, err)
@@ -96,10 +96,10 @@ INSERT INTO connector_versions
 		require.Len(t, pr.Results, 4)
 		require.Equal(t, pr.Results[0].Id, apid.MustParse("cxr_testgmail0000002"))
 		require.Equal(t, uint64(2), pr.Results[0].Version)
-		require.Equal(t, pr.Results[1].Id, apid.MustParse("cxr_testgmail0000001"))
-		require.Equal(t, uint64(2), pr.Results[1].Version)
-		require.Equal(t, pr.Results[2].Id, apid.MustParse("cxr_testgmail0000002"))
-		require.Equal(t, uint64(1), pr.Results[2].Version)
+		require.Equal(t, pr.Results[1].Id, apid.MustParse("cxr_testgmail0000002"))
+		require.Equal(t, uint64(1), pr.Results[1].Version)
+		require.Equal(t, pr.Results[2].Id, apid.MustParse("cxr_testgmail0000001"))
+		require.Equal(t, uint64(2), pr.Results[2].Version)
 		require.Equal(t, pr.Results[3].Id, apid.MustParse("cxr_testgmail0000001"))
 		require.Equal(t, uint64(1), pr.Results[3].Version)
 
@@ -111,10 +111,10 @@ INSERT INTO connector_versions
 		require.Len(t, pr.Results, 5)
 		require.Equal(t, apid.MustParse("cxr_testgmail0000002"), pr.Results[0].Id)
 		require.Equal(t, uint64(1), pr.Results[0].Version)
-		require.Equal(t, apid.MustParse("cxr_testgmail0000003"), pr.Results[1].Id)
-		require.Equal(t, uint64(1), pr.Results[1].Version)
-		require.Equal(t, apid.MustParse("cxr_testgmail0000002"), pr.Results[2].Id)
-		require.Equal(t, uint64(2), pr.Results[2].Version)
+		require.Equal(t, apid.MustParse("cxr_testgmail0000002"), pr.Results[1].Id)
+		require.Equal(t, uint64(2), pr.Results[1].Version)
+		require.Equal(t, apid.MustParse("cxr_testgmail0000003"), pr.Results[2].Id)
+		require.Equal(t, uint64(1), pr.Results[2].Version)
 		require.Equal(t, apid.MustParse("cxr_testgmail0000003"), pr.Results[3].Id)
 		require.Equal(t, uint64(2), pr.Results[3].Version)
 		require.Equal(t, apid.MustParse("cxr_testgmail0000003"), pr.Results[4].Id)
@@ -128,18 +128,18 @@ INSERT INTO connector_versions
 
 		sql := `
 INSERT INTO connectors
-(id,                         namespace,           name,                       created_at,            updated_at,            deleted_at) VALUES
-('cxr_testgmail0000001',     'root.prod',         'cxr_testgmail0000001',     '2023-10-01 00:00:00', '2023-10-01 00:00:00', null),
-('cxr_testgmail0000002',     'root.staging',      'cxr_testgmail0000002',     '2023-10-02 00:00:00', '2023-10-02 00:00:00', null),
-('cxr_testslack0000001',     'root.dev',          'cxr_testslack0000001',     '2023-10-03 00:00:00', '2023-10-03 00:00:00', null),
-('cxr_testgmail0000003',     'root.prod.tenant1', 'cxr_testgmail0000003',     '2023-10-04 00:00:00', '2023-10-04 00:00:00', null);
+(id,                         namespace,           name,                       labels,                    created_at,            updated_at,            deleted_at) VALUES
+('cxr_testgmail0000001',     'root.prod',         'cxr_testgmail0000001',     '{"type":"gmail"}',        '2023-10-01 00:00:00', '2023-10-01 00:00:00', null),
+('cxr_testgmail0000002',     'root.staging',      'cxr_testgmail0000002',     '{"type":"gmail"}',        '2023-10-02 00:00:00', '2023-10-02 00:00:00', null),
+('cxr_testslack0000001',     'root.dev',          'cxr_testslack0000001',     '{"type":"outlook"}',      '2023-10-03 00:00:00', '2023-10-03 00:00:00', null),
+('cxr_testgmail0000003',     'root.prod.tenant1', 'cxr_testgmail0000003',     '{"type":"google_drive"}', '2023-10-04 00:00:00', '2023-10-04 00:00:00', null);
 
-INSERT INTO connector_versions
-(id,                         version, labels,                    state,     encrypted_definition,                         hash,    created_at,            updated_at,            deleted_at) VALUES
-('cxr_testgmail0000001',     1,       '{"type":"gmail"}',        'primary', '{"id":"dek_test","d":"encrypted-def"}',      'hash1', '2023-10-01 00:00:00', '2023-10-01 00:00:00', null),
-('cxr_testgmail0000002',     1,       '{"type":"gmail"}',        'primary', '{"id":"dek_test","d":"encrypted-def"}',      'hash3', '2023-10-02 00:00:00', '2023-10-02 00:00:00', null),
-('cxr_testslack0000001',     1,       '{"type":"outlook"}',      'primary', '{"id":"dek_test","d":"encrypted-def"}',      'hash5', '2023-10-03 00:00:00', '2023-10-03 00:00:00', null),
-('cxr_testgmail0000003',     1,       '{"type":"google_drive"}', 'primary', '{"id":"dek_test","d":"encrypted-def"}',      'hash7', '2023-10-04 00:00:00', '2023-10-04 00:00:00', null);
+INSERT INTO connector_definition_versions
+(id,                         connector_id,                version, state,     encrypted_definition) VALUES
+('cvd_testgmail0000011',     'cxr_testgmail0000001',      1,       'primary', '{"id":"dek_test","d":"encrypted-def"}'),
+('cvd_testgmail0000021',     'cxr_testgmail0000002',      1,       'primary', '{"id":"dek_test","d":"encrypted-def"}'),
+('cvd_testslack0000011',     'cxr_testslack0000001',      1,       'primary', '{"id":"dek_test","d":"encrypted-def"}'),
+('cvd_testgmail0000031',     'cxr_testgmail0000003',      1,       'primary', '{"id":"dek_test","d":"encrypted-def"}');
 `
 		_, err := rawDb.Exec(sql)
 		require.NoError(t, err)
@@ -244,9 +244,9 @@ INSERT INTO connector_versions
 			assert.Equal(t, ConnectorVersionStateDraft, savedCV.State)
 			assert.Equal(t, "test_connector", savedCV.Labels["type"])
 			assert.Equal(t, "root.some-namespace", savedCV.Namespace)
-			assert.Equal(t, "test_hash", savedCV.Hash)
+			require.True(t, savedCV.DefinitionVersionId.HasPrefix(apid.PrefixConnectorDefinitionVersion))
 			assert.Equal(t, encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "test_encrypted_definition"}, savedCV.EncryptedDefinition)
-			require.Equal(t, 1, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_versions"))
+			require.Equal(t, 1, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_definition_versions"))
 		})
 
 		t.Run("refuses to create active and archived versions", func(t *testing.T) {
@@ -270,12 +270,12 @@ INSERT INTO connector_versions
 			// Test
 			err := db.UpsertConnectorVersion(ctx, cv)
 			require.Error(t, err) // Cannot create active directly (must be primary)
-			require.Equal(t, 0, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_versions"))
+			require.Equal(t, 0, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_definition_versions"))
 
 			cv.State = ConnectorVersionStateArchived
 			err = db.UpsertConnectorVersion(ctx, cv)
 			require.Error(t, err) // Cannot create archived directly (must be primary)
-			require.Equal(t, 0, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_versions"))
+			require.Equal(t, 0, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_definition_versions"))
 		})
 
 		t.Run("updates an existing draft version", func(t *testing.T) {
@@ -308,9 +308,8 @@ INSERT INTO connector_versions
 			assert.Equal(t, uint64(1), savedCV.Version)
 			assert.Equal(t, ConnectorVersionStateDraft, savedCV.State)
 			assert.Equal(t, "test_connector", savedCV.Labels["type"])
-			assert.Equal(t, "test_hash", savedCV.Hash)
 			assert.Equal(t, encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "test_encrypted_definition"}, savedCV.EncryptedDefinition)
-			require.Equal(t, 1, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_versions"))
+			require.Equal(t, 1, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_definition_versions"))
 		})
 
 		t.Run("refuses to change namespace for draft version", func(t *testing.T) {
@@ -349,12 +348,12 @@ INSERT INTO connector_versions
 			savedCV, err = db.GetConnectorVersion(ctx, connectorID, 1)
 			require.NoError(t, err)
 			assert.Equal(t, sconfig.RootNamespace, savedCV.Namespace)
-			require.Equal(t, 1, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_versions"))
+			require.Equal(t, 1, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_definition_versions"))
 		})
 
 		t.Run("creates multiple versions of the same connector", func(t *testing.T) {
 			// Setup
-			_, db := MustApplyBlankTestDbConfig(t, nil)
+			_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -367,7 +366,8 @@ INSERT INTO connector_versions
 				Version:             1,
 				Namespace:           sconfig.RootNamespace,
 				State:               ConnectorVersionStateDraft,
-				Labels:              Labels{"type": "test_connector"},
+				Labels:              Labels{"type": "test_connector_v1"},
+				Annotations:         Annotations{"owner": "v1"},
 				Hash:                "test_hash_v1",
 				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "test_encrypted_definition_v1"},
 			}
@@ -381,7 +381,8 @@ INSERT INTO connector_versions
 				Version:             2,
 				Namespace:           sconfig.RootNamespace,
 				State:               ConnectorVersionStateDraft,
-				Labels:              Labels{"type": "test_connector"},
+				Labels:              Labels{"type": "test_connector_v2"},
+				Annotations:         Annotations{"owner": "v2"},
 				Hash:                "test_hash_v2",
 				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "test_encrypted_definition_v2"},
 			}
@@ -394,14 +395,20 @@ INSERT INTO connector_versions
 			require.NoError(t, err)
 			require.NotNil(t, savedCV1)
 			assert.Equal(t, uint64(1), savedCV1.Version)
-			assert.Equal(t, "test_hash_v1", savedCV1.Hash)
+			assert.Equal(t, "test_connector_v2", savedCV1.Labels["type"])
+			assert.Equal(t, "v2", savedCV1.Annotations["owner"])
 
 			// Verify version 2
 			savedCV2, err := db.GetConnectorVersion(ctx, connectorID, 2)
 			require.NoError(t, err)
 			require.NotNil(t, savedCV2)
 			assert.Equal(t, uint64(2), savedCV2.Version)
-			assert.Equal(t, "test_hash_v2", savedCV2.Hash)
+			assert.Equal(t, savedCV1.Labels, savedCV2.Labels)
+			assert.Equal(t, savedCV1.Annotations, savedCV2.Annotations)
+			require.NotEqual(t, savedCV1.DefinitionVersionId, savedCV2.DefinitionVersionId)
+			require.True(t, savedCV1.DefinitionVersionId.HasPrefix(apid.PrefixConnectorDefinitionVersion))
+			require.True(t, savedCV2.DefinitionVersionId.HasPrefix(apid.PrefixConnectorDefinitionVersion))
+			require.Equal(t, 2, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_definition_versions"))
 		})
 
 		t.Run("creates a primary connector version", func(t *testing.T) {
@@ -491,7 +498,7 @@ INSERT INTO connector_versions
 			require.NotNil(t, savedCV1)
 			assert.Equal(t, ConnectorVersionStateActive, savedCV1.State)
 		})
-		t.Run("upsert does not update soft-deleted version", func(t *testing.T) {
+		t.Run("upsert does not resurrect a soft-deleted connector", func(t *testing.T) {
 			_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
@@ -510,11 +517,8 @@ INSERT INTO connector_versions
 			err := db.UpsertConnectorVersion(ctx, cv)
 			require.NoError(t, err)
 
-			// Soft-delete the version via raw SQL
-			_, err = rawDb.Exec(fmt.Sprintf("UPDATE connector_versions SET deleted_at = '%s' WHERE id = '%s' AND version = 1", now.Format("2006-01-02 15:04:05"), connectorID.String()))
-			require.NoError(t, err)
+			require.NoError(t, db.DeleteConnector(ctx, connectorID))
 
-			// Upserting a new version 2 should work — the soft-deleted v1 should not count toward max version
 			cv2 := &ConnectorVersion{
 				Id:                  connectorID,
 				Version:             1,
@@ -525,23 +529,16 @@ INSERT INTO connector_versions
 				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "new_encrypted_definition"},
 			}
 
-			// This will fail due to UNIQUE constraint on (id, version), which is expected —
-			// the important thing is that UpsertConnectorVersion does NOT attempt to update
-			// the soft-deleted row (it treats it as non-existent and goes down the insert path)
 			err = db.UpsertConnectorVersion(ctx, cv2)
 			require.Error(t, err)
 
-			// Verify the soft-deleted row was not modified
-			type cvResult struct {
-				Labels    string
-				Hash      string
-				DeletedAt *time.Time
-			}
-			var result cvResult
-			err = rawDb.QueryRow(fmt.Sprintf("SELECT labels, hash, deleted_at FROM connector_versions WHERE id = '%s' AND version = 1", connectorID.String())).Scan(&result.Labels, &result.Hash, &result.DeletedAt)
+			var encrypted encfield.EncryptedField
+			err = rawDb.QueryRow(fmt.Sprintf(
+				"SELECT encrypted_definition FROM connector_definition_versions WHERE connector_id = '%s' AND version = 1",
+				connectorID,
+			)).Scan(&encrypted)
 			require.NoError(t, err)
-			assert.NotNil(t, result.DeletedAt, "soft-deleted row should still have deleted_at set")
-			assert.Equal(t, "test_hash", result.Hash, "soft-deleted row should not have been updated")
+			require.Equal(t, cv.EncryptedDefinition, encrypted)
 		})
 
 		t.Run("refuses to skip version numbers", func(t *testing.T) {
@@ -686,8 +683,8 @@ INSERT INTO connector_versions
 			assert.Equal(t, ConnectorVersionStateActive, v1.State)
 		})
 
-		t.Run("returns not found for soft-deleted version", func(t *testing.T) {
-			_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
+		t.Run("returns not found for a version of a soft-deleted connector", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -705,11 +702,8 @@ INSERT INTO connector_versions
 			err := db.UpsertConnectorVersion(ctx, cv)
 			require.NoError(t, err)
 
-			// Soft-delete via raw SQL (no DeleteConnectorVersion function exists)
-			_, err = rawDb.Exec(fmt.Sprintf("UPDATE connector_versions SET deleted_at = '%s' WHERE id = '%s' AND version = 1", now.Format("2006-01-02 15:04:05"), connectorID.String()))
-			require.NoError(t, err)
+			require.NoError(t, db.DeleteConnector(ctx, connectorID))
 
-			// Attempting to set state on a soft-deleted version should return ErrNotFound
 			err = db.SetConnectorVersionState(ctx, connectorID, 1, ConnectorVersionStatePrimary)
 			require.ErrorIs(t, err, ErrNotFound)
 		})
@@ -754,7 +748,7 @@ INSERT INTO connector_versions
 	})
 
 	t.Run("DeleteConnector", func(t *testing.T) {
-		t.Run("soft-deletes every live version of the connector", func(t *testing.T) {
+		t.Run("soft-deletes the connector while retaining definition history", func(t *testing.T) {
 			_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
 			defer rawDb.Close()
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
@@ -776,13 +770,15 @@ INSERT INTO connector_versions
 			})
 			require.NoError(t, err)
 
-			require.Equal(t, 2, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_versions WHERE deleted_at IS NULL"))
+			require.Equal(t, 2, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_definition_versions"))
+			require.Equal(t, 1, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connectors WHERE deleted_at IS NULL"))
 
 			err = db.DeleteConnector(ctx, connectorID)
 			require.NoError(t, err)
 
-			require.Equal(t, 0, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_versions WHERE deleted_at IS NULL"))
-			require.Equal(t, 2, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_versions WHERE deleted_at IS NOT NULL"))
+			require.Equal(t, 2, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_definition_versions"))
+			require.Equal(t, 0, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connectors WHERE deleted_at IS NULL"))
+			require.Equal(t, 1, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connectors WHERE deleted_at IS NOT NULL"))
 
 			_, err = db.GetConnectorVersion(ctx, connectorID, 1)
 			require.ErrorIs(t, err, ErrNotFound)
@@ -799,7 +795,7 @@ INSERT INTO connector_versions
 			require.ErrorIs(t, err, ErrNotFound)
 		})
 
-		t.Run("returns ErrNotFound when all versions are already soft-deleted", func(t *testing.T) {
+		t.Run("returns ErrNotFound when the connector is already soft-deleted", func(t *testing.T) {
 			_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
 			defer rawDb.Close()
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
@@ -850,7 +846,8 @@ INSERT INTO connector_versions
 			require.NoError(t, err)
 			require.Equal(t, survivorID, survivor.Id)
 
-			require.Equal(t, 1, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_versions WHERE deleted_at IS NULL"))
+			require.Equal(t, 1, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connectors WHERE deleted_at IS NULL"))
+			require.Equal(t, 2, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_definition_versions"))
 		})
 
 		t.Run("rejects nil id", func(t *testing.T) {

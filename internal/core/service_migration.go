@@ -245,6 +245,17 @@ func (s *service) configConnectorToVersion(configConnector *config.Connector) (*
 	}, nil
 }
 
+func (s *service) connectorVersionHashEquals(cv *database.ConnectorVersion, expected string) (bool, error) {
+	if cv == nil {
+		return false, nil
+	}
+	actual, err := wrapConnectorVersion(*cv, s).getHash()
+	if err != nil {
+		return false, fmt.Errorf("failed to derive connector version hash: %w", err)
+	}
+	return actual == expected, nil
+}
+
 func (s *service) precheckConnectorsForMigration(ctx context.Context, configConnectors *config.Connectors) error {
 	type IdVersionStateTuple struct {
 		Id      apid.ID
@@ -446,8 +457,14 @@ func (s *service) precheckConnectorForMigration(ctx context.Context, configConne
 					return fmt.Errorf("connector %s currently has namespace '%s' and cannot be changed to %s", configConnector.Id, existingVersion.Namespace, configConnector.GetNamespace())
 				}
 
-				if existingVersion.State != database.ConnectorVersionStateDraft && existingVersion.Hash != configConnector.Hash() {
-					return fmt.Errorf("connector %s version %d has been published and cannot be modified", configConnector.Id, configConnector.Version)
+				if existingVersion.State != database.ConnectorVersionStateDraft {
+					matches, hashErr := s.connectorVersionHashEquals(existingVersion, configConnector.Hash())
+					if hashErr != nil {
+						return hashErr
+					}
+					if !matches {
+						return fmt.Errorf("connector %s version %d has been published and cannot be modified", configConnector.Id, configConnector.Version)
+					}
 				}
 			}
 		}
@@ -509,8 +526,14 @@ func (s *service) precheckConnectorForMigration(ctx context.Context, configConne
 					return fmt.Errorf("connector with identifying labels %s currently has namespace '%s' and cannot be changed to %s", labelSelector, existingVersion.Namespace, configConnector.GetNamespace())
 				}
 
-				if existingVersion.State != database.ConnectorVersionStateDraft && existingVersion.Hash != configConnector.Hash() {
-					return fmt.Errorf("connector with identifying labels %s version %d has been published and cannot be modified", labelSelector, configConnector.Version)
+				if existingVersion.State != database.ConnectorVersionStateDraft {
+					matches, hashErr := s.connectorVersionHashEquals(existingVersion, configConnector.Hash())
+					if hashErr != nil {
+						return hashErr
+					}
+					if !matches {
+						return fmt.Errorf("connector with identifying labels %s version %d has been published and cannot be modified", labelSelector, configConnector.Version)
+					}
 				}
 			}
 		}
@@ -544,6 +567,9 @@ func (s *service) migrateConnector(ctx context.Context, configConnectors *config
 
 	var existingVersion *database.ConnectorVersion
 	var err error
+	matchesExisting := func(candidate *ConnectorVersion) (bool, error) {
+		return s.connectorVersionHashEquals(existingVersion, candidate.Hash)
+	}
 
 	if configConnector.HasId() && configConnector.HasVersion() {
 		existingVersion, err = s.db.GetConnectorVersion(ctx, configConnector.Id, configConnector.Version)
@@ -559,9 +585,15 @@ func (s *service) migrateConnector(ctx context.Context, configConnectors *config
 				WithState(state).
 				Build()
 
-			if err == nil && cv.Hash == existingVersion.Hash {
-				// No update required
-				return id, nil
+			if err == nil {
+				matches, hashErr := matchesExisting(cv)
+				if hashErr != nil {
+					return apid.Nil, hashErr
+				}
+				if matches {
+					// No update required
+					return id, nil
+				}
 			}
 		}
 	} else if configConnector.HasId() {
@@ -578,9 +610,15 @@ func (s *service) migrateConnector(ctx context.Context, configConnectors *config
 				WithState(state).
 				Build()
 
-			if err == nil && cv.Hash == existingVersion.Hash {
-				// No update required
-				return id, nil
+			if err == nil {
+				matches, hashErr := matchesExisting(cv)
+				if hashErr != nil {
+					return apid.Nil, hashErr
+				}
+				if matches {
+					// No update required
+					return id, nil
+				}
 			}
 
 			version = existingVersion.Version + 1
@@ -604,9 +642,15 @@ func (s *service) migrateConnector(ctx context.Context, configConnectors *config
 				WithState(state).
 				Build()
 
-			if err == nil && cv.Hash == existingVersion.Hash {
-				// No update required
-				return id, nil
+			if err == nil {
+				matches, hashErr := matchesExisting(cv)
+				if hashErr != nil {
+					return apid.Nil, hashErr
+				}
+				if matches {
+					// No update required
+					return id, nil
+				}
 			}
 		} else {
 			existingVersion, err = s.db.GetConnectorVersionForLabels(ctx, labelSelector)
@@ -622,7 +666,7 @@ func (s *service) migrateConnector(ctx context.Context, configConnectors *config
 		// Pattern D: no ID, no version - use label-based lookup
 		labelValues := configConnector.GetIdentifyingLabelValues(identifyingLabels)
 		labelSelector := database.BuildLabelSelectorFromMap(labelValues)
-		existingVersion, err := s.db.GetConnectorVersionForLabels(ctx, labelSelector)
+		existingVersion, err = s.db.GetConnectorVersionForLabels(ctx, labelSelector)
 		if err != nil && !errors.Is(err, database.ErrNotFound) {
 			return apid.Nil, fmt.Errorf("failed to get connector version for labels: %w", err)
 		}
@@ -637,9 +681,15 @@ func (s *service) migrateConnector(ctx context.Context, configConnectors *config
 				WithState(state).
 				Build()
 
-			if err == nil && cv.Hash == existingVersion.Hash {
-				// No update required
-				return id, nil
+			if err == nil {
+				matches, hashErr := matchesExisting(cv)
+				if hashErr != nil {
+					return apid.Nil, hashErr
+				}
+				if matches {
+					// No update required
+					return id, nil
+				}
 			}
 
 			version = existingVersion.Version + 1
@@ -657,9 +707,15 @@ func (s *service) migrateConnector(ctx context.Context, configConnectors *config
 	}
 
 	// Final check, though this should be duplicative
-	if existingVersion != nil && existingVersion.Hash == cv.Hash {
-		// No update required
-		return id, nil
+	if existingVersion != nil {
+		matches, hashErr := matchesExisting(cv)
+		if hashErr != nil {
+			return apid.Nil, hashErr
+		}
+		if matches {
+			// No update required
+			return id, nil
+		}
 	}
 
 	// Tag the version with the source marker so the orphan-cleanup pass can

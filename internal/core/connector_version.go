@@ -2,6 +2,8 @@ package core
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"log/slog"
 	"sync"
@@ -62,7 +64,7 @@ func (cv *ConnectorVersion) GetState() database.ConnectorVersionState {
 }
 
 func (cv *ConnectorVersion) GetHash() string {
-	return cv.ConnectorVersion.Hash
+	return util.Must(cv.getHash())
 }
 
 func (cv *ConnectorVersion) GetDefinition() *cschema.Connector {
@@ -110,6 +112,18 @@ func (cv *ConnectorVersion) getDefinition() (*cschema.Connector, error) {
 	}
 
 	return cv.def, nil
+}
+
+func (cv *ConnectorVersion) getHash() (string, error) {
+	if cv.ConnectorVersion.Hash != "" {
+		return cv.ConnectorVersion.Hash, nil
+	}
+	decrypted, err := cv.s.encrypt.DecryptString(context.Background(), cv.ConnectorVersion.EncryptedDefinition)
+	if err != nil {
+		return "", err
+	}
+	hash := sha1.Sum([]byte(decrypted))
+	return hex.EncodeToString(hash[:])[:7], nil
 }
 
 func (cv *ConnectorVersion) setDefinition(def *cschema.Connector) error {

@@ -30,6 +30,10 @@ type EncryptedFieldRegistration struct {
 	JoinLocalCol     string // e.g. "connection_id" — FK column on this table
 	JoinRemoteCol    string // e.g. "id" — PK column on join table
 	JoinNamespaceCol string // e.g. "namespace" — namespace column on join table
+
+	// OmitBaseSoftDeleteFilter is used when the encrypted child table has no
+	// deleted_at column and lifecycle is owned by its joined parent.
+	OmitBaseSoftDeleteFilter bool
 }
 
 func (r EncryptedFieldRegistration) validate() error {
@@ -223,7 +227,9 @@ func (s *service) queryReEncryptionPage(
 	}
 
 	// WHERE conditions
-	q = q.Where(sq.Eq{reg.Table + ".deleted_at": nil})
+	if !reg.OmitBaseSoftDeleteFilter {
+		q = q.Where(sq.Eq{reg.Table + ".deleted_at": nil})
+	}
 	q = q.Where(sq.NotEq{"namespaces.target_data_encryption_key_id": nil})
 	q = q.Where(sq.Eq{NamespacesTable + ".deleted_at": nil})
 

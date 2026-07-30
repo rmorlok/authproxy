@@ -112,25 +112,27 @@ func IsValidConnectorVersionState[T string | ConnectorVersionState](state T) boo
 
 func init() {
 	RegisterEncryptedField(EncryptedFieldRegistration{
-		Table:            ConnectorVersionsTable,
-		PrimaryKeyCols:   []string{"id", "version"},
-		EncryptedCols:    []string{"encrypted_definition"},
-		JoinTable:        ConnectorsTable,
-		JoinLocalCol:     "id",
-		JoinRemoteCol:    "id",
-		JoinNamespaceCol: "namespace",
+		Table:                    ConnectorDefinitionVersionsTable,
+		PrimaryKeyCols:           []string{"id"},
+		EncryptedCols:            []string{"encrypted_definition"},
+		JoinTable:                ConnectorsTable,
+		JoinLocalCol:             "connector_id",
+		JoinRemoteCol:            "id",
+		JoinNamespaceCol:         "namespace",
+		OmitBaseSoftDeleteFilter: true,
 	})
 }
 
-const ConnectorVersionsTable = "connector_versions"
+const ConnectorDefinitionVersionsTable = "connector_definition_versions"
 
 type ConnectorVersion struct {
-	Id                  apid.ID
+	Id                  apid.ID // Logical connector ID (cxr_).
 	Namespace           string
 	Name                scommon.ResourceName
+	DefinitionVersionId apid.ID // Physical definition-version row ID (cvd_).
 	Version             uint64
 	State               ConnectorVersionState
-	Hash                string
+	Hash                string // Derived from the decrypted definition; not persisted.
 	EncryptedDefinition encfield.EncryptedField
 	Labels              Labels
 	Annotations         Annotations
@@ -143,16 +145,11 @@ type ConnectorVersion struct {
 func (cv *ConnectorVersion) versionCols() []string {
 	return []string{
 		"id",
+		"connector_id",
 		"version",
 		"state",
-		"hash",
 		"encrypted_definition",
-		"labels",
-		"annotations",
-		"created_at",
-		"updated_at",
 		"encrypted_at",
-		"deleted_at",
 	}
 }
 
@@ -161,9 +158,9 @@ func (cv *ConnectorVersion) fields() []any {
 		&cv.Id,
 		&cv.Namespace,
 		&cv.Name,
+		&cv.DefinitionVersionId,
 		&cv.Version,
 		&cv.State,
-		&cv.Hash,
 		&cv.EncryptedDefinition,
 		&cv.Labels,
 		&cv.Annotations,
@@ -176,43 +173,38 @@ func (cv *ConnectorVersion) fields() []any {
 
 func (cv *ConnectorVersion) versionValues() []any {
 	return []any{
+		cv.DefinitionVersionId,
 		cv.Id,
 		cv.Version,
 		cv.State,
-		cv.Hash,
 		cv.EncryptedDefinition,
-		cv.Labels,
-		cv.Annotations,
-		cv.CreatedAt,
-		cv.UpdatedAt,
 		cv.EncryptedAt,
-		cv.DeletedAt,
 	}
 }
 
 func connectorVersionSelectCols() []string {
 	return []string{
-		"cv.id",
+		"c.id",
 		"c.namespace",
 		"c.name",
-		"cv.version",
-		"cv.state",
-		"cv.hash",
-		"cv.encrypted_definition",
-		"cv.labels",
-		"cv.annotations",
-		"cv.created_at",
-		"cv.updated_at",
-		"cv.encrypted_at",
-		"cv.deleted_at",
+		"dv.id",
+		"dv.version",
+		"dv.state",
+		"dv.encrypted_definition",
+		"c.labels",
+		"c.annotations",
+		"c.created_at",
+		"c.updated_at",
+		"dv.encrypted_at",
+		"c.deleted_at",
 	}
 }
 
 func (s *service) selectConnectorVersions() sq.SelectBuilder {
 	return s.sq.
 		Select(connectorVersionSelectCols()...).
-		From(ConnectorVersionsTable + " cv").
-		Join(ConnectorsTable + " c ON c.id = cv.id")
+		From(ConnectorDefinitionVersionsTable + " dv").
+		Join(ConnectorsTable + " c ON c.id = dv.connector_id")
 }
 
 func (cv *ConnectorVersion) GetId() apid.ID {
@@ -238,6 +230,12 @@ func (cv *ConnectorVersion) Validate() error {
 		result = multierror.Append(result, fmt.Errorf("invalid connector version id: %w", err))
 	}
 
+	if !cv.DefinitionVersionId.IsNil() {
+		if err := cv.DefinitionVersionId.ValidatePrefix(apid.PrefixConnectorDefinitionVersion); err != nil {
+			result = multierror.Append(result, fmt.Errorf("invalid connector definition version id: %w", err))
+		}
+	}
+
 	if cv.Version == 0 {
 		result = multierror.Append(result, errors.New("version is required"))
 	}
@@ -254,10 +252,6 @@ func (cv *ConnectorVersion) Validate() error {
 
 	if !IsValidConnectorVersionState(cv.State) {
 		result = multierror.Append(result, errors.New("invalid connector version state"))
-	}
-
-	if cv.Hash == "" {
-		result = multierror.Append(result, errors.New("hash is required"))
 	}
 
 	if cv.EncryptedDefinition.IsZero() {
@@ -279,10 +273,9 @@ func (s *service) GetConnectorVersion(ctx context.Context, id apid.ID, version u
 	var result ConnectorVersion
 	err := s.selectConnectorVersions().
 		Where(sq.Eq{
-			"cv.id":         id,
-			"cv.version":    version,
-			"cv.deleted_at": nil,
-			"c.deleted_at":  nil,
+			"dv.connector_id": id,
+			"dv.version":      version,
+			"c.deleted_at":    nil,
 		}).
 		RunWith(s.db).
 		QueryRow().
@@ -312,12 +305,12 @@ func (s *service) GetConnectorVersions(
 	}
 
 	versionConditions := util.Map(requested, func(id ConnectorVersionId) sq.Sqlizer {
-		return sq.Eq{"cv.id": id.Id, "cv.version": id.Version}
+		return sq.Eq{"dv.connector_id": id.Id, "dv.version": id.Version}
 	})
 
 	rows, err := s.selectConnectorVersions().
 		Where(sq.And{
-			sq.Eq{"cv.deleted_at": nil, "c.deleted_at": nil},
+			sq.Eq{"c.deleted_at": nil},
 			sq.Or(versionConditions),
 		}).
 		RunWith(s.db).
@@ -385,8 +378,8 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 
 		exitingState, defaultUsed, err := sqlh.ScanWithDefault(sqb.
 			Select("state").
-			From(ConnectorVersionsTable).
-			Where(sq.Eq{"id": cv.Id, "version": cv.Version, "deleted_at": nil}).
+			From(ConnectorDefinitionVersionsTable).
+			Where(sq.Eq{"connector_id": cv.Id, "version": cv.Version}).
 			QueryRowContext(ctx),
 			ConnectorVersionStateDraft)
 
@@ -401,28 +394,10 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 				return errors.New("cannot modify non-draft connector")
 			}
 
-			// Preserve apxy/ system labels — the caller usually passes only
-			// the user portion, but if they include apxy/-prefixed entries
-			// (e.g. system-owned provenance markers), let those override the
-			// stored apxy values.
-			var existingLabels Labels
-			if scanErr := sqb.
-				Select("labels").
-				From(ConnectorVersionsTable).
-				Where(sq.Eq{"id": cv.Id, "version": cv.Version, "deleted_at": nil}).
-				QueryRowContext(ctx).
-				Scan(&existingLabels); scanErr != nil {
-				return scanErr
-			}
-			mergedLabels := MergeUpsertLabels(cv.Labels, existingLabels)
-
-			result, err := sqb.Update(ConnectorVersionsTable).
+			result, err := sqb.Update(ConnectorDefinitionVersionsTable).
 				Set("state", cv.State).
-				Set("labels", mergedLabels).
-				Set("annotations", cv.Annotations).
 				Set("encrypted_definition", cv.EncryptedDefinition).
-				Set("updated_at", apctx.GetClock(ctx).Now()).
-				Where(sq.Eq{"id": cv.Id, "version": cv.Version, "deleted_at": nil}).
+				Where(sq.Eq{"connector_id": cv.Id, "version": cv.Version}).
 				Exec()
 			if err != nil {
 				return err
@@ -443,8 +418,8 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 			maxVersion := uint64(0)
 			err := sqb.
 				Select("COALESCE(MAX(version), 0)").
-				From(ConnectorVersionsTable).
-				Where(sq.Eq{"id": cv.Id, "deleted_at": nil}).
+				From(ConnectorDefinitionVersionsTable).
+				Where(sq.Eq{"connector_id": cv.Id}).
 				QueryRowContext(ctx).
 				Scan(&maxVersion)
 
@@ -456,41 +431,29 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 				return errors.New("cannot insert connector version at non-sequential version")
 			}
 
-			nsLabels, err := s.fetchLabelsForCarryForward(ctx, tx, NamespacesTable, sq.Eq{
-				"path":       cv.Namespace,
-				"deleted_at": nil,
-			})
-			if err != nil {
-				return err
+			cpy := *cv
+			if cpy.DefinitionVersionId.IsNil() {
+				cpy.DefinitionVersionId = apid.New(apid.PrefixConnectorDefinitionVersion)
 			}
 
-			cpy := *cv
-			cpy.Labels = ApplyParentCarryForward(
-				cpy.Labels,
-				ParentCarryForward{Rt: NamespaceLabelToken, Labels: nsLabels},
-			)
-			cpy.Labels = InjectSelfImplicitLabels(cpy.Id, cpy.Namespace, cpy.Labels)
-			now := apctx.GetClock(ctx).Now()
-			cpy.CreatedAt = now
-			cpy.UpdatedAt = now
-
-			_, err = sqb.Insert(ConnectorVersionsTable).
+			_, err = sqb.Insert(ConnectorDefinitionVersionsTable).
 				Columns(cpy.versionCols()...).
 				Values(cpy.versionValues()...).
 				Exec()
 			if err != nil {
 				return err
 			}
+			cv.DefinitionVersionId = cpy.DefinitionVersionId
 		}
 
 		if cv.State == ConnectorVersionStatePrimary {
 			// New primary version, update any previous primary to active
-			result, err := sqb.Update(ConnectorVersionsTable).
+			result, err := sqb.Update(ConnectorDefinitionVersionsTable).
 				Set("state", ConnectorVersionStateActive).
 				Where(sq.And{
 					sq.Eq{
-						"id":    cv.Id,
-						"state": ConnectorVersionStatePrimary,
+						"connector_id": cv.Id,
+						"state":        ConnectorVersionStatePrimary,
 					},
 					sq.NotEq{"version": cv.Version},
 				}).
@@ -523,12 +486,27 @@ func (s *service) SetConnectorVersionState(ctx context.Context, id apid.ID, vers
 		sqb := s.sq.RunWith(tx)
 		now := apctx.GetClock(ctx).Now()
 
+		connectorResult, err := sqb.
+			Update(ConnectorsTable).
+			Set("updated_at", now).
+			Where(sq.Eq{"id": id, "deleted_at": nil}).
+			ExecContext(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to update connector timestamp: %w", err)
+		}
+		connectorsAffected, err := connectorResult.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("failed to update connector timestamp: %w", err)
+		}
+		if connectorsAffected == 0 {
+			return ErrNotFound
+		}
+
 		// Update the target version's state
 		dbResult, err := sqb.
-			Update(ConnectorVersionsTable).
-			Set("updated_at", now).
+			Update(ConnectorDefinitionVersionsTable).
 			Set("state", state).
-			Where(sq.Eq{"id": id, "version": version, "deleted_at": nil}).
+			Where(sq.Eq{"connector_id": id, "version": version}).
 			Exec()
 		if err != nil {
 			return fmt.Errorf("failed to set connector version state: %w", err)
@@ -549,11 +527,10 @@ func (s *service) SetConnectorVersionState(ctx context.Context, id apid.ID, vers
 
 		if state == ConnectorVersionStatePrimary {
 			// Ensure only one primary: transition any other primary version to active
-			_, err := sqb.Update(ConnectorVersionsTable).
+			_, err := sqb.Update(ConnectorDefinitionVersionsTable).
 				Set("state", ConnectorVersionStateActive).
-				Set("updated_at", now).
 				Where(sq.And{
-					sq.Eq{"id": id, "state": ConnectorVersionStatePrimary},
+					sq.Eq{"connector_id": id, "state": ConnectorVersionStatePrimary},
 					sq.NotEq{"version": version},
 				}).
 				Exec()
@@ -564,11 +541,10 @@ func (s *service) SetConnectorVersionState(ctx context.Context, id apid.ID, vers
 
 		if state == ConnectorVersionStateDraft {
 			// Ensure only one draft: transition any other draft version to archived
-			_, err := sqb.Update(ConnectorVersionsTable).
+			_, err := sqb.Update(ConnectorDefinitionVersionsTable).
 				Set("state", ConnectorVersionStateArchived).
-				Set("updated_at", now).
 				Where(sq.And{
-					sq.Eq{"id": id, "state": ConnectorVersionStateDraft},
+					sq.Eq{"connector_id": id, "state": ConnectorVersionStateDraft},
 					sq.NotEq{"version": version},
 				}).
 				Exec()
@@ -581,8 +557,9 @@ func (s *service) SetConnectorVersionState(ctx context.Context, id apid.ID, vers
 	})
 }
 
-// DeleteConnector soft-deletes the logical connector and all of its versions.
-// Returns ErrNotFound if the logical connector is not live.
+// DeleteConnector soft-deletes the logical connector, hiding all of its
+// definition versions while retaining their history until the connector is
+// hard-purged. Returns ErrNotFound if the logical connector is not live.
 func (s *service) DeleteConnector(ctx context.Context, id apid.ID) error {
 	if id == apid.Nil {
 		return errors.New("connector id is required")
@@ -612,15 +589,6 @@ func (s *service) DeleteConnector(ctx context.Context, id apid.ID) error {
 			return fmt.Errorf("multiple connectors were soft deleted: %w", ErrViolation)
 		}
 
-		_, err = sqb.
-			Update(ConnectorVersionsTable).
-			Set("updated_at", now).
-			Set("deleted_at", now).
-			Where(sq.Eq{"id": id, "deleted_at": nil}).
-			ExecContext(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to soft delete connector versions: %w", err)
-		}
 		return nil
 	})
 }
@@ -634,11 +602,11 @@ func (s *service) GetConnectorVersionForLabels(ctx context.Context, labelSelecto
 
 	var result ConnectorVersion
 	q := s.selectConnectorVersions().
-		Where(sq.Eq{"cv.deleted_at": nil, "c.deleted_at": nil})
+		Where(sq.Eq{"c.deleted_at": nil})
 
-	q = selector.ApplyToSqlBuilderWithProvider(q, "cv.labels", s.cfg.GetProvider())
+	q = selector.ApplyToSqlBuilderWithProvider(q, "c.labels", s.cfg.GetProvider())
 
-	err = q.OrderBy("cv.created_at DESC", "cv.version DESC").
+	err = q.OrderBy("c.created_at DESC", "dv.version DESC").
 		Limit(1).
 		RunWith(s.db).
 		QueryRow().
@@ -662,11 +630,11 @@ func (s *service) GetConnectorVersionForLabelsAndVersion(ctx context.Context, la
 
 	var result ConnectorVersion
 	q := s.selectConnectorVersions().
-		Where(sq.Eq{"cv.version": version, "cv.deleted_at": nil, "c.deleted_at": nil})
+		Where(sq.Eq{"dv.version": version, "c.deleted_at": nil})
 
-	q = selector.ApplyToSqlBuilderWithProvider(q, "cv.labels", s.cfg.GetProvider())
+	q = selector.ApplyToSqlBuilderWithProvider(q, "c.labels", s.cfg.GetProvider())
 
-	err = q.OrderBy("cv.created_at DESC").
+	err = q.OrderBy("c.created_at DESC").
 		Limit(1).
 		RunWith(s.db).
 		QueryRow().
@@ -685,12 +653,11 @@ func (s *service) GetConnectorVersionForState(ctx context.Context, id apid.ID, s
 	var result ConnectorVersion
 	err := s.selectConnectorVersions().
 		Where(sq.Eq{
-			"cv.id":         id,
-			"cv.state":      state,
-			"cv.deleted_at": nil,
-			"c.deleted_at":  nil,
+			"dv.connector_id": id,
+			"dv.state":        state,
+			"c.deleted_at":    nil,
 		}).
-		OrderBy("cv.version DESC").
+		OrderBy("dv.version DESC").
 		Limit(1).
 		RunWith(s.db).
 		QueryRow().
@@ -711,11 +678,10 @@ func (s *service) NewestConnectorVersionForId(ctx context.Context, id apid.ID) (
 	var result ConnectorVersion
 	err := s.selectConnectorVersions().
 		Where(sq.Eq{
-			"cv.id":         id,
-			"cv.deleted_at": nil,
-			"c.deleted_at":  nil,
+			"dv.connector_id": id,
+			"c.deleted_at":    nil,
 		}).
-		OrderBy("cv.version DESC").
+		OrderBy("dv.version DESC").
 		Limit(1).
 		RunWith(s.db).
 		QueryRow().
@@ -736,12 +702,11 @@ func (s *service) NewestPublishedConnectorVersionForId(ctx context.Context, id a
 	var result ConnectorVersion
 	err := s.selectConnectorVersions().
 		Where(sq.Eq{
-			"cv.id":         id,
-			"cv.state":      []ConnectorVersionState{ConnectorVersionStatePrimary, ConnectorVersionStateActive},
-			"cv.deleted_at": nil,
-			"c.deleted_at":  nil,
+			"dv.connector_id": id,
+			"dv.state":        []ConnectorVersionState{ConnectorVersionStatePrimary, ConnectorVersionStateActive},
+			"c.deleted_at":    nil,
 		}).
-		OrderBy("cv.version DESC").
+		OrderBy("dv.version DESC").
 		Limit(1).
 		RunWith(s.db).
 		QueryRow().
@@ -905,7 +870,7 @@ func (l *listConnectorVersionsFilters) applyRestrictions(ctx context.Context) sq
 		if err != nil {
 			l.addError(err)
 		} else {
-			q = selector.ApplyToSqlBuilderWithProvider(q, "cv.labels", l.s.cfg.GetProvider())
+			q = selector.ApplyToSqlBuilderWithProvider(q, "c.labels", l.s.cfg.GetProvider())
 		}
 	}
 
@@ -914,15 +879,15 @@ func (l *listConnectorVersionsFilters) applyRestrictions(ctx context.Context) sq
 	}
 
 	if len(l.IdsVal) > 0 {
-		q = q.Where(sq.Eq{"cv.id": l.IdsVal})
+		q = q.Where(sq.Eq{"dv.connector_id": l.IdsVal})
 	}
 
 	if len(l.VersionsVal) > 0 {
-		q = q.Where(sq.Eq{"cv.version": l.VersionsVal})
+		q = q.Where(sq.Eq{"dv.version": l.VersionsVal})
 	}
 
 	if len(l.StatesVal) > 0 {
-		q = q.Where(sq.Eq{"cv.state": l.StatesVal})
+		q = q.Where(sq.Eq{"dv.state": l.StatesVal})
 	}
 
 	if len(l.NamespaceMatchers) > 0 {
@@ -930,14 +895,27 @@ func (l *listConnectorVersionsFilters) applyRestrictions(ctx context.Context) sq
 	}
 
 	if !l.IncludeDeletedVal {
-		q = q.Where(sq.Eq{"cv.deleted_at": nil, "c.deleted_at": nil})
+		q = q.Where(sq.Eq{"c.deleted_at": nil})
 	}
 
 	// Always limit to one more than limit to check if there are more records
 	q = q.Limit(l.LimitVal + 1).Offset(l.Offset)
 
 	if l.OrderByFieldVal != nil {
-		q = q.OrderBy(fmt.Sprintf("cv.%s %s", *l.OrderByFieldVal, l.OrderByVal.String()))
+		orderCol := "dv." + string(*l.OrderByFieldVal)
+		switch *l.OrderByFieldVal {
+		case ConnectorVersionOrderById:
+			orderCol = "c.id"
+		case ConnectorVersionOrderByCreatedAt, ConnectorVersionOrderByUpdatedAt:
+			orderCol = "c." + string(*l.OrderByFieldVal)
+		}
+		q = q.OrderBy(fmt.Sprintf("%s %s", orderCol, l.OrderByVal.String()))
+		if *l.OrderByFieldVal != ConnectorVersionOrderById {
+			q = q.OrderBy(fmt.Sprintf("c.id %s", l.OrderByVal.String()))
+		}
+		if *l.OrderByFieldVal != ConnectorVersionOrderByVersion {
+			q = q.OrderBy(fmt.Sprintf("dv.version %s", l.OrderByVal.String()))
+		}
 	}
 
 	return q

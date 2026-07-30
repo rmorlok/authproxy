@@ -50,7 +50,7 @@ func (s *service) RefreshNamespaceLabelsCarryForward(ctx context.Context, nsPath
 	if err := s.refreshEncryptionKeysInNamespace(ctx, nsPath); err != nil {
 		return err
 	}
-	if err := s.refreshConnectorVersionsInNamespace(ctx, nsPath); err != nil {
+	if err := s.refreshConnectorsInNamespace(ctx, nsPath); err != nil {
 		return err
 	}
 	if err := s.refreshRateLimitsInNamespace(ctx, nsPath); err != nil {
@@ -73,16 +73,15 @@ func (s *service) RefreshNamespaceLabelsCarryForward(ctx context.Context, nsPath
 }
 
 // RefreshConnectionsForConnectorVersion re-derives the materialized apxy/
-// portion of every connection pointing at the given (id, version). Each
-// connection's update runs in its own short transaction.
-func (s *service) RefreshConnectionsForConnectorVersion(ctx context.Context, id apid.ID, version uint64) error {
+// portion of every connection pointing at the logical connector. Labels are
+// connector-owned, so a change applies across every definition version.
+func (s *service) RefreshConnectionsForConnectorVersion(ctx context.Context, id apid.ID, _ uint64) error {
 	rows, err := s.sq.
 		Select("id").
 		From(ConnectionsTable).
 		Where(sq.Eq{
-			"connector_id":      id,
-			"connector_version": version,
-			"deleted_at":        nil,
+			"connector_id": id,
+			"deleted_at":   nil,
 		}).
 		RunWith(s.db).
 		Query()
@@ -215,37 +214,13 @@ func (s *service) refreshRateLimitsInNamespace(ctx context.Context, nsPath strin
 	return nil
 }
 
-func (s *service) refreshConnectorVersionsInNamespace(ctx context.Context, nsPath string) error {
-	rows, err := s.sq.
-		Select("cv.id", "cv.version").
-		From(ConnectorVersionsTable + " cv").
-		Join(ConnectorsTable + " c ON c.id = cv.id").
-		Where(sq.Eq{"c.namespace": nsPath, "cv.deleted_at": nil, "c.deleted_at": nil}).
-		RunWith(s.db).
-		Query()
+func (s *service) refreshConnectorsInNamespace(ctx context.Context, nsPath string) error {
+	ids, err := s.scanIdsByNamespace(ConnectorsTable, nsPath)
 	if err != nil {
 		return err
 	}
-	type cvRef struct {
-		id      apid.ID
-		version uint64
-	}
-	var refs []cvRef
-	for rows.Next() {
-		var ref cvRef
-		if err := rows.Scan(&ref.id, &ref.version); err != nil {
-			rows.Close()
-			return err
-		}
-		refs = append(refs, ref)
-	}
-	if err := rows.Err(); err != nil {
-		rows.Close()
-		return err
-	}
-	rows.Close()
-	for _, ref := range refs {
-		if _, err := s.recomputeConnectorVersionLabelsTx(ctx, ref.id, ref.version); err != nil {
+	for _, id := range ids {
+		if _, err := s.recomputeConnectorLabelsTx(ctx, id); err != nil {
 			return err
 		}
 	}
@@ -276,9 +251,8 @@ func (s *service) recomputeConnectionLabelsTx(ctx context.Context, id apid.ID) (
 
 		userLabels, _ := SplitUserAndApxyLabels(conn.Labels)
 
-		cvLabels, err := s.fetchLabelsForCarryForward(ctx, tx, ConnectorVersionsTable, sq.Eq{
+		cvLabels, err := s.fetchLabelsForCarryForward(ctx, tx, ConnectorsTable, sq.Eq{
 			"id":         conn.ConnectorId,
-			"version":    conn.ConnectorVersion,
 			"deleted_at": nil,
 		})
 		if err != nil {
@@ -435,18 +409,20 @@ func (s *service) recomputeRateLimitLabelsTx(ctx context.Context, id apid.ID) (b
 	return corrected, err
 }
 
-// recomputeConnectorVersionLabelsTx opens a short transaction and
-// re-derives a connector version's full labels from its namespace and own
+// recomputeConnectorLabelsTx opens a short transaction and
+// re-derives a connector's full labels from its namespace and own
 // user labels. Returns true if drift was detected and corrected.
-func (s *service) recomputeConnectorVersionLabelsTx(ctx context.Context, id apid.ID, version uint64) (bool, error) {
+func (s *service) recomputeConnectorLabelsTx(ctx context.Context, id apid.ID) (bool, error) {
 	var corrected bool
 	err := s.transaction(func(tx *sql.Tx) error {
-		var cv ConnectorVersion
-		err := s.selectConnectorVersions().
-			Where(sq.Eq{"cv.id": id, "cv.version": version, "cv.deleted_at": nil, "c.deleted_at": nil}).
+		var connector connectorResource
+		err := s.sq.
+			Select(connector.cols()...).
+			From(ConnectorsTable).
+			Where(sq.Eq{"id": id, "deleted_at": nil}).
 			RunWith(tx).
 			QueryRow().
-			Scan(cv.fields()...)
+			Scan(connector.fields()...)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return nil
@@ -454,9 +430,9 @@ func (s *service) recomputeConnectorVersionLabelsTx(ctx context.Context, id apid
 			return err
 		}
 
-		userLabels, _ := SplitUserAndApxyLabels(cv.Labels)
+		userLabels, _ := SplitUserAndApxyLabels(connector.Labels)
 		nsLabels, err := s.fetchLabelsForCarryForward(ctx, tx, NamespacesTable, sq.Eq{
-			"path":       cv.Namespace,
+			"path":       connector.Namespace,
 			"deleted_at": nil,
 		})
 		if err != nil {
@@ -467,14 +443,17 @@ func (s *service) recomputeConnectorVersionLabelsTx(ctx context.Context, id apid
 			userLabels,
 			ParentCarryForward{Rt: NamespaceLabelToken, Labels: nsLabels},
 		)
-		newLabels = InjectSelfImplicitLabels(cv.Id, cv.Namespace, newLabels)
+		newLabels = InjectSelfImplicitLabels(connector.Id, connector.Namespace, newLabels)
 
 		var werr error
-		corrected, werr = s.writeRecomputedLabels(ctx, tx, ConnectorVersionsTable, sq.Eq{
-			"id":         id,
-			"version":    version,
-			"deleted_at": nil,
-		}, cv.Labels, newLabels)
+		corrected, werr = s.writeRecomputedLabels(
+			ctx,
+			tx,
+			ConnectorsTable,
+			sq.Eq{"id": id, "deleted_at": nil},
+			connector.Labels,
+			newLabels,
+		)
 		return werr
 	})
 	return corrected, err
@@ -590,7 +569,7 @@ func (s *service) ReconcileCarryForwardLabels(ctx context.Context, batchSize int
 		// Top-down: namespaces first (so child resources see fresh
 		// parent labels in subsequent passes), then per-resource walks.
 		{name: "namespaces", walk: s.reconcileNamespaces},
-		{name: "connector_versions", walk: s.reconcileConnectorVersions},
+		{name: "connectors", walk: s.reconcileConnectors},
 		{name: "connections", walk: s.reconcileConnections},
 		{name: "actors", walk: s.reconcileActors},
 		{name: "keys", walk: s.reconcileEncryptionKeys},
@@ -638,20 +617,20 @@ func (s *service) reconcileNamespaces(ctx context.Context, batchSize int32, limi
 	return corrected, err
 }
 
-func (s *service) reconcileConnectorVersions(ctx context.Context, batchSize int32, limiter *rate.Limiter) (int64, error) {
+func (s *service) reconcileConnectors(ctx context.Context, batchSize int32, limiter *rate.Limiter) (int64, error) {
 	var corrected int64
 	err := pagination.EnumerateThrottled(
 		ctx,
-		s.ListConnectorVersionsBuilder().Limit(batchSize).Enumerate,
+		s.ListConnectorsBuilder().Limit(batchSize).Enumerate,
 		limiter,
-		func(cv ConnectorVersion) error {
-			wasCorrected, err := s.recomputeConnectorVersionLabelsTx(ctx, cv.Id, cv.Version)
+		func(connector Connector) error {
+			wasCorrected, err := s.recomputeConnectorLabelsTx(ctx, connector.Id)
 			if err != nil {
 				return err
 			}
 			if wasCorrected {
 				corrected++
-				s.logger.Info("reconciled drifted carry-forward labels", "type", "connector_version", "id", cv.Id, "version", cv.Version)
+				s.logger.Info("reconciled drifted carry-forward labels", "type", "connector", "id", connector.Id)
 			}
 			return nil
 		})

@@ -2,6 +2,8 @@ package seeder
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -237,8 +239,16 @@ func Seed(ctx context.Context, opts Options) (*Result, error) {
 	if err != nil && !errors.Is(err, database.ErrNotFound) {
 		return nil, fmt.Errorf("get connector version: %w", err)
 	}
-	if existingConnector != nil && existingConnector.Hash != connectorHash {
-		return nil, fmt.Errorf("connector %s:%d already exists with a different hash", connectorID, connectorVersion)
+	if existingConnector != nil {
+		existingDefinition, decryptErr := opts.Encrypt.DecryptString(ctx, existingConnector.EncryptedDefinition)
+		if decryptErr != nil {
+			return nil, fmt.Errorf("decrypt existing connector version: %w", decryptErr)
+		}
+		hash := sha1.Sum([]byte(existingDefinition))
+		existingHash := hex.EncodeToString(hash[:])[:7]
+		if existingHash != connectorHash {
+			return nil, fmt.Errorf("connector %s:%d already exists with a different hash", connectorID, connectorVersion)
+		}
 	}
 	if opts.ProviderClientBootstrap {
 		logf("ensuring load-test OAuth2 client in provider")

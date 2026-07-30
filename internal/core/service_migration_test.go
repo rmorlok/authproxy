@@ -96,7 +96,7 @@ func TestMigration(t *testing.T) {
 			}
 
 			assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT id, version, state FROM connector_versions;
+			SELECT connector_id AS id, version, state FROM connector_definition_versions;
 		`, []connectorResult{})
 		})
 
@@ -121,7 +121,7 @@ func TestMigration(t *testing.T) {
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT id, version, state FROM connector_versions;
+			SELECT connector_id AS id, version, state FROM connector_definition_versions;
 		`, []connectorResult{
 					{
 						Id:      "cxr_test0000000000001",
@@ -156,7 +156,7 @@ func TestMigration(t *testing.T) {
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT id, version, state FROM connector_versions ORDER BY id;
+			SELECT connector_id AS id, version, state FROM connector_definition_versions ORDER BY id;
 		`, []connectorResult{
 					{
 						Id:      "cxr_test0000000000001",
@@ -196,7 +196,7 @@ func TestMigration(t *testing.T) {
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT id, version, state FROM connector_versions ORDER BY id;
+			SELECT connector_id AS id, version, state FROM connector_definition_versions ORDER BY id;
 		`, []connectorResult{
 					{
 						Id:      "cxr_test0000000000001",
@@ -234,7 +234,7 @@ func TestMigration(t *testing.T) {
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT id, version, state FROM connector_versions;
+			SELECT connector_id AS id, version, state FROM connector_definition_versions;
 		`, []connectorResult{
 					{
 						Id:      "cxr_test0000000000001",
@@ -278,7 +278,7 @@ func TestMigration(t *testing.T) {
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
+			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
 		`, []connectorResult{
 					{
 						Id:          "cxr_test0000000000001",
@@ -335,7 +335,7 @@ func TestMigration(t *testing.T) {
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
+			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
 		`, []connectorResult{
 					{
 						Id:          "cxr_test0000000000001",
@@ -383,7 +383,7 @@ func TestMigration(t *testing.T) {
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
+			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
 		`, []connectorResult{
 					{
 						Id:          "cxr_test0000000000001",
@@ -434,7 +434,7 @@ func TestMigration(t *testing.T) {
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
+			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
 		`, []connectorResult{
 					{
 						Id:          "cxr_test0000000000001",
@@ -484,7 +484,7 @@ func TestMigration(t *testing.T) {
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
+			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
 		`, []connectorResult{
 					{
 						Id:          "cxr_test0000000000001",
@@ -523,7 +523,7 @@ func TestMigration(t *testing.T) {
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
+			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
 		`, []connectorResult{})
 			})
 
@@ -559,7 +559,7 @@ func TestMigration(t *testing.T) {
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
+			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
 		`, []connectorResult{
 					{
 						Id:          "cxr_test0000000000001",
@@ -591,7 +591,7 @@ func TestMigration(t *testing.T) {
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT id, version, state FROM connector_versions;
+			SELECT connector_id AS id, version, state FROM connector_definition_versions;
 		`, []connectorResult{
 					{
 						Id:      "cxr_test0000000000001",
@@ -624,7 +624,7 @@ func TestMigration(t *testing.T) {
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT id, version, state FROM connector_versions ORDER BY id;
+			SELECT connector_id AS id, version, state FROM connector_definition_versions ORDER BY id;
 		`, []connectorResult{
 					{
 						Id:      "cxr_test0000000000001",
@@ -661,7 +661,7 @@ func TestMigration(t *testing.T) {
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT id, version, state FROM connector_versions;
+			SELECT connector_id AS id, version, state FROM connector_definition_versions;
 		`, []connectorResult{
 					{
 						Id:      "cxr_test0000000000001",
@@ -697,7 +697,7 @@ func TestMigration(t *testing.T) {
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
+			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
 		`, []connectorResult{
 					{
 						Id:          "cxr_test0000000000001",
@@ -745,7 +745,7 @@ func TestMigration(t *testing.T) {
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
+			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
 		`, []connectorResult{
 					{
 						Id:          "cxr_test0000000000001",
@@ -791,7 +791,7 @@ func TestMigration(t *testing.T) {
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
+			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
 		`, []connectorResult{
 					{
 						Id:          "cxr_test0000000000001",
@@ -839,7 +839,7 @@ func TestMigration(t *testing.T) {
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
+			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
 		`, []connectorResult{
 					{
 						Id:          "cxr_test0000000000001",
@@ -888,7 +888,7 @@ func TestMigration(t *testing.T) {
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
+			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
 		`, []connectorResult{})
 			})
 
@@ -922,7 +922,7 @@ func TestMigration(t *testing.T) {
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
+			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
 		`, []connectorResult{
 					{
 						Id:          "cxr_test0000000000001",
@@ -962,9 +962,9 @@ func TestMigration(t *testing.T) {
 				}
 
 				rows, err := rawDb.Query(withDisplayNameExpr(cfg, `
-			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name
-			FROM connector_versions
-			WHERE deleted_at IS NULL
+			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name
+			FROM connector_definition_versions
+			WHERE connector_id IN (SELECT id FROM connectors WHERE deleted_at IS NULL)
 			ORDER BY version;
 		`))
 				require.NoError(t, err)
@@ -1013,7 +1013,7 @@ func TestMigration(t *testing.T) {
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT id, version, state FROM connector_versions WHERE deleted_at IS NULL;
+			SELECT connector_id AS id, version, state FROM connector_definition_versions WHERE connector_id IN (SELECT id FROM connectors WHERE deleted_at IS NULL);
 		`, []connectorResult{})
 			})
 
@@ -1043,8 +1043,8 @@ func TestMigration(t *testing.T) {
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
 			SELECT version, state, DISPLAY_NAME_EXPR as display_name
-			FROM connector_versions
-			WHERE deleted_at IS NULL
+			FROM connector_definition_versions
+			WHERE connector_id IN (SELECT id FROM connectors WHERE deleted_at IS NULL)
 			ORDER BY version;
 		`, []connectorResult{
 					{
@@ -1074,7 +1074,7 @@ func TestMigration(t *testing.T) {
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT version, state FROM connector_versions;
+			SELECT version, state FROM connector_definition_versions;
 		`, []connectorResult{
 					{
 						Version: 1,
@@ -1103,7 +1103,7 @@ func TestMigration(t *testing.T) {
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT version, state FROM connector_versions;
+			SELECT version, state FROM connector_definition_versions;
 		`, []connectorResult{
 					{
 						Version: 1,
@@ -1136,7 +1136,7 @@ func TestMigration(t *testing.T) {
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
+			SELECT version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
 		`, []connectorResult{
 					{
 						Version:     1,
@@ -1178,7 +1178,7 @@ func TestMigration(t *testing.T) {
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
+			SELECT version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
 		`, []connectorResult{
 					{
 						Version:     1,
@@ -1222,7 +1222,7 @@ func TestMigration(t *testing.T) {
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
+			SELECT version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
 		`, []connectorResult{
 					{
 						Version:     1,
@@ -1266,7 +1266,7 @@ func TestMigration(t *testing.T) {
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
+			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
 		`, []connectorResult{})
 			})
 
@@ -1297,7 +1297,7 @@ func TestMigration(t *testing.T) {
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
+			SELECT version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
 		`, []connectorResult{
 					{
 						Version:     1,
@@ -1337,7 +1337,7 @@ func TestMigration(t *testing.T) {
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
+			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
 		`, []connectorResult{})
 			})
 
@@ -1371,7 +1371,7 @@ func TestMigration(t *testing.T) {
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
+			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
 		`, []connectorResult{})
 			})
 
@@ -1405,7 +1405,7 @@ func TestMigration(t *testing.T) {
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
+			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
 		`, []connectorResult{})
 			})
 
@@ -1437,7 +1437,7 @@ func TestMigration(t *testing.T) {
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
+			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
 		`, []connectorResult{})
 			})
 
@@ -1468,7 +1468,7 @@ func TestMigration(t *testing.T) {
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
+			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
 		`, []connectorResult{})
 			})
 
@@ -1535,7 +1535,7 @@ func TestMigration(t *testing.T) {
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
+			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
 		`, []connectorResult{})
 			})
 
@@ -1599,7 +1599,7 @@ func TestMigration(t *testing.T) {
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
+			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
 		`, []connectorResult{})
 			})
 		})
@@ -1637,7 +1637,7 @@ func TestMigration(t *testing.T) {
 
 				// The orphan's row is soft-deleted; only the surviving connector remains.
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT id, version, state FROM connector_versions WHERE deleted_at IS NULL ORDER BY id;
+			SELECT connector_id AS id, version, state FROM connector_definition_versions WHERE connector_id IN (SELECT id FROM connectors WHERE deleted_at IS NULL) ORDER BY id;
 		`, []connectorResult{
 					{Id: "cxr_test0000000000001", Version: 1, State: "primary"},
 				})
@@ -1685,7 +1685,7 @@ func TestMigration(t *testing.T) {
 				// Orphan must NOT be deleted (still rows present), and its primary version
 				// must be demoted to active.
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT id, version, state FROM connector_versions WHERE deleted_at IS NULL ORDER BY id;
+			SELECT connector_id AS id, version, state FROM connector_definition_versions WHERE connector_id IN (SELECT id FROM connectors WHERE deleted_at IS NULL) ORDER BY id;
 		`, []connectorResult{
 					{Id: "cxr_test0000000000001", Version: 1, State: "primary"},
 					{Id: "cxr_test0000000000002", Version: 1, State: "active"},
@@ -1731,7 +1731,7 @@ func TestMigration(t *testing.T) {
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT id, version, state FROM connector_versions WHERE deleted_at IS NULL ORDER BY id;
+			SELECT connector_id AS id, version, state FROM connector_definition_versions WHERE connector_id IN (SELECT id FROM connectors WHERE deleted_at IS NULL) ORDER BY id;
 		`, []connectorResult{
 					{Id: "cxr_test0000000000001", Version: 1, State: "primary"},
 					{Id: "cxr_test0000000000099", Version: 1, State: "primary"},
