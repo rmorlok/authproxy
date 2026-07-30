@@ -11,6 +11,7 @@ RUN corepack enable
 COPY package.json yarn.lock .yarnrc.yml ./
 COPY ui ui
 COPY sdks sdks
+COPY blog/package.json blog/package.json
 COPY docs/package.json docs/package.json
 # `demos/*/frontend` is declared as a workspace in the root package.json.
 # `yarn install --immutable` insists every declared workspace exists on
