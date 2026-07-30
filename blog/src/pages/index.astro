@@ -1,0 +1,25 @@
+---
+import PostCard from '../components/PostCard.astro';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getPublishedPosts } from '../lib/posts';
+
+const posts = await getPublishedPosts();
+---
+
+<BaseLayout>
+  <section class="hero">
+    <p class="eyebrow">AUTHENTICATION, INTEGRATIONS, OPERATIONS</p>
+    <h1>Build integrations without the authentication plumbing.</h1>
+    <p class="hero-copy">
+      Notes from the AuthProxy project on solving real integration problems—securely, clearly, and without reinventing every connection flow.
+    </p>
+  </section>
+
+  <section class="post-list" aria-labelledby="latest-articles">
+    <div class="section-heading">
+      <h2 id="latest-articles">Latest articles</h2>
+      <a href="/rss.xml">Follow via RSS <span aria-hidden="true">→</span></a>
+    </div>
+    {posts.length > 0 ? posts.map((post) => <PostCard post={post} />) : <p>No posts have been published yet.</p>}
+  </section>
+</BaseLayout>

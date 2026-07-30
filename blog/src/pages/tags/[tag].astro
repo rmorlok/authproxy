@@ -1,0 +1,36 @@
+---
+import PostCard from '../../components/PostCard.astro';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getPublishedPosts, type Post } from '../../lib/posts';
+
+export async function getStaticPaths() {
+  const posts = await getPublishedPosts();
+  const tags = [...new Set(posts.flatMap((post) => post.data.tags))].sort();
+
+  return tags.map((tag) => ({
+    params: { tag },
+    props: { tag, posts: posts.filter((post) => post.data.tags.includes(tag)) },
+  }));
+}
+
+interface Props {
+  tag: string;
+  posts: Post[];
+}
+
+const { tag, posts } = Astro.props;
+---
+
+<BaseLayout
+  title={`Articles tagged ${tag}`}
+  description={`AuthProxy Blog articles tagged ${tag}.`}
+  canonicalPath={`/tags/${tag}/`}
+>
+  <section class="tag-header">
+    <p class="eyebrow">TOPIC</p>
+    <h1>{tag}</h1>
+  </section>
+  <section class="post-list" aria-label={`Articles tagged ${tag}`}>
+    {posts.map((post) => <PostCard post={post} />)}
+  </section>
+</BaseLayout>

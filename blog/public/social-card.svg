@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title description">
+  <title id="title">AuthProxy Blog</title>
+  <desc id="description">Practical guidance for secure third-party API integrations.</desc>
+  <rect width="1200" height="630" fill="#0b1120"/>
+  <path d="M0 510C235 400 370 615 655 488s306-19 545-152v142H0Z" fill="#172554"/>
+  <rect x="92" y="94" width="92" height="92" rx="20" fill="#93c5fd"/>
+  <path fill="#10245f" d="m138 112-29 56h15l4-10h20l4 10h15l-29-56Zm0 22 5 13h-10l5-13Z"/>
+  <text x="92" y="290" fill="#dbeafe" font-family="Inter, Arial, sans-serif" font-size="76" font-weight="700">AuthProxy Blog</text>
+  <text x="96" y="358" fill="#a8b7d0" font-family="Inter, Arial, sans-serif" font-size="32">Secure third-party API integrations, explained.</text>
+</svg>
