@@ -61,12 +61,11 @@ autoscaling:
   # -- Optional autoscaling/v2 HPA behavior block.
   behavior: {}
 
-# -- Install the KEDA controller and its CRDs with this standard chart release.
-# KEDA is cluster-scoped. For independently installed service roles, leave it
-# enabled on exactly one release (normally the worker) and set it false on the
-# other releases. Set it false when the cluster platform already manages KEDA.
+# -- Install the bundled KEDA controller and its CRDs. Disabled by default so
+# the chart reuses the cluster-managed KEDA controller. Enable on exactly one
+# release only when the cluster does not already manage KEDA.
 keda:
-  enabled: true
+  enabled: false
 
 # -- Worker autoscaling based on the global pending Asynq queue. KEDA creates
 # the HPA, combining this Prometheus trigger with the optional CPU trigger.

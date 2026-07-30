@@ -81,6 +81,7 @@ jobs:
           set -euo pipefail
 
           disabled_manifest="$(mktemp)"
+          keda_controller_manifest="$(mktemp)"
           native_hpa_manifest="$(mktemp)"
           keda_manifest="$(mktemp)"
 
@@ -91,6 +92,19 @@ jobs:
             echo "HPA rendered even though autoscaling.enabled is false" >&2
             exit 1
           fi
+          if grep -q "name: keda-operator" "${disabled_manifest}"; then
+            echo "KEDA rendered even though keda.enabled is false" >&2
+            exit 1
+          fi
+
+          helm template authproxy deploy/charts/authproxy \
+            -f deploy/charts/authproxy/ci/sqlite-redis-values.yaml \
+            --set keda.enabled=true \
+            >"${keda_controller_manifest}"
+          grep -q "kind: CustomResourceDefinition" "${keda_controller_manifest}"
+          grep -q "name: scaledobjects.keda.sh" "${keda_controller_manifest}"
+          grep -q "kind: Deployment" "${keda_controller_manifest}"
+          grep -q "name: keda-operator" "${keda_controller_manifest}"
 
           helm template authproxy deploy/charts/authproxy \
             -f deploy/charts/authproxy/ci/sqlite-redis-values.yaml \

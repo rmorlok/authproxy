@@ -40,14 +40,14 @@ application version (`image.tag`).
 
 ```bash
 # Inspect available versions:
-helm show chart oci://ghcr.io/rmorlok/charts/authproxy --version 0.1.1
+helm show chart oci://ghcr.io/rmorlok/charts/authproxy --version 0.1.2
 
 # Pull a tarball locally:
-helm pull oci://ghcr.io/rmorlok/charts/authproxy --version 0.1.1
+helm pull oci://ghcr.io/rmorlok/charts/authproxy --version 0.1.2
 
 # Install:
 helm install authproxy oci://ghcr.io/rmorlok/charts/authproxy \
-  --version 0.1.1 \
+  --version 0.1.2 \
   -f my-values.yaml
 ```
 
@@ -61,7 +61,7 @@ The chart exposes typed values for the common connectivity blocks. See
 | `image`          | Container image repository, tag, pull policy                         |
 | `services.*`     | Per-service enable toggles (`api`, `adminApi`, `public`, `worker`)   |
 | `autoscaling`    | Optional native autoscaling/v2 HPA for the chart release             |
-| `keda`           | KEDA controller dependency; enabled for the standard all-in-one chart |
+| `keda`           | Optional KEDA controller dependency; disabled by default              |
 | `queueAutoscaling` | KEDA worker scaler using CPU plus global pending Asynq queue depth  |
 | `ports`          | Container port assignments                                            |
 | `ingress`        | Single Ingress with path → port-name routing                          |
@@ -134,10 +134,23 @@ owns the desired replica count.
 
 ### KEDA Worker Queue Scaling
 
-The standard all-in-one chart installs the pinned KEDA controller and CRDs.
-KEDA is cluster-scoped, so independently deployed service roles must set
-`keda.enabled=false` on every release except the worker release, or on all of
-them when a cluster platform release already manages KEDA.
+KEDA is cluster-scoped and is disabled by default. Install one KEDA controller
+as a cluster platform service, then enable `queueAutoscaling` on an AuthProxy
+worker release. The worker's namespaced `ScaledObject` is handled by that shared
+controller.
+
+For a KEDA-free cluster that needs a self-contained AuthProxy installation, the
+chart includes a pinned KEDA dependency. Enable it on exactly one release
+(normally the worker), never alongside an existing KEDA installation:
+
+```yaml
+keda:
+  enabled: true
+```
+
+For independently deployed AuthProxy roles, leave `keda.enabled=false` on API,
+public, and admin releases. It is also false on the worker when the cluster
+platform already manages KEDA.
 
 Enable `queueAutoscaling` only on a worker release. It requires a Prometheus
 endpoint that the KEDA controller can reach and a query that returns one global
