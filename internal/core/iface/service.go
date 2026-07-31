@@ -69,13 +69,13 @@ type C interface {
 	 */
 
 	// GetConnectorVersion returns the specified version of a connector.
-	GetConnectorVersion(ctx context.Context, id apid.ID, version uint64) (ConnectorVersion, error)
+	GetConnectorVersion(ctx context.Context, id apid.ID, version uint64) (Connector, error)
 
 	// GetConnectorVersions Retrieves multiple connector versions at once.
-	GetConnectorVersions(ctx context.Context, requested []ConnectorVersionId) (map[ConnectorVersionId]ConnectorVersion, error)
+	GetConnectorVersions(ctx context.Context, requested []ConnectorVersionId) (map[ConnectorVersionId]Connector, error)
 
 	// GetConnectorVersionForState returns the most recent version of the connector for the specified state.
-	GetConnectorVersionForState(ctx context.Context, id apid.ID, state database.ConnectorDefinitionVersionState) (ConnectorVersion, error)
+	GetConnectorVersionForState(ctx context.Context, id apid.ID, state database.ConnectorDefinitionVersionState) (Connector, error)
 
 	// ListConnectorsBuilder returns a builder to allow the caller to list connectors matching certain criteria.
 	ListConnectorsBuilder() ListConnectorsBuilder
@@ -90,18 +90,18 @@ type C interface {
 	ListConnectorVersionsFromCursor(ctx context.Context, cursor string) (ListConnectorVersionsExecutor, error)
 
 	// CreateConnectorVersion creates a new connector with version 1 in draft state.
-	CreateConnectorVersion(ctx context.Context, namespace string, definition *cschema.Connector, labels map[string]string, annotations map[string]string) (ConnectorVersion, error)
+	CreateConnectorVersion(ctx context.Context, namespace string, definition *cschema.Connector, labels map[string]string, annotations map[string]string) (Connector, error)
 
 	// CreateDraftConnectorVersion creates a new draft version for an existing connector.
 	// Returns ErrDraftAlreadyExists if a draft version already exists.
-	CreateDraftConnectorVersion(ctx context.Context, id apid.ID, definition *cschema.Connector, labels map[string]string, annotations map[string]string) (ConnectorVersion, error)
+	CreateDraftConnectorVersion(ctx context.Context, id apid.ID, definition *cschema.Connector, labels map[string]string, annotations map[string]string) (Connector, error)
 
 	// UpdateDraftConnectorVersion updates an existing draft version.
 	// Returns ErrNotDraft if the version is not in draft state.
-	UpdateDraftConnectorVersion(ctx context.Context, id apid.ID, version uint64, definition *cschema.Connector, labels map[string]string, annotations map[string]string) (ConnectorVersion, error)
+	UpdateDraftConnectorVersion(ctx context.Context, id apid.ID, version uint64, definition *cschema.Connector, labels map[string]string, annotations map[string]string) (Connector, error)
 
 	// GetOrCreateDraftConnectorVersion returns the existing draft version, or creates a new one by cloning the latest version.
-	GetOrCreateDraftConnectorVersion(ctx context.Context, id apid.ID) (ConnectorVersion, error)
+	GetOrCreateDraftConnectorVersion(ctx context.Context, id apid.ID) (Connector, error)
 
 	// DisconnectConnectorConnections starts a workflow that disconnects all connections for a connector.
 	DisconnectConnectorConnections(ctx context.Context, id apid.ID, opts ConnectorLifecycleOptions) (taskInfo *tasks.TaskInfo, err error)
@@ -131,7 +131,7 @@ type C interface {
 	GetConnection(ctx context.Context, id apid.ID) (Connection, error)
 
 	// CreateConnection creates a new connection.
-	CreateConnection(ctx context.Context, namespace string, cv ConnectorVersion) (Connection, error)
+	CreateConnection(ctx context.Context, namespace string, cv Connector) (Connection, error)
 
 	// ListConnectionsBuilder returns a builder to allow the caller to list connections matching certain criteria.
 	ListConnectionsBuilder() ListConnectionsBuilder

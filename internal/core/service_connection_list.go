@@ -13,7 +13,7 @@ import (
 type listConnectionsWrapper struct {
 	l  database.ListConnectionsBuilder
 	e  database.ListConnectionsExecutor
-	cc map[iface.ConnectorVersionId]*ConnectorVersion
+	cc map[iface.ConnectorVersionId]*Connector
 	s  *service
 }
 
@@ -47,7 +47,7 @@ func (l *listConnectionsWrapper) convertPageResult(ctx context.Context, result p
 
 	for _, v := range versions {
 		if l.cc == nil {
-			l.cc = make(map[iface.ConnectorVersionId]*ConnectorVersion)
+			l.cc = make(map[iface.ConnectorVersionId]*Connector)
 		}
 
 		l.cc[iface.ConnectorVersionId{Id: v.GetId(), Version: v.GetVersion()}] = v

@@ -54,7 +54,7 @@ func ConnectorToJson(c connIface.Connector) ConnectorJson {
 	return ConnectorVersionToConnectorJson(c)
 }
 
-func ConnectorVersionToConnectorJson(cv connIface.ConnectorVersion) ConnectorJson {
+func ConnectorVersionToConnectorJson(cv connIface.Connector) ConnectorJson {
 	def := cv.GetDefinition()
 	logo := ""
 	if def.Logo != nil {
@@ -88,7 +88,7 @@ type ListConnectorsRequestQueryParams struct {
 	OrderByVal    *string                                   `form:"order_by"`
 }
 
-func ConnectorVersionToJson(cv connIface.ConnectorVersion) ConnectorVersionJson {
+func ConnectorVersionToJson(cv connIface.Connector) ConnectorVersionJson {
 	def := cv.GetDefinition()
 
 	return ConnectorVersionJson{
@@ -1680,7 +1680,7 @@ func NewConnectorsRoutes(cfg config.C, authService auth.A, c connIface.C, e encr
 	}
 
 	connectorIDExtractor := func(v interface{}) string {
-		return string(v.(connIface.ConnectorVersion).GetId())
+		return string(v.(connIface.Connector).GetId())
 	}
 
 	connectorAuthGet := authService.NewRequiredBuilder().

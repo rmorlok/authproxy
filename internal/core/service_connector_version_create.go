@@ -13,7 +13,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/util"
 )
 
-func (s *service) CreateConnectorVersion(ctx context.Context, namespace string, definition *cschema.Connector, labels map[string]string, annotations map[string]string) (iface.ConnectorVersion, error) {
+func (s *service) CreateConnectorVersion(ctx context.Context, namespace string, definition *cschema.Connector, labels map[string]string, annotations map[string]string) (iface.Connector, error) {
 	id := apctx.GetIdGenerator(ctx).New(apid.PrefixConnectorVersion)
 
 	def := definition.Clone()
@@ -22,7 +22,7 @@ func (s *service) CreateConnectorVersion(ctx context.Context, namespace string, 
 	def.Namespace = util.ToPtr(namespace)
 	def.State = string(database.ConnectorDefinitionVersionStateDraft)
 
-	cv, err := newConnectorVersionBuilder(s).
+	cv, err := newConnectorBuilder(s).
 		WithConfig(def).
 		WithId(id).
 		WithVersion(1).
@@ -42,7 +42,7 @@ func (s *service) CreateConnectorVersion(ctx context.Context, namespace string, 
 	return s.getConnectorVersion(ctx, id, 1)
 }
 
-func (s *service) CreateDraftConnectorVersion(ctx context.Context, id apid.ID, definition *cschema.Connector, labels map[string]string, annotations map[string]string) (iface.ConnectorVersion, error) {
+func (s *service) CreateDraftConnectorVersion(ctx context.Context, id apid.ID, definition *cschema.Connector, labels map[string]string, annotations map[string]string) (iface.Connector, error) {
 	// Check for existing draft
 	existingDraft, err := s.db.GetConnectorDefinitionVersionForState(ctx, id, database.ConnectorDefinitionVersionStateDraft)
 	if err != nil && !errors.Is(err, database.ErrNotFound) {
@@ -68,7 +68,7 @@ func (s *service) CreateDraftConnectorVersion(ctx context.Context, id apid.ID, d
 	if definition != nil {
 		def = definition.Clone()
 	} else {
-		wrapped := wrapConnectorVersion(*latest, s)
+		wrapped := wrapConnector(*latest, s)
 		latestDef, err := wrapped.getDefinition()
 		if err != nil {
 			return nil, fmt.Errorf("failed to decrypt latest version definition: %w", err)
@@ -81,7 +81,7 @@ func (s *service) CreateDraftConnectorVersion(ctx context.Context, id apid.ID, d
 	def.Namespace = util.ToPtr(latest.Namespace)
 	def.State = string(database.ConnectorDefinitionVersionStateDraft)
 
-	cv, err := newConnectorVersionBuilder(s).
+	cv, err := newConnectorBuilder(s).
 		WithConfig(def).
 		WithId(id).
 		WithVersion(newVersion).

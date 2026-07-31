@@ -75,7 +75,6 @@ type ConnectorResourceSample struct {
 	Labels            database.Labels
 	State             database.ConnectorDefinitionVersionState
 	ConnectorVersion  uint64
-	TotalVersions     int64
 	ResourceCreatedAt time.Time
 	ResourceUpdatedAt time.Time
 	ResourceDeletedAt *time.Time

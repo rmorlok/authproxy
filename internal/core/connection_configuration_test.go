@@ -16,7 +16,7 @@ import (
 )
 
 func newTestConnectionWithService(s *service) *connection {
-	cv := NewTestConnectorVersion(cschema.Connector{})
+	cv := NewTestConnector(cschema.Connector{})
 	connId := apid.New(apid.PrefixConnection)
 	return &connection{
 		Connection: database.Connection{

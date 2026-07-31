@@ -192,7 +192,6 @@ func TestResourceMetrics_AdditionalResourceCounts(t *testing.T) {
 			Labels:            database.Labels{"env": "prod"},
 			State:             database.ConnectorDefinitionVersionStatePrimary,
 			ConnectorVersion:  2,
-			TotalVersions:     2,
 			ResourceCreatedAt: start.Add(-time.Hour),
 			ResourceUpdatedAt: start,
 		},

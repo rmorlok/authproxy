@@ -15,17 +15,17 @@ type listConnectorVersionWrapper struct {
 	s *service
 }
 
-func (l *listConnectorVersionWrapper) convertPageResult(result pagination.PageResult[database.ConnectorWithDefinition]) pagination.PageResult[iface.ConnectorVersion] {
+func (l *listConnectorVersionWrapper) convertPageResult(result pagination.PageResult[database.ConnectorWithDefinition]) pagination.PageResult[iface.Connector] {
 	if result.Error != nil {
-		return pagination.PageResult[iface.ConnectorVersion]{Error: result.Error}
+		return pagination.PageResult[iface.Connector]{Error: result.Error}
 	}
 
-	versions := make([]iface.ConnectorVersion, 0, len(result.Results))
+	versions := make([]iface.Connector, 0, len(result.Results))
 	for _, r := range result.Results {
-		versions = append(versions, wrapConnectorVersion(r, l.s))
+		versions = append(versions, wrapConnector(r, l.s))
 	}
 
-	return pagination.PageResult[iface.ConnectorVersion]{
+	return pagination.PageResult[iface.Connector]{
 		Results: versions,
 		Error:   result.Error,
 		HasMore: result.HasMore,
@@ -41,11 +41,11 @@ func (l *listConnectorVersionWrapper) executor() database.ListConnectorDefinitio
 	}
 }
 
-func (l *listConnectorVersionWrapper) FetchPage(ctx context.Context) pagination.PageResult[iface.ConnectorVersion] {
+func (l *listConnectorVersionWrapper) FetchPage(ctx context.Context) pagination.PageResult[iface.Connector] {
 	return l.convertPageResult(l.executor().FetchPage(ctx))
 }
 
-func (l *listConnectorVersionWrapper) Enumerate(ctx context.Context, callback pagination.EnumerateCallback[iface.ConnectorVersion]) error {
+func (l *listConnectorVersionWrapper) Enumerate(ctx context.Context, callback pagination.EnumerateCallback[iface.Connector]) error {
 	return l.executor().Enumerate(ctx, func(result pagination.PageResult[database.ConnectorWithDefinition]) (keepGoing pagination.KeepGoing, err error) {
 		return callback(l.convertPageResult(result))
 	})

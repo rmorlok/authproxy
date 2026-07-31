@@ -227,7 +227,7 @@ func (s *service) connectorVersionHashEquals(cv *database.ConnectorWithDefinitio
 	if cv == nil {
 		return false, nil
 	}
-	actual, err := wrapConnectorVersion(*cv, s).getHash()
+	actual, err := wrapConnector(*cv, s).getHash()
 	if err != nil {
 		return false, fmt.Errorf("failed to derive connector version hash: %w", err)
 	}
@@ -525,7 +525,7 @@ func (s *service) precheckConnectorForMigration(ctx context.Context, configConne
 // database, whether newly generated or matched against an existing row) so the
 // caller can track which connectors are config-managed and detect orphans.
 func (s *service) migrateConnector(ctx context.Context, configConnectors *config.Connectors, configConnector *config.Connector) (apid.ID, error) {
-	b := newConnectorVersionBuilder(s)
+	b := newConnectorBuilder(s)
 	identifyingLabels := configConnectors.GetIdentifyingLabels()
 
 	id := apctx.GetIdGenerator(ctx).New(apid.PrefixConnectorVersion)
@@ -545,7 +545,7 @@ func (s *service) migrateConnector(ctx context.Context, configConnectors *config
 
 	var existingVersion *database.ConnectorWithDefinition
 	var err error
-	matchesExisting := func(candidate *ConnectorVersion) (bool, error) {
+	matchesExisting := func(candidate *Connector) (bool, error) {
 		return s.connectorVersionHashEquals(existingVersion, candidate.Hash)
 	}
 

@@ -11,7 +11,7 @@ import (
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
 
-type ConnectorVersion struct {
+type Connector struct {
 	Id          apid.ID
 	Namespace   string
 	Version     uint64
@@ -25,56 +25,56 @@ type ConnectorVersion struct {
 	Definition  *cschema.Connector
 }
 
-func (m *ConnectorVersion) GetId() apid.ID {
+func (m *Connector) GetId() apid.ID {
 	return m.Id
 }
 
-func (m *ConnectorVersion) GetNamespace() string {
+func (m *Connector) GetNamespace() string {
 	return m.Namespace
 }
 
-func (m *ConnectorVersion) GetVersion() uint64 {
+func (m *Connector) GetVersion() uint64 {
 	return m.Version
 }
 
-func (m *ConnectorVersion) GetState() database.ConnectorDefinitionVersionState {
+func (m *Connector) GetState() database.ConnectorDefinitionVersionState {
 	return m.State
 }
 
-func (m *ConnectorVersion) GetType() string {
+func (m *Connector) GetType() string {
 	return m.Type
 }
 
-func (m *ConnectorVersion) GetHash() string {
+func (m *Connector) GetHash() string {
 	return m.Hash
 }
 
-func (m *ConnectorVersion) GetCreatedAt() time.Time {
+func (m *Connector) GetCreatedAt() time.Time {
 	return m.CreatedAt
 }
 
-func (m *ConnectorVersion) GetUpdatedAt() time.Time {
+func (m *Connector) GetUpdatedAt() time.Time {
 	return m.UpdatedAt
 }
 
-func (m *ConnectorVersion) GetLabels() map[string]string {
+func (m *Connector) GetLabels() map[string]string {
 	return m.Labels
 }
 
-func (m *ConnectorVersion) GetAnnotations() map[string]string {
+func (m *Connector) GetAnnotations() map[string]string {
 	return m.Annotations
 }
 
-func (m *ConnectorVersion) GetDefinition() *cschema.Connector {
+func (m *Connector) GetDefinition() *cschema.Connector {
 	return m.Definition
 }
 
-func (m *ConnectorVersion) SetState(_ context.Context, state database.ConnectorDefinitionVersionState) error {
+func (m *Connector) SetState(_ context.Context, state database.ConnectorDefinitionVersionState) error {
 	m.State = state
 	return nil
 }
 
-var _ iface.ConnectorVersion = (*ConnectorVersion)(nil)
+var _ iface.Connector = (*Connector)(nil)
 
 type ConnectorVersionMatcher struct {
 	ExpectedId      apid.ID
@@ -82,7 +82,7 @@ type ConnectorVersionMatcher struct {
 }
 
 func (m ConnectorVersionMatcher) Matches(x interface{}) bool {
-	cv, ok := x.(iface.ConnectorVersion)
+	cv, ok := x.(iface.Connector)
 	if !ok {
 		return false
 	}

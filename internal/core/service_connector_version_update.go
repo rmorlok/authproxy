@@ -29,7 +29,7 @@ func (s *service) enqueueConnectorLabelPropagation(ctx context.Context, id apid.
 	}
 }
 
-func (s *service) UpdateDraftConnectorVersion(ctx context.Context, id apid.ID, version uint64, definition *cschema.Connector, labels map[string]string, annotations map[string]string) (iface.ConnectorVersion, error) {
+func (s *service) UpdateDraftConnectorVersion(ctx context.Context, id apid.ID, version uint64, definition *cschema.Connector, labels map[string]string, annotations map[string]string) (iface.Connector, error) {
 	existing, err := s.db.GetConnectorDefinitionVersion(ctx, id, version)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
@@ -48,7 +48,7 @@ func (s *service) UpdateDraftConnectorVersion(ctx context.Context, id apid.ID, v
 	def.Namespace = util.ToPtr(existing.Namespace)
 	def.State = string(database.ConnectorDefinitionVersionStateDraft)
 
-	cv, err := newConnectorVersionBuilder(s).
+	cv, err := newConnectorBuilder(s).
 		WithConfig(def).
 		WithId(id).
 		WithVersion(version).
@@ -78,14 +78,14 @@ func (s *service) UpdateDraftConnectorVersion(ctx context.Context, id apid.ID, v
 	return s.getConnectorVersion(ctx, id, version)
 }
 
-func (s *service) GetOrCreateDraftConnectorVersion(ctx context.Context, id apid.ID) (iface.ConnectorVersion, error) {
+func (s *service) GetOrCreateDraftConnectorVersion(ctx context.Context, id apid.ID) (iface.Connector, error) {
 	// Try to find an existing draft
 	existingDraft, err := s.db.GetConnectorDefinitionVersionForState(ctx, id, database.ConnectorDefinitionVersionStateDraft)
 	if err != nil && !errors.Is(err, database.ErrNotFound) {
 		return nil, fmt.Errorf("failed to check for existing draft: %w", err)
 	}
 	if existingDraft != nil {
-		wrapped := wrapConnectorVersion(*existingDraft, s)
+		wrapped := wrapConnector(*existingDraft, s)
 		// Verify we can load the definition
 		if _, err := wrapped.getDefinition(); err != nil {
 			return nil, err
@@ -103,7 +103,7 @@ func (s *service) GetOrCreateDraftConnectorVersion(ctx context.Context, id apid.
 	}
 
 	// Decrypt and clone the latest definition
-	wrapped := wrapConnectorVersion(*latest, s)
+	wrapped := wrapConnector(*latest, s)
 	latestDef, err := wrapped.getDefinition()
 	if err != nil {
 		return nil, fmt.Errorf("failed to decrypt latest version definition: %w", err)
@@ -116,7 +116,7 @@ func (s *service) GetOrCreateDraftConnectorVersion(ctx context.Context, id apid.
 	def.Namespace = util.ToPtr(latest.Namespace)
 	def.State = string(database.ConnectorDefinitionVersionStateDraft)
 
-	cv, err := newConnectorVersionBuilder(s).
+	cv, err := newConnectorBuilder(s).
 		WithConfig(def).
 		WithId(id).
 		WithVersion(newVersion).

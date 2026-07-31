@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/httperr"
 )
 
 // AbortConnection aborts an in-progress connection setup, cleaning up any credentials and

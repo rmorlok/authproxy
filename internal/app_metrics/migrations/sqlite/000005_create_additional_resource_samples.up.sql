@@ -6,7 +6,6 @@ CREATE TABLE IF NOT EXISTS app_metrics_connector_resource_samples (
     labels TEXT NOT NULL DEFAULT '{}',
     state TEXT NOT NULL,
     connector_version INTEGER NOT NULL DEFAULT 0,
-    total_versions INTEGER NOT NULL DEFAULT 0,
     resource_created_at_ms INTEGER NOT NULL,
     resource_updated_at_ms INTEGER NOT NULL,
     resource_deleted_at_ms INTEGER,

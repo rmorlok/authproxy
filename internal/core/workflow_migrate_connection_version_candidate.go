@@ -124,8 +124,8 @@ func (s *service) migrationVersionPath(
 	connectorID apid.ID,
 	sourceVersion,
 	targetVersion uint64,
-) ([]*ConnectorVersion, error) {
-	var versions []*ConnectorVersion
+) ([]*Connector, error) {
+	var versions []*Connector
 	if targetVersion > sourceVersion {
 		for v := sourceVersion + 1; v <= targetVersion; v++ {
 			cv, err := s.getConnectorVersion(ctx, connectorID, v)

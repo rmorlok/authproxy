@@ -19,7 +19,7 @@ const (
 type probeBase struct {
 	cfg    *cschema.Probe
 	s      *service
-	cv     *ConnectorVersion
+	cv     *Connector
 	c      *connection
 	logger *slog.Logger
 }
@@ -80,7 +80,7 @@ func (p *probeBase) recordInvokeOutcome(
 	return outcome, err
 }
 
-func NewProbe(cfg *cschema.Probe, s *service, cv *ConnectorVersion, c *connection) iface.Probe {
+func NewProbe(cfg *cschema.Probe, s *service, cv *Connector, c *connection) iface.Probe {
 	base := probeBase{
 		cfg: cfg,
 		s:   s,

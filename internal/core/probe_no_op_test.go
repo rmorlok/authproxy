@@ -23,7 +23,7 @@ func TestProbeNoOp_Invoke(t *testing.T) {
 	defer ctrl.Finish()
 
 	s, _, _, _, _, _ := FullMockService(t, ctrl)
-	cv := NewTestConnectorVersion(cschema.Connector{})
+	cv := NewTestConnector(cschema.Connector{})
 	logger := slog.New(slog.NewTextHandler(testWriter{t}, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	conn := &connection{
 		Connection: database.Connection{

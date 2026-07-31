@@ -36,7 +36,7 @@ type Connection interface {
 	 * Nested entities
 	 */
 
-	GetConnectorVersionEntity() ConnectorVersion
+	GetConnectorVersionEntity() Connector
 
 	/*
 	 * Methods

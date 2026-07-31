@@ -26,7 +26,7 @@ func (n *namespaceHolder) GetNamespace() string {
 	return n.namespace
 }
 
-func TestWrapConnectorVersion(t *testing.T) {
+func TestWrapConnector(t *testing.T) {
 	// Setup
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -38,7 +38,7 @@ func TestWrapConnectorVersion(t *testing.T) {
 	}
 
 	connectorId := apid.New(apid.PrefixActor)
-	dbConnectorVersion := database.ConnectorWithDefinition{
+	dbConnector := database.ConnectorWithDefinition{
 		Id:                  connectorId,
 		Version:             1,
 		Labels:              map[string]string{"type": "test-connector"},
@@ -47,15 +47,15 @@ func TestWrapConnectorVersion(t *testing.T) {
 	}
 
 	// Test
-	cv := wrapConnectorVersion(dbConnectorVersion, s)
+	cv := wrapConnector(dbConnector, s)
 
 	// Verify
-	assert.Equal(t, dbConnectorVersion, cv.ConnectorWithDefinition)
+	assert.Equal(t, dbConnector, cv.ConnectorWithDefinition)
 	assert.Equal(t, s, cv.s)
 	assert.Nil(t, cv.def)
 }
 
-func TestConnectorVersion_GetDefinition(t *testing.T) {
+func TestConnector_GetDefinition(t *testing.T) {
 	// Setup
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -67,7 +67,7 @@ func TestConnectorVersion_GetDefinition(t *testing.T) {
 	}
 
 	connectorId := apid.New(apid.PrefixActor)
-	dbConnectorVersion := database.ConnectorWithDefinition{
+	dbConnector := database.ConnectorWithDefinition{
 		Id:                  connectorId,
 		Version:             1,
 		Labels:              map[string]string{"type": "test-connector"},
@@ -75,7 +75,7 @@ func TestConnectorVersion_GetDefinition(t *testing.T) {
 		EncryptedDefinition: encfield.EncryptedField{ID: "dek_test", Data: "encrypted-data"},
 	}
 
-	cv := wrapConnectorVersion(dbConnectorVersion, s)
+	cv := wrapConnector(dbConnector, s)
 
 	// Create a connector definition
 	def := &cschema.Connector{
@@ -102,7 +102,7 @@ func TestConnectorVersion_GetDefinition(t *testing.T) {
 	assert.Equal(t, result, result2)
 }
 
-func TestConnectorVersion_GetHashDerivesFromEncryptedDefinition(t *testing.T) {
+func TestConnector_GetHashDerivesFromEncryptedDefinition(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -117,7 +117,7 @@ func TestConnectorVersion_GetHashDerivesFromEncryptedDefinition(t *testing.T) {
 		DecryptString(gomock.Any(), encryptedDefinition).
 		Return(string(defJSON), nil)
 
-	cv := wrapConnectorVersion(database.ConnectorWithDefinition{
+	cv := wrapConnector(database.ConnectorWithDefinition{
 		Id:                  apid.New(apid.PrefixConnectorVersion),
 		Version:             1,
 		EncryptedDefinition: encryptedDefinition,
@@ -126,7 +126,7 @@ func TestConnectorVersion_GetHashDerivesFromEncryptedDefinition(t *testing.T) {
 	require.Equal(t, def.Hash(), cv.GetHash())
 }
 
-func TestConnectorVersion_SetDefinition(t *testing.T) {
+func TestConnector_SetDefinition(t *testing.T) {
 	// Setup
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -138,7 +138,7 @@ func TestConnectorVersion_SetDefinition(t *testing.T) {
 	}
 
 	connectorId := apid.New(apid.PrefixActor)
-	dbConnectorVersion := database.ConnectorWithDefinition{
+	dbConnector := database.ConnectorWithDefinition{
 		Id:                  connectorId,
 		Version:             1,
 		Labels:              map[string]string{"type": "test-connector"},
@@ -146,7 +146,7 @@ func TestConnectorVersion_SetDefinition(t *testing.T) {
 		EncryptedDefinition: encfield.EncryptedField{ID: "dek_test", Data: "encrypted-data"},
 	}
 
-	cv := wrapConnectorVersion(dbConnectorVersion, s)
+	cv := wrapConnector(dbConnector, s)
 
 	// Create a connector definition
 	def := &cschema.Connector{
@@ -177,8 +177,8 @@ func TestConnectorVersion_SetDefinition(t *testing.T) {
 	assert.Equal(t, def, cv.def)
 }
 
-func TestConnectorVersion_SetDefinitionResetsJavascriptLibrary(t *testing.T) {
-	cv := NewTestConnectorVersion(cschema.Connector{
+func TestConnector_SetDefinitionResetsJavascriptLibrary(t *testing.T) {
+	cv := NewTestConnector(cschema.Connector{
 		Javascript: `function isUpdated() { return false; }`,
 	})
 
@@ -200,8 +200,8 @@ func TestConnectorVersion_SetDefinitionResetsJavascriptLibrary(t *testing.T) {
 	assert.True(t, ok)
 }
 
-// NewTestConnectorVersion creates a new test connector version using provided connector configuration data.
-func NewTestConnectorVersion(c cschema.Connector) *ConnectorVersion {
+// NewTestConnector creates a hydrated test connector using the provided definition.
+func NewTestConnector(c cschema.Connector) *Connector {
 	e := encrypt.NewFakeEncryptService(false)
 	connectorId := apid.New(apid.PrefixActor)
 	if c.Id != apid.Nil {
@@ -220,7 +220,7 @@ func NewTestConnectorVersion(c cschema.Connector) *ConnectorVersion {
 		panic(err)
 	}
 
-	dbConnectorVersion := database.ConnectorWithDefinition{
+	dbConnector := database.ConnectorWithDefinition{
 		Id:                  connectorId,
 		Version:             version,
 		Labels:              map[string]string{"type": "test-connector"},
@@ -228,5 +228,5 @@ func NewTestConnectorVersion(c cschema.Connector) *ConnectorVersion {
 		EncryptedDefinition: encryptedDefinition,
 	}
 
-	return wrapConnectorVersion(dbConnectorVersion, &service{encrypt: e, logger: aplog.NewNoopLogger()})
+	return wrapConnector(dbConnector, &service{encrypt: e, logger: aplog.NewNoopLogger()})
 }

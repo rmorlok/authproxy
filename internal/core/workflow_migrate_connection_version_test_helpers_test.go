@@ -28,7 +28,7 @@ func newMigrationTestCandidate(t testing.TB) *connectionMigrationCandidate {
 			ConnectorVersion: 1,
 			HealthState:      database.ConnectionHealthStateHealthy,
 		}},
-		Target: &ConnectorVersion{ConnectorWithDefinition: database.ConnectorWithDefinition{
+		Target: &Connector{ConnectorWithDefinition: database.ConnectorWithDefinition{
 			Id:      connectorID,
 			Version: 2,
 		}},

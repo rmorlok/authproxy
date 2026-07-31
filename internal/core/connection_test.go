@@ -12,7 +12,7 @@ func newTestConnection(c cschema.Connector) *connection {
 }
 
 func newTestConnectionWithDetails(u apid.ID, s database.ConnectionState, c cschema.Connector) *connection {
-	cv := NewTestConnectorVersion(c)
+	cv := NewTestConnector(c)
 	return &connection{
 		Connection: database.Connection{
 			Id:               u,

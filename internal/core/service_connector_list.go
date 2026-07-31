@@ -9,12 +9,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
-func wrapConnector(c database.ConnectorWithDefinition, s *service) *Connector {
-	return &Connector{
-		ConnectorVersion: *wrapConnectorVersion(c, s),
-	}
-}
-
 type listConnectorWrapper struct {
 	l database.ListConnectorsBuilder
 	e database.ListConnectorsExecutor

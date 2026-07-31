@@ -154,10 +154,10 @@ func (e *errorConnection) GetMustacheContext(ctx context.Context) (map[string]an
 // configuredConnection wraps a mock Connection to also return a ConnectorVersion.
 type configuredConnection struct {
 	*mockCore.Connection
-	connectorVersion iface.ConnectorVersion
+	connectorVersion iface.Connector
 }
 
-func (c *configuredConnection) GetConnectorVersionEntity() iface.ConnectorVersion {
+func (c *configuredConnection) GetConnectorVersionEntity() iface.Connector {
 	return c.connectorVersion
 }
 
@@ -185,7 +185,7 @@ func TestGenerateAuthUrl_TemplatedEndpoint(t *testing.T) {
 						"tenant": "acme-corp",
 					},
 				},
-				connectorVersion: &mockCore.ConnectorVersion{
+				connectorVersion: &mockCore.Connector{
 					Id: connectorVersionId,
 				},
 			},
@@ -221,7 +221,7 @@ func TestGenerateAuthUrl_TemplatedEndpoint(t *testing.T) {
 						"tenant": "acme-corp",
 					},
 				},
-				connectorVersion: &mockCore.ConnectorVersion{
+				connectorVersion: &mockCore.Connector{
 					Id: connectorVersionId,
 				},
 			},
@@ -256,7 +256,7 @@ func TestGenerateAuthUrl_TemplatedEndpoint(t *testing.T) {
 					Id:     connectionId,
 					Labels: map[string]string{"tenant": "label-tenant"},
 				},
-				connectorVersion: &mockCore.ConnectorVersion{
+				connectorVersion: &mockCore.Connector{
 					Id: connectorVersionId,
 				},
 			},
@@ -288,7 +288,7 @@ func TestGenerateAuthUrl_TemplatedEndpoint(t *testing.T) {
 					Id:            connectionId,
 					Configuration: nil,
 				},
-				connectorVersion: &mockCore.ConnectorVersion{
+				connectorVersion: &mockCore.Connector{
 					Id: connectorVersionId,
 				},
 			},

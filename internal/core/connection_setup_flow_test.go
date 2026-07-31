@@ -38,7 +38,7 @@ func TestManifestSetupFlowIfJavascript(t *testing.T) {
 		},
 	}
 	conn, _ := newTestConnectionWithSetupFlow(t, ctrl, sf)
-	conn.cv = NewTestConnectorVersion(cschema.Connector{
+	conn.cv = NewTestConnector(cschema.Connector{
 		Javascript: `
 			function isSalesforceConnection() {
 				return labels["apxy/cxr/type"] === "salesforce";

@@ -13,8 +13,8 @@ import (
  */
 
 type ListConnectorVersionsExecutor interface {
-	FetchPage(context.Context) pagination.PageResult[ConnectorVersion]
-	Enumerate(context.Context, pagination.EnumerateCallback[ConnectorVersion]) error
+	FetchPage(context.Context) pagination.PageResult[Connector]
+	Enumerate(context.Context, pagination.EnumerateCallback[Connector]) error
 }
 
 type ListConnectorVersionsBuilder interface {

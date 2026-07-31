@@ -8,7 +8,6 @@ import (
 
 	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/internal/apctx"
-	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -188,10 +187,6 @@ func (h *ResourceSnapshotTaskHandler) snapshotConnectors(ctx context.Context, sa
 			samples := make([]*ConnectorResourceSample, 0, len(page.Results))
 			for _, connector := range page.Results {
 				connector := connector
-				totalVersions, err := h.countConnectorDefinitionVersions(ctx, connector.Id)
-				if err != nil {
-					return pagination.Stop, err
-				}
 				samples = append(samples, &ConnectorResourceSample{
 					SampledAt:         sampledAt,
 					ResourceType:      ResourceTypeConnector,
@@ -200,7 +195,6 @@ func (h *ResourceSnapshotTaskHandler) snapshotConnectors(ctx context.Context, sa
 					Labels:            connector.Labels,
 					State:             connector.State,
 					ConnectorVersion:  connector.Version,
-					TotalVersions:     totalVersions,
 					ResourceCreatedAt: connector.CreatedAt,
 					ResourceUpdatedAt: connector.UpdatedAt,
 					ResourceDeletedAt: connector.DeletedAt,
@@ -214,21 +208,6 @@ func (h *ResourceSnapshotTaskHandler) snapshotConnectors(ctx context.Context, sa
 		})
 	if err != nil {
 		return total, fmt.Errorf("failed to enumerate connector resources for app metrics snapshot: %w", err)
-	}
-	return total, nil
-}
-
-func (h *ResourceSnapshotTaskHandler) countConnectorDefinitionVersions(ctx context.Context, connectorID apid.ID) (int64, error) {
-	var total int64
-	err := h.db.ListConnectorDefinitionVersionsBuilder().
-		ForId(connectorID).
-		Limit(resourceSnapshotBatchSize).
-		Enumerate(ctx, func(page pagination.PageResult[database.ConnectorWithDefinition]) (pagination.KeepGoing, error) {
-			total += int64(len(page.Results))
-			return pagination.Continue, nil
-		})
-	if err != nil {
-		return 0, fmt.Errorf("failed to count definition versions for connector %s: %w", connectorID, err)
 	}
 	return total, nil
 }

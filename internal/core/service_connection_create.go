@@ -16,7 +16,7 @@ import (
 func (s *service) CreateConnection(
 	ctx context.Context,
 	namespace string,
-	cv iface.ConnectorVersion,
+	cv iface.Connector,
 ) (connection iface.Connection, err error) {
 	logger := aplog.LoggerOrDefault(cv, s)
 	logger.Info("creating new connection",
@@ -48,7 +48,7 @@ func (s *service) CreateConnection(
 		return nil, err
 	}
 
-	rawCv := cv.(*ConnectorVersion)
+	rawCv := cv.(*Connector)
 
 	logger.Info("created new connection",
 		"namespace", namespace,

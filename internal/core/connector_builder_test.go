@@ -25,7 +25,7 @@ func TestNewVersionBuilder(t *testing.T) {
 	}
 
 	// Test
-	builder := newConnectorVersionBuilder(s)
+	builder := newConnectorBuilder(s)
 
 	// Verify
 	assert.NotNil(t, builder)
@@ -46,7 +46,7 @@ func TestVersionBuilder_WithConfig(t *testing.T) {
 		logger:  aplog.NewNoopLogger(),
 	}
 
-	builder := newConnectorVersionBuilder(s)
+	builder := newConnectorBuilder(s)
 
 	// Create a test configuration
 	connectorID := apid.New(apid.PrefixActor)
@@ -67,7 +67,7 @@ func TestVersionBuilder_WithConfig(t *testing.T) {
 	assert.NotEmpty(t, builder.versionSetters)
 
 	// Test the setter function
-	cv := &ConnectorVersion{}
+	cv := &Connector{}
 	builder.versionSetters[0](cv)
 	assert.Equal(t, uint64(1), cv.Version)
 	assert.Equal(t, connectorID, cv.Id)
@@ -84,7 +84,7 @@ func TestVersionBuilder_WithId(t *testing.T) {
 		logger:  aplog.NewNoopLogger(),
 	}
 
-	builder := newConnectorVersionBuilder(s)
+	builder := newConnectorBuilder(s)
 
 	// Create a test ID
 	connectorID := apid.New(apid.PrefixActor)
@@ -98,7 +98,7 @@ func TestVersionBuilder_WithId(t *testing.T) {
 	assert.NotEmpty(t, builder.configSetters)
 
 	// Test the version setter function
-	cv := &ConnectorVersion{}
+	cv := &Connector{}
 	builder.versionSetters[0](cv)
 	assert.Equal(t, connectorID, cv.Id)
 
@@ -119,7 +119,7 @@ func TestVersionBuilder_WithVersion(t *testing.T) {
 		logger:  aplog.NewNoopLogger(),
 	}
 
-	builder := newConnectorVersionBuilder(s)
+	builder := newConnectorBuilder(s)
 
 	// Create a test version
 	version := uint64(2)
@@ -133,7 +133,7 @@ func TestVersionBuilder_WithVersion(t *testing.T) {
 	assert.NotEmpty(t, builder.configSetters)
 
 	// Test the version setter function
-	cv := &ConnectorVersion{}
+	cv := &Connector{}
 	builder.versionSetters[0](cv)
 	assert.Equal(t, version, cv.Version)
 
@@ -154,7 +154,7 @@ func TestVersionBuilder_Build_Success(t *testing.T) {
 		logger:  aplog.NewNoopLogger(),
 	}
 
-	builder := newConnectorVersionBuilder(s)
+	builder := newConnectorBuilder(s)
 
 	// Create a test configuration
 	connectorID := apid.New(apid.PrefixActor)
@@ -196,7 +196,7 @@ func TestVersionBuilder_Build_NilConnector(t *testing.T) {
 		logger:  aplog.NewNoopLogger(),
 	}
 
-	builder := newConnectorVersionBuilder(s)
+	builder := newConnectorBuilder(s)
 
 	// Test
 	cv, err := builder.Build()
@@ -218,7 +218,7 @@ func TestVersionBuilder_Build_EncryptError(t *testing.T) {
 		logger:  aplog.NewNoopLogger(),
 	}
 
-	builder := newConnectorVersionBuilder(s)
+	builder := newConnectorBuilder(s)
 
 	// Create a test configuration
 	connectorID := apid.New(apid.PrefixActor)

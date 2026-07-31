@@ -43,7 +43,7 @@ func (s *stubProxy) ProxyRequestRaw(ctx context.Context, _ httpf.RequestType, _ 
 func newProbeTestConnection(t *testing.T, ctrl *gomock.Controller, def cschema.Connector) (*connection, *stubProxy) {
 	t.Helper()
 	s, _, _, _, _, _ := FullMockService(t, ctrl)
-	cv := NewTestConnectorVersion(def)
+	cv := NewTestConnector(def)
 
 	logger := slog.New(slog.NewTextHandler(testWriter{t}, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	conn := &connection{
@@ -204,7 +204,7 @@ func TestProbeHttp_RawHttp_Success(t *testing.T) {
 	h := mockH.NewFactoryWithMockingClient(ctrl)
 	s, _, _, _, _, _ := FullMockService(t, ctrl)
 	s.httpf = h
-	cv := NewTestConnectorVersion(cschema.Connector{})
+	cv := NewTestConnector(cschema.Connector{})
 	logger := slog.New(slog.NewTextHandler(testWriter{t}, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	conn := &connection{
 		Connection: database.Connection{
@@ -244,7 +244,7 @@ func TestProbeHttp_RawHttp_Non2xxIsFailure(t *testing.T) {
 	h := mockH.NewFactoryWithMockingClient(ctrl)
 	s, _, _, _, _, _ := FullMockService(t, ctrl)
 	s.httpf = h
-	cv := NewTestConnectorVersion(cschema.Connector{})
+	cv := NewTestConnector(cschema.Connector{})
 	logger := slog.New(slog.NewTextHandler(testWriter{t}, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	conn := &connection{
 		Connection: database.Connection{

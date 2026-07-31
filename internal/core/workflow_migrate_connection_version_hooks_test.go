@@ -10,7 +10,7 @@ import (
 )
 
 func TestApplyMigrationHookForVersionSelectsUpAndDown(t *testing.T) {
-	version := NewTestConnectorVersion(cschema.Connector{
+	version := NewTestConnector(cschema.Connector{
 		Javascript: `
 			function migrateUp() {
 				return { config: { set: { direction: "up", from_cfg: cfg.seed } } };
@@ -39,7 +39,7 @@ func TestApplyMigrationHookForVersionSelectsUpAndDown(t *testing.T) {
 }
 
 func TestApplyMigrationHookForVersionSkipsMissingHook(t *testing.T) {
-	version := NewTestConnectorVersion(cschema.Connector{})
+	version := NewTestConnector(cschema.Connector{})
 	candidate := newMigrationTestCandidate(t)
 
 	require.NoError(t, version.s.applyMigrationHookForVersion(context.Background(), candidate, version, 1, 2))

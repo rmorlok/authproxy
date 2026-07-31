@@ -49,7 +49,6 @@ var connectorResourceSampleColumns = []string{
 	"labels",
 	"state",
 	"connector_version",
-	"total_versions",
 	"resource_created_at_ms",
 	"resource_updated_at_ms",
 	"resource_deleted_at_ms",
@@ -219,7 +218,6 @@ func (s *sqlRecordStore) StoreConnectorResourceSamples(ctx context.Context, samp
 			labelsVal,
 			string(sample.State),
 			sample.ConnectorVersion,
-			sample.TotalVersions,
 			sample.ResourceCreatedAt.UnixMilli(),
 			sample.ResourceUpdatedAt.UnixMilli(),
 			nullableUnixMillis(sample.ResourceDeletedAt),
@@ -233,7 +231,6 @@ func (s *sqlRecordStore) StoreConnectorResourceSamples(ctx context.Context, samp
 		labels = excluded.labels,
 		state = excluded.state,
 		connector_version = excluded.connector_version,
-		total_versions = excluded.total_versions,
 		resource_created_at_ms = excluded.resource_created_at_ms,
 		resource_updated_at_ms = excluded.resource_updated_at_ms,
 		resource_deleted_at_ms = excluded.resource_deleted_at_ms,
@@ -504,7 +501,7 @@ func (s *clickhouseRecordStore) StoreConnectorResourceSamples(ctx context.Contex
 	defer tx.Rollback()
 
 	stmt, err := tx.PrepareContext(ctx, fmt.Sprintf(
-		"INSERT INTO %s (%s, ingested_at_unix_nano) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"INSERT INTO %s (%s, ingested_at_unix_nano) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		connectorResourceSamplesTable,
 		strings.Join(connectorResourceSampleColumns, ", "),
 	))
@@ -527,7 +524,6 @@ func (s *clickhouseRecordStore) StoreConnectorResourceSamples(ctx context.Contex
 			labelsVal,
 			string(sample.State),
 			sample.ConnectorVersion,
-			sample.TotalVersions,
 			sample.ResourceCreatedAt.UnixMilli(),
 			sample.ResourceUpdatedAt.UnixMilli(),
 			nullableUnixMillis(sample.ResourceDeletedAt),
@@ -1097,7 +1093,6 @@ func scanConnectorResourceSample(row interface{ Scan(dest ...any) error }) (*Con
 		&sample.Labels,
 		&sample.State,
 		&sample.ConnectorVersion,
-		&sample.TotalVersions,
 		&createdAtMs,
 		&updatedAtMs,
 		&deletedAtMs,

@@ -192,7 +192,7 @@ func TestMigrationVersionPathPropagatesLookupError(t *testing.T) {
 	require.ErrorIs(t, err, wantErr)
 }
 
-func migrationTestVersionNumbers(versions []*ConnectorVersion) []uint64 {
+func migrationTestVersionNumbers(versions []*Connector) []uint64 {
 	result := make([]uint64, 0, len(versions))
 	for _, version := range versions {
 		result = append(result, version.Version)

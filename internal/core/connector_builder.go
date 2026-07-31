@@ -8,24 +8,24 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/config"
 )
 
-type connectorVersionBuilder struct {
+type connectorBuilder struct {
 	s              *service
 	c              *config.Connector
 	configSetters  []func(c *config.Connector)
-	versionSetters []func(v *ConnectorVersion)
+	versionSetters []func(v *Connector)
 }
 
-func newConnectorVersionBuilder(s *service) *connectorVersionBuilder {
-	return &connectorVersionBuilder{
+func newConnectorBuilder(s *service) *connectorBuilder {
+	return &connectorBuilder{
 		s: s,
 	}
 }
 
-func (b *connectorVersionBuilder) WithConfig(c *config.Connector) *connectorVersionBuilder {
+func (b *connectorBuilder) WithConfig(c *config.Connector) *connectorBuilder {
 	b.c = c
 
-	b.versionSetters = append([]func(v *ConnectorVersion){
-		func(v *ConnectorVersion) {
+	b.versionSetters = append([]func(v *Connector){
+		func(v *Connector) {
 			v.Version = c.Version
 			v.Id = c.Id
 			v.Namespace = c.GetNamespace()
@@ -36,9 +36,9 @@ func (b *connectorVersionBuilder) WithConfig(c *config.Connector) *connectorVers
 	return b
 }
 
-func (b *connectorVersionBuilder) WithId(id apid.ID) *connectorVersionBuilder {
+func (b *connectorBuilder) WithId(id apid.ID) *connectorBuilder {
 	b.versionSetters = append(b.versionSetters,
-		func(v *ConnectorVersion) {
+		func(v *Connector) {
 			v.Id = id
 		},
 	)
@@ -51,9 +51,9 @@ func (b *connectorVersionBuilder) WithId(id apid.ID) *connectorVersionBuilder {
 	return b
 }
 
-func (b *connectorVersionBuilder) WithState(state database.ConnectorDefinitionVersionState) *connectorVersionBuilder {
+func (b *connectorBuilder) WithState(state database.ConnectorDefinitionVersionState) *connectorBuilder {
 	b.versionSetters = append(b.versionSetters,
-		func(v *ConnectorVersion) {
+		func(v *Connector) {
 			v.State = state
 		},
 	)
@@ -66,9 +66,9 @@ func (b *connectorVersionBuilder) WithState(state database.ConnectorDefinitionVe
 	return b
 }
 
-func (b *connectorVersionBuilder) WithVersion(ver uint64) *connectorVersionBuilder {
+func (b *connectorBuilder) WithVersion(ver uint64) *connectorBuilder {
 	b.versionSetters = append(b.versionSetters,
-		func(v *ConnectorVersion) {
+		func(v *Connector) {
 			v.Version = ver
 		},
 	)
@@ -83,12 +83,12 @@ func (b *connectorVersionBuilder) WithVersion(ver uint64) *connectorVersionBuild
 
 var errNilConnector = errors.New("nil connector")
 
-func (b *connectorVersionBuilder) Build() (*ConnectorVersion, error) {
+func (b *connectorBuilder) Build() (*Connector, error) {
 	if b.c == nil {
 		return nil, errNilConnector
 	}
 
-	cv := ConnectorVersion{
+	cv := Connector{
 		s: b.s,
 	}
 

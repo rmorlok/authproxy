@@ -54,7 +54,7 @@ type migrationNotificationDef struct {
 // connection update and notification changes to persistent storage.
 type connectionMigrationCandidate struct {
 	Connection            *connection
-	Target                *ConnectorVersion
+	Target                *Connector
 	Config                map[string]any
 	UserLabels            map[string]string
 	Annotations           map[string]string

@@ -85,7 +85,6 @@ func TestResourceSnapshotTask_CreatesSamplesAndIsIdempotent(t *testing.T) {
 	require.Equal(t, "root.metrics", connectorSamples[0].Namespace)
 	require.Equal(t, database.ConnectorDefinitionVersionStatePrimary, connectorSamples[0].State)
 	require.Equal(t, uint64(1), connectorSamples[0].ConnectorVersion)
-	require.Equal(t, int64(1), connectorSamples[0].TotalVersions)
 
 	connectorVersionSamples := listConnectorVersionSamples(t, retriever, ctx, sampledAt)
 	require.Len(t, connectorVersionSamples, 1)

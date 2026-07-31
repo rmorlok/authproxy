@@ -121,7 +121,7 @@ func TestRefreshAuthAfterConnectionMigrationCallsRefresh(t *testing.T) {
 		database.ConnectorDefinitionVersionStateActive,
 		cschema.Connector{Auth: cschema.NewNoAuth()},
 	)
-	target := wrapConnectorVersion(*targetDB, s)
+	target := wrapConnector(*targetDB, s)
 	auth := &migrationRefreshTestAuthenticator{}
 	factory := &migrationRefreshTestFactory{auth: auth}
 	s.authMethodFactories = map[cschema.AuthType]auth_methods.Factory{
@@ -161,7 +161,7 @@ func TestRefreshAuthAfterConnectionMigrationReturnsRefreshError(t *testing.T) {
 		database.ConnectorDefinitionVersionStateActive,
 		cschema.Connector{Auth: cschema.NewNoAuth()},
 	)
-	target := wrapConnectorVersion(*targetDB, s)
+	target := wrapConnector(*targetDB, s)
 	wantErr := errors.New("refresh failed")
 	s.authMethodFactories = map[cschema.AuthType]auth_methods.Factory{
 		cschema.AuthTypeNoAuth: &migrationRefreshTestFactory{
@@ -198,7 +198,7 @@ func TestRefreshAuthAfterConnectionMigrationValidatesFactory(t *testing.T) {
 		database.ConnectorDefinitionVersionStateActive,
 		cschema.Connector{Auth: cschema.NewNoAuth()},
 	)
-	target := wrapConnectorVersion(*targetDB, s)
+	target := wrapConnector(*targetDB, s)
 	updated := &database.Connection{
 		Id:               apid.New(apid.PrefixConnection),
 		Namespace:        "root",

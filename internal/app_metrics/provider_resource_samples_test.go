@@ -172,7 +172,6 @@ func TestResourceSamples_AdditionalSamples_IdempotentAndQueryable(t *testing.T) 
 			Labels:            database.Labels{"env": "prod", "kind": "connector"},
 			State:             database.ConnectorDefinitionVersionStateDraft,
 			ConnectorVersion:  1,
-			TotalVersions:     1,
 			ResourceCreatedAt: createdAt,
 			ResourceUpdatedAt: updatedAt,
 		},
@@ -185,7 +184,6 @@ func TestResourceSamples_AdditionalSamples_IdempotentAndQueryable(t *testing.T) 
 			Labels:            database.Labels{"env": "prod", "kind": "connector"},
 			State:             database.ConnectorDefinitionVersionStatePrimary,
 			ConnectorVersion:  2,
-			TotalVersions:     2,
 			ResourceCreatedAt: createdAt,
 			ResourceUpdatedAt: sampledAt,
 		},
@@ -200,7 +198,6 @@ func TestResourceSamples_AdditionalSamples_IdempotentAndQueryable(t *testing.T) 
 	require.Equal(t, ResourceTypeConnector, connectorSamples[0].ResourceType)
 	require.Equal(t, database.ConnectorDefinitionVersionStatePrimary, connectorSamples[0].State)
 	require.Equal(t, uint64(2), connectorSamples[0].ConnectorVersion)
-	require.Equal(t, int64(2), connectorSamples[0].TotalVersions)
 
 	require.NoError(t, resourceStore.StoreConnectorVersionResourceSamples(ctx, []*ConnectorVersionResourceSample{
 		{

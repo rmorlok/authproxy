@@ -27,7 +27,7 @@ func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConn
 	}
 
 	var err error
-	var cv iface.ConnectorVersion
+	var cv iface.Connector
 	if req.HasVersion() {
 		cv, err = s.GetConnectorVersion(ctx, req.ConnectorId, req.ConnectorVersion)
 	} else {

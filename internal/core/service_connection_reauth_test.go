@@ -162,7 +162,7 @@ func TestReauthConnection(t *testing.T) {
 				},
 			},
 		}
-		cv := NewTestConnectorVersion(connector)
+		cv := NewTestConnector(connector)
 		conn := &connection{
 			Connection: database.Connection{
 				Id:               "cxn_test1111111111aa",
@@ -213,7 +213,7 @@ func TestReauthConnection(t *testing.T) {
 				},
 			},
 		}
-		cv := NewTestConnectorVersion(connector)
+		cv := NewTestConnector(connector)
 		conn := &connection{
 			Connection: database.Connection{
 				Id:               "cxn_test1111111111aa",

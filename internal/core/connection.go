@@ -24,7 +24,7 @@ type connection struct {
 	database.Connection
 
 	s      *service
-	cv     *ConnectorVersion
+	cv     *Connector
 	logger *slog.Logger
 
 	configMu     sync.Mutex
@@ -36,7 +36,7 @@ type connection struct {
 	proxyImplErr  error
 }
 
-func wrapConnection(c *database.Connection, cv *ConnectorVersion, s *service) *connection {
+func wrapConnection(c *database.Connection, cv *Connector, s *service) *connection {
 	return &connection{
 		Connection: *c,
 		s:          s,
@@ -101,7 +101,7 @@ func (c *connection) GetSetupStep() *cschema.SetupStep {
 	return c.SetupStep
 }
 
-func (c *connection) GetConnectorVersionEntity() iface.ConnectorVersion {
+func (c *connection) GetConnectorVersionEntity() iface.Connector {
 	return c.cv
 }
 
