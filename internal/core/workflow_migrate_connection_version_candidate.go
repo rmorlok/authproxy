@@ -128,21 +128,21 @@ func (s *service) migrationVersionPath(
 	var versions []*Connector
 	if targetVersion > sourceVersion {
 		for v := sourceVersion + 1; v <= targetVersion; v++ {
-			cv, err := s.getConnectorVersion(ctx, connectorID, v)
+			c, err := s.getConnectorVersion(ctx, connectorID, v)
 			if err != nil {
 				return nil, err
 			}
-			versions = append(versions, cv)
+			versions = append(versions, c)
 		}
 		return versions, nil
 	}
 
 	for v := sourceVersion; v > targetVersion; v-- {
-		cv, err := s.getConnectorVersion(ctx, connectorID, v)
+		c, err := s.getConnectorVersion(ctx, connectorID, v)
 		if err != nil {
 			return nil, err
 		}
-		versions = append(versions, cv)
+		versions = append(versions, c)
 	}
 
 	return versions, nil

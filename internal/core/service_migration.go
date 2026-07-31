@@ -556,7 +556,7 @@ func (s *service) migrateConnector(ctx context.Context, configConnectors *config
 		}
 
 		if existingVersion != nil {
-			cv, err := b.
+			c, err := b.
 				WithId(id).
 				WithVersion(version).
 				WithConfig(configConnector).
@@ -564,7 +564,7 @@ func (s *service) migrateConnector(ctx context.Context, configConnectors *config
 				Build()
 
 			if err == nil {
-				matches, hashErr := matchesExisting(cv)
+				matches, hashErr := matchesExisting(c)
 				if hashErr != nil {
 					return apid.Nil, hashErr
 				}
@@ -581,7 +581,7 @@ func (s *service) migrateConnector(ctx context.Context, configConnectors *config
 		}
 
 		if existingVersion != nil {
-			cv, err := b.
+			c, err := b.
 				WithId(id).
 				WithVersion(existingVersion.Version).
 				WithConfig(configConnector).
@@ -589,7 +589,7 @@ func (s *service) migrateConnector(ctx context.Context, configConnectors *config
 				Build()
 
 			if err == nil {
-				matches, hashErr := matchesExisting(cv)
+				matches, hashErr := matchesExisting(c)
 				if hashErr != nil {
 					return apid.Nil, hashErr
 				}
@@ -613,7 +613,7 @@ func (s *service) migrateConnector(ctx context.Context, configConnectors *config
 		if existingVersion != nil {
 			id = existingVersion.Id
 
-			cv, err := b.
+			c, err := b.
 				WithId(id).
 				WithVersion(version).
 				WithConfig(configConnector).
@@ -621,7 +621,7 @@ func (s *service) migrateConnector(ctx context.Context, configConnectors *config
 				Build()
 
 			if err == nil {
-				matches, hashErr := matchesExisting(cv)
+				matches, hashErr := matchesExisting(c)
 				if hashErr != nil {
 					return apid.Nil, hashErr
 				}
@@ -652,7 +652,7 @@ func (s *service) migrateConnector(ctx context.Context, configConnectors *config
 		if existingVersion != nil {
 			id = existingVersion.Id
 
-			cv, err := b.
+			c, err := b.
 				WithId(id).
 				WithVersion(existingVersion.Version).
 				WithConfig(configConnector).
@@ -660,7 +660,7 @@ func (s *service) migrateConnector(ctx context.Context, configConnectors *config
 				Build()
 
 			if err == nil {
-				matches, hashErr := matchesExisting(cv)
+				matches, hashErr := matchesExisting(c)
 				if hashErr != nil {
 					return apid.Nil, hashErr
 				}
@@ -674,7 +674,7 @@ func (s *service) migrateConnector(ctx context.Context, configConnectors *config
 		}
 	}
 
-	cv, err := b.
+	c, err := b.
 		WithId(id).
 		WithVersion(version).
 		WithConfig(configConnector).
@@ -686,7 +686,7 @@ func (s *service) migrateConnector(ctx context.Context, configConnectors *config
 
 	// Final check, though this should be duplicative
 	if existingVersion != nil {
-		matches, hashErr := matchesExisting(cv)
+		matches, hashErr := matchesExisting(c)
 		if hashErr != nil {
 			return apid.Nil, hashErr
 		}
@@ -700,14 +700,14 @@ func (s *service) migrateConnector(ctx context.Context, configConnectors *config
 	// distinguish config-managed connectors from API-created ones. Copy the
 	// labels map first because the builder shared a reference with the
 	// caller-owned config struct.
-	taggedLabels := make(database.Labels, len(cv.ConnectorWithDefinition.Labels)+1)
-	for k, v := range cv.ConnectorWithDefinition.Labels {
+	taggedLabels := make(database.Labels, len(c.ConnectorWithDefinition.Labels)+1)
+	for k, v := range c.ConnectorWithDefinition.Labels {
 		taggedLabels[k] = v
 	}
 	taggedLabels[connectorSourceLabelKey] = connectorSourceLabelValueConfig
-	cv.ConnectorWithDefinition.Labels = taggedLabels
+	c.ConnectorWithDefinition.Labels = taggedLabels
 
-	err = s.db.UpsertConnectorDefinitionVersion(ctx, &cv.ConnectorWithDefinition)
+	err = s.db.UpsertConnectorDefinitionVersion(ctx, &c.ConnectorWithDefinition)
 	if err != nil {
 		return apid.Nil, fmt.Errorf("failed to upsert connector version: %w", err)
 	}

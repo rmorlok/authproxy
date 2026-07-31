@@ -16,16 +16,16 @@ import (
 func (s *service) CreateConnection(
 	ctx context.Context,
 	namespace string,
-	cv iface.Connector,
+	c iface.Connector,
 ) (connection iface.Connection, err error) {
-	logger := aplog.LoggerOrDefault(cv, s)
+	logger := aplog.LoggerOrDefault(c, s)
 	logger.Info("creating new connection",
 		"namespace", namespace,
-		"connector_id", cv.GetId(),
-		"connector_version", cv.GetVersion(),
+		"connector_id", c.GetId(),
+		"connector_version", c.GetVersion(),
 	)
 
-	if !ns.IsSameOrChild(cv.GetNamespace(), namespace) {
+	if !ns.IsSameOrChild(c.GetNamespace(), namespace) {
 		return nil, httperr.BadRequestErr(errors.New("connections must be created in the same or child namespace of the connector"))
 	}
 
@@ -35,8 +35,8 @@ func (s *service) CreateConnection(
 	dbConn := database.Connection{
 		Id:               id,
 		Namespace:        namespace,
-		ConnectorId:      cv.GetId(),
-		ConnectorVersion: cv.GetVersion(),
+		ConnectorId:      c.GetId(),
+		ConnectorVersion: c.GetVersion(),
 		CreatedAt:        now,
 		UpdatedAt:        now,
 		State:            database.ConnectionStateSetup,
@@ -48,13 +48,13 @@ func (s *service) CreateConnection(
 		return nil, err
 	}
 
-	rawCv := cv.(*Connector)
+	connector := c.(*Connector)
 
 	logger.Info("created new connection",
 		"namespace", namespace,
-		"connector_id", cv.GetId(),
-		"connector_version", cv.GetVersion(),
+		"connector_id", c.GetId(),
+		"connector_version", c.GetVersion(),
 		"connection_id", id)
 
-	return wrapConnection(&dbConn, rawCv, s), nil
+	return wrapConnection(&dbConn, connector, s), nil
 }

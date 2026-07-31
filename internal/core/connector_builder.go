@@ -88,7 +88,7 @@ func (b *connectorBuilder) Build() (*Connector, error) {
 		return nil, errNilConnector
 	}
 
-	cv := Connector{
+	c := Connector{
 		s: b.s,
 	}
 
@@ -97,12 +97,12 @@ func (b *connectorBuilder) Build() (*Connector, error) {
 	}
 
 	for _, setter := range b.versionSetters {
-		setter(&cv)
+		setter(&c)
 	}
 
-	if err := cv.setDefinition(b.c); err != nil {
+	if err := c.setDefinition(b.c); err != nil {
 		return nil, err
 	}
 
-	return &cv, nil
+	return &c, nil
 }

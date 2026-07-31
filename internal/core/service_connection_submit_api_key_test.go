@@ -49,7 +49,7 @@ func newTestApiKeyConnection(
 		}},
 		Probes: probes,
 	}
-	cv := NewTestConnector(connector)
+	c := NewTestConnector(connector)
 
 	conn := &connection{
 		Connection: database.Connection{
@@ -57,12 +57,12 @@ func newTestApiKeyConnection(
 			Namespace:        "root",
 			State:            database.ConnectionStateSetup,
 			HealthState:      database.ConnectionHealthStateHealthy,
-			ConnectorId:      cv.GetId(),
-			ConnectorVersion: cv.GetVersion(),
+			ConnectorId:      c.GetId(),
+			ConnectorVersion: c.GetVersion(),
 		},
-		s:      s,
-		cv:     cv,
-		logger: aplog.NewNoopLogger(),
+		s:         s,
+		connector: c,
+		logger:    aplog.NewNoopLogger(),
 	}
 	return conn, db, ac
 }
@@ -265,18 +265,18 @@ func TestApiKeySubmit_PreconnectFieldNamedApiKeyIsNotTreatedAsCredential(t *test
 			Preconnect: &cschema.SetupFlowPhase{Steps: []cschema.SetupFlowStep{preconnect}},
 		},
 	}
-	cv := NewTestConnector(connector)
+	c := NewTestConnector(connector)
 	conn := &connection{
 		Connection: database.Connection{
 			Id:               "cxn_test2222222222aa",
 			Namespace:        "root",
 			State:            database.ConnectionStateSetup,
-			ConnectorId:      cv.GetId(),
-			ConnectorVersion: cv.GetVersion(),
+			ConnectorId:      c.GetId(),
+			ConnectorVersion: c.GetVersion(),
 		},
-		s:      s,
-		cv:     cv,
-		logger: aplog.NewNoopLogger(),
+		s:         s,
+		connector: c,
+		logger:    aplog.NewNoopLogger(),
 	}
 
 	step := cschema.MustNewSetupStep("tenant")
@@ -338,18 +338,18 @@ func TestApiKeySubmit_TransitionsToConfigureWhenNoProbes(t *testing.T) {
 			Configure: &cschema.SetupFlowPhase{Steps: []cschema.SetupFlowStep{configureStep}},
 		},
 	}
-	cv := NewTestConnector(connector)
+	c := NewTestConnector(connector)
 	conn := &connection{
 		Connection: database.Connection{
 			Id:               "cxn_test3333333333aa",
 			Namespace:        "root",
 			State:            database.ConnectionStateSetup,
-			ConnectorId:      cv.GetId(),
-			ConnectorVersion: cv.GetVersion(),
+			ConnectorId:      c.GetId(),
+			ConnectorVersion: c.GetVersion(),
 		},
-		s:      s,
-		cv:     cv,
-		logger: aplog.NewNoopLogger(),
+		s:         s,
+		connector: c,
+		logger:    aplog.NewNoopLogger(),
 	}
 
 	step := cschema.MustNewSetupStep(api_key.SynthesizedApiKeyCredentialsStepId)

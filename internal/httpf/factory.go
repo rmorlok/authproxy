@@ -97,7 +97,7 @@ func (f *clientFactory) ForConnection(c Connection) F {
 	var fp F = f
 
 	if cg, ok := c.(GettableConnectorVersion); ok {
-		cv := cg.GetConnectorVersionEntity()
+		cv := cg.GetConnector()
 		fp = fp.ForConnectorVersion(cv)
 	}
 

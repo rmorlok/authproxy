@@ -67,7 +67,7 @@ func newProbeHealthTestConn(
 ) (*connection, *mockDb.MockDB, *bytes.Buffer) {
 	t.Helper()
 	s, db, _, _, _, _ := FullMockService(t, ctrl)
-	cv := NewTestConnector(cschema.Connector{Probes: probes})
+	c := NewTestConnector(cschema.Connector{Probes: probes})
 	connId := apid.New(apid.PrefixConnection)
 
 	var buf bytes.Buffer
@@ -79,12 +79,12 @@ func newProbeHealthTestConn(
 			Namespace:        "root",
 			State:            database.ConnectionStateConfigured,
 			HealthState:      initialHealth,
-			ConnectorId:      cv.GetId(),
-			ConnectorVersion: cv.GetVersion(),
+			ConnectorId:      c.GetId(),
+			ConnectorVersion: c.GetVersion(),
 		},
-		s:      s,
-		cv:     cv,
-		logger: logger,
+		s:         s,
+		connector: c,
+		logger:    logger,
 	}, db, &buf
 }
 
@@ -342,7 +342,7 @@ func TestRecordPeriodicProbeOutcome_ApiKeyStampsLastValidatedAt(t *testing.T) {
 	defer ctrl.Finish()
 
 	s, db, _, _, _, _ := FullMockService(t, ctrl)
-	cv := NewTestConnector(cschema.Connector{
+	c := NewTestConnector(cschema.Connector{
 		Auth: &cschema.Auth{InnerVal: &cschema.AuthApiKey{
 			Type:      cschema.AuthTypeAPIKey,
 			Placement: &cschema.ApiKeyPlacement{Type: cschema.ApiKeyPlacementBearer},
@@ -358,12 +358,12 @@ func TestRecordPeriodicProbeOutcome_ApiKeyStampsLastValidatedAt(t *testing.T) {
 			Namespace:        "root",
 			State:            database.ConnectionStateConfigured,
 			HealthState:      database.ConnectionHealthStateHealthy,
-			ConnectorId:      cv.GetId(),
-			ConnectorVersion: cv.GetVersion(),
+			ConnectorId:      c.GetId(),
+			ConnectorVersion: c.GetVersion(),
 		},
-		s:      s,
-		cv:     cv,
-		logger: slog.New(slog.NewJSONHandler(&bytes.Buffer{}, nil)),
+		s:         s,
+		connector: c,
+		logger:    slog.New(slog.NewJSONHandler(&bytes.Buffer{}, nil)),
 	}
 
 	probe := &stubProbe{id: "ping", failureThresh: 3, recoveryThresh: 1}
@@ -390,7 +390,7 @@ func TestRecordPeriodicProbeOutcome_OAuth2SkipsLastValidatedAt(t *testing.T) {
 	defer ctrl.Finish()
 
 	s, db, _, _, _, _ := FullMockService(t, ctrl)
-	cv := NewTestConnector(cschema.Connector{
+	c := NewTestConnector(cschema.Connector{
 		Auth: &cschema.Auth{InnerVal: &cschema.AuthOAuth2{Type: cschema.AuthTypeOAuth2}},
 	})
 	connId := apid.New(apid.PrefixConnection)
@@ -401,12 +401,12 @@ func TestRecordPeriodicProbeOutcome_OAuth2SkipsLastValidatedAt(t *testing.T) {
 			Namespace:        "root",
 			State:            database.ConnectionStateConfigured,
 			HealthState:      database.ConnectionHealthStateHealthy,
-			ConnectorId:      cv.GetId(),
-			ConnectorVersion: cv.GetVersion(),
+			ConnectorId:      c.GetId(),
+			ConnectorVersion: c.GetVersion(),
 		},
-		s:      s,
-		cv:     cv,
-		logger: slog.New(slog.NewJSONHandler(&bytes.Buffer{}, nil)),
+		s:         s,
+		connector: c,
+		logger:    slog.New(slog.NewJSONHandler(&bytes.Buffer{}, nil)),
 	}
 
 	probe := &stubProbe{id: "ping", failureThresh: 3, recoveryThresh: 1}

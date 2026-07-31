@@ -227,7 +227,7 @@ func (c *connection) resolveAuthRequiredIfCredentialsEstablished(
 // their own runtime steps between those phases, and apxy:* pseudo-steps are
 // handled by the caller before this helper resolves notifications.
 func (c *connection) isAuthMethodSetupStep(stepID string) bool {
-	connector := c.cv.GetDefinition()
+	connector := c.connector.GetDefinition()
 	if connector == nil || connector.SetupFlow == nil {
 		return true
 	}

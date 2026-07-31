@@ -36,11 +36,11 @@ const setupTokenTTL = 15 * time.Minute
 // EncryptedConfiguration. Auth-method steps are constructed by the auth
 // method's factory and carry their own OnSubmit / RenderRedirect closures.
 func (s *service) buildManifestSetupFlow(c iface.Connection) iface.ManifestSetupFlow {
-	cv := c.GetConnectorVersionEntity()
-	if cv == nil {
+	connectorEntity := c.GetConnector()
+	if connectorEntity == nil {
 		return &manifestFlow{}
 	}
-	connector := cv.GetDefinition()
+	connector := connectorEntity.GetDefinition()
 	if connector == nil {
 		return &manifestFlow{}
 	}

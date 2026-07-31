@@ -23,7 +23,7 @@ func TestProbeNoOp_Invoke(t *testing.T) {
 	defer ctrl.Finish()
 
 	s, _, _, _, _, _ := FullMockService(t, ctrl)
-	cv := NewTestConnector(cschema.Connector{})
+	c := NewTestConnector(cschema.Connector{})
 	logger := slog.New(slog.NewTextHandler(testWriter{t}, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	conn := &connection{
 		Connection: database.Connection{
@@ -31,18 +31,18 @@ func TestProbeNoOp_Invoke(t *testing.T) {
 			Namespace:        "root",
 			State:            database.ConnectionStateConfigured,
 			HealthState:      database.ConnectionHealthStateHealthy,
-			ConnectorId:      cv.GetId(),
-			ConnectorVersion: cv.GetVersion(),
+			ConnectorId:      c.GetId(),
+			ConnectorVersion: c.GetVersion(),
 		},
-		s:      s,
-		cv:     cv,
-		logger: logger,
+		s:         s,
+		connector: c,
+		logger:    logger,
 	}
 
 	// No Http or ProxyHttp on the probe definition → NewProbe returns the
 	// no-op probe variant.
 	probeCfg := &cschema.Probe{Id: "noop"}
-	probe := NewProbe(probeCfg, s, cv, conn)
+	probe := NewProbe(probeCfg, s, c, conn)
 
 	outcome, err := probe.Invoke(context.Background())
 	require.NoError(t, err)

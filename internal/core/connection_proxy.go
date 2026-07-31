@@ -21,7 +21,7 @@ var ErrProxyNotImplemented = errors.New("auth type for connection does not imple
 // internal/proxy.
 func (c *connection) getProxyImpl() (iface.Proxy, error) {
 	c.proxyImplOnce.Do(func() {
-		def, err := c.cv.getDefinition()
+		def, err := c.connector.getDefinition()
 		if err != nil {
 			c.proxyImplErr = err
 			return

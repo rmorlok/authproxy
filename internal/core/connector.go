@@ -36,70 +36,70 @@ type Connector struct {
 	l *slog.Logger
 }
 
-func wrapConnector(cv database.ConnectorWithDefinition, s *service) *Connector {
+func wrapConnector(c database.ConnectorWithDefinition, s *service) *Connector {
 	return &Connector{
-		ConnectorWithDefinition: cv,
+		ConnectorWithDefinition: c,
 		s:                       s,
 		l: aplog.NewBuilder(s.logger).
-			WithNamespace(cv.Namespace).
-			WithConnectorId(cv.Id).
-			WithConnectorVersion(cv.Version).
+			WithNamespace(c.Namespace).
+			WithConnectorId(c.Id).
+			WithConnectorVersion(c.Version).
 			Build(),
 	}
 }
 
-func (cv *Connector) GetId() apid.ID {
-	return cv.ConnectorWithDefinition.Id
+func (c *Connector) GetId() apid.ID {
+	return c.ConnectorWithDefinition.Id
 }
 
-func (cv *Connector) GetNamespace() string {
-	return cv.ConnectorWithDefinition.Namespace
+func (c *Connector) GetNamespace() string {
+	return c.ConnectorWithDefinition.Namespace
 }
 
-func (cv *Connector) GetVersion() uint64 {
-	return cv.ConnectorWithDefinition.Version
+func (c *Connector) GetVersion() uint64 {
+	return c.ConnectorWithDefinition.Version
 }
 
-func (cv *Connector) GetState() database.ConnectorDefinitionVersionState {
-	return cv.ConnectorWithDefinition.State
+func (c *Connector) GetState() database.ConnectorDefinitionVersionState {
+	return c.ConnectorWithDefinition.State
 }
 
-func (cv *Connector) GetHash() string {
-	return util.Must(cv.getHash())
+func (c *Connector) GetHash() string {
+	return util.Must(c.getHash())
 }
 
-func (cv *Connector) GetDefinition() *cschema.Connector {
-	return util.Must(cv.getDefinition())
+func (c *Connector) GetDefinition() *cschema.Connector {
+	return util.Must(c.getDefinition())
 }
 
-func (cv *Connector) GetCreatedAt() time.Time {
-	return cv.ConnectorWithDefinition.CreatedAt
+func (c *Connector) GetCreatedAt() time.Time {
+	return c.ConnectorWithDefinition.CreatedAt
 }
 
-func (cv *Connector) GetUpdatedAt() time.Time {
-	return cv.ConnectorWithDefinition.UpdatedAt
+func (c *Connector) GetUpdatedAt() time.Time {
+	return c.ConnectorWithDefinition.UpdatedAt
 }
 
-func (cv *Connector) GetLabels() map[string]string {
-	return cv.ConnectorWithDefinition.Labels
+func (c *Connector) GetLabels() map[string]string {
+	return c.ConnectorWithDefinition.Labels
 }
 
-func (cv *Connector) GetAnnotations() map[string]string {
-	return cv.ConnectorWithDefinition.Annotations
+func (c *Connector) GetAnnotations() map[string]string {
+	return c.ConnectorWithDefinition.Annotations
 }
 
-func (cv *Connector) getDefinition() (*cschema.Connector, error) {
-	cv.defMu.RLock()
-	if cv.def != nil {
-		defer cv.defMu.RUnlock()
-		return cv.def, nil
+func (c *Connector) getDefinition() (*cschema.Connector, error) {
+	c.defMu.RLock()
+	if c.def != nil {
+		defer c.defMu.RUnlock()
+		return c.def, nil
 	}
-	cv.defMu.RUnlock()
+	c.defMu.RUnlock()
 
-	cv.defMu.Lock()
-	defer cv.defMu.Unlock()
-	if cv.def == nil {
-		decrypted, err := cv.s.encrypt.DecryptString(context.Background(), cv.ConnectorWithDefinition.EncryptedDefinition)
+	c.defMu.Lock()
+	defer c.defMu.Unlock()
+	if c.def == nil {
+		decrypted, err := c.s.encrypt.DecryptString(context.Background(), c.ConnectorWithDefinition.EncryptedDefinition)
 		if err != nil {
 			return nil, err
 		}
@@ -109,17 +109,17 @@ func (cv *Connector) getDefinition() (*cschema.Connector, error) {
 		if err != nil {
 			return nil, err
 		}
-		cv.def = &def
+		c.def = &def
 	}
 
-	return cv.def, nil
+	return c.def, nil
 }
 
-func (cv *Connector) getHash() (string, error) {
-	if cv.Hash != "" {
-		return cv.Hash, nil
+func (c *Connector) getHash() (string, error) {
+	if c.Hash != "" {
+		return c.Hash, nil
 	}
-	decrypted, err := cv.s.encrypt.DecryptString(context.Background(), cv.ConnectorWithDefinition.EncryptedDefinition)
+	decrypted, err := c.s.encrypt.DecryptString(context.Background(), c.ConnectorWithDefinition.EncryptedDefinition)
 	if err != nil {
 		return "", err
 	}
@@ -127,26 +127,26 @@ func (cv *Connector) getHash() (string, error) {
 	return hex.EncodeToString(hash[:])[:7], nil
 }
 
-func (cv *Connector) setDefinition(def *cschema.Connector) error {
-	cv.defMu.Lock()
+func (c *Connector) setDefinition(def *cschema.Connector) error {
+	c.defMu.Lock()
 
 	jsonBytes, err := json.Marshal(def)
 	if err != nil {
-		cv.defMu.Unlock()
+		c.defMu.Unlock()
 		return err
 	}
 
-	encrypted, err := cv.s.encrypt.EncryptStringForEntity(context.Background(), cv, string(jsonBytes))
+	encrypted, err := c.s.encrypt.EncryptStringForEntity(context.Background(), c, string(jsonBytes))
 	if err != nil {
-		cv.defMu.Unlock()
+		c.defMu.Unlock()
 		return err
 	}
-	cv.Hash = def.Hash()
-	cv.ConnectorWithDefinition.EncryptedDefinition = encrypted
-	cv.def = def
-	cv.defMu.Unlock()
+	c.Hash = def.Hash()
+	c.ConnectorWithDefinition.EncryptedDefinition = encrypted
+	c.def = def
+	c.defMu.Unlock()
 
-	cv.resetJavascriptLibrary()
+	c.resetJavascriptLibrary()
 
 	return nil
 }
@@ -184,8 +184,8 @@ func (c *Connector) resetJavascriptLibrary() {
 	c.jsLoaded = false
 }
 
-func (cv *Connector) Logger() *slog.Logger {
-	return cv.l
+func (c *Connector) Logger() *slog.Logger {
+	return c.l
 }
 
 var _ iface.Connector = (*Connector)(nil)

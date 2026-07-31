@@ -56,19 +56,19 @@ func newTestConnectionWithSetupFlowAndAsynq(t *testing.T, ctrl *gomock.Controlle
 	connector := cschema.Connector{
 		SetupFlow: sf,
 	}
-	cv := NewTestConnector(connector)
+	c := NewTestConnector(connector)
 	conn := &connection{
 		Connection: database.Connection{
 			Id:               "cxn_test1111111111aa",
 			Namespace:        "root",
 			State:            database.ConnectionStateSetup,
 			HealthState:      database.ConnectionHealthStateHealthy,
-			ConnectorId:      cv.GetId(),
-			ConnectorVersion: cv.GetVersion(),
+			ConnectorId:      c.GetId(),
+			ConnectorVersion: c.GetVersion(),
 		},
-		s:      s,
-		cv:     cv,
-		logger: aplog.NewNoopLogger(),
+		s:         s,
+		connector: c,
+		logger:    aplog.NewNoopLogger(),
 	}
 
 	return conn, db, ac
@@ -162,12 +162,12 @@ func TestSubmitForm(t *testing.T) {
 		conn, db := newTestConnectionWithSetupFlow(t, ctrl, sf)
 		// Promote the no-auth connector to OAuth2 so the manifest emits the
 		// authorize redirect step after the last preconnect step.
-		conn.cv = NewTestConnector(cschema.Connector{
+		conn.connector = NewTestConnector(cschema.Connector{
 			Auth:      &cschema.Auth{InnerVal: &cschema.AuthOAuth2{Type: cschema.AuthTypeOAuth2}},
 			SetupFlow: sf,
 		})
-		conn.ConnectorId = conn.cv.GetId()
-		conn.ConnectorVersion = conn.cv.GetVersion()
+		conn.ConnectorId = conn.connector.GetId()
+		conn.ConnectorVersion = conn.connector.GetVersion()
 		step := cschema.MustNewSetupStep("tenant")
 		conn.SetupStep = &step
 
@@ -362,7 +362,7 @@ func TestGetCurrentSetupStepResponse(t *testing.T) {
 				},
 			},
 		})
-		conn.cv = NewTestConnector(cschema.Connector{
+		conn.connector = NewTestConnector(cschema.Connector{
 			Auth: &cschema.Auth{InnerVal: &cschema.AuthOAuth2{Type: cschema.AuthTypeOAuth2}},
 			SetupFlow: &cschema.SetupFlow{
 				Preconnect: &cschema.SetupFlowPhase{
@@ -370,8 +370,8 @@ func TestGetCurrentSetupStepResponse(t *testing.T) {
 				},
 			},
 		})
-		conn.ConnectorId = conn.cv.GetId()
-		conn.ConnectorVersion = conn.cv.GetVersion()
+		conn.ConnectorId = conn.connector.GetId()
+		conn.ConnectorVersion = conn.connector.GetVersion()
 		step := cschema.MustNewSetupStep(oauth2.OAuth2AuthorizeStepId)
 		conn.SetupStep = &step
 
@@ -445,7 +445,7 @@ func TestGetCurrentSetupStepResponse(t *testing.T) {
 		defer ctrl.Finish()
 
 		conn, _ := newTestConnectionWithSetupFlow(t, ctrl, &cschema.SetupFlow{})
-		conn.cv.GetDefinition().Probes = []cschema.Probe{{Id: "ping"}}
+		conn.connector.GetDefinition().Probes = []cschema.Probe{{Id: "ping"}}
 		step := cschema.SetupStepVerify
 		conn.SetupStep = &step
 

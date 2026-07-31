@@ -32,7 +32,7 @@ func (s *service) ReauthConnection(ctx context.Context, id apid.ID, returnToUrl 
 		return nil, httperr.BadRequest("connection is not in a reauthable state")
 	}
 
-	connector := conn.cv.GetDefinition()
+	connector := conn.connector.GetDefinition()
 	if connector == nil || connector.Auth == nil {
 		return nil, httperr.InternalServerErrorMsg("connector has no auth configuration")
 	}

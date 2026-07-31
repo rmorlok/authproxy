@@ -39,14 +39,14 @@ func newOAuth2(
 	cfg config.C,
 	db database.DB,
 	r apredis.Client,
-	c coreIface.C,
+	connectors coreIface.C,
 	encrypt encrypt.E,
 	logger *slog.Logger,
 	httpf httpf.F,
 	connection coreIface.Connection,
 ) *oAuth2Connection {
-	cv := connection.GetConnectorVersionEntity()
-	connector := cv.GetDefinition()
+	c := connection.GetConnector()
+	connector := c.GetDefinition()
 	auth, ok := connector.Auth.Inner().(*sconfig.AuthOAuth2)
 	if !ok {
 		panic(fmt.Sprintf("connector id %s is not an oauth2 connector", connector.Id))
@@ -56,7 +56,7 @@ func newOAuth2(
 		cfg:        cfg,
 		db:         db,
 		r:          r,
-		connectors: c,
+		connectors: connectors,
 		encrypt:    encrypt,
 		logger:     logger,
 		auth:       auth,

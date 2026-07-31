@@ -131,7 +131,7 @@ type C interface {
 	GetConnection(ctx context.Context, id apid.ID) (Connection, error)
 
 	// CreateConnection creates a new connection.
-	CreateConnection(ctx context.Context, namespace string, cv Connector) (Connection, error)
+	CreateConnection(ctx context.Context, namespace string, c Connector) (Connection, error)
 
 	// ListConnectionsBuilder returns a builder to allow the caller to list connections matching certain criteria.
 	ListConnectionsBuilder() ListConnectionsBuilder

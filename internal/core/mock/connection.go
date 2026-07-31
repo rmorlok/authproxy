@@ -68,7 +68,7 @@ func (m *Connection) GetLabels() map[string]string {
 	return m.Labels
 }
 
-func (m *Connection) GetConnectorVersionEntity() iface.Connector {
+func (m *Connection) GetConnector() iface.Connector {
 	return nil
 }
 

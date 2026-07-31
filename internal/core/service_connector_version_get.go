@@ -102,7 +102,7 @@ func (s *service) getConnectionForDb(ctx context.Context, dbConn *database.Conne
 		Build()
 
 	logger.Debug("getting connector for connection")
-	cv, err := s.getConnectorVersion(ctx, dbConn.ConnectorId, dbConn.ConnectorVersion)
+	c, err := s.getConnectorVersion(ctx, dbConn.ConnectorId, dbConn.ConnectorVersion)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			logger.Error("connector is missing for connector version", "error", err)
@@ -113,5 +113,5 @@ func (s *service) getConnectionForDb(ctx context.Context, dbConn *database.Conne
 		return nil, fmt.Errorf("failed to get connector for connection: %w", err)
 	}
 
-	return wrapConnection(dbConn, cv, s), nil
+	return wrapConnection(dbConn, c, s), nil
 }

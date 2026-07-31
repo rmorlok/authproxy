@@ -82,12 +82,12 @@ type ConnectorVersionMatcher struct {
 }
 
 func (m ConnectorVersionMatcher) Matches(x interface{}) bool {
-	cv, ok := x.(iface.Connector)
+	c, ok := x.(iface.Connector)
 	if !ok {
 		return false
 	}
 
-	return cv.GetId() == m.ExpectedId && cv.GetVersion() == m.ExpectedVersion
+	return c.GetId() == m.ExpectedId && c.GetVersion() == m.ExpectedVersion
 }
 
 func (m ConnectorVersionMatcher) String() string {

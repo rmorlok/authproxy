@@ -157,7 +157,7 @@ type configuredConnection struct {
 	connectorVersion iface.Connector
 }
 
-func (c *configuredConnection) GetConnectorVersionEntity() iface.Connector {
+func (c *configuredConnection) GetConnector() iface.Connector {
 	return c.connectorVersion
 }
 

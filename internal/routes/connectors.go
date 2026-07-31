@@ -54,28 +54,28 @@ func ConnectorToJson(c connIface.Connector) ConnectorJson {
 	return ConnectorVersionToConnectorJson(c)
 }
 
-func ConnectorVersionToConnectorJson(cv connIface.Connector) ConnectorJson {
-	def := cv.GetDefinition()
+func ConnectorVersionToConnectorJson(c connIface.Connector) ConnectorJson {
+	def := c.GetDefinition()
 	logo := ""
 	if def.Logo != nil {
 		logo = def.Logo.GetUrl()
 	}
 
 	return ConnectorJson{
-		Id:            cv.GetId(),
-		Version:       cv.GetVersion(),
-		Namespace:     cv.GetNamespace(),
-		State:         schemaapi.ConnectorVersionState(cv.GetState()),
+		Id:            c.GetId(),
+		Version:       c.GetVersion(),
+		Namespace:     c.GetNamespace(),
+		State:         schemaapi.ConnectorVersionState(c.GetState()),
 		Highlight:     def.Highlight,
 		DisplayName:   def.DisplayName,
 		Description:   def.Description,
 		StatusPageUrl: def.StatusPageUrl,
 		Logo:          logo,
 		HasConfigure:  def.SetupFlow.HasConfigure(),
-		Labels:        cv.GetLabels(),
-		Annotations:   cv.GetAnnotations(),
-		CreatedAt:     cv.GetCreatedAt(),
-		UpdatedAt:     cv.GetUpdatedAt(),
+		Labels:        c.GetLabels(),
+		Annotations:   c.GetAnnotations(),
+		CreatedAt:     c.GetCreatedAt(),
+		UpdatedAt:     c.GetUpdatedAt(),
 	}
 }
 
@@ -88,19 +88,19 @@ type ListConnectorsRequestQueryParams struct {
 	OrderByVal    *string                                   `form:"order_by"`
 }
 
-func ConnectorVersionToJson(cv connIface.Connector) ConnectorVersionJson {
-	def := cv.GetDefinition()
+func ConnectorVersionToJson(c connIface.Connector) ConnectorVersionJson {
+	def := c.GetDefinition()
 
 	return ConnectorVersionJson{
-		Id:          cv.GetId(),
-		Version:     cv.GetVersion(),
-		Namespace:   cv.GetNamespace(),
-		State:       schemaapi.ConnectorVersionState(cv.GetState()),
+		Id:          c.GetId(),
+		Version:     c.GetVersion(),
+		Namespace:   c.GetNamespace(),
+		State:       schemaapi.ConnectorVersionState(c.GetState()),
 		Definition:  *def,
-		Labels:      cv.GetLabels(),
-		Annotations: cv.GetAnnotations(),
-		CreatedAt:   cv.GetCreatedAt(),
-		UpdatedAt:   cv.GetUpdatedAt(),
+		Labels:      c.GetLabels(),
+		Annotations: c.GetAnnotations(),
+		CreatedAt:   c.GetCreatedAt(),
+		UpdatedAt:   c.GetUpdatedAt(),
 	}
 }
 
@@ -346,14 +346,14 @@ func (r *ConnectorsRoutes) getVersion(gctx *gin.Context) {
 		return
 	}
 
-	cv := result.Results[0]
+	c := result.Results[0]
 
-	if httpErr := val.ValidateHttpStatusError(cv); httpErr != nil {
+	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
 		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, ConnectorVersionToJson(cv))
+	apgin.APIJSON(gctx, http.StatusOK, ConnectorVersionToJson(c))
 }
 
 // @Summary		List connector versions
@@ -1064,7 +1064,7 @@ func (r *ConnectorsRoutes) forceVersionState(gctx *gin.Context) {
 		return
 	}
 
-	cv, err := r.connectors.GetConnectorVersion(ctx, connectorId, version)
+	c, err := r.connectors.GetConnectorVersion(ctx, connectorId, version)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
 			apgin.WriteError(gctx, nil, httperr.NotFoundf("connector version '%s:%d' not found", connectorId, version))
@@ -1077,24 +1077,24 @@ func (r *ConnectorsRoutes) forceVersionState(gctx *gin.Context) {
 		return
 	}
 
-	if httpErr := val.ValidateHttpStatusError(cv); httpErr != nil {
+	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
 		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
-	if cv.GetState() == state {
-		apgin.APIJSON(gctx, http.StatusOK, ConnectorVersionToJson(cv))
+	if c.GetState() == state {
+		apgin.APIJSON(gctx, http.StatusOK, ConnectorVersionToJson(c))
 		return
 	}
 
-	err = cv.SetState(ctx, state)
+	err = c.SetState(ctx, state)
 	if err != nil {
 		apgin.WriteError(gctx, nil, httperr.FromError(err))
 		val.MarkErrorReturn()
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, ConnectorVersionToJson(cv))
+	apgin.APIJSON(gctx, http.StatusOK, ConnectorVersionToJson(c))
 }
 
 func (r *ConnectorsRoutes) loadConnectorByID(ctx context.Context, connectorId apid.ID) (connIface.Connector, error) {
@@ -1666,17 +1666,17 @@ func NewConnectorsRoutes(cfg config.C, authService auth.A, c connIface.C, e encr
 	}
 
 	getConnectorVersion := func(ctx context.Context, id connectorVersionID) (key_value.Resource, error) {
-		cv, err := c.GetConnectorVersion(ctx, id.ConnectorID, id.Version)
+		connector, err := c.GetConnectorVersion(ctx, id.ConnectorID, id.Version)
 		if err != nil {
 			if errors.Is(err, core.ErrNotFound) {
 				return nil, database.ErrNotFound
 			}
 			return nil, err
 		}
-		if cv == nil {
+		if connector == nil {
 			return nil, nil
 		}
-		return cv, nil
+		return connector, nil
 	}
 
 	connectorIDExtractor := func(v interface{}) string {
@@ -1781,87 +1781,87 @@ func NewConnectorsRoutes(cfg config.C, authService auth.A, c connIface.C, e encr
 	}
 
 	putVersionLabels := func(ctx context.Context, id connectorVersionID, kv map[string]string) (key_value.Resource, error) {
-		cv, err := c.GetConnectorVersion(ctx, id.ConnectorID, id.Version)
+		connector, err := c.GetConnectorVersion(ctx, id.ConnectorID, id.Version)
 		if err != nil {
 			if errors.Is(err, core.ErrNotFound) {
 				return nil, database.ErrNotFound
 			}
 			return nil, err
 		}
-		if cv.GetState() != database.ConnectorDefinitionVersionStateDraft {
+		if connector.GetState() != database.ConnectorDefinitionVersionStateDraft {
 			return nil, httperr.Conflictf("connector version '%s:%d' is not a draft", id.ConnectorID, id.Version)
 		}
 		merged := make(map[string]string)
-		for k, v := range cv.GetLabels() {
+		for k, v := range connector.GetLabels() {
 			merged[k] = v
 		}
 		for k, v := range kv {
 			merged[k] = v
 		}
-		return c.UpdateDraftConnectorVersion(ctx, id.ConnectorID, id.Version, cv.GetDefinition(), merged, cv.GetAnnotations())
+		return c.UpdateDraftConnectorVersion(ctx, id.ConnectorID, id.Version, connector.GetDefinition(), merged, connector.GetAnnotations())
 	}
 
 	deleteVersionLabels := func(ctx context.Context, id connectorVersionID, keys []string) (key_value.Resource, error) {
-		cv, err := c.GetConnectorVersion(ctx, id.ConnectorID, id.Version)
+		connector, err := c.GetConnectorVersion(ctx, id.ConnectorID, id.Version)
 		if err != nil {
 			if errors.Is(err, core.ErrNotFound) {
 				return nil, database.ErrNotFound
 			}
 			return nil, err
 		}
-		if cv.GetState() != database.ConnectorDefinitionVersionStateDraft {
+		if connector.GetState() != database.ConnectorDefinitionVersionStateDraft {
 			return nil, httperr.Conflictf("connector version '%s:%d' is not a draft", id.ConnectorID, id.Version)
 		}
 		merged := make(map[string]string)
-		for k, v := range cv.GetLabels() {
+		for k, v := range connector.GetLabels() {
 			merged[k] = v
 		}
 		for _, k := range keys {
 			delete(merged, k)
 		}
-		return c.UpdateDraftConnectorVersion(ctx, id.ConnectorID, id.Version, cv.GetDefinition(), merged, cv.GetAnnotations())
+		return c.UpdateDraftConnectorVersion(ctx, id.ConnectorID, id.Version, connector.GetDefinition(), merged, connector.GetAnnotations())
 	}
 
 	putVersionAnnotations := func(ctx context.Context, id connectorVersionID, kv map[string]string) (key_value.Resource, error) {
-		cv, err := c.GetConnectorVersion(ctx, id.ConnectorID, id.Version)
+		connector, err := c.GetConnectorVersion(ctx, id.ConnectorID, id.Version)
 		if err != nil {
 			if errors.Is(err, core.ErrNotFound) {
 				return nil, database.ErrNotFound
 			}
 			return nil, err
 		}
-		if cv.GetState() != database.ConnectorDefinitionVersionStateDraft {
+		if connector.GetState() != database.ConnectorDefinitionVersionStateDraft {
 			return nil, httperr.Conflictf("connector version '%s:%d' is not a draft", id.ConnectorID, id.Version)
 		}
 		merged := make(map[string]string)
-		for k, v := range cv.GetAnnotations() {
+		for k, v := range connector.GetAnnotations() {
 			merged[k] = v
 		}
 		for k, v := range kv {
 			merged[k] = v
 		}
-		return c.UpdateDraftConnectorVersion(ctx, id.ConnectorID, id.Version, cv.GetDefinition(), cv.GetLabels(), merged)
+		return c.UpdateDraftConnectorVersion(ctx, id.ConnectorID, id.Version, connector.GetDefinition(), connector.GetLabels(), merged)
 	}
 
 	deleteVersionAnnotations := func(ctx context.Context, id connectorVersionID, keys []string) (key_value.Resource, error) {
-		cv, err := c.GetConnectorVersion(ctx, id.ConnectorID, id.Version)
+		connector, err := c.GetConnectorVersion(ctx, id.ConnectorID, id.Version)
 		if err != nil {
 			if errors.Is(err, core.ErrNotFound) {
 				return nil, database.ErrNotFound
 			}
 			return nil, err
 		}
-		if cv.GetState() != database.ConnectorDefinitionVersionStateDraft {
+		if connector.GetState() != database.ConnectorDefinitionVersionStateDraft {
 			return nil, httperr.Conflictf("connector version '%s:%d' is not a draft", id.ConnectorID, id.Version)
 		}
 		merged := make(map[string]string)
-		for k, v := range cv.GetAnnotations() {
+		for k, v := range connector.GetAnnotations() {
 			merged[k] = v
 		}
 		for _, k := range keys {
 			delete(merged, k)
 		}
-		return c.UpdateDraftConnectorVersion(ctx, id.ConnectorID, id.Version, cv.GetDefinition(), cv.GetLabels(), merged)
+		return c.UpdateDraftConnectorVersion(ctx, id.ConnectorID, id.Version, connector.GetDefinition(), connector.GetLabels(), merged)
 	}
 
 	labelsAdapter := key_value.Adapter[apid.ID]{

@@ -30,12 +30,12 @@ func TestRetryConnectionSetup(t *testing.T) {
 		conn.s.encrypt = encrypt.NewFakeEncryptService(false)
 
 		db.EXPECT().GetConnection(gomock.Any(), conn.Id).Return(&conn.Connection, nil).AnyTimes()
-		db.EXPECT().GetConnectorDefinitionVersion(gomock.Any(), conn.cv.Id, conn.cv.Version).Return(&database.ConnectorWithDefinition{
-			Id:                  conn.cv.Id,
-			Version:             conn.cv.Version,
-			Labels:              conn.cv.GetLabels(),
+		db.EXPECT().GetConnectorDefinitionVersion(gomock.Any(), conn.connector.Id, conn.connector.Version).Return(&database.ConnectorWithDefinition{
+			Id:                  conn.connector.Id,
+			Version:             conn.connector.Version,
+			Labels:              conn.connector.GetLabels(),
 			State:               database.ConnectorDefinitionVersionStatePrimary,
-			EncryptedDefinition: conn.cv.EncryptedDefinition,
+			EncryptedDefinition: conn.connector.EncryptedDefinition,
 		}, nil).AnyTimes()
 
 		_, err := conn.s.RetryConnectionSetup(context.Background(), conn.Id, "")
@@ -61,12 +61,12 @@ func TestRetryConnectionSetup(t *testing.T) {
 		conn.s.encrypt = encrypt.NewFakeEncryptService(false)
 
 		db.EXPECT().GetConnection(gomock.Any(), conn.Id).Return(&conn.Connection, nil).AnyTimes()
-		db.EXPECT().GetConnectorDefinitionVersion(gomock.Any(), conn.cv.Id, conn.cv.Version).Return(&database.ConnectorWithDefinition{
-			Id:                  conn.cv.Id,
-			Version:             conn.cv.Version,
-			Labels:              conn.cv.GetLabels(),
+		db.EXPECT().GetConnectorDefinitionVersion(gomock.Any(), conn.connector.Id, conn.connector.Version).Return(&database.ConnectorWithDefinition{
+			Id:                  conn.connector.Id,
+			Version:             conn.connector.Version,
+			Labels:              conn.connector.GetLabels(),
 			State:               database.ConnectorDefinitionVersionStatePrimary,
-			EncryptedDefinition: conn.cv.EncryptedDefinition,
+			EncryptedDefinition: conn.connector.EncryptedDefinition,
 		}, nil).AnyTimes()
 
 		db.EXPECT().SetConnectionSetupError(gomock.Any(), conn.Id, (*string)(nil)).Return(nil)
@@ -98,12 +98,12 @@ func TestRetryConnectionSetup(t *testing.T) {
 		conn.s.encrypt = encrypt.NewFakeEncryptService(false)
 
 		db.EXPECT().GetConnection(gomock.Any(), conn.Id).Return(&conn.Connection, nil).AnyTimes()
-		db.EXPECT().GetConnectorDefinitionVersion(gomock.Any(), conn.cv.Id, conn.cv.Version).Return(&database.ConnectorWithDefinition{
-			Id:                  conn.cv.Id,
-			Version:             conn.cv.Version,
-			Labels:              conn.cv.GetLabels(),
+		db.EXPECT().GetConnectorDefinitionVersion(gomock.Any(), conn.connector.Id, conn.connector.Version).Return(&database.ConnectorWithDefinition{
+			Id:                  conn.connector.Id,
+			Version:             conn.connector.Version,
+			Labels:              conn.connector.GetLabels(),
 			State:               database.ConnectorDefinitionVersionStatePrimary,
-			EncryptedDefinition: conn.cv.EncryptedDefinition,
+			EncryptedDefinition: conn.connector.EncryptedDefinition,
 		}, nil).AnyTimes()
 
 		db.EXPECT().SetConnectionSetupError(gomock.Any(), conn.Id, (*string)(nil)).Return(nil)

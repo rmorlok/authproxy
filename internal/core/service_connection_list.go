@@ -55,8 +55,8 @@ func (l *listConnectionsWrapper) convertPageResult(ctx context.Context, result p
 
 	connections := make([]iface.Connection, 0, len(result.Results))
 	for _, r := range result.Results {
-		if cv, ok := l.cc[iface.ConnectorVersionId{Id: r.ConnectorId, Version: r.ConnectorVersion}]; ok {
-			connections = append(connections, wrapConnection(&r, cv, l.s))
+		if c, ok := l.cc[iface.ConnectorVersionId{Id: r.ConnectorId, Version: r.ConnectorVersion}]; ok {
+			connections = append(connections, wrapConnection(&r, c, l.s))
 		} else {
 			return pagination.PageResult[iface.Connection]{
 				Error: fmt.Errorf("could not find connector version %s:%d", r.ConnectorId, r.ConnectorVersion),

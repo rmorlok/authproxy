@@ -22,7 +22,7 @@ func (s *service) CreateConnectorVersion(ctx context.Context, namespace string, 
 	def.Namespace = util.ToPtr(namespace)
 	def.State = string(database.ConnectorDefinitionVersionStateDraft)
 
-	cv, err := newConnectorBuilder(s).
+	c, err := newConnectorBuilder(s).
 		WithConfig(def).
 		WithId(id).
 		WithVersion(1).
@@ -32,10 +32,10 @@ func (s *service) CreateConnectorVersion(ctx context.Context, namespace string, 
 		return nil, fmt.Errorf("failed to build connector version: %w", err)
 	}
 
-	cv.ConnectorWithDefinition.Labels = labels
-	cv.ConnectorWithDefinition.Annotations = annotations
+	c.ConnectorWithDefinition.Labels = labels
+	c.ConnectorWithDefinition.Annotations = annotations
 
-	if err := s.db.UpsertConnectorDefinitionVersion(ctx, &cv.ConnectorWithDefinition); err != nil {
+	if err := s.db.UpsertConnectorDefinitionVersion(ctx, &c.ConnectorWithDefinition); err != nil {
 		return nil, fmt.Errorf("failed to upsert connector version: %w", err)
 	}
 
@@ -81,7 +81,7 @@ func (s *service) CreateDraftConnectorVersion(ctx context.Context, id apid.ID, d
 	def.Namespace = util.ToPtr(latest.Namespace)
 	def.State = string(database.ConnectorDefinitionVersionStateDraft)
 
-	cv, err := newConnectorBuilder(s).
+	c, err := newConnectorBuilder(s).
 		WithConfig(def).
 		WithId(id).
 		WithVersion(newVersion).
@@ -92,18 +92,18 @@ func (s *service) CreateDraftConnectorVersion(ctx context.Context, id apid.ID, d
 	}
 
 	if labels != nil {
-		cv.ConnectorWithDefinition.Labels = labels
+		c.ConnectorWithDefinition.Labels = labels
 	} else {
-		cv.ConnectorWithDefinition.Labels = latest.Labels
+		c.ConnectorWithDefinition.Labels = latest.Labels
 	}
 
 	if annotations != nil {
-		cv.ConnectorWithDefinition.Annotations = annotations
+		c.ConnectorWithDefinition.Annotations = annotations
 	} else {
-		cv.ConnectorWithDefinition.Annotations = latest.Annotations
+		c.ConnectorWithDefinition.Annotations = latest.Annotations
 	}
 
-	if err := s.db.UpsertConnectorDefinitionVersion(ctx, &cv.ConnectorWithDefinition); err != nil {
+	if err := s.db.UpsertConnectorDefinitionVersion(ctx, &c.ConnectorWithDefinition); err != nil {
 		return nil, fmt.Errorf("failed to upsert connector version: %w", err)
 	}
 
