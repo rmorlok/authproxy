@@ -43,7 +43,7 @@ func (s *stubProxy) ProxyRequestRaw(ctx context.Context, _ httpf.RequestType, _ 
 func newProbeTestConnection(t *testing.T, ctrl *gomock.Controller, def cschema.Connector) (*connection, *stubProxy) {
 	t.Helper()
 	s, _, _, _, _, _ := FullMockService(t, ctrl)
-	cv := NewTestConnectorVersion(def)
+	c := NewTestConnector(def)
 
 	logger := slog.New(slog.NewTextHandler(testWriter{t}, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	conn := &connection{
@@ -52,12 +52,12 @@ func newProbeTestConnection(t *testing.T, ctrl *gomock.Controller, def cschema.C
 			Namespace:        "root",
 			State:            database.ConnectionStateConfigured,
 			HealthState:      database.ConnectionHealthStateHealthy,
-			ConnectorId:      cv.GetId(),
-			ConnectorVersion: cv.GetVersion(),
+			ConnectorId:      c.GetId(),
+			ConnectorVersion: c.GetVersion(),
 		},
-		s:      s,
-		cv:     cv,
-		logger: logger,
+		s:         s,
+		connector: c,
+		logger:    logger,
 	}
 
 	proxy := &stubProxy{}
@@ -92,7 +92,7 @@ func TestProbeHttp_ProxyHttp_Success(t *testing.T) {
 	conn, proxy := newProbeTestConnection(t, ctrl, cschema.Connector{Probes: []cschema.Probe{*probeCfg}})
 	proxy.resp = &iface.ProxyResponse{StatusCode: 200}
 
-	probe := NewProbe(probeCfg, conn.s, conn.cv, conn)
+	probe := NewProbe(probeCfg, conn.s, conn.connector, conn)
 	outcome, err := probe.Invoke(context.Background())
 
 	require.NoError(t, err)
@@ -132,7 +132,7 @@ func TestProbeHttp_ProxyHttp_Non2xxIsFailure(t *testing.T) {
 			conn, proxy := newProbeTestConnection(t, ctrl, cschema.Connector{Probes: []cschema.Probe{*probeCfg}})
 			proxy.resp = &iface.ProxyResponse{StatusCode: tc.status}
 
-			probe := NewProbe(probeCfg, conn.s, conn.cv, conn)
+			probe := NewProbe(probeCfg, conn.s, conn.connector, conn)
 			outcome, err := probe.Invoke(context.Background())
 
 			require.Errorf(t, err, "status %d must surface as a probe error", tc.status)
@@ -163,7 +163,7 @@ func TestProbeHttp_ProxyHttp_2xxRangeIsSuccess(t *testing.T) {
 			conn, proxy := newProbeTestConnection(t, ctrl, cschema.Connector{Probes: []cschema.Probe{*probeCfg}})
 			proxy.resp = &iface.ProxyResponse{StatusCode: status}
 
-			probe := NewProbe(probeCfg, conn.s, conn.cv, conn)
+			probe := NewProbe(probeCfg, conn.s, conn.connector, conn)
 			outcome, err := probe.Invoke(context.Background())
 
 			require.NoErrorf(t, err, "status %d must be treated as success", status)
@@ -186,7 +186,7 @@ func TestProbeHttp_ProxyHttp_TransportErrorIsFailure(t *testing.T) {
 	conn, proxy := newProbeTestConnection(t, ctrl, cschema.Connector{Probes: []cschema.Probe{*probeCfg}})
 	proxy.err = errors.New("dial tcp: connection refused")
 
-	probe := NewProbe(probeCfg, conn.s, conn.cv, conn)
+	probe := NewProbe(probeCfg, conn.s, conn.connector, conn)
 	outcome, err := probe.Invoke(context.Background())
 
 	require.Error(t, err)
@@ -204,7 +204,7 @@ func TestProbeHttp_RawHttp_Success(t *testing.T) {
 	h := mockH.NewFactoryWithMockingClient(ctrl)
 	s, _, _, _, _, _ := FullMockService(t, ctrl)
 	s.httpf = h
-	cv := NewTestConnectorVersion(cschema.Connector{})
+	c := NewTestConnector(cschema.Connector{})
 	logger := slog.New(slog.NewTextHandler(testWriter{t}, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	conn := &connection{
 		Connection: database.Connection{
@@ -212,12 +212,12 @@ func TestProbeHttp_RawHttp_Success(t *testing.T) {
 			Namespace:        "root",
 			State:            database.ConnectionStateConfigured,
 			HealthState:      database.ConnectionHealthStateHealthy,
-			ConnectorId:      cv.GetId(),
-			ConnectorVersion: cv.GetVersion(),
+			ConnectorId:      c.GetId(),
+			ConnectorVersion: c.GetVersion(),
 		},
-		s:      s,
-		cv:     cv,
-		logger: logger,
+		s:         s,
+		connector: c,
+		logger:    logger,
 	}
 
 	genmock.New("https://raw.example.com").Get("/health").Reply(200)
@@ -230,7 +230,7 @@ func TestProbeHttp_RawHttp_Success(t *testing.T) {
 		},
 	}
 
-	probe := NewProbe(probeCfg, s, cv, conn)
+	probe := NewProbe(probeCfg, s, c, conn)
 	outcome, err := probe.Invoke(context.Background())
 
 	require.NoError(t, err)
@@ -244,7 +244,7 @@ func TestProbeHttp_RawHttp_Non2xxIsFailure(t *testing.T) {
 	h := mockH.NewFactoryWithMockingClient(ctrl)
 	s, _, _, _, _, _ := FullMockService(t, ctrl)
 	s.httpf = h
-	cv := NewTestConnectorVersion(cschema.Connector{})
+	c := NewTestConnector(cschema.Connector{})
 	logger := slog.New(slog.NewTextHandler(testWriter{t}, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	conn := &connection{
 		Connection: database.Connection{
@@ -252,12 +252,12 @@ func TestProbeHttp_RawHttp_Non2xxIsFailure(t *testing.T) {
 			Namespace:        "root",
 			State:            database.ConnectionStateConfigured,
 			HealthState:      database.ConnectionHealthStateHealthy,
-			ConnectorId:      cv.GetId(),
-			ConnectorVersion: cv.GetVersion(),
+			ConnectorId:      c.GetId(),
+			ConnectorVersion: c.GetVersion(),
 		},
-		s:      s,
-		cv:     cv,
-		logger: logger,
+		s:         s,
+		connector: c,
+		logger:    logger,
 	}
 
 	genmock.New("https://raw.example.com").Get("/health").Reply(500)
@@ -270,7 +270,7 @@ func TestProbeHttp_RawHttp_Non2xxIsFailure(t *testing.T) {
 		},
 	}
 
-	probe := NewProbe(probeCfg, s, cv, conn)
+	probe := NewProbe(probeCfg, s, c, conn)
 	outcome, err := probe.Invoke(context.Background())
 
 	require.Error(t, err, "raw HTTP probe must treat 500 as failure")

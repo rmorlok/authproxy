@@ -34,10 +34,10 @@ func newTestOAuth2ConnectionAtAuthStep(t *testing.T, ctrl *gomock.Controller, sf
 		SetupFlow: sf,
 		Probes:    probes,
 	}
-	cv := NewTestConnectorVersion(connector)
-	conn.cv = cv
-	conn.ConnectorId = cv.GetId()
-	conn.ConnectorVersion = cv.GetVersion()
+	c := NewTestConnector(connector)
+	conn.connector = c
+	conn.ConnectorId = c.GetId()
+	conn.ConnectorVersion = c.GetVersion()
 	// Position the connection at the OAuth2 redirect step, as it would be
 	// after SetStateAndGeneratePublicUrl ran and before the callback fires.
 	step := cschema.MustNewSetupStep(oauth2.OAuth2AuthorizeStepId)
@@ -61,9 +61,9 @@ func TestHandleCredentialsEstablished(t *testing.T) {
 			Auth:   &cschema.Auth{InnerVal: &cschema.AuthOAuth2{Type: cschema.AuthTypeOAuth2}},
 			Probes: []cschema.Probe{{Id: "ping"}},
 		}
-		conn.cv = NewTestConnectorVersion(connector)
-		conn.ConnectorId = conn.cv.GetId()
-		conn.ConnectorVersion = conn.cv.GetVersion()
+		conn.connector = NewTestConnector(connector)
+		conn.ConnectorId = conn.connector.GetId()
+		conn.ConnectorVersion = conn.connector.GetVersion()
 		current := cschema.MustNewSetupStep(oauth2.OAuth2AuthorizeStepId)
 		conn.SetupStep = &current
 
@@ -92,12 +92,12 @@ func TestHandleCredentialsEstablished(t *testing.T) {
 		}
 		conn, db := newTestConnectionWithSetupFlow(t, ctrl, sf)
 		// OAuth2 connector positions us at the auth step.
-		conn.cv = NewTestConnectorVersion(cschema.Connector{
+		conn.connector = NewTestConnector(cschema.Connector{
 			Auth:      &cschema.Auth{InnerVal: &cschema.AuthOAuth2{Type: cschema.AuthTypeOAuth2}},
 			SetupFlow: sf,
 		})
-		conn.ConnectorId = conn.cv.GetId()
-		conn.ConnectorVersion = conn.cv.GetVersion()
+		conn.ConnectorId = conn.connector.GetId()
+		conn.ConnectorVersion = conn.connector.GetVersion()
 		current := cschema.MustNewSetupStep(oauth2.OAuth2AuthorizeStepId)
 		conn.SetupStep = &current
 
@@ -123,7 +123,7 @@ func TestHandleCredentialsEstablished(t *testing.T) {
 			},
 		}
 		conn, db, _ := newTestConnectionWithSetupFlowAndAsynq(t, ctrl, sf)
-		conn.cv = NewTestConnectorVersion(cschema.Connector{
+		conn.connector = NewTestConnector(cschema.Connector{
 			Auth:      &cschema.Auth{InnerVal: &cschema.AuthOAuth2{Type: cschema.AuthTypeOAuth2}},
 			SetupFlow: sf,
 			Probes: []cschema.Probe{{
@@ -131,8 +131,8 @@ func TestHandleCredentialsEstablished(t *testing.T) {
 				If: &common.Predicate{Javascript: `cfg.run_probe === true`},
 			}},
 		})
-		conn.ConnectorId = conn.cv.GetId()
-		conn.ConnectorVersion = conn.cv.GetVersion()
+		conn.ConnectorId = conn.connector.GetId()
+		conn.ConnectorVersion = conn.connector.GetVersion()
 		setConnectionConfigFixture(t, conn, map[string]any{"run_probe": false})
 		current := cschema.MustNewSetupStep(oauth2.OAuth2AuthorizeStepId)
 		conn.SetupStep = &current
@@ -153,11 +153,11 @@ func TestHandleCredentialsEstablished(t *testing.T) {
 		defer ctrl.Finish()
 
 		conn, db := newTestConnectionWithSetupFlow(t, ctrl, &cschema.SetupFlow{})
-		conn.cv = NewTestConnectorVersion(cschema.Connector{
+		conn.connector = NewTestConnector(cschema.Connector{
 			Auth: &cschema.Auth{InnerVal: &cschema.AuthOAuth2{Type: cschema.AuthTypeOAuth2}},
 		})
-		conn.ConnectorId = conn.cv.GetId()
-		conn.ConnectorVersion = conn.cv.GetVersion()
+		conn.ConnectorId = conn.connector.GetId()
+		conn.ConnectorVersion = conn.connector.GetVersion()
 		current := cschema.MustNewSetupStep(oauth2.OAuth2AuthorizeStepId)
 		conn.SetupStep = &current
 
@@ -178,11 +178,11 @@ func TestHandleCredentialsEstablished(t *testing.T) {
 		defer ctrl.Finish()
 
 		conn, db := newTestConnectionWithSetupFlow(t, ctrl, &cschema.SetupFlow{})
-		conn.cv = NewTestConnectorVersion(cschema.Connector{
+		conn.connector = NewTestConnector(cschema.Connector{
 			Auth: &cschema.Auth{InnerVal: &cschema.AuthOAuth2{Type: cschema.AuthTypeOAuth2}},
 		})
-		conn.ConnectorId = conn.cv.GetId()
-		conn.ConnectorVersion = conn.cv.GetVersion()
+		conn.ConnectorId = conn.connector.GetId()
+		conn.ConnectorVersion = conn.connector.GetVersion()
 		conn.HealthState = database.ConnectionHealthStateUnhealthy
 		current := cschema.MustNewSetupStep(oauth2.OAuth2AuthorizeStepId)
 		conn.SetupStep = &current

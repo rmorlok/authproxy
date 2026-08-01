@@ -279,7 +279,7 @@ func (r *ConnectionsRoutes) getDataSource(gctx *gin.Context) {
 }
 
 func ConnectionToJson(conn coreIface.Connection) ConnectionJson {
-	connector := ConnectorVersionToConnectorJson(conn.GetConnectorVersionEntity())
+	connector := ConnectorVersionToConnectorJson(conn.GetConnector())
 
 	return ConnectionJson{
 		Id:          conn.GetId(),
@@ -1319,7 +1319,7 @@ func (r *ConnectionsRoutes) getScopes(gctx *gin.Context) {
 		return
 	}
 
-	connector := c.GetConnectorVersionEntity().GetDefinition()
+	connector := c.GetConnector().GetDefinition()
 	if connector.Auth == nil {
 		apgin.WriteError(gctx, nil, httperr.New(http.StatusUnprocessableEntity, "scopes are only available for OAuth2 connections"))
 		val.MarkErrorReturn()

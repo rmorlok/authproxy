@@ -27,7 +27,7 @@ func TestBuildConnectionMigrationCandidateAssemblesTargetState(t *testing.T) {
 		e,
 		connectorID,
 		1,
-		database.ConnectorVersionStateActive,
+		database.ConnectorDefinitionVersionStateActive,
 		cschema.Connector{
 			Auth: cschema.NewNoAuth(),
 			SetupFlow: &cschema.SetupFlow{
@@ -48,7 +48,7 @@ func TestBuildConnectionMigrationCandidateAssemblesTargetState(t *testing.T) {
 		e,
 		connectorID,
 		2,
-		database.ConnectorVersionStateActive,
+		database.ConnectorDefinitionVersionStateActive,
 		cschema.Connector{
 			Auth: cschema.NewNoAuth(),
 			Probes: []cschema.Probe{
@@ -91,8 +91,8 @@ func TestBuildConnectionMigrationCandidateAssemblesTargetState(t *testing.T) {
 			"existing": "value",
 		}),
 	}, nil)
-	db.EXPECT().GetConnectorVersion(gomock.Any(), connectorID, uint64(1)).Return(sourceDB, nil).AnyTimes()
-	db.EXPECT().GetConnectorVersion(gomock.Any(), connectorID, uint64(2)).Return(targetDB, nil).AnyTimes()
+	db.EXPECT().GetConnectorDefinitionVersion(gomock.Any(), connectorID, uint64(1)).Return(sourceDB, nil).AnyTimes()
+	db.EXPECT().GetConnectorDefinitionVersion(gomock.Any(), connectorID, uint64(2)).Return(targetDB, nil).AnyTimes()
 
 	candidate, err := s.buildConnectionMigrationCandidate(context.Background(), connID, 2)
 	require.NoError(t, err)
@@ -124,8 +124,8 @@ func TestBuildConnectionMigrationCandidateRejectsNoopAndInactiveTargets(t *testi
 			ConnectorId:      connectorID,
 			ConnectorVersion: 1,
 		}, nil)
-		db.EXPECT().GetConnectorVersion(gomock.Any(), connectorID, uint64(1)).Return(
-			migrationTestDBConnectorVersion(t, e, connectorID, 1, database.ConnectorVersionStateActive, cschema.Connector{}),
+		db.EXPECT().GetConnectorDefinitionVersion(gomock.Any(), connectorID, uint64(1)).Return(
+			migrationTestDBConnectorVersion(t, e, connectorID, 1, database.ConnectorDefinitionVersionStateActive, cschema.Connector{}),
 			nil,
 		)
 
@@ -141,12 +141,12 @@ func TestBuildConnectionMigrationCandidateRejectsNoopAndInactiveTargets(t *testi
 			ConnectorId:      connectorID,
 			ConnectorVersion: 1,
 		}, nil)
-		db.EXPECT().GetConnectorVersion(gomock.Any(), connectorID, uint64(1)).Return(
-			migrationTestDBConnectorVersion(t, e, connectorID, 1, database.ConnectorVersionStateActive, cschema.Connector{}),
+		db.EXPECT().GetConnectorDefinitionVersion(gomock.Any(), connectorID, uint64(1)).Return(
+			migrationTestDBConnectorVersion(t, e, connectorID, 1, database.ConnectorDefinitionVersionStateActive, cschema.Connector{}),
 			nil,
 		)
-		db.EXPECT().GetConnectorVersion(gomock.Any(), connectorID, uint64(2)).Return(
-			migrationTestDBConnectorVersion(t, e, connectorID, 2, database.ConnectorVersionStateArchived, cschema.Connector{}),
+		db.EXPECT().GetConnectorDefinitionVersion(gomock.Any(), connectorID, uint64(2)).Return(
+			migrationTestDBConnectorVersion(t, e, connectorID, 2, database.ConnectorDefinitionVersionStateArchived, cschema.Connector{}),
 			nil,
 		)
 
@@ -164,8 +164,8 @@ func TestMigrationVersionPathOrdersUpAndDown(t *testing.T) {
 	connectorID := apid.New(apid.PrefixConnectorVersion)
 	for version := uint64(1); version <= 3; version++ {
 		db.EXPECT().
-			GetConnectorVersion(gomock.Any(), connectorID, version).
-			Return(migrationTestDBConnectorVersion(t, e, connectorID, version, database.ConnectorVersionStateActive, cschema.Connector{}), nil).
+			GetConnectorDefinitionVersion(gomock.Any(), connectorID, version).
+			Return(migrationTestDBConnectorVersion(t, e, connectorID, version, database.ConnectorDefinitionVersionStateActive, cschema.Connector{}), nil).
 			AnyTimes()
 	}
 
@@ -186,13 +186,13 @@ func TestMigrationVersionPathPropagatesLookupError(t *testing.T) {
 	s, _ := newMigrationTestService(t, db)
 	connectorID := apid.New(apid.PrefixConnectorVersion)
 	wantErr := errors.New("missing version")
-	db.EXPECT().GetConnectorVersion(gomock.Any(), connectorID, uint64(2)).Return(nil, wantErr)
+	db.EXPECT().GetConnectorDefinitionVersion(gomock.Any(), connectorID, uint64(2)).Return(nil, wantErr)
 
 	_, err := s.migrationVersionPath(context.Background(), connectorID, 1, 2)
 	require.ErrorIs(t, err, wantErr)
 }
 
-func migrationTestVersionNumbers(versions []*ConnectorVersion) []uint64 {
+func migrationTestVersionNumbers(versions []*Connector) []uint64 {
 	result := make([]uint64, 0, len(versions))
 	for _, version := range versions {
 		result = append(result, version.Version)

@@ -169,7 +169,7 @@ func TestGenerateAuthUrl_PKCEEmitsChallenge(t *testing.T) {
 			Connection: &mockCore.Connection{
 				Id: apid.New(apid.PrefixConnection),
 			},
-			connectorVersion: &mockCore.ConnectorVersion{
+			connectorVersion: &mockCore.Connector{
 				Id: apid.New(apid.PrefixConnectorVersion),
 			},
 		},
@@ -215,7 +215,7 @@ func TestGenerateAuthUrl_PKCEOmittedWhenDisabled(t *testing.T) {
 			Connection: &mockCore.Connection{
 				Id: apid.New(apid.PrefixConnection),
 			},
-			connectorVersion: &mockCore.ConnectorVersion{
+			connectorVersion: &mockCore.Connector{
 				Id: apid.New(apid.PrefixConnectorVersion),
 			},
 		},

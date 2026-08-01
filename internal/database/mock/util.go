@@ -7,13 +7,13 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 )
 
-type ConnectorVersionMatcher struct {
+type ConnectorWithDefinitionMatcher struct {
 	ExpectedId      apid.ID
 	ExpectedVersion uint64
 }
 
-func (m ConnectorVersionMatcher) Matches(x interface{}) bool {
-	cv, ok := x.(database.ConnectorVersion)
+func (m ConnectorWithDefinitionMatcher) Matches(x interface{}) bool {
+	cv, ok := x.(database.ConnectorWithDefinition)
 	if !ok {
 		return false
 	}
@@ -21,8 +21,8 @@ func (m ConnectorVersionMatcher) Matches(x interface{}) bool {
 	return cv.Id == m.ExpectedId && cv.Version == m.ExpectedVersion
 }
 
-func (m ConnectorVersionMatcher) String() string {
-	return fmt.Sprintf("is ConnectorVersion with ID=%s, Version=%d", m.ExpectedId, m.ExpectedVersion)
+func (m ConnectorWithDefinitionMatcher) String() string {
+	return fmt.Sprintf("is ConnectorWithDefinition with ID=%s, Version=%d", m.ExpectedId, m.ExpectedVersion)
 }
 
 type ConnectionMatcher struct {

@@ -118,10 +118,10 @@ func TestRefreshAuthAfterConnectionMigrationCallsRefresh(t *testing.T) {
 		e,
 		connectorID,
 		2,
-		database.ConnectorVersionStateActive,
+		database.ConnectorDefinitionVersionStateActive,
 		cschema.Connector{Auth: cschema.NewNoAuth()},
 	)
-	target := wrapConnectorVersion(*targetDB, s)
+	target := wrapConnector(*targetDB, s)
 	auth := &migrationRefreshTestAuthenticator{}
 	factory := &migrationRefreshTestFactory{auth: auth}
 	s.authMethodFactories = map[cschema.AuthType]auth_methods.Factory{
@@ -134,7 +134,7 @@ func TestRefreshAuthAfterConnectionMigrationCallsRefresh(t *testing.T) {
 		ConnectorId:      connectorID,
 		ConnectorVersion: 2,
 	}
-	db.EXPECT().GetConnectorVersion(gomock.Any(), connectorID, uint64(2)).Return(targetDB, nil)
+	db.EXPECT().GetConnectorDefinitionVersion(gomock.Any(), connectorID, uint64(2)).Return(targetDB, nil)
 
 	err := s.refreshAuthAfterConnectionMigration(context.Background(), updated, &connectionMigrationCandidate{
 		Target: target,
@@ -158,10 +158,10 @@ func TestRefreshAuthAfterConnectionMigrationReturnsRefreshError(t *testing.T) {
 		e,
 		connectorID,
 		2,
-		database.ConnectorVersionStateActive,
+		database.ConnectorDefinitionVersionStateActive,
 		cschema.Connector{Auth: cschema.NewNoAuth()},
 	)
-	target := wrapConnectorVersion(*targetDB, s)
+	target := wrapConnector(*targetDB, s)
 	wantErr := errors.New("refresh failed")
 	s.authMethodFactories = map[cschema.AuthType]auth_methods.Factory{
 		cschema.AuthTypeNoAuth: &migrationRefreshTestFactory{
@@ -175,7 +175,7 @@ func TestRefreshAuthAfterConnectionMigrationReturnsRefreshError(t *testing.T) {
 		ConnectorId:      connectorID,
 		ConnectorVersion: 2,
 	}
-	db.EXPECT().GetConnectorVersion(gomock.Any(), connectorID, uint64(2)).Return(targetDB, nil)
+	db.EXPECT().GetConnectorDefinitionVersion(gomock.Any(), connectorID, uint64(2)).Return(targetDB, nil)
 
 	err := s.refreshAuthAfterConnectionMigration(context.Background(), updated, &connectionMigrationCandidate{
 		Target: target,
@@ -195,10 +195,10 @@ func TestRefreshAuthAfterConnectionMigrationValidatesFactory(t *testing.T) {
 		e,
 		connectorID,
 		2,
-		database.ConnectorVersionStateActive,
+		database.ConnectorDefinitionVersionStateActive,
 		cschema.Connector{Auth: cschema.NewNoAuth()},
 	)
-	target := wrapConnectorVersion(*targetDB, s)
+	target := wrapConnector(*targetDB, s)
 	updated := &database.Connection{
 		Id:               apid.New(apid.PrefixConnection),
 		Namespace:        "root",
@@ -208,7 +208,7 @@ func TestRefreshAuthAfterConnectionMigrationValidatesFactory(t *testing.T) {
 	}
 
 	t.Run("missing factory", func(t *testing.T) {
-		db.EXPECT().GetConnectorVersion(gomock.Any(), connectorID, uint64(2)).Return(targetDB, nil)
+		db.EXPECT().GetConnectorDefinitionVersion(gomock.Any(), connectorID, uint64(2)).Return(targetDB, nil)
 		err := s.refreshAuthAfterConnectionMigration(context.Background(), updated, &connectionMigrationCandidate{
 			Target: target,
 		})
@@ -219,7 +219,7 @@ func TestRefreshAuthAfterConnectionMigrationValidatesFactory(t *testing.T) {
 		s.authMethodFactories = map[cschema.AuthType]auth_methods.Factory{
 			cschema.AuthTypeNoAuth: &migrationRefreshTestFactory{},
 		}
-		db.EXPECT().GetConnectorVersion(gomock.Any(), connectorID, uint64(2)).Return(targetDB, nil)
+		db.EXPECT().GetConnectorDefinitionVersion(gomock.Any(), connectorID, uint64(2)).Return(targetDB, nil)
 		err := s.refreshAuthAfterConnectionMigration(context.Background(), updated, &connectionMigrationCandidate{
 			Target: target,
 		})

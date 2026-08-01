@@ -89,14 +89,18 @@ func TestSearchResourcesCombinesTextSelectorAndNamespace(t *testing.T) {
 	require.ElementsMatch(t, []SearchLabelMatch{{Key: "env", Value: "prod"}, {Key: "name", Value: "payments-api"}}, result.Items[0].MatchedLabels)
 }
 
-func TestSearchResourcesCollapsesConnectorVersionsDeterministically(t *testing.T) {
+func TestSearchResourcesCollapsesConnectorDefinitionVersions(t *testing.T) {
 	_, db, raw := MustApplyBlankTestDbConfigRaw(t, nil)
 
 	connectorID := apid.New(apid.PrefixConnectorVersion)
+	definitionID1 := apid.New(apid.PrefixConnectorDefinitionVersion)
+	definitionID2 := apid.New(apid.PrefixConnectorDefinitionVersion)
+	definitionID3 := apid.New(apid.PrefixConnectorDefinitionVersion)
 	for _, statement := range []string{
-		fmt.Sprintf(`INSERT INTO connector_versions (id, version, namespace, labels, state, type, created_at, updated_at) VALUES ('%s', 1, 'root', '{"name":"old-primary"}', 'primary', 'test', CURRENT_TIMESTAMP, '2024-01-01T00:00:00Z')`, connectorID),
-		fmt.Sprintf(`INSERT INTO connector_versions (id, version, namespace, labels, state, type, created_at, updated_at) VALUES ('%s', 2, 'root', '{"name":"new-primary"}', 'primary', 'test', CURRENT_TIMESTAMP, '2025-01-01T00:00:00Z')`, connectorID),
-		fmt.Sprintf(`INSERT INTO connector_versions (id, version, namespace, labels, state, type, created_at, updated_at) VALUES ('%s', 3, 'root', '{"name":"draft-match"}', 'draft', 'test', CURRENT_TIMESTAMP, '2026-01-01T00:00:00Z')`, connectorID),
+		fmt.Sprintf(`INSERT INTO connectors (id, namespace, name, labels, created_at, updated_at) VALUES ('%s', 'root', '%s', '{"name":"connector-match","type":"test"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`, connectorID, connectorID),
+		fmt.Sprintf(`INSERT INTO connector_definition_versions (id, connector_id, version, state, encrypted_definition, created_at, updated_at) VALUES ('%s', '%s', 1, 'primary', '{"id":"dek_test","d":"v1"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`, definitionID1, connectorID),
+		fmt.Sprintf(`INSERT INTO connector_definition_versions (id, connector_id, version, state, encrypted_definition, created_at, updated_at) VALUES ('%s', '%s', 2, 'primary', '{"id":"dek_test","d":"v2"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`, definitionID2, connectorID),
+		fmt.Sprintf(`INSERT INTO connector_definition_versions (id, connector_id, version, state, encrypted_definition, created_at, updated_at) VALUES ('%s', '%s', 3, 'draft', '{"id":"dek_test","d":"v3"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`, definitionID3, connectorID),
 	} {
 		_, err := raw.Exec(statement)
 		require.NoError(t, err)
@@ -104,22 +108,13 @@ func TestSearchResourcesCollapsesConnectorVersionsDeterministically(t *testing.T
 
 	result, err := db.SearchResources(t.Context(), SearchResourcesParams{
 		ResourceType:      SearchResourceTypeConnector,
-		Query:             "new-primary",
+		Query:             "connector-match",
 		NamespaceMatchers: []string{"root.**"},
 		Limit:             10,
 	})
 	require.NoError(t, err)
 	require.Len(t, result.Items, 1)
 	require.Equal(t, connectorID.String(), result.Items[0].ResourceID)
-
-	notRepresentative, err := db.SearchResources(t.Context(), SearchResourcesParams{
-		ResourceType:      SearchResourceTypeConnector,
-		Query:             "draft-match",
-		NamespaceMatchers: []string{"root.**"},
-		Limit:             10,
-	})
-	require.NoError(t, err)
-	require.Empty(t, notRepresentative.Items)
 }
 
 func TestSearchResourcesEmptyNamespaceMatchersNeverMeansUnrestricted(t *testing.T) {

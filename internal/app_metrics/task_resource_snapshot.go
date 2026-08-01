@@ -183,7 +183,7 @@ func (h *ResourceSnapshotTaskHandler) snapshotConnectors(ctx context.Context, sa
 	total := 0
 	err := h.db.ListConnectorsBuilder().
 		Limit(resourceSnapshotBatchSize).
-		Enumerate(ctx, func(page pagination.PageResult[database.Connector]) (pagination.KeepGoing, error) {
+		Enumerate(ctx, func(page pagination.PageResult[database.ConnectorWithDefinition]) (pagination.KeepGoing, error) {
 			samples := make([]*ConnectorResourceSample, 0, len(page.Results))
 			for _, connector := range page.Results {
 				connector := connector
@@ -195,7 +195,6 @@ func (h *ResourceSnapshotTaskHandler) snapshotConnectors(ctx context.Context, sa
 					Labels:            connector.Labels,
 					State:             connector.State,
 					ConnectorVersion:  connector.Version,
-					TotalVersions:     connector.TotalVersions,
 					ResourceCreatedAt: connector.CreatedAt,
 					ResourceUpdatedAt: connector.UpdatedAt,
 					ResourceDeletedAt: connector.DeletedAt,
@@ -215,9 +214,9 @@ func (h *ResourceSnapshotTaskHandler) snapshotConnectors(ctx context.Context, sa
 
 func (h *ResourceSnapshotTaskHandler) snapshotConnectorVersions(ctx context.Context, sampledAt time.Time) (int, error) {
 	total := 0
-	err := h.db.ListConnectorVersionsBuilder().
+	err := h.db.ListConnectorDefinitionVersionsBuilder().
 		Limit(resourceSnapshotBatchSize).
-		Enumerate(ctx, func(page pagination.PageResult[database.ConnectorVersion]) (pagination.KeepGoing, error) {
+		Enumerate(ctx, func(page pagination.PageResult[database.ConnectorWithDefinition]) (pagination.KeepGoing, error) {
 			samples := make([]*ConnectorVersionResourceSample, 0, len(page.Results))
 			for _, connectorVersion := range page.Results {
 				connectorVersion := connectorVersion

@@ -17,14 +17,14 @@ import (
 )
 
 type factory struct {
-	cfg        config.C
-	db         database.DB
-	redis      apredis.Client
-	connectors coreIface.C
-	httpf      httpf.F
-	encrypt    encrypt.E
-	logger     *slog.Logger
-	tel        *telemetry
+	cfg     config.C
+	db      database.DB
+	redis   apredis.Client
+	core    coreIface.C
+	httpf   httpf.F
+	encrypt encrypt.E
+	logger  *slog.Logger
+	tel     *telemetry
 }
 
 // FactoryOption configures a Factory at construction time. The functional-
@@ -49,7 +49,16 @@ func WithTelemetry(providers *aptelemetry.Providers, telCfg *sconfig.Telemetry) 
 	}
 }
 
-func NewFactory(cfg config.C, db database.DB, r apredis.Client, c coreIface.C, httpf httpf.F, encrypt encrypt.E, logger *slog.Logger, opts ...FactoryOption) Factory {
+func NewFactory(
+	cfg config.C,
+	db database.DB,
+	r apredis.Client,
+	core coreIface.C,
+	httpf httpf.F,
+	encrypt encrypt.E,
+	logger *slog.Logger,
+	opts ...FactoryOption,
+) Factory {
 	resolved := &factoryOptions{}
 	for _, opt := range opts {
 		opt(resolved)
@@ -66,14 +75,14 @@ func NewFactory(cfg config.C, db database.DB, r apredis.Client, c coreIface.C, h
 	}
 
 	return &factory{
-		cfg:        cfg,
-		db:         db,
-		redis:      r,
-		connectors: c,
-		httpf:      httpf,
-		encrypt:    encrypt,
-		logger:     logger,
-		tel:        tel,
+		cfg:     cfg,
+		db:      db,
+		redis:   r,
+		core:    core,
+		httpf:   httpf,
+		encrypt: encrypt,
+		logger:  logger,
+		tel:     tel,
 	}
 }
 
@@ -93,7 +102,6 @@ func (f *factory) newConnection(connection coreIface.Connection) *oAuth2Connecti
 		f.cfg,
 		f.db,
 		f.redis,
-		f.connectors,
 		f.encrypt,
 		f.logger,
 		f.httpf,
@@ -105,13 +113,17 @@ func (f *factory) newConnection(connection coreIface.Connection) *oAuth2Connecti
 
 var _ auth_methods.Factory = (*factory)(nil)
 
-func (f *factory) GetOAuth2State(ctx context.Context, actor IActorData, stateId apid.ID) (OAuth2Connection, error) {
+func (f *factory) GetOAuth2State(
+	ctx context.Context,
+	actor IActorData,
+	stateId apid.ID,
+) (OAuth2Connection, error) {
 	conn, err := getOAuth2State(
 		ctx,
 		f.cfg,
 		f.db,
 		f.redis,
-		f.connectors,
+		f.core,
 		f.httpf,
 		f.encrypt,
 		f.logger,

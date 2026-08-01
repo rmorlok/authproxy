@@ -119,8 +119,8 @@ func (o *oAuth2Connection) saveStateToRedis(ctx context.Context, actor IActorDat
 		Id:               stateId,
 		Namespace:        actor.GetNamespace(),
 		ActorId:          actor.GetId(),
-		ConnectorId:      o.connection.GetConnectorVersionEntity().GetId(),
-		ConnectorVersion: o.connection.GetConnectorVersionEntity().GetVersion(),
+		ConnectorId:      o.connection.GetConnector().GetId(),
+		ConnectorVersion: o.connection.GetConnector().GetVersion(),
 		ConnectionId:     o.connection.GetId(),
 		ExpiresAt:        time.Now().Add(ttl),
 		ReturnToUrl:      returnToUrl,
@@ -263,8 +263,8 @@ func getOAuth2State(
 		return nil, err
 	}
 
-	cv := connection.GetConnectorVersionEntity()
-	connector := cv.GetDefinition()
+	c := connection.GetConnector()
+	connector := c.GetDefinition()
 	if connector.Auth.GetType() != sconfig.AuthTypeOAuth2 {
 		err := fmt.Errorf("connector %s is not an oauth2 connector", s.ConnectorId)
 		emitCallbackRejection(ctx, logger, rejectionConnectorTypeMismatch, rejectionAttrs{
@@ -277,9 +277,7 @@ func getOAuth2State(
 		return nil, err
 	}
 
-	// TODO: add actor auth validation once connections get ownership
-
-	o := newOAuth2(cfg, db, r, core, encrypt, logger, httpf, connection)
+	o := newOAuth2(cfg, db, r, encrypt, logger, httpf, connection)
 	o.state = s
 
 	return o, nil

@@ -17,11 +17,11 @@ const (
 )
 
 type probeBase struct {
-	cfg    *cschema.Probe
-	s      *service
-	cv     *ConnectorVersion
-	c      *connection
-	logger *slog.Logger
+	cfg       *cschema.Probe
+	s         *service
+	connector *Connector
+	c         *connection
+	logger    *slog.Logger
 }
 
 func (p *probeBase) IsPeriodic() bool {
@@ -80,18 +80,18 @@ func (p *probeBase) recordInvokeOutcome(
 	return outcome, err
 }
 
-func NewProbe(cfg *cschema.Probe, s *service, cv *ConnectorVersion, c *connection) iface.Probe {
+func NewProbe(cfg *cschema.Probe, s *service, c *Connector, conn *connection) iface.Probe {
 	base := probeBase{
-		cfg: cfg,
-		s:   s,
-		cv:  cv,
-		c:   c,
+		cfg:       cfg,
+		s:         s,
+		connector: c,
+		c:         conn,
 		logger: aplog.NewBuilder(s.logger).
 			With("probe_id", cfg.Id).
-			WithNamespace(c.Namespace).
-			WithConnectionId(c.Id).
-			WithConnectorId(cv.Id).
-			WithConnectorVersion(cv.Version).
+			WithNamespace(conn.Namespace).
+			WithConnectionId(conn.Id).
+			WithConnectorId(c.Id).
+			WithConnectorVersion(c.Version).
 			Build(),
 	}
 

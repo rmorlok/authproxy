@@ -34,8 +34,6 @@ const mockConnector: Connector = {
   description: 'Connect to your Google Calendar to manage events and appointments.',
   highlight: 'Manage events and appointments from Google Calendar.',
   logo: logoDataUri('Google Calendar', '#1a73e8'),
-  versions: 1,
-  states: [ConnectorVersionState.ACTIVE],
 };
 
 export const Default: Story = {

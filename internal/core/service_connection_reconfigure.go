@@ -17,7 +17,7 @@ func (c *connection) Reconfigure(ctx context.Context) (iface.ConnectionSetupResp
 		return nil, httperr.BadRequest("connection must be configured to reconfigure")
 	}
 
-	connector := c.cv.GetDefinition()
+	connector := c.connector.GetDefinition()
 	if connector == nil || connector.SetupFlow == nil || !connector.SetupFlow.HasConfigure() {
 		return nil, httperr.BadRequest("connector has no configure steps to reconfigure")
 	}

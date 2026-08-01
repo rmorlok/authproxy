@@ -12,7 +12,7 @@ import (
 var tablesToPurge = []string{
 	ActorTable,
 	ConnectionsTable,
-	ConnectorVersionsTable,
+	ConnectorsTable,
 	DataEncryptionKeysTable,
 	KeysTable,
 	NamespacesTable,

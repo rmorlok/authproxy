@@ -105,21 +105,21 @@ func (s *service) prepareArchiveConnectorVersionsV1(ctx context.Context, connect
 	}
 
 	found := false
-	err := s.db.ListConnectorVersionsBuilder().
+	err := s.db.ListConnectorDefinitionVersionsBuilder().
 		ForId(connectorID).
-		Enumerate(ctx, func(page pagination.PageResult[database.ConnectorVersion]) (pagination.KeepGoing, error) {
+		Enumerate(ctx, func(page pagination.PageResult[database.ConnectorWithDefinition]) (pagination.KeepGoing, error) {
 			for _, version := range page.Results {
 				found = true
 				switch version.State {
-				case database.ConnectorVersionStateDraft:
+				case database.ConnectorDefinitionVersionStateDraft:
 					logger.Info("archiving draft connector version", "version_id", version.Id)
-					if err := s.db.SetConnectorVersionState(ctx, version.Id, version.Version, database.ConnectorVersionStateArchived); err != nil {
+					if err := s.db.SetConnectorDefinitionVersionState(ctx, version.Id, version.Version, database.ConnectorDefinitionVersionStateArchived); err != nil {
 						logger.Info("failed archiving draft connector version", "version_id", version.Id, "error", err)
 						return pagination.Stop, err
 					}
-				case database.ConnectorVersionStatePrimary:
+				case database.ConnectorDefinitionVersionStatePrimary:
 					logger.Info("moving primary connector version to active", "version_id", version.Id)
-					if err := s.db.SetConnectorVersionState(ctx, version.Id, version.Version, database.ConnectorVersionStateActive); err != nil {
+					if err := s.db.SetConnectorDefinitionVersionState(ctx, version.Id, version.Version, database.ConnectorDefinitionVersionStateActive); err != nil {
 						logger.Info("failed moving primary to active", "version_id", version.Id, "error", err)
 						return pagination.Stop, err
 					}
@@ -152,17 +152,17 @@ func (s *service) finalizeArchiveConnectorVersionsV1(ctx context.Context, connec
 	}
 
 	found := false
-	err := s.db.ListConnectorVersionsBuilder().
+	err := s.db.ListConnectorDefinitionVersionsBuilder().
 		ForId(connectorID).
-		Enumerate(ctx, func(page pagination.PageResult[database.ConnectorVersion]) (pagination.KeepGoing, error) {
+		Enumerate(ctx, func(page pagination.PageResult[database.ConnectorWithDefinition]) (pagination.KeepGoing, error) {
 			for _, version := range page.Results {
 				found = true
-				if version.State == database.ConnectorVersionStateArchived {
+				if version.State == database.ConnectorDefinitionVersionStateArchived {
 					continue
 				}
 
 				logger.Info("archiving connector version", "version_id", version.Id)
-				if err := s.db.SetConnectorVersionState(ctx, version.Id, version.Version, database.ConnectorVersionStateArchived); err != nil {
+				if err := s.db.SetConnectorDefinitionVersionState(ctx, version.Id, version.Version, database.ConnectorDefinitionVersionStateArchived); err != nil {
 					logger.Info("failed archiving connector version", "version_id", version.Id, "error", err)
 					return pagination.Stop, err
 				}

@@ -27,11 +27,11 @@ func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConn
 	}
 
 	var err error
-	var cv iface.ConnectorVersion
+	var c iface.Connector
 	if req.HasVersion() {
-		cv, err = s.GetConnectorVersion(ctx, req.ConnectorId, req.ConnectorVersion)
+		c, err = s.GetConnectorVersion(ctx, req.ConnectorId, req.ConnectorVersion)
 	} else {
-		cv, err = s.GetConnectorVersionForState(ctx, req.ConnectorId, database.ConnectorVersionStatePrimary)
+		c, err = s.GetConnectorVersionForState(ctx, req.ConnectorId, database.ConnectorDefinitionVersionStatePrimary)
 	}
 
 	if err != nil {
@@ -44,7 +44,7 @@ func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConn
 		return nil, httperr.InternalServerError(httperr.WithInternalErr(err))
 	}
 
-	targetNamespace := cv.GetNamespace()
+	targetNamespace := c.GetNamespace()
 	if req.HasIntoNamespace() {
 		targetNamespace = req.IntoNamespace
 	}
@@ -54,14 +54,14 @@ func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConn
 		return nil, httperr.BadRequest(fmt.Sprintf("invalid namespace '%s'", targetNamespace), httperr.WithInternalErr(err))
 	}
 
-	if !namespace.IsSameOrChild(cv.GetNamespace(), targetNamespace) {
+	if !namespace.IsSameOrChild(c.GetNamespace(), targetNamespace) {
 		val.MarkErrorReturn()
-		return nil, httperr.BadRequestf("target namespace '%s' is not a child of the connector's namespace '%s'", targetNamespace, cv.GetNamespace())
+		return nil, httperr.BadRequestf("target namespace '%s' is not a child of the connector's namespace '%s'", targetNamespace, c.GetNamespace())
 	}
 
 	// Primary validation for the request -- make sure the user can initiate connections in the target namespace with
 	// the specified connector id.
-	if err := val.ValidateNamespaceResourceId(targetNamespace, cv.GetId().String()); err != nil {
+	if err := val.ValidateNamespaceResourceId(targetNamespace, c.GetId().String()); err != nil {
 		val.MarkErrorReturn()
 		return nil, httperr.Forbidden(err.Error(), httperr.WithInternalErr(err))
 	}
@@ -72,7 +72,7 @@ func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConn
 		return nil, httperr.InternalServerError(httperr.WithInternalErr(err))
 	}
 
-	connectionIface, err := s.CreateConnection(ctx, targetNamespace, cv)
+	connectionIface, err := s.CreateConnection(ctx, targetNamespace, c)
 	if err != nil {
 		val.MarkErrorReturn()
 		return nil, httperr.InternalServerError(httperr.WithInternalErr(err))

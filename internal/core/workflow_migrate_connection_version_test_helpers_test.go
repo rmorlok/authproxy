@@ -28,7 +28,7 @@ func newMigrationTestCandidate(t testing.TB) *connectionMigrationCandidate {
 			ConnectorVersion: 1,
 			HealthState:      database.ConnectionHealthStateHealthy,
 		}},
-		Target: &ConnectorVersion{ConnectorVersion: database.ConnectorVersion{
+		Target: &Connector{ConnectorWithDefinition: database.ConnectorWithDefinition{
 			Id:      connectorID,
 			Version: 2,
 		}},
@@ -55,9 +55,9 @@ func migrationTestDBConnectorVersion(
 	e encrypt.E,
 	connectorID apid.ID,
 	version uint64,
-	state database.ConnectorVersionState,
+	state database.ConnectorDefinitionVersionState,
 	def cschema.Connector,
-) *database.ConnectorVersion {
+) *database.ConnectorWithDefinition {
 	t.Helper()
 
 	if def.Auth == nil {
@@ -75,12 +75,11 @@ func migrationTestDBConnectorVersion(
 	)
 	require.NoError(t, err)
 
-	return &database.ConnectorVersion{
+	return &database.ConnectorWithDefinition{
 		Id:                  connectorID,
 		Namespace:           "root",
 		Version:             version,
 		State:               state,
-		Hash:                def.Hash(),
 		EncryptedDefinition: encrypted,
 	}
 }

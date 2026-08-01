@@ -103,18 +103,18 @@ func (m *MockGettableConnectorVersion) EXPECT() *MockGettableConnectorVersionMoc
 	return m.recorder
 }
 
-// GetConnectorVersionEntity mocks base method.
-func (m *MockGettableConnectorVersion) GetConnectorVersionEntity() httpf.ConnectorVersion {
+// GetConnector mocks base method.
+func (m *MockGettableConnectorVersion) GetConnector() httpf.ConnectorVersion {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetConnectorVersionEntity")
+	ret := m.ctrl.Call(m, "GetConnector")
 	ret0, _ := ret[0].(httpf.ConnectorVersion)
 	return ret0
 }
 
-// GetConnectorVersionEntity indicates an expected call of GetConnectorVersionEntity.
-func (mr *MockGettableConnectorVersionMockRecorder) GetConnectorVersionEntity() *gomock.Call {
+// GetConnector indicates an expected call of GetConnector.
+func (mr *MockGettableConnectorVersionMockRecorder) GetConnector() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnectorVersionEntity", reflect.TypeOf((*MockGettableConnectorVersion)(nil).GetConnectorVersionEntity))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnector", reflect.TypeOf((*MockGettableConnectorVersion)(nil).GetConnector))
 }
 
 // MockRateLimitConfigProvider is a mock of RateLimitConfigProvider interface.

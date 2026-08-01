@@ -20,7 +20,7 @@ func (c *connection) GetDataSource(ctx context.Context, sourceId string) ([]apjs
 		return nil, httperr.BadRequest("connection has no active setup step")
 	}
 
-	connector := c.cv.GetDefinition()
+	connector := c.connector.GetDefinition()
 	if connector == nil || connector.SetupFlow == nil {
 		return nil, httperr.BadRequest("connector has no setup flow")
 	}

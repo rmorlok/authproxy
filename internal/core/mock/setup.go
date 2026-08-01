@@ -37,13 +37,12 @@ func MockConnectionRetrieval(ctx context.Context, dbMock *mockDb.MockDB, e *mock
 
 // MockConnectorRetrival sets up mocks to retrieve a connector from the service any number of times.
 func MockConnectorRetrival(ctx context.Context, dbMock *mockDb.MockDB, e *mockE.MockE, c *cschema.Connector) {
-	state := database.ConnectorVersionStatePrimary
+	state := database.ConnectorDefinitionVersionStatePrimary
 	if c.State != "" {
-		state = database.ConnectorVersionState(c.State)
+		state = database.ConnectorDefinitionVersionState(c.State)
 	}
 
 	clock := apctx.GetClock(ctx)
-	hash := fmt.Sprintf("%s-hash", c.Id.String())
 	encryptedDefinition := encfield.EncryptedField{
 		ID:   "dek_mock",
 		Data: fmt.Sprintf("%s-encrypted-definition", c.Id.String()),
@@ -51,13 +50,12 @@ func MockConnectorRetrival(ctx context.Context, dbMock *mockDb.MockDB, e *mockE.
 
 	dbMock.
 		EXPECT().
-		GetConnectorVersion(gomock.Any(), c.Id, c.Version).
-		Return(&database.ConnectorVersion{
+		GetConnectorDefinitionVersion(gomock.Any(), c.Id, c.Version).
+		Return(&database.ConnectorWithDefinition{
 			Id:                  c.Id,
 			Version:             c.Version,
 			State:               state,
 			Labels:              c.Labels,
-			Hash:                hash,
 			EncryptedDefinition: encryptedDefinition,
 			CreatedAt:           clock.Now(),
 			UpdatedAt:           clock.Now(),

@@ -37,14 +37,14 @@ func TestCreateConnectorVersion(t *testing.T) {
 
 		// Upsert is called
 		db.EXPECT().
-			UpsertConnectorVersion(gomock.Any(), gomock.Any()).
+			UpsertConnectorDefinitionVersion(gomock.Any(), gomock.Any()).
 			Return(nil)
 
 		// Re-fetch after upsert
 		mock.MockConnectorRetrival(ctx, db, e, &cschema.Connector{
 			Id:          fixedId,
 			Version:     1,
-			State:       string(database.ConnectorVersionStateDraft),
+			State:       string(database.ConnectorDefinitionVersionStateDraft),
 			DisplayName: "New Connector",
 			Description: "A new connector",
 			Labels:      labels,
@@ -54,7 +54,7 @@ func TestCreateConnectorVersion(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, fixedId, result.GetId())
 		require.Equal(t, uint64(1), result.GetVersion())
-		require.Equal(t, database.ConnectorVersionStateDraft, result.GetState())
+		require.Equal(t, database.ConnectorDefinitionVersionStateDraft, result.GetState())
 		require.Equal(t, "test", result.GetLabels()["env"])
 	})
 
@@ -74,7 +74,7 @@ func TestCreateConnectorVersion(t *testing.T) {
 			Return(encfield.EncryptedField{ID: "dek_test", Data: "encrypted-def"}, nil)
 
 		db.EXPECT().
-			UpsertConnectorVersion(gomock.Any(), gomock.Any()).
+			UpsertConnectorDefinitionVersion(gomock.Any(), gomock.Any()).
 			Return(errors.New("db write failed"))
 
 		_, err := s.CreateConnectorVersion(ctx, "root", definition, nil, nil)
@@ -93,17 +93,17 @@ func TestCreateDraftConnectorVersion(t *testing.T) {
 
 		// No existing draft
 		db.EXPECT().
-			GetConnectorVersionForState(gomock.Any(), id, database.ConnectorVersionStateDraft).
+			GetConnectorDefinitionVersionForState(gomock.Any(), id, database.ConnectorDefinitionVersionStateDraft).
 			Return(nil, database.ErrNotFound)
 
 		// Latest version is version 1
 		db.EXPECT().
-			NewestConnectorVersionForId(gomock.Any(), id).
-			Return(&database.ConnectorVersion{
+			NewestConnectorDefinitionVersionForId(gomock.Any(), id).
+			Return(&database.ConnectorWithDefinition{
 				Id:        id,
 				Version:   1,
 				Namespace: "root",
-				State:     database.ConnectorVersionStatePrimary,
+				State:     database.ConnectorDefinitionVersionStatePrimary,
 				Labels:    map[string]string{"type": "test"},
 			}, nil)
 
@@ -114,7 +114,7 @@ func TestCreateDraftConnectorVersion(t *testing.T) {
 
 		// Upsert
 		db.EXPECT().
-			UpsertConnectorVersion(gomock.Any(), gomock.Any()).
+			UpsertConnectorDefinitionVersion(gomock.Any(), gomock.Any()).
 			Return(nil)
 
 		// Re-fetch
@@ -122,7 +122,7 @@ func TestCreateDraftConnectorVersion(t *testing.T) {
 		mock.MockConnectorRetrival(ctx, db, e, &cschema.Connector{
 			Id:          id,
 			Version:     2,
-			State:       string(database.ConnectorVersionStateDraft),
+			State:       string(database.ConnectorDefinitionVersionStateDraft),
 			DisplayName: "Updated Def",
 			Labels:      newLabels,
 		})
@@ -135,7 +135,7 @@ func TestCreateDraftConnectorVersion(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, id, result.GetId())
 		require.Equal(t, uint64(2), result.GetVersion())
-		require.Equal(t, database.ConnectorVersionStateDraft, result.GetState())
+		require.Equal(t, database.ConnectorDefinitionVersionStateDraft, result.GetState())
 	})
 
 	t.Run("success with nil definition clones latest", func(t *testing.T) {
@@ -148,7 +148,7 @@ func TestCreateDraftConnectorVersion(t *testing.T) {
 
 		// No existing draft
 		db.EXPECT().
-			GetConnectorVersionForState(gomock.Any(), id, database.ConnectorVersionStateDraft).
+			GetConnectorDefinitionVersionForState(gomock.Any(), id, database.ConnectorDefinitionVersionStateDraft).
 			Return(nil, database.ErrNotFound)
 
 		latestDef := &cschema.Connector{
@@ -160,12 +160,12 @@ func TestCreateDraftConnectorVersion(t *testing.T) {
 
 		// Latest version
 		db.EXPECT().
-			NewestConnectorVersionForId(gomock.Any(), id).
-			Return(&database.ConnectorVersion{
+			NewestConnectorDefinitionVersionForId(gomock.Any(), id).
+			Return(&database.ConnectorWithDefinition{
 				Id:                  id,
 				Version:             3,
 				Namespace:           "root.child",
-				State:               database.ConnectorVersionStatePrimary,
+				State:               database.ConnectorDefinitionVersionStatePrimary,
 				Labels:              map[string]string{"type": "original"},
 				EncryptedDefinition: encryptedDef,
 			}, nil)
@@ -183,14 +183,14 @@ func TestCreateDraftConnectorVersion(t *testing.T) {
 
 		// Upsert
 		db.EXPECT().
-			UpsertConnectorVersion(gomock.Any(), gomock.Any()).
+			UpsertConnectorDefinitionVersion(gomock.Any(), gomock.Any()).
 			Return(nil)
 
 		// Re-fetch
 		mock.MockConnectorRetrival(ctx, db, e, &cschema.Connector{
 			Id:          id,
 			Version:     4,
-			State:       string(database.ConnectorVersionStateDraft),
+			State:       string(database.ConnectorDefinitionVersionStateDraft),
 			DisplayName: "Latest Connector",
 			Labels:      map[string]string{"type": "original"},
 		})
@@ -211,11 +211,11 @@ func TestCreateDraftConnectorVersion(t *testing.T) {
 		ctx := context.Background()
 
 		db.EXPECT().
-			GetConnectorVersionForState(gomock.Any(), id, database.ConnectorVersionStateDraft).
-			Return(&database.ConnectorVersion{
+			GetConnectorDefinitionVersionForState(gomock.Any(), id, database.ConnectorDefinitionVersionStateDraft).
+			Return(&database.ConnectorWithDefinition{
 				Id:      id,
 				Version: 2,
-				State:   database.ConnectorVersionStateDraft,
+				State:   database.ConnectorDefinitionVersionStateDraft,
 			}, nil)
 
 		_, err := s.CreateDraftConnectorVersion(ctx, id, nil, nil, nil)
@@ -232,12 +232,12 @@ func TestCreateDraftConnectorVersion(t *testing.T) {
 
 		// No draft
 		db.EXPECT().
-			GetConnectorVersionForState(gomock.Any(), id, database.ConnectorVersionStateDraft).
+			GetConnectorDefinitionVersionForState(gomock.Any(), id, database.ConnectorDefinitionVersionStateDraft).
 			Return(nil, database.ErrNotFound)
 
 		// No versions at all
 		db.EXPECT().
-			NewestConnectorVersionForId(gomock.Any(), id).
+			NewestConnectorDefinitionVersionForId(gomock.Any(), id).
 			Return(nil, database.ErrNotFound)
 
 		_, err := s.CreateDraftConnectorVersion(ctx, id, nil, nil, nil)
@@ -253,7 +253,7 @@ func TestCreateDraftConnectorVersion(t *testing.T) {
 		ctx := context.Background()
 
 		db.EXPECT().
-			GetConnectorVersionForState(gomock.Any(), id, database.ConnectorVersionStateDraft).
+			GetConnectorDefinitionVersionForState(gomock.Any(), id, database.ConnectorDefinitionVersionStateDraft).
 			Return(nil, errors.New("connection refused"))
 
 		_, err := s.CreateDraftConnectorVersion(ctx, id, nil, nil, nil)
@@ -269,11 +269,11 @@ func TestCreateDraftConnectorVersion(t *testing.T) {
 		ctx := context.Background()
 
 		db.EXPECT().
-			GetConnectorVersionForState(gomock.Any(), id, database.ConnectorVersionStateDraft).
+			GetConnectorDefinitionVersionForState(gomock.Any(), id, database.ConnectorDefinitionVersionStateDraft).
 			Return(nil, database.ErrNotFound)
 
 		db.EXPECT().
-			NewestConnectorVersionForId(gomock.Any(), id).
+			NewestConnectorDefinitionVersionForId(gomock.Any(), id).
 			Return(nil, errors.New("timeout"))
 
 		_, err := s.CreateDraftConnectorVersion(ctx, id, nil, nil, nil)
@@ -289,16 +289,16 @@ func TestCreateDraftConnectorVersion(t *testing.T) {
 		ctx := context.Background()
 
 		db.EXPECT().
-			GetConnectorVersionForState(gomock.Any(), id, database.ConnectorVersionStateDraft).
+			GetConnectorDefinitionVersionForState(gomock.Any(), id, database.ConnectorDefinitionVersionStateDraft).
 			Return(nil, database.ErrNotFound)
 
 		db.EXPECT().
-			NewestConnectorVersionForId(gomock.Any(), id).
-			Return(&database.ConnectorVersion{
+			NewestConnectorDefinitionVersionForId(gomock.Any(), id).
+			Return(&database.ConnectorWithDefinition{
 				Id:        id,
 				Version:   1,
 				Namespace: "root",
-				State:     database.ConnectorVersionStatePrimary,
+				State:     database.ConnectorDefinitionVersionStatePrimary,
 			}, nil)
 
 		e.EXPECT().
@@ -306,7 +306,7 @@ func TestCreateDraftConnectorVersion(t *testing.T) {
 			Return(encfield.EncryptedField{ID: "dek_test", Data: "encrypted"}, nil)
 
 		db.EXPECT().
-			UpsertConnectorVersion(gomock.Any(), gomock.Any()).
+			UpsertConnectorDefinitionVersion(gomock.Any(), gomock.Any()).
 			Return(errors.New("constraint violation"))
 
 		_, err := s.CreateDraftConnectorVersion(ctx, id, &cschema.Connector{DisplayName: "Test"}, nil, nil)

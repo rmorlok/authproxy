@@ -8160,12 +8160,6 @@ const docTemplateApi = `{
                     "type": "string",
                     "example": "primary"
                 },
-                "states": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
                 "status_page_url": {
                     "type": "string",
                     "example": "https://status.salesforce.com"
@@ -8176,10 +8170,6 @@ const docTemplateApi = `{
                 "version": {
                     "type": "integer",
                     "example": 1
-                },
-                "versions": {
-                    "type": "integer",
-                    "example": 2
                 }
             }
         },
@@ -8431,12 +8421,6 @@ const docTemplateApi = `{
                     "type": "string",
                     "example": "primary"
                 },
-                "states": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
                 "status_page_url": {
                     "type": "string",
                     "example": "https://status.salesforce.com"
@@ -8447,10 +8431,6 @@ const docTemplateApi = `{
                 "version": {
                     "type": "integer",
                     "example": 1
-                },
-                "versions": {
-                    "type": "integer",
-                    "example": 2
                 }
             }
         },

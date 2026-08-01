@@ -13,8 +13,8 @@ import (
  */
 
 type ListConnectorVersionsExecutor interface {
-	FetchPage(context.Context) pagination.PageResult[ConnectorVersion]
-	Enumerate(context.Context, pagination.EnumerateCallback[ConnectorVersion]) error
+	FetchPage(context.Context) pagination.PageResult[Connector]
+	Enumerate(context.Context, pagination.EnumerateCallback[Connector]) error
 }
 
 type ListConnectorVersionsBuilder interface {
@@ -22,11 +22,11 @@ type ListConnectorVersionsBuilder interface {
 	Limit(int32) ListConnectorVersionsBuilder
 	ForId(apid.ID) ListConnectorVersionsBuilder
 	ForVersion(version uint64) ListConnectorVersionsBuilder
-	ForState(database.ConnectorVersionState) ListConnectorVersionsBuilder
-	ForStates([]database.ConnectorVersionState) ListConnectorVersionsBuilder
+	ForState(database.ConnectorDefinitionVersionState) ListConnectorVersionsBuilder
+	ForStates([]database.ConnectorDefinitionVersionState) ListConnectorVersionsBuilder
 	ForNamespaceMatcher(string) ListConnectorVersionsBuilder
 	ForNamespaceMatchers([]string) ListConnectorVersionsBuilder
-	OrderBy(database.ConnectorVersionOrderByField, pagination.OrderBy) ListConnectorVersionsBuilder
+	OrderBy(database.ConnectorDefinitionVersionOrderByField, pagination.OrderBy) ListConnectorVersionsBuilder
 	IncludeDeleted() ListConnectorVersionsBuilder
 	ForLabelSelector(selector string) ListConnectorVersionsBuilder
 }

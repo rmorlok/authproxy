@@ -272,9 +272,8 @@ func (s *service) CreateConnection(ctx context.Context, c *Connection) error {
 		// Fetch parent labels for carry-forward materialization. Missing
 		// parents yield nil — the daily consistency checker reconciles any
 		// drift if the parent appears later.
-		cvLabels, err := s.fetchLabelsForCarryForward(ctx, tx, ConnectorVersionsTable, sq.Eq{
+		cvLabels, err := s.fetchLabelsForCarryForward(ctx, tx, ConnectorsTable, sq.Eq{
 			"id":         c.ConnectorId,
-			"version":    c.ConnectorVersion,
 			"deleted_at": nil,
 		})
 		if err != nil {
@@ -616,9 +615,8 @@ func (s *service) UpdateConnectionForVersionMigration(ctx context.Context, updat
 			return err
 		}
 
-		cvLabels, err := s.fetchLabelsForCarryForward(ctx, tx, ConnectorVersionsTable, sq.Eq{
+		cvLabels, err := s.fetchLabelsForCarryForward(ctx, tx, ConnectorsTable, sq.Eq{
 			"id":         update.ConnectorId,
-			"version":    update.ConnectorVersion,
 			"deleted_at": nil,
 		})
 		if err != nil {

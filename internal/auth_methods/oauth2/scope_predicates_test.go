@@ -147,7 +147,7 @@ func TestGenerateAuthUrl_UsesEffectiveScopes(t *testing.T) {
 				Configuration: map[string]any{"push_files": false},
 				Labels:        map[string]string{"env": "prod"},
 			},
-			connectorVersion: &mockCore.ConnectorVersion{Id: apid.New(apid.PrefixConnectorVersion)},
+			connectorVersion: &mockCore.Connector{Id: apid.New(apid.PrefixConnectorVersion)},
 		},
 		auth: &cschema.AuthOAuth2{
 			Type:     cschema.AuthTypeOAuth2,
@@ -185,7 +185,7 @@ func TestGenerateAuthUrl_ConditionalScopeError(t *testing.T) {
 		cfg: cfg,
 		connection: &configuredConnection{
 			Connection:       &mockCore.Connection{Id: apid.New(apid.PrefixConnection)},
-			connectorVersion: &mockCore.ConnectorVersion{Id: apid.New(apid.PrefixConnectorVersion)},
+			connectorVersion: &mockCore.Connector{Id: apid.New(apid.PrefixConnectorVersion)},
 		},
 		auth: &cschema.AuthOAuth2{
 			Type:     cschema.AuthTypeOAuth2,

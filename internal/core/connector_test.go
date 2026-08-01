@@ -26,7 +26,7 @@ func (n *namespaceHolder) GetNamespace() string {
 	return n.namespace
 }
 
-func TestWrapConnectorVersion(t *testing.T) {
+func TestWrapConnector(t *testing.T) {
 	// Setup
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -38,25 +38,24 @@ func TestWrapConnectorVersion(t *testing.T) {
 	}
 
 	connectorId := apid.New(apid.PrefixActor)
-	dbConnectorVersion := database.ConnectorVersion{
+	dbConnector := database.ConnectorWithDefinition{
 		Id:                  connectorId,
 		Version:             1,
 		Labels:              map[string]string{"type": "test-connector"},
-		State:               database.ConnectorVersionStateDraft,
-		Hash:                "some-hash",
+		State:               database.ConnectorDefinitionVersionStateDraft,
 		EncryptedDefinition: encfield.EncryptedField{ID: "dek_test", Data: "encrypted-data"},
 	}
 
 	// Test
-	cv := wrapConnectorVersion(dbConnectorVersion, s)
+	c := wrapConnector(dbConnector, s)
 
 	// Verify
-	assert.Equal(t, dbConnectorVersion, cv.ConnectorVersion)
-	assert.Equal(t, s, cv.s)
-	assert.Nil(t, cv.def)
+	assert.Equal(t, dbConnector, c.ConnectorWithDefinition)
+	assert.Equal(t, s, c.s)
+	assert.Nil(t, c.def)
 }
 
-func TestConnectorVersion_GetDefinition(t *testing.T) {
+func TestConnector_GetDefinition(t *testing.T) {
 	// Setup
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -68,16 +67,15 @@ func TestConnectorVersion_GetDefinition(t *testing.T) {
 	}
 
 	connectorId := apid.New(apid.PrefixActor)
-	dbConnectorVersion := database.ConnectorVersion{
+	dbConnector := database.ConnectorWithDefinition{
 		Id:                  connectorId,
 		Version:             1,
 		Labels:              map[string]string{"type": "test-connector"},
-		State:               database.ConnectorVersionStateDraft,
-		Hash:                "some-hash",
+		State:               database.ConnectorDefinitionVersionStateDraft,
 		EncryptedDefinition: encfield.EncryptedField{ID: "dek_test", Data: "encrypted-data"},
 	}
 
-	cv := wrapConnectorVersion(dbConnectorVersion, s)
+	c := wrapConnector(dbConnector, s)
 
 	// Create a connector definition
 	def := &cschema.Connector{
@@ -93,18 +91,42 @@ func TestConnectorVersion_GetDefinition(t *testing.T) {
 		Return(string(defJSON), nil)
 
 	// Test
-	result := cv.GetDefinition()
+	result := c.GetDefinition()
 
 	// Verify
 	assert.Equal(t, def.DisplayName, result.DisplayName)
 	assert.Equal(t, def.Description, result.Description)
 
 	// Test caching - should not call decrypt again
-	result2 := cv.GetDefinition()
+	result2 := c.GetDefinition()
 	assert.Equal(t, result, result2)
 }
 
-func TestConnectorVersion_SetDefinition(t *testing.T) {
+func TestConnector_GetHashDerivesFromEncryptedDefinition(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockEncrypt := encryptmock.NewMockE(ctrl)
+	encryptedDefinition := encfield.EncryptedField{ID: "dek_test", Data: "encrypted-data"}
+	def := &cschema.Connector{
+		Labels:      map[string]string{"type": "test-connector"},
+		DisplayName: "Test Connector",
+	}
+	defJSON := util.Must(json.Marshal(def))
+	mockEncrypt.EXPECT().
+		DecryptString(gomock.Any(), encryptedDefinition).
+		Return(string(defJSON), nil)
+
+	c := wrapConnector(database.ConnectorWithDefinition{
+		Id:                  apid.New(apid.PrefixConnectorVersion),
+		Version:             1,
+		EncryptedDefinition: encryptedDefinition,
+	}, &service{encrypt: mockEncrypt, logger: aplog.NewNoopLogger()})
+
+	require.Equal(t, def.Hash(), c.GetHash())
+}
+
+func TestConnector_SetDefinition(t *testing.T) {
 	// Setup
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -116,16 +138,15 @@ func TestConnectorVersion_SetDefinition(t *testing.T) {
 	}
 
 	connectorId := apid.New(apid.PrefixActor)
-	dbConnectorVersion := database.ConnectorVersion{
+	dbConnector := database.ConnectorWithDefinition{
 		Id:                  connectorId,
 		Version:             1,
 		Labels:              map[string]string{"type": "test-connector"},
-		State:               database.ConnectorVersionStateDraft,
-		Hash:                "some-hash",
+		State:               database.ConnectorDefinitionVersionStateDraft,
 		EncryptedDefinition: encfield.EncryptedField{ID: "dek_test", Data: "encrypted-data"},
 	}
 
-	cv := wrapConnectorVersion(dbConnectorVersion, s)
+	c := wrapConnector(dbConnector, s)
 
 	// Create a connector definition
 	def := &cschema.Connector{
@@ -147,40 +168,40 @@ func TestConnectorVersion_SetDefinition(t *testing.T) {
 		Return(newEncryptedDef, nil)
 
 	// Test
-	err := cv.setDefinition(def)
+	err := c.setDefinition(def)
 
 	// Verify
 	assert.NoError(t, err)
-	assert.Equal(t, expectedHash, cv.Hash)
-	assert.Equal(t, newEncryptedDef, cv.EncryptedDefinition)
-	assert.Equal(t, def, cv.def)
+	assert.Equal(t, expectedHash, c.Hash)
+	assert.Equal(t, newEncryptedDef, c.EncryptedDefinition)
+	assert.Equal(t, def, c.def)
 }
 
-func TestConnectorVersion_SetDefinitionResetsJavascriptLibrary(t *testing.T) {
-	cv := NewTestConnectorVersion(cschema.Connector{
+func TestConnector_SetDefinitionResetsJavascriptLibrary(t *testing.T) {
+	c := NewTestConnector(cschema.Connector{
 		Javascript: `function isUpdated() { return false; }`,
 	})
 
-	library, err := cv.getJavascriptLibrary()
+	library, err := c.getJavascriptLibrary()
 	require.NoError(t, err)
 	ok, err := library.NewContext(nil).EvaluateBoolean(`isUpdated()`)
 	require.NoError(t, err)
 	assert.False(t, ok)
 
-	err = cv.setDefinition(&cschema.Connector{
+	err = c.setDefinition(&cschema.Connector{
 		Javascript: `function isUpdated() { return true; }`,
 	})
 	require.NoError(t, err)
 
-	library, err = cv.getJavascriptLibrary()
+	library, err = c.getJavascriptLibrary()
 	require.NoError(t, err)
 	ok, err = library.NewContext(nil).EvaluateBoolean(`isUpdated()`)
 	require.NoError(t, err)
 	assert.True(t, ok)
 }
 
-// NewTestConnectorVersion creates a new test connector version using provided connector configuration data.
-func NewTestConnectorVersion(c cschema.Connector) *ConnectorVersion {
+// NewTestConnector creates a hydrated test connector using the provided definition.
+func NewTestConnector(c cschema.Connector) *Connector {
 	e := encrypt.NewFakeEncryptService(false)
 	connectorId := apid.New(apid.PrefixActor)
 	if c.Id != apid.Nil {
@@ -190,23 +211,22 @@ func NewTestConnectorVersion(c cschema.Connector) *ConnectorVersion {
 	if c.Version != 0 {
 		version = c.Version
 	}
-	state := database.ConnectorVersionStatePrimary
+	state := database.ConnectorDefinitionVersionStatePrimary
 	if c.State != "" {
-		state = database.ConnectorVersionState(c.State)
+		state = database.ConnectorDefinitionVersionState(c.State)
 	}
 	encryptedDefinition, err := e.EncryptStringForEntity(context.Background(), &namespaceHolder{namespace: "root"}, string(util.Must(json.Marshal(c))))
 	if err != nil {
 		panic(err)
 	}
 
-	dbConnectorVersion := database.ConnectorVersion{
+	dbConnector := database.ConnectorWithDefinition{
 		Id:                  connectorId,
 		Version:             version,
 		Labels:              map[string]string{"type": "test-connector"},
 		State:               state,
-		Hash:                "some-hash",
 		EncryptedDefinition: encryptedDefinition,
 	}
 
-	return wrapConnectorVersion(dbConnectorVersion, &service{encrypt: e, logger: aplog.NewNoopLogger()})
+	return wrapConnector(dbConnector, &service{encrypt: e, logger: aplog.NewNoopLogger()})
 }

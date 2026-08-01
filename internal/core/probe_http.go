@@ -52,7 +52,7 @@ func (p *probeHttp) Invoke(ctx context.Context) (string, error) {
 		} else {
 			req := p.s.httpf.
 				ForConnection(p.c).
-				ForConnectorVersion(p.cv).
+				ForConnectorVersion(p.connector).
 				ForRequestType(httpf.RequestTypeProbe).
 				New().
 				UseContext(ctx).

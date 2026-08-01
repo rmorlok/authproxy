@@ -46,7 +46,7 @@ func (s *service) MigrateConnectionVersion(
 		}
 		return nil, err
 	}
-	if target.State != database.ConnectorVersionStatePrimary && target.State != database.ConnectorVersionStateActive {
+	if target.State != database.ConnectorDefinitionVersionStatePrimary && target.State != database.ConnectorDefinitionVersionStateActive {
 		return nil, httperr.BadRequest("target connector version must be primary or active")
 	}
 

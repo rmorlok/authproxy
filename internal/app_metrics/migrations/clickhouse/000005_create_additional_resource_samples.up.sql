@@ -6,7 +6,6 @@ CREATE TABLE IF NOT EXISTS app_metrics_connector_resource_samples (
     labels String DEFAULT '{}',
     state String,
     connector_version UInt64 DEFAULT 0,
-    total_versions Int64 DEFAULT 0,
     resource_created_at_ms Int64,
     resource_updated_at_ms Int64,
     resource_deleted_at_ms Nullable(Int64),

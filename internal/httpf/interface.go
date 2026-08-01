@@ -15,7 +15,7 @@ type ConnectorVersion interface {
 }
 
 type GettableConnectorVersion interface {
-	GetConnectorVersionEntity() ConnectorVersion
+	GetConnector() ConnectorVersion
 }
 
 // RateLimitConfigProvider is an optional interface that connections can implement to provide

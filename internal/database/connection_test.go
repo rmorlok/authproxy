@@ -1129,13 +1129,12 @@ func TestConnections(t *testing.T) {
 		}))
 
 		connectorID := apid.New(apid.PrefixConnectorVersion)
-		require.NoError(t, db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+		require.NoError(t, db.UpsertConnectorDefinitionVersion(ctx, &ConnectorWithDefinition{
 			Id:                  connectorID,
 			Version:             1,
 			Namespace:           "root.tenant-a",
-			State:               ConnectorVersionStateDraft,
+			State:               ConnectorDefinitionVersionStateDraft,
 			Labels:              Labels{"type": "google-drive"},
-			Hash:                "h",
 			EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "d"},
 		}))
 
@@ -1187,23 +1186,21 @@ func TestConnections(t *testing.T) {
 		}))
 
 		cvDrive := apid.New(apid.PrefixConnectorVersion)
-		require.NoError(t, db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+		require.NoError(t, db.UpsertConnectorDefinitionVersion(ctx, &ConnectorWithDefinition{
 			Id:                  cvDrive,
 			Version:             1,
 			Namespace:           "root.sel",
-			State:               ConnectorVersionStateDraft,
+			State:               ConnectorDefinitionVersionStateDraft,
 			Labels:              Labels{"type": "google-drive"},
-			Hash:                "h",
 			EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "d"},
 		}))
 		cvSlack := apid.New(apid.PrefixConnectorVersion)
-		require.NoError(t, db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+		require.NoError(t, db.UpsertConnectorDefinitionVersion(ctx, &ConnectorWithDefinition{
 			Id:                  cvSlack,
 			Version:             1,
 			Namespace:           "root.sel",
-			State:               ConnectorVersionStateDraft,
+			State:               ConnectorDefinitionVersionStateDraft,
 			Labels:              Labels{"type": "slack"},
-			Hash:                "h2",
 			EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000002"), Data: "d"},
 		}))
 

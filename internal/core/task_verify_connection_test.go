@@ -22,7 +22,7 @@ import (
 )
 
 // setupVerifyTest wires a minimal service whose db.GetConnection returns the
-// supplied connection and whose db.GetConnectorVersion + encrypt.DecryptString
+// supplied connection and whose db.GetConnectorDefinitionVersion + encrypt.DecryptString
 // resolve to the supplied connector. Lets each subtest customize the
 // connection's setup_step / health_state without sharing fixture state.
 func setupVerifyTest(
@@ -51,12 +51,11 @@ func setupVerifyTest(
 
 	encryptedDef := encfield.EncryptedField{ID: "dek_mock", Data: "encrypted-def"}
 	db.EXPECT().
-		GetConnectorVersion(gomock.Any(), connector.Id, connector.Version).
-		Return(&database.ConnectorVersion{
+		GetConnectorDefinitionVersion(gomock.Any(), connector.Id, connector.Version).
+		Return(&database.ConnectorWithDefinition{
 			Id:                  connector.Id,
 			Version:             connector.Version,
-			State:               database.ConnectorVersionStatePrimary,
-			Hash:                "hash",
+			State:               database.ConnectorDefinitionVersionStatePrimary,
 			EncryptedDefinition: encryptedDef,
 		}, nil).
 		AnyTimes()

@@ -16,19 +16,19 @@ import (
 )
 
 func newTestConnectionWithService(s *service) *connection {
-	cv := NewTestConnectorVersion(cschema.Connector{})
+	c := NewTestConnector(cschema.Connector{})
 	connId := apid.New(apid.PrefixConnection)
 	return &connection{
 		Connection: database.Connection{
 			Id:               connId,
 			Namespace:        "root",
 			State:            database.ConnectionStateSetup,
-			ConnectorId:      cv.GetId(),
-			ConnectorVersion: cv.GetVersion(),
+			ConnectorId:      c.GetId(),
+			ConnectorVersion: c.GetVersion(),
 		},
-		s:      s,
-		cv:     cv,
-		logger: aplog.NewNoopLogger(),
+		s:         s,
+		connector: c,
+		logger:    aplog.NewNoopLogger(),
 	}
 }
 

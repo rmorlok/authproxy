@@ -6,7 +6,7 @@ package core
 // across auth types — the Authenticator interface carries SupportsRevoke /
 // Revoke so this function makes no assumptions about which method is in use.
 func (c *connection) getRevokeCredentialsOperations() []operation {
-	def := c.cv.GetDefinition()
+	def := c.connector.GetDefinition()
 	if def == nil {
 		return nil
 	}

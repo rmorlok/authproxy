@@ -23,9 +23,9 @@ import (
 type connection struct {
 	database.Connection
 
-	s      *service
-	cv     *ConnectorVersion
-	logger *slog.Logger
+	s         *service
+	connector *Connector
+	logger    *slog.Logger
 
 	configMu     sync.Mutex
 	configLoaded bool
@@ -36,16 +36,16 @@ type connection struct {
 	proxyImplErr  error
 }
 
-func wrapConnection(c *database.Connection, cv *ConnectorVersion, s *service) *connection {
+func wrapConnection(dbConnection *database.Connection, c *Connector, s *service) *connection {
 	return &connection{
-		Connection: *c,
+		Connection: *dbConnection,
 		s:          s,
-		cv:         cv,
+		connector:  c,
 		logger: aplog.NewBuilder(s.logger).
-			WithNamespace(c.Namespace).
-			WithConnectionId(c.Id).
-			WithConnectorId(cv.Id).
-			WithConnectorVersion(cv.Version).
+			WithNamespace(dbConnection.Namespace).
+			WithConnectionId(dbConnection.Id).
+			WithConnectorId(c.Id).
+			WithConnectorVersion(c.Version).
 			Build(),
 	}
 }
@@ -101,12 +101,12 @@ func (c *connection) GetSetupStep() *cschema.SetupStep {
 	return c.SetupStep
 }
 
-func (c *connection) GetConnectorVersionEntity() iface.ConnectorVersion {
-	return c.cv
+func (c *connection) GetConnector() iface.Connector {
+	return c.connector
 }
 
 func (c *connection) GetJavascriptContext(ctx context.Context) (apjs.Context, error) {
-	jsLib, err := c.cv.getJavascriptLibrary()
+	jsLib, err := c.connector.getJavascriptLibrary()
 	if err != nil {
 		return apjs.Context{}, err
 	}
@@ -272,7 +272,7 @@ func (c *connection) GetMustacheContext(ctx context.Context) (map[string]any, er
 }
 
 func (c *connection) GetRateLimitConfig() *connectors.RateLimiting {
-	def := c.cv.GetDefinition()
+	def := c.connector.GetDefinition()
 	if def == nil {
 		return nil
 	}
@@ -283,7 +283,7 @@ func (c *connection) GetRateLimitConfig() *connectors.RateLimiting {
 // trace context injection. nil means "use the global default" from the
 // telemetry config block.
 func (c *connection) PropagateTraceContext() *bool {
-	def := c.cv.GetDefinition()
+	def := c.connector.GetDefinition()
 	if def == nil || def.Telemetry == nil {
 		return nil
 	}

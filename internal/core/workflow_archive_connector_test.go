@@ -137,20 +137,20 @@ func TestArchiveConnectorVersionActivitiesTransitionStates(t *testing.T) {
 	svc := &service{db: db, logger: test_utils.NewTestLogger()}
 	connectorID := apid.New(apid.PrefixConnectorVersion)
 
-	upsertConnectorVersion(t, db, connectorID, 1, database.ConnectorVersionStatePrimary)
-	upsertConnectorVersion(t, db, connectorID, 2, database.ConnectorVersionStatePrimary)
-	upsertConnectorVersion(t, db, connectorID, 3, database.ConnectorVersionStateDraft)
+	upsertConnectorVersion(t, db, connectorID, 1, database.ConnectorDefinitionVersionStatePrimary)
+	upsertConnectorVersion(t, db, connectorID, 2, database.ConnectorDefinitionVersionStatePrimary)
+	upsertConnectorVersion(t, db, connectorID, 3, database.ConnectorDefinitionVersionStateDraft)
 
 	require.NoError(t, svc.prepareArchiveConnectorVersionsV1(ctx, connectorID))
-	requireConnectorVersionState(t, db, connectorID, 1, database.ConnectorVersionStateActive)
-	requireConnectorVersionState(t, db, connectorID, 2, database.ConnectorVersionStateActive)
-	requireConnectorVersionState(t, db, connectorID, 3, database.ConnectorVersionStateArchived)
+	requireConnectorVersionState(t, db, connectorID, 1, database.ConnectorDefinitionVersionStateActive)
+	requireConnectorVersionState(t, db, connectorID, 2, database.ConnectorDefinitionVersionStateActive)
+	requireConnectorVersionState(t, db, connectorID, 3, database.ConnectorDefinitionVersionStateArchived)
 
 	require.NoError(t, svc.prepareArchiveConnectorVersionsV1(ctx, connectorID))
 	require.NoError(t, svc.finalizeArchiveConnectorVersionsV1(ctx, connectorID))
-	requireConnectorVersionState(t, db, connectorID, 1, database.ConnectorVersionStateArchived)
-	requireConnectorVersionState(t, db, connectorID, 2, database.ConnectorVersionStateArchived)
-	requireConnectorVersionState(t, db, connectorID, 3, database.ConnectorVersionStateArchived)
+	requireConnectorVersionState(t, db, connectorID, 1, database.ConnectorDefinitionVersionStateArchived)
+	requireConnectorVersionState(t, db, connectorID, 2, database.ConnectorDefinitionVersionStateArchived)
+	requireConnectorVersionState(t, db, connectorID, 3, database.ConnectorDefinitionVersionStateArchived)
 
 	require.NoError(t, svc.finalizeArchiveConnectorVersionsV1(ctx, connectorID))
 }
@@ -170,15 +170,14 @@ func upsertConnectorVersion(
 	db database.DB,
 	connectorID apid.ID,
 	version uint64,
-	state database.ConnectorVersionState,
+	state database.ConnectorDefinitionVersionState,
 ) {
 	t.Helper()
-	require.NoError(t, db.UpsertConnectorVersion(context.Background(), &database.ConnectorVersion{
+	require.NoError(t, db.UpsertConnectorDefinitionVersion(context.Background(), &database.ConnectorWithDefinition{
 		Id:                  connectorID,
 		Version:             version,
 		Namespace:           sconfig.RootNamespace,
 		State:               state,
-		Hash:                "hash",
 		EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "encrypted-definition"},
 		Labels:              database.Labels{"type": "test"},
 	}))
@@ -189,10 +188,10 @@ func requireConnectorVersionState(
 	db database.DB,
 	connectorID apid.ID,
 	version uint64,
-	expected database.ConnectorVersionState,
+	expected database.ConnectorDefinitionVersionState,
 ) {
 	t.Helper()
-	connectorVersion, err := db.GetConnectorVersion(context.Background(), connectorID, version)
+	connectorVersion, err := db.GetConnectorDefinitionVersion(context.Background(), connectorID, version)
 	require.NoError(t, err)
 	require.Equal(t, expected, connectorVersion.State)
 }

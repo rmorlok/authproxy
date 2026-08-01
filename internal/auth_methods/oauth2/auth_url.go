@@ -53,19 +53,19 @@ func (o *oAuth2Connection) getPublicRedirectUrl(ctx context.Context, stateId api
 }
 
 func (o *oAuth2Connection) GenerateAuthUrl(ctx context.Context, actor IActorData) (string, error) {
-	cv := o.connection.GetConnectorVersionEntity()
+	c := o.connection.GetConnector()
 
 	if !o.auth.ClientId.HasValue(ctx) {
-		return "", fmt.Errorf("client id does not have value for connector %s", cv.GetId())
+		return "", fmt.Errorf("client id does not have value for connector %s", c.GetId())
 	}
 
 	clientId, err := o.auth.ClientId.GetValue(ctx)
 	if err != nil {
-		return "", fmt.Errorf("failed to get client id for connector %s: %w", cv.GetId(), err)
+		return "", fmt.Errorf("failed to get client id for connector %s: %w", c.GetId(), err)
 	}
 
 	if o.auth.Authorization.Endpoint == "" {
-		return "", fmt.Errorf("no authorization endpoint for connector %s", cv.GetId())
+		return "", fmt.Errorf("no authorization endpoint for connector %s", c.GetId())
 	}
 
 	if o.state == nil {
@@ -79,17 +79,17 @@ func (o *oAuth2Connection) GenerateAuthUrl(ctx context.Context, actor IActorData
 
 	scopes, err := o.effectiveScopes(ctx)
 	if err != nil {
-		return "", fmt.Errorf("failed to resolve oauth2 scopes for connector %s: %w", cv.GetId(), err)
+		return "", fmt.Errorf("failed to resolve oauth2 scopes for connector %s: %w", c.GetId(), err)
 	}
 
 	authEndpoint, err := o.renderMustache(ctx, o.auth.Authorization.Endpoint)
 	if err != nil {
-		return "", fmt.Errorf("failed to render authorization endpoint template for connector %s: %w", cv.GetId(), err)
+		return "", fmt.Errorf("failed to render authorization endpoint template for connector %s: %w", c.GetId(), err)
 	}
 
 	authUrl3p, err := url.Parse(authEndpoint)
 	if err != nil {
-		return "", fmt.Errorf("failed to parse authorization endpoint for connector %s: %w", cv.GetId(), err)
+		return "", fmt.Errorf("failed to parse authorization endpoint for connector %s: %w", c.GetId(), err)
 	}
 
 	query := authUrl3p.Query()
@@ -105,7 +105,7 @@ func (o *oAuth2Connection) GenerateAuthUrl(ctx context.Context, actor IActorData
 		method := o.auth.Authorization.PKCE.GetMethodOrDefault()
 		challenge, err := pkceChallengeFor(method, o.state.PKCECodeVerifier)
 		if err != nil {
-			return "", fmt.Errorf("failed to compute pkce challenge for connector %s: %w", cv.GetId(), err)
+			return "", fmt.Errorf("failed to compute pkce challenge for connector %s: %w", c.GetId(), err)
 		}
 		query.Set("code_challenge", challenge)
 		query.Set("code_challenge_method", string(method))
@@ -114,7 +114,7 @@ func (o *oAuth2Connection) GenerateAuthUrl(ctx context.Context, actor IActorData
 	for k, v := range o.auth.Authorization.QueryOverrides {
 		rendered, err := o.renderMustache(ctx, v)
 		if err != nil {
-			return "", fmt.Errorf("failed to render query override %q template for connector %s: %w", k, cv.GetId(), err)
+			return "", fmt.Errorf("failed to render query override %q template for connector %s: %w", k, c.GetId(), err)
 		}
 		query.Set(k, rendered)
 	}

@@ -16,15 +16,15 @@ import (
 )
 
 type oAuth2Connection struct {
-	cfg        config.C
-	db         database.DB
-	r          apredis.Client
-	connectors coreIface.C
-	encrypt    encrypt.E
-	logger     *slog.Logger
-	auth       *sconfig.AuthOAuth2
-	httpf      httpf.F
+	cfg     config.C
+	db      database.DB
+	r       apredis.Client
+	encrypt encrypt.E
+	logger  *slog.Logger
+	auth    *sconfig.AuthOAuth2
+	httpf   httpf.F
 
+	connector  coreIface.C
 	connection coreIface.Connection
 	state      *state
 
@@ -39,27 +39,25 @@ func newOAuth2(
 	cfg config.C,
 	db database.DB,
 	r apredis.Client,
-	c coreIface.C,
 	encrypt encrypt.E,
 	logger *slog.Logger,
 	httpf httpf.F,
 	connection coreIface.Connection,
 ) *oAuth2Connection {
-	cv := connection.GetConnectorVersionEntity()
-	connector := cv.GetDefinition()
-	auth, ok := connector.Auth.Inner().(*sconfig.AuthOAuth2)
+	c := connection.GetConnector()
+	connDef := c.GetDefinition()
+	auth, ok := connDef.Auth.Inner().(*sconfig.AuthOAuth2)
 	if !ok {
-		panic(fmt.Sprintf("connector id %s is not an oauth2 connector", connector.Id))
+		panic(fmt.Sprintf("connector id %s is not an oauth2 connector", connDef.Id))
 	}
 
 	return &oAuth2Connection{
-		cfg:        cfg,
-		db:         db,
-		r:          r,
-		connectors: c,
-		encrypt:    encrypt,
-		logger:     logger,
-		auth:       auth,
+		cfg:     cfg,
+		db:      db,
+		r:       r,
+		encrypt: encrypt,
+		logger:  logger,
+		auth:    auth,
 
 		connection: connection,
 		httpf:      httpf,

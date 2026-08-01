@@ -59,15 +59,15 @@ func createArchiveVersionShape(t *testing.T, rig *connectorDisconnectAllRig, con
 	draft, err := rig.env.Core.CreateDraftConnectorVersion(ctx, connector.id, nil, nil, nil)
 	require.NoError(t, err)
 	require.Equal(t, uint64(2), draft.GetVersion())
-	require.NoError(t, draft.SetState(ctx, database.ConnectorVersionStatePrimary))
+	require.NoError(t, draft.SetState(ctx, database.ConnectorDefinitionVersionStatePrimary))
 
 	nextDraft, err := rig.env.Core.CreateDraftConnectorVersion(ctx, connector.id, nil, nil, nil)
 	require.NoError(t, err)
 	require.Equal(t, uint64(3), nextDraft.GetVersion())
 
-	requireConnectorVersionState(t, rig.env.Db, connector.id, 1, database.ConnectorVersionStateActive)
-	requireConnectorVersionState(t, rig.env.Db, connector.id, 2, database.ConnectorVersionStatePrimary)
-	requireConnectorVersionState(t, rig.env.Db, connector.id, 3, database.ConnectorVersionStateDraft)
+	requireConnectorVersionState(t, rig.env.Db, connector.id, 1, database.ConnectorDefinitionVersionStateActive)
+	requireConnectorVersionState(t, rig.env.Db, connector.id, 2, database.ConnectorDefinitionVersionStatePrimary)
+	requireConnectorVersionState(t, rig.env.Db, connector.id, 3, database.ConnectorDefinitionVersionStateDraft)
 
 	return []uint64{1, 2, 3}
 }
@@ -77,11 +77,11 @@ func requireConnectorVersionState(
 	db database.DB,
 	connectorID apid.ID,
 	version uint64,
-	expected database.ConnectorVersionState,
+	expected database.ConnectorDefinitionVersionState,
 ) {
 	t.Helper()
 
-	connectorVersion, err := db.GetConnectorVersion(context.Background(), connectorID, version)
+	connectorVersion, err := db.GetConnectorDefinitionVersion(context.Background(), connectorID, version)
 	require.NoError(t, err)
 	require.Equal(t, expected, connectorVersion.State)
 }
@@ -95,7 +95,7 @@ func requireConnectorVersionsArchived(
 	t.Helper()
 
 	for _, version := range versions {
-		requireConnectorVersionState(t, db, connectorID, version, database.ConnectorVersionStateArchived)
+		requireConnectorVersionState(t, db, connectorID, version, database.ConnectorDefinitionVersionStateArchived)
 	}
 }
 

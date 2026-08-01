@@ -141,7 +141,7 @@ func (c *connection) consecutiveOutcomeStreak(ctx context.Context, probeId, matc
 // last_validated_at on probe success. No-op for non-api-key auth types and
 // when no active credential exists.
 func (c *connection) maybeUpdateApiKeyLastValidated(ctx context.Context) error {
-	def := c.cv.GetDefinition()
+	def := c.connector.GetDefinition()
 	if def == nil || def.Auth == nil {
 		return nil
 	}

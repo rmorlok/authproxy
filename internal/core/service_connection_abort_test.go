@@ -23,13 +23,12 @@ func setupAbortTest(t *testing.T, ctrl *gomock.Controller, sf *cschema.SetupFlow
 
 	// Mock the DB calls that getConnection makes
 	db.EXPECT().GetConnection(gomock.Any(), conn.Id).Return(&conn.Connection, nil).AnyTimes()
-	db.EXPECT().GetConnectorVersion(gomock.Any(), conn.cv.Id, conn.cv.Version).Return(&database.ConnectorVersion{
-		Id:                  conn.cv.Id,
-		Version:             conn.cv.Version,
-		Labels:              conn.cv.GetLabels(),
-		State:               database.ConnectorVersionStatePrimary,
-		Hash:                conn.cv.Hash,
-		EncryptedDefinition: conn.cv.EncryptedDefinition,
+	db.EXPECT().GetConnectorDefinitionVersion(gomock.Any(), conn.connector.Id, conn.connector.Version).Return(&database.ConnectorWithDefinition{
+		Id:                  conn.connector.Id,
+		Version:             conn.connector.Version,
+		Labels:              conn.connector.GetLabels(),
+		State:               database.ConnectorDefinitionVersionStatePrimary,
+		EncryptedDefinition: conn.connector.EncryptedDefinition,
 	}, nil).AnyTimes()
 
 	return conn, db

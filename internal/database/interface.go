@@ -7,6 +7,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/encfield"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
+	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -94,18 +95,19 @@ type DB interface {
 	 * Connectors
 	 */
 
-	GetConnectorVersion(ctx context.Context, id apid.ID, version uint64) (*ConnectorVersion, error)
-	GetConnectorVersions(ctx context.Context, requested []ConnectorVersionId) (map[ConnectorVersionId]*ConnectorVersion, error)
-	GetConnectorVersionForLabels(ctx context.Context, labelSelector string) (*ConnectorVersion, error)
-	GetConnectorVersionForLabelsAndVersion(ctx context.Context, labelSelector string, version uint64) (*ConnectorVersion, error)
-	GetConnectorVersionForState(ctx context.Context, id apid.ID, state ConnectorVersionState) (*ConnectorVersion, error)
-	NewestConnectorVersionForId(ctx context.Context, id apid.ID) (*ConnectorVersion, error)
-	NewestPublishedConnectorVersionForId(ctx context.Context, id apid.ID) (*ConnectorVersion, error)
-	UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersion) error
-	SetConnectorVersionState(ctx context.Context, id apid.ID, version uint64, state ConnectorVersionState) error
+	GetConnectorDefinitionVersion(ctx context.Context, id apid.ID, version uint64) (*ConnectorWithDefinition, error)
+	GetConnectorDefinitionVersions(ctx context.Context, requested []ConnectorDefinitionVersionId) (map[ConnectorDefinitionVersionId]*ConnectorWithDefinition, error)
+	GetConnectorDefinitionVersionForLabels(ctx context.Context, labelSelector string) (*ConnectorWithDefinition, error)
+	GetConnectorDefinitionVersionForLabelsAndVersion(ctx context.Context, labelSelector string, version uint64) (*ConnectorWithDefinition, error)
+	GetConnectorDefinitionVersionForState(ctx context.Context, id apid.ID, state ConnectorDefinitionVersionState) (*ConnectorWithDefinition, error)
+	NewestConnectorDefinitionVersionForId(ctx context.Context, id apid.ID) (*ConnectorWithDefinition, error)
+	NewestPublishedConnectorDefinitionVersionForId(ctx context.Context, id apid.ID) (*ConnectorWithDefinition, error)
+	UpsertConnectorDefinitionVersion(ctx context.Context, cv *ConnectorWithDefinition) error
+	SetConnectorDefinitionVersionState(ctx context.Context, id apid.ID, version uint64, state ConnectorDefinitionVersionState) error
+	UpdateConnectorName(ctx context.Context, id apid.ID, name scommon.ResourceName) error
 	DeleteConnector(ctx context.Context, id apid.ID) error
-	ListConnectorVersionsBuilder() ListConnectorVersionsBuilder
-	ListConnectorVersionsFromCursor(ctx context.Context, cursor string) (ListConnectorVersionsExecutor, error)
+	ListConnectorDefinitionVersionsBuilder() ListConnectorDefinitionVersionsBuilder
+	ListConnectorDefinitionVersionsFromCursor(ctx context.Context, cursor string) (ListConnectorDefinitionVersionsExecutor, error)
 	ListConnectorsBuilder() ListConnectorsBuilder
 	ListConnectorsFromCursor(ctx context.Context, cursor string) (ListConnectorsExecutor, error)
 
@@ -288,13 +290,12 @@ type DB interface {
 	// nested namespace can fan out to many descendants.
 	RefreshNamespaceLabelsCarryForward(ctx context.Context, nsPath string) error
 
-	// RefreshConnectionsForConnectorVersion re-derives the materialized
-	// apxy/ portion of every connection pointing at the given (id,
-	// version). Each connection's update runs in its own short
+	// RefreshConnectionsForConnector re-derives the materialized
+	// apxy/ portion of every connection pointing at the given logical
+	// connector. Each connection's update runs in its own short
 	// transaction. Intended to be invoked from a background asynq task
-	// after a connector version's user labels change (only meaningful for
-	// draft versions; primary and active are immutable).
-	RefreshConnectionsForConnectorVersion(ctx context.Context, id apid.ID, version uint64) error
+	// after a connector's user labels change.
+	RefreshConnectionsForConnector(ctx context.Context, id apid.ID) error
 
 	// ReconcileCarryForwardLabels walks every labelled resource in batches
 	// of `batchSize` and re-derives the materialized apxy/ portion of

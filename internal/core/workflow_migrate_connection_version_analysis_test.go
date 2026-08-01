@@ -55,8 +55,8 @@ func TestApplyAuthMigrationAnalysisFlagsOAuthChangesOnly(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			candidate := newMigrationTestCandidate(t)
-			candidate.Connection.cv = NewTestConnectorVersion(cschema.Connector{Auth: tt.sourceAuth})
-			candidate.Target = NewTestConnectorVersion(cschema.Connector{Auth: tt.targetAuth})
+			candidate.Connection.connector = NewTestConnector(cschema.Connector{Auth: tt.sourceAuth})
+			candidate.Target = NewTestConnector(cschema.Connector{Auth: tt.targetAuth})
 
 			require.NoError(t, applyAuthMigrationAnalysis(slog.Default(), candidate))
 			require.Equal(t, tt.want, candidate.RefreshAuth)
@@ -128,8 +128,8 @@ func TestApplySetupFieldMigrationAnalysisConfigureRejectsInvalidStep(t *testing.
 
 func TestApplySetupFlowMigrationAnalysisPropagatesSchemaErrors(t *testing.T) {
 	candidate := newMigrationTestCandidate(t)
-	candidate.Connection.cv = &ConnectorVersion{def: &cschema.Connector{Auth: cschema.NewNoAuth()}}
-	candidate.Target = &ConnectorVersion{def: &cschema.Connector{
+	candidate.Connection.connector = &Connector{def: &cschema.Connector{Auth: cschema.NewNoAuth()}}
+	candidate.Target = &Connector{def: &cschema.Connector{
 		Auth: cschema.NewNoAuth(),
 		SetupFlow: &cschema.SetupFlow{
 			Configure: &cschema.SetupFlowPhase{

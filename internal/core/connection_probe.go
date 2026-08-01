@@ -13,11 +13,11 @@ var ErrProbeNotFound = errors.New("probe not found")
 var ErrProbeDisabled = errors.New("probe disabled")
 
 func (c *connection) GetProbe(probeId string) (iface.Probe, error) {
-	def := c.cv.GetDefinition()
+	def := c.connector.GetDefinition()
 
 	for i := range def.Probes {
 		if def.Probes[i].Id == probeId {
-			return NewProbe(&def.Probes[i], c.s, c.cv, c), nil
+			return NewProbe(&def.Probes[i], c.s, c.connector, c), nil
 		}
 	}
 
@@ -25,18 +25,18 @@ func (c *connection) GetProbe(probeId string) (iface.Probe, error) {
 }
 
 func (c *connection) GetProbes() []iface.Probe {
-	def := c.cv.GetDefinition()
+	def := c.connector.GetDefinition()
 	probes := make([]iface.Probe, 0, len(def.Probes))
 
 	for i := range def.Probes {
-		probes = append(probes, NewProbe(&def.Probes[i], c.s, c.cv, c))
+		probes = append(probes, NewProbe(&def.Probes[i], c.s, c.connector, c))
 	}
 
 	return probes
 }
 
 func (c *connection) GetEnabledProbe(ctx context.Context, probeId string) (iface.Probe, error) {
-	def := c.cv.GetDefinition()
+	def := c.connector.GetDefinition()
 
 	for i := range def.Probes {
 		probe := &def.Probes[i]
@@ -51,14 +51,14 @@ func (c *connection) GetEnabledProbe(ctx context.Context, probeId string) (iface
 		if !enabled {
 			return nil, fmt.Errorf("probe %q: %w", probeId, ErrProbeDisabled)
 		}
-		return NewProbe(probe, c.s, c.cv, c), nil
+		return NewProbe(probe, c.s, c.connector, c), nil
 	}
 
 	return nil, ErrProbeNotFound
 }
 
 func (c *connection) GetEnabledProbes(ctx context.Context) ([]iface.Probe, error) {
-	def := c.cv.GetDefinition()
+	def := c.connector.GetDefinition()
 	probes := make([]iface.Probe, 0, len(def.Probes))
 
 	for i := range def.Probes {
@@ -70,7 +70,7 @@ func (c *connection) GetEnabledProbes(ctx context.Context) ([]iface.Probe, error
 		if !enabled {
 			continue
 		}
-		probes = append(probes, NewProbe(probe, c.s, c.cv, c))
+		probes = append(probes, NewProbe(probe, c.s, c.connector, c))
 	}
 
 	return probes, nil

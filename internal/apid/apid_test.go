@@ -28,6 +28,12 @@ func TestNewSessionPrefix(t *testing.T) {
 	require.Len(t, string(id), 5+suffixLen)
 }
 
+func TestNewConnectorDefinitionVersionPrefix(t *testing.T) {
+	id := New(PrefixConnectorDefinitionVersion)
+	require.True(t, id.HasPrefix(PrefixConnectorDefinitionVersion))
+	require.Len(t, string(id), 4+suffixLen)
+}
+
 func TestParse(t *testing.T) {
 	t.Run("valid", func(t *testing.T) {
 		id, err := Parse("act_7Ks9mPqR2xvN3bXY")

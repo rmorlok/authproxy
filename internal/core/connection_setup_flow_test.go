@@ -38,7 +38,7 @@ func TestManifestSetupFlowIfJavascript(t *testing.T) {
 		},
 	}
 	conn, _ := newTestConnectionWithSetupFlow(t, ctrl, sf)
-	conn.cv = NewTestConnectorVersion(cschema.Connector{
+	conn.connector = NewTestConnector(cschema.Connector{
 		Javascript: `
 			function isSalesforceConnection() {
 				return labels["apxy/cxr/type"] === "salesforce";
@@ -89,7 +89,7 @@ func TestManifestSetupFlowIfJavascriptVerifyBoundary(t *testing.T) {
 		},
 	})
 	setConnectionConfigFixture(t, conn, map[string]any{"region": "eu"})
-	conn.cv.GetDefinition().Probes = []cschema.Probe{{Id: "ping"}}
+	conn.connector.GetDefinition().Probes = []cschema.Probe{{Id: "ping"}}
 
 	flow := conn.s.buildManifestSetupFlow(conn)
 	first, err := flow.FirstStep(context.Background())
@@ -110,7 +110,7 @@ func TestManifestSetupFlowSkipsVerifyWhenAllProbesDisabled(t *testing.T) {
 		},
 	})
 	setConnectionConfigFixture(t, conn, map[string]any{"run_probe": false})
-	conn.cv.GetDefinition().Probes = []cschema.Probe{{
+	conn.connector.GetDefinition().Probes = []cschema.Probe{{
 		Id: "ping",
 		If: &common.Predicate{Javascript: `cfg.run_probe === true`},
 	}}

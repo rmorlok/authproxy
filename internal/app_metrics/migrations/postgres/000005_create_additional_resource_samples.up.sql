@@ -6,7 +6,6 @@ CREATE TABLE IF NOT EXISTS app_metrics_connector_resource_samples (
     labels JSONB NOT NULL DEFAULT '{}',
     state TEXT NOT NULL,
     connector_version BIGINT NOT NULL DEFAULT 0,
-    total_versions BIGINT NOT NULL DEFAULT 0,
     resource_created_at_ms BIGINT NOT NULL,
     resource_updated_at_ms BIGINT NOT NULL,
     resource_deleted_at_ms BIGINT,

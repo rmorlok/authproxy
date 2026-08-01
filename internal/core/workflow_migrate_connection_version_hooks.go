@@ -19,7 +19,7 @@ import (
 func (s *service) applyMigrationHookForVersion(
 	ctx context.Context,
 	candidate *connectionMigrationCandidate,
-	version *ConnectorVersion,
+	version *Connector,
 	sourceVersion,
 	targetVersion uint64,
 ) error {

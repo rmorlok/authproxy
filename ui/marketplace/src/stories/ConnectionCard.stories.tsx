@@ -75,8 +75,6 @@ const mockConnection: Connection = {
   id: '123e4567-e89b-12d3-a456-426614174000',
   connector: {
       type: 'google-calendar',
-      versions: 0,
-      states: [ConnectorVersionState.PRIMARY],
       id: "923e4567-e89b-12d3-a456-426614174009",
       version: 0,
       state: ConnectorVersionState.PRIMARY,

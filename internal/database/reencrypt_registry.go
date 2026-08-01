@@ -30,6 +30,7 @@ type EncryptedFieldRegistration struct {
 	JoinLocalCol     string // e.g. "connection_id" — FK column on this table
 	JoinRemoteCol    string // e.g. "id" — PK column on join table
 	JoinNamespaceCol string // e.g. "namespace" — namespace column on join table
+
 }
 
 func (r EncryptedFieldRegistration) validate() error {

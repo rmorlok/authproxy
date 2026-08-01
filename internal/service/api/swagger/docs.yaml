@@ -62,10 +62,6 @@ definitions:
       state:
         example: primary
         type: string
-      states:
-        items:
-          type: string
-        type: array
       status_page_url:
         example: https://status.salesforce.com
         type: string
@@ -73,9 +69,6 @@ definitions:
         type: string
       version:
         example: 1
-        type: integer
-      versions:
-        example: 2
         type: integer
     type: object
   github_com_rmorlok_authproxy_internal_schema_api.MetricsSchemaMetricJson:
@@ -256,10 +249,6 @@ definitions:
       state:
         example: primary
         type: string
-      states:
-        items:
-          type: string
-        type: array
       status_page_url:
         example: https://status.salesforce.com
         type: string
@@ -267,9 +256,6 @@ definitions:
         type: string
       version:
         example: 1
-        type: integer
-      versions:
-        example: 2
         type: integer
     type: object
   routes.CreateActorRequestJson:

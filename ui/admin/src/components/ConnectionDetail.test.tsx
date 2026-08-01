@@ -82,8 +82,6 @@ const connection = {
     has_configure: false,
     created_at: '2026-07-25T00:00:00.000Z',
     updated_at: '2026-07-25T00:00:00.000Z',
-    versions: 4,
-    states: [ConnectorVersionState.PRIMARY, ConnectorVersionState.ACTIVE],
   },
   created_at: '2026-07-25T00:00:00.000Z',
   updated_at: '2026-07-25T00:00:00.000Z',

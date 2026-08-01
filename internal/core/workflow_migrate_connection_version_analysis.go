@@ -44,7 +44,7 @@ func applyAuthMigrationAnalysis(
 	log *slog.Logger,
 	candidate *connectionMigrationCandidate,
 ) error {
-	sourceDef := candidate.Connection.cv.GetDefinition()
+	sourceDef := candidate.Connection.connector.GetDefinition()
 	targetDef := candidate.Target.GetDefinition()
 	if sourceDef == nil || targetDef == nil || targetDef.Auth == nil {
 		return nil
@@ -80,7 +80,7 @@ func applySetupFlowMigrationAnalysis(
 	candidate *connectionMigrationCandidate,
 ) error {
 	// Get the connector definition from where we start and end
-	sourceDef := candidate.Connection.cv.GetDefinition()
+	sourceDef := candidate.Connection.connector.GetDefinition()
 	targetDef := candidate.Target.GetDefinition()
 	if targetDef == nil || targetDef.SetupFlow == nil {
 		return nil

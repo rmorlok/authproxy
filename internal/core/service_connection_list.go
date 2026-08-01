@@ -13,7 +13,7 @@ import (
 type listConnectionsWrapper struct {
 	l  database.ListConnectionsBuilder
 	e  database.ListConnectionsExecutor
-	cc map[iface.ConnectorVersionId]*ConnectorVersion
+	cc map[iface.ConnectorVersionId]*Connector
 	s  *service
 }
 
@@ -47,7 +47,7 @@ func (l *listConnectionsWrapper) convertPageResult(ctx context.Context, result p
 
 	for _, v := range versions {
 		if l.cc == nil {
-			l.cc = make(map[iface.ConnectorVersionId]*ConnectorVersion)
+			l.cc = make(map[iface.ConnectorVersionId]*Connector)
 		}
 
 		l.cc[iface.ConnectorVersionId{Id: v.GetId(), Version: v.GetVersion()}] = v
@@ -55,8 +55,8 @@ func (l *listConnectionsWrapper) convertPageResult(ctx context.Context, result p
 
 	connections := make([]iface.Connection, 0, len(result.Results))
 	for _, r := range result.Results {
-		if cv, ok := l.cc[iface.ConnectorVersionId{Id: r.ConnectorId, Version: r.ConnectorVersion}]; ok {
-			connections = append(connections, wrapConnection(&r, cv, l.s))
+		if c, ok := l.cc[iface.ConnectorVersionId{Id: r.ConnectorId, Version: r.ConnectorVersion}]; ok {
+			connections = append(connections, wrapConnection(&r, c, l.s))
 		} else {
 			return pagination.PageResult[iface.Connection]{
 				Error: fmt.Errorf("could not find connector version %s:%d", r.ConnectorId, r.ConnectorVersion),

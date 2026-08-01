@@ -11,12 +11,12 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 )
 
-func (s *service) GetConnectorVersion(ctx context.Context, id apid.ID, version uint64) (iface.ConnectorVersion, error) {
+func (s *service) GetConnectorVersion(ctx context.Context, id apid.ID, version uint64) (iface.Connector, error) {
 	return s.getConnectorVersion(ctx, id, version)
 }
 
-func (s *service) getConnectorVersion(ctx context.Context, id apid.ID, version uint64) (*ConnectorVersion, error) {
-	cv, err := s.db.GetConnectorVersion(ctx, id, version)
+func (s *service) getConnectorVersion(ctx context.Context, id apid.ID, version uint64) (*Connector, error) {
+	cv, err := s.db.GetConnectorDefinitionVersion(ctx, id, version)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
 			return nil, ErrNotFound
@@ -24,7 +24,7 @@ func (s *service) getConnectorVersion(ctx context.Context, id apid.ID, version u
 		return nil, err
 	}
 
-	wrapped := wrapConnectorVersion(*cv, s)
+	wrapped := wrapConnector(*cv, s)
 
 	// Make sure we can load the connector definition from the encrypted value
 	_, err = wrapped.getDefinition()
@@ -35,8 +35,8 @@ func (s *service) getConnectorVersion(ctx context.Context, id apid.ID, version u
 	return wrapped, nil
 }
 
-func (s *service) getConnectorVersions(ctx context.Context, requested []iface.ConnectorVersionId) (map[iface.ConnectorVersionId]*ConnectorVersion, error) {
-	results, err := s.db.GetConnectorVersions(ctx, requested)
+func (s *service) getConnectorVersions(ctx context.Context, requested []iface.ConnectorVersionId) (map[iface.ConnectorVersionId]*Connector, error) {
+	results, err := s.db.GetConnectorDefinitionVersions(ctx, requested)
 	if err != nil {
 		return nil, err
 	}
@@ -45,9 +45,9 @@ func (s *service) getConnectorVersions(ctx context.Context, requested []iface.Co
 		return nil, nil
 	}
 
-	wrappedResults := make(map[iface.ConnectorVersionId]*ConnectorVersion, len(results))
+	wrappedResults := make(map[iface.ConnectorVersionId]*Connector, len(results))
 	for id, cv := range results {
-		tmp := wrapConnectorVersion(*cv, s)
+		tmp := wrapConnector(*cv, s)
 
 		// Make sure we can load the connector definition from the encrypted value
 		_, err = tmp.getDefinition()
@@ -61,13 +61,13 @@ func (s *service) getConnectorVersions(ctx context.Context, requested []iface.Co
 	return wrappedResults, nil
 }
 
-func (s *service) GetConnectorVersions(ctx context.Context, requested []iface.ConnectorVersionId) (map[iface.ConnectorVersionId]iface.ConnectorVersion, error) {
+func (s *service) GetConnectorVersions(ctx context.Context, requested []iface.ConnectorVersionId) (map[iface.ConnectorVersionId]iface.Connector, error) {
 	results, err := s.getConnectorVersions(ctx, requested)
 	if err != nil {
 		return nil, err
 	}
 
-	wrappedResults := make(map[iface.ConnectorVersionId]iface.ConnectorVersion, len(results))
+	wrappedResults := make(map[iface.ConnectorVersionId]iface.Connector, len(results))
 	for k, v := range results {
 		wrappedResults[k] = v
 	}
@@ -75,8 +75,8 @@ func (s *service) GetConnectorVersions(ctx context.Context, requested []iface.Co
 	return wrappedResults, nil
 }
 
-func (s *service) GetConnectorVersionForState(ctx context.Context, id apid.ID, state database.ConnectorVersionState) (iface.ConnectorVersion, error) {
-	cv, err := s.db.GetConnectorVersionForState(ctx, id, state)
+func (s *service) GetConnectorVersionForState(ctx context.Context, id apid.ID, state database.ConnectorDefinitionVersionState) (iface.Connector, error) {
+	cv, err := s.db.GetConnectorDefinitionVersionForState(ctx, id, state)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +85,7 @@ func (s *service) GetConnectorVersionForState(ctx context.Context, id apid.ID, s
 		return nil, nil
 	}
 
-	wrapped := wrapConnectorVersion(*cv, s)
+	wrapped := wrapConnector(*cv, s)
 
 	// Make sure we can load the connector definition from the encrypted value
 	_, err = wrapped.getDefinition()
@@ -102,7 +102,7 @@ func (s *service) getConnectionForDb(ctx context.Context, dbConn *database.Conne
 		Build()
 
 	logger.Debug("getting connector for connection")
-	cv, err := s.getConnectorVersion(ctx, dbConn.ConnectorId, dbConn.ConnectorVersion)
+	c, err := s.getConnectorVersion(ctx, dbConn.ConnectorId, dbConn.ConnectorVersion)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			logger.Error("connector is missing for connector version", "error", err)
@@ -113,5 +113,5 @@ func (s *service) getConnectionForDb(ctx context.Context, dbConn *database.Conne
 		return nil, fmt.Errorf("failed to get connector for connection: %w", err)
 	}
 
-	return wrapConnection(dbConn, cv, s), nil
+	return wrapConnection(dbConn, c, s), nil
 }

@@ -10,22 +10,22 @@ import (
 )
 
 type listConnectorVersionWrapper struct {
-	l database.ListConnectorVersionsBuilder
-	e database.ListConnectorVersionsExecutor
+	l database.ListConnectorDefinitionVersionsBuilder
+	e database.ListConnectorDefinitionVersionsExecutor
 	s *service
 }
 
-func (l *listConnectorVersionWrapper) convertPageResult(result pagination.PageResult[database.ConnectorVersion]) pagination.PageResult[iface.ConnectorVersion] {
+func (l *listConnectorVersionWrapper) convertPageResult(result pagination.PageResult[database.ConnectorWithDefinition]) pagination.PageResult[iface.Connector] {
 	if result.Error != nil {
-		return pagination.PageResult[iface.ConnectorVersion]{Error: result.Error}
+		return pagination.PageResult[iface.Connector]{Error: result.Error}
 	}
 
-	versions := make([]iface.ConnectorVersion, 0, len(result.Results))
+	versions := make([]iface.Connector, 0, len(result.Results))
 	for _, r := range result.Results {
-		versions = append(versions, wrapConnectorVersion(r, l.s))
+		versions = append(versions, wrapConnector(r, l.s))
 	}
 
-	return pagination.PageResult[iface.ConnectorVersion]{
+	return pagination.PageResult[iface.Connector]{
 		Results: versions,
 		Error:   result.Error,
 		HasMore: result.HasMore,
@@ -33,7 +33,7 @@ func (l *listConnectorVersionWrapper) convertPageResult(result pagination.PageRe
 	}
 }
 
-func (l *listConnectorVersionWrapper) executor() database.ListConnectorVersionsExecutor {
+func (l *listConnectorVersionWrapper) executor() database.ListConnectorDefinitionVersionsExecutor {
 	if l.e != nil {
 		return l.e
 	} else {
@@ -41,12 +41,12 @@ func (l *listConnectorVersionWrapper) executor() database.ListConnectorVersionsE
 	}
 }
 
-func (l *listConnectorVersionWrapper) FetchPage(ctx context.Context) pagination.PageResult[iface.ConnectorVersion] {
+func (l *listConnectorVersionWrapper) FetchPage(ctx context.Context) pagination.PageResult[iface.Connector] {
 	return l.convertPageResult(l.executor().FetchPage(ctx))
 }
 
-func (l *listConnectorVersionWrapper) Enumerate(ctx context.Context, callback pagination.EnumerateCallback[iface.ConnectorVersion]) error {
-	return l.executor().Enumerate(ctx, func(result pagination.PageResult[database.ConnectorVersion]) (keepGoing pagination.KeepGoing, err error) {
+func (l *listConnectorVersionWrapper) Enumerate(ctx context.Context, callback pagination.EnumerateCallback[iface.Connector]) error {
+	return l.executor().Enumerate(ctx, func(result pagination.PageResult[database.ConnectorWithDefinition]) (keepGoing pagination.KeepGoing, err error) {
 		return callback(l.convertPageResult(result))
 	})
 }
@@ -72,14 +72,14 @@ func (l *listConnectorVersionWrapper) ForVersion(version uint64) iface.ListConne
 	}
 }
 
-func (l *listConnectorVersionWrapper) ForState(s database.ConnectorVersionState) iface.ListConnectorVersionsBuilder {
+func (l *listConnectorVersionWrapper) ForState(s database.ConnectorDefinitionVersionState) iface.ListConnectorVersionsBuilder {
 	return &listConnectorVersionWrapper{
 		l: l.l.ForState(s),
 		s: l.s,
 	}
 }
 
-func (l *listConnectorVersionWrapper) ForStates(states []database.ConnectorVersionState) iface.ListConnectorVersionsBuilder {
+func (l *listConnectorVersionWrapper) ForStates(states []database.ConnectorDefinitionVersionState) iface.ListConnectorVersionsBuilder {
 	return &listConnectorVersionWrapper{
 		l: l.l.ForStates(states),
 		s: l.s,
@@ -100,7 +100,7 @@ func (l *listConnectorVersionWrapper) ForNamespaceMatchers(matchers []string) if
 	}
 }
 
-func (l *listConnectorVersionWrapper) OrderBy(f database.ConnectorVersionOrderByField, o pagination.OrderBy) iface.ListConnectorVersionsBuilder {
+func (l *listConnectorVersionWrapper) OrderBy(f database.ConnectorDefinitionVersionOrderByField, o pagination.OrderBy) iface.ListConnectorVersionsBuilder {
 	return &listConnectorVersionWrapper{
 		l: l.l.OrderBy(f, o),
 		s: l.s,
@@ -123,13 +123,13 @@ func (l *listConnectorVersionWrapper) ForLabelSelector(s string) iface.ListConne
 
 func (s *service) ListConnectorVersionsBuilder() iface.ListConnectorVersionsBuilder {
 	return &listConnectorVersionWrapper{
-		l: s.db.ListConnectorVersionsBuilder(),
+		l: s.db.ListConnectorDefinitionVersionsBuilder(),
 		s: s,
 	}
 }
 
 func (s *service) ListConnectorVersionsFromCursor(ctx context.Context, cursor string) (iface.ListConnectorVersionsExecutor, error) {
-	e, err := s.db.ListConnectorVersionsFromCursor(ctx, cursor)
+	e, err := s.db.ListConnectorDefinitionVersionsFromCursor(ctx, cursor)
 	if err != nil {
 		return nil, err
 	}
