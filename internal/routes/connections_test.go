@@ -2225,6 +2225,7 @@ func TestConnections(t *testing.T) {
 			var connection ConnectionJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &connection))
 			require.Equal(t, expectedName, string(connection.Name))
+			require.Equal(t, expectedName, connection.Labels["apxy/cxn/-/name"])
 		}
 
 		otherName := "other-connection"
@@ -2241,6 +2242,7 @@ func TestConnections(t *testing.T) {
 		var renamed ConnectionJson
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &renamed))
 		require.Equal(t, "renamed-connection", string(renamed.Name))
+		require.Equal(t, "renamed-connection", renamed.Labels["apxy/cxn/-/name"])
 
 		w = httptest.NewRecorder()
 		req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(

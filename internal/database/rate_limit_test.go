@@ -186,12 +186,14 @@ func TestRateLimit_Labels(t *testing.T) {
 	user, _ := SplitUserAndApxyLabels(updated.Labels)
 	require.Equal(t, Labels{"only-this": "now"}, user)
 	require.Equal(t, string(rl.Id), updated.Labels["apxy/rl/-/id"])
+	require.Equal(t, string(rl.Id), updated.Labels["apxy/rl/-/name"])
 
 	// DeleteLabels
 	updated, err = db.DeleteRateLimitLabels(ctx, rl.Id, []string{"only-this"})
 	require.NoError(t, err)
 	user, _ = SplitUserAndApxyLabels(updated.Labels)
 	require.Empty(t, user)
+	require.Equal(t, string(rl.Id), updated.Labels["apxy/rl/-/name"])
 
 	// Not found cases
 	fake := apid.New(apid.PrefixRateLimit)

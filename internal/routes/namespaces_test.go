@@ -288,6 +288,7 @@ func TestNamespaces(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, "root.allowed", resp.Path)
 			require.Equal(t, "allowed", string(resp.Name))
+			require.Equal(t, "allowed", resp.Labels["apxy/ns/-/name"])
 			require.Equal(t, string(database.NamespaceStateActive), string(resp.State))
 		})
 

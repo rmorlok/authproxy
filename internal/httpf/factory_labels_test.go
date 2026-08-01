@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/rmorlok/authproxy/internal/apid"
+	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/stretchr/testify/require"
 )
 
@@ -17,22 +18,24 @@ type stubConnection struct {
 	labels    map[string]string
 }
 
-func (s *stubConnection) GetId() apid.ID                  { return s.id }
-func (s *stubConnection) GetNamespace() string            { return s.namespace }
-func (s *stubConnection) GetConnectorId() apid.ID         { return s.cvID }
-func (s *stubConnection) GetConnectorVersion() uint64     { return s.cvVersion }
-func (s *stubConnection) GetLabels() map[string]string    { return s.labels }
+func (s *stubConnection) GetId() apid.ID               { return s.id }
+func (s *stubConnection) GetNamespace() string         { return s.namespace }
+func (s *stubConnection) GetConnectorId() apid.ID      { return s.cvID }
+func (s *stubConnection) GetConnectorVersion() uint64  { return s.cvVersion }
+func (s *stubConnection) GetLabels() map[string]string { return s.labels }
 
 // stubActor is a minimal Actor implementation for testing.
 type stubActor struct {
 	id        apid.ID
+	name      scommon.ResourceName
 	namespace string
 	labels    map[string]string
 }
 
-func (s *stubActor) GetId() apid.ID               { return s.id }
-func (s *stubActor) GetNamespace() string         { return s.namespace }
-func (s *stubActor) GetLabels() map[string]string { return s.labels }
+func (s *stubActor) GetId() apid.ID                { return s.id }
+func (s *stubActor) GetName() scommon.ResourceName { return s.name }
+func (s *stubActor) GetNamespace() string          { return s.namespace }
+func (s *stubActor) GetLabels() map[string]string  { return s.labels }
 
 func newTestFactory() *clientFactory {
 	return &clientFactory{
@@ -47,11 +50,11 @@ func TestForConnectionCopiesAllLabels(t *testing.T) {
 		cvID:      apid.MustParse("cxr_test1234567890ab"),
 		cvVersion: 1,
 		labels: map[string]string{
-			"team":             "platform",
-			"apxy/cxn/-/id":    "cxn_test1234567890ab",
-			"apxy/cxn/-/ns":    "root.foo",
-			"apxy/cxr/type":    "google_drive",
-			"apxy/ns/tier":     "pro",
+			"team":          "platform",
+			"apxy/cxn/-/id": "cxn_test1234567890ab",
+			"apxy/cxn/-/ns": "root.foo",
+			"apxy/cxr/type": "google_drive",
+			"apxy/ns/tier":  "pro",
 		},
 	}
 
@@ -139,10 +142,11 @@ func TestForActorAddsActorLabels(t *testing.T) {
 	}
 	actor := &stubActor{
 		id:        apid.MustParse("act_test1234567890ab"),
+		name:      "marketplace-user",
 		namespace: "root.bar",
 		labels: map[string]string{
-			"team":  "marketplace",
-			"role":  "admin",
+			"team": "marketplace",
+			"role": "admin",
 		},
 	}
 
@@ -154,6 +158,7 @@ func TestForActorAddsActorLabels(t *testing.T) {
 
 	// Actor's self-implicit identifier labels are present.
 	require.Equal(t, "act_test1234567890ab", f.requestInfo.Labels["apxy/act/-/id"])
+	require.Equal(t, "marketplace-user", f.requestInfo.Labels["apxy/act/-/name"])
 	require.Equal(t, "root.bar", f.requestInfo.Labels["apxy/act/-/ns"])
 
 	// Connection's apxy/ labels survive — actor doesn't trample them.
@@ -172,8 +177,8 @@ func TestForActorDoesNotForwardActorApxyKeys(t *testing.T) {
 		namespace: "root.bar",
 		labels: map[string]string{
 			"team":          "marketplace",
-			"apxy/ns/tier":  "free",     // should NOT propagate
-			"apxy/act/-/id": "ignored",  // self-implicit comes from id, not from labels
+			"apxy/ns/tier":  "free",    // should NOT propagate
+			"apxy/act/-/id": "ignored", // self-implicit comes from id, not from labels
 		},
 	}
 
@@ -181,8 +186,24 @@ func TestForActorDoesNotForwardActorApxyKeys(t *testing.T) {
 
 	require.Equal(t, "marketplace", f.requestInfo.Labels["apxy/act/team"])
 	require.Equal(t, "act_test1234567890ab", f.requestInfo.Labels["apxy/act/-/id"])
+	require.Equal(t, "act_test1234567890ab", f.requestInfo.Labels["apxy/act/-/name"])
 	_, hasNs := f.requestInfo.Labels["apxy/ns/tier"]
 	require.False(t, hasNs, "actor's apxy/ns/* must not leak through to the request")
+}
+
+func TestForActorNameSnapshotUsesCurrentValueWithoutRewritingHistory(t *testing.T) {
+	actor := &stubActor{
+		id:        apid.MustParse("act_test1234567890ab"),
+		name:      "before",
+		namespace: "root",
+	}
+
+	before := newTestFactory().ForActor(actor).(*clientFactory)
+	actor.name = "after"
+	after := newTestFactory().ForActor(actor).(*clientFactory)
+
+	require.Equal(t, "before", before.requestInfo.Labels["apxy/act/-/name"])
+	require.Equal(t, "after", after.requestInfo.Labels["apxy/act/-/name"])
 }
 
 func TestForActorNilIsNoop(t *testing.T) {

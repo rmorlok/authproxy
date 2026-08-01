@@ -11,6 +11,7 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	apid "github.com/rmorlok/authproxy/internal/apid"
 	httpf "github.com/rmorlok/authproxy/internal/httpf"
+	common "github.com/rmorlok/authproxy/internal/schema/common"
 	connectors "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	gentleman "gopkg.in/h2non/gentleman.v2"
 )
@@ -333,6 +334,20 @@ func (m *MockActor) GetLabels() map[string]string {
 func (mr *MockActorMockRecorder) GetLabels() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLabels", reflect.TypeOf((*MockActor)(nil).GetLabels))
+}
+
+// GetName mocks base method.
+func (m *MockActor) GetName() common.ResourceName {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetName")
+	ret0, _ := ret[0].(common.ResourceName)
+	return ret0
+}
+
+// GetName indicates an expected call of GetName.
+func (mr *MockActorMockRecorder) GetName() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetName", reflect.TypeOf((*MockActor)(nil).GetName))
 }
 
 // GetNamespace mocks base method.

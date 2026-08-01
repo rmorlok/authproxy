@@ -1856,8 +1856,10 @@ func TestKeys(t *testing.T) {
 
 		named := createNamed("primary-key")
 		require.Equal(t, "primary-key", string(named.Name))
+		require.Equal(t, "primary-key", named.Labels["apxy/key/-/name"])
 		defaulted := createKey(t, tu, "root", nil)
 		require.Equal(t, defaulted.Id.String(), string(defaulted.Name))
+		require.Equal(t, defaulted.Id.String(), defaulted.Labels["apxy/key/-/name"])
 
 		w := httptest.NewRecorder()
 		req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
@@ -1882,6 +1884,7 @@ func TestKeys(t *testing.T) {
 		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &got))
 		require.Equal(t, "renamed-key", string(got.Name))
+		require.Equal(t, "renamed-key", got.Labels["apxy/key/-/name"])
 
 		_ = createNamed("conflicting-key")
 		w = httptest.NewRecorder()

@@ -271,7 +271,7 @@ func (s *service) recomputeConnectionLabelsTx(ctx context.Context, id apid.ID) (
 			ParentCarryForward{Rt: ApidPrefixToLabelToken(apid.PrefixConnectorVersion), Labels: cvLabels},
 			ParentCarryForward{Rt: NamespaceLabelToken, Labels: nsLabels},
 		)
-		newLabels = InjectSelfImplicitLabels(conn.Id, conn.Namespace, newLabels)
+		newLabels = InjectSelfImplicitLabels(conn.Id, conn.Name, conn.Namespace, newLabels)
 
 		var werr error
 		corrected, werr = s.writeRecomputedLabels(ctx, tx, ConnectionsTable, sq.Eq{"id": id, "deleted_at": nil}, conn.Labels, newLabels)
@@ -314,7 +314,7 @@ func (s *service) recomputeActorLabelsTx(ctx context.Context, id apid.ID) (bool,
 			userLabels,
 			ParentCarryForward{Rt: NamespaceLabelToken, Labels: nsLabels},
 		)
-		newLabels = InjectSelfImplicitLabels(a.Id, a.Namespace, newLabels)
+		newLabels = InjectSelfImplicitLabels(a.Id, a.Name, a.Namespace, newLabels)
 
 		var werr error
 		corrected, werr = s.writeRecomputedLabels(ctx, tx, ActorTable, sq.Eq{"id": id, "deleted_at": nil}, a.Labels, newLabels)
@@ -357,7 +357,7 @@ func (s *service) recomputeEncryptionKeyLabelsTx(ctx context.Context, id apid.ID
 			userLabels,
 			ParentCarryForward{Rt: NamespaceLabelToken, Labels: nsLabels},
 		)
-		newLabels = InjectSelfImplicitLabels(ek.Id, ek.Namespace, newLabels)
+		newLabels = InjectSelfImplicitLabels(ek.Id, ek.Name, ek.Namespace, newLabels)
 
 		var werr error
 		corrected, werr = s.writeRecomputedLabels(ctx, tx, KeysTable, sq.Eq{"id": id, "deleted_at": nil}, ek.Labels, newLabels)
@@ -400,7 +400,7 @@ func (s *service) recomputeRateLimitLabelsTx(ctx context.Context, id apid.ID) (b
 			userLabels,
 			ParentCarryForward{Rt: NamespaceLabelToken, Labels: nsLabels},
 		)
-		newLabels = InjectSelfImplicitLabels(rl.Id, rl.Namespace, newLabels)
+		newLabels = InjectSelfImplicitLabels(rl.Id, rl.Name, rl.Namespace, newLabels)
 
 		var werr error
 		corrected, werr = s.writeRecomputedLabels(ctx, tx, RateLimitsTable, sq.Eq{"id": id, "deleted_at": nil}, rl.Labels, newLabels)
@@ -443,7 +443,7 @@ func (s *service) recomputeConnectorLabelsTx(ctx context.Context, id apid.ID) (b
 			userLabels,
 			ParentCarryForward{Rt: NamespaceLabelToken, Labels: nsLabels},
 		)
-		newLabels = InjectSelfImplicitLabels(connector.Id, connector.Namespace, newLabels)
+		newLabels = InjectSelfImplicitLabels(connector.Id, connector.Name, connector.Namespace, newLabels)
 
 		var werr error
 		corrected, werr = s.writeRecomputedLabels(

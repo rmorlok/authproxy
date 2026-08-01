@@ -15,6 +15,9 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
+	scommon "github.com/rmorlok/authproxy/internal/schema/common"
+	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
+	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 )
 
 // Kubernetes-style label restrictions
@@ -69,10 +72,11 @@ var (
 	// implicit identifier labels (e.g. apxy/cxr/-/id).
 	apxyPathSegmentRegex = regexp.MustCompile(`^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?|-)$`)
 
-	// apxyLabelValueRegex matches the same character classes as labelValueRegex
-	// but allows up to ApxyLabelValueMaxLength characters total. Used for
-	// system-managed apxy/-prefixed values such as namespace paths.
-	apxyLabelValueRegex = regexp.MustCompile(`^([a-zA-Z0-9]([a-zA-Z0-9._-]{0,251}[a-zA-Z0-9])?)?$|^[a-zA-Z0-9]?$`)
+	// apxyLabelValueRegex accepts the trusted system-value character set and
+	// allows leading/trailing underscores or hyphens used by the established
+	// namespace-segment grammar. User label values retain the stricter
+	// Kubernetes-style boundary rules.
+	apxyLabelValueRegex = regexp.MustCompile(`^[a-zA-Z0-9._-]{0,253}$`)
 )
 
 // Labels is a map of key-value pairs following Kubernetes label restrictions.
@@ -254,15 +258,15 @@ func ValidateLabelValue(value string) error {
 
 // ValidateApxyLabelValue validates a label value stored under an apxy/-prefixed
 // key. It allows up to ApxyLabelValueMaxLength characters so namespace paths
-// (e.g. root.foo.bar.baz...) can fit. Character rules are otherwise the same
-// as ValidateLabelValue.
+// (e.g. root.foo.bar.baz...) can fit, including the leading underscores and
+// trailing hyphens accepted in namespace path segments.
 func ValidateApxyLabelValue(value string) error {
 	if len(value) > ApxyLabelValueMaxLength {
 		return fmt.Errorf("apxy label value exceeds maximum length of %d characters", ApxyLabelValueMaxLength)
 	}
 
 	if value != "" && !apxyLabelValueRegex.MatchString(value) {
-		return fmt.Errorf("apxy label value %q must start and end with alphanumeric and contain only alphanumeric, '-', '_', or '.'", value)
+		return fmt.Errorf("apxy label value %q may contain only alphanumeric characters, '-', '_', or '.'", value)
 	}
 
 	return nil
@@ -555,32 +559,36 @@ func ApidPrefixToLabelToken(p apid.Prefix) string {
 	return strings.TrimSuffix(string(p), "_")
 }
 
-// BuildImplicitIdentifierLabelsForToken builds the apxy/<rt>/-/id and
-// apxy/<rt>/-/ns implicit identifier labels for any resource type, keyed by
-// the supplied <rt> token and identifier string. This is the underlying
-// builder used by both apid-keyed and path-keyed resources.
-func BuildImplicitIdentifierLabelsForToken(rt, id, namespacePath string) Labels {
+// BuildImplicitResourceLabelsForToken builds the apxy/<rt>/-/id,
+// apxy/<rt>/-/name, and apxy/<rt>/-/ns implicit identity labels for any
+// resource type, keyed by the supplied <rt> token and identifier string. This
+// is the underlying builder used by both apid-keyed and path-keyed resources.
+func BuildImplicitResourceLabelsForToken(rt, id string, name scommon.ResourceName, namespacePath string) Labels {
 	if rt == "" || id == "" {
 		return nil
 	}
+	if name == "" {
+		name = scommon.ResourceName(id)
+	}
 	return Labels{
-		fmt.Sprintf("%s%s/%s/id", ApxyReservedPrefix, rt, ApxyImplicitSegment): id,
-		fmt.Sprintf("%s%s/%s/ns", ApxyReservedPrefix, rt, ApxyImplicitSegment): namespacePath,
+		fmt.Sprintf("%s%s/%s/id", ApxyReservedPrefix, rt, ApxyImplicitSegment):   id,
+		fmt.Sprintf("%s%s/%s/name", ApxyReservedPrefix, rt, ApxyImplicitSegment): string(name),
+		fmt.Sprintf("%s%s/%s/ns", ApxyReservedPrefix, rt, ApxyImplicitSegment):   namespacePath,
 	}
 }
 
-// BuildNamespaceImplicitIdentifierLabels builds the self-implicit identifier
-// labels for a namespace. Both the -/id and -/ns labels carry the namespace's
-// own path (a namespace is its own namespace).
-func BuildNamespaceImplicitIdentifierLabels(path string) Labels {
-	return BuildImplicitIdentifierLabelsForToken(NamespaceLabelToken, path, path)
+// BuildNamespaceImplicitResourceLabels builds a namespace's self-implicit
+// identity labels. Both -/id and -/ns carry the namespace path, while -/name
+// carries the final path segment.
+func BuildNamespaceImplicitResourceLabels(path string) Labels {
+	return BuildImplicitResourceLabelsForToken(NamespaceLabelToken, path, namespace.NameFromPath(path), path)
 }
 
 // InjectNamespaceSelfImplicitLabels returns a copy of existing with a
-// namespace's own apxy/ns/-/id and apxy/ns/-/ns labels added. Mirrors
+// namespace's own apxy/ns/-/id, apxy/ns/-/name, and apxy/ns/-/ns labels added. Mirrors
 // InjectSelfImplicitLabels but for path-keyed namespace resources.
 func InjectNamespaceSelfImplicitLabels(path string, existing Labels) Labels {
-	implicit := BuildNamespaceImplicitIdentifierLabels(path)
+	implicit := BuildNamespaceImplicitResourceLabels(path)
 	if len(implicit) == 0 {
 		if existing == nil {
 			return nil
@@ -597,25 +605,23 @@ func InjectNamespaceSelfImplicitLabels(path string, existing Labels) Labels {
 	return out
 }
 
-// BuildImplicitIdentifierLabels returns the two implicit identifier labels
-// for an apid-keyed resource: apxy/<rt>/-/id and apxy/<rt>/-/ns, where <rt>
-// is derived from the resource's id prefix. The id and namespacePath are
-// stored as label values verbatim — callers must ensure they have already
-// been validated by their respective rules.
-func BuildImplicitIdentifierLabels(id apid.ID, namespacePath string) Labels {
+// BuildImplicitResourceLabels returns the three implicit identity labels for
+// an apid-keyed resource: apxy/<rt>/-/id, apxy/<rt>/-/name, and
+// apxy/<rt>/-/ns, where <rt> is derived from the resource's id prefix.
+func BuildImplicitResourceLabels(id apid.ID, name scommon.ResourceName, namespacePath string) Labels {
 	if id.IsNil() {
 		return nil
 	}
-	return BuildImplicitIdentifierLabelsForToken(ApidPrefixToLabelToken(id.Prefix()), string(id), namespacePath)
+	return BuildImplicitResourceLabelsForToken(ApidPrefixToLabelToken(id.Prefix()), string(id), name, namespacePath)
 }
 
 // InjectSelfImplicitLabels returns a copy of existing with the resource's own
-// apxy/<rt>/-/id and apxy/<rt>/-/ns labels added. The self-implicit labels
+// apxy/<rt>/-/id, apxy/<rt>/-/name, and apxy/<rt>/-/ns labels added. The self-implicit labels
 // override any same-keyed entries already in existing (deeper-overrides-
 // shallower across the carry-forward chain). Callers pass this to the create
-// path so the row is persisted with the implicit identifier labels in place.
-func InjectSelfImplicitLabels(id apid.ID, namespacePath string, existing Labels) Labels {
-	implicit := BuildImplicitIdentifierLabels(id, namespacePath)
+// path so the row is persisted with the implicit identity labels in place.
+func InjectSelfImplicitLabels(id apid.ID, name scommon.ResourceName, namespacePath string, existing Labels) Labels {
+	implicit := BuildImplicitResourceLabels(id, name, namespacePath)
 	if len(implicit) == 0 {
 		if existing == nil {
 			return nil
@@ -630,6 +636,59 @@ func InjectSelfImplicitLabels(id apid.ID, namespacePath string, existing Labels)
 		out[k] = v
 	}
 	return out
+}
+
+// updateResourceNameAndSelfLabels atomically updates a mutable resource name
+// and its self-implicit name label. PostgreSQL locks the row between the read
+// and write so a concurrent label mutation cannot be lost; SQLite serializes
+// the write transaction itself.
+func (s *service) updateResourceNameAndSelfLabels(
+	ctx context.Context,
+	table string,
+	id apid.ID,
+	name scommon.ResourceName,
+) error {
+	return s.transaction(func(tx *sql.Tx) error {
+		var namespacePath string
+		var labels Labels
+		query := s.sq.
+			Select("namespace", "labels").
+			From(table).
+			Where(sq.Eq{"id": id, "deleted_at": nil})
+		if s.cfg.GetProvider() == sconfig.DatabaseProviderPostgres {
+			query = query.Suffix("FOR UPDATE")
+		}
+		if err := query.RunWith(tx).QueryRowContext(ctx).Scan(&namespacePath, &labels); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrNotFound
+			}
+			return fmt.Errorf("failed to read %s before rename: %w", table, err)
+		}
+
+		labels = InjectSelfImplicitLabels(id, name, namespacePath, labels)
+		result, err := s.sq.
+			Update(table).
+			Set("name", name).
+			Set("labels", labels).
+			Set("updated_at", apctx.GetClock(ctx).Now()).
+			Where(sq.Eq{"id": id, "deleted_at": nil}).
+			RunWith(tx).
+			ExecContext(ctx)
+		if err != nil {
+			return wrapDatabaseMutationError(fmt.Sprintf("failed to update %s name", table), err)
+		}
+		affected, err := result.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("failed to update %s name: %w", table, err)
+		}
+		if affected == 0 {
+			return ErrNotFound
+		}
+		if affected > 1 {
+			return fmt.Errorf("multiple %s rows were renamed: %w", table, ErrViolation)
+		}
+		return nil
+	})
 }
 
 // SplitUserAndApxyLabels partitions a labels map into the user-provided

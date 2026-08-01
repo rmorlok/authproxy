@@ -183,7 +183,7 @@ func (s *service) CreateRateLimit(ctx context.Context, rl *RateLimit) error {
 			rl.Labels,
 			ParentCarryForward{Rt: NamespaceLabelToken, Labels: nsLabels},
 		)
-		rl.Labels = InjectSelfImplicitLabels(rl.Id, rl.Namespace, rl.Labels)
+		rl.Labels = InjectSelfImplicitLabels(rl.Id, rl.Name, rl.Namespace, rl.Labels)
 
 		now := apctx.GetClock(ctx).Now()
 		rl.CreatedAt = now
@@ -264,25 +264,8 @@ func (s *service) UpdateRateLimitName(ctx context.Context, id apid.ID, name scom
 		return nil, fmt.Errorf("invalid rate limit name: %w", err)
 	}
 
-	result, err := s.sq.
-		Update(RateLimitsTable).
-		Set("name", name).
-		Set("updated_at", apctx.GetClock(ctx).Now()).
-		Where(sq.Eq{"id": id, "deleted_at": nil}).
-		RunWith(s.db).
-		ExecContext(ctx)
-	if err != nil {
-		return nil, wrapDatabaseMutationError("failed to update rate limit name", err)
-	}
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return nil, fmt.Errorf("failed to update rate limit name: %w", err)
-	}
-	if affected == 0 {
-		return nil, ErrNotFound
-	}
-	if affected > 1 {
-		return nil, fmt.Errorf("multiple rate limits were renamed: %w", ErrViolation)
+	if err := s.updateResourceNameAndSelfLabels(ctx, RateLimitsTable, id, name); err != nil {
+		return nil, err
 	}
 	return s.GetRateLimit(ctx, id)
 }

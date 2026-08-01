@@ -46,6 +46,7 @@ func TestConnectorNameDefaultsAndProjectsAcrossVersions(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, scommon.ResourceName(id.String()), first.Name)
 	require.Equal(t, first.Name, second.Name)
+	require.Equal(t, id.String(), first.Labels["apxy/cxr/-/name"])
 
 	versions := db.ListConnectorDefinitionVersionsBuilder().ForId(id).FetchPage(ctx)
 	require.NoError(t, versions.Error)
@@ -74,6 +75,7 @@ func TestConnectorRenameDoesNotRewriteVersions(t *testing.T) {
 		projected, err := db.GetConnectorDefinitionVersion(ctx, id, version)
 		require.NoError(t, err)
 		require.Equal(t, scommon.ResourceName("renamed"), projected.Name)
+		require.Equal(t, "renamed", projected.Labels["apxy/cxr/-/name"])
 	}
 
 	renamedDefinitions := connectorDefinitionPayloads(t, rawDB, id)
@@ -165,6 +167,9 @@ func TestConnectorNameExactListPaginationAndNamespaceRestrictions(t *testing.T) 
 
 	err = db.UpdateConnectorName(ctx, otherID, "shared")
 	require.ErrorIs(t, err, ErrDuplicate)
+	unchanged, getErr := db.GetConnectorDefinitionVersion(ctx, otherID, 1)
+	require.NoError(t, getErr)
+	require.Equal(t, "other", unchanged.Labels["apxy/cxr/-/name"])
 }
 
 func TestConnectorDefinitionVersionLifecyclePreservesName(t *testing.T) {

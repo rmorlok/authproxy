@@ -8,11 +8,13 @@ import (
 	"github.com/rmorlok/authproxy/internal/auth_methods"
 	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
+	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
 
 type IActorData interface {
 	GetId() apid.ID
+	GetName() scommon.ResourceName
 	GetExternalId() string
 	GetLabels() map[string]string
 	GetAnnotations() map[string]string

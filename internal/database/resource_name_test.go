@@ -145,7 +145,7 @@ func namedResourceHarnesses() []namedResourceHarness {
 				return value.Name, nil
 			},
 			rename: func(ctx context.Context, db DB, id apid.ID, name scommon.ResourceName) error {
-				_, err := db.UpdateKey(ctx, id, map[string]interface{}{"name": name})
+				_, err := db.UpdateKeyName(ctx, id, name)
 				return err
 			},
 			list: func(ctx context.Context, db DB, name scommon.ResourceName, matchers []string, limit int32) namedResourcePage {
@@ -233,6 +233,43 @@ func TestResourceNamesDefaultToID(t *testing.T) {
 			name, err := harness.getName(ctx, db, id)
 			require.NoError(t, err)
 			require.Equal(t, scommon.ResourceName(id.String()), name)
+		})
+	}
+}
+
+func TestResourceNameImplicitLabelsOnCreateAndRename(t *testing.T) {
+	for _, harness := range namedResourceHarnesses() {
+		t.Run(harness.resourceType, func(t *testing.T) {
+			_, db, rawDB := MustApplyBlankTestDbConfigRaw(t, nil)
+			ctx := context.Background()
+			id := apid.New(harness.prefix)
+			labelKey := fmt.Sprintf("apxy/%s/-/name", ApidPrefixToLabelToken(harness.prefix))
+
+			require.NoError(t, harness.create(ctx, db, id, "root", "before"))
+			var labels Labels
+			require.NoError(t, rawDB.QueryRow(fmt.Sprintf(
+				"SELECT labels FROM %s WHERE id = '%s'",
+				harness.table,
+				id.String(),
+			)).Scan(&labels))
+			require.Equal(t, "before", labels[labelKey])
+
+			require.NoError(t, harness.rename(ctx, db, id, "after"))
+			require.NoError(t, rawDB.QueryRow(fmt.Sprintf(
+				"SELECT labels FROM %s WHERE id = '%s'",
+				harness.table,
+				id.String(),
+			)).Scan(&labels))
+			require.Equal(t, "after", labels[labelKey])
+
+			require.NoError(t, harness.create(ctx, db, apid.New(harness.prefix), "root", "taken"))
+			require.ErrorIs(t, harness.rename(ctx, db, id, "taken"), ErrDuplicate)
+			require.NoError(t, rawDB.QueryRow(fmt.Sprintf(
+				"SELECT labels FROM %s WHERE id = '%s'",
+				harness.table,
+				id.String(),
+			)).Scan(&labels))
+			require.Equal(t, "after", labels[labelKey], "a failed rename must not change the implicit name label")
 		})
 	}
 }

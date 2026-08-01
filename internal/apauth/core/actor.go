@@ -3,11 +3,13 @@ package core
 import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
+	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 )
 
 type IActorData interface {
 	GetId() apid.ID
+	GetName() scommon.ResourceName
 	GetExternalId() string
 	GetPermissions() []aschema.Permission
 	GetNamespace() string
@@ -22,6 +24,7 @@ type Actor struct {
 	// how the JWT is structured.
 
 	Id          apid.ID              `json:"-"` // This is the database ID of the actor. It cannot be set in the JWT directly.
+	Name        scommon.ResourceName `json:"name,omitempty"`
 	ExternalId  string               `json:"external_id"`
 	Namespace   string               `json:"namespace,omitempty"`
 	Labels      map[string]string    `json:"labels,omitempty"`
@@ -31,6 +34,13 @@ type Actor struct {
 
 func (a *Actor) GetId() apid.ID {
 	return a.Id
+}
+
+func (a *Actor) GetName() scommon.ResourceName {
+	if a.Name == "" && !a.Id.IsNil() {
+		return scommon.ResourceName(a.Id.String())
+	}
+	return a.Name
 }
 
 func (a *Actor) GetExternalId() string {
@@ -87,14 +97,16 @@ func CreateActor(data IActorData) *Actor {
 		return a
 	}
 
-	return &Actor{
+	actor := &Actor{
 		Id:          data.GetId(),
+		Name:        data.GetName(),
 		ExternalId:  data.GetExternalId(),
 		Namespace:   data.GetNamespace(),
 		Labels:      data.GetLabels(),
 		Annotations: data.GetAnnotations(),
 		Permissions: data.GetPermissions(),
 	}
+	return actor
 }
 
 var _ IActorData = &Actor{}

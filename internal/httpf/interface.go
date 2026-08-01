@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"gopkg.in/h2non/gentleman.v2"
 )
@@ -47,6 +48,7 @@ type Connection interface {
 // actor initiated the call) is a valid input for ForActor.
 type Actor interface {
 	GetId() apid.ID
+	GetName() common.ResourceName
 	GetNamespace() string
 	GetLabels() map[string]string
 }

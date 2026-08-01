@@ -447,25 +447,34 @@ func TestApidPrefixToLabelToken(t *testing.T) {
 	require.Equal(t, "", ApidPrefixToLabelToken(apid.Prefix("")))
 }
 
-func TestBuildImplicitIdentifierLabels(t *testing.T) {
-	t.Run("builds id and ns labels", func(t *testing.T) {
+func TestBuildImplicitResourceLabels(t *testing.T) {
+	t.Run("builds id name and ns labels", func(t *testing.T) {
 		id := apid.MustParse("cxn_test1234567890ab")
-		labels := BuildImplicitIdentifierLabels(id, "root.foo.bar")
+		labels := BuildImplicitResourceLabels(id, "billing", "root.foo.bar")
 		require.Equal(t, Labels{
-			"apxy/cxn/-/id": "cxn_test1234567890ab",
-			"apxy/cxn/-/ns": "root.foo.bar",
+			"apxy/cxn/-/id":   "cxn_test1234567890ab",
+			"apxy/cxn/-/name": "billing",
+			"apxy/cxn/-/ns":   "root.foo.bar",
 		}, labels)
 		// Result must validate under the system rules.
 		require.NoError(t, labels.Validate())
 	})
 
 	t.Run("nil id returns nil", func(t *testing.T) {
-		require.Nil(t, BuildImplicitIdentifierLabels(apid.Nil, "/foo"))
+		require.Nil(t, BuildImplicitResourceLabels(apid.Nil, "billing", "/foo"))
+	})
+
+	t.Run("empty name defaults to id", func(t *testing.T) {
+		id := apid.MustParse("act_test1234567890ab")
+		labels := BuildImplicitResourceLabels(id, "", "root")
+		require.Equal(t, id.String(), labels["apxy/act/-/name"])
 	})
 
 	t.Run("uses correct rt token per resource type", func(t *testing.T) {
-		labels := BuildImplicitIdentifierLabels(apid.MustParse("cxr_test1234567890ab"), "root")
+		labels := BuildImplicitResourceLabels(apid.MustParse("cxr_test1234567890ab"), "connector", "root")
 		_, ok := labels["apxy/cxr/-/id"]
+		require.True(t, ok)
+		_, ok = labels["apxy/cxr/-/name"]
 		require.True(t, ok)
 		_, ok = labels["apxy/cxr/-/ns"]
 		require.True(t, ok)
@@ -613,6 +622,11 @@ func TestApxyLabelValueValidation(t *testing.T) {
 		require.NoError(t, ValidateApxyLabelValue(longPath))
 	})
 
+	t.Run("apxy mode accepts namespace name boundaries", func(t *testing.T) {
+		require.NoError(t, ValidateApxyLabelValue("_billing-"))
+		require.Error(t, ValidateLabelValue("_billing-"))
+	})
+
 	t.Run("apxy mode rejects values exceeding apxy cap", func(t *testing.T) {
 		// 254 chars: starts/ends alphanumeric so the regex is the only constraint.
 		tooLong := "a" + strings.Repeat("b", 252) + "c"
@@ -633,23 +647,24 @@ func TestApxyLabelValueValidation(t *testing.T) {
 }
 
 func TestInjectSelfImplicitLabels(t *testing.T) {
-	t.Run("adds id and ns labels", func(t *testing.T) {
+	t.Run("adds id name and ns labels", func(t *testing.T) {
 		id := apid.MustParse("cxn_test1234567890ab")
-		out := InjectSelfImplicitLabels(id, "root.foo", Labels{"team": "platform"})
+		out := InjectSelfImplicitLabels(id, "billing", "root.foo", Labels{"team": "platform"})
 		require.Equal(t, "cxn_test1234567890ab", out["apxy/cxn/-/id"])
+		require.Equal(t, "billing", out["apxy/cxn/-/name"])
 		require.Equal(t, "root.foo", out["apxy/cxn/-/ns"])
 		require.Equal(t, "platform", out["team"])
 	})
 
 	t.Run("nil input still produces implicit labels", func(t *testing.T) {
 		id := apid.MustParse("cxn_test1234567890ab")
-		out := InjectSelfImplicitLabels(id, "root", nil)
-		require.Len(t, out, 2)
+		out := InjectSelfImplicitLabels(id, "billing", "root", nil)
+		require.Len(t, out, 3)
 		require.Equal(t, "root", out["apxy/cxn/-/ns"])
 	})
 
 	t.Run("nil id is a no-op pass-through", func(t *testing.T) {
-		out := InjectSelfImplicitLabels(apid.Nil, "root", Labels{"team": "platform"})
+		out := InjectSelfImplicitLabels(apid.Nil, "billing", "root", Labels{"team": "platform"})
 		require.Equal(t, Labels{"team": "platform"}, out)
 	})
 }
@@ -657,6 +672,7 @@ func TestInjectSelfImplicitLabels(t *testing.T) {
 func TestInjectNamespaceSelfImplicitLabels(t *testing.T) {
 	out := InjectNamespaceSelfImplicitLabels("root.foo.bar", Labels{"pig": "oink"})
 	require.Equal(t, "root.foo.bar", out["apxy/ns/-/id"])
+	require.Equal(t, "bar", out["apxy/ns/-/name"])
 	require.Equal(t, "root.foo.bar", out["apxy/ns/-/ns"])
 	require.Equal(t, "oink", out["pig"])
 }

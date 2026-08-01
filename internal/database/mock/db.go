@@ -2035,6 +2035,21 @@ func (mr *MockDBMockRecorder) UpdateKeyLabels(ctx, id, labels interface{}) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateKeyLabels", reflect.TypeOf((*MockDB)(nil).UpdateKeyLabels), ctx, id, labels)
 }
 
+// UpdateKeyName mocks base method.
+func (m *MockDB) UpdateKeyName(ctx context.Context, id apid.ID, name common.ResourceName) (*database.Key, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateKeyName", ctx, id, name)
+	ret0, _ := ret[0].(*database.Key)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateKeyName indicates an expected call of UpdateKeyName.
+func (mr *MockDBMockRecorder) UpdateKeyName(ctx, id, name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateKeyName", reflect.TypeOf((*MockDB)(nil).UpdateKeyName), ctx, id, name)
+}
+
 // UpdateNamespaceAnnotations mocks base method.
 func (m *MockDB) UpdateNamespaceAnnotations(ctx context.Context, path string, annotations map[string]string) (*database.Namespace, error) {
 	m.ctrl.T.Helper()

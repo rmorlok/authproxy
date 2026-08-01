@@ -158,12 +158,14 @@ func TestKey(t *testing.T) {
 		updatedUser, _ := SplitUserAndApxyLabels(updated.Labels)
 		require.Equal(t, Labels{"new-label": "value"}, updatedUser)
 		require.Equal(t, string(ek.Id), updated.Labels["apxy/key/-/id"])
+		require.Equal(t, string(ek.Id), updated.Labels["apxy/key/-/name"])
 
 		// DeleteLabels
 		updated, err = db.DeleteKeyLabels(ctx, ek.Id, []string{"new-label"})
 		require.NoError(t, err)
 		updatedUser, _ = SplitUserAndApxyLabels(updated.Labels)
 		require.Empty(t, updatedUser)
+		require.Equal(t, string(ek.Id), updated.Labels["apxy/key/-/name"])
 	})
 
 	t.Run("Annotations", func(t *testing.T) {
