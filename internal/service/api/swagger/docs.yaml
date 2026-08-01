@@ -117,6 +117,8 @@ definitions:
           type: string
         type: object
       name:
+        description: Name is automatically set to the final segment of Path and cannot
+          be changed.
         example: acme
         type: string
       path:
@@ -409,6 +411,8 @@ definitions:
           type: string
         type: object
       name:
+        description: Name is automatically set to the final segment of Path and cannot
+          be changed.
         example: acme
         type: string
       path:
@@ -5163,7 +5167,8 @@ paths:
     patch:
       consumes:
       - application/json
-      description: Update a namespace's labels
+      description: Update a namespace's labels and annotations. Its path and derived
+        name cannot be changed.
       parameters:
       - description: Namespace path
         in: path

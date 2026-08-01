@@ -287,6 +287,7 @@ func TestNamespaces(t *testing.T) {
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Equal(t, "root.allowed", resp.Path)
+			require.Equal(t, "allowed", string(resp.Name))
 			require.Equal(t, string(database.NamespaceStateActive), string(resp.State))
 		})
 
@@ -724,6 +725,7 @@ func TestNamespaces(t *testing.T) {
 			var resp NamespaceJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			require.Equal(t, "root.patchns", resp.Path)
+			require.Equal(t, "patchns", string(resp.Name))
 			require.Equal(t, "production", resp.Labels["env"])
 			require.Equal(t, "backend", resp.Labels["team"])
 

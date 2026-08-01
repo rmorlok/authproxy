@@ -321,7 +321,7 @@ func (r *NamespacesRoutes) list(gctx *gin.Context) {
 }
 
 // @Summary		Update namespace
-// @Description	Update a namespace's labels
+// @Description	Update a namespace's labels and annotations. Its path and derived name cannot be changed.
 // @Tags			namespaces
 // @Accept			json
 // @Produce		json

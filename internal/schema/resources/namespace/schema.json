@@ -5,7 +5,7 @@
     "NamespaceName": {
       "type": "string",
       "pattern": "^[a-zA-Z0-9_]+[a-zA-Z0-9_\\-]*$",
-      "description": "The read-only name of a namespace, derived from the final segment of its path."
+      "description": "The read-only name automatically set to the final segment of a namespace's immutable path when the namespace is created."
     },
     "NamespacePath": {
       "type": "string",

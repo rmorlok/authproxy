@@ -6213,7 +6213,7 @@ const docTemplateApi = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Update a namespace's labels",
+                "description": "Update a namespace's labels and annotations. Its path and derived name cannot be changed.",
                 "consumes": [
                     "application/json"
                 ],
@@ -8334,6 +8334,7 @@ const docTemplateApi = `{
                     }
                 },
                 "name": {
+                    "description": "Name is automatically set to the final segment of Path and cannot be changed.",
                     "type": "string",
                     "example": "acme"
                 },
@@ -8735,6 +8736,7 @@ const docTemplateApi = `{
                     }
                 },
                 "name": {
+                    "description": "Name is automatically set to the final segment of Path and cannot be changed.",
                     "type": "string",
                     "example": "acme"
                 },

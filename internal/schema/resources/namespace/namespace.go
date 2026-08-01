@@ -10,8 +10,8 @@ import (
 	"github.com/rmorlok/authproxy/internal/util"
 )
 
-// NameFromPath returns the read-only resource name derived from the final
-// segment of a namespace path.
+// NameFromPath returns the read-only resource name automatically derived from
+// the final segment of a namespace's immutable path.
 func NameFromPath(path string) common.ResourceName {
 	if i := strings.LastIndex(path, PathSeparator); i >= 0 {
 		return common.ResourceName(path[i+len(PathSeparator):])

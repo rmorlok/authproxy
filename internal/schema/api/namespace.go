@@ -19,7 +19,8 @@ const (
 //
 //	@Description	Namespace for organizing resources
 type NamespaceJson struct {
-	Path        string              `json:"path" yaml:"path" example:"root.acme"`
+	Path string `json:"path" yaml:"path" example:"root.acme"`
+	// Name is automatically set to the final segment of Path and cannot be changed.
 	Name        common.ResourceName `json:"name" yaml:"name" swaggertype:"string" example:"acme"`
 	State       NamespaceState      `json:"state" yaml:"state" swaggertype:"string" example:"active"`
 	KeyId       *string             `json:"key_id,omitempty" yaml:"key_id,omitempty" example:"key_test550e8400abcd"`
