@@ -8,12 +8,14 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
 
 type Connector struct {
 	Id          apid.ID
 	Namespace   string
+	Name        common.ResourceName
 	Version     uint64
 	State       database.ConnectorDefinitionVersionState
 	Type        string
@@ -31,6 +33,10 @@ func (m *Connector) GetId() apid.ID {
 
 func (m *Connector) GetNamespace() string {
 	return m.Namespace
+}
+
+func (m *Connector) GetName() common.ResourceName {
+	return m.Name
 }
 
 func (m *Connector) GetVersion() uint64 {

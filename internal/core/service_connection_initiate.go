@@ -9,6 +9,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httperr"
+	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 )
 
@@ -72,9 +73,16 @@ func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConn
 		return nil, httperr.InternalServerError(httperr.WithInternalErr(err))
 	}
 
-	connectionIface, err := s.CreateConnection(ctx, targetNamespace, c)
+	var name scommon.ResourceName
+	if req.Name != nil {
+		name = *req.Name
+	}
+	connectionIface, err := s.CreateConnection(ctx, targetNamespace, name, c)
 	if err != nil {
 		val.MarkErrorReturn()
+		if errors.Is(err, database.ErrDuplicate) {
+			return nil, httperr.Conflictf("connection name '%s' already exists in namespace '%s'", name, targetNamespace)
+		}
 		return nil, httperr.InternalServerError(httperr.WithInternalErr(err))
 	}
 	// CreateConnection returns the concrete *connection typed as iface; we

@@ -18,6 +18,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/routes/key_value"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	schemaapiopenapi "github.com/rmorlok/authproxy/internal/schema/api/openapi"
+	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -43,6 +44,7 @@ type ListRateLimitsRequestQueryParams struct {
 	Cursor        *string `form:"cursor"`
 	LimitVal      *int32  `form:"limit"`
 	NamespaceVal  *string `form:"namespace"`
+	NameVal       *string `form:"name"`
 	LabelSelector *string `form:"label_selector"`
 	OrderByVal    *string `form:"order_by"`
 }
@@ -51,6 +53,7 @@ func RateLimitToJson(r coreIface.RateLimit) RateLimitJson {
 	return RateLimitJson{
 		Id:          r.GetId(),
 		Namespace:   r.GetNamespace(),
+		Name:        r.GetName(),
 		Definition:  r.GetDefinition(),
 		Labels:      r.GetLabels(),
 		Annotations: r.GetAnnotations(),
@@ -171,6 +174,7 @@ func (r *RateLimitsRoutes) get(gctx *gin.Context) {
 // @Success		200		{object}	OpenAPIRateLimitJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
+// @Failure		409		{object}	ErrorResponse
 // @Failure		500		{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/rate-limits [post]
@@ -187,6 +191,13 @@ func (r *RateLimitsRoutes) create(gctx *gin.Context) {
 
 	if req.Namespace == "" {
 		apgin.WriteError(gctx, nil, httperr.BadRequest("namespace is required"))
+		val.MarkErrorReturn()
+		return
+	}
+
+	name, httpErr := optionalResourceName(req.Name, "rate limit")
+	if httpErr != nil {
+		apgin.WriteError(gctx, nil, httpErr)
 		val.MarkErrorReturn()
 		return
 	}
@@ -219,8 +230,13 @@ func (r *RateLimitsRoutes) create(gctx *gin.Context) {
 		}
 	}
 
-	rl, err := r.core.CreateRateLimit(ctx, req.Namespace, req.Definition, req.Labels, req.Annotations)
+	rl, err := r.core.CreateRateLimit(ctx, req.Namespace, name, req.Definition, req.Labels, req.Annotations)
 	if err != nil {
+		if conflictErr := resourceNameConflictError(err, "rate limit", name, req.Namespace); conflictErr != nil {
+			apgin.WriteError(gctx, nil, conflictErr)
+			val.MarkErrorReturn()
+			return
+		}
 		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
@@ -237,6 +253,7 @@ func (r *RateLimitsRoutes) create(gctx *gin.Context) {
 // @Param			cursor			query		string	false	"Pagination cursor"
 // @Param			limit			query		integer	false	"Maximum number of results to return"
 // @Param			namespace		query		string	false	"Filter by namespace"
+// @Param			name			query		string	false	"Filter by exact name"
 // @Param			label_selector	query		string	false	"Filter by label selector"
 // @Param			order_by		query		string	false	"Order by field (e.g., 'created_at:desc')"
 // @Success		200				{object}	OpenAPIListRateLimitsResponseJson
@@ -274,6 +291,16 @@ func (r *RateLimitsRoutes) list(gctx *gin.Context) {
 		}
 
 		b = b.ForNamespaceMatchers(val.GetEffectiveNamespaceMatchers(req.NamespaceVal))
+
+		if req.NameVal != nil {
+			name := scommon.ResourceName(*req.NameVal)
+			if err := name.Validate(); err != nil {
+				apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid rate limit name: %s", err.Error()))
+				val.MarkErrorReturn()
+				return
+			}
+			b = b.ForName(name)
+		}
 
 		if req.LabelSelector != nil {
 			b = b.ForLabelSelector(*req.LabelSelector)
@@ -313,7 +340,7 @@ func (r *RateLimitsRoutes) list(gctx *gin.Context) {
 }
 
 // @Summary		Update rate limit
-// @Description	Update a rate limit's definition, labels, or annotations
+// @Description	Update a rate limit's name, definition, labels, or annotations
 // @Tags			rate_limits
 // @Accept			json
 // @Produce		json
@@ -323,6 +350,7 @@ func (r *RateLimitsRoutes) list(gctx *gin.Context) {
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		404		{object}	ErrorResponse
+// @Failure		409		{object}	ErrorResponse
 // @Failure		500		{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/rate-limits/{id} [patch]
@@ -383,6 +411,24 @@ func (r *RateLimitsRoutes) update(gctx *gin.Context) {
 	if httpErr := val.ValidateHttpStatusError(rl); httpErr != nil {
 		apgin.WriteError(gctx, nil, httpErr)
 		return
+	}
+
+	if req.Name != nil {
+		name, httpErr := optionalResourceName(req.Name, "rate limit")
+		if httpErr != nil {
+			apgin.WriteError(gctx, nil, httpErr)
+			val.MarkErrorReturn()
+			return
+		}
+		if _, err := r.core.UpdateRateLimitName(ctx, id, name); err != nil {
+			if conflictErr := resourceNameConflictError(err, "rate limit", name, rl.GetNamespace()); conflictErr != nil {
+				apgin.WriteError(gctx, nil, conflictErr)
+				val.MarkErrorReturn()
+				return
+			}
+			r.handleMutateError(gctx, val, id, err)
+			return
+		}
 	}
 
 	if req.Definition != nil {

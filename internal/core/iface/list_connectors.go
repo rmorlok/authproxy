@@ -5,6 +5,7 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
@@ -21,6 +22,7 @@ type ListConnectorsBuilder interface {
 	ForStates([]database.ConnectorDefinitionVersionState) ListConnectorsBuilder
 	ForNamespaceMatcher(string) ListConnectorsBuilder
 	ForNamespaceMatchers([]string) ListConnectorsBuilder
+	ForName(name common.ResourceName) ListConnectorsBuilder
 	OrderBy(database.ConnectorOrderByField, pagination.OrderBy) ListConnectorsBuilder
 	IncludeDeleted() ListConnectorsBuilder
 	ForLabelSelector(selector string) ListConnectorsBuilder

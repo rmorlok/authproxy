@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
 
@@ -32,6 +33,7 @@ const (
 type ConnectionJson struct {
 	Id          apid.ID               `json:"id" yaml:"id" swaggertype:"string" example:"cxn_test550e8400abcde"`
 	Namespace   string                `json:"namespace" yaml:"namespace" example:"root.acme"`
+	Name        common.ResourceName   `json:"name" yaml:"name" swaggertype:"string" example:"production-crm"`
 	Labels      map[string]string     `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Annotations map[string]string     `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	State       ConnectionState       `json:"state" yaml:"state" swaggertype:"string" example:"configured"`
@@ -89,8 +91,9 @@ type ForceConnectionStateRequestJson struct {
 //
 //	@Description	Request to update a connection's labels and annotations
 type UpdateConnectionRequestJson struct {
-	Labels      map[string]string `json:"labels" yaml:"labels"`
-	Annotations map[string]string `json:"annotations" yaml:"annotations"`
+	Name        *common.ResourceName `json:"name,omitempty" yaml:"name,omitempty" swaggertype:"string" example:"production-crm"`
+	Labels      map[string]string    `json:"labels" yaml:"labels"`
+	Annotations map[string]string    `json:"annotations" yaml:"annotations"`
 }
 
 // ProxyResponseJson is the response from a proxied request.

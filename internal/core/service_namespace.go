@@ -9,6 +9,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	dbtasks "github.com/rmorlok/authproxy/internal/database/tasks"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -283,6 +284,13 @@ func (l *listNamespaceWrapper) ForNamespaceMatcher(matcher string) iface.ListNam
 func (l *listNamespaceWrapper) ForNamespaceMatchers(matchers []string) iface.ListNamespacesBuilder {
 	return &listNamespaceWrapper{
 		l: l.l.ForNamespaceMatchers(matchers),
+		s: l.s,
+	}
+}
+
+func (l *listNamespaceWrapper) ForName(name common.ResourceName) iface.ListNamespacesBuilder {
+	return &listNamespaceWrapper{
+		l: l.l.ForName(name),
 		s: l.s,
 	}
 }

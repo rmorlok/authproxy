@@ -84,6 +84,13 @@ func TestMatches(t *testing.T) {
 	}
 }
 
+func TestNamespaceName(t *testing.T) {
+	require.Equal(t, "root", string(NameFromPath("root")))
+	require.Equal(t, "billing", string(NameFromPath("root.prod.billing")))
+	require.NoError(t, ValidateName("_billing-"))
+	require.Error(t, ValidateName("billing.prod"))
+}
+
 func TestNamespaces(t *testing.T) {
 	t.Run("path", func(t *testing.T) {
 		t.Run("validation", func(t *testing.T) {

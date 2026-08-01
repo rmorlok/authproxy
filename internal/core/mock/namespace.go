@@ -8,10 +8,13 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/schema/common"
+	nsschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 )
 
 type Namespace struct {
 	Path        string
+	Name        common.ResourceName
 	State       database.NamespaceState
 	KeyId       *apid.ID
 	CreatedAt   time.Time
@@ -22,6 +25,13 @@ type Namespace struct {
 
 func (m *Namespace) GetPath() string {
 	return m.Path
+}
+
+func (m *Namespace) GetName() common.ResourceName {
+	if m.Name != "" {
+		return m.Name
+	}
+	return nsschema.NameFromPath(m.Path)
 }
 
 func (m *Namespace) GetState() database.NamespaceState {

@@ -10,6 +10,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	cfgschema "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -26,10 +27,11 @@ func (s *service) GetKey(ctx context.Context, id apid.ID) (iface.Key, error) {
 	return wrapKey(*ek, s), nil
 }
 
-func (s *service) CreateKey(ctx context.Context, namespace string, keyData *cfgschema.KeyData, labels map[string]string) (iface.Key, error) {
+func (s *service) CreateKey(ctx context.Context, namespace string, name common.ResourceName, keyData *cfgschema.KeyData, labels map[string]string) (iface.Key, error) {
 	ek := &database.Key{
 		Id:        apid.New(apid.PrefixKey),
 		Namespace: namespace,
+		Name:      name,
 		State:     database.KeyStateActive,
 		Labels:    database.Labels(labels),
 	}
@@ -60,6 +62,20 @@ func (s *service) CreateKey(ctx context.Context, namespace string, keyData *cfgs
 	encrypt.EnqueueGenerateDataEncryptionKeysToDatabase(ctx, s.ac, s.logger)
 	encrypt.EnqueueForceSyncKeysToDatabase(ctx, s.r, s.ac, s.logger)
 
+	return wrapKey(*ek, s), nil
+}
+
+func (s *service) UpdateKeyName(ctx context.Context, id apid.ID, name common.ResourceName) (iface.Key, error) {
+	if err := name.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid key name: %w", err)
+	}
+	ek, err := s.db.UpdateKey(ctx, id, map[string]interface{}{"name": name})
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
 	return wrapKey(*ek, s), nil
 }
 
@@ -272,6 +288,10 @@ func (l *listKeyWrapper) ForNamespaceMatcher(matcher string) iface.ListKeysBuild
 
 func (l *listKeyWrapper) ForNamespaceMatchers(matchers []string) iface.ListKeysBuilder {
 	return &listKeyWrapper{l: l.l.ForNamespaceMatchers(matchers), s: l.s}
+}
+
+func (l *listKeyWrapper) ForName(name common.ResourceName) iface.ListKeysBuilder {
+	return &listKeyWrapper{l: l.l.ForName(name), s: l.s}
 }
 
 func (l *listKeyWrapper) ForState(state database.KeyState) iface.ListKeysBuilder {

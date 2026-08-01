@@ -8,6 +8,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
+	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 )
 
@@ -31,6 +32,7 @@ func wrapRateLimit(rl database.RateLimit, s *service) *RateLimit {
 
 func (r *RateLimit) GetId() apid.ID                    { return r.Id }
 func (r *RateLimit) GetNamespace() string              { return r.Namespace }
+func (r *RateLimit) GetName() scommon.ResourceName     { return r.Name }
 func (r *RateLimit) GetDefinition() rlschema.RateLimit { return r.Definition }
 func (r *RateLimit) GetLabels() map[string]string      { return r.Labels }
 func (r *RateLimit) GetAnnotations() map[string]string { return r.Annotations }

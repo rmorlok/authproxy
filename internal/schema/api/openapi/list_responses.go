@@ -44,6 +44,7 @@ type ConnectorVersionJson struct {
 	Id          apid.ID                         `json:"id" swaggertype:"string" example:"cxr_test550e8400abcde"`
 	Version     uint64                          `json:"version" example:"1"`
 	Namespace   string                          `json:"namespace" example:"root.acme"`
+	Name        string                          `json:"name" example:"salesforce"`
 	State       schemaapi.ConnectorVersionState `json:"state" swaggertype:"string" example:"primary"`
 	Definition  interface{}                     `json:"definition"`
 	Labels      map[string]string               `json:"labels,omitempty"`
@@ -69,6 +70,7 @@ type ListConnectorVersionsResponseJson struct {
 type ConnectionJson struct {
 	Id          apid.ID           `json:"id" swaggertype:"string" example:"cxn_test550e8400abcde"`
 	Namespace   string            `json:"namespace" example:"root.acme"`
+	Name        string            `json:"name" example:"production-crm"`
 	Labels      map[string]string `json:"labels,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`
 	State       string            `json:"state" example:"configured"`
@@ -156,6 +158,7 @@ type ListNotificationsResponseJson struct {
 //	@Description	Request to create a new connector
 type CreateConnectorRequestJson struct {
 	Namespace   string            `json:"namespace" example:"root.acme"`
+	Name        *string           `json:"name,omitempty" example:"salesforce"`
 	Definition  interface{}       `json:"definition"`
 	Labels      map[string]string `json:"labels,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`
@@ -163,8 +166,18 @@ type CreateConnectorRequestJson struct {
 
 // UpdateConnectorRequestJson documents the connector update body.
 //
-//	@Description	Request to update a connector or connector version
+//	@Description	Request to update a logical connector
 type UpdateConnectorRequestJson struct {
+	Name        *string            `json:"name,omitempty" example:"salesforce"`
+	Definition  interface{}        `json:"definition,omitempty"`
+	Labels      *map[string]string `json:"labels,omitempty"`
+	Annotations *map[string]string `json:"annotations,omitempty"`
+}
+
+// UpdateConnectorVersionRequestJson documents connector definition-version updates.
+//
+//	@Description Request to update a connector definition version
+type UpdateConnectorVersionRequestJson struct {
 	Definition  interface{}        `json:"definition,omitempty"`
 	Labels      *map[string]string `json:"labels,omitempty"`
 	Annotations *map[string]string `json:"annotations,omitempty"`
@@ -200,6 +213,7 @@ type ConnectorLifecycleResponseJson struct {
 type KeyJson struct {
 	Id          apid.ID                `json:"id" swaggertype:"string" example:"key_test550e8400abcd"`
 	Namespace   string                 `json:"namespace" example:"root.acme"`
+	Name        string                 `json:"name" example:"primary-encryption-key"`
 	State       string                 `json:"state" example:"active"`
 	KeyData     map[string]interface{} `json:"key_data,omitempty" swaggertype:"object"`
 	Labels      map[string]string      `json:"labels,omitempty"`
@@ -213,6 +227,7 @@ type KeyJson struct {
 //	@Description	Request to create a key
 type CreateKeyRequestJson struct {
 	Namespace   string                 `json:"namespace" example:"root.acme"`
+	Name        *string                `json:"name,omitempty" example:"primary-encryption-key"`
 	KeyData     map[string]interface{} `json:"key_data,omitempty"`
 	Labels      map[string]string      `json:"labels,omitempty"`
 	Annotations map[string]string      `json:"annotations,omitempty"`
@@ -282,6 +297,7 @@ type TaskInfoJson struct {
 //
 //	@Description	Request to update a key
 type UpdateKeyRequestJson struct {
+	Name        *string                 `json:"name,omitempty" example:"primary-encryption-key"`
 	State       *string                 `json:"state,omitempty" example:"disabled"`
 	KeyData     *map[string]interface{} `json:"key_data,omitempty"`
 	Labels      *map[string]string      `json:"labels,omitempty"`
@@ -295,6 +311,7 @@ type UpdateKeyRequestJson struct {
 type RateLimitJson struct {
 	Id          apid.ID           `json:"id" swaggertype:"string" example:"rl_test550e8400abcde"`
 	Namespace   string            `json:"namespace" example:"root.acme"`
+	Name        string            `json:"name" example:"public-api"`
 	Definition  map[string]any    `json:"definition"`
 	Labels      map[string]string `json:"labels,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`
@@ -315,6 +332,7 @@ type ListRateLimitsResponseJson struct {
 //	@Description	Request to create a rate limit
 type CreateRateLimitRequestJson struct {
 	Namespace   string            `json:"namespace" example:"root.acme"`
+	Name        *string           `json:"name,omitempty" example:"public-api"`
 	Definition  map[string]any    `json:"definition"`
 	Labels      map[string]string `json:"labels,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`
@@ -324,6 +342,7 @@ type CreateRateLimitRequestJson struct {
 //
 //	@Description	Request to update a rate limit
 type UpdateRateLimitRequestJson struct {
+	Name        *string            `json:"name,omitempty" example:"public-api"`
 	Definition  map[string]any     `json:"definition,omitempty"`
 	Labels      *map[string]string `json:"labels,omitempty"`
 	Annotations *map[string]string `json:"annotations,omitempty"`

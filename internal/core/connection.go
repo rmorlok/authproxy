@@ -14,6 +14,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"
+	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
@@ -56,6 +57,10 @@ func (c *connection) GetId() apid.ID {
 
 func (c *connection) GetNamespace() string {
 	return c.Namespace
+}
+
+func (c *connection) GetName() scommon.ResourceName {
+	return c.Name
 }
 
 func (c *connection) GetState() database.ConnectionState {

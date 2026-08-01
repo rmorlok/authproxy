@@ -11,12 +11,14 @@ import (
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
 
 type Connection struct {
 	Id                apid.ID
 	Namespace         string
+	Name              common.ResourceName
 	State             database.ConnectionState
 	HealthState       database.ConnectionHealthState
 	ConnectorId       apid.ID
@@ -38,6 +40,10 @@ func (m *Connection) GetId() apid.ID {
 
 func (m *Connection) GetNamespace() string {
 	return m.Namespace
+}
+
+func (m *Connection) GetName() common.ResourceName {
+	return m.Name
 }
 
 func (m *Connection) GetState() database.ConnectionState {

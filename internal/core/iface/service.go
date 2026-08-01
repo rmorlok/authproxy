@@ -8,6 +8,7 @@ import (
 	authcore "github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
+	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	cfgschema "github.com/rmorlok/authproxy/internal/schema/config"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
@@ -90,7 +91,10 @@ type C interface {
 	ListConnectorVersionsFromCursor(ctx context.Context, cursor string) (ListConnectorVersionsExecutor, error)
 
 	// CreateConnectorVersion creates a new connector with version 1 in draft state.
-	CreateConnectorVersion(ctx context.Context, namespace string, definition *cschema.Connector, labels map[string]string, annotations map[string]string) (Connector, error)
+	CreateConnectorVersion(ctx context.Context, namespace string, name scommon.ResourceName, definition *cschema.Connector, labels map[string]string, annotations map[string]string) (Connector, error)
+
+	// UpdateConnectorName renames a logical connector without changing its definition-version history.
+	UpdateConnectorName(ctx context.Context, id apid.ID, name scommon.ResourceName) error
 
 	// CreateDraftConnectorVersion creates a new draft version for an existing connector.
 	// Returns ErrDraftAlreadyExists if a draft version already exists.
@@ -131,7 +135,10 @@ type C interface {
 	GetConnection(ctx context.Context, id apid.ID) (Connection, error)
 
 	// CreateConnection creates a new connection.
-	CreateConnection(ctx context.Context, namespace string, c Connector) (Connection, error)
+	CreateConnection(ctx context.Context, namespace string, name scommon.ResourceName, c Connector) (Connection, error)
+
+	// UpdateConnectionName renames a connection addressed by immutable ID.
+	UpdateConnectionName(ctx context.Context, id apid.ID, name scommon.ResourceName) (Connection, error)
 
 	// ListConnectionsBuilder returns a builder to allow the caller to list connections matching certain criteria.
 	ListConnectionsBuilder() ListConnectionsBuilder
@@ -258,7 +265,10 @@ type C interface {
 	GetKey(ctx context.Context, id apid.ID) (Key, error)
 
 	// CreateKey creates a new key.
-	CreateKey(ctx context.Context, namespace string, keyData *cfgschema.KeyData, labels map[string]string) (Key, error)
+	CreateKey(ctx context.Context, namespace string, name scommon.ResourceName, keyData *cfgschema.KeyData, labels map[string]string) (Key, error)
+
+	// UpdateKeyName renames a key addressed by immutable ID.
+	UpdateKeyName(ctx context.Context, id apid.ID, name scommon.ResourceName) (Key, error)
 
 	// GetKeyData returns the decrypted provider configuration for a key.
 	GetKeyData(ctx context.Context, id apid.ID) (*cfgschema.KeyData, error)
@@ -306,7 +316,10 @@ type C interface {
 	GetRateLimit(ctx context.Context, id apid.ID) (RateLimit, error)
 
 	// CreateRateLimit creates a new rate-limit resource. Definition is validated before insert.
-	CreateRateLimit(ctx context.Context, namespace string, def rlschema.RateLimit, labels, annotations map[string]string) (RateLimit, error)
+	CreateRateLimit(ctx context.Context, namespace string, name scommon.ResourceName, def rlschema.RateLimit, labels, annotations map[string]string) (RateLimit, error)
+
+	// UpdateRateLimitName renames a rate limit addressed by immutable ID.
+	UpdateRateLimitName(ctx context.Context, id apid.ID, name scommon.ResourceName) (RateLimit, error)
 
 	// UpdateRateLimitDefinition replaces a rate limit's definition payload.
 	UpdateRateLimitDefinition(ctx context.Context, id apid.ID, def rlschema.RateLimit) (RateLimit, error)

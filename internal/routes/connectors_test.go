@@ -2757,4 +2757,122 @@ func TestConnectors(t *testing.T) {
 			})
 		})
 	})
+
+	t.Run("resource name API", func(t *testing.T) {
+		tu := setup(t, nil)
+
+		createNamed := func(name *string, displayName string, expectedStatus int) ConnectorVersionJson {
+			body := map[string]interface{}{
+				"namespace": "root",
+				"definition": map[string]interface{}{
+					"display_name": displayName,
+				},
+			}
+			if name != nil {
+				body["name"] = *name
+			}
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost, "/connectors", util.JsonToReader(body),
+				"root", "some-actor", aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, expectedStatus, w.Code, w.Body.String())
+			if expectedStatus != http.StatusCreated {
+				require.NotContains(t, w.Body.String(), "UNIQUE")
+				return ConnectorVersionJson{}
+			}
+			var connector ConnectorVersionJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &connector))
+			return connector
+		}
+
+		customName := "salesforce"
+		custom := createNamed(&customName, "Salesforce", http.StatusCreated)
+		require.Equal(t, customName, string(custom.Name))
+		defaulted := createNamed(nil, "Defaulted", http.StatusCreated)
+		require.Equal(t, defaulted.Id.String(), string(defaulted.Name))
+		createNamed(&customName, "Conflicting", http.StatusConflict)
+
+		otherName := "other-connector"
+		_ = createNamed(&otherName, "Other", http.StatusCreated)
+		w := httptest.NewRecorder()
+		req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+			http.MethodPatch, "/connectors/"+custom.Id.String(), util.JsonToReader(map[string]string{"name": "renamed-connector"}),
+			"root", "some-actor", aschema.AllPermissions(),
+		)
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+		tu.Gin.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		var renamed ConnectorVersionJson
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &renamed))
+		require.Equal(t, "renamed-connector", string(renamed.Name))
+
+		w = httptest.NewRecorder()
+		req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
+			http.MethodPatch, "/connectors/"+custom.Id.String(), util.JsonToReader(map[string]string{"name": otherName}),
+			"root", "some-actor", aschema.AllPermissions(),
+		)
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+		tu.Gin.ServeHTTP(w, req)
+		require.Equal(t, http.StatusConflict, w.Code, w.Body.String())
+
+		for _, path := range []string{
+			"/connectors/" + custom.Id.String(),
+			fmt.Sprintf("/connectors/%s/versions/%d", custom.Id, custom.Version),
+		} {
+			w = httptest.NewRecorder()
+			req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet, path, nil, "root", "some-actor", aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+			require.Contains(t, w.Body.String(), `"name":"renamed-connector"`)
+		}
+
+		w = httptest.NewRecorder()
+		req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
+			http.MethodGet, "/connectors?name=renamed-connector", nil,
+			"root", "some-actor", aschema.AllPermissions(),
+		)
+		require.NoError(t, err)
+		tu.Gin.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		var listed ListConnectorsResponseJson
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &listed))
+		require.Len(t, listed.Items, 1)
+		require.Equal(t, custom.Id, listed.Items[0].Id)
+
+		w = httptest.NewRecorder()
+		req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
+			http.MethodPatch, fmt.Sprintf("/connectors/%s/versions/%d", custom.Id, custom.Version),
+			util.JsonToReader(map[string]string{"name": "divergent"}),
+			"root", "some-actor", aschema.AllPermissions(),
+		)
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+		tu.Gin.ServeHTTP(w, req)
+		require.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+
+		seededID := apid.MustParse("cxr_test0000000000001")
+		w = httptest.NewRecorder()
+		req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
+			http.MethodPost, "/connectors/"+seededID.String()+"/versions",
+			util.JsonToReader(map[string]string{"name": "divergent"}),
+			"root", "some-actor", aschema.AllPermissions(),
+		)
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+		tu.Gin.ServeHTTP(w, req)
+		require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+		var version ConnectorVersionJson
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &version))
+		require.Equal(t, seededID.String(), string(version.Name))
+		require.NotEqual(t, "divergent", string(version.Name))
+	})
 }

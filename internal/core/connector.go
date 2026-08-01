@@ -14,6 +14,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
+	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/rmorlok/authproxy/internal/util"
 )
@@ -54,6 +55,10 @@ func (c *Connector) GetId() apid.ID {
 
 func (c *Connector) GetNamespace() string {
 	return c.ConnectorWithDefinition.Namespace
+}
+
+func (c *Connector) GetName() scommon.ResourceName {
+	return c.ConnectorWithDefinition.Name
 }
 
 func (c *Connector) GetVersion() uint64 {

@@ -1873,6 +1873,21 @@ func (mr *MockDBMockRecorder) UpdateActorAnnotations(ctx, id, annotations interf
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateActorAnnotations", reflect.TypeOf((*MockDB)(nil).UpdateActorAnnotations), ctx, id, annotations)
 }
 
+// UpdateActorName mocks base method.
+func (m *MockDB) UpdateActorName(ctx context.Context, id apid.ID, name common.ResourceName) (*database.Actor, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateActorName", ctx, id, name)
+	ret0, _ := ret[0].(*database.Actor)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateActorName indicates an expected call of UpdateActorName.
+func (mr *MockDBMockRecorder) UpdateActorName(ctx, id, name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateActorName", reflect.TypeOf((*MockDB)(nil).UpdateActorName), ctx, id, name)
+}
+
 // UpdateApiKeyCredentialLastValidated mocks base method.
 func (m *MockDB) UpdateApiKeyCredentialLastValidated(ctx context.Context, credentialId apid.ID, at time.Time) error {
 	m.ctrl.T.Helper()
@@ -1930,6 +1945,21 @@ func (m *MockDB) UpdateConnectionLabels(ctx context.Context, id apid.ID, labels 
 func (mr *MockDBMockRecorder) UpdateConnectionLabels(ctx, id, labels interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateConnectionLabels", reflect.TypeOf((*MockDB)(nil).UpdateConnectionLabels), ctx, id, labels)
+}
+
+// UpdateConnectionName mocks base method.
+func (m *MockDB) UpdateConnectionName(ctx context.Context, id apid.ID, name common.ResourceName) (*database.Connection, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateConnectionName", ctx, id, name)
+	ret0, _ := ret[0].(*database.Connection)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateConnectionName indicates an expected call of UpdateConnectionName.
+func (mr *MockDBMockRecorder) UpdateConnectionName(ctx, id, name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateConnectionName", reflect.TypeOf((*MockDB)(nil).UpdateConnectionName), ctx, id, name)
 }
 
 // UpdateConnectorName mocks base method.
@@ -2078,6 +2108,21 @@ func (m *MockDB) UpdateRateLimitLabels(ctx context.Context, id apid.ID, labels m
 func (mr *MockDBMockRecorder) UpdateRateLimitLabels(ctx, id, labels interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateRateLimitLabels", reflect.TypeOf((*MockDB)(nil).UpdateRateLimitLabels), ctx, id, labels)
+}
+
+// UpdateRateLimitName mocks base method.
+func (m *MockDB) UpdateRateLimitName(ctx context.Context, id apid.ID, name common.ResourceName) (*database.RateLimit, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateRateLimitName", ctx, id, name)
+	ret0, _ := ret[0].(*database.RateLimit)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateRateLimitName indicates an expected call of UpdateRateLimitName.
+func (mr *MockDBMockRecorder) UpdateRateLimitName(ctx, id, name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateRateLimitName", reflect.TypeOf((*MockDB)(nil).UpdateRateLimitName), ctx, id, name)
 }
 
 // UpsertActor mocks base method.

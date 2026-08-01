@@ -8,6 +8,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
+	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 )
 
 // Key is the core abstraction around encryption keys.
@@ -34,6 +35,10 @@ func (ek *Key) GetId() apid.ID {
 
 func (ek *Key) GetNamespace() string {
 	return ek.Namespace
+}
+
+func (ek *Key) GetName() scommon.ResourceName {
+	return ek.Name
 }
 
 func (ek *Key) GetState() database.KeyState {

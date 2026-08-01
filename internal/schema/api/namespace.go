@@ -1,6 +1,10 @@
 package api
 
-import "time"
+import (
+	"time"
+
+	"github.com/rmorlok/authproxy/internal/schema/common"
+)
 
 // NamespaceState is the lifecycle state of a namespace.
 type NamespaceState string
@@ -15,13 +19,15 @@ const (
 //
 //	@Description	Namespace for organizing resources
 type NamespaceJson struct {
-	Path        string            `json:"path" yaml:"path" example:"root.acme"`
-	State       NamespaceState    `json:"state" yaml:"state" swaggertype:"string" example:"active"`
-	KeyId       *string           `json:"key_id,omitempty" yaml:"key_id,omitempty" example:"key_test550e8400abcd"`
-	Labels      map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Annotations map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	CreatedAt   time.Time         `json:"created_at" yaml:"created_at"`
-	UpdatedAt   time.Time         `json:"updated_at" yaml:"updated_at"`
+	Path string `json:"path" yaml:"path" example:"root.acme"`
+	// Name is automatically set to the final segment of Path and cannot be changed.
+	Name        common.ResourceName `json:"name" yaml:"name" swaggertype:"string" example:"acme"`
+	State       NamespaceState      `json:"state" yaml:"state" swaggertype:"string" example:"active"`
+	KeyId       *string             `json:"key_id,omitempty" yaml:"key_id,omitempty" example:"key_test550e8400abcd"`
+	Labels      map[string]string   `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Annotations map[string]string   `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	CreatedAt   time.Time           `json:"created_at" yaml:"created_at"`
+	UpdatedAt   time.Time           `json:"updated_at" yaml:"updated_at"`
 }
 
 // CreateNamespaceRequestJson represents a request to create a namespace.

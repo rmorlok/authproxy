@@ -6,10 +6,34 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/util"
 )
 
+// NameFromPath returns the read-only resource name automatically derived from
+// the final segment of a namespace's immutable path.
+func NameFromPath(path string) common.ResourceName {
+	if i := strings.LastIndex(path, PathSeparator); i >= 0 {
+		return common.ResourceName(path[i+len(PathSeparator):])
+	}
+	return common.ResourceName(path)
+}
+
 var validPathRegex = regexp.MustCompile(`^root(?:\.[a-zA-Z0-9_]+[a-zA-Z0-9_\-]*)*$`)
+var validNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_]+[a-zA-Z0-9_\-]*$`)
+
+// ValidateName checks a namespace's derived final path segment. Namespace
+// names retain the established namespace-segment grammar, including leading
+// underscores and trailing hyphens.
+func ValidateName(name string) error {
+	if name == "" {
+		return errors.New("name is required")
+	}
+	if !validNameRegex.MatchString(name) {
+		return errors.New("name must be a valid namespace path segment")
+	}
+	return nil
+}
 
 // Root represents the base namespace for all hierarchical paths in the system. Other namespaces
 // follow from this path using PathSeparator, e.g. root.child.grandchild.

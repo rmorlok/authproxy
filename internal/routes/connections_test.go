@@ -12,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
+	"github.com/redis/go-redis/v9"
 	asynqmock "github.com/rmorlok/authproxy/internal/apasynq/mock"
 	auth2 "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/apctx"
@@ -78,6 +79,7 @@ func TestConnections(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		ac := asynqmock.NewMockClient(ctrl)
 		rs := mock.NewMockClient(ctrl)
+		rs.EXPECT().Incr(gomock.Any(), gomock.Any()).Return(redis.NewIntCmd(context.Background())).AnyTimes()
 		c := core.NewCoreService(cfg, db, e, rs, h, ac, test_utils.NewTestLogger())
 		assert.NoError(t, c.Migrate(context.Background()))
 		cr := NewConnectionsRoutes(cfg, auth, db, rds, c, h, e, test_utils.NewTestLogger())
@@ -2172,5 +2174,95 @@ func TestConnections(t *testing.T) {
 			assert.Equal(t, []string{"read", "write", "admin"}, resp.Requested)
 			assert.Equal(t, []string{"read", "write"}, resp.Granted)
 		})
+	})
+
+	t.Run("resource name API", func(t *testing.T) {
+		tu, done := setup(t, nil)
+		defer done()
+
+		initiate := func(name *string, expectedStatus int) apid.ID {
+			body := map[string]interface{}{
+				"connector_id":  connectorId.String(),
+				"return_to_url": "https://example.com/callback",
+			}
+			if name != nil {
+				body["name"] = *name
+			}
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost, "/connections/_initiate", util.JsonToReader(body),
+				"root", "some-actor", aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, expectedStatus, w.Code, w.Body.String())
+			if expectedStatus != http.StatusOK {
+				require.NotContains(t, w.Body.String(), "UNIQUE")
+				return apid.Nil
+			}
+			var resp struct {
+				Id apid.ID `json:"id"`
+			}
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			return resp.Id
+		}
+
+		customName := "production-crm"
+		customID := initiate(&customName, http.StatusOK)
+		defaultID := initiate(nil, http.StatusOK)
+		initiate(&customName, http.StatusConflict)
+
+		for id, expectedName := range map[apid.ID]string{customID: customName, defaultID: defaultID.String()} {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet, "/connections/"+id.String(), nil,
+				"root", "some-actor", aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+			var connection ConnectionJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &connection))
+			require.Equal(t, expectedName, string(connection.Name))
+		}
+
+		otherName := "other-connection"
+		_ = initiate(&otherName, http.StatusOK)
+		w := httptest.NewRecorder()
+		req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+			http.MethodPatch, "/connections/"+customID.String(), util.JsonToReader(map[string]string{"name": "renamed-connection"}),
+			"root", "some-actor", aschema.AllPermissions(),
+		)
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+		tu.Gin.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		var renamed ConnectionJson
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &renamed))
+		require.Equal(t, "renamed-connection", string(renamed.Name))
+
+		w = httptest.NewRecorder()
+		req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
+			http.MethodPatch, "/connections/"+customID.String(), util.JsonToReader(map[string]string{"name": otherName}),
+			"root", "some-actor", aschema.AllPermissions(),
+		)
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+		tu.Gin.ServeHTTP(w, req)
+		require.Equal(t, http.StatusConflict, w.Code, w.Body.String())
+
+		w = httptest.NewRecorder()
+		req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
+			http.MethodGet, "/connections?name=renamed-connection", nil,
+			"root", "some-actor", aschema.AllPermissions(),
+		)
+		require.NoError(t, err)
+		tu.Gin.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		var listed ListConnectionResponseJson
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &listed))
+		require.Len(t, listed.Items, 1)
+		require.Equal(t, customID, listed.Items[0].Id)
 	})
 }

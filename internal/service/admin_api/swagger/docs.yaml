@@ -19,6 +19,9 @@ definitions:
         additionalProperties:
           type: string
         type: object
+      name:
+        example: billing-service
+        type: string
       namespace:
         example: root.acme
         type: string
@@ -55,6 +58,9 @@ definitions:
         type: object
       logo:
         example: https://example.com/logo.png
+        type: string
+      name:
+        example: salesforce
         type: string
       namespace:
         example: root.acme
@@ -110,6 +116,11 @@ definitions:
         additionalProperties:
           type: string
         type: object
+      name:
+        description: Name is automatically set to the final segment of Path and cannot
+          be changed.
+        example: acme
+        type: string
       path:
         example: root.acme
         type: string
@@ -138,6 +149,9 @@ definitions:
         additionalProperties:
           type: string
         type: object
+      name:
+        example: billing-service
+        type: string
       namespace:
         example: root.acme
         type: string
@@ -243,6 +257,9 @@ definitions:
       logo:
         example: https://example.com/logo.png
         type: string
+      name:
+        example: salesforce
+        type: string
       namespace:
         example: root.acme
         type: string
@@ -272,6 +289,9 @@ definitions:
         additionalProperties:
           type: string
         type: object
+      name:
+        example: billing-service
+        type: string
       namespace:
         example: root.acme
         type: string
@@ -346,6 +366,11 @@ definitions:
           namespace. Defaults to the connector namespace if not specified.
         example: root.acme
         type: string
+      name:
+        description: Optional mutable name for the connection. Defaults to the generated
+          connection ID.
+        example: production-crm
+        type: string
       return_to_url:
         description: The URL to return to after the connection is completed.
         example: https://example.com/callback
@@ -385,6 +410,11 @@ definitions:
         additionalProperties:
           type: string
         type: object
+      name:
+        description: Name is automatically set to the final segment of Path and cannot
+          be changed.
+        example: acme
+        type: string
       path:
         example: root.acme
         type: string
@@ -414,6 +444,9 @@ definitions:
         additionalProperties:
           type: string
         type: object
+      name:
+        example: production-crm
+        type: string
       namespace:
         example: root.acme
         type: string
@@ -461,6 +494,9 @@ definitions:
         additionalProperties:
           type: string
         type: object
+      name:
+        example: salesforce
+        type: string
       namespace:
         example: root.acme
         type: string
@@ -485,6 +521,9 @@ definitions:
         additionalProperties:
           type: string
         type: object
+      name:
+        example: salesforce
+        type: string
       namespace:
         example: root.acme
         type: string
@@ -516,6 +555,9 @@ definitions:
         additionalProperties:
           type: string
         type: object
+      name:
+        example: primary-encryption-key
+        type: string
       namespace:
         example: root.acme
         type: string
@@ -534,6 +576,9 @@ definitions:
         additionalProperties:
           type: string
         type: object
+      name:
+        example: public-api
+        type: string
       namespace:
         example: root.acme
         type: string
@@ -594,6 +639,9 @@ definitions:
         additionalProperties:
           type: string
         type: object
+      name:
+        example: primary-encryption-key
+        type: string
       namespace:
         example: root.acme
         type: string
@@ -765,6 +813,9 @@ definitions:
         additionalProperties:
           type: string
         type: object
+      name:
+        example: public-api
+        type: string
       namespace:
         example: root.acme
         type: string
@@ -889,7 +940,23 @@ definitions:
         type: string
     type: object
   routes.OpenAPIUpdateConnectorRequestJson:
-    description: Request to update a connector or connector version
+    description: Request to update a logical connector
+    properties:
+      annotations:
+        additionalProperties:
+          type: string
+        type: object
+      definition: {}
+      labels:
+        additionalProperties:
+          type: string
+        type: object
+      name:
+        example: salesforce
+        type: string
+    type: object
+  routes.OpenAPIUpdateConnectorVersionRequestJson:
+    description: Request to update a connector definition version
     properties:
       annotations:
         additionalProperties:
@@ -915,6 +982,9 @@ definitions:
         additionalProperties:
           type: string
         type: object
+      name:
+        example: primary-encryption-key
+        type: string
       state:
         example: disabled
         type: string
@@ -933,6 +1003,9 @@ definitions:
         additionalProperties:
           type: string
         type: object
+      name:
+        example: public-api
+        type: string
     type: object
   routes.ProxyRequest:
     description: Request to proxy or simulate an HTTP request
@@ -1018,6 +1091,9 @@ definitions:
         additionalProperties:
           type: string
         type: object
+      name:
+        example: billing-service
+        type: string
     type: object
   routes.UpdateConnectionRequestJson:
     description: Request to update a connection's labels and annotations
@@ -1030,6 +1106,9 @@ definitions:
         additionalProperties:
           type: string
         type: object
+      name:
+        example: production-crm
+        type: string
     type: object
   routes.UpdateNamespaceRequestJson:
     description: Namespace update request
@@ -1069,6 +1148,10 @@ paths:
       - description: Filter by external ID
         in: query
         name: external_id
+        type: string
+      - description: Filter by exact resource name
+        in: query
+        name: name
         type: string
       - description: Filter by namespace
         in: query
@@ -1261,6 +1344,10 @@ paths:
             $ref: '#/definitions/routes.ErrorResponse'
         "404":
           description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "409":
+          description: Conflict
           schema:
             $ref: '#/definitions/routes.ErrorResponse'
         "500":
@@ -1775,6 +1862,10 @@ paths:
         in: query
         name: namespace
         type: string
+      - description: Filter by exact resource name
+        in: query
+        name: name
+        type: string
       - description: Filter by label selector
         in: query
         name: label_selector
@@ -1834,6 +1925,10 @@ paths:
           description: Unauthorized
           schema:
             $ref: '#/definitions/routes.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -1885,7 +1980,7 @@ paths:
     patch:
       consumes:
       - application/json
-      description: Update a connection's labels
+      description: Update a connection's name or labels
       parameters:
       - description: Connection UUID
         in: path
@@ -1919,6 +2014,10 @@ paths:
             $ref: '#/definitions/routes.ErrorResponse'
         "404":
           description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "409":
+          description: Conflict
           schema:
             $ref: '#/definitions/routes.ErrorResponse'
         "500":
@@ -2841,6 +2940,10 @@ paths:
         in: query
         name: namespace
         type: string
+      - description: Filter by exact resource name
+        in: query
+        name: name
+        type: string
       - description: Filter by label selector
         in: query
         name: label_selector
@@ -2903,6 +3006,10 @@ paths:
           description: Forbidden
           schema:
             $ref: '#/definitions/routes.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -2954,7 +3061,7 @@ paths:
     patch:
       consumes:
       - application/json
-      description: Update an existing connector's draft version, creating one if needed
+      description: Update a connector-level name and/or its draft definition metadata
       parameters:
       - description: Connector UUID
         in: path
@@ -2988,6 +3095,10 @@ paths:
             $ref: '#/definitions/routes.ErrorResponse'
         "404":
           description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "409":
+          description: Conflict
           schema:
             $ref: '#/definitions/routes.ErrorResponse'
         "500":
@@ -3494,6 +3605,10 @@ paths:
         in: query
         name: namespace
         type: string
+      - description: Filter by exact resource name
+        in: query
+        name: name
+        type: string
       - description: Filter by label selector
         in: query
         name: label_selector
@@ -3641,7 +3756,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.OpenAPIUpdateConnectorRequestJson'
+          $ref: '#/definitions/routes.OpenAPIUpdateConnectorVersionRequestJson'
       produces:
       - application/json
       responses:
@@ -4172,6 +4287,10 @@ paths:
         in: query
         name: namespace
         type: string
+      - description: Filter by exact resource name
+        in: query
+        name: name
+        type: string
       - description: Filter by label selector
         in: query
         name: label_selector
@@ -4228,6 +4347,10 @@ paths:
             $ref: '#/definitions/routes.ErrorResponse'
         "401":
           description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "409":
+          description: Conflict
           schema:
             $ref: '#/definitions/routes.ErrorResponse'
         "500":
@@ -4343,6 +4466,10 @@ paths:
             $ref: '#/definitions/routes.ErrorResponse'
         "404":
           description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "409":
+          description: Conflict
           schema:
             $ref: '#/definitions/routes.ErrorResponse'
         "500":
@@ -4923,6 +5050,10 @@ paths:
         in: query
         name: namespace
         type: string
+      - description: Filter by exact final path segment
+        in: query
+        name: name
+        type: string
       - description: Filter by label selector
         in: query
         name: label_selector
@@ -5036,7 +5167,8 @@ paths:
     patch:
       consumes:
       - application/json
-      description: Update a namespace's labels
+      description: Update a namespace's labels and annotations. Its path and derived
+        name cannot be changed.
       parameters:
       - description: Namespace path
         in: path
@@ -5566,6 +5698,10 @@ paths:
         in: query
         name: namespace
         type: string
+      - description: Filter by exact name
+        in: query
+        name: name
+        type: string
       - description: Filter by label selector
         in: query
         name: label_selector
@@ -5622,6 +5758,10 @@ paths:
             $ref: '#/definitions/routes.ErrorResponse'
         "401":
           description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "409":
+          description: Conflict
           schema:
             $ref: '#/definitions/routes.ErrorResponse'
         "500":
@@ -5754,7 +5894,7 @@ paths:
     patch:
       consumes:
       - application/json
-      description: Update a rate limit's definition, labels, or annotations
+      description: Update a rate limit's name, definition, labels, or annotations
       parameters:
       - description: Rate limit ID
         in: path
@@ -5784,6 +5924,10 @@ paths:
             $ref: '#/definitions/routes.ErrorResponse'
         "404":
           description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "409":
+          description: Conflict
           schema:
             $ref: '#/definitions/routes.ErrorResponse'
         "500":

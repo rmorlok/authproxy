@@ -27,16 +27,28 @@ func (s *service) GetRateLimit(ctx context.Context, id apid.ID) (iface.RateLimit
 	return wrapRateLimit(*rl, s), nil
 }
 
-func (s *service) CreateRateLimit(ctx context.Context, namespace string, def rlschema.RateLimit, labels, annotations map[string]string) (iface.RateLimit, error) {
+func (s *service) CreateRateLimit(ctx context.Context, namespace string, name common.ResourceName, def rlschema.RateLimit, labels, annotations map[string]string) (iface.RateLimit, error) {
 	rl := &database.RateLimit{
 		Id:          apid.New(apid.PrefixRateLimit),
 		Namespace:   namespace,
+		Name:        name,
 		Definition:  def,
 		Labels:      database.Labels(labels),
 		Annotations: database.Annotations(annotations),
 	}
 
 	if err := s.db.CreateRateLimit(ctx, rl); err != nil {
+		return nil, err
+	}
+	return wrapRateLimit(*rl, s), nil
+}
+
+func (s *service) UpdateRateLimitName(ctx context.Context, id apid.ID, name common.ResourceName) (iface.RateLimit, error) {
+	rl, err := s.db.UpdateRateLimitName(ctx, id, name)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			return nil, ErrNotFound
+		}
 		return nil, err
 	}
 	return wrapRateLimit(*rl, s), nil
@@ -180,6 +192,10 @@ func (l *listRateLimitsWrapper) ForNamespaceMatcher(matcher string) iface.ListRa
 
 func (l *listRateLimitsWrapper) ForNamespaceMatchers(matchers []string) iface.ListRateLimitsBuilder {
 	return &listRateLimitsWrapper{l: l.l.ForNamespaceMatchers(matchers), s: l.s}
+}
+
+func (l *listRateLimitsWrapper) ForName(name common.ResourceName) iface.ListRateLimitsBuilder {
+	return &listRateLimitsWrapper{l: l.l.ForName(name), s: l.s}
 }
 
 func (l *listRateLimitsWrapper) OrderBy(f database.RateLimitOrderByField, o pagination.OrderBy) iface.ListRateLimitsBuilder {

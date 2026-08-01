@@ -117,6 +117,10 @@ func (b *staticListConnectionsBuilder) ForNamespaceMatchers([]string) database.L
 	return b
 }
 
+func (b *staticListConnectionsBuilder) ForName(common.ResourceName) database.ListConnectionsBuilder {
+	return b
+}
+
 func (b *staticListConnectionsBuilder) OrderBy(database.ConnectionOrderByField, pagination.OrderBy) database.ListConnectionsBuilder {
 	return b
 }

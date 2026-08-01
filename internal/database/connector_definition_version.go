@@ -14,6 +14,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/encfield"
+	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -707,6 +708,7 @@ type ListConnectorDefinitionVersionsBuilder interface {
 	ForStates([]ConnectorDefinitionVersionState) ListConnectorDefinitionVersionsBuilder
 	ForNamespaceMatcher(string) ListConnectorDefinitionVersionsBuilder
 	ForNamespaceMatchers([]string) ListConnectorDefinitionVersionsBuilder
+	ForName(name scommon.ResourceName) ListConnectorDefinitionVersionsBuilder
 	OrderBy(ConnectorDefinitionVersionOrderByField, pagination.OrderBy) ListConnectorDefinitionVersionsBuilder
 	IncludeDeleted() ListConnectorDefinitionVersionsBuilder
 	ForLabelSelector(selector string) ListConnectorDefinitionVersionsBuilder
@@ -720,6 +722,7 @@ type listConnectorDefinitionVersionsFilters struct {
 	NamespaceMatchers []string                                `json:"namespace_matchers,omitempty"`
 	IdsVal            []apid.ID                               `json:"ids,omitempty"`
 	VersionsVal       []uint64                                `json:"versions,omitempty"`
+	NameVal           *scommon.ResourceName                   `json:"name,omitempty"`
 	OrderByFieldVal   *ConnectorDefinitionVersionOrderByField `json:"order_by_field"`
 	OrderByVal        *pagination.OrderBy                     `json:"order_by"`
 	IncludeDeletedVal bool                                    `json:"include_deleted,omitempty"`
@@ -777,6 +780,14 @@ func (l *listConnectorDefinitionVersionsFilters) ForVersion(version uint64) List
 	return l
 }
 
+func (l *listConnectorDefinitionVersionsFilters) ForName(name scommon.ResourceName) ListConnectorDefinitionVersionsBuilder {
+	if err := name.Validate(); err != nil {
+		return l.addError(err)
+	}
+	l.NameVal = &name
+	return l
+}
+
 func (l *listConnectorDefinitionVersionsFilters) OrderBy(field ConnectorDefinitionVersionOrderByField, by pagination.OrderBy) ListConnectorDefinitionVersionsBuilder {
 	if IsValidConnectorDefinitionVersionOrderByField(field) {
 		l.OrderByFieldVal = &field
@@ -831,6 +842,10 @@ func (l *listConnectorDefinitionVersionsFilters) applyRestrictions(ctx context.C
 
 	if len(l.VersionsVal) > 0 {
 		q = q.Where(sq.Eq{"dv.version": l.VersionsVal})
+	}
+
+	if l.NameVal != nil {
+		q = q.Where(sq.Eq{"c.name": *l.NameVal})
 	}
 
 	if len(l.StatesVal) > 0 {

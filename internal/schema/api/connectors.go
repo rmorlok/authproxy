@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
 
@@ -24,6 +25,7 @@ type ConnectorJson struct {
 	Id            apid.ID               `json:"id" yaml:"id" swaggertype:"string" example:"cxr_test550e8400abcde"`
 	Version       uint64                `json:"version" yaml:"version" example:"1"`
 	Namespace     string                `json:"namespace" yaml:"namespace" example:"root.acme"`
+	Name          common.ResourceName   `json:"name" yaml:"name" swaggertype:"string" example:"salesforce"`
 	State         ConnectorVersionState `json:"state" yaml:"state" swaggertype:"string" example:"primary"`
 	DisplayName   string                `json:"display_name" yaml:"display_name" example:"Salesforce"`
 	Highlight     string                `json:"highlight,omitempty" yaml:"highlight,omitempty" example:"CRM platform"`
@@ -49,6 +51,7 @@ type ConnectorVersionJson struct {
 	Id          apid.ID               `json:"id" yaml:"id" swaggertype:"string" example:"cxr_test550e8400abcde"`
 	Version     uint64                `json:"version" yaml:"version" example:"1"`
 	Namespace   string                `json:"namespace" yaml:"namespace" example:"root.acme"`
+	Name        common.ResourceName   `json:"name" yaml:"name" swaggertype:"string" example:"salesforce"`
 	State       ConnectorVersionState `json:"state" yaml:"state" swaggertype:"string" example:"primary"`
 	Definition  cschema.Connector     `json:"definition" yaml:"definition"`
 	Labels      map[string]string     `json:"labels,omitempty" yaml:"labels,omitempty"`
@@ -66,16 +69,28 @@ type ListConnectorVersionsResponseJson struct {
 //
 //	@Description	Request to create a new connector
 type CreateConnectorRequestJson struct {
-	Namespace   string            `json:"namespace" yaml:"namespace" example:"root.acme"`
-	Definition  cschema.Connector `json:"definition" yaml:"definition"`
-	Labels      map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Annotations map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	Namespace   string               `json:"namespace" yaml:"namespace" example:"root.acme"`
+	Name        *common.ResourceName `json:"name,omitempty" yaml:"name,omitempty" swaggertype:"string" example:"salesforce"`
+	Definition  cschema.Connector    `json:"definition" yaml:"definition"`
+	Labels      map[string]string    `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Annotations map[string]string    `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 }
 
-// UpdateConnectorRequestJson is the request body for PATCH /connectors/:id and PATCH /connectors/:id/versions/:version.
+// UpdateConnectorRequestJson is the request body for PATCH /connectors/:id.
 //
-//	@Description	Request to update a connector or connector version
+//	@Description	Request to update a logical connector
 type UpdateConnectorRequestJson struct {
+	Name        *common.ResourceName `json:"name,omitempty" yaml:"name,omitempty" swaggertype:"string" example:"salesforce"`
+	Definition  *cschema.Connector   `json:"definition,omitempty" yaml:"definition,omitempty"`
+	Labels      *map[string]string   `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Annotations *map[string]string   `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+}
+
+// UpdateConnectorVersionRequestJson is the request body for PATCH /connectors/:id/versions/:version.
+// Connector-level fields such as name are intentionally excluded.
+//
+//	@Description Request to update a connector definition version
+type UpdateConnectorVersionRequestJson struct {
 	Definition  *cschema.Connector `json:"definition,omitempty" yaml:"definition,omitempty"`
 	Labels      *map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Annotations *map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
