@@ -75,6 +75,7 @@ create table connector_definition_versions
     state                text not null,
     encrypted_definition text not null,
     encrypted_at         datetime,
+    deleted_at           datetime,
     foreign key (connector_id) references connectors (id) on delete cascade,
     unique (connector_id, version)
 );
@@ -82,21 +83,27 @@ create table connector_definition_versions
 create index idx_connector_definition_versions_connector_state
     on connector_definition_versions (connector_id, state);
 
+create index idx_connector_definition_versions_deleted_at
+    on connector_definition_versions (deleted_at);
+
 insert into connector_definition_versions (
     id,
     connector_id,
     version,
     state,
     encrypted_definition,
-    encrypted_at
+    encrypted_at,
+    deleted_at
 )
 select
-    'cvd_' || substr(id, 5) || '_' || cast(version as text),
-    id,
-    version,
-    state,
-    encrypted_definition,
-    encrypted_at
-from connector_versions;
+    'cvd_' || substr(cv.id, 5) || '_' || cast(cv.version as text),
+    cv.id,
+    cv.version,
+    cv.state,
+    cv.encrypted_definition,
+    cv.encrypted_at,
+    c.deleted_at
+from connector_versions cv
+join connectors c on c.id = cv.id;
 
 drop table connector_versions;

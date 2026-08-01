@@ -282,6 +282,19 @@ func TestReEncryptRegistry(t *testing.T) {
 		require.Len(t, cvTargets, 1)
 		require.Len(t, cvTargets[0].PrimaryKeyValues, 1)
 		require.Equal(t, apid.PrefixConnectorDefinitionVersion, cv.DefinitionVersionId.Prefix())
+
+		require.NoError(t, db.DeleteConnector(ctx, cvId))
+		cvTargets = nil
+		err = db.EnumerateFieldsRequiringReEncryption(ctx, func(targets []ReEncryptionTarget, lastPage bool) (keepGoing pagination.KeepGoing, err error) {
+			for _, tgt := range targets {
+				if tgt.Table == ConnectorDefinitionVersionsTable {
+					cvTargets = append(cvTargets, tgt)
+				}
+			}
+			return pagination.Continue, nil
+		})
+		require.NoError(t, err)
+		require.Empty(t, cvTargets)
 	})
 
 	t.Run("nullable encrypted field skipped", func(t *testing.T) {

@@ -81,14 +81,13 @@ func IsValidConnectorDefinitionVersionState[T string | ConnectorDefinitionVersio
 
 func init() {
 	RegisterEncryptedField(EncryptedFieldRegistration{
-		Table:                    ConnectorDefinitionVersionsTable,
-		PrimaryKeyCols:           []string{"id"},
-		EncryptedCols:            []string{"encrypted_definition"},
-		JoinTable:                ConnectorsTable,
-		JoinLocalCol:             "connector_id",
-		JoinRemoteCol:            "id",
-		JoinNamespaceCol:         "namespace",
-		OmitBaseSoftDeleteFilter: true,
+		Table:            ConnectorDefinitionVersionsTable,
+		PrimaryKeyCols:   []string{"id"},
+		EncryptedCols:    []string{"encrypted_definition"},
+		JoinTable:        ConnectorsTable,
+		JoinLocalCol:     "connector_id",
+		JoinRemoteCol:    "id",
+		JoinNamespaceCol: "namespace",
 	})
 }
 
@@ -103,6 +102,7 @@ type ConnectorDefinitionVersion struct {
 	State               ConnectorDefinitionVersionState
 	EncryptedDefinition encfield.EncryptedField
 	EncryptedAt         *time.Time
+	DeletedAt           *time.Time
 }
 
 func (cv *ConnectorDefinitionVersion) cols() []string {
@@ -113,6 +113,7 @@ func (cv *ConnectorDefinitionVersion) cols() []string {
 		"state",
 		"encrypted_definition",
 		"encrypted_at",
+		"deleted_at",
 	}
 }
 
@@ -124,6 +125,7 @@ func (cv *ConnectorDefinitionVersion) fields() []any {
 		&cv.State,
 		&cv.EncryptedDefinition,
 		&cv.EncryptedAt,
+		&cv.DeletedAt,
 	}
 }
 
@@ -135,6 +137,7 @@ func (cv *ConnectorDefinitionVersion) values() []any {
 		cv.State,
 		cv.EncryptedDefinition,
 		cv.EncryptedAt,
+		cv.DeletedAt,
 	}
 }
 
@@ -185,6 +188,7 @@ func (s *service) GetConnectorDefinitionVersion(ctx context.Context, id apid.ID,
 		Where(sq.Eq{
 			"dv.connector_id": id,
 			"dv.version":      version,
+			"dv.deleted_at":   nil,
 			"c.deleted_at":    nil,
 		}).
 		RunWith(s.db).
@@ -220,7 +224,7 @@ func (s *service) GetConnectorDefinitionVersions(
 
 	rows, err := s.selectConnectorDefinitionVersions().
 		Where(sq.And{
-			sq.Eq{"c.deleted_at": nil},
+			sq.Eq{"c.deleted_at": nil, "dv.deleted_at": nil},
 			sq.Or(versionConditions),
 		}).
 		RunWith(s.db).
@@ -283,7 +287,7 @@ func (s *service) UpsertConnectorDefinitionVersion(ctx context.Context, cv *Conn
 		exitingState, defaultUsed, err := sqlh.ScanWithDefault(sqb.
 			Select("state").
 			From(ConnectorDefinitionVersionsTable).
-			Where(sq.Eq{"connector_id": cv.Id, "version": cv.Version}).
+			Where(sq.Eq{"connector_id": cv.Id, "version": cv.Version, "deleted_at": nil}).
 			QueryRowContext(ctx),
 			ConnectorDefinitionVersionStateDraft)
 
@@ -302,7 +306,7 @@ func (s *service) UpsertConnectorDefinitionVersion(ctx context.Context, cv *Conn
 				Set("state", cv.State).
 				Set("encrypted_definition", cv.EncryptedDefinition).
 				Set("encrypted_at", cv.EncryptedAt).
-				Where(sq.Eq{"connector_id": cv.Id, "version": cv.Version}).
+				Where(sq.Eq{"connector_id": cv.Id, "version": cv.Version, "deleted_at": nil}).
 				Exec()
 			if err != nil {
 				return err
@@ -324,7 +328,7 @@ func (s *service) UpsertConnectorDefinitionVersion(ctx context.Context, cv *Conn
 			err := sqb.
 				Select("COALESCE(MAX(version), 0)").
 				From(ConnectorDefinitionVersionsTable).
-				Where(sq.Eq{"connector_id": cv.Id}).
+				Where(sq.Eq{"connector_id": cv.Id, "deleted_at": nil}).
 				QueryRowContext(ctx).
 				Scan(&maxVersion)
 
@@ -362,6 +366,7 @@ func (s *service) UpsertConnectorDefinitionVersion(ctx context.Context, cv *Conn
 					sq.Eq{
 						"connector_id": cv.Id,
 						"state":        ConnectorDefinitionVersionStatePrimary,
+						"deleted_at":   nil,
 					},
 					sq.NotEq{"version": cv.Version},
 				}).
@@ -414,7 +419,7 @@ func (s *service) SetConnectorDefinitionVersionState(ctx context.Context, id api
 		dbResult, err := sqb.
 			Update(ConnectorDefinitionVersionsTable).
 			Set("state", state).
-			Where(sq.Eq{"connector_id": id, "version": version}).
+			Where(sq.Eq{"connector_id": id, "version": version, "deleted_at": nil}).
 			Exec()
 		if err != nil {
 			return fmt.Errorf("failed to set connector version state: %w", err)
@@ -438,7 +443,7 @@ func (s *service) SetConnectorDefinitionVersionState(ctx context.Context, id api
 			_, err := sqb.Update(ConnectorDefinitionVersionsTable).
 				Set("state", ConnectorDefinitionVersionStateActive).
 				Where(sq.And{
-					sq.Eq{"connector_id": id, "state": ConnectorDefinitionVersionStatePrimary},
+					sq.Eq{"connector_id": id, "state": ConnectorDefinitionVersionStatePrimary, "deleted_at": nil},
 					sq.NotEq{"version": version},
 				}).
 				Exec()
@@ -452,7 +457,7 @@ func (s *service) SetConnectorDefinitionVersionState(ctx context.Context, id api
 			_, err := sqb.Update(ConnectorDefinitionVersionsTable).
 				Set("state", ConnectorDefinitionVersionStateArchived).
 				Where(sq.And{
-					sq.Eq{"connector_id": id, "state": ConnectorDefinitionVersionStateDraft},
+					sq.Eq{"connector_id": id, "state": ConnectorDefinitionVersionStateDraft, "deleted_at": nil},
 					sq.NotEq{"version": version},
 				}).
 				Exec()
@@ -497,6 +502,15 @@ func (s *service) DeleteConnector(ctx context.Context, id apid.ID) error {
 			return fmt.Errorf("multiple connectors were soft deleted: %w", ErrViolation)
 		}
 
+		_, err = sqb.
+			Update(ConnectorDefinitionVersionsTable).
+			Set("deleted_at", now).
+			Where(sq.Eq{"connector_id": id, "deleted_at": nil}).
+			ExecContext(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to soft delete connector definition versions: %w", err)
+		}
+
 		return nil
 	})
 }
@@ -510,7 +524,7 @@ func (s *service) GetConnectorDefinitionVersionForLabels(ctx context.Context, la
 
 	var result ConnectorWithDefinition
 	q := s.selectConnectorDefinitionVersions().
-		Where(sq.Eq{"c.deleted_at": nil})
+		Where(sq.Eq{"c.deleted_at": nil, "dv.deleted_at": nil})
 
 	q = selector.ApplyToSqlBuilderWithProvider(q, "c.labels", s.cfg.GetProvider())
 
@@ -538,7 +552,7 @@ func (s *service) GetConnectorDefinitionVersionForLabelsAndVersion(ctx context.C
 
 	var result ConnectorWithDefinition
 	q := s.selectConnectorDefinitionVersions().
-		Where(sq.Eq{"dv.version": version, "c.deleted_at": nil})
+		Where(sq.Eq{"dv.version": version, "dv.deleted_at": nil, "c.deleted_at": nil})
 
 	q = selector.ApplyToSqlBuilderWithProvider(q, "c.labels", s.cfg.GetProvider())
 
@@ -563,6 +577,7 @@ func (s *service) GetConnectorDefinitionVersionForState(ctx context.Context, id 
 		Where(sq.Eq{
 			"dv.connector_id": id,
 			"dv.state":        state,
+			"dv.deleted_at":   nil,
 			"c.deleted_at":    nil,
 		}).
 		OrderBy("dv.version DESC").
@@ -587,6 +602,7 @@ func (s *service) NewestConnectorDefinitionVersionForId(ctx context.Context, id 
 	err := s.selectConnectorDefinitionVersions().
 		Where(sq.Eq{
 			"dv.connector_id": id,
+			"dv.deleted_at":   nil,
 			"c.deleted_at":    nil,
 		}).
 		OrderBy("dv.version DESC").
@@ -612,6 +628,7 @@ func (s *service) NewestPublishedConnectorDefinitionVersionForId(ctx context.Con
 		Where(sq.Eq{
 			"dv.connector_id": id,
 			"dv.state":        []ConnectorDefinitionVersionState{ConnectorDefinitionVersionStatePrimary, ConnectorDefinitionVersionStateActive},
+			"dv.deleted_at":   nil,
 			"c.deleted_at":    nil,
 		}).
 		OrderBy("dv.version DESC").
@@ -803,7 +820,7 @@ func (l *listConnectorDefinitionVersionsFilters) applyRestrictions(ctx context.C
 	}
 
 	if !l.IncludeDeletedVal {
-		q = q.Where(sq.Eq{"c.deleted_at": nil})
+		q = q.Where(sq.Eq{"c.deleted_at": nil, "dv.deleted_at": nil})
 	}
 
 	// Always limit to one more than limit to check if there are more records

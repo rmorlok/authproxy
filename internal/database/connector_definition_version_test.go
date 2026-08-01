@@ -761,8 +761,19 @@ INSERT INTO connector_definition_versions
 			require.NoError(t, err)
 
 			require.Equal(t, 2, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_definition_versions"))
+			require.Equal(t, 2, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_definition_versions WHERE deleted_at IS NOT NULL"))
 			require.Equal(t, 0, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connectors WHERE deleted_at IS NULL"))
 			require.Equal(t, 1, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connectors WHERE deleted_at IS NOT NULL"))
+
+			rows, err := rawDb.Query("SELECT deleted_at FROM connector_definition_versions ORDER BY version")
+			require.NoError(t, err)
+			defer rows.Close()
+			for rows.Next() {
+				var deletedAt time.Time
+				require.NoError(t, rows.Scan(&deletedAt))
+				require.True(t, now.Equal(deletedAt))
+			}
+			require.NoError(t, rows.Err())
 
 			_, err = db.GetConnectorDefinitionVersion(ctx, connectorID, 1)
 			require.ErrorIs(t, err, ErrNotFound)
@@ -832,6 +843,8 @@ INSERT INTO connector_definition_versions
 
 			require.Equal(t, 1, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connectors WHERE deleted_at IS NULL"))
 			require.Equal(t, 2, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_definition_versions"))
+			require.Equal(t, 1, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_definition_versions WHERE deleted_at IS NULL"))
+			require.Equal(t, 1, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_definition_versions WHERE deleted_at IS NOT NULL"))
 		})
 
 		t.Run("rejects nil id", func(t *testing.T) {

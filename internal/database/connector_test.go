@@ -197,8 +197,19 @@ func TestConnectorMigrationBackfillsDeterministically(t *testing.T) {
 	require.Error(t, err)
 	_, err = rawDB.Query("SELECT created_at FROM connector_definition_versions")
 	require.Error(t, err)
-	_, err = rawDB.Query("SELECT deleted_at FROM connector_definition_versions")
-	require.Error(t, err)
+	var liveDefinitionDeletedAt any
+	require.NoError(t, rawDB.QueryRow(fmt.Sprintf(
+		"SELECT deleted_at FROM connector_definition_versions WHERE connector_id = '%s' LIMIT 1",
+		liveID,
+	)).Scan(&liveDefinitionDeletedAt))
+	require.Nil(t, liveDefinitionDeletedAt)
+
+	var deletedDefinitionDeletedAt any
+	require.NoError(t, rawDB.QueryRow(fmt.Sprintf(
+		"SELECT deleted_at FROM connector_definition_versions WHERE connector_id = '%s' LIMIT 1",
+		deletedID,
+	)).Scan(&deletedDefinitionDeletedAt))
+	require.NotNil(t, deletedDefinitionDeletedAt)
 
 	rows, err := rawDB.Query(fmt.Sprintf(
 		"SELECT id FROM connector_definition_versions WHERE connector_id = '%s' ORDER BY version",

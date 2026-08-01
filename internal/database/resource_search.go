@@ -128,7 +128,7 @@ func searchSourceFor(resourceType SearchResourceType) (searchSource, error) {
 				") AS search_row_num\n" +
 				"FROM connector_definition_versions dv\n" +
 				"JOIN connectors c ON c.id = dv.connector_id\n" +
-				"WHERE c.deleted_at IS NULL\n",
+				"WHERE c.deleted_at IS NULL AND dv.deleted_at IS NULL\n",
 			extraWhere: sq.Eq{"src.search_row_num": 1},
 		}, nil
 	default:

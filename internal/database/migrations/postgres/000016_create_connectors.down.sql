@@ -44,7 +44,7 @@ select
     c.created_at,
     c.updated_at,
     d.encrypted_at,
-    c.deleted_at
+    d.deleted_at
 from connector_definition_versions d
 join connectors c on c.id = d.connector_id;
 

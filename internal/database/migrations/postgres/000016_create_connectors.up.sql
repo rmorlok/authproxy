@@ -75,11 +75,15 @@ create table connector_definition_versions
     state                text not null,
     encrypted_definition jsonb not null,
     encrypted_at         timestamptz,
+    deleted_at           timestamptz,
     unique (connector_id, version)
 );
 
 create index idx_connector_definition_versions_connector_state
     on connector_definition_versions (connector_id, state);
+
+create index idx_connector_definition_versions_deleted_at
+    on connector_definition_versions (deleted_at);
 
 insert into connector_definition_versions (
     id,
@@ -87,15 +91,18 @@ insert into connector_definition_versions (
     version,
     state,
     encrypted_definition,
-    encrypted_at
+    encrypted_at,
+    deleted_at
 )
 select
-    'cvd_' || substr(id, 5) || '_' || version::text,
-    id,
-    version,
-    state,
-    encrypted_definition,
-    encrypted_at
-from connector_versions;
+    'cvd_' || substr(cv.id, 5) || '_' || cv.version::text,
+    cv.id,
+    cv.version,
+    cv.state,
+    cv.encrypted_definition,
+    cv.encrypted_at,
+    c.deleted_at
+from connector_versions cv
+join connectors c on c.id = cv.id;
 
 drop table connector_versions;
