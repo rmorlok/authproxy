@@ -12,13 +12,14 @@ import (
 //
 //	@Description	Rate-limit API response
 type RateLimitJson struct {
-	Id          apid.ID            `json:"id" yaml:"id" swaggertype:"string" example:"rl_test550e8400abcde"`
-	Namespace   string             `json:"namespace" yaml:"namespace" example:"root.acme"`
-	Definition  rlschema.RateLimit `json:"definition" yaml:"definition"`
-	Labels      map[string]string  `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Annotations map[string]string  `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	CreatedAt   time.Time          `json:"created_at" yaml:"created_at"`
-	UpdatedAt   time.Time          `json:"updated_at" yaml:"updated_at"`
+	Id          apid.ID             `json:"id" yaml:"id" swaggertype:"string" example:"rl_test550e8400abcde"`
+	Namespace   string              `json:"namespace" yaml:"namespace" example:"root.acme"`
+	Name        common.ResourceName `json:"name" yaml:"name" swaggertype:"string" example:"public-api"`
+	Definition  rlschema.RateLimit  `json:"definition" yaml:"definition"`
+	Labels      map[string]string   `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Annotations map[string]string   `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	CreatedAt   time.Time           `json:"created_at" yaml:"created_at"`
+	UpdatedAt   time.Time           `json:"updated_at" yaml:"updated_at"`
 }
 
 type ListRateLimitsResponseJson struct {
@@ -30,19 +31,21 @@ type ListRateLimitsResponseJson struct {
 //
 //	@Description	Request to create a rate limit
 type CreateRateLimitRequestJson struct {
-	Namespace   string             `json:"namespace" yaml:"namespace" example:"root.acme"`
-	Definition  rlschema.RateLimit `json:"definition" yaml:"definition"`
-	Labels      map[string]string  `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Annotations map[string]string  `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	Namespace   string               `json:"namespace" yaml:"namespace" example:"root.acme"`
+	Name        *common.ResourceName `json:"name,omitempty" yaml:"name,omitempty" swaggertype:"string" example:"public-api"`
+	Definition  rlschema.RateLimit   `json:"definition" yaml:"definition"`
+	Labels      map[string]string    `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Annotations map[string]string    `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 }
 
 // UpdateRateLimitRequestJson is the request body for PATCH /rate-limits/:id.
 //
 //	@Description	Request to update a rate limit
 type UpdateRateLimitRequestJson struct {
-	Definition  *rlschema.RateLimit `json:"definition,omitempty" yaml:"definition,omitempty"`
-	Labels      *map[string]string  `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Annotations *map[string]string  `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	Name        *common.ResourceName `json:"name,omitempty" yaml:"name,omitempty" swaggertype:"string" example:"public-api"`
+	Definition  *rlschema.RateLimit  `json:"definition,omitempty" yaml:"definition,omitempty"`
+	Labels      *map[string]string   `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Annotations *map[string]string   `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 }
 
 // ProxyRequestJson is the wire shape used by API endpoints that accept a

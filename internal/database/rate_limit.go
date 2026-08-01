@@ -196,7 +196,7 @@ func (s *service) CreateRateLimit(ctx context.Context, rl *RateLimit) error {
 			RunWith(tx).
 			Exec()
 		if err != nil {
-			return fmt.Errorf("failed to create rate limit: %w", err)
+			return wrapDatabaseMutationError("failed to create rate limit", err)
 		}
 
 		affected, err := dbResult.RowsAffected()
@@ -249,6 +249,41 @@ func (s *service) UpdateRateLimitDefinition(ctx context.Context, id apid.ID, def
 		return nil, ErrNotFound
 	}
 
+	return s.GetRateLimit(ctx, id)
+}
+
+// UpdateRateLimitName renames one live rate limit addressed by immutable ID.
+func (s *service) UpdateRateLimitName(ctx context.Context, id apid.ID, name scommon.ResourceName) (*RateLimit, error) {
+	if id.IsNil() {
+		return nil, errors.New("rate limit id is required")
+	}
+	if err := id.ValidatePrefix(apid.PrefixRateLimit); err != nil {
+		return nil, fmt.Errorf("invalid rate limit id: %w", err)
+	}
+	if err := name.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid rate limit name: %w", err)
+	}
+
+	result, err := s.sq.
+		Update(RateLimitsTable).
+		Set("name", name).
+		Set("updated_at", apctx.GetClock(ctx).Now()).
+		Where(sq.Eq{"id": id, "deleted_at": nil}).
+		RunWith(s.db).
+		ExecContext(ctx)
+	if err != nil {
+		return nil, wrapDatabaseMutationError("failed to update rate limit name", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return nil, fmt.Errorf("failed to update rate limit name: %w", err)
+	}
+	if affected == 0 {
+		return nil, ErrNotFound
+	}
+	if affected > 1 {
+		return nil, fmt.Errorf("multiple rate limits were renamed: %w", ErrViolation)
+	}
 	return s.GetRateLimit(ctx, id)
 }
 
@@ -574,6 +609,7 @@ type ListRateLimitsBuilder interface {
 	Limit(int32) ListRateLimitsBuilder
 	ForNamespaceMatcher(matcher string) ListRateLimitsBuilder
 	ForNamespaceMatchers(matchers []string) ListRateLimitsBuilder
+	ForName(name scommon.ResourceName) ListRateLimitsBuilder
 	OrderBy(RateLimitOrderByField, pagination.OrderBy) ListRateLimitsBuilder
 	IncludeDeleted() ListRateLimitsBuilder
 	ForLabelSelector(selector string) ListRateLimitsBuilder
@@ -584,6 +620,7 @@ type listRateLimitsFilters struct {
 	LimitVal          uint64                 `json:"limit"`
 	Offset            uint64                 `json:"offset"`
 	NamespaceMatchers []string               `json:"namespace_matchers,omitempty"`
+	NameVal           *scommon.ResourceName  `json:"name,omitempty"`
 	OrderByFieldVal   *RateLimitOrderByField `json:"order_by_field"`
 	OrderByVal        *pagination.OrderBy    `json:"order_by"`
 	IncludeDeletedVal bool                   `json:"include_deleted,omitempty"`
@@ -616,6 +653,14 @@ func (l *listRateLimitsFilters) ForNamespaceMatchers(matchers []string) ListRate
 		}
 	}
 	l.NamespaceMatchers = matchers
+	return l
+}
+
+func (l *listRateLimitsFilters) ForName(name scommon.ResourceName) ListRateLimitsBuilder {
+	if err := name.Validate(); err != nil {
+		return l.addError(err)
+	}
+	l.NameVal = &name
 	return l
 }
 
@@ -670,6 +715,10 @@ func (l *listRateLimitsFilters) applyRestrictions(ctx context.Context) sq.Select
 
 	if len(l.NamespaceMatchers) > 0 {
 		q = restrictToNamespaceMatchers(q, "namespace", l.NamespaceMatchers)
+	}
+
+	if l.NameVal != nil {
+		q = q.Where(sq.Eq{"name": *l.NameVal})
 	}
 
 	q = q.Limit(l.LimitVal + 1).Offset(l.Offset)

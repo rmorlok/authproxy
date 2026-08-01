@@ -8,6 +8,8 @@ import (
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
+	scommon "github.com/rmorlok/authproxy/internal/schema/common"
+	nschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 )
 
 // Namespace is the core abstraction around namespaces.
@@ -34,6 +36,10 @@ func (ns *Namespace) GetNamespace() string {
 
 func (ns *Namespace) GetPath() string {
 	return ns.Path
+}
+
+func (ns *Namespace) GetName() scommon.ResourceName {
+	return nschema.NameFromPath(ns.Path)
 }
 
 func (ns *Namespace) GetState() database.NamespaceState {

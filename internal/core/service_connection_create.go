@@ -10,12 +10,14 @@ import (
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httperr"
+	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	ns "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 )
 
 func (s *service) CreateConnection(
 	ctx context.Context,
 	namespace string,
+	name scommon.ResourceName,
 	c iface.Connector,
 ) (connection iface.Connection, err error) {
 	logger := aplog.LoggerOrDefault(c, s)
@@ -35,6 +37,7 @@ func (s *service) CreateConnection(
 	dbConn := database.Connection{
 		Id:               id,
 		Namespace:        namespace,
+		Name:             name,
 		ConnectorId:      c.GetId(),
 		ConnectorVersion: c.GetVersion(),
 		CreatedAt:        now,
@@ -57,4 +60,20 @@ func (s *service) CreateConnection(
 		"connection_id", id)
 
 	return wrapConnection(&dbConn, connector, s), nil
+}
+
+func (s *service) UpdateConnectionName(ctx context.Context, id apid.ID, name scommon.ResourceName) (iface.Connection, error) {
+	dbConn, err := s.db.UpdateConnectionName(ctx, id, name)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+
+	c, err := s.getConnectorVersion(ctx, dbConn.ConnectorId, dbConn.ConnectorVersion)
+	if err != nil {
+		return nil, err
+	}
+	return wrapConnection(dbConn, c, s), nil
 }

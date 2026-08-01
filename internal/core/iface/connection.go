@@ -9,6 +9,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apjs"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
 
@@ -19,6 +20,7 @@ type Connection interface {
 
 	GetId() apid.ID
 	GetNamespace() string
+	GetName() common.ResourceName
 	GetState() database.ConnectionState
 	GetHealthState() database.ConnectionHealthState
 	GetConnectorId() apid.ID

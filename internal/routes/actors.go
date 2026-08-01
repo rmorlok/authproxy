@@ -18,6 +18,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/routes/key_value"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	schemaapiopenapi "github.com/rmorlok/authproxy/internal/schema/api/openapi"
+	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -48,6 +49,7 @@ func DatabaseActorToJson(a *database.Actor) ActorJson {
 	return ActorJson{
 		Id:          a.Id,
 		Namespace:   a.GetNamespace(),
+		Name:        a.GetName(),
 		Labels:      a.GetLabels(),
 		Annotations: a.GetAnnotations(),
 		ExternalId:  a.ExternalId,
@@ -60,6 +62,7 @@ type ListActorsRequestQuery struct {
 	Cursor        *string `form:"cursor"`
 	LimitVal      *int32  `form:"limit"`
 	ExternalId    *string `form:"external_id"`
+	NameVal       *string `form:"name"`
 	NamespaceVal  *string `form:"namespace"`
 	LabelSelector *string `form:"label_selector"`
 	OrderByVal    *string `form:"order_by"`
@@ -73,6 +76,7 @@ type ListActorsRequestQuery struct {
 // @Param			cursor			query		string	false	"Pagination cursor"
 // @Param			limit			query		integer	false	"Maximum number of results to return"
 // @Param			external_id		query		string	false	"Filter by external ID"
+// @Param			name			query		string	false	"Filter by exact resource name"
 // @Param			namespace		query		string	false	"Filter by namespace"
 // @Param			label_selector	query		string	false	"Filter by label selector"
 // @Param			order_by		query		string	false	"Order by field (e.g., 'created_at:asc')"
@@ -113,6 +117,16 @@ func (r *ActorsRoutes) list(gctx *gin.Context) {
 
 		if req.ExternalId != nil {
 			b = b.ForExternalId(*req.ExternalId)
+		}
+
+		if req.NameVal != nil {
+			name := scommon.ResourceName(*req.NameVal)
+			if err := name.Validate(); err != nil {
+				apgin.WriteError(gctx, r.logger, httperr.BadRequestf("invalid actor name: %s", err.Error()))
+				val.MarkErrorReturn()
+				return
+			}
+			b = b.ForName(name)
 		}
 
 		b = b.ForNamespaceMatchers(val.GetEffectiveNamespaceMatchers(req.NamespaceVal))
@@ -439,6 +453,13 @@ func (r *ActorsRoutes) create(gctx *gin.Context) {
 		return
 	}
 
+	name, httpErr := optionalResourceName(req.Name, "actor")
+	if httpErr != nil {
+		apgin.WriteError(gctx, r.logger, httpErr)
+		val.MarkErrorReturn()
+		return
+	}
+
 	// Validate namespace path
 	if err := namespace.ValidatePath(req.Namespace); err != nil {
 		apgin.WriteError(gctx, r.logger, httperr.BadRequest(fmt.Sprintf("invalid namespace '%s': %s", req.Namespace, err.Error()), httperr.WithInternalErr(err)))
@@ -489,6 +510,7 @@ func (r *ActorsRoutes) create(gctx *gin.Context) {
 	actor := &database.Actor{
 		Id:          apid.New(apid.PrefixActor),
 		Namespace:   req.Namespace,
+		Name:        name,
 		ExternalId:  req.ExternalId,
 		Labels:      req.Labels,
 		Annotations: req.Annotations,
@@ -503,7 +525,11 @@ func (r *ActorsRoutes) create(gctx *gin.Context) {
 		}
 
 		if errors.Is(err, database.ErrDuplicate) {
-			apgin.WriteError(gctx, r.logger, httperr.Conflictf("actor with external_id '%s' already exists in namespace '%s'", req.ExternalId, req.Namespace))
+			if conflictErr := resourceNameConflictError(err, "actor", name, req.Namespace); conflictErr != nil && name != "" {
+				apgin.WriteError(gctx, r.logger, conflictErr)
+			} else {
+				apgin.WriteError(gctx, r.logger, httperr.Conflictf("actor with external_id '%s' already exists in namespace '%s'", req.ExternalId, req.Namespace))
+			}
 			val.MarkErrorReturn()
 			return
 		}
@@ -536,6 +562,7 @@ func (r *ActorsRoutes) create(gctx *gin.Context) {
 // @Failure		401		{object}	ErrorResponse
 // @Failure		403		{object}	ErrorResponse
 // @Failure		404		{object}	ErrorResponse
+// @Failure		409		{object}	ErrorResponse
 // @Failure		500		{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/actors/{id} [patch]
@@ -607,6 +634,27 @@ func (r *ActorsRoutes) update(gctx *gin.Context) {
 		return
 	}
 
+	if req.Name != nil {
+		name, httpErr := optionalResourceName(req.Name, "actor")
+		if httpErr != nil {
+			apgin.WriteError(gctx, r.logger, httpErr)
+			val.MarkErrorReturn()
+			return
+		}
+		updated, err := r.db.UpdateActorName(ctx, id, name)
+		if err != nil {
+			if conflictErr := resourceNameConflictError(err, "actor", name, existingActor.Namespace); conflictErr != nil {
+				apgin.WriteError(gctx, r.logger, conflictErr)
+				val.MarkErrorReturn()
+				return
+			}
+			apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErr(err)))
+			val.MarkErrorReturn()
+			return
+		}
+		existingActor = updated
+	}
+
 	if req.Labels != nil {
 		existingActor.Labels = req.Labels
 	}
@@ -661,6 +709,12 @@ func (r *ActorsRoutes) updateByExternalId(gctx *gin.Context) {
 	var req UpdateActorRequestJson
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
 		apgin.WriteError(gctx, r.logger, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
+		val.MarkErrorReturn()
+		return
+	}
+
+	if req.Name != nil {
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("actor names can only be changed through the ID-addressed update endpoint"))
 		val.MarkErrorReturn()
 		return
 	}

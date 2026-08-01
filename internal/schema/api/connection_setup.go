@@ -6,6 +6,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	nschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 )
 
@@ -23,6 +24,9 @@ type InitiateConnectionRequest struct {
 	// namespace. Defaults to the connector namespace if not specified.
 	IntoNamespace string `json:"into_namespace,omitempty" yaml:"into_namespace,omitempty" example:"root.acme"`
 
+	// Optional mutable name for the connection. Defaults to the generated connection ID.
+	Name *common.ResourceName `json:"name,omitempty" yaml:"name,omitempty" swaggertype:"string" example:"production-crm"`
+
 	// The URL to return to after the connection is completed.
 	ReturnToUrl string `json:"return_to_url" yaml:"return_to_url" example:"https://example.com/callback"`
 }
@@ -37,6 +41,12 @@ func (icr *InitiateConnectionRequest) Validate() error {
 	if icr.HasIntoNamespace() {
 		if err := nschema.ValidatePath(icr.IntoNamespace); err != nil {
 			result = multierror.Append(result, err)
+		}
+	}
+
+	if icr.Name != nil {
+		if err := icr.Name.Validate(); err != nil {
+			result = multierror.Append(result, fmt.Errorf("invalid connection name: %w", err))
 		}
 	}
 

@@ -6,6 +6,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
@@ -96,6 +97,13 @@ func (l *listConnectorWrapper) ForNamespaceMatcher(m string) iface.ListConnector
 func (l *listConnectorWrapper) ForNamespaceMatchers(matchers []string) iface.ListConnectorsBuilder {
 	return &listConnectorWrapper{
 		l: l.l.ForNamespaceMatchers(matchers),
+		s: l.s,
+	}
+}
+
+func (l *listConnectorWrapper) ForName(name common.ResourceName) iface.ListConnectorsBuilder {
+	return &listConnectorWrapper{
+		l: l.l.ForName(name),
 		s: l.s,
 	}
 }

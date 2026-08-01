@@ -6,6 +6,7 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -14,6 +15,7 @@ import (
 type RateLimit interface {
 	GetId() apid.ID
 	GetNamespace() string
+	GetName() common.ResourceName
 	GetDefinition() rlschema.RateLimit
 	GetLabels() map[string]string
 	GetAnnotations() map[string]string
@@ -31,6 +33,7 @@ type ListRateLimitsBuilder interface {
 	Limit(int32) ListRateLimitsBuilder
 	ForNamespaceMatcher(matcher string) ListRateLimitsBuilder
 	ForNamespaceMatchers(matchers []string) ListRateLimitsBuilder
+	ForName(name common.ResourceName) ListRateLimitsBuilder
 	OrderBy(database.RateLimitOrderByField, pagination.OrderBy) ListRateLimitsBuilder
 	IncludeDeleted() ListRateLimitsBuilder
 	ForLabelSelector(selector string) ListRateLimitsBuilder

@@ -19,6 +19,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/routes/key_value"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	schemaapiopenapi "github.com/rmorlok/authproxy/internal/schema/api/openapi"
+	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
@@ -37,6 +38,7 @@ type ListKeysRequestQueryParams struct {
 	LimitVal      *int32             `form:"limit"`
 	StateVal      *database.KeyState `form:"state"`
 	NamespaceVal  *string            `form:"namespace"`
+	NameVal       *string            `form:"name"`
 	LabelSelector *string            `form:"label_selector"`
 	OrderByVal    *string            `form:"order_by"`
 }
@@ -71,6 +73,7 @@ func keyMetadataToJson(ek coreIface.Key) KeyJson {
 	return KeyJson{
 		Id:          ek.GetId(),
 		Namespace:   ek.GetNamespace(),
+		Name:        ek.GetName(),
 		State:       schemaapi.KeyState(ek.GetState()),
 		Labels:      ek.GetLabels(),
 		Annotations: ek.GetAnnotations(),
@@ -149,6 +152,7 @@ func (r *KeysRoutes) get(gctx *gin.Context) {
 // @Success		200		{object}	OpenAPIKeyJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
+// @Failure		409		{object}	ErrorResponse
 // @Failure		500		{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/keys [post]
@@ -174,6 +178,13 @@ func (r *KeysRoutes) create(gctx *gin.Context) {
 		return
 	}
 
+	name, httpErr := optionalResourceName(req.Name, "key")
+	if httpErr != nil {
+		apgin.WriteError(gctx, nil, httpErr)
+		val.MarkErrorReturn()
+		return
+	}
+
 	if err := val.ValidateNamespace(req.Namespace); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
@@ -188,8 +199,13 @@ func (r *KeysRoutes) create(gctx *gin.Context) {
 		}
 	}
 
-	ek, err := r.core.CreateKey(ctx, req.Namespace, req.KeyData, req.Labels)
+	ek, err := r.core.CreateKey(ctx, req.Namespace, name, req.KeyData, req.Labels)
 	if err != nil {
+		if conflictErr := resourceNameConflictError(err, "key", name, req.Namespace); conflictErr != nil {
+			apgin.WriteError(gctx, nil, conflictErr)
+			val.MarkErrorReturn()
+			return
+		}
 		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
@@ -230,6 +246,7 @@ func (r *KeysRoutes) create(gctx *gin.Context) {
 // @Param			limit			query		integer	false	"Maximum number of results to return"
 // @Param			state			query		string	false	"Filter by state"
 // @Param			namespace		query		string	false	"Filter by namespace"
+// @Param			name			query		string	false	"Filter by exact resource name"
 // @Param			label_selector	query		string	false	"Filter by label selector"
 // @Param			order_by		query		string	false	"Order by field (e.g., 'state:asc')"
 // @Success		200				{object}	OpenAPIListKeysResponseJson
@@ -271,6 +288,16 @@ func (r *KeysRoutes) list(gctx *gin.Context) {
 		}
 
 		b = b.ForNamespaceMatchers(val.GetEffectiveNamespaceMatchers(req.NamespaceVal))
+
+		if req.NameVal != nil {
+			name := scommon.ResourceName(*req.NameVal)
+			if err := name.Validate(); err != nil {
+				apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid key name: %s", err.Error()))
+				val.MarkErrorReturn()
+				return
+			}
+			b = b.ForName(name)
+		}
 
 		if req.LabelSelector != nil {
 			b = b.ForLabelSelector(*req.LabelSelector)
@@ -334,6 +361,7 @@ func (r *KeysRoutes) list(gctx *gin.Context) {
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		404		{object}	ErrorResponse
+// @Failure		409		{object}	ErrorResponse
 // @Failure		500		{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/keys/{id} [patch]
@@ -403,6 +431,27 @@ func (r *KeysRoutes) update(gctx *gin.Context) {
 	if httpErr := val.ValidateHttpStatusError(ek); httpErr != nil {
 		apgin.WriteError(gctx, nil, httpErr)
 		return
+	}
+
+	if req.Name != nil {
+		name, httpErr := optionalResourceName(req.Name, "key")
+		if httpErr != nil {
+			apgin.WriteError(gctx, nil, httpErr)
+			val.MarkErrorReturn()
+			return
+		}
+		originalNamespace := ek.GetNamespace()
+		ek, err = r.core.UpdateKeyName(ctx, id, name)
+		if err != nil {
+			if conflictErr := resourceNameConflictError(err, "key", name, originalNamespace); conflictErr != nil {
+				apgin.WriteError(gctx, nil, conflictErr)
+				val.MarkErrorReturn()
+				return
+			}
+			apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+			val.MarkErrorReturn()
+			return
+		}
 	}
 
 	if req.State != nil {

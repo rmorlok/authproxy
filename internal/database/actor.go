@@ -246,6 +246,10 @@ func (a *Actor) GetNamespace() string {
 	return a.Namespace
 }
 
+func (a *Actor) GetName() scommon.ResourceName {
+	return a.Name
+}
+
 func (a *Actor) GetLabels() map[string]string {
 	return a.Labels
 }
@@ -430,7 +434,7 @@ func (s *service) CreateActor(ctx context.Context, a *Actor) error {
 			RunWith(tx).
 			Exec()
 		if err != nil {
-			return err
+			return wrapDatabaseMutationError("failed to create actor", err)
 		}
 
 		affected, err := result.RowsAffected()
@@ -523,7 +527,7 @@ func (s *service) UpsertActor(ctx context.Context, d IActorData) (*Actor, error)
 					RunWith(tx).
 					Exec()
 				if err != nil {
-					return fmt.Errorf("failed to create actor on upsert: %w", err)
+					return wrapDatabaseMutationError("failed to create actor on upsert", err)
 				}
 
 				affected, err := dbResult.RowsAffected()
@@ -567,7 +571,7 @@ func (s *service) UpsertActor(ctx context.Context, d IActorData) (*Actor, error)
 				RunWith(tx).
 				Exec()
 			if err != nil {
-				return fmt.Errorf("failed to update existing actor: %w", err)
+				return wrapDatabaseMutationError("failed to update existing actor", err)
 			}
 
 			affected, err := dbResult.RowsAffected()
@@ -590,6 +594,42 @@ func (s *service) UpsertActor(ctx context.Context, d IActorData) (*Actor, error)
 	}
 
 	return result, nil
+}
+
+// UpdateActorName renames one live actor without changing its immutable ID or
+// external identity.
+func (s *service) UpdateActorName(ctx context.Context, id apid.ID, name scommon.ResourceName) (*Actor, error) {
+	if id.IsNil() {
+		return nil, errors.New("actor id is required")
+	}
+	if err := id.ValidatePrefix(apid.PrefixActor); err != nil {
+		return nil, fmt.Errorf("invalid actor id: %w", err)
+	}
+	if err := name.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid actor name: %w", err)
+	}
+
+	result, err := s.sq.
+		Update(ActorTable).
+		Set("name", name).
+		Set("updated_at", apctx.GetClock(ctx).Now()).
+		Where(sq.Eq{"id": id, "deleted_at": nil}).
+		RunWith(s.db).
+		ExecContext(ctx)
+	if err != nil {
+		return nil, wrapDatabaseMutationError("failed to update actor name", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return nil, fmt.Errorf("failed to update actor name: %w", err)
+	}
+	if affected == 0 {
+		return nil, ErrNotFound
+	}
+	if affected > 1 {
+		return nil, fmt.Errorf("multiple actors were renamed: %w", ErrViolation)
+	}
+	return s.GetActor(ctx, id)
 }
 
 func (s *service) DeleteActor(ctx context.Context, id apid.ID) error {
@@ -629,6 +669,7 @@ type ListActorsExecutor interface {
 type ListActorsBuilder interface {
 	ListActorsExecutor
 	ForExternalId(externalId string) ListActorsBuilder
+	ForName(name scommon.ResourceName) ListActorsBuilder
 	ForNamespaceMatcher(matcher string) ListActorsBuilder
 	ForNamespaceMatchers(matchers []string) ListActorsBuilder
 	Limit(int32) ListActorsBuilder
@@ -638,16 +679,17 @@ type ListActorsBuilder interface {
 }
 
 type listActorsFilters struct {
-	s                 *service            `json:"-"`
-	LimitVal          uint64              `json:"limit"`
-	Offset            uint64              `json:"offset"`
-	OrderByFieldVal   *ActorOrderByField  `json:"order_by_field"`
-	OrderByVal        *pagination.OrderBy `json:"order_by"`
-	IncludeDeletedVal bool                `json:"include_deleted,omitempty"`
-	ExternalIdVal     *string             `json:"external_id,omitempty"`
-	NamespaceMatchers []string            `json:"namespace_matchers,omitempty"`
-	LabelSelectorVal  *string             `json:"label_selector,omitempty"`
-	Errors            *multierror.Error   `json:"-"`
+	s                 *service              `json:"-"`
+	LimitVal          uint64                `json:"limit"`
+	Offset            uint64                `json:"offset"`
+	OrderByFieldVal   *ActorOrderByField    `json:"order_by_field"`
+	OrderByVal        *pagination.OrderBy   `json:"order_by"`
+	IncludeDeletedVal bool                  `json:"include_deleted,omitempty"`
+	ExternalIdVal     *string               `json:"external_id,omitempty"`
+	NameVal           *scommon.ResourceName `json:"name,omitempty"`
+	NamespaceMatchers []string              `json:"namespace_matchers,omitempty"`
+	LabelSelectorVal  *string               `json:"label_selector,omitempty"`
+	Errors            *multierror.Error     `json:"-"`
 }
 
 func (l *listActorsFilters) Limit(limit int32) ListActorsBuilder {
@@ -670,6 +712,14 @@ func (l *listActorsFilters) IncludeDeleted() ListActorsBuilder {
 
 func (l *listActorsFilters) ForExternalId(externalId string) ListActorsBuilder {
 	l.ExternalIdVal = &externalId
+	return l
+}
+
+func (l *listActorsFilters) ForName(name scommon.ResourceName) ListActorsBuilder {
+	if err := name.Validate(); err != nil {
+		return l.addError(err)
+	}
+	l.NameVal = &name
 	return l
 }
 
@@ -742,6 +792,14 @@ func (l *listActorsFilters) applyRestrictions(ctx context.Context) sq.SelectBuil
 
 	if len(l.NamespaceMatchers) > 0 {
 		q = restrictToNamespaceMatchers(q, "namespace", l.NamespaceMatchers)
+	}
+
+	if l.ExternalIdVal != nil {
+		q = q.Where(sq.Eq{"external_id": *l.ExternalIdVal})
+	}
+
+	if l.NameVal != nil {
+		q = q.Where(sq.Eq{"name": *l.NameVal})
 	}
 
 	if l.OrderByFieldVal != nil {

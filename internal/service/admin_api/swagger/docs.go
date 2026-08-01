@@ -54,6 +54,12 @@ const docTemplateadmin_api = `{
                     },
                     {
                         "type": "string",
+                        "description": "Filter by exact resource name",
+                        "name": "name",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
                         "description": "Filter by namespace",
                         "name": "namespace",
                         "in": "query"
@@ -553,6 +559,12 @@ const docTemplateadmin_api = `{
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/routes.ErrorResponse"
                         }
@@ -1145,6 +1157,12 @@ const docTemplateadmin_api = `{
                     },
                     {
                         "type": "string",
+                        "description": "Filter by exact resource name",
+                        "name": "name",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
                         "description": "Filter by label selector",
                         "name": "label_selector",
                         "in": "query"
@@ -1232,6 +1250,12 @@ const docTemplateadmin_api = `{
                             "$ref": "#/definitions/routes.ErrorResponse"
                         }
                     },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -1307,7 +1331,7 @@ const docTemplateadmin_api = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Update a connection's labels",
+                "description": "Update a connection's name or labels",
                 "consumes": [
                     "application/json"
                 ],
@@ -1363,6 +1387,12 @@ const docTemplateadmin_api = `{
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/routes.ErrorResponse"
                         }
@@ -2772,6 +2802,12 @@ const docTemplateadmin_api = `{
                     },
                     {
                         "type": "string",
+                        "description": "Filter by exact resource name",
+                        "name": "name",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
                         "description": "Filter by label selector",
                         "name": "label_selector",
                         "in": "query"
@@ -2863,6 +2899,12 @@ const docTemplateadmin_api = `{
                             "$ref": "#/definitions/routes.ErrorResponse"
                         }
                     },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -2938,7 +2980,7 @@ const docTemplateadmin_api = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Update an existing connector's draft version, creating one if needed",
+                "description": "Update a connector-level name and/or its draft definition metadata",
                 "consumes": [
                     "application/json"
                 ],
@@ -2994,6 +3036,12 @@ const docTemplateadmin_api = `{
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/routes.ErrorResponse"
                         }
@@ -3773,6 +3821,12 @@ const docTemplateadmin_api = `{
                     },
                     {
                         "type": "string",
+                        "description": "Filter by exact resource name",
+                        "name": "name",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
                         "description": "Filter by label selector",
                         "name": "label_selector",
                         "in": "query"
@@ -3996,7 +4050,7 @@ const docTemplateadmin_api = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPIUpdateConnectorRequestJson"
+                            "$ref": "#/definitions/routes.OpenAPIUpdateConnectorVersionRequestJson"
                         }
                     }
                 ],
@@ -4806,6 +4860,12 @@ const docTemplateadmin_api = `{
                     },
                     {
                         "type": "string",
+                        "description": "Filter by exact resource name",
+                        "name": "name",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
                         "description": "Filter by label selector",
                         "name": "label_selector",
                         "in": "query"
@@ -4887,6 +4947,12 @@ const docTemplateadmin_api = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/routes.ErrorResponse"
                         }
@@ -5066,6 +5132,12 @@ const docTemplateadmin_api = `{
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/routes.ErrorResponse"
                         }
@@ -5965,6 +6037,12 @@ const docTemplateadmin_api = `{
                         "type": "string",
                         "description": "Filter by namespace path pattern",
                         "name": "namespace",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by exact final path segment",
+                        "name": "name",
                         "in": "query"
                     },
                     {
@@ -6967,6 +7045,12 @@ const docTemplateadmin_api = `{
                     },
                     {
                         "type": "string",
+                        "description": "Filter by exact name",
+                        "name": "name",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
                         "description": "Filter by label selector",
                         "name": "label_selector",
                         "in": "query"
@@ -7048,6 +7132,12 @@ const docTemplateadmin_api = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/routes.ErrorResponse"
                         }
@@ -7246,7 +7336,7 @@ const docTemplateadmin_api = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Update a rate limit's definition, labels, or annotations",
+                "description": "Update a rate limit's name, definition, labels, or annotations",
                 "consumes": [
                     "application/json"
                 ],
@@ -7296,6 +7386,12 @@ const docTemplateadmin_api = `{
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/routes.ErrorResponse"
                         }
@@ -8100,6 +8196,10 @@ const docTemplateadmin_api = `{
                         "type": "string"
                     }
                 },
+                "name": {
+                    "type": "string",
+                    "example": "billing-service"
+                },
                 "namespace": {
                     "type": "string",
                     "example": "root.acme"
@@ -8151,6 +8251,10 @@ const docTemplateadmin_api = `{
                 "logo": {
                     "type": "string",
                     "example": "https://example.com/logo.png"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "salesforce"
                 },
                 "namespace": {
                     "type": "string",
@@ -8229,6 +8333,10 @@ const docTemplateadmin_api = `{
                         "type": "string"
                     }
                 },
+                "name": {
+                    "type": "string",
+                    "example": "acme"
+                },
                 "path": {
                     "type": "string",
                     "example": "root.acme"
@@ -8268,6 +8376,10 @@ const docTemplateadmin_api = `{
                     "additionalProperties": {
                         "type": "string"
                     }
+                },
+                "name": {
+                    "type": "string",
+                    "example": "billing-service"
                 },
                 "namespace": {
                     "type": "string",
@@ -8413,6 +8525,10 @@ const docTemplateadmin_api = `{
                     "type": "string",
                     "example": "https://example.com/logo.png"
                 },
+                "name": {
+                    "type": "string",
+                    "example": "salesforce"
+                },
                 "namespace": {
                     "type": "string",
                     "example": "root.acme"
@@ -8453,6 +8569,10 @@ const docTemplateadmin_api = `{
                     "additionalProperties": {
                         "type": "string"
                     }
+                },
+                "name": {
+                    "type": "string",
+                    "example": "billing-service"
                 },
                 "namespace": {
                     "type": "string",
@@ -8552,6 +8672,11 @@ const docTemplateadmin_api = `{
                     "type": "string",
                     "example": "root.acme"
                 },
+                "name": {
+                    "description": "Optional mutable name for the connection. Defaults to the generated connection ID.",
+                    "type": "string",
+                    "example": "production-crm"
+                },
                 "return_to_url": {
                     "description": "The URL to return to after the connection is completed.",
                     "type": "string",
@@ -8609,6 +8734,10 @@ const docTemplateadmin_api = `{
                         "type": "string"
                     }
                 },
+                "name": {
+                    "type": "string",
+                    "example": "acme"
+                },
                 "path": {
                     "type": "string",
                     "example": "root.acme"
@@ -8649,6 +8778,10 @@ const docTemplateadmin_api = `{
                     "additionalProperties": {
                         "type": "string"
                     }
+                },
+                "name": {
+                    "type": "string",
+                    "example": "production-crm"
                 },
                 "namespace": {
                     "type": "string",
@@ -8717,6 +8850,10 @@ const docTemplateadmin_api = `{
                         "type": "string"
                     }
                 },
+                "name": {
+                    "type": "string",
+                    "example": "salesforce"
+                },
                 "namespace": {
                     "type": "string",
                     "example": "root.acme"
@@ -8750,6 +8887,10 @@ const docTemplateadmin_api = `{
                     "additionalProperties": {
                         "type": "string"
                     }
+                },
+                "name": {
+                    "type": "string",
+                    "example": "salesforce"
                 },
                 "namespace": {
                     "type": "string",
@@ -8796,6 +8937,10 @@ const docTemplateadmin_api = `{
                         "type": "string"
                     }
                 },
+                "name": {
+                    "type": "string",
+                    "example": "primary-encryption-key"
+                },
                 "namespace": {
                     "type": "string",
                     "example": "root.acme"
@@ -8821,6 +8966,10 @@ const docTemplateadmin_api = `{
                     "additionalProperties": {
                         "type": "string"
                     }
+                },
+                "name": {
+                    "type": "string",
+                    "example": "public-api"
                 },
                 "namespace": {
                     "type": "string",
@@ -8905,6 +9054,10 @@ const docTemplateadmin_api = `{
                     "additionalProperties": {
                         "type": "string"
                     }
+                },
+                "name": {
+                    "type": "string",
+                    "example": "primary-encryption-key"
                 },
                 "namespace": {
                     "type": "string",
@@ -9150,6 +9303,10 @@ const docTemplateadmin_api = `{
                         "type": "string"
                     }
                 },
+                "name": {
+                    "type": "string",
+                    "example": "public-api"
+                },
                 "namespace": {
                     "type": "string",
                     "example": "root.acme"
@@ -9325,7 +9482,30 @@ const docTemplateadmin_api = `{
             }
         },
         "routes.OpenAPIUpdateConnectorRequestJson": {
-            "description": "Request to update a connector or connector version",
+            "description": "Request to update a logical connector",
+            "type": "object",
+            "properties": {
+                "annotations": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "definition": {},
+                "labels": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "name": {
+                    "type": "string",
+                    "example": "salesforce"
+                }
+            }
+        },
+        "routes.OpenAPIUpdateConnectorVersionRequestJson": {
+            "description": "Request to update a connector definition version",
             "type": "object",
             "properties": {
                 "annotations": {
@@ -9363,6 +9543,10 @@ const docTemplateadmin_api = `{
                         "type": "string"
                     }
                 },
+                "name": {
+                    "type": "string",
+                    "example": "primary-encryption-key"
+                },
                 "state": {
                     "type": "string",
                     "example": "disabled"
@@ -9388,6 +9572,10 @@ const docTemplateadmin_api = `{
                     "additionalProperties": {
                         "type": "string"
                     }
+                },
+                "name": {
+                    "type": "string",
+                    "example": "public-api"
                 }
             }
         },
@@ -9508,6 +9696,10 @@ const docTemplateadmin_api = `{
                     "additionalProperties": {
                         "type": "string"
                     }
+                },
+                "name": {
+                    "type": "string",
+                    "example": "billing-service"
                 }
             }
         },
@@ -9526,6 +9718,10 @@ const docTemplateadmin_api = `{
                     "additionalProperties": {
                         "type": "string"
                     }
+                },
+                "name": {
+                    "type": "string",
+                    "example": "production-crm"
                 }
             }
         },

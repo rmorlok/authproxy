@@ -56,7 +56,7 @@ func newDryRunService(t *testing.T) (iface.C, ratelimit.MutableCache, func()) {
 
 func installRule(t *testing.T, svc iface.C, rlCache ratelimit.MutableCache, namespace string, def rlschema.RateLimit) *database.RateLimit {
 	t.Helper()
-	created, err := svc.CreateRateLimit(context.Background(), namespace, def, nil, nil)
+	created, err := svc.CreateRateLimit(context.Background(), namespace, "", def, nil, nil)
 	require.NoError(t, err)
 	// The cache the enforcer reads holds *database.RateLimit rows
 	// (loaded by the refresher). Read straight back from the iface

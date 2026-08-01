@@ -66,7 +66,7 @@ func TestCreateKeyEnqueuesDEKGeneration(t *testing.T) {
 			Return(nil, nil),
 	)
 
-	created, err := s.CreateKey(ctx, "root.dev", keyData, map[string]string{"purpose": "test"})
+	created, err := s.CreateKey(ctx, "root.dev", "", keyData, map[string]string{"purpose": "test"})
 
 	require.NoError(t, err)
 	require.Equal(t, "root.dev", created.GetNamespace())

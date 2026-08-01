@@ -13,6 +13,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/httperr"
+	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -522,6 +523,7 @@ type ListNamespacesBuilder interface {
 	ForChildrenOf(path string) ListNamespacesBuilder
 	ForNamespaceMatcher(matcher string) ListNamespacesBuilder
 	ForNamespaceMatchers(matchers []string) ListNamespacesBuilder
+	ForName(name scommon.ResourceName) ListNamespacesBuilder
 	ForState(NamespaceState) ListNamespacesBuilder
 	OrderBy(NamespaceOrderByField, pagination.OrderBy) ListNamespacesBuilder
 	IncludeDeleted() ListNamespacesBuilder
@@ -536,6 +538,7 @@ type listNamespacesFilters struct {
 	PathPrefixVal     string                 `json:"path_prefix,omitempty"`
 	DepthVal          *uint64                `json:"depth,omitempty"`
 	NamespaceMatchers []string               `json:"namespace_matchers,omitempty"`
+	NameVal           *scommon.ResourceName  `json:"name,omitempty"`
 	OrderByFieldVal   *NamespaceOrderByField `json:"order_by_field"`
 	OrderByVal        *pagination.OrderBy    `json:"order_by"`
 	IncludeDeletedVal bool                   `json:"include_deleted,omitempty"`
@@ -596,6 +599,14 @@ func (l *listNamespacesFilters) ForNamespaceMatchers(matchers []string) ListName
 		}
 	}
 	l.NamespaceMatchers = matchers
+	return l
+}
+
+func (l *listNamespacesFilters) ForName(name scommon.ResourceName) ListNamespacesBuilder {
+	if err := namespace.ValidateName(string(name)); err != nil {
+		return l.addError(err)
+	}
+	l.NameVal = &name
 	return l
 }
 
@@ -669,6 +680,14 @@ func (l *listNamespacesFilters) applyRestrictions(ctx context.Context) sq.Select
 
 	if len(l.NamespaceMatchers) > 0 {
 		q = restrictToNamespaceMatchers(q, "path", l.NamespaceMatchers)
+	}
+
+	if l.NameVal != nil {
+		escapedName := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(string(*l.NameVal))
+		q = q.Where(sq.Or{
+			sq.Eq{"path": *l.NameVal},
+			sq.Expr(`path LIKE ? ESCAPE '\'`, "%"+namespace.PathSeparator+escapedName),
+		})
 	}
 
 	// Always limit to one more than limit to check if there are more records

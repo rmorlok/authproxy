@@ -7,6 +7,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
@@ -112,6 +113,10 @@ func (l *listConnectionsWrapper) ForNamespaceMatcher(m string) iface.ListConnect
 
 func (l *listConnectionsWrapper) ForNamespaceMatchers(matchers []string) iface.ListConnectionsBuilder {
 	return l.cloneWithBuilder(l.l.ForNamespaceMatchers(matchers))
+}
+
+func (l *listConnectionsWrapper) ForName(name common.ResourceName) iface.ListConnectionsBuilder {
+	return l.cloneWithBuilder(l.l.ForName(name))
 }
 
 func (l *listConnectionsWrapper) OrderBy(f database.ConnectionOrderByField, o pagination.OrderBy) iface.ListConnectionsBuilder {

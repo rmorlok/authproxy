@@ -17,6 +17,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/routes/key_value"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	schemaapiopenapi "github.com/rmorlok/authproxy/internal/schema/api/openapi"
+	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -41,6 +42,7 @@ func NamespaceToJson(ns coreIface.Namespace) NamespaceJson {
 
 	return NamespaceJson{
 		Path:        ns.GetPath(),
+		Name:        ns.GetName(),
 		State:       schemaapi.NamespaceState(ns.GetState()),
 		KeyId:       ekId,
 		Labels:      ns.GetLabels(),
@@ -56,6 +58,7 @@ type ListNamespacesRequestQueryParams struct {
 	StateVal      *database.NamespaceState `form:"state"`
 	ChildrenOf    *string                  `form:"children_of"`
 	NamespaceVal  *string                  `form:"namespace"`
+	NameVal       *string                  `form:"name"`
 	LabelSelector *string                  `form:"label_selector"`
 	OrderByVal    *string                  `form:"order_by"`
 }
@@ -208,6 +211,7 @@ func (r *NamespacesRoutes) create(gctx *gin.Context) {
 // @Param			state			query		string	false	"Filter by namespace state"
 // @Param			children_of		query		string	false	"Filter to children of a parent namespace"
 // @Param			namespace		query		string	false	"Filter by namespace path pattern"
+// @Param			name			query		string	false	"Filter by exact final path segment"
 // @Param			label_selector	query		string	false	"Filter by label selector"
 // @Param			order_by		query		string	false	"Order by field (e.g., 'path:asc')"
 // @Success		200				{object}	OpenAPIListNamespacesResponseJson
@@ -267,6 +271,16 @@ func (r *NamespacesRoutes) list(gctx *gin.Context) {
 		}
 
 		b = b.ForNamespaceMatchers(val.GetEffectiveNamespaceMatchers(req.NamespaceVal))
+
+		if req.NameVal != nil {
+			name := scommon.ResourceName(*req.NameVal)
+			if err := namespace.ValidateName(*req.NameVal); err != nil {
+				apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid namespace name: %s", err.Error()))
+				val.MarkErrorReturn()
+				return
+			}
+			b = b.ForName(name)
+		}
 
 		if req.LabelSelector != nil {
 			b = b.ForLabelSelector(*req.LabelSelector)

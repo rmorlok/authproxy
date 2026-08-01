@@ -35,6 +35,7 @@ import (
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/test_utils"
+	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/stretchr/testify/require"
 	clock "k8s.io/utils/clock/testing"
 )
@@ -1827,5 +1828,84 @@ func TestKeys(t *testing.T) {
 			_, exists := got.Annotations["annotation"]
 			require.False(t, exists)
 		})
+	})
+
+	t.Run("resource name API", func(t *testing.T) {
+		tu, done := setup(t, context.Background(), nil)
+		defer done()
+
+		createNamed := func(name string) KeyJson {
+			body := map[string]interface{}{
+				"namespace": "root",
+				"name":      name,
+				"key_data":  map[string]interface{}{"value": "named-key-data"},
+			}
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost, "/keys", util.JsonToReader(body),
+				"root", "some-actor", aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+			var key KeyJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &key))
+			return key
+		}
+
+		named := createNamed("primary-key")
+		require.Equal(t, "primary-key", string(named.Name))
+		defaulted := createKey(t, tu, "root", nil)
+		require.Equal(t, defaulted.Id.String(), string(defaulted.Name))
+
+		w := httptest.NewRecorder()
+		req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+			http.MethodGet, "/keys/"+named.Id.String(), nil,
+			"root", "some-actor", aschema.AllPermissions(),
+		)
+		require.NoError(t, err)
+		tu.Gin.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		var got KeyJson
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &got))
+		require.Equal(t, "primary-key", string(got.Name))
+
+		w = httptest.NewRecorder()
+		req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
+			http.MethodPatch, "/keys/"+named.Id.String(), util.JsonToReader(map[string]string{"name": "renamed-key"}),
+			"root", "some-actor", aschema.AllPermissions(),
+		)
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+		tu.Gin.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &got))
+		require.Equal(t, "renamed-key", string(got.Name))
+
+		_ = createNamed("conflicting-key")
+		w = httptest.NewRecorder()
+		req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
+			http.MethodPatch, "/keys/"+named.Id.String(), util.JsonToReader(map[string]string{"name": "conflicting-key"}),
+			"root", "some-actor", aschema.AllPermissions(),
+		)
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+		tu.Gin.ServeHTTP(w, req)
+		require.Equal(t, http.StatusConflict, w.Code, w.Body.String())
+		require.NotContains(t, w.Body.String(), "UNIQUE")
+
+		w = httptest.NewRecorder()
+		req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
+			http.MethodGet, "/keys?name=renamed-key", nil,
+			"root", "some-actor", aschema.AllPermissions(),
+		)
+		require.NoError(t, err)
+		tu.Gin.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		var listed ListKeysResponseJson
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &listed))
+		require.Len(t, listed.Items, 1)
+		require.Equal(t, named.Id, listed.Items[0].Id)
 	})
 }

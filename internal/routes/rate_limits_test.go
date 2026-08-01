@@ -30,6 +30,7 @@ import (
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 	"github.com/rmorlok/authproxy/internal/test_utils"
+	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/stretchr/testify/require"
 )
 
@@ -658,7 +659,7 @@ func TestRateLimits(t *testing.T) {
 		ctx := context.Background()
 		ids := make([]apid.ID, 0, len(defs))
 		for _, def := range defs {
-			rl, err := tu.Core.CreateRateLimit(ctx, namespace, def, nil, nil)
+			rl, err := tu.Core.CreateRateLimit(ctx, namespace, "", def, nil, nil)
 			require.NoError(t, err)
 			ids = append(ids, rl.GetId())
 		}
@@ -953,6 +954,85 @@ func TestRateLimits(t *testing.T) {
 				require.Equal(t, 1, resp.Matched[0].Remaining, "iteration %d", i+1)
 			}
 		})
+	})
+
+	t.Run("resource name API", func(t *testing.T) {
+		tu, done := setup(t)
+		defer done()
+
+		createNamed := func(name string) RateLimitJson {
+			body := map[string]interface{}{
+				"namespace":  "root",
+				"name":       name,
+				"definition": validDef(),
+			}
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost, "/rate-limits", util.JsonToReader(body),
+				"root", "some-actor", aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+			var rateLimit RateLimitJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &rateLimit))
+			return rateLimit
+		}
+
+		named := createNamed("public-api")
+		require.Equal(t, "public-api", string(named.Name))
+		defaulted := createRateLimit(t, tu, "root", nil)
+		require.Equal(t, defaulted.Id.String(), string(defaulted.Name))
+
+		w := httptest.NewRecorder()
+		req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+			http.MethodGet, "/rate-limits/"+named.Id.String(), nil,
+			"root", "some-actor", aschema.AllPermissions(),
+		)
+		require.NoError(t, err)
+		tu.Gin.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		var got RateLimitJson
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &got))
+		require.Equal(t, "public-api", string(got.Name))
+
+		w = httptest.NewRecorder()
+		req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
+			http.MethodPatch, "/rate-limits/"+named.Id.String(), util.JsonToReader(map[string]string{"name": "renamed-limit"}),
+			"root", "some-actor", aschema.AllPermissions(),
+		)
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+		tu.Gin.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &got))
+		require.Equal(t, "renamed-limit", string(got.Name))
+
+		_ = createNamed("conflicting-limit")
+		w = httptest.NewRecorder()
+		req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
+			http.MethodPatch, "/rate-limits/"+named.Id.String(), util.JsonToReader(map[string]string{"name": "conflicting-limit"}),
+			"root", "some-actor", aschema.AllPermissions(),
+		)
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+		tu.Gin.ServeHTTP(w, req)
+		require.Equal(t, http.StatusConflict, w.Code, w.Body.String())
+		require.NotContains(t, w.Body.String(), "UNIQUE")
+
+		w = httptest.NewRecorder()
+		req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
+			http.MethodGet, "/rate-limits?name=renamed-limit", nil,
+			"root", "some-actor", aschema.AllPermissions(),
+		)
+		require.NoError(t, err)
+		tu.Gin.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		var listed ListRateLimitsResponseJson
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &listed))
+		require.Len(t, listed.Items, 1)
+		require.Equal(t, named.Id, listed.Items[0].Id)
 	})
 }
 

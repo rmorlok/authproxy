@@ -309,7 +309,7 @@ func (s *service) CreateConnection(ctx context.Context, c *Connection) error {
 			RunWith(tx).
 			Exec()
 		if err != nil {
-			return err
+			return wrapDatabaseMutationError("failed to create connection", err)
 		}
 
 		affected, err := result.RowsAffected()
@@ -343,6 +343,41 @@ func (s *service) GetConnection(ctx context.Context, id apid.ID) (*Connection, e
 	}
 
 	return &result, nil
+}
+
+// UpdateConnectionName renames one live connection addressed by immutable ID.
+func (s *service) UpdateConnectionName(ctx context.Context, id apid.ID, name scommon.ResourceName) (*Connection, error) {
+	if id.IsNil() {
+		return nil, errors.New("connection id is required")
+	}
+	if err := id.ValidatePrefix(apid.PrefixConnection); err != nil {
+		return nil, fmt.Errorf("invalid connection id: %w", err)
+	}
+	if err := name.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid connection name: %w", err)
+	}
+
+	result, err := s.sq.
+		Update(ConnectionsTable).
+		Set("name", name).
+		Set("updated_at", apctx.GetClock(ctx).Now()).
+		Where(sq.Eq{"id": id, "deleted_at": nil}).
+		RunWith(s.db).
+		ExecContext(ctx)
+	if err != nil {
+		return nil, wrapDatabaseMutationError("failed to update connection name", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return nil, fmt.Errorf("failed to update connection name: %w", err)
+	}
+	if affected == 0 {
+		return nil, ErrNotFound
+	}
+	if affected > 1 {
+		return nil, fmt.Errorf("multiple connections were renamed: %w", ErrViolation)
+	}
+	return s.GetConnection(ctx, id)
 }
 
 func (s *service) DeleteConnection(ctx context.Context, id apid.ID) error {
@@ -724,6 +759,7 @@ type ListConnectionsBuilder interface {
 	ForConnectorId(id apid.ID) ListConnectionsBuilder
 	ForNamespaceMatcher(matcher string) ListConnectionsBuilder
 	ForNamespaceMatchers(matchers []string) ListConnectionsBuilder
+	ForName(name scommon.ResourceName) ListConnectionsBuilder
 	OrderBy(ConnectionOrderByField, pagination.OrderBy) ListConnectionsBuilder
 	IncludeDeleted() ListConnectionsBuilder
 	WithDeletedHandling(DeletedHandling) ListConnectionsBuilder
@@ -739,6 +775,7 @@ type listConnectionsFilters struct {
 	StatesVal           []ConnectionState       `json:"states,omitempty"`
 	ConnectorIdsVal     []apid.ID               `json:"connector_ids,omitempty"`
 	NamespaceMatchers   []string                `json:"namespace_matchers,omitempty"`
+	NameVal             *scommon.ResourceName   `json:"name,omitempty"`
 	OrderByFieldVal     *ConnectionOrderByField `json:"order_by_field"`
 	OrderByVal          *pagination.OrderBy     `json:"order_by"`
 	IncludeDeletedVal   bool                    `json:"include_deleted,omitempty"`
@@ -784,6 +821,14 @@ func (l *listConnectionsFilters) ForNamespaceMatchers(matchers []string) ListCon
 		}
 	}
 	l.NamespaceMatchers = matchers
+	return l
+}
+
+func (l *listConnectionsFilters) ForName(name scommon.ResourceName) ListConnectionsBuilder {
+	if err := name.Validate(); err != nil {
+		return l.addError(err)
+	}
+	l.NameVal = &name
 	return l
 }
 
@@ -880,6 +925,10 @@ func (l *listConnectionsFilters) applyRestrictions(ctx context.Context) sq.Selec
 
 	if len(l.NamespaceMatchers) > 0 {
 		q = restrictToNamespaceMatchers(q, "namespace", l.NamespaceMatchers)
+	}
+
+	if l.NameVal != nil {
+		q = q.Where(sq.Eq{"name": *l.NameVal})
 	}
 
 	if l.SetupStepNotNullVal {

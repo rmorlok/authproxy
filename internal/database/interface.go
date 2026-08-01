@@ -82,6 +82,7 @@ type DB interface {
 	GetActorByExternalId(ctx context.Context, namespace, externalId string) (*Actor, error)
 	CreateActor(ctx context.Context, actor *Actor) error
 	UpsertActor(ctx context.Context, actor IActorData) (*Actor, error)
+	UpdateActorName(ctx context.Context, id apid.ID, name scommon.ResourceName) (*Actor, error)
 	DeleteActor(ctx context.Context, id apid.ID) error
 	PutActorLabels(ctx context.Context, id apid.ID, labels map[string]string) (*Actor, error)
 	DeleteActorLabels(ctx context.Context, id apid.ID, keys []string) (*Actor, error)
@@ -117,6 +118,7 @@ type DB interface {
 
 	GetConnection(ctx context.Context, id apid.ID) (*Connection, error)
 	CreateConnection(ctx context.Context, c *Connection) error
+	UpdateConnectionName(ctx context.Context, id apid.ID, name scommon.ResourceName) (*Connection, error)
 	DeleteConnection(ctx context.Context, id apid.ID) error
 	SetConnectionState(ctx context.Context, id apid.ID, state ConnectionState) error
 	SetConnectionHealthState(ctx context.Context, id apid.ID, state ConnectionHealthState) error
@@ -248,6 +250,7 @@ type DB interface {
 
 	GetRateLimit(ctx context.Context, id apid.ID) (*RateLimit, error)
 	CreateRateLimit(ctx context.Context, rl *RateLimit) error
+	UpdateRateLimitName(ctx context.Context, id apid.ID, name scommon.ResourceName) (*RateLimit, error)
 	UpdateRateLimitDefinition(ctx context.Context, id apid.ID, def rlschema.RateLimit) (*RateLimit, error)
 	DeleteRateLimit(ctx context.Context, id apid.ID) error
 	UpdateRateLimitLabels(ctx context.Context, id apid.ID, labels map[string]string) (*RateLimit, error)

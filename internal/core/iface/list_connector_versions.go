@@ -5,6 +5,7 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
@@ -26,6 +27,7 @@ type ListConnectorVersionsBuilder interface {
 	ForStates([]database.ConnectorDefinitionVersionState) ListConnectorVersionsBuilder
 	ForNamespaceMatcher(string) ListConnectorVersionsBuilder
 	ForNamespaceMatchers([]string) ListConnectorVersionsBuilder
+	ForName(name common.ResourceName) ListConnectorVersionsBuilder
 	OrderBy(database.ConnectorDefinitionVersionOrderByField, pagination.OrderBy) ListConnectorVersionsBuilder
 	IncludeDeleted() ListConnectorVersionsBuilder
 	ForLabelSelector(selector string) ListConnectorVersionsBuilder

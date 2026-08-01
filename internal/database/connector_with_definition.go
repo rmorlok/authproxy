@@ -181,6 +181,7 @@ type ListConnectorsBuilder interface {
 	ForId(apid.ID) ListConnectorsBuilder
 	ForNamespaceMatcher(string) ListConnectorsBuilder
 	ForNamespaceMatchers([]string) ListConnectorsBuilder
+	ForName(name scommon.ResourceName) ListConnectorsBuilder
 	ForState(ConnectorDefinitionVersionState) ListConnectorsBuilder
 	ForStates([]ConnectorDefinitionVersionState) ListConnectorsBuilder
 	OrderBy(ConnectorOrderByField, pagination.OrderBy) ListConnectorsBuilder
@@ -196,6 +197,7 @@ type listConnectorsFilters struct {
 	NamespaceMatchers []string                          `json:"namespace_matchers,omitempty"`
 	TypeVal           []string                          `json:"types,omitempty"`
 	IdsVal            []apid.ID                         `json:"ids,omitempty"`
+	NameVal           *scommon.ResourceName             `json:"name,omitempty"`
 	OrderByFieldVal   *ConnectorOrderByField            `json:"order_by_field"`
 	OrderByVal        *pagination.OrderBy               `json:"order_by"`
 	IncludeDeletedVal bool                              `json:"include_deleted,omitempty"`
@@ -250,6 +252,14 @@ func (l *listConnectorsFilters) ForType(t string) ListConnectorsBuilder {
 
 func (l *listConnectorsFilters) ForId(id apid.ID) ListConnectorsBuilder {
 	l.IdsVal = []apid.ID{id}
+	return l
+}
+
+func (l *listConnectorsFilters) ForName(name scommon.ResourceName) ListConnectorsBuilder {
+	if err := name.Validate(); err != nil {
+		return l.addError(err)
+	}
+	l.NameVal = &name
 	return l
 }
 
@@ -345,6 +355,10 @@ c.deleted_at as deleted_at
 
 	if len(l.IdsVal) > 0 {
 		q = q.Where(sq.Eq{"c.id": l.IdsVal})
+	}
+
+	if l.NameVal != nil {
+		q = q.Where(sq.Eq{"c.name": *l.NameVal})
 	}
 
 	if len(l.StatesVal) > 0 {

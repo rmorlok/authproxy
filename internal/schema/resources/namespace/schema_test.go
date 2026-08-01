@@ -40,6 +40,22 @@ func TestSchema(t *testing.T) {
 		}
 	}{
 		{
+			name: "NamespaceName",
+			ref:  "./schema.json#/$defs/NamespaceName",
+			tests: []struct {
+				name  string
+				valid bool
+				data  string
+			}{
+				{name: "bad value", valid: false, data: `{"test": "bad.name"}`},
+				{name: "wrong type", valid: false, data: `{"test": 99}`},
+				{name: "empty", valid: false, data: `{"test": ""}`},
+				{name: "simple", valid: true, data: `{"test": "billing"}`},
+				{name: "leading underscore", valid: true, data: `{"test": "_billing"}`},
+				{name: "trailing dash", valid: true, data: `{"test": "billing-"}`},
+			},
+		},
+		{
 			name: "NamespacePath",
 			ref:  "./schema.json#/$defs/NamespacePath",
 			tests: []struct {

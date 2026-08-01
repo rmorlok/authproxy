@@ -1868,4 +1868,74 @@ func TestActorsRoutes(t *testing.T) {
 			require.False(t, exists)
 		})
 	})
+
+	t.Run("resource name API", func(t *testing.T) {
+		tu, done := setup(t, nil)
+		defer done()
+
+		create := func(externalID string, name *string) ActorJson {
+			body := map[string]interface{}{"external_id": externalID, "namespace": "root"}
+			if name != nil {
+				body["name"] = *name
+			}
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodPost, "/actors", util.JsonToReader(body))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			req = authenticate(t, tu, req)
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+			var actor ActorJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &actor))
+			return actor
+		}
+
+		customName := "billing"
+		custom := create("named-actor", &customName)
+		require.Equal(t, customName, string(custom.Name))
+		defaulted := create("default-named-actor", nil)
+		require.Equal(t, defaulted.Id.String(), string(defaulted.Name))
+
+		w := httptest.NewRecorder()
+		req, err := http.NewRequest(http.MethodGet, "/actors/"+custom.Id.String(), nil)
+		require.NoError(t, err)
+		req = authenticate(t, tu, req)
+		tu.Gin.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		var got ActorJson
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &got))
+		require.Equal(t, customName, string(got.Name))
+
+		w = httptest.NewRecorder()
+		req, err = http.NewRequest(http.MethodPatch, "/actors/"+custom.Id.String(), util.JsonToReader(map[string]string{"name": "renamed"}))
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+		req = authenticate(t, tu, req)
+		tu.Gin.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &got))
+		require.Equal(t, "renamed", string(got.Name))
+
+		conflictName := "conflict"
+		_ = create("conflicting-actor", &conflictName)
+		w = httptest.NewRecorder()
+		req, err = http.NewRequest(http.MethodPatch, "/actors/"+custom.Id.String(), util.JsonToReader(map[string]string{"name": conflictName}))
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+		req = authenticate(t, tu, req)
+		tu.Gin.ServeHTTP(w, req)
+		require.Equal(t, http.StatusConflict, w.Code, w.Body.String())
+		require.NotContains(t, w.Body.String(), "UNIQUE")
+
+		w = httptest.NewRecorder()
+		req, err = http.NewRequest(http.MethodGet, "/actors?name=renamed", nil)
+		require.NoError(t, err)
+		req = authenticate(t, tu, req)
+		tu.Gin.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		var listed ListActorsResponseJson
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &listed))
+		require.Len(t, listed.Items, 1)
+		require.Equal(t, custom.Id, listed.Items[0].Id)
+	})
 }

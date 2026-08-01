@@ -182,7 +182,7 @@ func (s *service) ensureConnectorForDefinition(
 		Values(connector.values()...).
 		ExecContext(ctx)
 	if err != nil {
-		return err
+		return wrapDatabaseMutationError("failed to create connector", err)
 	}
 	cv.Name = connector.Name
 	cv.Labels = connector.Labels
@@ -213,7 +213,7 @@ func (s *service) UpdateConnectorName(ctx context.Context, id apid.ID, name scom
 		RunWith(s.db).
 		ExecContext(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to update connector name: %w", err)
+		return wrapDatabaseMutationError("failed to update connector name", err)
 	}
 	affected, err := result.RowsAffected()
 	if err != nil {

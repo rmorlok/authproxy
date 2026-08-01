@@ -280,7 +280,7 @@ func (s *service) CreateKey(ctx context.Context, ek *Key) error {
 			RunWith(tx).
 			Exec()
 		if err != nil {
-			return fmt.Errorf("failed to create key: %w", err)
+			return wrapDatabaseMutationError("failed to create key", err)
 		}
 
 		affected, err := dbResult.RowsAffected()
@@ -310,7 +310,7 @@ func (s *service) UpdateKey(ctx context.Context, id apid.ID, updates map[string]
 
 	dbResult, err := q.RunWith(s.db).Exec()
 	if err != nil {
-		return nil, fmt.Errorf("failed to update key: %w", err)
+		return nil, wrapDatabaseMutationError("failed to update key", err)
 	}
 
 	affected, err := dbResult.RowsAffected()
@@ -702,6 +702,7 @@ type ListKeysBuilder interface {
 	Limit(int32) ListKeysBuilder
 	ForNamespaceMatcher(matcher string) ListKeysBuilder
 	ForNamespaceMatchers(matchers []string) ListKeysBuilder
+	ForName(name scommon.ResourceName) ListKeysBuilder
 	ForState(KeyState) ListKeysBuilder
 	OrderBy(KeyOrderByField, pagination.OrderBy) ListKeysBuilder
 	IncludeDeleted() ListKeysBuilder
@@ -709,16 +710,17 @@ type ListKeysBuilder interface {
 }
 
 type listKeysFilters struct {
-	s                 *service            `json:"-"`
-	LimitVal          uint64              `json:"limit"`
-	Offset            uint64              `json:"offset"`
-	StatesVal         []KeyState          `json:"states,omitempty"`
-	NamespaceMatchers []string            `json:"namespace_matchers,omitempty"`
-	OrderByFieldVal   *KeyOrderByField    `json:"order_by_field"`
-	OrderByVal        *pagination.OrderBy `json:"order_by"`
-	IncludeDeletedVal bool                `json:"include_deleted,omitempty"`
-	LabelSelectorVal  *string             `json:"label_selector,omitempty"`
-	Errors            *multierror.Error   `json:"-"`
+	s                 *service              `json:"-"`
+	LimitVal          uint64                `json:"limit"`
+	Offset            uint64                `json:"offset"`
+	StatesVal         []KeyState            `json:"states,omitempty"`
+	NamespaceMatchers []string              `json:"namespace_matchers,omitempty"`
+	NameVal           *scommon.ResourceName `json:"name,omitempty"`
+	OrderByFieldVal   *KeyOrderByField      `json:"order_by_field"`
+	OrderByVal        *pagination.OrderBy   `json:"order_by"`
+	IncludeDeletedVal bool                  `json:"include_deleted,omitempty"`
+	LabelSelectorVal  *string               `json:"label_selector,omitempty"`
+	Errors            *multierror.Error     `json:"-"`
 }
 
 func (l *listKeysFilters) addError(e error) ListKeysBuilder {
@@ -751,6 +753,14 @@ func (l *listKeysFilters) ForNamespaceMatchers(matchers []string) ListKeysBuilde
 		}
 	}
 	l.NamespaceMatchers = matchers
+	return l
+}
+
+func (l *listKeysFilters) ForName(name scommon.ResourceName) ListKeysBuilder {
+	if err := name.Validate(); err != nil {
+		return l.addError(err)
+	}
+	l.NameVal = &name
 	return l
 }
 
@@ -811,6 +821,10 @@ func (l *listKeysFilters) applyRestrictions(ctx context.Context) sq.SelectBuilde
 
 	if len(l.NamespaceMatchers) > 0 {
 		q = restrictToNamespaceMatchers(q, "namespace", l.NamespaceMatchers)
+	}
+
+	if l.NameVal != nil {
+		q = q.Where(sq.Eq{"name": *l.NameVal})
 	}
 
 	q = q.Limit(l.LimitVal + 1).Offset(l.Offset)

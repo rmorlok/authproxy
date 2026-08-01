@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
@@ -150,6 +151,7 @@ func TestNamespaces(t *testing.T) {
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Equal(t, "root.dev", resp.Path)
+			require.Equal(t, "dev", string(resp.Name))
 			require.Equal(t, string(database.NamespaceStateActive), string(resp.State))
 		})
 
@@ -421,6 +423,12 @@ func TestNamespaces(t *testing.T) {
 		})
 		require.NoError(t, err)
 
+		err = tu.Db.CreateNamespace(ctx, &database.Namespace{
+			Path:  "root.prod.old",
+			State: database.NamespaceStateActive,
+		})
+		require.NoError(t, err)
+
 		t.Run("unauthorized", func(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := http.NewRequest(http.MethodGet, "/namespaces", nil)
@@ -464,7 +472,7 @@ func TestNamespaces(t *testing.T) {
 			var resp ListNamespacesResponseJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
-			require.Len(t, resp.Items, 4)
+			require.Len(t, resp.Items, 5)
 		})
 
 		t.Run("bad request for invalid children_of namespace", func(t *testing.T) {
@@ -520,6 +528,50 @@ func TestNamespaces(t *testing.T) {
 			require.Len(t, resp.Items, 2)
 			require.Equal(t, "root.dev", resp.Items[0].Path)
 			require.Equal(t, "root.dev.old", resp.Items[1].Path)
+		})
+
+		t.Run("filter by derived name preserves pagination and authorization", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet, "/namespaces?name=old&limit=1", nil,
+				"root", "some-actor", aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+			var first ListNamespacesResponseJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &first))
+			require.Len(t, first.Items, 1)
+			require.Equal(t, "old", string(first.Items[0].Name))
+			require.NotEmpty(t, first.Cursor)
+
+			w = httptest.NewRecorder()
+			req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet, "/namespaces?cursor="+url.QueryEscape(first.Cursor), nil,
+				"root", "some-actor", aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+			var second ListNamespacesResponseJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &second))
+			require.Len(t, second.Items, 1)
+			require.Equal(t, "old", string(second.Items[0].Name))
+			require.NotEqual(t, first.Items[0].Path, second.Items[0].Path)
+
+			w = httptest.NewRecorder()
+			req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet, "/namespaces?name=old", nil,
+				"root", "some-actor", aschema.PermissionsSingle("root.dev.**", "namespaces", "list"),
+			)
+			require.NoError(t, err)
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+			var authorized ListNamespacesResponseJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &authorized))
+			require.Len(t, authorized.Items, 1)
+			require.Equal(t, "root.dev.old", authorized.Items[0].Path)
 		})
 
 		t.Run("filter to namespace", func(t *testing.T) {

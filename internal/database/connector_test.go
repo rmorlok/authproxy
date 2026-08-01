@@ -127,6 +127,46 @@ func TestConnectorNameUniquenessAndDeleteReuse(t *testing.T) {
 	require.ErrorIs(t, db.UpdateConnectorName(ctx, firstID, "deleted"), ErrNotFound)
 }
 
+func TestConnectorNameExactListPaginationAndNamespaceRestrictions(t *testing.T) {
+	_, db := MustApplyBlankTestDbConfig(t, nil)
+	ctx := context.Background()
+	require.NoError(t, db.EnsureNamespaceByPath(ctx, "root.allowed"))
+	require.NoError(t, db.EnsureNamespaceByPath(ctx, "root.hidden"))
+
+	allowedID := apid.New(apid.PrefixConnectorVersion)
+	hiddenID := apid.New(apid.PrefixConnectorVersion)
+	otherID := apid.New(apid.PrefixConnectorVersion)
+	require.NoError(t, db.UpsertConnectorDefinitionVersion(ctx, testConnectorWithDefinition(allowedID, "root.allowed", "shared", 1)))
+	require.NoError(t, db.UpsertConnectorDefinitionVersion(ctx, testConnectorWithDefinition(hiddenID, "root.hidden", "shared", 1)))
+	require.NoError(t, db.UpsertConnectorDefinitionVersion(ctx, testConnectorWithDefinition(otherID, "root.allowed", "other", 1)))
+
+	allowed := db.ListConnectorsBuilder().ForName("shared").ForNamespaceMatchers([]string{"root.allowed"}).FetchPage(ctx)
+	require.NoError(t, allowed.Error)
+	require.Len(t, allowed.Results, 1)
+	require.Equal(t, allowedID, allowed.Results[0].Id)
+
+	first := db.ListConnectorsBuilder().ForName("shared").ForNamespaceMatchers([]string{"root.**"}).Limit(1).FetchPage(ctx)
+	require.NoError(t, first.Error)
+	require.Len(t, first.Results, 1)
+	require.NotEmpty(t, first.Cursor)
+	executor, err := db.ListConnectorsFromCursor(ctx, first.Cursor)
+	require.NoError(t, err)
+	second := executor.FetchPage(ctx)
+	require.NoError(t, second.Error)
+	require.Len(t, second.Results, 1)
+	require.ElementsMatch(t, []apid.ID{allowedID, hiddenID}, []apid.ID{first.Results[0].Id, second.Results[0].Id})
+
+	versions := db.ListConnectorDefinitionVersionsBuilder().ForName("shared").ForNamespaceMatchers([]string{"root.**"}).FetchPage(ctx)
+	require.NoError(t, versions.Error)
+	require.Len(t, versions.Results, 2)
+	for _, version := range versions.Results {
+		require.Equal(t, scommon.ResourceName("shared"), version.Name)
+	}
+
+	err = db.UpdateConnectorName(ctx, otherID, "shared")
+	require.ErrorIs(t, err, ErrDuplicate)
+}
+
 func TestConnectorDefinitionVersionLifecyclePreservesName(t *testing.T) {
 	_, db := MustApplyBlankTestDbConfig(t, nil)
 	ctx := context.Background()

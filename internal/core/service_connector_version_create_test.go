@@ -50,7 +50,7 @@ func TestCreateConnectorVersion(t *testing.T) {
 			Labels:      labels,
 		})
 
-		result, err := s.CreateConnectorVersion(ctx, "root", definition, labels, nil)
+		result, err := s.CreateConnectorVersion(ctx, "root", "", definition, labels, nil)
 		require.NoError(t, err)
 		require.Equal(t, fixedId, result.GetId())
 		require.Equal(t, uint64(1), result.GetVersion())
@@ -77,7 +77,7 @@ func TestCreateConnectorVersion(t *testing.T) {
 			UpsertConnectorDefinitionVersion(gomock.Any(), gomock.Any()).
 			Return(errors.New("db write failed"))
 
-		_, err := s.CreateConnectorVersion(ctx, "root", definition, nil, nil)
+		_, err := s.CreateConnectorVersion(ctx, "root", "", definition, nil, nil)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "failed to upsert connector version")
 	})

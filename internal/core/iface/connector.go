@@ -6,6 +6,7 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
 
@@ -14,6 +15,7 @@ import (
 type Connector interface {
 	GetId() apid.ID
 	GetNamespace() string
+	GetName() common.ResourceName
 	GetVersion() uint64
 	GetState() database.ConnectorDefinitionVersionState
 	GetHash() string

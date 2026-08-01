@@ -9,11 +9,12 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
+	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/rmorlok/authproxy/internal/util"
 )
 
-func (s *service) CreateConnectorVersion(ctx context.Context, namespace string, definition *cschema.Connector, labels map[string]string, annotations map[string]string) (iface.Connector, error) {
+func (s *service) CreateConnectorVersion(ctx context.Context, namespace string, name scommon.ResourceName, definition *cschema.Connector, labels map[string]string, annotations map[string]string) (iface.Connector, error) {
 	id := apctx.GetIdGenerator(ctx).New(apid.PrefixConnectorVersion)
 
 	def := definition.Clone()
@@ -34,12 +35,23 @@ func (s *service) CreateConnectorVersion(ctx context.Context, namespace string, 
 
 	c.ConnectorWithDefinition.Labels = labels
 	c.ConnectorWithDefinition.Annotations = annotations
+	c.ConnectorWithDefinition.Name = name
 
 	if err := s.db.UpsertConnectorDefinitionVersion(ctx, &c.ConnectorWithDefinition); err != nil {
 		return nil, fmt.Errorf("failed to upsert connector version: %w", err)
 	}
 
 	return s.getConnectorVersion(ctx, id, 1)
+}
+
+func (s *service) UpdateConnectorName(ctx context.Context, id apid.ID, name scommon.ResourceName) error {
+	if err := s.db.UpdateConnectorName(ctx, id, name); err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			return ErrNotFound
+		}
+		return err
+	}
+	return nil
 }
 
 func (s *service) CreateDraftConnectorVersion(ctx context.Context, id apid.ID, definition *cschema.Connector, labels map[string]string, annotations map[string]string) (iface.Connector, error) {
