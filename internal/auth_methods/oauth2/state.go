@@ -277,9 +277,7 @@ func getOAuth2State(
 		return nil, err
 	}
 
-	// TODO: add actor auth validation once connections get ownership
-
-	o := newOAuth2(cfg, db, r, core, encrypt, logger, httpf, connection)
+	o := newOAuth2(cfg, db, r, encrypt, logger, httpf, connection)
 	o.state = s
 
 	return o, nil

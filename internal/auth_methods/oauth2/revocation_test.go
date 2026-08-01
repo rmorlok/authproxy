@@ -67,7 +67,6 @@ func TestRevokeRefreshToken(t *testing.T) {
 			db:         db,
 			httpf:      h,
 			r:          nil,
-			connectors: nil,
 			encrypt:    encrypt,
 			logger:     logger,
 			connection: &mockCore.Connection{
