@@ -36,6 +36,8 @@ type ConnectorWithDefinition struct {
 	Annotations         Annotations
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
+	DefinitionCreatedAt time.Time
+	DefinitionUpdatedAt time.Time
 	EncryptedAt         *time.Time
 	DeletedAt           *time.Time
 }
@@ -53,6 +55,8 @@ func connectorWithDefinitionSelectCols() []string {
 		"c.annotations",
 		"c.created_at",
 		"c.updated_at",
+		"dv.created_at",
+		"dv.updated_at",
 		"dv.encrypted_at",
 		"c.deleted_at",
 	}
@@ -71,6 +75,8 @@ func (cv *ConnectorWithDefinition) fields() []any {
 		&cv.Annotations,
 		&cv.CreatedAt,
 		&cv.UpdatedAt,
+		&cv.DefinitionCreatedAt,
+		&cv.DefinitionUpdatedAt,
 		&cv.EncryptedAt,
 		&cv.DeletedAt,
 	}
@@ -83,6 +89,8 @@ func (cv *ConnectorWithDefinition) definitionVersion() ConnectorDefinitionVersio
 		Version:             cv.Version,
 		State:               cv.State,
 		EncryptedDefinition: cv.EncryptedDefinition,
+		CreatedAt:           cv.DefinitionCreatedAt,
+		UpdatedAt:           cv.DefinitionUpdatedAt,
 		EncryptedAt:         cv.EncryptedAt,
 	}
 }
@@ -317,6 +325,8 @@ c.labels as labels,
 c.annotations as annotations,
 c.created_at as created_at,
 c.updated_at as updated_at,
+rr.created_at as definition_created_at,
+rr.updated_at as definition_updated_at,
 rr.encrypted_at as encrypted_at,
 c.deleted_at as deleted_at
 `).

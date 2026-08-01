@@ -74,6 +74,8 @@ create table connector_definition_versions
     version              integer not null,
     state                text not null,
     encrypted_definition text not null,
+    created_at           datetime not null,
+    updated_at           datetime not null,
     encrypted_at         datetime,
     deleted_at           datetime,
     foreign key (connector_id) references connectors (id) on delete cascade,
@@ -92,6 +94,8 @@ insert into connector_definition_versions (
     version,
     state,
     encrypted_definition,
+    created_at,
+    updated_at,
     encrypted_at,
     deleted_at
 )
@@ -101,6 +105,8 @@ select
     cv.version,
     cv.state,
     cv.encrypted_definition,
+    coalesce(cv.created_at, c.created_at, current_timestamp),
+    coalesce(cv.updated_at, cv.created_at, c.updated_at, c.created_at, current_timestamp),
     cv.encrypted_at,
     c.deleted_at
 from connector_versions cv

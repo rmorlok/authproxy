@@ -15,7 +15,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/encfield"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
-	"github.com/rmorlok/authproxy/internal/sqlh"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -101,6 +100,8 @@ type ConnectorDefinitionVersion struct {
 	Version             uint64
 	State               ConnectorDefinitionVersionState
 	EncryptedDefinition encfield.EncryptedField
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
 	EncryptedAt         *time.Time
 	DeletedAt           *time.Time
 }
@@ -112,6 +113,8 @@ func (cv *ConnectorDefinitionVersion) cols() []string {
 		"version",
 		"state",
 		"encrypted_definition",
+		"created_at",
+		"updated_at",
 		"encrypted_at",
 		"deleted_at",
 	}
@@ -124,6 +127,8 @@ func (cv *ConnectorDefinitionVersion) fields() []any {
 		&cv.Version,
 		&cv.State,
 		&cv.EncryptedDefinition,
+		&cv.CreatedAt,
+		&cv.UpdatedAt,
 		&cv.EncryptedAt,
 		&cv.DeletedAt,
 	}
@@ -136,6 +141,8 @@ func (cv *ConnectorDefinitionVersion) values() []any {
 		cv.Version,
 		cv.State,
 		cv.EncryptedDefinition,
+		cv.CreatedAt,
+		cv.UpdatedAt,
 		cv.EncryptedAt,
 		cv.DeletedAt,
 	}
@@ -279,32 +286,36 @@ func (s *service) UpsertConnectorDefinitionVersion(ctx context.Context, cv *Conn
 
 	return s.transaction(func(tx *sql.Tx) error {
 		sqb := s.sq.RunWith(tx)
+		now := apctx.GetClock(ctx).Now()
 
 		if err := s.ensureConnectorForDefinition(ctx, tx, cv); err != nil {
 			return err
 		}
 
-		exitingState, defaultUsed, err := sqlh.ScanWithDefault(sqb.
+		var existingState ConnectorDefinitionVersionState
+		var existingCreatedAt time.Time
+		err := sqb.
 			Select("state").
 			From(ConnectorDefinitionVersionsTable).
 			Where(sq.Eq{"connector_id": cv.Id, "version": cv.Version, "deleted_at": nil}).
-			QueryRowContext(ctx),
-			ConnectorDefinitionVersionStateDraft)
-
-		existingRow := !defaultUsed
-		if err != nil {
+			Column("created_at").
+			QueryRowContext(ctx).
+			Scan(&existingState, &existingCreatedAt)
+		existingRow := err == nil
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
 
 		if existingRow {
-			if exitingState != ConnectorDefinitionVersionStateDraft {
-				logger.Error("cannot modify non-draft connector", "existing_state", exitingState)
+			if existingState != ConnectorDefinitionVersionStateDraft {
+				logger.Error("cannot modify non-draft connector", "existing_state", existingState)
 				return errors.New("cannot modify non-draft connector")
 			}
 
 			result, err := sqb.Update(ConnectorDefinitionVersionsTable).
 				Set("state", cv.State).
 				Set("encrypted_definition", cv.EncryptedDefinition).
+				Set("updated_at", now).
 				Set("encrypted_at", cv.EncryptedAt).
 				Where(sq.Eq{"connector_id": cv.Id, "version": cv.Version, "deleted_at": nil}).
 				Exec()
@@ -321,6 +332,8 @@ func (s *service) UpsertConnectorDefinitionVersion(ctx context.Context, cv *Conn
 				logger.Error("expected to update 1 row for connector version", "got", count)
 				return fmt.Errorf("expected to update 1 row for connector version, got %d", count)
 			}
+			cv.DefinitionCreatedAt = existingCreatedAt
+			cv.DefinitionUpdatedAt = now
 		} else {
 			// No existing row at this version. Need to verify if there are existing rows, the new version is
 			// existing version + 1
@@ -344,6 +357,8 @@ func (s *service) UpsertConnectorDefinitionVersion(ctx context.Context, cv *Conn
 			if definitionVersion.Id.IsNil() {
 				definitionVersion.Id = apid.New(apid.PrefixConnectorDefinitionVersion)
 			}
+			definitionVersion.CreatedAt = now
+			definitionVersion.UpdatedAt = now
 			if err := definitionVersion.Validate(); err != nil {
 				return err
 			}
@@ -356,12 +371,15 @@ func (s *service) UpsertConnectorDefinitionVersion(ctx context.Context, cv *Conn
 				return err
 			}
 			cv.DefinitionVersionId = definitionVersion.Id
+			cv.DefinitionCreatedAt = definitionVersion.CreatedAt
+			cv.DefinitionUpdatedAt = definitionVersion.UpdatedAt
 		}
 
 		if cv.State == ConnectorDefinitionVersionStatePrimary {
 			// New primary version, update any previous primary to active
 			result, err := sqb.Update(ConnectorDefinitionVersionsTable).
 				Set("state", ConnectorDefinitionVersionStateActive).
+				Set("updated_at", now).
 				Where(sq.And{
 					sq.Eq{
 						"connector_id": cv.Id,
@@ -419,6 +437,7 @@ func (s *service) SetConnectorDefinitionVersionState(ctx context.Context, id api
 		dbResult, err := sqb.
 			Update(ConnectorDefinitionVersionsTable).
 			Set("state", state).
+			Set("updated_at", now).
 			Where(sq.Eq{"connector_id": id, "version": version, "deleted_at": nil}).
 			Exec()
 		if err != nil {
@@ -442,6 +461,7 @@ func (s *service) SetConnectorDefinitionVersionState(ctx context.Context, id api
 			// Ensure only one primary: transition any other primary version to active
 			_, err := sqb.Update(ConnectorDefinitionVersionsTable).
 				Set("state", ConnectorDefinitionVersionStateActive).
+				Set("updated_at", now).
 				Where(sq.And{
 					sq.Eq{"connector_id": id, "state": ConnectorDefinitionVersionStatePrimary, "deleted_at": nil},
 					sq.NotEq{"version": version},
@@ -456,6 +476,7 @@ func (s *service) SetConnectorDefinitionVersionState(ctx context.Context, id api
 			// Ensure only one draft: transition any other draft version to archived
 			_, err := sqb.Update(ConnectorDefinitionVersionsTable).
 				Set("state", ConnectorDefinitionVersionStateArchived).
+				Set("updated_at", now).
 				Where(sq.And{
 					sq.Eq{"connector_id": id, "state": ConnectorDefinitionVersionStateDraft, "deleted_at": nil},
 					sq.NotEq{"version": version},
@@ -504,6 +525,7 @@ func (s *service) DeleteConnector(ctx context.Context, id apid.ID) error {
 
 		_, err = sqb.
 			Update(ConnectorDefinitionVersionsTable).
+			Set("updated_at", now).
 			Set("deleted_at", now).
 			Where(sq.Eq{"connector_id": id, "deleted_at": nil}).
 			ExecContext(ctx)
@@ -828,11 +850,8 @@ func (l *listConnectorDefinitionVersionsFilters) applyRestrictions(ctx context.C
 
 	if l.OrderByFieldVal != nil {
 		orderCol := "dv." + string(*l.OrderByFieldVal)
-		switch *l.OrderByFieldVal {
-		case ConnectorDefinitionVersionOrderById:
+		if *l.OrderByFieldVal == ConnectorDefinitionVersionOrderById {
 			orderCol = "c.id"
-		case ConnectorDefinitionVersionOrderByCreatedAt, ConnectorDefinitionVersionOrderByUpdatedAt:
-			orderCol = "c." + string(*l.OrderByFieldVal)
 		}
 		q = q.OrderBy(fmt.Sprintf("%s %s", orderCol, l.OrderByVal.String()))
 		if *l.OrderByFieldVal != ConnectorDefinitionVersionOrderById {

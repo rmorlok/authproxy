@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/encfield"
@@ -195,8 +196,13 @@ func TestConnectorMigrationBackfillsDeterministically(t *testing.T) {
 	require.Error(t, err)
 	_, err = rawDB.Query("SELECT type FROM connector_definition_versions")
 	require.Error(t, err)
-	_, err = rawDB.Query("SELECT created_at FROM connector_definition_versions")
-	require.Error(t, err)
+	var liveDefinitionCreatedAt, liveDefinitionUpdatedAt time.Time
+	require.NoError(t, rawDB.QueryRow(fmt.Sprintf(
+		"SELECT created_at, updated_at FROM connector_definition_versions WHERE connector_id = '%s' AND version = 2",
+		liveID,
+	)).Scan(&liveDefinitionCreatedAt, &liveDefinitionUpdatedAt))
+	require.True(t, time.Date(2024, time.March, 1, 0, 0, 0, 0, time.UTC).Equal(liveDefinitionCreatedAt))
+	require.True(t, time.Date(2024, time.March, 2, 0, 0, 0, 0, time.UTC).Equal(liveDefinitionUpdatedAt))
 	var liveDefinitionDeletedAt any
 	require.NoError(t, rawDB.QueryRow(fmt.Sprintf(
 		"SELECT deleted_at FROM connector_definition_versions WHERE connector_id = '%s' LIMIT 1",
@@ -230,9 +236,9 @@ func TestConnectorMigrationBackfillsDeterministically(t *testing.T) {
 
 	_, err = rawDB.Exec(fmt.Sprintf(`
 		INSERT INTO connector_definition_versions (
-			id, connector_id, version, state, encrypted_definition
+			id, connector_id, version, state, encrypted_definition, created_at, updated_at
 		) VALUES (
-			'cvd_duplicate', '%s', 2, 'draft', '{"id":"dek_duplicate","d":"duplicate"}'
+			'cvd_duplicate', '%s', 2, 'draft', '{"id":"dek_duplicate","d":"duplicate"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 		)
 	`, liveID))
 	require.Error(t, err, "(connector_id, version) must be unique")

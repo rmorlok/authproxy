@@ -31,16 +31,16 @@ INSERT INTO connectors
 ('cxr_testgmail0000003',     'root.child.grand', 'cxr_testgmail0000003',     '{"type":"google_drive"}', '2023-10-04 00:00:00', '2023-10-14 00:00:00', null);
 
 INSERT INTO connector_definition_versions
-(id,                         connector_id,                version, state,      encrypted_definition) VALUES
-('cvd_testgmail0000011',     'cxr_testgmail0000001',      1,       'active',   '{"id":"dek_test","d":"encrypted-def"}'),
-('cvd_testgmail0000012',     'cxr_testgmail0000001',      2,       'primary',  '{"id":"dek_test","d":"encrypted-def"}'),
-('cvd_testgmail0000021',     'cxr_testgmail0000002',      1,       'archived', '{"id":"dek_test","d":"encrypted-def"}'),
-('cvd_testgmail0000022',     'cxr_testgmail0000002',      2,       'primary',  '{"id":"dek_test","d":"encrypted-def"}'),
-('cvd_testslack0000011',     'cxr_testslack0000001',      1,       'active',   '{"id":"dek_test","d":"encrypted-def"}'),
-('cvd_testslack0000012',     'cxr_testslack0000001',      2,       'primary',  '{"id":"dek_test","d":"encrypted-def"}'),
-('cvd_testgmail0000031',     'cxr_testgmail0000003',      1,       'archived', '{"id":"dek_test","d":"encrypted-def"}'),
-('cvd_testgmail0000032',     'cxr_testgmail0000003',      2,       'active',   '{"id":"dek_test","d":"encrypted-def"}'),
-('cvd_testgmail0000033',     'cxr_testgmail0000003',      3,       'primary',  '{"id":"dek_test","d":"encrypted-def"}');
+(id,                         connector_id,                version, state,      encrypted_definition,                       created_at,            updated_at) VALUES
+('cvd_testgmail0000011',     'cxr_testgmail0000001',      1,       'active',   '{"id":"dek_test","d":"encrypted-def"}', '2023-10-01 00:00:00', '2023-10-10 00:00:00'),
+('cvd_testgmail0000012',     'cxr_testgmail0000001',      2,       'primary',  '{"id":"dek_test","d":"encrypted-def"}', '2023-10-01 01:00:00', '2023-10-10 01:00:00'),
+('cvd_testgmail0000021',     'cxr_testgmail0000002',      1,       'archived', '{"id":"dek_test","d":"encrypted-def"}', '2023-10-02 00:00:00', '2023-10-11 00:00:00'),
+('cvd_testgmail0000022',     'cxr_testgmail0000002',      2,       'primary',  '{"id":"dek_test","d":"encrypted-def"}', '2023-10-02 01:00:00', '2023-10-11 01:00:00'),
+('cvd_testslack0000011',     'cxr_testslack0000001',      1,       'active',   '{"id":"dek_test","d":"encrypted-def"}', '2023-10-03 00:00:00', '2023-10-12 00:00:00'),
+('cvd_testslack0000012',     'cxr_testslack0000001',      2,       'primary',  '{"id":"dek_test","d":"encrypted-def"}', '2023-10-03 01:00:00', '2023-10-12 01:00:00'),
+('cvd_testgmail0000031',     'cxr_testgmail0000003',      1,       'archived', '{"id":"dek_test","d":"encrypted-def"}', '2023-10-04 00:00:00', '2023-10-14 00:00:00'),
+('cvd_testgmail0000032',     'cxr_testgmail0000003',      2,       'active',   '{"id":"dek_test","d":"encrypted-def"}', '2023-10-04 01:00:00', '2023-10-14 01:00:00'),
+('cvd_testgmail0000033',     'cxr_testgmail0000003',      3,       'primary',  '{"id":"dek_test","d":"encrypted-def"}', '2023-10-04 02:00:00', '2023-10-14 02:00:00');
 `
 		_, err := rawDb.Exec(sql)
 		require.NoError(t, err)
@@ -135,11 +135,11 @@ INSERT INTO connectors
 ('cxr_testgmail0000003',     'root.prod.tenant1', 'cxr_testgmail0000003',     '{"type":"google_drive"}', '2023-10-04 00:00:00', '2023-10-04 00:00:00', null);
 
 INSERT INTO connector_definition_versions
-(id,                         connector_id,                version, state,     encrypted_definition) VALUES
-('cvd_testgmail0000011',     'cxr_testgmail0000001',      1,       'primary', '{"id":"dek_test","d":"encrypted-def"}'),
-('cvd_testgmail0000021',     'cxr_testgmail0000002',      1,       'primary', '{"id":"dek_test","d":"encrypted-def"}'),
-('cvd_testslack0000011',     'cxr_testslack0000001',      1,       'primary', '{"id":"dek_test","d":"encrypted-def"}'),
-('cvd_testgmail0000031',     'cxr_testgmail0000003',      1,       'primary', '{"id":"dek_test","d":"encrypted-def"}');
+(id,                         connector_id,                version, state,     encrypted_definition,                       created_at,            updated_at) VALUES
+('cvd_testgmail0000011',     'cxr_testgmail0000001',      1,       'primary', '{"id":"dek_test","d":"encrypted-def"}', '2023-10-01 00:00:00', '2023-10-01 00:00:00'),
+('cvd_testgmail0000021',     'cxr_testgmail0000002',      1,       'primary', '{"id":"dek_test","d":"encrypted-def"}', '2023-10-02 00:00:00', '2023-10-02 00:00:00'),
+('cvd_testslack0000011',     'cxr_testslack0000001',      1,       'primary', '{"id":"dek_test","d":"encrypted-def"}', '2023-10-03 00:00:00', '2023-10-03 00:00:00'),
+('cvd_testgmail0000031',     'cxr_testgmail0000003',      1,       'primary', '{"id":"dek_test","d":"encrypted-def"}', '2023-10-04 00:00:00', '2023-10-04 00:00:00');
 `
 		_, err := rawDb.Exec(sql)
 		require.NoError(t, err)
@@ -244,6 +244,8 @@ INSERT INTO connector_definition_versions
 			assert.Equal(t, "root.some-namespace", savedCV.Namespace)
 			require.True(t, savedCV.DefinitionVersionId.HasPrefix(apid.PrefixConnectorDefinitionVersion))
 			assert.Equal(t, encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "test_encrypted_definition"}, savedCV.EncryptedDefinition)
+			require.True(t, now.Equal(savedCV.DefinitionCreatedAt))
+			require.True(t, now.Equal(savedCV.DefinitionUpdatedAt))
 			require.Equal(t, 1, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_definition_versions"))
 		})
 
@@ -279,7 +281,8 @@ INSERT INTO connector_definition_versions
 			// Setup
 			_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
-			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+			clk := clock.NewFakeClock(now)
+			ctx := apctx.NewBuilderBackground().WithClock(clk).Build()
 
 			// Create a new connector version
 			connectorID := apid.New(apid.PrefixConnectorVersion)
@@ -296,6 +299,11 @@ INSERT INTO connector_definition_versions
 			err := db.UpsertConnectorDefinitionVersion(ctx, cv)
 			require.NoError(t, err)
 
+			clk.Step(time.Hour)
+			cv.EncryptedDefinition.Data = "updated_encrypted_definition"
+			err = db.UpsertConnectorDefinitionVersion(ctx, cv)
+			require.NoError(t, err)
+
 			// Verify
 			savedCV, err := db.GetConnectorDefinitionVersion(ctx, connectorID, 1)
 			require.NoError(t, err)
@@ -304,7 +312,9 @@ INSERT INTO connector_definition_versions
 			assert.Equal(t, uint64(1), savedCV.Version)
 			assert.Equal(t, ConnectorDefinitionVersionStateDraft, savedCV.State)
 			assert.Equal(t, "test_connector", savedCV.Labels["type"])
-			assert.Equal(t, encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "test_encrypted_definition"}, savedCV.EncryptedDefinition)
+			assert.Equal(t, encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "updated_encrypted_definition"}, savedCV.EncryptedDefinition)
+			require.True(t, now.Equal(savedCV.DefinitionCreatedAt))
+			require.True(t, now.Add(time.Hour).Equal(savedCV.DefinitionUpdatedAt))
 			require.Equal(t, 1, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_definition_versions"))
 		})
 

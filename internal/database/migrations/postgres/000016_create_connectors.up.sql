@@ -74,6 +74,8 @@ create table connector_definition_versions
     version              bigint not null,
     state                text not null,
     encrypted_definition jsonb not null,
+    created_at           timestamptz not null,
+    updated_at           timestamptz not null,
     encrypted_at         timestamptz,
     deleted_at           timestamptz,
     unique (connector_id, version)
@@ -91,6 +93,8 @@ insert into connector_definition_versions (
     version,
     state,
     encrypted_definition,
+    created_at,
+    updated_at,
     encrypted_at,
     deleted_at
 )
@@ -100,6 +104,8 @@ select
     cv.version,
     cv.state,
     cv.encrypted_definition,
+    coalesce(cv.created_at, c.created_at, current_timestamp),
+    coalesce(cv.updated_at, cv.created_at, c.updated_at, c.created_at, current_timestamp),
     cv.encrypted_at,
     c.deleted_at
 from connector_versions cv

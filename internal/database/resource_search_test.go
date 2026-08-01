@@ -98,9 +98,9 @@ func TestSearchResourcesCollapsesConnectorDefinitionVersions(t *testing.T) {
 	definitionID3 := apid.New(apid.PrefixConnectorDefinitionVersion)
 	for _, statement := range []string{
 		fmt.Sprintf(`INSERT INTO connectors (id, namespace, name, labels, created_at, updated_at) VALUES ('%s', 'root', '%s', '{"name":"connector-match","type":"test"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`, connectorID, connectorID),
-		fmt.Sprintf(`INSERT INTO connector_definition_versions (id, connector_id, version, state, encrypted_definition) VALUES ('%s', '%s', 1, 'primary', '{"id":"dek_test","d":"v1"}')`, definitionID1, connectorID),
-		fmt.Sprintf(`INSERT INTO connector_definition_versions (id, connector_id, version, state, encrypted_definition) VALUES ('%s', '%s', 2, 'primary', '{"id":"dek_test","d":"v2"}')`, definitionID2, connectorID),
-		fmt.Sprintf(`INSERT INTO connector_definition_versions (id, connector_id, version, state, encrypted_definition) VALUES ('%s', '%s', 3, 'draft', '{"id":"dek_test","d":"v3"}')`, definitionID3, connectorID),
+		fmt.Sprintf(`INSERT INTO connector_definition_versions (id, connector_id, version, state, encrypted_definition, created_at, updated_at) VALUES ('%s', '%s', 1, 'primary', '{"id":"dek_test","d":"v1"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`, definitionID1, connectorID),
+		fmt.Sprintf(`INSERT INTO connector_definition_versions (id, connector_id, version, state, encrypted_definition, created_at, updated_at) VALUES ('%s', '%s', 2, 'primary', '{"id":"dek_test","d":"v2"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`, definitionID2, connectorID),
+		fmt.Sprintf(`INSERT INTO connector_definition_versions (id, connector_id, version, state, encrypted_definition, created_at, updated_at) VALUES ('%s', '%s', 3, 'draft', '{"id":"dek_test","d":"v3"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`, definitionID3, connectorID),
 	} {
 		_, err := raw.Exec(statement)
 		require.NoError(t, err)

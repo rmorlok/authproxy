@@ -41,8 +41,8 @@ select
     null,
     '',
     d.encrypted_definition,
-    c.created_at,
-    c.updated_at,
+    d.created_at,
+    d.updated_at,
     d.encrypted_at,
     d.deleted_at
 from connector_definition_versions d
