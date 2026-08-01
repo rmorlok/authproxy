@@ -245,9 +245,9 @@ VALUES
 ('%s', '%s', '%s', '{"type":"test"}', '2026-05-29 12:00:00', '2026-05-29 12:00:00');
 
 INSERT INTO connector_definition_versions
-(id, connector_id, version, state, encrypted_definition)
+(id, connector_id, version, state, encrypted_definition, created_at, updated_at)
 VALUES
-('%s', '%s', %d, '%s', '{"id":"dek_test","d":"encrypted-def"}')
+('%s', '%s', %d, '%s', '{"id":"dek_test","d":"encrypted-def"}', '2026-05-29 12:00:00', '2026-05-29 12:00:00')
 `, id, namespace, id, definitionID, id, version, state))
 	require.NoError(t, err)
 }
