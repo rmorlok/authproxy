@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -17,6 +18,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/encfield"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	scommon "github.com/rmorlok/authproxy/internal/schema/common"
@@ -120,6 +122,107 @@ func TestResourceSearchRouteQueryAndPermissions(t *testing.T) {
 		require.Equal(t, "payments-service", response.Items[0].Name)
 		require.Equal(t, map[string]string{"env": "prod"}, response.Items[0].Labels)
 	})
+}
+
+func TestResourceNamesEndToEndAcrossVersionsAndAuthorization(t *testing.T) {
+	setup := setupResourceSearchRoute(t, nil)
+	ctx := t.Context()
+	for _, ns := range []string{"root.allowed", "root.hidden"} {
+		require.NoError(t, setup.db.EnsureNamespaceByPath(ctx, ns))
+	}
+
+	createConnectorVersion := func(id apid.ID, ns, name string, version uint64, state database.ConnectorDefinitionVersionState) {
+		t.Helper()
+		require.NoError(t, setup.db.UpsertConnectorDefinitionVersion(ctx, &database.ConnectorWithDefinition{
+			Id:        id,
+			Name:      scommon.ResourceName(name),
+			Namespace: ns,
+			Version:   version,
+			State:     state,
+			EncryptedDefinition: encfield.EncryptedField{
+				ID:   apid.New(apid.PrefixDataEncryptionKey),
+				Data: fmt.Sprintf("definition-%d", version),
+			},
+		}))
+	}
+
+	allowedConnectorID := apid.New(apid.PrefixConnector)
+	createConnectorVersion(allowedConnectorID, "root.allowed", "payments-provider", 1, database.ConnectorDefinitionVersionStatePrimary)
+	createConnectorVersion(allowedConnectorID, "root.allowed", "", 2, database.ConnectorDefinitionVersionStateDraft)
+	hiddenConnectorID := apid.New(apid.PrefixConnector)
+	createConnectorVersion(hiddenConnectorID, "root.hidden", "billing-provider", 1, database.ConnectorDefinitionVersionStatePrimary)
+
+	connectionID := apid.New(apid.PrefixConnection)
+	require.NoError(t, setup.db.CreateConnection(ctx, &database.Connection{
+		Id:               connectionID,
+		Name:             "payments-live",
+		Namespace:        "root.allowed",
+		ConnectorId:      allowedConnectorID,
+		ConnectorVersion: 1,
+		State:            database.ConnectionStateConfigured,
+	}))
+
+	// Rename by immutable IDs, then drive the same reconciliation that the
+	// targeted background task performs for connector descendants.
+	require.NoError(t, setup.db.UpdateConnectorName(ctx, allowedConnectorID, "billing-provider"))
+	_, err := setup.db.UpdateConnectionName(ctx, connectionID, "billing-live")
+	require.NoError(t, err)
+	require.NoError(t, setup.db.RefreshConnectionsForConnector(ctx, allowedConnectorID))
+
+	versions := setup.db.ListConnectorDefinitionVersionsBuilder().
+		ForName("billing-provider").
+		ForNamespaceMatchers([]string{"root.allowed"}).
+		FetchPage(ctx)
+	require.NoError(t, versions.Error)
+	require.Len(t, versions.Results, 2)
+	for _, version := range versions.Results {
+		require.Equal(t, allowedConnectorID, version.Id)
+		require.Equal(t, scommon.ResourceName("billing-provider"), version.Name)
+		require.Equal(t, "billing-provider", version.Labels["apxy/cxr/-/name"])
+	}
+
+	connections := setup.db.ListConnectionsBuilder().
+		ForName("billing-live").
+		ForNamespaceMatchers([]string{"root.allowed"}).
+		FetchPage(ctx)
+	require.NoError(t, connections.Error)
+	require.Len(t, connections.Results, 1)
+	require.Equal(t, connectionID, connections.Results[0].Id)
+	require.Equal(t, "billing-live", connections.Results[0].Labels["apxy/cxn/-/name"])
+	require.Equal(t, "billing-provider", connections.Results[0].Labels["apxy/cxr/-/name"])
+
+	permissions := []aschema.Permission{{
+		Namespace: "root.allowed",
+		Resources: []string{"connectors", "connections"},
+		Verbs:     []string{"list", "get"},
+	}}
+	w := httptest.NewRecorder()
+	setup.gin.ServeHTTP(w, signedSearchRequest(
+		t,
+		setup,
+		"/search/resources?q=billing-provider&resource_type=connector&namespace=root.**",
+		permissions,
+	))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var response schemaapi.SearchResourcesResponseJson
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+	require.Len(t, response.Items, 1, "the hidden duplicate and extra connector version must not leak")
+	require.Equal(t, allowedConnectorID.String(), response.Items[0].ResourceId)
+	require.Equal(t, "billing-provider", response.Items[0].Name)
+	require.Equal(t, "root.allowed", response.Items[0].Namespace)
+
+	w = httptest.NewRecorder()
+	setup.gin.ServeHTTP(w, signedSearchRequest(
+		t,
+		setup,
+		"/search/resources?q=billing-live&resource_type=connection&namespace=root.**",
+		permissions,
+	))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+	require.Len(t, response.Items, 1)
+	require.Equal(t, connectionID.String(), response.Items[0].ResourceId)
+	require.Equal(t, "billing-live", response.Items[0].Name)
 }
 
 func TestResourceSearchRouteValidation(t *testing.T) {

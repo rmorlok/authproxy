@@ -11,6 +11,10 @@ AuthProxy exposes two ways to send an HTTP request through a connection. Both au
 
 In both cases, the `Authorization` credential presented to AuthProxy identifies the AuthProxy caller. AuthProxy does not forward that credential upstream; it applies authentication from the selected connection.
 
+Proxy URLs always use the immutable connection ID. A connection name is useful
+for display and exact-name discovery, but renaming it does not change either
+proxy endpoint or a stored `$CONNECTION_ID` reference.
+
 ## Wrapped proxy
 
 The wrapped endpoint accepts a JSON description of the upstream request:

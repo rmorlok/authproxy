@@ -454,11 +454,18 @@ func TestResourceNameMigrationBackfillsExistingRows(t *testing.T) {
 	_, db, rawDB := MustApplyBlankTestDbConfigRaw(t, nil)
 	service := db.(*service)
 	migrateDatabaseToVersion(t, service, 14)
+	ctx := context.Background()
+	deletedActorID := apid.New(apid.PrefixActor)
 
 	_, err := rawDB.Exec(`
 		INSERT INTO actors (id, namespace, external_id)
 		VALUES ('act_migration', 'root', 'migration')
 	`)
+	require.NoError(t, err)
+	_, err = rawDB.Exec(fmt.Sprintf(`
+		INSERT INTO actors (id, namespace, external_id, deleted_at)
+		VALUES ('%s', 'root', 'deleted-before-name-migration', CURRENT_TIMESTAMP)
+	`, deletedActorID))
 	require.NoError(t, err)
 	_, err = rawDB.Exec(`
 		INSERT INTO connections (id, namespace, state, connector_id, connector_version)
@@ -509,6 +516,19 @@ func TestResourceNameMigrationBackfillsExistingRows(t *testing.T) {
 		"SELECT name FROM keys WHERE id = 'key_global'",
 	).Scan(&globalKeyName))
 	require.Equal(t, "key_global", globalKeyName)
+
+	// The partial uniqueness indexes introduced by the migration must not let
+	// a populated soft-deleted row reserve its backfilled name forever.
+	replacementID := apid.New(apid.PrefixActor)
+	require.NoError(t, db.CreateActor(ctx, &Actor{
+		Id:         replacementID,
+		Name:       scommon.ResourceName(deletedActorID.String()),
+		Namespace:  "root",
+		ExternalId: "replacement-after-name-migration",
+	}))
+	replacement, err := db.GetActor(ctx, replacementID)
+	require.NoError(t, err)
+	require.Equal(t, scommon.ResourceName(deletedActorID.String()), replacement.Name)
 
 	migrateDatabaseToVersion(t, service, 16)
 }

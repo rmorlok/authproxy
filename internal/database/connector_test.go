@@ -293,6 +293,20 @@ func TestConnectorMigrationBackfillsDeterministically(t *testing.T) {
 	require.Equal(t, "root.live", projected.Namespace)
 	require.Equal(t, scommon.ResourceName(liveID.String()), projected.Name)
 
+	// A connector that was already soft-deleted before the table split must
+	// release its backfilled name after the upgrade. Reusing the name creates a
+	// new logical connector without reviving or rewriting the old versions.
+	replacementID := apid.New(apid.PrefixConnector)
+	require.NoError(t, db.UpsertConnectorDefinitionVersion(
+		context.Background(),
+		testConnectorWithDefinition(replacementID, "root.deleted", scommon.ResourceName(deletedID.String()), 1),
+	))
+	replacement, err := db.GetConnectorDefinitionVersion(context.Background(), replacementID, 1)
+	require.NoError(t, err)
+	require.Equal(t, scommon.ResourceName(deletedID.String()), replacement.Name)
+	require.Equal(t, 2, sqlhMustCountConnectorDefinitionVersions(t, rawDB, liveID))
+	require.Equal(t, 1, sqlhMustCountConnectorDefinitionVersions(t, rawDB, replacementID))
+
 	migrateDatabaseToVersion(t, service, 15)
 	rows, err = rawDB.Query(fmt.Sprintf(
 		"SELECT DISTINCT namespace FROM connector_versions WHERE id = '%s'",

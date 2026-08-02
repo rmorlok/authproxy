@@ -18,7 +18,7 @@ configureClient({
 });
 
 const {data} = await connections.list({limit: 20});
-console.log(data.results);
+console.log(data.items);
 ```
 
 The shared client defaults to a 10-second timeout, `withCredentials: true`, and an `Accept: application/json` header.
@@ -76,9 +76,44 @@ import {connections, ConnectionState} from '@authproxy/api';
 const {data: connection} = await connections.get('cxn_abc');
 
 if (connection.state === ConnectionState.CONFIGURED) {
-  console.log('Connection setup is complete');
+  console.log(connection.name, connection.id);
 }
 ```
+
+### Create, rename, and query by name
+
+Resource models expose both `name` and immutable `id`. Optional create names
+default to the generated ID when omitted. Updates and direct reads remain
+ID-addressed:
+
+```ts
+import {connections, connectors} from '@authproxy/api';
+
+await connections.initiate(
+  'cxr_01example',
+  'https://app.example.com/integrations/complete',
+  {'app.example.com/tenant': 'acme'},
+  'production-crm',
+);
+
+await connections.update('cxn_01example', {
+  name: 'production-salesforce',
+});
+
+const {data: page} = await connections.list({
+  name: 'production-salesforce',
+  namespace: 'root.acme',
+});
+
+console.log(page.items[0].name, page.items[0].id);
+
+// The logical connector name is shared by all versions.
+await connectors.update('cxr_01example', {name: 'salesforce'});
+```
+
+An exact-name list can return duplicate names when its namespace matcher spans
+several namespaces. Use the returned ID for navigation, persistence, proxying,
+and later updates.
 
 ## Send a request through a connection
 

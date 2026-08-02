@@ -9,6 +9,10 @@ AuthProxy exposes connector-wide lifecycle operations for administrative cleanup
 
 Both endpoints start go-workflows-backed background work and return a `task_id` that can be polled with `GET /tasks/{task_id}`. They run on the normal worker service, share the application database through the workflow backend, and use the same task polling contract as other long-running work.
 
+Admin lists display the connector name, but lifecycle URLs continue to use the
+immutable connector ID. Renaming a connector does not change an in-flight task,
+workflow instance ID, or any connector-version reference.
+
 ## Choosing An Operation
 
 Use **disconnect all** when a connector should remain available, but every current connection for that connector version should be disconnected and removed. This is the operational cleanup action for compromised credentials, connector configuration problems, or a deliberate reset before users reconnect. It does not change connector version state.
