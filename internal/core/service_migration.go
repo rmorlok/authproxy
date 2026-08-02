@@ -2,20 +2,16 @@ package core
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
+	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
-	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
-
-	"strings"
 )
 
 // MigrateMutexKeyName is the key that can be used when locking to perform a migration in redis.
@@ -127,7 +123,7 @@ func (s *service) MigrateConnectors(ctx context.Context) error {
 
 	seen := make(map[apid.ID]struct{}, len(cfgRoot.Connectors.GetConnectors()))
 	for _, configConnector := range cfgRoot.Connectors.GetConnectors() {
-		resolvedId, err := s.migrateConnector(ctx, cfgRoot.Connectors, &configConnector)
+		resolvedId, err := s.migrateConnector(ctx, &configConnector)
 		if err != nil {
 			return err
 		}
@@ -235,170 +231,55 @@ func (s *service) connectorVersionHashEquals(cv *database.ConnectorWithDefinitio
 }
 
 func (s *service) precheckConnectorsForMigration(ctx context.Context, configConnectors *config.Connectors) error {
-	type IdVersionStateTuple struct {
-		Id      apid.ID
-		Version uint64
-		State   string
-	}
-
-	type IdVersionTuple struct {
-		Id      apid.ID
-		Version uint64
-	}
-
-	type IdStateTuple struct {
-		Id    apid.ID
-		State string
-	}
-
-	identifyingLabels := configConnectors.GetIdentifyingLabels()
-
-	idVersionStateCounts := make(map[IdVersionStateTuple]int)
-	idVersionCounts := make(map[IdVersionTuple]int)
-	idStateCounts := make(map[IdStateTuple]int)
-	idCounts := make(map[apid.ID]int)
-	identifyingLabelCounts := make(map[string]int)
-
-	// Helper to serialize identifying label values for map key
-	serializeLabels := func(c *config.Connector) string {
-		labelValues := c.GetIdentifyingLabelValues(identifyingLabels)
-		data, _ := json.Marshal(labelValues)
-		return string(data)
+	if err := configConnectors.ValidateIdentities(&scommon.ValidationContext{}); err != nil {
+		return fmt.Errorf("invalid connector configuration: %w", err)
 	}
 
 	for _, configConnector := range configConnectors.GetConnectors() {
-		if err := s.precheckConnectorForMigration(ctx, configConnectors, &configConnector); err != nil {
+		if err := s.precheckConnectorForMigration(ctx, &configConnector); err != nil {
 			return err
 		}
-
-		labelKey := serializeLabels(&configConnector)
-
-		if configConnector.HasId() && configConnector.HasVersion() && configConnector.HasState() {
-			idVersionStateCounts[IdVersionStateTuple{
-				Id:      configConnector.Id,
-				Version: configConnector.Version,
-				State:   configConnector.State,
-			}]++
-
-			// All other entries for this id must have version and state specified if one does
-			for _, cc := range configConnectors.GetConnectors() {
-				if cc.Id == configConnector.Id && cc.Version == configConnector.Version && cc.State == configConnector.State {
-					// Same entry we are checking
-					continue
-				}
-
-				if cc.Id == configConnector.Id {
-					if !cc.HasVersion() || (!configConnector.IsDraft() && !cc.HasState()) {
-						return fmt.Errorf("connector %s version %d has state %s but other entries do not have all these fields specified", configConnector.Id, configConnector.Version, configConnector.State)
-					}
-				}
-
-				ccLabelKey := serializeLabels(&cc)
-				if ccLabelKey == labelKey && !cc.HasId() {
-					return fmt.Errorf("a connector with identifying labels %s exists with an id, but not all connectors with those labels have id", labelKey)
-				}
-			}
-		} else if configConnector.HasId() && configConnector.HasVersion() {
-			idVersionCounts[IdVersionTuple{
-				Id:      configConnector.Id,
-				Version: configConnector.Version,
-			}]++
-
-			// All other entries for this id must have version if one does
-			for _, cc := range configConnectors.GetConnectors() {
-				if cc.Id == configConnector.Id && cc.Version == configConnector.Version {
-					// Same entry we are checking
-					continue
-				}
-
-				if cc.Id == configConnector.Id && !cc.HasVersion() {
-					if !cc.HasVersion() {
-						return fmt.Errorf("connector %s has version %d has but not all other entries do not have version specified", configConnector.Id, configConnector.Version)
-					}
-				}
-
-				ccLabelKey := serializeLabels(&cc)
-				if ccLabelKey == labelKey && !cc.HasId() {
-					return fmt.Errorf("a connector with identifying labels %s exists with an id, but not all connectors with those labels have id", labelKey)
-				}
-			}
-		} else if configConnector.HasId() && configConnector.HasState() {
-			idStateCounts[IdStateTuple{
-				Id:    configConnector.Id,
-				State: configConnector.State,
-			}]++
-
-			// All other entries for this id must have version if one does
-			for _, cc := range configConnectors.GetConnectors() {
-				if cc.Id == configConnector.Id && cc.State == configConnector.State {
-					// Same entry we are checking
-					continue
-				}
-
-				ccLabelKey := serializeLabels(&cc)
-				if ccLabelKey == labelKey && !cc.HasId() {
-					return fmt.Errorf("a connector with identifying labels %s exists with an id, but not all connectors with those labels have id", labelKey)
-				}
-			}
-		} else if configConnector.HasId() {
-			idCounts[configConnector.Id]++
-
-			// All other entries for this id must have version if one does
-			for _, cc := range configConnectors.GetConnectors() {
-				if cc.Id == configConnector.Id && cc.State == configConnector.State {
-					// Same entry we are checking
-					continue
-				}
-
-				ccLabelKey := serializeLabels(&cc)
-				if ccLabelKey == labelKey && !cc.HasId() {
-					return fmt.Errorf("a connector with identifying labels %s exists with an id, but not all connectors with those labels have id", labelKey)
-				}
-			}
-		} else {
-			// Only identifying labels specified
-			identifyingLabelCounts[labelKey]++
-		}
 	}
 
-	result := &multierror.Error{}
+	return nil
+}
 
-	for idVersionState, count := range idVersionStateCounts {
-		if count > 1 {
-			result = multierror.Append(result, fmt.Errorf("connector %s version %d has multiple entries with state %s", idVersionState.Id, idVersionState.Version, idVersionState.State))
-		}
+func (s *service) connectorForConfigName(ctx context.Context, namespace string, name scommon.ResourceName) (*database.ConnectorWithDefinition, error) {
+	page := s.db.ListConnectorsBuilder().
+		ForName(name).
+		ForNamespaceMatchers([]string{namespace}).
+		Limit(2).
+		FetchPage(ctx)
+	if page.Error != nil {
+		return nil, page.Error
 	}
-
-	for idVersion, count := range idVersionCounts {
-		if count > 1 {
-			result = multierror.Append(result, fmt.Errorf("connector %s version %d has multiple entries without differentiating state", idVersion.Id, idVersion.Version))
-		}
+	if len(page.Results) == 0 {
+		return nil, database.ErrNotFound
 	}
-
-	for id, count := range idCounts {
-		if count > 1 {
-			result = multierror.Append(result, fmt.Errorf("connector %s has multiple entries without differentiating state or version", id))
-		}
+	if len(page.Results) > 1 {
+		return nil, fmt.Errorf("multiple connectors named %q exist in namespace %q: %w", name, namespace, database.ErrViolation)
 	}
-
-	for labelKey, count := range identifyingLabelCounts {
-		if count > 1 {
-			result = multierror.Append(result, fmt.Errorf("connector with identifying labels %s has multiple entries without differentiating id or version", labelKey))
-		}
-	}
-
-	return result.ErrorOrNil()
+	return &page.Results[0], nil
 }
 
 // precheckConnectorForMigration checks the database to see if the connector definition aligns with the current state.
 // This covers enforcement that a version that is published cannot change, and what identifiers are required to
 // differentiate this connector definition from others that exist.
-func (s *service) precheckConnectorForMigration(ctx context.Context, configConnectors *config.Connectors, configConnector *config.Connector) error {
+func (s *service) precheckConnectorForMigration(ctx context.Context, configConnector *config.Connector) error {
 	// Don't modify original as we do all the checks
 	configConnector = configConnector.Clone()
-	identifyingLabels := configConnectors.GetIdentifyingLabels()
 
 	if configConnector.HasId() {
+		if configConnector.HasName() {
+			byName, err := s.connectorForConfigName(ctx, configConnector.GetNamespace(), configConnector.Name)
+			if err != nil && !errors.Is(err, database.ErrNotFound) {
+				return fmt.Errorf("failed to check connector name during precheck: %w", err)
+			}
+			if byName != nil && byName.Id != configConnector.Id {
+				return fmt.Errorf("connector name %q already belongs to connector %s in namespace %q", configConnector.Name, byName.Id, configConnector.GetNamespace())
+			}
+		}
+
 		if configConnector.HasVersion() {
 			existingVersion, err := s.db.GetConnectorDefinitionVersion(ctx, configConnector.Id, configConnector.Version)
 			if err != nil && !errors.Is(err, database.ErrNotFound) {
@@ -445,53 +326,42 @@ func (s *service) precheckConnectorForMigration(ctx context.Context, configConne
 					}
 				}
 			}
+		} else {
+			existingVersion, err := s.db.NewestConnectorDefinitionVersionForId(ctx, configConnector.Id)
+			if err != nil && !errors.Is(err, database.ErrNotFound) {
+				return fmt.Errorf("failed to get newest version of connector for precheck: %w", err)
+			}
+			if existingVersion != nil && existingVersion.Namespace != configConnector.GetNamespace() {
+				return fmt.Errorf("connector %s currently has namespace path %q and cannot be changed to %q", configConnector.Id, existingVersion.Namespace, configConnector.GetNamespace())
+			}
 		}
 	} else {
-		// No connector id means that we need to look up by identifying labels
-		labelValues := configConnector.GetIdentifyingLabelValues(identifyingLabels)
-		labelSelector := database.BuildLabelSelectorFromMap(labelValues)
-
-		b := s.db.ListConnectorsBuilder().
-			ForLabelSelector(labelSelector).
-			OrderBy(database.ConnectorOrderByCreatedAt, pagination.OrderByDesc).
-			Limit(100)
-
-		results := make([]database.ConnectorWithDefinition, 0)
-		err := b.Enumerate(ctx, func(result pagination.PageResult[database.ConnectorWithDefinition]) (keepGoing pagination.KeepGoing, err error) {
-			results = append(results, result.Results...)
-			return pagination.Continue, nil
-		})
-		if err != nil {
-			return fmt.Errorf("failed to check for existing connector for precheck: %w", err)
-		}
-
-		if len(results) > 1 {
-			connectorIds := strings.Join(util.Map(results, func(c database.ConnectorWithDefinition) string { return c.Id.String() }), ", ")
-			return fmt.Errorf("connector with identifying labels %s is not unique among existing defined connectors: %s", labelSelector, connectorIds)
-		} else if len(results) == 1 {
-			if results[0].Namespace != configConnector.GetNamespace() {
-				return fmt.Errorf("connector %s currently has namespace path '%s' and cannot be changed to '%s'", configConnector.Id, results[0].Namespace, configConnector.GetNamespace())
-			}
+		existingConnector, err := s.connectorForConfigName(ctx, configConnector.GetNamespace(), configConnector.Name)
+		if err != nil && !errors.Is(err, database.ErrNotFound) {
+			return fmt.Errorf("failed to check for existing connector by name during precheck: %w", err)
 		}
 
 		if configConnector.HasVersion() {
-			existingVersion, err := s.db.GetConnectorDefinitionVersionForLabelsAndVersion(ctx, labelSelector, configConnector.Version)
-			if err != nil && !errors.Is(err, database.ErrNotFound) {
-				return fmt.Errorf("failed to check for existing connector version for precheck: %w", err)
+			var existingVersion *database.ConnectorWithDefinition
+			if existingConnector != nil {
+				existingVersion, err = s.db.GetConnectorDefinitionVersion(ctx, existingConnector.Id, configConnector.Version)
+				if err != nil && !errors.Is(err, database.ErrNotFound) {
+					return fmt.Errorf("failed to check for existing connector version for precheck: %w", err)
+				}
 			}
 
-			if errors.Is(err, database.ErrNotFound) {
-				if len(results) == 0 {
+			if existingVersion == nil {
+				if existingConnector == nil {
 					if configConnector.Version != 1 {
-						return fmt.Errorf("connector with identifying labels %s does not have previous versions and must start with version 1", labelSelector)
+						return fmt.Errorf("connector %q in namespace %q does not have previous versions and must start with version 1", configConnector.Name, configConnector.GetNamespace())
 					}
 				} else {
-					newestVersion, err := s.db.NewestConnectorDefinitionVersionForId(ctx, results[0].Id)
+					newestVersion, err := s.db.NewestConnectorDefinitionVersionForId(ctx, existingConnector.Id)
 					if err != nil && !errors.Is(err, database.ErrNotFound) {
 						return fmt.Errorf("failed to get newest version of connector for precheck: %w", err)
 					}
 					if newestVersion != nil && newestVersion.Version+1 != configConnector.Version {
-						return fmt.Errorf("connector with identifying labels %s currently has version %d and cannot be incremented to %d", labelSelector, newestVersion.Version, configConnector.Version)
+						return fmt.Errorf("connector %q in namespace %q currently has version %d and cannot be incremented to %d", configConnector.Name, configConnector.GetNamespace(), newestVersion.Version, configConnector.Version)
 					}
 				}
 			} else {
@@ -500,17 +370,13 @@ func (s *service) precheckConnectorForMigration(ctx context.Context, configConne
 					configConnector.State = string(database.ConnectorDefinitionVersionStatePrimary)
 				}
 
-				if existingVersion.Namespace != configConnector.GetNamespace() {
-					return fmt.Errorf("connector with identifying labels %s currently has namespace '%s' and cannot be changed to %s", labelSelector, existingVersion.Namespace, configConnector.GetNamespace())
-				}
-
 				if existingVersion.State != database.ConnectorDefinitionVersionStateDraft {
 					matches, hashErr := s.connectorVersionHashEquals(existingVersion, configConnector.Hash())
 					if hashErr != nil {
 						return hashErr
 					}
 					if !matches {
-						return fmt.Errorf("connector with identifying labels %s version %d has been published and cannot be modified", labelSelector, configConnector.Version)
+						return fmt.Errorf("connector %q in namespace %q version %d has been published and cannot be modified", configConnector.Name, configConnector.GetNamespace(), configConnector.Version)
 					}
 				}
 			}
@@ -524,11 +390,21 @@ func (s *service) precheckConnectorForMigration(ctx context.Context, configConne
 // Returns the resolved connector id (the id this config entry maps to in the
 // database, whether newly generated or matched against an existing row) so the
 // caller can track which connectors are config-managed and detect orphans.
-func (s *service) migrateConnector(ctx context.Context, configConnectors *config.Connectors, configConnector *config.Connector) (apid.ID, error) {
-	b := newConnectorBuilder(s)
-	identifyingLabels := configConnectors.GetIdentifyingLabels()
+func (s *service) syncConfiguredConnectorName(ctx context.Context, configConnector *config.Connector, existingVersion *database.ConnectorWithDefinition) error {
+	if existingVersion == nil || !configConnector.HasId() || !configConnector.HasName() || existingVersion.Name == configConnector.Name {
+		return nil
+	}
+	if err := s.UpdateConnectorName(ctx, configConnector.Id, configConnector.Name); err != nil {
+		return fmt.Errorf("failed to rename configured connector %s to %q: %w", configConnector.Id, configConnector.Name, err)
+	}
+	existingVersion.Name = configConnector.Name
+	return nil
+}
 
-	id := apctx.GetIdGenerator(ctx).New(apid.PrefixConnectorVersion)
+func (s *service) migrateConnector(ctx context.Context, configConnector *config.Connector) (apid.ID, error) {
+	b := newConnectorBuilder(s)
+
+	id := apctx.GetIdGenerator(ctx).New(apid.PrefixConnector)
 	if configConnector.HasId() {
 		id = configConnector.Id
 	}
@@ -553,6 +429,16 @@ func (s *service) migrateConnector(ctx context.Context, configConnectors *config
 		existingVersion, err = s.db.GetConnectorDefinitionVersion(ctx, configConnector.Id, configConnector.Version)
 		if err != nil && !errors.Is(err, database.ErrNotFound) {
 			return apid.Nil, fmt.Errorf("failed to get connector version: %w", err)
+		}
+		existingConnector := existingVersion
+		if existingConnector == nil && configConnector.HasName() {
+			existingConnector, err = s.db.NewestConnectorDefinitionVersionForId(ctx, configConnector.Id)
+			if err != nil && !errors.Is(err, database.ErrNotFound) {
+				return apid.Nil, fmt.Errorf("failed to get connector for rename: %w", err)
+			}
+		}
+		if err := s.syncConfiguredConnectorName(ctx, configConnector, existingConnector); err != nil {
+			return apid.Nil, err
 		}
 
 		if existingVersion != nil {
@@ -579,6 +465,9 @@ func (s *service) migrateConnector(ctx context.Context, configConnectors *config
 		if err != nil && !errors.Is(err, database.ErrNotFound) {
 			return apid.Nil, fmt.Errorf("failed to get newest version of connector: %w", err)
 		}
+		if err := s.syncConfiguredConnectorName(ctx, configConnector, existingVersion); err != nil {
+			return apid.Nil, err
+		}
 
 		if existingVersion != nil {
 			c, err := b.
@@ -602,16 +491,21 @@ func (s *service) migrateConnector(ctx context.Context, configConnectors *config
 			version = existingVersion.Version + 1
 		}
 	} else if configConnector.HasVersion() {
-		// Pattern C: version only, no ID - use label-based lookup
-		labelValues := configConnector.GetIdentifyingLabelValues(identifyingLabels)
-		labelSelector := database.BuildLabelSelectorFromMap(labelValues)
-		existingVersion, err = s.db.GetConnectorDefinitionVersionForLabelsAndVersion(ctx, labelSelector, configConnector.Version)
-		if err != nil && !errors.Is(err, database.ErrNotFound) {
-			return apid.Nil, fmt.Errorf("failed to get connector version for labels/version: %w", err)
+		// Pattern C: version and name, no ID - resolve the logical connector by
+		// exact name within its namespace, then address the version by its ID.
+		existingConnector, lookupErr := s.connectorForConfigName(ctx, configConnector.GetNamespace(), configConnector.Name)
+		if lookupErr != nil && !errors.Is(lookupErr, database.ErrNotFound) {
+			return apid.Nil, fmt.Errorf("failed to get connector by name: %w", lookupErr)
 		}
-
-		if existingVersion != nil {
-			id = existingVersion.Id
+		if existingConnector != nil {
+			id = existingConnector.Id
+			existingVersion, err = s.db.GetConnectorDefinitionVersion(ctx, id, configConnector.Version)
+			if err != nil && !errors.Is(err, database.ErrNotFound) {
+				return apid.Nil, fmt.Errorf("failed to get connector version by name: %w", err)
+			}
+			if existingVersion == nil {
+				existingVersion = existingConnector
+			}
 
 			c, err := b.
 				WithId(id).
@@ -630,23 +524,13 @@ func (s *service) migrateConnector(ctx context.Context, configConnectors *config
 					return id, nil
 				}
 			}
-		} else {
-			existingVersion, err = s.db.GetConnectorDefinitionVersionForLabels(ctx, labelSelector)
-			if err != nil && !errors.Is(err, database.ErrNotFound) {
-				return apid.Nil, fmt.Errorf("failed to get connector version for labels: %w", err)
-			}
-
-			if existingVersion != nil {
-				id = existingVersion.Id
-			}
 		}
 	} else {
-		// Pattern D: no ID, no version - use label-based lookup
-		labelValues := configConnector.GetIdentifyingLabelValues(identifyingLabels)
-		labelSelector := database.BuildLabelSelectorFromMap(labelValues)
-		existingVersion, err = s.db.GetConnectorDefinitionVersionForLabels(ctx, labelSelector)
+		// Pattern D: name only - resolve the logical connector by exact name
+		// within its namespace and let definition changes auto-increment version.
+		existingVersion, err = s.connectorForConfigName(ctx, configConnector.GetNamespace(), configConnector.Name)
 		if err != nil && !errors.Is(err, database.ErrNotFound) {
-			return apid.Nil, fmt.Errorf("failed to get connector version for labels: %w", err)
+			return apid.Nil, fmt.Errorf("failed to get connector by name: %w", err)
 		}
 
 		if existingVersion != nil {
@@ -683,6 +567,9 @@ func (s *service) migrateConnector(ctx context.Context, configConnectors *config
 	if err != nil {
 		return apid.Nil, fmt.Errorf("failed to build connector version: %w", err)
 	}
+	// Name is config reconciliation metadata for the logical connector, not
+	// part of the encrypted definition assembled by connectorBuilder.
+	c.ConnectorWithDefinition.Name = configConnector.Name
 
 	// Final check, though this should be duplicative
 	if existingVersion != nil {

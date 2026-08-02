@@ -538,62 +538,6 @@ func (s *service) DeleteConnector(ctx context.Context, id apid.ID) error {
 	})
 }
 
-// GetConnectorDefinitionVersionForLabels finds the newest connector version matching the label selector.
-func (s *service) GetConnectorDefinitionVersionForLabels(ctx context.Context, labelSelector string) (*ConnectorWithDefinition, error) {
-	selector, err := ParseLabelSelector(labelSelector)
-	if err != nil {
-		return nil, err
-	}
-
-	var result ConnectorWithDefinition
-	q := s.selectConnectorDefinitionVersions().
-		Where(sq.Eq{"c.deleted_at": nil, "dv.deleted_at": nil})
-
-	q = selector.ApplyToSqlBuilderWithProvider(q, "c.labels", s.cfg.GetProvider())
-
-	err = q.OrderBy("c.created_at DESC", "dv.version DESC").
-		Limit(1).
-		RunWith(s.db).
-		QueryRow().
-		Scan(result.fields()...)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &result, nil
-}
-
-// GetConnectorDefinitionVersionForLabelsAndVersion finds a connector version by labels + specific version.
-func (s *service) GetConnectorDefinitionVersionForLabelsAndVersion(ctx context.Context, labelSelector string, version uint64) (*ConnectorWithDefinition, error) {
-	selector, err := ParseLabelSelector(labelSelector)
-	if err != nil {
-		return nil, err
-	}
-
-	var result ConnectorWithDefinition
-	q := s.selectConnectorDefinitionVersions().
-		Where(sq.Eq{"dv.version": version, "dv.deleted_at": nil, "c.deleted_at": nil})
-
-	q = selector.ApplyToSqlBuilderWithProvider(q, "c.labels", s.cfg.GetProvider())
-
-	err = q.OrderBy("c.created_at DESC").
-		Limit(1).
-		RunWith(s.db).
-		QueryRow().
-		Scan(result.fields()...)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &result, nil
-}
-
 func (s *service) GetConnectorDefinitionVersionForState(ctx context.Context, id apid.ID, state ConnectorDefinitionVersionState) (*ConnectorWithDefinition, error) {
 	var result ConnectorWithDefinition
 	err := s.selectConnectorDefinitionVersions().

@@ -1,7 +1,6 @@
 package connectors
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -17,10 +16,6 @@ type Connectors struct {
 	AutoMigrate               *bool                 `json:"auto_migrate,omitempty" yaml:"auto_migrate,omitempty"`
 	AutoMigrationLockDuration *common.HumanDuration `json:"auto_migration_lock_duration,omitempty" yaml:"auto_migration_lock_duration,omitempty"`
 	LoadFromList              []Connector           `json:"load_from_list,omitempty" yaml:"load_from_list,omitempty"`
-
-	// IdentifyingLabels defines which label keys differentiate connectors when no explicit ID is specified.
-	// Defaults to ["type"] for backwards compatibility.
-	IdentifyingLabels []string `json:"identifying_labels,omitempty" yaml:"identifying_labels,omitempty"`
 }
 
 func FromList(c []Connector) *Connectors {
@@ -47,141 +42,160 @@ func (c *Connectors) GetConnectors() []Connector {
 	return c.LoadFromList
 }
 
-// GetIdentifyingLabels returns the identifying labels for connector differentiation.
-// Defaults to ["type"] for backwards compatibility when not specified.
-func (c *Connectors) GetIdentifyingLabels() []string {
-	if c == nil || len(c.IdentifyingLabels) == 0 {
-		return []string{"type"}
-	}
-	return c.IdentifyingLabels
-}
-
 func (c *Connectors) Validate(vc *common.ValidationContext) error {
 	result := &multierror.Error{}
-	identifyingLabels := c.GetIdentifyingLabels()
-
-	// Track by identifying label values (JSON-serialized) instead of Type
-	identifyingLabelCounts := make(map[string]int)          // serialized labels -> count
-	identifyingLabelHasUuidCount := make(map[string]int)    // serialized labels -> count with uuid
-	identifyingLabelHasVersionCount := make(map[string]int) // serialized labels -> count with version
-	identifyingLabelNoUuidVersionCount := make(map[string]map[uint64]int)
-
-	uuidToCount := make(map[apid.ID]int)
-	uuidHasVersionsCount := make(map[apid.ID]int)
-	uuidVersionCount := make(map[apid.ID]map[uint64]int)
-
-	// Beyond the validation of the individual connector configurations, this validate method checks to make sure that
-	// all connectors in the list are properly differentiated. We allow users to specify connectors only by identifying
-	// labels as long as there is only one of them. Assuming unspecified the system auto manages versions, attempting
-	// to immediately mark the new version as primary. If the user wants to manage this rollout process directly, they
-	// need to specify versions in the config to match what the system is tracking.
-	//
-	// Likewise, it is possible to have multiple connectors with the same identifying labels to provide alternatives
-	// for how to connect. If they want to specify multiple connectors with the same identifying labels, they must
-	// explicitly specify UUIDs to differentiate so that the system knows how to manage the upgrade path.
-
 	for i, connector := range c.GetConnectors() {
 		// We use a blank validation context at the connector level to account for the future of splitting
 		// the connector definition to a separate file.
 		if err := connector.Validate(&common.ValidationContext{}); err != nil {
-			labelValues := connector.GetIdentifyingLabelValues(identifyingLabels)
-			labelKey := serializeLabelValues(labelValues)
-
-			if connector.Id != apid.Nil && labelKey != "{}" {
-				err = multierror.Prefix(err, fmt.Sprintf("connector %s (%s): ", connector.Id.String(), labelKey))
-			} else if connector.Id != apid.Nil {
+			if connector.Id != apid.Nil {
 				err = multierror.Prefix(err, fmt.Sprintf("connector %s: ", connector.Id.String()))
-			} else if labelKey != "{}" {
-				err = multierror.Prefix(err, fmt.Sprintf("connector with labels %s: ", labelKey))
+			} else if connector.Name != "" {
+				err = multierror.Prefix(err, fmt.Sprintf("connector %s: ", connector.Name))
 			} else {
 				err = multierror.Prefix(err, fmt.Sprintf("connector %d: ", i))
 			}
 
 			result = multierror.Append(result, err)
 		}
+	}
+	result = multierror.Append(result, c.ValidateIdentities(vc))
+	return result.ErrorOrNil()
+}
 
-		// Validate all identifying labels are present
-		labelValues := connector.GetIdentifyingLabelValues(identifyingLabels)
-		for _, key := range identifyingLabels {
-			if _, exists := labelValues[key]; !exists {
-				result = multierror.Append(result, vc.NewErrorfForField(
-					"load_from_list",
-					"connector %d missing required identifying label %q", i, key,
-				))
-			}
+// ValidateIdentities validates only the fields used to reconcile configured
+// connector entries. Migration uses it for its identity precheck; full
+// connector-definition validation remains the responsibility of Validate.
+func (c *Connectors) ValidateIdentities(vc *common.ValidationContext) error {
+	result := &multierror.Error{}
+	type nameKey struct {
+		Namespace string
+		Name      common.ResourceName
+	}
+	type logicalKey struct {
+		Id        apid.ID
+		Namespace string
+		Name      common.ResourceName
+	}
+	type identityDetails struct {
+		ids         map[apid.ID]struct{}
+		hasNoId     bool
+		versions    map[uint64]int
+		unversioned map[string]int
+	}
+
+	byName := make(map[nameKey]*identityDetails)
+	byLogical := make(map[logicalKey]*identityDetails)
+	idNamespaces := make(map[apid.ID]map[string]struct{})
+	idNames := make(map[apid.ID]map[common.ResourceName]struct{})
+
+	for i, connector := range c.GetConnectors() {
+		if !connector.HasId() && !connector.HasName() {
+			result = multierror.Append(result, vc.NewErrorfForField(
+				"load_from_list",
+				"connector %d must specify name when id is omitted", i,
+			))
+			continue
 		}
 
-		// Create key from identifying label values
-		identifyingKey := serializeLabelValues(labelValues)
+		name := connector.Name
+		if name == "" {
+			name = common.ResourceName(connector.Id.String())
+		}
+		nk := nameKey{Namespace: connector.GetNamespace(), Name: name}
+		nameDetails := byName[nk]
+		if nameDetails == nil {
+			nameDetails = &identityDetails{ids: make(map[apid.ID]struct{}), versions: make(map[uint64]int)}
+			byName[nk] = nameDetails
+		}
+		if connector.HasId() {
+			nameDetails.ids[connector.Id] = struct{}{}
+		} else {
+			nameDetails.hasNoId = true
+		}
 
-		if connector.Id != apid.Nil {
-			uuidToCount[connector.Id]++
+		lk := logicalKey{Id: connector.Id}
+		if !connector.HasId() {
+			lk.Namespace = connector.GetNamespace()
+			lk.Name = name
+		}
+		logicalDetails := byLogical[lk]
+		if logicalDetails == nil {
+			logicalDetails = &identityDetails{versions: make(map[uint64]int), unversioned: make(map[string]int)}
+			byLogical[lk] = logicalDetails
+		}
+		if connector.HasVersion() {
+			logicalDetails.versions[connector.Version]++
+		} else {
+			state := connector.State
+			if state == "" {
+				state = "primary"
+			}
+			logicalDetails.unversioned[state]++
+		}
 
-			if connector.Version != 0 {
-				uuidHasVersionsCount[connector.Id]++
-				if uuidVersionCount[connector.Id] == nil {
-					uuidVersionCount[connector.Id] = make(map[uint64]int)
+		if connector.HasId() {
+			if idNamespaces[connector.Id] == nil {
+				idNamespaces[connector.Id] = make(map[string]struct{})
+			}
+			idNamespaces[connector.Id][connector.GetNamespace()] = struct{}{}
+			if connector.HasName() {
+				if idNames[connector.Id] == nil {
+					idNames[connector.Id] = make(map[common.ResourceName]struct{})
 				}
-				uuidVersionCount[connector.Id][connector.Version]++
+				idNames[connector.Id][connector.Name] = struct{}{}
 			}
 		}
+	}
 
-		if identifyingKey != "{}" {
-			identifyingLabelCounts[identifyingKey]++
+	for key, details := range byName {
+		if len(details.ids) > 1 {
+			result = multierror.Append(result, vc.NewErrorf("connector name %q in namespace %q is assigned to multiple ids", key.Name, key.Namespace))
+		}
+		if details.hasNoId && len(details.ids) > 0 {
+			result = multierror.Append(result, vc.NewErrorf("connector name %q in namespace %q mixes entries with and without ids", key.Name, key.Namespace))
+		}
+	}
 
-			if connector.Id != apid.Nil {
-				identifyingLabelHasUuidCount[identifyingKey]++
+	for id, namespaces := range idNamespaces {
+		if len(namespaces) > 1 {
+			result = multierror.Append(result, vc.NewErrorf("connector %s is assigned to multiple namespaces", id))
+		}
+	}
+	for id, names := range idNames {
+		if len(names) > 1 {
+			result = multierror.Append(result, vc.NewErrorf("connector %s is assigned multiple names", id))
+		}
+	}
+
+	for key, details := range byLogical {
+		if len(details.unversioned) > 0 && len(details.versions) > 0 {
+			if key.Id != apid.Nil {
+				result = multierror.Append(result, vc.NewErrorf("connector %s has multiple entries without differentiated versions", key.Id))
 			} else {
-				if connector.Version != 0 {
-					if identifyingLabelNoUuidVersionCount[identifyingKey] == nil {
-						identifyingLabelNoUuidVersionCount[identifyingKey] = make(map[uint64]int)
-					}
-					identifyingLabelNoUuidVersionCount[identifyingKey][connector.Version]++
+				result = multierror.Append(result, vc.NewErrorf("connector name %q in namespace %q has multiple entries without differentiated versions", key.Name, key.Namespace))
+			}
+		}
+		for state, count := range details.unversioned {
+			if count <= 1 {
+				continue
+			}
+			if key.Id != apid.Nil {
+				result = multierror.Append(result, vc.NewErrorf("connector %s has multiple unversioned entries for state %q", key.Id, state))
+			} else {
+				result = multierror.Append(result, vc.NewErrorf("connector name %q in namespace %q has multiple unversioned entries for state %q", key.Name, key.Namespace, state))
+			}
+		}
+		for version, count := range details.versions {
+			if count > 1 {
+				if key.Id != apid.Nil {
+					result = multierror.Append(result, vc.NewErrorf("duplicate connectors exist for id %s with version %d", key.Id, version))
+				} else {
+					result = multierror.Append(result, vc.NewErrorf("duplicate connectors exist for name %q in namespace %q with version %d", key.Name, key.Namespace, version))
 				}
-			}
-
-			if connector.Version != 0 {
-				identifyingLabelHasVersionCount[identifyingKey]++
-			}
-		}
-	}
-
-	for key, count := range identifyingLabelCounts {
-		if count > 1 && identifyingLabelHasUuidCount[key] < count && identifyingLabelHasVersionCount[key] < count {
-			result = multierror.Append(result, vc.NewErrorf("duplicate connectors exist for identifying labels %s without ids or versions specified to fully differentiate", key))
-		}
-	}
-
-	for id, count := range uuidToCount {
-		if count > 1 && count > uuidHasVersionsCount[id] {
-			result = multierror.Append(result, vc.NewErrorf("duplicate connectors exist for id %s without differentiated versions", id.String()))
-		}
-	}
-
-	for key, versionCounts := range identifyingLabelNoUuidVersionCount {
-		for version, count := range versionCounts {
-			if count > 1 {
-				result = multierror.Append(result, vc.NewErrorf("duplicate connectors exist for identifying labels %s with version %d", key, version))
-			}
-		}
-	}
-
-	for id, versionCounts := range uuidVersionCount {
-		for version, count := range versionCounts {
-			if count > 1 {
-				result = multierror.Append(result, vc.NewErrorf("duplicate connectors exist for id %s with version %d", id.String(), version))
 			}
 		}
 	}
 
 	return result.ErrorOrNil()
-}
-
-// serializeLabelValues serializes label values to a JSON string for use as a map key.
-func serializeLabelValues(labels map[string]string) string {
-	if len(labels) == 0 {
-		return "{}"
-	}
-	data, _ := json.Marshal(labels)
-	return string(data)
 }

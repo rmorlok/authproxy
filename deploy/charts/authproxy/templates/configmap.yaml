@@ -120,9 +120,6 @@ template syntax.
 
 {{/* --- connectors block (required by validator; empty list is acceptable) --- */}}
 {{- $connectors := dict "auto_migrate" .Values.connectors.autoMigrate "load_from_list" .Values.connectors.loadFromList -}}
-{{- if .Values.connectors.identifyingLabels -}}
-{{-   $_ := set $connectors "identifying_labels" .Values.connectors.identifyingLabels -}}
-{{- end -}}
 {{- $_ := set $cfg "connectors" $connectors -}}
 
 {{/* --- app_metrics (server unconditionally wires up the metrics store) --- */}}

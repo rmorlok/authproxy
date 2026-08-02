@@ -98,8 +98,6 @@ type DB interface {
 
 	GetConnectorDefinitionVersion(ctx context.Context, id apid.ID, version uint64) (*ConnectorWithDefinition, error)
 	GetConnectorDefinitionVersions(ctx context.Context, requested []ConnectorDefinitionVersionId) (map[ConnectorDefinitionVersionId]*ConnectorWithDefinition, error)
-	GetConnectorDefinitionVersionForLabels(ctx context.Context, labelSelector string) (*ConnectorWithDefinition, error)
-	GetConnectorDefinitionVersionForLabelsAndVersion(ctx context.Context, labelSelector string, version uint64) (*ConnectorWithDefinition, error)
 	GetConnectorDefinitionVersionForState(ctx context.Context, id apid.ID, state ConnectorDefinitionVersionState) (*ConnectorWithDefinition, error)
 	NewestConnectorDefinitionVersionForId(ctx context.Context, id apid.ID) (*ConnectorWithDefinition, error)
 	NewestPublishedConnectorDefinitionVersionForId(ctx context.Context, id apid.ID) (*ConnectorWithDefinition, error)

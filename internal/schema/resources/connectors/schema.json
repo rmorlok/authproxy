@@ -272,6 +272,9 @@
     "id": {
       "$ref": "../../common/schema.json#/$defs/UUID"
     },
+    "name": {
+      "$ref": "../../common/schema.json#/$defs/ResourceName"
+    },
     "namespace": {
       "$ref": "../namespace/schema.json#/$defs/NamespacePath"
     },

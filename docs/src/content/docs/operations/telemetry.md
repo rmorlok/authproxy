@@ -148,7 +148,8 @@ Per-connector overrides for trace context propagation live on the connector defi
 ```yaml
 connectors:
   load_from_list:
-    - labels:
+    - name: google-drive
+      labels:
         type: google-drive
       auth: { type: OAuth2, ... }
       telemetry:

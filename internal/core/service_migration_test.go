@@ -12,7 +12,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apasynq/mock"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apredis"
-	apredis2 "github.com/rmorlok/authproxy/internal/apredis"
+	apredismock "github.com/rmorlok/authproxy/internal/apredis/mock"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -65,11 +65,15 @@ func TestMigration(t *testing.T) {
 
 		logger := slog.Default()
 		cfg, db, rawDb = database.MustApplyBlankTestDbConfigRaw(t, cfg)
-		cfg, r = apredis2.MustApplyTestConfig(cfg)
-		e := encrypt.NewEncryptService(cfg, db, logger)
 		ctrl := gomock.NewController(t)
+		r = apredismock.NewMockClient(ctrl)
+		e := encrypt.NewEncryptService(cfg, db, logger)
 
 		asynqClient = mock.NewMockClient(ctrl)
+		asynqClient.(*mock.MockClient).EXPECT().
+			EnqueueContext(gomock.Any(), gomock.Any()).
+			AnyTimes().
+			Return(nil, nil)
 		h = hmock.NewMockF(ctrl)
 
 		service = NewCoreService(cfg, db, e, r, h, asynqClient, logger)
@@ -97,7 +101,107 @@ func TestMigration(t *testing.T) {
 
 			assertSqlWithDisplayName(t, rawDb, cfg, `
 			SELECT connector_id AS id, version, state FROM connector_definition_versions;
-		`, []connectorResult{})
+			`, []connectorResult{})
+		})
+
+		t.Run("names reconcile connector identity", func(t *testing.T) {
+			t.Run("label changes preserve the generated connector id", func(t *testing.T) {
+				cleanup := setup(t, []cschema.Connector{{
+					Name:        "configured",
+					Labels:      map[string]string{"type": "before"},
+					DisplayName: "Before",
+				}})
+				defer cleanup()
+
+				require.NoError(t, service.MigrateConnectors(context.Background()))
+				first := db.ListConnectorsBuilder().ForName("configured").FetchPage(context.Background())
+				require.NoError(t, first.Error)
+				require.Len(t, first.Results, 1)
+				generatedID := first.Results[0].Id
+
+				cfg.GetRoot().Connectors.LoadFromList[0].Labels["type"] = "after"
+				cfg.GetRoot().Connectors.LoadFromList[0].DisplayName = "After"
+				require.NoError(t, service.MigrateConnectors(context.Background()))
+
+				result := db.ListConnectorsBuilder().ForName("configured").FetchPage(context.Background())
+				require.NoError(t, result.Error)
+				require.Len(t, result.Results, 1)
+				require.Equal(t, generatedID, result.Results[0].Id)
+				require.Equal(t, "after", result.Results[0].Labels["type"])
+
+				versions := db.ListConnectorDefinitionVersionsBuilder().ForId(generatedID).FetchPage(context.Background())
+				require.NoError(t, versions.Error)
+				require.Len(t, versions.Results, 2)
+			})
+
+			t.Run("explicit id can rename without creating a version", func(t *testing.T) {
+				connectorID := apid.MustParse("cxr_test0000000000001")
+				cleanup := setup(t, []cschema.Connector{{
+					Id:          connectorID,
+					Name:        "before",
+					Labels:      map[string]string{"type": "same"},
+					DisplayName: "Unchanged definition",
+				}})
+				defer cleanup()
+
+				require.NoError(t, service.MigrateConnectors(context.Background()))
+				cfg.GetRoot().Connectors.LoadFromList[0].Name = "after"
+				require.NoError(t, service.MigrateConnectors(context.Background()))
+
+				renamed := db.ListConnectorsBuilder().ForName("after").FetchPage(context.Background())
+				require.NoError(t, renamed.Error)
+				require.Len(t, renamed.Results, 1)
+				require.Equal(t, connectorID, renamed.Results[0].Id)
+				require.Equal(t, "after", renamed.Results[0].Labels["apxy/cxr/-/name"])
+
+				versions := db.ListConnectorDefinitionVersionsBuilder().ForId(connectorID).FetchPage(context.Background())
+				require.NoError(t, versions.Error)
+				require.Len(t, versions.Results, 1)
+			})
+
+			t.Run("explicit id can rename while adding a version", func(t *testing.T) {
+				connectorID := apid.MustParse("cxr_test0000000000001")
+				cleanup := setup(t, []cschema.Connector{{
+					Id:          connectorID,
+					Name:        "before",
+					Version:     1,
+					Labels:      map[string]string{"type": "same"},
+					DisplayName: "Version one",
+				}})
+				defer cleanup()
+
+				require.NoError(t, service.MigrateConnectors(context.Background()))
+				cfg.GetRoot().Connectors.LoadFromList[0].Name = "after"
+				cfg.GetRoot().Connectors.LoadFromList[0].Version = 2
+				cfg.GetRoot().Connectors.LoadFromList[0].DisplayName = "Version two"
+				require.NoError(t, service.MigrateConnectors(context.Background()))
+
+				renamed := db.ListConnectorsBuilder().ForName("after").FetchPage(context.Background())
+				require.NoError(t, renamed.Error)
+				require.Len(t, renamed.Results, 1)
+				require.Equal(t, connectorID, renamed.Results[0].Id)
+
+				versions := db.ListConnectorDefinitionVersionsBuilder().ForId(connectorID).FetchPage(context.Background())
+				require.NoError(t, versions.Error)
+				require.Len(t, versions.Results, 2)
+			})
+
+			t.Run("same name in different namespaces creates different connectors", func(t *testing.T) {
+				firstNamespace := "root.first"
+				secondNamespace := "root.second"
+				cleanup := setup(t, []cschema.Connector{
+					{Name: "shared", Namespace: &firstNamespace, Labels: map[string]string{"type": "same"}},
+					{Name: "shared", Namespace: &secondNamespace, Labels: map[string]string{"type": "same"}},
+				})
+				defer cleanup()
+
+				require.NoError(t, service.Migrate(context.Background()))
+
+				results := db.ListConnectorsBuilder().ForName("shared").FetchPage(context.Background())
+				require.NoError(t, results.Error)
+				require.Len(t, results.Results, 2)
+				require.NotEqual(t, results.Results[0].Id, results.Results[1].Id)
+			})
 		})
 
 		t.Run("id and version", func(t *testing.T) {
@@ -934,10 +1038,11 @@ func TestMigration(t *testing.T) {
 			})
 		})
 
-		t.Run("type and version", func(t *testing.T) {
+		t.Run("name and version", func(t *testing.T) {
 			t.Run("changed once preserves generated id", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
+						Name:        "fake",
 						Version:     1,
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "initial",
@@ -996,6 +1101,7 @@ func TestMigration(t *testing.T) {
 			t.Run("initial version must start at one", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
+						Name:        "fake",
 						Version:     2,
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "initial",
@@ -1020,6 +1126,7 @@ func TestMigration(t *testing.T) {
 			t.Run("cannot change published version", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
+						Name:        "fake",
 						Version:     1,
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "initial",
@@ -1056,10 +1163,11 @@ func TestMigration(t *testing.T) {
 			})
 		})
 
-		t.Run("type only", func(t *testing.T) {
+		t.Run("name only", func(t *testing.T) {
 			t.Run("single initial", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
+						Name:   "fake",
 						Labels: map[string]string{"type": "fake"},
 					},
 				})
@@ -1086,6 +1194,7 @@ func TestMigration(t *testing.T) {
 			t.Run("unchanged initial", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
+						Name:   "fake",
 						Labels: map[string]string{"type": "fake"},
 					},
 				})
@@ -1115,6 +1224,7 @@ func TestMigration(t *testing.T) {
 			t.Run("changed once", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
+						Name:        "fake",
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "initial",
 					},
@@ -1154,6 +1264,7 @@ func TestMigration(t *testing.T) {
 			t.Run("changed once then unchanged", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
+						Name:        "fake",
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "initial",
 					},
@@ -1196,6 +1307,7 @@ func TestMigration(t *testing.T) {
 			t.Run("changed twice", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
+						Name:        "fake",
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "initial",
 					},
@@ -1242,13 +1354,15 @@ func TestMigration(t *testing.T) {
 				})
 			})
 
-			t.Run("does not allow duplicate type without id initial", func(t *testing.T) {
+			t.Run("does not allow duplicate name without id initial", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
+						Name:        "fake",
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "first",
 					},
 					{
+						Name:        "fake",
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "second",
 					},
@@ -1270,9 +1384,10 @@ func TestMigration(t *testing.T) {
 		`, []connectorResult{})
 			})
 
-			t.Run("does not allow duplicate type without id when migrated", func(t *testing.T) {
+			t.Run("does not allow duplicate name without id when migrated", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
+						Name:        "fake",
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "first",
 					},
@@ -1283,6 +1398,7 @@ func TestMigration(t *testing.T) {
 				require.NoError(t, err)
 
 				cfg.GetRoot().Connectors.LoadFromList = append(cfg.GetRoot().Connectors.LoadFromList, cschema.Connector{
+					Name:        "fake",
 					Labels:      map[string]string{"type": "fake"},
 					DisplayName: "second",
 				})
@@ -1472,15 +1588,17 @@ func TestMigration(t *testing.T) {
 		`, []connectorResult{})
 			})
 
-			t.Run("id version and type without id", func(t *testing.T) {
+			t.Run("id version and name without id", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
+						Name:        "fake",
 						Version:     1,
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
 					},
 					{
+						Name:        "fake",
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
 					},
@@ -1493,11 +1611,13 @@ func TestMigration(t *testing.T) {
 				cleanup2 := setup(t, []cschema.Connector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
+						Name:        "fake",
 						Version:     1,
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
 					},
 					{
+						Name:        "fake",
 						Version:     2,
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
@@ -1511,11 +1631,13 @@ func TestMigration(t *testing.T) {
 				cleanup3 := setup(t, []cschema.Connector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
+						Name:        "fake",
 						Version:     1,
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
 					},
 					{
+						Name:        "fake",
 						Version:     2,
 						State:       "draft",
 						Labels:      map[string]string{"type": "fake"},
@@ -1539,14 +1661,16 @@ func TestMigration(t *testing.T) {
 		`, []connectorResult{})
 			})
 
-			t.Run("id and type without id", func(t *testing.T) {
+			t.Run("id and name without id", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
+						Name:        "fake",
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
 					},
 					{
+						Name:        "fake",
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
 					},
@@ -1559,10 +1683,12 @@ func TestMigration(t *testing.T) {
 				cleanup2 := setup(t, []cschema.Connector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
+						Name:        "fake",
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
 					},
 					{
+						Name:        "fake",
 						Version:     2,
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
@@ -1576,10 +1702,12 @@ func TestMigration(t *testing.T) {
 				cleanup3 := setup(t, []cschema.Connector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
+						Name:        "fake",
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
 					},
 					{
+						Name:        "fake",
 						Version:     2,
 						State:       "draft",
 						Labels:      map[string]string{"type": "fake"},

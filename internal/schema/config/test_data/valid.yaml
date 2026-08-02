@@ -80,7 +80,8 @@ connectors:
   auto_migrate: true
   auto_migration_lock_duration: 30s
   load_from_list:
-  - labels:
+  - name: google-drive
+    labels:
       type: google-drive
     display_name: Google Drive
     logo:
@@ -118,7 +119,8 @@ connectors:
           required: false
           reason: |
             We need to be able to see what's been going on in drive
-  - labels:
+  - name: greenhouse
+    labels:
       type: greenhouse
     version: 1
     display_name: Greenhouse
@@ -131,7 +133,8 @@ connectors:
       type: api-key
       placement:
         type: bearer
-  - labels:
+  - name: google-calendar
+    labels:
       type: google-calendar
     display_name: Google Calendar
     logo: https://upload.wikimedia.org/wikipedia/commons/a/a5/Google_Calendar_icon_%282020%29.svg
@@ -155,7 +158,8 @@ connectors:
         - id: https://www.googleapis.com/auth/calendar.readonly
           reason: |
             We need to be able to read the calendar
-  - labels:
+  - name: gmail
+    labels:
       type: gmail
     display_name: GMail
     logo:
@@ -180,7 +184,8 @@ connectors:
         - id: https://www.googleapis.com/auth/gmail.readonly
           reason: |
             We need to be able to read your emails
-  - labels:
+  - name: pipedrive
+    labels:
       type: pipedrive
     display_name: pipedrive
     logo:
@@ -207,7 +212,8 @@ connectors:
         - id: webhooks:full
           reason: |
             Allows us to receive notification of changes in realtime
-  - labels:
+  - name: asana
+    labels:
       type: asana
     display_name: Asana
     logo:

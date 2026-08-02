@@ -986,14 +986,24 @@ func TestSchemaDefinitions(t *testing.T) {
 					Data:  `{"test": {}}`,
 				},
 				{
-					Name:  "with identifying_labels",
-					Valid: true,
+					Name:  "identifying_labels was removed",
+					Valid: false,
 					Data:  `{"test": {"identifying_labels": ["type", "region"]}}`,
 				},
 				{
 					Name:  "with auto_migrate",
 					Valid: true,
 					Data:  `{"test": {"auto_migrate": true, "auto_migration_lock_duration": "30s"}}`,
+				},
+				{
+					Name:  "connector with name",
+					Valid: true,
+					Data:  `{"test":{"load_from_list":[{"name":"example","labels":{},"display_name":"Example","logo":{"public_url":"https://example.com/logo.svg"},"auth":{"type":"no-auth"}}]}}`,
+				},
+				{
+					Name:  "connector without id or name",
+					Valid: false,
+					Data:  `{"test":{"load_from_list":[{"labels":{},"display_name":"Example","logo":{"public_url":"https://example.com/logo.svg"},"auth":{"type":"no-auth"}}]}}`,
 				},
 				{
 					Name:  "extra property",

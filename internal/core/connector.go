@@ -135,7 +135,13 @@ func (c *Connector) getHash() (string, error) {
 func (c *Connector) setDefinition(def *cschema.Connector) error {
 	c.defMu.Lock()
 
-	jsonBytes, err := json.Marshal(def)
+	// A connector name belongs to the logical connector row. Keep it out of
+	// the encrypted, version-specific definition so renaming never changes the
+	// definition hash or produces stale duplicated metadata in API responses.
+	storedDefinition := def.Clone()
+	storedDefinition.Name = ""
+
+	jsonBytes, err := json.Marshal(storedDefinition)
 	if err != nil {
 		c.defMu.Unlock()
 		return err
@@ -146,9 +152,9 @@ func (c *Connector) setDefinition(def *cschema.Connector) error {
 		c.defMu.Unlock()
 		return err
 	}
-	c.Hash = def.Hash()
+	c.Hash = storedDefinition.Hash()
 	c.ConnectorWithDefinition.EncryptedDefinition = encrypted
-	c.def = def
+	c.def = storedDefinition
 	c.defMu.Unlock()
 
 	c.resetJavascriptLibrary()

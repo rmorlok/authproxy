@@ -297,9 +297,8 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "autoMigrate":       { "type": "boolean" },
-        "loadFromList":      { "type": "array" },
-        "identifyingLabels": { "type": "array", "items": { "type": "string" } }
+        "autoMigrate":  { "type": "boolean" },
+        "loadFromList": { "type": "array" }
       }
     },
 
