@@ -77,14 +77,27 @@ Every signed token has an **actor** (who is making the call) and a **service-id 
 
 ### `ap list connectors` / `ap list connections`
 
-Paginates `GET /api/v1/connectors` and `GET /api/v1/connections`, printing each item to stdout. Used to discover IDs to feed to the other commands.
+Paginates `GET /api/v1/connectors` and `GET /api/v1/connections`, printing each
+item to stdout. Output includes the human-readable name and immutable ID. Use
+the name to recognize a resource, but pass the ID to commands and URLs that
+address it directly.
 
 ```bash
-ap list connectors --type oauth2 --state active --output table
-ap list connections --order "created_at DESC"
+ap list connectors --name salesforce --state active --output table
+ap list connections --name production-crm --order "created_at DESC"
 ```
 
-Useful flags: `--state`, `--type` (connectors only), `--order "<field> ASC|DESC"`, plus the global output flags from the `Output` helper (`--output json|jsonl|table`, `--limit`, …).
+`--name` is an exact, case-sensitive filter. If the caller can list several
+namespaces, the same name can produce more than one result; compare namespace
+and ID before acting. Other useful flags are `--state`, `--type` (connectors
+only), `--order "<field> ASC|DESC"`, plus the global output flags from the
+`Output` helper (`--output json|jsonl|table`, `--limit`, …).
+
+JSON and JSONL output retain the existing `id` field and add `name`; scripts
+that need durable identity should continue reading `id`. The CLI does not yet
+have dedicated create or rename commands, so use the API for those operations.
+See [Resource identity and names](/reference/api/#resource-identity-and-names)
+for create, rename-by-ID, conflict, and query examples.
 
 ### `ap sign-jwt`
 

@@ -116,3 +116,6 @@ Resource metrics are computed from periodic app-metrics resource samples.
 | `resources.rate_limits` | `count` | `mode`, `namespace` |
 
 All metric queries accept the same namespace matcher and label selector fields. Label selectors evaluate against the frozen labels stored with the request event or resource sample, not the current live resource.
+Implicit `apxy/<rt>/-/name` labels therefore preserve the name captured in that
+sample or request snapshot. Renaming a live resource does not rewrite
+historical metrics data.

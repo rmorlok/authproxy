@@ -41,6 +41,7 @@ lifecycle around those calls.
 | **Connection** | A namespace-scoped instance of a connector containing encrypted credentials and setup state. |
 | **Namespace** | A hierarchical authorization and isolation boundary such as `root.tenants.acme`. |
 | **Actor** | A user or service identity that authenticates to AuthProxy and receives namespace-scoped permissions. |
+| **ID and name** | Every durable resource keeps an immutable ID for URLs and references plus a human-readable name for display and discovery. |
 | **Labels** | Selectable metadata used to map AuthProxy resources to host entities and add dimensions to request events. |
 | **Annotations** | Non-selectable metadata for descriptions or other values that should not drive queries. |
 

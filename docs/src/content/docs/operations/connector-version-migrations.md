@@ -15,6 +15,13 @@ Bulk rollout is intentionally a host concern. Hosts can call the single
 connection endpoint for each connection they want to move and track the
 returned task ids.
 
+The connector's ID, name, namespace, labels, and annotations belong to the
+logical connector, not an individual definition version. Every source and
+target version therefore projects the same connector name. A version migration
+changes the connection's recorded version but does not rename the connector or
+connection. Rename the logical connector separately through its ID-addressed
+update endpoint.
+
 ```mermaid
 flowchart LR
     Host["Host rollout job"] --> API["Migrate one connection"]

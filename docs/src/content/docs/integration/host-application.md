@@ -13,7 +13,7 @@ minimum metadata needed to authorize and operate third-party connections.
 | User or service principal | Actor `external_id` | Use an immutable primary key, not email or display name. |
 | Tenant or organization | Namespace | Derive a stable, namespace-safe segment and never rename it when the tenant's display name changes. |
 | Team | Optional child namespace | Create it only when it is an authorization boundary. Otherwise use a label. |
-| Integration installation | Connection | Store the `cxn_...` id in the host, or label the connection with the host installation id. |
+| Integration installation | Connection | Store the immutable `cxn_...` ID in the host. Supply a human-readable name for display and exact-name discovery. |
 | Searchable host metadata | Labels | Keep values short and non-sensitive; labels appear in request-event dimensions. |
 | Descriptive metadata | Annotations | Use for non-selectable values such as a host record URL or description. |
 
@@ -111,16 +111,20 @@ cannot elevate it.
 
 ## Track host installations
 
-There are two common lookup patterns:
+There are three common lookup patterns:
 
 - **Store the connection id.** Add `cxn_...` to the host installation row. This
   is the most direct lookup for proxy requests.
+- **Assign a resource name.** Use a stable, human-readable value such as
+  `production-crm` in UI lists and reconciliation tools. Exact-name queries are
+  namespace-scoped; names can be changed and must not replace the stored ID.
 - **Apply a label.** Add a label such as
   `app.example.com/installation-id=ins_123` and query with a label selector.
   This is useful for reconciliation and audit searches.
 
-Using both gives fast direct access plus recoverable reconciliation. Never rely
-on a user-editable provider account name as the join key.
+Using all three gives fast direct access, readable operator output, and
+recoverable reconciliation. Never use a mutable AuthProxy name or a
+user-editable provider account name as the durable join key.
 
 Labels improve discovery; namespace permissions still enforce access. See
 [Labels and annotations](/concepts/labels-and-annotations/) for selector,

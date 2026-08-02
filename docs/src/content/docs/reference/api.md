@@ -27,6 +27,77 @@ Every protected request needs an actor JWT or a browser session with the
 required namespace, resource, resource-ID, and verb scope. See
 [authentication and authorization](/security/authentication-and-authorization/).
 
+## Resource identity and names
+
+Namespace, actor, connector, connection, key, and rate-limit responses expose a
+human-readable `name` alongside their direct identity (`id`, or `path` for a
+namespace). Keep using the immutable ID in URLs, permissions, foreign-key
+fields, and stored references. Names are for display and discovery; renaming a
+resource does not change its URL.
+
+Create requests for actors, connectors, connections, keys, and rate limits may
+include `name`. If it is omitted, AuthProxy generates the ID first and uses that
+ID as the initial name:
+
+```http
+POST /api/v1/connections/_initiate
+Content-Type: application/json
+
+{
+  "connector_id": "cxr_01example",
+  "into_namespace": "root.acme",
+  "name": "production-crm",
+  "return_to_url": "https://app.example.com/integrations/complete"
+}
+```
+
+Rename through the immutable ID. The response keeps the same `id` and returns
+the new `name`:
+
+```http
+PATCH /api/v1/connections/cxn_01example
+Content-Type: application/json
+
+{
+  "name": "production-salesforce"
+}
+```
+
+Names are case-sensitive and unique among live resources of the same type in
+the same namespace. A conflicting create or rename returns `409 Conflict` and
+does not expose a database constraint. Deleting a resource releases its name
+for reuse. The same name may appear on another resource type or in another
+namespace.
+
+A connector has one name shared by all definition versions. Rename it with
+`PATCH /api/v1/connectors/{connector_id}`. Version-specific create and update
+requests do not accept a separate name. A namespace name is read-only and is
+derived from the final segment of its path.
+
+### Query by name
+
+Collection APIs accept an exact `name` filter in addition to namespace and
+label filters:
+
+```http
+GET /api/v1/connections?name=production-salesforce&namespace=root.acme
+```
+
+The namespace restriction is important when a query can span multiple
+namespaces, because those namespaces may contain the same name. Results still
+include both `name` and immutable `id`.
+
+The Admin cross-resource endpoint searches names directly and also searches
+user-label values:
+
+```http
+GET /api/v1/search/resources?q=production&resource_type=connection
+```
+
+Exact name matches rank before name prefixes, which rank before name
+substrings and matching label values. Namespace and resource-ID permissions are
+applied before results are returned.
+
 ## Regenerate specifications
 
 Swagger artifacts are generated from Go route annotations. Run:
