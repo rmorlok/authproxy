@@ -92,6 +92,7 @@ const renderConnectionCard = (connection: Connection, store = createMockStore(ro
 describe('ConnectionCard', () => {
     const mockConnector: Connector = {
         id: 'google-calendar',
+        name: 'google-calendar',
         namespace: 'root',
         version: 1,
         state: ConnectorVersionState.ACTIVE,
@@ -106,6 +107,7 @@ describe('ConnectionCard', () => {
 
     const baseConnection: Connection = {
         id: '123e4567-e89b-12d3-a456-426614174000',
+        name: 'primary-calendar',
         namespace: 'root',
         connector: mockConnector,
         state: ConnectionState.CONFIGURED,
