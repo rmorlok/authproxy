@@ -15,6 +15,7 @@ import (
 	oauth2 "github.com/rmorlok/authproxy/internal/auth_methods/oauth2"
 	iface "github.com/rmorlok/authproxy/internal/core/iface"
 	auth "github.com/rmorlok/authproxy/internal/schema/auth"
+	common "github.com/rmorlok/authproxy/internal/schema/common"
 	connectors "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
 
@@ -39,6 +40,20 @@ func NewMockIActorData(ctrl *gomock.Controller) *MockIActorData {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockIActorData) EXPECT() *MockIActorDataMockRecorder {
 	return m.recorder
+}
+
+// GetAnnotations mocks base method.
+func (m *MockIActorData) GetAnnotations() map[string]string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetAnnotations")
+	ret0, _ := ret[0].(map[string]string)
+	return ret0
+}
+
+// GetAnnotations indicates an expected call of GetAnnotations.
+func (mr *MockIActorDataMockRecorder) GetAnnotations() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAnnotations", reflect.TypeOf((*MockIActorData)(nil).GetAnnotations))
 }
 
 // GetExternalId mocks base method.
@@ -83,18 +98,18 @@ func (mr *MockIActorDataMockRecorder) GetLabels() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLabels", reflect.TypeOf((*MockIActorData)(nil).GetLabels))
 }
 
-// GetAnnotations mocks base method.
-func (m *MockIActorData) GetAnnotations() map[string]string {
+// GetName mocks base method.
+func (m *MockIActorData) GetName() common.ResourceName {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetAnnotations")
-	ret0, _ := ret[0].(map[string]string)
+	ret := m.ctrl.Call(m, "GetName")
+	ret0, _ := ret[0].(common.ResourceName)
 	return ret0
 }
 
-// GetAnnotations indicates an expected call of GetAnnotations.
-func (mr *MockIActorDataMockRecorder) GetAnnotations() *gomock.Call {
+// GetName indicates an expected call of GetName.
+func (mr *MockIActorDataMockRecorder) GetName() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAnnotations", reflect.TypeOf((*MockIActorData)(nil).GetAnnotations))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetName", reflect.TypeOf((*MockIActorData)(nil).GetName))
 }
 
 // GetNamespace mocks base method.

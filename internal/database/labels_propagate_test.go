@@ -89,7 +89,9 @@ func TestRateLimitLabelChangePropagation(t *testing.T) {
 	// User labels are still empty (we never set any) and identifier labels
 	// survived.
 	require.Equal(t, string(rlIn_child), r.Labels["apxy/rl/-/id"])
+	require.Equal(t, string(rlIn_child), r.Labels["apxy/rl/-/name"])
 	require.Equal(t, "root.rl.child", r.Labels["apxy/rl/-/ns"])
+	require.Equal(t, "child", r.Labels["apxy/ns/-/name"])
 }
 
 // TestRateLimitDriftReconciliation simulates label-column drift on a
@@ -132,6 +134,8 @@ func TestRateLimitDriftReconciliation(t *testing.T) {
 	got, err := db.GetRateLimit(ctx, rlID)
 	require.NoError(t, err)
 	require.Equal(t, "platform", got.Labels["apxy/ns/team"], "carry-forward should overwrite the stale value")
+	require.Equal(t, rlID.String(), got.Labels["apxy/rl/-/name"], "repair should restore the missing self name")
+	require.Equal(t, "drift", got.Labels["apxy/ns/-/name"], "repair should restore the namespace name")
 }
 
 // TestRateLimitRecomputeIdempotent confirms recomputeRateLimitLabelsTx returns

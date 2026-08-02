@@ -618,6 +618,7 @@ func TestConnections(t *testing.T) {
 			assert.False(t, exists)
 			// apxy/ self-implicit labels are preserved across user-driven updates.
 			assert.Equal(t, string(u), apxyLabels["apxy/cxn/-/id"])
+			assert.Equal(t, string(u), apxyLabels["apxy/cxn/-/name"])
 			assert.Equal(t, "root.some-namespace", apxyLabels["apxy/cxn/-/ns"])
 			assert.Equal(t, newNow, c.UpdatedAt)
 		})

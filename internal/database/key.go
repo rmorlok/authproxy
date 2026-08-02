@@ -268,7 +268,7 @@ func (s *service) CreateKey(ctx context.Context, ek *Key) error {
 			ek.Labels,
 			ParentCarryForward{Rt: NamespaceLabelToken, Labels: nsLabels},
 		)
-		ek.Labels = InjectSelfImplicitLabels(ek.Id, ek.Namespace, ek.Labels)
+		ek.Labels = InjectSelfImplicitLabels(ek.Id, ek.Name, ek.Namespace, ek.Labels)
 		now := apctx.GetClock(ctx).Now()
 		ek.CreatedAt = now
 		ek.UpdatedAt = now
@@ -322,6 +322,24 @@ func (s *service) UpdateKey(ctx context.Context, id apid.ID, updates map[string]
 		return nil, ErrNotFound
 	}
 
+	return s.GetKey(ctx, id)
+}
+
+// UpdateKeyName renames one live key and refreshes its self-implicit name
+// label without changing its immutable ID.
+func (s *service) UpdateKeyName(ctx context.Context, id apid.ID, name scommon.ResourceName) (*Key, error) {
+	if id.IsNil() {
+		return nil, errors.New("key id is required")
+	}
+	if err := id.ValidatePrefix(apid.PrefixKey); err != nil {
+		return nil, fmt.Errorf("invalid key id: %w", err)
+	}
+	if err := name.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid key name: %w", err)
+	}
+	if err := s.updateResourceNameAndSelfLabels(ctx, KeysTable, id, name); err != nil {
+		return nil, err
+	}
 	return s.GetKey(ctx, id)
 }
 

@@ -3,6 +3,8 @@ package core
 import (
 	"testing"
 
+	"github.com/rmorlok/authproxy/internal/apid"
+	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -21,6 +23,13 @@ func TestActor(t *testing.T) {
 
 		u.Namespace = "test-namespace"
 		assert.Equal(t, "test-namespace", u.GetNamespace())
+	})
+	t.Run("GetName", func(t *testing.T) {
+		u := Actor{Id: apid.MustParse("act_test1234567890ab")}
+		assert.Equal(t, scommon.ResourceName("act_test1234567890ab"), u.GetName())
+
+		u.Name = "billing-user"
+		assert.Equal(t, scommon.ResourceName("billing-user"), u.GetName())
 	})
 	t.Run("GetLabels", func(t *testing.T) {
 		u := Actor{}

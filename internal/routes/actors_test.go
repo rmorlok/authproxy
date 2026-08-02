@@ -968,6 +968,7 @@ func TestActorsRoutes(t *testing.T) {
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			respUser, _ := database.SplitUserAndApxyLabels(database.Labels(resp.Labels))
 			require.Empty(t, respUser)
+			require.Equal(t, string(resp.Name), resp.Labels["apxy/act/-/name"])
 
 			// Verify the labels are cleared in the database (user portion only;
 			// apxy/ self-implicit labels remain).
@@ -975,6 +976,7 @@ func TestActorsRoutes(t *testing.T) {
 			require.NoError(t, err)
 			updatedUser, _ := database.SplitUserAndApxyLabels(updatedActor.Labels)
 			require.Empty(t, updatedUser)
+			require.Equal(t, string(updatedActor.Name), updatedActor.Labels["apxy/act/-/name"])
 		})
 
 		t.Run("success - labels unchanged", func(t *testing.T) {
@@ -1893,8 +1895,10 @@ func TestActorsRoutes(t *testing.T) {
 		customName := "billing"
 		custom := create("named-actor", &customName)
 		require.Equal(t, customName, string(custom.Name))
+		require.Equal(t, customName, custom.Labels["apxy/act/-/name"])
 		defaulted := create("default-named-actor", nil)
 		require.Equal(t, defaulted.Id.String(), string(defaulted.Name))
+		require.Equal(t, defaulted.Id.String(), defaulted.Labels["apxy/act/-/name"])
 
 		w := httptest.NewRecorder()
 		req, err := http.NewRequest(http.MethodGet, "/actors/"+custom.Id.String(), nil)
@@ -1915,6 +1919,7 @@ func TestActorsRoutes(t *testing.T) {
 		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &got))
 		require.Equal(t, "renamed", string(got.Name))
+		require.Equal(t, "renamed", got.Labels["apxy/act/-/name"])
 
 		conflictName := "conflict"
 		_ = create("conflicting-actor", &conflictName)

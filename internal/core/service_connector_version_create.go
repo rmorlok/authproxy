@@ -51,6 +51,7 @@ func (s *service) UpdateConnectorName(ctx context.Context, id apid.ID, name scom
 		}
 		return err
 	}
+	s.enqueueConnectorLabelPropagation(ctx, id)
 	return nil
 }
 

@@ -2792,8 +2792,10 @@ func TestConnectors(t *testing.T) {
 		customName := "salesforce"
 		custom := createNamed(&customName, "Salesforce", http.StatusCreated)
 		require.Equal(t, customName, string(custom.Name))
+		require.Equal(t, customName, custom.Labels["apxy/cxr/-/name"])
 		defaulted := createNamed(nil, "Defaulted", http.StatusCreated)
 		require.Equal(t, defaulted.Id.String(), string(defaulted.Name))
+		require.Equal(t, defaulted.Id.String(), defaulted.Labels["apxy/cxr/-/name"])
 		createNamed(&customName, "Conflicting", http.StatusConflict)
 
 		otherName := "other-connector"
@@ -2810,6 +2812,7 @@ func TestConnectors(t *testing.T) {
 		var renamed ConnectorVersionJson
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &renamed))
 		require.Equal(t, "renamed-connector", string(renamed.Name))
+		require.Equal(t, "renamed-connector", renamed.Labels["apxy/cxr/-/name"])
 
 		w = httptest.NewRecorder()
 		req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(

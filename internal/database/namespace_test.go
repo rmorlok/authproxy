@@ -681,6 +681,7 @@ INSERT INTO namespaces
 			require.False(t, existsAlsoOld)
 			// apxy/ self-implicit labels are preserved across user-driven updates.
 			require.Equal(t, "root.updlabels2", updated.Labels["apxy/ns/-/id"])
+			require.Equal(t, "updlabels2", updated.Labels["apxy/ns/-/name"])
 
 			// Verify in database
 			retrieved, err := db.GetNamespace(ctx, "root.updlabels2")
@@ -1932,6 +1933,7 @@ INSERT INTO namespaces
 
 		// Child's own self-implicit wins over the parent's pass-through.
 		require.Equal(t, "root.foo.bar", bar.Labels["apxy/ns/-/id"])
+		require.Equal(t, "bar", bar.Labels["apxy/ns/-/name"])
 		require.Equal(t, "root.foo.bar", bar.Labels["apxy/ns/-/ns"])
 
 		// And the parent's user labels did NOT silently leak into the
@@ -2240,10 +2242,13 @@ func TestNamespaceLabelChangePropagation(t *testing.T) {
 		a, err := db.GetActor(ctx, actorIn_t)
 		require.NoError(t, err)
 		require.Equal(t, "woof", a.Labels["apxy/ns/dog"])
+		require.Equal(t, "t", a.Labels["apxy/ns/-/name"])
 		ek, err := db.GetKey(ctx, ekIn_b)
 		require.NoError(t, err)
 		require.Equal(t, "woof", ek.Labels["apxy/ns/dog"])
 		require.Equal(t, "oink", ek.Labels["apxy/ns/pig"])
+		require.Equal(t, "b", ek.Labels["apxy/ns/-/name"])
+		require.NotContains(t, ek.Labels, "apxy/ns/apxy/ns/-/name")
 
 		// Replace root.t's labels — dog goes away, cow comes in.
 		_, err = db.UpdateNamespaceLabels(ctx, "root.t", map[string]string{"cow": "moo"})
@@ -2341,6 +2346,7 @@ func TestConnectorLabelChangePropagation(t *testing.T) {
 		cvID := apid.New(apid.PrefixConnectorVersion)
 		require.NoError(t, db.UpsertConnectorDefinitionVersion(ctx, &ConnectorWithDefinition{
 			Id:                  cvID,
+			Name:                "drive",
 			Version:             1,
 			Namespace:           "root.cv",
 			State:               ConnectorDefinitionVersionStateDraft,
@@ -2360,6 +2366,7 @@ func TestConnectorLabelChangePropagation(t *testing.T) {
 		c, err := db.GetConnection(ctx, connID)
 		require.NoError(t, err)
 		require.Equal(t, "google-drive", c.Labels["apxy/cxr/type"])
+		require.Equal(t, "drive", c.Labels["apxy/cxr/-/name"])
 
 		// Re-upsert the draft cv with new user labels.
 		require.NoError(t, db.UpsertConnectorDefinitionVersion(ctx, &ConnectorWithDefinition{
@@ -2376,6 +2383,12 @@ func TestConnectorLabelChangePropagation(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, "slack", c.Labels["apxy/cxr/type"])
 		require.Equal(t, "x", c.Labels["apxy/cxr/extra"])
+
+		require.NoError(t, db.UpdateConnectorName(ctx, cvID, "slack"))
+		require.NoError(t, db.RefreshConnectionsForConnector(ctx, cvID))
+		c, err = db.GetConnection(ctx, connID)
+		require.NoError(t, err)
+		require.Equal(t, "slack", c.Labels["apxy/cxr/-/name"])
 	})
 }
 
@@ -2392,7 +2405,7 @@ func TestReconcileCarryForwardLabels(t *testing.T) {
 		}))
 		cvID := apid.New(apid.PrefixConnectorVersion)
 		require.NoError(t, db.UpsertConnectorDefinitionVersion(ctx, &ConnectorWithDefinition{
-			Id: cvID, Version: 1, Namespace: "root.recon",
+			Id: cvID, Name: "recon-connector", Version: 1, Namespace: "root.recon",
 			State: ConnectorDefinitionVersionStateDraft, Labels: Labels{"type": "google-drive"},
 			EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "d"},
 		}))
@@ -2430,6 +2443,9 @@ func TestReconcileCarryForwardLabels(t *testing.T) {
 		c, err := db.GetConnection(ctx, connID)
 		require.NoError(t, err)
 		require.Equal(t, "google-drive", c.Labels["apxy/cxr/type"])
+		require.Equal(t, "recon-connector", c.Labels["apxy/cxr/-/name"])
+		require.Equal(t, connID.String(), c.Labels["apxy/cxn/-/name"])
+		require.Equal(t, "recon", c.Labels["apxy/ns/-/name"])
 	})
 
 	t.Run("idempotent - subsequent runs after a clean pass find nothing", func(t *testing.T) {

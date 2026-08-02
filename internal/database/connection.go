@@ -296,7 +296,7 @@ func (s *service) CreateConnection(ctx context.Context, c *Connection) error {
 			ParentCarryForward{Rt: ApidPrefixToLabelToken(apid.PrefixConnectorVersion), Labels: cvLabels},
 			ParentCarryForward{Rt: NamespaceLabelToken, Labels: nsLabels},
 		)
-		cpy.Labels = InjectSelfImplicitLabels(cpy.Id, cpy.Namespace, cpy.Labels)
+		cpy.Labels = InjectSelfImplicitLabels(cpy.Id, cpy.Name, cpy.Namespace, cpy.Labels)
 
 		now := apctx.GetClock(ctx).Now()
 		cpy.CreatedAt = now
@@ -357,25 +357,8 @@ func (s *service) UpdateConnectionName(ctx context.Context, id apid.ID, name sco
 		return nil, fmt.Errorf("invalid connection name: %w", err)
 	}
 
-	result, err := s.sq.
-		Update(ConnectionsTable).
-		Set("name", name).
-		Set("updated_at", apctx.GetClock(ctx).Now()).
-		Where(sq.Eq{"id": id, "deleted_at": nil}).
-		RunWith(s.db).
-		ExecContext(ctx)
-	if err != nil {
-		return nil, wrapDatabaseMutationError("failed to update connection name", err)
-	}
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return nil, fmt.Errorf("failed to update connection name: %w", err)
-	}
-	if affected == 0 {
-		return nil, ErrNotFound
-	}
-	if affected > 1 {
-		return nil, fmt.Errorf("multiple connections were renamed: %w", ErrViolation)
+	if err := s.updateResourceNameAndSelfLabels(ctx, ConnectionsTable, id, name); err != nil {
+		return nil, err
 	}
 	return s.GetConnection(ctx, id)
 }
@@ -670,7 +653,7 @@ func (s *service) UpdateConnectionForVersionMigration(ctx context.Context, updat
 			ParentCarryForward{Rt: ApidPrefixToLabelToken(apid.PrefixConnectorVersion), Labels: cvLabels},
 			ParentCarryForward{Rt: NamespaceLabelToken, Labels: nsLabels},
 		)
-		newLabels = InjectSelfImplicitLabels(update.Id, existing.Namespace, newLabels)
+		newLabels = InjectSelfImplicitLabels(update.Id, existing.Name, existing.Namespace, newLabels)
 
 		now := apctx.GetClock(ctx).Now()
 		healthState := existing.HealthState

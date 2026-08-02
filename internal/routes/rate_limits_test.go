@@ -982,8 +982,10 @@ func TestRateLimits(t *testing.T) {
 
 		named := createNamed("public-api")
 		require.Equal(t, "public-api", string(named.Name))
+		require.Equal(t, "public-api", named.Labels["apxy/rl/-/name"])
 		defaulted := createRateLimit(t, tu, "root", nil)
 		require.Equal(t, defaulted.Id.String(), string(defaulted.Name))
+		require.Equal(t, defaulted.Id.String(), defaulted.Labels["apxy/rl/-/name"])
 
 		w := httptest.NewRecorder()
 		req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
@@ -1008,6 +1010,7 @@ func TestRateLimits(t *testing.T) {
 		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &got))
 		require.Equal(t, "renamed-limit", string(got.Name))
+		require.Equal(t, "renamed-limit", got.Labels["apxy/rl/-/name"])
 
 		_ = createNamed("conflicting-limit")
 		w = httptest.NewRecorder()

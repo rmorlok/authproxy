@@ -206,6 +206,7 @@ type DB interface {
 
 	GetKey(ctx context.Context, id apid.ID) (*Key, error)
 	CreateKey(ctx context.Context, ek *Key) error
+	UpdateKeyName(ctx context.Context, id apid.ID, name scommon.ResourceName) (*Key, error)
 	UpdateKey(ctx context.Context, id apid.ID, updates map[string]interface{}) (*Key, error)
 	DeleteKey(ctx context.Context, id apid.ID) error
 	SetKeyState(ctx context.Context, id apid.ID, state KeyState) error

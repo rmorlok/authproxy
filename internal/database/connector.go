@@ -118,7 +118,7 @@ func (s *service) ensureConnectorForDefinition(
 		labels := existing.Labels
 		if cv.Labels != nil {
 			labels = MergeUpsertLabels(cv.Labels, existing.Labels)
-			labels = InjectSelfImplicitLabels(existing.Id, existing.Namespace, labels)
+			labels = InjectSelfImplicitLabels(existing.Id, existing.Name, existing.Namespace, labels)
 		}
 		annotations := existing.Annotations
 		if cv.Annotations != nil {
@@ -160,7 +160,7 @@ func (s *service) ensureConnectorForDefinition(
 		cv.Labels,
 		ParentCarryForward{Rt: NamespaceLabelToken, Labels: nsLabels},
 	)
-	labels = InjectSelfImplicitLabels(cv.Id, cv.Namespace, labels)
+	labels = InjectSelfImplicitLabels(cv.Id, name, cv.Namespace, labels)
 
 	now := apctx.GetClock(ctx).Now()
 	connector := Connector{
@@ -205,25 +205,5 @@ func (s *service) UpdateConnectorName(ctx context.Context, id apid.ID, name scom
 		return fmt.Errorf("invalid connector name: %w", err)
 	}
 
-	result, err := s.sq.
-		Update(ConnectorsTable).
-		Set("name", name).
-		Set("updated_at", apctx.GetClock(ctx).Now()).
-		Where(sq.Eq{"id": id, "deleted_at": nil}).
-		RunWith(s.db).
-		ExecContext(ctx)
-	if err != nil {
-		return wrapDatabaseMutationError("failed to update connector name", err)
-	}
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed to update connector name: %w", err)
-	}
-	if affected == 0 {
-		return ErrNotFound
-	}
-	if affected > 1 {
-		return fmt.Errorf("multiple connectors were renamed: %w", ErrViolation)
-	}
-	return nil
+	return s.updateResourceNameAndSelfLabels(ctx, ConnectorsTable, id, name)
 }

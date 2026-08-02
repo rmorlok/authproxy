@@ -583,6 +583,7 @@ type mockActorData struct {
 }
 
 func (m *mockActorData) GetId() apid.ID                       { return m.id }
+func (m *mockActorData) GetName() common.ResourceName         { return common.ResourceName(m.id.String()) }
 func (m *mockActorData) GetExternalId() string                { return "ext-123" }
 func (m *mockActorData) GetLabels() map[string]string         { return nil }
 func (m *mockActorData) GetAnnotations() map[string]string    { return nil }

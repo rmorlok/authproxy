@@ -877,6 +877,7 @@ INSERT INTO connector_definition_versions
 				Labels: Labels{
 					"type":            "t",
 					"apxy/cxr/source": "config",
+					"apxy/cxr/-/name": "caller-cannot-override",
 				},
 				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "e1"},
 			})
@@ -888,6 +889,7 @@ INSERT INTO connector_definition_versions
 			require.Equal(t, "t", saved.Labels["type"])
 			// self-implicit labels still injected
 			require.Equal(t, string(connectorID), saved.Labels["apxy/cxr/-/id"])
+			require.Equal(t, string(connectorID), saved.Labels["apxy/cxr/-/name"])
 		})
 
 		t.Run("caller-supplied apxy labels override stored apxy on update", func(t *testing.T) {
@@ -926,6 +928,7 @@ INSERT INTO connector_definition_versions
 			require.Equal(t, "config", saved.Labels["apxy/cxr/source"], "caller's apxy value must override stored")
 			// self-implicit labels stay intact
 			require.Equal(t, string(connectorID), saved.Labels["apxy/cxr/-/id"])
+			require.Equal(t, string(connectorID), saved.Labels["apxy/cxr/-/name"])
 		})
 
 		t.Run("stored apxy labels not in caller are preserved on update", func(t *testing.T) {

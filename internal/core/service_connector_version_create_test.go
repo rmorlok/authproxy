@@ -12,6 +12,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/core/mock"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encfield"
+	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/stretchr/testify/require"
 )
@@ -80,6 +81,29 @@ func TestCreateConnectorVersion(t *testing.T) {
 		_, err := s.CreateConnectorVersion(ctx, "root", "", definition, nil, nil)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "failed to upsert connector version")
+	})
+}
+
+func TestUpdateConnectorName(t *testing.T) {
+	t.Run("enqueues connection label propagation", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		s, db, _, _, ac, _ := FullMockService(t, ctrl)
+		id := apid.MustParse("cxr_testrename000001")
+
+		db.EXPECT().UpdateConnectorName(gomock.Any(), id, scommon.ResourceName("renamed")).Return(nil)
+		ac.EXPECT().EnqueueContext(gomock.Any(), gomock.Any()).Return(nil, nil)
+
+		require.NoError(t, s.UpdateConnectorName(context.Background(), id, "renamed"))
+	})
+
+	t.Run("does not enqueue after database failure", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		s, db, _, _, _, _ := FullMockService(t, ctrl)
+		id := apid.MustParse("cxr_testrename000002")
+
+		db.EXPECT().UpdateConnectorName(gomock.Any(), id, scommon.ResourceName("renamed")).Return(database.ErrNotFound)
+
+		require.ErrorIs(t, s.UpdateConnectorName(context.Background(), id, "renamed"), ErrNotFound)
 	})
 }
 

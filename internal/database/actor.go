@@ -422,7 +422,7 @@ func (s *service) CreateActor(ctx context.Context, a *Actor) error {
 			cpy.Labels,
 			ParentCarryForward{Rt: NamespaceLabelToken, Labels: nsLabels},
 		)
-		cpy.Labels = InjectSelfImplicitLabels(cpy.Id, cpy.Namespace, cpy.Labels)
+		cpy.Labels = InjectSelfImplicitLabels(cpy.Id, cpy.Name, cpy.Namespace, cpy.Labels)
 		now := apctx.GetClock(ctx).Now()
 		cpy.CreatedAt = now
 		cpy.UpdatedAt = now
@@ -514,7 +514,7 @@ func (s *service) UpsertActor(ctx context.Context, d IActorData) (*Actor, error)
 					newActor.Labels,
 					ParentCarryForward{Rt: NamespaceLabelToken, Labels: nsLabels},
 				)
-				newActor.Labels = InjectSelfImplicitLabels(newActor.Id, newActor.Namespace, newActor.Labels)
+				newActor.Labels = InjectSelfImplicitLabels(newActor.Id, newActor.Name, newActor.Namespace, newActor.Labels)
 				validationErr := newActor.validate()
 				if validationErr != nil {
 					return validationErr
@@ -609,25 +609,8 @@ func (s *service) UpdateActorName(ctx context.Context, id apid.ID, name scommon.
 		return nil, fmt.Errorf("invalid actor name: %w", err)
 	}
 
-	result, err := s.sq.
-		Update(ActorTable).
-		Set("name", name).
-		Set("updated_at", apctx.GetClock(ctx).Now()).
-		Where(sq.Eq{"id": id, "deleted_at": nil}).
-		RunWith(s.db).
-		ExecContext(ctx)
-	if err != nil {
-		return nil, wrapDatabaseMutationError("failed to update actor name", err)
-	}
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return nil, fmt.Errorf("failed to update actor name: %w", err)
-	}
-	if affected == 0 {
-		return nil, ErrNotFound
-	}
-	if affected > 1 {
-		return nil, fmt.Errorf("multiple actors were renamed: %w", ErrViolation)
+	if err := s.updateResourceNameAndSelfLabels(ctx, ActorTable, id, name); err != nil {
+		return nil, err
 	}
 	return s.GetActor(ctx, id)
 }

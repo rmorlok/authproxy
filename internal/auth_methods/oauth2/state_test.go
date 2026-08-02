@@ -16,6 +16,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/encfield"
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
+	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -28,6 +29,7 @@ type stateTestActor struct {
 }
 
 func (a stateTestActor) GetId() apid.ID                       { return a.id }
+func (a stateTestActor) GetName() scommon.ResourceName        { return scommon.ResourceName(a.id.String()) }
 func (a stateTestActor) GetExternalId() string                { return "" }
 func (a stateTestActor) GetLabels() map[string]string         { return nil }
 func (a stateTestActor) GetAnnotations() map[string]string    { return nil }

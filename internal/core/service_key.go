@@ -69,7 +69,7 @@ func (s *service) UpdateKeyName(ctx context.Context, id apid.ID, name common.Res
 	if err := name.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid key name: %w", err)
 	}
-	ek, err := s.db.UpdateKey(ctx, id, map[string]interface{}{"name": name})
+	ek, err := s.db.UpdateKeyName(ctx, id, name)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
 			return nil, ErrNotFound

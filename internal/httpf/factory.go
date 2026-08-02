@@ -127,8 +127,8 @@ func (f *clientFactory) ForConnection(c Connection) F {
 
 // ForActor attaches the initiating actor's identity and labels to the
 // request snapshot. The actor's user labels are re-keyed under
-// apxy/act/<k> and the apxy/act/-/id and apxy/act/-/ns self-implicit
-// labels are added. Other apxy/-prefixed entries on the actor (e.g.
+// apxy/act/<k> and the apxy/act/-/id, apxy/act/-/name, and
+// apxy/act/-/ns self-implicit labels are added. Other apxy/-prefixed entries on the actor (e.g.
 // apxy/ns/<k> from the actor's namespace) are NOT forwarded — those
 // describe the actor's own context and would collide with the
 // connection's namespace context, which the request is acting under.
@@ -148,7 +148,7 @@ func (f *clientFactory) ForActor(actor Actor) F {
 		}
 		actorContribution[fmt.Sprintf("%s%s/%s", database.ApxyReservedPrefix, actToken, k)] = v
 	}
-	for k, v := range database.BuildImplicitIdentifierLabels(actor.GetId(), actor.GetNamespace()) {
+	for k, v := range database.BuildImplicitResourceLabels(actor.GetId(), actor.GetName(), actor.GetNamespace()) {
 		actorContribution[k] = v
 	}
 
