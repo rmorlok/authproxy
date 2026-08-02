@@ -40,6 +40,7 @@ import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import { Link } from "react-router-dom";
 import AnnotationsEditor from "./AnnotationsEditor";
+import ResourceNameEditor from './ResourceNameEditor';
 
 const CONNECTION_MIGRATION_TIMEOUT_SECONDS = 600;
 
@@ -339,6 +340,15 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
         </Stack>
       </Stack>
 
+      <ResourceNameEditor
+        name={conn.name}
+        resourceType="Connection"
+        onRename={async (name) => {
+          const response = await connections.update(conn.id, {name});
+          setConn(response.data);
+        }}
+      />
+
       {actionError && <Alert severity="error">{actionError}</Alert>}
 
       {migrationStatus && (
@@ -416,6 +426,14 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
       <Box>
         <Typography variant="h6" sx={{mt: 1}}>Connector</Typography>
         <Stack direction={{xs: 'column', sm: 'row'}} spacing={4} sx={{mt: 1}}>
+          <Box>
+            <Typography variant="subtitle2" color="text.secondary">Name</Typography>
+            <Typography variant="body1">
+              <Link to={`/connectors/${conn.connector.id}/versions/${conn.connector.version}`} style={{color: 'inherit', textDecoration: 'none'}}>
+                {conn.connector.name}
+              </Link>
+            </Typography>
+          </Box>
           <Box>
             <Typography variant="subtitle2" color="text.secondary">ID</Typography>
               <Typography variant="body1" sx={{wordBreak: 'break-all'}}>

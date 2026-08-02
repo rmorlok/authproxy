@@ -38,6 +38,7 @@ export interface NamespaceAnnotation {
 
 export interface Namespace {
   path: string;
+  name: string;
   state: NamespaceState;
   key_id?: string;
   labels?: Record<string, string>;
@@ -64,6 +65,7 @@ export interface CreateNamespaceRequest {
  * Parameters used for listing namespaces.
  */
 export interface ListNamespaceParams {
+  name?: string;
   state?: NamespaceState;
   namespace?: string;
   label_selector?: string;

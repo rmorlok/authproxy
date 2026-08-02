@@ -10,6 +10,7 @@ export enum KeyState {
 
 export interface Key {
   id: string;
+  name: string;
   namespace: string;
   state: KeyState;
   key_data?: KeyData;
@@ -23,12 +24,14 @@ export type KeyData = Record<string, unknown>;
 
 export interface CreateKeyRequest {
     namespace: string;
+    name?: string;
     key_data?: KeyData;
     labels?: Record<string, string>;
     annotations?: Record<string, string>;
 }
 
 export interface UpdateKeyRequest {
+    name?: string;
     state?: KeyState;
     key_data?: KeyData;
     labels?: Record<string, string>;
@@ -36,6 +39,7 @@ export interface UpdateKeyRequest {
 }
 
 export interface ListKeysParams {
+  name?: string;
   cursor?: string;
   limit?: number;
   state?: KeyState;

@@ -32,6 +32,13 @@ function renderState(state: ConnectorVersionState) {
 
 export const columns: GridColDef<Connector>[] = [
     {
+        field: 'name',
+        headerName: 'Name',
+        flex: 0.7,
+        minWidth: 120,
+        sortable: true,
+    },
+    {
         field: 'id',
         headerName: 'ID',
         flex: 0.8,

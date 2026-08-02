@@ -18,6 +18,7 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import Tooltip from '@mui/material/Tooltip';
 import Alert from '@mui/material/Alert';
+import TextField from '@mui/material/TextField';
 import {
     listRateLimits, RateLimit, RateLimitMode, RateLimitDefinition,
     ListResponse, ListRateLimitsParams, namespaceAndChildren,
@@ -104,6 +105,7 @@ export default function RateLimits() {
     const [createOpen, setCreateOpen] = useState(false);
     const [createLoading, setCreateLoading] = useState(false);
     const [createError, setCreateError] = useState<string | null>(null);
+    const [createName, setCreateName] = useState('');
     const [createDef, setCreateDef] = useState<RateLimitDefinition>(EMPTY_DEFINITION);
 
     const responsesCacheRef = useRef<ListResponse<RateLimit>[]>([]);
@@ -254,10 +256,12 @@ export default function RateLimits() {
         try {
             const request: CreateRateLimitRequest = {
                 namespace: ns,
+                name: createName.trim() || undefined,
                 definition: createDef,
             };
             await createRateLimit(request);
             setCreateOpen(false);
+            setCreateName('');
             setCreateDef(EMPTY_DEFINITION);
             resetPagination();
             fetchPage(1);
@@ -270,6 +274,13 @@ export default function RateLimits() {
     };
 
     const columns: GridColDef<RateLimit>[] = useMemo(() => [
+        {
+            field: 'name',
+            headerName: 'Name',
+            flex: 0.6,
+            minWidth: 140,
+            sortable: true,
+        },
         {
             field: 'id',
             headerName: 'ID',
@@ -421,6 +432,15 @@ export default function RateLimits() {
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                         Will be created in namespace <Chip size="small" label={ns || 'root'} />.
                     </Typography>
+                    <TextField
+                        label="Name"
+                        value={createName}
+                        onChange={(event) => setCreateName(event.target.value)}
+                        helperText="Optional; defaults to the generated immutable ID."
+                        disabled={createLoading}
+                        fullWidth
+                        sx={{mb: 2}}
+                    />
                     <RateLimitDefinitionEditor value={createDef} onChange={setCreateDef} />
                     {createError && <Alert severity="error" sx={{ mt: 2 }}>{createError}</Alert>}
                 </DialogContent>

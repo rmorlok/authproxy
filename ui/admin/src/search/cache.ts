@@ -171,18 +171,19 @@ export function mergeSearchResults(
 }
 
 function searchableValues(item: SearchResourceSummary): string[] {
-    return Object.values(item.labels);
+    return [item.name, ...Object.values(item.labels)];
 }
 
 function localScore(item: SearchResourceSummary, needle: string): number {
     if (!needle) return 0;
-    let score = 0;
-    for (const value of searchableValues(item).map((value) => value.toLowerCase())) {
-        if (value === needle) score = Math.max(score, 3);
-        else if (value.startsWith(needle)) score = Math.max(score, 2);
-        else if (value.includes(needle)) score = Math.max(score, 1);
+    const name = item.name.toLowerCase();
+    if (name === needle) return 3;
+    if (name.startsWith(needle)) return 2;
+    if (name.includes(needle)) return 1;
+    for (const value of Object.values(item.labels).map((value) => value.toLowerCase())) {
+        if (value.includes(needle)) return 1;
     }
-    return score;
+    return 0;
 }
 
 function matchesLabelSelector(labels: Record<string, string>, selector: string): boolean {

@@ -58,6 +58,12 @@
       "properties": {
         "resource_type": { "$ref": "#/$defs/SearchResourceType" },
         "resource_id": { "type": "string" },
+        "name": {
+          "anyOf": [
+            { "$ref": "../common/schema.json#/$defs/ResourceName" },
+            { "$ref": "../resources/namespace/schema.json#/$defs/NamespaceName" }
+          ]
+        },
         "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
         "labels": { "$ref": "#/$defs/StringMap" },
         "matched_labels": {
@@ -69,7 +75,7 @@
           "format": "date-time"
         }
       },
-      "required": ["resource_type", "resource_id", "namespace", "labels", "matched_labels", "updated_at"],
+      "required": ["resource_type", "resource_id", "name", "namespace", "labels", "matched_labels", "updated_at"],
       "additionalProperties": false
     },
     "SearchResourcesResponse": {

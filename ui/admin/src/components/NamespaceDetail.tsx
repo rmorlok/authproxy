@@ -28,6 +28,7 @@ import {
   NAMESPACE_PATH_SEPARATOR,
 } from '@authproxy/api';
 import AnnotationsEditor from "./AnnotationsEditor";
+import ResourceNameEditor from './ResourceNameEditor';
 
 function StateChip({state}: { state: NamespaceState }) {
   const colors: Record<string, "default" | "success" | "error" | "info" | "warning" | "primary" | "secondary"> = {
@@ -161,6 +162,8 @@ export default function NamespaceDetail({namespacePath}: { namespacePath: string
     <Stack spacing={2} sx={{p: 2}}>
       <Typography variant="h5">Namespace</Typography>
 
+      <ResourceNameEditor name={ns.name} resourceType="Namespace"/>
+
       {actionError && <Alert severity="error">{actionError}</Alert>}
 
       <Box>
@@ -265,7 +268,7 @@ export default function NamespaceDetail({namespacePath}: { namespacePath: string
                     <ListSubheader key={`header-${p}`}>{p}</ListSubheader>,
                     ...keys.map(ek => (
                       <MenuItem key={ek.id} value={ek.id}>
-                        {ek.id}
+                        {ek.name} · {ek.id}
                       </MenuItem>
                     )),
                   ];

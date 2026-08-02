@@ -71,6 +71,7 @@ export const loadCurrent = createAsyncThunk<
 
         let current: Namespace = {
             path: currentPath,
+            name: currentPath.split(NAMESPACE_PATH_SEPARATOR).pop() || currentPath,
             state: NamespaceState.ACTIVE,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()

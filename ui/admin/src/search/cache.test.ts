@@ -17,6 +17,7 @@ function resource(
     return {
         resource_type: type,
         resource_id: id,
+        name: labels.name ?? id,
         namespace: 'root.team',
         labels,
         matched_labels: [],
@@ -81,6 +82,17 @@ describe('local search', () => {
         const parsed = parseSearchQuery('type:connection label:env=prod payments');
         expect(filterCachedResources(items, parsed).map((item) => item.resource_id))
             .toEqual(['cxn_exact', 'cxn_prefix']);
+    });
+
+    it('ranks first-class names ahead of label-only matches', () => {
+        const items = [
+            {...resource('cxn_label', 'connection', {alias: 'payments'}), name: 'billing'},
+            {...resource('cxn_prefix'), name: 'payments-api'},
+            {...resource('cxn_exact'), name: 'payments'},
+        ];
+
+        expect(filterCachedResources(items, parseSearchQuery('payments')).map((item) => item.resource_id))
+            .toEqual(['cxn_exact', 'cxn_prefix', 'cxn_label']);
     });
 
     it('deduplicates local and remote results', () => {

@@ -27,6 +27,7 @@ import { useNavigate } from 'react-router-dom';
 import AnnotationsEditor from './AnnotationsEditor';
 import RateLimitDefinitionEditor from './RateLimitDefinitionEditor';
 import { EMPTY_DEFINITION } from './RateLimitDefinitionForm';
+import ResourceNameEditor from './ResourceNameEditor';
 
 function ModeChip({ mode }: { mode: RateLimitMode }) {
     const color = mode === RateLimitMode.ENFORCE ? 'warning' : 'info';
@@ -224,6 +225,15 @@ export default function RateLimitDetail({ rateLimitId }: { rateLimitId: string }
             </Stack>
 
             {actionError && <Alert severity="error" onClose={() => setActionError(null)}>{actionError}</Alert>}
+
+            <ResourceNameEditor
+                name={rl.name}
+                resourceType="Rate Limit"
+                onRename={async (name) => {
+                    const response = await rateLimits.update(rl.id, {name});
+                    setRl(response.data);
+                }}
+            />
 
             <Box>
                 <Typography variant="subtitle2" color="text.secondary">ID</Typography>

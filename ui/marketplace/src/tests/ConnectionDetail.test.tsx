@@ -45,6 +45,7 @@ vi.mock('@authproxy/api', async () => {
 
 const connector: Connector = {
   id: 'gmail',
+  name: 'gmail',
   namespace: 'root',
   version: 1,
   state: ConnectorVersionState.ACTIVE,
@@ -59,6 +60,7 @@ const connector: Connector = {
 
 const connection: Connection = {
   id: 'c-gmail',
+  name: 'primary-gmail',
   namespace: 'root',
   connector,
   state: ConnectionState.CONFIGURED,

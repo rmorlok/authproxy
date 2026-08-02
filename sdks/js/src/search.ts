@@ -19,6 +19,7 @@ export interface SearchLabelMatch {
 export interface SearchResourceSummary {
     resource_type: SearchResourceType;
     resource_id: string;
+    name: string;
     namespace: string;
     labels: Record<string, string>;
     matched_labels: SearchLabelMatch[];

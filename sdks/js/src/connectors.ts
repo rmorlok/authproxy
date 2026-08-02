@@ -4,6 +4,7 @@ import {ListResponse} from './common';
 // Connector models
 export interface ConnectorVersion {
     id: string;
+    name: string;
     version: number;
     namespace: string;
     state: ConnectorVersionState;
@@ -16,6 +17,7 @@ export interface ConnectorVersion {
 
 export interface Connector {
     id: string;
+    name: string;
     version: number;
     namespace: string;
     state: ConnectorVersionState;
@@ -48,6 +50,7 @@ export enum ConnectorVersionState {
 }
 
 export interface ListConnectorsParams {
+    name?: string;
     state?: ConnectorVersionState;
     namespace?: string;
     label_selector?: string;
@@ -63,6 +66,10 @@ export interface ListConnectorVersionsParams {
     cursor?: string;
     limit?: number;
     order_by?: string;
+}
+
+export interface UpdateConnectorRequest {
+    name?: string;
 }
 
 export interface ConnectorLifecycleRequest {
@@ -86,6 +93,13 @@ export const listConnectors = (params: ListConnectorsParams) => {
  */
 export const getConnector = (id: string) => {
     return client.get<Connector>(`/api/v1/connectors/${id}`);
+};
+
+/**
+ * Update connector-level fields shared by every definition version.
+ */
+export const updateConnector = (id: string, request: UpdateConnectorRequest) => {
+    return client.patch<Connector>(`/api/v1/connectors/${id}`, request);
 };
 
 /**
@@ -204,6 +218,7 @@ export const deleteConnectorVersionAnnotation = (id: string, version: number, an
 export const connectors = {
     list: listConnectors,
     get: getConnector,
+    update: updateConnector,
     listVersions: listConnectorVersions,
     getVersion: getConnectorVersion,
     force_version_state: forceConnectorVersionState,

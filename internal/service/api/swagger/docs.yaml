@@ -908,6 +908,9 @@ definitions:
                     type: string
                 type: object
               type: array
+            name:
+              example: production-crm
+              type: string
             namespace:
               example: root.acme
               type: string
@@ -6283,8 +6286,8 @@ paths:
       - rate_limits
   /search/resources:
     get:
-      description: Search durable resources by label value and exact label selector,
-        or seed a bounded recent-resource cache
+      description: Search durable resources by first-class name, label value, and
+        exact label selector, or seed a bounded recent-resource cache
       parameters:
       - description: 'Search mode: query or seed'
         in: query
@@ -6297,7 +6300,8 @@ paths:
           type: string
         name: resource_type
         type: array
-      - description: Case-insensitive literal label-value substring (minimum 3 characters)
+      - description: Case-insensitive literal resource-name or label-value substring
+          (minimum 3 characters)
         in: query
         name: q
         type: string

@@ -7940,7 +7940,7 @@ const docTemplateApi = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Search durable resources by label value and exact label selector, or seed a bounded recent-resource cache",
+                "description": "Search durable resources by first-class name, label value, and exact label selector, or seed a bounded recent-resource cache",
                 "produces": [
                     "application/json"
                 ],
@@ -7967,7 +7967,7 @@ const docTemplateApi = `{
                     },
                     {
                         "type": "string",
-                        "description": "Case-insensitive literal label-value substring (minimum 3 characters)",
+                        "description": "Case-insensitive literal resource-name or label-value substring (minimum 3 characters)",
                         "name": "q",
                         "in": "query"
                     },
@@ -9437,6 +9437,10 @@ const docTemplateApi = `{
                                         }
                                     }
                                 }
+                            },
+                            "name": {
+                                "type": "string",
+                                "example": "production-crm"
                             },
                             "namespace": {
                                 "type": "string",

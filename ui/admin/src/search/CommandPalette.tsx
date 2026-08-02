@@ -390,7 +390,7 @@ export function CommandPaletteProvider({
                                         <ResourceTypeBadge type={item.resource_type} />
                                         <Box sx={{minWidth: 0, flex: 1}}>
                                             <Typography variant="body2" fontWeight={600} noWrap>
-                                                {resourceTitle(item, parsed.text)}
+                                                {item.name}
                                             </Typography>
                                             <Typography variant="caption" color="text.secondary" noWrap component="div">
                                                 {item.resource_id}
@@ -495,38 +495,6 @@ function StatusRow({children, color = 'text.secondary'}: React.PropsWithChildren
             <Typography variant="caption" component="div">{children}</Typography>
         </Box>
     );
-}
-
-function resourceTitle(item: SearchResourceSummary, searchText: string): string {
-    const needle = searchText.toLowerCase();
-    const candidates = [
-        ...item.matched_labels,
-        ...Object.entries(item.labels).map(([key, value]) => ({key, value})),
-    ].filter((candidate, index, all) =>
-        Boolean(candidate.value) &&
-        all.findIndex((other) => other.key === candidate.key && other.value === candidate.value) === index,
-    );
-    if (needle) {
-        const queryMatch = candidates
-            .filter((candidate) => candidate.value.toLowerCase().includes(needle))
-            .sort((left, right) =>
-                titleMatchRank(left.value, needle) - titleMatchRank(right.value, needle) ||
-                left.key.localeCompare(right.key),
-            )[0];
-        if (queryMatch) return queryMatch.value;
-    }
-    const matched = item.matched_labels.find((label) => label.value)?.value;
-    if (matched) return matched;
-    if (item.labels.name) return item.labels.name;
-    const label = Object.entries(item.labels).sort(([left], [right]) => left.localeCompare(right))[0]?.[1];
-    return label || item.resource_id;
-}
-
-function titleMatchRank(value: string, needle: string): number {
-    const normalized = value.toLowerCase();
-    if (normalized === needle) return 0;
-    if (normalized.startsWith(needle)) return 1;
-    return 2;
 }
 
 function resourcePath(item: SearchResourceSummary): string {

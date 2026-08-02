@@ -64,6 +64,7 @@ type SearchLabelMatch struct {
 type SearchResource struct {
 	ResourceType  SearchResourceType
 	ResourceID    string
+	Name          string
 	Namespace     string
 	Labels        Labels
 	MatchedLabels []SearchLabelMatch
@@ -87,6 +88,7 @@ type ResourceSearcher interface {
 type searchSource struct {
 	from              string
 	idExpression      string
+	nameExpression    string
 	nsExpression      string
 	labelsExpression  string
 	updatedExpression string
@@ -95,28 +97,29 @@ type searchSource struct {
 	extraWhere        sq.Sqlizer
 }
 
-func searchSourceFor(resourceType SearchResourceType) (searchSource, error) {
+func searchSourceFor(resourceType SearchResourceType, provider config.DatabaseProvider) (searchSource, error) {
 	switch resourceType {
 	case SearchResourceTypeActor:
-		return searchSource{from: "actors src", idExpression: "src.id", nsExpression: "src.namespace", labelsExpression: "src.labels", updatedExpression: "src.updated_at"}, nil
+		return searchSource{from: "actors src", idExpression: "src.id", nameExpression: "src.name", nsExpression: "src.namespace", labelsExpression: "src.labels", updatedExpression: "src.updated_at"}, nil
 	case SearchResourceTypeConnection:
-		return searchSource{from: "connections src", idExpression: "src.id", nsExpression: "src.namespace", labelsExpression: "src.labels", updatedExpression: "src.updated_at"}, nil
+		return searchSource{from: "connections src", idExpression: "src.id", nameExpression: "src.name", nsExpression: "src.namespace", labelsExpression: "src.labels", updatedExpression: "src.updated_at"}, nil
 	case SearchResourceTypeNamespace:
-		return searchSource{from: "namespaces src", idExpression: "src.path", nsExpression: "src.path", labelsExpression: "src.labels", updatedExpression: "src.updated_at"}, nil
+		return searchSource{from: "namespaces src", idExpression: "src.path", nameExpression: namespaceSearchNameExpression(provider), nsExpression: "src.path", labelsExpression: "src.labels", updatedExpression: "src.updated_at"}, nil
 	case SearchResourceTypeKey:
-		return searchSource{from: "keys src", idExpression: "src.id", nsExpression: "src.namespace", labelsExpression: "src.labels", updatedExpression: "src.updated_at"}, nil
+		return searchSource{from: "keys src", idExpression: "src.id", nameExpression: "src.name", nsExpression: "src.namespace", labelsExpression: "src.labels", updatedExpression: "src.updated_at"}, nil
 	case SearchResourceTypeRateLimit:
-		return searchSource{from: "rate_limits src", idExpression: "src.id", nsExpression: "src.namespace", labelsExpression: "src.labels", updatedExpression: "src.updated_at"}, nil
+		return searchSource{from: "rate_limits src", idExpression: "src.id", nameExpression: "src.name", nsExpression: "src.namespace", labelsExpression: "src.labels", updatedExpression: "src.updated_at"}, nil
 	case SearchResourceTypeConnector:
 		return searchSource{
 			from:              "search_connector_rows src",
 			idExpression:      "src.id",
+			nameExpression:    "src.name",
 			nsExpression:      "src.namespace",
 			labelsExpression:  "src.labels",
 			updatedExpression: "src.updated_at",
 			withName:          "search_connector_rows",
 			withSQL: "\n" +
-				"SELECT c.id, c.namespace, c.labels, c.updated_at, dv.state, dv.version, ROW_NUMBER() OVER (\n" +
+				"SELECT c.id, c.name, c.namespace, c.labels, c.updated_at, dv.state, dv.version, ROW_NUMBER() OVER (\n" +
 				"  PARTITION BY dv.connector_id\n" +
 				"  ORDER BY CASE dv.state\n" +
 				"    WHEN 'primary' THEN 1\n" +
@@ -134,6 +137,15 @@ func searchSourceFor(resourceType SearchResourceType) (searchSource, error) {
 	default:
 		return searchSource{}, fmt.Errorf("unsupported search resource type %q", resourceType)
 	}
+}
+
+func namespaceSearchNameExpression(provider config.DatabaseProvider) string {
+	if provider == config.DatabaseProviderPostgres {
+		return "regexp_replace(src.path, '^.*\\.', '')"
+	}
+	// Namespace segments cannot contain quotes, so converting the path to a
+	// JSON array is a compact provider-native way to select its final segment.
+	return `json_extract('["' || replace(src.path, '.', '","') || '"]', '$[#-1]')`
 }
 
 // SearchResources performs a bounded search for exactly one resource type.
@@ -158,7 +170,7 @@ func (s *service) SearchResources(ctx context.Context, params SearchResourcesPar
 		}
 	}
 
-	source, err := searchSourceFor(params.ResourceType)
+	source, err := searchSourceFor(params.ResourceType, s.cfg.GetProvider())
 	if err != nil {
 		return SearchResourcesResult{}, err
 	}
@@ -167,14 +179,15 @@ func (s *service) SearchResources(ctx context.Context, params SearchResourcesPar
 	rankSQL := "0"
 	rankArgs := []interface{}{}
 	if queryText != "" {
-		exact := labelValuePredicateSQL(s.cfg.GetProvider(), source.labelsExpression, "=")
-		prefix := labelValuePredicateSQL(s.cfg.GetProvider(), source.labelsExpression, "LIKE")
+		exact := fmt.Sprintf("LOWER(%s) = ?", source.nameExpression)
+		prefix := fmt.Sprintf("LOWER(%s) LIKE ? ESCAPE '\\'", source.nameExpression)
 		rankSQL = fmt.Sprintf("CASE WHEN %s THEN 0 WHEN %s THEN 1 ELSE 2 END", exact, prefix)
 		rankArgs = append(rankArgs, queryText, escapeLike(queryText)+"%")
 	}
 
 	q := s.sq.Select(
 		source.idExpression,
+		source.nameExpression,
 		source.nsExpression,
 		source.labelsExpression,
 		source.updatedExpression,
@@ -200,13 +213,18 @@ func (s *service) SearchResources(ctx context.Context, params SearchResourcesPar
 	}
 
 	if queryText != "" {
+		nameContains := fmt.Sprintf("LOWER(%s) LIKE ? ESCAPE '\\'", source.nameExpression)
 		contains := labelValuePredicateSQL(s.cfg.GetProvider(), source.labelsExpression, "LIKE")
-		q = q.Where(sq.Expr(contains, "%"+escapeLike(queryText)+"%"))
+		pattern := "%" + escapeLike(queryText) + "%"
+		q = q.Where(sq.Or{
+			sq.Expr(nameContains, pattern),
+			sq.Expr(contains, pattern),
+		})
 	}
 
 	orderBy := make([]string, 0, 3)
 	if queryText != "" {
-		orderBy = append(orderBy, "5 ASC")
+		orderBy = append(orderBy, "6 ASC")
 	}
 	orderBy = append(orderBy, source.updatedExpression+" DESC", source.idExpression+" ASC")
 	q = q.OrderBy(orderBy...).Limit(uint64(params.Limit + 1))
@@ -225,7 +243,7 @@ func (s *service) SearchResources(ctx context.Context, params SearchResourcesPar
 	for rows.Next() {
 		var item SearchResource
 		var storedLabels Labels
-		if err := rows.Scan(&item.ResourceID, &item.Namespace, &storedLabels, &item.UpdatedAt, &item.MatchRank); err != nil {
+		if err := rows.Scan(&item.ResourceID, &item.Name, &item.Namespace, &storedLabels, &item.UpdatedAt, &item.MatchRank); err != nil {
 			return SearchResourcesResult{}, err
 		}
 		item.ResourceType = params.ResourceType

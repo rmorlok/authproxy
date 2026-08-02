@@ -25,6 +25,7 @@ export enum ConnectionHealthState {
 }
 
 export interface UpdateConnectionRequest {
+    name?: string;
     labels?: Record<string, string>;
     annotations?: Record<string, string>;
 }
@@ -49,6 +50,7 @@ export interface ConnectionAnnotation {
 
 export interface Connection {
     id: string;
+    name: string;
     namespace: string;
     connector: Connector;
     state: ConnectionState;
@@ -71,6 +73,7 @@ export function canBeDisconnected(connection: Connection): boolean {
 // Request models
 export interface InitiateConnectionRequest {
     connector_id: string;
+    name?: string;
     return_to_url: string;
     labels?: Record<string, string>;
 }
@@ -187,6 +190,7 @@ export type ForceConnectionStateResponse = Connection;
  * Parameters used for listing connections.
  */
 export interface ListConnectionsParams {
+    name?: string;
     state?: ConnectionState;
     namespace?: string;
     label_selector?: string;
@@ -215,10 +219,12 @@ export const getConnection = (id: string) => {
 export const initiateConnection = (
     connectorId: string,
     returnToUrl: string,
-    labels?: Record<string, string>
+    labels?: Record<string, string>,
+    name?: string,
 ) => {
     const request: InitiateConnectionRequest = {
         connector_id: connectorId,
+        name,
         return_to_url: returnToUrl,
         labels,
     };

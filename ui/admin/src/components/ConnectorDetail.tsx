@@ -30,6 +30,7 @@ import {Link, useNavigate} from 'react-router-dom';
 import {StateChip} from "./StateChip";
 import ConnectorVersionDetail from "./ConnectorVersionDetail";
 import AnnotationsEditor from "./AnnotationsEditor";
+import ResourceNameEditor from './ResourceNameEditor';
 
 const CONNECTOR_LIFECYCLE_TIMEOUT_SECONDS = 600;
 
@@ -177,7 +178,7 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
         task: result.taskInfo,
       });
       refreshConnectorData();
-    } catch (err: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
+    } catch (err: any) {
       setLifecycleStatus({
         action,
         state: 'failed',
@@ -196,9 +197,20 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
     <Stack spacing={2} sx={{p: 2}}>
       <Stack direction="row" spacing={2} alignItems="center">
         {conn.logo && <Avatar alt={conn.display_name} src={conn.logo} sx={{width: 40, height: 40}} />}
-        <Typography variant="h5">{conn.display_name || conn.labels?.type || 'Unnamed Connector'}</Typography>
+        <ResourceNameEditor
+          name={conn.name}
+          resourceType="Connector"
+          onRename={async (name) => {
+            await connectors.update(conn.id, {name});
+            refreshConnectorData();
+          }}
+        />
         <StateChip state={conn.state}/>
       </Stack>
+
+      {conn.display_name && (
+        <Typography variant="body2" color="text.secondary">Definition display name: {conn.display_name}</Typography>
+      )}
 
       {conn.description && (
         <Typography variant="body1" color="text.secondary">{conn.description}</Typography>

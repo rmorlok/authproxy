@@ -9,6 +9,7 @@ type SearchResourcesResponseJson struct {
 	Items []struct {
 		ResourceType  string            `json:"resource_type" example:"connection"`
 		ResourceId    string            `json:"resource_id" example:"cxn_test550e8400abcde"`
+		Name          string            `json:"name" example:"production-crm"`
 		Namespace     string            `json:"namespace" example:"root.acme"`
 		Labels        map[string]string `json:"labels"`
 		MatchedLabels []struct {
