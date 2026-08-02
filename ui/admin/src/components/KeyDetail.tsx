@@ -24,6 +24,7 @@ import Tooltip from '@mui/material/Tooltip';
 import {Key, keys, KeyState, UpdateKeyRequest} from '@authproxy/api';
 import { useNavigate } from "react-router-dom";
 import AnnotationsEditor from "./AnnotationsEditor";
+import ResourceNameEditor from './ResourceNameEditor';
 import KeyDataForm, {
   buildKeyDataPayload,
   createEmptyKeyDataFormState,
@@ -228,6 +229,15 @@ export default function KeyDetail({keyId}: { keyId: string }) {
       </Stack>
 
       {actionError && <Alert severity="error">{actionError}</Alert>}
+
+      <ResourceNameEditor
+        name={ek.name}
+        resourceType="Key"
+        onRename={async (name) => {
+          const response = await keys.update(ek.id, {name});
+          setEk(response.data);
+        }}
+      />
 
       <Box>
         <Typography variant="subtitle2" color="text.secondary">ID</Typography>

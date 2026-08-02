@@ -16,6 +16,7 @@ import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import Alert from '@mui/material/Alert';
+import TextField from '@mui/material/TextField';
 import AddIcon from '@mui/icons-material/Add';
 import {
     listKeys, KeyState, Key, ListResponse,
@@ -50,6 +51,13 @@ function renderState(state: KeyState) {
 }
 
 export const columns: GridColDef<Key>[] = [
+    {
+        field: 'name',
+        headerName: 'Name',
+        flex: 0.7,
+        minWidth: 120,
+        sortable: true,
+    },
     {
         field: 'id',
         headerName: 'ID',
@@ -139,6 +147,7 @@ export default function Keys() {
     const [createOpen, setCreateOpen] = useState(false);
     const [createLoading, setCreateLoading] = useState(false);
     const [createError, setCreateError] = useState<string | null>(null);
+    const [createName, setCreateName] = useState('');
     const [createKeyData, setCreateKeyData] = useState<KeyDataFormState>(createEmptyKeyDataFormState());
     const [createLabelRows, setCreateLabelRows] = useState<KeyValueRow[]>([]);
     const [createAnnotationRows, setCreateAnnotationRows] = useState<KeyValueRow[]>([]);
@@ -271,6 +280,7 @@ export default function Keys() {
         try {
             const request: CreateKeyRequest = {
                 namespace: ns,
+                name: createName.trim() || undefined,
                 key_data: buildKeyDataPayload(createKeyData),
                 labels: rowsToMap(createLabelRows),
                 annotations: rowsToMap(createAnnotationRows),
@@ -290,6 +300,7 @@ export default function Keys() {
 
     const resetCreateDialog = () => {
         setCreateError(null);
+        setCreateName('');
         setCreateKeyData(createEmptyKeyDataFormState());
         setCreateLabelRows([]);
         setCreateAnnotationRows([]);
@@ -407,6 +418,14 @@ export default function Keys() {
                         Namespace: {ns}
                     </Typography>
                     <Stack spacing={3}>
+                        <TextField
+                            label="Name"
+                            value={createName}
+                            onChange={(event) => setCreateName(event.target.value)}
+                            helperText="Optional; defaults to the generated immutable ID."
+                            disabled={createLoading}
+                            fullWidth
+                        />
                         <KeyDataForm value={createKeyData} onChange={setCreateKeyData} disabled={createLoading}/>
                         <KeyValueRowsEditor
                             title="Labels"

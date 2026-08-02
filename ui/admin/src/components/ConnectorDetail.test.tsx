@@ -12,6 +12,7 @@ vi.mock('@authproxy/api', () => {
     disconnectAll: vi.fn(),
     get: vi.fn(),
     listVersions: vi.fn(),
+    update: vi.fn(),
   };
 
   return {
@@ -36,6 +37,7 @@ vi.mock('@authproxy/api', () => {
 
 const connector = {
   id: 'cxr_test',
+  name: 'example-connector',
   version: 4,
   namespace: 'root',
   state: ConnectorVersionState.PRIMARY,
@@ -48,10 +50,10 @@ const connector = {
 };
 
 const connectorVersions = [
-  {id: 'cxr_test', version: 4, state: ConnectorVersionState.PRIMARY, created_at: '2026-07-25T00:00:00.000Z'},
-  {id: 'cxr_test', version: 3, state: ConnectorVersionState.ACTIVE, created_at: '2026-07-24T00:00:00.000Z'},
-  {id: 'cxr_test', version: 2, state: ConnectorVersionState.ACTIVE, created_at: '2026-07-23T00:00:00.000Z'},
-  {id: 'cxr_test', version: 1, state: ConnectorVersionState.ARCHIVED, created_at: '2026-07-22T00:00:00.000Z'},
+  {id: 'cxr_test', name: 'example-connector', version: 4, state: ConnectorVersionState.PRIMARY, created_at: '2026-07-25T00:00:00.000Z'},
+  {id: 'cxr_test', name: 'example-connector', version: 3, state: ConnectorVersionState.ACTIVE, created_at: '2026-07-24T00:00:00.000Z'},
+  {id: 'cxr_test', name: 'example-connector', version: 2, state: ConnectorVersionState.ACTIVE, created_at: '2026-07-23T00:00:00.000Z'},
+  {id: 'cxr_test', name: 'example-connector', version: 1, state: ConnectorVersionState.ARCHIVED, created_at: '2026-07-22T00:00:00.000Z'},
 ];
 
 describe('ConnectorDetail', () => {
@@ -75,7 +77,7 @@ describe('ConnectorDetail', () => {
       </MemoryRouter>,
     );
 
-    await screen.findByRole('heading', {name: 'Example connector'});
+    await screen.findByRole('heading', {name: 'example-connector'});
     await waitFor(() => expect(connectors.listVersions).toHaveBeenCalledWith(
       connector.id,
       {limit: 100, order_by: 'version desc'},

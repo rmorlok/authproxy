@@ -129,6 +129,7 @@ describe('CommandPalette', () => {
                     items: [{
                         resource_type: 'connection',
                         resource_id: 'cxn_payroll',
+                        name: 'Payroll',
                         namespace: 'root',
                         labels: {name: 'Payroll'},
                         matched_labels: [{key: 'name', value: 'Payroll'}],
@@ -156,6 +157,7 @@ describe('CommandPalette', () => {
                 items: [{
                     resource_type: 'connection',
                     resource_id: 'cxn_stale',
+                    name: 'Stale',
                     namespace: 'root',
                     labels: {name: 'Stale'},
                     matched_labels: [{key: 'name', value: 'Stale'}],
@@ -211,6 +213,7 @@ describe('CommandPalette', () => {
                 items: [{
                     resource_type: 'connection',
                     resource_id: 'cxn_payments',
+                    name: 'Payments',
                     namespace: 'root',
                     labels: {env: 'prod', name: 'Payments'},
                     matched_labels: [],

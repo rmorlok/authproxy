@@ -21,6 +21,7 @@ type SearchLabelMatchJson struct {
 type SearchResourceSummaryJson struct {
 	ResourceType  SearchResourceType     `json:"resource_type" yaml:"resource_type" swaggertype:"string" example:"connection"`
 	ResourceId    string                 `json:"resource_id" yaml:"resource_id" example:"cxn_test550e8400abcde"`
+	Name          string                 `json:"name" yaml:"name" example:"production-crm"`
 	Namespace     string                 `json:"namespace" yaml:"namespace" example:"root.acme"`
 	Labels        map[string]string      `json:"labels" yaml:"labels"`
 	MatchedLabels []SearchLabelMatchJson `json:"matched_labels" yaml:"matched_labels"`

@@ -19,6 +19,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
+	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/test_utils"
 	"github.com/stretchr/testify/require"
@@ -57,11 +58,12 @@ func setupResourceSearchRoute(t *testing.T, decorate func(database.DB) database.
 	return resourceSearchRouteSetup{gin: router, db: db, authUtil: authUtil, routes: searchRoutes}
 }
 
-func createSearchActor(t *testing.T, db database.DB, namespace string, labels database.Labels) *database.Actor {
+func createSearchActor(t *testing.T, db database.DB, namespace, name string, labels database.Labels) *database.Actor {
 	t.Helper()
 	require.NoError(t, db.EnsureNamespaceByPath(t.Context(), namespace))
 	actor := &database.Actor{
 		Id:         apid.New(apid.PrefixActor),
+		Name:       scommon.ResourceName(name),
 		Namespace:  namespace,
 		ExternalId: "search-" + apid.New(apid.PrefixActor).String(),
 		Labels:     labels,
@@ -88,8 +90,8 @@ func signedSearchRequest(t *testing.T, setup resourceSearchRouteSetup, rawURL st
 
 func TestResourceSearchRouteQueryAndPermissions(t *testing.T) {
 	setup := setupResourceSearchRoute(t, nil)
-	allowed := createSearchActor(t, setup.db, "root.team", database.Labels{"name": "payments-service", "env": "prod"})
-	_ = createSearchActor(t, setup.db, "root.other", database.Labels{"name": "payments-service", "env": "prod"})
+	allowed := createSearchActor(t, setup.db, "root.team", "payments-service", database.Labels{"env": "prod"})
+	_ = createSearchActor(t, setup.db, "root.other", "payments-service", database.Labels{"env": "prod"})
 
 	t.Run("requires authentication", func(t *testing.T) {
 		w := httptest.NewRecorder()
@@ -115,7 +117,8 @@ func TestResourceSearchRouteQueryAndPermissions(t *testing.T) {
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
 		require.Len(t, response.Items, 1)
 		require.Equal(t, allowed.Id.String(), response.Items[0].ResourceId)
-		require.Equal(t, map[string]string{"env": "prod", "name": "payments-service"}, response.Items[0].Labels)
+		require.Equal(t, "payments-service", response.Items[0].Name)
+		require.Equal(t, map[string]string{"env": "prod"}, response.Items[0].Labels)
 	})
 }
 
@@ -160,8 +163,9 @@ func TestResourceSearchRouteSeedCoversRemainingTypes(t *testing.T) {
 				return database.SearchResourcesResult{Items: []database.SearchResource{{
 					ResourceType: params.ResourceType,
 					ResourceID:   resourceID,
+					Name:         "seed",
 					Namespace:    "root.seed",
-					Labels:       database.Labels{"name": "seed"},
+					Labels:       database.Labels{},
 					UpdatedAt:    time.Date(2026, 7, 12, 12, 0, 0, 0, time.UTC),
 				}}}, nil
 			},
@@ -180,6 +184,9 @@ func TestResourceSearchRouteSeedCoversRemainingTypes(t *testing.T) {
 	var response schemaapi.SearchResourcesResponseJson
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
 	require.Len(t, response.Items, 3)
+	for _, item := range response.Items {
+		require.Equal(t, "seed", item.Name)
+	}
 	require.Empty(t, response.TruncatedTypes)
 	require.Empty(t, response.IncompleteTypes)
 

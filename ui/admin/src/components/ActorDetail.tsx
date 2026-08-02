@@ -11,6 +11,7 @@ import dayjs from 'dayjs';
 import Tooltip from '@mui/material/Tooltip';
 import {Actor, actors} from '@authproxy/api';
 import AnnotationsEditor from "./AnnotationsEditor";
+import ResourceNameEditor from './ResourceNameEditor';
 
 export default function ActorDetail({actorId}: { actorId: string }) {
   const [loading, setLoading] = useState(true);
@@ -67,6 +68,15 @@ export default function ActorDetail({actorId}: { actorId: string }) {
   return (
     <Stack spacing={2} sx={{p: 2}}>
       <Typography variant="h5">Actor</Typography>
+
+      <ResourceNameEditor
+        name={actor.name}
+        resourceType="Actor"
+        onRename={async (name) => {
+          const response = await actors.update(actor.id, {name});
+          setActor(response.data);
+        }}
+      />
 
       <Box>
         <Typography variant="subtitle2" color="text.secondary">ID</Typography>

@@ -123,8 +123,9 @@ function resource(
     return {
         resource_type: resourceType,
         resource_id: resourceId,
+        name,
         namespace: resourceNamespace,
-        labels: {name, ...labels},
+        labels,
         matched_labels: [],
         updated_at: '2026-07-12T12:00:00Z',
     };

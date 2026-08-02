@@ -65,12 +65,12 @@ var searchPermissionResources = map[database.SearchResourceType]string{
 }
 
 // @Summary      Search Admin resources
-// @Description  Search durable resources by label value and exact label selector, or seed a bounded recent-resource cache
+// @Description  Search durable resources by first-class name, label value, and exact label selector, or seed a bounded recent-resource cache
 // @Tags         search
 // @Produce      json
 // @Param        mode            query string false "Search mode: query or seed"
 // @Param        resource_type   query []string false "Resource types; may be repeated" collectionFormat(multi)
-// @Param        q               query string false "Case-insensitive literal label-value substring (minimum 3 characters)"
+// @Param        q               query string false "Case-insensitive literal resource-name or label-value substring (minimum 3 characters)"
 // @Param        label_selector  query string false "Exact Kubernetes-style label selector"
 // @Param        namespace       query string false "Namespace matcher"
 // @Param        limit           query int false "Maximum results (query) or results per type (seed), up to 50"
@@ -293,6 +293,7 @@ collectionComplete:
 		response.Items = append(response.Items, schemaapi.SearchResourceSummaryJson{
 			ResourceType:  schemaapi.SearchResourceType(resource.ResourceType),
 			ResourceId:    resource.ResourceID,
+			Name:          resource.Name,
 			Namespace:     resource.Namespace,
 			Labels:        labels,
 			MatchedLabels: matches,

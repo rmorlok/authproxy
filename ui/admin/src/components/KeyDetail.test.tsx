@@ -27,6 +27,7 @@ vi.mock('@authproxy/api', () => {
 
 const initialKey = {
   id: 'key_test',
+  name: 'primary-key',
   namespace: 'root.dev',
   state: KeyState.ACTIVE,
   key_data: {

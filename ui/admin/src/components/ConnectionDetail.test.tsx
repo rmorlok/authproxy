@@ -24,6 +24,7 @@ vi.mock('@authproxy/api', () => {
     get: vi.fn(),
     migrateVersion: vi.fn(),
     putAnnotation: vi.fn(),
+    update: vi.fn(),
   };
   const connectorApi = {
     listVersions: vi.fn(),
@@ -68,11 +69,13 @@ vi.mock('@authproxy/api', () => {
 
 const connection = {
   id: 'cxn_test',
+  name: 'production-crm',
   namespace: 'root',
   state: ConnectionState.CONFIGURED,
   health_state: ConnectionHealthState.HEALTHY,
   connector: {
     id: 'cxr_test',
+    name: 'example-connector',
     version: 2,
     namespace: 'root',
     state: ConnectorVersionState.ACTIVE,
@@ -88,11 +91,11 @@ const connection = {
 };
 
 const connectorVersions = [
-  {id: 'cxr_test', version: 4, state: ConnectorVersionState.DRAFT},
-  {id: 'cxr_test', version: 3, state: ConnectorVersionState.PRIMARY},
-  {id: 'cxr_test', version: 2, state: ConnectorVersionState.ACTIVE},
-  {id: 'cxr_test', version: 1, state: ConnectorVersionState.ACTIVE},
-  {id: 'cxr_test', version: 0, state: ConnectorVersionState.ARCHIVED},
+  {id: 'cxr_test', name: 'example-connector', version: 4, state: ConnectorVersionState.DRAFT},
+  {id: 'cxr_test', name: 'example-connector', version: 3, state: ConnectorVersionState.PRIMARY},
+  {id: 'cxr_test', name: 'example-connector', version: 2, state: ConnectorVersionState.ACTIVE},
+  {id: 'cxr_test', name: 'example-connector', version: 1, state: ConnectorVersionState.ACTIVE},
+  {id: 'cxr_test', name: 'example-connector', version: 0, state: ConnectorVersionState.ARCHIVED},
 ];
 
 function renderConnectionDetail() {
@@ -115,6 +118,10 @@ describe('ConnectionDetail', () => {
         source_version: 2,
         target_version: 3,
       },
+    } as any);
+    vi.mocked(connections.update).mockResolvedValue({
+      status: 200,
+      data: {...connection, name: 'customer-crm'},
     } as any);
     vi.mocked(tasks.pollForTaskFinalized).mockResolvedValue({
       result: PollForTaskResult.FINALIZED,
@@ -188,5 +195,21 @@ describe('ConnectionDetail', () => {
       });
     });
     expect(await screen.findByText('Rollback to v1 completed.')).toBeTruthy();
+  });
+
+  it('renames the connection while keeping its id as the route identity', async () => {
+    const user = userEvent.setup();
+    renderConnectionDetail();
+
+    await screen.findByRole('heading', {name: 'production-crm'});
+    await user.click(screen.getByRole('button', {name: 'Rename connection'}));
+    const input = screen.getByRole('textbox', {name: 'Name'});
+    await user.clear(input);
+    await user.type(input, 'customer-crm');
+    await user.click(screen.getByRole('button', {name: 'Save'}));
+
+    await waitFor(() => expect(connections.update).toHaveBeenCalledWith('cxn_test', {name: 'customer-crm'}));
+    expect(await screen.findByRole('heading', {name: 'customer-crm'})).toBeTruthy();
+    expect(screen.getByText('cxn_test')).toBeTruthy();
   });
 });

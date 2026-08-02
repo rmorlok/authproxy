@@ -39,6 +39,7 @@ vi.mock('@authproxy/api', () => {
 
 const rootNamespace = {
     path: ROOT_NAMESPACE_PATH,
+    name: ROOT_NAMESPACE_PATH,
     state: NamespaceState.ACTIVE,
     created_at: '2026-06-20T00:00:00.000Z',
     updated_at: '2026-06-20T00:00:00.000Z',
@@ -90,6 +91,7 @@ describe('NamespaceSelector', () => {
         const createdNamespace = {
             ...rootNamespace,
             path: 'root.team-a',
+            name: 'team-a',
         };
         vi.mocked(namespaces.create).mockResolvedValue({status: 200, data: createdNamespace} as any);
         vi.mocked(namespaces.getByPath).mockResolvedValue({status: 200, data: createdNamespace} as any);

@@ -37,6 +37,12 @@ function renderState(state: ConnectionState) {
 }
 
 export const columns: GridColDef<Connection>[] = [
+    { field: 'name',
+        headerName: 'Name',
+        flex: 0.8,
+        minWidth: 120,
+        sortable: true,
+    },
     { field: 'id',
         headerName: 'ID',
         flex: 0.8,
@@ -74,6 +80,14 @@ export const columns: GridColDef<Connection>[] = [
                 </Stack>
             );
         },
+    },
+    {
+        field: 'connector.name',
+        headerName: 'Connector Name',
+        flex: 0.6,
+        minWidth: 100,
+        sortable: false,
+        valueGetter: (_, row) => row.connector.name,
     },
     {
         field: 'connector.id',
