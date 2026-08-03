@@ -331,13 +331,13 @@ func TestPKCE_TokenExchangeRejected(t *testing.T) {
 			// Step 1: initiate. The state record is written to Redis with a
 			// freshly generated verifier (because the connector has a PKCE
 			// block); the redirect URL points at /oauth2/redirect with the
-			// new state_id.
+			// new stateId.
 			connID, redirectURL := env.InitiateOAuth2Connection(t, connectorID, returnToURL)
 
 			redirectParsed, err := url.Parse(redirectURL)
 			require.NoError(t, err)
-			stateIDStr := redirectParsed.Query().Get("state_id")
-			require.NotEmpty(t, stateIDStr, "InitiateOAuth2Connection should embed state_id: %s", redirectURL)
+			stateIDStr := redirectParsed.Query().Get("stateId")
+			require.NotEmpty(t, stateIDStr, "InitiateOAuth2Connection should embed stateId: %s", redirectURL)
 			stateID, err := apid.Parse(stateIDStr)
 			require.NoError(t, err)
 

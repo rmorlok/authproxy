@@ -94,7 +94,7 @@ func TestOAuth2ProbeHealth_FailureAndRecovery(t *testing.T) {
 	connID, redirectURL := env.InitiateOAuth2Connection(t, connectorID, returnToURL)
 	parsed, err := url.Parse(redirectURL)
 	require.NoError(t, err)
-	stateID := parsed.Query().Get("state_id")
+	stateID := parsed.Query().Get("stateId")
 	require.NotEmpty(t, stateID)
 
 	authResp := provider.Authorize(helpers.AuthorizeRequest{
