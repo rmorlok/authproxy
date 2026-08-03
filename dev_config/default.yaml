@@ -161,9 +161,8 @@ telemetry:
       - /healthz
   proxy:
     # Project an allowlisted subset of connection labels onto proxy
-    # metrics + spans. `type` matches the connectors.identifying_labels
-    # entry above so the Grafana "Proxy RED" dashboard's per-`type`
-    # panel populates automatically.
+    # metrics + spans. `type` is an ordinary connector label used by the
+    # Grafana "Proxy RED" dashboard's per-`type` panel.
     span_attribute_labels:
       - type
       - env
@@ -177,14 +176,12 @@ telemetry:
 connectors:
   auto_migrate: true
   auto_migration_lock_duration: 30s
-  identifying_labels:
-    - type
-    - env
   load_from_list:
   #
   # Root
   #
-  - labels:
+  - name: google-drive
+    labels:
       type: google-drive
       env: prod
     display_name: Google Drive
@@ -224,7 +221,8 @@ connectors:
           required: false
           reason: |
             We need to be able to see what's been going on in drive
-  - labels:
+  - name: greenhouse
+    labels:
       type: greenhouse
       env: prod
     display_name: Greenhouse
@@ -237,7 +235,8 @@ connectors:
       type: api-key
       placement:
         type: bearer
-  - labels:
+  - name: google-calendar
+    labels:
       type: google-calendar
       env: prod
     display_name: Google Calendar
@@ -332,7 +331,8 @@ connectors:
         proxy_http:
           method: GET
           url: https://www.googleapis.com/calendar/v3/users/me/calendarList
-  - labels:
+  - name: gmail
+    labels:
       type: gmail
       env: prod
     display_name: GMail
@@ -359,7 +359,8 @@ connectors:
         - id: https://www.googleapis.com/auth/gmail.readonly
           reason: |
             We need to be able to read your emails
-  - labels:
+  - name: pipedrive
+    labels:
       type: pipedrive
       env: prod
     display_name: pipedrive
@@ -387,7 +388,8 @@ connectors:
         - id: webhooks:full
           reason: |
             Allows us to receive notification of changes in realtime
-  - labels:
+  - name: asana
+    labels:
       type: asana
       env: prod
     display_name: Asana
@@ -418,7 +420,8 @@ connectors:
   #
   # DEV
   #
-#  - labels:
+#  - name: google-drive-dev
+#    labels:
 #      type: google-drive
 #      env: dev
 #    namespace: root.dev
@@ -458,7 +461,8 @@ connectors:
 #          required: false
 #          reason: |
 #            We need to be able to see what's been going on in drive
-#  - labels:
+#  - name: greenhouse-dev
+#    labels:
 #      type: greenhouse
 #      env: dev
 #    namespace: root.dev
@@ -472,7 +476,8 @@ connectors:
 #      type: api-key
 #      placement:
 #        type: bearer
-#  - labels:
+#  - name: google-calendar-dev
+#    labels:
 #      type: google-calendar
 #      env: dev
 #    namespace: root.dev
@@ -502,7 +507,8 @@ connectors:
     #
     # Stage
     #
-#  - labels:
+#  - name: google-drive-stage
+#    labels:
 #      type: google-drive
 #      env: stage
 #    namespace: root.stage
@@ -542,7 +548,8 @@ connectors:
 #          required: false
 #          reason: |
 #            We need to be able to see what's been going on in drive
-#  - labels:
+#  - name: greenhouse-stage
+#    labels:
 #      type: greenhouse
 #      env: stage
 #    namespace: root.stage
@@ -556,7 +563,8 @@ connectors:
 #      type: api-key
 #      placement:
 #        type: bearer
-#  - labels:
+#  - name: google-calendar-stage
+#    labels:
 #      type: google-calendar
 #      env: stage
 #    display_name: Google Calendar (STAGE)

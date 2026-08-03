@@ -47,15 +47,19 @@
         },
         "load_from_list": {
           "items": {
-            "$ref": "../resources/connectors/schema.json"
+            "allOf": [
+              {
+                "$ref": "../resources/connectors/schema.json"
+              },
+              {
+                "anyOf": [
+                  { "required": ["id"] },
+                  { "required": ["name"] }
+                ]
+              }
+            ]
           },
           "type": "array"
-        },
-        "identifying_labels": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
         }
       },
       "additionalProperties": false,

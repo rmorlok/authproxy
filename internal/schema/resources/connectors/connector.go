@@ -14,9 +14,13 @@ import (
 
 type Connector struct {
 	// Id is the global id for this connector. This does not change version to version. In the config file, this can
-	// be omitted if there is only one instance of a particular type of connector. If there are multiple connectors that
-	// share the same identifying labels, the ids would need to be explicitly defined.
+	// be omitted when Name is specified; the logical connector is then reconciled by name within its namespace.
 	Id apid.ID `json:"id" yaml:"id"`
+
+	// Name is the mutable name of the logical connector. Config entries without an explicit ID must specify a name so
+	// AuthProxy can reconcile the same logical connector across reloads. When an ID is specified and name is omitted,
+	// a newly created connector defaults its name to the ID.
+	Name common.ResourceName `json:"name,omitempty" yaml:"name,omitempty" swaggerignore:"true"`
 
 	// Version is the logical version of the connector. When auth materially changes, such as adding new scopes,
 	// changing client ids/secrets, adding configuration settings, etc. the logical version of the connector must change
@@ -133,6 +137,11 @@ func (c *Connector) Clone() *Connector {
 
 func (c *Connector) Validate(vc *common.ValidationContext) error {
 	result := &multierror.Error{}
+	if c.Name != "" {
+		if err := c.Name.Validate(); err != nil {
+			result = multierror.Append(result, vc.NewErrorfForField("name", "%v", err))
+		}
+	}
 	javascript, err := apjs.CompileAndValidateLibrary(c.Javascript)
 	if err != nil {
 		result = multierror.Append(result, vc.NewErrorfForField("javascript", "invalid connector javascript: %v", err))
@@ -194,25 +203,18 @@ func (c *Connector) Validate(vc *common.ValidationContext) error {
 	return result.ErrorOrNil()
 }
 
-// GetIdentifyingLabelValues returns the values for the specified identifying labels.
-func (c *Connector) GetIdentifyingLabelValues(identifyingLabels []string) map[string]string {
-	result := make(map[string]string)
-	if c == nil || c.Labels == nil {
-		return result
-	}
-	for _, key := range identifyingLabels {
-		if v, ok := c.Labels[key]; ok {
-			result[key] = v
-		}
-	}
-	return result
-}
-
 // Hash computes a semantic hash of the connector data. It does not account for data that is not stored in the
 // configuration directly (e.g. environment variables referenced). A change in the hash implies that a new version
 // must be created if the existing version is already live.
 func (c *Connector) Hash() string {
-	jsonData, err := json.Marshal(c)
+	if c == nil {
+		return ""
+	}
+	definition := c.Clone()
+	// Name belongs to the logical connector rather than an individual
+	// definition version, so a rename must not change the definition hash.
+	definition.Name = ""
+	jsonData, err := json.Marshal(definition)
 	if err != nil {
 		return ""
 	}
@@ -228,6 +230,11 @@ func (c *Connector) HasId() bool {
 	}
 
 	return c.Id != apid.Nil
+}
+
+// HasName returns true when the configuration explicitly specifies a name.
+func (c *Connector) HasName() bool {
+	return c != nil && c.Name != ""
 }
 
 // HasVersion returns true if the connector has a version. This implies that the configuration set a version explicitly.

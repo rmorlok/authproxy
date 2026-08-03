@@ -353,9 +353,6 @@ connectors:
   # connector schema docs for the format. Leave empty to manage connectors
   # exclusively through the admin API.
   loadFromList: []
-  # -- Labels used to identify connectors across reloads (matching the
-  # AuthProxy `connectors.identifying_labels` field).
-  identifyingLabels: []
 
 # -- Free-form config overlay merged on top of the rendered AuthProxy YAML.
 # Use this for fields the chart hasn't promoted to typed values yet.
