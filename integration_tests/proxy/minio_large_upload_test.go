@@ -35,7 +35,7 @@ const minioStreamingBucket = "authproxy-streaming-test"
 // path would show up clearly in the runtime.MemStats delta below.
 const uploadSize = 50 << 20 // 50 MiB
 
-// TestProxyRaw_MinIOLargeUpload proves /_proxy_raw streams a large
+// TestProxyRaw_MinIOLargeUpload proves /_proxyRaw streams a large
 // upload end-to-end without buffering: the bytes that hit MinIO are
 // byte-identical (SHA-256 match) to what the client sent, the
 // request log marks the body as too-large-skipped (so no tee

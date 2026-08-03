@@ -265,10 +265,10 @@ func TestCallbackRejection_ReplayedState(t *testing.T) {
 	callbackURL := rig.env.ForgeOAuth2CallbackURL(stateID, code)
 
 	// First delivery: state validates, code exchanged, state deleted from Redis.
-	// Land on the connection's return_to_url (possibly with setup=pending suffix).
+	// Land on the connection's returnToUrl (possibly with setup=pending suffix).
 	loc := rig.env.DeliverOAuth2Callback(t, callbackURL)
 	require.Truef(t, strings.HasPrefix(loc, rig.returnToURL),
-		"first callback should land on return_to_url; got %q", loc)
+		"first callback should land on returnToUrl; got %q", loc)
 	require.Empty(t, rig.logCapture.RecordsWithMessage(t, rejectionEventMessage),
 		"first callback must not emit a rejection event")
 

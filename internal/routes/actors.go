@@ -61,11 +61,11 @@ func DatabaseActorToJson(a *database.Actor) ActorJson {
 type ListActorsRequestQuery struct {
 	Cursor        *string `form:"cursor"`
 	LimitVal      *int32  `form:"limit"`
-	ExternalId    *string `form:"external_id"`
+	ExternalId    *string `form:"externalId"`
 	NameVal       *string `form:"name"`
 	NamespaceVal  *string `form:"namespace"`
-	LabelSelector *string `form:"label_selector"`
-	OrderByVal    *string `form:"order_by"`
+	LabelSelector *string `form:"labelSelector"`
+	OrderByVal    *string `form:"orderBy"`
 }
 
 // @Summary		List actors
@@ -75,11 +75,11 @@ type ListActorsRequestQuery struct {
 // @Produce		json
 // @Param			cursor			query		string	false	"Pagination cursor"
 // @Param			limit			query		integer	false	"Maximum number of results to return"
-// @Param			external_id		query		string	false	"Filter by external ID"
+// @Param			externalId		query		string	false	"Filter by external ID"
 // @Param			name			query		string	false	"Filter by exact resource name"
 // @Param			namespace		query		string	false	"Filter by namespace"
-// @Param			label_selector	query		string	false	"Filter by label selector"
-// @Param			order_by		query		string	false	"Order by field (e.g., 'created_at:asc')"
+// @Param			labelSelector	query		string	false	"Filter by label selector"
+// @Param			orderBy		query		string	false	"Order by field (e.g., 'created_at:asc')"
 // @Success		200				{object}	OpenAPIListActorsResponseJson
 // @Failure		400				{object}	ErrorResponse
 // @Failure		401				{object}	ErrorResponse
@@ -231,7 +231,7 @@ func (r *ActorsRoutes) get(gctx *gin.Context) {
 // @Tags			actors
 // @Accept			json
 // @Produce		json
-// @Param			external_id	path		string	true	"External ID of the actor"
+// @Param			externalId	path		string	true	"External ID of the actor"
 // @Param			namespace	query		string	false	"Namespace (defaults to authenticated actor's namespace)"
 // @Success		200			{object}	ActorJson
 // @Failure		400			{object}	ErrorResponse
@@ -239,14 +239,14 @@ func (r *ActorsRoutes) get(gctx *gin.Context) {
 // @Failure		404			{object}	ErrorResponse
 // @Failure		500			{object}	ErrorResponse
 // @Security		BearerAuth
-// @Router			/actors/external-id/{external_id} [get]
+// @Router			/actors/external-id/{externalId} [get]
 func (r *ActorsRoutes) getByExternalId(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
-	externalId := gctx.Param("external_id")
+	externalId := gctx.Param("externalId")
 	if externalId == "" {
-		apgin.WriteError(gctx, r.logger, httperr.BadRequest("external_id is required"))
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("externalId is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -340,7 +340,7 @@ func (r *ActorsRoutes) delete(gctx *gin.Context) {
 		return
 	}
 
-	r.logger.Info("deleting actor ", "id", a.Id.String(), "external_id", a.ExternalId)
+	r.logger.Info("deleting actor ", "id", a.Id.String(), "externalId", a.ExternalId)
 
 	err = r.db.DeleteActor(ctx, id)
 	if err != nil {
@@ -357,7 +357,7 @@ func (r *ActorsRoutes) delete(gctx *gin.Context) {
 // @Tags			actors
 // @Accept			json
 // @Produce		json
-// @Param			external_id	path	string	true	"External ID of the actor"
+// @Param			externalId	path	string	true	"External ID of the actor"
 // @Param			namespace	query	string	false	"Namespace (defaults to authenticated actor's namespace)"
 // @Success		204			"No Content"
 // @Failure		400			{object}	ErrorResponse
@@ -365,14 +365,14 @@ func (r *ActorsRoutes) delete(gctx *gin.Context) {
 // @Failure		403			{object}	ErrorResponse
 // @Failure		500			{object}	ErrorResponse
 // @Security		BearerAuth
-// @Router			/actors/external-id/{external_id} [delete]
+// @Router			/actors/external-id/{externalId} [delete]
 func (r *ActorsRoutes) deleteByExternalId(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
-	externalId := gctx.Param("external_id")
+	externalId := gctx.Param("externalId")
 
 	if externalId == "" {
-		apgin.WriteError(gctx, r.logger, httperr.BadRequest("external_id is required"))
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("externalId is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -409,7 +409,7 @@ func (r *ActorsRoutes) deleteByExternalId(gctx *gin.Context) {
 		return
 	}
 
-	r.logger.Info("deleting actor ", "id", a.Id.String(), "external_id", a.ExternalId)
+	r.logger.Info("deleting actor ", "id", a.Id.String(), "externalId", a.ExternalId)
 
 	err = r.db.DeleteActor(ctx, a.Id)
 	if err != nil {
@@ -440,7 +440,7 @@ func (r *ActorsRoutes) create(gctx *gin.Context) {
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
 	var req CreateActorRequestJson
-	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+	if err := bindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, r.logger, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
@@ -448,7 +448,7 @@ func (r *ActorsRoutes) create(gctx *gin.Context) {
 
 	// Validate external_id is not empty
 	if req.ExternalId == "" {
-		apgin.WriteError(gctx, r.logger, httperr.BadRequest("external_id is required"))
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("externalId is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -486,7 +486,7 @@ func (r *ActorsRoutes) create(gctx *gin.Context) {
 	// Check if actor already exists with the same external_id in the namespace
 	existingActor, err := r.db.GetActorByExternalId(ctx, req.Namespace, req.ExternalId)
 	if err == nil && existingActor != nil {
-		apgin.WriteError(gctx, r.logger, httperr.Conflictf("actor with external_id '%s' already exists in namespace '%s'", req.ExternalId, req.Namespace))
+		apgin.WriteError(gctx, r.logger, httperr.Conflictf("actor with externalId '%s' already exists in namespace '%s'", req.ExternalId, req.Namespace))
 		val.MarkErrorReturn()
 		return
 	}
@@ -528,7 +528,7 @@ func (r *ActorsRoutes) create(gctx *gin.Context) {
 			if conflictErr := resourceNameConflictError(err, "actor", name, req.Namespace); conflictErr != nil && name != "" {
 				apgin.WriteError(gctx, r.logger, conflictErr)
 			} else {
-				apgin.WriteError(gctx, r.logger, httperr.Conflictf("actor with external_id '%s' already exists in namespace '%s'", req.ExternalId, req.Namespace))
+				apgin.WriteError(gctx, r.logger, httperr.Conflictf("actor with externalId '%s' already exists in namespace '%s'", req.ExternalId, req.Namespace))
 			}
 			val.MarkErrorReturn()
 			return
@@ -584,7 +584,7 @@ func (r *ActorsRoutes) update(gctx *gin.Context) {
 	}
 
 	var req UpdateActorRequestJson
-	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+	if err := bindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, r.logger, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
@@ -678,7 +678,7 @@ func (r *ActorsRoutes) update(gctx *gin.Context) {
 // @Tags			actors
 // @Accept			json
 // @Produce		json
-// @Param			external_id	path		string					true	"External ID of the actor"
+// @Param			externalId	path		string					true	"External ID of the actor"
 // @Param			namespace	query		string					false	"Namespace (defaults to authenticated actor's namespace)"
 // @Param			request		body		UpdateActorRequestJson	true	"Actor update request"
 // @Success		200			{object}	ActorJson
@@ -688,14 +688,14 @@ func (r *ActorsRoutes) update(gctx *gin.Context) {
 // @Failure		404			{object}	ErrorResponse
 // @Failure		500			{object}	ErrorResponse
 // @Security		BearerAuth
-// @Router			/actors/external-id/{external_id} [patch]
+// @Router			/actors/external-id/{externalId} [patch]
 func (r *ActorsRoutes) updateByExternalId(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
-	externalId := gctx.Param("external_id")
+	externalId := gctx.Param("externalId")
 	if externalId == "" {
-		apgin.WriteError(gctx, r.logger, httperr.BadRequest("external_id is required"))
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("externalId is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -707,7 +707,7 @@ func (r *ActorsRoutes) updateByExternalId(gctx *gin.Context) {
 	}
 
 	var req UpdateActorRequestJson
-	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+	if err := bindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, r.logger, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
@@ -925,10 +925,10 @@ func (r *ActorsRoutes) Register(g gin.IRouter) {
 		r.create,
 	)
 	g.GET(
-		"/actors/external-id/:external_id",
+		"/actors/external-id/:externalId",
 		r.auth.NewRequiredBuilder().
 			ForResource("actors").
-			ForIdField("external_id").
+			ForIdField("externalId").
 			ForIdExtractor(func(obj interface{}) string { return obj.(*database.Actor).ExternalId }).
 			ForNamespaceQueryParam("namespace").
 			ForVerb("get").
@@ -936,10 +936,10 @@ func (r *ActorsRoutes) Register(g gin.IRouter) {
 		r.getByExternalId,
 	)
 	g.DELETE(
-		"/actors/external-id/:external_id",
+		"/actors/external-id/:externalId",
 		r.auth.NewRequiredBuilder().
 			ForResource("actors").
-			ForIdField("external_id").
+			ForIdField("externalId").
 			ForIdExtractor(func(obj interface{}) string { return obj.(*database.Actor).ExternalId }).
 			ForNamespaceQueryParam("namespace").
 			ForVerb("delete").
@@ -947,10 +947,10 @@ func (r *ActorsRoutes) Register(g gin.IRouter) {
 		r.deleteByExternalId,
 	)
 	g.PATCH(
-		"/actors/external-id/:external_id",
+		"/actors/external-id/:externalId",
 		r.auth.NewRequiredBuilder().
 			ForResource("actors").
-			ForIdField("external_id").
+			ForIdField("externalId").
 			ForIdExtractor(func(obj interface{}) string { return obj.(*database.Actor).ExternalId }).
 			ForNamespaceQueryParam("namespace").
 			ForVerb("update").

@@ -245,13 +245,13 @@ func (s *service) DryRunRateLimit(ctx context.Context, req iface.DryRunRateLimit
 		return iface.DryRunRateLimitResult{}, fmt.Errorf("%w: request.url is required", ErrInvalidArgument)
 	}
 	if req.RequestType == "" {
-		return iface.DryRunRateLimitResult{}, fmt.Errorf("%w: request_type is required", ErrInvalidArgument)
+		return iface.DryRunRateLimitResult{}, fmt.Errorf("%w: requestType is required", ErrInvalidArgument)
 	}
 	if !common.IsValidRequestType(req.RequestType) {
-		return iface.DryRunRateLimitResult{}, fmt.Errorf("%w: invalid request_type %q", ErrInvalidArgument, req.RequestType)
+		return iface.DryRunRateLimitResult{}, fmt.Errorf("%w: invalid requestType %q", ErrInvalidArgument, req.RequestType)
 	}
 	if req.Context.ConnectionId == nil && req.Context.Namespace == nil {
-		return iface.DryRunRateLimitResult{}, fmt.Errorf("%w: connection_id or namespace is required", ErrInvalidArgument)
+		return iface.DryRunRateLimitResult{}, fmt.Errorf("%w: connectionId or namespace is required", ErrInvalidArgument)
 	}
 
 	reqCtx, err := s.hydrateDryRunContext(ctx, req)

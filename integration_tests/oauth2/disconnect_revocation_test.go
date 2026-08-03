@@ -147,7 +147,7 @@ func (r *disconnectRevocationRig) disconnect(t *testing.T, connectionID string) 
 		Connection struct {
 			State string `json:"state"`
 		} `json:"connection"`
-		TaskID string `json:"task_id"`
+		TaskID string `json:"taskId"`
 	}
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
 	assert.Equal(t, string(database.ConnectionStateDisconnecting), body.Connection.State)

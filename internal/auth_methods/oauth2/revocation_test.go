@@ -63,12 +63,12 @@ func TestRevokeRefreshToken(t *testing.T) {
 		logger, _ := mockLog.NewTestLogger(t)
 
 		return &oAuth2Connection{
-			cfg:        nil,
-			db:         db,
-			httpf:      h,
-			r:          nil,
-			encrypt:    encrypt,
-			logger:     logger,
+			cfg:     nil,
+			db:      db,
+			httpf:   h,
+			r:       nil,
+			encrypt: encrypt,
+			logger:  logger,
 			connection: &mockCore.Connection{
 				Id: connectionId,
 			},

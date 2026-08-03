@@ -4,8 +4,8 @@
       "id": "key_test550e8400abcd",
       "namespace": "root.acme",
       "state": "disabled",
-      "created_at": "2026-01-02T03:04:05Z",
-      "updated_at": "2026-01-02T03:05:06Z"
+      "createdAt": "2026-01-02T03:04:05Z",
+      "updatedAt": "2026-01-02T03:05:06Z"
     }
   ],
   "cursor": "next"

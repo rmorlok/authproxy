@@ -27,16 +27,16 @@ type ConnectorJson struct {
 	Namespace     string                `json:"namespace" yaml:"namespace" example:"root.acme"`
 	Name          common.ResourceName   `json:"name" yaml:"name" swaggertype:"string" example:"salesforce"`
 	State         ConnectorVersionState `json:"state" yaml:"state" swaggertype:"string" example:"primary"`
-	DisplayName   string                `json:"display_name" yaml:"display_name" example:"Salesforce"`
+	DisplayName   string                `json:"displayName" yaml:"displayName" example:"Salesforce"`
 	Highlight     string                `json:"highlight,omitempty" yaml:"highlight,omitempty" example:"CRM platform"`
 	Description   string                `json:"description" yaml:"description" example:"Salesforce CRM integration"`
-	StatusPageUrl string                `json:"status_page_url,omitempty" yaml:"status_page_url,omitempty" example:"https://status.salesforce.com"`
+	StatusPageUrl string                `json:"statusPageUrl,omitempty" yaml:"statusPageUrl,omitempty" example:"https://status.salesforce.com"`
 	Logo          string                `json:"logo" yaml:"logo" example:"https://example.com/logo.png"`
-	HasConfigure  bool                  `json:"has_configure" yaml:"has_configure" example:"false"`
+	HasConfigure  bool                  `json:"hasConfigure" yaml:"hasConfigure" example:"false"`
 	Labels        map[string]string     `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Annotations   map[string]string     `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	CreatedAt     time.Time             `json:"created_at" yaml:"created_at"`
-	UpdatedAt     time.Time             `json:"updated_at" yaml:"updated_at"`
+	CreatedAt     time.Time             `json:"createdAt" yaml:"createdAt"`
+	UpdatedAt     time.Time             `json:"updatedAt" yaml:"updatedAt"`
 }
 
 type ListConnectorsResponseJson struct {
@@ -56,8 +56,8 @@ type ConnectorVersionJson struct {
 	Definition  cschema.Connector     `json:"definition" yaml:"definition"`
 	Labels      map[string]string     `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Annotations map[string]string     `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	CreatedAt   time.Time             `json:"created_at" yaml:"created_at"`
-	UpdatedAt   time.Time             `json:"updated_at" yaml:"updated_at"`
+	CreatedAt   time.Time             `json:"createdAt" yaml:"createdAt"`
+	UpdatedAt   time.Time             `json:"updatedAt" yaml:"updatedAt"`
 }
 
 type ListConnectorVersionsResponseJson struct {
@@ -110,7 +110,7 @@ type CreateConnectorVersionRequestJson struct {
 //
 //	@Description	Request to run a connector lifecycle operation
 type ConnectorLifecycleRequestJson struct {
-	TimeoutSeconds *int64 `json:"timeout_seconds,omitempty" yaml:"timeout_seconds,omitempty" example:"600"`
+	TimeoutSeconds *int64 `json:"timeoutSeconds,omitempty" yaml:"timeoutSeconds,omitempty" example:"600"`
 }
 
 // ConnectorLifecycleResponseJson is returned after starting a connector-level
@@ -118,8 +118,8 @@ type ConnectorLifecycleRequestJson struct {
 //
 //	@Description	Response for connector lifecycle operation
 type ConnectorLifecycleResponseJson struct {
-	TaskId      string  `json:"task_id" yaml:"task_id"`
-	ConnectorId apid.ID `json:"connector_id" yaml:"connector_id" swaggertype:"string" example:"cxr_test550e8400abcde"`
+	TaskId      string  `json:"taskId" yaml:"taskId"`
+	ConnectorId apid.ID `json:"connectorId" yaml:"connectorId" swaggertype:"string" example:"cxr_test550e8400abcde"`
 }
 
 // ForceConnectorVersionStateRequestJson is the request body for

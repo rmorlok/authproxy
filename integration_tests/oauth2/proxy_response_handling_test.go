@@ -114,7 +114,7 @@ func TestProxyResponseHandling_401RefreshesAndRetriesOnce(t *testing.T) {
 
 	retryEvents := rig.logCapture.RecordsWithMessage(t, proxyUpstreamRetryAttemptedMessage)
 	require.Lenf(t, retryEvents, 1, "401 self-heal should emit exactly one retry-attempt event; got %d", len(retryEvents))
-	assert.Equal(t, connID, retryEvents[0]["connection_id"])
+	assert.Equal(t, connID, retryEvents[0]["connectionId"])
 	assert.Equal(t, float64(401), retryEvents[0]["provider_status_code"])
 	require.Lenf(t, rig.logCapture.RecordsWithMessage(t, tokenRefreshSuccessMessage), 1,
 		"401 self-heal should emit one refresh-succeeded event")
@@ -150,7 +150,7 @@ func TestProxyResponseHandling_Persistent401RefreshesOnceThenSurfaces(t *testing
 		"persistent 401 should emit exactly one retry-attempt event")
 	authFailures := rig.logCapture.RecordsWithMessage(t, proxyUpstreamAuthFailureMessage)
 	require.Lenf(t, authFailures, 1, "persistent final 401 should emit one auth-failure event; got %d", len(authFailures))
-	assert.Equal(t, connID, authFailures[0]["connection_id"])
+	assert.Equal(t, connID, authFailures[0]["connectionId"])
 	assert.Equal(t, float64(401), authFailures[0]["provider_status_code"])
 	require.Lenf(t, rig.logCapture.RecordsWithMessage(t, tokenRefreshSuccessMessage), 1,
 		"persistent 401 still refreshes successfully once")
@@ -205,7 +205,7 @@ func TestProxyResponseHandling_429DoesNotRefresh(t *testing.T) {
 
 	rateLimitEvents := rig.logCapture.RecordsWithMessage(t, proxyUpstreamRateLimitedMessage)
 	require.Lenf(t, rateLimitEvents, 1, "429 should emit one rate-limit event; got %d", len(rateLimitEvents))
-	assert.Equal(t, connID, rateLimitEvents[0]["connection_id"])
+	assert.Equal(t, connID, rateLimitEvents[0]["connectionId"])
 	assert.Equal(t, float64(429), rateLimitEvents[0]["provider_status_code"])
 	assert.Equal(t, "7", rateLimitEvents[0]["retry_after"])
 	assert.Equal(t, float64(7), rateLimitEvents[0]["retry_after_seconds"])

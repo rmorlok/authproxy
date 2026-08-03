@@ -100,7 +100,7 @@ sequenceDiagram
         PUB->>P: POST /token
         PUB->>DB: insert oauth2_token, advance connection
         PUB->>R: DEL state
-        PUB-->>T: 302 → return_to_url
+        PUB-->>T: 302 → returnToUrl
         T->>PUB: GET /oauth2/callback?state=…&code=… (replay)
         PUB->>R: GET state (miss — was deleted)
         PUB-->>T: 302 → error_pages.internal_error

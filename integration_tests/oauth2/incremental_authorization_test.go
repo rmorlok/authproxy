@@ -123,7 +123,7 @@ func (r *incrementalAuthRig) startReauth(t *testing.T, connectionID string, scop
 	}
 
 	body, err := json.Marshal(struct {
-		ReturnToUrl string `json:"return_to_url,omitempty"`
+		ReturnToUrl string `json:"returnToUrl,omitempty"`
 	}{
 		ReturnToUrl: r.returnToURL,
 	})
@@ -188,7 +188,7 @@ func (r *incrementalAuthRig) approveOAuthRedirect(t *testing.T, redirectURL stri
 
 	loc := r.env.DeliverOAuth2Callback(t, r.env.ForgeOAuth2CallbackURL(stateID, code))
 	require.Truef(t, strings.HasPrefix(loc, r.returnToURL),
-		"auth flow should land on return_to_url; got %q", loc)
+		"auth flow should land on returnToUrl; got %q", loc)
 }
 
 func (r *incrementalAuthRig) proxyResourceStatus(t *testing.T, connectionID, path string) int {

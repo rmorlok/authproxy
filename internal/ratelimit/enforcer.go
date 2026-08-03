@@ -257,7 +257,7 @@ func (rt *EnforcerRoundTripper) syntheticTooManyRequests(ruleID apid.ID, retryAf
 		retryAfterSeconds = 1
 	}
 	body := fmt.Sprintf(
-		`{"error":"rate limited","rate_limit_id":%q,"retry_after_seconds":%d}`,
+		`{"error":"rate limited","rateLimitId":%q,"retryAfterSeconds":%d}`,
 		string(ruleID), retryAfterSeconds,
 	)
 	return &http.Response{

@@ -86,16 +86,16 @@ func TestRateLimits(t *testing.T) {
 	validDef := func() map[string]interface{} {
 		return map[string]interface{}{
 			"selector": map[string]interface{}{
-				"methods":       []string{"GET"},
-				"request_types": []string{"proxy"},
+				"methods":      []string{"GET"},
+				"requestTypes": []string{"proxy"},
 			},
 			"bucket": map[string]interface{}{
 				"dimensions": []string{"actor"},
 			},
 			"algorithm": map[string]interface{}{
-				"token_bucket": map[string]interface{}{
-					"capacity":    60,
-					"refill_rate": 1.0,
+				"tokenBucket": map[string]interface{}{
+					"capacity":   60,
+					"refillRate": 1.0,
 				},
 			},
 		}
@@ -277,7 +277,7 @@ func TestRateLimits(t *testing.T) {
 
 		t.Run("invalid definition - request_types empty list", func(t *testing.T) {
 			def := validDef()
-			def["selector"].(map[string]interface{})["request_types"] = []string{}
+			def["selector"].(map[string]interface{})["requestTypes"] = []string{}
 			body, _ := json.Marshal(map[string]interface{}{"namespace": "root", "definition": def})
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
@@ -513,7 +513,7 @@ func TestRateLimits(t *testing.T) {
 		t.Run("filter by label_selector", func(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-				http.MethodGet, "/rate-limits?label_selector=team%3Dalpha", nil,
+				http.MethodGet, "/rate-limits?labelSelector=team%3Dalpha", nil,
 				"root", "some-actor", aschema.AllPermissions())
 			require.NoError(t, err)
 			tu.Gin.ServeHTTP(w, req)
@@ -546,7 +546,7 @@ func TestRateLimits(t *testing.T) {
 		t.Run("invalid order_by", func(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-				http.MethodGet, "/rate-limits?order_by=banana%3Aasc", nil,
+				http.MethodGet, "/rate-limits?orderBy=banana%3Aasc", nil,
 				"root", "some-actor", aschema.AllPermissions())
 			require.NoError(t, err)
 			tu.Gin.ServeHTTP(w, req)
@@ -646,7 +646,7 @@ func TestRateLimits(t *testing.T) {
 		})
 	})
 
-	// --- _dry_run ---
+	// --- _dryRun ---
 	//
 	// installRules takes raw schema definitions, persists them via
 	// core.CreateRateLimit (so the namespace / id assignment lifecycle
@@ -680,7 +680,7 @@ func TestRateLimits(t *testing.T) {
 		w := httptest.NewRecorder()
 		req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 			http.MethodPost,
-			"/rate-limits/_dry_run",
+			"/rate-limits/_dryRun",
 			bytes.NewReader(raw),
 			"root",
 			"dry-run-actor",
@@ -693,7 +693,7 @@ func TestRateLimits(t *testing.T) {
 	}
 
 	// tokenBucketRule is a minimal rate-limit definition the dry-run
-	// tests reuse. POST/PATCH/PUT, request_type=proxy, per-actor
+	// tests reuse. POST/PATCH/PUT, requestType=proxy, per-actor
 	// bucket. Cheap to evaluate and easy to peek.
 	tokenBucketRule := func() rlschema.RateLimit {
 		return rlschema.RateLimit{
@@ -719,10 +719,10 @@ func TestRateLimits(t *testing.T) {
 					"method": "POST",
 					"url":    "https://api.example.com/v1/things",
 				},
-				"request_type": "proxy",
+				"requestType": "proxy",
 				"context": map[string]interface{}{
 					"namespace": "root",
-					"actor_id":  "act_test",
+					"actorId":   "act_test",
 				},
 			}
 		}
@@ -747,7 +747,7 @@ func TestRateLimits(t *testing.T) {
 			require.Equal(t, http.StatusBadRequest, code, string(raw))
 		})
 
-		t.Run("rejects when neither connection_id nor namespace given", func(t *testing.T) {
+		t.Run("rejects when neither connectionId nor namespace given", func(t *testing.T) {
 			tu, done := setup(t)
 			defer done()
 

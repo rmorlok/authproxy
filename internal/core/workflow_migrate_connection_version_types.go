@@ -45,7 +45,7 @@ type migrationNotificationDef struct {
 	Level     string         `json:"level"`
 	Title     string         `json:"title"`
 	Message   string         `json:"message"`
-	ActionURL string         `json:"action_url"`
+	ActionURL string         `json:"actionUrl"`
 	Metadata  map[string]any `json:"metadata"`
 }
 

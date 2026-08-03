@@ -3,17 +3,21 @@
   "definition": {
     "mode": "enforce",
     "selector": {
-      "methods": ["GET"],
-      "path_match": {
+      "methods": [
+        "GET"
+      ],
+      "pathMatch": {
         "kind": "glob",
         "value": "/reports/*"
       }
     },
     "bucket": {
-      "dimensions": ["connection"]
+      "dimensions": [
+        "connection"
+      ]
     },
     "algorithm": {
-      "sliding_window": {
+      "slidingWindow": {
         "window": "5m",
         "limit": 500,
         "mode": "counter"

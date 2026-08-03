@@ -37,8 +37,8 @@ func NewWorkflowMonitoringRoutes(
 }
 
 type workflowListCursor struct {
-	AfterInstanceID  string `json:"after_instance_id"`
-	AfterExecutionID string `json:"after_execution_id"`
+	AfterInstanceID  string `json:"afterInstanceId"`
+	AfterExecutionID string `json:"afterExecutionId"`
 	Count            int    `json:"count"`
 }
 
@@ -50,10 +50,10 @@ type ListWorkflowInstancesResponseJson = schemaapi.ListWorkflowInstancesResponse
 type ListWorkflowHistoryResponseJson = schemaapi.ListWorkflowHistoryResponseJson
 
 func workflowInstanceFromParams(gctx *gin.Context) (*wfcore.WorkflowInstance, bool) {
-	instanceID := gctx.Param("instance_id")
-	executionID := gctx.Param("execution_id")
+	instanceID := gctx.Param("instanceId")
+	executionID := gctx.Param("executionId")
 	if instanceID == "" || executionID == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("instance_id and execution_id are required"))
+		apgin.WriteError(gctx, nil, httperr.BadRequest("instanceId and executionId are required"))
 		return nil, false
 	}
 
@@ -339,7 +339,7 @@ func (r *WorkflowMonitoringRoutes) Register(g gin.IRouter) {
 		r.listInstances,
 	)
 	g.GET(
-		"/workflow-monitoring/instances/:instance_id/:execution_id",
+		"/workflow-monitoring/instances/:instanceId/:executionId",
 		r.auth.NewRequiredBuilder().
 			ForResource("workflow_monitoring").
 			ForVerb("get").
@@ -347,7 +347,7 @@ func (r *WorkflowMonitoringRoutes) Register(g gin.IRouter) {
 		r.getInstance,
 	)
 	g.GET(
-		"/workflow-monitoring/instances/:instance_id/:execution_id/history",
+		"/workflow-monitoring/instances/:instanceId/:executionId/history",
 		r.auth.NewRequiredBuilder().
 			ForResource("workflow_monitoring").
 			ForVerb("get").
@@ -355,7 +355,7 @@ func (r *WorkflowMonitoringRoutes) Register(g gin.IRouter) {
 		r.getHistory,
 	)
 	g.GET(
-		"/workflow-monitoring/instances/:instance_id/:execution_id/tree",
+		"/workflow-monitoring/instances/:instanceId/:executionId/tree",
 		r.auth.NewRequiredBuilder().
 			ForResource("workflow_monitoring").
 			ForVerb("get").
@@ -363,7 +363,7 @@ func (r *WorkflowMonitoringRoutes) Register(g gin.IRouter) {
 		r.getTree,
 	)
 	g.POST(
-		"/workflow-monitoring/instances/:instance_id/:execution_id/_cancel",
+		"/workflow-monitoring/instances/:instanceId/:executionId/_cancel",
 		r.auth.NewRequiredBuilder().
 			ForResource("workflow_monitoring").
 			ForVerb("manage").
@@ -371,7 +371,7 @@ func (r *WorkflowMonitoringRoutes) Register(g gin.IRouter) {
 		r.cancelInstance,
 	)
 	g.DELETE(
-		"/workflow-monitoring/instances/:instance_id/:execution_id",
+		"/workflow-monitoring/instances/:instanceId/:executionId",
 		r.auth.NewRequiredBuilder().
 			ForResource("workflow_monitoring").
 			ForVerb("manage").

@@ -166,7 +166,7 @@ func TestPKCE_HappyPath_S256(t *testing.T) {
 
 	browserCtx, _ := helpers.NewBrowser(t)
 
-	connectorsURL := env.PublicURL + "/connectors?auth_token=" + url.QueryEscape(authToken)
+	connectorsURL := env.PublicURL + "/connectors?authToken=" + url.QueryEscape(authToken)
 	require.NoError(t, chromedp.Run(browserCtx,
 		chromedp.Navigate(connectorsURL),
 		chromedp.WaitVisible(`//button[normalize-space()='Connect']`, chromedp.BySearch),
@@ -397,19 +397,19 @@ func TestPKCE_TokenExchangeRejected(t *testing.T) {
 			// Step 5: deliver the callback. The proxy reads the (mutated)
 			// state, posts /token, and the provider rejects PKCE. The
 			// failure path here mirrors any other token-exchange failure
-			// during setup: redirect to return_to_url with setup=pending so
+			// during setup: redirect to returnToUrl with setup=pending so
 			// the marketplace UI re-renders the connection in its
 			// auth_failed state (same shape scenario 7 pins for plain
 			// invalid_grant cases).
 			loc := env.DeliverOAuth2Callback(t, env.ForgeOAuth2CallbackURL(stateIDStr, code))
 			require.Truef(t, strings.HasPrefix(loc, returnToURL),
-				"PKCE rejection should redirect to return_to_url with setup=pending; got %q", loc)
+				"PKCE rejection should redirect to returnToUrl with setup=pending; got %q", loc)
 			parsed, err := url.Parse(loc)
 			require.NoError(t, err)
 			assert.Equal(t, "pending", parsed.Query().Get("setup"),
 				"PKCE rejection redirect should carry setup=pending")
-			assert.Equal(t, connID, parsed.Query().Get("connection_id"),
-				"PKCE rejection redirect should carry the connection_id")
+			assert.Equal(t, connID, parsed.Query().Get("connectionId"),
+				"PKCE rejection redirect should carry the connectionId")
 
 			// Exactly one structured token-exchange failure event. The
 			// category depends on whether the provider's error body

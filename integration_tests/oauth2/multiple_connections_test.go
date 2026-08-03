@@ -168,7 +168,7 @@ func completeAuthFlowWithRedirect(t *testing.T, r *proxyRefreshRig, connID, redi
 		callbackOpts...,
 	)
 	require.Truef(t, strings.HasPrefix(loc, r.returnToURL),
-		"auth flow should land on return_to_url; got %q", loc)
+		"auth flow should land on returnToUrl; got %q", loc)
 	return connID
 }
 

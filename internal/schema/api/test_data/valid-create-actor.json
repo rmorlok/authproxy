@@ -1,5 +1,5 @@
 {
-  "external_id": "user-123",
+  "externalId": "user-123",
   "namespace": "root.acme",
   "labels": {
     "team": "platform"

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/aptelemetry"
 	"github.com/rmorlok/authproxy/internal/schema/config"
@@ -45,6 +46,9 @@ func WithTelemetry(providers *aptelemetry.Providers, cfg *config.Telemetry, serv
 // debug mode, logging, recovery, and error logging middleware. Pass
 // WithTelemetry to add OTel instrumentation (server spans + HTTP metrics).
 func ForService(service config.Service, logger *slog.Logger, debugMode bool, opts ...ServiceOption) *gin.Engine {
+	// AuthProxy's wire contract is intentionally strict: old snake_case body
+	// fields are validation errors instead of silently being ignored by Gin.
+	binding.EnableDecoderDisallowUnknownFields = true
 	logFormatter := func(param gin.LogFormatterParams) string {
 		var statusColor, methodColor, resetColor string
 		if param.IsOutputColor() {
@@ -116,6 +120,7 @@ func ForService(service config.Service, logger *slog.Logger, debugMode bool, opt
 
 // ForTest returns a Gin engine configured for tests with recovery and error logging.
 func ForTest(logger *slog.Logger) *gin.Engine {
+	binding.EnableDecoderDisallowUnknownFields = true
 	engine := gin.New()
 	engine.Use(gin.Recovery(), ErrorLoggingMiddleware(logger))
 	return engine

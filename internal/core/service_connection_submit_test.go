@@ -147,7 +147,7 @@ func TestSubmitForm(t *testing.T) {
 		assert.Equal(t, "Region", form.StepTitle)
 	})
 
-	t.Run("last preconnect step transitions to OAuth2 redirect requires return_to_url", func(t *testing.T) {
+	t.Run("last preconnect step transitions to OAuth2 redirect requires returnToUrl", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
@@ -172,7 +172,7 @@ func TestSubmitForm(t *testing.T) {
 		conn.SetupStep = &step
 
 		// OnSubmit will merge config, then advanceToStep will render the
-		// redirect — which rejects (return_to_url empty) before SetSetupStep
+		// redirect — which rejects (returnToUrl empty) before SetSetupStep
 		// is called. So the only DB write we expect is the config merge.
 		db.EXPECT().SetConnectionEncryptedConfiguration(gomock.Any(), conn.Id, gomock.Any()).Return(nil)
 
@@ -181,7 +181,7 @@ func TestSubmitForm(t *testing.T) {
 			Data:   json.RawMessage(`{"tenant":"acme"}`),
 		})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "return_to_url is required")
+		assert.Contains(t, err.Error(), "returnToUrl is required")
 	})
 
 	t.Run("configure step completes flow", func(t *testing.T) {

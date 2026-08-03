@@ -48,7 +48,7 @@ type RequestEventMetricPoint struct {
 }
 
 type RequestEventMetricSeries struct {
-	RefID  string                    `json:"ref_id"`
+	RefID  string                    `json:"refId"`
 	Labels map[string]string         `json:"labels,omitempty"`
 	Points []RequestEventMetricPoint `json:"points"`
 }

@@ -6,7 +6,7 @@
       "type": "sync",
       "payload": "{\"id\":\"1\"}",
       "state": "pending",
-      "max_retry": 5,
+      "maxRetry": 5,
       "retried": 1
     }
   ],

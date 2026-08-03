@@ -114,7 +114,7 @@ func TestProxyRefresh_TransientRetrySucceeds(t *testing.T) {
 	// must stay clean on eventual success.
 	succeeded := rig.logCapture.RecordsWithMessage(t, tokenRefreshSuccessMessage)
 	require.Lenf(t, succeeded, 1, "retried success must emit exactly one refresh-succeeded event; got %d", len(succeeded))
-	assert.Equal(t, connID, succeeded[0]["connection_id"])
+	assert.Equal(t, connID, succeeded[0]["connectionId"])
 	assert.Empty(t, rig.logCapture.RecordsWithMessage(t, tokenRefreshFailureMessage),
 		"retried success must not emit a refresh-failed event")
 
@@ -175,7 +175,7 @@ func TestProxyRefresh_TransientRetryExhausted(t *testing.T) {
 	require.Lenf(t, failed, 1, "exhausted retry must emit exactly one refresh-failed event; got %d (%v)", len(failed), failed)
 	event := failed[0]
 	assert.Equal(t, "provider_5xx", event["category"])
-	assert.Equal(t, connID, event["connection_id"])
+	assert.Equal(t, connID, event["connectionId"])
 	assert.Equal(t, float64(503), event["provider_status_code"])
 	assert.Equalf(t, float64(tokenRefreshMaxAttempts), event["attempts"],
 		"failure event should record attempts=tokenRefreshMaxAttempts on exhaustion")

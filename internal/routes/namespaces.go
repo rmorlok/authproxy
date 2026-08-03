@@ -56,11 +56,11 @@ type ListNamespacesRequestQueryParams struct {
 	Cursor        *string                  `form:"cursor"`
 	LimitVal      *int32                   `form:"limit"`
 	StateVal      *database.NamespaceState `form:"state"`
-	ChildrenOf    *string                  `form:"children_of"`
+	ChildrenOf    *string                  `form:"childrenOf"`
 	NamespaceVal  *string                  `form:"namespace"`
 	NameVal       *string                  `form:"name"`
-	LabelSelector *string                  `form:"label_selector"`
-	OrderByVal    *string                  `form:"order_by"`
+	LabelSelector *string                  `form:"labelSelector"`
+	OrderByVal    *string                  `form:"orderBy"`
 }
 
 type NamespacesRoutes struct {
@@ -135,7 +135,7 @@ func (r *NamespacesRoutes) create(gctx *gin.Context) {
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
 	var req CreateNamespaceRequestJson
-	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+	if err := bindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
@@ -209,11 +209,11 @@ func (r *NamespacesRoutes) create(gctx *gin.Context) {
 // @Param			cursor			query		string	false	"Pagination cursor"
 // @Param			limit			query		integer	false	"Maximum number of results to return"
 // @Param			state			query		string	false	"Filter by namespace state"
-// @Param			children_of		query		string	false	"Filter to children of a parent namespace"
+// @Param			childrenOf		query		string	false	"Filter to children of a parent namespace"
 // @Param			namespace		query		string	false	"Filter by namespace path pattern"
 // @Param			name			query		string	false	"Filter by exact final path segment"
-// @Param			label_selector	query		string	false	"Filter by label selector"
-// @Param			order_by		query		string	false	"Order by field (e.g., 'path:asc')"
+// @Param			labelSelector	query		string	false	"Filter by label selector"
+// @Param			orderBy		query		string	false	"Order by field (e.g., 'path:asc')"
 // @Success		200				{object}	OpenAPIListNamespacesResponseJson
 // @Failure		400				{object}	ErrorResponse
 // @Failure		401				{object}	ErrorResponse
@@ -347,7 +347,7 @@ func (r *NamespacesRoutes) update(gctx *gin.Context) {
 	}
 
 	var req UpdateNamespaceRequestJson
-	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+	if err := bindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
@@ -606,14 +606,14 @@ func (r *NamespacesRoutes) setKey(gctx *gin.Context) {
 	}
 
 	var req SetNamespaceKeyRequestJson
-	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+	if err := bindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if req.KeyId == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("key_id is required"))
+		apgin.WriteError(gctx, nil, httperr.BadRequest("keyId is required"))
 		val.MarkErrorReturn()
 		return
 	}

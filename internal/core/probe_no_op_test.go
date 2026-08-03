@@ -14,7 +14,7 @@ import (
 )
 
 // TestProbeNoOp_Invoke covers the no-op probe variant: NewProbe falls back
-// to probeNoOp when the connector declares neither http nor proxy_http.
+// to probeNoOp when the connector declares neither http nor proxyHttp.
 // Every invocation should be reported as success with no error so the
 // connector's health signal stays healthy by default when no real probe is
 // configured.

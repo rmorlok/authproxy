@@ -17,7 +17,7 @@ import (
 // Scenario 12 from issue #173: logs, errors, and metrics emitted by any
 // OAuth flow must not contain access tokens, refresh tokens, authorization
 // codes, client secrets, PKCE code verifiers, or raw provider credentials.
-// Logs may include connection_id, tenant id, provider id, correlation id,
+// Logs may include connectionId, tenant id, provider id, correlation id,
 // error category, retry count, and scope-mismatch metadata.
 //
 // The proxy redacts at the wire layer (request_log) and at the structured
@@ -120,14 +120,14 @@ func serializeRecords(t *testing.T, records []map[string]any) string {
 // assertConnectionIDPresent is a positive control: if logs from the OAuth
 // flow are NOT being captured at all, the negative assertions in
 // assertNoSecretsInLogs trivially pass. Pin a known-allowed value
-// (connection_id) so the test fails loudly when the capture path
+// (connectionId) so the test fails loudly when the capture path
 // regresses.
 func assertConnectionIDPresent(t *testing.T, capture *helpers.LogCapture, connectionID string) {
 	t.Helper()
-	require.NotEmpty(t, connectionID, "positive control: connection_id is empty — test bug")
+	require.NotEmpty(t, connectionID, "positive control: connectionId is empty — test bug")
 	joined := serializeRecords(t, capture.Records(t))
 	require.Containsf(t, joined, connectionID,
-		"positive control: connection_id %q should appear in some captured record — log capture may be misconfigured", connectionID)
+		"positive control: connectionId %q should appear in some captured record — log capture may be misconfigured", connectionID)
 }
 
 // TestRedaction_HappyPathFlowLeaksNoSecrets — drive a complete authorization-
@@ -164,7 +164,7 @@ func TestRedaction_HappyPathFlowLeaksNoSecrets(t *testing.T) {
 
 	loc := rig.env.DeliverOAuth2Callback(t, rig.env.ForgeOAuth2CallbackURL(stateID, secrets.AuthorizationCode))
 	require.Truef(t, strings.HasPrefix(loc, rig.returnToURL),
-		"auth flow must land on return_to_url; got %q", loc)
+		"auth flow must land on returnToUrl; got %q", loc)
 
 	// One proxied API call so proxy-path logs are exercised too.
 	w := rig.env.DoProxyRequest(t, connID, rig.provider.ResourceURL("/echo"), "GET")

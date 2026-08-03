@@ -40,9 +40,9 @@ type ResourceSearchRoutes struct {
 
 type SearchResourcesRequestQuery struct {
 	Mode          string   `form:"mode"`
-	ResourceTypes []string `form:"resource_type"`
+	ResourceTypes []string `form:"resourceType"`
 	Query         string   `form:"q"`
-	LabelSelector string   `form:"label_selector"`
+	LabelSelector string   `form:"labelSelector"`
 	Namespace     string   `form:"namespace"`
 	Limit         *int     `form:"limit"`
 }
@@ -69,9 +69,9 @@ var searchPermissionResources = map[database.SearchResourceType]string{
 // @Tags         search
 // @Produce      json
 // @Param        mode            query string false "Search mode: query or seed"
-// @Param        resource_type   query []string false "Resource types; may be repeated" collectionFormat(multi)
+// @Param        resourceType   query []string false "Resource types; may be repeated" collectionFormat(multi)
 // @Param        q               query string false "Case-insensitive literal resource-name or label-value substring (minimum 3 characters)"
-// @Param        label_selector  query string false "Exact Kubernetes-style label selector"
+// @Param        labelSelector  query string false "Exact Kubernetes-style label selector"
 // @Param        namespace       query string false "Namespace matcher"
 // @Param        limit           query int false "Maximum results (query) or results per type (seed), up to 50"
 // @Success      200 {object} OpenAPISearchResourcesResponseJson
@@ -112,7 +112,7 @@ func (r *ResourceSearchRoutes) search(gctx *gin.Context) {
 	}
 	if mode == resourceSearchModeQuery {
 		if queryText == "" && labelSelector == "" {
-			apgin.WriteError(gctx, r.logger, httperr.BadRequest("query mode requires q or label_selector"))
+			apgin.WriteError(gctx, r.logger, httperr.BadRequest("query mode requires q or labelSelector"))
 			return
 		}
 		if queryText != "" && len([]rune(queryText)) < 3 && labelSelector == "" {

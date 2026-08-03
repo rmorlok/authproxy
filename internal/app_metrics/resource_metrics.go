@@ -51,7 +51,7 @@ type ResourceMetricPoint struct {
 }
 
 type ResourceMetricSeries struct {
-	RefID  string                `json:"ref_id"`
+	RefID  string                `json:"refId"`
 	Labels map[string]string     `json:"labels,omitempty"`
 	Points []ResourceMetricPoint `json:"points"`
 }

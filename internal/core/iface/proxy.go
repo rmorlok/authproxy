@@ -20,8 +20,8 @@ type ProxyRequest struct {
 	Method   string                `json:"method"`
 	Headers  map[string]HeadersVal `json:"headers"`
 	Labels   map[string]string     `json:"labels,omitempty"`
-	BodyRaw  []byte                `json:"body_raw,omitempty"`
-	BodyJson interface{}           `json:"body_json,omitempty"`
+	BodyRaw  []byte                `json:"bodyRaw,omitempty"`
+	BodyJson interface{}           `json:"bodyJson,omitempty"`
 }
 
 func (r *ProxyRequest) Apply(req *gentleman.Request) {
@@ -87,10 +87,10 @@ func (r *ProxyRequest) Validate() error {
 }
 
 type ProxyResponse struct {
-	StatusCode int               `json:"status_code"`
+	StatusCode int               `json:"statusCode"`
 	Headers    map[string]string `json:"headers"`
-	BodyRaw    []byte            `json:"body_raw"`
-	BodyJson   interface{}       `json:"body_json"`
+	BodyRaw    []byte            `json:"bodyRaw"`
+	BodyJson   interface{}       `json:"bodyJson"`
 }
 
 // ProxyResponseFromGentlemen creates a ProxyResponse from a gentleman.Response

@@ -1,4 +1,4 @@
 {
   "error": "Bad Request",
-  "stack_trace": "handler.go:42"
+  "stackTrace": "handler.go:42"
 }

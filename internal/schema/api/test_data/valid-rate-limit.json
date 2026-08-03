@@ -4,19 +4,26 @@
   "definition": {
     "mode": "enforce",
     "selector": {
-      "methods": ["POST"],
-      "request_types": ["proxy"],
-      "label_selector": "team == payments",
-      "path_match": {
+      "methods": [
+        "POST"
+      ],
+      "requestTypes": [
+        "proxy"
+      ],
+      "labelSelector": "team == payments",
+      "pathMatch": {
         "kind": "prefix",
         "value": "/v1/"
       }
     },
     "bucket": {
-      "dimensions": ["actor", "labels/team"]
+      "dimensions": [
+        "actor",
+        "labels/team"
+      ]
     },
     "algorithm": {
-      "fixed_window": {
+      "fixedWindow": {
         "window": "1m",
         "limit": 100
       }
@@ -28,6 +35,6 @@
   "annotations": {
     "note": "protect write traffic"
   },
-  "created_at": "2026-01-02T03:04:05Z",
-  "updated_at": "2026-01-02T03:05:06Z"
+  "createdAt": "2026-01-02T03:04:05Z",
+  "updatedAt": "2026-01-02T03:05:06Z"
 }

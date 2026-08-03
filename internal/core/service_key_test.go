@@ -91,7 +91,7 @@ func TestGetKeyDataDecryptsProviderConfig(t *testing.T) {
 
 	enc.EXPECT().
 		Decrypt(gomock.Any(), encrypted).
-		Return([]byte(`{"aws_kms_key_id":"alias/authproxy","aws_region":"us-east-1"}`), nil)
+		Return([]byte(`{"awsKmsKeyId":"alias/authproxy","awsRegion":"us-east-1"}`), nil)
 
 	keyData, err := s.GetKeyData(ctx, keyID)
 
@@ -129,8 +129,8 @@ func TestUpdateKeyDataEncryptsAndEnqueuesReconciliation(t *testing.T) {
 		DoAndReturn(func(_ context.Context, _ string, data []byte) (encfield.EncryptedField, error) {
 			var decoded map[string]interface{}
 			require.NoError(t, json.Unmarshal(data, &decoded))
-			require.Equal(t, "alias/authproxy-v2", decoded["aws_kms_key_id"])
-			require.Equal(t, "us-east-1", decoded["aws_region"])
+			require.Equal(t, "alias/authproxy-v2", decoded["awsKmsKeyId"])
+			require.Equal(t, "us-east-1", decoded["awsRegion"])
 			return updatedEncrypted, nil
 		})
 

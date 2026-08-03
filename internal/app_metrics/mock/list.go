@@ -22,20 +22,20 @@ type MockListRequestBuilderExecutor struct {
 
 	Namespace                *string     `json:"namespace,omitempty"`
 	Namespaces               []string    `json:"namespaces,omitempty"`
-	RequestType              *string     `json:"request_type,omitempty"`
-	CorrelationId            *string     `json:"correlation_id,omitempty"`
-	ConnectionId             *apid.ID    `json:"connection_id,omitempty"`
-	ConnectorType            *string     `json:"connector_type,omitempty"`
-	ConnectorId              *apid.ID    `json:"connector_id,omitempty"`
-	ConnectorVersion         *uint64     `json:"connector_version,omitempty"`
+	RequestType              *string     `json:"requestType,omitempty"`
+	CorrelationId            *string     `json:"correlationId,omitempty"`
+	ConnectionId             *apid.ID    `json:"connectionId,omitempty"`
+	ConnectorType            *string     `json:"connectorType,omitempty"`
+	ConnectorId              *apid.ID    `json:"connectorId,omitempty"`
+	ConnectorVersion         *uint64     `json:"connectorVersion,omitempty"`
 	Method                   *string     `json:"method,omitempty"`
-	StatusCodeRangeInclusive []int       `json:"status_code_range,omitempty"`
-	TimestampRange           []time.Time `json:"timestamp_range,omitempty"`
+	StatusCodeRangeInclusive []int       `json:"statusCodeRange,omitempty"`
+	TimestampRange           []time.Time `json:"timestampRange,omitempty"`
 	Path                     *string     `json:"path,omitempty"`
-	PathRegex                *string     `json:"path_regex,omitempty"`
-	LabelSelector            *string     `json:"label_selector,omitempty"`
-	ResponseSource           *string     `json:"response_source,omitempty"`
-	RateLimitId              *apid.ID    `json:"rate_limit_id,omitempty"`
+	PathRegex                *string     `json:"pathRegex,omitempty"`
+	LabelSelector            *string     `json:"labelSelector,omitempty"`
+	ResponseSource           *string     `json:"responseSource,omitempty"`
+	RateLimitId              *apid.ID    `json:"rateLimitId,omitempty"`
 }
 
 func (l *MockListRequestBuilderExecutor) ForNamespaceMatcher(matcher string) app_metrics.ListRequestBuilder {

@@ -180,7 +180,7 @@ func TestActorsRoutes(t *testing.T) {
 
 		t.Run("invalid order_by field", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodGet, "/actors?order_by=not_a_field%20asc", nil)
+			req, err := http.NewRequest(http.MethodGet, "/actors?orderBy=not_a_field%20asc", nil)
 			require.NoError(t, err)
 			req = authenticate(t, tu, req)
 
@@ -199,7 +199,7 @@ func TestActorsRoutes(t *testing.T) {
 			require.NoError(t, err)
 
 			w := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodGet, "/actors?label_selector=app%3Dtest-app", nil)
+			req, err := http.NewRequest(http.MethodGet, "/actors?labelSelector=app%3Dtest-app", nil)
 			require.NoError(t, err)
 			req = authenticate(t, tu, req)
 
@@ -1876,7 +1876,7 @@ func TestActorsRoutes(t *testing.T) {
 		defer done()
 
 		create := func(externalID string, name *string) ActorJson {
-			body := map[string]interface{}{"external_id": externalID, "namespace": "root"}
+			body := map[string]interface{}{"externalId": externalID, "namespace": "root"}
 			if name != nil {
 				body["name"] = *name
 			}

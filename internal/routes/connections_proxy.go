@@ -81,7 +81,7 @@ func (r *ConnectionsProxyRoutes) proxy(gctx *gin.Context) {
 	}
 
 	var proxyRequest iface.ProxyRequest
-	if err := gctx.ShouldBindJSON(&proxyRequest); err != nil {
+	if err := bindJSONBody(gctx, &proxyRequest); err != nil {
 		apgin.WriteError(gctx, r.logger, httperr.BadRequest("invalid proxy request payload", httperr.WithInternalErr(err)))
 		return
 	}
@@ -109,7 +109,7 @@ func (r *ConnectionsProxyRoutes) Register(g gin.IRouter) {
 		Build()
 
 	g.POST("/connections/:id/_proxy", proxyAuth, r.proxy)
-	g.Any("/connections/:id/_proxy_raw", proxyAuth, r.proxyRaw)
+	g.Any("/connections/:id/_proxyRaw", proxyAuth, r.proxyRaw)
 }
 
 func NewConnectionsProxyRoutes(

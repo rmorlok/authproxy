@@ -139,7 +139,7 @@ func (r *authMethodCompatibilityRig) completeAuthFlow(t *testing.T, pkce bool) (
 
 	loc := r.env.DeliverOAuth2Callback(t, authResp.RedirectURL)
 	require.Truef(t, strings.HasPrefix(loc, r.returnToURL),
-		"successful auth method flow should redirect to return_to_url; got %q", loc)
+		"successful auth method flow should redirect to returnToUrl; got %q", loc)
 
 	token := r.env.GetOAuth2Token(t, connID)
 	require.NotNil(t, token, "successful auth method flow must persist a token")
@@ -246,11 +246,11 @@ func TestProviderAuthMethodCompatibility_InvalidMethodFailsClearly(t *testing.T)
 
 	loc := rig.env.DeliverOAuth2Callback(t, authResp.RedirectURL)
 	require.Truef(t, strings.HasPrefix(loc, rig.returnToURL),
-		"invalid auth method should redirect to return_to_url with setup=pending; got %q", loc)
+		"invalid auth method should redirect to returnToUrl with setup=pending; got %q", loc)
 	parsedLoc, err := url.Parse(loc)
 	require.NoError(t, err)
 	assert.Equal(t, "pending", parsedLoc.Query().Get("setup"))
-	assert.Equal(t, connID, parsedLoc.Query().Get("connection_id"))
+	assert.Equal(t, connID, parsedLoc.Query().Get("connectionId"))
 
 	require.Nil(t, rig.env.GetOAuth2Token(t, connID),
 		"token row must not persist when provider rejects the configured client auth method")

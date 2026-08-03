@@ -20,7 +20,7 @@ provider, against the real marketplace UI, and stores what it receives.
    after the SPA's `session._initiate` resolves.
 2. **State round-trips** from authorize → callback verbatim.
 3. **Final navigation** lands the browser on the marketplace's
-   `/connections` page (`return_to_url`).
+   `/connections` page (`returnToUrl`).
 4. **Callback** persists encrypted access and refresh tokens with a
    future `access_token_expires_at`.
 5. **Connection** transitions to `ready` (no probes/configure on this
@@ -60,9 +60,9 @@ sequenceDiagram
     T->>P: POST /test/clients + /test/users (register)
 
     Note over T,B: 1. Marketplace boot
-    T->>B: navigate /connectors?auth_token=…
+    T->>B: navigate /connectors?authToken=…
     B->>PUB: GET /connectors → SPA index.html
-    B->>PUB: POST /api/v1/session/_initiate (auth_token)
+    B->>PUB: POST /api/v1/session/_initiate (authToken)
     PUB-->>B: 200 + Set-Cookie: SESSION-ID
     B->>PUB: GET /api/v1/connectors
     PUB-->>B: 200 [test connector]
@@ -92,7 +92,7 @@ sequenceDiagram
     PUB->>P: POST /token grant_type=authorization_code
     P-->>PUB: { access_token, refresh_token, expires_in, ... }
     PUB->>DB: insert oauth2_token (encrypted) + connection→ready
-    PUB-->>B: 302 → return_to_url
+    PUB-->>B: 302 → returnToUrl
     B->>PUB: GET /connections → SPA renders "Your Connections"
 
     Note over T,API: 5. Proxied call

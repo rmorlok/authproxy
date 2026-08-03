@@ -7,7 +7,7 @@ post-auth redirect behavior must not send users to arbitrary external URLs.
 
 `TestOAuth2OpenRedirectProtection_InvalidReturnURLFallsBackToMarketplace`
 boots a real marketplace session in Chrome, initiates an OAuth connection from
-that browser session with a malicious external `return_to_url`, and then drives
+that browser session with a malicious external `returnToUrl`, and then drives
 the provider login and consent forms through chromedp. After the provider
 redirects back to AuthProxy's OAuth callback, the browser must land on the
 marketplace `/connections` page, not the hostile origin.

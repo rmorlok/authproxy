@@ -1,8 +1,10 @@
 package key_value
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 
@@ -11,6 +13,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apgin"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httperr"
+	"github.com/rmorlok/authproxy/internal/util"
 )
 
 // Adapter wires the generic label/annotation handlers to a specific
@@ -207,7 +210,13 @@ func (a Adapter[ID]) HandlePut(gctx *gin.Context) {
 	}
 
 	var req PutKeyValueRequestJson
-	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+	data, err := io.ReadAll(gctx.Request.Body)
+	if err != nil {
+		apgin.WriteError(gctx, a.Logger, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
+		return
+	}
+	gctx.Request.Body = io.NopCloser(bytes.NewReader(data))
+	if err := util.DecodeJSONStrict(data, &req); err != nil {
 		apgin.WriteError(gctx, a.Logger, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
