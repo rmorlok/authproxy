@@ -91,8 +91,8 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection, highlightNe
     })).then((action) => {
       if (action.meta.requestStatus === 'fulfilled') {
         const response = action.payload as any;
-        if (isRedirectResponse(response) && response.redirect_url) {
-          window.location.href = response.redirect_url;
+        if (isRedirectResponse(response) && response.redirectUrl) {
+          window.location.href = response.redirectUrl;
           return;
         }
         if (isCompleteResponse(response)) {
@@ -115,7 +115,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection, highlightNe
       if (action.meta.requestStatus === 'fulfilled') {
         const response = action.payload as any;
         if (isRedirectResponse(response)) {
-          window.location.href = response.redirect_url;
+          window.location.href = response.redirectUrl;
         }
       }
     });
@@ -134,7 +134,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection, highlightNe
   // Reauth is meaningful on configured connections unless healthy setup is the
   // only outstanding action. If health is unhealthy, reauth remains primary.
   const canReauth = connection.state === ConnectionState.CONFIGURED && (requiresReconnection || !requiresSetup);
-  const canReconfigure = connection.state === ConnectionState.CONFIGURED && connector?.has_configure && !requiresSetup;
+  const canReconfigure = connection.state === ConnectionState.CONFIGURED && connector?.hasConfigure && !requiresSetup;
 
   const handleActionsMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setActionsAnchorEl(event.currentTarget);
@@ -165,10 +165,10 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection, highlightNe
 
       if (responsePayload &&
           typeof responsePayload === 'object' &&
-          'task_id' in responsePayload) {
+		  'taskId' in responsePayload) {
 
         const taskPollResult =
-            await tasks.pollForTaskFinalized((responsePayload as DisconnectResponseJson).task_id);
+            await tasks.pollForTaskFinalized((responsePayload as DisconnectResponseJson).taskId);
         if (taskPollResult.result !== PollForTaskResult.FINALIZED) {
             addToast({
               message: 'Error while checking for status of disconnect',
@@ -286,7 +286,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection, highlightNe
       </Box>
       <CardContent sx={{ flexGrow: 1, width: '100%', boxSizing: 'border-box' }}>
         <Typography gutterBottom variant="h5" component="div">
-          {connector ? connector.display_name : 'Unknown Connector'}
+          {connector ? connector.displayName : 'Unknown Connector'}
         </Typography>
         <Box
           sx={{
@@ -423,7 +423,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection, highlightNe
         <DialogTitle>Disconnect Confirmation</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Are you sure you want to disconnect from {connector?.display_name || 'this connector'}?
+            Are you sure you want to disconnect from {connector?.displayName || 'this connector'}?
           </DialogContentText>
         </DialogContent>
         <DialogActions>

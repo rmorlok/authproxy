@@ -114,32 +114,32 @@ export const TruncatedAndIncomplete: Story = {
 };
 
 function resource(
-    resourceType: SearchResourceSummary['resource_type'],
+    resourceType: SearchResourceSummary['resourceType'],
     resourceId: string,
     name: string,
     labels: Record<string, string>,
     resourceNamespace = 'root.acme',
 ): SearchResourceSummary {
     return {
-        resource_type: resourceType,
-        resource_id: resourceId,
+        resourceType: resourceType,
+        resourceId: resourceId,
         name,
         namespace: resourceNamespace,
         labels,
-        matched_labels: [],
-        updated_at: '2026-07-12T12:00:00Z',
+        matchedLabels: [],
+        updatedAt: '2026-07-12T12:00:00Z',
     };
 }
 
 function response(
     items: SearchResourceSummary[],
-    truncatedTypes: SearchResourcesResponse['truncated_types'] = [],
-    incompleteTypes: SearchResourcesResponse['incomplete_types'] = [],
+    truncatedTypes: SearchResourcesResponse['truncatedTypes'] = [],
+    incompleteTypes: SearchResourcesResponse['incompleteTypes'] = [],
 ): SearchResourcesResponse {
     return {
         items,
-        truncated_types: truncatedTypes,
-        incomplete_types: incompleteTypes,
+        truncatedTypes: truncatedTypes,
+        incompleteTypes: incompleteTypes,
     };
 }
 

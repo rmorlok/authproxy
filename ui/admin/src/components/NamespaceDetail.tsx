@@ -184,11 +184,11 @@ export default function NamespaceDetail({namespacePath}: { namespacePath: string
       <Stack direction={{xs: 'column', sm: 'row'}} spacing={4}>
         <Box>
           <Typography variant="subtitle2" color="text.secondary">Created</Typography>
-          <Typography variant="body1">{dayjs(ns.created_at).format('MMM DD, YYYY, h:mm A')}</Typography>
+          <Typography variant="body1">{dayjs(ns.createdAt).format('MMM DD, YYYY, h:mm A')}</Typography>
         </Box>
         <Box>
           <Typography variant="subtitle2" color="text.secondary">Updated</Typography>
-          <Typography variant="body1">{dayjs(ns.updated_at).format('MMM DD, YYYY, h:mm A')}</Typography>
+          <Typography variant="body1">{dayjs(ns.updatedAt).format('MMM DD, YYYY, h:mm A')}</Typography>
         </Box>
       </Stack>
 
@@ -219,14 +219,14 @@ export default function NamespaceDetail({namespacePath}: { namespacePath: string
 
       <Box>
         <Typography variant="subtitle2" color="text.secondary">Key</Typography>
-        {ns.key_id ? (
+        {ns.keyId ? (
           <Stack direction="row" spacing={1} alignItems="center" sx={{mt: 0.5}}>
-            <Link component={RouterLink} to={`/keys/${ns.key_id}`}>
+            <Link component={RouterLink} to={`/keys/${ns.keyId}`}>
               <Typography variant="body1" component="code" sx={{
                 fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
                 fontSize: '0.9rem',
               }}>
-                {ns.key_id}
+                {ns.keyId}
               </Typography>
             </Link>
             <Button size="small" onClick={openSelector} disabled={actionLoading || isRoot}>Change Key</Button>

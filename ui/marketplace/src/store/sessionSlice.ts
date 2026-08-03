@@ -9,12 +9,12 @@ import {
 } from '@authproxy/api';
 
 interface AuthState {
-    actor_id: string | null;
+    actorId: string | null;
     status: 'checking' | 'redirecting' | 'authenticated' | 'unauthenticated';
 }
 
 const initialState: AuthState = {
-    actor_id: null,
+    actorId: null,
     status: 'checking',
 };
 
@@ -48,7 +48,7 @@ export const initiateSessionAsync = createAsyncThunk<
             console.error(
                 `[AuthProxy marketplace] session initiate failed with no usable response; falling back to ${fallback}`,
             );
-            return rejectWithValue({ redirect_url: fallback });
+            return rejectWithValue({ redirectUrl: fallback });
         }
     }
 );
@@ -59,7 +59,7 @@ export const sessionSlice = createSlice({
     reducers: {
         terminate: (state) => {
             state.status = 'checking';
-            state.actor_id = null;
+            state.actorId = null;
 
             setTimeout(async () => {
                 await session.terminate();
@@ -69,17 +69,17 @@ export const sessionSlice = createSlice({
     extraReducers: (builder) => {
         builder
             .addCase(initiateSessionAsync.pending, (state) => {
-                state.actor_id = null;
+                state.actorId = null;
                 state.status = 'checking';
             })
             .addCase(initiateSessionAsync.fulfilled, (state, action) => {
                 state.status = 'authenticated';
-                state.actor_id = action.payload.actor_id;
+                state.actorId = action.payload.actorId;
             })
             .addCase(initiateSessionAsync.rejected, (state, action) => {
                 state.status = 'unauthenticated';
-                state.actor_id = null;
-                const target = action.payload?.redirect_url || import.meta.env.VITE_PUBLIC_BASE_URL + '/error';
+                state.actorId = null;
+                const target = action.payload?.redirectUrl || import.meta.env.VITE_PUBLIC_BASE_URL + '/error';
                 console.warn(`[AuthProxy marketplace] not authenticated; redirecting to ${target}`);
                 setTimeout(() => {
                     window.location.href = target;
@@ -91,6 +91,6 @@ export const sessionSlice = createSlice({
 export const {terminate} = sessionSlice.actions;
 
 export const selectAuthStatus = (state: RootState) => state.auth.status;
-export const selectActorId = (state: RootState) => state.auth.actor_id;
+export const selectActorId = (state: RootState) => state.auth.actorId;
 
 export default sessionSlice.reducer;

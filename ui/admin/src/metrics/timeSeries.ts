@@ -15,11 +15,11 @@ export interface ChartMetricPoint {
     [seriesKey: string]: string | number | null;
 }
 
-export const metricSeriesLabel = (series: Pick<MetricsSeries, 'ref_id' | 'labels'>): string => {
+export const metricSeriesLabel = (series: Pick<MetricsSeries, 'refId' | 'labels'>): string => {
     const labels = series.labels || {};
     const entries = Object.entries(labels).sort(([a], [b]) => a.localeCompare(b));
     if (entries.length === 0) {
-        return series.ref_id;
+        return series.refId;
     }
     return entries.map(([key, value]) => `${key}: ${value}`).join(', ');
 };
@@ -28,7 +28,7 @@ export const summarizeMetricSeries = (series: MetricsSeries): MetricsSeriesSumma
     const latest = findLatestMetricPoint(series.points || []);
     const total = (series.points || []).reduce((sum, point) => sum + point.value, 0);
     return {
-        refId: series.ref_id,
+        refId: series.refId,
         metric: series.metric,
         aggregation: series.aggregation,
         labels: series.labels || {},
@@ -50,8 +50,8 @@ export const metricsResponseIsEmpty = (response: MetricsQueryResponse | null | u
 export const metricsSeriesByRef = (response: MetricsQueryResponse | null | undefined): Record<string, MetricsSeries[]> => {
     const grouped: Record<string, MetricsSeries[]> = {};
     for (const series of response?.series || []) {
-        grouped[series.ref_id] = grouped[series.ref_id] || [];
-        grouped[series.ref_id].push(series);
+        grouped[series.refId] = grouped[series.refId] || [];
+        grouped[series.refId].push(series);
     }
     return grouped;
 };

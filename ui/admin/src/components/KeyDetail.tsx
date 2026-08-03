@@ -127,7 +127,7 @@ export default function KeyDetail({keyId}: { keyId: string }) {
   const onClickEdit = () => {
     setActionError(null);
     setEditState(ek.state);
-    setEditKeyData(keyDataFormStateFromConfig(ek.key_data));
+    setEditKeyData(keyDataFormStateFromConfig(ek.keyData));
     setEditKeyDataDirty(false);
     setEditLabelRows(mapToRows(ek.labels, {readonlyKeyPrefix: SYSTEM_LABEL_PREFIX}));
     setEditAnnotationRows(mapToRows(ek.annotations));
@@ -170,7 +170,7 @@ export default function KeyDetail({keyId}: { keyId: string }) {
         annotations: rowsToMap(editAnnotationRows),
       };
       if (editKeyDataDirty) {
-        request.key_data = buildKeyDataPayload(editKeyData);
+        request.keyData = buildKeyDataPayload(editKeyData);
       }
       const resp = await keys.update(ek.id, request);
       setEk(resp.data);
@@ -273,11 +273,11 @@ export default function KeyDetail({keyId}: { keyId: string }) {
 
       <Box>
         <Typography variant="subtitle2" color="text.secondary">Key Data</Typography>
-        {ek.key_data ? (
+        {ek.keyData ? (
           <Stack spacing={1} sx={{mt: 0.5}}>
             <Stack direction="row" spacing={0.5} flexWrap="wrap">
-              <Chip label={keyDataSourceLabel(ek.key_data)} size="small" color="primary" variant="outlined"/>
-              {keyDataDisplayFields(ek.key_data).map(({key, value}) => (
+              <Chip label={keyDataSourceLabel(ek.keyData)} size="small" color="primary" variant="outlined"/>
+              {keyDataDisplayFields(ek.keyData).map(({key, value}) => (
                 <Chip key={key} label={`${key}: ${value}`} size="small" variant="outlined"/>
               ))}
             </Stack>
@@ -290,11 +290,11 @@ export default function KeyDetail({keyId}: { keyId: string }) {
       <Stack direction={{xs: 'column', sm: 'row'}} spacing={4}>
         <Box>
           <Typography variant="subtitle2" color="text.secondary">Created</Typography>
-          <Typography variant="body1">{dayjs(ek.created_at).format('MMM DD, YYYY, h:mm A')}</Typography>
+          <Typography variant="body1">{dayjs(ek.createdAt).format('MMM DD, YYYY, h:mm A')}</Typography>
         </Box>
         <Box>
           <Typography variant="subtitle2" color="text.secondary">Updated</Typography>
-          <Typography variant="body1">{dayjs(ek.updated_at).format('MMM DD, YYYY, h:mm A')}</Typography>
+          <Typography variant="body1">{dayjs(ek.updatedAt).format('MMM DD, YYYY, h:mm A')}</Typography>
         </Box>
       </Stack>
 

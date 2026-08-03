@@ -38,25 +38,25 @@ function ModeChip({ mode }: { mode: RateLimitMode }) {
 // algorithm card. Keeps the detail page scannable without rendering the
 // full nested JSON.
 function algorithmDisplay(def: RateLimitDefinition): { label: string; rows: Array<[string, string]> } {
-    if (def.algorithm.fixed_window) {
-        const a = def.algorithm.fixed_window;
+    if (def.algorithm.fixedWindow) {
+        const a = def.algorithm.fixedWindow;
         return {
             label: 'Fixed window',
             rows: [['Window', a.window], ['Limit', `${a.limit}`]],
         };
     }
-    if (def.algorithm.sliding_window) {
-        const a = def.algorithm.sliding_window;
+    if (def.algorithm.slidingWindow) {
+        const a = def.algorithm.slidingWindow;
         return {
             label: `Sliding window (${a.mode})`,
             rows: [['Window', a.window], ['Limit', `${a.limit}`], ['Mode', a.mode]],
         };
     }
-    if (def.algorithm.token_bucket) {
-        const a = def.algorithm.token_bucket;
+    if (def.algorithm.tokenBucket) {
+        const a = def.algorithm.tokenBucket;
         return {
             label: 'Token bucket',
-            rows: [['Capacity', `${a.capacity}`], ['Refill rate', `${a.refill_rate} tok/s`]],
+            rows: [['Capacity', `${a.capacity}`], ['Refill rate', `${a.refillRate} tok/s`]],
         };
     }
     return { label: '—', rows: [] };
@@ -267,11 +267,11 @@ export default function RateLimitDetail({ rateLimitId }: { rateLimitId: string }
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={4}>
                 <Box>
                     <Typography variant="subtitle2" color="text.secondary">Created</Typography>
-                    <Typography variant="body1">{dayjs(rl.created_at).format('MMM DD, YYYY, h:mm A')}</Typography>
+                    <Typography variant="body1">{dayjs(rl.createdAt).format('MMM DD, YYYY, h:mm A')}</Typography>
                 </Box>
                 <Box>
                     <Typography variant="subtitle2" color="text.secondary">Updated</Typography>
-                    <Typography variant="body1">{dayjs(rl.updated_at).format('MMM DD, YYYY, h:mm A')}</Typography>
+                    <Typography variant="body1">{dayjs(rl.updatedAt).format('MMM DD, YYYY, h:mm A')}</Typography>
                 </Box>
             </Stack>
 
@@ -290,28 +290,28 @@ export default function RateLimitDetail({ rateLimitId }: { rateLimitId: string }
             <Box>
                 <Typography variant="subtitle2" color="text.secondary">Selector</Typography>
                 <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{ mt: 0.5, rowGap: 0.5 }}>
-                    {rl.definition.selector.label_selector && (
-                        <Chip label={`labels: ${rl.definition.selector.label_selector}`} size="small" variant="outlined" />
+                    {rl.definition.selector.labelSelector && (
+                        <Chip label={`labels: ${rl.definition.selector.labelSelector}`} size="small" variant="outlined" />
                     )}
                     {rl.definition.selector.methods && rl.definition.selector.methods.length > 0 && (
                         <Chip label={`methods: ${rl.definition.selector.methods.join(', ')}`} size="small" variant="outlined" />
                     )}
-                    {rl.definition.selector.path_match && (
+                    {rl.definition.selector.pathMatch && (
                         <Chip
-                            label={`path ${rl.definition.selector.path_match.kind}: ${rl.definition.selector.path_match.value}`}
+                            label={`path ${rl.definition.selector.pathMatch.kind}: ${rl.definition.selector.pathMatch.value}`}
                             size="small" variant="outlined"
                         />
                     )}
-                    {rl.definition.selector.request_types && rl.definition.selector.request_types.length > 0 && (
+                    {rl.definition.selector.requestTypes && rl.definition.selector.requestTypes.length > 0 && (
                         <Chip
-                            label={`types: ${rl.definition.selector.request_types.join(', ')}`}
+                            label={`types: ${rl.definition.selector.requestTypes.join(', ')}`}
                             size="small" variant="outlined"
                         />
                     )}
-                    {!rl.definition.selector.label_selector
+                    {!rl.definition.selector.labelSelector
                         && (!rl.definition.selector.methods || rl.definition.selector.methods.length === 0)
-                        && !rl.definition.selector.path_match
-                        && (!rl.definition.selector.request_types || rl.definition.selector.request_types.length === 0) && (
+                        && !rl.definition.selector.pathMatch
+                        && (!rl.definition.selector.requestTypes || rl.definition.selector.requestTypes.length === 0) && (
                         <Typography variant="body2" color="text.secondary">No selector clauses (matches default proxy + probe traffic)</Typography>
                     )}
                 </Stack>

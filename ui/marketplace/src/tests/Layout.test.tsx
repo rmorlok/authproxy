@@ -33,19 +33,19 @@ vi.mock('@authproxy/api', async () => {
 
 const notification: Notification = {
     id: 'ntf_1',
-    key: 'connection:cxn_1:auth_required',
+    key: 'connection:cxn1:auth_required',
     level: NotificationLevel.WARNING,
     state: NotificationState.ACTIVE,
-    resource_type: 'connection',
-    resource_id: 'cxn_1',
+    resourceType: 'connection',
+    resourceId: 'cxn_1',
     namespace: 'root',
     title: 'Connection requires re-authentication',
     message: 'Reconnect this connection to continue using it.',
-    action_url: '/connections/cxn_1?action=reauth',
-    can_action: true,
+    actionUrl: '/connections/cxn_1?action=reauth',
+    canAction: true,
     viewed: false,
-    created_at: '2026-07-12T12:00:00Z',
-    updated_at: '2026-07-12T12:00:00Z',
+    createdAt: '2026-07-12T12:00:00Z',
+    updatedAt: '2026-07-12T12:00:00Z',
 };
 
 function LocationProbe() {
@@ -63,7 +63,7 @@ function renderLayout() {
             toasts: toastsReducer,
         }),
         preloadedState: {
-            auth: { actor_id: 'actor_test', status: 'authenticated' },
+            auth: { actorId: 'actor_test', status: 'authenticated' },
             connectors: { items: [], status: 'succeeded', error: null },
             connections: {
                 items: [],
@@ -125,7 +125,7 @@ describe('Layout notifications', () => {
         await waitFor(() => {
             expect(notifications.list).toHaveBeenCalledWith({
                 limit: 25,
-                include_viewed: true,
+                includeViewed: true,
             });
         });
 

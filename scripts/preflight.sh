@@ -44,6 +44,9 @@ say "Checking workflow guardrails"
 say "Checking route JSON rendering guardrails"
 go run ./tools/check-gin-json-rendering >/dev/null
 
+say "Checking AuthProxy contract casing"
+go run ./tools/check-contract-casing >/dev/null
+
 say "Checking schema package layout"
 "$ROOT_DIR/scripts/check-schema-layout.sh" >/dev/null
 

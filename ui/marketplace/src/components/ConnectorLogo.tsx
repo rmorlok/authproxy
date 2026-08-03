@@ -3,7 +3,7 @@ import { Box, Typography } from '@mui/material';
 import { Connector } from '@authproxy/api';
 import { marketplaceTokens } from '../theme';
 
-type ConnectorLogoShape = Pick<Connector, 'display_name' | 'logo'>;
+type ConnectorLogoShape = Pick<Connector, 'displayName' | 'logo'>;
 
 interface ConnectorLogoProps {
   connector?: ConnectorLogoShape;
@@ -52,7 +52,7 @@ const variantSizing = {
 
 const ConnectorLogo: React.FC<ConnectorLogoProps> = ({ connector, variant = 'compact' }) => {
   const [logoFailed, setLogoFailed] = React.useState(false);
-  const displayName = connector?.display_name || 'Unknown Connector';
+  const displayName = connector?.displayName || 'Unknown Connector';
   const logo = connector?.logo;
   const sizing = variantSizing[variant];
 

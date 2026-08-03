@@ -31,7 +31,7 @@ const mockStore = configureStore({
       items: [
         {
           id: 'google-calendar',
-          display_name: 'Google Calendar',
+          displayName: 'Google Calendar',
           description: 'Connect to your Google Calendar to manage events and appointments.',
           logo: googleCalendarLogo,
         },
@@ -78,14 +78,14 @@ const mockConnection: Connection = {
       id: "923e4567-e89b-12d3-a456-426614174009",
       version: 0,
       state: ConnectorVersionState.PRIMARY,
-      display_name: "Google Calendar",
+      displayName: "Google Calendar",
       description: "A google calendar connector",
       logo: googleCalendarLogo
   },
   state: ConnectionState.CONFIGURED,
-  health_state: ConnectionHealthState.HEALTHY,
-  created_at: '2023-04-01T12:00:00Z',
-  updated_at: '2023-04-01T12:00:00Z',
+  healthState: ConnectionHealthState.HEALTHY,
+  createdAt: '2023-04-01T12:00:00Z',
+  updatedAt: '2023-04-01T12:00:00Z',
 };
 
 export const Connected: Story = {
@@ -107,7 +107,7 @@ export const ConnectedConfigurable: Story = {
       ...mockConnection,
       connector: {
         ...mockConnection.connector,
-        has_configure: true,
+        hasConfigure: true,
       },
     },
   },
@@ -119,7 +119,7 @@ export const WideLogo: Story = {
       ...mockConnection,
       connector: {
         ...mockConnection.connector,
-        display_name: 'Wide Format Systems',
+        displayName: 'Wide Format Systems',
         highlight: 'A wide logo should scale down inside the header without being cut off.',
         logo: wideFormatLogo,
       },
@@ -133,9 +133,9 @@ export const Unhealthy: Story = {
       ...mockConnection,
       connector: {
         ...mockConnection.connector,
-        has_configure: true,
+        hasConfigure: true,
       },
-      health_state: ConnectionHealthState.UNHEALTHY,
+      healthState: ConnectionHealthState.UNHEALTHY,
     },
   },
 };
@@ -180,7 +180,7 @@ export const UnknownConnector: Story = {
   args: {
     connection: {
       ...mockConnection,
-      connector_id: 'unknown-connector',
+      connectorId: 'unknown-connector',
     },
   },
 };
@@ -204,7 +204,7 @@ export const WithTaskInProgress: Story = {
             items: [
               {
                 id: 'google-calendar',
-                display_name: 'Google Calendar',
+                displayName: 'Google Calendar',
                 description: 'Connect to your Google Calendar to manage events and appointments.',
                 logo: googleCalendarLogo,
               },

@@ -36,13 +36,13 @@ import { oneDark } from "@codemirror/theme-one-dark";
 function getLogoUrlFromDefinition(cv: ConnectorVersion): string {
     if (!cv || !cv.definition || !cv.definition.logo) return "";
 
-    if (cv.definition.logo.public_url) {
-        return cv.definition.logo.public_url;
+    if (cv.definition.logo.publicUrl) {
+        return cv.definition.logo.publicUrl;
     }
 
     if (cv.definition.logo.base64) {
-        if (cv.definition.logo.mime_type === "image/svg+xml") {
-            return `data:${cv.definition.logo.mime_type};base64,${cv.definition.logo.base64}`;
+        if (cv.definition.logo.mimeType === "image/svg+xml") {
+            return `data:${cv.definition.logo.mimeType};base64,${cv.definition.logo.base64}`;
         } else {
             return `data:image/png;base64,${cv.definition.logo.base64}`;
         }
@@ -143,7 +143,7 @@ export default function ConnectorVersionDetail(
         setActionError(null);
         setActionLoading(true);
         try {
-            await connectors.force_version_state(cv.id, cv.version, selectedState as ConnectorVersionState);
+            await connectors.forceVersionState(cv.id, cv.version, selectedState as ConnectorVersionState);
             setForceStateOpen(false);
             fetchConnectorVersion();
         } catch (err: any) {
@@ -206,8 +206,8 @@ export default function ConnectorVersionDetail(
         <Stack spacing={2} sx={{p: 2}}>
             <Stack direction="row" spacing={2} alignItems="center">
                 {cv.definition.logo &&
-                    <Avatar alt={cv.definition.display_name} src={getLogoUrlFromDefinition(cv)} sx={{width: 40, height: 40}}/>}
-                <Typography variant="h5">{cv.definition.display_name || cv.labels?.type || 'Unnamed Connector'}</Typography>
+                    <Avatar alt={cv.definition.displayName} src={getLogoUrlFromDefinition(cv)} sx={{width: 40, height: 40}}/>}
+                <Typography variant="h5">{cv.definition.displayName || cv.labels?.type || 'Unnamed Connector'}</Typography>
                 <StateChip state={cv.state}/>
                 <IconButton aria-label="actions" onClick={openMenu} size="small">
                     <MoreVertIcon/>
@@ -219,25 +219,25 @@ export default function ConnectorVersionDetail(
 
             {actionError && <Alert severity="error">{actionError}</Alert>}
 
-            {(cv.definition.status_page_url || cv.definition.marketplace_url || cv.definition.developer_console_url || cv.definition.oauth_client_url) && (
+            {(cv.definition.statusPageUrl || cv.definition.marketplaceUrl || cv.definition.developerConsoleUrl || cv.definition.oauthClientUrl) && (
                 <Stack direction="row" spacing={2} flexWrap="wrap">
-                    {cv.definition.status_page_url && (
-                        <MuiLink href={cv.definition.status_page_url} target="_blank" rel="noopener noreferrer" underline="hover" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+                    {cv.definition.statusPageUrl && (
+                        <MuiLink href={cv.definition.statusPageUrl} target="_blank" rel="noopener noreferrer" underline="hover" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
                             Status Page <OpenInNewIcon fontSize="inherit" />
                         </MuiLink>
                     )}
-                    {cv.definition.marketplace_url && (
-                        <MuiLink href={cv.definition.marketplace_url} target="_blank" rel="noopener noreferrer" underline="hover" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+                    {cv.definition.marketplaceUrl && (
+                        <MuiLink href={cv.definition.marketplaceUrl} target="_blank" rel="noopener noreferrer" underline="hover" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
                             Marketplace <OpenInNewIcon fontSize="inherit" />
                         </MuiLink>
                     )}
-                    {cv.definition.developer_console_url && (
-                        <MuiLink href={cv.definition.developer_console_url} target="_blank" rel="noopener noreferrer" underline="hover" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+                    {cv.definition.developerConsoleUrl && (
+                        <MuiLink href={cv.definition.developerConsoleUrl} target="_blank" rel="noopener noreferrer" underline="hover" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
                             Developer Console <OpenInNewIcon fontSize="inherit" />
                         </MuiLink>
                     )}
-                    {cv.definition.oauth_client_url && (
-                        <MuiLink href={cv.definition.oauth_client_url} target="_blank" rel="noopener noreferrer" underline="hover" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+                    {cv.definition.oauthClientUrl && (
+                        <MuiLink href={cv.definition.oauthClientUrl} target="_blank" rel="noopener noreferrer" underline="hover" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
                             OAuth Client <OpenInNewIcon fontSize="inherit" />
                         </MuiLink>
                     )}

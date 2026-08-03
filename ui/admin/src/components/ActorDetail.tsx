@@ -108,7 +108,7 @@ export default function ActorDetail({actorId}: { actorId: string }) {
       <Stack direction={{xs: 'column', sm: 'row'}} spacing={4}>
         <Box>
           <Typography variant="subtitle2" color="text.secondary">External ID</Typography>
-          <Typography variant="body1">{actor.external_id}</Typography>
+          <Typography variant="body1">{actor.externalId}</Typography>
         </Box>
         <Box>
           <Typography variant="subtitle2" color="text.secondary">Namespace</Typography>
@@ -119,11 +119,11 @@ export default function ActorDetail({actorId}: { actorId: string }) {
       <Stack direction={{xs: 'column', sm: 'row'}} spacing={4}>
         <Box>
           <Typography variant="subtitle2" color="text.secondary">Created</Typography>
-          <Typography variant="body1">{dayjs(actor.created_at).format('MMM DD, YYYY, h:mm A')}</Typography>
+          <Typography variant="body1">{dayjs(actor.createdAt).format('MMM DD, YYYY, h:mm A')}</Typography>
         </Box>
         <Box>
           <Typography variant="subtitle2" color="text.secondary">Updated</Typography>
-          <Typography variant="body1">{dayjs(actor.updated_at).format('MMM DD, YYYY, h:mm A')}</Typography>
+          <Typography variant="body1">{dayjs(actor.updatedAt).format('MMM DD, YYYY, h:mm A')}</Typography>
         </Box>
       </Stack>
 

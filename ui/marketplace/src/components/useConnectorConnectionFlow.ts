@@ -33,7 +33,7 @@ export function useConnectorConnectionFlow() {
       if (action.meta.requestStatus === 'fulfilled') {
         const response = action.payload as any;
         if (isRedirectResponse(response)) {
-          window.location.href = response.redirect_url;
+          window.location.href = response.redirectUrl;
         } else if (isCompleteResponse(response)) {
           navigate('/connections');
           dispatch(fetchConnectionsAsync());
@@ -53,7 +53,7 @@ export function useConnectorConnectionFlow() {
       if (action.meta.requestStatus === 'fulfilled') {
         const response = action.payload as any;
         if (isRedirectResponse(response)) {
-          window.location.href = response.redirect_url;
+          window.location.href = response.redirectUrl;
         } else if (isCompleteResponse(response)) {
           navigate('/connections');
           dispatch(fetchConnectionsAsync());

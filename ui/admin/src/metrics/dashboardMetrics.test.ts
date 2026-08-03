@@ -15,7 +15,7 @@ import {
 } from './dashboardMetrics';
 
 const series = (overrides: Partial<MetricsSeries>): MetricsSeries => ({
-    ref_id: 'connections',
+    refId: 'connections',
     metric: 'resources.connections',
     aggregation: 'count',
     labels: {},

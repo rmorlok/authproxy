@@ -104,7 +104,7 @@ export class SearchResourceCache {
     }
 
     private key(scopeKey: string, item: SearchResourceSummary): string {
-        return `${scopeKey}|${item.resource_type}|${item.resource_id}`;
+        return `${scopeKey}|${item.resourceType}|${item.resourceId}`;
     }
 }
 
@@ -125,7 +125,7 @@ export function filterCachedResources(
     const types = new Set(parsed.resourceTypes);
     const needle = parsed.text.toLowerCase();
     const filtered = items.filter((item) => {
-        if (types.size > 0 && !types.has(item.resource_type)) {
+        if (types.size > 0 && !types.has(item.resourceType)) {
             return false;
         }
         if (parsed.labelSelector && !matchesLabelSelector(item.labels, parsed.labelSelector)) {
@@ -139,9 +139,9 @@ export function filterCachedResources(
 
     return filtered
         .map((item) => ({item, score: localScore(item, needle)}))
-        .sort((a, b) => b.score - a.score || Date.parse(b.item.updated_at) - Date.parse(a.item.updated_at) ||
-            a.item.resource_type.localeCompare(b.item.resource_type) ||
-            a.item.resource_id.localeCompare(b.item.resource_id))
+        .sort((a, b) => b.score - a.score || Date.parse(b.item.updatedAt) - Date.parse(a.item.updatedAt) ||
+            a.item.resourceType.localeCompare(b.item.resourceType) ||
+            a.item.resourceId.localeCompare(b.item.resourceId))
         .map(({item}) => item)
         .slice(0, SEARCH_RESULT_LIMIT);
 }
@@ -159,9 +159,9 @@ export function mergeSearchResults(
     const retainedTypes = retainLocalTypes === undefined ? null : new Set(retainLocalTypes);
     const retainedLocal = retainedTypes === null
         ? local
-        : local.filter((item) => retainedTypes.has(item.resource_type));
+        : local.filter((item) => retainedTypes.has(item.resourceType));
     for (const item of [...remote, ...retainedLocal]) {
-        const key = `${item.resource_type}|${item.resource_id}`;
+        const key = `${item.resourceType}|${item.resourceId}`;
         if (seen.has(key)) continue;
         seen.add(key);
         result.push(item);

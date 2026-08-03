@@ -13,11 +13,11 @@ export interface ConnectionStatusPresentation {
 }
 
 export const getConnectionStatusPresentation = (connection: Connection): ConnectionStatusPresentation => {
-  const createdDate = new Date(connection.created_at).toLocaleDateString();
-  const hasPendingSetup = Boolean(connection.setup_step_id);
+  const createdDate = new Date(connection.createdAt).toLocaleDateString();
+  const hasPendingSetup = Boolean(connection.setupStepId);
   const isUnhealthy =
     connection.state === ConnectionState.CONFIGURED &&
-    connection.health_state === ConnectionHealthState.UNHEALTHY;
+    connection.healthState === ConnectionHealthState.UNHEALTHY;
   const isHealthyConfigured =
     connection.state === ConnectionState.CONFIGURED &&
     !isUnhealthy &&

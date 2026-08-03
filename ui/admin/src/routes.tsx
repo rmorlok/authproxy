@@ -136,7 +136,7 @@ export const router = createBrowserRouter([
                 handle: { title: 'Rate Limits' },
             },
             {
-                path: 'rate-limits/_dry_run',
+                path: 'rate-limits/_dryRun',
                 element: <RateLimitDryRunPage />,
                 handle: [
                     {
