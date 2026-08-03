@@ -228,7 +228,7 @@ func (env *IntegrationTestEnv) ListNotifications(
 		q.Set("state", string(state))
 	}
 	if includeViewed {
-		q.Set("include_viewed", "true")
+		q.Set("includeViewed", "true")
 	}
 	path := "/api/v1/notifications"
 	if encoded := q.Encode(); encoded != "" {

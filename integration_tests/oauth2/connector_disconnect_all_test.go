@@ -115,7 +115,7 @@ func (r *connectorDisconnectAllRig) completeAuthFlow(t *testing.T, connector con
 	connID, redirectURL := r.env.InitiateOAuth2Connection(t, connector.id, r.returnToURL)
 	parsed, err := url.Parse(redirectURL)
 	require.NoError(t, err)
-	stateID := parsed.Query().Get("state_id")
+	stateID := parsed.Query().Get("stateId")
 	require.NotEmpty(t, stateID)
 
 	authResp := r.provider.Authorize(helpers.AuthorizeRequest{

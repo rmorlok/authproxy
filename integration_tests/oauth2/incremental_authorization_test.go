@@ -166,8 +166,8 @@ func (r *incrementalAuthRig) approveOAuthRedirect(t *testing.T, redirectURL stri
 
 	parsed, err := url.Parse(redirectURL)
 	require.NoError(t, err)
-	stateID := parsed.Query().Get("state_id")
-	require.NotEmpty(t, stateID, "redirect should embed state_id: %s", redirectURL)
+	stateID := parsed.Query().Get("stateId")
+	require.NotEmpty(t, stateID, "redirect should embed stateId: %s", redirectURL)
 
 	scope := "read_write"
 	if scopeOverride != nil {

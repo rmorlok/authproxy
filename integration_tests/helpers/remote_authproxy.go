@@ -129,7 +129,7 @@ func (h *RemoteAuthProxy) ListConnectors(t *testing.T, labelSelector string) []s
 
 	endpoint := h.PublicURL + "/api/v1/connectors?limit=100"
 	if labelSelector != "" {
-		endpoint += "&label_selector=" + url.QueryEscape(labelSelector)
+		endpoint += "&labelSelector=" + url.QueryEscape(labelSelector)
 	}
 
 	var list schemaapi.ListConnectorsResponseJson

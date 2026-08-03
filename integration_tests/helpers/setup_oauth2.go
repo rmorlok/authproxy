@@ -285,7 +285,7 @@ func (env *IntegrationTestEnv) ReauthOAuth2Connection(t *testing.T, connectionID
 }
 
 // FollowOAuth2Redirect issues an in-process GET to the public service's
-// `/oauth2/redirect` endpoint with the same state_id and signed JWT the user's
+// `/oauth2/redirect` endpoint with the same stateId and signed JWT the user's
 // browser would carry, and returns the Location header — the URL of the OAuth
 // provider's authorize endpoint. The proxy generates the upstream URL from the
 // connector config, so callers can assert on its query parameters.
@@ -361,13 +361,13 @@ type OAuth2StateForTest struct {
 	Namespace              string                `json:"namespace"`
 	ActorId                apid.ID               `json:"actorId"`
 	ConnectorId            apid.ID               `json:"connectorId"`
-	ConnectorVersion       uint64                `json:"connector_version"`
+	ConnectorVersion       uint64                `json:"connectorVersion"`
 	ConnectionId           apid.ID               `json:"connectionId"`
 	ReturnToUrl            string                `json:"returnToUrl"`
-	CancelSessionAfterAuth bool                  `json:"cancel_session_after_auth"`
-	ExpiresAt              time.Time             `json:"expires_at"`
-	PKCECodeVerifier       string                `json:"pkce_code_verifier,omitempty"`
-	PKCEMethod             connectors.PKCEMethod `json:"pkce_method,omitempty"`
+	CancelSessionAfterAuth bool                  `json:"cancelSessionAfterAuth"`
+	ExpiresAt              time.Time             `json:"expiresAt"`
+	PKCECodeVerifier       string                `json:"pkceCodeVerifier,omitempty"`
+	PKCEMethod             connectors.PKCEMethod `json:"pkceMethod,omitempty"`
 }
 
 // WriteOAuth2StateForTest encrypts and stores a synthetic OAuth2 state

@@ -111,7 +111,7 @@ func (r *authMethodCompatibilityRig) completeAuthFlow(t *testing.T, pkce bool) (
 	connID, redirectURL := r.env.InitiateOAuth2Connection(t, r.connectorID, r.returnToURL)
 	parsedRedirect, err := url.Parse(redirectURL)
 	require.NoError(t, err)
-	stateID := parsedRedirect.Query().Get("state_id")
+	stateID := parsedRedirect.Query().Get("stateId")
 	require.NotEmpty(t, stateID)
 
 	authReq := helpers.AuthorizeRequest{
@@ -231,7 +231,7 @@ func TestProviderAuthMethodCompatibility_InvalidMethodFailsClearly(t *testing.T)
 	connID, redirectURL := rig.env.InitiateOAuth2Connection(t, rig.connectorID, rig.returnToURL)
 	parsedRedirect, err := url.Parse(redirectURL)
 	require.NoError(t, err)
-	stateID := parsedRedirect.Query().Get("state_id")
+	stateID := parsedRedirect.Query().Get("stateId")
 	require.NotEmpty(t, stateID)
 
 	authResp := rig.provider.Authorize(helpers.AuthorizeRequest{

@@ -114,8 +114,8 @@ func (s *scopeMismatchSetup) driveApprovalAndGetConnectionId(t *testing.T) strin
 	connID, redirectURL := s.env.InitiateOAuth2Connection(t, s.connectorID, s.returnToURL)
 	parsed, err := url.Parse(redirectURL)
 	require.NoError(t, err)
-	stateID := parsed.Query().Get("state_id")
-	require.NotEmpty(t, stateID, "InitiateOAuth2Connection should embed state_id: %s", redirectURL)
+	stateID := parsed.Query().Get("stateId")
+	require.NotEmpty(t, stateID, "InitiateOAuth2Connection should embed stateId: %s", redirectURL)
 
 	authResp := s.provider.Authorize(helpers.AuthorizeRequest{
 		ClientID:    s.clientKey,
