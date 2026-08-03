@@ -28,35 +28,35 @@ type RateLimiting struct {
 	// The system checks headers in order and uses the first one that contains a parseable value.
 	// Supported value formats: integer seconds, HTTP-date (RFC 7231), ISO 8601 timestamp.
 	// Defaults to ["Retry-After"] if unset.
-	RetryAfterHeaders []string `json:"retry_after_headers,omitempty" yaml:"retry_after_headers,omitempty"`
+	RetryAfterHeaders []string `json:"retryAfterHeaders,omitempty" yaml:"retryAfterHeaders,omitempty"`
 
 	// MaxRetryAfter caps the maximum backoff duration to prevent unreasonably long waits.
 	// Defaults to 15 minutes if unset.
-	MaxRetryAfter *common.HumanDuration `json:"max_retry_after,omitempty" yaml:"max_retry_after,omitempty"`
+	MaxRetryAfter *common.HumanDuration `json:"maxRetryAfter,omitempty" yaml:"maxRetryAfter,omitempty"`
 
 	// DefaultRetryAfter is used when a 429 is received but no parseable retry-after header is found
 	// and exponential backoff is not configured. Defaults to 60 seconds if unset.
-	DefaultRetryAfter *common.HumanDuration `json:"default_retry_after,omitempty" yaml:"default_retry_after,omitempty"`
+	DefaultRetryAfter *common.HumanDuration `json:"defaultRetryAfter,omitempty" yaml:"defaultRetryAfter,omitempty"`
 
 	// ExponentialBackoff configures backoff behavior when no retry-after header is present and
 	// consecutive 429s are received. If unset, DefaultRetryAfter is used as a flat backoff.
-	ExponentialBackoff *ExponentialBackoff `json:"exponential_backoff,omitempty" yaml:"exponential_backoff,omitempty"`
+	ExponentialBackoff *ExponentialBackoff `json:"exponentialBackoff,omitempty" yaml:"exponentialBackoff,omitempty"`
 }
 
 // ExponentialBackoff configures exponential backoff for 429 responses that lack retry-after headers.
 type ExponentialBackoff struct {
 	// InitialInterval is the starting backoff duration. Defaults to 1 second.
-	InitialInterval *common.HumanDuration `json:"initial_interval,omitempty" yaml:"initial_interval,omitempty"`
+	InitialInterval *common.HumanDuration `json:"initialInterval,omitempty" yaml:"initialInterval,omitempty"`
 
 	// Multiplier is the backoff multiplier applied for each consecutive 429. Defaults to 2.0.
 	Multiplier *float64 `json:"multiplier,omitempty" yaml:"multiplier,omitempty"`
 
 	// MaxInterval caps the maximum backoff interval. Defaults to 5 minutes.
-	MaxInterval *common.HumanDuration `json:"max_interval,omitempty" yaml:"max_interval,omitempty"`
+	MaxInterval *common.HumanDuration `json:"maxInterval,omitempty" yaml:"maxInterval,omitempty"`
 
 	// JitterFraction adds randomness to the backoff duration (0.0 to 1.0). The actual backoff will be
 	// between (1-jitter)*computed and (1+jitter)*computed. Defaults to 0.1.
-	JitterFraction *float64 `json:"jitter_fraction,omitempty" yaml:"jitter_fraction,omitempty"`
+	JitterFraction *float64 `json:"jitterFraction,omitempty" yaml:"jitterFraction,omitempty"`
 }
 
 func (r *RateLimiting) Clone() *RateLimiting {

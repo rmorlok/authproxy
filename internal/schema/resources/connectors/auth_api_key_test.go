@@ -45,7 +45,7 @@ func TestAuthApiKey_Roundtrip(t *testing.T) {
 				type: api-key
 				placement:
 					type: header
-					header_name: Authorization
+					headerName: Authorization
 					prefix: 'Token '
 `,
 		},
@@ -62,7 +62,7 @@ func TestAuthApiKey_Roundtrip(t *testing.T) {
 				type: api-key
 				placement:
 					type: header
-					header_name: X-API-Key
+					headerName: X-API-Key
 `,
 		},
 		{
@@ -78,7 +78,7 @@ func TestAuthApiKey_Roundtrip(t *testing.T) {
 				type: api-key
 				placement:
 					type: query
-					param_name: appid
+					paramName: appid
 `,
 		},
 		{
@@ -94,7 +94,7 @@ func TestAuthApiKey_Roundtrip(t *testing.T) {
 				type: api-key
 				placement:
 					type: basic
-					username_field: account_id
+					usernameField: account_id
 `,
 		},
 	}

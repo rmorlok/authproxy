@@ -15,8 +15,8 @@ import (
 type ServiceAdminApi struct {
 	ServiceHttp
 	Ui                       *ServiceAdminUi                   `json:"ui" yaml:"ui"`
-	SessionTimeoutVal        *HumanDuration                    `json:"session_timeout" yaml:"session_timeout"`
-	XsrfRequestQueueDepthVal *int                              `json:"xsrf_request_queue_depth" yaml:"xsrf_request_queue_depth"`
+	SessionTimeoutVal        *HumanDuration                    `json:"sessionTimeout" yaml:"sessionTimeout"`
+	XsrfRequestQueueDepthVal *int                              `json:"xsrfRequestQueueDepth" yaml:"xsrfRequestQueueDepth"`
 	StaticVal                *ServicePublicStaticContentConfig `json:"static,omitempty" yaml:"static,omitempty"`
 	CookieVal                *CookieConfig                     `json:"cookie,omitempty" yaml:"cookie,omitempty"`
 }
@@ -88,21 +88,40 @@ func (s *ServiceAdminApi) UnmarshalYAML(value *yaml.Node) error {
 	if value.Kind != yaml.MappingNode {
 		return fmt.Errorf("service worker expected a mapping node, got %s", KindToString(value.Kind))
 	}
+	adminFields := []string{
+		"ui",
+		"sessionTimeout",
+		"xsrfRequestQueueDepth",
+		"static",
+		"cookie",
+	}
+	if err := validateYAMLMappingFields(value, append(httpServiceYAMLFields, adminFields...)...); err != nil {
+		return err
+	}
 
 	hs, err := httpServiceUnmarshalYAML(value)
 	if err != nil {
 		return err
 	}
 
-	// Let the rest unmarshall normally
-	type RawType ServiceAdminApi
-	raw := (*RawType)(s)
-	if err := value.Decode(raw); err != nil {
+	type rawServiceAdminApi struct {
+		Ui                       *ServiceAdminUi                   `yaml:"ui"`
+		SessionTimeoutVal        *HumanDuration                    `yaml:"sessionTimeout"`
+		XsrfRequestQueueDepthVal *int                              `yaml:"xsrfRequestQueueDepth"`
+		StaticVal                *ServicePublicStaticContentConfig `yaml:"static,omitempty"`
+		CookieVal                *CookieConfig                     `yaml:"cookie,omitempty"`
+	}
+	raw := &rawServiceAdminApi{}
+	if err := util.DecodeYAMLNodeStrict(yamlMappingWithFields(value, adminFields...), raw); err != nil {
 		return err
 	}
 
-	// Set the custom unmarshalled types
-	raw.ServiceHttp = hs
+	s.ServiceHttp = hs
+	s.Ui = raw.Ui
+	s.SessionTimeoutVal = raw.SessionTimeoutVal
+	s.XsrfRequestQueueDepthVal = raw.XsrfRequestQueueDepthVal
+	s.StaticVal = raw.StaticVal
+	s.CookieVal = raw.CookieVal
 
 	return nil
 }
@@ -141,15 +160,15 @@ func (s *ServiceAdminApi) GetId() ServiceId {
 
 type ServiceAdminUi struct {
 	Enabled bool         `json:"enabled" yaml:"enabled"`
-	BaseUrl *StringValue `json:"base_url" yaml:"base_url"`
+	BaseUrl *StringValue `json:"baseUrl" yaml:"baseUrl"`
 
 	// InitiateSessionUrl is the URL that will be redirected to in order to establish a session for an actor. This
 	// happens if the admin portal is accessed without coming from a pre-authorized context. This URL should
-	// take a `redirect_url` query parameter where the actor should be redirected to following successful authentication.
-	// When redirecting to `redirect_url`, the host application should append an `auth_token` query param with a signed
+	// take a `returnToUrl` query parameter where the actor should be redirected to following successful authentication.
+	// When redirecting to `returnToUrl`, the host application should append an `authToken` query param with a signed
 	// JWT for authenticating the user. This JWT should use a nonce and expiration to protect against session
 	// hijacking
-	InitiateSessionUrl *StringValue `json:"initiate_session_url" yaml:"initiate_session_url"`
+	InitiateSessionUrl *StringValue `json:"initiateSessionUrl" yaml:"initiateSessionUrl"`
 }
 
 func (s *ServiceAdminUi) GetInitiateSessionUrl(returnTo string) string {
@@ -164,7 +183,7 @@ func (s *ServiceAdminUi) GetInitiateSessionUrl(returnTo string) string {
 	}
 
 	q := u.Query()
-	q.Set("return_to", returnTo)
+	q.Set("returnToUrl", returnTo)
 	u.RawQuery = q.Encode()
 
 	return u.String()

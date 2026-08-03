@@ -4,8 +4,8 @@ package config
 // what is going on in the system. These settings should not be enabled in production.
 type DevSettings struct {
 	Enabled                  bool `json:"enabled" yaml:"enabled"`
-	FakeEncryption           bool `json:"fake_encryption" yaml:"fake_encryption"`
-	FakeEncryptionSkipBase64 bool `json:"fake_encryption_skip_base64" yaml:"fake_encryption_skip_base64"`
+	FakeEncryption           bool `json:"fakeEncryption" yaml:"fakeEncryption"`
+	FakeEncryptionSkipBase64 bool `json:"fakeEncryptionSkipBase64" yaml:"fakeEncryptionSkipBase64"`
 }
 
 func (d *DevSettings) IsEnabled() bool {

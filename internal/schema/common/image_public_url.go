@@ -7,10 +7,10 @@ import (
 
 type ImagePublicUrl struct {
 	// PublicUrl is the URL of the image
-	PublicUrl string `json:"public_url" yaml:"public_url"`
+	PublicUrl string `json:"publicUrl" yaml:"publicUrl"`
 
 	// IsDirectString implied how this value was loaded from the config. If true, implies this was loaded
-	// as a string value instead of an object with the `public_url` key. This drives how we render to JSON/YAML
+	// as a string value instead of an object with the `publicUrl` key. This drives how we render to JSON/YAML
 	// to be consistent on the round trip.
 	//
 	// This field is exposed publicly to allow for testing, but should not be manipulated directly.
@@ -38,7 +38,7 @@ func (d ImagePublicUrl) MarshalYAML() (interface{}, error) {
 	}
 
 	return map[string]string{
-		"public_url": d.PublicUrl,
+		"publicUrl": d.PublicUrl,
 	}, nil
 }
 

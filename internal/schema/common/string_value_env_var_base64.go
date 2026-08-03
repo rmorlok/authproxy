@@ -8,7 +8,7 @@ import (
 )
 
 type StringValueEnvVarBase64 struct {
-	EnvVar  string  `json:"env_var_base64" yaml:"env_var_base64"`
+	EnvVar  string  `json:"envVarBase64" yaml:"envVarBase64"`
 	Default *string `json:"default,omitempty" yaml:"default,omitempty"`
 }
 

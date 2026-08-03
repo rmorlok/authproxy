@@ -1,17 +1,15 @@
-# $schema: ./schema.json
-
 labels:
   type: google-drive
-display_name: Google Drive
+displayName: Google Drive
 logo:
-  public_url: https://example.com/logo.png
+  publicUrl: https://example.com/logo.png
 description: Conditional scope and probe example
 auth:
   type: OAuth2
-  client_id:
-    env_var: GOOGLE_CLIENT_ID
-  client_secret:
-    env_var: GOOGLE_CLIENT_SECRET
+  clientId:
+    envVar: GOOGLE_CLIENT_ID
+  clientSecret:
+    envVar: GOOGLE_CLIENT_SECRET
   authorization:
     endpoint: https://accounts.google.com/o/oauth2/v2/auth
   token:
@@ -32,6 +30,6 @@ probes:
     period: 1m
     if:
       javascript: cfg.has_drive === true
-    proxy_http:
+    proxyHttp:
       method: GET
       url: https://www.googleapis.com/drive/v3/about

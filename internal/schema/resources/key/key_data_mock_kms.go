@@ -33,7 +33,7 @@ type keyDataMockKMSVersion struct {
 // exposes the KEK as KeyVersionInfo.Data; instead, it unwraps persisted DEKs
 // that were created separately from encryption key version sync.
 type KeyDataMockKMS struct {
-	MockKMSID string `json:"mock_kms_id" yaml:"mock_kms_id"`
+	MockKMSID string `json:"mockKmsId" yaml:"mockKmsId"`
 }
 
 func ResetKeyDataMockKMSRegistry() {

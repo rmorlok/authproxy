@@ -287,10 +287,10 @@ func TestKeyDataAwsKMS_KeyDataSerialization(t *testing.T) {
 	t.Run("json", func(t *testing.T) {
 		var kd KeyData
 		require.NoError(t, json.Unmarshal([]byte(`{
-			"aws_kms_key_id": "alias/authproxy",
-			"aws_region": "us-east-1",
-			"aws_kms_endpoint": "http://localhost:4566",
-			"cache_ttl": "5m"
+			"awsKmsKeyId": "alias/authproxy",
+			"awsRegion": "us-east-1",
+			"awsKmsEndpoint": "http://localhost:4566",
+			"cacheTtl": "5m"
 		}`), &kd))
 
 		awsKMS, ok := kd.InnerVal.(*KeyDataAwsKMS)
@@ -304,10 +304,10 @@ func TestKeyDataAwsKMS_KeyDataSerialization(t *testing.T) {
 	t.Run("yaml", func(t *testing.T) {
 		var kd KeyData
 		require.NoError(t, yaml.Unmarshal([]byte(`
-aws_kms_key_id: alias/authproxy
-aws_region: us-east-1
-aws_kms_endpoint: http://localhost:4566
-cache_ttl: 5m
+awsKmsKeyId: alias/authproxy
+awsRegion: us-east-1
+awsKmsEndpoint: http://localhost:4566
+cacheTtl: 5m
 `), &kd))
 
 		awsKMS, ok := kd.InnerVal.(*KeyDataAwsKMS)

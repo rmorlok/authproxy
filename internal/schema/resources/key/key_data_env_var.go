@@ -7,7 +7,7 @@ import (
 )
 
 type KeyDataEnvVar struct {
-	EnvVar string `json:"env_var" yaml:"env_var"`
+	EnvVar string `json:"envVar" yaml:"envVar"`
 }
 
 func (kev *KeyDataEnvVar) GetCurrentVersion(ctx context.Context) (KeyVersionInfo, error) {

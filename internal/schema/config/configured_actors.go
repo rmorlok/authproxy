@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/rmorlok/authproxy/internal/util"
 	"gopkg.in/yaml.v3"
 )
 
@@ -49,7 +50,7 @@ func (ca *ConfiguredActors) MarshalJSON() ([]byte, error) {
 func (ca *ConfiguredActors) UnmarshalJSON(data []byte) error {
 	if len(data) >= 2 && data[0] == '[' && data[len(data)-1] == ']' {
 		var actorsList ConfiguredActorsList
-		err := json.Unmarshal(data, &actorsList)
+		err := util.DecodeJSONStrict(data, &actorsList)
 		ca.InnerVal = actorsList
 		return err
 	}
@@ -62,13 +63,13 @@ func (ca *ConfiguredActors) UnmarshalJSON(data []byte) error {
 
 	var t ConfiguredActorsType
 
-	if _, ok := valueMap["keys_path"]; ok {
+	if _, ok := valueMap["keysPath"]; ok {
 		t = &ConfiguredActorsExternalSource{}
 	} else {
-		return fmt.Errorf("invalid structure for actors; must be list or have keys_path")
+		return fmt.Errorf("invalid structure for actors; must be list or have keysPath")
 	}
 
-	if err := json.Unmarshal(data, t); err != nil {
+	if err := util.DecodeJSONStrict(data, t); err != nil {
 		return err
 	}
 
@@ -90,7 +91,7 @@ func (ca *ConfiguredActors) MarshalYAML() (interface{}, error) {
 func (ca *ConfiguredActors) UnmarshalYAML(value *yaml.Node) error {
 	if value.Kind == yaml.SequenceNode {
 		var actorsList ConfiguredActorsList
-		err := value.Decode(&actorsList)
+		err := util.DecodeYAMLNodeStrict(value, &actorsList)
 		ca.InnerVal = actorsList
 		return err
 	}
@@ -101,7 +102,7 @@ func (ca *ConfiguredActors) UnmarshalYAML(value *yaml.Node) error {
 	}
 
 	var actorsExternalSource ConfiguredActorsExternalSource
-	if err := value.Decode(&actorsExternalSource); err != nil {
+	if err := util.DecodeYAMLNodeStrict(value, &actorsExternalSource); err != nil {
 		return err
 	}
 

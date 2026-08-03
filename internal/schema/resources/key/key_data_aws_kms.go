@@ -33,11 +33,11 @@ type awsKMSClient interface {
 
 // KeyDataAwsKMS uses AWS KMS as a wrapping-key provider for data encryption keys.
 type KeyDataAwsKMS struct {
-	AwsKMSKeyID    string                 `json:"aws_kms_key_id" yaml:"aws_kms_key_id"`
-	AwsRegion      string                 `json:"aws_region,omitempty" yaml:"aws_region,omitempty"`
-	AwsKMSEndpoint string                 `json:"aws_kms_endpoint,omitempty" yaml:"aws_kms_endpoint,omitempty"`
-	Credentials    *common.AwsCredentials `json:"aws_credentials,omitempty" yaml:"aws_credentials,omitempty"`
-	CacheTTL       string                 `json:"cache_ttl,omitempty" yaml:"cache_ttl,omitempty"`
+	AwsKMSKeyID    string                 `json:"awsKmsKeyId" yaml:"awsKmsKeyId"`
+	AwsRegion      string                 `json:"awsRegion,omitempty" yaml:"awsRegion,omitempty"`
+	AwsKMSEndpoint string                 `json:"awsKmsEndpoint,omitempty" yaml:"awsKmsEndpoint,omitempty"`
+	Credentials    *common.AwsCredentials `json:"awsCredentials,omitempty" yaml:"awsCredentials,omitempty"`
+	CacheTTL       string                 `json:"cacheTtl,omitempty" yaml:"cacheTtl,omitempty"`
 
 	cache keyDataCache
 

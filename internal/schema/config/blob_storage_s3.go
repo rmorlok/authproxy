@@ -14,7 +14,7 @@ type BlobStorageS3 struct {
 	Region         string              `json:"region,omitempty" yaml:"region,omitempty"`
 	Bucket         string              `json:"bucket" yaml:"bucket"`
 	Credentials    *AwsCredentials     `json:"credentials,omitempty" yaml:"credentials,omitempty"`
-	ForcePathStyle bool                `json:"force_path_style,omitempty" yaml:"force_path_style,omitempty"`
+	ForcePathStyle bool                `json:"forcePathStyle,omitempty" yaml:"forcePathStyle,omitempty"`
 	Prefix         string              `json:"prefix,omitempty" yaml:"prefix,omitempty"`
 }
 

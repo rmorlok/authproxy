@@ -54,9 +54,9 @@ address: localhost:6379
 network: tcp
 protocol: 2
 username:
-  env_var: REDIS_USERNAME
+  envVar: REDIS_USERNAME
 password:
-  env_var: REDIS_PASSWORD
+  envVar: REDIS_PASSWORD
 `
 			var redis Redis
 			assert.NoError(yaml.Unmarshal([]byte(data), &redis))

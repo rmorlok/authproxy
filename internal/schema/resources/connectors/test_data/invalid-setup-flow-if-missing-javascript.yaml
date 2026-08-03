@@ -1,20 +1,18 @@
-# $schema: ./schema.json
-
 labels:
   type: conditional-no-script
-display_name: Conditional Setup
+displayName: Conditional Setup
 logo:
-  public_url: https://example.com/conditional.png
+  publicUrl: https://example.com/conditional.png
 description: |
   Connector with an invalid conditional setup step.
 auth:
   type: no-auth
-setup_flow:
+setupFlow:
   configure:
     steps:
       - id: advanced_options
         if: {}
-        json_schema:
+        jsonSchema:
           type: object
           properties:
             sync_mode:

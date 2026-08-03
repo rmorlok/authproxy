@@ -78,7 +78,7 @@ func (s *SlidingWindow) Validate(vc *common.ValidationContext) error {
 // per second.
 type TokenBucket struct {
 	Capacity   int     `json:"capacity" yaml:"capacity"`
-	RefillRate float64 `json:"refill_rate" yaml:"refill_rate"`
+	RefillRate float64 `json:"refillRate" yaml:"refillRate"`
 }
 
 // Validate ensures Capacity and RefillRate are positive.
@@ -100,9 +100,9 @@ func (t *TokenBucket) Validate(vc *common.ValidationContext) error {
 // Algorithm is a tagged union: exactly one of FixedWindow, SlidingWindow, or
 // TokenBucket must be set.
 type Algorithm struct {
-	FixedWindow   *FixedWindow   `json:"fixed_window,omitempty" yaml:"fixed_window,omitempty"`
-	SlidingWindow *SlidingWindow `json:"sliding_window,omitempty" yaml:"sliding_window,omitempty"`
-	TokenBucket   *TokenBucket   `json:"token_bucket,omitempty" yaml:"token_bucket,omitempty"`
+	FixedWindow   *FixedWindow   `json:"fixedWindow,omitempty" yaml:"fixedWindow,omitempty"`
+	SlidingWindow *SlidingWindow `json:"slidingWindow,omitempty" yaml:"slidingWindow,omitempty"`
+	TokenBucket   *TokenBucket   `json:"tokenBucket,omitempty" yaml:"tokenBucket,omitempty"`
 }
 
 // Validate ensures exactly one variant is set and that the chosen variant

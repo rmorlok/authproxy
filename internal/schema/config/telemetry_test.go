@@ -93,15 +93,15 @@ enabled: true
 exporter:
   protocol: grpc
   endpoint:
-    env_var: OTEL_EXPORTER_OTLP_ENDPOINT
+    envVar: OTEL_EXPORTER_OTLP_ENDPOINT
     default: http://localhost:4317
   insecure: true
   headers:
     authorization:
-      env_var: OTEL_HEADER_AUTH
+      envVar: OTEL_HEADER_AUTH
       default: Bearer dev-token
 resource:
-  service_name_prefix: authproxy
+  serviceNamePrefix: authproxy
   attributes:
     deployment.environment: dev
 sampling:
@@ -111,21 +111,21 @@ signals:
   metrics: true
   logs: false
 http:
-  excluded_paths:
+  excludedPaths:
     - /ping
     - /healthz
     - /metrics
 proxy:
-  span_attribute_labels:
+  spanAttributeLabels:
     - type
     - env
     - tenant_id
-  metric_dimension_labels:
+  metricDimensionLabels:
     - type
     - env
-  metric_dimension_value_cap: 50
+  metricDimensionValueCap: 50
 propagation:
-  inject_outbound_default: false
+  injectOutboundDefault: false
 `
 
 	var tel Telemetry
@@ -168,7 +168,7 @@ func TestTelemetry_EnvVarOverride(t *testing.T) {
 enabled: true
 exporter:
   endpoint:
-    env_var: OTEL_TEST_ENDPOINT
+    envVar: OTEL_TEST_ENDPOINT
     default: http://localhost:4317
 `
 	var tel Telemetry
@@ -184,7 +184,7 @@ func TestTelemetry_EnvVarFallsBackToDefault(t *testing.T) {
 enabled: true
 exporter:
   endpoint:
-    env_var: OTEL_TELEMETRY_TEST_UNSET_VAR
+    envVar: OTEL_TELEMETRY_TEST_UNSET_VAR
     default: http://localhost:4317
 `
 	var tel Telemetry

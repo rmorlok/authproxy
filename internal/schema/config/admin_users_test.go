@@ -19,11 +19,11 @@ func TestAdminUsers(t *testing.T) {
 			data := `
 - username: georgebush
   key:
-    public_key:
+    publicKey:
       value: some-key-value
 - username: bobdole
   key:
-    public_key:
+    publicKey:
       value: some-key-value
 `
 			var adminUsers AdminUsers
@@ -36,7 +36,7 @@ func TestAdminUsers(t *testing.T) {
 		})
 		t.Run("external source", func(t *testing.T) {
 			data := fmt.Sprintf(`
-keys_path: %s
+keysPath: %s
 `, tu.TestDataPath("admin_user_keys"))
 			var adminUsers AdminUsers
 			err := yaml.Unmarshal([]byte(data), &adminUsers)
@@ -50,7 +50,7 @@ keys_path: %s
   {
     "username": "georgebush",
     "key": {
-      "public_key": {
+      "publicKey": {
         "value": "some-key-value"
       }
     }
@@ -58,7 +58,7 @@ keys_path: %s
   {
     "username": "bobdole",
     "key": {
-      "public_key": {
+      "publicKey": {
         "value": "some-key-value"
       }
     }
@@ -74,7 +74,7 @@ keys_path: %s
 		})
 		t.Run("external source", func(t *testing.T) {
 			data := fmt.Sprintf(`{
-"keys_path": "%s"
+"keysPath": "%s"
 }`, tu.TestDataPath("admin_user_keys"))
 			var adminUsers AdminUsers
 			err := json.Unmarshal([]byte(data), &adminUsers)

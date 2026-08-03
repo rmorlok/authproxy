@@ -3,6 +3,7 @@ package common
 import (
 	"fmt"
 
+	"github.com/rmorlok/authproxy/internal/util"
 	"gopkg.in/yaml.v3"
 )
 
@@ -46,7 +47,7 @@ fieldLoop:
 		}
 	}
 
-	if err := value.Decode(creds); err != nil {
+	if err := util.DecodeYAMLNodeStrict(value, creds); err != nil {
 		return err
 	}
 

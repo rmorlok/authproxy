@@ -35,15 +35,15 @@ type gcpKMSClient interface {
 
 // KeyDataGcpKMS uses Google Cloud KMS as a wrapping-key provider for data encryption keys.
 type KeyDataGcpKMS struct {
-	GcpKMSKeyName      string              `json:"gcp_kms_key_name,omitempty" yaml:"gcp_kms_key_name,omitempty"`
-	GcpProject         string              `json:"gcp_project,omitempty" yaml:"gcp_project,omitempty"`
-	GcpLocation        string              `json:"gcp_location,omitempty" yaml:"gcp_location,omitempty"`
-	GcpKeyRing         string              `json:"gcp_key_ring,omitempty" yaml:"gcp_key_ring,omitempty"`
-	GcpCryptoKey       string              `json:"gcp_crypto_key,omitempty" yaml:"gcp_crypto_key,omitempty"`
-	GcpKMSEndpoint     string              `json:"gcp_kms_endpoint,omitempty" yaml:"gcp_kms_endpoint,omitempty"`
-	GcpCredentialsFile string              `json:"gcp_credentials_file,omitempty" yaml:"gcp_credentials_file,omitempty"`
-	GcpCredentialsJSON *common.StringValue `json:"gcp_credentials_json,omitempty" yaml:"gcp_credentials_json,omitempty" apiredact:"secret"`
-	CacheTTL           string              `json:"cache_ttl,omitempty" yaml:"cache_ttl,omitempty"`
+	GcpKMSKeyName      string              `json:"gcpKmsKeyName,omitempty" yaml:"gcpKmsKeyName,omitempty"`
+	GcpProject         string              `json:"gcpProject,omitempty" yaml:"gcpProject,omitempty"`
+	GcpLocation        string              `json:"gcpLocation,omitempty" yaml:"gcpLocation,omitempty"`
+	GcpKeyRing         string              `json:"gcpKeyRing,omitempty" yaml:"gcpKeyRing,omitempty"`
+	GcpCryptoKey       string              `json:"gcpCryptoKey,omitempty" yaml:"gcpCryptoKey,omitempty"`
+	GcpKMSEndpoint     string              `json:"gcpKmsEndpoint,omitempty" yaml:"gcpKmsEndpoint,omitempty"`
+	GcpCredentialsFile string              `json:"gcpCredentialsFile,omitempty" yaml:"gcpCredentialsFile,omitempty"`
+	GcpCredentialsJSON *common.StringValue `json:"gcpCredentialsJson,omitempty" yaml:"gcpCredentialsJson,omitempty" apiredact:"secret"`
+	CacheTTL           string              `json:"cacheTtl,omitempty" yaml:"cacheTtl,omitempty"`
 
 	cache keyDataCache
 

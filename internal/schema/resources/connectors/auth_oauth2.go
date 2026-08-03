@@ -42,7 +42,7 @@ type AuthOAuth2 struct {
 	Type AuthType `json:"type" yaml:"type"`
 	// GrantType selects the OAuth2 grant flow. nil preserves the historical
 	// authorization-code behavior.
-	GrantType *OAuth2GrantType `json:"grant_type,omitempty" yaml:"grant_type,omitempty"`
+	GrantType *OAuth2GrantType `json:"grantType,omitempty" yaml:"grantType,omitempty"`
 	// TokenEndpointAuthMethod selects how client credentials are presented
 	// to the token endpoint. nil signals "use the default" and resolves to
 	// client_secret_post via GetTokenEndpointAuthMethodOrDefault, matching
@@ -50,9 +50,9 @@ type AuthOAuth2 struct {
 	// empty-string value is rejected by the validator — it is not a valid
 	// method per RFC 7591 §2 and must not silently fall through to the
 	// default.
-	TokenEndpointAuthMethod *TokenEndpointAuthMethod `json:"token_endpoint_auth_method,omitempty" yaml:"token_endpoint_auth_method,omitempty"`
-	ClientId                *common.StringValue      `json:"client_id,omitempty" yaml:"client_id,omitempty"`
-	ClientSecret            *common.StringValue      `json:"client_secret,omitempty" yaml:"client_secret,omitempty" apiredact:"secret"`
+	TokenEndpointAuthMethod *TokenEndpointAuthMethod `json:"tokenEndpointAuthMethod,omitempty" yaml:"tokenEndpointAuthMethod,omitempty"`
+	ClientId                *common.StringValue      `json:"clientId,omitempty" yaml:"clientId,omitempty"`
+	ClientSecret            *common.StringValue      `json:"clientSecret,omitempty" yaml:"clientSecret,omitempty" apiredact:"secret"`
 	Scopes                  []Scope                  `json:"scopes" yaml:"scopes"`
 	Authorization           AuthOauth2Authorization  `json:"authorization" yaml:"authorization"`
 	Token                   AuthOauth2Token          `json:"token" yaml:"token"`

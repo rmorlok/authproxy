@@ -7,7 +7,7 @@ import (
 )
 
 type StringValueEnvVar struct {
-	EnvVar  string  `json:"env_var" yaml:"env_var"`
+	EnvVar  string  `json:"envVar" yaml:"envVar"`
 	Default *string `json:"default,omitempty" yaml:"default,omitempty"`
 }
 

@@ -43,6 +43,6 @@ func (p *AuthOauth2PKCE) Clone() *AuthOauth2PKCE {
 
 type AuthOauth2Authorization struct {
 	Endpoint       string            `json:"endpoint" yaml:"endpoint"`
-	QueryOverrides map[string]string `json:"query_overrides,omitempty" yaml:"query_overrides,omitempty"`
+	QueryOverrides map[string]string `json:"queryOverrides,omitempty" yaml:"queryOverrides,omitempty"`
 	PKCE           *AuthOauth2PKCE   `json:"pkce,omitempty" yaml:"pkce,omitempty"`
 }

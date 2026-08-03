@@ -1,20 +1,18 @@
-# $schema: ./schema.json
-
 labels:
   type: asana
 id: D21753F8-2E91-43E7-ADEF-8ED80A6086AC
 version: 1
-display_name: Asana
+displayName: Asana
 logo:
-  public_url: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Asana_logo.svg/2880px-Asana_logo.svg.png
+  publicUrl: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Asana_logo.svg/2880px-Asana_logo.svg.png
 description: |
   Allow our agent organize your work
 auth:
   type: OAuth2
-  client_id:
-    env_var: ASANA_CLIENT_ID
-  client_secret:
-    env_var: ASANA_CLIENT_SECRET
+  clientId:
+    envVar: ASANA_CLIENT_ID
+  clientSecret:
+    envVar: ASANA_CLIENT_SECRET
   authorization:
     endpoint: https://app.asana.com/-/oauth_authorize
   token:

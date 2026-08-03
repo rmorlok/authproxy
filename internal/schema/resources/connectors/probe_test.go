@@ -132,8 +132,8 @@ func TestProbe_YAMLRoundTrip_WithThresholds(t *testing.T) {
 	t.Run("yaml", func(t *testing.T) {
 		data, err := yaml.Marshal(original)
 		require.NoError(t, err)
-		assert.Contains(t, string(data), "failure_threshold: 5")
-		assert.Contains(t, string(data), "recovery_threshold: 2")
+		assert.Contains(t, string(data), "failureThreshold: 5")
+		assert.Contains(t, string(data), "recoveryThreshold: 2")
 
 		var back Probe
 		require.NoError(t, yaml.Unmarshal(data, &back))
@@ -143,8 +143,8 @@ func TestProbe_YAMLRoundTrip_WithThresholds(t *testing.T) {
 	t.Run("json", func(t *testing.T) {
 		data, err := json.Marshal(original)
 		require.NoError(t, err)
-		assert.Contains(t, string(data), `"failure_threshold":5`)
-		assert.Contains(t, string(data), `"recovery_threshold":2`)
+		assert.Contains(t, string(data), `"failureThreshold":5`)
+		assert.Contains(t, string(data), `"recoveryThreshold":2`)
 
 		var back Probe
 		require.NoError(t, json.Unmarshal(data, &back))

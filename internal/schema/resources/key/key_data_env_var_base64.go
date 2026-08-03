@@ -8,7 +8,7 @@ import (
 )
 
 type KeyDataEnvBase64Var struct {
-	EnvVar string `json:"env_var_base64" yaml:"env_var_base64"`
+	EnvVar string `json:"envVarBase64" yaml:"envVarBase64"`
 }
 
 func (kev *KeyDataEnvBase64Var) GetCurrentVersion(ctx context.Context) (KeyVersionInfo, error) {
