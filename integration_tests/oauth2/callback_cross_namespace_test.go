@@ -98,8 +98,8 @@ func TestCallbackRejection_CrossNamespace(t *testing.T) {
 	connID, redirectURL := env.InitiateOAuth2Connection(t, connectorID, returnTo, helpers.WithActor(sharedExternalID, tenantA))
 	parsed, err := url.Parse(redirectURL)
 	require.NoError(t, err)
-	stateID := parsed.Query().Get("state_id")
-	require.NotEmpty(t, stateID, "InitiateOAuth2ConnectionAsActor should embed state_id: %s", redirectURL)
+	stateID := parsed.Query().Get("stateId")
+	require.NotEmpty(t, stateID, "InitiateOAuth2ConnectionAsActor should embed stateId: %s", redirectURL)
 
 	// 2. Mint a code via the test provider's /test/authorize. The provider
 	//    only validates against its own client/user records, so the

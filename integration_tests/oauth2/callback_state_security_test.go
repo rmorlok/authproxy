@@ -106,14 +106,14 @@ func newCallbackStateSecurityRig(t *testing.T, name string) *callbackStateSecuri
 
 // initiateAndStateID kicks off a connection and returns the connection
 // ID plus the state UUID the proxy persisted in Redis. The state UUID
-// rides in the `state_id` query of the redirect URL.
+// rides in the `stateId` query of the redirect URL.
 func (r *callbackStateSecurityRig) initiateAndStateID(t *testing.T) (connectionID, stateID string) {
 	t.Helper()
 	connID, redirectURL := r.env.InitiateOAuth2Connection(t, r.connectorID, r.returnToURL)
 	parsed, err := url.Parse(redirectURL)
 	require.NoError(t, err)
-	stateID = parsed.Query().Get("state_id")
-	require.NotEmpty(t, stateID, "InitiateOAuth2Connection should embed state_id in redirect URL: %s", redirectURL)
+	stateID = parsed.Query().Get("stateId")
+	require.NotEmpty(t, stateID, "InitiateOAuth2Connection should embed stateId in redirect URL: %s", redirectURL)
 	return connID, stateID
 }
 

@@ -24,10 +24,10 @@ import (
 // succeeded) from 401 (refresh-then-replay failed, original upstream
 // 401 propagated).
 type proxyResponseBody struct {
-	StatusCode int                    `json:"status_code"`
+	StatusCode int                    `json:"statusCode"`
 	Headers    map[string]string      `json:"headers"`
-	BodyRaw    []byte                 `json:"body_raw"`
-	BodyJson   map[string]interface{} `json:"body_json"`
+	BodyRaw    []byte                 `json:"bodyRaw"`
+	BodyJson   map[string]interface{} `json:"bodyJson"`
 }
 
 func parseRevocationProxyResponse(t *testing.T, w *httptest.ResponseRecorder) proxyResponseBody {

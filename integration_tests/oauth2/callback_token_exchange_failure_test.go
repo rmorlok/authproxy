@@ -109,8 +109,8 @@ func (r *tokenExchangeFailureRig) initiateAndMintCode(t *testing.T) (connectionI
 	connID, redirectURL := r.env.InitiateOAuth2Connection(t, r.connectorID, r.returnToURL)
 	parsed, err := url.Parse(redirectURL)
 	require.NoError(t, err)
-	stateID = parsed.Query().Get("state_id")
-	require.NotEmpty(t, stateID, "InitiateOAuth2Connection should embed state_id: %s", redirectURL)
+	stateID = parsed.Query().Get("stateId")
+	require.NotEmpty(t, stateID, "InitiateOAuth2Connection should embed stateId: %s", redirectURL)
 
 	authResp := r.provider.Authorize(helpers.AuthorizeRequest{
 		ClientID:    r.clientKey,

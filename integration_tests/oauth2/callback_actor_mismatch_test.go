@@ -83,8 +83,8 @@ func TestCallbackRejection_ActorMismatch(t *testing.T) {
 	connID, redirectURL := env.InitiateOAuth2Connection(t, connectorID, returnTo, helpers.WithActor(attackerExternalID, sconfig.RootNamespace))
 	parsed, err := url.Parse(redirectURL)
 	require.NoError(t, err)
-	stateID := parsed.Query().Get("state_id")
-	require.NotEmpty(t, stateID, "InitiateOAuth2ConnectionAsActor should embed state_id in redirect URL: %s", redirectURL)
+	stateID := parsed.Query().Get("stateId")
+	require.NotEmpty(t, stateID, "InitiateOAuth2ConnectionAsActor should embed stateId in redirect URL: %s", redirectURL)
 
 	// 2. Mint a code via the test provider's /test/authorize. The provider
 	//    doesn't care which proxy actor owns the state — it's validating

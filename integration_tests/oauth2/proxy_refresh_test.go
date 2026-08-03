@@ -113,7 +113,7 @@ func (r *proxyRefreshRig) completeAuthFlow(t *testing.T) string {
 	connID, redirectURL := r.env.InitiateOAuth2Connection(t, r.connectorID, r.returnToURL)
 	parsed, err := url.Parse(redirectURL)
 	require.NoError(t, err)
-	stateID := parsed.Query().Get("state_id")
+	stateID := parsed.Query().Get("stateId")
 	require.NotEmpty(t, stateID)
 
 	authResp := r.provider.Authorize(helpers.AuthorizeRequest{

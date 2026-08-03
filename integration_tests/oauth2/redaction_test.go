@@ -146,7 +146,7 @@ func TestRedaction_HappyPathFlowLeaksNoSecrets(t *testing.T) {
 	connID, redirectURL := rig.env.InitiateOAuth2Connection(t, rig.connectorID, rig.returnToURL)
 	parsed, err := url.Parse(redirectURL)
 	require.NoError(t, err)
-	stateID := parsed.Query().Get("state_id")
+	stateID := parsed.Query().Get("stateId")
 	require.NotEmpty(t, stateID)
 
 	authResp := rig.provider.Authorize(helpers.AuthorizeRequest{

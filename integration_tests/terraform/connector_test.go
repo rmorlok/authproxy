@@ -10,7 +10,7 @@ import (
 
 // minimalConnectorDefinition is a simple NoAuth connector definition for testing.
 const minimalConnectorDefinition = `{
-  "display_name": "Test Connector",
+  "displayName": "Test Connector",
   "description": "A test connector for integration tests",
   "auth": {
     "type": "no-auth"
@@ -18,7 +18,7 @@ const minimalConnectorDefinition = `{
 }`
 
 const updatedConnectorDefinition = `{
-  "display_name": "Test Connector Updated",
+  "displayName": "Test Connector Updated",
   "description": "An updated test connector",
   "auth": {
     "type": "no-auth"
