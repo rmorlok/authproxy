@@ -53,19 +53,10 @@ generate_admin_api_swagger() {
     mv internal/service/admin_api/swagger/admin_api_swagger.yaml internal/service/admin_api/swagger/docs.yaml
 }
 
-generate_api_swagger &
-api_pid=$!
-
-generate_admin_api_swagger &
-admin_api_pid=$!
-
-status=0
-wait "$api_pid" || status=$?
-wait "$admin_api_pid" || status=$?
-
-if [[ "$status" -ne 0 ]]; then
-    exit "$status"
-fi
+# swaggo parses Go packages through shared caches. Running the two document
+# builds serially keeps the generated definition names deterministic.
+generate_api_swagger
+generate_admin_api_swagger
 
 echo "Swagger documentation generated successfully!"
 echo "Output files:"
