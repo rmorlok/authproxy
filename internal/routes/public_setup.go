@@ -82,10 +82,14 @@ func (h *PublicSetupRoutes) Register(g *gin.Engine) {
 		WithRedirectOnUnauthenticated(h.sessionInitiateUrlGenerator).
 		Build()
 
-	g.GET("/setup/connections/:id/advance", mw, h.advance)
-	g.POST("/setup/connections/:id/advance", mw, h.advance)
-	g.GET("/setup/connections/:id/abort", mw, h.abort)
-	g.POST("/setup/connections/:id/abort", mw, h.abort)
+	// These browser-facing endpoints are outside /api/v1. Apply the same
+	// strict query-name policy as API routes; the third-party OAuth callback
+	// remains exempt because its provider parameters are opaque.
+	queryCasing := RejectSnakeCaseQueryParams()
+	g.GET("/setup/connections/:id/advance", queryCasing, mw, h.advance)
+	g.POST("/setup/connections/:id/advance", queryCasing, mw, h.advance)
+	g.GET("/setup/connections/:id/abort", queryCasing, mw, h.abort)
+	g.POST("/setup/connections/:id/abort", queryCasing, mw, h.abort)
 }
 
 func (h *PublicSetupRoutes) advance(gctx *gin.Context) {
