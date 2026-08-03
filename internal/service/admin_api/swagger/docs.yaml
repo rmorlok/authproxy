@@ -1,6 +1,6 @@
 basePath: /api/v1
 definitions:
-  github_com_rmorlok_authproxy_internal_schema_api.ActorJson:
+  api.ActorJson:
     description: Actor identity within a namespace
     properties:
       annotations:
@@ -28,7 +28,7 @@ definitions:
       updated_at:
         type: string
     type: object
-  github_com_rmorlok_authproxy_internal_schema_api.ConnectorJson:
+  api.ConnectorJson:
     description: Connector API summary response
     properties:
       annotations:
@@ -77,7 +77,7 @@ definitions:
         example: 1
         type: integer
     type: object
-  github_com_rmorlok_authproxy_internal_schema_api.MetricsSchemaMetricJson:
+  api.MetricsSchemaMetricJson:
     description: Supported metric definition
     properties:
       aggregations:
@@ -100,7 +100,7 @@ definitions:
         example: request_events
         type: string
     type: object
-  github_com_rmorlok_authproxy_internal_schema_api.NamespaceJson:
+  api.NamespaceJson:
     description: Namespace for organizing resources
     properties:
       annotations:
@@ -660,7 +660,7 @@ definitions:
       items:
         description: List of actors.
         items:
-          $ref: '#/definitions/github_com_rmorlok_authproxy_internal_schema_api.ActorJson'
+          $ref: '#/definitions/api.ActorJson'
         type: array
     type: object
   routes.OpenAPIListConnectionResponseJson:
@@ -692,7 +692,7 @@ definitions:
       items:
         description: List of connectors.
         items:
-          $ref: '#/definitions/github_com_rmorlok_authproxy_internal_schema_api.ConnectorJson'
+          $ref: '#/definitions/api.ConnectorJson'
         type: array
     type: object
   routes.OpenAPIListKeysResponseJson:
@@ -713,7 +713,7 @@ definitions:
       items:
         description: List of namespaces.
         items:
-          $ref: '#/definitions/github_com_rmorlok_authproxy_internal_schema_api.NamespaceJson'
+          $ref: '#/definitions/api.NamespaceJson'
         type: array
     type: object
   routes.OpenAPIListNotificationsResponseJson:
@@ -750,7 +750,7 @@ definitions:
     properties:
       metrics:
         items:
-          $ref: '#/definitions/github_com_rmorlok_authproxy_internal_schema_api.MetricsSchemaMetricJson'
+          $ref: '#/definitions/api.MetricsSchemaMetricJson'
         type: array
     type: object
   routes.OpenAPIMigrateConnectionVersionRequestJson:
