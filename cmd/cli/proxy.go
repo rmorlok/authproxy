@@ -22,7 +22,7 @@ import (
 )
 
 // rawProxyEnvelopeHeader is the upstream-URL header consumed by
-// /_proxy_raw. Spelled in the API's display form; net/http canonicalises
+	// /_proxyRaw. Spelled in the API's display form; net/http canonicalises
 // on read.
 const rawProxyEnvelopeHeader = "X-AuthProxy-Upstream-URL"
 
@@ -40,14 +40,14 @@ var hopByHopHeaders = map[string]struct{}{
 }
 
 // rawProxyHandler returns an http.Handler that forwards each inbound
-// request through {apiBaseURL}/api/v1/connections/{connectionID}/_proxy_raw
+	// request through {apiBaseURL}/api/v1/connections/{connectionID}/_proxyRaw
 // with the JWT signer attached and bodies streamed both directions.
 //
 // If upstreamBase is non-nil, the inbound path+query is appended to it
 // to derive X-AuthProxy-Upstream-URL automatically. Otherwise the
 // caller must set the header on the inbound request.
 func rawProxyHandler(apiBaseURL string, connectionID string, upstreamBase *url.URL, signer jwt.Signer) http.HandlerFunc {
-	rawProxyURL := strings.TrimRight(apiBaseURL, "/") + "/api/v1/connections/" + connectionID + "/_proxy_raw"
+	rawProxyURL := strings.TrimRight(apiBaseURL, "/") + "/api/v1/connections/" + connectionID + "/_proxyRaw"
 
 	return func(w http.ResponseWriter, req *http.Request) {
 		upstream := req.Header.Get(rawProxyEnvelopeHeader)
@@ -168,8 +168,8 @@ func cmdProxy() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "proxy --connection <id> [--upstream-base <url>] [curl|wget <args>]",
-		Short: "Reverse proxy that forwards requests through a connection's /_proxy_raw endpoint",
-		Long: `Boots a streaming reverse-proxy through the connection's /_proxy_raw
+		Short: "Reverse proxy that forwards requests through a connection's /_proxyRaw endpoint",
+		Long: `Boots a streaming reverse-proxy through the connection's /_proxyRaw
 endpoint. Bodies stream both directions so chunked uploads and SSE
 responses pass through without buffering.
 
@@ -258,7 +258,7 @@ func parseUpstreamBase(s string) (*url.URL, error) {
 func runProxyListener(apiURL, connectionID string, base *url.URL, signer jwt.Signer, ip string, port int) error {
 	addr := fmt.Sprintf("%s:%d", ip, port)
 	log.Printf("ap proxy listening on %s", addr)
-	log.Printf("forwarding through %s/api/v1/connections/%s/_proxy_raw", strings.TrimRight(apiURL, "/"), connectionID)
+	log.Printf("forwarding through %s/api/v1/connections/%s/_proxyRaw", strings.TrimRight(apiURL, "/"), connectionID)
 	if base != nil {
 		log.Printf("upstream-base: %s", base.String())
 	} else {

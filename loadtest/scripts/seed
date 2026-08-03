@@ -19,46 +19,46 @@ if [[ -z "$config_file" ]]; then
   sqlite_path="$run_dir/authproxy-seed.sqlite3"
   loadtest_log "generating local SQLite/miniredis seed config: $config_file"
   cat > "$config_file" <<EOF
-host_application:
-  initiate_session_url: http://placeholder.invalid/login
+hostApplication:
+  initiateSessionUrl: http://placeholder.invalid/login
 
 connections:
-  setup_ttl: 1s
+  setupTtl: 1s
 
 tasks:
-  default_retention: 24h
+  defaultRetention: 24h
 
 database:
   provider: sqlite
-  auto_migrate: true
+  autoMigrate: true
   path: $sqlite_path
 
 redis:
   provider: miniredis
 
-system_auth:
-  jwt_signing_key:
-    public_key:
+systemAuth:
+  jwtSigningKey:
+    publicKey:
       path: $REPO_ROOT/dev_config/system.pub
-    private_key:
+    privateKey:
       path: $REPO_ROOT/dev_config/system
   actors:
-    keys_path: $REPO_ROOT/dev_config/keys/admin
+    keysPath: $REPO_ROOT/dev_config/keys/admin
     permissions:
       - namespace: root.**
         resources:
           - "*"
         verbs:
           - "*"
-  global_aes_key:
+  globalAesKey:
     path: $REPO_ROOT/dev_config/keys/global_aes.key
 
 connectors:
-  auto_migrate: false
-  load_from_list: []
+  autoMigrate: false
+  loadFromList: []
 
-app_metrics:
-  auto_migrate: false
+appMetrics:
+  autoMigrate: false
   database:
     provider: sqlite
     path: $sqlite_path

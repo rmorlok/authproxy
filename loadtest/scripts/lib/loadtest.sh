@@ -256,9 +256,9 @@ loadtest_init_run_dir() {
 loadtest_profile_p95_seconds() {
   local profile_file=$1
   local value
-  value=$(loadtest_yaml_section_value "$profile_file" k6 p95_latency_ms)
+  value=$(loadtest_yaml_section_value "$profile_file" k6 p95LatencyMs)
   if [[ -z "$value" ]]; then
-    value=$(loadtest_yaml_section_value "$profile_file" acceptance p95_latency_target)
+    value=$(loadtest_yaml_section_value "$profile_file" acceptance p95LatencyTarget)
   fi
 
   case "$value" in

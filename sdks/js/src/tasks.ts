@@ -16,7 +16,7 @@ export interface TaskInfoJson {
   id: string;
   type: string;
   state: TaskState;
-  updated_at?: string;
+  updatedAt?: string;
 }
 
 /**

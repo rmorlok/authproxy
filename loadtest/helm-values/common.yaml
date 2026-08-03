@@ -83,14 +83,14 @@ appMetrics:
     database: authproxy_app_metrics
     user: authproxy
     password:
-      env_var: CLICKHOUSE_PASSWORD
+      envVar: CLICKHOUSE_PASSWORD
   fullRequestRecording: never
 
 config:
   connections:
-    setup_ttl: 1s
+    setupTtl: 1s
   tasks:
-    default_retention: 24h
+    defaultRetention: 24h
   telemetry:
     enabled: true
     exporter:
@@ -98,7 +98,7 @@ config:
       endpoint: http://otel-lgtm:4317
       insecure: true
     resource:
-      service_name_prefix: authproxy-load
+      serviceNamePrefix: authproxy-load
       attributes:
         deployment.environment: loadtest
     sampling:
@@ -108,12 +108,12 @@ config:
       metrics: true
       logs: true
     http:
-      excluded_paths:
+      excludedPaths:
         - /ping
         - /healthz
     proxy:
-      span_attribute_labels:
+      spanAttributeLabels:
         - loadtest
-      metric_dimension_labels:
+      metricDimensionLabels:
         - loadtest
-      metric_dimension_value_cap: 25
+      metricDimensionValueCap: 25

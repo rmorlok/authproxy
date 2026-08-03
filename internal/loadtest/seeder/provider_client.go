@@ -27,7 +27,7 @@ type providerClientRequest struct {
 	Key                     string `json:"key"`
 	Secret                  string `json:"secret"`
 	Scope                   string `json:"scope"`
-	TokenEndpointAuthMethod string `json:"token_endpoint_auth_method"`
+	TokenEndpointAuthMethod string `json:"tokenEndpointAuthMethod"`
 }
 
 func ensureProviderLoadtestClient(ctx context.Context, client HTTPClient, providerBaseURL string) error {

@@ -4,56 +4,56 @@ description: Baseline high-cardinality target profile.
 cluster:
   target: real-cluster
 objects:
-  namespaces_min: 50000
-  namespaces_max: 100000
+  namespacesMin: 50000
+  namespacesMax: 100000
   connections: 100000
-  stale_setup_connections: 1000
-  oauth_tokens_expiring_percent:
+  staleSetupConnections: 1000
+  oauthTokensExpiringPercent:
     - 10
     - 50
     - 100
-  periodic_probe_percent:
+  periodicProbePercent:
     - 1
     - 10
     - 100
 authproxy:
-  api_replicas: 2
-  worker_replicas: 2
+  apiReplicas: 2
+  workerReplicas: 2
   # Public OAuth callbacks are not exercised by this proxy/cardinality profile.
-  public_replicas: 0
-  admin_api_replicas: 1
+  publicReplicas: 0
+  adminApiReplicas: 1
 k6:
   mode: operator
   scenario: proxy-raw
   rate: 500
   duration: 10m
-  time_unit: 1s
-  connection_rows: 10000
+  timeUnit: 1s
+  connectionRows: 10000
   parallelism: 4
-  pre_allocated_vus: 250
-  max_vus: 2000
-  request_timeout: 30s
-  p95_latency_ms: 1000
-  max_failed_rate: 0.001
-  upstream_status: 200
-  upstream_bytes: 256
-  upstream_delay_ms: 0
-  upstream_jitter_ms: 0
-  upstream_bearer_prefix: at_
-  upstream_path_prefix: /test/load/resource/proxy
-  soak_duration: 2h
-  spike_base_rate: 500
-  spike_rate: 1500
-  spike_ramp_up: 2m
-  spike_hold: 5m
-  spike_ramp_down: 2m
-  spike_recovery: 5m
-  scale_replicas:
+  preAllocatedVus: 250
+  maxVus: 2000
+  requestTimeout: 30s
+  p95LatencyMs: 1000
+  maxFailedRate: 0.001
+  upstreamStatus: 200
+  upstreamBytes: 256
+  upstreamDelayMs: 0
+  upstreamJitterMs: 0
+  upstreamBearerPrefix: at_
+  upstreamPathPrefix: /test/load/resource/proxy
+  soakDuration: 2h
+  spikeBaseRate: 500
+  spikeRate: 1500
+  spikeRampUp: 2m
+  spikeHold: 5m
+  spikeRampDown: 2m
+  spikeRecovery: 5m
+  scaleReplicas:
     - 2
     - 4
     - 8
     - 16
 acceptance:
-  max_5xx_rate: 0.001
-  p95_latency_target: profile-configured
-  refresh_sweep_must_drain_before_next_cron: true
+  max5xxRate: 0.001
+  p95LatencyTarget: profile-configured
+  refreshSweepMustDrainBeforeNextCron: true

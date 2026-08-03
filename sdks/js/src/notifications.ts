@@ -17,26 +17,26 @@ export interface Notification {
     key: string;
     level: NotificationLevel;
     state: NotificationState;
-    resource_type: string;
-    resource_id: string;
+    resourceType: string;
+    resourceId: string;
     namespace: string;
     title: string;
     message: string;
-    action_url?: string;
-    can_action: boolean;
+    actionUrl?: string;
+    canAction: boolean;
     viewed: boolean;
     metadata?: Record<string, unknown>;
-    created_at: string;
-    updated_at: string;
-    resolved_at?: string;
+    createdAt: string;
+    updatedAt: string;
+    resolvedAt?: string;
 }
 
 export interface ListNotificationsParams {
     limit?: number;
-    include_viewed?: boolean;
+    includeViewed?: boolean;
     state?: NotificationState;
     namespace?: string;
-    label_selector?: string;
+    labelSelector?: string;
 }
 
 export interface MarkNotificationsViewedRequest {

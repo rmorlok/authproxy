@@ -45,10 +45,10 @@ k6_env_or_profile() {
 k6_p95_threshold_ms() {
   local value=${LOADTEST_K6_P95_THRESHOLD_MS:-}
   if [[ -z "$value" ]]; then
-    value=$(loadtest_yaml_section_value "$profile_file" k6 p95_latency_ms)
+    value=$(loadtest_yaml_section_value "$profile_file" k6 p95LatencyMs)
   fi
   if [[ -z "$value" ]]; then
-    value=$(loadtest_yaml_section_value "$profile_file" acceptance p95_latency_target)
+    value=$(loadtest_yaml_section_value "$profile_file" acceptance p95LatencyTarget)
   fi
 
   case "$value" in
@@ -100,7 +100,7 @@ shape_for_scenario() {
 duration_for_scenario() {
   case "$1" in
     proxy-soak)
-      k6_env_or_profile LOADTEST_K6_SOAK_DURATION soak_duration 2h
+      k6_env_or_profile LOADTEST_K6_SOAK_DURATION soakDuration 2h
       ;;
     *)
       k6_env_or_profile LOADTEST_K6_DURATION duration 5m
@@ -108,10 +108,10 @@ duration_for_scenario() {
   esac
 }
 
-max_5xx_rate() {
+max5xxRate() {
   local value=${LOADTEST_K6_MAX_5XX_RATE:-}
   if [[ -z "$value" ]]; then
-    value=$(loadtest_yaml_section_value "$profile_file" acceptance max_5xx_rate)
+    value=$(loadtest_yaml_section_value "$profile_file" acceptance max5xxRate)
   fi
   printf "%s\n" "${value:-0.001}"
 }
@@ -125,7 +125,7 @@ prepare_connections_dataset() {
   [[ -f "$source" ]] || loadtest_die "connections dataset does not exist: $source"
 
   local rows
-  rows=$(k6_env_or_profile LOADTEST_K6_CONNECTION_ROWS connection_rows 10000)
+  rows=$(k6_env_or_profile LOADTEST_K6_CONNECTION_ROWS connectionRows 10000)
   if [[ "$rows" != "all" && ! "$rows" =~ ^[0-9]+$ ]]; then
     loadtest_die "LOADTEST_K6_CONNECTION_ROWS must be numeric or all"
   fi
@@ -247,26 +247,26 @@ apply_k6_env_configmap() {
     printf "LOADTEST_K6_API_REPLICAS=%s\n" "$api_replicas"
     printf "LOADTEST_K6_RATE=%s\n" "$(k6_env_or_profile LOADTEST_K6_RATE rate 100)"
     printf "LOADTEST_K6_DURATION=%s\n" "$(duration_for_scenario "$scenario_name")"
-    printf "LOADTEST_K6_TIME_UNIT=%s\n" "$(k6_env_or_profile LOADTEST_K6_TIME_UNIT time_unit 1s)"
-    printf "LOADTEST_K6_PRE_ALLOCATED_VUS=%s\n" "$(k6_env_or_profile LOADTEST_K6_PRE_ALLOCATED_VUS pre_allocated_vus 100)"
-    printf "LOADTEST_K6_MAX_VUS=%s\n" "$(k6_env_or_profile LOADTEST_K6_MAX_VUS max_vus 1000)"
-    printf "LOADTEST_K6_REQUEST_TIMEOUT=%s\n" "$(k6_env_or_profile LOADTEST_K6_REQUEST_TIMEOUT request_timeout 30s)"
+    printf "LOADTEST_K6_TIME_UNIT=%s\n" "$(k6_env_or_profile LOADTEST_K6_TIME_UNIT timeUnit 1s)"
+    printf "LOADTEST_K6_PRE_ALLOCATED_VUS=%s\n" "$(k6_env_or_profile LOADTEST_K6_PRE_ALLOCATED_VUS preAllocatedVus 100)"
+    printf "LOADTEST_K6_MAX_VUS=%s\n" "$(k6_env_or_profile LOADTEST_K6_MAX_VUS maxVus 1000)"
+    printf "LOADTEST_K6_REQUEST_TIMEOUT=%s\n" "$(k6_env_or_profile LOADTEST_K6_REQUEST_TIMEOUT requestTimeout 30s)"
     printf "LOADTEST_K6_P95_THRESHOLD_MS=%s\n" "$(k6_p95_threshold_ms)"
-    printf "LOADTEST_K6_MAX_FAILED_RATE=%s\n" "$(k6_env_or_profile LOADTEST_K6_MAX_FAILED_RATE max_failed_rate "$(max_5xx_rate)")"
-    printf "LOADTEST_K6_MAX_5XX_RATE=%s\n" "$(max_5xx_rate)"
-    printf "LOADTEST_K6_UPSTREAM_STATUS=%s\n" "$(k6_env_or_profile LOADTEST_K6_UPSTREAM_STATUS upstream_status 200)"
-    printf "LOADTEST_K6_UPSTREAM_BYTES=%s\n" "$(k6_env_or_profile LOADTEST_K6_UPSTREAM_BYTES upstream_bytes 256)"
-    printf "LOADTEST_K6_UPSTREAM_DELAY_MS=%s\n" "$(k6_env_or_profile LOADTEST_K6_UPSTREAM_DELAY_MS upstream_delay_ms 0)"
-    printf "LOADTEST_K6_UPSTREAM_JITTER_MS=%s\n" "$(k6_env_or_profile LOADTEST_K6_UPSTREAM_JITTER_MS upstream_jitter_ms 0)"
-    printf "LOADTEST_K6_UPSTREAM_BEARER_PREFIX=%s\n" "$(k6_env_or_profile LOADTEST_K6_UPSTREAM_BEARER_PREFIX upstream_bearer_prefix at_)"
-    printf "LOADTEST_K6_UPSTREAM_PATH_PREFIX=%s\n" "$(k6_env_or_profile LOADTEST_K6_UPSTREAM_PATH_PREFIX upstream_path_prefix /test/load/resource/proxy)"
-    printf "LOADTEST_K6_PROXY_METHOD=%s\n" "$(k6_env_or_profile LOADTEST_K6_PROXY_METHOD proxy_method GET)"
-    printf "LOADTEST_K6_SPIKE_BASE_RATE=%s\n" "$(k6_env_or_profile LOADTEST_K6_SPIKE_BASE_RATE spike_base_rate "$(k6_env_or_profile LOADTEST_K6_RATE rate 100)")"
-    printf "LOADTEST_K6_SPIKE_RATE=%s\n" "$(k6_env_or_profile LOADTEST_K6_SPIKE_RATE spike_rate 300)"
-    printf "LOADTEST_K6_SPIKE_RAMP_UP=%s\n" "$(k6_env_or_profile LOADTEST_K6_SPIKE_RAMP_UP spike_ramp_up 1m)"
-    printf "LOADTEST_K6_SPIKE_HOLD=%s\n" "$(k6_env_or_profile LOADTEST_K6_SPIKE_HOLD spike_hold 3m)"
-    printf "LOADTEST_K6_SPIKE_RAMP_DOWN=%s\n" "$(k6_env_or_profile LOADTEST_K6_SPIKE_RAMP_DOWN spike_ramp_down 1m)"
-    printf "LOADTEST_K6_SPIKE_RECOVERY=%s\n" "$(k6_env_or_profile LOADTEST_K6_SPIKE_RECOVERY spike_recovery 3m)"
+    printf "LOADTEST_K6_MAX_FAILED_RATE=%s\n" "$(k6_env_or_profile LOADTEST_K6_MAX_FAILED_RATE maxFailedRate "$(max5xxRate)")"
+    printf "LOADTEST_K6_MAX_5XX_RATE=%s\n" "$(max5xxRate)"
+    printf "LOADTEST_K6_UPSTREAM_STATUS=%s\n" "$(k6_env_or_profile LOADTEST_K6_UPSTREAM_STATUS upstreamStatus 200)"
+    printf "LOADTEST_K6_UPSTREAM_BYTES=%s\n" "$(k6_env_or_profile LOADTEST_K6_UPSTREAM_BYTES upstreamBytes 256)"
+    printf "LOADTEST_K6_UPSTREAM_DELAY_MS=%s\n" "$(k6_env_or_profile LOADTEST_K6_UPSTREAM_DELAY_MS upstreamDelayMs 0)"
+    printf "LOADTEST_K6_UPSTREAM_JITTER_MS=%s\n" "$(k6_env_or_profile LOADTEST_K6_UPSTREAM_JITTER_MS upstreamJitterMs 0)"
+    printf "LOADTEST_K6_UPSTREAM_BEARER_PREFIX=%s\n" "$(k6_env_or_profile LOADTEST_K6_UPSTREAM_BEARER_PREFIX upstreamBearerPrefix at_)"
+    printf "LOADTEST_K6_UPSTREAM_PATH_PREFIX=%s\n" "$(k6_env_or_profile LOADTEST_K6_UPSTREAM_PATH_PREFIX upstreamPathPrefix /test/load/resource/proxy)"
+    printf "LOADTEST_K6_PROXY_METHOD=%s\n" "$(k6_env_or_profile LOADTEST_K6_PROXY_METHOD proxyMethod GET)"
+    printf "LOADTEST_K6_SPIKE_BASE_RATE=%s\n" "$(k6_env_or_profile LOADTEST_K6_SPIKE_BASE_RATE spikeBaseRate "$(k6_env_or_profile LOADTEST_K6_RATE rate 100)")"
+    printf "LOADTEST_K6_SPIKE_RATE=%s\n" "$(k6_env_or_profile LOADTEST_K6_SPIKE_RATE spikeRate 300)"
+    printf "LOADTEST_K6_SPIKE_RAMP_UP=%s\n" "$(k6_env_or_profile LOADTEST_K6_SPIKE_RAMP_UP spikeRampUp 1m)"
+    printf "LOADTEST_K6_SPIKE_HOLD=%s\n" "$(k6_env_or_profile LOADTEST_K6_SPIKE_HOLD spikeHold 3m)"
+    printf "LOADTEST_K6_SPIKE_RAMP_DOWN=%s\n" "$(k6_env_or_profile LOADTEST_K6_SPIKE_RAMP_DOWN spikeRampDown 1m)"
+    printf "LOADTEST_K6_SPIKE_RECOVERY=%s\n" "$(k6_env_or_profile LOADTEST_K6_SPIKE_RECOVERY spikeRecovery 3m)"
   } > "$env_file"
 
   kubectl -n "$namespace" create configmap "$configmap_name" \
@@ -434,7 +434,7 @@ record_scale_result() {
   local results_file="$run_dir/k6/scale-results.tsv"
 
   if [[ ! -f "$results_file" ]]; then
-    printf "api_replicas\tscenario\titerations_per_second\thttp_req_duration_p95_ms\thttp_req_failed_rate\tdropped_iterations\tmax_vus\tlog_file\tsummary_file\n" > "$results_file"
+    printf "api_replicas\tscenario\titerations_per_second\thttp_req_duration_p95_ms\thttp_req_failed_rate\tdropped_iterations\tmaxVus\tlog_file\tsummary_file\n" > "$results_file"
   fi
 
   if command -v jq >/dev/null 2>&1 && [[ -f "$summary_file" ]]; then
@@ -492,9 +492,9 @@ run_proxy_suite() {
       local replica_count
       while IFS= read -r replica_count; do
         [[ -n "$replica_count" ]] && replicas+=("$replica_count")
-      done < <(loadtest_yaml_section_list "$profile_file" k6 scale_replicas)
+      done < <(loadtest_yaml_section_list "$profile_file" k6 scaleReplicas)
       if [[ "${#replicas[@]}" -eq 0 ]]; then
-        loadtest_die "profile $profile_name has no k6.scale_replicas entries"
+        loadtest_die "profile $profile_name has no k6.scaleReplicas entries"
       fi
       if [[ "$k6_mode" == "operator" && -z "${LOADTEST_K6_WAIT:-}" ]]; then
         export LOADTEST_K6_WAIT=true

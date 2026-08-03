@@ -88,10 +88,10 @@ profile_values_dir="$run_dir/helm-values/profile-overrides"
 mkdir -p "$profile_values_dir"
 
 profile_replica_count() {
-  local service=$1
-  local value
-  value=$(loadtest_yaml_section_value "$profile_file" authproxy "${service}_replicas")
-  [[ "$value" =~ ^[0-9]+$ ]] || loadtest_die "authproxy.${service}_replicas must be a non-negative integer"
+	local field=$1
+	local value
+	value=$(loadtest_yaml_section_value "$profile_file" authproxy "$field")
+	[[ "$value" =~ ^[0-9]+$ ]] || loadtest_die "authproxy.${field} must be a non-negative integer"
   printf "%s\n" "$value"
 }
 
@@ -112,7 +112,7 @@ write_profile_values() {
   printf "%s\n" "$output"
 }
 
-admin_api_profile_values=$(write_profile_values admin_api "$(profile_replica_count admin_api)" false)
+admin_api_profile_values=$(write_profile_values admin_api "$(profile_replica_count adminApi)" false)
 api_profile_values=$(write_profile_values api "$(profile_replica_count api)" true)
 public_replicas=$(profile_replica_count public)
 public_profile_values=$(write_profile_values public "$public_replicas" false)

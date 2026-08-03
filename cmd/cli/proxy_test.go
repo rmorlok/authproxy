@@ -104,10 +104,10 @@ func TestProxyCmd_NoPositional_RunsListenerMode(t *testing.T) {
 // sets X-AuthProxy-Upstream-URL to https://upstream/v1/foo and signs
 // the outbound request before forwarding to the AuthProxy server.
 func TestRawProxyHandler_DerivesUpstreamFromBase(t *testing.T) {
-	// Fake AuthProxy /_proxy_raw server. The handler's outbound request
+	// Fake AuthProxy /_proxyRaw server. The handler's outbound request
 	// lands here; we assert the envelope and echo a small body back.
 	authproxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/api/v1/connections/cxn_test/_proxy_raw", r.URL.Path)
+		assert.Equal(t, "/api/v1/connections/cxn_test/_proxyRaw", r.URL.Path)
 		assert.Equal(t, "https://upstream.example.com/v1/foo?q=1", r.Header.Get("X-AuthProxy-Upstream-URL"))
 		assert.Equal(t, "Bearer test-token", r.Header.Get("Authorization"))
 		assert.Equal(t, "ap-curl-test", r.Header.Get("X-Caller"))

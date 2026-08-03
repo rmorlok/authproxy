@@ -105,7 +105,7 @@ func (r *KeyResource) Create(ctx context.Context, req resource.CreateRequest, re
 		Namespace:   plan.Namespace.ValueString(),
 		Labels:      labels,
 		Annotations: annotations,
-		KeyData:     map[string]interface{}{"num_bytes": 32},
+		KeyData:     map[string]interface{}{"numBytes": 32},
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create key", err.Error())
