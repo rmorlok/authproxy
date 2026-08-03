@@ -8169,7 +8169,7 @@ const docTemplateadmin_api = `{
         }
     },
     "definitions": {
-        "github_com_rmorlok_authproxy_internal_schema_api.ActorJson": {
+        "api.ActorJson": {
             "description": "Actor identity within a namespace",
             "type": "object",
             "properties": {
@@ -8209,7 +8209,7 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "github_com_rmorlok_authproxy_internal_schema_api.ConnectorJson": {
+        "api.ConnectorJson": {
             "description": "Connector API summary response",
             "type": "object",
             "properties": {
@@ -8277,7 +8277,7 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "github_com_rmorlok_authproxy_internal_schema_api.MetricsSchemaMetricJson": {
+        "api.MetricsSchemaMetricJson": {
             "description": "Supported metric definition",
             "type": "object",
             "properties": {
@@ -8310,7 +8310,7 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "github_com_rmorlok_authproxy_internal_schema_api.NamespaceJson": {
+        "api.NamespaceJson": {
             "description": "Namespace for organizing resources",
             "type": "object",
             "properties": {
@@ -9086,7 +9086,7 @@ const docTemplateadmin_api = `{
                     "description": "List of actors.",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_api.ActorJson"
+                        "$ref": "#/definitions/api.ActorJson"
                     }
                 }
             }
@@ -9131,7 +9131,7 @@ const docTemplateadmin_api = `{
                     "description": "List of connectors.",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_api.ConnectorJson"
+                        "$ref": "#/definitions/api.ConnectorJson"
                     }
                 }
             }
@@ -9161,7 +9161,7 @@ const docTemplateadmin_api = `{
                     "description": "List of namespaces.",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_api.NamespaceJson"
+                        "$ref": "#/definitions/api.NamespaceJson"
                     }
                 }
             }
@@ -9215,7 +9215,7 @@ const docTemplateadmin_api = `{
                 "metrics": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_api.MetricsSchemaMetricJson"
+                        "$ref": "#/definitions/api.MetricsSchemaMetricJson"
                     }
                 }
             }

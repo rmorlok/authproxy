@@ -8163,7 +8163,7 @@
         }
     },
     "definitions": {
-        "github_com_rmorlok_authproxy_internal_schema_api.ActorJson": {
+        "api.ActorJson": {
             "description": "Actor identity within a namespace",
             "type": "object",
             "properties": {
@@ -8203,7 +8203,7 @@
                 }
             }
         },
-        "github_com_rmorlok_authproxy_internal_schema_api.ConnectorJson": {
+        "api.ConnectorJson": {
             "description": "Connector API summary response",
             "type": "object",
             "properties": {
@@ -8271,7 +8271,7 @@
                 }
             }
         },
-        "github_com_rmorlok_authproxy_internal_schema_api.MetricsSchemaMetricJson": {
+        "api.MetricsSchemaMetricJson": {
             "description": "Supported metric definition",
             "type": "object",
             "properties": {
@@ -8304,7 +8304,7 @@
                 }
             }
         },
-        "github_com_rmorlok_authproxy_internal_schema_api.NamespaceJson": {
+        "api.NamespaceJson": {
             "description": "Namespace for organizing resources",
             "type": "object",
             "properties": {
@@ -9080,7 +9080,7 @@
                     "description": "List of actors.",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_api.ActorJson"
+                        "$ref": "#/definitions/api.ActorJson"
                     }
                 }
             }
@@ -9125,7 +9125,7 @@
                     "description": "List of connectors.",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_api.ConnectorJson"
+                        "$ref": "#/definitions/api.ConnectorJson"
                     }
                 }
             }
@@ -9155,7 +9155,7 @@
                     "description": "List of namespaces.",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_api.NamespaceJson"
+                        "$ref": "#/definitions/api.NamespaceJson"
                     }
                 }
             }
@@ -9209,7 +9209,7 @@
                 "metrics": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_api.MetricsSchemaMetricJson"
+                        "$ref": "#/definitions/api.MetricsSchemaMetricJson"
                     }
                 }
             }
