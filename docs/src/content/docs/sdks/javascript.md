@@ -138,7 +138,7 @@ const {data} = await client.post<ProxyResponse>(
   request,
 );
 
-console.log(data.status_code, data.body_json);
+console.log(data.statusCode, data.bodyJson);
 ```
 
 The wrapped endpoint buffers request and response bodies. For large files, chunked bodies, or server-sent events, use [`ap proxy`](/sdks/proxying/#use-ap-proxy) and the streaming raw endpoint instead.

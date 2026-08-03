@@ -102,7 +102,7 @@ Connection lifecycle states are `setup`, `configured`, `disabled`,
 
 When a caller uses `POST /api/v1/connections/{id}/_proxy`, AuthProxy checks
 `connections:proxy` permission against the connection's namespace before it
-loads credentials. The raw streaming route, `/_proxy_raw`, uses the same
+loads credentials. The raw streaming route, `/_proxyRaw`, uses the same
 permission.
 
 ## OAuth connection flow
@@ -174,10 +174,10 @@ An **actor** represents a caller: an end user, application service, operator, or
 automation. Its host-facing identity is the pair:
 
 ```text
-(actor namespace, external_id)
+(actor namespace, externalId)
 ```
 
-`external_id` should be the host application's immutable user or service id,
+`externalId` should be the host application's immutable user or service id,
 not an email address. The same external id may exist in different actor
 namespaces.
 

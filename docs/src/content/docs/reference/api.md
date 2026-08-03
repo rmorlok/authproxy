@@ -13,6 +13,15 @@ Both publish generated Swagger 2.0 documentation when the service is running.
 The Admin URL uses the self-signed development certificate in a local checkout.
 Production URLs depend on deployment routing.
 
+:::caution[Breaking contract cutover]
+
+All AuthProxy-owned JSON fields, YAML fields, and URL query/path parameter names
+use lowerCamelCase. Snake_case input is rejected; there are no aliases or
+migration window. Reset persisted AuthProxy state before deploying this release
+instead of starting it against old serialized connector or configuration data.
+
+:::
+
 ## Which API to use
 
 - Use the **application API** for host-application resource access and
@@ -44,10 +53,10 @@ POST /api/v1/connections/_initiate
 Content-Type: application/json
 
 {
-  "connector_id": "cxr_01example",
-  "into_namespace": "root.acme",
+  "connectorId": "cxr_01example",
+  "intoNamespace": "root.acme",
   "name": "production-crm",
-  "return_to_url": "https://app.example.com/integrations/complete"
+  "returnToUrl": "https://app.example.com/integrations/complete"
 }
 ```
 
@@ -70,7 +79,7 @@ for reuse. The same name may appear on another resource type or in another
 namespace.
 
 A connector has one name shared by all definition versions. Rename it with
-`PATCH /api/v1/connectors/{connector_id}`. Version-specific create and update
+`PATCH /api/v1/connectors/{connectorId}`. Version-specific create and update
 requests do not accept a separate name. A namespace name is read-only and is
 derived from the final segment of its path.
 
@@ -91,7 +100,7 @@ The Admin cross-resource endpoint searches names directly and also searches
 user-label values:
 
 ```http
-GET /api/v1/search/resources?q=production&resource_type=connection
+GET /api/v1/search/resources?q=production&resourceType=connection
 ```
 
 Exact name matches rank before name prefixes, which rank before name

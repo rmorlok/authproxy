@@ -11,11 +11,11 @@ The development configuration demonstrates the full server shape at
 
 | Block | Purpose |
 |---|---|
-| `public`, `api`, `admin_api`, `worker` | Enabled services, ports, TLS, UI, and health behavior |
-| `host_application`, `marketplace` | Browser login handoff and Marketplace URL |
-| `system_auth` | JWT, actors, global encryption key, and DEK policy |
+| `public`, `api`, `adminApi`, `worker` | Enabled services, ports, TLS, UI, and health behavior |
+| `hostApplication`, `marketplace` | Browser login handoff and Marketplace URL |
+| `systemAuth` | JWT, actors, global encryption key, and DEK policy |
 | `database`, `redis` | Primary database and distributed state |
-| `app_metrics` | Request-event, resource-metric, and optional blob storage |
+| `appMetrics` | Request-event, resource-metric, and optional blob storage |
 | `connectors` | Connector loading and name-based reconciliation |
 | `tasks` | Task retention and worker behavior |
 | `telemetry` | OTLP exporter, signals, sampling, and label projection |
@@ -31,15 +31,15 @@ immutable `id`:
 
 ```yaml
 connectors:
-  auto_migrate: true
-  load_from_list:
+  autoMigrate: true
+  loadFromList:
     - name: google-drive
       namespace: root.integrations
       labels:
         type: google-drive
-      display_name: Google Drive
+      displayName: Google Drive
       logo:
-        public_url: https://example.com/google-drive.svg
+        publicUrl: https://example.com/google-drive.svg
       description: Connect to Google Drive.
       auth:
         type: no-auth
@@ -56,7 +56,7 @@ its ID fixed and change `name`. Changing the name of an ID-less entry describes
 a new connector, so the old config-managed connector enters the normal orphan
 cleanup flow.
 
-The former `connectors.identifying_labels` setting has been removed. Delete it
+The former `connectors.identifyingLabels` setting has been removed. Delete it
 from existing configuration and add a stable `name` to every connector entry
 that does not already specify `id`.
 

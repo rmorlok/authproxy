@@ -16,7 +16,7 @@ recovery, or workforce/customer identity provider.
 
 ## Map Host Identities to Actors
 
-An actor represents a user or service principal. Its `external_id` should be a
+An actor represents a user or service principal. Its `externalId` should be a
 stable, non-reassignable identifier from the host system. Avoid mutable values
 such as email addresses when a durable user id is available.
 
@@ -25,7 +25,7 @@ For example:
 ```text
 Host tenant:    org_123
 Host principal: usr_456
-AuthProxy actor external_id: usr_456
+AuthProxy actor externalId: usr_456
 AuthProxy resource namespace: root.tenants.org_123
 ```
 
@@ -37,7 +37,7 @@ an email address, connection label, or other business metadata.
 | Path | Typical use | Security properties |
 |---|---|---|
 | Bearer JWT in `Authorization` | Host backend, CLI, automation | Signature and claims validated on each request; audience must include the receiving service |
-| One-time JWT in `auth_token` | Marketplace or Admin UI session handoff | Must include expiration and nonce; nonce is atomically marked used |
+| One-time JWT in `authToken` | Marketplace or Admin UI session handoff | Must include expiration and nonce; nonce is atomically marked used |
 | Browser session | Marketplace or Admin UI after handoff | Server-side state in Redis; encrypted session identifier in an `HttpOnly` cookie; XSRF token required for mutating session requests |
 | System-signed JWT | Internal AuthProxy handoffs and OAuth state | Minted and validated by AuthProxy services; protect internal signing material as production key material |
 
@@ -61,7 +61,7 @@ The embedded Marketplace and Admin UI use a delegated session flow:
 2. The host maps the user to an actor and decides what they may access.
 3. The host backend signs a short-lived JWT with the target AuthProxy service
    in `aud`, an expiration, and a one-time nonce.
-4. The host redirects to the AuthProxy UI with `auth_token=<jwt>`.
+4. The host redirects to the AuthProxy UI with `authToken=<jwt>`.
 5. The UI calls `POST /api/v1/session/_initiate`; AuthProxy validates the token, marks
    the nonce used, and establishes a server-side session.
 6. Later UI requests use the session cookie and an XSRF token for mutations.
@@ -72,9 +72,9 @@ Keep the handoff safe:
 - Keep the signing key in the backend and limit who can invoke the signing
   operation.
 - Use the shortest practical expiration and a fresh nonce for every handoff.
-- Allowlist `return_to` destinations. Do not turn the login endpoint into an
+- Allowlist `returnToUrl` destinations. Do not turn the login endpoint into an
   open redirect.
-- Avoid logging URLs that contain `auth_token`; scrub query strings at proxies,
+- Avoid logging URLs that contain `authToken`; scrub query strings at proxies,
   analytics tools, and error trackers.
 - Configure the external HTTPS URL correctly. Session cookies are `Secure` when
   AuthProxy is configured as HTTPS, so that setting must match ingress or proxy
@@ -99,7 +99,7 @@ permissions:
     verbs: [get, list, create, update]
   - namespace: root.tenants.org_123.**
     resources: [connections]
-    resource_ids: [cxn_example]
+    resourceIds: [cxn_example]
     verbs: [proxy]
 ```
 
@@ -132,7 +132,7 @@ while a task token can be limited to proxying through one connection:
 permissions:
   - namespace: root.tenants.org_123
     resources: [connections]
-    resource_ids: [cxn_salesforce]
+    resourceIds: [cxn_salesforce]
     verbs: [proxy]
 ```
 

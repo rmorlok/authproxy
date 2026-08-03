@@ -23,32 +23,32 @@ The rest of this doc uses `ap <command>` for brevity.
 # Default actor signed onto outbound requests. If omitted, --actorId on
 # the command line is required (or `--admin` falls back to the current
 # OS username).
-admin_username: bobdole
+adminUsername: bobdole
 
 # Asymmetric signing key (RS256). Use this for the standard dev setup —
-# the public key lives in the server's system_auth.jwt_signing_key block.
-admin_private_key_path: /path/to/private/key
+# the public key lives in the server's systemAuth.jwtSigningKey block.
+adminPrivateKeyPath: /path/to/private/key
 
 # Optional alternative: HMAC shared secret (HS256). Mutually exclusive
-# with admin_private_key_path on a given invocation.
-# admin_shared_key_path: /path/to/shared.secret
+# with adminPrivateKeyPath on a given invocation.
+# adminSharedKeyPath: /path/to/shared.secret
 
 # Base URLs for each AuthProxy service. Only the services you call need
 # to be set — `api` is the most common for everyday CLI use.
 server:
   api: http://localhost:8081
-  admin_api: http://localhost:8082
+  adminApi: http://localhost:8082
   auth: http://localhost:8080
   marketplace: http://localhost:5173
-  admin_ui: http://localhost:5174
+  adminUi: http://localhost:5174
 
 # Defaults for `ap signing-proxy`. Useful when several AuthProxy clones
 # share one machine — each clone's signing-proxy needs its own port. The
-# `env_var` form lets one shared ~/.authproxy.yaml pick up the per-clone
+# `envVar` form lets one shared ~/.authproxy.yaml pick up the per-clone
 # value from the clone's .env (AUTHPROXY_SIGNING_PROXY_PORT).
-signing_proxy:
+signingProxy:
   port:
-    env_var: AUTHPROXY_SIGNING_PROXY_PORT
+    envVar: AUTHPROXY_SIGNING_PROXY_PORT
     default: "8888"
 ```
 
@@ -60,18 +60,18 @@ AuthProxy supports two JWT signing modes:
 
 | Mode | YAML field / flag | Server-side counterpart |
 |---|---|---|
-| RS256 (asymmetric) | `admin_private_key_path` / `--privateKeyPath` | `system_auth.jwt_signing_key.public_key.path` |
-| HS256 (shared secret) | `admin_shared_key_path` / `--secretKeyPath` | `system_auth.jwt_signing_key.private_key.path` (used as the shared secret) |
+| RS256 (asymmetric) | `adminPrivateKeyPath` / `--privateKeyPath` | `systemAuth.jwtSigningKey.publicKey.path` |
+| HS256 (shared secret) | `adminSharedKeyPath` / `--secretKeyPath` | `systemAuth.jwtSigningKey.privateKey.path` (used as the shared secret) |
 
-The dev stack ships a ready-to-use RSA keypair under [`dev_config/keys/admin/`](https://github.com/rmorlok/authproxy/tree/main/dev_config/keys/admin/) (`bobdole` + `bobdole.pub`) paired with the matching public key registered in `dev_config/default.yaml`. Point `admin_private_key_path` at `dev_config/keys/admin/bobdole` and you're signed in as `bobdole` against a fresh `docker compose up -d` server.
+The dev stack ships a ready-to-use RSA keypair under [`dev_config/keys/admin/`](https://github.com/rmorlok/authproxy/tree/main/dev_config/keys/admin/) (`bobdole` + `bobdole.pub`) paired with the matching public key registered in `dev_config/default.yaml`. Point `adminPrivateKeyPath` at `dev_config/keys/admin/bobdole` and you're signed in as `bobdole` against a fresh `docker compose up -d` server.
 
 ### Actor and scope
 
 Every signed token has an **actor** (who is making the call) and a **service-id allowlist** (which AuthProxy services the token is valid against).
 
-- Actor defaults: `--actorId` > YAML `admin_username` > current OS username (only when `--admin` is set).
+- Actor defaults: `--actorId` > YAML `adminUsername` > current OS username (only when `--admin` is set).
 - Service allowlist defaults to `all`. Override with `--apis admin-api,api` to scope a token down. Valid IDs: `admin-api`, `api`, `public`, `worker`.
-- `--admin` flips the token's permissions to match the `system_auth.actors.permissions` block on the server (full access in the dev config).
+- `--admin` flips the token's permissions to match the `systemAuth.actors.permissions` block on the server (full access in the dev config).
 
 ## Commands
 
@@ -133,7 +133,7 @@ ap sign-jwt --actorId grafana --apis api,admin-api --grafana-preset logs --no-ex
 
 Grafana presets use top-level JWT permissions. Those permissions only restrict the token; the backing actor still needs matching normal permissions.
 
-Permission namespaces in a permissions file support the same actor templates as normal actor permissions: `{{external_id}}`, `{{labels.<label>}}`, and `{{annotations.<annotation>}}`. These render against the backing actor, and missing label or annotation values make the permission fail to match.
+Permission namespaces in a permissions file support the same actor templates as normal actor permissions: `{{externalId}}`, `{{labels.<label>}}`, and `{{annotations.<annotation>}}`. These render against the backing actor, and missing label or annotation values make the permission fail to match.
 
 ### `ap verify-jwt`
 
@@ -152,13 +152,13 @@ ap signing-proxy --proxyTo=api --port 8888
 ap signing-proxy --proxyTo=admin-api --enableLoginRedirect=true
 ```
 
-`--proxyTo` accepts a service id (`api`, `admin-api`, `public`) or an absolute URL. `--enableLoginRedirect` adds a `/login-redirect` handler that simulates the host application's session-initiation flow — wire `host_application.initiate_session_url` (or `admin_api.ui.initiate_session_url`) at the printed URL.
+`--proxyTo` accepts a service id (`api`, `admin-api`, `public`) or an absolute URL. `--enableLoginRedirect` adds a `/login-redirect` handler that simulates the host application's session-initiation flow — wire `hostApplication.initiateSessionUrl` (or `adminApi.ui.initiateSessionUrl`) at the printed URL.
 
-`--port` defaults to `8888`. If the CLI config sets `signing_proxy.port`, that value is used instead when `--port` is not given on the command line. Multiple clones on one machine should set `AUTHPROXY_SIGNING_PROXY_PORT` per clone in their `.env` and reference it from a shared `~/.authproxy.yaml` via `signing_proxy.port.env_var`.
+`--port` defaults to `8888`. If the CLI config sets `signingProxy.port`, that value is used instead when `--port` is not given on the command line. Multiple clones on one machine should set `AUTHPROXY_SIGNING_PROXY_PORT` per clone in their `.env` and reference it from a shared `~/.authproxy.yaml` via `signingProxy.port.envVar`.
 
 ### `ap proxy` — connection-scoped streaming proxy
 
-Routes inbound requests through `POST /api/v1/connections/{id}/_proxy_raw` so the connection's credentials are applied and bodies stream end-to-end (chunked uploads, SSE responses).
+Routes inbound requests through `POST /api/v1/connections/{id}/_proxyRaw` so the connection's credentials are applied and bodies stream end-to-end (chunked uploads, SSE responses).
 
 **Long-running mode.** Boots a listener on `--port` (default 9999). Each inbound request derives its `X-AuthProxy-Upstream-URL` from `--upstream-base` (path + query appended) or the caller may set the header directly.
 
@@ -244,9 +244,9 @@ Each clone (`~/src/authproxy1`, `~/src/authproxy2`, …) needs its own port pool
 A single shared `~/.authproxy.yaml` picks up whichever clone you ran `ap` from by reading the env var loaded from that clone's `.env`:
 
 ```yaml
-signing_proxy:
+signingProxy:
   port:
-    env_var: AUTHPROXY_SIGNING_PROXY_PORT
+    envVar: AUTHPROXY_SIGNING_PROXY_PORT
     default: "8888"
 ```
 

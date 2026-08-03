@@ -7,7 +7,7 @@ Connector setup flows let a connector collect configuration before and after cre
 ## Phases
 
 ```yaml
-setup_flow:
+setupFlow:
   preconnect:
     steps: []
   configure:
@@ -16,7 +16,7 @@ setup_flow:
 
 `preconnect` steps run before the auth method establishes credentials. Use them for values needed by the auth flow itself, such as a tenant, region, or instance URL.
 
-`configure` steps run after credentials are available. Use them for connection-specific choices such as workspace selection, sync settings, or other post-auth options. Configure form steps can define `data_sources` because AuthProxy can call the upstream API through the authenticated proxy at that point.
+`configure` steps run after credentials are available. Use them for connection-specific choices such as workspace selection, sync settings, or other post-auth options. Configure form steps can define `dataSources` because AuthProxy can call the upstream API through the authenticated proxy at that point.
 
 Auth-method steps and AuthProxy pseudo-steps are inserted by the runtime. Connector YAML cannot conditionally hide or override them. In particular:
 
@@ -29,12 +29,12 @@ Auth-method steps and AuthProxy pseudo-steps are inserted by the runtime. Connec
 Form steps are the default step type. They use JSON Schema for submitted data and optional JSONForms UI Schema for layout.
 
 ```yaml
-setup_flow:
+setupFlow:
   preconnect:
     steps:
       - id: region
         title: Region
-        json_schema:
+        jsonSchema:
           type: object
           required:
             - region
@@ -46,14 +46,14 @@ setup_flow:
                 - eu
 ```
 
-When a form step is submitted, AuthProxy validates the payload against the step's `json_schema` and merges only top-level fields declared in `properties` into the connection configuration.
+When a form step is submitted, AuthProxy validates the payload against the step's `jsonSchema` and merges only top-level fields declared in `properties` into the connection configuration.
 
 ## Redirect Steps
 
 Redirect steps send the user to an off-platform URL before continuing setup. Set `type: redirect` and provide `redirect.url`.
 
 ```yaml
-setup_flow:
+setupFlow:
   preconnect:
     steps:
       - id: external_setup
@@ -68,7 +68,7 @@ Redirect URLs support `{{cfg.field_name}}` mustache references plus two runtime 
 - `{{RETURN_ADVANCE}}`: a signed one-time-use URL that advances the connection to the next step.
 - `{{RETURN_ABORT}}`: a signed one-time-use URL that aborts the in-flight setup.
 
-Redirect steps cannot define `json_schema`, `ui_schema`, or `data_sources`.
+Redirect steps cannot define `jsonSchema`, `uiSchema`, or `dataSources`.
 
 ## Conditional Steps
 
@@ -77,7 +77,7 @@ Connector-authored form and redirect steps can include an `if.javascript` condit
 Setup-step predicates share the same shape and runtime context as OAuth scope and probe predicates. See [Connector predicates](/integration/connector-predicates/) for the shared predicate contract and non-setup examples.
 
 ```yaml
-setup_flow:
+setupFlow:
   configure:
     steps:
       - id: advanced_options
@@ -85,7 +85,7 @@ setup_flow:
         if:
           javascript: |
             cfg.region === "eu" && labels["apxy/cxr/type"] === "salesforce"
-        json_schema:
+        jsonSchema:
           type: object
           properties:
             sync_mode:
@@ -105,12 +105,12 @@ The JavaScript runtime exposes these variables:
 Conditions are useful when a later step depends on an earlier answer, a connector label, or an operator-supplied annotation:
 
 ```yaml
-setup_flow:
+setupFlow:
   preconnect:
     steps:
       - id: region
         title: Region
-        json_schema:
+        jsonSchema:
           type: object
           required:
             - region
@@ -124,7 +124,7 @@ setup_flow:
     steps:
       - id: workspace
         title: Workspace
-        json_schema:
+        jsonSchema:
           type: object
           required:
             - workspace_id
@@ -132,9 +132,9 @@ setup_flow:
             workspace_id:
               type: string
               x-data-source: workspaces
-        data_sources:
+        dataSources:
           workspaces:
-            proxy_request:
+            proxyRequest:
               method: GET
               url: https://api.example.com/workspaces
             transform: data.map(w => ({ value: w.id, label: w.name }))
@@ -143,7 +143,7 @@ setup_flow:
         if:
           javascript: |
             cfg.region === "eu" && annotations["setup-mode"] === "advanced"
-        json_schema:
+        jsonSchema:
           type: object
           properties:
             sync_mode:
@@ -167,7 +167,7 @@ If all connector-authored steps in a phase are ineligible, the runtime skips tha
 
 ## Data Sources
 
-Configure form steps can define `data_sources` for controls that need upstream options. AuthProxy calls the `proxy_request` through the authenticated connection, exposes the JSON response as `data`, and evaluates `transform` JavaScript to produce options:
+Configure form steps can define `dataSources` for controls that need upstream options. AuthProxy calls the `proxyRequest` through the authenticated connection, exposes the JSON response as `data`, and evaluates `transform` JavaScript to produce options:
 
 ```yaml
 javascript: |
@@ -177,20 +177,20 @@ javascript: |
     });
   }
 
-setup_flow:
+setupFlow:
   configure:
     steps:
       - id: workspace
         title: Workspace
-        json_schema:
+        jsonSchema:
           type: object
           properties:
             workspace_id:
               type: string
               x-data-source: workspaces
-        data_sources:
+        dataSources:
           workspaces:
-            proxy_request:
+            proxyRequest:
               method: GET
               url: https://api.example.com/workspaces
             transform: workspaceOptions(data.items)

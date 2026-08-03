@@ -34,25 +34,25 @@ sequenceDiagram
     participant H as "Host application"
 
     User->>M: "Open Marketplace"
-    M->>P: "POST /api/v1/session/_initiate {return_to_url}"
+    M->>P: "POST /api/v1/session/_initiate {returnToUrl}"
     alt "Valid AuthProxy session already exists"
-        P-->>M: "200 {actor_id}"
+        P-->>M: "200 {actorId}"
     else "No valid session"
-        P-->>M: "401 {redirect_url}"
-        M->>H: "Navigate to initiate_session_url?return_to=..."
+        P-->>M: "401 {redirectUrl}"
+        M->>H: "Navigate to initiate_session_url?returnToUrl=..."
         H->>H: "Authenticate user and map actor"
         H->>H: "Sign JWT with expiration and nonce"
-        H-->>M: "302 return_to?auth_token=JWT"
+        H-->>M: "302 returnToUrl?authToken=JWT"
         M->>P: "POST /api/v1/session/_initiate + Bearer JWT"
         P->>P: "Verify actor, consume nonce, create session"
-        P-->>M: "200 {actor_id} + session cookie"
+        P-->>M: "200 {actorId} + session cookie"
     end
     M->>P: "List connectors and manage connections"
 ```
 
-The configured `host_application.initiate_session_url` receives a `return_to`
+The configured `hostApplication.initiateSessionUrl` receives a `returnToUrl`
 query parameter. After authenticating the user, the host redirects to that URL
-with an `auth_token` query parameter. The Marketplace moves the token into the
+with an `authToken` query parameter. The Marketplace moves the token into the
 `Authorization: Bearer` header when it calls the session endpoint.
 
 If authentication succeeds, the Public service consumes the nonce and creates
@@ -65,27 +65,27 @@ For a separately hosted Marketplace:
 
 ```yaml
 public:
-  base_url: https://authproxy.example.com
+  baseUrl: https://authproxy.example.com
   https: true
   cookie:
-    same_site: none
+    sameSite: none
 
-host_application:
-  initiate_session_url: https://app.example.com/auth/authproxy
+hostApplication:
+  initiateSessionUrl: https://app.example.com/auth/authproxy
 
 marketplace:
-  base_url: https://integrations.example.com
+  baseUrl: https://integrations.example.com
 ```
 
 The host endpoint follows this logic:
 
 ```text
 require an authenticated host session
-read return_to
-reject return_to unless it matches an exact Marketplace allowlist
+read returnToUrl
+reject returnToUrl unless it matches an exact Marketplace allowlist
 map the host user and tenant to an AuthProxy actor and namespace
 sign an AuthProxy JWT for the Public service with a short expiration and nonce
-redirect to return_to with auth_token=<jwt>
+redirect to returnToUrl with authToken=<jwt>
 ```
 
 The signing key remains in the host backend. Register its public key or trusted
@@ -118,7 +118,7 @@ ap login-redirect --port 8889
 ap sign-marketplace-login-url --actorId alice
 ```
 
-`login-redirect` implements the `return_to` handoff locally, while
+`login-redirect` implements the `returnToUrl` handoff locally, while
 `sign-marketplace-login-url` prints a Marketplace URL containing a one-time
 token. See the [CLI reference](/development/cli/#ap-login-redirect).
 

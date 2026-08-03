@@ -29,7 +29,7 @@ sequenceDiagram
 
     User->>Shell: Choose actor and destination
     Shell->>Shell: Sign nonce JWT for actor
-    Shell-->>UI: Redirect with auth_token
+    Shell-->>UI: Redirect with authToken
     UI->>AP: POST /session/_initiate
     AP->>AP: Verify signer, nonce, actor, and scope
     AP-->>UI: Session cookie and UI configuration

@@ -71,10 +71,10 @@ OAuth2 scopes support two predicate-related fields:
 ```yaml
 auth:
   type: OAuth2
-  client_id:
-    env_var: GOOGLE_CLIENT_ID
-  client_secret:
-    env_var: GOOGLE_CLIENT_SECRET
+  clientId:
+    envVar: GOOGLE_CLIENT_ID
+  clientSecret:
+    envVar: GOOGLE_CLIENT_SECRET
   authorization:
     endpoint: https://accounts.google.com/o/oauth2/v2/auth
   token:
@@ -107,7 +107,7 @@ AuthProxy uses the same effective scope set when building the OAuth authorizatio
 
 ### OAuth Timing
 
-OAuth scope predicates are evaluated before OAuth authorization for authorization-code connectors. Any `cfg` values they read must already exist before OAuth begins, usually from `setup_flow.preconnect` steps. Values collected in `setup_flow.configure` happen after OAuth and are too late to affect the initial authorization URL.
+OAuth scope predicates are evaluated before OAuth authorization for authorization-code connectors. Any `cfg` values they read must already exist before OAuth begins, usually from `setupFlow.preconnect` steps. Values collected in `setupFlow.configure` happen after OAuth and are too late to affect the initial authorization URL.
 
 For client-credentials connectors, scope predicates are evaluated before the token request. Any `cfg` values they read must be collected before that request is made.
 
@@ -121,7 +121,7 @@ Probes support `if.javascript` to decide whether the probe is enabled for a conn
 probes:
   - id: drive-health
     period: 1m
-    proxy_http:
+    proxyHttp:
       method: GET
       url: https://www.googleapis.com/drive/v3/about
 
@@ -129,7 +129,7 @@ probes:
     period: 30s
     if:
       javascript: cfg.has_calendar === true
-    proxy_http:
+    proxyHttp:
       method: GET
       url: https://www.googleapis.com/calendar/v3/users/me/calendarList
 ```

@@ -4,10 +4,10 @@ title: Connector Lifecycle Operations
 
 AuthProxy exposes connector-wide lifecycle operations for administrative cleanup:
 
-- `POST /connectors/{id}/_disconnect_all`
+- `POST /connectors/{id}/_disconnectAll`
 - `POST /connectors/{id}/_archive`
 
-Both endpoints start go-workflows-backed background work and return a `task_id` that can be polled with `GET /tasks/{task_id}`. They run on the normal worker service, share the application database through the workflow backend, and use the same task polling contract as other long-running work.
+Both endpoints start go-workflows-backed background work and return a `taskId` that can be polled with `GET /tasks/{taskId}`. They run on the normal worker service, share the application database through the workflow backend, and use the same task polling contract as other long-running work.
 
 Admin lists display the connector name, but lifecycle URLs continue to use the
 immutable connector ID. Renaming a connector does not change an in-flight task,
@@ -27,11 +27,11 @@ Both endpoints accept an optional JSON body:
 
 ```json
 {
-  "timeout_seconds": 600
+  "timeoutSeconds": 600
 }
 ```
 
-`timeout_seconds` must be greater than zero. If omitted, AuthProxy uses the default connector lifecycle timeout of 600 seconds.
+`timeoutSeconds` must be greater than zero. If omitted, AuthProxy uses the default connector lifecycle timeout of 600 seconds.
 
 The caller needs `connectors:disconnect_all` permission for disconnect-all and `connectors:archive` permission for archive, scoped to the connector namespace and id.
 
@@ -41,15 +41,15 @@ The start response contains a secure task token:
 
 ```json
 {
-  "task_id": "encrypted-task-info",
-  "connector_id": "cxr_..."
+  "taskId": "encrypted-task-info",
+  "connectorId": "cxr_..."
 }
 ```
 
 Poll it with:
 
 ```http
-GET /tasks/{task_id}
+GET /tasks/{taskId}
 ```
 
 Workflow-backed connector lifecycle tasks usually report these states:
@@ -75,8 +75,8 @@ Archive uses the same disconnect-all workflow as a child. Its requested timeout 
 
 Connector lifecycle workflow instance ids are deterministic:
 
-- `core.connector.disconnect_all.v1:<connector_id>`
-- `core.connector.archive.v1:<connector_id>`
+- `core.connector.disconnect_all.v1:<connectorId>`
+- `core.connector.archive.v1:<connectorId>`
 
 This prevents duplicate disconnect-all or archive workflows from running for the same connector at the same time. After a workflow completes, AuthProxy can start a new execution with the same workflow instance id, which allows a connector to be disconnected again after new connections are created.
 
