@@ -12,7 +12,7 @@ telemetry:
   exporter:
     protocol: grpc
     endpoint:
-      env_var: AUTHPROXY_OTEL_ENDPOINT
+      envVar: AUTHPROXY_OTEL_ENDPOINT
       default: ""
     insecure: true
 ```
@@ -54,7 +54,7 @@ Toggling a signal off while telemetry is enabled keeps the corresponding provide
 | Asynq handlers + scheduler | `asynq.task {type}` and `asynq.scheduler.sync` | consumer / internal | `messaging.system=asynq`, `messaging.destination.name`, `messaging.message.id`, `authproxy.asynq.task_type`, `authproxy.asynq.retry_count`, `authproxy.asynq.max_retry` |
 | OAuth2 lifecycle | `oauth2.token_exchange`, `oauth2.refresh`, `oauth2.revoke` | client | `authproxy.connector_id`, `authproxy.oauth2.operation` |
 
-Health and readiness endpoints (`/ping`, `/healthz`) are excluded from spans and metrics by default — configurable via `telemetry.http.excluded_paths`. **Token contents, refresh payloads, and other secrets are never captured as span attributes.**
+Health and readiness endpoints (`/ping`, `/healthz`) are excluded from spans and metrics by default — configurable via `telemetry.http.excludedPaths`. **Token contents, refresh payloads, and other secrets are never captured as span attributes.**
 
 ## Metrics catalog
 
@@ -90,7 +90,7 @@ Standard `db.client.connections.*` and per-command histograms emitted by the red
 - `authproxy.oauth2.token_exchange.attempts.total{result}` — counter.
 - `authproxy.oauth2.token_exchange.failures.total{reason}` — counter.
 
-OAuth2 counters also receive any **allowlisted** connection-label dimensions from `telemetry.proxy.metric_dimension_labels` (e.g. `type=google_drive`, `env=prod`). The raw `authproxy.connector_id` is intentionally **not** emitted as a metric attribute — see the [label projection](#label-projection) section.
+OAuth2 counters also receive any **allowlisted** connection-label dimensions from `telemetry.proxy.metricDimensionLabels` (e.g. `type=google_drive`, `env=prod`). The raw `authproxy.connector_id` is intentionally **not** emitted as a metric attribute — see the [label projection](#label-projection) section.
 
 ## Configuration reference
 
@@ -102,17 +102,17 @@ telemetry:
 
   exporter:
     protocol: grpc                    # grpc (default) | http/protobuf
-    endpoint:                         # StringValue — supports env_var fallthrough
-      env_var: AUTHPROXY_OTEL_ENDPOINT
+    endpoint:                         # StringValue — supports envVar fallthrough
+      envVar: AUTHPROXY_OTEL_ENDPOINT
       default: ""                     # empty default → endpoint-gated soft-disable
-    headers:                          # map<string, StringValue> — env_var fallthrough on each value
+    headers:                          # map<string, StringValue> — envVar fallthrough on each value
       authorization:
-        env_var: OTEL_HEADER_AUTH
+        envVar: OTEL_HEADER_AUTH
         default: ""
     insecure: true                    # disable TLS on the OTLP connection
 
   resource:
-    service_name_prefix: authproxy    # prepended to service id (e.g. authproxy-api). Default "authproxy".
+    serviceNamePrefix: authproxy    # prepended to service id (e.g. authproxy-api). Default "authproxy".
     attributes:                       # static key/value resource attrs
       deployment.environment: prod
 
@@ -125,35 +125,35 @@ telemetry:
     logs: true
 
   http:
-    excluded_paths:                   # paths excluded from inbound HTTP spans + metrics
+    excludedPaths:                   # paths excluded from inbound HTTP spans + metrics
       - /ping
       - /healthz
 
   proxy:
-    span_attribute_labels:            # connection-label keys to project as proxy span attributes
+    spanAttributeLabels:            # connection-label keys to project as proxy span attributes
       - type
       - env
       - tenant_id
-    metric_dimension_labels:          # connection-label keys to project as metric attributes (proxy + oauth2)
+    metricDimensionLabels:          # connection-label keys to project as metric attributes (proxy + oauth2)
       - type
       - env
-    metric_dimension_value_cap: 50    # max distinct values per metric dim key; overflow collapses to "other"
+    metricDimensionValueCap: 50    # max distinct values per metric dim key; overflow collapses to "other"
 
   propagation:
-    inject_outbound_default: false    # global default for W3C traceparent injection on outbound calls
+    injectOutboundDefault: false    # global default for W3C traceparent injection on outbound calls
 ```
 
 Per-connector overrides for trace context propagation live on the connector definition:
 
 ```yaml
 connectors:
-  load_from_list:
+  loadFromList:
     - name: google-drive
       labels:
         type: google-drive
       auth: { type: OAuth2, ... }
       telemetry:
-        propagate_trace_context: true   # overrides telemetry.propagation.inject_outbound_default for this connector
+        propagateTraceContext: true   # overrides telemetry.propagation.injectOutboundDefault for this connector
 ```
 
 ## Standard `OTEL_*` env vars
@@ -164,7 +164,7 @@ The SDK honors the standard OpenTelemetry environment variables. YAML values tak
 - `OTEL_EXPORTER_OTLP_HEADERS` — comma-separated `k=v` pairs (overridden by `telemetry.exporter.headers`).
 - `OTEL_EXPORTER_OTLP_PROTOCOL` — `grpc` or `http/protobuf` (overridden by `telemetry.exporter.protocol`).
 - `OTEL_RESOURCE_ATTRIBUTES` — comma-separated `k=v` pairs merged into the resource alongside `telemetry.resource.attributes`.
-- `OTEL_SERVICE_NAME` — overrides `resource.service_name_prefix + "-" + service_id` if set.
+- `OTEL_SERVICE_NAME` — overrides `resource.serviceNamePrefix + "-" + serviceId` if set.
 - `OTEL_METRIC_EXPORT_INTERVAL` — milliseconds. The SDK default is 60s; set to a smaller value for interactive dev (the dev sample uses `5000`).
 - `OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE` — `cumulative` (default — required for Prometheus exporters) or `delta`. The dev sample sets `cumulative` explicitly.
 
@@ -186,14 +186,14 @@ These are merged into `httpf.RequestInfo.Labels` via `ForConnection` (copies con
 
 Two separate keys in the config control projection:
 
-- **`telemetry.proxy.span_attribute_labels`** — keys whose values become **span attributes** on outbound proxy spans. Cheap; can tolerate higher cardinality.
-- **`telemetry.proxy.metric_dimension_labels`** — keys whose values become **metric dimensions** on outbound proxy metrics (also applied to OAuth2 lifecycle counters). Strictly bounded — every new value adds to the active series count in Prometheus.
+- **`telemetry.proxy.spanAttributeLabels`** — keys whose values become **span attributes** on outbound proxy spans. Cheap; can tolerate higher cardinality.
+- **`telemetry.proxy.metricDimensionLabels`** — keys whose values become **metric dimensions** on outbound proxy metrics (also applied to OAuth2 lifecycle counters). Strictly bounded — every new value adds to the active series count in Prometheus.
 
-A key in `span_attribute_labels` but not `metric_dimension_labels` shows up only on spans. Keys missing from both are dropped entirely. Keys not present in the effective set produce no attribute — they are absent, not empty strings.
+A key in `spanAttributeLabels` but not `metricDimensionLabels` shows up only on spans. Keys missing from both are dropped entirely. Keys not present in the effective set produce no attribute — they are absent, not empty strings.
 
 ### Value cap
 
-`telemetry.proxy.metric_dimension_value_cap` (off by default — set to a positive integer to enable) caps the number of **distinct values** per metric-dimension key. Once a key has admitted that many values, every new distinct value collapses to the literal string `"other"`. Previously-admitted values keep passing through verbatim. The cap is per-process and per-key — a multi-replica deployment caps independently on each replica.
+`telemetry.proxy.metricDimensionValueCap` (off by default — set to a positive integer to enable) caps the number of **distinct values** per metric-dimension key. Once a key has admitted that many values, every new distinct value collapses to the literal string `"other"`. Previously-admitted values keep passing through verbatim. The cap is per-process and per-key — a multi-replica deployment caps independently on each replica.
 
 This is the cardinality safety net for any allowlisted label whose value space might grow unboundedly (`tenant_id`, `customer_id`, etc.).
 
@@ -203,8 +203,8 @@ Outbound proxy requests **do not** inject W3C `traceparent` / `tracestate` by de
 
 Two knobs control this:
 
-- **Global default**: `telemetry.propagation.inject_outbound_default` (default `false`).
-- **Per-connector override**: `telemetry.propagate_trace_context` on the connector definition. Overrides the global default for outbound calls routed through that connector.
+- **Global default**: `telemetry.propagation.injectOutboundDefault` (default `false`).
+- **Per-connector override**: `telemetry.propagateTraceContext` on the connector definition. Overrides the global default for outbound calls routed through that connector.
 
 Inbound services accept incoming W3C headers via a parent-based sampler unconditionally — that's the normal OTel inbound contract and does not depend on this setting.
 
@@ -247,7 +247,7 @@ Each of the four services reports a distinct `service.name`:
 | `public` | `authproxy-public` |
 | `worker` | `authproxy-worker` |
 
-The prefix (`authproxy`) is configurable via `telemetry.resource.service_name_prefix`. Other resource attributes:
+The prefix (`authproxy`) is configurable via `telemetry.resource.serviceNamePrefix`. Other resource attributes:
 
 - `service.version` — from the build info (or empty in dev runs without an embedded version)
 - `service.instance.id` — random UUID per process start

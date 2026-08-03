@@ -70,7 +70,7 @@ sequenceDiagram
 
     User->>Host: Sign in and open integrations
     Host->>Host: Sign short-lived nonce JWT
-    Host-->>UI: Redirect with auth_token
+    Host-->>UI: Redirect with authToken
     UI->>AP: Exchange token for session
     AP-->>UI: Session established
 ```

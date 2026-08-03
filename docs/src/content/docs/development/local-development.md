@@ -63,14 +63,14 @@ development, the CLI signing proxy can stand in for that host.
 Create `~/.authproxy.yaml`:
 
 ```yaml
-admin_username: bobdole
-admin_private_key_path: /absolute/path/to/authproxy/dev_config/keys/admin/bobdole
+adminUsername: bobdole
+adminPrivateKeyPath: /absolute/path/to/authproxy/dev_config/keys/admin/bobdole
 server:
   api: http://localhost:8081
-  admin_api: https://localhost:8082
+  adminApi: https://localhost:8082
   auth: https://localhost:8080
   marketplace: http://localhost:5173
-  admin_ui: http://localhost:5174
+  adminUi: http://localhost:5174
 ```
 
 The corresponding development public key is already registered by

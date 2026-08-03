@@ -25,13 +25,13 @@ Content-Type: application/json
 List all connections in production for that tenant:
 
 ```http
-GET /api/v1/connections?label_selector=app.example.com/tenant-id=tenant-42,app.example.com/env=production
+GET /api/v1/connections?labelSelector=app.example.com/tenant-id=tenant-42,app.example.com/env=production
 ```
 
 Find every request log entry produced by that tenant:
 
 ```http
-GET /api/v1/metrics/request-events?label_selector=app.example.com/tenant-id=tenant-42
+GET /api/v1/metrics/request-events?labelSelector=app.example.com/tenant-id=tenant-42
 ```
 
 You did not have to write a separate "AuthProxy connection id → my tenant id" mapping table. The label travelled with the connection onto every request log entry automatically (see [Carry-forward](#carry-forward--how-labels-flow-through-the-hierarchy)).
@@ -180,7 +180,7 @@ the daily consistency checker.
 
 ## Per-request label snapshot
 
-When an application sends a request through the proxy, AuthProxy assembles a **label snapshot** for that request. This is what gets recorded on the request log entry and what label selectors evaluate against (e.g., the `label_selector` clause on a [rate limit](/operations/rate-limits/)).
+When an application sends a request through the proxy, AuthProxy assembles a **label snapshot** for that request. This is what gets recorded on the request log entry and what label selectors evaluate against (e.g., the `labelSelector` clause on a [rate limit](/operations/rate-limits/)).
 
 The snapshot is the union of:
 
@@ -196,7 +196,7 @@ may briefly remain at its pre-rename value while reconciliation runs.
 
 ## Label selectors
 
-Anywhere the API takes a `label_selector` query parameter, the syntax is Kubernetes-style:
+Anywhere the API takes a `labelSelector` query parameter, the syntax is Kubernetes-style:
 
 | Form | Matches |
 |---|---|

@@ -156,7 +156,7 @@ permissions. See [Application Metrics](/operations/app-metrics/).
 
 ### Keys and Storage
 
-- [ ] `system_auth.global_aes_key` uses durable, recoverable production key
+- [ ] `systemAuth.globalAesKey` uses durable, recoverable production key
   material; fake encryption, inline values, and ephemeral random keys are not
   used in production.
 - [ ] KMS/secret-manager identities have only the operations and keys they
