@@ -147,9 +147,9 @@ func TestErrorPages_RenderRenderOrRedirect(t *testing.T) {
 func TestErrorPages_UnmarshalJSON(t *testing.T) {
 	t.Run("with simple fields", func(t *testing.T) {
 		jsonData := `{
-			"not_found": "https://example.com/404",
+			"notFound": "https://example.com/404",
 			"unauthorized": "https://example.com/401",
-			"internal_error": "https://example.com/500"
+			"internalError": "https://example.com/500"
 		}`
 
 		var ep ErrorPages

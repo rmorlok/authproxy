@@ -1,7 +1,7 @@
 {{/*
 Render the AuthProxy config YAML from typed values, layered with the free-
 form `config` overlay. Sensitive fields reference env vars via the
-AuthProxy StringValue { env_var: NAME } pattern so passwords stay in
+AuthProxy StringValue { envVar: NAME } pattern so passwords stay in
 Secrets, not in this ConfigMap.
 */}}
 {{- $cfg := dict -}}
@@ -10,18 +10,18 @@ Secrets, not in this ConfigMap.
 {{- if .Values.services.public.enabled -}}
 {{- $public := dict "port" .Values.ports.public -}}
 {{- if .Values.services.public.baseUrl -}}
-{{-   $_ := set $public "base_url" (tpl .Values.services.public.baseUrl $) -}}
+{{-   $_ := set $public "baseUrl" (tpl .Values.services.public.baseUrl $) -}}
 {{- end -}}
 {{- if .Values.services.public.enableProxy -}}
-{{-   $_ := set $public "enable_proxy" true -}}
+{{-   $_ := set $public "enableProxy" true -}}
 {{- end -}}
 {{- if .Values.services.public.static.enabled -}}
 {{-   $static := dict -}}
 {{-   if .Values.services.public.static.mountAt -}}
-{{-     $_ := set $static "mount_at" .Values.services.public.static.mountAt -}}
+{{-     $_ := set $static "mountAt" .Values.services.public.static.mountAt -}}
 {{-   end -}}
 {{-   if .Values.services.public.static.serveFrom -}}
-{{-     $_ := set $static "serve_from" (tpl .Values.services.public.static.serveFrom $) -}}
+{{-     $_ := set $static "serveFrom" (tpl .Values.services.public.static.serveFrom $) -}}
 {{-   end -}}
 {{-   $_ := set $public "static" $static -}}
 {{- end -}}
@@ -35,41 +35,41 @@ Secrets, not in this ConfigMap.
 {{- if .Values.services.adminApi.ui.enabled -}}
 {{-   $ui := dict "enabled" true -}}
 {{-   if .Values.services.adminApi.ui.baseUrl -}}
-{{-     $_ := set $ui "base_url" (tpl .Values.services.adminApi.ui.baseUrl $) -}}
+{{-     $_ := set $ui "baseUrl" (tpl .Values.services.adminApi.ui.baseUrl $) -}}
 {{-   end -}}
 {{-   if .Values.services.adminApi.ui.initiateSessionUrl -}}
-{{-     $_ := set $ui "initiate_session_url" (tpl .Values.services.adminApi.ui.initiateSessionUrl $) -}}
+{{-     $_ := set $ui "initiateSessionUrl" (tpl .Values.services.adminApi.ui.initiateSessionUrl $) -}}
 {{-   end -}}
 {{-   $_ := set $adminApi "ui" $ui -}}
 {{- end -}}
 {{- if .Values.services.adminApi.static.enabled -}}
 {{-   $static := dict -}}
 {{-   if .Values.services.adminApi.static.mountAt -}}
-{{-     $_ := set $static "mount_at" .Values.services.adminApi.static.mountAt -}}
+{{-     $_ := set $static "mountAt" .Values.services.adminApi.static.mountAt -}}
 {{-   end -}}
 {{-   if .Values.services.adminApi.static.serveFrom -}}
-{{-     $_ := set $static "serve_from" (tpl .Values.services.adminApi.static.serveFrom $) -}}
+{{-     $_ := set $static "serveFrom" (tpl .Values.services.adminApi.static.serveFrom $) -}}
 {{-   end -}}
 {{-   $_ := set $adminApi "static" $static -}}
 {{- end -}}
-{{- $_ := set $cfg "admin_api" $adminApi -}}
+{{- $_ := set $cfg "adminApi" $adminApi -}}
 {{- end -}}
 {{- if .Values.services.worker.enabled -}}
-{{- $worker := dict "health_check_port" .Values.ports.workerHealth -}}
+{{- $worker := dict "healthCheckPort" .Values.ports.workerHealth -}}
 {{- if .Values.worker.workflowPollers -}}
-{{-   $_ := set $worker "workflow_pollers" .Values.worker.workflowPollers -}}
+{{-   $_ := set $worker "workflowPollers" .Values.worker.workflowPollers -}}
 {{- end -}}
 {{- if .Values.worker.activityPollers -}}
-{{-   $_ := set $worker "activity_pollers" .Values.worker.activityPollers -}}
+{{-   $_ := set $worker "activityPollers" .Values.worker.activityPollers -}}
 {{- end -}}
 {{- if .Values.worker.maxParallelWorkflowTasks -}}
-{{-   $_ := set $worker "max_parallel_workflow_tasks" .Values.worker.maxParallelWorkflowTasks -}}
+{{-   $_ := set $worker "maxParallelWorkflowTasks" .Values.worker.maxParallelWorkflowTasks -}}
 {{- end -}}
 {{- if .Values.worker.maxParallelActivityTasks -}}
-{{-   $_ := set $worker "max_parallel_activity_tasks" .Values.worker.maxParallelActivityTasks -}}
+{{-   $_ := set $worker "maxParallelActivityTasks" .Values.worker.maxParallelActivityTasks -}}
 {{- end -}}
 {{- if .Values.worker.workflowHeartbeatInterval -}}
-{{-   $_ := set $worker "workflow_heartbeat_interval" .Values.worker.workflowHeartbeatInterval -}}
+{{-   $_ := set $worker "workflowHeartbeatInterval" .Values.worker.workflowHeartbeatInterval -}}
 {{- end -}}
 {{- $_ := set $cfg "worker" $worker -}}
 {{- end -}}
@@ -83,7 +83,7 @@ template syntax.
 */}}
 
 {{/* --- database --- */}}
-{{- $db := dict "provider" .Values.database.provider "auto_migrate" .Values.database.autoMigrate -}}
+{{- $db := dict "provider" .Values.database.provider "autoMigrate" .Values.database.autoMigrate -}}
 {{- if eq .Values.database.provider "postgres" -}}
 {{-   $_ := set $db "host" (tpl .Values.database.host $) -}}
 {{-   $_ := set $db "port" .Values.database.port -}}
@@ -91,7 +91,7 @@ template syntax.
 {{-   $_ := set $db "database" (tpl .Values.database.database $) -}}
 {{-   $_ := set $db "sslmode" .Values.database.sslmode -}}
 {{-   if .Values.database.existingSecret -}}
-{{-     $_ := set $db "password" (dict "env_var" "AUTHPROXY_DB_PASSWORD") -}}
+{{-     $_ := set $db "password" (dict "envVar" "AUTHPROXY_DB_PASSWORD") -}}
 {{-   end -}}
 {{- else if eq .Values.database.provider "sqlite" -}}
 {{-   $_ := set $db "path" .Values.database.path -}}
@@ -108,24 +108,24 @@ template syntax.
 {{-     $_ := set $redis "username" (tpl .Values.redis.username $) -}}
 {{-   end -}}
 {{-   if .Values.redis.existingSecret -}}
-{{-     $_ := set $redis "password" (dict "env_var" "AUTHPROXY_REDIS_PASSWORD") -}}
+{{-     $_ := set $redis "password" (dict "envVar" "AUTHPROXY_REDIS_PASSWORD") -}}
 {{-   end -}}
 {{- end -}}
 {{- $_ := set $cfg "redis" $redis -}}
 
 {{/* --- host application (required by validator) --- */}}
 {{- if .Values.hostApplication.initiateSessionUrl -}}
-{{-   $_ := set $cfg "host_application" (dict "initiate_session_url" (tpl .Values.hostApplication.initiateSessionUrl $)) -}}
+{{-   $_ := set $cfg "hostApplication" (dict "initiateSessionUrl" (tpl .Values.hostApplication.initiateSessionUrl $)) -}}
 {{- end -}}
 
 {{/* --- connectors block (required by validator; empty list is acceptable) --- */}}
-{{- $connectors := dict "auto_migrate" .Values.connectors.autoMigrate "load_from_list" .Values.connectors.loadFromList -}}
+{{- $connectors := dict "autoMigrate" .Values.connectors.autoMigrate "loadFromList" .Values.connectors.loadFromList -}}
 {{- $_ := set $cfg "connectors" $connectors -}}
 
-{{/* --- app_metrics (server unconditionally wires up the metrics store) --- */}}
+{{/* --- appMetrics (server unconditionally wires up the metrics store) --- */}}
 {{/*
-  Server-side this used to be `http_logging`; renamed to `app_metrics`
-  with the request-event capture moved under a `request_events`
+  Server-side this used to be `httpLogging`; renamed to `appMetrics`
+  with the request-event capture moved under a `requestEvents`
   sub-block. See internal/schema/config/app_metrics.go.
 */}}
 {{- $metricsDb := dict -}}
@@ -142,7 +142,7 @@ template syntax.
 {{- else if eq $blobProvider "memory" -}}
 {{-   $blobStorage = dict "provider" "memory" -}}
 {{- else if .Values.s3.enabled -}}
-{{-   $s3 := dict "provider" "s3" "bucket" .Values.s3.bucket "force_path_style" .Values.s3.forcePathStyle -}}
+{{-   $s3 := dict "provider" "s3" "bucket" .Values.s3.bucket "forcePathStyle" .Values.s3.forcePathStyle -}}
 {{-   if .Values.s3.region -}}{{- $_ := set $s3 "region" .Values.s3.region -}}{{- end -}}
 {{-   if .Values.s3.endpoint -}}{{- $_ := set $s3 "endpoint" .Values.s3.endpoint -}}{{- end -}}
 {{-   if .Values.s3.prefix -}}{{- $_ := set $s3 "prefix" .Values.s3.prefix -}}{{- end -}}
@@ -152,31 +152,31 @@ template syntax.
 {{- end -}}
 
 {{- $appMetrics := dict
-      "auto_migrate" .Values.appMetrics.autoMigrate
+      "autoMigrate" .Values.appMetrics.autoMigrate
       "database" $metricsDb
-      "request_events" (dict
-        "full_request_recording" .Values.appMetrics.fullRequestRecording) -}}
+      "requestEvents" (dict
+        "fullRequestRecording" .Values.appMetrics.fullRequestRecording) -}}
 {{- if $blobStorage -}}
-{{-   $_ := set $appMetrics "blob_storage" $blobStorage -}}
+{{-   $_ := set $appMetrics "blobStorage" $blobStorage -}}
 {{- end -}}
-{{- $_ := set $cfg "app_metrics" $appMetrics -}}
+{{- $_ := set $cfg "appMetrics" $appMetrics -}}
 
 {{/* --- crypto material file paths --- */}}
 {{- if .Values.jwt.existingSecret -}}
-{{-   $sysAuth := dict "jwt_signing_key" (dict
-        "public_key" (dict "path" (printf "%s/%s" .Values.jwt.mountPath .Values.jwt.publicKeyFile))
-        "private_key" (dict "path" (printf "%s/%s" .Values.jwt.mountPath .Values.jwt.privateKeyFile))) -}}
+{{-   $sysAuth := dict "jwtSigningKey" (dict
+        "publicKey" (dict "path" (printf "%s/%s" .Values.jwt.mountPath .Values.jwt.publicKeyFile))
+        "privateKey" (dict "path" (printf "%s/%s" .Values.jwt.mountPath .Values.jwt.privateKeyFile))) -}}
 {{-   if .Values.encryptionKeys.existingSecret -}}
-{{-     $_ := set $sysAuth "global_aes_key" (dict "path" (printf "%s/%s" .Values.encryptionKeys.mountPath .Values.encryptionKeys.globalAesKeyFile)) -}}
+{{-     $_ := set $sysAuth "globalAesKey" (dict "path" (printf "%s/%s" .Values.encryptionKeys.mountPath .Values.encryptionKeys.globalAesKeyFile)) -}}
 {{-   end -}}
 {{-   if .Values.actors.existingSecret -}}
-{{-     $actors := dict "keys_path" .Values.actors.mountPath -}}
+{{-     $actors := dict "keysPath" .Values.actors.mountPath -}}
 {{-     if .Values.actors.permissions -}}
 {{-       $_ := set $actors "permissions" .Values.actors.permissions -}}
 {{-     end -}}
 {{-     $_ := set $sysAuth "actors" $actors -}}
 {{-   end -}}
-{{-   $_ := set $cfg "system_auth" $sysAuth -}}
+{{-   $_ := set $cfg "systemAuth" $sysAuth -}}
 {{- end -}}
 
 {{/* --- overlay: merge user-provided `config` over the rendered defaults --- */}}

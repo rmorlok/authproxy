@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/rmorlok/authproxy/internal/util"
 	"gopkg.in/yaml.v3"
 )
 
@@ -63,13 +64,13 @@ fieldLoop:
 		case "base64":
 			keyData = &StringValueBase64{}
 			break fieldLoop
-		case "env_var":
+		case "envVar":
 			keyData = &StringValueEnvVar{}
 			break fieldLoop
-		case "env_var_base64":
+		case "envVarBase64":
 			keyData = &StringValueEnvVarBase64{}
 			break fieldLoop
-		case "template_env_vars":
+		case "templateEnvVars":
 			keyData = &StringValueTemplatedEnvVars{}
 			break fieldLoop
 		case "path":
@@ -79,10 +80,10 @@ fieldLoop:
 	}
 
 	if keyData == nil {
-		return fmt.Errorf("invalid structure for value type; does not match value, base64, env_var, env_var_base64, template_env_vars, path")
+		return fmt.Errorf("invalid structure for value type; does not match value, base64, envVar, envVarBase64, templateEnvVars, path")
 	}
 
-	if err := value.Decode(keyData); err != nil {
+	if err := util.DecodeYAMLNodeStrict(value, keyData); err != nil {
 		return err
 	}
 

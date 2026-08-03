@@ -19,7 +19,7 @@ import (
 )
 
 type TlsConfigSelfSignedAutogen struct {
-	AutoGenPath string `json:"auto_gen_path" yaml:"auto_gen_path"`
+	AutoGenPath string `json:"autoGenPath" yaml:"autoGenPath"`
 }
 
 const (

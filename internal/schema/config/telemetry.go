@@ -89,7 +89,7 @@ type TelemetryResource struct {
 	// ServiceNamePrefix is prepended (with a hyphen) to the service id to
 	// produce the OTel service.name. Defaults to "authproxy" so services
 	// appear as "authproxy-api", "authproxy-admin-api", etc.
-	ServiceNamePrefix *string `json:"service_name_prefix,omitempty" yaml:"service_name_prefix,omitempty"`
+	ServiceNamePrefix *string `json:"serviceNamePrefix,omitempty" yaml:"serviceNamePrefix,omitempty"`
 
 	// Attributes are user-supplied resource attributes merged into the
 	// resource. OTEL_RESOURCE_ATTRIBUTES env var entries are merged in
@@ -117,7 +117,7 @@ type TelemetryHTTP struct {
 	// ExcludedPaths is the list of HTTP request paths to exclude from
 	// spans and metrics. Defaults to /ping and /healthz when nil. An empty
 	// slice (explicitly configured) disables exclusion entirely.
-	ExcludedPaths []string `json:"excluded_paths,omitempty" yaml:"excluded_paths,omitempty"`
+	ExcludedPaths []string `json:"excludedPaths,omitempty" yaml:"excludedPaths,omitempty"`
 }
 
 // TelemetryProxy configures label projection for outbound proxy telemetry.
@@ -128,16 +128,16 @@ type TelemetryHTTP struct {
 type TelemetryProxy struct {
 	// SpanAttributeLabels are label keys whose values are projected as
 	// attributes on the proxy span. Cheap; can tolerate higher cardinality.
-	SpanAttributeLabels []string `json:"span_attribute_labels,omitempty" yaml:"span_attribute_labels,omitempty"`
+	SpanAttributeLabels []string `json:"spanAttributeLabels,omitempty" yaml:"spanAttributeLabels,omitempty"`
 
 	// MetricDimensionLabels are label keys whose values become metric
 	// dimensions on proxy metrics. Strictly bounded to control cardinality.
-	MetricDimensionLabels []string `json:"metric_dimension_labels,omitempty" yaml:"metric_dimension_labels,omitempty"`
+	MetricDimensionLabels []string `json:"metricDimensionLabels,omitempty" yaml:"metricDimensionLabels,omitempty"`
 
 	// MetricDimensionValueCap, when > 0, caps the number of distinct values
 	// per metric dimension key. Values beyond the cap collapse to "other"
 	// to bound cardinality. Off by default.
-	MetricDimensionValueCap *int `json:"metric_dimension_value_cap,omitempty" yaml:"metric_dimension_value_cap,omitempty"`
+	MetricDimensionValueCap *int `json:"metricDimensionValueCap,omitempty" yaml:"metricDimensionValueCap,omitempty"`
 }
 
 // TelemetryPropagation configures outbound trace context injection.
@@ -145,7 +145,7 @@ type TelemetryPropagation struct {
 	// InjectOutboundDefault is the global default for injecting W3C
 	// traceparent/tracestate on outbound proxy requests. Defaults to false
 	// (opt-in). Per-connector settings override this default.
-	InjectOutboundDefault *bool `json:"inject_outbound_default,omitempty" yaml:"inject_outbound_default,omitempty"`
+	InjectOutboundDefault *bool `json:"injectOutboundDefault,omitempty" yaml:"injectOutboundDefault,omitempty"`
 }
 
 // IsEnabled reports whether the telemetry block is set and Enabled is true.

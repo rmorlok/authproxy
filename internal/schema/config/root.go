@@ -9,24 +9,24 @@ import (
 )
 
 type Root struct {
-	AdminApi        ServiceAdminApi `json:"admin_api" yaml:"admin_api"`
+	AdminApi        ServiceAdminApi `json:"adminApi" yaml:"adminApi"`
 	Api             ServiceApi      `json:"api" yaml:"api"`
 	Public          ServicePublic   `json:"public" yaml:"public"`
 	Worker          ServiceWorker   `json:"worker" yaml:"worker"`
 	Marketplace     *Marketplace    `json:"marketplace,omitempty" yaml:"marketplace,omitempty"`
-	HostApplication HostApplication `json:"host_application" yaml:"host_application"`
-	SystemAuth      SystemAuth      `json:"system_auth" yaml:"system_auth"`
+	HostApplication HostApplication `json:"hostApplication" yaml:"hostApplication"`
+	SystemAuth      SystemAuth      `json:"systemAuth" yaml:"systemAuth"`
 	Database        *Database       `json:"database" yaml:"database"`
 	Logging         *LoggingConfig  `json:"logging,omitempty" yaml:"logging,omitempty"`
 	Redis           *Redis          `json:"redis" yaml:"redis"`
 	Oauth           OAuth           `json:"oauth" yaml:"oauth"`
-	ErrorPages      ErrorPages      `json:"error_pages,omitempty" yaml:"error_pages,omitempty"`
+	ErrorPages      ErrorPages      `json:"errorPages,omitempty" yaml:"errorPages,omitempty"`
 	Connectors      *Connectors     `json:"connectors" yaml:"connectors"`
-	AppMetrics      *AppMetrics     `json:"app_metrics,omitempty" yaml:"app_metrics,omitempty"`
+	AppMetrics      *AppMetrics     `json:"appMetrics,omitempty" yaml:"appMetrics,omitempty"`
 	Connections     *Connections    `json:"connections,omitempty" yaml:"connections,omitempty"`
 	Tasks           *Tasks          `json:"tasks,omitempty" yaml:"tasks,omitempty"`
 	Telemetry       *Telemetry      `json:"telemetry,omitempty" yaml:"telemetry,omitempty"`
-	DevSettings     *DevSettings    `json:"dev_settings,omitempty" yaml:"dev_settings,omitempty"`
+	DevSettings     *DevSettings    `json:"devSettings,omitempty" yaml:"devSettings,omitempty"`
 }
 
 func (r *Root) GetRootLogger() *slog.Logger {

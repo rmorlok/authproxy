@@ -18,9 +18,9 @@ const (
 )
 
 type ErrorPages struct {
-	NotFound      string       `json:"not_found,omitempty" yaml:"not_found,omitempty"`
+	NotFound      string       `json:"notFound,omitempty" yaml:"notFound,omitempty"`
 	Unauthorized  string       `json:"unauthorized,omitempty" yaml:"unauthorized,omitempty"`
-	InternalError string       `json:"internal_error,omitempty" yaml:"internal_error,omitempty"`
+	InternalError string       `json:"internalError,omitempty" yaml:"internalError,omitempty"`
 	Template      *StringValue `json:"template,omitempty" yaml:"template,omitempty"`
 }
 

@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/rmorlok/authproxy/internal/apjs"
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	"github.com/rmorlok/authproxy/internal/util"
 	"gopkg.in/yaml.v3"
 )
 
@@ -155,7 +156,7 @@ func (r *ScopeRequired) UnmarshalJSON(data []byte) error {
 	}
 
 	var predicate common.Predicate
-	if err := json.Unmarshal(data, &predicate); err == nil {
+	if err := util.DecodeJSONStrict(data, &predicate); err == nil {
 		r.Bool = nil
 		r.Predicate = &predicate
 		return nil
@@ -187,7 +188,7 @@ func (r *ScopeRequired) UnmarshalYAML(value *yaml.Node) error {
 	}
 
 	var predicate common.Predicate
-	if err := value.Decode(&predicate); err == nil {
+	if err := util.DecodeYAMLNodeStrict(value, &predicate); err == nil {
 		r.Bool = nil
 		r.Predicate = &predicate
 		return nil

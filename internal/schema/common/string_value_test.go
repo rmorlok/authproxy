@@ -167,7 +167,7 @@ base64: ywAAAAAAQABAAACAUwAOw==
 						Template: "https://{{HOST}}.example.com/api",
 					},
 					data: `
-template_env_vars: https://{{HOST}}.example.com/api
+templateEnvVars: https://{{HOST}}.example.com/api
 `,
 				},
 				{
@@ -177,7 +177,7 @@ template_env_vars: https://{{HOST}}.example.com/api
 						Default:  util.ToPtr("https://default.example.com/api"),
 					},
 					data: `
-template_env_vars: https://{{HOST}}.example.com/api
+templateEnvVars: https://{{HOST}}.example.com/api
 default: https://default.example.com/api
 `,
 				},
@@ -353,7 +353,7 @@ base64: iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/wcAAwAB/1J8
 					expected: &StringValueTemplatedEnvVars{
 						Template: "https://{{HOST}}.example.com/api",
 					},
-					data: `{"template_env_vars":"https://{{HOST}}.example.com/api"}`,
+					data: `{"templateEnvVars":"https://{{HOST}}.example.com/api"}`,
 				},
 				{
 					name: "templated env vars - default",
@@ -361,7 +361,7 @@ base64: iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/wcAAwAB/1J8
 						Template: "https://{{HOST}}.example.com/api",
 						Default:  util.ToPtr("https://default.example.com/api"),
 					},
-					data: `{"template_env_vars":"https://{{HOST}}.example.com/api","default":"https://default.example.com/api"}`,
+					data: `{"templateEnvVars":"https://{{HOST}}.example.com/api","default":"https://default.example.com/api"}`,
 				},
 			}
 

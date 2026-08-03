@@ -10,7 +10,7 @@ import (
 
 func TestKeyDataRandomBytesJSONRoundTrip(t *testing.T) {
 	var kd KeyData
-	require.NoError(t, json.Unmarshal([]byte(`{"num_bytes":32}`), &kd))
+	require.NoError(t, json.Unmarshal([]byte(`{"numBytes":32}`), &kd))
 
 	randomBytes, ok := kd.InnerVal.(*KeyDataRandomBytes)
 	require.True(t, ok)
@@ -29,7 +29,7 @@ func TestKeyDataRandomBytesJSONRoundTrip(t *testing.T) {
 
 func TestKeyDataRandomBytesYAMLAcceptsNumBytes(t *testing.T) {
 	var kd KeyData
-	require.NoError(t, yaml.Unmarshal([]byte("num_bytes: 32\n"), &kd))
+	require.NoError(t, yaml.Unmarshal([]byte("numBytes: 32\n"), &kd))
 
 	randomBytes, ok := kd.InnerVal.(*KeyDataRandomBytes)
 	require.True(t, ok)

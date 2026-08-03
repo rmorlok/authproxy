@@ -1,8 +1,8 @@
 labels:
   type: migration-test
-display_name: Migration Test
+displayName: Migration Test
 logo:
-  public_url: https://example.com/logo.png
+  publicUrl: https://example.com/logo.png
 description: Tests connector version migration hooks
 auth:
   type: no-auth

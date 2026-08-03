@@ -18,7 +18,7 @@ const (
 type AppMetrics struct {
 	// AutoMigrate controls if the migration to build the indexes for app metrics happens automatically on startup.
 	// If this value is not specified in the config, it defaults to true.
-	AutoMigrate *bool `json:"auto_migrate,omitempty" yaml:"auto_migrate,omitempty"`
+	AutoMigrate *bool `json:"autoMigrate,omitempty" yaml:"autoMigrate,omitempty"`
 
 	// Database is the database provider for app metrics. This can be the same database as the main database but would
 	// typically be a data warehouse in production.
@@ -26,14 +26,14 @@ type AppMetrics struct {
 
 	// BlobStorage configures the blob storage backend used for storing full request/response logs.
 	// If not configured, full request-event logging will use an in-memory store (not suitable for production).
-	BlobStorage *BlobStorage `json:"blob_storage,omitempty" yaml:"blob_storage,omitempty"`
+	BlobStorage *BlobStorage `json:"blobStorage,omitempty" yaml:"blobStorage,omitempty"`
 
 	// ResourceSnapshotInterval is how often resource snapshot jobs should write metrics samples.
 	// If unset, defaults to 15 minutes.
-	ResourceSnapshotInterval *HumanDuration `json:"resource_snapshot_interval,omitempty" yaml:"resource_snapshot_interval,omitempty"`
+	ResourceSnapshotInterval *HumanDuration `json:"resourceSnapshotInterval,omitempty" yaml:"resourceSnapshotInterval,omitempty"`
 
 	// RequestEvents configures request-event capture into the app metrics store.
-	RequestEvents *AppMetricsRequestEvents `json:"request_events,omitempty" yaml:"request_events,omitempty"`
+	RequestEvents *AppMetricsRequestEvents `json:"requestEvents,omitempty" yaml:"requestEvents,omitempty"`
 }
 
 // AppMetricsRequestEvents are the settings related to capturing HTTP request events.
@@ -42,26 +42,26 @@ type AppMetricsRequestEvents struct {
 	Retention *HumanDuration `json:"retention" yaml:"retention"`
 
 	// MaxRequestSize is the max size of request that will be stored. Values over this will be truncated.
-	MaxRequestSize *HumanByteSize `json:"max_request_size,omitempty" yaml:"max_request_size,omitempty"`
+	MaxRequestSize *HumanByteSize `json:"maxRequestSize,omitempty" yaml:"maxRequestSize,omitempty"`
 
 	// MaxResponseSize is the max size of the response that will be stored. Values over this will be truncated.
-	MaxResponseSize *HumanByteSize `json:"max_response_size,omitempty" yaml:"max_response_size,omitempty"`
+	MaxResponseSize *HumanByteSize `json:"maxResponseSize,omitempty" yaml:"maxResponseSize,omitempty"`
 
 	// MaxResponseWait is the maximum amount of time to wait for a response before logging it. Defaults to 60 seconds.
-	MaxResponseWait *HumanDuration `json:"max_response_wait" yaml:"max_response_wait"`
+	MaxResponseWait *HumanDuration `json:"maxResponseWait" yaml:"maxResponseWait"`
 
 	// FullRequestRecording flags if the full body/headers be logged for requests. Defaults to never, or can be enabled
 	// with API calls to specific resources, or always on.
-	FullRequestRecording *FullRequestRecording `json:"full_request_recording,omitempty" yaml:"full_request_recording,omitempty"`
+	FullRequestRecording *FullRequestRecording `json:"fullRequestRecording,omitempty" yaml:"fullRequestRecording,omitempty"`
 
 	// FullRequestRetention is how long the full request events should be retained. If unset, defaults to 30 days.
-	FullRequestRetention *HumanDuration `json:"full_request_retention,omitempty" yaml:"full_request_retention,omitempty"`
+	FullRequestRetention *HumanDuration `json:"fullRequestRetention,omitempty" yaml:"fullRequestRetention,omitempty"`
 
 	// FlushInterval is how often buffered records are flushed the database. Defaults to 5s.
-	FlushInterval *HumanDuration `json:"flush_interval,omitempty" yaml:"flush_interval,omitempty"`
+	FlushInterval *HumanDuration `json:"flushInterval,omitempty" yaml:"flushInterval,omitempty"`
 
 	// FlushBatchSize is the number of records that triggers a flush. Defaults to 1000.
-	FlushBatchSize *int `json:"flush_batch_size,omitempty" yaml:"flush_batch_size,omitempty"`
+	FlushBatchSize *int `json:"flushBatchSize,omitempty" yaml:"flushBatchSize,omitempty"`
 }
 
 func (d *AppMetrics) Validate(vc *common.ValidationContext) error {

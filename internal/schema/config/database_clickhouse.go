@@ -21,13 +21,13 @@ type DatabaseClickhouse struct {
 	Provider                  DatabaseProvider `json:"provider" yaml:"provider"`
 	Addresses                 []string         `json:"addresses,omitempty" yaml:"addresses,omitempty"`
 	Address                   *StringValue     `json:"address,omitempty" yaml:"address,omitempty"`
-	AddressList               *StringValue     `json:"address_list,omitempty" yaml:"address_list,omitempty"`
+	AddressList               *StringValue     `json:"addressList,omitempty" yaml:"addressList,omitempty"`
 	Database                  *StringValue     `json:"database" yaml:"database"`
 	User                      *StringValue     `json:"user,omitempty" yaml:"user,omitempty"`
 	Password                  *StringValue     `json:"password,omitempty" yaml:"password,omitempty"`
 	Protocol                  *string          `json:"protocol,omitempty" yaml:"protocol,omitempty"`
-	AutoMigrate               bool             `json:"auto_migrate,omitempty" yaml:"auto_migrate,omitempty"`
-	AutoMigrationLockDuration *HumanDuration   `json:"auto_migration_lock_duration,omitempty" yaml:"auto_migration_lock_duration,omitempty"`
+	AutoMigrate               bool             `json:"autoMigrate,omitempty" yaml:"autoMigrate,omitempty"`
+	AutoMigrationLockDuration *HumanDuration   `json:"autoMigrationLockDuration,omitempty" yaml:"autoMigrationLockDuration,omitempty"`
 }
 
 func (d *DatabaseClickhouse) GetProvider() DatabaseProvider {

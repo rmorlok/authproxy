@@ -3,6 +3,8 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/rmorlok/authproxy/internal/util"
 )
 
 func (d *Database) MarshalJSON() ([]byte, error) {
@@ -37,7 +39,7 @@ func (d *Database) UnmarshalJSON(data []byte) error {
 		return fmt.Errorf("invalid structure for database; missing provider field")
 	}
 
-	if err := json.Unmarshal(data, t); err != nil {
+	if err := util.DecodeJSONStrict(data, t); err != nil {
 		return err
 	}
 

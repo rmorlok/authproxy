@@ -14,11 +14,11 @@ func TestAdminUsersList(t *testing.T) {
 			data := `
 - username: georgebush
   key:
-    public_key:
+    publicKey:
       value: some-key-value
 - username: bobdole
   key:
-    public_key:
+    publicKey:
       value: some-key-value
 `
 			adminUsers, err := UnmarshallYamlAdminUsersListString(data)

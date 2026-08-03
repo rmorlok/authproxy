@@ -12,8 +12,8 @@ type LoggingConfigTint struct {
 	To         LoggingConfigOutput `json:"to,omitempty" yaml:"to,omitempty"`
 	Level      LoggingConfigLevel  `json:"level,omitempty" yaml:"level,omitempty"`
 	Source     bool                `json:"source,omitempty" yaml:"source,omitempty"`
-	NoColor    *bool               `json:"no_color,omitempty" yaml:"no_color,omitempty"`
-	TimeFormat *string             `json:"time_format,omitempty" yaml:"time_format,omitempty"`
+	NoColor    *bool               `json:"noColor,omitempty" yaml:"noColor,omitempty"`
+	TimeFormat *string             `json:"timeFormat,omitempty" yaml:"timeFormat,omitempty"`
 }
 
 func (l *LoggingConfigTint) GetType() LoggingConfigType {

@@ -71,7 +71,7 @@ func TestSchema(t *testing.T) {
 		{
 			name:  "valid permission with resource_ids",
 			valid: true,
-			data:  `{"test": {"namespace": "root.prod", "resources": ["connector"], "resource_ids": ["conn-1"], "verbs": ["read"]}}`,
+			data:  `{"test": {"namespace": "root.prod", "resources": ["connector"], "resourceIds": ["conn-1"], "verbs": ["read"]}}`,
 		},
 		{
 			name:  "valid permission with external_id namespace template",

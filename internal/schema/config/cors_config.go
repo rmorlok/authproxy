@@ -3,12 +3,12 @@ package config
 import "github.com/gin-contrib/cors"
 
 type CorsConfig struct {
-	AllowedOrigins   []string       `json:"allowed_origins,omitempty" yaml:"allowed_origins,omitempty"`
-	AllowedMethods   []string       `json:"allowed_methods,omitempty" yaml:"allowed_methods,omitempty"`
-	AllowedHeaders   []string       `json:"allowed_headers,omitempty" yaml:"allowed_headers,omitempty"`
-	ExposedHeaders   []string       `json:"exposed_headers,omitempty" yaml:"exposed_headers,omitempty"`
-	MaxAge           *HumanDuration `json:"max_age,omitempty" yaml:"max_age,omitempty"`
-	AllowCredentials *bool          `json:"allow_credentials,omitempty" yaml:"allow_credentials,omitempty"`
+	AllowedOrigins   []string       `json:"allowedOrigins,omitempty" yaml:"allowedOrigins,omitempty"`
+	AllowedMethods   []string       `json:"allowedMethods,omitempty" yaml:"allowedMethods,omitempty"`
+	AllowedHeaders   []string       `json:"allowedHeaders,omitempty" yaml:"allowedHeaders,omitempty"`
+	ExposedHeaders   []string       `json:"exposedHeaders,omitempty" yaml:"exposedHeaders,omitempty"`
+	MaxAge           *HumanDuration `json:"maxAge,omitempty" yaml:"maxAge,omitempty"`
+	AllowCredentials *bool          `json:"allowCredentials,omitempty" yaml:"allowCredentials,omitempty"`
 }
 
 func (c *CorsConfig) ToGinCorsConfig(defaults *cors.Config) *cors.Config {

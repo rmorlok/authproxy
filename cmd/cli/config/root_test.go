@@ -10,8 +10,8 @@ import (
 func TestUnmarshallYamlRoot(t *testing.T) {
 	t.Run("minimal config", func(t *testing.T) {
 		data := []byte(`
-admin_username: bobdole
-admin_private_key_path: /home/bob/.authproxy/admin.key
+adminUsername: bobdole
+adminPrivateKeyPath: /home/bob/.authproxy/admin.key
 server:
   api: http://localhost:8081
 `)
@@ -31,15 +31,15 @@ server:
 
 	t.Run("full config with all server urls", func(t *testing.T) {
 		data := []byte(`
-admin_username: bobdole
-admin_private_key_path: /home/bob/.authproxy/admin.key
-admin_shared_key_path: /home/bob/.authproxy/shared.key
+adminUsername: bobdole
+adminPrivateKeyPath: /home/bob/.authproxy/admin.key
+adminSharedKeyPath: /home/bob/.authproxy/shared.key
 server:
   api: http://localhost:8081
-  admin_api: http://localhost:8082
+  adminApi: http://localhost:8082
   auth: http://localhost:8080
   marketplace: http://localhost:5173
-  admin_ui: http://localhost:5174
+  adminUi: http://localhost:5174
 `)
 		root, err := UnmarshallYamlRoot(data)
 		require.NoError(t, err)
@@ -57,8 +57,8 @@ server:
 	t.Run("admin_username via env var", func(t *testing.T) {
 		t.Setenv("CLI_ROOT_TEST_USERNAME", "alice")
 		data := []byte(`
-admin_username:
-  env_var: CLI_ROOT_TEST_USERNAME
+adminUsername:
+  envVar: CLI_ROOT_TEST_USERNAME
 `)
 		root, err := UnmarshallYamlRoot(data)
 		require.NoError(t, err)
@@ -67,8 +67,8 @@ admin_username:
 
 	t.Run("admin_username via env var with default", func(t *testing.T) {
 		data := []byte(`
-admin_username:
-  env_var: CLI_ROOT_TEST_UNSET_USERNAME
+adminUsername:
+  envVar: CLI_ROOT_TEST_UNSET_USERNAME
   default: defaultuser
 `)
 		root, err := UnmarshallYamlRoot(data)
@@ -78,8 +78,8 @@ admin_username:
 
 	t.Run("admin_username via env var unset returns empty (not error)", func(t *testing.T) {
 		data := []byte(`
-admin_username:
-  env_var: CLI_ROOT_TEST_UNSET_USERNAME_NO_DEFAULT
+adminUsername:
+  envVar: CLI_ROOT_TEST_UNSET_USERNAME_NO_DEFAULT
 `)
 		root, err := UnmarshallYamlRoot(data)
 		require.NoError(t, err)
@@ -92,7 +92,7 @@ admin_username:
 		data := []byte(`
 server:
   api:
-    template_env_vars: http://{{CLI_ROOT_TEST_HOST}}:{{CLI_ROOT_TEST_PORT}}
+    templateEnvVars: http://{{CLI_ROOT_TEST_HOST}}:{{CLI_ROOT_TEST_PORT}}
 `)
 		root, err := UnmarshallYamlRoot(data)
 		require.NoError(t, err)
@@ -103,7 +103,7 @@ server:
 		data := []byte(`
 server:
   api:
-    template_env_vars: http://{{CLI_ROOT_TEST_MISSING}}:8081
+    templateEnvVars: http://{{CLI_ROOT_TEST_MISSING}}:8081
     default: http://localhost:8081
 `)
 		root, err := UnmarshallYamlRoot(data)
@@ -132,7 +132,7 @@ server:
 
 	t.Run("signing_proxy port direct value", func(t *testing.T) {
 		data := []byte(`
-signing_proxy:
+signingProxy:
   port: "8898"
 `)
 		root, err := UnmarshallYamlRoot(data)
@@ -145,9 +145,9 @@ signing_proxy:
 	t.Run("signing_proxy port via env var", func(t *testing.T) {
 		t.Setenv("CLI_ROOT_TEST_SIGNING_PROXY_PORT", "8908")
 		data := []byte(`
-signing_proxy:
+signingProxy:
   port:
-    env_var: CLI_ROOT_TEST_SIGNING_PROXY_PORT
+    envVar: CLI_ROOT_TEST_SIGNING_PROXY_PORT
     default: "8888"
 `)
 		root, err := UnmarshallYamlRoot(data)
@@ -159,7 +159,7 @@ signing_proxy:
 
 	t.Run("signing_proxy port invalid value returns error", func(t *testing.T) {
 		data := []byte(`
-signing_proxy:
+signingProxy:
   port: "not-a-number"
 `)
 		root, err := UnmarshallYamlRoot(data)
@@ -170,6 +170,11 @@ signing_proxy:
 
 	t.Run("malformed yaml returns error", func(t *testing.T) {
 		_, err := UnmarshallYamlRoot([]byte("admin_username: : :"))
+		require.Error(t, err)
+	})
+
+	t.Run("legacy snake case keys return an error", func(t *testing.T) {
+		_, err := UnmarshallYamlRoot([]byte("admin_username: bobdole\n"))
 		require.Error(t, err)
 	})
 }

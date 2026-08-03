@@ -1,8 +1,6 @@
-# $schema: ./schema.json
-
 labels:
   type: google-drive
-display_name: Google Drive
+displayName: Google Drive
 description: Invalid probe predicate example
 auth:
   type: no-auth

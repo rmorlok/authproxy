@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 
+	"github.com/rmorlok/authproxy/internal/util"
 	"gopkg.in/yaml.v3"
 )
 
@@ -52,7 +53,7 @@ func configuredActorsListUnmarshalYAML(value *yaml.Node) (ConfiguredActorsList, 
 	var results []*ConfiguredActor
 	for _, childNode := range value.Content {
 		var actor ConfiguredActor
-		if err := childNode.Decode(&actor); err != nil {
+		if err := util.DecodeYAMLNodeStrict(childNode, &actor); err != nil {
 			return nil, err
 		}
 		results = append(results, &actor)

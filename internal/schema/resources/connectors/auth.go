@@ -7,6 +7,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	"github.com/rmorlok/authproxy/internal/util"
 )
 
 type AuthType string
@@ -90,7 +91,7 @@ fieldLoop:
 		return fmt.Errorf("invalid auth type must be: %s, %s, %s", AuthTypeAPIKey, AuthTypeOAuth2, AuthTypeNoAuth)
 	}
 
-	if err := value.Decode(auth); err != nil {
+	if err := util.DecodeYAMLNodeStrict(value, auth); err != nil {
 		return err
 	}
 
@@ -132,7 +133,7 @@ func (a *Auth) UnmarshalJSON(data []byte) error {
 		return fmt.Errorf("invalid auth type '%s', possible types are: %s, %s, %s", m["type"], AuthTypeAPIKey, AuthTypeOAuth2, AuthTypeNoAuth)
 	}
 
-	if err := json.Unmarshal(data, ai); err != nil {
+	if err := util.DecodeJSONStrict(data, ai); err != nil {
 		return err
 	}
 

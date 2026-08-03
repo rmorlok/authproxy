@@ -25,7 +25,7 @@ type keyDataMockEntry struct {
 // version data lives in the global registry. This lets tests mutate the set of versions
 // between sync calls while child encryption keys can deserialize from encrypted data.
 type KeyDataMock struct {
-	MockID string `json:"mock_id" yaml:"mock_id"`
+	MockID string `json:"mockId" yaml:"mockId"`
 }
 
 // ResetKeyDataMockRegistry clears all entries from the global mock registry.

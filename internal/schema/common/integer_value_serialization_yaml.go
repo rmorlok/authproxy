@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/rmorlok/authproxy/internal/util"
 	"gopkg.in/yaml.v3"
 )
 
@@ -51,17 +52,17 @@ fieldLoop:
 		case "value":
 			keyData = &IntegerValueDirect{}
 			break fieldLoop
-		case "env_var":
+		case "envVar":
 			keyData = &IntegerValueEnvVar{}
 			break fieldLoop
 		}
 	}
 
 	if keyData == nil {
-		return fmt.Errorf("invalid structure for value type; does not match value, value attribute, env_var")
+		return fmt.Errorf("invalid structure for value type; does not match value, value attribute, envVar")
 	}
 
-	if err := value.Decode(keyData); err != nil {
+	if err := util.DecodeYAMLNodeStrict(value, keyData); err != nil {
 		return err
 	}
 

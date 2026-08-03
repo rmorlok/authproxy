@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 
+	"github.com/rmorlok/authproxy/internal/util"
 	"gopkg.in/yaml.v3"
 )
 
@@ -46,10 +47,10 @@ fieldLoop:
 		keyNode := value.Content[i]
 
 		switch keyNode.Value {
-		case "accept_tos":
+		case "acceptTos":
 			tlsConfig = &TlsConfigLetsEncrypt{}
 			break fieldLoop
-		case "auto_gen_path":
+		case "autoGenPath":
 			tlsConfig = &TlsConfigSelfSignedAutogen{}
 			break fieldLoop
 		case "cert":
@@ -62,7 +63,7 @@ fieldLoop:
 		return nil, fmt.Errorf("invalid structure for tls config type; does not match vals, lets encrypt, self-signed auto gen")
 	}
 
-	if err := value.Decode(tlsConfig); err != nil {
+	if err := util.DecodeYAMLNodeStrict(value, tlsConfig); err != nil {
 		return nil, err
 	}
 

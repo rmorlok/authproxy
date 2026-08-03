@@ -1,58 +1,58 @@
 public:
   port: 8080
-  base_url: https://marketplace.demo.authproxy.net
-  enable_proxy: true
+  baseUrl: https://marketplace.demo.authproxy.net
+  enableProxy: true
   static: {}
 api:
   port: 8081
-admin_api:
+adminApi:
   port: 8082
   ui:
     enabled: true
-    base_url: https://admin.demo.authproxy.net
-    initiate_session_url: https://demo.authproxy.net/
+    baseUrl: https://admin.demo.authproxy.net
+    initiateSessionUrl: https://demo.authproxy.net/
   static: {}
 worker:
-  health_check_port: 8083
+  healthCheckPort: 8083
 database:
   provider: postgres
-  auto_migrate: true
+  autoMigrate: true
   host: demo-postgresql
   port: 5432
   user: authproxy
   database: authproxy
   sslmode: disable
   password:
-    env_var: AUTHPROXY_DB_PASSWORD
+    envVar: AUTHPROXY_DB_PASSWORD
 redis:
   provider: redis
   address: demo-redis-master:6379
   db: 0
   password:
-    env_var: AUTHPROXY_REDIS_PASSWORD
-host_application:
-  initiate_session_url: https://demo.authproxy.net/
+    envVar: AUTHPROXY_REDIS_PASSWORD
+hostApplication:
+  initiateSessionUrl: https://demo.authproxy.net/
 connectors:
-  auto_migrate: true
-  load_from_list: []
-app_metrics:
-  auto_migrate: true
+  autoMigrate: true
+  loadFromList: []
+appMetrics:
+  autoMigrate: true
   database:
     provider: sqlite
     path: /tmp/authproxy-app-metrics.db
-  blob_storage:
+  blobStorage:
     provider: s3
     endpoint: http://demo-minio:9000
     region: us-east-1
     bucket: authproxy-request-logs
     credentials:
       type: access_key
-      access_key_id: authproxy
-      secret_access_key:
-        env_var: MINIO_ROOT_PASSWORD
-    force_path_style: true
-  request_events:
-    full_request_recording: never
+      accessKeyId: authproxy
+      secretAccessKey:
+        envVar: MINIO_ROOT_PASSWORD
+    forcePathStyle: true
+  requestEvents:
+    fullRequestRecording: never
 telemetry:
   enabled: true
   exporter:
@@ -60,7 +60,7 @@ telemetry:
     endpoint: http://demo-otel-lgtm:4317
     insecure: true
   resource:
-    service_name_prefix: authproxy-demo
+    serviceNamePrefix: authproxy-demo
     attributes:
       deployment.environment: demo
   sampling:
@@ -70,27 +70,27 @@ telemetry:
     metrics: true
     logs: true
   http:
-    excluded_paths:
+    excludedPaths:
       - /ping
       - /healthz
   proxy:
-    span_attribute_labels:
+    spanAttributeLabels:
       - type
       - demo
-    metric_dimension_labels:
+    metricDimensionLabels:
       - type
       - demo
-    metric_dimension_value_cap: 50
-system_auth:
-  jwt_signing_key:
-    public_key:
+    metricDimensionValueCap: 50
+systemAuth:
+  jwtSigningKey:
+    publicKey:
       path: /etc/authproxy/keys/jwt/system.pub
-    private_key:
+    privateKey:
       path: /etc/authproxy/keys/jwt/system
-  global_aes_key:
+  globalAesKey:
     path: /etc/authproxy/keys/encryption/global_aes.key
   actors:
-    keys_path: /etc/authproxy/keys/actors
+    keysPath: /etc/authproxy/keys/actors
     permissions:
       - namespace: root.**
         resources:

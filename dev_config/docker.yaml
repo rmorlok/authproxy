@@ -4,64 +4,64 @@
 public:
   port: 8080
   cookie:
-    same_site: none
+    sameSite: none
   tls:
-    auto_gen_path: /app/dev_config/keys/tls/
+    autoGenPath: /app/dev_config/keys/tls/
   static: {}  # Serve the embedded marketplace UI at the service root.
 
 api:
   port: 8081
 
-admin_api:
+adminApi:
   port: 8082
   ui:
     enabled: true
-    base_url: http://localhost:5174
-    initiate_session_url: http://host.docker.internal:8888/login-redirect
+    baseUrl: http://localhost:5174
+    initiateSessionUrl: http://host.docker.internal:8888/login-redirect
   cookie:
-    same_site: none
+    sameSite: none
   tls:
-    auto_gen_path: /app/dev_config/keys/tls/
+    autoGenPath: /app/dev_config/keys/tls/
   static: {}  # Serve the embedded admin UI at the service root.
 
 worker:
-  health_check_port:
-    env_var: HEALTH_CHECK_PORT
+  healthCheckPort:
+    envVar: HEALTH_CHECK_PORT
     default: 8083
-  cron_sync_interval: 1m
+  cronSyncInterval: 1m
 
 tasks:
-  default_retention: 24h
+  defaultRetention: 24h
 
-host_application:
-  initiate_session_url: http://host.docker.internal:8888/login-redirect
+hostApplication:
+  initiateSessionUrl: http://host.docker.internal:8888/login-redirect
 
 marketplace:
-  base_url: http://localhost:5173
+  baseUrl: http://localhost:5173
 
-system_auth:
-  jwt_signing_key:
-    public_key:
+systemAuth:
+  jwtSigningKey:
+    publicKey:
       path: /app/dev_config/keys/system.pub
-    private_key:
+    privateKey:
       path: /app/dev_config/keys/system
   actors:
-    keys_path: /app/dev_config/keys/admin
+    keysPath: /app/dev_config/keys/admin
     permissions:
       - namespace: root.**
         resources:
           - "*"
         verbs:
           - "*"
-  global_aes_key:
+  globalAesKey:
     path: /app/dev_config/keys/global_aes.key
 
-error_pages:
-  internal_error: https://example.com
+errorPages:
+  internalError: https://example.com
 
 database:
   provider: postgres
-  auto_migrate: true
+  autoMigrate: true
   host: postgres
   port: 5432
   user: postgres
@@ -73,28 +73,28 @@ logging:
   type: tint
   level: debug
 
-app_metrics:
-  resource_snapshot_interval: 15m
-  request_events:
-    full_request_recording: always
+appMetrics:
+  resourceSnapshotInterval: 15m
+  requestEvents:
+    fullRequestRecording: always
   database:
     provider: clickhouse
-    auto_migrate: true
+    autoMigrate: true
     user: authproxy
     password: authproxy
     addresses:
       - clickhouse:8123
     database: authproxy
-  blob_storage:
+  blobStorage:
     provider: s3
     endpoint: http://minio:9000
     region: us-east-1
     bucket: authproxy-request-logs
     credentials:
       type: access_key
-      access_key_id: minioadmin
-      secret_access_key: minioadmin
-    force_path_style: true
+      accessKeyId: minioadmin
+      secretAccessKey: minioadmin
+    forcePathStyle: true
     prefix: "rlf/"
 
 redis:
@@ -102,12 +102,12 @@ redis:
   address: redis:6379
 
 oauth:
-  round_trip_ttl: 60m
+  roundTripTtl: 60m
 
 connectors:
-  auto_migrate: true
-  auto_migration_lock_duration: 30s
-  load_from_list:
+  autoMigrate: true
+  autoMigrationLockDuration: 30s
+  loadFromList:
   #
   # Root
   #
@@ -115,28 +115,28 @@ connectors:
     labels:
       type: google-drive
       env: prod
-    display_name: Google Drive
+    displayName: Google Drive
     logo:
-      public_url: https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Google_Drive_icon_%282020%29.svg/1024px-Google_Drive_icon_%282020%29.svg.png?20221103153031
+      publicUrl: https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Google_Drive_icon_%282020%29.svg/1024px-Google_Drive_icon_%282020%29.svg.png?20221103153031
     highlight: |
       Have the agent track your work in Google Drive.
     description: |
       This integration connects Google Drive to Acme app.
     auth:
       type: OAuth2
-      client_id:
-        env_var: GOOGLE_CLIENT_ID
-      client_secret:
-        env_var: GOOGLE_CLIENT_SECRET
+      clientId:
+        envVar: GOOGLE_CLIENT_ID
+      clientSecret:
+        envVar: GOOGLE_CLIENT_SECRET
       authorization:
         endpoint: https://accounts.google.com/o/oauth2/v2/auth
-        query_overrides:
+        queryOverrides:
           prompt: consent
       token:
         endpoint: https://oauth2.googleapis.com/token
       revocation:
         endpoint: https://oauth2.googleapis.com/revoke
-        supported_tokens: refresh_token
+        supportedTokens: refresh_token
       scopes:
         - id: https://www.googleapis.com/auth/drive.readonly
           reason: |

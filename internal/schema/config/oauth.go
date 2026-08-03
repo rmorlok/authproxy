@@ -15,26 +15,26 @@ type OAuth struct {
 	// completes the redirect from the auth proxy public service. This value must be less than RoundTripTtl. This value
 	// should be as small as possible as the handoff from the API to the redirect involves a one-time-use auth token
 	// in the query parameters, which could be used to steal the session.
-	InitiateToRedirectTtl HumanDuration `json:"initiate_to_redirect_ttl" yaml:"initiate_to_redirect_ttl"`
+	InitiateToRedirectTtl HumanDuration `json:"initiateToRedirectTtl" yaml:"initiateToRedirectTtl"`
 
 	// RoundTripTtl is the time we allow for the user to go through the oauth flow, from the initiate call, all the
 	// way back to returning to AuthProxy to exchange the auth token for an access token. The purpose of this timeout
 	// is to reduce the time that a redirect link from auth proxy would be valid for the purposes of phishing other
 	// peoples credentials using this link as the basis.
-	RoundTripTtl HumanDuration `json:"round_trip_ttl" yaml:"round_trip_ttl"`
+	RoundTripTtl HumanDuration `json:"roundTripTtl" yaml:"roundTripTtl"`
 
 	// RefreshTokensInBackground controls if the system should proactively refresh tokens in the background. Default
 	// value is `true`. If set to false, tokens will not be refreshed until they are detected to be expired when used.
-	RefreshTokensInBackground *bool `json:"refresh_tokens_in_background" yaml:"refresh_tokens_in_background"`
+	RefreshTokensInBackground *bool `json:"refreshTokensInBackground" yaml:"refreshTokensInBackground"`
 
 	// RefreshTokensTimeBeforeExpiry is the default time prior to token expiry to refresh the tokens. This value can be
 	// overridden on a per-connector basis, but the granularity of this value is limited by the cron for running refresh.
 	// If not specified the default value is 10 minutes.
-	RefreshTokensTimeBeforeExpiry *HumanDuration `json:"refresh_tokens_time_before_expiry" yaml:"refresh_tokens_time_before_expiry"`
+	RefreshTokensTimeBeforeExpiry *HumanDuration `json:"refreshTokensTimeBeforeExpiry" yaml:"refreshTokensTimeBeforeExpiry"`
 
 	// RefreshTokensCronSchedule is the schedule at which the background job to refresh oauth tokens will run. If not
 	// specified, runs every 10 minutes.
-	RefreshTokensCronSchedule string `json:"refresh_tokens_cron_schedule" yaml:"refresh_tokens_cron_schedule"`
+	RefreshTokensCronSchedule string `json:"refreshTokensCronSchedule" yaml:"refreshTokensCronSchedule"`
 }
 
 func (o *OAuth) GetRoundTripTtlOrDefault() time.Duration {

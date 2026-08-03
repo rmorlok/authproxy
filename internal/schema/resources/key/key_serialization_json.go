@@ -3,6 +3,8 @@ package key
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/rmorlok/authproxy/internal/util"
 )
 
 func (k *Key) MarshalJSON() ([]byte, error) {
@@ -24,17 +26,17 @@ func (k *Key) UnmarshalJSON(data []byte) error {
 
 	var t KeyType
 
-	if _, ok := valueMap["public_key"]; ok {
+	if _, ok := valueMap["publicKey"]; ok {
 		t = &KeyPublicPrivate{}
-	} else if _, ok := valueMap["private_key"]; ok {
+	} else if _, ok := valueMap["privateKey"]; ok {
 		t = &KeyPublicPrivate{}
-	} else if _, ok := valueMap["shared_key"]; ok {
+	} else if _, ok := valueMap["sharedKey"]; ok {
 		t = &KeyShared{}
 	} else {
-		return fmt.Errorf("invalid structure for key type; does not match public_key, private_key or shared_key")
+		return fmt.Errorf("invalid structure for key type; does not match publicKey, privateKey or sharedKey")
 	}
 
-	if err := json.Unmarshal(data, t); err != nil {
+	if err := util.DecodeJSONStrict(data, t); err != nil {
 		return err
 	}
 

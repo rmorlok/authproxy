@@ -30,7 +30,7 @@ const (
 // providers that protect a locally-generated DEK instead of returning key bytes.
 type KeyVersionProtectedData struct {
 	Type        string            `json:"type" yaml:"type"`
-	WrappedData string            `json:"wrapped_data" yaml:"wrapped_data"`
+	WrappedData string            `json:"wrappedData" yaml:"wrappedData"`
 	Metadata    map[string]string `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 }
 

@@ -9,11 +9,11 @@ import (
 )
 
 type TlsConfigLetsEncrypt struct {
-	AcceptTos     bool           `json:"accept_tos" yaml:"accept_tos"`
+	AcceptTos     bool           `json:"acceptTos" yaml:"acceptTos"`
 	Email         string         `json:"email" yaml:"email"`
-	HostWhitelist []string       `json:"host_whitelist" yaml:"host_whitelist"`
-	RenewBefore   *HumanDuration `json:"renew_before,omitempty" yaml:"renew_before,omitempty"`
-	CacheDir      string         `json:"cache_dir" yaml:"cache_dir"`
+	HostWhitelist []string       `json:"hostWhitelist" yaml:"hostWhitelist"`
+	RenewBefore   *HumanDuration `json:"renewBefore,omitempty" yaml:"renewBefore,omitempty"`
+	CacheDir      string         `json:"cacheDir" yaml:"cacheDir"`
 }
 
 func (tle *TlsConfigLetsEncrypt) TlsConfig(ctx context.Context, s HttpServiceLike) (*tls.Config, error) {

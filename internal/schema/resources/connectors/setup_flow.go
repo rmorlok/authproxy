@@ -380,16 +380,16 @@ type SetupFlowStep struct {
 	// JsonSchema is the JSON Schema defining the form's data model and
 	// validation rules. Required for form-kind steps; must be absent for
 	// redirect-kind steps.
-	JsonSchema common.RawJSON `json:"json_schema,omitempty" yaml:"json_schema,omitempty"`
+	JsonSchema common.RawJSON `json:"jsonSchema,omitempty" yaml:"jsonSchema,omitempty"`
 
 	// UiSchema is the JSONForms UI Schema defining the form's layout and
 	// rendering. Optional for form steps; must be absent for redirect steps.
-	UiSchema common.RawJSON `json:"ui_schema,omitempty" yaml:"ui_schema,omitempty"`
+	UiSchema common.RawJSON `json:"uiSchema,omitempty" yaml:"uiSchema,omitempty"`
 
 	// DataSources defines dynamic data endpoints that can be referenced by form fields
 	// using the x-data-source property in the JSON Schema. Only allowed in configure
 	// form steps.
-	DataSources map[string]DataSourceDef `json:"data_sources,omitempty" yaml:"data_sources,omitempty"`
+	DataSources map[string]DataSourceDef `json:"dataSources,omitempty" yaml:"dataSources,omitempty"`
 
 	// If optionally gates this user-authored setup step. Runtime evaluates the
 	// configured condition server-side; clients only see eligible steps.
@@ -705,7 +705,7 @@ func (sf *SetupFlow) AllConfigFieldNames() map[string]bool {
 // DataSourceDef defines how to fetch dynamic data for populating form fields.
 type DataSourceDef struct {
 	// ProxyRequest defines an HTTP request to make through the connection's authenticated proxy.
-	ProxyRequest *DataSourceProxyRequest `json:"proxy_request,omitempty" yaml:"proxy_request,omitempty"`
+	ProxyRequest *DataSourceProxyRequest `json:"proxyRequest,omitempty" yaml:"proxyRequest,omitempty"`
 
 	// Transform is a JavaScript expression that transforms the API response into
 	// an array of {value, label} objects for use in dropdowns/selects.

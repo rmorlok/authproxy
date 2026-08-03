@@ -5,28 +5,28 @@ import (
 	"strconv"
 
 	scommon "github.com/rmorlok/authproxy/internal/schema/common"
-	"gopkg.in/yaml.v3"
+	"github.com/rmorlok/authproxy/internal/util"
 )
 
 type Root struct {
-	AdminUsernameVal       scommon.StringValue `json:"admin_username" yaml:"admin_username"`
-	AdminPrivateKeyPathVal scommon.StringValue `json:"admin_private_key_path" yaml:"admin_private_key_path"`
-	AdminSharedKeyPathVal  scommon.StringValue `json:"admin_shared_key_path" yaml:"admin_shared_key_path"`
+	AdminUsernameVal       scommon.StringValue `json:"adminUsername" yaml:"adminUsername"`
+	AdminPrivateKeyPathVal scommon.StringValue `json:"adminPrivateKeyPath" yaml:"adminPrivateKeyPath"`
+	AdminSharedKeyPathVal  scommon.StringValue `json:"adminSharedKeyPath" yaml:"adminSharedKeyPath"`
 	ServerVal              struct {
 		ApiVal         scommon.StringValue `json:"api" yaml:"api"`
-		AdminApiVal    scommon.StringValue `json:"admin_api" yaml:"admin_api"`
+		AdminApiVal    scommon.StringValue `json:"adminApi" yaml:"adminApi"`
 		AuthVal        scommon.StringValue `json:"auth" yaml:"auth"`
 		MarketplaceVal scommon.StringValue `json:"marketplace" yaml:"marketplace"`
-		AdminUiVal     scommon.StringValue `json:"admin_ui" yaml:"admin_ui"`
+		AdminUiVal     scommon.StringValue `json:"adminUi" yaml:"adminUi"`
 	} `json:"server" yaml:"server"`
 	SigningProxyVal struct {
 		PortVal scommon.StringValue `json:"port" yaml:"port"`
-	} `json:"signing_proxy" yaml:"signing_proxy"`
+	} `json:"signingProxy" yaml:"signingProxy"`
 }
 
 func UnmarshallYamlRoot(data []byte) (*Root, error) {
 	var root Root
-	if err := yaml.Unmarshal(data, &root); err != nil {
+	if err := util.DecodeYAMLStrict(data, &root); err != nil {
 		return nil, err
 	}
 

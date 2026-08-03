@@ -3,6 +3,8 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/rmorlok/authproxy/internal/util"
 )
 
 func (l *LoggingConfig) MarshalJSON() ([]byte, error) {
@@ -39,7 +41,7 @@ func (l *LoggingConfig) UnmarshalJSON(data []byte) error {
 		return fmt.Errorf("invalid structure for logging; missing type field")
 	}
 
-	if err := json.Unmarshal(data, t); err != nil {
+	if err := util.DecodeJSONStrict(data, t); err != nil {
 		return err
 	}
 
