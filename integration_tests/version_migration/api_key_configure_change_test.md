@@ -10,7 +10,7 @@
 ## Flow
 
 1. Start the core workflow worker in-process.
-2. Call `POST /connections/{id}/_migrate_version` targeting version 2.
+2. Call `POST /connections/{id}/_migrateVersion` targeting version 2.
 3. Wait for the durable task to complete.
 4. Submit the `configure-workspace` form with a workspace value.
 

@@ -15,20 +15,20 @@ import (
 //	@Description	Request to initiate a connection
 type InitiateConnectionRequest struct {
 	// ID of the connector to initiate the connection for.
-	ConnectorId apid.ID `json:"connector_id" yaml:"connector_id" swaggertype:"string" example:"cxr_test550e8400abcde"`
+	ConnectorId apid.ID `json:"connectorId" yaml:"connectorId" swaggertype:"string" example:"cxr_test550e8400abcde"`
 
 	// Version of the connector to initiate connection for; if not specified defaults to the primary version.
-	ConnectorVersion uint64 `json:"connector_version,omitempty" yaml:"connector_version,omitempty" example:"1"`
+	ConnectorVersion uint64 `json:"connectorVersion,omitempty" yaml:"connectorVersion,omitempty" example:"1"`
 
 	// The namespace to create the connection in. Must be the namespace of connector or a child namespace of that
 	// namespace. Defaults to the connector namespace if not specified.
-	IntoNamespace string `json:"into_namespace,omitempty" yaml:"into_namespace,omitempty" example:"root.acme"`
+	IntoNamespace string `json:"intoNamespace,omitempty" yaml:"intoNamespace,omitempty" example:"root.acme"`
 
 	// Optional mutable name for the connection. Defaults to the generated connection ID.
 	Name *common.ResourceName `json:"name,omitempty" yaml:"name,omitempty" swaggertype:"string" example:"production-crm"`
 
 	// The URL to return to after the connection is completed.
-	ReturnToUrl string `json:"return_to_url" yaml:"return_to_url" example:"https://example.com/callback"`
+	ReturnToUrl string `json:"returnToUrl" yaml:"returnToUrl" example:"https://example.com/callback"`
 }
 
 func (icr *InitiateConnectionRequest) Validate() error {
@@ -87,7 +87,7 @@ type ConnectionSetupRedirect struct {
 	Type ConnectionSetupResponseType `json:"type" yaml:"type" swaggertype:"string" example:"redirect"`
 
 	// URL to redirect the user to.
-	RedirectUrl string `json:"redirect_url" yaml:"redirect_url" example:"https://oauth.provider.com/authorize?..."`
+	RedirectUrl string `json:"redirectUrl" yaml:"redirectUrl" example:"https://oauth.provider.com/authorize?..."`
 }
 
 func (icr *ConnectionSetupRedirect) GetId() apid.ID {
@@ -109,19 +109,19 @@ type ConnectionSetupForm struct {
 	Type ConnectionSetupResponseType `json:"type" yaml:"type" swaggertype:"string" example:"form"`
 
 	// Step ID being submitted.
-	StepId string `json:"step_id" yaml:"step_id" example:"preconnect:0"`
+	StepId string `json:"stepId" yaml:"stepId" example:"preconnect:0"`
 
 	// Step title.
-	StepTitle string `json:"step_title,omitempty" yaml:"step_title,omitempty" example:"Choose workspace"`
+	StepTitle string `json:"stepTitle,omitempty" yaml:"stepTitle,omitempty" example:"Choose workspace"`
 
 	// Step description.
-	StepDescription string `json:"step_description,omitempty" yaml:"step_description,omitempty"`
+	StepDescription string `json:"stepDescription,omitempty" yaml:"stepDescription,omitempty"`
 
 	// JSON Schema defining the form fields.
-	JsonSchema json.RawMessage `json:"json_schema" yaml:"json_schema" swaggertype:"object"`
+	JsonSchema json.RawMessage `json:"jsonSchema" yaml:"jsonSchema" swaggertype:"object"`
 
 	// UI Schema for JSON Forms rendering.
-	UiSchema json.RawMessage `json:"ui_schema" yaml:"ui_schema" swaggertype:"object"`
+	UiSchema json.RawMessage `json:"uiSchema" yaml:"uiSchema" swaggertype:"object"`
 }
 
 func (icf *ConnectionSetupForm) GetId() apid.ID {
@@ -172,7 +172,7 @@ type ConnectionSetupError struct {
 	Id       apid.ID                     `json:"id" yaml:"id" swaggertype:"string" example:"cxn_test550e8400abcde"`
 	Type     ConnectionSetupResponseType `json:"type" yaml:"type" swaggertype:"string" example:"error"`
 	Error    string                      `json:"error" yaml:"error" example:"probe verification failed"`
-	CanRetry bool                        `json:"can_retry" yaml:"can_retry" example:"true"`
+	CanRetry bool                        `json:"canRetry" yaml:"canRetry" example:"true"`
 }
 
 func (ice *ConnectionSetupError) GetId() apid.ID {
@@ -188,14 +188,14 @@ func (ice *ConnectionSetupError) GetType() ConnectionSetupResponseType {
 //	@Description	Form submission data
 type SubmitConnectionRequest struct {
 	// StepId is the id of the step being submitted. Must match the current setup step's id.
-	StepId string `json:"step_id" yaml:"step_id" example:"preconnect:0"`
+	StepId string `json:"stepId" yaml:"stepId" example:"preconnect:0"`
 
 	// Data is the form data submitted by the user for the current step.
 	Data json.RawMessage `json:"data" yaml:"data" swaggertype:"object"`
 
 	// ReturnToUrl is required when the next step after form submission is an auth redirect.
 	// The client should provide this so the OAuth callback knows where to return.
-	ReturnToUrl string `json:"return_to_url,omitempty" yaml:"return_to_url,omitempty" example:"https://example.com/callback"`
+	ReturnToUrl string `json:"returnToUrl,omitempty" yaml:"returnToUrl,omitempty" example:"https://example.com/callback"`
 }
 
 // DataSourceOptionJson represents a single option from a data source for populating form dropdowns.

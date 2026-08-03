@@ -28,7 +28,7 @@ type stubRedirectGenerator struct {
 func (s *stubRedirectGenerator) GetInitiateSessionUrl(returnToUrl string) string {
 	u, _ := url.Parse(s.loginUrl)
 	q := u.Query()
-	q.Set("return_to", returnToUrl)
+	q.Set("returnToUrl", returnToUrl)
 	u.RawQuery = q.Encode()
 	return u.String()
 }
@@ -45,7 +45,7 @@ type authRedirectTestSetup struct {
 
 func newAuthRedirectTestSetup(t *testing.T, register func(g *gin.Engine, a A, gen AuthRedirectUrlGenerator)) *authRedirectTestSetup {
 	cfg, db := database.MustApplyBlankTestDbConfig(t, nil)
-	// GetBaseUrl — used to build the return_to URL on redirect — panics without a port.
+	// GetBaseUrl — used to build the returnTo URL on redirect — panics without a port.
 	cfg.GetRoot().Api.PortVal = common.NewIntegerValueDirect(8081)
 	cfg, auth, authUtil := TestAuthServiceWithDb(sconfig.ServiceIdApi, cfg, db)
 
@@ -75,7 +75,7 @@ func TestRequiredWithAuthRedirect(t *testing.T) {
 		g.GET("/ping", a.RequiredWithAuthRedirect(gen), okHandler)
 	}
 
-	t.Run("unauthenticated redirects to login with return_to", func(t *testing.T) {
+	t.Run("unauthenticated redirects to login with returnToUrl", func(t *testing.T) {
 		tu := newAuthRedirectTestSetup(t, register)
 
 		w := httptest.NewRecorder()
@@ -90,16 +90,16 @@ func TestRequiredWithAuthRedirect(t *testing.T) {
 		assert.Equal(t, "login.example.com", loc.Host)
 		assert.Equal(t, "/login", loc.Path)
 
-		returnTo := loc.Query().Get("return_to")
-		require.NotEmpty(t, returnTo, "Location should include return_to query param")
+		returnTo := loc.Query().Get("returnToUrl")
+		require.NotEmpty(t, returnTo, "Location should include returnTo query param")
 		assert.Contains(t, returnTo, "/ping")
 		assert.Contains(t, returnTo, "foo=bar")
 	})
 
-	t.Run("unauthenticated with valid auth_token query param proceeds", func(t *testing.T) {
+	t.Run("unauthenticated with valid authToken query param proceeds", func(t *testing.T) {
 		tu := newAuthRedirectTestSetup(t, register)
 
-		// The user arrives back at the endpoint after login with an auth_token query parameter
+		// The user arrives back at the endpoint after login with an authToken query parameter
 		// issued by the host application. The middleware should authenticate via the token and
 		// let the handler run.
 		tokenString, err := tu.AuthUtil.GenerateBearerToken(
@@ -108,7 +108,7 @@ func TestRequiredWithAuthRedirect(t *testing.T) {
 		require.NoError(t, err)
 
 		w := httptest.NewRecorder()
-		req, err := http.NewRequest(http.MethodGet, "/ping?foo=bar&auth_token="+url.QueryEscape(tokenString), nil)
+		req, err := http.NewRequest(http.MethodGet, "/ping?foo=bar&authToken="+url.QueryEscape(tokenString), nil)
 		require.NoError(t, err)
 		tu.Gin.ServeHTTP(w, req)
 
@@ -203,7 +203,7 @@ func TestPermissionValidatorBuilder_WithRedirectOnUnauthenticated(t *testing.T) 
 
 		loc, err := url.Parse(w.Header().Get("Location"))
 		require.NoError(t, err)
-		returnTo := loc.Query().Get("return_to")
+		returnTo := loc.Query().Get("returnToUrl")
 		require.NotEmpty(t, returnTo)
 		assert.Contains(t, returnTo, "/oauth2/callback")
 		assert.Contains(t, returnTo, "state=abc")
@@ -245,11 +245,11 @@ func TestPermissionValidatorBuilder_WithRedirectOnUnauthenticated(t *testing.T) 
 		require.Equal(t, http.StatusForbidden, w.Code, w.Header().Get("x-authproxy-debug"))
 	})
 
-	t.Run("unauthenticated with valid auth_token authenticates and proceeds", func(t *testing.T) {
+	t.Run("unauthenticated with valid authToken authenticates and proceeds", func(t *testing.T) {
 		tu := newAuthRedirectTestSetup(t, register)
 
 		// Simulates the second hit of the flow: user was redirected to login, came back with a
-		// freshly minted auth_token query param carrying the right permissions.
+		// freshly minted authToken query param carrying the right permissions.
 		tokenString, err := tu.AuthUtil.GenerateBearerToken(
 			ctx, "some-actor", "root",
 			aschema.PermissionsSingle("root.**", "connections", "create"),
@@ -257,7 +257,7 @@ func TestPermissionValidatorBuilder_WithRedirectOnUnauthenticated(t *testing.T) 
 		require.NoError(t, err)
 
 		w := httptest.NewRecorder()
-		req, err := http.NewRequest(http.MethodGet, "/oauth2/callback?state=abc&auth_token="+url.QueryEscape(tokenString), nil)
+		req, err := http.NewRequest(http.MethodGet, "/oauth2/callback?state=abc&authToken="+url.QueryEscape(tokenString), nil)
 		require.NoError(t, err)
 		tu.Gin.ServeHTTP(w, req)
 

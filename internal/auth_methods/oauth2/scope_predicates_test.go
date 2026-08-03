@@ -226,7 +226,7 @@ func TestExchangeClientCredentials_UsesEffectiveScopes(t *testing.T) {
 		}, nil)
 	encrypt.EXPECT().
 		DecryptString(gomock.Any(), encryptedCredentials).
-		Return(`{"client_id":"client-id","client_secret":"client-secret"}`, nil)
+		Return(`{"clientId":"client-id","clientSecret":"client-secret"}`, nil)
 	encrypt.EXPECT().
 		EncryptStringForEntity(gomock.Any(), gomock.Any(), "access-token").
 		Return(encfield.EncryptedField{ID: "ekv_test", Data: "encrypted_access_token"}, nil)
@@ -317,7 +317,7 @@ func TestRefreshAccessToken_ClientCredentialsUsesEffectiveScopes(t *testing.T) {
 		}, nil)
 	encrypt.EXPECT().
 		DecryptString(gomock.Any(), encryptedCredentials).
-		Return(`{"client_id":"client-id","client_secret":"client-secret"}`, nil)
+		Return(`{"clientId":"client-id","clientSecret":"client-secret"}`, nil)
 	encrypt.EXPECT().
 		EncryptStringForEntity(gomock.Any(), gomock.Any(), "new-access-token").
 		Return(encfield.EncryptedField{ID: "ekv_test", Data: "encrypted_access_token"}, nil)

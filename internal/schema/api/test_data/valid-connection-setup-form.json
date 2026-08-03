@@ -1,9 +1,9 @@
 {
   "id": "cxn_test0000000000002",
   "type": "form",
-  "step_id": "preconnect:0",
-  "step_title": "Choose workspace",
-  "json_schema": {
+  "stepId": "preconnect:0",
+  "stepTitle": "Choose workspace",
+  "jsonSchema": {
     "type": "object",
     "properties": {
       "workspace": {
@@ -11,7 +11,7 @@
       }
     }
   },
-  "ui_schema": {
+  "uiSchema": {
     "workspace": {
       "ui:widget": "select"
     }

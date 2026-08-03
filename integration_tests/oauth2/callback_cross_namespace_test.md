@@ -15,7 +15,7 @@ in `callback_state_security_test.go`. The cross-actor defense lives in
 The primary scenario is a multi-tenant AuthProxy deployment: a single
 instance manages connections for two customer apps, and each app uses
 a child namespace (`root.tenant-a`, `root.tenant-b`) to isolate its
-actors. Because actor rows are scoped per `(namespace, external_id)`,
+actors. Because actor rows are scoped per `(namespace, externalId)`,
 the **same external id can refer to two different users** — each
 tenant's "alice" is a distinct actor with a distinct `act_…` id.
 
@@ -84,9 +84,9 @@ attacker-sends-link-to-victim delivery vector.
 | Step | Action |
 | ---- | ------ |
 | Setup | Create namespaces `root.tenant-a-<suffix>`, `root.tenant-b-<suffix>`. |
-| Attacker | Alice (external_id = `user-123-<suffix>`) initiates in tenant-a. State has `Namespace=tenant-a`, `ActorId=act_alice`. |
+| Attacker | Alice (externalId = `user-123-<suffix>`) initiates in tenant-a. State has `Namespace=tenant-a`, `ActorId=act_alice`. |
 | Provider | `/test/authorize` issues a code under alice's stateId. |
-| Victim | Bob (external_id = `user-123-<suffix>`, same as alice) bootstraps via `/connectors?auth_token=<bob>` in tenant-b. Browser holds `SESSION-ID` cookie scoped to bob. |
+| Victim | Bob (externalId = `user-123-<suffix>`, same as alice) bootstraps via `/connectors?authToken=<bob>` in tenant-b. Browser holds `SESSION-ID` cookie scoped to bob. |
 | Forge | Browser navigates to the cross-tenant callback URL. |
 | Reject | Public service identifies bob (act_bob in tenant-b); `s.ActorId (act_alice) != act_bob` → `actor_mismatch`. |
 
@@ -171,7 +171,7 @@ sequenceDiagram
     T->>P: POST /test/authorize (decision=approve)
     P-->>T: redirect URL with code + state_id
 
-    T->>VIC: navigate /connectors?auth_token=<bob@tenant-b>
+    T->>VIC: navigate /connectors?authToken=<bob@tenant-b>
     VIC->>PUB: SPA bootstrap → SESSION-ID cookie for bob@tenant-b
 
     T->>VIC: navigate /oauth2/callback?state=…&code=…
@@ -196,7 +196,7 @@ sequenceDiagram
     T->>API: POST /_initiate (real, materializes actor + connection)
     API->>R: write real state envelope
     API->>DB: insert actor row, connection row
-    T->>DB: GetActorByExternalId → caller's actor_id
+    T->>DB: GetActorByExternalId → caller's actorId
 
     T->>E: EncryptGlobal(JSON of synthetic state)
     E-->>T: EncryptedField

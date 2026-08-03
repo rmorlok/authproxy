@@ -194,14 +194,14 @@ type listConnectorsFilters struct {
 	LimitVal          uint64                            `json:"limit"`
 	Offset            uint64                            `json:"offset"`
 	StatesVal         []ConnectorDefinitionVersionState `json:"states,omitempty"`
-	NamespaceMatchers []string                          `json:"namespace_matchers,omitempty"`
+	NamespaceMatchers []string                          `json:"namespaceMatchers,omitempty"`
 	TypeVal           []string                          `json:"types,omitempty"`
 	IdsVal            []apid.ID                         `json:"ids,omitempty"`
 	NameVal           *scommon.ResourceName             `json:"name,omitempty"`
-	OrderByFieldVal   *ConnectorOrderByField            `json:"order_by_field"`
-	OrderByVal        *pagination.OrderBy               `json:"order_by"`
-	IncludeDeletedVal bool                              `json:"include_deleted,omitempty"`
-	LabelSelectorVal  *string                           `json:"label_selector,omitempty"`
+	OrderByFieldVal   *ConnectorOrderByField            `json:"orderByField"`
+	OrderByVal        *pagination.OrderBy               `json:"orderBy"`
+	IncludeDeletedVal bool                              `json:"includeDeleted,omitempty"`
+	LabelSelectorVal  *string                           `json:"labelSelector,omitempty"`
 	Errors            *multierror.Error                 `json:"-"`
 }
 

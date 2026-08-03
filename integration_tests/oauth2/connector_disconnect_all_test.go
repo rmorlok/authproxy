@@ -144,7 +144,7 @@ func (r *connectorDisconnectAllRig) disconnectAll(t *testing.T, connectorID apid
 	})
 	require.NoError(t, err)
 
-	path := "/api/v1/connectors/" + connectorID.String() + "/_disconnect_all"
+	path := "/api/v1/connectors/" + connectorID.String() + "/_disconnectAll"
 	req, err := r.env.ApiAuthUtil.NewSignedRequestForActorExternalId(
 		http.MethodPost,
 		path,

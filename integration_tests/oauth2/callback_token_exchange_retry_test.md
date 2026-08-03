@@ -64,7 +64,7 @@ For every retry case:
   non-retryable failure. The non-retryable 4xx tests do not pin the
   field — it is populated there too, but the assertion belongs here
   where the exhausted retry budget is the point of the test.
-- **302 to `return_to_url?setup=pending&connection_id=<id>` even on
+- **302 to `returnToUrl?setup=pending&connectionId=<id>` even on
   exhaustion.** Same as the permanent failure path — the user must land
   somewhere recoverable, the marketplace UI re-renders the connection
   in `auth_failed`, and the user can retry/cancel.
@@ -161,5 +161,5 @@ sequenceDiagram
     P-->>PUB: 503
     Note over PUB: classifyTokenEndpointStatus → provider_5xx<br/>emitTokenExchangeFailure (one event, attempts=3)
     PUB->>DB: HandleAuthFailed → setup_step=auth_failed,<br/>setup_error="received status code 503"
-    PUB-->>T: 302 → return_to_url?setup=pending&connection_id=…
+    PUB-->>T: 302 → returnToUrl?setup=pending&connectionId=…
 ```

@@ -4,35 +4,69 @@
   "$defs": {
     "ConnectionSetupResponseType": {
       "type": "string",
-      "enum": ["redirect", "form", "complete", "verifying", "error"]
+      "enum": [
+        "redirect",
+        "form",
+        "complete",
+        "verifying",
+        "error"
+      ]
     },
     "NamespaceState": {
       "type": "string",
-      "enum": ["active", "destroying", "destroyed"]
+      "enum": [
+        "active",
+        "destroying",
+        "destroyed"
+      ]
     },
     "ConnectorVersionState": {
       "type": "string",
-      "enum": ["draft", "primary", "active", "archived"]
+      "enum": [
+        "draft",
+        "primary",
+        "active",
+        "archived"
+      ]
     },
     "ConnectionState": {
       "type": "string",
-      "enum": ["setup", "configured", "disabled", "disconnecting", "disconnected"]
+      "enum": [
+        "setup",
+        "configured",
+        "disabled",
+        "disconnecting",
+        "disconnected"
+      ]
     },
     "ConnectionHealthState": {
       "type": "string",
-      "enum": ["healthy", "unhealthy"]
+      "enum": [
+        "healthy",
+        "unhealthy"
+      ]
     },
     "NotificationLevel": {
       "type": "string",
-      "enum": ["info", "warning", "error"]
+      "enum": [
+        "info",
+        "warning",
+        "error"
+      ]
     },
     "NotificationState": {
       "type": "string",
-      "enum": ["active", "resolved"]
+      "enum": [
+        "active",
+        "resolved"
+      ]
     },
     "KeyState": {
       "type": "string",
-      "enum": ["active", "disabled"]
+      "enum": [
+        "active",
+        "disabled"
+      ]
     },
     "StringMap": {
       "type": "object",
@@ -42,40 +76,76 @@
     },
     "SearchResourceType": {
       "type": "string",
-      "enum": ["actor", "connection", "connector", "namespace", "key", "rate_limit"]
+      "enum": [
+        "actor",
+        "connection",
+        "connector",
+        "namespace",
+        "key",
+        "rate_limit"
+      ]
     },
     "SearchLabelMatch": {
       "type": "object",
       "properties": {
-        "key": { "type": "string" },
-        "value": { "type": "string" }
+        "key": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
       },
-      "required": ["key", "value"],
+      "required": [
+        "key",
+        "value"
+      ],
       "additionalProperties": false
     },
     "SearchResourceSummary": {
       "type": "object",
       "properties": {
-        "resource_type": { "$ref": "#/$defs/SearchResourceType" },
-        "resource_id": { "type": "string" },
+        "resourceType": {
+          "$ref": "#/$defs/SearchResourceType"
+        },
+        "resourceId": {
+          "type": "string"
+        },
         "name": {
           "anyOf": [
-            { "$ref": "../common/schema.json#/$defs/ResourceName" },
-            { "$ref": "../resources/namespace/schema.json#/$defs/NamespaceName" }
+            {
+              "$ref": "../common/schema.json#/$defs/ResourceName"
+            },
+            {
+              "$ref": "../resources/namespace/schema.json#/$defs/NamespaceName"
+            }
           ]
         },
-        "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
-        "labels": { "$ref": "#/$defs/StringMap" },
-        "matched_labels": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/SearchLabelMatch" }
+        "namespace": {
+          "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath"
         },
-        "updated_at": {
+        "labels": {
+          "$ref": "#/$defs/StringMap"
+        },
+        "matchedLabels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SearchLabelMatch"
+          }
+        },
+        "updatedAt": {
           "type": "string",
           "format": "date-time"
         }
       },
-      "required": ["resource_type", "resource_id", "name", "namespace", "labels", "matched_labels", "updated_at"],
+      "required": [
+        "resourceType",
+        "resourceId",
+        "name",
+        "namespace",
+        "labels",
+        "matchedLabels",
+        "updatedAt"
+      ],
       "additionalProperties": false
     },
     "SearchResourcesResponse": {
@@ -83,159 +153,281 @@
       "properties": {
         "items": {
           "type": "array",
-          "items": { "$ref": "#/$defs/SearchResourceSummary" }
+          "items": {
+            "$ref": "#/$defs/SearchResourceSummary"
+          }
         },
-        "truncated_types": {
+        "truncatedTypes": {
           "type": "array",
-          "items": { "$ref": "#/$defs/SearchResourceType" }
+          "items": {
+            "$ref": "#/$defs/SearchResourceType"
+          }
         },
-        "incomplete_types": {
+        "incompleteTypes": {
           "type": "array",
-          "items": { "$ref": "#/$defs/SearchResourceType" }
+          "items": {
+            "$ref": "#/$defs/SearchResourceType"
+          }
         }
       },
-      "required": ["items", "truncated_types", "incomplete_types"],
+      "required": [
+        "items",
+        "truncatedTypes",
+        "incompleteTypes"
+      ],
       "additionalProperties": false
     },
     "HeadersVal": {
       "oneOf": [
-        { "type": "string" },
+        {
+          "type": "string"
+        },
         {
           "type": "array",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         }
       ]
     },
     "HeadersMap": {
       "type": "object",
-      "additionalProperties": { "$ref": "#/$defs/HeadersVal" }
+      "additionalProperties": {
+        "$ref": "#/$defs/HeadersVal"
+      }
     },
     "ErrorResponse": {
       "type": "object",
       "properties": {
-        "error": { "type": "string" },
-        "stack_trace": { "type": "string" }
+        "error": {
+          "type": "string"
+        },
+        "stackTrace": {
+          "type": "string"
+        }
       },
-      "required": ["error"],
+      "required": [
+        "error"
+      ],
       "additionalProperties": false
     },
     "InitiateConnectionRequest": {
       "type": "object",
       "properties": {
-        "connector_id": { "type": "string" },
-        "connector_version": {
+        "connectorId": {
+          "type": "string"
+        },
+        "connectorVersion": {
           "type": "integer",
           "minimum": 1
         },
-        "into_namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
-        "return_to_url": {
+        "intoNamespace": {
+          "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath"
+        },
+        "returnToUrl": {
           "type": "string",
           "format": "uri"
         }
       },
-      "required": ["connector_id", "return_to_url"],
+      "required": [
+        "connectorId",
+        "returnToUrl"
+      ],
       "additionalProperties": false
     },
     "ConnectionSetupRedirect": {
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "type": { "const": "redirect" },
-        "redirect_url": {
+        "id": {
+          "type": "string"
+        },
+        "type": {
+          "const": "redirect"
+        },
+        "redirectUrl": {
           "type": "string",
           "format": "uri"
         }
       },
-      "required": ["id", "type", "redirect_url"],
+      "required": [
+        "id",
+        "type",
+        "redirectUrl"
+      ],
       "additionalProperties": false
     },
     "ConnectionSetupForm": {
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "type": { "const": "form" },
-        "step_id": { "type": "string" },
-        "step_title": { "type": "string" },
-        "step_description": { "type": "string" },
-        "json_schema": { "type": "object" },
-        "ui_schema": { "type": "object" }
+        "id": {
+          "type": "string"
+        },
+        "type": {
+          "const": "form"
+        },
+        "stepId": {
+          "type": "string"
+        },
+        "stepTitle": {
+          "type": "string"
+        },
+        "stepDescription": {
+          "type": "string"
+        },
+        "jsonSchema": {
+          "type": "object"
+        },
+        "uiSchema": {
+          "type": "object"
+        }
       },
-      "required": ["id", "type", "step_id", "json_schema", "ui_schema"],
+      "required": [
+        "id",
+        "type",
+        "stepId",
+        "jsonSchema",
+        "uiSchema"
+      ],
       "additionalProperties": false
     },
     "ConnectionSetupComplete": {
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "type": { "const": "complete" }
+        "id": {
+          "type": "string"
+        },
+        "type": {
+          "const": "complete"
+        }
       },
-      "required": ["id", "type"],
+      "required": [
+        "id",
+        "type"
+      ],
       "additionalProperties": false
     },
     "ConnectionSetupVerifying": {
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "type": { "const": "verifying" }
+        "id": {
+          "type": "string"
+        },
+        "type": {
+          "const": "verifying"
+        }
       },
-      "required": ["id", "type"],
+      "required": [
+        "id",
+        "type"
+      ],
       "additionalProperties": false
     },
     "ConnectionSetupError": {
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "type": { "const": "error" },
-        "error": { "type": "string" },
-        "can_retry": { "type": "boolean" }
+        "id": {
+          "type": "string"
+        },
+        "type": {
+          "const": "error"
+        },
+        "error": {
+          "type": "string"
+        },
+        "canRetry": {
+          "type": "boolean"
+        }
       },
-      "required": ["id", "type", "error", "can_retry"],
+      "required": [
+        "id",
+        "type",
+        "error",
+        "canRetry"
+      ],
       "additionalProperties": false
     },
     "SubmitConnectionRequest": {
       "type": "object",
       "properties": {
-        "step_id": { "type": "string" },
+        "stepId": {
+          "type": "string"
+        },
         "data": {},
-        "return_to_url": {
+        "returnToUrl": {
           "type": "string",
           "format": "uri"
         }
       },
-      "required": ["step_id", "data"],
+      "required": [
+        "stepId",
+        "data"
+      ],
       "additionalProperties": false
     },
     "DataSourceOption": {
       "type": "object",
       "properties": {
-        "value": { "type": "string" },
-        "label": { "type": "string" }
+        "value": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        }
       },
-      "required": ["value", "label"],
+      "required": [
+        "value",
+        "label"
+      ],
       "additionalProperties": false
     },
     "Connection": {
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
-        "labels": { "$ref": "#/$defs/StringMap" },
-        "annotations": { "$ref": "#/$defs/StringMap" },
-        "state": { "$ref": "#/$defs/ConnectionState" },
-        "health_state": { "$ref": "#/$defs/ConnectionHealthState" },
-        "setup_step_id": { "type": "string" },
-        "setup_error": { "type": "string" },
-        "connector": { "$ref": "#/$defs/Connector" },
-        "created_at": {
+        "id": {
+          "type": "string"
+        },
+        "namespace": {
+          "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath"
+        },
+        "labels": {
+          "$ref": "#/$defs/StringMap"
+        },
+        "annotations": {
+          "$ref": "#/$defs/StringMap"
+        },
+        "state": {
+          "$ref": "#/$defs/ConnectionState"
+        },
+        "healthState": {
+          "$ref": "#/$defs/ConnectionHealthState"
+        },
+        "setupStepId": {
+          "type": "string"
+        },
+        "setupError": {
+          "type": "string"
+        },
+        "connector": {
+          "$ref": "#/$defs/Connector"
+        },
+        "createdAt": {
           "type": "string",
           "format": "date-time"
         },
-        "updated_at": {
+        "updatedAt": {
           "type": "string",
           "format": "date-time"
         }
       },
-      "required": ["id", "namespace", "state", "health_state", "connector", "created_at", "updated_at"],
+      "required": [
+        "id",
+        "namespace",
+        "state",
+        "healthState",
+        "connector",
+        "createdAt",
+        "updatedAt"
+      ],
       "additionalProperties": false
     },
     "ListConnectionResponse": {
@@ -243,17 +435,23 @@
       "properties": {
         "items": {
           "type": "array",
-          "items": { "$ref": "#/$defs/Connection" }
+          "items": {
+            "$ref": "#/$defs/Connection"
+          }
         },
-        "cursor": { "type": "string" }
+        "cursor": {
+          "type": "string"
+        }
       },
-      "required": ["items"],
+      "required": [
+        "items"
+      ],
       "additionalProperties": false
     },
     "DisconnectConnectionRequest": {
       "type": "object",
       "properties": {
-        "timeout_seconds": {
+        "timeoutSeconds": {
           "type": "integer",
           "minimum": 1
         }
@@ -263,99 +461,157 @@
     "DisconnectResponse": {
       "type": "object",
       "properties": {
-        "task_id": { "type": "string" },
-        "connection": { "$ref": "#/$defs/Connection" }
+        "taskId": {
+          "type": "string"
+        },
+        "connection": {
+          "$ref": "#/$defs/Connection"
+        }
       },
-      "required": ["task_id", "connection"],
+      "required": [
+        "taskId",
+        "connection"
+      ],
       "additionalProperties": false
     },
     "MigrateConnectionVersionRequest": {
       "type": "object",
       "properties": {
-        "target_version": {
+        "targetVersion": {
           "type": "integer",
           "minimum": 1
         },
-        "timeout_seconds": {
+        "timeoutSeconds": {
           "type": "integer",
           "minimum": 1
         }
       },
-      "required": ["target_version"],
+      "required": [
+        "targetVersion"
+      ],
       "additionalProperties": false
     },
     "MigrateConnectionVersionResponse": {
       "type": "object",
       "properties": {
-        "task_id": { "type": "string" },
-        "connection_id": { "type": "string" },
-        "source_version": {
+        "taskId": {
+          "type": "string"
+        },
+        "connectionId": {
+          "type": "string"
+        },
+        "sourceVersion": {
           "type": "integer",
           "minimum": 1
         },
-        "target_version": {
+        "targetVersion": {
           "type": "integer",
           "minimum": 1
         }
       },
-      "required": ["task_id", "connection_id", "source_version", "target_version"],
+      "required": [
+        "taskId",
+        "connectionId",
+        "sourceVersion",
+        "targetVersion"
+      ],
       "additionalProperties": false
     },
     "ForceConnectionStateRequest": {
       "type": "object",
       "properties": {
-        "state": { "$ref": "#/$defs/ConnectionState" }
+        "state": {
+          "$ref": "#/$defs/ConnectionState"
+        }
       },
-      "required": ["state"],
+      "required": [
+        "state"
+      ],
       "additionalProperties": false
     },
     "UpdateConnectionRequest": {
       "type": "object",
       "properties": {
-        "labels": { "$ref": "#/$defs/StringMap" },
-        "annotations": { "$ref": "#/$defs/StringMap" }
+        "labels": {
+          "$ref": "#/$defs/StringMap"
+        },
+        "annotations": {
+          "$ref": "#/$defs/StringMap"
+        }
       },
       "additionalProperties": false
     },
     "ProxyResponse": {
       "type": "object",
       "properties": {
-        "status_code": { "type": "integer" },
-        "headers": { "$ref": "#/$defs/StringMap" },
-        "body_raw": {
+        "statusCode": {
+          "type": "integer"
+        },
+        "headers": {
+          "$ref": "#/$defs/StringMap"
+        },
+        "bodyRaw": {
           "type": "string",
           "contentEncoding": "base64"
         },
-        "body_json": {}
+        "bodyJson": {}
       },
-      "required": ["status_code"],
+      "required": [
+        "statusCode"
+      ],
       "additionalProperties": false
     },
     "Notification": {
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "key": { "type": "string" },
-        "level": { "$ref": "#/$defs/NotificationLevel" },
-        "state": { "$ref": "#/$defs/NotificationState" },
-        "resource_type": { "type": "string" },
-        "resource_id": { "type": "string" },
-        "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
-        "title": { "type": "string" },
-        "message": { "type": "string" },
-        "action_url": { "type": "string" },
-        "can_action": { "type": "boolean" },
-        "viewed": { "type": "boolean" },
-        "metadata": { "type": "object" },
-        "created_at": {
+        "id": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "level": {
+          "$ref": "#/$defs/NotificationLevel"
+        },
+        "state": {
+          "$ref": "#/$defs/NotificationState"
+        },
+        "resourceType": {
+          "type": "string"
+        },
+        "resourceId": {
+          "type": "string"
+        },
+        "namespace": {
+          "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath"
+        },
+        "title": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "actionUrl": {
+          "type": "string"
+        },
+        "canAction": {
+          "type": "boolean"
+        },
+        "viewed": {
+          "type": "boolean"
+        },
+        "metadata": {
+          "type": "object"
+        },
+        "createdAt": {
           "type": "string",
           "format": "date-time"
         },
-        "updated_at": {
+        "updatedAt": {
           "type": "string",
           "format": "date-time"
         },
-        "resolved_at": {
+        "resolvedAt": {
           "type": "string",
           "format": "date-time"
         }
@@ -365,15 +621,15 @@
         "key",
         "level",
         "state",
-        "resource_type",
-        "resource_id",
+        "resourceType",
+        "resourceId",
         "namespace",
         "title",
         "message",
-        "can_action",
+        "canAction",
         "viewed",
-        "created_at",
-        "updated_at"
+        "createdAt",
+        "updatedAt"
       ],
       "additionalProperties": false
     },
@@ -382,48 +638,81 @@
       "properties": {
         "items": {
           "type": "array",
-          "items": { "$ref": "#/$defs/Notification" }
+          "items": {
+            "$ref": "#/$defs/Notification"
+          }
         },
-        "cursor": { "type": "string" }
+        "cursor": {
+          "type": "string"
+        }
       },
-      "required": ["items"],
+      "required": [
+        "items"
+      ],
       "additionalProperties": false
     },
     "Namespace": {
       "type": "object",
       "properties": {
-        "path": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
-        "state": { "$ref": "#/$defs/NamespaceState" },
-        "key_id": { "type": "string" },
-        "labels": { "$ref": "#/$defs/StringMap" },
-        "annotations": { "$ref": "#/$defs/StringMap" },
-        "created_at": {
+        "path": {
+          "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath"
+        },
+        "state": {
+          "$ref": "#/$defs/NamespaceState"
+        },
+        "keyId": {
+          "type": "string"
+        },
+        "labels": {
+          "$ref": "#/$defs/StringMap"
+        },
+        "annotations": {
+          "$ref": "#/$defs/StringMap"
+        },
+        "createdAt": {
           "type": "string",
           "format": "date-time"
         },
-        "updated_at": {
+        "updatedAt": {
           "type": "string",
           "format": "date-time"
         }
       },
-      "required": ["path", "state", "created_at", "updated_at"],
+      "required": [
+        "path",
+        "state",
+        "createdAt",
+        "updatedAt"
+      ],
       "additionalProperties": false
     },
     "CreateNamespaceRequest": {
       "type": "object",
       "properties": {
-        "path": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
-        "labels": { "$ref": "#/$defs/StringMap" },
-        "annotations": { "$ref": "#/$defs/StringMap" }
+        "path": {
+          "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath"
+        },
+        "labels": {
+          "$ref": "#/$defs/StringMap"
+        },
+        "annotations": {
+          "$ref": "#/$defs/StringMap"
+        }
       },
-      "required": ["path"],
+      "required": [
+        "path"
+      ],
       "additionalProperties": false
     },
     "UpdateNamespaceRequest": {
       "type": "object",
       "properties": {
-        "labels": { "$ref": "#/$defs/StringMap" },
-        "annotations": { "$ref": "#/$defs/StringMap" }
+        "labels": {
+          "$ref": "#/$defs/StringMap"
+        },
+        "annotations": {
+          "$ref": "#/$defs/StringMap"
+        }
       },
       "additionalProperties": false
     },
@@ -432,65 +721,110 @@
       "properties": {
         "items": {
           "type": "array",
-          "items": { "$ref": "#/$defs/Namespace" }
+          "items": {
+            "$ref": "#/$defs/Namespace"
+          }
         },
-        "cursor": { "type": "string" }
+        "cursor": {
+          "type": "string"
+        }
       },
-      "required": ["items"],
+      "required": [
+        "items"
+      ],
       "additionalProperties": false
     },
     "SetNamespaceKeyRequest": {
       "type": "object",
       "properties": {
-        "key_id": { "type": "string" }
+        "keyId": {
+          "type": "string"
+        }
       },
-      "required": ["key_id"],
+      "required": [
+        "keyId"
+      ],
       "additionalProperties": false
     },
     "NamespaceKey": {
       "type": "object",
       "properties": {
-        "key_id": { "type": "string" }
+        "keyId": {
+          "type": "string"
+        }
       },
-      "required": ["key_id"],
+      "required": [
+        "keyId"
+      ],
       "additionalProperties": false
     },
     "Actor": {
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
-        "external_id": { "type": "string" },
-        "labels": { "$ref": "#/$defs/StringMap" },
-        "annotations": { "$ref": "#/$defs/StringMap" },
-        "created_at": {
+        "id": {
+          "type": "string"
+        },
+        "namespace": {
+          "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath"
+        },
+        "externalId": {
+          "type": "string"
+        },
+        "labels": {
+          "$ref": "#/$defs/StringMap"
+        },
+        "annotations": {
+          "$ref": "#/$defs/StringMap"
+        },
+        "createdAt": {
           "type": "string",
           "format": "date-time"
         },
-        "updated_at": {
+        "updatedAt": {
           "type": "string",
           "format": "date-time"
         }
       },
-      "required": ["id", "namespace", "external_id", "created_at", "updated_at"],
+      "required": [
+        "id",
+        "namespace",
+        "externalId",
+        "createdAt",
+        "updatedAt"
+      ],
       "additionalProperties": false
     },
     "CreateActorRequest": {
       "type": "object",
       "properties": {
-        "external_id": { "type": "string" },
-        "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
-        "labels": { "$ref": "#/$defs/StringMap" },
-        "annotations": { "$ref": "#/$defs/StringMap" }
+        "externalId": {
+          "type": "string"
+        },
+        "namespace": {
+          "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath"
+        },
+        "labels": {
+          "$ref": "#/$defs/StringMap"
+        },
+        "annotations": {
+          "$ref": "#/$defs/StringMap"
+        }
       },
-      "required": ["external_id", "namespace"],
+      "required": [
+        "externalId",
+        "namespace"
+      ],
       "additionalProperties": false
     },
     "UpdateActorRequest": {
       "type": "object",
       "properties": {
-        "labels": { "$ref": "#/$defs/StringMap" },
-        "annotations": { "$ref": "#/$defs/StringMap" }
+        "labels": {
+          "$ref": "#/$defs/StringMap"
+        },
+        "annotations": {
+          "$ref": "#/$defs/StringMap"
+        }
       },
       "additionalProperties": false
     },
@@ -499,11 +833,17 @@
       "properties": {
         "items": {
           "type": "array",
-          "items": { "$ref": "#/$defs/Actor" }
+          "items": {
+            "$ref": "#/$defs/Actor"
+          }
         },
-        "cursor": { "type": "string" }
+        "cursor": {
+          "type": "string"
+        }
       },
-      "required": ["items"],
+      "required": [
+        "items"
+      ],
       "additionalProperties": false
     },
     "MetricsRange": {
@@ -517,15 +857,23 @@
           "type": "string",
           "format": "date-time"
         },
-        "step": { "type": "string" }
+        "step": {
+          "type": "string"
+        }
       },
-      "required": ["start", "end", "step"],
+      "required": [
+        "start",
+        "end",
+        "step"
+      ],
       "additionalProperties": false
     },
     "MetricsQueryRef": {
       "type": "object",
       "properties": {
-        "ref_id": { "type": "string" },
+        "refId": {
+          "type": "string"
+        },
         "metric": {
           "type": "string",
           "enum": [
@@ -542,9 +890,13 @@
         },
         "aggregation": {
           "type": "string",
-          "enum": ["count", "avg", "p95"]
+          "enum": [
+            "count",
+            "avg",
+            "p95"
+          ]
         },
-        "group_by": {
+        "groupBy": {
           "type": "array",
           "items": {
             "type": "string",
@@ -563,22 +915,37 @@
           }
         }
       },
-      "required": ["ref_id", "metric", "aggregation"],
+      "required": [
+        "refId",
+        "metric",
+        "aggregation"
+      ],
       "additionalProperties": false
     },
     "MetricsQueryRequest": {
       "type": "object",
       "properties": {
-        "range": { "$ref": "#/$defs/MetricsRange" },
-        "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespaceMatcher" },
-        "label_selector": { "type": "string" },
+        "range": {
+          "$ref": "#/$defs/MetricsRange"
+        },
+        "namespace": {
+          "$ref": "../resources/namespace/schema.json#/$defs/NamespaceMatcher"
+        },
+        "labelSelector": {
+          "type": "string"
+        },
         "queries": {
           "type": "array",
-          "items": { "$ref": "#/$defs/MetricsQueryRef" },
+          "items": {
+            "$ref": "#/$defs/MetricsQueryRef"
+          },
           "minItems": 1
         }
       },
-      "required": ["range", "queries"],
+      "required": [
+        "range",
+        "queries"
+      ],
       "additionalProperties": false
     },
     "MetricsPoint": {
@@ -588,24 +955,44 @@
           "type": "string",
           "format": "date-time"
         },
-        "value": { "type": "number" }
+        "value": {
+          "type": "number"
+        }
       },
-      "required": ["timestamp", "value"],
+      "required": [
+        "timestamp",
+        "value"
+      ],
       "additionalProperties": false
     },
     "MetricsSeries": {
       "type": "object",
       "properties": {
-        "ref_id": { "type": "string" },
-        "metric": { "type": "string" },
-        "aggregation": { "type": "string" },
-        "labels": { "$ref": "#/$defs/StringMap" },
+        "refId": {
+          "type": "string"
+        },
+        "metric": {
+          "type": "string"
+        },
+        "aggregation": {
+          "type": "string"
+        },
+        "labels": {
+          "$ref": "#/$defs/StringMap"
+        },
         "points": {
           "type": "array",
-          "items": { "$ref": "#/$defs/MetricsPoint" }
+          "items": {
+            "$ref": "#/$defs/MetricsPoint"
+          }
         }
       },
-      "required": ["ref_id", "metric", "aggregation", "points"],
+      "required": [
+        "refId",
+        "metric",
+        "aggregation",
+        "points"
+      ],
       "additionalProperties": false
     },
     "MetricsQueryResponse": {
@@ -613,10 +1000,14 @@
       "properties": {
         "series": {
           "type": "array",
-          "items": { "$ref": "#/$defs/MetricsSeries" }
+          "items": {
+            "$ref": "#/$defs/MetricsSeries"
+          }
         }
       },
-      "required": ["series"],
+      "required": [
+        "series"
+      ],
       "additionalProperties": false
     },
     "MetricsSchemaMetric": {
@@ -638,17 +1029,24 @@
         },
         "kind": {
           "type": "string",
-          "enum": ["counter", "gauge"]
+          "enum": [
+            "counter",
+            "gauge"
+          ]
         },
         "aggregations": {
           "type": "array",
           "items": {
             "type": "string",
-            "enum": ["count", "avg", "p95"]
+            "enum": [
+              "count",
+              "avg",
+              "p95"
+            ]
           },
           "minItems": 1
         },
-        "group_by": {
+        "groupBy": {
           "type": "array",
           "items": {
             "type": "string",
@@ -667,7 +1065,12 @@
           }
         }
       },
-      "required": ["metric", "kind", "aggregations", "group_by"],
+      "required": [
+        "metric",
+        "kind",
+        "aggregations",
+        "groupBy"
+      ],
       "additionalProperties": false
     },
     "MetricsSchemaResponse": {
@@ -675,39 +1078,63 @@
       "properties": {
         "metrics": {
           "type": "array",
-          "items": { "$ref": "#/$defs/MetricsSchemaMetric" }
+          "items": {
+            "$ref": "#/$defs/MetricsSchemaMetric"
+          }
         }
       },
-      "required": ["metrics"],
+      "required": [
+        "metrics"
+      ],
       "additionalProperties": false
     },
     "Connector": {
       "description": "API summary projection of a connector version. This intentionally differs from the resource connector definition schema: fields such as logo are flattened for responses, while runtime fields such as state, has_configure, timestamps, version counts, and state summaries are added by the API. Request bodies and version detail responses reference the canonical resource schema under their definition fields.",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
+        "id": {
+          "type": "string"
+        },
         "version": {
           "type": "integer",
           "minimum": 1
         },
-        "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
-        "state": { "$ref": "#/$defs/ConnectorVersionState" },
-        "display_name": { "type": "string" },
-        "highlight": { "type": "string" },
-        "description": { "type": "string" },
-        "status_page_url": {
+        "namespace": {
+          "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath"
+        },
+        "state": {
+          "$ref": "#/$defs/ConnectorVersionState"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "highlight": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "statusPageUrl": {
           "type": "string",
           "format": "uri"
         },
-        "logo": { "type": "string" },
-        "has_configure": { "type": "boolean" },
-        "labels": { "$ref": "#/$defs/StringMap" },
-        "annotations": { "$ref": "#/$defs/StringMap" },
-        "created_at": {
+        "logo": {
+          "type": "string"
+        },
+        "hasConfigure": {
+          "type": "boolean"
+        },
+        "labels": {
+          "$ref": "#/$defs/StringMap"
+        },
+        "annotations": {
+          "$ref": "#/$defs/StringMap"
+        },
+        "createdAt": {
           "type": "string",
           "format": "date-time"
         },
-        "updated_at": {
+        "updatedAt": {
           "type": "string",
           "format": "date-time"
         },
@@ -717,10 +1144,23 @@
         },
         "states": {
           "type": "array",
-          "items": { "$ref": "#/$defs/ConnectorVersionState" }
+          "items": {
+            "$ref": "#/$defs/ConnectorVersionState"
+          }
         }
       },
-      "required": ["id", "version", "namespace", "state", "display_name", "description", "logo", "has_configure", "created_at", "updated_at"],
+      "required": [
+        "id",
+        "version",
+        "namespace",
+        "state",
+        "displayName",
+        "description",
+        "logo",
+        "hasConfigure",
+        "createdAt",
+        "updatedAt"
+      ],
       "additionalProperties": false
     },
     "ListConnectorsResponse": {
@@ -728,36 +1168,62 @@
       "properties": {
         "items": {
           "type": "array",
-          "items": { "$ref": "#/$defs/Connector" }
+          "items": {
+            "$ref": "#/$defs/Connector"
+          }
         },
-        "cursor": { "type": "string" }
+        "cursor": {
+          "type": "string"
+        }
       },
-      "required": ["items"],
+      "required": [
+        "items"
+      ],
       "additionalProperties": false
     },
     "ConnectorVersion": {
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
+        "id": {
+          "type": "string"
+        },
         "version": {
           "type": "integer",
           "minimum": 1
         },
-        "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
-        "state": { "$ref": "#/$defs/ConnectorVersionState" },
-        "definition": { "$ref": "../resources/connectors/schema.json" },
-        "labels": { "$ref": "#/$defs/StringMap" },
-        "annotations": { "$ref": "#/$defs/StringMap" },
-        "created_at": {
+        "namespace": {
+          "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath"
+        },
+        "state": {
+          "$ref": "#/$defs/ConnectorVersionState"
+        },
+        "definition": {
+          "$ref": "../resources/connectors/schema.json"
+        },
+        "labels": {
+          "$ref": "#/$defs/StringMap"
+        },
+        "annotations": {
+          "$ref": "#/$defs/StringMap"
+        },
+        "createdAt": {
           "type": "string",
           "format": "date-time"
         },
-        "updated_at": {
+        "updatedAt": {
           "type": "string",
           "format": "date-time"
         }
       },
-      "required": ["id", "version", "namespace", "state", "definition", "created_at", "updated_at"],
+      "required": [
+        "id",
+        "version",
+        "namespace",
+        "state",
+        "definition",
+        "createdAt",
+        "updatedAt"
+      ],
       "additionalProperties": false
     },
     "ListConnectorVersionsResponse": {
@@ -765,46 +1231,75 @@
       "properties": {
         "items": {
           "type": "array",
-          "items": { "$ref": "#/$defs/ConnectorVersion" }
+          "items": {
+            "$ref": "#/$defs/ConnectorVersion"
+          }
         },
-        "cursor": { "type": "string" }
+        "cursor": {
+          "type": "string"
+        }
       },
-      "required": ["items"],
+      "required": [
+        "items"
+      ],
       "additionalProperties": false
     },
     "CreateConnectorRequest": {
       "type": "object",
       "properties": {
-        "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
-        "definition": { "$ref": "../resources/connectors/schema.json" },
-        "labels": { "$ref": "#/$defs/StringMap" },
-        "annotations": { "$ref": "#/$defs/StringMap" }
+        "namespace": {
+          "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath"
+        },
+        "definition": {
+          "$ref": "../resources/connectors/schema.json"
+        },
+        "labels": {
+          "$ref": "#/$defs/StringMap"
+        },
+        "annotations": {
+          "$ref": "#/$defs/StringMap"
+        }
       },
-      "required": ["namespace", "definition"],
+      "required": [
+        "namespace",
+        "definition"
+      ],
       "additionalProperties": false
     },
     "UpdateConnectorRequest": {
       "type": "object",
       "properties": {
-        "definition": { "$ref": "../resources/connectors/schema.json" },
-        "labels": { "$ref": "#/$defs/StringMap" },
-        "annotations": { "$ref": "#/$defs/StringMap" }
+        "definition": {
+          "$ref": "../resources/connectors/schema.json"
+        },
+        "labels": {
+          "$ref": "#/$defs/StringMap"
+        },
+        "annotations": {
+          "$ref": "#/$defs/StringMap"
+        }
       },
       "additionalProperties": false
     },
     "CreateConnectorVersionRequest": {
       "type": "object",
       "properties": {
-        "definition": { "$ref": "../resources/connectors/schema.json" },
-        "labels": { "$ref": "#/$defs/StringMap" },
-        "annotations": { "$ref": "#/$defs/StringMap" }
+        "definition": {
+          "$ref": "../resources/connectors/schema.json"
+        },
+        "labels": {
+          "$ref": "#/$defs/StringMap"
+        },
+        "annotations": {
+          "$ref": "#/$defs/StringMap"
+        }
       },
       "additionalProperties": false
     },
     "ConnectorLifecycleRequest": {
       "type": "object",
       "properties": {
-        "timeout_seconds": {
+        "timeoutSeconds": {
           "type": "integer",
           "minimum": 1
         }
@@ -814,38 +1309,65 @@
     "ConnectorLifecycleResponse": {
       "type": "object",
       "properties": {
-        "task_id": { "type": "string" },
-        "connector_id": { "type": "string" }
+        "taskId": {
+          "type": "string"
+        },
+        "connectorId": {
+          "type": "string"
+        }
       },
-      "required": ["task_id", "connector_id"],
+      "required": [
+        "taskId",
+        "connectorId"
+      ],
       "additionalProperties": false
     },
     "ForceConnectorVersionStateRequest": {
       "type": "object",
       "properties": {
-        "state": { "$ref": "#/$defs/ConnectorVersionState" }
+        "state": {
+          "$ref": "#/$defs/ConnectorVersionState"
+        }
       },
-      "required": ["state"],
+      "required": [
+        "state"
+      ],
       "additionalProperties": false
     },
     "RateLimit": {
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
-        "definition": { "$ref": "../resources/rate_limit/schema.json#/$defs/RateLimit" },
-        "labels": { "$ref": "#/$defs/StringMap" },
-        "annotations": { "$ref": "#/$defs/StringMap" },
-        "created_at": {
+        "id": {
+          "type": "string"
+        },
+        "namespace": {
+          "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath"
+        },
+        "definition": {
+          "$ref": "../resources/rate_limit/schema.json#/$defs/RateLimit"
+        },
+        "labels": {
+          "$ref": "#/$defs/StringMap"
+        },
+        "annotations": {
+          "$ref": "#/$defs/StringMap"
+        },
+        "createdAt": {
           "type": "string",
           "format": "date-time"
         },
-        "updated_at": {
+        "updatedAt": {
           "type": "string",
           "format": "date-time"
         }
       },
-      "required": ["id", "namespace", "definition", "created_at", "updated_at"],
+      "required": [
+        "id",
+        "namespace",
+        "definition",
+        "createdAt",
+        "updatedAt"
+      ],
       "additionalProperties": false
     },
     "ListRateLimitsResponse": {
@@ -853,30 +1375,53 @@
       "properties": {
         "items": {
           "type": "array",
-          "items": { "$ref": "#/$defs/RateLimit" }
+          "items": {
+            "$ref": "#/$defs/RateLimit"
+          }
         },
-        "cursor": { "type": "string" }
+        "cursor": {
+          "type": "string"
+        }
       },
-      "required": ["items"],
+      "required": [
+        "items"
+      ],
       "additionalProperties": false
     },
     "CreateRateLimitRequest": {
       "type": "object",
       "properties": {
-        "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
-        "definition": { "$ref": "../resources/rate_limit/schema.json#/$defs/RateLimit" },
-        "labels": { "$ref": "#/$defs/StringMap" },
-        "annotations": { "$ref": "#/$defs/StringMap" }
+        "namespace": {
+          "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath"
+        },
+        "definition": {
+          "$ref": "../resources/rate_limit/schema.json#/$defs/RateLimit"
+        },
+        "labels": {
+          "$ref": "#/$defs/StringMap"
+        },
+        "annotations": {
+          "$ref": "#/$defs/StringMap"
+        }
       },
-      "required": ["namespace", "definition"],
+      "required": [
+        "namespace",
+        "definition"
+      ],
       "additionalProperties": false
     },
     "UpdateRateLimitRequest": {
       "type": "object",
       "properties": {
-        "definition": { "$ref": "../resources/rate_limit/schema.json#/$defs/RateLimit" },
-        "labels": { "$ref": "#/$defs/StringMap" },
-        "annotations": { "$ref": "#/$defs/StringMap" }
+        "definition": {
+          "$ref": "../resources/rate_limit/schema.json#/$defs/RateLimit"
+        },
+        "labels": {
+          "$ref": "#/$defs/StringMap"
+        },
+        "annotations": {
+          "$ref": "#/$defs/StringMap"
+        }
       },
       "additionalProperties": false
     },
@@ -887,100 +1432,187 @@
           "type": "string",
           "format": "uri"
         },
-        "method": { "$ref": "../resources/rate_limit/schema.json#/$defs/HttpMethod" },
-        "headers": { "$ref": "#/$defs/HeadersMap" },
-        "labels": { "$ref": "#/$defs/StringMap" },
-        "body_raw": {
+        "method": {
+          "$ref": "../resources/rate_limit/schema.json#/$defs/HttpMethod"
+        },
+        "headers": {
+          "$ref": "#/$defs/HeadersMap"
+        },
+        "labels": {
+          "$ref": "#/$defs/StringMap"
+        },
+        "bodyRaw": {
           "type": "string",
           "contentEncoding": "base64"
         },
-        "body_json": {}
+        "bodyJson": {}
       },
-      "required": ["url", "method"],
+      "required": [
+        "url",
+        "method"
+      ],
       "additionalProperties": false
     },
     "DryRunContext": {
       "type": "object",
       "properties": {
-        "connection_id": { "type": "string" },
-        "actor_id": { "type": "string" },
-        "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" }
+        "connectionId": {
+          "type": "string"
+        },
+        "actorId": {
+          "type": "string"
+        },
+        "namespace": {
+          "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath"
+        }
       },
       "additionalProperties": false
     },
     "DryRunRequest": {
       "type": "object",
       "properties": {
-        "request": { "$ref": "#/$defs/ProxyRequest" },
-        "request_type": { "$ref": "../common/schema.json#/$defs/RequestType" },
-        "context": { "$ref": "#/$defs/DryRunContext" }
+        "request": {
+          "$ref": "#/$defs/ProxyRequest"
+        },
+        "requestType": {
+          "$ref": "../common/schema.json#/$defs/RequestType"
+        },
+        "context": {
+          "$ref": "#/$defs/DryRunContext"
+        }
       },
-      "required": ["request", "request_type", "context"],
+      "required": [
+        "request",
+        "requestType",
+        "context"
+      ],
       "additionalProperties": false
     },
     "DryRunMatch": {
       "type": "object",
       "properties": {
-        "rate_limit_id": { "type": "string" },
-        "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
-        "effective_mode": { "$ref": "../resources/rate_limit/schema.json#/$defs/Mode" },
-        "bucket_key": { "type": "string" },
-        "algorithm_summary": { "type": "string" },
-        "would_allow": { "type": "boolean" },
-        "remaining": { "type": "integer" },
-        "retry_after_ms": {
+        "rateLimitId": {
+          "type": "string"
+        },
+        "namespace": {
+          "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath"
+        },
+        "effectiveMode": {
+          "$ref": "../resources/rate_limit/schema.json#/$defs/Mode"
+        },
+        "bucketKey": {
+          "type": "string"
+        },
+        "algorithmSummary": {
+          "type": "string"
+        },
+        "wouldAllow": {
+          "type": "boolean"
+        },
+        "remaining": {
+          "type": "integer"
+        },
+        "retryAfterMs": {
           "type": "integer",
           "minimum": 0
         },
-        "peek_failed": { "type": "boolean" }
+        "peekFailed": {
+          "type": "boolean"
+        }
       },
-      "required": ["rate_limit_id", "namespace", "effective_mode", "bucket_key", "algorithm_summary", "would_allow", "remaining", "retry_after_ms", "peek_failed"],
+      "required": [
+        "rateLimitId",
+        "namespace",
+        "effectiveMode",
+        "bucketKey",
+        "algorithmSummary",
+        "wouldAllow",
+        "remaining",
+        "retryAfterMs",
+        "peekFailed"
+      ],
       "additionalProperties": false
     },
     "DryRunNotMatched": {
       "type": "object",
       "properties": {
-        "rate_limit_id": { "type": "string" },
-        "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
-        "reason": { "type": "string" }
+        "rateLimitId": {
+          "type": "string"
+        },
+        "namespace": {
+          "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath"
+        },
+        "reason": {
+          "type": "string"
+        }
       },
-      "required": ["rate_limit_id", "namespace", "reason"],
+      "required": [
+        "rateLimitId",
+        "namespace",
+        "reason"
+      ],
       "additionalProperties": false
     },
     "DryRunResponse": {
       "type": "object",
       "properties": {
-        "request_label_snapshot": { "$ref": "#/$defs/StringMap" },
+        "requestLabelSnapshot": {
+          "$ref": "#/$defs/StringMap"
+        },
         "matched": {
           "type": "array",
-          "items": { "$ref": "#/$defs/DryRunMatch" }
+          "items": {
+            "$ref": "#/$defs/DryRunMatch"
+          }
         },
-        "not_matched": {
+        "notMatched": {
           "type": "array",
-          "items": { "$ref": "#/$defs/DryRunNotMatched" }
+          "items": {
+            "$ref": "#/$defs/DryRunNotMatched"
+          }
         }
       },
-      "required": ["request_label_snapshot", "matched", "not_matched"],
+      "required": [
+        "requestLabelSnapshot",
+        "matched",
+        "notMatched"
+      ],
       "additionalProperties": false
     },
     "Key": {
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
-        "state": { "$ref": "#/$defs/KeyState" },
-        "labels": { "$ref": "#/$defs/StringMap" },
-        "annotations": { "$ref": "#/$defs/StringMap" },
-        "created_at": {
+        "id": {
+          "type": "string"
+        },
+        "namespace": {
+          "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath"
+        },
+        "state": {
+          "$ref": "#/$defs/KeyState"
+        },
+        "labels": {
+          "$ref": "#/$defs/StringMap"
+        },
+        "annotations": {
+          "$ref": "#/$defs/StringMap"
+        },
+        "createdAt": {
           "type": "string",
           "format": "date-time"
         },
-        "updated_at": {
+        "updatedAt": {
           "type": "string",
           "format": "date-time"
         }
       },
-      "required": ["id", "namespace", "state", "created_at", "updated_at"],
+      "required": [
+        "id",
+        "namespace",
+        "state",
+        "createdAt",
+        "updatedAt"
+      ],
       "additionalProperties": false
     },
     "ListKeysResponse": {
@@ -988,97 +1620,155 @@
       "properties": {
         "items": {
           "type": "array",
-          "items": { "$ref": "#/$defs/Key" }
+          "items": {
+            "$ref": "#/$defs/Key"
+          }
         },
-        "cursor": { "type": "string" }
+        "cursor": {
+          "type": "string"
+        }
       },
-      "required": ["items"],
+      "required": [
+        "items"
+      ],
       "additionalProperties": false
     },
     "CreateKeyRequest": {
       "type": "object",
       "properties": {
-        "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
-        "key_data": { "$ref": "../resources/key/schema.json#/$defs/KeyData" },
-        "labels": { "$ref": "#/$defs/StringMap" },
-        "annotations": { "$ref": "#/$defs/StringMap" }
+        "namespace": {
+          "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath"
+        },
+        "keyData": {
+          "$ref": "../resources/key/schema.json#/$defs/KeyData"
+        },
+        "labels": {
+          "$ref": "#/$defs/StringMap"
+        },
+        "annotations": {
+          "$ref": "#/$defs/StringMap"
+        }
       },
-      "required": ["namespace"],
+      "required": [
+        "namespace"
+      ],
       "additionalProperties": false
     },
     "UpdateKeyRequest": {
       "type": "object",
       "properties": {
-        "state": { "$ref": "#/$defs/KeyState" },
-        "labels": { "$ref": "#/$defs/StringMap" },
-        "annotations": { "$ref": "#/$defs/StringMap" }
+        "state": {
+          "$ref": "#/$defs/KeyState"
+        },
+        "labels": {
+          "$ref": "#/$defs/StringMap"
+        },
+        "annotations": {
+          "$ref": "#/$defs/StringMap"
+        }
       },
       "additionalProperties": false
     },
     "SessionInitiateParams": {
       "type": "object",
       "properties": {
-        "return_to_url": {
+        "returnToUrl": {
           "type": "string",
           "format": "uri"
         }
       },
-      "required": ["return_to_url"],
+      "required": [
+        "returnToUrl"
+      ],
       "additionalProperties": false
     },
     "SessionInitiateFailureResponse": {
       "type": "object",
       "properties": {
-        "redirect_url": {
+        "redirectUrl": {
           "type": "string",
           "format": "uri"
         }
       },
-      "required": ["redirect_url"],
+      "required": [
+        "redirectUrl"
+      ],
       "additionalProperties": false
     },
     "SessionInitiateSuccessResponse": {
       "type": "object",
       "properties": {
-        "actor_id": { "type": "string" }
+        "actorId": {
+          "type": "string"
+        }
       },
-      "required": ["actor_id"],
+      "required": [
+        "actorId"
+      ],
       "additionalProperties": false
     },
     "KeyValue": {
       "type": "object",
       "properties": {
-        "key": { "type": "string" },
-        "value": { "type": "string" }
+        "key": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
       },
-      "required": ["key", "value"],
+      "required": [
+        "key",
+        "value"
+      ],
       "additionalProperties": false
     },
     "PutKeyValueRequest": {
       "type": "object",
       "properties": {
-        "value": { "type": "string" }
+        "value": {
+          "type": "string"
+        }
       },
-      "required": ["value"],
+      "required": [
+        "value"
+      ],
       "additionalProperties": false
     },
     "RequestEventRateLimit": {
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "mode": { "$ref": "../resources/rate_limit/schema.json#/$defs/Mode" },
-        "bucket": { "$ref": "#/$defs/StringMap" }
+        "id": {
+          "type": "string"
+        },
+        "mode": {
+          "$ref": "../resources/rate_limit/schema.json#/$defs/Mode"
+        },
+        "bucket": {
+          "$ref": "#/$defs/StringMap"
+        }
       },
-      "required": ["id", "mode"],
+      "required": [
+        "id",
+        "mode"
+      ],
       "additionalProperties": false
     },
     "RequestEvent": {
       "type": "object",
       "properties": {
-        "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
-        "type": { "$ref": "../common/schema.json#/$defs/RequestType" },
-        "request_id": { "type": "string" },
-        "correlation_id": { "type": "string" },
+        "namespace": {
+          "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath"
+        },
+        "type": {
+          "$ref": "../common/schema.json#/$defs/RequestType"
+        },
+        "requestId": {
+          "type": "string"
+        },
+        "correlationId": {
+          "type": "string"
+        },
         "timestamp": {
           "type": "string",
           "format": "date-time"
@@ -1087,59 +1777,117 @@
           "type": "integer",
           "minimum": 0
         },
-        "connection_id": { "type": "string" },
-        "connector_id": { "type": "string" },
-        "connector_version": {
+        "connectionId": {
+          "type": "string"
+        },
+        "connectorId": {
+          "type": "string"
+        },
+        "connectorVersion": {
           "type": "integer",
           "minimum": 0
         },
-        "method": { "$ref": "../resources/rate_limit/schema.json#/$defs/HttpMethod" },
-        "host": { "type": "string" },
-        "scheme": { "type": "string" },
-        "path": { "type": "string" },
-        "request_http_version": { "type": "string" },
-        "request_size_bytes": {
+        "method": {
+          "$ref": "../resources/rate_limit/schema.json#/$defs/HttpMethod"
+        },
+        "host": {
+          "type": "string"
+        },
+        "scheme": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "requestHttpVersion": {
+          "type": "string"
+        },
+        "requestSizeBytes": {
           "type": "integer",
           "minimum": 0
         },
-        "request_mime_type": { "type": "string" },
-        "request_body_skipped": {
+        "requestMimeType": {
+          "type": "string"
+        },
+        "requestBodySkipped": {
           "type": "string",
-          "enum": ["streaming", "too_large"]
+          "enum": [
+            "streaming",
+            "too_large"
+          ]
         },
-        "response_status_code": {
+        "responseStatusCode": {
           "type": "integer",
           "minimum": 100,
           "maximum": 599
         },
-        "response_error": { "type": "string" },
-        "response_http_version": { "type": "string" },
-        "response_size_bytes": {
+        "responseError": {
+          "type": "string"
+        },
+        "responseHttpVersion": {
+          "type": "string"
+        },
+        "responseSizeBytes": {
           "type": "integer",
           "minimum": 0
         },
-        "response_mime_type": { "type": "string" },
-        "response_body_skipped": {
-          "type": "string",
-          "enum": ["streaming", "too_large"]
+        "responseMimeType": {
+          "type": "string"
         },
-        "internal_timeout": { "type": "boolean" },
-        "request_cancelled": { "type": "boolean" },
-        "full_request_recorded": { "type": "boolean" },
-        "labels": { "$ref": "#/$defs/StringMap" },
-        "response_source": {
+        "responseBodySkipped": {
           "type": "string",
-          "enum": ["upstream", "connector_rate_limiter", "rate_limit"]
+          "enum": [
+            "streaming",
+            "too_large"
+          ]
         },
-        "rate_limit_id": { "type": "string" },
-        "rate_limit_mode": { "$ref": "../resources/rate_limit/schema.json#/$defs/Mode" },
-        "rate_limit_bucket": { "$ref": "#/$defs/StringMap" },
-        "rate_limit_matched": {
+        "internalTimeout": {
+          "type": "boolean"
+        },
+        "requestCancelled": {
+          "type": "boolean"
+        },
+        "fullRequestRecorded": {
+          "type": "boolean"
+        },
+        "labels": {
+          "$ref": "#/$defs/StringMap"
+        },
+        "responseSource": {
+          "type": "string",
+          "enum": [
+            "upstream",
+            "connector_rate_limiter",
+            "rate_limit"
+          ]
+        },
+        "rateLimitId": {
+          "type": "string"
+        },
+        "rateLimitMode": {
+          "$ref": "../resources/rate_limit/schema.json#/$defs/Mode"
+        },
+        "rateLimitBucket": {
+          "$ref": "#/$defs/StringMap"
+        },
+        "rateLimitMatched": {
           "type": "array",
-          "items": { "$ref": "#/$defs/RequestEventRateLimit" }
+          "items": {
+            "$ref": "#/$defs/RequestEventRateLimit"
+          }
         }
       },
-      "required": ["namespace", "type", "request_id", "timestamp", "duration", "method", "host", "scheme", "path"],
+      "required": [
+        "namespace",
+        "type",
+        "requestId",
+        "timestamp",
+        "duration",
+        "method",
+        "host",
+        "scheme",
+        "path"
+      ],
       "additionalProperties": false
     },
     "ListRequestEventsResponse": {
@@ -1147,103 +1895,231 @@
       "properties": {
         "items": {
           "type": "array",
-          "items": { "$ref": "#/$defs/RequestEvent" }
+          "items": {
+            "$ref": "#/$defs/RequestEvent"
+          }
         },
-        "cursor": { "type": "string" },
+        "cursor": {
+          "type": "string"
+        },
         "total": {
           "type": "integer",
           "minimum": 0
         }
       },
-      "required": ["items"],
+      "required": [
+        "items"
+      ],
       "additionalProperties": false
     },
     "TaskState": {
       "type": "string",
-      "enum": ["unknown", "active", "pending", "scheduled", "retry", "failed", "completed"]
+      "enum": [
+        "unknown",
+        "active",
+        "pending",
+        "scheduled",
+        "retry",
+        "failed",
+        "completed"
+      ]
     },
     "TaskInfo": {
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "type": { "type": "string" },
-        "state": { "$ref": "#/$defs/TaskState" },
-        "updated_at": {
+        "id": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/TaskState"
+        },
+        "updatedAt": {
           "type": "string",
           "format": "date-time"
         }
       },
-      "required": ["id", "type", "state"],
+      "required": [
+        "id",
+        "type",
+        "state"
+      ],
       "additionalProperties": false
     },
     "QueueInfo": {
       "type": "object",
       "properties": {
-        "queue": { "type": "string" },
-        "memory_usage": { "type": "integer" },
-        "latency_seconds": { "type": "number" },
-        "size": { "type": "integer" },
-        "groups": { "type": "integer" },
-        "pending": { "type": "integer" },
-        "active": { "type": "integer" },
-        "scheduled": { "type": "integer" },
-        "retry": { "type": "integer" },
-        "archived": { "type": "integer" },
-        "completed": { "type": "integer" },
-        "aggregating": { "type": "integer" },
-        "processed": { "type": "integer" },
-        "failed": { "type": "integer" },
-        "processed_total": { "type": "integer" },
-        "failed_total": { "type": "integer" },
-        "paused": { "type": "boolean" },
+        "queue": {
+          "type": "string"
+        },
+        "memoryUsage": {
+          "type": "integer"
+        },
+        "latencySeconds": {
+          "type": "number"
+        },
+        "size": {
+          "type": "integer"
+        },
+        "groups": {
+          "type": "integer"
+        },
+        "pending": {
+          "type": "integer"
+        },
+        "active": {
+          "type": "integer"
+        },
+        "scheduled": {
+          "type": "integer"
+        },
+        "retry": {
+          "type": "integer"
+        },
+        "archived": {
+          "type": "integer"
+        },
+        "completed": {
+          "type": "integer"
+        },
+        "aggregating": {
+          "type": "integer"
+        },
+        "processed": {
+          "type": "integer"
+        },
+        "failed": {
+          "type": "integer"
+        },
+        "processedTotal": {
+          "type": "integer"
+        },
+        "failedTotal": {
+          "type": "integer"
+        },
+        "paused": {
+          "type": "boolean"
+        },
         "timestamp": {
           "type": "string",
           "format": "date-time"
         }
       },
-      "required": ["queue", "memory_usage", "latency_seconds", "size", "groups", "pending", "active", "scheduled", "retry", "archived", "completed", "aggregating", "processed", "failed", "processed_total", "failed_total", "paused", "timestamp"],
+      "required": [
+        "queue",
+        "memoryUsage",
+        "latencySeconds",
+        "size",
+        "groups",
+        "pending",
+        "active",
+        "scheduled",
+        "retry",
+        "archived",
+        "completed",
+        "aggregating",
+        "processed",
+        "failed",
+        "processedTotal",
+        "failedTotal",
+        "paused",
+        "timestamp"
+      ],
       "additionalProperties": false
     },
     "MonitoringTaskInfo": {
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "queue": { "type": "string" },
-        "type": { "type": "string" },
-        "payload": { "type": "string" },
-        "state": { "type": "string" },
-        "max_retry": { "type": "integer" },
-        "retried": { "type": "integer" },
-        "last_err": { "type": "string" },
-        "last_failed_at": { "type": "string" },
-        "next_process_at": { "type": "string" },
-        "completed_at": { "type": "string" },
-        "is_orphaned": { "type": "boolean" },
-        "group": { "type": "string" }
+        "id": {
+          "type": "string"
+        },
+        "queue": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "payload": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "maxRetry": {
+          "type": "integer"
+        },
+        "retried": {
+          "type": "integer"
+        },
+        "lastErr": {
+          "type": "string"
+        },
+        "lastFailedAt": {
+          "type": "string"
+        },
+        "nextProcessAt": {
+          "type": "string"
+        },
+        "completedAt": {
+          "type": "string"
+        },
+        "isOrphaned": {
+          "type": "boolean"
+        },
+        "group": {
+          "type": "string"
+        }
       },
-      "required": ["id", "queue", "type", "payload", "state", "max_retry", "retried"],
+      "required": [
+        "id",
+        "queue",
+        "type",
+        "payload",
+        "state",
+        "maxRetry",
+        "retried"
+      ],
       "additionalProperties": false
     },
     "DailyStats": {
       "type": "object",
       "properties": {
-        "queue": { "type": "string" },
-        "processed": { "type": "integer" },
-        "failed": { "type": "integer" },
+        "queue": {
+          "type": "string"
+        },
+        "processed": {
+          "type": "integer"
+        },
+        "failed": {
+          "type": "integer"
+        },
         "date": {
           "type": "string",
           "format": "date"
         }
       },
-      "required": ["queue", "processed", "failed", "date"],
+      "required": [
+        "queue",
+        "processed",
+        "failed",
+        "date"
+      ],
       "additionalProperties": false
     },
     "WorkerInfo": {
       "type": "object",
       "properties": {
-        "task_id": { "type": "string" },
-        "task_type": { "type": "string" },
-        "queue": { "type": "string" },
+        "taskId": {
+          "type": "string"
+        },
+        "taskType": {
+          "type": "string"
+        },
+        "queue": {
+          "type": "string"
+        },
         "started": {
           "type": "string",
           "format": "date-time"
@@ -1253,40 +2129,78 @@
           "format": "date-time"
         }
       },
-      "required": ["task_id", "task_type", "queue", "started", "deadline"],
+      "required": [
+        "taskId",
+        "taskType",
+        "queue",
+        "started",
+        "deadline"
+      ],
       "additionalProperties": false
     },
     "ServerInfo": {
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "host": { "type": "string" },
-        "pid": { "type": "integer" },
-        "concurrency": { "type": "integer" },
+        "id": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "pid": {
+          "type": "integer"
+        },
+        "concurrency": {
+          "type": "integer"
+        },
         "queues": {
           "type": "object",
-          "additionalProperties": { "type": "integer" }
+          "additionalProperties": {
+            "type": "integer"
+          }
         },
-        "strict_priority": { "type": "boolean" },
+        "strictPriority": {
+          "type": "boolean"
+        },
         "started": {
           "type": "string",
           "format": "date-time"
         },
-        "status": { "type": "string" },
-        "active_workers": {
+        "status": {
+          "type": "string"
+        },
+        "activeWorkers": {
           "type": "array",
-          "items": { "$ref": "#/$defs/WorkerInfo" }
+          "items": {
+            "$ref": "#/$defs/WorkerInfo"
+          }
         }
       },
-      "required": ["id", "host", "pid", "concurrency", "queues", "strict_priority", "started", "status", "active_workers"],
+      "required": [
+        "id",
+        "host",
+        "pid",
+        "concurrency",
+        "queues",
+        "strictPriority",
+        "started",
+        "status",
+        "activeWorkers"
+      ],
       "additionalProperties": false
     },
     "SchedulerEntry": {
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "spec": { "type": "string" },
-        "task_type": { "type": "string" },
+        "id": {
+          "type": "string"
+        },
+        "spec": {
+          "type": "string"
+        },
+        "taskType": {
+          "type": "string"
+        },
         "next": {
           "type": "string",
           "format": "date-time"
@@ -1296,18 +2210,25 @@
           "format": "date-time"
         }
       },
-      "required": ["id", "spec", "task_type", "next"],
+      "required": [
+        "id",
+        "spec",
+        "taskType",
+        "next"
+      ],
       "additionalProperties": false
     },
     "BulkActionResponse": {
       "type": "object",
       "properties": {
-        "affected_count": {
+        "affectedCount": {
           "type": "integer",
           "minimum": 0
         }
       },
-      "required": ["affected_count"],
+      "required": [
+        "affectedCount"
+      ],
       "additionalProperties": false
     },
     "ListQueuesResponse": {
@@ -1315,10 +2236,14 @@
       "properties": {
         "items": {
           "type": "array",
-          "items": { "$ref": "#/$defs/QueueInfo" }
+          "items": {
+            "$ref": "#/$defs/QueueInfo"
+          }
         }
       },
-      "required": ["items"],
+      "required": [
+        "items"
+      ],
       "additionalProperties": false
     },
     "ListMonitoringTasksResponse": {
@@ -1326,11 +2251,17 @@
       "properties": {
         "items": {
           "type": "array",
-          "items": { "$ref": "#/$defs/MonitoringTaskInfo" }
+          "items": {
+            "$ref": "#/$defs/MonitoringTaskInfo"
+          }
         },
-        "cursor": { "type": "string" }
+        "cursor": {
+          "type": "string"
+        }
       },
-      "required": ["items"],
+      "required": [
+        "items"
+      ],
       "additionalProperties": false
     },
     "ListServersResponse": {
@@ -1338,10 +2269,14 @@
       "properties": {
         "items": {
           "type": "array",
-          "items": { "$ref": "#/$defs/ServerInfo" }
+          "items": {
+            "$ref": "#/$defs/ServerInfo"
+          }
         }
       },
-      "required": ["items"],
+      "required": [
+        "items"
+      ],
       "additionalProperties": false
     },
     "ListSchedulerEntriesResponse": {
@@ -1349,10 +2284,14 @@
       "properties": {
         "items": {
           "type": "array",
-          "items": { "$ref": "#/$defs/SchedulerEntry" }
+          "items": {
+            "$ref": "#/$defs/SchedulerEntry"
+          }
         }
       },
-      "required": ["items"],
+      "required": [
+        "items"
+      ],
       "additionalProperties": false
     },
     "ListQueueHistoryResponse": {
@@ -1360,10 +2299,14 @@
       "properties": {
         "items": {
           "type": "array",
-          "items": { "$ref": "#/$defs/DailyStats" }
+          "items": {
+            "$ref": "#/$defs/DailyStats"
+          }
         }
       },
-      "required": ["items"],
+      "required": [
+        "items"
+      ],
       "additionalProperties": false
     }
   }

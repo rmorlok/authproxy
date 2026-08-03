@@ -43,7 +43,7 @@
                     {
                         "type": "string",
                         "description": "Filter by external ID",
-                        "name": "external_id",
+                        "name": "externalId",
                         "in": "query"
                     },
                     {
@@ -61,13 +61,13 @@
                     {
                         "type": "string",
                         "description": "Filter by label selector",
-                        "name": "label_selector",
+                        "name": "labelSelector",
                         "in": "query"
                     },
                     {
                         "type": "string",
                         "description": "Order by field (e.g., 'created_at:asc')",
-                        "name": "order_by",
+                        "name": "orderBy",
                         "in": "query"
                     }
                 ],
@@ -166,7 +166,7 @@
                 }
             }
         },
-        "/actors/external-id/{external_id}": {
+        "/actors/external-id/{externalId}": {
             "get": {
                 "security": [
                     {
@@ -188,7 +188,7 @@
                     {
                         "type": "string",
                         "description": "External ID of the actor",
-                        "name": "external_id",
+                        "name": "externalId",
                         "in": "path",
                         "required": true
                     },
@@ -253,7 +253,7 @@
                     {
                         "type": "string",
                         "description": "External ID of the actor",
-                        "name": "external_id",
+                        "name": "externalId",
                         "in": "path",
                         "required": true
                     },
@@ -315,7 +315,7 @@
                     {
                         "type": "string",
                         "description": "External ID of the actor",
-                        "name": "external_id",
+                        "name": "externalId",
                         "in": "path",
                         "required": true
                     },
@@ -1140,7 +1140,7 @@
                     {
                         "type": "string",
                         "description": "Filter by connector ID",
-                        "name": "connector_id",
+                        "name": "connectorId",
                         "in": "query"
                     },
                     {
@@ -1158,13 +1158,13 @@
                     {
                         "type": "string",
                         "description": "Filter by label selector",
-                        "name": "label_selector",
+                        "name": "labelSelector",
                         "in": "query"
                     },
                     {
                         "type": "string",
                         "description": "Order by field (e.g., 'created_at:asc')",
-                        "name": "order_by",
+                        "name": "orderBy",
                         "in": "query"
                     }
                 ],
@@ -1449,7 +1449,7 @@
                 }
             }
         },
-        "/connections/{id}/_cancel_setup": {
+        "/connections/{id}/_cancelSetup": {
             "post": {
                 "security": [
                     {
@@ -1498,7 +1498,7 @@
                 }
             }
         },
-        "/connections/{id}/_data_source/{source_id}": {
+        "/connections/{id}/_dataSource/{sourceId}": {
             "get": {
                 "security": [
                     {
@@ -1524,7 +1524,7 @@
                     {
                         "type": "string",
                         "description": "Data Source ID",
-                        "name": "source_id",
+                        "name": "sourceId",
                         "in": "path",
                         "required": true
                     }
@@ -1629,7 +1629,7 @@
                 }
             }
         },
-        "/connections/{id}/_force_state": {
+        "/connections/{id}/_forceState": {
             "put": {
                 "security": [
                     {
@@ -1705,7 +1705,7 @@
                 }
             }
         },
-        "/connections/{id}/_migrate_version": {
+        "/connections/{id}/_migrateVersion": {
             "post": {
                 "security": [
                     {
@@ -2037,7 +2037,7 @@
                 }
             }
         },
-        "/connections/{id}/_setup_step": {
+        "/connections/{id}/_setupStep": {
             "get": {
                 "security": [
                     {
@@ -2063,7 +2063,7 @@
                     {
                         "type": "string",
                         "description": "URL to return to after a resumed redirect step",
-                        "name": "return_to_url",
+                        "name": "returnToUrl",
                         "in": "query"
                     }
                 ],
@@ -2803,13 +2803,13 @@
                     {
                         "type": "string",
                         "description": "Filter by label selector",
-                        "name": "label_selector",
+                        "name": "labelSelector",
                         "in": "query"
                     },
                     {
                         "type": "string",
                         "description": "Order by field (e.g., 'created_at:asc')",
-                        "name": "order_by",
+                        "name": "orderBy",
                         "in": "query"
                     }
                 ],
@@ -3130,7 +3130,7 @@
                 }
             }
         },
-        "/connectors/{id}/_disconnect_all": {
+        "/connectors/{id}/_disconnectAll": {
             "post": {
                 "security": [
                     {
@@ -3822,13 +3822,13 @@
                     {
                         "type": "string",
                         "description": "Filter by label selector",
-                        "name": "label_selector",
+                        "name": "labelSelector",
                         "in": "query"
                     },
                     {
                         "type": "string",
                         "description": "Order by field (e.g., 'version:desc')",
-                        "name": "order_by",
+                        "name": "orderBy",
                         "in": "query"
                     }
                 ],
@@ -4094,7 +4094,7 @@
                 }
             }
         },
-        "/connectors/{id}/versions/{version}/_force_state": {
+        "/connectors/{id}/versions/{version}/_forceState": {
             "put": {
                 "security": [
                     {
@@ -4861,13 +4861,13 @@
                     {
                         "type": "string",
                         "description": "Filter by label selector",
-                        "name": "label_selector",
+                        "name": "labelSelector",
                         "in": "query"
                     },
                     {
                         "type": "string",
                         "description": "Order by field (e.g., 'state:asc')",
-                        "name": "order_by",
+                        "name": "orderBy",
                         "in": "query"
                     }
                 ],
@@ -5770,7 +5770,7 @@
                     {
                         "type": "string",
                         "description": "Order by field (e.g., 'timestamp:desc')",
-                        "name": "order_by",
+                        "name": "orderBy",
                         "in": "query"
                     },
                     {
@@ -5782,37 +5782,37 @@
                     {
                         "type": "string",
                         "description": "Filter by request type",
-                        "name": "request_type",
+                        "name": "requestType",
                         "in": "query"
                     },
                     {
                         "type": "string",
                         "description": "Filter by correlation ID",
-                        "name": "correlation_id",
+                        "name": "correlationId",
                         "in": "query"
                     },
                     {
                         "type": "string",
                         "description": "Filter by connection UUID",
-                        "name": "connection_id",
+                        "name": "connectionId",
                         "in": "query"
                     },
                     {
                         "type": "string",
                         "description": "Filter by connector type",
-                        "name": "connector_type",
+                        "name": "connectorType",
                         "in": "query"
                     },
                     {
                         "type": "string",
                         "description": "Filter by connector UUID",
-                        "name": "connector_id",
+                        "name": "connectorId",
                         "in": "query"
                     },
                     {
                         "type": "integer",
                         "description": "Filter by connector version",
-                        "name": "connector_version",
+                        "name": "connectorVersion",
                         "in": "query"
                     },
                     {
@@ -5824,19 +5824,19 @@
                     {
                         "type": "integer",
                         "description": "Filter by exact status code",
-                        "name": "status_code",
+                        "name": "statusCode",
                         "in": "query"
                     },
                     {
                         "type": "string",
                         "description": "Filter by status code range (e.g., '200-299')",
-                        "name": "status_code_range",
+                        "name": "statusCodeRange",
                         "in": "query"
                     },
                     {
                         "type": "string",
                         "description": "Filter by timestamp range",
-                        "name": "timestamp_range",
+                        "name": "timestampRange",
                         "in": "query"
                     },
                     {
@@ -5848,13 +5848,13 @@
                     {
                         "type": "string",
                         "description": "Filter by path regex",
-                        "name": "path_regex",
+                        "name": "pathRegex",
                         "in": "query"
                     },
                     {
                         "type": "string",
                         "description": "Filter by label selector (e.g., 'env=prod,team=api')",
-                        "name": "label_selector",
+                        "name": "labelSelector",
                         "in": "query"
                     }
                 ],
@@ -6024,7 +6024,7 @@
                     {
                         "type": "string",
                         "description": "Filter to children of a parent namespace",
-                        "name": "children_of",
+                        "name": "childrenOf",
                         "in": "query"
                     },
                     {
@@ -6042,13 +6042,13 @@
                     {
                         "type": "string",
                         "description": "Filter by label selector",
-                        "name": "label_selector",
+                        "name": "labelSelector",
                         "in": "query"
                     },
                     {
                         "type": "string",
                         "description": "Order by field (e.g., 'path:asc')",
-                        "name": "order_by",
+                        "name": "orderBy",
                         "in": "query"
                     }
                 ],
@@ -6823,7 +6823,7 @@
                     {
                         "type": "boolean",
                         "description": "Include notifications the actor has already viewed",
-                        "name": "include_viewed",
+                        "name": "includeViewed",
                         "in": "query"
                     },
                     {
@@ -6841,7 +6841,7 @@
                     {
                         "type": "string",
                         "description": "Filter by denormalized resource label selector",
-                        "name": "label_selector",
+                        "name": "labelSelector",
                         "in": "query"
                     }
                 ],
@@ -7046,13 +7046,13 @@
                     {
                         "type": "string",
                         "description": "Filter by label selector",
-                        "name": "label_selector",
+                        "name": "labelSelector",
                         "in": "query"
                     },
                     {
                         "type": "string",
                         "description": "Order by field (e.g., 'created_at:desc')",
-                        "name": "order_by",
+                        "name": "orderBy",
                         "in": "query"
                     }
                 ],
@@ -7145,7 +7145,7 @@
                 }
             }
         },
-        "/rate-limits/_dry_run": {
+        "/rate-limits/_dryRun": {
             "post": {
                 "security": [
                     {
@@ -7956,7 +7956,7 @@
                         },
                         "collectionFormat": "multi",
                         "description": "Resource types; may be repeated",
-                        "name": "resource_type",
+                        "name": "resourceType",
                         "in": "query"
                     },
                     {
@@ -7968,7 +7968,7 @@
                     {
                         "type": "string",
                         "description": "Exact Kubernetes-style label selector",
-                        "name": "label_selector",
+                        "name": "labelSelector",
                         "in": "query"
                     },
                     {
@@ -8173,10 +8173,10 @@
                         "type": "string"
                     }
                 },
-                "created_at": {
+                "createdAt": {
                     "type": "string"
                 },
-                "external_id": {
+                "externalId": {
                     "type": "string",
                     "example": "user-123"
                 },
@@ -8198,7 +8198,7 @@
                     "type": "string",
                     "example": "root.acme"
                 },
-                "updated_at": {
+                "updatedAt": {
                     "type": "string"
                 }
             }
@@ -8213,18 +8213,18 @@
                         "type": "string"
                     }
                 },
-                "created_at": {
+                "createdAt": {
                     "type": "string"
                 },
                 "description": {
                     "type": "string",
                     "example": "Salesforce CRM integration"
                 },
-                "display_name": {
+                "displayName": {
                     "type": "string",
                     "example": "Salesforce"
                 },
-                "has_configure": {
+                "hasConfigure": {
                     "type": "boolean",
                     "example": false
                 },
@@ -8258,11 +8258,11 @@
                     "type": "string",
                     "example": "primary"
                 },
-                "status_page_url": {
+                "statusPageUrl": {
                     "type": "string",
                     "example": "https://status.salesforce.com"
                 },
-                "updated_at": {
+                "updatedAt": {
                     "type": "string"
                 },
                 "version": {
@@ -8284,7 +8284,7 @@
                         "count"
                     ]
                 },
-                "group_by": {
+                "groupBy": {
                     "type": "array",
                     "items": {
                         "type": "string"
@@ -8314,10 +8314,10 @@
                         "type": "string"
                     }
                 },
-                "created_at": {
+                "createdAt": {
                     "type": "string"
                 },
-                "key_id": {
+                "keyId": {
                     "type": "string",
                     "example": "key_test550e8400abcd"
                 },
@@ -8340,7 +8340,7 @@
                     "type": "string",
                     "example": "active"
                 },
-                "updated_at": {
+                "updatedAt": {
                     "type": "string"
                 }
             }
@@ -8355,10 +8355,10 @@
                         "type": "string"
                     }
                 },
-                "created_at": {
+                "createdAt": {
                     "type": "string"
                 },
-                "external_id": {
+                "externalId": {
                     "type": "string",
                     "example": "user-123"
                 },
@@ -8380,7 +8380,7 @@
                     "type": "string",
                     "example": "root.acme"
                 },
-                "updated_at": {
+                "updatedAt": {
                     "type": "string"
                 }
             }
@@ -8427,20 +8427,20 @@
                     "type": "string",
                     "example": "cxn_test550e8400abcde"
                 },
-                "json_schema": {
+                "jsonSchema": {
                     "description": "JSON Schema defining the form fields.",
                     "type": "object"
                 },
-                "step_description": {
+                "stepDescription": {
                     "description": "Step description.",
                     "type": "string"
                 },
-                "step_id": {
+                "stepId": {
                     "description": "Step ID being submitted.",
                     "type": "string",
                     "example": "preconnect:0"
                 },
-                "step_title": {
+                "stepTitle": {
                     "description": "Step title.",
                     "type": "string",
                     "example": "Choose workspace"
@@ -8450,7 +8450,7 @@
                     "type": "string",
                     "example": "form"
                 },
-                "ui_schema": {
+                "uiSchema": {
                     "description": "UI Schema for JSON Forms rendering.",
                     "type": "object"
                 }
@@ -8465,7 +8465,7 @@
                     "type": "string",
                     "example": "cxn_test550e8400abcde"
                 },
-                "redirect_url": {
+                "redirectUrl": {
                     "description": "URL to redirect the user to.",
                     "type": "string",
                     "example": "https://oauth.provider.com/authorize?..."
@@ -8487,18 +8487,18 @@
                         "type": "string"
                     }
                 },
-                "created_at": {
+                "createdAt": {
                     "type": "string"
                 },
                 "description": {
                     "type": "string",
                     "example": "Salesforce CRM integration"
                 },
-                "display_name": {
+                "displayName": {
                     "type": "string",
                     "example": "Salesforce"
                 },
-                "has_configure": {
+                "hasConfigure": {
                     "type": "boolean",
                     "example": false
                 },
@@ -8532,11 +8532,11 @@
                     "type": "string",
                     "example": "primary"
                 },
-                "status_page_url": {
+                "statusPageUrl": {
                     "type": "string",
                     "example": "https://status.salesforce.com"
                 },
-                "updated_at": {
+                "updatedAt": {
                     "type": "string"
                 },
                 "version": {
@@ -8555,7 +8555,7 @@
                         "type": "string"
                     }
                 },
-                "external_id": {
+                "externalId": {
                     "type": "string",
                     "example": "user-123"
                 },
@@ -8622,7 +8622,7 @@
                     "type": "string",
                     "example": "Bad Request"
                 },
-                "stack_trace": {
+                "stackTrace": {
                     "description": "Stack trace, only populated in debug mode.",
                     "type": "string"
                 }
@@ -8652,17 +8652,17 @@
             "description": "Request to initiate a connection",
             "type": "object",
             "properties": {
-                "connector_id": {
+                "connectorId": {
                     "description": "ID of the connector to initiate the connection for.",
                     "type": "string",
                     "example": "cxr_test550e8400abcde"
                 },
-                "connector_version": {
+                "connectorVersion": {
                     "description": "Version of the connector to initiate connection for; if not specified defaults to the primary version.",
                     "type": "integer",
                     "example": 1
                 },
-                "into_namespace": {
+                "intoNamespace": {
                     "description": "The namespace to create the connection in. Must be the namespace of connector or a child namespace of that\nnamespace. Defaults to the connector namespace if not specified.",
                     "type": "string",
                     "example": "root.acme"
@@ -8672,7 +8672,7 @@
                     "type": "string",
                     "example": "production-crm"
                 },
-                "return_to_url": {
+                "returnToUrl": {
                     "description": "The URL to return to after the connection is completed.",
                     "type": "string",
                     "example": "https://example.com/callback"
@@ -8716,10 +8716,10 @@
                         "type": "string"
                     }
                 },
-                "created_at": {
+                "createdAt": {
                     "type": "string"
                 },
-                "key_id": {
+                "keyId": {
                     "type": "string",
                     "example": "key_test550e8400abcd"
                 },
@@ -8742,7 +8742,7 @@
                     "type": "string",
                     "example": "active"
                 },
-                "updated_at": {
+                "updatedAt": {
                     "type": "string"
                 }
             }
@@ -8758,10 +8758,10 @@
                     }
                 },
                 "connector": {},
-                "created_at": {
+                "createdAt": {
                     "type": "string"
                 },
-                "health_state": {
+                "healthState": {
                     "type": "string",
                     "example": "healthy"
                 },
@@ -8783,10 +8783,10 @@
                     "type": "string",
                     "example": "root.acme"
                 },
-                "setup_error": {
+                "setupError": {
                     "type": "string"
                 },
-                "setup_step_id": {
+                "setupStepId": {
                     "type": "string",
                     "example": "tenant"
                 },
@@ -8794,7 +8794,7 @@
                     "type": "string",
                     "example": "configured"
                 },
-                "updated_at": {
+                "updatedAt": {
                     "type": "string"
                 }
             }
@@ -8803,7 +8803,7 @@
             "description": "Request to run a connector lifecycle operation",
             "type": "object",
             "properties": {
-                "timeout_seconds": {
+                "timeoutSeconds": {
                     "type": "integer",
                     "example": 600
                 }
@@ -8813,11 +8813,11 @@
             "description": "Response for connector lifecycle operation",
             "type": "object",
             "properties": {
-                "connector_id": {
+                "connectorId": {
                     "type": "string",
                     "example": "cxr_test550e8400abcde"
                 },
-                "task_id": {
+                "taskId": {
                     "type": "string"
                 }
             }
@@ -8832,7 +8832,7 @@
                         "type": "string"
                     }
                 },
-                "created_at": {
+                "createdAt": {
                     "type": "string"
                 },
                 "definition": {},
@@ -8858,7 +8858,7 @@
                     "type": "string",
                     "example": "primary"
                 },
-                "updated_at": {
+                "updatedAt": {
                     "type": "string"
                 },
                 "version": {
@@ -8923,7 +8923,7 @@
                         "type": "string"
                     }
                 },
-                "key_data": {
+                "keyData": {
                     "type": "object",
                     "additionalProperties": true
                 },
@@ -8977,7 +8977,7 @@
             "description": "Request body for connection disconnect operations",
             "type": "object",
             "properties": {
-                "timeout_seconds": {
+                "timeoutSeconds": {
                     "type": "integer",
                     "example": 600
                 }
@@ -8988,7 +8988,7 @@
             "type": "object",
             "properties": {
                 "connection": {},
-                "task_id": {
+                "taskId": {
                     "type": "string"
                 }
             }
@@ -8999,7 +8999,7 @@
             "properties": {
                 "context": {},
                 "request": {},
-                "request_type": {
+                "requestType": {
                     "type": "string",
                     "example": "proxy"
                 }
@@ -9013,11 +9013,11 @@
                     "type": "array",
                     "items": {}
                 },
-                "not_matched": {
+                "notMatched": {
                     "type": "array",
                     "items": {}
                 },
-                "request_label_snapshot": {
+                "requestLabelSnapshot": {
                     "type": "object",
                     "additionalProperties": {
                         "type": "string"
@@ -9035,14 +9035,14 @@
                         "type": "string"
                     }
                 },
-                "created_at": {
+                "createdAt": {
                     "type": "string"
                 },
                 "id": {
                     "type": "string",
                     "example": "key_test550e8400abcd"
                 },
-                "key_data": {
+                "keyData": {
                     "type": "object"
                 },
                 "labels": {
@@ -9063,7 +9063,7 @@
                     "type": "string",
                     "example": "active"
                 },
-                "updated_at": {
+                "updatedAt": {
                     "type": "string"
                 }
             }
@@ -9218,11 +9218,11 @@
             "description": "Request body for connection connector-version migration operations",
             "type": "object",
             "properties": {
-                "target_version": {
+                "targetVersion": {
                     "type": "integer",
                     "example": 3
                 },
-                "timeout_seconds": {
+                "timeoutSeconds": {
                     "type": "integer",
                     "example": 600
                 }
@@ -9232,19 +9232,19 @@
             "description": "Response for connection connector-version migration operation",
             "type": "object",
             "properties": {
-                "connection_id": {
+                "connectionId": {
                     "type": "string",
                     "example": "cxn_test550e8400abcde"
                 },
-                "source_version": {
+                "sourceVersion": {
                     "type": "integer",
                     "example": 1
                 },
-                "target_version": {
+                "targetVersion": {
                     "type": "integer",
                     "example": 3
                 },
-                "task_id": {
+                "taskId": {
                     "type": "string"
                 }
             }
@@ -9253,8 +9253,8 @@
             "description": "Response from a proxied HTTP request",
             "type": "object",
             "properties": {
-                "body_json": {},
-                "body_raw": {
+                "bodyJson": {},
+                "bodyRaw": {
                     "type": "array",
                     "items": {
                         "type": "integer"
@@ -9266,7 +9266,7 @@
                         "type": "string"
                     }
                 },
-                "status_code": {
+                "statusCode": {
                     "type": "integer",
                     "example": 200
                 }
@@ -9282,7 +9282,7 @@
                         "type": "string"
                     }
                 },
-                "created_at": {
+                "createdAt": {
                     "type": "string"
                 },
                 "definition": {
@@ -9307,7 +9307,7 @@
                     "type": "string",
                     "example": "root.acme"
                 },
-                "updated_at": {
+                "updatedAt": {
                     "type": "string"
                 }
             }
@@ -9316,16 +9316,16 @@
             "description": "HTTP request events entry",
             "type": "object",
             "properties": {
-                "connection_id": {
+                "connectionId": {
                     "type": "string"
                 },
-                "connector_id": {
+                "connectorId": {
                     "type": "string"
                 },
-                "connector_version": {
+                "connectorVersion": {
                     "type": "integer"
                 },
-                "correlation_id": {
+                "correlationId": {
                     "type": "string"
                 },
                 "duration": {
@@ -9354,31 +9354,31 @@
                     "type": "string",
                     "example": "/v1/users"
                 },
-                "rate_limit_bucket": {
+                "rateLimitBucket": {
                     "type": "object",
                     "additionalProperties": {
                         "type": "string"
                     }
                 },
-                "rate_limit_id": {
+                "rateLimitId": {
                     "type": "string"
                 },
-                "rate_limit_matched": {
+                "rateLimitMatched": {
                     "type": "array",
                     "items": {}
                 },
-                "rate_limit_mode": {
+                "rateLimitMode": {
                     "type": "string"
                 },
-                "request_id": {
+                "requestId": {
                     "type": "string",
                     "example": "req_test550e8400abcde"
                 },
-                "response_source": {
+                "responseSource": {
                     "type": "string",
                     "example": "upstream"
                 },
-                "response_status_code": {
+                "responseStatusCode": {
                     "type": "integer",
                     "example": 200
                 },
@@ -9398,7 +9398,7 @@
         "routes.OpenAPISearchResourcesResponseJson": {
             "type": "object",
             "properties": {
-                "incomplete_types": {
+                "incompleteTypes": {
                     "type": "array",
                     "items": {
                         "type": "string"
@@ -9416,7 +9416,7 @@
                                     "type": "string"
                                 }
                             },
-                            "matched_labels": {
+                            "matchedLabels": {
                                 "type": "array",
                                 "items": {
                                     "type": "object",
@@ -9440,21 +9440,21 @@
                                 "type": "string",
                                 "example": "root.acme"
                             },
-                            "resource_id": {
+                            "resourceId": {
                                 "type": "string",
                                 "example": "cxn_test550e8400abcde"
                             },
-                            "resource_type": {
+                            "resourceType": {
                                 "type": "string",
                                 "example": "connection"
                             },
-                            "updated_at": {
+                            "updatedAt": {
                                 "type": "string"
                             }
                         }
                     }
                 },
-                "truncated_types": {
+                "truncatedTypes": {
                     "type": "array",
                     "items": {
                         "type": "string"
@@ -9476,7 +9476,7 @@
                 "type": {
                     "type": "string"
                 },
-                "updated_at": {
+                "updatedAt": {
                     "type": "string"
                 }
             }
@@ -9533,7 +9533,7 @@
                         "type": "string"
                     }
                 },
-                "key_data": {
+                "keyData": {
                     "type": "object",
                     "additionalProperties": true
                 },
@@ -9583,8 +9583,8 @@
             "description": "Request to proxy or simulate an HTTP request",
             "type": "object",
             "properties": {
-                "body_json": {},
-                "body_raw": {
+                "bodyJson": {},
+                "bodyRaw": {
                     "type": "array",
                     "items": {
                         "type": "integer"
@@ -9621,7 +9621,7 @@
         "routes.ReauthConnectionRequest": {
             "type": "object",
             "properties": {
-                "return_to_url": {
+                "returnToUrl": {
                     "type": "string"
                 }
             }
@@ -9629,7 +9629,7 @@
         "routes.RetryConnectionRequest": {
             "type": "object",
             "properties": {
-                "return_to_url": {
+                "returnToUrl": {
                     "type": "string"
                 }
             }
@@ -9637,7 +9637,7 @@
         "routes.SessionInitiateFailureResponse": {
             "type": "object",
             "properties": {
-                "redirect_url": {
+                "redirectUrl": {
                     "type": "string",
                     "example": "https://example.com/auth"
                 }
@@ -9646,7 +9646,7 @@
         "routes.SessionInitiateParams": {
             "type": "object",
             "properties": {
-                "return_to_url": {
+                "returnToUrl": {
                     "type": "string",
                     "example": "https://example.com/return"
                 }
@@ -9655,7 +9655,7 @@
         "routes.SessionInitiateSuccessResponse": {
             "type": "object",
             "properties": {
-                "actor_id": {
+                "actorId": {
                     "type": "string",
                     "example": "act_test550e8400abcde"
                 }
@@ -9669,12 +9669,12 @@
                     "description": "Data is the form data submitted by the user for the current step.",
                     "type": "object"
                 },
-                "return_to_url": {
+                "returnToUrl": {
                     "description": "ReturnToUrl is required when the next step after form submission is an auth redirect.\nThe client should provide this so the OAuth callback knows where to return.",
                     "type": "string",
                     "example": "https://example.com/callback"
                 },
-                "step_id": {
+                "stepId": {
                     "description": "StepId is the id of the step being submitted. Must match the current setup step's id.",
                     "type": "string",
                     "example": "preconnect:0"

@@ -309,7 +309,7 @@ func TestConnectors(t *testing.T) {
 			tu := setup(t, nil)
 
 			w := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodPost, "/connectors/cxr_test0000000000001/_disconnect_all", nil)
+			req, err := http.NewRequest(http.MethodPost, "/connectors/cxr_test0000000000001/_disconnectAll", nil)
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -340,7 +340,7 @@ func TestConnectors(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPost,
-				"/connectors/cxr_test0000000000001/_disconnect_all",
+				"/connectors/cxr_test0000000000001/_disconnectAll",
 				nil,
 				"root",
 				"some-actor",
@@ -358,7 +358,7 @@ func TestConnectors(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPost,
-				"/connectors/cxr_test0000000000001/_disconnect_all",
+				"/connectors/cxr_test0000000000001/_disconnectAll",
 				nil,
 				"root",
 				"some-actor",
@@ -415,7 +415,7 @@ func TestConnectors(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPost,
-				"/connectors/cxr_test0000000000001/_disconnect_all",
+				"/connectors/cxr_test0000000000001/_disconnectAll",
 				util.JsonToReader(ConnectorLifecycleRequestJson{TimeoutSeconds: util.ToPtr(int64(600))}),
 				"root",
 				"some-actor",
@@ -722,7 +722,7 @@ func TestConnectors(t *testing.T) {
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 					http.MethodGet,
-					"/connectors?label_selector=env%3Dprod",
+					"/connectors?labelSelector=env%3Dprod",
 					nil,
 					"root",
 					"some-actor",
@@ -885,7 +885,7 @@ func TestConnectors(t *testing.T) {
 				require.NoError(t, json.Unmarshal(w.Body.Bytes(), &raw))
 				definition := raw["definition"].(map[string]any)
 				auth := definition["auth"].(map[string]any)
-				require.Equal(t, "*************", auth["client_secret"])
+				require.Equal(t, "*************", auth["clientSecret"])
 			})
 
 			t.Run("replays connector secrets with secret replay permission", func(t *testing.T) {
@@ -927,7 +927,7 @@ func TestConnectors(t *testing.T) {
 				require.NoError(t, json.Unmarshal(w.Body.Bytes(), &raw))
 				definition := raw["definition"].(map[string]any)
 				auth := definition["auth"].(map[string]any)
-				require.Equal(t, "client-secret", auth["client_secret"])
+				require.Equal(t, "client-secret", auth["clientSecret"])
 			})
 		})
 
@@ -2136,7 +2136,7 @@ func TestConnectors(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := http.NewRequest(
 				http.MethodPut,
-				fmt.Sprintf("/connectors/%s/versions/1/_force_state", connectorId),
+				fmt.Sprintf("/connectors/%s/versions/1/_forceState", connectorId),
 				util.JsonToReader(ForceConnectorVersionStateRequestJson{State: string(database.ConnectorDefinitionVersionStateArchived)}),
 			)
 			require.NoError(t, err)
@@ -2149,7 +2149,7 @@ func TestConnectors(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
-				"/connectors/bad-uuid/versions/1/_force_state",
+				"/connectors/bad-uuid/versions/1/_forceState",
 				util.JsonToReader(ForceConnectorVersionStateRequestJson{State: string(database.ConnectorDefinitionVersionStateArchived)}),
 				"root",
 				"some-actor",
@@ -2165,7 +2165,7 @@ func TestConnectors(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
-				fmt.Sprintf("/connectors/%s/versions/99/_force_state", connectorId),
+				fmt.Sprintf("/connectors/%s/versions/99/_forceState", connectorId),
 				util.JsonToReader(ForceConnectorVersionStateRequestJson{State: string(database.ConnectorDefinitionVersionStateArchived)}),
 				"root",
 				"some-actor",
@@ -2181,7 +2181,7 @@ func TestConnectors(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
-				fmt.Sprintf("/connectors/%s/versions/1/_force_state", connectorId),
+				fmt.Sprintf("/connectors/%s/versions/1/_forceState", connectorId),
 				util.JsonToReader(ForceConnectorVersionStateRequestJson{State: string(database.ConnectorDefinitionVersionStateArchived)}),
 				"root",
 				"some-actor",
@@ -2203,7 +2203,7 @@ func TestConnectors(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
-				fmt.Sprintf("/connectors/%s/versions/1/_force_state", connectorId),
+				fmt.Sprintf("/connectors/%s/versions/1/_forceState", connectorId),
 				util.JsonToReader(ForceConnectorVersionStateRequestJson{State: string(database.ConnectorDefinitionVersionStatePrimary)}),
 				"root",
 				"some-actor",
@@ -2306,7 +2306,7 @@ func TestConnectors(t *testing.T) {
 				w = httptest.NewRecorder()
 				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
 					http.MethodPut,
-					fmt.Sprintf("/connectors/%s/versions/%d/_force_state", created.Id, created.Version),
+					fmt.Sprintf("/connectors/%s/versions/%d/_forceState", created.Id, created.Version),
 					util.JsonToReader(ForceConnectorVersionStateRequestJson{State: string(database.ConnectorDefinitionVersionStatePrimary)}),
 					"root",
 					"some-actor",
@@ -2765,7 +2765,7 @@ func TestConnectors(t *testing.T) {
 			body := map[string]interface{}{
 				"namespace": "root",
 				"definition": map[string]interface{}{
-					"display_name": displayName,
+					"displayName": displayName,
 				},
 			}
 			if name != nil {
@@ -2872,10 +2872,7 @@ func TestConnectors(t *testing.T) {
 		require.NoError(t, err)
 		req.Header.Set("Content-Type", "application/json")
 		tu.Gin.ServeHTTP(w, req)
-		require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
-		var version ConnectorVersionJson
-		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &version))
-		require.Equal(t, seededID.String(), string(version.Name))
-		require.NotEqual(t, "divergent", string(version.Name))
+		require.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+		require.Contains(t, w.Body.String(), "unknown field")
 	})
 }

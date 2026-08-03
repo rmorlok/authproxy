@@ -62,7 +62,7 @@ func (f *factory) ManifestSetupSteps(connection coreIface.Connection, connector 
 			Description: "Sign in to authorize this connection.",
 			Render: func(ctx context.Context, opts coreIface.RenderRedirectOptions) (coreIface.RedirectInfo, error) {
 				if opts.ReturnToUrl == "" {
-					return coreIface.RedirectInfo{}, fmt.Errorf("return_to_url is required for OAuth2 authorize step")
+					return coreIface.RedirectInfo{}, fmt.Errorf("returnToUrl is required for OAuth2 authorize step")
 				}
 				ra := apauthcore.GetAuthFromContext(ctx)
 				o2 := f.NewOAuth2(connection)

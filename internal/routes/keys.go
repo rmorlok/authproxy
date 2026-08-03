@@ -39,8 +39,8 @@ type ListKeysRequestQueryParams struct {
 	StateVal      *database.KeyState `form:"state"`
 	NamespaceVal  *string            `form:"namespace"`
 	NameVal       *string            `form:"name"`
-	LabelSelector *string            `form:"label_selector"`
-	OrderByVal    *string            `form:"order_by"`
+	LabelSelector *string            `form:"labelSelector"`
+	OrderByVal    *string            `form:"orderBy"`
 }
 
 func KeyToJson(ctx context.Context, c coreIface.C, ek coreIface.Key) (KeyJson, error) {
@@ -161,7 +161,7 @@ func (r *KeysRoutes) create(gctx *gin.Context) {
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
 	var req CreateKeyRequestJson
-	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+	if err := bindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
@@ -247,8 +247,8 @@ func (r *KeysRoutes) create(gctx *gin.Context) {
 // @Param			state			query		string	false	"Filter by state"
 // @Param			namespace		query		string	false	"Filter by namespace"
 // @Param			name			query		string	false	"Filter by exact resource name"
-// @Param			label_selector	query		string	false	"Filter by label selector"
-// @Param			order_by		query		string	false	"Order by field (e.g., 'state:asc')"
+// @Param			labelSelector	query		string	false	"Filter by label selector"
+// @Param			orderBy		query		string	false	"Order by field (e.g., 'state:asc')"
 // @Success		200				{object}	OpenAPIListKeysResponseJson
 // @Failure		400				{object}	ErrorResponse
 // @Failure		401				{object}	ErrorResponse
@@ -378,7 +378,7 @@ func (r *KeysRoutes) update(gctx *gin.Context) {
 	}
 
 	var req UpdateKeyRequestJson
-	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+	if err := bindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return

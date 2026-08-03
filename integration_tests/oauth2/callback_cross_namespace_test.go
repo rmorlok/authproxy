@@ -23,15 +23,15 @@ import (
 // TestCallbackRejection_CrossNamespace covers issue #167 case 6: a multi-tenant
 // AuthProxy deployment where two customer apps share the instance and use
 // child namespaces (`root.tenant-a`, `root.tenant-b`) to isolate their actors.
-// The same external_id can refer to two different users — one in each
+// The same externalId can refer to two different users — one in each
 // namespace — because actor rows are scoped per-namespace.
 //
 // Threat: an attacker (alice in tenant-a) initiates a connection, drives the
 // provider's authorize step to mint a code, and sends the resulting callback
-// URL to a victim with the same external_id in a different tenant (bob in
+// URL to a victim with the same externalId in a different tenant (bob in
 // tenant-b). When bob's browser follows the link, the public service
 // identifies bob from his SESSION-ID cookie. Because actor IDs are
-// independently allocated per (namespace, external_id), bob's actor id
+// independently allocated per (namespace, externalId), bob's actor id
 // differs from alice's — so state validation rejects with `actor_mismatch`
 // before reaching the namespace-specific defense-in-depth checks.
 //
@@ -43,8 +43,8 @@ func TestCallbackRejection_CrossNamespace(t *testing.T) {
 	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
 	tenantA := "root.tenant-a-" + suffix
 	tenantB := "root.tenant-b-" + suffix
-	// Same external_id in both tenants — the multi-tenant collision the
-	// test exercises. Each tenant's actor row gets its own actor_id.
+	// Same externalId in both tenants — the multi-tenant collision the
+	// test exercises. Each tenant's actor row gets its own actorId.
 	sharedExternalID := "user-123-" + suffix
 	clientKey := "cross-ns-client-" + suffix
 	clientSecret := "cross-ns-secret-" + suffix
@@ -118,9 +118,9 @@ func TestCallbackRejection_CrossNamespace(t *testing.T) {
 	code := providerCallback.Query().Get("code")
 	require.NotEmpty(t, code, "provider should issue a code on approve; got %s", authResp.RedirectURL)
 
-	// 3. Victim bob's marketplace session in tenant-b. Same external_id
+	// 3. Victim bob's marketplace session in tenant-b. Same externalId
 	//    as alice but a different namespace, so the auth middleware
-	//    materializes a separate actor row with a different actor_id.
+	//    materializes a separate actor row with a different actorId.
 	bobAuthToken, err := env.PublicAuthUtil.GenerateBearerToken(
 		ctx, sharedExternalID, tenantB, aschema.AllPermissions(),
 	)
@@ -128,7 +128,7 @@ func TestCallbackRejection_CrossNamespace(t *testing.T) {
 
 	browserCtx, _ := helpers.NewBrowser(t)
 
-	connectorsURL := env.PublicURL + "/connectors?auth_token=" + url.QueryEscape(bobAuthToken)
+	connectorsURL := env.PublicURL + "/connectors?authToken=" + url.QueryEscape(bobAuthToken)
 	require.NoError(t, chromedp.Run(browserCtx,
 		chromedp.Navigate(connectorsURL),
 		chromedp.WaitVisible(`//button[normalize-space()='Connect']`, chromedp.BySearch),

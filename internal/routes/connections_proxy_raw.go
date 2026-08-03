@@ -18,7 +18,7 @@ import (
 
 const (
 	// HeaderUpstreamURL identifies the upstream URL to forward to.
-	// Required on every /_proxy_raw request. Spelled with the API's
+	// Required on every /_proxyRaw request. Spelled with the API's
 	// public capitalization (X-AuthProxy-…); Go's http.Header
 	// canonicalizes on lookup so the comparison still hits.
 	HeaderUpstreamURL = "X-AuthProxy-Upstream-URL"
@@ -49,7 +49,7 @@ var (
 // Bound on the same `connections:proxy` verb as the wrapped /_proxy
 // route — both are "make a proxied call as this connection".
 //
-//	ANY /connections/{id}/_proxy_raw
+//	ANY /connections/{id}/_proxyRaw
 func (r *ConnectionsProxyRoutes) proxyRaw(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)

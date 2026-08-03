@@ -20,7 +20,7 @@ func newRefreshOauth2TokenTask(connectionId apid.ID) (*asynq.Task, error) {
 }
 
 type refreshOAuthTokenTaskPayload struct {
-	ConnectionId apid.ID `json:"connection_id"`
+	ConnectionId apid.ID `json:"connectionId"`
 }
 
 func (th *taskHandler) refreshOauth2Token(ctx context.Context, t *asynq.Task) error {

@@ -132,7 +132,7 @@ func (s *scopeMismatchSetup) driveApprovalAndGetConnectionId(t *testing.T) strin
 
 	loc := s.env.DeliverOAuth2Callback(t, s.env.ForgeOAuth2CallbackURL(stateID, code))
 	require.Truef(t, strings.HasPrefix(loc, s.returnToURL),
-		"auth flow should land on return_to_url; got %q", loc)
+		"auth flow should land on returnToUrl; got %q", loc)
 	return connID
 }
 

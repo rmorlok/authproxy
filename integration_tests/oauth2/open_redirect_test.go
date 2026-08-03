@@ -70,7 +70,7 @@ func TestOAuth2OpenRedirectProtection_InvalidReturnURLFallsBackToMarketplace(t *
 	require.NoError(t, err)
 
 	browserCtx, _ := helpers.NewBrowser(t)
-	connectorsURL := env.PublicURL + "/connectors?auth_token=" + url.QueryEscape(authToken)
+	connectorsURL := env.PublicURL + "/connectors?authToken=" + url.QueryEscape(authToken)
 	require.NoError(t, chromedp.Run(browserCtx,
 		chromedp.Navigate(connectorsURL),
 		chromedp.WaitVisible(`//button[normalize-space()='Connect']`, chromedp.BySearch),
@@ -100,7 +100,7 @@ func TestOAuth2OpenRedirectProtection_InvalidReturnURLFallsBackToMarketplace(t *
 	var finalURL string
 	require.NoError(t, chromedp.Run(browserCtx, chromedp.Location(&finalURL)))
 	assert.Truef(t, strings.HasPrefix(finalURL, env.PublicURL+"/connections"),
-		"invalid return_to_url should fall back to marketplace connections page; got %q", finalURL)
+		"invalid returnToUrl should fall back to marketplace connections page; got %q", finalURL)
 	assert.NotContains(t, finalURL, "evil.example", "callback must not redirect to the attacker-controlled origin")
 
 	page := env.Db.ListConnectionsBuilder().

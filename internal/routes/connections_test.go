@@ -381,7 +381,7 @@ func TestConnections(t *testing.T) {
 			require.NoError(t, err)
 
 			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connections?connector_id="+oauthConnectorId.String(), nil, "root", "some-actor", aschema.PermissionsSingle("root.**", "connections", "list"))
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connections?connectorId="+oauthConnectorId.String(), nil, "root", "some-actor", aschema.PermissionsSingle("root.**", "connections", "list"))
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -397,7 +397,7 @@ func TestConnections(t *testing.T) {
 
 		t.Run("invalid connector id filter", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connections?connector_id=not-an-id", nil, "root", "some-actor", aschema.PermissionsSingle("root.**", "connections", "list"))
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connections?connectorId=not-an-id", nil, "root", "some-actor", aschema.PermissionsSingle("root.**", "connections", "list"))
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -417,7 +417,7 @@ func TestConnections(t *testing.T) {
 			require.NoError(t, err)
 
 			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connections?label_selector=env%3Dtest-label-conn", nil, "root", "some-actor", aschema.AllPermissions())
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connections?labelSelector=env%3Dtest-label-conn", nil, "root", "some-actor", aschema.AllPermissions())
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -527,8 +527,8 @@ func TestConnections(t *testing.T) {
 		t.Run("unauthorized", func(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := http.NewRequest(http.MethodPost, "/connections/_initiate", util.JsonToReader(map[string]interface{}{
-				"connector_id":  connectorId.String(),
-				"return_to_url": "https://example.com/callback",
+				"connectorId": connectorId.String(),
+				"returnToUrl": "https://example.com/callback",
 			}))
 			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/json")
@@ -543,8 +543,8 @@ func TestConnections(t *testing.T) {
 				http.MethodPost,
 				"/connections/_initiate",
 				util.JsonToReader(map[string]interface{}{
-					"connector_id":  connectorId.String(),
-					"return_to_url": "https://example.com/callback",
+					"connectorId": connectorId.String(),
+					"returnToUrl": "https://example.com/callback",
 				}),
 				"root",
 				"some-actor",
@@ -1283,7 +1283,7 @@ func TestConnections(t *testing.T) {
 
 		t.Run("unauthorized", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodPut, "/connections/"+u.String()+"/_force_state", util.JsonToReader(ForceStateRequestJson{State: string(database.ConnectionStateDisconnected)}))
+			req, err := http.NewRequest(http.MethodPut, "/connections/"+u.String()+"/_forceState", util.JsonToReader(ForceStateRequestJson{State: string(database.ConnectionStateDisconnected)}))
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -1294,7 +1294,7 @@ func TestConnections(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
-				"/connections/"+apid.New(apid.PrefixConnection).String()+"/_force_state",
+				"/connections/"+apid.New(apid.PrefixConnection).String()+"/_forceState",
 				util.JsonToReader(ForceStateRequestJson{State: string(database.ConnectionStateDisconnected)}),
 				"root",
 				"some-actor",
@@ -1310,7 +1310,7 @@ func TestConnections(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
-				"/connections/"+apid.New(apid.PrefixConnection).String()+"/_force_state",
+				"/connections/"+apid.New(apid.PrefixConnection).String()+"/_forceState",
 				util.JsonToReader(ForceStateRequestJson{State: string(database.ConnectionStateDisconnected)}),
 				"root",
 				"some-actor",
@@ -1326,7 +1326,7 @@ func TestConnections(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
-				"/connections/"+u.String()+"/_force_state",
+				"/connections/"+u.String()+"/_forceState",
 				util.JsonToReader(ForceStateRequestJson{State: string(database.ConnectionStateDisconnected)}),
 				"root",
 				"some-actor",
@@ -1352,7 +1352,7 @@ func TestConnections(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
-				"/connections/"+u.String()+"/_force_state",
+				"/connections/"+u.String()+"/_forceState",
 				util.JsonToReader(ForceStateRequestJson{State: string(database.ConnectionStateDisconnected)}),
 				"root",
 				"some-actor",
@@ -1375,7 +1375,7 @@ func TestConnections(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
-				"/connections/"+u.String()+"/_force_state",
+				"/connections/"+u.String()+"/_forceState",
 				util.JsonToReader(ForceStateRequestJson{State: string(database.ConnectionStateConfigured)}),
 				"root",
 				"some-actor",
@@ -1915,7 +1915,7 @@ func TestConnections(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		// _setup_step is part of the setup flow, so it accepts create or update —
+		// _setupStep is part of the setup flow, so it accepts create or update —
 		// not get, since reading the in-progress setup state is gated on the same
 		// activity that produces it.
 		for _, verb := range []string{"create", "update"} {
@@ -1923,7 +1923,7 @@ func TestConnections(t *testing.T) {
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 					http.MethodGet,
-					"/connections/"+connId.String()+"/_setup_step",
+					"/connections/"+connId.String()+"/_setupStep",
 					nil,
 					"root",
 					"some-actor",
@@ -1941,7 +1941,7 @@ func TestConnections(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
-				"/connections/"+connId.String()+"/_setup_step",
+				"/connections/"+connId.String()+"/_setupStep",
 				nil,
 				"root",
 				"some-actor",
@@ -1968,14 +1968,14 @@ func TestConnections(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		// _data_source serves dynamic options for the active setup step, so it accepts
+		// _dataSource serves dynamic options for the active setup step, so it accepts
 		// create or update — not get.
 		for _, verb := range []string{"create", "update"} {
 			t.Run(verb+"-only actor passes auth", func(t *testing.T) {
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 					http.MethodGet,
-					"/connections/"+connId.String()+"/_data_source/some-source",
+					"/connections/"+connId.String()+"/_dataSource/some-source",
 					nil,
 					"root",
 					"some-actor",
@@ -1993,7 +1993,7 @@ func TestConnections(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
-				"/connections/"+connId.String()+"/_data_source/some-source",
+				"/connections/"+connId.String()+"/_dataSource/some-source",
 				nil,
 				"root",
 				"some-actor",
@@ -2182,8 +2182,8 @@ func TestConnections(t *testing.T) {
 
 		initiate := func(name *string, expectedStatus int) apid.ID {
 			body := map[string]interface{}{
-				"connector_id":  connectorId.String(),
-				"return_to_url": "https://example.com/callback",
+				"connectorId": connectorId.String(),
+				"returnToUrl": "https://example.com/callback",
 			}
 			if name != nil {
 				body["name"] = *name

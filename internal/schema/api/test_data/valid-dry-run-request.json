@@ -4,18 +4,21 @@
     "method": "POST",
     "headers": {
       "content-type": "application/json",
-      "x-trace": ["one", "two"]
+      "x-trace": [
+        "one",
+        "two"
+      ]
     },
     "labels": {
       "team": "payments"
     },
-    "body_json": {
+    "bodyJson": {
       "name": "Ada"
     }
   },
-  "request_type": "proxy",
+  "requestType": "proxy",
   "context": {
-    "actor_id": "act_test550e8400abcde",
+    "actorId": "act_test550e8400abcde",
     "namespace": "root.acme"
   }
 }

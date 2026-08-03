@@ -72,7 +72,7 @@ func (u *sseUpstream) emitSnapshot() []time.Time {
 }
 
 // TestProxyRaw_SSEStreamingResponse proves the response side of
-// /_proxy_raw streams an SSE-shaped response in real time rather
+// /_proxyRaw streams an SSE-shaped response in real time rather
 // than buffering the whole thing: each token must arrive at the
 // client within sseMaxArrival of the upstream emitting it, and the
 // proxied response must carry through the Content-Type:

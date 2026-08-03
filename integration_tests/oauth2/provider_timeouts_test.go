@@ -87,11 +87,11 @@ func TestTokenExchangeTimeout_RetriesAndExhausts(t *testing.T) {
 	loc := rig.env.DeliverOAuth2Callback(t, rig.env.ForgeOAuth2CallbackURL(stateID, code))
 
 	require.Truef(t, strings.HasPrefix(loc, rig.returnToURL),
-		"timeout exhaustion should still 302 to return_to_url with setup=pending; got %q", loc)
+		"timeout exhaustion should still 302 to returnToUrl with setup=pending; got %q", loc)
 	parsed, err := url.Parse(loc)
 	require.NoError(t, err)
 	assert.Equal(t, "pending", parsed.Query().Get("setup"))
-	assert.Equal(t, connID, parsed.Query().Get("connection_id"))
+	assert.Equal(t, connID, parsed.Query().Get("connectionId"))
 
 	// Exactly one failure event with category=network_error and
 	// attempts=tokenExchangeMaxAttempts. provider_status_code is
@@ -165,7 +165,7 @@ func TestTokenRefreshTimeout_RetriesAndExhausts(t *testing.T) {
 	require.Lenf(t, failed, 1, "exhausted refresh timeout must emit exactly one refresh-failed event; got %d (%v)", len(failed), failed)
 	event := failed[0]
 	assert.Equal(t, "network_error", event["category"])
-	assert.Equal(t, connID, event["connection_id"])
+	assert.Equal(t, connID, event["connectionId"])
 	assert.Equalf(t, float64(tokenRefreshMaxAttempts), event["attempts"],
 		"failure event should record attempts=tokenRefreshMaxAttempts on exhaustion")
 	_, hasStatus := event["provider_status_code"]

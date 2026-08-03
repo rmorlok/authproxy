@@ -48,20 +48,20 @@ func (i Intent) IsValid() bool { return i == IntentAdvance || i == IntentAbort }
 // marketplace's eventual destination through the off-platform bounce.
 type Claims struct {
 	// ConnectionId is the connection the token authorizes a transition on.
-	ConnectionId apid.ID `json:"connection_id"`
+	ConnectionId apid.ID `json:"connectionId"`
 
 	// StepId is the redirect step the token was minted from. The handler
 	// rejects if the connection's current setup_step has changed away
 	// from this id between mint and consume, defending against a stale
 	// token unexpectedly advancing past an unrelated step.
-	StepId string `json:"step_id"`
+	StepId string `json:"stepId"`
 
 	// ActorId is the actor that initiated the redirect step. The /advance
 	// and /abort endpoints require a session and reject when the
 	// session's actor doesn't match this claim — defends against a
 	// leaked token being used by a different user even before its TTL
 	// expires.
-	ActorId apid.ID `json:"actor_id"`
+	ActorId apid.ID `json:"actorId"`
 
 	// Intent gates which endpoint can consume the token.
 	Intent Intent `json:"intent"`
@@ -69,7 +69,7 @@ type Claims struct {
 	// ReturnToUrl is the marketplace URL the consumer should redirect the
 	// user back to after the transition completes. Carries the original
 	// _initiate return-to URL through the off-platform bounce.
-	ReturnToUrl string `json:"return_to_url,omitempty"`
+	ReturnToUrl string `json:"returnToUrl,omitempty"`
 
 	// Jti is the opaque token id surfaced as the URL-side parameter.
 	// Populated by Mint; callers do not set it.
@@ -99,7 +99,7 @@ type MintInput struct {
 // Validate sanity-checks the input. Returns nil on success.
 func (m MintInput) Validate() error {
 	if m.ConnectionId == apid.Nil {
-		return errors.New("setup_token: connection_id is required")
+		return errors.New("setup token: connectionId is required")
 	}
 	if m.StepId == "" {
 		return errors.New("setup_token: step_id is required")

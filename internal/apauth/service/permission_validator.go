@@ -287,7 +287,7 @@ func (pb *PermissionValidatorBuilder) ForNamespacePathParam(param string) *Permi
 //
 // This is intended for browser-initiated endpoints (e.g. OAuth2 redirects) where a bare 401 is
 // a dead end for the user. The generated login URL is expected to round-trip the user back to
-// the original endpoint with an auth_token query parameter after successful authentication.
+// the original endpoint with an authToken query parameter after successful authentication.
 func (pb *PermissionValidatorBuilder) WithRedirectOnUnauthenticated(gen AuthRedirectUrlGenerator) *PermissionValidatorBuilder {
 	pb.unauthRedirectGen = gen
 	return pb

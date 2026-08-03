@@ -8,22 +8,22 @@
     "owner": "integrations"
   },
   "state": "configured",
-  "health_state": "healthy",
-  "setup_step_id": "tenant",
+  "healthState": "healthy",
+  "setupStepId": "tenant",
   "connector": {
     "id": "cxr_test550e8400abcde",
     "version": 1,
     "namespace": "root.acme",
     "state": "primary",
-    "display_name": "Salesforce",
+    "displayName": "Salesforce",
     "highlight": "CRM platform",
     "description": "Salesforce CRM integration",
-    "status_page_url": "https://status.salesforce.com",
+    "statusPageUrl": "https://status.salesforce.com",
     "logo": "https://example.com/logo.png",
-    "has_configure": false,
-    "created_at": "2026-05-25T12:00:00Z",
-    "updated_at": "2026-05-25T12:30:00Z"
+    "hasConfigure": false,
+    "createdAt": "2026-05-25T12:00:00Z",
+    "updatedAt": "2026-05-25T12:30:00Z"
   },
-  "created_at": "2026-05-25T12:00:00Z",
-  "updated_at": "2026-05-25T12:30:00Z"
+  "createdAt": "2026-05-25T12:00:00Z",
+  "updatedAt": "2026-05-25T12:30:00Z"
 }

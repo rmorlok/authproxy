@@ -602,12 +602,12 @@ type listRateLimitsFilters struct {
 	s                 *service               `json:"-"`
 	LimitVal          uint64                 `json:"limit"`
 	Offset            uint64                 `json:"offset"`
-	NamespaceMatchers []string               `json:"namespace_matchers,omitempty"`
+	NamespaceMatchers []string               `json:"namespaceMatchers,omitempty"`
 	NameVal           *scommon.ResourceName  `json:"name,omitempty"`
-	OrderByFieldVal   *RateLimitOrderByField `json:"order_by_field"`
-	OrderByVal        *pagination.OrderBy    `json:"order_by"`
-	IncludeDeletedVal bool                   `json:"include_deleted,omitempty"`
-	LabelSelectorVal  *string                `json:"label_selector,omitempty"`
+	OrderByFieldVal   *RateLimitOrderByField `json:"orderByField"`
+	OrderByVal        *pagination.OrderBy    `json:"orderBy"`
+	IncludeDeletedVal bool                   `json:"includeDeleted,omitempty"`
+	LabelSelectorVal  *string                `json:"labelSelector,omitempty"`
 	Errors            *multierror.Error      `json:"-"`
 }
 

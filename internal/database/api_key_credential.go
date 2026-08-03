@@ -38,13 +38,13 @@ const ConnectionCredentialsTable = "connection_credentials"
 // (the api-key proxy) share one contract. The database itself never inspects
 // the plaintext — it only stores the encrypted blob.
 type ApiKeyCredentialPlaintext struct {
-	ApiKey   string `json:"api_key"`
+	ApiKey   string `json:"apiKey"`
 	Username string `json:"username,omitempty"`
 }
 
 type OAuth2ClientCredentialsPlaintext struct {
-	ClientId     string `json:"client_id"`
-	ClientSecret string `json:"client_secret,omitempty"`
+	ClientId     string `json:"clientId"`
+	ClientSecret string `json:"clientSecret,omitempty"`
 }
 
 // ApiKeyCredential is one row in the connection_credentials table — an

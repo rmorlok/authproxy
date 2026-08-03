@@ -45,8 +45,8 @@ type ListRateLimitsRequestQueryParams struct {
 	LimitVal      *int32  `form:"limit"`
 	NamespaceVal  *string `form:"namespace"`
 	NameVal       *string `form:"name"`
-	LabelSelector *string `form:"label_selector"`
-	OrderByVal    *string `form:"order_by"`
+	LabelSelector *string `form:"labelSelector"`
+	OrderByVal    *string `form:"orderBy"`
 }
 
 func RateLimitToJson(r coreIface.RateLimit) RateLimitJson {
@@ -183,7 +183,7 @@ func (r *RateLimitsRoutes) create(gctx *gin.Context) {
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
 	var req CreateRateLimitRequestJson
-	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+	if err := bindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
@@ -254,8 +254,8 @@ func (r *RateLimitsRoutes) create(gctx *gin.Context) {
 // @Param			limit			query		integer	false	"Maximum number of results to return"
 // @Param			namespace		query		string	false	"Filter by namespace"
 // @Param			name			query		string	false	"Filter by exact name"
-// @Param			label_selector	query		string	false	"Filter by label selector"
-// @Param			order_by		query		string	false	"Order by field (e.g., 'created_at:desc')"
+// @Param			labelSelector	query		string	false	"Filter by label selector"
+// @Param			orderBy		query		string	false	"Order by field (e.g., 'created_at:desc')"
 // @Success		200				{object}	OpenAPIListRateLimitsResponseJson
 // @Failure		400				{object}	ErrorResponse
 // @Failure		401				{object}	ErrorResponse
@@ -366,7 +366,7 @@ func (r *RateLimitsRoutes) update(gctx *gin.Context) {
 	}
 
 	var req UpdateRateLimitRequestJson
-	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+	if err := bindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
@@ -543,13 +543,13 @@ func (r *RateLimitsRoutes) delete(gctx *gin.Context) {
 // @Failure		404		{object}	ErrorResponse
 // @Failure		500		{object}	ErrorResponse
 // @Security		BearerAuth
-// @Router			/rate-limits/_dry_run [post]
+// @Router			/rate-limits/_dryRun [post]
 func (r *RateLimitsRoutes) dryRun(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
 	var req DryRunRequestJson
-	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+	if err := bindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
@@ -731,7 +731,7 @@ func (r *RateLimitsRoutes) Register(g gin.IRouter) {
 		r.create,
 	)
 	g.POST(
-		"/rate-limits/_dry_run",
+		"/rate-limits/_dryRun",
 		r.authService.NewRequiredBuilder().
 			ForResource("rate_limits").
 			ForIdExtractor(idExtractor).

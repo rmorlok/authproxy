@@ -99,14 +99,14 @@ over-eager flip on a transient blip would spam reconnect prompts.
   reconnect prompt; a regression that failed to flip would leave
   customers stuck with no way to recover.
 - **Exactly one `oauth token refresh failed` event** with
-  `category=no_refresh_token` and the correct `connection_id`. Permanent
+  `category=no_refresh_token` and the correct `connectionId`. Permanent
   refresh categories emit one event per detection — the next proxy
   call won't re-emit because the connection is already unhealthy and
   the auth-state hasn't changed.
 - **Exactly one `connection health state changed` event** with
   `previous_health_state=healthy`, `health_state=unhealthy`,
   `reason=refresh_no_refresh_token`. This is what dashboards correlate
-  with the refresh-failure event — same connection_id, same wall-clock
+  with the refresh-failure event — same connectionId, same wall-clock
   window — to attribute the health flip to its root cause without
   parsing log lines.
 - **Zero refresh-endpoint HTTP calls.** `errNoRefreshToken` short-circuits
@@ -218,7 +218,7 @@ no-refresh-token test asserts zero `EndpointRefresh` calls.
 | Lever                                                       | What it controls |
 | ----------------------------------------------------------- | ---------------- |
 | `helpers.SetupOptions{IncludePublic: true, LogCapture: …}`  | Bring up the public service in-process and capture every slog record so the test can pin refresh + health-transition events. |
-| `completeAuthFlow(t)` (test-local helper)                   | One-call auth flow: `InitiateOAuth2Connection` → `provider.Authorize` → `DeliverOAuth2Callback`. Returns a `connection_id` with a real provider-issued token persisted. |
+| `completeAuthFlow(t)` (test-local helper)                   | One-call auth flow: `InitiateOAuth2Connection` → `provider.Authorize` → `DeliverOAuth2Callback`. Returns a `connectionId` with a real provider-issued token persisted. |
 | `forceTokenExpired(t, connectionID, clearRefreshToken)`     | Insert a replacement `oauth2_tokens` row with `AccessTokenExpiresAt` 1 hour in the past, optionally with a zero-value `EncryptedRefreshToken`. Reuses the existing encrypted access-token field — the expiry check fires before any decrypt. |
 | `env.DoProxyRequest(t, connectionID, url, method)`          | In-process POST to `/api/v1/connections/<id>/_proxy`. Exercises `oAuth2Connection.ProxyRequest` end to end, including the refresh path triggered by `getValidToken`. |
 | `provider.Requests(RequestsFilter{Endpoint: EndpointRefresh, ClientID})` | Count refresh-token grants observed at the provider. The load-bearing assertion that proves the refresh round-trip ran or did not when refresh is impossible. |

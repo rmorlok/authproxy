@@ -38,7 +38,7 @@ type stubSessionInitiateUrlGenerator struct {
 func (s *stubSessionInitiateUrlGenerator) GetInitiateSessionUrl(returnTo string) string {
 	u, _ := url.Parse(s.loginUrl)
 	q := u.Query()
-	q.Set("return_to", returnTo)
+	q.Set("returnToUrl", returnTo)
 	u.RawQuery = q.Encode()
 	return u.String()
 }
@@ -54,7 +54,7 @@ func setupPublicOauth2Test(t *testing.T) (*gin.Engine, *auth2.AuthTestUtil, *stu
 		},
 	})
 	cfg, db := database.MustApplyBlankTestDbConfig(t, cfg)
-	// GetBaseUrl is called to build return_to on unauthenticated redirects; requires a port.
+	// GetBaseUrl is called to build returnToUrl on unauthenticated redirects; requires a port.
 	cfg.GetRoot().Public.PortVal = common.NewIntegerValueDirect(8080)
 	cfg, rds := apredis.MustApplyTestConfig(cfg)
 	cfg, auth, authUtil := auth2.TestAuthServiceWithDb(sconfig.ServiceIdPublic, cfg, db)
@@ -81,12 +81,12 @@ func TestPublicOauth2Routes_Redirect(t *testing.T) {
 	t.Setenv("AUTHPROXY_DEBUG_MODE", "true")
 	ctx := context.Background()
 
-	t.Run("unauthenticated redirects to login with return_to", func(t *testing.T) {
+	t.Run("unauthenticated redirects to login with returnToUrl", func(t *testing.T) {
 		r, _, _, done := setupPublicOauth2Test(t)
 		defer done()
 
 		w := httptest.NewRecorder()
-		req, err := http.NewRequest(http.MethodGet, "/oauth2/redirect?state_id=abc", nil)
+		req, err := http.NewRequest(http.MethodGet, "/oauth2/redirect?stateId=abc", nil)
 		require.NoError(t, err)
 		r.ServeHTTP(w, req)
 
@@ -95,10 +95,10 @@ func TestPublicOauth2Routes_Redirect(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "login.example.com", loc.Host)
 
-		returnTo := loc.Query().Get("return_to")
-		require.NotEmpty(t, returnTo, "Location should include return_to")
+		returnTo := loc.Query().Get("returnToUrl")
+		require.NotEmpty(t, returnTo, "Location should include returnToUrl")
 		assert.Contains(t, returnTo, "/oauth2/redirect")
-		assert.Contains(t, returnTo, "state_id=abc")
+		assert.Contains(t, returnTo, "stateId=abc")
 	})
 
 	t.Run("authenticated without permission returns 403", func(t *testing.T) {
@@ -108,7 +108,7 @@ func TestPublicOauth2Routes_Redirect(t *testing.T) {
 		w := httptest.NewRecorder()
 		req, err := authUtil.NewSignedRequestForActorExternalId(
 			http.MethodGet,
-			"/oauth2/redirect?state_id=abc",
+			"/oauth2/redirect?stateId=abc",
 			nil,
 			"root",
 			"some-actor",
@@ -120,14 +120,14 @@ func TestPublicOauth2Routes_Redirect(t *testing.T) {
 		require.Equal(t, http.StatusForbidden, w.Code, w.Header().Get("x-authproxy-debug"))
 	})
 
-	t.Run("authenticated with permission but malformed state_id reaches handler", func(t *testing.T) {
+	t.Run("authenticated with permission but malformed stateId reaches handler", func(t *testing.T) {
 		r, authUtil, _, done := setupPublicOauth2Test(t)
 		defer done()
 
 		w := httptest.NewRecorder()
 		req, err := authUtil.NewSignedRequestForActorExternalId(
 			http.MethodGet,
-			"/oauth2/redirect?state_id=not-a-uuid",
+			"/oauth2/redirect?stateId=not-a-uuid",
 			nil,
 			"root",
 			"some-actor",
@@ -141,10 +141,10 @@ func TestPublicOauth2Routes_Redirect(t *testing.T) {
 		// the request to reach the handler.
 		require.NotEqual(t, http.StatusFound, w.Code)
 		require.NotEqual(t, http.StatusForbidden, w.Code)
-		assert.Contains(t, w.Header().Get("x-authproxy-debug"), "failed to parse state_id")
+		assert.Contains(t, w.Header().Get("x-authproxy-debug"), "failed to parse stateId")
 	})
 
-	t.Run("unauthenticated with valid auth_token query param passes auth and reaches handler", func(t *testing.T) {
+	t.Run("unauthenticated with valid authToken query param passes auth and reaches handler", func(t *testing.T) {
 		r, authUtil, _, done := setupPublicOauth2Test(t)
 		defer done()
 
@@ -155,11 +155,11 @@ func TestPublicOauth2Routes_Redirect(t *testing.T) {
 		require.NoError(t, err)
 
 		w := httptest.NewRecorder()
-		// state_id omitted so the handler hits the "state_id is required" branch — the middleware
-		// must still let the request through because the auth_token authenticates the user.
+		// stateId omitted so the handler hits the "stateId is required" branch — the middleware
+		// must still let the request through because the authToken authenticates the user.
 		req, err := http.NewRequest(
 			http.MethodGet,
-			"/oauth2/redirect?auth_token="+url.QueryEscape(tokenString),
+			"/oauth2/redirect?authToken="+url.QueryEscape(tokenString),
 			nil,
 		)
 		require.NoError(t, err)
@@ -168,14 +168,14 @@ func TestPublicOauth2Routes_Redirect(t *testing.T) {
 		require.NotEqual(t, http.StatusFound, w.Code)
 		require.NotEqual(t, http.StatusForbidden, w.Code)
 		require.NotEqual(t, http.StatusUnauthorized, w.Code)
-		assert.Contains(t, w.Header().Get("x-authproxy-debug"), "state_id is required")
+		assert.Contains(t, w.Header().Get("x-authproxy-debug"), "stateId is required")
 	})
 }
 
 func TestPublicOauth2Routes_Callback(t *testing.T) {
 	t.Setenv("AUTHPROXY_DEBUG_MODE", "true")
 
-	t.Run("unauthenticated redirects to login with return_to", func(t *testing.T) {
+	t.Run("unauthenticated redirects to login with returnToUrl", func(t *testing.T) {
 		r, _, _, done := setupPublicOauth2Test(t)
 		defer done()
 
@@ -189,7 +189,7 @@ func TestPublicOauth2Routes_Callback(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "login.example.com", loc.Host)
 
-		returnTo := loc.Query().Get("return_to")
+		returnTo := loc.Query().Get("returnToUrl")
 		require.NotEmpty(t, returnTo)
 		assert.Contains(t, returnTo, "/oauth2/callback")
 		assert.Contains(t, returnTo, "state=abc")

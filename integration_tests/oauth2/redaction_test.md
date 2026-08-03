@@ -5,7 +5,7 @@ metrics emitted by any OAuth flow must
 not contain access tokens, refresh tokens, authorization codes, client
 secrets, PKCE code verifiers, or raw provider credentials.
 
-Logs *may* include connection_id, tenant id, provider id, correlation
+Logs *may* include connectionId, tenant id, provider id, correlation
 id, error category, retry count, and scope-mismatch metadata — those
 are the operator-visible identifiers operators correlate alerts
 against.
@@ -39,7 +39,7 @@ property is exercised on:
 Each test ends with two assertions:
 
 - **`assertConnectionIDPresent`** — positive control. The flow's
-  connection_id must appear in *some* captured record, proving the
+  connectionId must appear in *some* captured record, proving the
   capture is wired up. Without this, "no secret found" trivially
   passes when nothing is captured at all.
 - **`assertNoSecretsInLogs`** — for each secret in `flowSecrets`, the
@@ -89,7 +89,7 @@ slog emitted.
   reach metric dimensions structurally. The unit tests in
   `telemetry_test.go` pin this.
 - **OpenTelemetry span attributes.** Spans currently set
-  `authproxy.connector_id` and `authproxy.oauth2.operation`, both
+  `authproxy.connectorId` and `authproxy.oauth2.operation`, both
   bounded. No secret values are added on span attributes.
 - **API response bodies returned to the calling client.** If the
   proxy ever embeds a provider error body into the response it

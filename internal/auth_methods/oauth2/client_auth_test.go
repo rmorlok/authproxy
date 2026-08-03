@@ -143,7 +143,7 @@ func TestResolveClientCredentials_ClientCredentialsUsesStoredSetupCredential(t *
 		}, nil)
 	encrypt.EXPECT().
 		DecryptString(gomock.Any(), encrypted).
-		Return(`{"client_id":"stored-client","client_secret":"stored-secret"}`, nil)
+		Return(`{"clientId":"stored-client","clientSecret":"stored-secret"}`, nil)
 
 	o := &oAuth2Connection{
 		db:      db,

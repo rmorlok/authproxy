@@ -1,5 +1,5 @@
 {
   "id": "cxn_test0000000000002",
   "type": "redirect",
-  "redirect_url": "https://oauth.provider.example/authorize"
+  "redirectUrl": "https://oauth.provider.example/authorize"
 }

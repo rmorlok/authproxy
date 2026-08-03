@@ -145,7 +145,7 @@ func TestTokenExchange_TransientRetrySucceeds(t *testing.T) {
 	loc := rig.env.DeliverOAuth2Callback(t, rig.env.ForgeOAuth2CallbackURL(stateID, code))
 
 	require.Truef(t, strings.HasPrefix(loc, rig.returnToURL),
-		"successful retry should land on return_to_url; got %q", loc)
+		"successful retry should land on returnToUrl; got %q", loc)
 
 	conn := rig.env.GetConnection(t, connID)
 	assert.Equal(t, database.ConnectionStateConfigured, conn.State,
@@ -193,11 +193,11 @@ func TestTokenExchange_TransientRetryExhausted(t *testing.T) {
 	loc := rig.env.DeliverOAuth2Callback(t, rig.env.ForgeOAuth2CallbackURL(stateID, code))
 
 	require.Truef(t, strings.HasPrefix(loc, rig.returnToURL),
-		"exhausted retry should still 302 to return_to_url with setup=pending so the UI re-renders; got %q", loc)
+		"exhausted retry should still 302 to returnToUrl with setup=pending so the UI re-renders; got %q", loc)
 	parsed, err := url.Parse(loc)
 	require.NoError(t, err)
 	assert.Equal(t, "pending", parsed.Query().Get("setup"))
-	assert.Equal(t, connID, parsed.Query().Get("connection_id"))
+	assert.Equal(t, connID, parsed.Query().Get("connectionId"))
 
 	events := rig.logCapture.RecordsWithMessage(t, tokenExchangeFailureMessage)
 	require.Lenf(t, events, 1, "exhausted retry should emit exactly one failure event; got %d (%v)", len(events), events)
@@ -243,7 +243,7 @@ func TestTokenExchange_5xxVariants_AllRetried(t *testing.T) {
 
 	loc := rig.env.DeliverOAuth2Callback(t, rig.env.ForgeOAuth2CallbackURL(stateID, code))
 	require.Truef(t, strings.HasPrefix(loc, rig.returnToURL),
-		"504 exhaustion should still redirect to return_to_url; got %q", loc)
+		"504 exhaustion should still redirect to returnToUrl; got %q", loc)
 
 	events := rig.logCapture.RecordsWithMessage(t, tokenExchangeFailureMessage)
 	require.Lenf(t, events, 1, "504 exhaustion should emit exactly one failure event; got %d", len(events))

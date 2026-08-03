@@ -260,7 +260,7 @@ func TestTokenExchangeMalformed_CurrentlyAccepted(t *testing.T) {
 
 			loc := rig.env.DeliverOAuth2Callback(t, rig.env.ForgeOAuth2CallbackURL(stateID, code))
 			require.Truef(t, strings.HasPrefix(loc, rig.returnToURL),
-				"%s (%s): accepted exchange should land on return_to_url; got %q", tc.name, tc.note, loc)
+				"%s (%s): accepted exchange should land on returnToUrl; got %q", tc.name, tc.note, loc)
 
 			// No failure event — the spec violation is silent.
 			assert.Emptyf(t, rig.logCapture.RecordsWithMessage(t, tokenExchangeFailureMessage),

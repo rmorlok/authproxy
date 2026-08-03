@@ -20,8 +20,8 @@ const (
 )
 
 type migrateConnectionVersionWorkflowInputV1 struct {
-	ConnectionID  apid.ID       `json:"connection_id"`
-	TargetVersion uint64        `json:"target_version"`
+	ConnectionID  apid.ID       `json:"connectionId"`
+	TargetVersion uint64        `json:"targetVersion"`
 	Timeout       time.Duration `json:"timeout"`
 }
 

@@ -71,7 +71,7 @@ func waitForLog(t *testing.T, env *helpers.IntegrationTestEnv, connectionID stri
 
 // TestProxyRawBodyCapture_TeeDecision is the end-to-end version of the
 // unit-test invariants in app_metrics/roundtripper_test.go: the raw
-// /_proxy_raw path drives the same RoundTripper, so the
+// /_proxyRaw path drives the same RoundTripper, so the
 // streaming/too_large/captured choice must show up on the LogRecord
 // without any per-path special-casing.
 //

@@ -2,11 +2,14 @@
   "definition": {
     "mode": "observe",
     "selector": {
-      "request_types": ["proxy", "probe"]
+      "requestTypes": [
+        "proxy",
+        "probe"
+      ]
     },
     "bucket": {},
     "algorithm": {
-      "fixed_window": {
+      "fixedWindow": {
         "window": "10s",
         "limit": 10
       }

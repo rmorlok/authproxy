@@ -35,7 +35,7 @@ func (c *connection) advanceToStep(
 	}
 
 	// For redirect steps, render the URL FIRST. The closure may reject
-	// invalid inputs (missing return_to_url) — surfacing those before any
+	// invalid inputs (missing returnToUrl) — surfacing those before any
 	// DB write keeps the connection's setup_step consistent on rejection.
 	var redirectInfo iface.RedirectInfo
 	if next.Type() == iface.ManifestStepTypeRedirect {

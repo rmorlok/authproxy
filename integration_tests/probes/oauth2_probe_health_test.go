@@ -112,7 +112,7 @@ func TestOAuth2ProbeHealth_FailureAndRecovery(t *testing.T) {
 
 	loc := env.DeliverOAuth2Callback(t, env.ForgeOAuth2CallbackURL(stateID, code))
 	require.Truef(t, strings.HasPrefix(loc, returnToURL),
-		"auth flow should land on return_to_url; got %q", loc)
+		"auth flow should land on returnToUrl; got %q", loc)
 
 	// After auth callback the connection is in verify phase (we added a
 	// probe). Drive verify synchronously — production has the asynq
