@@ -60,10 +60,10 @@ export default function RateLimitDryRun() {
         try {
             const resp = await dryRunRateLimit({
                 request: formValue.request,
-                request_type: requestType,
+                requestType: requestType,
                 context: {
-                    connection_id: formValue.context.connectionId,
-                    actor_id: formValue.context.actorId,
+                    connectionId: formValue.context.connectionId,
+                    actorId: formValue.context.actorId,
                     namespace: formValue.context.namespace,
                 },
             });
@@ -132,7 +132,7 @@ export default function RateLimitDryRun() {
 }
 
 function ResultsPanel({ result }: { result: DryRunRateLimitResponse }) {
-    const hasAny = result.matched.length > 0 || result.not_matched.length > 0;
+    const hasAny = result.matched.length > 0 || result.notMatched.length > 0;
     return (
         <Stack spacing={3}>
             <Section
@@ -142,28 +142,28 @@ function ResultsPanel({ result }: { result: DryRunRateLimitResponse }) {
             >
                 {result.matched.length > 0 && (
                     <Stack spacing={1}>
-                        {result.matched.map((m) => <MatchedRow key={m.rate_limit_id} match={m} />)}
+                        {result.matched.map((m) => <MatchedRow key={m.rateLimitId} match={m} />)}
                     </Stack>
                 )}
             </Section>
 
             <Section
                 title="Not matched"
-                count={result.not_matched.length}
+                count={result.notMatched.length}
                 emptyMessage={
                     hasAny
                         ? 'Every in-scope rule matched.'
                         : 'No rules in scope for this namespace.'
                 }
             >
-                {result.not_matched.length > 0 && (
+                {result.notMatched.length > 0 && (
                     <Stack spacing={1}>
-                        {result.not_matched.map((nm) => <NotMatchedRow key={nm.rate_limit_id} nm={nm} />)}
+                        {result.notMatched.map((nm) => <NotMatchedRow key={nm.rateLimitId} nm={nm} />)}
                     </Stack>
                 )}
             </Section>
 
-            <LabelSnapshot snapshot={result.request_label_snapshot} />
+            <LabelSnapshot snapshot={result.requestLabelSnapshot} />
         </Stack>
     );
 }
@@ -195,28 +195,28 @@ function Section({
 }
 
 function MatchedRow({ match }: { match: DryRunRateLimitMatch }) {
-    const enforce = match.effective_mode === 'enforce';
+    const enforce = match.effectiveMode === 'enforce';
     return (
         <Paper variant="outlined" sx={{ p: 1.5 }}>
             <Stack spacing={1}>
                 <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" rowGap={1}>
-                    <Link component={RouterLink} to={`/rate-limits/${match.rate_limit_id}`} variant="body2" sx={{
+                    <Link component={RouterLink} to={`/rate-limits/${match.rateLimitId}`} variant="body2" sx={{
                         fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
                     }}>
-                        {match.rate_limit_id}
+                        {match.rateLimitId}
                     </Link>
                     <Chip
-                        label={match.effective_mode}
+                        label={match.effectiveMode}
                         size="small"
                         color={enforce ? 'warning' : 'info'}
                         variant="outlined"
                     />
                     <Chip
-                        label={match.would_allow ? 'would allow' : 'would 429'}
+                        label={match.wouldAllow ? 'would allow' : 'would 429'}
                         size="small"
-                        color={match.would_allow ? 'success' : 'error'}
+                        color={match.wouldAllow ? 'success' : 'error'}
                     />
-                    {match.peek_failed && (
+                    {match.peekFailed && (
                         <Chip
                             label="peek failed — runtime would fail-open"
                             size="small"
@@ -227,15 +227,15 @@ function MatchedRow({ match }: { match: DryRunRateLimitMatch }) {
                 </Stack>
                 <Divider />
                 <Stack direction="row" spacing={3} flexWrap="wrap" rowGap={0.5}>
-                    <KeyVal label="Algorithm" value={match.algorithm_summary} />
-                    {match.would_allow ? (
+                    <KeyVal label="Algorithm" value={match.algorithmSummary} />
+                    {match.wouldAllow ? (
                         <KeyVal label="Remaining" value={String(match.remaining)} />
                     ) : (
-                        <KeyVal label="Retry after" value={`${match.retry_after_ms} ms`} />
+                        <KeyVal label="Retry after" value={`${match.retryAfterMs} ms`} />
                     )}
                     <KeyVal label="Namespace" value={match.namespace} />
                 </Stack>
-                <KeyVal label="Bucket key" value={match.bucket_key || '(global)'} mono />
+                <KeyVal label="Bucket key" value={match.bucketKey || '(global)'} mono />
             </Stack>
         </Paper>
     );
@@ -245,10 +245,10 @@ function NotMatchedRow({ nm }: { nm: DryRunRateLimitNotMatched }) {
     return (
         <Paper variant="outlined" sx={{ p: 1.5 }}>
             <Stack direction="row" spacing={2} alignItems="baseline" flexWrap="wrap" rowGap={0.5}>
-                <Link component={RouterLink} to={`/rate-limits/${nm.rate_limit_id}`} variant="body2" sx={{
+                <Link component={RouterLink} to={`/rate-limits/${nm.rateLimitId}`} variant="body2" sx={{
                     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
                 }}>
-                    {nm.rate_limit_id}
+                    {nm.rateLimitId}
                 </Link>
                 <Typography variant="caption" color="text.secondary">{nm.namespace}</Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>{nm.reason}</Typography>

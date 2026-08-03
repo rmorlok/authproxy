@@ -27,6 +27,7 @@ import {useQueryState, parseAsInteger, parseAsStringLiteral, parseAsString} from
 import {useNavigate} from "react-router-dom";
 import {useSelector} from "react-redux";
 import {selectCurrentNamespacePath} from "../store/namespacesSlice";
+import {toSnakeCase} from '../util';
 import KeyDataForm, {
     buildKeyDataPayload,
     createEmptyKeyDataFormState,
@@ -99,7 +100,7 @@ export const columns: GridColDef<Key>[] = [
         },
     },
     {
-        field: 'created_at',
+        field: 'createdAt',
         headerName: 'Created At',
         flex: 1,
         minWidth: 80,
@@ -109,7 +110,7 @@ export const columns: GridColDef<Key>[] = [
         }
     },
     {
-        field: 'updated_at',
+        field: 'updatedAt',
         headerName: 'Updated At',
         flex: 1,
         minWidth: 100,
@@ -137,7 +138,7 @@ export default function Keys() {
     const [error, setError] = useState<string | null>(null);
 
     const [page, setPage] = useQueryState<number>('page', parseAsInteger.withDefault(1));
-    const [pageSize, setPageSize] = useQueryState<number>('page_size', parseAsInteger.withDefault(defaultPageSize));
+    const [pageSize, setPageSize] = useQueryState<number>('pageSize', parseAsInteger.withDefault(defaultPageSize));
     const [stateFilter, setStateFilter] = useQueryState<string>('state', parseAsStringLiteral(stateVals).withDefault(''));
     const [sort, setSort] = useQueryState<string>('sort', parseAsString.withDefault(''));
 
@@ -171,7 +172,7 @@ export default function Keys() {
         } else {
             const sortField = sortModel[0].field;
             const sortDir = sortModel[0].sort === 'desc' ? 'desc' : 'asc';
-            setSort(`${sortField} ${sortDir}`);
+            setSort(`${toSnakeCase(sortField)} ${sortDir}`);
         }
     }, []);
 
@@ -213,7 +214,7 @@ export default function Keys() {
                 const params: ListKeysParams = prevResp?.cursor ? {cursor: prevResp.cursor} : {
                     state: (stateFilter as KeyState) || undefined,
                     namespace: namespaceAndChildren(ns),
-                    order_by: sort || undefined,
+                    orderBy: sort || undefined,
                     limit: pageSize,
                 };
 
@@ -281,7 +282,7 @@ export default function Keys() {
             const request: CreateKeyRequest = {
                 namespace: ns,
                 name: createName.trim() || undefined,
-                key_data: buildKeyDataPayload(createKeyData),
+                keyData: buildKeyDataPayload(createKeyData),
                 labels: rowsToMap(createLabelRows),
                 annotations: rowsToMap(createAnnotationRows),
             };

@@ -31,21 +31,22 @@ import {useQueryState, parseAsInteger, parseAsStringLiteral, parseAsString} from
 import {useNavigate} from "react-router-dom";
 import {useSelector} from "react-redux";
 import {selectCurrentNamespacePath} from "../store/namespacesSlice";
+import {toSnakeCase} from '../util';
 
 // Summarise the algorithm variant in one short string. Keeps the column
 // scannable instead of showing the full JSON.
 function algorithmSummary(def: RateLimitDefinition): string {
-    if (def.algorithm.fixed_window) {
-        const fw = def.algorithm.fixed_window;
+    if (def.algorithm.fixedWindow) {
+        const fw = def.algorithm.fixedWindow;
         return `fixed ${fw.limit}/${fw.window}`;
     }
-    if (def.algorithm.sliding_window) {
-        const sw = def.algorithm.sliding_window;
+    if (def.algorithm.slidingWindow) {
+        const sw = def.algorithm.slidingWindow;
         return `sliding(${sw.mode}) ${sw.limit}/${sw.window}`;
     }
-    if (def.algorithm.token_bucket) {
-        const tb = def.algorithm.token_bucket;
-        return `token bucket ${tb.capacity} @ ${tb.refill_rate}/s`;
+    if (def.algorithm.tokenBucket) {
+        const tb = def.algorithm.tokenBucket;
+        return `token bucket ${tb.capacity} @ ${tb.refillRate}/s`;
     }
     return '—';
 }
@@ -55,14 +56,14 @@ function selectorSummary(def: RateLimitDefinition): string {
     if (def.selector.methods && def.selector.methods.length > 0) {
         parts.push(def.selector.methods.join('|'));
     }
-    if (def.selector.path_match) {
-        parts.push(`${def.selector.path_match.kind}:${def.selector.path_match.value}`);
+    if (def.selector.pathMatch) {
+        parts.push(`${def.selector.pathMatch.kind}:${def.selector.pathMatch.value}`);
     }
-    if (def.selector.label_selector) {
-        parts.push(def.selector.label_selector);
+    if (def.selector.labelSelector) {
+        parts.push(def.selector.labelSelector);
     }
-    if (def.selector.request_types && def.selector.request_types.length > 0) {
-        parts.push(`types=${def.selector.request_types.join(',')}`);
+    if (def.selector.requestTypes && def.selector.requestTypes.length > 0) {
+        parts.push(`types=${def.selector.requestTypes.join(',')}`);
     }
     return parts.length === 0 ? 'any' : parts.join(' · ');
 }
@@ -91,7 +92,7 @@ export default function RateLimits() {
     const [error, setError] = useState<string | null>(null);
 
     const [page, setPage] = useQueryState<number>('page', parseAsInteger.withDefault(1));
-    const [pageSize, setPageSize] = useQueryState<number>('page_size', parseAsInteger.withDefault(defaultPageSize));
+    const [pageSize, setPageSize] = useQueryState<number>('pageSize', parseAsInteger.withDefault(defaultPageSize));
     const [modeFilter, setModeFilter] = useQueryState<string>('mode', parseAsStringLiteral(modeVals).withDefault(''));
     const [sort, setSort] = useQueryState<string>('sort', parseAsString.withDefault(''));
 
@@ -127,7 +128,7 @@ export default function RateLimits() {
         } else {
             const sortField = sortModel[0].field;
             const sortDir = sortModel[0].sort === 'desc' ? 'desc' : 'asc';
-            setSort(`${sortField} ${sortDir}`);
+            setSort(`${toSnakeCase(sortField)} ${sortDir}`);
         }
     }, []);
 
@@ -168,7 +169,7 @@ export default function RateLimits() {
 
                 const params: ListRateLimitsParams = prevResp?.cursor ? {cursor: prevResp.cursor} : {
                     namespace: namespaceAndChildren(ns),
-                    order_by: sort || undefined,
+                    orderBy: sort || undefined,
                     limit: pageSize,
                 };
 
@@ -361,7 +362,7 @@ export default function RateLimits() {
             sortable: false,
         },
         {
-            field: 'created_at',
+            field: 'createdAt',
             headerName: 'Created',
             flex: 0.6,
             minWidth: 160,
@@ -375,7 +376,7 @@ export default function RateLimits() {
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
                 <Typography component="h2" variant="h6">Rate Limits</Typography>
                 <Stack direction="row" spacing={1}>
-                    <Button variant="outlined" size="small" onClick={() => navigate('/rate-limits/_dry_run')}>
+                    <Button variant="outlined" size="small" onClick={() => navigate('/rate-limits/_dryRun')}>
                         Dry run
                     </Button>
                     <Button variant="contained" size="small" onClick={() => setCreateOpen(true)}>

@@ -18,18 +18,18 @@ const baseConnection: Connection = {
     namespace: 'root',
     version: 1,
     state: ConnectorVersionState.ACTIVE,
-    display_name: 'GMail',
+    displayName: 'GMail',
     description: 'Have the agent respond to your emails without you needing to be involved. Like magic.',
     highlight: 'Respond to email automatically.',
     logo: gmailLogo,
-    has_configure: true,
-    created_at: '2023-04-01T12:00:00Z',
-    updated_at: '2023-04-01T12:00:00Z',
+    hasConfigure: true,
+    createdAt: '2023-04-01T12:00:00Z',
+    updatedAt: '2023-04-01T12:00:00Z',
   },
   state: ConnectionState.CONFIGURED,
-  health_state: ConnectionHealthState.HEALTHY,
-  created_at: '2026-06-14T12:00:00Z',
-  updated_at: '2026-06-14T12:00:00Z',
+  healthState: ConnectionHealthState.HEALTHY,
+  createdAt: '2026-06-14T12:00:00Z',
+  updatedAt: '2026-06-14T12:00:00Z',
 };
 
 const makeStore = (connection: Connection) => configureStore({
@@ -100,6 +100,6 @@ export const RequiresSetup: Story = {
 export const RequiresReconnection: Story = {
   render: () => renderWithConnection({
     ...baseConnection,
-    health_state: ConnectionHealthState.UNHEALTHY,
+    healthState: ConnectionHealthState.UNHEALTHY,
   }),
 };

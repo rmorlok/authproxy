@@ -61,7 +61,7 @@ export const useMetricsQuery = ({
             {
                 range,
                 namespace: effectiveNamespace,
-                label_selector: labelSelector || undefined,
+                labelSelector: labelSelector || undefined,
                 queries,
             },
             {signal: controller.signal},

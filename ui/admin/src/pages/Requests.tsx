@@ -19,7 +19,7 @@ import Link from '@mui/material/Link';
 import dayjs from 'dayjs';
 import Chip from '@mui/material/Chip';
 import TextField from '@mui/material/TextField';
-import {HttpStatusChip, Duration} from '../util';
+import {HttpStatusChip, Duration, toSnakeCase} from '../util';
 import {useQueryState, parseAsInteger, parseAsStringLiteral, parseAsString} from 'nuqs'
 import RequestDetail from "../components/RequestDetail";
 import {useSelector} from "react-redux";
@@ -42,7 +42,7 @@ export const columns: (GridColDef<RequestEventRecord> & {hideInitial?: boolean})
         sortable: true,
     },
     {
-        field: 'response_status_code',
+        field: 'responseStatusCode',
         headerName: 'Status',
         sortable: true,
         align: 'center',
@@ -52,7 +52,7 @@ export const columns: (GridColDef<RequestEventRecord> & {hideInitial?: boolean})
         // Visible by default — tells operators at a glance whether a 429
         // came from the 3rd party or from one of authproxy's own rate
         // limiters.
-        field: 'response_source',
+        field: 'responseSource',
         headerName: 'Source',
         description: 'who produced the response (upstream / connector rate limiter / rate limit resource)',
         sortable: true,
@@ -71,7 +71,7 @@ export const columns: (GridColDef<RequestEventRecord> & {hideInitial?: boolean})
         // requests where a rate-limit resource fired. When present, link
         // to the rate-limiter detail page so operators can jump straight
         // to the rule that produced the 429.
-        field: 'rate_limit_id',
+        field: 'rateLimitId',
         headerName: 'Rate Limit',
         description: 'ID of the rate-limit resource that fired (if any)',
         sortable: true,
@@ -98,13 +98,13 @@ export const columns: (GridColDef<RequestEventRecord> & {hideInitial?: boolean})
         sortable: true,
     },
     {
-        field: 'request_id',
+        field: 'requestId',
         headerName: 'ID',
         sortable: true,
         hideInitial: true,
     },
     {
-        field: 'correlation_id',
+        field: 'correlationId',
         headerName: 'Correlation ID',
         sortable: true,
         hideInitial: true,
@@ -122,13 +122,13 @@ export const columns: (GridColDef<RequestEventRecord> & {hideInitial?: boolean})
 
     },
     {
-        field: 'connection_id',
+        field: 'connectionId',
         headerName: 'Connection ID',
         minWidth: 290,
         sortable: true,
     },
     {
-        field: 'connector_version',
+        field: 'connectorVersion',
         headerName: 'Connector Version',
         sortable: false,
         hideInitial: true,
@@ -171,67 +171,67 @@ export const columns: (GridColDef<RequestEventRecord> & {hideInitial?: boolean})
         flex: 1,
     },
     {
-        field: 'request_http_version',
+        field: 'requestHttpVersion',
         headerName: 'Req. HTTP Version',
         sortable: true,
         hideInitial: true,
     },
     {
-        field: 'request_size_bytes',
+        field: 'requestSizeBytes',
         headerName: 'Req. Size',
         description: 'request size in bytes',
         sortable: true,
         hideInitial: true,
     },
     {
-        field: 'request_mime_type',
+        field: 'requestMimeType',
         headerName: 'Req. Mime Type',
         description: 'request mime type',
         sortable: true,
         hideInitial: true,
     },
     {
-        field: 'response_http_version',
+        field: 'responseHttpVersion',
         headerName: 'Resp. HTTP Version',
         description: 'response http version',
         sortable: false,
         hideInitial: true,
     },
     {
-        field: 'response_size_bytes',
+        field: 'responseSizeBytes',
         headerName: 'Size',
         description: 'response size in bytes',
         sortable: false,
     },
     {
-        field: 'response_mime_type',
+        field: 'responseMimeType',
         headerName: 'Mime Type',
         description: 'response mime type',
         sortable: false,
         minWidth: 250,
     },
     {
-        field: 'response_error',
+        field: 'responseError',
         headerName: 'Error',
         description: 'error message from executing request',
         sortable: false,
     },
     {
-        field: 'internal_timeout',
+        field: 'internalTimeout',
         headerName: 'Timeout',
         description: 'did request recording timeout before completing',
         sortable: false,
         hideInitial: true,
     },
     {
-        field: 'request_cancelled',
+        field: 'requestCancelled',
         headerName: 'Cancelled',
         description: 'was the request cancelled before the full body was consumed',
         sortable: false,
         hideInitial: true,
     },
     {
-        field: 'full_request_recorded',
+        field: 'fullRequestRecorded',
         headerName: 'Full',
         description: 'was the full request/response recorded',
         sortable: false,
@@ -263,10 +263,10 @@ export default function Requests() {
     const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
 
     const [page, setPage] = useQueryState<number>('page', parseAsInteger.withDefault(1));
-    const [pageSize, setPageSize] = useQueryState<number>('page_size', parseAsInteger.withDefault(defaultPageSize));
+    const [pageSize, setPageSize] = useQueryState<number>('pageSize', parseAsInteger.withDefault(defaultPageSize));
     const [typeFilter, setTypeFilter] = useQueryState<string>('type', parseAsStringLiteral(stateVals).withDefault('')); // empty = all
     const [sort, setSort] = useQueryState<string>('sort', parseAsString.withDefault(''));
-    const [labelSelector, setLabelSelector] = useQueryState<string>('label_selector', parseAsString.withDefault(''));
+    const [labelSelector, setLabelSelector] = useQueryState<string>('labelSelector', parseAsString.withDefault(''));
     const [requestId, setRequestId] = useQueryState<string>('id', parseAsString.withDefault(''));
 
     const [hasNextPage, setHasNextPage] = useState<boolean>(false);
@@ -298,7 +298,7 @@ export default function Requests() {
         } else {
             const sortField = sortModel[0].field;
             const sortDir = sortModel[0].sort === 'desc' ? 'desc' : 'asc';
-            setSort(`${sortField} ${sortDir}`);
+            setSort(`${toSnakeCase(sortField)} ${sortDir}`);
         }
     }, []);
 
@@ -343,9 +343,9 @@ export default function Requests() {
 
                 const params: ListRequestEventsParams = prevResp?.cursor ? {cursor: prevResp.cursor} : {
                     namespace: ns + ".**",
-                    request_type: (typeFilter as RequestType) || undefined,
-                    label_selector: labelSelector || undefined,
-                    order_by: sort || undefined,
+                    requestType: (typeFilter as RequestType) || undefined,
+                    labelSelector: labelSelector || undefined,
+                    orderBy: sort || undefined,
                     limit: pageSize,
                 };
 
@@ -430,7 +430,7 @@ export default function Requests() {
                 <DataGrid
                     rows={rows}
                     columns={columns}
-                    getRowId={(row) => row.request_id}
+                    getRowId={(row) => row.requestId}
                     getRowClassName={(params) =>
                         params.indexRelativeToCurrentPage % 2 === 0 ? 'clickable-row even' : 'clickable-row odd'
                     }
@@ -496,7 +496,7 @@ export default function Requests() {
             >
                 <Box sx={{width: {xs: '100vw', sm: 520, md: 720}, pl: 2}}>
                     {(() => {
-                        const rec = rows.find(r => r.request_id === requestId);
+                        const rec = rows.find(r => r.requestId === requestId);
                         if (!requestId) return null;
                         return (
                             <RequestDetail

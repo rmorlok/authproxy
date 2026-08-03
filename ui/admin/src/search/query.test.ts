@@ -14,10 +14,10 @@ describe('search query parser', () => {
     });
 
     it('routes namespace paths directly', () => {
-        expect(directSearchDestination('root.acme_team')).toEqual({
+        expect(directSearchDestination('root.acmeTeam')).toEqual({
             kind: 'namespace',
             path: '/namespace',
-            namespace: 'root.acme_team',
+            namespace: 'root.acmeTeam',
         });
     });
 

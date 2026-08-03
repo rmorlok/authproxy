@@ -108,10 +108,10 @@ export default function Tasks() {
         },
         {field: 'completed', headerName: 'Completed', flex: 0.4, minWidth: 80},
         {
-            field: 'processed_total', headerName: 'Processed', flex: 0.5, minWidth: 80,
+            field: 'processedTotal', headerName: 'Processed', flex: 0.5, minWidth: 80,
         },
         {
-            field: 'failed_total', headerName: 'Failed', flex: 0.4, minWidth: 70,
+            field: 'failedTotal', headerName: 'Failed', flex: 0.4, minWidth: 70,
             renderCell: (params) => params.value ? (
                 <Typography color="error" variant="body2">{params.value}</Typography>
             ) : <span>0</span>,
@@ -123,7 +123,7 @@ export default function Tasks() {
                 <Chip label="Active" size="small" color="success" variant="outlined"/>,
         },
         {
-            field: 'latency_seconds', headerName: 'Latency', flex: 0.4, minWidth: 80,
+            field: 'latencySeconds', headerName: 'Latency', flex: 0.4, minWidth: 80,
             renderCell: (params) => {
                 const secs = params.value as number;
                 if (secs < 1) return '<1s';
@@ -150,7 +150,7 @@ export default function Tasks() {
         {field: 'status', headerName: 'Status', flex: 0.4, minWidth: 80},
         {field: 'started', headerName: 'Started', flex: 0.8, minWidth: 140},
         {
-            field: 'active_workers',
+            field: 'activeWorkers',
             headerName: 'Active Workers',
             flex: 0.4,
             minWidth: 100,
@@ -161,7 +161,7 @@ export default function Tasks() {
     const schedulerColumns: GridColDef<SchedulerEntry>[] = [
         {field: 'id', headerName: 'ID', flex: 0.6, minWidth: 80},
         {field: 'spec', headerName: 'Cron Spec', flex: 0.6, minWidth: 100},
-        {field: 'task_type', headerName: 'Task Type', flex: 0.8, minWidth: 120},
+        {field: 'taskType', headerName: 'Task Type', flex: 0.8, minWidth: 120},
         {field: 'next', headerName: 'Next Run', flex: 0.8, minWidth: 140},
         {field: 'prev', headerName: 'Last Run', flex: 0.8, minWidth: 140, renderCell: (params) => params.value || '-'},
     ];

@@ -9,7 +9,7 @@ import {
 import type {MetricsQueryResponse, MetricsSeries} from '@authproxy/api';
 
 const series = (overrides: Partial<MetricsSeries>): MetricsSeries => ({
-    ref_id: 'connections',
+    refId: 'connections',
     metric: 'resources.connections',
     aggregation: 'count',
     labels: {},
@@ -20,8 +20,8 @@ const series = (overrides: Partial<MetricsSeries>): MetricsSeries => ({
 describe('metrics time-series helpers', () => {
     it('formats labels in a stable order', () => {
         expect(metricSeriesLabel(series({
-            labels: {state: 'configured', health_state: 'healthy'},
-        }))).toEqual('health_state: healthy, state: configured');
+            labels: {state: 'configured', healthState: 'healthy'},
+        }))).toEqual('healthState: healthy, state: configured');
         expect(metricSeriesLabel(series({labels: {}}))).toEqual('connections');
     });
 
