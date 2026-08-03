@@ -4,8 +4,8 @@ import { ListResponse } from './common';
 // Queue info
 export interface QueueInfo {
   queue: string;
-  memory_usage: number;
-  latency_seconds: number;
+  memoryUsage: number;
+  latencySeconds: number;
   size: number;
   groups: number;
   pending: number;
@@ -17,8 +17,8 @@ export interface QueueInfo {
   aggregating: number;
   processed: number;
   failed: number;
-  processed_total: number;
-  failed_total: number;
+  processedTotal: number;
+  failedTotal: number;
   paused: boolean;
   timestamp: string;
 }
@@ -30,13 +30,13 @@ export interface MonitoringTaskInfo {
   type: string;
   payload: string;
   state: string;
-  max_retry: number;
+  maxRetry: number;
   retried: number;
-  last_err?: string;
-  last_failed_at?: string;
-  next_process_at?: string;
-  completed_at?: string;
-  is_orphaned?: boolean;
+  lastErr?: string;
+  lastFailedAt?: string;
+  nextProcessAt?: string;
+  completedAt?: string;
+  isOrphaned?: boolean;
   group?: string;
 }
 
@@ -50,8 +50,8 @@ export interface DailyStats {
 
 // Worker info
 export interface WorkerInfo {
-  task_id: string;
-  task_type: string;
+  taskId: string;
+  taskType: string;
   queue: string;
   started: string;
   deadline: string;
@@ -64,24 +64,24 @@ export interface ServerInfo {
   pid: number;
   concurrency: number;
   queues: Record<string, number>;
-  strict_priority: boolean;
+  strictPriority: boolean;
   started: string;
   status: string;
-  active_workers: WorkerInfo[];
+  activeWorkers: WorkerInfo[];
 }
 
 // Scheduler entry
 export interface SchedulerEntry {
   id: string;
   spec: string;
-  task_type: string;
+  taskType: string;
   next: string;
   prev?: string;
 }
 
 // Bulk action response
 export interface BulkActionResponse {
-  affected_count: number;
+  affectedCount: number;
 }
 
 // Query params
@@ -216,7 +216,7 @@ export const unpauseQueue = (queue: string) => {
  */
 export const runAllArchivedTasks = (queue: string) => {
   return client.post<BulkActionResponse>(
-    `/api/v1/task-monitoring/queues/${queue}/archived/_run-all`
+    `/api/v1/task-monitoring/queues/${queue}/archived/_runAll`
   );
 };
 
@@ -225,7 +225,7 @@ export const runAllArchivedTasks = (queue: string) => {
  */
 export const runAllRetryTasks = (queue: string) => {
   return client.post<BulkActionResponse>(
-    `/api/v1/task-monitoring/queues/${queue}/retry/_run-all`
+    `/api/v1/task-monitoring/queues/${queue}/retry/_runAll`
   );
 };
 

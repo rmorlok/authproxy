@@ -1,16 +1,16 @@
 import { client } from './client';
 
 type ApiSessionInitiateRequest = {
-  auth_token?: string;
-  return_to_url: string;
+  authToken?: string;
+  returnToUrl: string;
 };
 
 type ApiSessionInitiateSuccessResponse = {
-  actor_id: string;
+  actorId: string;
 };
 
 type ApiSessionInitiateFailureResponse = {
-  redirect_url: string;
+  redirectUrl: string;
 };
 
 type ApiSessionInitiateResponse =
@@ -20,7 +20,7 @@ type ApiSessionInitiateResponse =
 function isInitiateSessionSuccessResponse(
   response: ApiSessionInitiateResponse
 ): response is ApiSessionInitiateSuccessResponse {
-  return 'actor_id' in response;
+  return 'actorId' in response;
 }
 
 
@@ -28,13 +28,13 @@ type ApiSessionTerminateResponse = Record<string, never>;
 
 const initiate = (params: ApiSessionInitiateRequest) => {
   const headers: { Authorization?: string } = {};
-  if (params.auth_token) {
-    headers.Authorization = `Bearer ${params.auth_token}`;
+  if (params.authToken) {
+    headers.Authorization = `Bearer ${params.authToken}`;
   }
   return client.post<ApiSessionInitiateResponse>(
     '/api/v1/session/_initiate',
     {
-      return_to_url: params.return_to_url,
+      returnToUrl: params.returnToUrl,
     },
     {
       headers: headers,

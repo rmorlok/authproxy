@@ -102,7 +102,7 @@ func setConnectionListQuery(req *resty.Request, name, state, order, cursor strin
 		req.SetQueryParam("state", state)
 	}
 	if order != "" {
-		req.SetQueryParam("order_by", order)
+		req.SetQueryParam("orderBy", order)
 	}
 	if cursor != "" {
 		req.SetQueryParam("cursor", cursor)

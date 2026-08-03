@@ -23,7 +23,7 @@ describe('resource name contracts', () => {
     });
 
     it('sends optional names on create requests', () => {
-        createActor({namespace: 'root', external_id: 'customer-1', name: 'customer'});
+        createActor({namespace: 'root', externalId: 'customer-1', name: 'customer'});
         initiateConnection('cxr_test', '/return', {env: 'prod'}, 'production-crm');
         createKey({namespace: 'root', name: 'primary-key'});
         createRateLimit({
@@ -33,7 +33,7 @@ describe('resource name contracts', () => {
                 mode: RateLimitMode.ENFORCE,
                 selector: {},
                 bucket: {},
-                algorithm: {fixed_window: {window: '1m', limit: 10}},
+                algorithm: {fixedWindow: {window: '1m', limit: 10}},
             },
         });
 

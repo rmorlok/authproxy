@@ -26,22 +26,21 @@ import (
 	"time"
 
 	"github.com/go-resty/resty/v2"
-	"gopkg.in/yaml.v3"
-
 	"github.com/rmorlok/authproxy/internal/apauth/jwt"
 	"github.com/rmorlok/authproxy/internal/schema/api"
 	"github.com/rmorlok/authproxy/internal/schema/config"
+	"github.com/rmorlok/authproxy/internal/util"
 )
 
 // SeedConfig is the YAML shape the binary consumes.
 type SeedConfig struct {
 	Actors             []ActorSeed             `yaml:"actors"`
-	OAuth2TestProvider *OAuth2TestProviderSeed `yaml:"oauth2_test_provider"`
+	OAuth2TestProvider *OAuth2TestProviderSeed `yaml:"oauth2TestProvider"`
 	Connectors         []ConnectorSeed         `yaml:"connectors"`
 }
 
 type ActorSeed struct {
-	ExternalId  string            `yaml:"external_id"`
+	ExternalId  string            `yaml:"externalId"`
 	Namespace   string            `yaml:"namespace,omitempty"`
 	Labels      map[string]string `yaml:"labels,omitempty"`
 	Annotations map[string]string `yaml:"annotations,omitempty"`
@@ -59,19 +58,19 @@ type ConnectorSeed struct {
 }
 
 type OAuth2TestProviderSeed struct {
-	BaseUrl                string                     `yaml:"base_url"`
+	BaseUrl                string                     `yaml:"baseUrl"`
 	Clients                []OAuth2TestProviderClient `yaml:"clients,omitempty"`
 	Users                  []OAuth2TestProviderUser   `yaml:"users,omitempty"`
-	ResourcePolicies       []OAuth2ResourcePolicy     `yaml:"resource_policies,omitempty"`
-	APIKeyResourcePolicies []APIKeyResourcePolicy     `yaml:"api_key_resource_policies,omitempty"`
+	ResourcePolicies       []OAuth2ResourcePolicy     `yaml:"resourcePolicies,omitempty"`
+	APIKeyResourcePolicies []APIKeyResourcePolicy     `yaml:"apiKeyResourcePolicies,omitempty"`
 }
 
 type OAuth2TestProviderClient struct {
 	Key                     string `json:"key" yaml:"key"`
 	Secret                  string `json:"secret,omitempty" yaml:"secret,omitempty"`
-	RedirectURI             string `json:"redirect_uri,omitempty" yaml:"redirect_uri,omitempty"`
-	TokenEndpointAuthMethod string `json:"token_endpoint_auth_method,omitempty" yaml:"token_endpoint_auth_method,omitempty"`
-	RequirePKCE             bool   `json:"require_pkce,omitempty" yaml:"require_pkce,omitempty"`
+	RedirectURI             string `json:"redirectUri,omitempty" yaml:"redirectUri,omitempty"`
+	TokenEndpointAuthMethod string `json:"tokenEndpointAuthMethod,omitempty" yaml:"tokenEndpointAuthMethod,omitempty"`
+	RequirePKCE             bool   `json:"requirePkce,omitempty" yaml:"requirePkce,omitempty"`
 	Scope                   string `json:"scope,omitempty" yaml:"scope,omitempty"`
 }
 
@@ -80,20 +79,20 @@ type OAuth2TestProviderUser struct {
 	Password    string `json:"password,omitempty" yaml:"password,omitempty"`
 	Role        string `json:"role,omitempty" yaml:"role,omitempty"`
 	Email       string `json:"email,omitempty" yaml:"email,omitempty"`
-	DisplayName string `json:"display_name,omitempty" yaml:"display_name,omitempty"`
+	DisplayName string `json:"displayName,omitempty" yaml:"displayName,omitempty"`
 	Sub         string `json:"sub,omitempty" yaml:"sub,omitempty"`
 }
 
 type OAuth2ResourcePolicy struct {
 	Path          string `json:"path" yaml:"path"`
-	RequiredScope string `json:"required_scope" yaml:"required_scope"`
+	RequiredScope string `json:"requiredScope" yaml:"requiredScope"`
 }
 
 type APIKeyResourcePolicy struct {
 	Path       string `json:"path" yaml:"path"`
 	Key        string `json:"key" yaml:"key"`
 	Placement  string `json:"placement,omitempty" yaml:"placement,omitempty"`
-	HeaderName string `json:"header_name,omitempty" yaml:"header_name,omitempty"`
+	HeaderName string `json:"headerName,omitempty" yaml:"headerName,omitempty"`
 	Prefix     string `json:"prefix,omitempty" yaml:"prefix,omitempty"`
 }
 
@@ -142,7 +141,7 @@ func loadConfig(path string) (*SeedConfig, error) {
 		return nil, fmt.Errorf("read seed config %q: %w", path, err)
 	}
 	var c SeedConfig
-	if err := yaml.Unmarshal(data, &c); err != nil {
+	if err := util.DecodeYAMLStrict(data, &c); err != nil {
 		return nil, fmt.Errorf("parse seed config %q: %w", path, err)
 	}
 	return &c, nil
@@ -363,7 +362,7 @@ func listSeededConnector(c *resty.Client, baseUrl string, seed ConnectorSeed) (*
 	resp, err := c.R().
 		SetHeader("Accept", "application/json").
 		SetQueryParam("namespace", connectorNamespace(seed)).
-		SetQueryParam("label_selector", fmt.Sprintf("%s=%s", seedLabelKey, seed.Key)).
+		SetQueryParam("labelSelector", fmt.Sprintf("%s=%s", seedLabelKey, seed.Key)).
 		SetQueryParam("limit", "1").
 		SetResult(&list).
 		Get(fmt.Sprintf("%s/api/v1/connectors", baseUrl))
@@ -442,7 +441,7 @@ func forceConnectorPrimary(c *resty.Client, baseUrl string, version api.Connecto
 	resp, err := c.R().
 		SetHeader("Content-Type", "application/json").
 		SetBody(api.ForceConnectorVersionStateRequestJson{State: string(api.ConnectorVersionStatePrimary)}).
-		Put(fmt.Sprintf("%s/api/v1/connectors/%s/versions/%d/_force_state", baseUrl, version.Id, version.Version))
+		Put(fmt.Sprintf("%s/api/v1/connectors/%s/versions/%d/_forceState", baseUrl, version.Id, version.Version))
 	if err != nil {
 		return fmt.Errorf("PUT connector seed %s:%d primary: %w", version.Id, version.Version, err)
 	}

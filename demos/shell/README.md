@@ -20,12 +20,12 @@ marketplace or admin UI.
                                                                 ▼
                             ┌──────────────────────────────────────────────────┐
                             │  Marketplace or Admin UI                          │
-                            │  picks up ?auth_token=… → establishes session     │
+                            │  picks up ?authToken=… → establishes session     │
                             └──────────────────────────────────────────────────┘
 ```
 
 The backend holds **one** admin private key. AuthProxy's auth model
-trusts an admin-signed JWT to bear any `actor_external_id` claim — so
+trusts an admin-signed JWT to represent any actor `externalId` — so
 one key is enough to "be" any of the three demo identities.
 
 ## Running locally
@@ -46,11 +46,11 @@ openssl rsa -in demos/shell/dev_keys/demo-shell -pubout -out demos/shell/dev_key
 Add the public key as an admin actor in `dev_config/default.yaml`:
 
 ```yaml
-system_auth:
+systemAuth:
   actors:
-    - external_id: demo-shell
+    - externalId: demo-shell
       key:
-        public_key:
+        publicKey:
           path: ./demos/shell/dev_keys/demo-shell.pub
       permissions:
         - namespace: "root.**"
@@ -122,7 +122,7 @@ The backend reads the following env vars:
 
 | Var                       | Required | Notes                                                                       |
 |---------------------------|----------|-----------------------------------------------------------------------------|
-| `ADMIN_USERNAME`          | ✅        | external_id of the admin actor whose key is mounted at `ADMIN_PRIVATE_KEY_PATH` |
+| `ADMIN_USERNAME`          | ✅        | externalId of the admin actor whose key is mounted at `ADMIN_PRIVATE_KEY_PATH` |
 | `ADMIN_PRIVATE_KEY_PATH`  | ✅        | File path; PEM RSA or EC                                                    |
 | `AUTHPROXY_ADMIN_UI_URL`  | ✅        | Base URL of the admin SPA                                                   |
 | `AUTHPROXY_MARKETPLACE_URL` | ✅      | Base URL of the marketplace SPA                                             |
@@ -144,8 +144,8 @@ dev mode, `/config.json` and `/sso` are proxied to the backend; override
 
 It's tempting to give the demo shell one keypair per demo identity. The
 existing AuthProxy auth model already covers the multi-identity case via
-admin-actor vouching: an admin's JWT can bear any `actor_external_id`
-claim and AuthProxy will trust the user assignment. That's the same
+admin-actor vouching: an admin's JWT can represent any actor `externalId`
+and AuthProxy will trust the user assignment. That's the same
 pattern `cmd/cli/sign-marketplace-login-url` uses, so the demo shell
 mirrors it.
 

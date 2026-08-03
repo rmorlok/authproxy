@@ -197,7 +197,7 @@ func ssoHandler(s settings, logger *slog.Logger) http.HandlerFunc {
 			return
 		}
 		q := parsed.Query()
-		q.Set("auth_token", token)
+		q.Set("authToken", token)
 		parsed.RawQuery = q.Encode()
 
 		logger.Info("signed token, redirecting", "actor", actor, "destination", destination)

@@ -324,7 +324,7 @@ func (r *ConnectorResource) ImportState(ctx context.Context, req resource.Import
 // before storing the definition in state to avoid "inconsistent result" errors.
 var connectorMetadataFields = []string{
 	"id", "version", "namespace", "state", "logo",
-	"labels", "annotations", "created_at", "updated_at",
+	"labels", "annotations", "createdAt", "updatedAt",
 }
 
 func setConnectorState(model *ConnectorResourceModel, cv *client.ConnectorVersion) {
@@ -357,7 +357,7 @@ func setConnectorState(model *ConnectorResourceModel, cv *client.ConnectorVersio
 
 	// Extract display_name from definition
 	var def struct {
-		DisplayName string `json:"display_name"`
+		DisplayName string `json:"displayName"`
 	}
 	if cv.Definition != nil {
 		if err := json.Unmarshal(cv.Definition, &def); err == nil {
