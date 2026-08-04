@@ -15,13 +15,13 @@ function resource(
     labels: Record<string, string> = {},
 ): SearchResourceSummary {
     return {
-        resource_type: type,
-        resource_id: id,
+        resourceType: type,
+        resourceId: id,
         name: labels.name ?? id,
         namespace: 'root.team',
         labels,
-        matched_labels: [],
-        updated_at: '2026-07-12T12:00:00Z',
+        matchedLabels: [],
+        updatedAt: '2026-07-12T12:00:00Z',
     };
 }
 
@@ -42,7 +42,7 @@ describe('SearchResourceCache', () => {
             cache.put('all', [resource('cxn_' + i)], 100 + i);
         }
         expect(cache.size).toBe(SEARCH_CACHE_MAX_ENTRIES);
-        expect(cache.list('all', 1000).some((item) => item.resource_id === 'cxn_0')).toBe(false);
+        expect(cache.list('all', 1000).some((item) => item.resourceId === 'cxn_0')).toBe(false);
     });
 
     it('refreshes entries when their scope is read', () => {
@@ -55,7 +55,7 @@ describe('SearchResourceCache', () => {
         expect(cache.list('keep', 1000)).toHaveLength(1);
         cache.put('other', [resource('cxn_new')], 1000);
 
-        expect(cache.list('keep', 1000).map((item) => item.resource_id)).toEqual(['cxn_keep']);
+        expect(cache.list('keep', 1000).map((item) => item.resourceId)).toEqual(['cxn_keep']);
     });
 
     it('invalidates seed completeness when LRU eviction removes scope entries', () => {
@@ -80,7 +80,7 @@ describe('local search', () => {
             resource('act_other', 'actor', {name: 'payments', env: 'prod'}),
         ];
         const parsed = parseSearchQuery('type:connection label:env=prod payments');
-        expect(filterCachedResources(items, parsed).map((item) => item.resource_id))
+        expect(filterCachedResources(items, parsed).map((item) => item.resourceId))
             .toEqual(['cxn_exact', 'cxn_prefix']);
     });
 
@@ -91,14 +91,14 @@ describe('local search', () => {
             {...resource('cxn_exact'), name: 'payments'},
         ];
 
-        expect(filterCachedResources(items, parseSearchQuery('payments')).map((item) => item.resource_id))
+        expect(filterCachedResources(items, parseSearchQuery('payments')).map((item) => item.resourceId))
             .toEqual(['cxn_exact', 'cxn_prefix', 'cxn_label']);
     });
 
     it('deduplicates local and remote results', () => {
         const local = [resource('cxn_one'), resource('cxn_two')];
         const remote = [resource('cxn_two'), resource('cxn_three')];
-        expect(mergeSearchResults(local, remote).map((item) => item.resource_id))
+        expect(mergeSearchResults(local, remote).map((item) => item.resourceId))
             .toEqual(['cxn_two', 'cxn_three', 'cxn_one']);
     });
 
@@ -106,9 +106,9 @@ describe('local search', () => {
         const local = [resource('cxn_stale'), resource('act_partial', 'actor')];
         const remote = [resource('cxn_current')];
 
-        expect(mergeSearchResults(local, remote, []).map((item) => item.resource_id))
+        expect(mergeSearchResults(local, remote, []).map((item) => item.resourceId))
             .toEqual(['cxn_current']);
-        expect(mergeSearchResults(local, remote, ['actor']).map((item) => item.resource_id))
+        expect(mergeSearchResults(local, remote, ['actor']).map((item) => item.resourceId))
             .toEqual(['cxn_current', 'act_partial']);
     });
 

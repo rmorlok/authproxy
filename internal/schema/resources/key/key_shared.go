@@ -1,7 +1,7 @@
 package key
 
 type KeyShared struct {
-	SharedKey *KeyData `json:"shared_key" yaml:"shared_key"`
+	SharedKey *KeyData `json:"sharedKey" yaml:"sharedKey"`
 }
 
 func (ks *KeyShared) CanSign() bool {

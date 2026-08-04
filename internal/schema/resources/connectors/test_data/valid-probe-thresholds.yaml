@@ -1,31 +1,29 @@
-# $schema: ./schema.json
-
 labels:
   type: asana
-display_name: Asana
+displayName: Asana
 logo:
-  public_url: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Asana_logo.svg/2880px-Asana_logo.svg.png
+  publicUrl: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Asana_logo.svg/2880px-Asana_logo.svg.png
 description: |
   Allow our agent organize your work
 probes:
   - id: strict-ping
     cron: "*/5 * * * *"
-    failure_threshold: 5
-    recovery_threshold: 2
+    failureThreshold: 5
+    recoveryThreshold: 2
     http:
       method: GET
       url: https://example.com/ping
   - id: defaults-applied
     period: 1h
-    proxy_http:
+    proxyHttp:
       method: GET
       url: https://example.com/test
 auth:
   type: OAuth2
-  client_id:
-    env_var: ASANA_CLIENT_ID
-  client_secret:
-    env_var: ASANA_CLIENT_SECRET
+  clientId:
+    envVar: ASANA_CLIENT_ID
+  clientSecret:
+    envVar: ASANA_CLIENT_SECRET
   authorization:
     endpoint: https://app.asana.com/-/oauth_authorize
   token:

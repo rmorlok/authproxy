@@ -9,7 +9,7 @@
 ## Flow
 
 1. Publish version 2 and script its refresh response to grant only `read`.
-2. Migrate the connection to version 2 through `_migrate_version` and wait for
+2. Migrate the connection to version 2 through `_migrateVersion` and wait for
    the durable workflow.
 3. Start `_reauth`, inspect the generated authorization URL, and complete the
    callback after granting `read write`.

@@ -113,7 +113,7 @@ func (r *proxyRefreshRig) completeAuthFlow(t *testing.T) string {
 	connID, redirectURL := r.env.InitiateOAuth2Connection(t, r.connectorID, r.returnToURL)
 	parsed, err := url.Parse(redirectURL)
 	require.NoError(t, err)
-	stateID := parsed.Query().Get("state_id")
+	stateID := parsed.Query().Get("stateId")
 	require.NotEmpty(t, stateID)
 
 	authResp := r.provider.Authorize(helpers.AuthorizeRequest{
@@ -131,7 +131,7 @@ func (r *proxyRefreshRig) completeAuthFlow(t *testing.T) string {
 
 	loc := r.env.DeliverOAuth2Callback(t, r.env.ForgeOAuth2CallbackURL(stateID, code))
 	require.Truef(t, strings.HasPrefix(loc, r.returnToURL),
-		"auth flow should land on return_to_url; got %q", loc)
+		"auth flow should land on returnToUrl; got %q", loc)
 	return connID
 }
 
@@ -229,7 +229,7 @@ func TestProxyRefresh_ExpiredAccessTokenRefreshes(t *testing.T) {
 	assert.Equalf(t, 1, refreshCalls,
 		"expected exactly one grant_type=refresh_token call; got %d", refreshCalls)
 
-	// Structured success event with the right connection_id.
+	// Structured success event with the right connection_id log attribute.
 	succeeded := rig.logCapture.RecordsWithMessage(t, tokenRefreshSuccessMessage)
 	require.Lenf(t, succeeded, 1, "expected exactly one refresh-succeeded event; got %d", len(succeeded))
 	assert.Equal(t, connID, succeeded[0]["connection_id"])

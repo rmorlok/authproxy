@@ -43,31 +43,31 @@ type Options struct {
 }
 
 type Result struct {
-	ProfileName               string             `json:"profile_name"`
-	ProviderBaseURL           string             `json:"provider_base_url"`
-	BaseNamespace             string             `json:"base_namespace"`
-	ConnectorID               apid.ID            `json:"connector_id"`
-	ConnectorVersion          uint64             `json:"connector_version"`
-	RequestedTenantNamespaces int                `json:"requested_tenant_namespaces"`
-	RequestedConnections      int                `json:"requested_connections"`
-	RequestedStaleSetups      int                `json:"requested_stale_setup_connections"`
-	OAuthExpiringPercent      int                `json:"oauth_expiring_percent"`
-	PeriodicProbePercent      int                `json:"periodic_probe_percent"`
-	StartedAt                 time.Time          `json:"started_at"`
-	FinishedAt                time.Time          `json:"finished_at"`
-	CreatedNamespaces         int                `json:"created_namespaces"`
-	UpsertedActors            int                `json:"upserted_actors"`
-	CreatedConnections        int                `json:"created_connections"`
-	ExistingConnections       int                `json:"existing_connections"`
-	CreatedStaleSetups        int                `json:"created_stale_setup_connections"`
-	ExistingStaleSetups       int                `json:"existing_stale_setup_connections"`
-	UpsertedOAuthTokens       int                `json:"upserted_oauth_tokens"`
-	ProbeEnabledConnections   int                `json:"probe_enabled_connections"`
-	VerifiedSamples           []VerifiedSample   `json:"verified_samples"`
+	ProfileName               string             `json:"profileName"`
+	ProviderBaseURL           string             `json:"providerBaseUrl"`
+	BaseNamespace             string             `json:"baseNamespace"`
+	ConnectorID               apid.ID            `json:"connectorId"`
+	ConnectorVersion          uint64             `json:"connectorVersion"`
+	RequestedTenantNamespaces int                `json:"requestedTenantNamespaces"`
+	RequestedConnections      int                `json:"requestedConnections"`
+	RequestedStaleSetups      int                `json:"requestedStaleSetupConnections"`
+	OAuthExpiringPercent      int                `json:"oauthExpiringPercent"`
+	PeriodicProbePercent      int                `json:"periodicProbePercent"`
+	StartedAt                 time.Time          `json:"startedAt"`
+	FinishedAt                time.Time          `json:"finishedAt"`
+	CreatedNamespaces         int                `json:"createdNamespaces"`
+	UpsertedActors            int                `json:"upsertedActors"`
+	CreatedConnections        int                `json:"createdConnections"`
+	ExistingConnections       int                `json:"existingConnections"`
+	CreatedStaleSetups        int                `json:"createdStaleSetupConnections"`
+	ExistingStaleSetups       int                `json:"existingStaleSetupConnections"`
+	UpsertedOAuthTokens       int                `json:"upsertedOauthTokens"`
+	ProbeEnabledConnections   int                `json:"probeEnabledConnections"`
+	VerifiedSamples           []VerifiedSample   `json:"verifiedSamples"`
 	Namespaces                []NamespaceRecord  `json:"namespaces"`
 	Actors                    []ActorRecord      `json:"actors"`
 	Connections               []ConnectionRecord `json:"connections"`
-	StaleSetups               []ConnectionRecord `json:"stale_setup_connections"`
+	StaleSetups               []ConnectionRecord `json:"staleSetupConnections"`
 }
 
 type NamespaceRecord struct {
@@ -75,29 +75,29 @@ type NamespaceRecord struct {
 }
 
 type ActorRecord struct {
-	ActorID    apid.ID `json:"actor_id"`
+	ActorID    apid.ID `json:"actorId"`
 	Namespace  string  `json:"namespace"`
-	ExternalID string  `json:"external_id"`
+	ExternalID string  `json:"externalId"`
 }
 
 type ConnectionRecord struct {
-	ConnectionID         apid.ID   `json:"connection_id"`
+	ConnectionID         apid.ID   `json:"connectionId"`
 	Namespace            string    `json:"namespace"`
-	ActorID              apid.ID   `json:"actor_id"`
-	ConnectorID          apid.ID   `json:"connector_id"`
-	ConnectorVersion     uint64    `json:"connector_version"`
-	RefreshToken         string    `json:"refresh_token"`
-	AccessToken          string    `json:"access_token"`
-	AccessTokenExpiresAt time.Time `json:"access_token_expires_at"`
-	ProbeEnabled         bool      `json:"probe_enabled"`
-	OAuthTokenID         *apid.ID  `json:"oauth_token_id,omitempty"`
+	ActorID              apid.ID   `json:"actorId"`
+	ConnectorID          apid.ID   `json:"connectorId"`
+	ConnectorVersion     uint64    `json:"connectorVersion"`
+	RefreshToken         string    `json:"refreshToken"`
+	AccessToken          string    `json:"accessToken"`
+	AccessTokenExpiresAt time.Time `json:"accessTokenExpiresAt"`
+	ProbeEnabled         bool      `json:"probeEnabled"`
+	OAuthTokenID         *apid.ID  `json:"oauthTokenId,omitempty"`
 }
 
 type VerifiedSample struct {
-	ConnectionID apid.ID `json:"connection_id"`
+	ConnectionID apid.ID `json:"connectionId"`
 	Namespace    string  `json:"namespace"`
-	ActorID      apid.ID `json:"actor_id"`
-	OAuthTokenID apid.ID `json:"oauth_token_id"`
+	ActorID      apid.ID `json:"actorId"`
+	OAuthTokenID apid.ID `json:"oauthTokenId"`
 }
 
 func Seed(ctx context.Context, opts Options) (*Result, error) {

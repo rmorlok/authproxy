@@ -695,7 +695,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 			tok, err := a.Token(testContext, testClaims())
 			require.NoError(t, err)
 
-			req := httptest.NewRequest("GET", "/blah?auth_token="+tok, nil)
+			req := httptest.NewRequest("GET", "/blah?authToken="+tok, nil)
 			w := httptest.NewRecorder()
 			ra, err := raw.establishAuthFromRequest(testContext, true, req, w)
 			require.NoError(t, err)
@@ -714,7 +714,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 				WithClock(test_clock.NewFakeClock(time.Date(2059, 10, 1, 0, 0, 0, 0, time.UTC))).
 				Build()
 
-			req := httptest.NewRequest("GET", "/blah?auth_token="+tok, nil)
+			req := httptest.NewRequest("GET", "/blah?authToken="+tok, nil)
 			w := httptest.NewRecorder()
 			_, err = raw.establishAuthFromRequest(futureCtx, true, req, w)
 			require.NotNil(t, err)
@@ -722,7 +722,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 		t.Run("bad token", func(t *testing.T) {
 			setup(t)
 
-			req := httptest.NewRequest("GET", "/blah?auth_token=blah", nil)
+			req := httptest.NewRequest("GET", "/blah?authToken=blah", nil)
 			w := httptest.NewRecorder()
 			_, err := raw.establishAuthFromRequest(testContext, true, req, w)
 			require.NotNil(t, err)
@@ -1021,7 +1021,7 @@ func TestAuth_Nonce(t *testing.T) {
 		require.NoError(t, err)
 
 		w := httptest.NewRecorder()
-		req := httptest.NewRequest("GET", "/?auth_token="+tok, nil).WithContext(ctx)
+		req := httptest.NewRequest("GET", "/?authToken="+tok, nil).WithContext(ctx)
 		ts.Gin.ServeHTTP(w, req)
 		require.Equal(t, http.StatusOK, w.Code)
 		require.Equal(t, c.Actor.ExternalId, w.Body.String())
@@ -1038,7 +1038,7 @@ func TestAuth_Nonce(t *testing.T) {
 		require.NoError(t, err)
 
 		w := httptest.NewRecorder()
-		req := httptest.NewRequest("GET", "/?auth_token="+tok, nil).WithContext(ctx)
+		req := httptest.NewRequest("GET", "/?authToken="+tok, nil).WithContext(ctx)
 		ts.Gin.ServeHTTP(w, req)
 		require.Equal(t, http.StatusUnauthorized, w.Code)
 	})
@@ -1055,14 +1055,14 @@ func TestAuth_Nonce(t *testing.T) {
 
 		// First request ok
 		w := httptest.NewRecorder()
-		req := httptest.NewRequest("GET", "/?auth_token="+tok, nil).WithContext(ctx)
+		req := httptest.NewRequest("GET", "/?authToken="+tok, nil).WithContext(ctx)
 		ts.Gin.ServeHTTP(w, req)
 		require.Equal(t, http.StatusOK, w.Code)
 		require.Equal(t, c.Actor.ExternalId, w.Body.String())
 
 		// Second request fail
 		w = httptest.NewRecorder()
-		req = httptest.NewRequest("GET", "/?auth_token="+tok, nil).WithContext(ctx)
+		req = httptest.NewRequest("GET", "/?authToken="+tok, nil).WithContext(ctx)
 		ts.Gin.ServeHTTP(w, req)
 		require.Equal(t, http.StatusUnauthorized, w.Code)
 	})
@@ -1078,7 +1078,7 @@ func TestAuth_Nonce(t *testing.T) {
 		require.NoError(t, err)
 
 		w := httptest.NewRecorder()
-		req := httptest.NewRequest("GET", "/?auth_token="+tok, nil).WithContext(ctx)
+		req := httptest.NewRequest("GET", "/?authToken="+tok, nil).WithContext(ctx)
 		ts.Gin.ServeHTTP(w, req)
 		require.Equal(t, http.StatusUnauthorized, w.Code)
 	})

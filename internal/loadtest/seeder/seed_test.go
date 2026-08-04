@@ -146,8 +146,8 @@ func TestSeedWritesArtifactsAndIsConnectionIdempotent(t *testing.T) {
 
 	summary, err := os.ReadFile(filepath.Join(runDir, "seed-summary.json"))
 	require.NoError(t, err)
-	assert.Contains(t, string(summary), `"existing_connections": 2`)
-	assert.Contains(t, string(summary), `"existing_stale_setup_connections": 1`)
+	assert.Contains(t, string(summary), `"existingConnections": 2`)
+	assert.Contains(t, string(summary), `"existingStaleSetupConnections": 1`)
 
 	plan, err := os.ReadFile(filepath.Join(runDir, "seed-plan.txt"))
 	require.NoError(t, err)

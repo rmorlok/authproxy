@@ -7,7 +7,7 @@ AuthProxy exposes two ways to send an HTTP request through a connection. Both au
 | Endpoint | Body handling | Response handling | Best for |
 |---|---|---|---|
 | `POST /api/v1/connections/{id}/_proxy` | JSON envelope; buffered | JSON envelope; buffered | Ordinary API calls and typed application code |
-| `ANY /api/v1/connections/{id}/_proxy_raw` | Original body streams through | Original response streams through | Large files, chunked bodies, and server-sent events |
+| `ANY /api/v1/connections/{id}/_proxyRaw` | Original body streams through | Original response streams through | Large files, chunked bodies, and server-sent events |
 
 In both cases, the `Authorization` credential presented to AuthProxy identifies the AuthProxy caller. AuthProxy does not forward that credential upstream; it applies authentication from the selected connection.
 
@@ -34,7 +34,7 @@ curl --request POST \
     "labels": {
       "app.example.com/tenant": "tenant-42"
     },
-    "body_json": {
+    "bodyJson": {
       "name": "example"
     }
   }'
@@ -48,29 +48,29 @@ The request fields are:
 | `method` | HTTP method such as `GET`, `POST`, or `PATCH` |
 | `headers` | Headers to send upstream, excluding provider credentials |
 | `labels` | Optional request labels used by rate limits, request events, and telemetry |
-| `body_json` | JSON request body |
-| `body_raw` | Base64-encoded request bytes; use instead of `body_json` |
+| `bodyJson` | JSON request body |
+| `bodyRaw` | Base64-encoded request bytes; use instead of `bodyJson` |
 
-`POST`, `PUT`, and `PATCH` requests require either `body_json` or `body_raw`. Do not set both.
+`POST`, `PUT`, and `PATCH` requests require either `bodyJson` or `bodyRaw`. Do not set both.
 
 AuthProxy returns the upstream result in a response envelope:
 
 ```json
 {
-  "status_code": 201,
+  "statusCode": 201,
   "headers": {
     "Content-Type": "application/json"
   },
-  "body_json": {
+  "bodyJson": {
     "id": "widget-123",
     "name": "example"
   }
 }
 ```
 
-The outer AuthProxy request returns `200` when an upstream response was received. Inspect `status_code` for the third-party status. AuthProxy authorization, validation, or transport failures use an error status on the outer request.
+The outer AuthProxy request returns `200` when an upstream response was received. Inspect `statusCode` for the third-party status. AuthProxy authorization, validation, or transport failures use an error status on the outer request.
 
-Responses with an `application/json` content type populate `body_json`. Other response bodies are returned as base64-encoded `body_raw`.
+Responses with an `application/json` content type populate `bodyJson`. Other response bodies are returned as base64-encoded `bodyRaw`.
 
 ### JavaScript
 
@@ -97,7 +97,7 @@ const request: ProxyRequest = {
   url: 'https://api.example.com/v1/widgets',
   method: 'POST',
   headers: {'Content-Type': 'application/json'},
-  body_json: {name: 'example'},
+  bodyJson: {name: 'example'},
 };
 
 const {data} = await client.post<ProxyResponse>(
@@ -105,8 +105,8 @@ const {data} = await client.post<ProxyResponse>(
   request,
 );
 
-if (data.status_code >= 400) {
-  throw new Error(`Upstream returned ${data.status_code}`);
+if (data.statusCode >= 400) {
+  throw new Error(`Upstream returned ${data.statusCode}`);
 }
 ```
 
@@ -118,7 +118,7 @@ The raw endpoint preserves streaming semantics in both directions. Send the upst
 
 ```bash
 curl --no-buffer \
-  "$AUTHPROXY_API_URL/api/v1/connections/$CONNECTION_ID/_proxy_raw" \
+  "$AUTHPROXY_API_URL/api/v1/connections/$CONNECTION_ID/_proxyRaw" \
   --header "Authorization: Bearer $TOKEN" \
   --header "X-AuthProxy-Upstream-URL: https://api.example.com/v1/events" \
   --header "Accept: text/event-stream" \

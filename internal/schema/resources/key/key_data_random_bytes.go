@@ -8,7 +8,7 @@ import (
 )
 
 type KeyDataRandomBytes struct {
-	NumBytes  int `json:"num_bytes" yaml:"num_bytes"`
+	NumBytes  int `json:"numBytes" yaml:"numBytes"`
 	bytes     []byte
 	bytesOnce sync.Once
 }

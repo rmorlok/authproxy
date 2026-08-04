@@ -10,7 +10,7 @@
 ## Flow
 
 1. Start the core workflow worker in-process.
-2. Call `POST /connections/{id}/_migrate_version` targeting version 2.
+2. Call `POST /connections/{id}/_migrateVersion` targeting version 2.
 3. Wait for the durable task to complete.
 4. Rotate the stub upstream to require a new API key.
 5. Start reauth through `POST /connections/{id}/_reauth`.

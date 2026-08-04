@@ -62,7 +62,7 @@ The final arg is the service to run: `admin-api`, `api`, `public`, `worker`, or 
 # JWT-signing reverse proxy to the AuthProxy server itself (dev tool).
 go run ./cmd/cli signing-proxy --enableLoginRedirect=true --proxyTo=api
 
-# Connection-scoped streaming reverse proxy through /_proxy_raw.
+# Connection-scoped streaming reverse proxy through /_proxyRaw.
 go run ./cmd/cli proxy --connection cxn_xxx --upstream-base https://api.openai.com
 
 # One-shot through curl or wget. Everything after `curl`/`wget` is

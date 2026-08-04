@@ -34,16 +34,16 @@ export interface MetricsRange {
 }
 
 export interface MetricsQueryRef {
-    ref_id: string;
+    refId: string;
     metric: MetricsMetric;
     aggregation: MetricsAggregation;
-    group_by?: MetricsGroupBy[];
+    groupBy?: MetricsGroupBy[];
 }
 
 export interface MetricsQueryRequest {
     range: MetricsRange;
     namespace?: string;
-    label_selector?: string;
+    labelSelector?: string;
     queries: MetricsQueryRef[];
 }
 
@@ -53,7 +53,7 @@ export interface MetricsPoint {
 }
 
 export interface MetricsSeries {
-    ref_id: string;
+    refId: string;
     metric: string;
     aggregation: string;
     labels?: Record<string, string>;

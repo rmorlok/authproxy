@@ -9,12 +9,12 @@ import (
 type ServiceWorker struct {
 	ServiceCommon             `json:",inline" yaml:",inline"`
 	ConcurrencyVal            *StringValue   `json:"concurrency" yaml:"concurrency"`
-	CronSyncInterval          *HumanDuration `json:"cron_sync_interval,omitempty" yaml:"cron_sync_interval,omitempty"`
-	WorkflowPollers           *StringValue   `json:"workflow_pollers,omitempty" yaml:"workflow_pollers,omitempty"`
-	ActivityPollers           *StringValue   `json:"activity_pollers,omitempty" yaml:"activity_pollers,omitempty"`
-	MaxParallelWorkflowTasks  *StringValue   `json:"max_parallel_workflow_tasks,omitempty" yaml:"max_parallel_workflow_tasks,omitempty"`
-	MaxParallelActivityTasks  *StringValue   `json:"max_parallel_activity_tasks,omitempty" yaml:"max_parallel_activity_tasks,omitempty"`
-	WorkflowHeartbeatInterval *HumanDuration `json:"workflow_heartbeat_interval,omitempty" yaml:"workflow_heartbeat_interval,omitempty"`
+	CronSyncInterval          *HumanDuration `json:"cronSyncInterval,omitempty" yaml:"cronSyncInterval,omitempty"`
+	WorkflowPollers           *StringValue   `json:"workflowPollers,omitempty" yaml:"workflowPollers,omitempty"`
+	ActivityPollers           *StringValue   `json:"activityPollers,omitempty" yaml:"activityPollers,omitempty"`
+	MaxParallelWorkflowTasks  *StringValue   `json:"maxParallelWorkflowTasks,omitempty" yaml:"maxParallelWorkflowTasks,omitempty"`
+	MaxParallelActivityTasks  *StringValue   `json:"maxParallelActivityTasks,omitempty" yaml:"maxParallelActivityTasks,omitempty"`
+	WorkflowHeartbeatInterval *HumanDuration `json:"workflowHeartbeatInterval,omitempty" yaml:"workflowHeartbeatInterval,omitempty"`
 }
 
 func (s *ServiceWorker) HealthCheckPort() uint64 {

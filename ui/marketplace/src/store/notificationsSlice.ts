@@ -25,7 +25,7 @@ export const fetchNotificationsAsync = createAsyncThunk(
     async (params?: ListNotificationsParams) => {
         const response = await notifications.list({
             limit: 25,
-            include_viewed: true,
+            includeViewed: true,
             ...params,
         });
         return response.data.items;

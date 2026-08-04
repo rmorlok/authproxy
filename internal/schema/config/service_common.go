@@ -7,11 +7,12 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/rmorlok/authproxy/internal/util"
 	"gopkg.in/yaml.v3"
 )
 
 type ServiceCommon struct {
-	HealthCheckPortVal *IntegerValue `json:"health_check_port,omitempty" yaml:"health_check_port,omitempty"`
+	HealthCheckPortVal *IntegerValue `json:"healthCheckPort,omitempty" yaml:"healthCheckPort,omitempty"`
 }
 
 func (s *ServiceCommon) healthCheckPort() *uint64 {
@@ -30,11 +31,61 @@ func (s *ServiceCommon) healthCheckPort() *uint64 {
 type ServiceHttp struct {
 	ServiceCommon `json:",inline" yaml:",inline"`
 	PortVal       *IntegerValue `json:"port" yaml:"port"`
-	BaseUrl       *StringValue  `json:"base_url,omitempty" yaml:"base_url,omitempty"`
+	BaseUrl       *StringValue  `json:"baseUrl,omitempty" yaml:"baseUrl,omitempty"`
 	DomainVal     string        `json:"domain" yaml:"domain"`
 	IsHttpsVal    bool          `json:"https" yaml:"https"`
 	CorsVal       *CorsConfig   `json:"cors,omitempty" yaml:"cors,omitempty"`
 	TlsVal        TlsConfig     `json:"tls,omitempty" yaml:"tls,omitempty"`
+}
+
+var httpServiceYAMLFields = []string{
+	"healthCheckPort",
+	"port",
+	"baseUrl",
+	"domain",
+	"https",
+	"cors",
+	"tls",
+}
+
+// validateYAMLMappingFields ensures custom YAML unmarshalling retains the
+// unknown-field behavior used by the ordinary strict decoder.
+func validateYAMLMappingFields(value *yaml.Node, fieldNames ...string) error {
+	if value.Kind != yaml.MappingNode {
+		return fmt.Errorf("expected a mapping node, got %s", KindToString(value.Kind))
+	}
+
+	allowed := make(map[string]struct{}, len(fieldNames))
+	for _, fieldName := range fieldNames {
+		allowed[fieldName] = struct{}{}
+	}
+
+	for i := 0; i < len(value.Content); i += 2 {
+		if _, ok := allowed[value.Content[i].Value]; !ok {
+			return fmt.Errorf("unknown config field %q", value.Content[i].Value)
+		}
+	}
+
+	return nil
+}
+
+// yamlMappingWithFields returns a shallow mapping view containing only the
+// requested fields. It lets embedded custom unmarshallers decode their own
+// fields strictly without seeing their parent's fields.
+func yamlMappingWithFields(value *yaml.Node, fieldNames ...string) *yaml.Node {
+	fields := make(map[string]struct{}, len(fieldNames))
+	for _, fieldName := range fieldNames {
+		fields[fieldName] = struct{}{}
+	}
+
+	filtered := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+	for i := 0; i < len(value.Content); i += 2 {
+		if _, ok := fields[value.Content[i].Value]; ok {
+			filtered.Content = append(filtered.Content, value.Content[i], value.Content[i+1])
+		}
+	}
+
+	return filtered
 }
 
 func httpServiceUnmarshalYAML(value *yaml.Node) (ServiceHttp, error) {
@@ -45,42 +96,48 @@ func httpServiceUnmarshalYAML(value *yaml.Node) (ServiceHttp, error) {
 
 	var tlsConfig TlsConfig
 
-	// Handle custom unmarshalling for some attributes. Iterate through the mapping node's content,
-	// which will be sequences of keys, then values.
+	// Handle custom unmarshalling for TLS without changing the parent mapping:
+	// ServicePublic and ServiceAdminApi contain additional fields that must be
+	// decoded by their own strict unmarshallers.
 	for i := 0; i < len(value.Content); i += 2 {
 		keyNode := value.Content[i]
 		valueNode := value.Content[i+1]
 
-		var err error
-		matched := false
-
 		switch keyNode.Value {
 		case "tls":
+			var err error
 			if tlsConfig, err = tlsConfigUnmarshalYAML(valueNode); err != nil {
 				return ServiceHttp{}, err
 			}
-			matched = true
-		}
-
-		if matched {
-			// Remove the key/value from the raw unmarshalling and pull back our index
-			// because of the changing slice size to the left of what we are indexing
-			value.Content = append(value.Content[:i], value.Content[i+2:]...)
-			i -= 2
 		}
 	}
 
-	// Let the rest unmarshall normally
-	type RawType ServiceHttp
-	raw := &RawType{}
-	if err := value.Decode(raw); err != nil {
+	// Decode only the common HTTP fields. TlsVal is an interface and is handled
+	// above, so deliberately omit it from the raw type.
+	type rawServiceHttp struct {
+		HealthCheckPortVal *IntegerValue `yaml:"healthCheckPort,omitempty"`
+		PortVal            *IntegerValue `yaml:"port"`
+		BaseUrl            *StringValue  `yaml:"baseUrl,omitempty"`
+		DomainVal          string        `yaml:"domain"`
+		IsHttpsVal         bool          `yaml:"https"`
+		CorsVal            *CorsConfig   `yaml:"cors,omitempty"`
+	}
+
+	raw := &rawServiceHttp{}
+	httpFields := yamlMappingWithFields(value, httpServiceYAMLFields[:len(httpServiceYAMLFields)-1]...)
+	if err := util.DecodeYAMLNodeStrict(httpFields, raw); err != nil {
 		return ServiceHttp{}, err
 	}
 
-	// Set the custom unmarshalled types
-	raw.TlsVal = tlsConfig
-
-	return ServiceHttp(*raw), nil
+	return ServiceHttp{
+		ServiceCommon: ServiceCommon{HealthCheckPortVal: raw.HealthCheckPortVal},
+		PortVal:       raw.PortVal,
+		BaseUrl:       raw.BaseUrl,
+		DomainVal:     raw.DomainVal,
+		IsHttpsVal:    raw.IsHttpsVal,
+		CorsVal:       raw.CorsVal,
+		TlsVal:        tlsConfig,
+	}, nil
 }
 
 func (s *ServiceHttp) Port() uint64 {

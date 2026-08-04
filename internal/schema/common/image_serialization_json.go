@@ -3,6 +3,8 @@ package common
 import (
 	"encoding/json"
 	"errors"
+
+	"github.com/rmorlok/authproxy/internal/util"
 )
 
 func (d *Image) MarshalJSON() ([]byte, error) {
@@ -32,15 +34,15 @@ func (d *Image) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	if _, ok := tmp["public_url"]; ok {
+	if _, ok := tmp["publicUrl"]; ok {
 		d.InnerVal = &ImagePublicUrl{}
-		return json.Unmarshal(data, d.InnerVal)
+		return util.DecodeJSONStrict(data, d.InnerVal)
 	}
 
 	if _, ok := tmp["base64"]; ok {
 		d.InnerVal = &ImageBase64{}
-		return json.Unmarshal(data, d.InnerVal)
+		return util.DecodeJSONStrict(data, d.InnerVal)
 	}
 
-	return errors.New("invalid structure for image type; does not match base64 or public_url")
+	return errors.New("invalid structure for image type; does not match base64 or publicUrl")
 }

@@ -10,7 +10,7 @@ describe('KeyDataForm helpers', () => {
   it('builds random key data with the provider discriminator', () => {
     expect(buildKeyDataPayload(createEmptyKeyDataFormState())).toEqual({
       random: true,
-      num_bytes: 32,
+      numBytes: 32,
     });
   });
 
@@ -18,25 +18,25 @@ describe('KeyDataForm helpers', () => {
     const payload = buildKeyDataPayload({
       type: 'aws_kms',
       fields: {
-        aws_kms_key_id: 'alias/authproxy',
-        aws_region: 'us-east-1',
-        aws_kms_endpoint: 'http://localhost:4566',
-        cache_ttl: '5m',
-        aws_credentials_type: 'access_key',
-        aws_access_key_id: 'test-access-key',
-        aws_secret_access_key: 'test-secret-key',
+        awsKmsKeyId: 'alias/authproxy',
+        awsRegion: 'us-east-1',
+        awsKmsEndpoint: 'http://localhost:4566',
+        cacheTtl: '5m',
+        awsCredentialsType: 'access_key',
+        awsAccessKeyId: 'test-access-key',
+        awsSecretAccessKey: 'test-secret-key',
       },
     });
 
     expect(payload).toEqual({
-      aws_kms_key_id: 'alias/authproxy',
-      aws_region: 'us-east-1',
-      aws_kms_endpoint: 'http://localhost:4566',
-      cache_ttl: '5m',
-      aws_credentials: {
+      awsKmsKeyId: 'alias/authproxy',
+      awsRegion: 'us-east-1',
+      awsKmsEndpoint: 'http://localhost:4566',
+      cacheTtl: '5m',
+      awsCredentials: {
         type: 'access_key',
-        access_key_id: 'test-access-key',
-        secret_access_key: 'test-secret-key',
+        accessKeyId: 'test-access-key',
+        secretAccessKey: 'test-secret-key',
       },
     });
   });
@@ -45,43 +45,43 @@ describe('KeyDataForm helpers', () => {
     const payload = buildKeyDataPayload({
       type: 'gcp_kms',
       fields: {
-        gcp_project: 'auth-proxy-446804',
-        gcp_location: 'global',
-        gcp_key_ring: 'authproxy',
-        gcp_crypto_key: 'authproxy-github-actions-ci-1',
-        gcp_credentials_file: '/tmp/gcp.json',
-        cache_ttl: '5m',
+        gcpProject: 'auth-proxy-446804',
+        gcpLocation: 'global',
+        gcpKeyRing: 'authproxy',
+        gcpCryptoKey: 'authproxy-github-actions-ci-1',
+        gcpCredentialsFile: '/tmp/gcp.json',
+        cacheTtl: '5m',
       },
     });
 
     expect(payload).toEqual({
-      gcp_project: 'auth-proxy-446804',
-      gcp_location: 'global',
-      gcp_key_ring: 'authproxy',
-      gcp_crypto_key: 'authproxy-github-actions-ci-1',
-      gcp_credentials_file: '/tmp/gcp.json',
-      cache_ttl: '5m',
+      gcpProject: 'auth-proxy-446804',
+      gcpLocation: 'global',
+      gcpKeyRing: 'authproxy',
+      gcpCryptoKey: 'authproxy-github-actions-ci-1',
+      gcpCredentialsFile: '/tmp/gcp.json',
+      cacheTtl: '5m',
     });
   });
 
   it('round-trips API key data into editable state', () => {
     expect(keyDataFormStateFromConfig({
-      aws_kms_key_id: 'alias/authproxy',
-      aws_region: 'us-east-1',
-      aws_credentials: {
+      awsKmsKeyId: 'alias/authproxy',
+      awsRegion: 'us-east-1',
+      awsCredentials: {
         type: 'access_key',
-        access_key_id: '***************',
-        secret_access_key: '***************',
+        accessKeyId: '***************',
+        secretAccessKey: '***************',
       },
     })).toEqual({
       type: 'aws_kms',
       fields: {
-        num_bytes: '32',
-        aws_credentials_type: 'access_key',
-        aws_kms_key_id: 'alias/authproxy',
-        aws_region: 'us-east-1',
-        aws_access_key_id: '***************',
-        aws_secret_access_key: '***************',
+        numBytes: '32',
+        awsCredentialsType: 'access_key',
+        awsKmsKeyId: 'alias/authproxy',
+        awsRegion: 'us-east-1',
+        awsAccessKeyId: '***************',
+        awsSecretAccessKey: '***************',
       },
     });
   });
@@ -90,10 +90,10 @@ describe('KeyDataForm helpers', () => {
     expect(validateKeyDataFormState({
       type: 'aws_kms',
       fields: {
-        aws_kms_key_id: 'alias/authproxy',
-        aws_credentials_type: 'access_key',
-        aws_access_key_id: '***************',
-        aws_secret_access_key: '***************',
+        awsKmsKeyId: 'alias/authproxy',
+        awsCredentialsType: 'access_key',
+        awsAccessKeyId: '***************',
+        awsSecretAccessKey: '***************',
       },
     })).toBe('AWS Access Key ID must be re-entered to update key data');
   });
@@ -102,17 +102,17 @@ describe('KeyDataForm helpers', () => {
     expect(validateKeyDataFormState({
       type: 'gcp_kms',
       fields: {
-        gcp_project: 'auth-proxy-446804',
-        gcp_location: 'global',
+        gcpProject: 'auth-proxy-446804',
+        gcpLocation: 'global',
       },
     })).toBe('GCP Key Ring is required');
 
     expect(validateKeyDataFormState({
       type: 'aws_kms',
       fields: {
-        aws_kms_key_id: 'alias/authproxy',
-        aws_credentials_type: 'access_key',
-        aws_access_key_id: 'test-access-key',
+        awsKmsKeyId: 'alias/authproxy',
+        awsCredentialsType: 'access_key',
+        awsAccessKeyId: 'test-access-key',
       },
     })).toBe('AWS Secret Access Key is required');
   });

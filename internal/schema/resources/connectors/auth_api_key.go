@@ -23,20 +23,20 @@ type ApiKeyPlacement struct {
 	Type ApiKeyPlacementType `json:"type" yaml:"type"`
 
 	// HeaderName is the HTTP header to set when Type == header. Required for header.
-	HeaderName string `json:"header_name,omitempty" yaml:"header_name,omitempty"`
+	HeaderName string `json:"headerName,omitempty" yaml:"headerName,omitempty"`
 
 	// Prefix is an optional literal prepended to the key value when Type == header.
 	// e.g. "Token " produces a header value of "Token <key>".
 	Prefix string `json:"prefix,omitempty" yaml:"prefix,omitempty"`
 
 	// ParamName is the URL query parameter name when Type == query. Required for query.
-	ParamName string `json:"param_name,omitempty" yaml:"param_name,omitempty"`
+	ParamName string `json:"paramName,omitempty" yaml:"paramName,omitempty"`
 
 	// UsernameField is the name of the user-supplied form field that holds the username
 	// (or account-id-like value) paired with the api key when Type == basic. Required
 	// for basic. The proxy base64-encodes "<username>:<key>" for the Authorization
 	// header; the user is never asked for the encoded form directly.
-	UsernameField string `json:"username_field,omitempty" yaml:"username_field,omitempty"`
+	UsernameField string `json:"usernameField,omitempty" yaml:"usernameField,omitempty"`
 }
 
 func (p *ApiKeyPlacement) Clone() *ApiKeyPlacement {

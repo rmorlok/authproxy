@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+
+	"github.com/rmorlok/authproxy/internal/util"
 )
 
 func (sv *StringValue) MarshalJSON() ([]byte, error) {
@@ -58,19 +60,19 @@ func (sv *StringValue) UnmarshalJSON(data []byte) error {
 		svi = &StringValueDirect{}
 	} else if _, ok := valueMap["base64"]; ok {
 		svi = &StringValueBase64{}
-	} else if _, ok := valueMap["env_var"]; ok {
+	} else if _, ok := valueMap["envVar"]; ok {
 		svi = &StringValueEnvVar{}
-	} else if _, ok := valueMap["env_var_base64"]; ok {
+	} else if _, ok := valueMap["envVarBase64"]; ok {
 		svi = &StringValueEnvVarBase64{}
-	} else if _, ok := valueMap["template_env_vars"]; ok {
+	} else if _, ok := valueMap["templateEnvVars"]; ok {
 		svi = &StringValueTemplatedEnvVars{}
 	} else if _, ok := valueMap["path"]; ok {
 		svi = &StringValueFile{}
 	} else {
-		return fmt.Errorf("invalid structure for value type; does not match value, base64, env_var, env_var_base64, template_env_vars, path")
+		return fmt.Errorf("invalid structure for value type; does not match value, base64, envVar, envVarBase64, templateEnvVars, path")
 	}
 
-	if err := json.Unmarshal(data, svi); err != nil {
+	if err := util.DecodeJSONStrict(data, svi); err != nil {
 		return err
 	}
 

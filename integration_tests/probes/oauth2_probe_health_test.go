@@ -94,7 +94,7 @@ func TestOAuth2ProbeHealth_FailureAndRecovery(t *testing.T) {
 	connID, redirectURL := env.InitiateOAuth2Connection(t, connectorID, returnToURL)
 	parsed, err := url.Parse(redirectURL)
 	require.NoError(t, err)
-	stateID := parsed.Query().Get("state_id")
+	stateID := parsed.Query().Get("stateId")
 	require.NotEmpty(t, stateID)
 
 	authResp := provider.Authorize(helpers.AuthorizeRequest{
@@ -112,7 +112,7 @@ func TestOAuth2ProbeHealth_FailureAndRecovery(t *testing.T) {
 
 	loc := env.DeliverOAuth2Callback(t, env.ForgeOAuth2CallbackURL(stateID, code))
 	require.Truef(t, strings.HasPrefix(loc, returnToURL),
-		"auth flow should land on return_to_url; got %q", loc)
+		"auth flow should land on returnToUrl; got %q", loc)
 
 	// After auth callback the connection is in verify phase (we added a
 	// probe). Drive verify synchronously — production has the asynq

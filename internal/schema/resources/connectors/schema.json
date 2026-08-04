@@ -5,7 +5,10 @@
     "AuthApiKey": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["type", "placement"],
+      "required": [
+        "type",
+        "placement"
+      ],
       "properties": {
         "type": {
           "const": "api-key"
@@ -19,7 +22,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "propagate_trace_context": {
+        "propagateTraceContext": {
           "type": "boolean"
         }
       }
@@ -27,36 +30,73 @@
     "ApiKeyPlacement": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["type"],
+      "required": [
+        "type"
+      ],
       "properties": {
         "type": {
-          "enum": ["bearer", "header", "query", "basic"]
+          "enum": [
+            "bearer",
+            "header",
+            "query",
+            "basic"
+          ]
         },
-        "header_name": {
+        "headerName": {
           "type": "string"
         },
         "prefix": {
           "type": "string"
         },
-        "param_name": {
+        "paramName": {
           "type": "string"
         },
-        "username_field": {
+        "usernameField": {
           "type": "string"
         }
       },
       "allOf": [
         {
-          "if": { "properties": { "type": { "const": "header" } } },
-          "then": { "required": ["header_name"] }
+          "if": {
+            "properties": {
+              "type": {
+                "const": "header"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "headerName"
+            ]
+          }
         },
         {
-          "if": { "properties": { "type": { "const": "query" } } },
-          "then": { "required": ["param_name"] }
+          "if": {
+            "properties": {
+              "type": {
+                "const": "query"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "paramName"
+            ]
+          }
         },
         {
-          "if": { "properties": { "type": { "const": "basic" } } },
-          "then": { "required": ["username_field"] }
+          "if": {
+            "properties": {
+              "type": {
+                "const": "basic"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "usernameField"
+            ]
+          }
         }
       ]
     },
@@ -72,7 +112,9 @@
     "MigrationHook": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["javascript"],
+      "required": [
+        "javascript"
+      ],
       "properties": {
         "javascript": {
           "type": "string",
@@ -95,10 +137,16 @@
     "Probe": {
       "oneOf": [
         {
-          "required": ["id", "http"]
+          "required": [
+            "id",
+            "http"
+          ]
         },
         {
-          "required": ["id", "proxy_http"]
+          "required": [
+            "id",
+            "proxyHttp"
+          ]
         }
       ],
       "properties": {
@@ -111,7 +159,7 @@
         "cron": {
           "$ref": "../../common/schema.json#/$defs/Cron"
         },
-        "proxy_http": {
+        "proxyHttp": {
           "$ref": "#/$defs/ProbeHttp"
         },
         "http": {
@@ -120,34 +168,53 @@
         "if": {
           "$ref": "../../common/schema.json#/$defs/Predicate"
         },
-        "failure_threshold": {
+        "failureThreshold": {
           "type": "integer",
           "minimum": 1
         },
-        "recovery_threshold": {
+        "recoveryThreshold": {
           "type": "integer",
           "minimum": 1
         }
       },
       "dependencies": {
         "period": {
-          "not": { "required": ["cron"] }
+          "not": {
+            "required": [
+              "cron"
+            ]
+          }
         },
         "cron": {
-          "not": { "required": ["period"] }
+          "not": {
+            "required": [
+              "period"
+            ]
+          }
         },
-        "proxy_http": {
-          "not": { "required": ["http"] }
+        "proxyHttp": {
+          "not": {
+            "required": [
+              "http"
+            ]
+          }
         },
         "http": {
-          "not": { "required": ["proxy_http"] }
+          "not": {
+            "required": [
+              "proxyHttp"
+            ]
+          }
         }
       },
       "additionalProperties": false,
       "type": "object"
     },
     "ProbeHttp": {
-      "required": ["method", "url"],
+      "required": [
+        "method",
+        "url"
+      ],
       "properties": {
         "method": {
           "type": "string"
@@ -161,10 +228,10 @@
             "type": "string"
           }
         },
-        "body_raw": {
+        "bodyRaw": {
           "type": "string"
         },
-        "body_json": {
+        "bodyJson": {
           "type": "object"
         },
         "body": {
@@ -192,7 +259,9 @@
     },
     "SetupFlowPhase": {
       "type": "object",
-      "required": ["steps"],
+      "required": [
+        "steps"
+      ],
       "properties": {
         "steps": {
           "type": "array",
@@ -206,7 +275,10 @@
     },
     "SetupFlowStep": {
       "type": "object",
-      "required": ["id", "json_schema"],
+      "required": [
+        "id",
+        "jsonSchema"
+      ],
       "properties": {
         "id": {
           "type": "string"
@@ -217,13 +289,13 @@
         "description": {
           "type": "string"
         },
-        "json_schema": {
+        "jsonSchema": {
           "type": "object"
         },
-        "ui_schema": {
+        "uiSchema": {
           "type": "object"
         },
-        "data_sources": {
+        "dataSources": {
           "type": "object",
           "additionalProperties": {
             "$ref": "#/$defs/DataSourceDef"
@@ -237,9 +309,12 @@
     },
     "DataSourceDef": {
       "type": "object",
-      "required": ["proxy_request", "transform"],
+      "required": [
+        "proxyRequest",
+        "transform"
+      ],
       "properties": {
-        "proxy_request": {
+        "proxyRequest": {
           "$ref": "#/$defs/DataSourceProxyRequest"
         },
         "transform": {
@@ -250,7 +325,10 @@
     },
     "DataSourceProxyRequest": {
       "type": "object",
-      "required": ["method", "url"],
+      "required": [
+        "method",
+        "url"
+      ],
       "properties": {
         "method": {
           "type": "string"
@@ -290,7 +368,7 @@
     "state": {
       "type": "string"
     },
-    "display_name": {
+    "displayName": {
       "type": "string"
     },
     "logo": {
@@ -304,9 +382,15 @@
     },
     "auth": {
       "oneOf": [
-        { "$ref": "./schema-oauth.json" },
-        { "$ref": "#/$defs/AuthApiKey" },
-        { "$ref": "#/$defs/AuthNoAuth" }
+        {
+          "$ref": "./schema-oauth.json"
+        },
+        {
+          "$ref": "#/$defs/AuthApiKey"
+        },
+        {
+          "$ref": "#/$defs/AuthNoAuth"
+        }
       ]
     },
     "javascript": {
@@ -321,14 +405,19 @@
         "$ref": "#/$defs/Probe"
       }
     },
-    "setup_flow": {
+    "setupFlow": {
       "$ref": "#/$defs/SetupFlow"
     },
     "telemetry": {
       "$ref": "#/$defs/ConnectorTelemetry"
     }
   },
-  "required": ["labels", "display_name", "logo", "auth"],
+  "required": [
+    "labels",
+    "displayName",
+    "logo",
+    "auth"
+  ],
   "additionalProperties": false,
   "type": "object"
 }

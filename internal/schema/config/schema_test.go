@@ -110,30 +110,30 @@ func Test_SchemaAppMetricsShape(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, schema.Validate(map[string]any{
-		"app_metrics": map[string]any{
-			"resource_snapshot_interval": "15m",
+		"appMetrics": map[string]any{
+			"resourceSnapshotInterval": "15m",
 			"database": map[string]any{
 				"provider": "sqlite",
 				"path":     "./tmp/app_metrics.db",
 			},
-			"request_events": map[string]any{
-				"full_request_recording": "always",
+			"requestEvents": map[string]any{
+				"fullRequestRecording": "always",
 			},
 		},
 	}))
 
 	require.Error(t, schema.Validate(map[string]any{
-		"http_logging": map[string]any{
-			"full_request_recording": "always",
+		"httpLogging": map[string]any{
+			"fullRequestRecording": "always",
 		},
 	}))
 
 	require.NoError(t, schema.Validate(map[string]any{
 		"connections": map[string]any{
-			"setup_ttl": "1s",
+			"setupTtl": "1s",
 		},
 		"tasks": map[string]any{
-			"default_retention": "24h",
+			"defaultRetention": "24h",
 		},
 	}))
 }
@@ -204,12 +204,12 @@ func TestSchemaDefinitions(t *testing.T) {
 				{
 					Name:  "env var",
 					Valid: true,
-					Data:  `{"test": {"env_var": "MY_KEY"}}`,
+					Data:  `{"test": {"envVar": "MY_KEY"}}`,
 				},
 				{
 					Name:  "env var base64",
 					Valid: true,
-					Data:  `{"test": {"env_var_base64": "MY_KEY_B64"}}`,
+					Data:  `{"test": {"envVarBase64": "MY_KEY_B64"}}`,
 				},
 				{
 					Name:  "file path",
@@ -219,37 +219,37 @@ func TestSchemaDefinitions(t *testing.T) {
 				{
 					Name:  "num bytes",
 					Valid: true,
-					Data:  `{"test": {"num_bytes": 32}}`,
+					Data:  `{"test": {"numBytes": 32}}`,
 				},
 				{
 					Name:  "aws kms",
 					Valid: true,
-					Data:  `{"test": {"aws_kms_key_id": "alias/authproxy", "aws_region": "us-east-1", "aws_kms_endpoint": "http://localhost:4566", "aws_credentials": {"type": "implicit"}, "cache_ttl": "5m"}}`,
+					Data:  `{"test": {"awsKmsKeyId": "alias/authproxy", "awsRegion": "us-east-1", "awsKmsEndpoint": "http://localhost:4566", "awsCredentials": {"type": "implicit"}, "cacheTtl": "5m"}}`,
 				},
 				{
 					Name:  "gcp kms full resource",
 					Valid: true,
-					Data:  `{"test": {"gcp_kms_key_name": "projects/test-project/locations/global/keyRings/authproxy/cryptoKeys/dek-wrapper", "gcp_kms_endpoint": "localhost:8085", "gcp_credentials_json": {"env_var": "GCP_CREDS_JSON"}, "cache_ttl": "5m"}}`,
+					Data:  `{"test": {"gcpKmsKeyName": "projects/test-project/locations/global/keyRings/authproxy/cryptoKeys/dek-wrapper", "gcpKmsEndpoint": "localhost:8085", "gcpCredentialsJson": {"envVar": "GCP_CREDS_JSON"}, "cacheTtl": "5m"}}`,
 				},
 				{
 					Name:  "gcp kms components",
 					Valid: true,
-					Data:  `{"test": {"gcp_project": "test-project", "gcp_location": "global", "gcp_key_ring": "authproxy", "gcp_crypto_key": "dek-wrapper", "gcp_credentials_file": "/tmp/gcp-creds.json", "cache_ttl": "5m"}}`,
+					Data:  `{"test": {"gcpProject": "test-project", "gcpLocation": "global", "gcpKeyRing": "authproxy", "gcpCryptoKey": "dek-wrapper", "gcpCredentialsFile": "/tmp/gcp-creds.json", "cacheTtl": "5m"}}`,
 				},
 				{
 					Name:  "gcp kms missing component",
 					Valid: false,
-					Data:  `{"test": {"gcp_project": "test-project", "gcp_location": "global", "gcp_crypto_key": "dek-wrapper"}}`,
+					Data:  `{"test": {"gcpProject": "test-project", "gcpLocation": "global", "gcpCryptoKey": "dek-wrapper"}}`,
 				},
 				{
 					Name:  "vault transit",
 					Valid: true,
-					Data:  `{"test": {"vault_address": "http://127.0.0.1:8200", "vault_token": "dev-only-token", "vault_namespace": "admin", "vault_transit_mount_path": "transit", "vault_transit_key_name": "authproxy", "cache_ttl": "5m"}}`,
+					Data:  `{"test": {"vaultAddress": "http://127.0.0.1:8200", "vaultToken": "dev-only-token", "vaultNamespace": "admin", "vaultTransitMountPath": "transit", "vaultTransitKeyName": "authproxy", "cacheTtl": "5m"}}`,
 				},
 				{
 					Name:  "vault transit missing key name",
 					Valid: false,
-					Data:  `{"test": {"vault_address": "http://127.0.0.1:8200", "vault_transit_mount_path": "transit"}}`,
+					Data:  `{"test": {"vaultAddress": "http://127.0.0.1:8200", "vaultTransitMountPath": "transit"}}`,
 				},
 				{
 					Name:  "empty object",
@@ -269,7 +269,7 @@ func TestSchemaDefinitions(t *testing.T) {
 				{
 					Name:  "num_bytes with string",
 					Valid: false,
-					Data:  `{"test": {"num_bytes": "32"}}`,
+					Data:  `{"test": {"numBytes": "32"}}`,
 				},
 			},
 		},
@@ -292,17 +292,17 @@ func TestSchemaDefinitions(t *testing.T) {
 				{
 					Name:  "shared key",
 					Valid: true,
-					Data:  `{"test": {"shared_key": {"value": "my-shared-key"}}}`,
+					Data:  `{"test": {"sharedKey": {"value": "my-shared-key"}}}`,
 				},
 				{
 					Name:  "public/private key",
 					Valid: true,
-					Data:  `{"test": {"public_key": {"path": "/keys/pub"}, "private_key": {"path": "/keys/priv"}}}`,
+					Data:  `{"test": {"publicKey": {"path": "/keys/pub"}, "privateKey": {"path": "/keys/priv"}}}`,
 				},
 				{
 					Name:  "shared key with env var",
 					Valid: true,
-					Data:  `{"test": {"shared_key": {"env_var": "MY_KEY"}}}`,
+					Data:  `{"test": {"sharedKey": {"envVar": "MY_KEY"}}}`,
 				},
 			},
 		},
@@ -330,22 +330,22 @@ func TestSchemaDefinitions(t *testing.T) {
 				{
 					Name:  "lets encrypt",
 					Valid: true,
-					Data:  `{"test": {"accept_tos": true, "email": "admin@example.com", "cache_dir": "/certs"}}`,
+					Data:  `{"test": {"acceptTos": true, "email": "admin@example.com", "cacheDir": "/certs"}}`,
 				},
 				{
 					Name:  "lets encrypt with host whitelist",
 					Valid: true,
-					Data:  `{"test": {"accept_tos": true, "email": "admin@example.com", "cache_dir": "/certs", "host_whitelist": ["example.com"]}}`,
+					Data:  `{"test": {"acceptTos": true, "email": "admin@example.com", "cacheDir": "/certs", "hostWhitelist": ["example.com"]}}`,
 				},
 				{
 					Name:  "lets encrypt with renew_before",
 					Valid: true,
-					Data:  `{"test": {"accept_tos": true, "email": "admin@example.com", "cache_dir": "/certs", "renew_before": "30d"}}`,
+					Data:  `{"test": {"acceptTos": true, "email": "admin@example.com", "cacheDir": "/certs", "renewBefore": "30d"}}`,
 				},
 				{
 					Name:  "self-signed autogen",
 					Valid: true,
-					Data:  `{"test": {"auto_gen_path": "/certs/autogen"}}`,
+					Data:  `{"test": {"autoGenPath": "/certs/autogen"}}`,
 				},
 				{
 					Name:  "cert without key",
@@ -355,7 +355,7 @@ func TestSchemaDefinitions(t *testing.T) {
 				{
 					Name:  "lets encrypt without accept_tos",
 					Valid: false,
-					Data:  `{"test": {"email": "admin@example.com", "cache_dir": "/certs"}}`,
+					Data:  `{"test": {"email": "admin@example.com", "cacheDir": "/certs"}}`,
 				},
 			},
 		},
@@ -383,12 +383,12 @@ func TestSchemaDefinitions(t *testing.T) {
 				{
 					Name:  "sqlite with auto_migrate",
 					Valid: true,
-					Data:  `{"test": {"provider": "sqlite", "path": "/data/db.sqlite", "auto_migrate": true}}`,
+					Data:  `{"test": {"provider": "sqlite", "path": "/data/db.sqlite", "autoMigrate": true}}`,
 				},
 				{
 					Name:  "sqlite with auto_migration_lock_duration",
 					Valid: true,
-					Data:  `{"test": {"provider": "sqlite", "path": "/data/db.sqlite", "auto_migration_lock_duration": "30s"}}`,
+					Data:  `{"test": {"provider": "sqlite", "path": "/data/db.sqlite", "autoMigrationLockDuration": "30s"}}`,
 				},
 				{
 					Name:  "postgres minimal",
@@ -403,12 +403,12 @@ func TestSchemaDefinitions(t *testing.T) {
 				{
 					Name:  "postgres with auto_migrate",
 					Valid: true,
-					Data:  `{"test": {"provider": "postgres", "host": "localhost", "auto_migrate": true}}`,
+					Data:  `{"test": {"provider": "postgres", "host": "localhost", "autoMigrate": true}}`,
 				},
 				{
 					Name:  "postgres with auto_migration_lock_duration",
 					Valid: true,
-					Data:  `{"test": {"provider": "postgres", "host": "localhost", "auto_migration_lock_duration": "30s"}}`,
+					Data:  `{"test": {"provider": "postgres", "host": "localhost", "autoMigrationLockDuration": "30s"}}`,
 				},
 				{
 					Name:  "missing provider",
@@ -456,12 +456,12 @@ func TestSchemaDefinitions(t *testing.T) {
 				{
 					Name:  "sqlite with auto_migrate",
 					Valid: true,
-					Data:  `{"test": {"provider": "sqlite", "path": "/data/db.sqlite", "auto_migrate": true}}`,
+					Data:  `{"test": {"provider": "sqlite", "path": "/data/db.sqlite", "autoMigrate": true}}`,
 				},
 				{
 					Name:  "sqlite with auto_migration_lock_duration",
 					Valid: true,
-					Data:  `{"test": {"provider": "sqlite", "path": "/data/db.sqlite", "auto_migration_lock_duration": "30s"}}`,
+					Data:  `{"test": {"provider": "sqlite", "path": "/data/db.sqlite", "autoMigrationLockDuration": "30s"}}`,
 				},
 				{
 					Name:  "postgres minimal",
@@ -476,12 +476,12 @@ func TestSchemaDefinitions(t *testing.T) {
 				{
 					Name:  "postgres with auto_migrate",
 					Valid: true,
-					Data:  `{"test": {"provider": "postgres", "host": "localhost", "auto_migrate": true}}`,
+					Data:  `{"test": {"provider": "postgres", "host": "localhost", "autoMigrate": true}}`,
 				},
 				{
 					Name:  "postgres with auto_migration_lock_duration",
 					Valid: true,
-					Data:  `{"test": {"provider": "postgres", "host": "localhost", "auto_migration_lock_duration": "30s"}}`,
+					Data:  `{"test": {"provider": "postgres", "host": "localhost", "autoMigrationLockDuration": "30s"}}`,
 				},
 				{
 					Name:  "clickhouse minimal",
@@ -501,17 +501,17 @@ func TestSchemaDefinitions(t *testing.T) {
 				{
 					Name:  "clickhouse full - address list",
 					Valid: true,
-					Data:  `{"test": {"provider": "clickhouse", "address_list": "host1,host2", "user": "bobdole", "password": "secret", "database": "authproxy"}}`,
+					Data:  `{"test": {"provider": "clickhouse", "addressList": "host1,host2", "user": "bobdole", "password": "secret", "database": "authproxy"}}`,
 				},
 				{
 					Name:  "clickhouse with auto_migrate",
 					Valid: true,
-					Data:  `{"test": {"provider": "clickhouse", "address": "localhost", "auto_migrate": true}}`,
+					Data:  `{"test": {"provider": "clickhouse", "address": "localhost", "autoMigrate": true}}`,
 				},
 				{
 					Name:  "clickhouse with auto_migration_lock_duration",
 					Valid: true,
-					Data:  `{"test": {"provider": "clickhouse", "address": "localhost", "auto_migration_lock_duration": "30s"}}`,
+					Data:  `{"test": {"provider": "clickhouse", "address": "localhost", "autoMigrationLockDuration": "30s"}}`,
 				},
 				{
 					Name:  "clickhouse with protocol http",
@@ -599,7 +599,7 @@ func TestSchemaDefinitions(t *testing.T) {
 				{
 					Name:  "tint with all options",
 					Valid: true,
-					Data:  `{"test": {"type": "tint", "to": "stderr", "level": "warn", "source": false, "no_color": true, "time_format": "15:04:05"}}`,
+					Data:  `{"test": {"type": "tint", "to": "stderr", "level": "warn", "source": false, "noColor": true, "timeFormat": "15:04:05"}}`,
 				},
 				{
 					Name:  "missing type",
@@ -614,7 +614,7 @@ func TestSchemaDefinitions(t *testing.T) {
 				{
 					Name:  "text with extra property",
 					Valid: false,
-					Data:  `{"test": {"type": "text", "no_color": true}}`,
+					Data:  `{"test": {"type": "text", "noColor": true}}`,
 				},
 				{
 					Name:  "none with extra property",
@@ -652,7 +652,7 @@ func TestSchemaDefinitions(t *testing.T) {
 				{
 					Name:  "redis with all options",
 					Valid: true,
-					Data:  `{"test": {"provider": "redis", "address": "localhost:6379", "network": "tcp", "protocol": 2, "username": "user", "password": {"env_var": "REDIS_PASS"}, "db": 1}}`,
+					Data:  `{"test": {"provider": "redis", "address": "localhost:6379", "network": "tcp", "protocol": 2, "username": "user", "password": {"envVar": "REDIS_PASS"}, "db": 1}}`,
 				},
 				{
 					Name:  "miniredis",
@@ -743,27 +743,27 @@ func TestSchemaDefinitions(t *testing.T) {
 				{
 					Name:  "minimal",
 					Valid: true,
-					Data:  `{"test": {"external_id": "actor-1", "key": {"shared_key": {"value": "secret"}}}}`,
+					Data:  `{"test": {"externalId": "actor-1", "key": {"sharedKey": {"value": "secret"}}}}`,
 				},
 				{
 					Name:  "with permissions",
 					Valid: true,
-					Data:  `{"test": {"external_id": "actor-1", "key": {"shared_key": {"value": "secret"}}, "permissions": [{"namespace": "root", "resources": ["*"], "verbs": ["*"]}]}}`,
+					Data:  `{"test": {"externalId": "actor-1", "key": {"sharedKey": {"value": "secret"}}, "permissions": [{"namespace": "root", "resources": ["*"], "verbs": ["*"]}]}}`,
 				},
 				{
 					Name:  "with labels",
 					Valid: true,
-					Data:  `{"test": {"external_id": "actor-1", "key": {"shared_key": {"value": "secret"}}, "labels": {"env": "prod"}}}`,
+					Data:  `{"test": {"externalId": "actor-1", "key": {"sharedKey": {"value": "secret"}}, "labels": {"env": "prod"}}}`,
 				},
 				{
 					Name:  "missing external_id",
 					Valid: false,
-					Data:  `{"test": {"key": {"shared_key": {"value": "secret"}}}}`,
+					Data:  `{"test": {"key": {"sharedKey": {"value": "secret"}}}}`,
 				},
 				{
 					Name:  "missing key",
 					Valid: false,
-					Data:  `{"test": {"external_id": "actor-1"}}`,
+					Data:  `{"test": {"externalId": "actor-1"}}`,
 				},
 			},
 		},
@@ -786,22 +786,22 @@ func TestSchemaDefinitions(t *testing.T) {
 				{
 					Name:  "inline list",
 					Valid: true,
-					Data:  `{"test": [{"external_id": "actor-1", "key": {"shared_key": {"value": "secret"}}}]}`,
+					Data:  `{"test": [{"externalId": "actor-1", "key": {"sharedKey": {"value": "secret"}}}]}`,
 				},
 				{
 					Name:  "external source",
 					Valid: true,
-					Data:  `{"test": {"keys_path": "/keys/actors"}}`,
+					Data:  `{"test": {"keysPath": "/keys/actors"}}`,
 				},
 				{
 					Name:  "external source with permissions",
 					Valid: true,
-					Data:  `{"test": {"keys_path": "/keys/actors", "permissions": [{"namespace": "root.**", "resources": ["*"], "verbs": ["*"]}]}}`,
+					Data:  `{"test": {"keysPath": "/keys/actors", "permissions": [{"namespace": "root.**", "resources": ["*"], "verbs": ["*"]}]}}`,
 				},
 				{
 					Name:  "external source with sync cron",
 					Valid: true,
-					Data:  `{"test": {"keys_path": "/keys/actors", "sync_cron_schedule": "*/5 * * * *"}}`,
+					Data:  `{"test": {"keysPath": "/keys/actors", "syncCronSchedule": "*/5 * * * *"}}`,
 				},
 				{
 					Name:  "external source missing keys_path",
@@ -829,22 +829,22 @@ func TestSchemaDefinitions(t *testing.T) {
 				{
 					Name:  "minimal",
 					Valid: true,
-					Data:  `{"test": {"username": "admin", "key": {"shared_key": {"value": "secret"}}}}`,
+					Data:  `{"test": {"username": "admin", "key": {"sharedKey": {"value": "secret"}}}}`,
 				},
 				{
 					Name:  "with email",
 					Valid: true,
-					Data:  `{"test": {"username": "admin", "email": "admin@example.com", "key": {"shared_key": {"value": "secret"}}}}`,
+					Data:  `{"test": {"username": "admin", "email": "admin@example.com", "key": {"sharedKey": {"value": "secret"}}}}`,
 				},
 				{
 					Name:  "with permissions",
 					Valid: true,
-					Data:  `{"test": {"username": "admin", "key": {"shared_key": {"value": "secret"}}, "permissions": [{"namespace": "root.**", "resources": ["*"], "verbs": ["*"]}]}}`,
+					Data:  `{"test": {"username": "admin", "key": {"sharedKey": {"value": "secret"}}, "permissions": [{"namespace": "root.**", "resources": ["*"], "verbs": ["*"]}]}}`,
 				},
 				{
 					Name:  "missing username",
 					Valid: false,
-					Data:  `{"test": {"key": {"shared_key": {"value": "secret"}}}}`,
+					Data:  `{"test": {"key": {"sharedKey": {"value": "secret"}}}}`,
 				},
 				{
 					Name:  "missing key",
@@ -854,7 +854,7 @@ func TestSchemaDefinitions(t *testing.T) {
 				{
 					Name:  "extra property",
 					Valid: false,
-					Data:  `{"test": {"username": "admin", "key": {"shared_key": {"value": "secret"}}, "extra": "field"}}`,
+					Data:  `{"test": {"username": "admin", "key": {"sharedKey": {"value": "secret"}}, "extra": "field"}}`,
 				},
 			},
 		},
@@ -877,22 +877,22 @@ func TestSchemaDefinitions(t *testing.T) {
 				{
 					Name:  "inline list",
 					Valid: true,
-					Data:  `{"test": [{"username": "admin", "key": {"shared_key": {"value": "secret"}}}]}`,
+					Data:  `{"test": [{"username": "admin", "key": {"sharedKey": {"value": "secret"}}}]}`,
 				},
 				{
 					Name:  "external source",
 					Valid: true,
-					Data:  `{"test": {"keys_path": "/keys/admins"}}`,
+					Data:  `{"test": {"keysPath": "/keys/admins"}}`,
 				},
 				{
 					Name:  "external source with permissions",
 					Valid: true,
-					Data:  `{"test": {"keys_path": "/keys/admins", "permissions": [{"namespace": "root.**", "resources": ["*"], "verbs": ["*"]}]}}`,
+					Data:  `{"test": {"keysPath": "/keys/admins", "permissions": [{"namespace": "root.**", "resources": ["*"], "verbs": ["*"]}]}}`,
 				},
 				{
 					Name:  "external source with sync cron",
 					Valid: true,
-					Data:  `{"test": {"keys_path": "/keys/admins", "sync_cron_schedule": "*/5 * * * *"}}`,
+					Data:  `{"test": {"keysPath": "/keys/admins", "syncCronSchedule": "*/5 * * * *"}}`,
 				},
 				{
 					Name:  "external source missing keys_path",
@@ -925,37 +925,37 @@ func TestSchemaDefinitions(t *testing.T) {
 				{
 					Name:  "with jwt signing key",
 					Valid: true,
-					Data:  `{"test": {"jwt_signing_key": {"shared_key": {"value": "secret"}}, "jwt_issuer": "my-app"}}`,
+					Data:  `{"test": {"jwtSigningKey": {"sharedKey": {"value": "secret"}}, "jwtIssuer": "my-app"}}`,
 				},
 				{
 					Name:  "jwt_token_duration as integer",
 					Valid: true,
-					Data:  `{"test": {"jwt_token_duration": 3600000000000}}`,
+					Data:  `{"test": {"jwtTokenDuration": 3600000000000}}`,
 				},
 				{
 					Name:  "jwt_token_duration as string is invalid",
 					Valid: false,
-					Data:  `{"test": {"jwt_token_duration": "1h"}}`,
+					Data:  `{"test": {"jwtTokenDuration": "1h"}}`,
 				},
 				{
 					Name:  "global_aes_key is KeyData not Key",
 					Valid: true,
-					Data:  `{"test": {"global_aes_key": {"env_var_base64": "GLOBAL_AES_KEY"}}}`,
+					Data:  `{"test": {"globalAesKey": {"envVarBase64": "GLOBAL_AES_KEY"}}}`,
 				},
 				{
 					Name:  "data encryption key policy",
 					Valid: true,
-					Data:  `{"test": {"data_encryption_keys": {"rotation_interval": "24h", "ensure_current": true}}}`,
+					Data:  `{"test": {"dataEncryptionKeys": {"rotationInterval": "24h", "ensureCurrent": true}}}`,
 				},
 				{
 					Name:  "actors as external source",
 					Valid: true,
-					Data:  `{"test": {"actors": {"keys_path": "/keys/actors"}}}`,
+					Data:  `{"test": {"actors": {"keysPath": "/keys/actors"}}}`,
 				},
 				{
 					Name:  "actors as inline list",
 					Valid: true,
-					Data:  `{"test": {"actors": [{"external_id": "svc", "key": {"shared_key": {"value": "secret"}}}]}}`,
+					Data:  `{"test": {"actors": [{"externalId": "svc", "key": {"sharedKey": {"value": "secret"}}}]}}`,
 				},
 				{
 					Name:  "extra property",
@@ -988,22 +988,22 @@ func TestSchemaDefinitions(t *testing.T) {
 				{
 					Name:  "identifying_labels was removed",
 					Valid: false,
-					Data:  `{"test": {"identifying_labels": ["type", "region"]}}`,
+					Data:  `{"test": {"identifyingLabels": ["type", "region"]}}`,
 				},
 				{
 					Name:  "with auto_migrate",
 					Valid: true,
-					Data:  `{"test": {"auto_migrate": true, "auto_migration_lock_duration": "30s"}}`,
+					Data:  `{"test": {"autoMigrate": true, "autoMigrationLockDuration": "30s"}}`,
 				},
 				{
 					Name:  "connector with name",
 					Valid: true,
-					Data:  `{"test":{"load_from_list":[{"name":"example","labels":{},"display_name":"Example","logo":{"public_url":"https://example.com/logo.svg"},"auth":{"type":"no-auth"}}]}}`,
+					Data:  `{"test":{"loadFromList":[{"name":"example","labels":{},"displayName":"Example","logo":{"publicUrl":"https://example.com/logo.svg"},"auth":{"type":"no-auth"}}]}}`,
 				},
 				{
 					Name:  "connector without id or name",
 					Valid: false,
-					Data:  `{"test":{"load_from_list":[{"labels":{},"display_name":"Example","logo":{"public_url":"https://example.com/logo.svg"},"auth":{"type":"no-auth"}}]}}`,
+					Data:  `{"test":{"loadFromList":[{"labels":{},"displayName":"Example","logo":{"publicUrl":"https://example.com/logo.svg"},"auth":{"type":"no-auth"}}]}}`,
 				},
 				{
 					Name:  "extra property",
@@ -1036,7 +1036,7 @@ func TestSchemaDefinitions(t *testing.T) {
 				{
 					Name:  "with urls",
 					Valid: true,
-					Data:  `{"test": {"not_found": "https://example.com/404", "unauthorized": "https://example.com/401"}}`,
+					Data:  `{"test": {"notFound": "https://example.com/404", "unauthorized": "https://example.com/401"}}`,
 				},
 				{
 					Name:  "template as string (StringValue)",
@@ -1051,7 +1051,7 @@ func TestSchemaDefinitions(t *testing.T) {
 				{
 					Name:  "template as env var (StringValue)",
 					Valid: true,
-					Data:  `{"test": {"template": {"env_var": "ERROR_TEMPLATE"}}}`,
+					Data:  `{"test": {"template": {"envVar": "ERROR_TEMPLATE"}}}`,
 				},
 				{
 					Name:  "extra property",
@@ -1079,12 +1079,12 @@ func TestSchemaDefinitions(t *testing.T) {
 				{
 					Name:  "base_url as string (StringValue)",
 					Valid: true,
-					Data:  `{"test": {"base_url": "http://localhost:5173"}}`,
+					Data:  `{"test": {"baseUrl": "http://localhost:5173"}}`,
 				},
 				{
 					Name:  "base_url as env var (StringValue)",
 					Valid: true,
-					Data:  `{"test": {"base_url": {"env_var": "MARKETPLACE_URL"}}}`,
+					Data:  `{"test": {"baseUrl": {"envVar": "MARKETPLACE_URL"}}}`,
 				},
 				{
 					Name:  "extra property",
@@ -1112,12 +1112,12 @@ func TestSchemaDefinitions(t *testing.T) {
 				{
 					Name:  "base_url as string (StringValue)",
 					Valid: true,
-					Data:  `{"test": {"enabled": true, "base_url": "http://localhost:5174"}}`,
+					Data:  `{"test": {"enabled": true, "baseUrl": "http://localhost:5174"}}`,
 				},
 				{
 					Name:  "base_url as env var (StringValue)",
 					Valid: true,
-					Data:  `{"test": {"enabled": true, "base_url": {"env_var": "ADMIN_UI_URL"}}}`,
+					Data:  `{"test": {"enabled": true, "baseUrl": {"envVar": "ADMIN_UI_URL"}}}`,
 				},
 				{
 					Name:  "extra property",
@@ -1150,17 +1150,17 @@ func TestSchemaDefinitions(t *testing.T) {
 				{
 					Name:  "port as env var",
 					Valid: true,
-					Data:  `{"test": {"port": {"env_var": "API_PORT"}}}`,
+					Data:  `{"test": {"port": {"envVar": "API_PORT"}}}`,
 				},
 				{
 					Name:  "health_check_port as number",
 					Valid: true,
-					Data:  `{"test": {"port": 8080, "health_check_port": 8081}}`,
+					Data:  `{"test": {"port": 8080, "healthCheckPort": 8081}}`,
 				},
 				{
 					Name:  "base_url as string",
 					Valid: true,
-					Data:  `{"test": {"port": 8080, "base_url": "https://api.example.com"}}`,
+					Data:  `{"test": {"port": 8080, "baseUrl": "https://api.example.com"}}`,
 				},
 				{
 					Name:  "port as string is invalid for IntegerValue",
@@ -1193,17 +1193,17 @@ func TestSchemaDefinitions(t *testing.T) {
 				{
 					Name:  "workflow options as strings",
 					Valid: true,
-					Data:  `{"test": {"workflow_pollers": "3", "activity_pollers": "4", "max_parallel_workflow_tasks": "5", "max_parallel_activity_tasks": "6", "workflow_heartbeat_interval": "7s"}}`,
+					Data:  `{"test": {"workflowPollers": "3", "activityPollers": "4", "maxParallelWorkflowTasks": "5", "maxParallelActivityTasks": "6", "workflowHeartbeatInterval": "7s"}}`,
 				},
 				{
 					Name:  "workflow options as integer equivalents",
 					Valid: true,
-					Data:  `{"test": {"workflow_pollers": 3, "activity_pollers": 4, "max_parallel_workflow_tasks": 5, "max_parallel_activity_tasks": 6}}`,
+					Data:  `{"test": {"workflowPollers": 3, "activityPollers": 4, "maxParallelWorkflowTasks": 5, "maxParallelActivityTasks": 6}}`,
 				},
 				{
 					Name:  "extra property",
 					Valid: false,
-					Data:  `{"test": {"workflow_pollers": "3", "extra": "field"}}`,
+					Data:  `{"test": {"workflowPollers": "3", "extra": "field"}}`,
 				},
 			},
 		},
@@ -1226,7 +1226,7 @@ func TestSchemaDefinitions(t *testing.T) {
 				{
 					Name:  "with initiate_session_url",
 					Valid: true,
-					Data:  `{"test": {"initiate_session_url": "http://localhost:8888/login"}}`,
+					Data:  `{"test": {"initiateSessionUrl": "http://localhost:8888/login"}}`,
 				},
 				{
 					Name:  "empty is valid",
@@ -1236,7 +1236,7 @@ func TestSchemaDefinitions(t *testing.T) {
 				{
 					Name:  "extra property not allowed",
 					Valid: false,
-					Data:  `{"test": {"initiate_session_url": "http://localhost:8888/login", "extra": "field"}}`,
+					Data:  `{"test": {"initiateSessionUrl": "http://localhost:8888/login", "extra": "field"}}`,
 				},
 			},
 		},

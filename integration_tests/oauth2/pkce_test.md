@@ -128,7 +128,7 @@ up at authorize. Any drift between authorize-side challenge derivation
 and state persistence would surface here.
 
 **Per-subtest assertions:**
-1. Callback redirects to `return_to_url?connection_id=<id>&setup=pending`.
+1. Callback redirects to `returnToUrl?connectionId=<id>&setup=pending`.
    This matches the token-exchange failure path in `callback_token_exchange_failure_test.go`
    shape: a token-exchange failure during setup is a setup failure, and
    the marketplace UI's reconnect prompt fires on the `setup=pending`

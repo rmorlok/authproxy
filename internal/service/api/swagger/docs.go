@@ -49,7 +49,7 @@ const docTemplateApi = `{
                     {
                         "type": "string",
                         "description": "Filter by external ID",
-                        "name": "external_id",
+                        "name": "externalId",
                         "in": "query"
                     },
                     {
@@ -67,13 +67,13 @@ const docTemplateApi = `{
                     {
                         "type": "string",
                         "description": "Filter by label selector",
-                        "name": "label_selector",
+                        "name": "labelSelector",
                         "in": "query"
                     },
                     {
                         "type": "string",
                         "description": "Order by field (e.g., 'created_at:asc')",
-                        "name": "order_by",
+                        "name": "orderBy",
                         "in": "query"
                     }
                 ],
@@ -172,7 +172,7 @@ const docTemplateApi = `{
                 }
             }
         },
-        "/actors/external-id/{external_id}": {
+        "/actors/external-id/{externalId}": {
             "get": {
                 "security": [
                     {
@@ -194,7 +194,7 @@ const docTemplateApi = `{
                     {
                         "type": "string",
                         "description": "External ID of the actor",
-                        "name": "external_id",
+                        "name": "externalId",
                         "in": "path",
                         "required": true
                     },
@@ -259,7 +259,7 @@ const docTemplateApi = `{
                     {
                         "type": "string",
                         "description": "External ID of the actor",
-                        "name": "external_id",
+                        "name": "externalId",
                         "in": "path",
                         "required": true
                     },
@@ -321,7 +321,7 @@ const docTemplateApi = `{
                     {
                         "type": "string",
                         "description": "External ID of the actor",
-                        "name": "external_id",
+                        "name": "externalId",
                         "in": "path",
                         "required": true
                     },
@@ -1146,7 +1146,7 @@ const docTemplateApi = `{
                     {
                         "type": "string",
                         "description": "Filter by connector ID",
-                        "name": "connector_id",
+                        "name": "connectorId",
                         "in": "query"
                     },
                     {
@@ -1164,13 +1164,13 @@ const docTemplateApi = `{
                     {
                         "type": "string",
                         "description": "Filter by label selector",
-                        "name": "label_selector",
+                        "name": "labelSelector",
                         "in": "query"
                     },
                     {
                         "type": "string",
                         "description": "Order by field (e.g., 'created_at:asc')",
-                        "name": "order_by",
+                        "name": "orderBy",
                         "in": "query"
                     }
                 ],
@@ -1455,7 +1455,7 @@ const docTemplateApi = `{
                 }
             }
         },
-        "/connections/{id}/_cancel_setup": {
+        "/connections/{id}/_cancelSetup": {
             "post": {
                 "security": [
                     {
@@ -1504,7 +1504,7 @@ const docTemplateApi = `{
                 }
             }
         },
-        "/connections/{id}/_data_source/{source_id}": {
+        "/connections/{id}/_dataSource/{sourceId}": {
             "get": {
                 "security": [
                     {
@@ -1530,7 +1530,7 @@ const docTemplateApi = `{
                     {
                         "type": "string",
                         "description": "Data Source ID",
-                        "name": "source_id",
+                        "name": "sourceId",
                         "in": "path",
                         "required": true
                     }
@@ -1635,7 +1635,7 @@ const docTemplateApi = `{
                 }
             }
         },
-        "/connections/{id}/_force_state": {
+        "/connections/{id}/_forceState": {
             "put": {
                 "security": [
                     {
@@ -1711,7 +1711,7 @@ const docTemplateApi = `{
                 }
             }
         },
-        "/connections/{id}/_migrate_version": {
+        "/connections/{id}/_migrateVersion": {
             "post": {
                 "security": [
                     {
@@ -2043,7 +2043,7 @@ const docTemplateApi = `{
                 }
             }
         },
-        "/connections/{id}/_setup_step": {
+        "/connections/{id}/_setupStep": {
             "get": {
                 "security": [
                     {
@@ -2069,7 +2069,7 @@ const docTemplateApi = `{
                     {
                         "type": "string",
                         "description": "URL to return to after a resumed redirect step",
-                        "name": "return_to_url",
+                        "name": "returnToUrl",
                         "in": "query"
                     }
                 ],
@@ -2809,13 +2809,13 @@ const docTemplateApi = `{
                     {
                         "type": "string",
                         "description": "Filter by label selector",
-                        "name": "label_selector",
+                        "name": "labelSelector",
                         "in": "query"
                     },
                     {
                         "type": "string",
                         "description": "Order by field (e.g., 'created_at:asc')",
-                        "name": "order_by",
+                        "name": "orderBy",
                         "in": "query"
                     }
                 ],
@@ -3136,7 +3136,7 @@ const docTemplateApi = `{
                 }
             }
         },
-        "/connectors/{id}/_disconnect_all": {
+        "/connectors/{id}/_disconnectAll": {
             "post": {
                 "security": [
                     {
@@ -3828,13 +3828,13 @@ const docTemplateApi = `{
                     {
                         "type": "string",
                         "description": "Filter by label selector",
-                        "name": "label_selector",
+                        "name": "labelSelector",
                         "in": "query"
                     },
                     {
                         "type": "string",
                         "description": "Order by field (e.g., 'version:desc')",
-                        "name": "order_by",
+                        "name": "orderBy",
                         "in": "query"
                     }
                 ],
@@ -4100,7 +4100,7 @@ const docTemplateApi = `{
                 }
             }
         },
-        "/connectors/{id}/versions/{version}/_force_state": {
+        "/connectors/{id}/versions/{version}/_forceState": {
             "put": {
                 "security": [
                     {
@@ -4867,13 +4867,13 @@ const docTemplateApi = `{
                     {
                         "type": "string",
                         "description": "Filter by label selector",
-                        "name": "label_selector",
+                        "name": "labelSelector",
                         "in": "query"
                     },
                     {
                         "type": "string",
                         "description": "Order by field (e.g., 'state:asc')",
-                        "name": "order_by",
+                        "name": "orderBy",
                         "in": "query"
                     }
                 ],
@@ -5776,7 +5776,7 @@ const docTemplateApi = `{
                     {
                         "type": "string",
                         "description": "Order by field (e.g., 'timestamp:desc')",
-                        "name": "order_by",
+                        "name": "orderBy",
                         "in": "query"
                     },
                     {
@@ -5788,37 +5788,37 @@ const docTemplateApi = `{
                     {
                         "type": "string",
                         "description": "Filter by request type",
-                        "name": "request_type",
+                        "name": "requestType",
                         "in": "query"
                     },
                     {
                         "type": "string",
                         "description": "Filter by correlation ID",
-                        "name": "correlation_id",
+                        "name": "correlationId",
                         "in": "query"
                     },
                     {
                         "type": "string",
                         "description": "Filter by connection UUID",
-                        "name": "connection_id",
+                        "name": "connectionId",
                         "in": "query"
                     },
                     {
                         "type": "string",
                         "description": "Filter by connector type",
-                        "name": "connector_type",
+                        "name": "connectorType",
                         "in": "query"
                     },
                     {
                         "type": "string",
                         "description": "Filter by connector UUID",
-                        "name": "connector_id",
+                        "name": "connectorId",
                         "in": "query"
                     },
                     {
                         "type": "integer",
                         "description": "Filter by connector version",
-                        "name": "connector_version",
+                        "name": "connectorVersion",
                         "in": "query"
                     },
                     {
@@ -5830,19 +5830,19 @@ const docTemplateApi = `{
                     {
                         "type": "integer",
                         "description": "Filter by exact status code",
-                        "name": "status_code",
+                        "name": "statusCode",
                         "in": "query"
                     },
                     {
                         "type": "string",
                         "description": "Filter by status code range (e.g., '200-299')",
-                        "name": "status_code_range",
+                        "name": "statusCodeRange",
                         "in": "query"
                     },
                     {
                         "type": "string",
                         "description": "Filter by timestamp range",
-                        "name": "timestamp_range",
+                        "name": "timestampRange",
                         "in": "query"
                     },
                     {
@@ -5854,13 +5854,13 @@ const docTemplateApi = `{
                     {
                         "type": "string",
                         "description": "Filter by path regex",
-                        "name": "path_regex",
+                        "name": "pathRegex",
                         "in": "query"
                     },
                     {
                         "type": "string",
                         "description": "Filter by label selector (e.g., 'env=prod,team=api')",
-                        "name": "label_selector",
+                        "name": "labelSelector",
                         "in": "query"
                     }
                 ],
@@ -6030,7 +6030,7 @@ const docTemplateApi = `{
                     {
                         "type": "string",
                         "description": "Filter to children of a parent namespace",
-                        "name": "children_of",
+                        "name": "childrenOf",
                         "in": "query"
                     },
                     {
@@ -6048,13 +6048,13 @@ const docTemplateApi = `{
                     {
                         "type": "string",
                         "description": "Filter by label selector",
-                        "name": "label_selector",
+                        "name": "labelSelector",
                         "in": "query"
                     },
                     {
                         "type": "string",
                         "description": "Order by field (e.g., 'path:asc')",
-                        "name": "order_by",
+                        "name": "orderBy",
                         "in": "query"
                     }
                 ],
@@ -6829,7 +6829,7 @@ const docTemplateApi = `{
                     {
                         "type": "boolean",
                         "description": "Include notifications the actor has already viewed",
-                        "name": "include_viewed",
+                        "name": "includeViewed",
                         "in": "query"
                     },
                     {
@@ -6847,7 +6847,7 @@ const docTemplateApi = `{
                     {
                         "type": "string",
                         "description": "Filter by denormalized resource label selector",
-                        "name": "label_selector",
+                        "name": "labelSelector",
                         "in": "query"
                     }
                 ],
@@ -7052,13 +7052,13 @@ const docTemplateApi = `{
                     {
                         "type": "string",
                         "description": "Filter by label selector",
-                        "name": "label_selector",
+                        "name": "labelSelector",
                         "in": "query"
                     },
                     {
                         "type": "string",
                         "description": "Order by field (e.g., 'created_at:desc')",
-                        "name": "order_by",
+                        "name": "orderBy",
                         "in": "query"
                     }
                 ],
@@ -7151,7 +7151,7 @@ const docTemplateApi = `{
                 }
             }
         },
-        "/rate-limits/_dry_run": {
+        "/rate-limits/_dryRun": {
             "post": {
                 "security": [
                     {
@@ -7962,7 +7962,7 @@ const docTemplateApi = `{
                         },
                         "collectionFormat": "multi",
                         "description": "Resource types; may be repeated",
-                        "name": "resource_type",
+                        "name": "resourceType",
                         "in": "query"
                     },
                     {
@@ -7974,7 +7974,7 @@ const docTemplateApi = `{
                     {
                         "type": "string",
                         "description": "Exact Kubernetes-style label selector",
-                        "name": "label_selector",
+                        "name": "labelSelector",
                         "in": "query"
                     },
                     {
@@ -8169,7 +8169,7 @@ const docTemplateApi = `{
         }
     },
     "definitions": {
-        "github_com_rmorlok_authproxy_internal_schema_api.ActorJson": {
+        "api.ActorJson": {
             "description": "Actor identity within a namespace",
             "type": "object",
             "properties": {
@@ -8179,10 +8179,10 @@ const docTemplateApi = `{
                         "type": "string"
                     }
                 },
-                "created_at": {
+                "createdAt": {
                     "type": "string"
                 },
-                "external_id": {
+                "externalId": {
                     "type": "string",
                     "example": "user-123"
                 },
@@ -8204,12 +8204,12 @@ const docTemplateApi = `{
                     "type": "string",
                     "example": "root.acme"
                 },
-                "updated_at": {
+                "updatedAt": {
                     "type": "string"
                 }
             }
         },
-        "github_com_rmorlok_authproxy_internal_schema_api.ConnectorJson": {
+        "api.ConnectorJson": {
             "description": "Connector API summary response",
             "type": "object",
             "properties": {
@@ -8219,18 +8219,18 @@ const docTemplateApi = `{
                         "type": "string"
                     }
                 },
-                "created_at": {
+                "createdAt": {
                     "type": "string"
                 },
                 "description": {
                     "type": "string",
                     "example": "Salesforce CRM integration"
                 },
-                "display_name": {
+                "displayName": {
                     "type": "string",
                     "example": "Salesforce"
                 },
-                "has_configure": {
+                "hasConfigure": {
                     "type": "boolean",
                     "example": false
                 },
@@ -8264,11 +8264,11 @@ const docTemplateApi = `{
                     "type": "string",
                     "example": "primary"
                 },
-                "status_page_url": {
+                "statusPageUrl": {
                     "type": "string",
                     "example": "https://status.salesforce.com"
                 },
-                "updated_at": {
+                "updatedAt": {
                     "type": "string"
                 },
                 "version": {
@@ -8277,7 +8277,7 @@ const docTemplateApi = `{
                 }
             }
         },
-        "github_com_rmorlok_authproxy_internal_schema_api.MetricsSchemaMetricJson": {
+        "api.MetricsSchemaMetricJson": {
             "description": "Supported metric definition",
             "type": "object",
             "properties": {
@@ -8290,7 +8290,7 @@ const docTemplateApi = `{
                         "count"
                     ]
                 },
-                "group_by": {
+                "groupBy": {
                     "type": "array",
                     "items": {
                         "type": "string"
@@ -8310,7 +8310,7 @@ const docTemplateApi = `{
                 }
             }
         },
-        "github_com_rmorlok_authproxy_internal_schema_api.NamespaceJson": {
+        "api.NamespaceJson": {
             "description": "Namespace for organizing resources",
             "type": "object",
             "properties": {
@@ -8320,10 +8320,10 @@ const docTemplateApi = `{
                         "type": "string"
                     }
                 },
-                "created_at": {
+                "createdAt": {
                     "type": "string"
                 },
-                "key_id": {
+                "keyId": {
                     "type": "string",
                     "example": "key_test550e8400abcd"
                 },
@@ -8346,7 +8346,7 @@ const docTemplateApi = `{
                     "type": "string",
                     "example": "active"
                 },
-                "updated_at": {
+                "updatedAt": {
                     "type": "string"
                 }
             }
@@ -8361,10 +8361,10 @@ const docTemplateApi = `{
                         "type": "string"
                     }
                 },
-                "created_at": {
+                "createdAt": {
                     "type": "string"
                 },
-                "external_id": {
+                "externalId": {
                     "type": "string",
                     "example": "user-123"
                 },
@@ -8386,7 +8386,7 @@ const docTemplateApi = `{
                     "type": "string",
                     "example": "root.acme"
                 },
-                "updated_at": {
+                "updatedAt": {
                     "type": "string"
                 }
             }
@@ -8433,20 +8433,20 @@ const docTemplateApi = `{
                     "type": "string",
                     "example": "cxn_test550e8400abcde"
                 },
-                "json_schema": {
+                "jsonSchema": {
                     "description": "JSON Schema defining the form fields.",
                     "type": "object"
                 },
-                "step_description": {
+                "stepDescription": {
                     "description": "Step description.",
                     "type": "string"
                 },
-                "step_id": {
+                "stepId": {
                     "description": "Step ID being submitted.",
                     "type": "string",
                     "example": "preconnect:0"
                 },
-                "step_title": {
+                "stepTitle": {
                     "description": "Step title.",
                     "type": "string",
                     "example": "Choose workspace"
@@ -8456,7 +8456,7 @@ const docTemplateApi = `{
                     "type": "string",
                     "example": "form"
                 },
-                "ui_schema": {
+                "uiSchema": {
                     "description": "UI Schema for JSON Forms rendering.",
                     "type": "object"
                 }
@@ -8471,7 +8471,7 @@ const docTemplateApi = `{
                     "type": "string",
                     "example": "cxn_test550e8400abcde"
                 },
-                "redirect_url": {
+                "redirectUrl": {
                     "description": "URL to redirect the user to.",
                     "type": "string",
                     "example": "https://oauth.provider.com/authorize?..."
@@ -8493,18 +8493,18 @@ const docTemplateApi = `{
                         "type": "string"
                     }
                 },
-                "created_at": {
+                "createdAt": {
                     "type": "string"
                 },
                 "description": {
                     "type": "string",
                     "example": "Salesforce CRM integration"
                 },
-                "display_name": {
+                "displayName": {
                     "type": "string",
                     "example": "Salesforce"
                 },
-                "has_configure": {
+                "hasConfigure": {
                     "type": "boolean",
                     "example": false
                 },
@@ -8538,11 +8538,11 @@ const docTemplateApi = `{
                     "type": "string",
                     "example": "primary"
                 },
-                "status_page_url": {
+                "statusPageUrl": {
                     "type": "string",
                     "example": "https://status.salesforce.com"
                 },
-                "updated_at": {
+                "updatedAt": {
                     "type": "string"
                 },
                 "version": {
@@ -8561,7 +8561,7 @@ const docTemplateApi = `{
                         "type": "string"
                     }
                 },
-                "external_id": {
+                "externalId": {
                     "type": "string",
                     "example": "user-123"
                 },
@@ -8628,7 +8628,7 @@ const docTemplateApi = `{
                     "type": "string",
                     "example": "Bad Request"
                 },
-                "stack_trace": {
+                "stackTrace": {
                     "description": "Stack trace, only populated in debug mode.",
                     "type": "string"
                 }
@@ -8658,17 +8658,17 @@ const docTemplateApi = `{
             "description": "Request to initiate a connection",
             "type": "object",
             "properties": {
-                "connector_id": {
+                "connectorId": {
                     "description": "ID of the connector to initiate the connection for.",
                     "type": "string",
                     "example": "cxr_test550e8400abcde"
                 },
-                "connector_version": {
+                "connectorVersion": {
                     "description": "Version of the connector to initiate connection for; if not specified defaults to the primary version.",
                     "type": "integer",
                     "example": 1
                 },
-                "into_namespace": {
+                "intoNamespace": {
                     "description": "The namespace to create the connection in. Must be the namespace of connector or a child namespace of that\nnamespace. Defaults to the connector namespace if not specified.",
                     "type": "string",
                     "example": "root.acme"
@@ -8678,7 +8678,7 @@ const docTemplateApi = `{
                     "type": "string",
                     "example": "production-crm"
                 },
-                "return_to_url": {
+                "returnToUrl": {
                     "description": "The URL to return to after the connection is completed.",
                     "type": "string",
                     "example": "https://example.com/callback"
@@ -8722,10 +8722,10 @@ const docTemplateApi = `{
                         "type": "string"
                     }
                 },
-                "created_at": {
+                "createdAt": {
                     "type": "string"
                 },
-                "key_id": {
+                "keyId": {
                     "type": "string",
                     "example": "key_test550e8400abcd"
                 },
@@ -8748,7 +8748,7 @@ const docTemplateApi = `{
                     "type": "string",
                     "example": "active"
                 },
-                "updated_at": {
+                "updatedAt": {
                     "type": "string"
                 }
             }
@@ -8764,10 +8764,10 @@ const docTemplateApi = `{
                     }
                 },
                 "connector": {},
-                "created_at": {
+                "createdAt": {
                     "type": "string"
                 },
-                "health_state": {
+                "healthState": {
                     "type": "string",
                     "example": "healthy"
                 },
@@ -8789,10 +8789,10 @@ const docTemplateApi = `{
                     "type": "string",
                     "example": "root.acme"
                 },
-                "setup_error": {
+                "setupError": {
                     "type": "string"
                 },
-                "setup_step_id": {
+                "setupStepId": {
                     "type": "string",
                     "example": "tenant"
                 },
@@ -8800,7 +8800,7 @@ const docTemplateApi = `{
                     "type": "string",
                     "example": "configured"
                 },
-                "updated_at": {
+                "updatedAt": {
                     "type": "string"
                 }
             }
@@ -8809,7 +8809,7 @@ const docTemplateApi = `{
             "description": "Request to run a connector lifecycle operation",
             "type": "object",
             "properties": {
-                "timeout_seconds": {
+                "timeoutSeconds": {
                     "type": "integer",
                     "example": 600
                 }
@@ -8819,11 +8819,11 @@ const docTemplateApi = `{
             "description": "Response for connector lifecycle operation",
             "type": "object",
             "properties": {
-                "connector_id": {
+                "connectorId": {
                     "type": "string",
                     "example": "cxr_test550e8400abcde"
                 },
-                "task_id": {
+                "taskId": {
                     "type": "string"
                 }
             }
@@ -8838,7 +8838,7 @@ const docTemplateApi = `{
                         "type": "string"
                     }
                 },
-                "created_at": {
+                "createdAt": {
                     "type": "string"
                 },
                 "definition": {},
@@ -8864,7 +8864,7 @@ const docTemplateApi = `{
                     "type": "string",
                     "example": "primary"
                 },
-                "updated_at": {
+                "updatedAt": {
                     "type": "string"
                 },
                 "version": {
@@ -8929,7 +8929,7 @@ const docTemplateApi = `{
                         "type": "string"
                     }
                 },
-                "key_data": {
+                "keyData": {
                     "type": "object",
                     "additionalProperties": true
                 },
@@ -8983,7 +8983,7 @@ const docTemplateApi = `{
             "description": "Request body for connection disconnect operations",
             "type": "object",
             "properties": {
-                "timeout_seconds": {
+                "timeoutSeconds": {
                     "type": "integer",
                     "example": 600
                 }
@@ -8994,7 +8994,7 @@ const docTemplateApi = `{
             "type": "object",
             "properties": {
                 "connection": {},
-                "task_id": {
+                "taskId": {
                     "type": "string"
                 }
             }
@@ -9005,7 +9005,7 @@ const docTemplateApi = `{
             "properties": {
                 "context": {},
                 "request": {},
-                "request_type": {
+                "requestType": {
                     "type": "string",
                     "example": "proxy"
                 }
@@ -9019,11 +9019,11 @@ const docTemplateApi = `{
                     "type": "array",
                     "items": {}
                 },
-                "not_matched": {
+                "notMatched": {
                     "type": "array",
                     "items": {}
                 },
-                "request_label_snapshot": {
+                "requestLabelSnapshot": {
                     "type": "object",
                     "additionalProperties": {
                         "type": "string"
@@ -9041,14 +9041,14 @@ const docTemplateApi = `{
                         "type": "string"
                     }
                 },
-                "created_at": {
+                "createdAt": {
                     "type": "string"
                 },
                 "id": {
                     "type": "string",
                     "example": "key_test550e8400abcd"
                 },
-                "key_data": {
+                "keyData": {
                     "type": "object"
                 },
                 "labels": {
@@ -9069,7 +9069,7 @@ const docTemplateApi = `{
                     "type": "string",
                     "example": "active"
                 },
-                "updated_at": {
+                "updatedAt": {
                     "type": "string"
                 }
             }
@@ -9086,7 +9086,7 @@ const docTemplateApi = `{
                     "description": "List of actors.",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_api.ActorJson"
+                        "$ref": "#/definitions/api.ActorJson"
                     }
                 }
             }
@@ -9131,7 +9131,7 @@ const docTemplateApi = `{
                     "description": "List of connectors.",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_api.ConnectorJson"
+                        "$ref": "#/definitions/api.ConnectorJson"
                     }
                 }
             }
@@ -9161,7 +9161,7 @@ const docTemplateApi = `{
                     "description": "List of namespaces.",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_api.NamespaceJson"
+                        "$ref": "#/definitions/api.NamespaceJson"
                     }
                 }
             }
@@ -9215,7 +9215,7 @@ const docTemplateApi = `{
                 "metrics": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_api.MetricsSchemaMetricJson"
+                        "$ref": "#/definitions/api.MetricsSchemaMetricJson"
                     }
                 }
             }
@@ -9224,11 +9224,11 @@ const docTemplateApi = `{
             "description": "Request body for connection connector-version migration operations",
             "type": "object",
             "properties": {
-                "target_version": {
+                "targetVersion": {
                     "type": "integer",
                     "example": 3
                 },
-                "timeout_seconds": {
+                "timeoutSeconds": {
                     "type": "integer",
                     "example": 600
                 }
@@ -9238,19 +9238,19 @@ const docTemplateApi = `{
             "description": "Response for connection connector-version migration operation",
             "type": "object",
             "properties": {
-                "connection_id": {
+                "connectionId": {
                     "type": "string",
                     "example": "cxn_test550e8400abcde"
                 },
-                "source_version": {
+                "sourceVersion": {
                     "type": "integer",
                     "example": 1
                 },
-                "target_version": {
+                "targetVersion": {
                     "type": "integer",
                     "example": 3
                 },
-                "task_id": {
+                "taskId": {
                     "type": "string"
                 }
             }
@@ -9259,8 +9259,8 @@ const docTemplateApi = `{
             "description": "Response from a proxied HTTP request",
             "type": "object",
             "properties": {
-                "body_json": {},
-                "body_raw": {
+                "bodyJson": {},
+                "bodyRaw": {
                     "type": "array",
                     "items": {
                         "type": "integer"
@@ -9272,7 +9272,7 @@ const docTemplateApi = `{
                         "type": "string"
                     }
                 },
-                "status_code": {
+                "statusCode": {
                     "type": "integer",
                     "example": 200
                 }
@@ -9288,7 +9288,7 @@ const docTemplateApi = `{
                         "type": "string"
                     }
                 },
-                "created_at": {
+                "createdAt": {
                     "type": "string"
                 },
                 "definition": {
@@ -9313,7 +9313,7 @@ const docTemplateApi = `{
                     "type": "string",
                     "example": "root.acme"
                 },
-                "updated_at": {
+                "updatedAt": {
                     "type": "string"
                 }
             }
@@ -9322,16 +9322,16 @@ const docTemplateApi = `{
             "description": "HTTP request events entry",
             "type": "object",
             "properties": {
-                "connection_id": {
+                "connectionId": {
                     "type": "string"
                 },
-                "connector_id": {
+                "connectorId": {
                     "type": "string"
                 },
-                "connector_version": {
+                "connectorVersion": {
                     "type": "integer"
                 },
-                "correlation_id": {
+                "correlationId": {
                     "type": "string"
                 },
                 "duration": {
@@ -9360,31 +9360,31 @@ const docTemplateApi = `{
                     "type": "string",
                     "example": "/v1/users"
                 },
-                "rate_limit_bucket": {
+                "rateLimitBucket": {
                     "type": "object",
                     "additionalProperties": {
                         "type": "string"
                     }
                 },
-                "rate_limit_id": {
+                "rateLimitId": {
                     "type": "string"
                 },
-                "rate_limit_matched": {
+                "rateLimitMatched": {
                     "type": "array",
                     "items": {}
                 },
-                "rate_limit_mode": {
+                "rateLimitMode": {
                     "type": "string"
                 },
-                "request_id": {
+                "requestId": {
                     "type": "string",
                     "example": "req_test550e8400abcde"
                 },
-                "response_source": {
+                "responseSource": {
                     "type": "string",
                     "example": "upstream"
                 },
-                "response_status_code": {
+                "responseStatusCode": {
                     "type": "integer",
                     "example": 200
                 },
@@ -9404,7 +9404,7 @@ const docTemplateApi = `{
         "routes.OpenAPISearchResourcesResponseJson": {
             "type": "object",
             "properties": {
-                "incomplete_types": {
+                "incompleteTypes": {
                     "type": "array",
                     "items": {
                         "type": "string"
@@ -9422,7 +9422,7 @@ const docTemplateApi = `{
                                     "type": "string"
                                 }
                             },
-                            "matched_labels": {
+                            "matchedLabels": {
                                 "type": "array",
                                 "items": {
                                     "type": "object",
@@ -9446,21 +9446,21 @@ const docTemplateApi = `{
                                 "type": "string",
                                 "example": "root.acme"
                             },
-                            "resource_id": {
+                            "resourceId": {
                                 "type": "string",
                                 "example": "cxn_test550e8400abcde"
                             },
-                            "resource_type": {
+                            "resourceType": {
                                 "type": "string",
                                 "example": "connection"
                             },
-                            "updated_at": {
+                            "updatedAt": {
                                 "type": "string"
                             }
                         }
                     }
                 },
-                "truncated_types": {
+                "truncatedTypes": {
                     "type": "array",
                     "items": {
                         "type": "string"
@@ -9482,7 +9482,7 @@ const docTemplateApi = `{
                 "type": {
                     "type": "string"
                 },
-                "updated_at": {
+                "updatedAt": {
                     "type": "string"
                 }
             }
@@ -9539,7 +9539,7 @@ const docTemplateApi = `{
                         "type": "string"
                     }
                 },
-                "key_data": {
+                "keyData": {
                     "type": "object",
                     "additionalProperties": true
                 },
@@ -9589,8 +9589,8 @@ const docTemplateApi = `{
             "description": "Request to proxy or simulate an HTTP request",
             "type": "object",
             "properties": {
-                "body_json": {},
-                "body_raw": {
+                "bodyJson": {},
+                "bodyRaw": {
                     "type": "array",
                     "items": {
                         "type": "integer"
@@ -9627,7 +9627,7 @@ const docTemplateApi = `{
         "routes.ReauthConnectionRequest": {
             "type": "object",
             "properties": {
-                "return_to_url": {
+                "returnToUrl": {
                     "type": "string"
                 }
             }
@@ -9635,7 +9635,7 @@ const docTemplateApi = `{
         "routes.RetryConnectionRequest": {
             "type": "object",
             "properties": {
-                "return_to_url": {
+                "returnToUrl": {
                     "type": "string"
                 }
             }
@@ -9643,7 +9643,7 @@ const docTemplateApi = `{
         "routes.SessionInitiateFailureResponse": {
             "type": "object",
             "properties": {
-                "redirect_url": {
+                "redirectUrl": {
                     "type": "string",
                     "example": "https://example.com/auth"
                 }
@@ -9652,7 +9652,7 @@ const docTemplateApi = `{
         "routes.SessionInitiateParams": {
             "type": "object",
             "properties": {
-                "return_to_url": {
+                "returnToUrl": {
                     "type": "string",
                     "example": "https://example.com/return"
                 }
@@ -9661,7 +9661,7 @@ const docTemplateApi = `{
         "routes.SessionInitiateSuccessResponse": {
             "type": "object",
             "properties": {
-                "actor_id": {
+                "actorId": {
                     "type": "string",
                     "example": "act_test550e8400abcde"
                 }
@@ -9675,12 +9675,12 @@ const docTemplateApi = `{
                     "description": "Data is the form data submitted by the user for the current step.",
                     "type": "object"
                 },
-                "return_to_url": {
+                "returnToUrl": {
                     "description": "ReturnToUrl is required when the next step after form submission is an auth redirect.\nThe client should provide this so the OAuth callback knows where to return.",
                     "type": "string",
                     "example": "https://example.com/callback"
                 },
-                "step_id": {
+                "stepId": {
                     "description": "StepId is the id of the step being submitted. Must match the current setup step's id.",
                     "type": "string",
                     "example": "preconnect:0"

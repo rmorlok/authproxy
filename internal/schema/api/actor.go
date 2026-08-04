@@ -14,18 +14,18 @@ type ActorJson struct {
 	Id          apid.ID             `json:"id" yaml:"id" swaggertype:"string" example:"act_test550e8400abcde"`
 	Namespace   string              `json:"namespace" yaml:"namespace" example:"root.acme"`
 	Name        common.ResourceName `json:"name" yaml:"name" swaggertype:"string" example:"billing-service"`
-	ExternalId  string              `json:"external_id" yaml:"external_id" example:"user-123"`
+	ExternalId  string              `json:"externalId" yaml:"externalId" example:"user-123"`
 	Labels      map[string]string   `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Annotations map[string]string   `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	CreatedAt   time.Time           `json:"created_at" yaml:"created_at"`
-	UpdatedAt   time.Time           `json:"updated_at" yaml:"updated_at"`
+	CreatedAt   time.Time           `json:"createdAt" yaml:"createdAt"`
+	UpdatedAt   time.Time           `json:"updatedAt" yaml:"updatedAt"`
 }
 
 // CreateActorRequestJson represents a request to create an actor.
 //
 //	@Description	Actor creation request
 type CreateActorRequestJson struct {
-	ExternalId  string               `json:"external_id" yaml:"external_id" example:"user-123"`
+	ExternalId  string               `json:"externalId" yaml:"externalId" example:"user-123"`
 	Namespace   string               `json:"namespace" yaml:"namespace" example:"root.acme"`
 	Name        *common.ResourceName `json:"name,omitempty" yaml:"name,omitempty" swaggertype:"string" example:"billing-service"`
 	Labels      map[string]string    `json:"labels,omitempty" yaml:"labels,omitempty"`

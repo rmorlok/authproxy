@@ -1,6 +1,6 @@
 {
   "definition": {
-    "display_name": "Salesforce",
+    "displayName": "Salesforce",
     "logo": "https://example.com/logo.png",
     "description": "Updated Salesforce integration",
     "auth": {

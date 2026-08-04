@@ -20,10 +20,10 @@ import (
 
 // proxyResponse mirrors the JSON structure returned by the proxy endpoint.
 type proxyResponse struct {
-	StatusCode int               `json:"status_code"`
+	StatusCode int               `json:"statusCode"`
 	Headers    map[string]string `json:"headers"`
-	BodyRaw    []byte            `json:"body_raw"`
-	BodyJson   interface{}       `json:"body_json"`
+	BodyRaw    []byte            `json:"bodyRaw"`
+	BodyJson   interface{}       `json:"bodyJson"`
 }
 
 func parseProxyResponse(t *testing.T, w *httptest.ResponseRecorder) *proxyResponse {

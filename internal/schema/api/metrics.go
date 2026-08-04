@@ -15,10 +15,10 @@ type MetricsRangeJson struct {
 //
 //	@Description	One metric series request
 type MetricsQueryRefJson struct {
-	RefID       string   `json:"ref_id" yaml:"ref_id" example:"requests"`
+	RefID       string   `json:"refId" yaml:"refId" example:"requests"`
 	Metric      string   `json:"metric" yaml:"metric" example:"request_events"`
 	Aggregation string   `json:"aggregation" yaml:"aggregation" example:"count"`
-	GroupBy     []string `json:"group_by,omitempty" yaml:"group_by,omitempty" example:"method,response_status_code"`
+	GroupBy     []string `json:"groupBy,omitempty" yaml:"groupBy,omitempty" example:"method,response_status_code"`
 }
 
 // MetricsQueryRequestJson is the generic Admin API metrics query request.
@@ -27,7 +27,7 @@ type MetricsQueryRefJson struct {
 type MetricsQueryRequestJson struct {
 	Range         MetricsRangeJson      `json:"range" yaml:"range"`
 	Namespace     *string               `json:"namespace,omitempty" yaml:"namespace,omitempty" example:"root.**"`
-	LabelSelector *string               `json:"label_selector,omitempty" yaml:"label_selector,omitempty" example:"env=prod,team=api"`
+	LabelSelector *string               `json:"labelSelector,omitempty" yaml:"labelSelector,omitempty" example:"env=prod,team=api"`
 	Queries       []MetricsQueryRefJson `json:"queries" yaml:"queries"`
 }
 
@@ -43,7 +43,7 @@ type MetricsPointJson struct {
 //
 //	@Description	Labeled metric time series
 type MetricsSeriesJson struct {
-	RefID       string             `json:"ref_id" yaml:"ref_id"`
+	RefID       string             `json:"refId" yaml:"refId"`
 	Metric      string             `json:"metric" yaml:"metric"`
 	Aggregation string             `json:"aggregation" yaml:"aggregation"`
 	Labels      map[string]string  `json:"labels,omitempty" yaml:"labels,omitempty"`
@@ -64,7 +64,7 @@ type MetricsSchemaMetricJson struct {
 	Metric       string   `json:"metric" yaml:"metric" example:"request_events"`
 	Kind         string   `json:"kind" yaml:"kind" example:"counter"`
 	Aggregations []string `json:"aggregations" yaml:"aggregations" example:"count"`
-	GroupBy      []string `json:"group_by" yaml:"group_by" example:"method,response_status_code"`
+	GroupBy      []string `json:"groupBy" yaml:"groupBy" example:"method,response_status_code"`
 }
 
 // MetricsSchemaResponseJson is the response for the metrics schema endpoint.

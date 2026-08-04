@@ -25,13 +25,13 @@ const (
 )
 
 type notificationAuthCacheFingerprint struct {
-	ActorID            apid.ID              `json:"actor_id"`
-	ExternalID         string               `json:"external_id"`
+	ActorID            apid.ID              `json:"actorId"`
+	ExternalID         string               `json:"externalId"`
 	Namespace          string               `json:"namespace"`
 	Labels             map[string]string    `json:"labels,omitempty"`
 	Annotations        map[string]string    `json:"annotations,omitempty"`
-	ActorPermissions   []aschema.Permission `json:"actor_permissions,omitempty"`
-	RequestPermissions []aschema.Permission `json:"request_permissions,omitempty"`
+	ActorPermissions   []aschema.Permission `json:"actorPermissions,omitempty"`
+	RequestPermissions []aschema.Permission `json:"requestPermissions,omitempty"`
 }
 
 // ListActorNotifications returns actor-visible notifications with the actor's

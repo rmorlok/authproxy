@@ -29,7 +29,7 @@ const DefaultProbeOutcomeRetention = 24 * time.Hour
 // changing schedule wiring (e.g. an operator could enqueue an ad-hoc cleanup
 // with a stricter retention).
 type probeOutcomeCleanupTaskPayload struct {
-	RetentionSeconds int64 `json:"retention_seconds,omitempty"`
+	RetentionSeconds int64 `json:"retentionSeconds,omitempty"`
 }
 
 func newProbeOutcomeCleanupTask(retention time.Duration) (*asynq.Task, error) {

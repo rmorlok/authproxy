@@ -59,7 +59,7 @@
     },
     "ImagePublicUrl": {
       "properties": {
-        "public_url": {
+        "publicUrl": {
           "type": "string",
           "format": "uri",
           "description": "A publicly accessible URL to the image."
@@ -67,14 +67,14 @@
       },
       "type": "object",
       "required": [
-        "public_url"
+        "publicUrl"
       ],
       "additionalProperties": false,
       "description": "An image represented as a publicly accessible URL."
     },
     "ImageBase64": {
       "properties": {
-        "mime_type": {
+        "mimeType": {
           "type": "string",
           "description": "The MIME type of the image, e.g., 'image/jpeg'."
         },
@@ -87,7 +87,7 @@
       },
       "type": "object",
       "required": [
-        "mime_type",
+        "mimeType",
         "base64"
       ],
       "additionalProperties": false,
@@ -95,9 +95,15 @@
     },
     "Image": {
       "oneOf": [
-        { "$ref": "#/$defs/ImagePublicUrlString" },
-        { "$ref": "#/$defs/ImagePublicUrl" },
-        { "$ref": "#/$defs/ImageBase64" }
+        {
+          "$ref": "#/$defs/ImagePublicUrlString"
+        },
+        {
+          "$ref": "#/$defs/ImagePublicUrl"
+        },
+        {
+          "$ref": "#/$defs/ImageBase64"
+        }
       ],
       "description": "An image, either as a publicly accessible URL or as a base64 encoded string."
     },
@@ -145,7 +151,7 @@
     },
     "StringValueEnvVar": {
       "properties": {
-        "env_var": {
+        "envVar": {
           "type": "string",
           "description": "An environment variable from which the value will be read."
         },
@@ -156,14 +162,14 @@
       },
       "type": "object",
       "required": [
-        "env_var"
+        "envVar"
       ],
       "additionalProperties": false,
       "description": "A string value used in configuration"
     },
     "StringValueEnvVarBase64": {
       "properties": {
-        "env_var_base64": {
+        "envVarBase64": {
           "type": "string",
           "description": "An environment variable from which the value will be read as base64."
         },
@@ -176,7 +182,7 @@
       },
       "type": "object",
       "required": [
-        "env_var_base64"
+        "envVarBase64"
       ],
       "additionalProperties": false,
       "description": "A string value used in configuration"
@@ -197,7 +203,7 @@
     },
     "StringValueTemplatedEnvVars": {
       "properties": {
-        "template_env_vars": {
+        "templateEnvVars": {
           "type": "string",
           "description": "A mustache-style template (e.g. 'https://{{HOST}}/api/{{VERSION}}') whose {{...}} tokens are substituted with the values of the corresponding environment variables. The primary value is considered absent if any referenced environment variable is unset or empty."
         },
@@ -208,22 +214,40 @@
       },
       "type": "object",
       "required": [
-        "template_env_vars"
+        "templateEnvVars"
       ],
       "additionalProperties": false,
       "description": "A string value rendered from a mustache template whose variables are read from environment variables."
     },
     "StringValue": {
       "oneOf": [
-        { "$ref": "#/$defs/StringValueInlineString" },
-        { "$ref": "#/$defs/StringValueInlineNumber" },
-        { "$ref": "#/$defs/StringValueInlineBool" },
-        { "$ref": "#/$defs/StringValueDirect" },
-        { "$ref": "#/$defs/StringValueBase64" },
-        { "$ref": "#/$defs/StringValueEnvVar" },
-        { "$ref": "#/$defs/StringValueEnvVarBase64" },
-        { "$ref": "#/$defs/StringValueTemplatedEnvVars" },
-        { "$ref": "#/$defs/StringValueFile" }
+        {
+          "$ref": "#/$defs/StringValueInlineString"
+        },
+        {
+          "$ref": "#/$defs/StringValueInlineNumber"
+        },
+        {
+          "$ref": "#/$defs/StringValueInlineBool"
+        },
+        {
+          "$ref": "#/$defs/StringValueDirect"
+        },
+        {
+          "$ref": "#/$defs/StringValueBase64"
+        },
+        {
+          "$ref": "#/$defs/StringValueEnvVar"
+        },
+        {
+          "$ref": "#/$defs/StringValueEnvVarBase64"
+        },
+        {
+          "$ref": "#/$defs/StringValueTemplatedEnvVars"
+        },
+        {
+          "$ref": "#/$defs/StringValueFile"
+        }
       ],
       "description": "A string value used in configuration that can be expressed in on of several ways."
     },
@@ -247,7 +271,7 @@
     },
     "IntegerValueEnvVar": {
       "properties": {
-        "env_var": {
+        "envVar": {
           "type": "string",
           "description": "An environment variable from which the value will be read."
         },
@@ -258,52 +282,90 @@
       },
       "type": "object",
       "required": [
-        "env_var"
+        "envVar"
       ],
       "additionalProperties": false,
       "description": "A integer value used in configuration"
     },
     "IntegerValue": {
       "oneOf": [
-        { "$ref": "#/$defs/IntegerValueInline" },
-        { "$ref": "#/$defs/IntegerValueDirect" },
-        { "$ref": "#/$defs/IntegerValueEnvVar" }
+        {
+          "$ref": "#/$defs/IntegerValueInline"
+        },
+        {
+          "$ref": "#/$defs/IntegerValueDirect"
+        },
+        {
+          "$ref": "#/$defs/IntegerValueEnvVar"
+        }
       ],
       "description": "A integer value used in configuration that can be expressed in on of several ways."
     },
     "AwsCredentialsAccessKey": {
       "type": "object",
       "properties": {
-        "type": { "const": "access_key" },
-        "access_key_id": { "$ref": "#/$defs/StringValue" },
-        "secret_access_key": { "$ref": "#/$defs/StringValue" }
+        "type": {
+          "const": "access_key"
+        },
+        "accessKeyId": {
+          "$ref": "#/$defs/StringValue"
+        },
+        "secretAccessKey": {
+          "$ref": "#/$defs/StringValue"
+        }
       },
-      "required": ["type", "access_key_id", "secret_access_key"],
+      "required": [
+        "type",
+        "accessKeyId",
+        "secretAccessKey"
+      ],
       "additionalProperties": false
     },
     "AwsCredentialsImplicit": {
       "type": "object",
       "properties": {
-        "type": { "const": "implicit" }
+        "type": {
+          "const": "implicit"
+        }
       },
-      "required": ["type"],
+      "required": [
+        "type"
+      ],
       "additionalProperties": false
     },
     "AwsCredentials": {
       "oneOf": [
-        { "$ref": "#/$defs/AwsCredentialsAccessKey" },
-        { "$ref": "#/$defs/AwsCredentialsImplicit" }
+        {
+          "$ref": "#/$defs/AwsCredentialsAccessKey"
+        },
+        {
+          "$ref": "#/$defs/AwsCredentialsImplicit"
+        }
       ]
     },
     "StringValueBool": {
       "oneOf": [
-        { "$ref": "#/$defs/StringValueInlineBool" },
-        { "$ref": "#/$defs/StringValueDirect" },
-        { "$ref": "#/$defs/StringValueBase64" },
-        { "$ref": "#/$defs/StringValueEnvVar" },
-        { "$ref": "#/$defs/StringValueEnvVarBase64" },
-        { "$ref": "#/$defs/StringValueTemplatedEnvVars" },
-        { "$ref": "#/$defs/StringValueFile" }
+        {
+          "$ref": "#/$defs/StringValueInlineBool"
+        },
+        {
+          "$ref": "#/$defs/StringValueDirect"
+        },
+        {
+          "$ref": "#/$defs/StringValueBase64"
+        },
+        {
+          "$ref": "#/$defs/StringValueEnvVar"
+        },
+        {
+          "$ref": "#/$defs/StringValueEnvVarBase64"
+        },
+        {
+          "$ref": "#/$defs/StringValueTemplatedEnvVars"
+        },
+        {
+          "$ref": "#/$defs/StringValueFile"
+        }
       ],
       "description": "A boolean value used in configuration that can be expressed in on of several ways. When taken from other sources, the string value is parsed as a bool."
     }

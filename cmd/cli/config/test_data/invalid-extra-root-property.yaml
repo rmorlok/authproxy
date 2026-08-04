@@ -1,4 +1,2 @@
-# $schema: ../schema.json
-
-admin_username: bobdole
-extra_property_not_allowed: oops
+adminUsername: bobdole
+extraPropertyNotAllowed: oops

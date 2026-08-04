@@ -88,12 +88,12 @@ and scale runs.
 
 - `all`: refresh sweeps, scheduler sync, resource snapshot, and stale setup
   cleanup.
-- `refresh-sweep`: seeds each `objects.oauth_tokens_expiring_percent` value
+- `refresh-sweep`: seeds each `objects.oauthTokensExpiringPercent` value
   and enqueues the OAuth refresh sweep task.
-- `scheduler-sync`: seeds each `objects.periodic_probe_percent` value and
+- `scheduler-sync`: seeds each `objects.periodicProbePercent` value and
   measures the periodic scheduler's connection walk without needing a worker.
 - `resource-snapshot`: enqueues the app-metrics resource snapshot task.
-- `stale-setup-cleanup`: seeds `objects.stale_setup_connections`, waits for the
+- `stale-setup-cleanup`: seeds `objects.staleSetupConnections`, waits for the
   load-test setup TTL, then enqueues stale setup cleanup.
 - `probe-outcome-cleanup`: optional cleanup-task walk over probe-enabled
   connections.
@@ -111,17 +111,17 @@ record enqueue/queue state without waiting for worker processing.
 
 - `smoke`: low-rate health checks for the deployed services.
 - `proxy-raw`: constant-arrival-rate traffic against
-  `/api/v1/connections/{id}/_proxy_raw`.
+  `/api/v1/connections/{id}/_proxyRaw`.
 - `proxy-wrapped`: constant-arrival-rate comparison traffic against
   `/api/v1/connections/{id}/_proxy`.
 - `proxy-scale`: sequentially fixes `authproxy-api` replicas to the profile's
-  `k6.scale_replicas` entries and runs `LOADTEST_PROXY_SCALE_SCENARIO`
+  `k6.scaleReplicas` entries and runs `LOADTEST_PROXY_SCALE_SCENARIO`
   (`proxy-raw` by default) at each size.
-- `proxy-soak`: long constant-arrival-rate run using `k6.soak_duration`.
+- `proxy-soak`: long constant-arrival-rate run using `k6.soakDuration`.
 - `proxy-spike`: ramping-arrival-rate run using the profile's spike knobs.
 
 The proxy script calls the go-oauth2-server load sink under
-`/test/load/resource/proxy/{connection_id}` and expects the provider to accept
+`/test/load/resource/proxy/{connectionId}` and expects the provider to accept
 seeded bearer tokens with the `at_` prefix. Override the sink behavior with
 `K6_UPSTREAM_STATUS`, `K6_UPSTREAM_BYTES`, `K6_UPSTREAM_DELAY_MS`,
 `K6_UPSTREAM_JITTER_MS`, and `K6_UPSTREAM_BEARER_PREFIX`.
@@ -139,7 +139,7 @@ k6 thresholds fail runs when:
 
 ConfigMap-backed k6 Operator scripts have a Kubernetes size ceiling, so the
 runner defaults to a compact sample of 10,000 seeded connections. Tune that with
-`LOADTEST_K6_CONNECTION_ROWS` or `k6.connection_rows`; use `all` only when the
+`LOADTEST_K6_CONNECTION_ROWS` or `k6.connectionRows`; use `all` only when the
 generated ConfigMap remains below `LOADTEST_K6_CONFIGMAP_MAX_BYTES`. Grafana's
 k6 Operator docs recommend a PVC or local-file based runner image for larger
 multi-file suites:

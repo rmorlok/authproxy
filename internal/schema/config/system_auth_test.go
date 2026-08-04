@@ -13,14 +13,14 @@ func TestSystemAuth(t *testing.T) {
 	t.Run("yaml parse", func(t *testing.T) {
 		t.Run("actors path", func(t *testing.T) {
 			data := `
-  cookie_domain: localhost:8080
-  jwt_signing_key:
-    public_key:
+  cookieDomain: localhost:8080
+  jwtSigningKey:
+    publicKey:
       path: ./dev_config/keys/system.pub
-    private_key:
+    privateKey:
       path: ./dev_config/keys/system
   actors:
-    keys_path: ./dev_config/keys/actors
+    keysPath: ./dev_config/keys/actors
 `
 			expected := SystemAuth{
 				JwtSigningKey: &Key{
@@ -51,16 +51,16 @@ func TestSystemAuth(t *testing.T) {
 		})
 		t.Run("actors list", func(t *testing.T) {
 			data := `
-cookie_domain: localhost:8080
-jwt_signing_key:
-  public_key:
+cookieDomain: localhost:8080
+jwtSigningKey:
+  publicKey:
     path: ./dev_config/keys/system.pub
-  private_key:
+  privateKey:
     path: ./dev_config/keys/system
 actors:
-  - external_id: bobdole
+  - externalId: bobdole
     key:
-      public_key:
+      publicKey:
         path: ./dev_config/keys/actors/bobdole.pub
 `
 			expected := SystemAuth{

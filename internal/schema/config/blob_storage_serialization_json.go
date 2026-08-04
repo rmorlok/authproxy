@@ -3,6 +3,8 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/rmorlok/authproxy/internal/util"
 )
 
 func (b *BlobStorage) MarshalJSON() ([]byte, error) {
@@ -38,7 +40,7 @@ func (b *BlobStorage) UnmarshalJSON(data []byte) error {
 		t = &BlobStorageS3{}
 	}
 
-	if err := json.Unmarshal(data, t); err != nil {
+	if err := util.DecodeJSONStrict(data, t); err != nil {
 		return err
 	}
 

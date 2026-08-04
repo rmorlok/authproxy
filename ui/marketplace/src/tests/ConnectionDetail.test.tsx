@@ -49,13 +49,13 @@ const connector: Connector = {
   namespace: 'root',
   version: 1,
   state: ConnectorVersionState.ACTIVE,
-  display_name: 'GMail',
+  displayName: 'GMail',
   description: 'Have the agent respond to your emails without you needing to be involved. Like magic.',
   highlight: 'Respond to email automatically.',
   logo: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg"/%3E',
-  has_configure: true,
-  created_at: '2023-04-01T12:00:00Z',
-  updated_at: '2023-04-01T12:00:00Z',
+  hasConfigure: true,
+  createdAt: '2023-04-01T12:00:00Z',
+  updatedAt: '2023-04-01T12:00:00Z',
 };
 
 const connection: Connection = {
@@ -64,9 +64,9 @@ const connection: Connection = {
   namespace: 'root',
   connector,
   state: ConnectionState.CONFIGURED,
-  health_state: ConnectionHealthState.HEALTHY,
-  created_at: '2023-04-01T12:00:00Z',
-  updated_at: '2023-04-01T12:00:00Z',
+  healthState: ConnectionHealthState.HEALTHY,
+  createdAt: '2023-04-01T12:00:00Z',
+  updatedAt: '2023-04-01T12:00:00Z',
 };
 
 const baseConnectionsState = {
@@ -96,7 +96,7 @@ function renderConnectionDetail(preloadedState: any = {}, initialEntry = '/conne
       toasts: toastsReducer,
     }),
     preloadedState: {
-      auth: { actor_id: 'actor_test', status: 'authenticated' },
+      auth: { actorId: 'actor_test', status: 'authenticated' },
       connectors: { items: [], status: 'succeeded', error: null },
       connections: baseConnectionsState,
       toasts: { items: [] },
@@ -130,7 +130,7 @@ describe('ConnectionDetail', () => {
     vi.mocked(connections.cancelSetup).mockResolvedValue({} as any);
     vi.mocked(connections.disconnect).mockResolvedValue({
       data: {
-        task_id: 'task-123',
+        taskId: 'task-123',
         connection: {
           ...connection,
           state: ConnectionState.DISCONNECTING,
@@ -216,7 +216,7 @@ describe('ConnectionDetail', () => {
   test('resumes pending setup from notification action URL', async () => {
     const pendingSetupConnection = {
       ...connection,
-      setup_step_id: 'workspace',
+      setupStepId: 'workspace',
     };
 
     renderConnectionDetail({

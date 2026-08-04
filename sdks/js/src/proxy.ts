@@ -18,18 +18,18 @@ export interface ProxyRequest {
     labels?: Record<string, string>;
     /**
      * Raw body bytes, base64-encoded for transport. Exactly one of
-     * body_raw / body_json may be set; for GET/HEAD/etc., neither.
+     * bodyRaw / bodyJson may be set; for GET/HEAD/etc., neither.
      */
-    body_raw?: string;
-    /** JSON body. Alternative to body_raw. */
-    body_json?: unknown;
+    bodyRaw?: string;
+    /** JSON body. Alternative to bodyRaw. */
+    bodyJson?: unknown;
 }
 
 export interface ProxyResponse {
-    status_code: number;
+    statusCode: number;
     headers: Record<string, string>;
-    body_raw?: string;
-    body_json?: unknown;
+    bodyRaw?: string;
+    bodyJson?: unknown;
 }
 
 // Valid HTTP methods accepted by the proxy. Mirrors the server's

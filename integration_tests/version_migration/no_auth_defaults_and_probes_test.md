@@ -14,7 +14,7 @@ has the JSON Schema default `us-east-1`.
 ## Flow
 
 1. Migrate the configured connection from version 1 to version 2 through
-   `POST /connections/{id}/_migrate_version` and wait for the durable workflow
+   `POST /connections/{id}/_migrateVersion` and wait for the durable workflow
    task to complete.
 2. Record requests to the retained and newly added probe endpoints.
 

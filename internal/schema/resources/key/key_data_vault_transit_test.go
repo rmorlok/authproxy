@@ -299,12 +299,12 @@ func TestKeyDataVaultTransit_KeyDataSerialization(t *testing.T) {
 	t.Run("json", func(t *testing.T) {
 		var kd KeyData
 		require.NoError(t, json.Unmarshal([]byte(`{
-			"vault_address": "http://127.0.0.1:8200",
-			"vault_token": "dev-only-token",
-			"vault_namespace": "admin",
-			"vault_transit_mount_path": "transit",
-			"vault_transit_key_name": "authproxy",
-			"cache_ttl": "5m"
+			"vaultAddress": "http://127.0.0.1:8200",
+			"vaultToken": "dev-only-token",
+			"vaultNamespace": "admin",
+			"vaultTransitMountPath": "transit",
+			"vaultTransitKeyName": "authproxy",
+			"cacheTtl": "5m"
 		}`), &kd))
 
 		transit, ok := kd.InnerVal.(*KeyDataVaultTransit)
@@ -320,11 +320,11 @@ func TestKeyDataVaultTransit_KeyDataSerialization(t *testing.T) {
 	t.Run("yaml vault address first", func(t *testing.T) {
 		var kd KeyData
 		require.NoError(t, yaml.Unmarshal([]byte(`
-vault_address: http://127.0.0.1:8200
-vault_token: dev-only-token
-vault_transit_mount_path: transit
-vault_transit_key_name: authproxy
-cache_ttl: 5m
+vaultAddress: http://127.0.0.1:8200
+vaultToken: dev-only-token
+vaultTransitMountPath: transit
+vaultTransitKeyName: authproxy
+cacheTtl: 5m
 `), &kd))
 
 		transit, ok := kd.InnerVal.(*KeyDataVaultTransit)

@@ -78,7 +78,7 @@ func (j *service) Required(validators ...AuthValidator) gin.HandlerFunc {
 
 // RequiredWithAuthRedirect is like Required but, when the request is unauthenticated, issues a 302 redirect to
 // the login URL produced by gen rather than returning 401. The original request URL is passed through to gen so
-// the browser lands back on this endpoint after authenticating (typically with an auth_token query param).
+// the browser lands back on this endpoint after authenticating (typically with an authToken query param).
 func (j *service) RequiredWithAuthRedirect(gen AuthRedirectUrlGenerator, validators ...AuthValidator) gin.HandlerFunc {
 	return j.requiredWithRedirectAndPostValidation(gen, validators, nil)
 }
@@ -92,7 +92,7 @@ func (j *service) requiredWithPostValidation(validators []AuthValidator, postVal
 // requiredWithRedirectAndPostValidation is the shared implementation for Required/RequiredWithAuthRedirect and
 // the permission builder. If unauthRedirect is nil the behavior matches Required (401 on unauthenticated). If
 // set, unauthenticated requests are redirected to the URL produced by unauthRedirect.GetInitiateSessionUrl with
-// the current request URL as the return_to target.
+// the current request URL as the returnTo target.
 func (j *service) requiredWithRedirectAndPostValidation(unauthRedirect AuthRedirectUrlGenerator, validators []AuthValidator, postValidation func(gctx *gin.Context, ra *core.RequestAuth)) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		_next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

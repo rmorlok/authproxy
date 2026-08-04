@@ -319,13 +319,13 @@ Provider notes:
 Use this workflow when the actual data-encryption key should change, such as a
 routine cryptoperiod rotation or a tenant isolation change.
 
-Configure policy under `system_auth.data_encryption_keys`:
+Configure policy under `systemAuth.dataEncryptionKeys`:
 
 ```yaml
-system_auth:
-  data_encryption_keys:
-    ensure_current: true
-    rotation_interval: 2160h # 90 days
+systemAuth:
+  dataEncryptionKeys:
+    ensureCurrent: true
+    rotationInterval: 2160h # 90 days
 ```
 
 Operational steps:

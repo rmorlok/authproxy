@@ -49,13 +49,13 @@ const connector: Connector = {
     namespace: 'root',
     version: 1,
     state: ConnectorVersionState.ACTIVE,
-    display_name: 'Google Calendar',
+    displayName: 'Google Calendar',
     description: 'Calendar app',
     highlight: 'Calendar highlight',
     logo: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg"/%3E',
-    has_configure: false,
-    created_at: '2023-04-01T12:00:00Z',
-    updated_at: '2023-04-01T12:00:00Z',
+    hasConfigure: false,
+    createdAt: '2023-04-01T12:00:00Z',
+    updatedAt: '2023-04-01T12:00:00Z',
 };
 
 const baseConnectionsState = {
@@ -77,7 +77,7 @@ const baseConnectionsState = {
 
 function renderConnectorList(preloadedState: any) {
     const store = createStore({
-        auth: { actor_id: 'actor_test', status: 'authenticated' },
+        auth: { actorId: 'actor_test', status: 'authenticated' },
         toasts: {items: []},
         ...preloadedState,
     });
@@ -163,7 +163,7 @@ describe('ConnectorList', () => {
                     {
                         ...connector,
                         id: 'gmail',
-                        display_name: 'GMail',
+                        displayName: 'GMail',
                         highlight: undefined,
                         description: 'Have the agent respond to your emails without you needing to be involved. Like magic.',
                     },

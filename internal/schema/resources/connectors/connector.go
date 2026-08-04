@@ -41,7 +41,7 @@ type Connector struct {
 	State string `json:"state,omitempty" yaml:"state,omitempty"`
 
 	// DisplayName is the human readable name of the connector. This is displayed to the user in the marketplace portal.
-	DisplayName string `json:"display_name" yaml:"display_name"`
+	DisplayName string `json:"displayName" yaml:"displayName"`
 
 	// Logo is the logo of the connector. This is displayed to the user in the marketplace portal.
 	Logo *common.Image `json:"logo" yaml:"logo"`
@@ -54,19 +54,19 @@ type Connector struct {
 
 	// StatusPageUrl is a URL to the status page for the external service this connector integrates with.
 	// This helps users track 3rd party outages that may affect their connections.
-	StatusPageUrl string `json:"status_page_url,omitempty" yaml:"status_page_url,omitempty"`
+	StatusPageUrl string `json:"statusPageUrl,omitempty" yaml:"statusPageUrl,omitempty"`
 
 	// MarketplaceUrl is a URL to the marketplace listing for this connector's external service.
 	// For example, this could link to the app's listing in the service's app marketplace.
-	MarketplaceUrl string `json:"marketplace_url,omitempty" yaml:"marketplace_url,omitempty"`
+	MarketplaceUrl string `json:"marketplaceUrl,omitempty" yaml:"marketplaceUrl,omitempty"`
 
 	// DeveloperConsoleUrl is a URL to the developer console for this connector's external service.
 	// This is where developers manage their app's configuration, API keys, etc.
-	DeveloperConsoleUrl string `json:"developer_console_url,omitempty" yaml:"developer_console_url,omitempty"`
+	DeveloperConsoleUrl string `json:"developerConsoleUrl,omitempty" yaml:"developerConsoleUrl,omitempty"`
 
 	// OAuthClientUrl is a URL to the OAuth client management page for this connector's external service.
 	// This is typically a sub-page of the developer console where the OAuth client credentials are managed.
-	OAuthClientUrl string `json:"oauth_client_url,omitempty" yaml:"oauth_client_url,omitempty"`
+	OAuthClientUrl string `json:"oauthClientUrl,omitempty" yaml:"oauthClientUrl,omitempty"`
 
 	// Auth is how this connector authenticates. Possible values are of type OAuth2 or APIKey. See individual
 	// documentation for each struct for more details.
@@ -83,14 +83,14 @@ type Connector struct {
 
 	// RateLimiting configures how 429 rate limiting responses from the 3rd party are handled.
 	// If unset, default behavior is enabled (parse Retry-After header, 60s default backoff).
-	RateLimiting *RateLimiting `json:"rate_limiting,omitempty" yaml:"rate_limiting,omitempty"`
+	RateLimiting *RateLimiting `json:"rateLimiting,omitempty" yaml:"rateLimiting,omitempty"`
 
 	// Probes are a list of probes to run against connections of this connector type to validation the connection.
 	Probes []Probe `json:"probes,omitempty" yaml:"probes,omitempty"`
 
 	// SetupFlow defines the multi-step setup flow for configuring connections.
 	// Includes optional preconnect forms (before auth) and configure forms (after auth).
-	SetupFlow *SetupFlow `json:"setup_flow,omitempty" yaml:"setup_flow,omitempty"`
+	SetupFlow *SetupFlow `json:"setupFlow,omitempty" yaml:"setupFlow,omitempty"`
 
 	// Labels are the labels for the connector.
 	Labels map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`

@@ -51,7 +51,7 @@ to access the marketplace SPA. This marketplace URL will be used by the SPA to e
 			}
 
 			query := parsedUrl.Query()
-			query.Set("auth_token", tok)
+			query.Set("authToken", tok)
 			parsedUrl.RawQuery = query.Encode()
 
 			fmt.Print(parsedUrl.String())

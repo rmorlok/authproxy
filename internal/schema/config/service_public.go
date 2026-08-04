@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rmorlok/authproxy/internal/util"
 	"gopkg.in/yaml.v3"
 )
 
@@ -17,8 +18,8 @@ import (
 // ServeFromPath to override with an on-disk build for local iteration or
 // custom branding.
 type ServicePublicStaticContentConfig struct {
-	MountAtPath   string `json:"mount_at" yaml:"mount_at"`
-	ServeFromPath string `json:"serve_from" yaml:"serve_from"`
+	MountAtPath   string `json:"mountAt" yaml:"mountAt"`
+	ServeFromPath string `json:"serveFrom" yaml:"serveFrom"`
 }
 
 // IsEmbedded reports whether the static handler should serve from the service's
@@ -29,15 +30,15 @@ func (c *ServicePublicStaticContentConfig) IsEmbedded() bool {
 
 type CookieConfig struct {
 	DomainVal   *string `json:"domain,omitempty" yaml:"domain,omitempty"`
-	SameSiteVal *string `json:"same_site,omitempty" yaml:"same_site,omitempty"`
+	SameSiteVal *string `json:"sameSite,omitempty" yaml:"sameSite,omitempty"`
 }
 
 type ServicePublic struct {
 	ServiceHttp
-	SessionTimeoutVal        *HumanDuration                    `json:"session_timeout" yaml:"session_timeout"`
-	XsrfRequestQueueDepthVal *int                              `json:"xsrf_request_queue_depth" yaml:"xsrf_request_queue_depth"`
-	EnableMarketplaceApisVal *bool                             `json:"enable_marketplace_apis,omitempty" yaml:"enable_marketplace_apis,omitempty"`
-	EnableProxyVal           *bool                             `json:"enable_proxy,omitempty" yaml:"enable_proxy,omitempty"`
+	SessionTimeoutVal        *HumanDuration                    `json:"sessionTimeout" yaml:"sessionTimeout"`
+	XsrfRequestQueueDepthVal *int                              `json:"xsrfRequestQueueDepth" yaml:"xsrfRequestQueueDepth"`
+	EnableMarketplaceApisVal *bool                             `json:"enableMarketplaceApis,omitempty" yaml:"enableMarketplaceApis,omitempty"`
+	EnableProxyVal           *bool                             `json:"enableProxy,omitempty" yaml:"enableProxy,omitempty"`
 	StaticVal                *ServicePublicStaticContentConfig `json:"static,omitempty" yaml:"static,omitempty"`
 	CookieVal                *CookieConfig                     `json:"cookie,omitempty" yaml:"cookie,omitempty"`
 }
@@ -47,21 +48,43 @@ func (s *ServicePublic) UnmarshalYAML(value *yaml.Node) error {
 	if value.Kind != yaml.MappingNode {
 		return fmt.Errorf("service worker expected a mapping node, got %s", KindToString(value.Kind))
 	}
+	publicFields := []string{
+		"sessionTimeout",
+		"xsrfRequestQueueDepth",
+		"enableMarketplaceApis",
+		"enableProxy",
+		"static",
+		"cookie",
+	}
+	if err := validateYAMLMappingFields(value, append(httpServiceYAMLFields, publicFields...)...); err != nil {
+		return err
+	}
 
 	hs, err := httpServiceUnmarshalYAML(value)
 	if err != nil {
 		return err
 	}
 
-	// Let the rest unmarshall normally
-	type RawType ServicePublic
-	raw := (*RawType)(s)
-	if err := value.Decode(raw); err != nil {
+	type rawServicePublic struct {
+		SessionTimeoutVal        *HumanDuration                    `yaml:"sessionTimeout"`
+		XsrfRequestQueueDepthVal *int                              `yaml:"xsrfRequestQueueDepth"`
+		EnableMarketplaceApisVal *bool                             `yaml:"enableMarketplaceApis,omitempty"`
+		EnableProxyVal           *bool                             `yaml:"enableProxy,omitempty"`
+		StaticVal                *ServicePublicStaticContentConfig `yaml:"static,omitempty"`
+		CookieVal                *CookieConfig                     `yaml:"cookie,omitempty"`
+	}
+	raw := &rawServicePublic{}
+	if err := util.DecodeYAMLNodeStrict(yamlMappingWithFields(value, publicFields...), raw); err != nil {
 		return err
 	}
 
-	// Set the custom unmarshalled types
-	raw.ServiceHttp = hs
+	s.ServiceHttp = hs
+	s.SessionTimeoutVal = raw.SessionTimeoutVal
+	s.XsrfRequestQueueDepthVal = raw.XsrfRequestQueueDepthVal
+	s.EnableMarketplaceApisVal = raw.EnableMarketplaceApisVal
+	s.EnableProxyVal = raw.EnableProxyVal
+	s.StaticVal = raw.StaticVal
+	s.CookieVal = raw.CookieVal
 
 	return nil
 }

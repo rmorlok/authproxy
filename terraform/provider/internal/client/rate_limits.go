@@ -17,10 +17,10 @@ type RateLimitPathMatch struct {
 }
 
 type RateLimitSelector struct {
-	LabelSelector string              `json:"label_selector,omitempty"`
+	LabelSelector string              `json:"labelSelector,omitempty"`
 	Methods       []string            `json:"methods,omitempty"`
-	PathMatch     *RateLimitPathMatch `json:"path_match,omitempty"`
-	RequestTypes  []string            `json:"request_types,omitempty"`
+	PathMatch     *RateLimitPathMatch `json:"pathMatch,omitempty"`
+	RequestTypes  []string            `json:"requestTypes,omitempty"`
 }
 
 type RateLimitBucket struct {
@@ -40,7 +40,7 @@ type RateLimitSlidingWindow struct {
 
 type RateLimitTokenBucket struct {
 	Capacity   int     `json:"capacity"`
-	RefillRate float64 `json:"refill_rate"`
+	RefillRate float64 `json:"refillRate"`
 }
 
 // RateLimitAlgorithm is a tagged union: exactly one variant is set per
@@ -48,9 +48,9 @@ type RateLimitTokenBucket struct {
 // provider-side ConfigValidator on the resource enforces it at plan time
 // so authors see the error before \`terraform apply\`.
 type RateLimitAlgorithm struct {
-	FixedWindow   *RateLimitFixedWindow   `json:"fixed_window,omitempty"`
-	SlidingWindow *RateLimitSlidingWindow `json:"sliding_window,omitempty"`
-	TokenBucket   *RateLimitTokenBucket   `json:"token_bucket,omitempty"`
+	FixedWindow   *RateLimitFixedWindow   `json:"fixedWindow,omitempty"`
+	SlidingWindow *RateLimitSlidingWindow `json:"slidingWindow,omitempty"`
+	TokenBucket   *RateLimitTokenBucket   `json:"tokenBucket,omitempty"`
 }
 
 // RateLimitDefinition is the JSON-serialised "definition" payload of a
@@ -69,8 +69,8 @@ type RateLimit struct {
 	Definition  RateLimitDefinition `json:"definition"`
 	Labels      map[string]string   `json:"labels,omitempty"`
 	Annotations map[string]string   `json:"annotations,omitempty"`
-	CreatedAt   time.Time           `json:"created_at"`
-	UpdatedAt   time.Time           `json:"updated_at"`
+	CreatedAt   time.Time           `json:"createdAt"`
+	UpdatedAt   time.Time           `json:"updatedAt"`
 }
 
 type CreateRateLimitRequest struct {

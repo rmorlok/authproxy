@@ -36,14 +36,14 @@ const RESERVED_DIMENSIONS = ['actor', 'connection', 'connector', 'connector_vers
 type AlgorithmVariant = 'token_bucket' | 'fixed_window' | 'sliding_window';
 
 function detectVariant(algo: RateLimitAlgorithm): AlgorithmVariant {
-    if (algo.fixed_window) return 'fixed_window';
-    if (algo.sliding_window) return 'sliding_window';
+    if (algo.fixedWindow) return 'fixed_window';
+    if (algo.slidingWindow) return 'sliding_window';
     return 'token_bucket';
 }
 
 // Defaults for each algorithm variant — picked to be valid out of the box so
 // switching variants in the UI doesn't immediately produce a validation error.
-const DEFAULT_TOKEN_BUCKET: RateLimitTokenBucket = { capacity: 60, refill_rate: 1 };
+const DEFAULT_TOKEN_BUCKET: RateLimitTokenBucket = { capacity: 60, refillRate: 1 };
 const DEFAULT_FIXED_WINDOW: RateLimitFixedWindow = { window: '1m', limit: 100 };
 const DEFAULT_SLIDING_WINDOW: RateLimitSlidingWindow = { window: '1m', limit: 100, mode: SlidingWindowMode.COUNTER };
 
@@ -51,13 +51,13 @@ export const EMPTY_DEFINITION: RateLimitDefinition = {
     mode: RateLimitMode.ENFORCE,
     selector: {
         methods: ['POST', 'PATCH', 'PUT'],
-        request_types: ['proxy'],
+        requestTypes: ['proxy'],
     },
     bucket: {
         dimensions: ['actor'],
     },
     algorithm: {
-        token_bucket: { ...DEFAULT_TOKEN_BUCKET },
+        tokenBucket: { ...DEFAULT_TOKEN_BUCKET },
     },
 };
 
@@ -82,13 +82,13 @@ export default function RateLimitDefinitionForm({ value, onChange }: Props) {
         let nextAlgo: RateLimitAlgorithm;
         switch (next) {
             case 'fixed_window':
-                nextAlgo = { fixed_window: { ...DEFAULT_FIXED_WINDOW } };
+                nextAlgo = { fixedWindow: { ...DEFAULT_FIXED_WINDOW } };
                 break;
             case 'sliding_window':
-                nextAlgo = { sliding_window: { ...DEFAULT_SLIDING_WINDOW } };
+                nextAlgo = { slidingWindow: { ...DEFAULT_SLIDING_WINDOW } };
                 break;
             default:
-                nextAlgo = { token_bucket: { ...DEFAULT_TOKEN_BUCKET } };
+                nextAlgo = { tokenBucket: { ...DEFAULT_TOKEN_BUCKET } };
         }
         update({ algorithm: nextAlgo });
     };
@@ -141,8 +141,8 @@ function Section({ title, children, hint }: { title: string; children: React.Rea
 
 function SelectorSection({ value, onChange }: { value: RateLimitSelector; onChange: (p: Partial<RateLimitSelector>) => void }) {
     const methods = value.methods || [];
-    const requestTypes = value.request_types || [];
-    const pathMatch = value.path_match;
+    const requestTypes = value.requestTypes || [];
+    const pathMatch = value.pathMatch;
 
     return (
         <Section title="Selector" hint="Match criteria — clauses are AND-ed. Leave a clause empty to skip it.">
@@ -153,8 +153,8 @@ function SelectorSection({ value, onChange }: { value: RateLimitSelector; onChan
                     helperText="Kubernetes-style selector evaluated against the per-request label snapshot. Leave blank to skip."
                     fullWidth
                     size="small"
-                    value={value.label_selector || ''}
-                    onChange={(e) => onChange({ label_selector: e.target.value || undefined })}
+                    value={value.labelSelector || ''}
+                    onChange={(e) => onChange({ labelSelector: e.target.value || undefined })}
                 />
 
                 <FormControl>
@@ -179,7 +179,7 @@ function SelectorSection({ value, onChange }: { value: RateLimitSelector; onChan
                     <FormLabel sx={{ mb: 0.5 }}>Request types</FormLabel>
                     <ToggleButtonGroup
                         value={requestTypes}
-                        onChange={(_, next: string[]) => onChange({ request_types: next.length > 0 ? next : undefined })}
+                        onChange={(_, next: string[]) => onChange({ requestTypes: next.length > 0 ? next : undefined })}
                         size="small"
                         color="primary"
                         sx={{ flexWrap: 'wrap', gap: 0.5 }}
@@ -199,7 +199,7 @@ function SelectorSection({ value, onChange }: { value: RateLimitSelector; onChan
                             <Switch
                                 checked={!!pathMatch}
                                 onChange={(_, checked) => onChange({
-                                    path_match: checked
+                                    pathMatch: checked
                                         ? { kind: PathMatchKind.PREFIX, value: '' }
                                         : undefined,
                                 })}
@@ -215,7 +215,7 @@ function SelectorSection({ value, onChange }: { value: RateLimitSelector; onChan
                                     labelId="path-kind-label"
                                     label="Kind"
                                     value={pathMatch.kind}
-                                    onChange={(e) => onChange({ path_match: { ...pathMatch, kind: e.target.value as PathMatchKind } })}
+                                    onChange={(e) => onChange({ pathMatch: { ...pathMatch, kind: e.target.value as PathMatchKind } })}
                                 >
                                     <MenuItem value={PathMatchKind.PREFIX}>prefix</MenuItem>
                                     <MenuItem value={PathMatchKind.GLOB}>glob</MenuItem>
@@ -227,7 +227,7 @@ function SelectorSection({ value, onChange }: { value: RateLimitSelector; onChan
                                 size="small"
                                 fullWidth
                                 value={pathMatch.value}
-                                onChange={(e) => onChange({ path_match: { ...pathMatch, value: e.target.value } })}
+                                onChange={(e) => onChange({ pathMatch: { ...pathMatch, value: e.target.value } })}
                                 placeholder={pathMatch.kind === PathMatchKind.REGEX ? '^/v2/users/[^/]+$' : '/services/data/'}
                             />
                         </Stack>
@@ -297,14 +297,14 @@ function AlgorithmSection({
                 <FormControlLabel value="sliding_window" control={<Radio />} label="Sliding window" />
             </RadioGroup>
 
-            {variant === 'token_bucket' && algorithm.token_bucket && (
+            {variant === 'token_bucket' && algorithm.tokenBucket && (
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                     <TextField
                         label="Capacity"
                         size="small"
                         type="number"
-                        value={algorithm.token_bucket.capacity}
-                        onChange={(e) => onChange({ token_bucket: { ...algorithm.token_bucket!, capacity: Number(e.target.value) } })}
+                        value={algorithm.tokenBucket.capacity}
+                        onChange={(e) => onChange({ tokenBucket: { ...algorithm.tokenBucket!, capacity: Number(e.target.value) } })}
                         helperText="Maximum tokens (burst capacity)"
                         slotProps={{ htmlInput: { min: 1, step: 1 } }}
                     />
@@ -312,50 +312,50 @@ function AlgorithmSection({
                         label="Refill rate"
                         size="small"
                         type="number"
-                        value={algorithm.token_bucket.refill_rate}
-                        onChange={(e) => onChange({ token_bucket: { ...algorithm.token_bucket!, refill_rate: Number(e.target.value) } })}
+                        value={algorithm.tokenBucket.refillRate}
+                        onChange={(e) => onChange({ tokenBucket: { ...algorithm.tokenBucket!, refillRate: Number(e.target.value) } })}
                         helperText="Tokens added per second (fractional OK)"
                         slotProps={{ htmlInput: { min: 0, step: 0.1 } }}
                     />
                 </Stack>
             )}
 
-            {variant === 'fixed_window' && algorithm.fixed_window && (
+            {variant === 'fixed_window' && algorithm.fixedWindow && (
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                     <TextField
                         label="Window"
                         size="small"
-                        value={algorithm.fixed_window.window}
-                        onChange={(e) => onChange({ fixed_window: { ...algorithm.fixed_window!, window: e.target.value } })}
+                        value={algorithm.fixedWindow.window}
+                        onChange={(e) => onChange({ fixedWindow: { ...algorithm.fixedWindow!, window: e.target.value } })}
                         helperText="HumanDuration, e.g. 1m, 5m, 1h"
                     />
                     <TextField
                         label="Limit"
                         size="small"
                         type="number"
-                        value={algorithm.fixed_window.limit}
-                        onChange={(e) => onChange({ fixed_window: { ...algorithm.fixed_window!, limit: Number(e.target.value) } })}
+                        value={algorithm.fixedWindow.limit}
+                        onChange={(e) => onChange({ fixedWindow: { ...algorithm.fixedWindow!, limit: Number(e.target.value) } })}
                         helperText="Maximum requests per window"
                         slotProps={{ htmlInput: { min: 1, step: 1 } }}
                     />
                 </Stack>
             )}
 
-            {variant === 'sliding_window' && algorithm.sliding_window && (
+            {variant === 'sliding_window' && algorithm.slidingWindow && (
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                     <TextField
                         label="Window"
                         size="small"
-                        value={algorithm.sliding_window.window}
-                        onChange={(e) => onChange({ sliding_window: { ...algorithm.sliding_window!, window: e.target.value } })}
+                        value={algorithm.slidingWindow.window}
+                        onChange={(e) => onChange({ slidingWindow: { ...algorithm.slidingWindow!, window: e.target.value } })}
                         helperText="HumanDuration, e.g. 1m, 5m"
                     />
                     <TextField
                         label="Limit"
                         size="small"
                         type="number"
-                        value={algorithm.sliding_window.limit}
-                        onChange={(e) => onChange({ sliding_window: { ...algorithm.sliding_window!, limit: Number(e.target.value) } })}
+                        value={algorithm.slidingWindow.limit}
+                        onChange={(e) => onChange({ slidingWindow: { ...algorithm.slidingWindow!, limit: Number(e.target.value) } })}
                         helperText="Max requests in trailing window"
                         slotProps={{ htmlInput: { min: 1, step: 1 } }}
                     />
@@ -364,8 +364,8 @@ function AlgorithmSection({
                         <Select
                             labelId="sw-mode-label"
                             label="Mode"
-                            value={algorithm.sliding_window.mode}
-                            onChange={(e) => onChange({ sliding_window: { ...algorithm.sliding_window!, mode: e.target.value as SlidingWindowMode } })}
+                            value={algorithm.slidingWindow.mode}
+                            onChange={(e) => onChange({ slidingWindow: { ...algorithm.slidingWindow!, mode: e.target.value as SlidingWindowMode } })}
                         >
                             <MenuItem value={SlidingWindowMode.LOG}>log (exact)</MenuItem>
                             <MenuItem value={SlidingWindowMode.COUNTER}>counter (approximate)</MenuItem>

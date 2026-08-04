@@ -93,7 +93,7 @@ func (env *IntegrationTestEnv) ForceConnectorVersionState(
 	body, err := jsonMarshal(schemaapi.ForceConnectorVersionStateRequestJson{State: string(state)})
 	require.NoError(t, err)
 
-	path := fmt.Sprintf("/api/v1/connectors/%s/versions/%d/_force_state", connectorID, version)
+	path := fmt.Sprintf("/api/v1/connectors/%s/versions/%d/_forceState", connectorID, version)
 	w := env.doSignedRequest(t, http.MethodPut, path, body, env.resolveOAuth2Options(opts))
 	require.Equalf(t, http.StatusOK, w.Code, "force connector version state failed: %s", w.Body.String())
 
@@ -137,7 +137,7 @@ func (env *IntegrationTestEnv) MigrateConnectionVersion(
 	body, err := jsonMarshal(req)
 	require.NoError(t, err)
 
-	path := "/api/v1/connections/" + connectionID + "/_migrate_version"
+	path := "/api/v1/connections/" + connectionID + "/_migrateVersion"
 	w := env.doSignedRequest(t, http.MethodPost, path, body, env.resolveOAuth2Options(opts))
 	require.Equalf(t, http.StatusOK, w.Code, "migrate connection version failed: %s", w.Body.String())
 
@@ -228,7 +228,7 @@ func (env *IntegrationTestEnv) ListNotifications(
 		q.Set("state", string(state))
 	}
 	if includeViewed {
-		q.Set("include_viewed", "true")
+		q.Set("includeViewed", "true")
 	}
 	path := "/api/v1/notifications"
 	if encoded := q.Encode(); encoded != "" {

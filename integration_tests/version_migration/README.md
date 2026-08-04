@@ -3,7 +3,7 @@
 This package contains end-to-end scenarios for single-connection connector
 version migration. The tests define connectors, create real connections,
 publish newer connector versions, migrate those connections through
-`POST /connections/{id}/_migrate_version`, and assert resulting connection
+`POST /connections/{id}/_migrateVersion`, and assert resulting connection
 state, auth/config behavior, probes, and notifications.
 
 Scenario files:

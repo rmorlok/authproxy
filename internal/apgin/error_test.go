@@ -36,7 +36,7 @@ func TestWriteError(t *testing.T) {
 			&httperr.Error{Status: http.StatusForbidden, ResponseMsg: "Forbidden", InternalErr: errors.New("internal error text")},
 			true,
 			http.StatusForbidden,
-			`{"error":"Forbidden","stack_trace":"internal error text.*"}`,
+			`{"error":"Forbidden","stackTrace":"internal error text.*"}`,
 		},
 	}
 

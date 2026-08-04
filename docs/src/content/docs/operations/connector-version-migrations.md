@@ -126,7 +126,7 @@ return {
         level: "warning",
         title: "Connection needs review",
         message: "Review this connection before using the new connector version.",
-        action_url: "/connections/cxn_123?action=configure",
+        actionUrl: "/connections/cxn_123?action=configure",
         metadata: {
           reason: "workspace mapping changed"
         }
@@ -156,7 +156,7 @@ After hooks run, AuthProxy compares the source and target connector definitions
 and updates the migration candidate:
 
 - Target-only setup fields with JSON Schema defaults are filled automatically.
-- Missing required configure fields set `setup_step_id` so the actor can resume
+- Missing required configure fields set `setupStepId` so the actor can resume
   setup.
 - Missing required preconnect fields or required OAuth scope changes leave the
   connection configured but unhealthy, requiring re-authentication.
@@ -189,26 +189,26 @@ same deterministic key instead of creating a duplicate.
 The notification API is:
 
 ```http
-GET /api/v1/notifications?include_viewed=true
+GET /api/v1/notifications?includeViewed=true
 POST /api/v1/notifications/{id}/_viewed
 POST /api/v1/notifications/_viewed
 ```
 
 `GET /notifications` returns actor-filtered active notifications with `viewed`,
-`can_action`, and `action_url` when the actor is allowed to perform the action.
-Clients should only follow `action_url` when `can_action` is true.
+`canAction`, and `actionUrl` when the actor is allowed to perform the action.
+Clients should only follow `actionUrl` when `canAction` is true.
 
 ## API
 
 Start a single connection migration with:
 
 ```http
-POST /api/v1/connections/{id}/_migrate_version
+POST /api/v1/connections/{id}/_migrateVersion
 Content-Type: application/json
 
 {
-  "target_version": 3,
-  "timeout_seconds": 600
+  "targetVersion": 3,
+  "timeoutSeconds": 600
 }
 ```
 
@@ -216,10 +216,10 @@ The response binds the workflow task to the caller:
 
 ```json
 {
-  "task_id": "tsk_...",
-  "connection_id": "cxn_...",
-  "source_version": 1,
-  "target_version": 3
+  "taskId": "tsk_...",
+  "connectionId": "cxn_...",
+  "sourceVersion": 1,
+  "targetVersion": 3
 }
 ```
 

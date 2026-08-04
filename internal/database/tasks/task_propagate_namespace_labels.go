@@ -13,7 +13,7 @@ const taskTypePropagateNamespaceLabels = "database:propagate_namespace_labels"
 // PropagateNamespaceLabelsPayload is the asynq task payload for
 // taskTypePropagateNamespaceLabels.
 type PropagateNamespaceLabelsPayload struct {
-	NamespacePath string `json:"namespace_path"`
+	NamespacePath string `json:"namespacePath"`
 }
 
 // NewPropagateNamespaceLabelsTask returns an asynq task that, when

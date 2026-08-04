@@ -153,7 +153,7 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 		dm.GetCoreService(),
 	)
 
-	api := server.Group("/api/v1")
+	api := server.Group("/api/v1", common_routes.RejectSnakeCaseQueryParams())
 
 	routesConnectors.Register(api)
 	routesConnections.Register(api)

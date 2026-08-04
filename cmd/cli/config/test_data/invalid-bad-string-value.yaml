@@ -1,4 +1,2 @@
-# $schema: ../schema.json
-
-admin_username:
-  unknown_form: bobdole
+adminUsername:
+  unknownForm: bobdole

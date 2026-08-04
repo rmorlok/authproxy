@@ -97,7 +97,7 @@ func TestResourceSearchRouteQueryAndPermissions(t *testing.T) {
 
 	t.Run("requires authentication", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		req, err := http.NewRequest(http.MethodGet, "/search/resources?q=payments&resource_type=actor", nil)
+		req, err := http.NewRequest(http.MethodGet, "/search/resources?q=payments&resourceType=actor", nil)
 		require.NoError(t, err)
 		setup.gin.ServeHTTP(w, req)
 		require.Equal(t, http.StatusUnauthorized, w.Code)
@@ -111,7 +111,7 @@ func TestResourceSearchRouteQueryAndPermissions(t *testing.T) {
 			ResourceIds: []string{allowed.Id.String()},
 			Verbs:       []string{"list", "get"},
 		}}
-		req := signedSearchRequest(t, setup, "/search/resources?q=payments&resource_type=actor&namespace=root.team.**", permissions)
+		req := signedSearchRequest(t, setup, "/search/resources?q=payments&resourceType=actor&namespace=root.team.**", permissions)
 		setup.gin.ServeHTTP(w, req)
 		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 
@@ -200,7 +200,7 @@ func TestResourceNamesEndToEndAcrossVersionsAndAuthorization(t *testing.T) {
 	setup.gin.ServeHTTP(w, signedSearchRequest(
 		t,
 		setup,
-		"/search/resources?q=billing-provider&resource_type=connector&namespace=root.**",
+		"/search/resources?q=billing-provider&resourceType=connector&namespace=root.**",
 		permissions,
 	))
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
@@ -215,7 +215,7 @@ func TestResourceNamesEndToEndAcrossVersionsAndAuthorization(t *testing.T) {
 	setup.gin.ServeHTTP(w, signedSearchRequest(
 		t,
 		setup,
-		"/search/resources?q=billing-live&resource_type=connection&namespace=root.**",
+		"/search/resources?q=billing-live&resourceType=connection&namespace=root.**",
 		permissions,
 	))
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
@@ -233,10 +233,10 @@ func TestResourceSearchRouteValidation(t *testing.T) {
 		"/search/resources?q=ab",
 		"/search/resources?mode=invalid&q=valid",
 		"/search/resources?mode=seed&q=invalid",
-		"/search/resources?q=valid&resource_type=unknown",
-		"/search/resources?label_selector=" + url.QueryEscape("bad key=value"),
-		"/search/resources?label_selector=" + url.QueryEscape(","),
-		"/search/resources?label_selector=" + url.QueryEscape("env=prod,"),
+		"/search/resources?q=valid&resourceType=unknown",
+		"/search/resources?labelSelector=" + url.QueryEscape("bad key=value"),
+		"/search/resources?labelSelector=" + url.QueryEscape(","),
+		"/search/resources?labelSelector=" + url.QueryEscape("env=prod,"),
 		"/search/resources?q=valid&limit=51",
 	}
 	for _, rawURL := range tests {
@@ -279,7 +279,7 @@ func TestResourceSearchRouteSeedCoversRemainingTypes(t *testing.T) {
 	setup.gin.ServeHTTP(w, signedSearchRequest(
 		t,
 		setup,
-		"/search/resources?mode=seed&resource_type=namespace&resource_type=key&resource_type=rate_limit&limit=50",
+		"/search/resources?mode=seed&resourceType=namespace&resourceType=key&resourceType=rate_limit&limit=50",
 		aschema.AllPermissions(),
 	))
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
@@ -319,7 +319,7 @@ func TestResourceSearchRouteReturnsIncompleteTypes(t *testing.T) {
 		}
 	})
 	w := httptest.NewRecorder()
-	setup.gin.ServeHTTP(w, signedSearchRequest(t, setup, "/search/resources?q=payments&resource_type=actor", aschema.AllPermissions()))
+	setup.gin.ServeHTTP(w, signedSearchRequest(t, setup, "/search/resources?q=payments&resourceType=actor", aschema.AllPermissions()))
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	var response schemaapi.SearchResourcesResponseJson
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
@@ -345,7 +345,7 @@ func TestResourceSearchRouteOverallDeadlineDoesNotWaitForIgnoredCancellation(t *
 	setup.routes.overallTimeout = 20 * time.Millisecond
 
 	w := httptest.NewRecorder()
-	setup.gin.ServeHTTP(w, signedSearchRequest(t, setup, "/search/resources?q=payments&resource_type=actor", aschema.AllPermissions()))
+	setup.gin.ServeHTTP(w, signedSearchRequest(t, setup, "/search/resources?q=payments&resourceType=actor", aschema.AllPermissions()))
 	close(release)
 
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
@@ -364,6 +364,6 @@ func TestResourceSearchRouteUnexpectedDatabaseFailure(t *testing.T) {
 		}
 	})
 	w := httptest.NewRecorder()
-	setup.gin.ServeHTTP(w, signedSearchRequest(t, setup, "/search/resources?q=payments&resource_type=actor", aschema.AllPermissions()))
+	setup.gin.ServeHTTP(w, signedSearchRequest(t, setup, "/search/resources?q=payments&resourceType=actor", aschema.AllPermissions()))
 	require.Equal(t, http.StatusInternalServerError, w.Code, w.Body.String())
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	"github.com/rmorlok/authproxy/internal/util"
 	"gopkg.in/yaml.v3"
 )
 
@@ -29,23 +30,23 @@ fieldLoop:
 		keyNode := value.Content[i]
 
 		switch keyNode.Value {
-		case "public_key":
+		case "publicKey":
 			key = &KeyPublicPrivate{}
 			break fieldLoop
-		case "private_key":
+		case "privateKey":
 			key = &KeyPublicPrivate{}
 			break fieldLoop
-		case "shared_key":
+		case "sharedKey":
 			key = &KeyShared{}
 			break fieldLoop
 		}
 	}
 
 	if key == nil {
-		return fmt.Errorf("invalid structure for key type; does not match value, public_key/private_key or shared_key")
+		return fmt.Errorf("invalid structure for key type; does not match value, publicKey/privateKey or sharedKey")
 	}
 
-	if err := value.Decode(key); err != nil {
+	if err := util.DecodeYAMLNodeStrict(value, key); err != nil {
 		return err
 	}
 

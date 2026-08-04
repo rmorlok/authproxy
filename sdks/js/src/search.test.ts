@@ -15,7 +15,7 @@ describe('searchResources', () => {
         const controller = new AbortController();
         searchResources({
             mode: 'query',
-            resource_type: ['connection', 'namespace'],
+            resourceType: ['connection', 'namespace'],
             q: 'payments',
         }, {signal: controller.signal});
 
@@ -23,7 +23,7 @@ describe('searchResources', () => {
             signal: controller.signal,
             params: {
                 mode: 'query',
-                resource_type: ['connection', 'namespace'],
+                resourceType: ['connection', 'namespace'],
                 q: 'payments',
             },
             paramsSerializer: {indexes: null},
@@ -31,8 +31,8 @@ describe('searchResources', () => {
     });
 
     it('preserves a caller-provided params serializer', () => {
-        const paramsSerializer = vi.fn(() => 'resource_type=connection');
-        searchResources({resource_type: ['connection']}, {paramsSerializer});
+        const paramsSerializer = vi.fn(() => 'resourceType=connection');
+        searchResources({resourceType: ['connection']}, {paramsSerializer});
 
         expect(getMock).toHaveBeenCalledWith('/api/v1/search/resources', expect.objectContaining({
             paramsSerializer,

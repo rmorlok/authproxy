@@ -52,7 +52,7 @@ For every case:
 - **Structured success/failure events.** Eventual success → one
   `oauth token refresh succeeded` event, no failure event. Exhaustion →
   one `oauth token refresh failed` event with
-  `category=provider_5xx`, `connection_id`, `provider_status_code`, and
+  `category=provider_5xx`, `connectionId`, `provider_status_code`, and
   `attempts=tokenRefreshMaxAttempts`. The `attempts` field is the
   dashboard signal that distinguishes exhausted-budget failures from
   single non-retryable failures and is the central reason this file

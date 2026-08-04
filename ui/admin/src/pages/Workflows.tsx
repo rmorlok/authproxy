@@ -20,12 +20,12 @@ import {
 
 const stateColors: Record<string, 'primary' | 'secondary' | 'success' | 'warning' | 'default'> = {
     active: 'primary',
-    continued_as_new: 'warning',
+    continuedAsNew: 'warning',
     finished: 'success',
 };
 
 function workflowId(row: WorkflowInstanceRef) {
-    return `${row.instance?.instance_id ?? ''}:${row.instance?.execution_id ?? ''}`;
+    return `${row.instance?.instanceId ?? ''}:${row.instance?.executionId ?? ''}`;
 }
 
 function formatTimestamp(value?: string) {
@@ -35,7 +35,7 @@ function formatTimestamp(value?: string) {
 export default function Workflows() {
     const navigate = useNavigate();
     const [page, setPage] = useQueryState<number>('page', parseAsInteger.withDefault(1));
-    const [pageSize, setPageSize] = useQueryState<number>('page_size', parseAsInteger.withDefault(30));
+    const [pageSize, setPageSize] = useQueryState<number>('pageSize', parseAsInteger.withDefault(30));
     const [autoRefresh, setAutoRefresh] = useState(true);
     const [instances, setInstances] = useState<WorkflowInstanceRef[]>([]);
     const [loading, setLoading] = useState(false);
@@ -135,23 +135,23 @@ export default function Workflows() {
     const handleWorkflowClick: GridEventListener<'rowClick'> = (params) => {
         const instance = params.row.instance;
         if (!instance) return;
-        navigate(`/workflows/${encodeURIComponent(instance.instance_id)}/${encodeURIComponent(instance.execution_id)}`);
+        navigate(`/workflows/${encodeURIComponent(instance.instanceId)}/${encodeURIComponent(instance.executionId)}`);
     };
 
     const columns: GridColDef<WorkflowInstanceRef>[] = [
         {
-            field: 'instance_id',
+            field: 'instanceId',
             headerName: 'Instance ID',
             flex: 1.2,
             minWidth: 180,
-            valueGetter: (_value, row) => row.instance?.instance_id ?? '',
+            valueGetter: (_value, row) => row.instance?.instanceId ?? '',
         },
         {
-            field: 'execution_id',
+            field: 'executionId',
             headerName: 'Execution ID',
             flex: 1.2,
             minWidth: 180,
-            valueGetter: (_value, row) => row.instance?.execution_id ?? '',
+            valueGetter: (_value, row) => row.instance?.executionId ?? '',
         },
         {field: 'queue', headerName: 'Queue', flex: 0.6, minWidth: 110},
         {
@@ -169,14 +169,14 @@ export default function Workflows() {
             ),
         },
         {
-            field: 'created_at',
+            field: 'createdAt',
             headerName: 'Created',
             flex: 0.8,
             minWidth: 160,
             renderCell: (params) => formatTimestamp(params.value as string | undefined),
         },
         {
-            field: 'completed_at',
+            field: 'completedAt',
             headerName: 'Completed',
             flex: 0.8,
             minWidth: 160,

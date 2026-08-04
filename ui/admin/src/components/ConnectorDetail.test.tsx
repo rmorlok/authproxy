@@ -41,19 +41,19 @@ const connector = {
   version: 4,
   namespace: 'root',
   state: ConnectorVersionState.PRIMARY,
-  display_name: 'Example connector',
+  displayName: 'Example connector',
   description: '',
   logo: '',
-  has_configure: false,
-  created_at: '2026-07-25T00:00:00.000Z',
-  updated_at: '2026-07-25T00:00:00.000Z',
+  hasConfigure: false,
+  createdAt: '2026-07-25T00:00:00.000Z',
+  updatedAt: '2026-07-25T00:00:00.000Z',
 };
 
 const connectorVersions = [
-  {id: 'cxr_test', name: 'example-connector', version: 4, state: ConnectorVersionState.PRIMARY, created_at: '2026-07-25T00:00:00.000Z'},
-  {id: 'cxr_test', name: 'example-connector', version: 3, state: ConnectorVersionState.ACTIVE, created_at: '2026-07-24T00:00:00.000Z'},
-  {id: 'cxr_test', name: 'example-connector', version: 2, state: ConnectorVersionState.ACTIVE, created_at: '2026-07-23T00:00:00.000Z'},
-  {id: 'cxr_test', name: 'example-connector', version: 1, state: ConnectorVersionState.ARCHIVED, created_at: '2026-07-22T00:00:00.000Z'},
+  {id: 'cxr_test', name: 'example-connector', version: 4, state: ConnectorVersionState.PRIMARY, createdAt: '2026-07-25T00:00:00.000Z'},
+  {id: 'cxr_test', name: 'example-connector', version: 3, state: ConnectorVersionState.ACTIVE, createdAt: '2026-07-24T00:00:00.000Z'},
+  {id: 'cxr_test', name: 'example-connector', version: 2, state: ConnectorVersionState.ACTIVE, createdAt: '2026-07-23T00:00:00.000Z'},
+  {id: 'cxr_test', name: 'example-connector', version: 1, state: ConnectorVersionState.ARCHIVED, createdAt: '2026-07-22T00:00:00.000Z'},
 ];
 
 describe('ConnectorDetail', () => {
@@ -80,7 +80,7 @@ describe('ConnectorDetail', () => {
     await screen.findByRole('heading', {name: 'example-connector'});
     await waitFor(() => expect(connectors.listVersions).toHaveBeenCalledWith(
       connector.id,
-      {limit: 100, order_by: 'version desc'},
+      {limit: 100, orderBy: 'version desc'},
     ));
 
     const states = screen.getByText('Available States').parentElement;

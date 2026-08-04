@@ -20,15 +20,15 @@ const (
 )
 
 type TaskInfo struct {
-	TrackedVia          TrackedVia `json:"tracked_via"`
-	ActorId             apid.ID    `json:"actor_id,omitempty"`
-	AsynqId             string     `json:"asynq_id,omitempty"`
-	AsynqQueue          string     `json:"asynq_queue,omitempty"`
-	AsynqType           string     `json:"asynq_type,omitempty"`
-	WorkflowInstanceId  string     `json:"workflow_instance_id,omitempty"`
-	WorkflowExecutionId string     `json:"workflow_execution_id,omitempty"`
-	WorkflowName        string     `json:"workflow_name,omitempty"`
-	WorkflowQueue       string     `json:"workflow_queue,omitempty"`
+	TrackedVia          TrackedVia `json:"trackedVia"`
+	ActorId             apid.ID    `json:"actorId,omitempty"`
+	AsynqId             string     `json:"asynqId,omitempty"`
+	AsynqQueue          string     `json:"asynqQueue,omitempty"`
+	AsynqType           string     `json:"asynqType,omitempty"`
+	WorkflowInstanceId  string     `json:"workflowInstanceId,omitempty"`
+	WorkflowExecutionId string     `json:"workflowExecutionId,omitempty"`
+	WorkflowName        string     `json:"workflowName,omitempty"`
+	WorkflowQueue       string     `json:"workflowQueue,omitempty"`
 }
 
 type Actor interface {

@@ -25,8 +25,8 @@ func newProbeTask(connectionId apid.ID, probeId string) (*asynq.Task, error) {
 }
 
 type probeTaskPayload struct {
-	ConnectionId apid.ID `json:"connection_id"`
-	ProbeId      string  `json:"probe_id"`
+	ConnectionId apid.ID `json:"connectionId"`
+	ProbeId      string  `json:"probeId"`
 }
 
 func skipTaskErrorIfProbeIsPeriodic(p iface.Probe, err error) error {

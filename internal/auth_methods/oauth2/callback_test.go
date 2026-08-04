@@ -73,7 +73,7 @@ func TestAppendSetupPendingToReturnUrl_AddsExpectedQueryParams(t *testing.T) {
 	parsed, err := url.Parse(got)
 	require.NoError(t, err)
 	assert.Equal(t, "pending", parsed.Query().Get("setup"))
-	assert.Equal(t, connID.String(), parsed.Query().Get("connection_id"))
+	assert.Equal(t, connID.String(), parsed.Query().Get("connectionId"))
 	assert.Equal(t, "https", parsed.Scheme)
 	assert.Equal(t, "app.example.com", parsed.Host)
 	assert.Equal(t, "/return", parsed.Path)
@@ -94,7 +94,7 @@ func TestAppendSetupPendingToReturnUrl_PreservesExistingQuery(t *testing.T) {
 	assert.Equal(t, "integrations", q.Get("tab"))
 	assert.Equal(t, "email", q.Get("utm"))
 	assert.Equal(t, "pending", q.Get("setup"))
-	assert.Equal(t, connID.String(), q.Get("connection_id"))
+	assert.Equal(t, connID.String(), q.Get("connectionId"))
 }
 
 // TestAppendSetupPendingToReturnUrl_ParseFailureFallback covers the

@@ -49,8 +49,8 @@ type ConnectorVersionJson struct {
 	Definition  interface{}                     `json:"definition"`
 	Labels      map[string]string               `json:"labels,omitempty"`
 	Annotations map[string]string               `json:"annotations,omitempty"`
-	CreatedAt   time.Time                       `json:"created_at"`
-	UpdatedAt   time.Time                       `json:"updated_at"`
+	CreatedAt   time.Time                       `json:"createdAt"`
+	UpdatedAt   time.Time                       `json:"updatedAt"`
 }
 
 // ListConnectorVersionsResponseJson documents the paginated connector version list response.
@@ -74,12 +74,12 @@ type ConnectionJson struct {
 	Labels      map[string]string `json:"labels,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`
 	State       string            `json:"state" example:"configured"`
-	HealthState string            `json:"health_state" example:"healthy"`
-	SetupStep   string            `json:"setup_step_id,omitempty" example:"tenant"`
-	SetupError  string            `json:"setup_error,omitempty"`
+	HealthState string            `json:"healthState" example:"healthy"`
+	SetupStep   string            `json:"setupStepId,omitempty" example:"tenant"`
+	SetupError  string            `json:"setupError,omitempty"`
 	Connector   interface{}       `json:"connector"`
-	CreatedAt   time.Time         `json:"created_at"`
-	UpdatedAt   time.Time         `json:"updated_at"`
+	CreatedAt   time.Time         `json:"createdAt"`
+	UpdatedAt   time.Time         `json:"updatedAt"`
 }
 
 // ListConnectionResponseJson documents the paginated connection list response.
@@ -94,7 +94,7 @@ type ListConnectionResponseJson struct {
 //
 //	@Description	Response for disconnect operation
 type DisconnectResponseJson struct {
-	TaskId     string      `json:"task_id"`
+	TaskId     string      `json:"taskId"`
 	Connection interface{} `json:"connection"`
 }
 
@@ -102,25 +102,25 @@ type DisconnectResponseJson struct {
 //
 //	@Description	Request body for connection disconnect operations
 type DisconnectConnectionRequestJson struct {
-	TimeoutSeconds *int64 `json:"timeout_seconds,omitempty" example:"600"`
+	TimeoutSeconds *int64 `json:"timeoutSeconds,omitempty" example:"600"`
 }
 
 // MigrateConnectionVersionRequestJson documents connection version migration operation bodies.
 //
 //	@Description	Request body for connection connector-version migration operations
 type MigrateConnectionVersionRequestJson struct {
-	TargetVersion  uint64 `json:"target_version" example:"3"`
-	TimeoutSeconds *int64 `json:"timeout_seconds,omitempty" example:"600"`
+	TargetVersion  uint64 `json:"targetVersion" example:"3"`
+	TimeoutSeconds *int64 `json:"timeoutSeconds,omitempty" example:"600"`
 }
 
 // MigrateConnectionVersionResponseJson documents the connection version migration response.
 //
 //	@Description	Response for connection connector-version migration operation
 type MigrateConnectionVersionResponseJson struct {
-	TaskId        string  `json:"task_id"`
-	ConnectionId  apid.ID `json:"connection_id" swaggertype:"string" example:"cxn_test550e8400abcde"`
-	SourceVersion uint64  `json:"source_version" example:"1"`
-	TargetVersion uint64  `json:"target_version" example:"3"`
+	TaskId        string  `json:"taskId"`
+	ConnectionId  apid.ID `json:"connectionId" swaggertype:"string" example:"cxn_test550e8400abcde"`
+	SourceVersion uint64  `json:"sourceVersion" example:"1"`
+	TargetVersion uint64  `json:"targetVersion" example:"3"`
 }
 
 // NotificationJson documents actor-visible notifications.
@@ -131,18 +131,18 @@ type NotificationJson struct {
 	Key          string                 `json:"key"`
 	Level        string                 `json:"level" example:"warning"`
 	State        string                 `json:"state" example:"active"`
-	ResourceType string                 `json:"resource_type" example:"connection"`
-	ResourceId   apid.ID                `json:"resource_id" swaggertype:"string" example:"cxn_test550e8400abcde"`
+	ResourceType string                 `json:"resourceType" example:"connection"`
+	ResourceId   apid.ID                `json:"resourceId" swaggertype:"string" example:"cxn_test550e8400abcde"`
 	Namespace    string                 `json:"namespace" example:"root.acme"`
 	Title        string                 `json:"title"`
 	Message      string                 `json:"message"`
-	ActionUrl    string                 `json:"action_url,omitempty"`
-	CanAction    bool                   `json:"can_action"`
+	ActionUrl    string                 `json:"actionUrl,omitempty"`
+	CanAction    bool                   `json:"canAction"`
 	Viewed       bool                   `json:"viewed"`
 	Metadata     map[string]interface{} `json:"metadata,omitempty"`
-	CreatedAt    time.Time              `json:"created_at"`
-	UpdatedAt    time.Time              `json:"updated_at"`
-	ResolvedAt   *time.Time             `json:"resolved_at,omitempty"`
+	CreatedAt    time.Time              `json:"createdAt"`
+	UpdatedAt    time.Time              `json:"updatedAt"`
+	ResolvedAt   *time.Time             `json:"resolvedAt,omitempty"`
 }
 
 // ListNotificationsResponseJson documents the paginated notification list response.
@@ -196,15 +196,15 @@ type CreateConnectorVersionRequestJson struct {
 //
 //	@Description	Request to run a connector lifecycle operation
 type ConnectorLifecycleRequestJson struct {
-	TimeoutSeconds *int64 `json:"timeout_seconds,omitempty" example:"600"`
+	TimeoutSeconds *int64 `json:"timeoutSeconds,omitempty" example:"600"`
 }
 
 // ConnectorLifecycleResponseJson documents connector lifecycle operation responses.
 //
 //	@Description	Response for connector lifecycle operation
 type ConnectorLifecycleResponseJson struct {
-	TaskId      string  `json:"task_id"`
-	ConnectorId apid.ID `json:"connector_id" swaggertype:"string" example:"cxr_test550e8400abcde"`
+	TaskId      string  `json:"taskId"`
+	ConnectorId apid.ID `json:"connectorId" swaggertype:"string" example:"cxr_test550e8400abcde"`
 }
 
 // KeyJson documents a managed key response.
@@ -215,11 +215,11 @@ type KeyJson struct {
 	Namespace   string                 `json:"namespace" example:"root.acme"`
 	Name        string                 `json:"name" example:"primary-encryption-key"`
 	State       string                 `json:"state" example:"active"`
-	KeyData     map[string]interface{} `json:"key_data,omitempty" swaggertype:"object"`
+	KeyData     map[string]interface{} `json:"keyData,omitempty" swaggertype:"object"`
 	Labels      map[string]string      `json:"labels,omitempty"`
 	Annotations map[string]string      `json:"annotations,omitempty"`
-	CreatedAt   time.Time              `json:"created_at"`
-	UpdatedAt   time.Time              `json:"updated_at"`
+	CreatedAt   time.Time              `json:"createdAt"`
+	UpdatedAt   time.Time              `json:"updatedAt"`
 }
 
 // CreateKeyRequestJson documents the key creation body.
@@ -228,7 +228,7 @@ type KeyJson struct {
 type CreateKeyRequestJson struct {
 	Namespace   string                 `json:"namespace" example:"root.acme"`
 	Name        *string                `json:"name,omitempty" example:"primary-encryption-key"`
-	KeyData     map[string]interface{} `json:"key_data,omitempty"`
+	KeyData     map[string]interface{} `json:"keyData,omitempty"`
 	Labels      map[string]string      `json:"labels,omitempty"`
 	Annotations map[string]string      `json:"annotations,omitempty"`
 }
@@ -263,24 +263,24 @@ type MetricsSchemaResponseJson struct {
 type RequestEventJson struct {
 	Namespace           string            `json:"namespace" example:"root.acme"`
 	Type                string            `json:"type" example:"proxy"`
-	RequestId           string            `json:"request_id" swaggertype:"string" example:"req_test550e8400abcde"`
-	CorrelationId       string            `json:"correlation_id,omitempty"`
+	RequestId           string            `json:"requestId" swaggertype:"string" example:"req_test550e8400abcde"`
+	CorrelationId       string            `json:"correlationId,omitempty"`
 	Timestamp           time.Time         `json:"timestamp"`
 	MillisecondDuration int64             `json:"duration" example:"150"`
-	ConnectionId        string            `json:"connection_id,omitempty" swaggertype:"string"`
-	ConnectorId         string            `json:"connector_id,omitempty" swaggertype:"string"`
-	ConnectorVersion    uint64            `json:"connector_version,omitempty"`
+	ConnectionId        string            `json:"connectionId,omitempty" swaggertype:"string"`
+	ConnectorId         string            `json:"connectorId,omitempty" swaggertype:"string"`
+	ConnectorVersion    uint64            `json:"connectorVersion,omitempty"`
 	Method              string            `json:"method" example:"GET"`
 	Host                string            `json:"host" example:"api.example.com"`
 	Scheme              string            `json:"scheme" example:"https"`
 	Path                string            `json:"path" example:"/v1/users"`
-	ResponseStatusCode  int               `json:"response_status_code,omitempty" example:"200"`
+	ResponseStatusCode  int               `json:"responseStatusCode,omitempty" example:"200"`
 	Labels              map[string]string `json:"labels,omitempty"`
-	ResponseSource      string            `json:"response_source,omitempty" example:"upstream"`
-	RateLimitId         string            `json:"rate_limit_id,omitempty" swaggertype:"string"`
-	RateLimitMode       string            `json:"rate_limit_mode,omitempty"`
-	RateLimitBucket     map[string]string `json:"rate_limit_bucket,omitempty"`
-	RateLimitMatched    []interface{}     `json:"rate_limit_matched,omitempty"`
+	ResponseSource      string            `json:"responseSource,omitempty" example:"upstream"`
+	RateLimitId         string            `json:"rateLimitId,omitempty" swaggertype:"string"`
+	RateLimitMode       string            `json:"rateLimitMode,omitempty"`
+	RateLimitBucket     map[string]string `json:"rateLimitBucket,omitempty"`
+	RateLimitMatched    []interface{}     `json:"rateLimitMatched,omitempty"`
 }
 
 // TaskInfoJson documents public background task status.
@@ -290,7 +290,7 @@ type TaskInfoJson struct {
 	Id        string `json:"id"`
 	Type      string `json:"type"`
 	State     string `json:"state" example:"completed"`
-	UpdatedAt string `json:"updated_at,omitempty"`
+	UpdatedAt string `json:"updatedAt,omitempty"`
 }
 
 // UpdateKeyRequestJson documents the key update body.
@@ -299,7 +299,7 @@ type TaskInfoJson struct {
 type UpdateKeyRequestJson struct {
 	Name        *string                 `json:"name,omitempty" example:"primary-encryption-key"`
 	State       *string                 `json:"state,omitempty" example:"disabled"`
-	KeyData     *map[string]interface{} `json:"key_data,omitempty"`
+	KeyData     *map[string]interface{} `json:"keyData,omitempty"`
 	Labels      *map[string]string      `json:"labels,omitempty"`
 	Annotations *map[string]string      `json:"annotations,omitempty"`
 }
@@ -315,8 +315,8 @@ type RateLimitJson struct {
 	Definition  map[string]any    `json:"definition"`
 	Labels      map[string]string `json:"labels,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`
-	CreatedAt   time.Time         `json:"created_at"`
-	UpdatedAt   time.Time         `json:"updated_at"`
+	CreatedAt   time.Time         `json:"createdAt"`
+	UpdatedAt   time.Time         `json:"updatedAt"`
 }
 
 // ListRateLimitsResponseJson documents the paginated rate-limit list response.
@@ -356,8 +356,8 @@ type ProxyRequestJson struct {
 	Method   string            `json:"method" example:"POST"`
 	Headers  map[string]any    `json:"headers,omitempty" swaggertype:"object"`
 	Labels   map[string]string `json:"labels,omitempty"`
-	BodyRaw  []byte            `json:"body_raw,omitempty"`
-	BodyJson interface{}       `json:"body_json,omitempty"`
+	BodyRaw  []byte            `json:"bodyRaw,omitempty"`
+	BodyJson interface{}       `json:"bodyJson,omitempty"`
 }
 
 // DryRunRequestJson documents the rate-limit dry-run request body.
@@ -365,7 +365,7 @@ type ProxyRequestJson struct {
 //	@Description	Dry-run input: a proxy-shaped request + request type + the identity it runs under
 type DryRunRequestJson struct {
 	Request     interface{} `json:"request"`
-	RequestType string      `json:"request_type" example:"proxy"`
+	RequestType string      `json:"requestType" example:"proxy"`
 	Context     interface{} `json:"context"`
 }
 
@@ -373,8 +373,8 @@ type DryRunRequestJson struct {
 //
 //	@Description	Identity the request runs under
 type DryRunContextJson struct {
-	ConnectionId string `json:"connection_id,omitempty"`
-	ActorId      string `json:"actor_id,omitempty"`
+	ConnectionId string `json:"connectionId,omitempty"`
+	ActorId      string `json:"actorId,omitempty"`
 	Namespace    string `json:"namespace,omitempty" example:"root.acme"`
 }
 
@@ -382,25 +382,25 @@ type DryRunContextJson struct {
 //
 //	@Description	Per-rule match + peek-driven would-allow result
 type DryRunResponseJson struct {
-	RequestLabelSnapshot map[string]string `json:"request_label_snapshot"`
+	RequestLabelSnapshot map[string]string `json:"requestLabelSnapshot"`
 	Matched              []interface{}     `json:"matched"`
-	NotMatched           []interface{}     `json:"not_matched"`
+	NotMatched           []interface{}     `json:"notMatched"`
 }
 
 type DryRunMatchJson struct {
-	RateLimitId      string `json:"rate_limit_id" swaggertype:"string" example:"rl_test550e8400abcde"`
+	RateLimitId      string `json:"rateLimitId" swaggertype:"string" example:"rl_test550e8400abcde"`
 	Namespace        string `json:"namespace" example:"root.acme"`
-	EffectiveMode    string `json:"effective_mode" example:"enforce"`
-	BucketKey        string `json:"bucket_key" example:"actor=act_abc|labels/team=acme"`
-	AlgorithmSummary string `json:"algorithm_summary" example:"token bucket 60 @ 1/s"`
-	WouldAllow       bool   `json:"would_allow"`
+	EffectiveMode    string `json:"effectiveMode" example:"enforce"`
+	BucketKey        string `json:"bucketKey" example:"actor=act_abc|labels/team=acme"`
+	AlgorithmSummary string `json:"algorithmSummary" example:"token bucket 60 @ 1/s"`
+	WouldAllow       bool   `json:"wouldAllow"`
 	Remaining        int    `json:"remaining"`
-	RetryAfterMs     int64  `json:"retry_after_ms"`
-	PeekFailed       bool   `json:"peek_failed"`
+	RetryAfterMs     int64  `json:"retryAfterMs"`
+	PeekFailed       bool   `json:"peekFailed"`
 }
 
 type DryRunNotMatchedJson struct {
-	RateLimitId string `json:"rate_limit_id" swaggertype:"string" example:"rl_test550e8400abcde"`
+	RateLimitId string `json:"rateLimitId" swaggertype:"string" example:"rl_test550e8400abcde"`
 	Namespace   string `json:"namespace" example:"root.acme"`
 	Reason      string `json:"reason"`
 }
@@ -409,8 +409,8 @@ type DryRunNotMatchedJson struct {
 //
 //	@Description	Response from a proxied HTTP request
 type ProxyResponseJson struct {
-	StatusCode int               `json:"status_code" example:"200"`
+	StatusCode int               `json:"statusCode" example:"200"`
 	Headers    map[string]string `json:"headers,omitempty"`
-	BodyRaw    []byte            `json:"body_raw,omitempty"`
-	BodyJson   interface{}       `json:"body_json,omitempty"`
+	BodyRaw    []byte            `json:"bodyRaw,omitempty"`
+	BodyJson   interface{}       `json:"bodyJson,omitempty"`
 }

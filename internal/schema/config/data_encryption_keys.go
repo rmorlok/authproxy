@@ -14,11 +14,11 @@ const defaultDataEncryptionKeyRotationInterval = 90 * 24 * time.Hour
 type DataEncryptionKeys struct {
 	// RotationInterval is how old the current DEK can be before a new current DEK
 	// is generated. Defaults to 90 days.
-	RotationInterval *HumanDuration `json:"rotation_interval,omitempty" yaml:"rotation_interval,omitempty"`
+	RotationInterval *HumanDuration `json:"rotationInterval,omitempty" yaml:"rotationInterval,omitempty"`
 
 	// EnsureCurrent controls whether the DEK generator creates a current DEK
 	// when a data-encryption key has none. Defaults to true.
-	EnsureCurrent *bool `json:"ensure_current,omitempty" yaml:"ensure_current,omitempty"`
+	EnsureCurrent *bool `json:"ensureCurrent,omitempty" yaml:"ensureCurrent,omitempty"`
 }
 
 func (d *DataEncryptionKeys) Validate(vc *common.ValidationContext) error {

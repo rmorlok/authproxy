@@ -18,6 +18,7 @@ import {useQueryState, parseAsInteger, parseAsStringLiteral, parseAsString} from
 import {useNavigate} from "react-router-dom";
 import {useSelector} from "react-redux";
 import {selectCurrentNamespacePath} from "../store/namespacesSlice";
+import {toSnakeCase} from '../util';
 
 function renderState(state: ConnectorVersionState) {
     const colors: Record<ConnectorVersionState, "default" | "success" | "error" | "info" | "warning" | "primary" | "secondary"> = {
@@ -86,7 +87,7 @@ export const columns: GridColDef<Connector>[] = [
         },
     },
     {
-        field: 'display_name',
+        field: 'displayName',
         headerName: 'Display Name',
         flex: 0.5,
         minWidth: 80,
@@ -100,26 +101,7 @@ export const columns: GridColDef<Connector>[] = [
         sortable: false,
     },
     {
-        field: 'versions',
-        headerName: 'Num Versions',
-        flex: 0.4,
-        minWidth: 80,
-        sortable: false,
-    },
-    {
-        field: 'states',
-        headerName: 'States',
-        flex: 0.4,
-        minWidth: 80,
-        sortable: false,
-        renderCell: (params) => {
-            return (<div>
-                {(params.value as ConnectorVersionState[]).map((v) => renderState(v))}
-            </div>);
-        },
-    },
-    {
-        field: 'created_at',
+        field: 'createdAt',
         headerName: 'Created At',
         flex: 1,
         minWidth: 80,
@@ -130,7 +112,7 @@ export const columns: GridColDef<Connector>[] = [
 
     },
     {
-        field: 'updated_at',
+        field: 'updatedAt',
         headerName: 'Updated At',
         flex: 1,
         minWidth: 100,
@@ -161,7 +143,7 @@ export default function Connectors() {
     const [error, setError] = useState<string | null>(null);
 
     const [page, setPage] = useQueryState<number>('page', parseAsInteger.withDefault(1));
-    const [pageSize, setPageSize] = useQueryState<number>('page_size', parseAsInteger.withDefault(defaultPageSize));
+    const [pageSize, setPageSize] = useQueryState<number>('pageSize', parseAsInteger.withDefault(defaultPageSize));
     const [stateFilter, setStateFilter] = useQueryState<string>('state', parseAsStringLiteral(stateVals).withDefault('')); // empty = all
     const [sort, setSort] = useQueryState<string>('sort', parseAsString.withDefault(''));
 
@@ -194,7 +176,7 @@ export default function Connectors() {
         } else {
             const sortField = sortModel[0].field;
             const sortDir = sortModel[0].sort === 'desc' ? 'desc' : 'asc';
-            setSort(`${sortField} ${sortDir}`);
+            setSort(`${toSnakeCase(sortField)} ${sortDir}`);
         }
     }, []);
 
@@ -240,7 +222,7 @@ export default function Connectors() {
                 const params: ListConnectorsParams = prevResp?.cursor ? {cursor: prevResp.cursor} : {
                     state: (stateFilter as ConnectorVersionState) || undefined,
                     namespace: namespaceAndChildren(ns),
-                    order_by: sort || undefined,
+                    orderBy: sort || undefined,
                     limit: pageSize,
                 };
 

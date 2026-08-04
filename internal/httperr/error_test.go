@@ -123,7 +123,7 @@ func TestError_WriteResponse(t *testing.T) {
 			&Error{Status: http.StatusNotFound, ResponseMsg: "Not Found", InternalErr: errors.New("internal error text")},
 			true,
 			http.StatusNotFound,
-			`{"error":"Not Found","stack_trace":"internal error text.*"}`,
+			`{"error":"Not Found","stackTrace":"internal error text.*"}`,
 		},
 	}
 

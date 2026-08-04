@@ -11,8 +11,8 @@ import (
 // AwsCredentialsAccessKey provides explicit access key credentials for S3-compatible storage.
 type AwsCredentialsAccessKey struct {
 	Type            AwsCredentialsType `json:"type" yaml:"type"`
-	AccessKeyID     *StringValue       `json:"access_key_id" yaml:"access_key_id" apiredact:"secret"`
-	SecretAccessKey *StringValue       `json:"secret_access_key" yaml:"secret_access_key" apiredact:"secret"`
+	AccessKeyID     *StringValue       `json:"accessKeyId" yaml:"accessKeyId" apiredact:"secret"`
+	SecretAccessKey *StringValue       `json:"secretAccessKey" yaml:"secretAccessKey" apiredact:"secret"`
 }
 
 func (c *AwsCredentialsAccessKey) GetCredentialsType() AwsCredentialsType {

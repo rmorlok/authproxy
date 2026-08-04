@@ -65,7 +65,7 @@ export default function RequestForm({ value, onChange, connectionNamespace }: Pr
         !!(value.context.actorId || value.context.namespace),
     );
     const [bodyOpen, setBodyOpen] = useState(
-        !!(value.request.body_raw || value.request.body_json !== undefined),
+        !!(value.request.bodyRaw || value.request.bodyJson !== undefined),
     );
 
     const update = (patch: Partial<RequestFormValue>) => onChange({ ...value, ...patch });
@@ -148,7 +148,7 @@ export default function RequestForm({ value, onChange, connectionNamespace }: Pr
                                         // Collapsing clears the body so the
                                         // outgoing request doesn't keep
                                         // hidden state.
-                                        updateRequest({ body_raw: undefined, body_json: undefined });
+                                        updateRequest({ bodyRaw: undefined, bodyJson: undefined });
                                     }
                                 }}
                             />
@@ -285,23 +285,23 @@ function BodyEditor({
     onChange: (patch: Partial<ProxyRequest>) => void;
     dark: boolean;
 }) {
-    const initialKind: BodyKind = value.body_json !== undefined
+    const initialKind: BodyKind = value.bodyJson !== undefined
         ? 'json'
-        : value.body_raw
+        : value.bodyRaw
             ? 'raw'
             : 'json';
     const [kind, setKind] = useState<BodyKind>(initialKind);
 
     const jsonText = useMemo(() => {
-        if (value.body_json === undefined) return '';
+        if (value.bodyJson === undefined) return '';
         try {
-            return JSON.stringify(value.body_json, null, 2);
+            return JSON.stringify(value.bodyJson, null, 2);
         } catch {
             return '';
         }
-    }, [value.body_json]);
+    }, [value.bodyJson]);
 
-    const rawText = value.body_raw || '';
+    const rawText = value.bodyRaw || '';
 
     return (
         <Box sx={{ mt: 1 }}>
@@ -314,8 +314,8 @@ function BodyEditor({
                     setKind(next);
                     // Switching kind clears the other channel so we never
                     // accidentally send both — the server rejects that.
-                    if (next === 'json') onChange({ body_raw: undefined });
-                    if (next === 'raw') onChange({ body_json: undefined });
+                    if (next === 'json') onChange({ bodyRaw: undefined });
+                    if (next === 'raw') onChange({ bodyJson: undefined });
                 }}
                 sx={{ mb: 1 }}
             >
@@ -331,12 +331,12 @@ function BodyEditor({
                         minHeight="120px"
                         onChange={(text) => {
                             if (text.trim() === '') {
-                                onChange({ body_json: undefined });
+                                onChange({ bodyJson: undefined });
                                 return;
                             }
                             try {
                                 const parsed = JSON.parse(text);
-                                onChange({ body_json: parsed });
+                                onChange({ bodyJson: parsed });
                             } catch {
                                 // Keep typing; only commit when valid.
                             }
@@ -347,7 +347,7 @@ function BodyEditor({
                         value={rawText}
                         theme={dark ? oneDark : undefined}
                         minHeight="120px"
-                        onChange={(text) => onChange({ body_raw: text })}
+                        onChange={(text) => onChange({ bodyRaw: text })}
                     />
                 )}
             </Box>

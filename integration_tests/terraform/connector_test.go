@@ -10,7 +10,7 @@ import (
 
 // minimalConnectorDefinition is a simple NoAuth connector definition for testing.
 const minimalConnectorDefinition = `{
-  "display_name": "Test Connector",
+  "displayName": "Test Connector",
   "description": "A test connector for integration tests",
   "auth": {
     "type": "no-auth"
@@ -18,7 +18,7 @@ const minimalConnectorDefinition = `{
 }`
 
 const updatedConnectorDefinition = `{
-  "display_name": "Test Connector Updated",
+  "displayName": "Test Connector Updated",
   "description": "An updated test connector",
   "auth": {
     "type": "no-auth"
@@ -44,7 +44,7 @@ resource "authproxy_namespace" "test" {
 resource "authproxy_connector" "test" {
   namespace  = authproxy_namespace.test.path
   definition = jsonencode({
-    display_name = "Test Connector"
+    displayName = "Test Connector"
     description  = "A test connector for integration tests"
     auth = {
       type = "no-auth"
@@ -72,7 +72,7 @@ resource "authproxy_namespace" "test" {
 resource "authproxy_connector" "test" {
   namespace  = authproxy_namespace.test.path
   definition = jsonencode({
-    display_name = "Test Connector Updated"
+    displayName = "Test Connector Updated"
     description  = "An updated test connector"
     auth = {
       type = "no-auth"
@@ -108,7 +108,7 @@ resource "authproxy_connector" "test" {
   namespace  = authproxy_namespace.test.path
   publish    = false
   definition = jsonencode({
-    display_name = "Draft Connector"
+    displayName = "Draft Connector"
     description  = "A draft connector"
     auth = {
       type = "no-auth"
@@ -146,7 +146,7 @@ resource "authproxy_connector" "test" {
   namespace  = authproxy_namespace.test.path
   publish    = false
   definition = jsonencode({
-    display_name = "Transitioning Connector"
+    displayName = "Transitioning Connector"
     description  = "Will be promoted"
     auth = {
       type = "no-auth"
@@ -170,7 +170,7 @@ resource "authproxy_connector" "test" {
   namespace  = authproxy_namespace.test.path
   publish    = true
   definition = jsonencode({
-    display_name = "Transitioning Connector"
+    displayName = "Transitioning Connector"
     description  = "Will be promoted"
     auth = {
       type = "no-auth"
@@ -205,7 +205,7 @@ resource "authproxy_namespace" "test" {
 resource "authproxy_connector" "test" {
   namespace  = authproxy_namespace.test.path
   definition = jsonencode({
-    display_name = "Labeled Connector"
+    displayName = "Labeled Connector"
     description  = "Connector with labels"
     auth = {
       type = "no-auth"
@@ -230,7 +230,7 @@ resource "authproxy_namespace" "test" {
 resource "authproxy_connector" "test" {
   namespace  = authproxy_namespace.test.path
   definition = jsonencode({
-    display_name = "Labeled Connector"
+    displayName = "Labeled Connector"
     description  = "Connector with labels"
     auth = {
       type = "no-auth"
@@ -271,7 +271,7 @@ resource "authproxy_namespace" "test" {
 resource "authproxy_connector" "test" {
   namespace  = authproxy_namespace.test.path
   definition = jsonencode({
-    display_name = "Annotated Connector"
+    displayName = "Annotated Connector"
     description  = "Connector with annotations"
     auth = {
       type = "no-auth"
@@ -300,7 +300,7 @@ resource "authproxy_namespace" "test" {
 resource "authproxy_connector" "test" {
   namespace  = authproxy_namespace.test.path
   definition = jsonencode({
-    display_name = "Annotated Connector"
+    displayName = "Annotated Connector"
     description  = "Connector with annotations"
     auth = {
       type = "no-auth"
@@ -328,7 +328,7 @@ resource "authproxy_namespace" "test" {
 resource "authproxy_connector" "test" {
   namespace  = authproxy_namespace.test.path
   definition = jsonencode({
-    display_name = "Annotated Connector"
+    displayName = "Annotated Connector"
     description  = "Connector with annotations"
     auth = {
       type = "no-auth"
@@ -369,7 +369,7 @@ resource "authproxy_namespace" "test" {
 resource "authproxy_connector" "test" {
   namespace  = authproxy_namespace.test.path
   definition = jsonencode({
-    display_name = "Import Test Connector"
+    displayName = "Import Test Connector"
     description  = "For import testing"
     auth = {
       type = "no-auth"
@@ -403,7 +403,7 @@ resource "authproxy_namespace" "test" {
 resource "authproxy_connector" "test" {
   namespace  = authproxy_namespace.test.path
   definition = jsonencode({
-    display_name = "DataSource Test Connector"
+    displayName = "DataSource Test Connector"
     description  = "For data source testing"
     auth = {
       type = "no-auth"

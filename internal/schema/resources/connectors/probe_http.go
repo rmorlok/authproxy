@@ -20,10 +20,10 @@ type ProbeHttp struct {
 	Headers map[string]string `json:"headers,omitempty" yaml:"headers,omitempty"`
 
 	// BodyRaw is the raw body to send with the request. This will expect a base64 encoded string.
-	BodyRaw []byte `json:"body_raw,omitempty" yaml:"body_raw,omitempty"`
+	BodyRaw []byte `json:"bodyRaw,omitempty" yaml:"bodyRaw,omitempty"`
 
 	// BodyJson is the JSON body to send with the request. If used, the config can specify an inlined object.
-	BodyJson interface{} `json:"body_json,omitempty" yaml:"body_json,omitempty"`
+	BodyJson interface{} `json:"bodyJson,omitempty" yaml:"bodyJson,omitempty"`
 
 	// Body is the body to send with the request. This will be a string value.
 	Body string `json:"body,omitempty" yaml:"body,omitempty"`

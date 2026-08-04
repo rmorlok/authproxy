@@ -40,11 +40,11 @@ type AuthProxyClaims struct {
 
 	// SystemSigned indicates this token was signed by an AuthProxy service using the GlobalAESKey (HMAC).
 	// This is used for internal auth transfer between services, OAuth redirects, etc.
-	SystemSigned bool `json:"system_signed,omitempty"`
+	SystemSigned bool `json:"systemSigned,omitempty"`
 
 	// ActorSigned indicates this token was signed by an actor using their own private key (asymmetric).
 	// This is used by the CLI and other external callers that have actor credentials.
-	ActorSigned bool `json:"actor_signed,omitempty"`
+	ActorSigned bool `json:"actorSigned,omitempty"`
 
 	// Nonce is a one-time-use value. Adding a nonce to the JWT make it a one-time-use for auth purposes. If you use
 	// a nonce, the JWT must also have an expiry so that tracking of the nonce values do not need to be kept forever.

@@ -1,8 +1,8 @@
 package key
 
 type KeyPublicPrivate struct {
-	PublicKey  *KeyData `json:"public_key" yaml:"public_key"`
-	PrivateKey *KeyData `json:"private_key" yaml:"private_key"`
+	PublicKey  *KeyData `json:"publicKey" yaml:"publicKey"`
+	PrivateKey *KeyData `json:"privateKey" yaml:"privateKey"`
 }
 
 func (kpp *KeyPublicPrivate) CanSign() bool {

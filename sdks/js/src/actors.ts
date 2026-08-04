@@ -33,15 +33,15 @@ export interface Actor {
   namespace: string;
   labels?: Record<string, string>;
   annotations?: Record<string, string>;
-  external_id: string;
-  created_at: string;
-  updated_at: string;
+  externalId: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CreateActorRequest {
     namespace: string;
     name?: string;
-    external_id: string;
+    externalId: string;
     labels?: Record<string, string>;
     annotations?: Record<string, string>;
 }
@@ -51,12 +51,12 @@ export interface CreateActorRequest {
  */
 export interface ListActorsParams {
   name?: string;
-  external_id?: string;
+  externalId?: string;
   namespace?: string;
-  label_selector?: string;
+  labelSelector?: string;
   cursor?: string;
   limit?: number;
-  order_by?: string;
+  orderBy?: string;
 }
 
 /**

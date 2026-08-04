@@ -92,7 +92,7 @@ sequenceDiagram
     T->>P: POST /test/scripts endpoint=token<br/>action.scope_override = "<scenario value>"
 
     Note over T,B: Standard chromedp Allow flow
-    T->>B: navigate /connectors?auth_token=…
+    T->>B: navigate /connectors?authToken=…
     B->>PUB: GET /connectors → SPA
     T->>B: click Connect
     B->>PUB: POST /connections/_initiate
@@ -112,7 +112,7 @@ sequenceDiagram
     else optional missing / extra / all / omitted
         PUB->>DB: connection → ready
     end
-    PUB-->>B: 302 → return_to_url
+    PUB-->>B: 302 → returnToUrl
     B->>PUB: GET /connections → SPA "Your Connections"
 
     Note over T,API: Inspect via the new endpoint

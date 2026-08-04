@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 
+	"github.com/rmorlok/authproxy/internal/util"
 	"gopkg.in/yaml.v3"
 )
 
@@ -47,7 +48,7 @@ fieldLoop:
 		}
 	}
 
-	if err := value.Decode(redis); err != nil {
+	if err := util.DecodeYAMLNodeStrict(value, redis); err != nil {
 		return err
 	}
 

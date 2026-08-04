@@ -15,7 +15,7 @@ import (
 // header parsing.
 func makeReq(t *testing.T, headers map[string][]string) *http.Request {
 	t.Helper()
-	r := httptest.NewRequest(http.MethodPost, "https://api.local/connections/cxn_1/_proxy_raw", strings.NewReader(""))
+	r := httptest.NewRequest(http.MethodPost, "https://api.local/connections/cxn_1/_proxyRaw", strings.NewReader(""))
 	for k, vv := range headers {
 		for _, v := range vv {
 			r.Header.Add(k, v)

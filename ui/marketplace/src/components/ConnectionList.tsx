@@ -84,17 +84,17 @@ const ConnectionList: React.FC = () => {
     }
   }, [status, connectorsStatus, dispatch]);
 
-  // After OAuth completes, the callback redirects here with setup=pending&connection_id=...
+  // After OAuth completes, the callback redirects here with setup=pending&connectionId=...
   // Detect these params and fetch the configure step to show the setup form.
   useEffect(() => {
     const setup = searchParams.get('setup');
-    const connectionId = searchParams.get('connection_id');
+    const connectionId = searchParams.get('connectionId');
 
     if (setup === 'pending' && connectionId) {
       dispatch(getSetupStepAsync(connectionId));
       // Clean up the URL params so a page refresh doesn't re-trigger
       searchParams.delete('setup');
-      searchParams.delete('connection_id');
+      searchParams.delete('connectionId');
       setSearchParams(searchParams, { replace: true });
     }
   }, [searchParams, setSearchParams, dispatch]);
@@ -135,7 +135,7 @@ const ConnectionList: React.FC = () => {
       if (action.meta.requestStatus === 'fulfilled') {
         const response = action.payload as any;
         if (isRedirectResponse(response)) {
-          window.location.href = response.redirect_url;
+          window.location.href = response.redirectUrl;
         } else if (isCompleteResponse(response)) {
           dispatch(fetchConnectionsAsync());
         } else {
@@ -167,9 +167,9 @@ const ConnectionList: React.FC = () => {
       returnToUrl: window.location.href,
     })).then((action) => {
       if (action.meta.requestStatus === 'fulfilled') {
-        const response = action.payload as { type: string; redirect_url?: string };
-        if (response.type === 'redirect' && response.redirect_url) {
-          window.location.href = response.redirect_url;
+        const response = action.payload as { type: string; redirectUrl?: string };
+        if (response.type === 'redirect' && response.redirectUrl) {
+          window.location.href = response.redirectUrl;
         }
       }
     });
@@ -191,7 +191,7 @@ const ConnectionList: React.FC = () => {
       if (action.meta.requestStatus === 'fulfilled') {
         const response = action.payload as any;
         if (isRedirectResponse(response)) {
-          window.location.href = response.redirect_url;
+          window.location.href = response.redirectUrl;
         } else if (isCompleteResponse(response)) {
           dispatch(fetchConnectionsAsync());
         }

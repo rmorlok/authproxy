@@ -200,7 +200,7 @@ func GetGinServer(
 		logger,
 	)
 
-	api := server.Group("/api/v1")
+	api := server.Group("/api/v1", common_routes.RejectSnakeCaseQueryParams())
 
 	routesConnectors.Register(api)
 	routesConnections.Register(api)

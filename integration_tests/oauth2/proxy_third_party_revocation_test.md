@@ -36,7 +36,7 @@ through a real-world cause.
 - **Exactly one refresh-failed event.** Captures the first attempted
   refresh (the 401-retry path). Asserts:
   - `category = provider_4xx_other` (see fixture caveat below)
-  - `connection_id = <connID>`
+  - `connectionId = <connID>`
   - `provider_status_code = 400`
   - `provider_error = "Refresh token revoked"`
 - **Exactly one health-state-changed event** with

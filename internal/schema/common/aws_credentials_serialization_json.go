@@ -3,6 +3,8 @@ package common
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/rmorlok/authproxy/internal/util"
 )
 
 func (c *AwsCredentials) MarshalJSON() ([]byte, error) {
@@ -36,7 +38,7 @@ func (c *AwsCredentials) UnmarshalJSON(data []byte) error {
 		t = &AwsCredentialsImplicit{}
 	}
 
-	if err := json.Unmarshal(data, t); err != nil {
+	if err := util.DecodeJSONStrict(data, t); err != nil {
 		return err
 	}
 

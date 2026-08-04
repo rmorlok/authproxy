@@ -11,7 +11,7 @@ import (
 
 const (
 	JwtHeaderKey  = "Authorization"
-	JwtQueryParam = "auth_token"
+	JwtQueryParam = "authToken"
 )
 
 // AuthRedirectUrlGenerator produces the URL a browser should be redirected to when a request
@@ -31,8 +31,8 @@ type A interface {
 	Required(validators ...AuthValidator) gin.HandlerFunc
 	// RequiredWithAuthRedirect is like Required but, when the request is not authenticated,
 	// redirects the browser to the URL produced by gen rather than returning 401. The current
-	// request URL is passed through as the return_to target so the browser lands back on the
-	// same endpoint after re-authenticating (typically with an auth_token query param).
+	// request URL is passed through as the returnTo target so the browser lands back on the
+	// same endpoint after re-authenticating (typically with an authToken query param).
 	// Authenticated-but-invalid actors still receive 403 as usual.
 	RequiredWithAuthRedirect(gen AuthRedirectUrlGenerator, validators ...AuthValidator) gin.HandlerFunc
 	Optional(validators ...AuthValidator) gin.HandlerFunc

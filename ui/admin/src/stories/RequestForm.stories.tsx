@@ -48,7 +48,7 @@ export const Prefilled: Story = {
                 url: 'https://api.example.com/v1/things',
                 headers: { 'X-Source': 'admin-ui' },
                 labels: { team: 'acme' },
-                body_json: { name: 'example' },
+                bodyJson: { name: 'example' },
             },
             context: {},
         },

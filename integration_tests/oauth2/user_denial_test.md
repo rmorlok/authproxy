@@ -27,7 +27,7 @@ denial is surfaced to the user via the standard return-URL.
    stored or `setup_error` would say "no code in query" — see assertion
    5).
 3. **Final navigation** lands on the marketplace's `/connections` page.
-   The proxy decorates the return URL with `?setup=pending&connection_id=…`
+   The proxy decorates the return URL with `?setup=pending&connectionId=…`
    but the SPA strips those params as soon as it consumes them
    (`ui/marketplace/src/components/ConnectionList.tsx`), so the test does
    not assert the suffix — the connection-level checks (5) prove the
@@ -71,7 +71,7 @@ sequenceDiagram
     T->>P: POST /test/clients + /test/users (register)
 
     Note over T,B: 1–3. Marketplace boot, Connect, login
-    T->>B: navigate /connectors?auth_token=…
+    T->>B: navigate /connectors?authToken=…
     B->>PUB: GET /connectors → SPA + session._initiate
     T->>B: click "Connect"
     B->>PUB: POST /api/v1/connections/_initiate
@@ -90,7 +90,7 @@ sequenceDiagram
     B->>PUB: GET /oauth2/callback?error=access_denied&state=…
     PUB->>R: load+invalidate oauth state
     PUB->>DB: HandleAuthFailed → setup_step=auth_failed,<br/>setup_error="authorization denied by provider: access_denied"
-    PUB-->>B: 302 → return_to_url?setup=pending&connection_id=…
+    PUB-->>B: 302 → returnToUrl?setup=pending&connectionId=…
     B->>PUB: GET /connections → SPA renders "Your Connections"
 
     Note over T,DB: 6. Test assertions

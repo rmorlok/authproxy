@@ -20,7 +20,7 @@ vi.mock('@authproxy/api', () => {
   const connectionApi = {
     deleteAnnotation: vi.fn(),
     disconnect: vi.fn(),
-    force_state: vi.fn(),
+    forceState: vi.fn(),
     get: vi.fn(),
     migrateVersion: vi.fn(),
     putAnnotation: vi.fn(),
@@ -72,22 +72,22 @@ const connection = {
   name: 'production-crm',
   namespace: 'root',
   state: ConnectionState.CONFIGURED,
-  health_state: ConnectionHealthState.HEALTHY,
+  healthState: ConnectionHealthState.HEALTHY,
   connector: {
     id: 'cxr_test',
     name: 'example-connector',
     version: 2,
     namespace: 'root',
     state: ConnectorVersionState.ACTIVE,
-    display_name: 'Example connector',
+    displayName: 'Example connector',
     description: '',
     logo: '',
-    has_configure: false,
-    created_at: '2026-07-25T00:00:00.000Z',
-    updated_at: '2026-07-25T00:00:00.000Z',
+    hasConfigure: false,
+    createdAt: '2026-07-25T00:00:00.000Z',
+    updatedAt: '2026-07-25T00:00:00.000Z',
   },
-  created_at: '2026-07-25T00:00:00.000Z',
-  updated_at: '2026-07-25T00:00:00.000Z',
+  createdAt: '2026-07-25T00:00:00.000Z',
+  updatedAt: '2026-07-25T00:00:00.000Z',
 };
 
 const connectorVersions = [
@@ -113,10 +113,10 @@ describe('ConnectionDetail', () => {
     vi.mocked(connections.migrateVersion).mockResolvedValue({
       status: 200,
       data: {
-        task_id: 'task_test',
-        connection_id: connection.id,
-        source_version: 2,
-        target_version: 3,
+        taskId: 'task_test',
+        connectionId: connection.id,
+        sourceVersion: 2,
+        targetVersion: 3,
       },
     } as any);
     vi.mocked(connections.update).mockResolvedValue({
@@ -142,7 +142,7 @@ describe('ConnectionDetail', () => {
         status: 200,
         data: {
           ...connection,
-          health_state: ConnectionHealthState.UNHEALTHY,
+          healthState: ConnectionHealthState.UNHEALTHY,
         },
       } as any);
     renderConnectionDetail();
@@ -162,8 +162,8 @@ describe('ConnectionDetail', () => {
 
     await waitFor(() => {
       expect(connections.migrateVersion).toHaveBeenCalledWith(connection.id, {
-        target_version: 3,
-        timeout_seconds: 600,
+        targetVersion: 3,
+        timeoutSeconds: 600,
       });
     });
     expect(tasks.pollForTaskFinalized).toHaveBeenCalledWith('task_test', {
@@ -190,8 +190,8 @@ describe('ConnectionDetail', () => {
 
     await waitFor(() => {
       expect(connections.migrateVersion).toHaveBeenCalledWith(connection.id, {
-        target_version: 1,
-        timeout_seconds: 600,
+        targetVersion: 1,
+        timeoutSeconds: 600,
       });
     });
     expect(await screen.findByText('Rollback to v1 completed.')).toBeTruthy();

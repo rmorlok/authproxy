@@ -19,17 +19,17 @@ type SearchLabelMatchJson struct {
 }
 
 type SearchResourceSummaryJson struct {
-	ResourceType  SearchResourceType     `json:"resource_type" yaml:"resource_type" swaggertype:"string" example:"connection"`
-	ResourceId    string                 `json:"resource_id" yaml:"resource_id" example:"cxn_test550e8400abcde"`
+	ResourceType  SearchResourceType     `json:"resourceType" yaml:"resourceType" swaggertype:"string" example:"connection"`
+	ResourceId    string                 `json:"resourceId" yaml:"resourceId" example:"cxn_test550e8400abcde"`
 	Name          string                 `json:"name" yaml:"name" example:"production-crm"`
 	Namespace     string                 `json:"namespace" yaml:"namespace" example:"root.acme"`
 	Labels        map[string]string      `json:"labels" yaml:"labels"`
-	MatchedLabels []SearchLabelMatchJson `json:"matched_labels" yaml:"matched_labels"`
-	UpdatedAt     time.Time              `json:"updated_at" yaml:"updated_at"`
+	MatchedLabels []SearchLabelMatchJson `json:"matchedLabels" yaml:"matchedLabels"`
+	UpdatedAt     time.Time              `json:"updatedAt" yaml:"updatedAt"`
 }
 
 type SearchResourcesResponseJson struct {
 	Items           []SearchResourceSummaryJson `json:"items" yaml:"items"`
-	TruncatedTypes  []SearchResourceType        `json:"truncated_types" yaml:"truncated_types"`
-	IncompleteTypes []SearchResourceType        `json:"incomplete_types" yaml:"incomplete_types"`
+	TruncatedTypes  []SearchResourceType        `json:"truncatedTypes" yaml:"truncatedTypes"`
+	IncompleteTypes []SearchResourceType        `json:"incompleteTypes" yaml:"incompleteTypes"`
 }

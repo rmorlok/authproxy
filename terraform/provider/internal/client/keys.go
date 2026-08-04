@@ -12,15 +12,15 @@ type Key struct {
 	State       string            `json:"state"`
 	Labels      map[string]string `json:"labels,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`
-	CreatedAt   time.Time         `json:"created_at"`
-	UpdatedAt   time.Time         `json:"updated_at"`
+	CreatedAt   time.Time         `json:"createdAt"`
+	UpdatedAt   time.Time         `json:"updatedAt"`
 }
 
 type CreateKeyRequest struct {
 	Namespace   string                 `json:"namespace"`
 	Labels      map[string]string      `json:"labels,omitempty"`
 	Annotations map[string]string      `json:"annotations,omitempty"`
-	KeyData     map[string]interface{} `json:"key_data"`
+	KeyData     map[string]interface{} `json:"keyData"`
 }
 
 type UpdateKeyRequest struct {

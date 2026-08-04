@@ -62,7 +62,7 @@ type SessionInitiateSuccessResponse = schemaapi.SessionInitiateSuccessResponse
 // If we are successful setting up a session, return any configuration information needed by the marketplace. If session
 // is not successful, return a 403 error code, but have a custom response that includes a redirect URL where the
 // SPA can redirect to get authenticated. This URL will redirect to the host application to get a nonce JWT, and return
-// to the specified URL with a `auth_token` URL parameter, which will be used by the SPA to call this endpoint again.
+// to the specified URL with an `authToken` URL parameter, which will be used by the SPA to call this endpoint again.
 func (r *SessionRoutes) initiate(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	logger := aplog.NewBuilder(r.logger).
@@ -72,7 +72,7 @@ func (r *SessionRoutes) initiate(gctx *gin.Context) {
 	logger.Debug("received initiate request")
 
 	var req SessionInitiateParams
-	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+	if err := bindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, r.logger, httperr.BadRequestErr(err))
 		return
 	}

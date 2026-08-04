@@ -8,7 +8,7 @@ import (
 )
 
 type IntegerValueEnvVar struct {
-	EnvVar  string `json:"env_var" yaml:"env_var"`
+	EnvVar  string `json:"envVar" yaml:"envVar"`
 	Default *int64 `json:"default,omitempty" yaml:"default,omitempty"`
 }
 

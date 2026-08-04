@@ -30,18 +30,18 @@ type NotificationJson struct {
 	Key          string            `json:"key" yaml:"key"`
 	Level        NotificationLevel `json:"level" yaml:"level" swaggertype:"string" example:"warning"`
 	State        NotificationState `json:"state" yaml:"state" swaggertype:"string" example:"active"`
-	ResourceType string            `json:"resource_type" yaml:"resource_type" example:"connection"`
-	ResourceId   apid.ID           `json:"resource_id" yaml:"resource_id" swaggertype:"string" example:"cxn_test550e8400abcde"`
+	ResourceType string            `json:"resourceType" yaml:"resourceType" example:"connection"`
+	ResourceId   apid.ID           `json:"resourceId" yaml:"resourceId" swaggertype:"string" example:"cxn_test550e8400abcde"`
 	Namespace    string            `json:"namespace" yaml:"namespace" example:"root.acme"`
 	Title        string            `json:"title" yaml:"title"`
 	Message      string            `json:"message" yaml:"message"`
-	ActionUrl    string            `json:"action_url,omitempty" yaml:"action_url,omitempty"`
-	CanAction    bool              `json:"can_action" yaml:"can_action"`
+	ActionUrl    string            `json:"actionUrl,omitempty" yaml:"actionUrl,omitempty"`
+	CanAction    bool              `json:"canAction" yaml:"canAction"`
 	Viewed       bool              `json:"viewed" yaml:"viewed"`
 	Metadata     map[string]any    `json:"metadata,omitempty" yaml:"metadata,omitempty"`
-	CreatedAt    time.Time         `json:"created_at" yaml:"created_at"`
-	UpdatedAt    time.Time         `json:"updated_at" yaml:"updated_at"`
-	ResolvedAt   *time.Time        `json:"resolved_at,omitempty" yaml:"resolved_at,omitempty"`
+	CreatedAt    time.Time         `json:"createdAt" yaml:"createdAt"`
+	UpdatedAt    time.Time         `json:"updatedAt" yaml:"updatedAt"`
+	ResolvedAt   *time.Time        `json:"resolvedAt,omitempty" yaml:"resolvedAt,omitempty"`
 }
 
 type ListNotificationsResponseJson struct {
@@ -58,13 +58,13 @@ type MarkNotificationsViewedRequestJson struct {
 type NotificationUpsertJson struct {
 	Key               string               `json:"key" yaml:"key"`
 	Level             NotificationLevel    `json:"level" yaml:"level"`
-	ResourceType      string               `json:"resource_type" yaml:"resource_type"`
-	ResourceId        apid.ID              `json:"resource_id" yaml:"resource_id"`
+	ResourceType      string               `json:"resourceType" yaml:"resourceType"`
+	ResourceId        apid.ID              `json:"resourceId" yaml:"resourceId"`
 	Namespace         string               `json:"namespace" yaml:"namespace"`
 	Title             string               `json:"title" yaml:"title"`
 	Message           string               `json:"message" yaml:"message"`
-	ActionUrl         string               `json:"action_url,omitempty" yaml:"action_url,omitempty"`
-	ViewPermissions   []aschema.Permission `json:"view_permissions,omitempty" yaml:"view_permissions,omitempty"`
-	ActionPermissions []aschema.Permission `json:"action_permissions,omitempty" yaml:"action_permissions,omitempty"`
+	ActionUrl         string               `json:"actionUrl,omitempty" yaml:"actionUrl,omitempty"`
+	ViewPermissions   []aschema.Permission `json:"viewPermissions,omitempty" yaml:"viewPermissions,omitempty"`
+	ActionPermissions []aschema.Permission `json:"actionPermissions,omitempty" yaml:"actionPermissions,omitempty"`
 	Metadata          map[string]any       `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 }

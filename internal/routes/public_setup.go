@@ -82,10 +82,14 @@ func (h *PublicSetupRoutes) Register(g *gin.Engine) {
 		WithRedirectOnUnauthenticated(h.sessionInitiateUrlGenerator).
 		Build()
 
-	g.GET("/setup/connections/:id/advance", mw, h.advance)
-	g.POST("/setup/connections/:id/advance", mw, h.advance)
-	g.GET("/setup/connections/:id/abort", mw, h.abort)
-	g.POST("/setup/connections/:id/abort", mw, h.abort)
+	// These browser-facing endpoints are outside /api/v1. Apply the same
+	// strict query-name policy as API routes; the third-party OAuth callback
+	// remains exempt because its provider parameters are opaque.
+	queryCasing := RejectSnakeCaseQueryParams()
+	g.GET("/setup/connections/:id/advance", queryCasing, mw, h.advance)
+	g.POST("/setup/connections/:id/advance", queryCasing, mw, h.advance)
+	g.GET("/setup/connections/:id/abort", queryCasing, mw, h.abort)
+	g.POST("/setup/connections/:id/abort", queryCasing, mw, h.abort)
 }
 
 func (h *PublicSetupRoutes) advance(gctx *gin.Context) {
@@ -132,7 +136,7 @@ func (h *PublicSetupRoutes) handle(
 		// Both ErrNotFound (forged / expired / replayed) and ErrTampered
 		// (modified payload) surface as a generic error page.
 		h.logger.WarnContext(ctx, "setup token rejected",
-			"connection_id", connectionId,
+			"connectionId", connectionId,
 			"intent", endpointIntent,
 			"error", err)
 		h.renderError(gctx, err)
@@ -143,7 +147,7 @@ func (h *PublicSetupRoutes) handle(
 	// and vice-versa, even though both endpoints validate the same token.
 	if claims.Intent != endpointIntent {
 		h.logger.WarnContext(ctx, "setup token intent mismatch",
-			"connection_id", connectionId,
+			"connectionId", connectionId,
 			"endpoint_intent", endpointIntent,
 			"token_intent", claims.Intent)
 		h.renderError(gctx, fmt.Errorf("token intent %q does not match endpoint %q", claims.Intent, endpointIntent))
@@ -154,8 +158,8 @@ func (h *PublicSetupRoutes) handle(
 	// against connection B.
 	if claims.ConnectionId != connectionId {
 		h.logger.WarnContext(ctx, "setup token connection mismatch",
-			"path_connection_id", connectionId,
-			"token_connection_id", claims.ConnectionId)
+			"path_connectionId", connectionId,
+			"token_connectionId", claims.ConnectionId)
 		h.renderError(gctx, errors.New("token does not authorize this connection"))
 		return
 	}
@@ -165,7 +169,7 @@ func (h *PublicSetupRoutes) handle(
 	// signed-in user fails here — even before the TTL expires.
 	if claims.ActorId != sessionActor.GetId() {
 		h.logger.WarnContext(ctx, "setup token actor mismatch",
-			"connection_id", connectionId,
+			"connectionId", connectionId,
 			"session_actor_id", sessionActor.GetId(),
 			"token_actor_id", claims.ActorId)
 		h.renderError(gctx, errors.New("token does not authorize this actor"))
@@ -174,7 +178,7 @@ func (h *PublicSetupRoutes) handle(
 
 	if err := action(gctx, connectionId, claims); err != nil {
 		h.logger.ErrorContext(ctx, "setup token action failed",
-			"connection_id", connectionId,
+			"connectionId", connectionId,
 			"intent", endpointIntent,
 			"error", err)
 		h.renderError(gctx, err)
@@ -229,7 +233,7 @@ func (h *PublicSetupRoutes) doAbort(gctx *gin.Context, connectionId apid.ID, cla
 }
 
 // computeReturnUrl assembles the final redirect URL. If the claims carry a
-// marketplace return URL, augment it with connection_id and setup=pending
+// marketplace return URL, augment it with connectionId and setup=pending
 // when more setup steps remain. Falls back to the internal error page URL
 // when no return URL is configured — better than a blank redirect.
 func (h *PublicSetupRoutes) computeReturnUrl(returnTo string, connectionId apid.ID, setupPending bool) string {
@@ -241,7 +245,7 @@ func (h *PublicSetupRoutes) computeReturnUrl(returnTo string, connectionId apid.
 		return returnTo
 	}
 	q := u.Query()
-	q.Set("connection_id", connectionId.String())
+	q.Set("connectionId", connectionId.String())
 	if setupPending {
 		q.Set("setup", "pending")
 	}

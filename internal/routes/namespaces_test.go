@@ -481,7 +481,7 @@ func TestNamespaces(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
-				"/namespaces?children_of=%2F%2F%2Faction%2Frefresh",
+				"/namespaces?childrenOf=%2F%2F%2Faction%2Frefresh",
 				nil,
 				"root",
 				"some-actor",
@@ -616,7 +616,7 @@ func TestNamespaces(t *testing.T) {
 			require.NoError(t, err)
 
 			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/namespaces?label_selector=env%3Dtest-label", nil, "root", "some-actor", aschema.AllPermissions())
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/namespaces?labelSelector=env%3Dtest-label", nil, "root", "some-actor", aschema.AllPermissions())
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)

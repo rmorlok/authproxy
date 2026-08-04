@@ -2,8 +2,8 @@
   "items": [
     {
       "queue": "default",
-      "memory_usage": 1024,
-      "latency_seconds": 0.25,
+      "memoryUsage": 1024,
+      "latencySeconds": 0.25,
       "size": 3,
       "groups": 0,
       "pending": 1,
@@ -15,8 +15,8 @@
       "aggregating": 0,
       "processed": 10,
       "failed": 1,
-      "processed_total": 100,
-      "failed_total": 5,
+      "processedTotal": 100,
+      "failedTotal": 5,
       "paused": false,
       "timestamp": "2026-01-02T03:04:05Z"
     }

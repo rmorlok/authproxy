@@ -205,7 +205,7 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
     setActionError(null);
     setActionLoading(true);
     try {
-      await connections.force_state(conn.id, selectedState as ConnectionState);
+      await connections.forceState(conn.id, selectedState as ConnectionState);
       setForceStateOpen(false);
       fetchConnection();
     } catch (err: any) {
@@ -231,7 +231,7 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
     try {
       const response = await connectors.listVersions(conn.connector.id, {
         limit: 100,
-        order_by: 'version desc',
+        orderBy: 'version desc',
       });
       const eligible = response.data.items.filter((version) =>
         version.version !== conn.connector.version &&
@@ -265,17 +265,17 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
 
     try {
       const response = await connections.migrateVersion(conn.id, {
-        target_version: selectedMigrationTarget.version,
-        timeout_seconds: CONNECTION_MIGRATION_TIMEOUT_SECONDS,
+        targetVersion: selectedMigrationTarget.version,
+        timeoutSeconds: CONNECTION_MIGRATION_TIMEOUT_SECONDS,
       });
       setMigrationStatus({
         action,
         state: 'polling',
         targetVersion: selectedMigrationTarget.version,
-        taskId: response.data.task_id,
+        taskId: response.data.taskId,
       });
 
-      const result = await tasks.pollForTaskFinalized(response.data.task_id, {
+      const result = await tasks.pollForTaskFinalized(response.data.taskId, {
         initialDelay: 1000,
         maxDelay: 5000,
         maxAttempts: 140,
@@ -286,7 +286,7 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
           action,
           state: 'failed',
           targetVersion: selectedMigrationTarget.version,
-          taskId: response.data.task_id,
+          taskId: response.data.taskId,
           task: result.taskInfo,
           message: result.taskInfo?.state === TaskState.FAILED
             ? 'Migration workflow failed before completing.'
@@ -300,7 +300,7 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
         action,
         state: 'completed',
         targetVersion: selectedMigrationTarget.version,
-        taskId: response.data.task_id,
+        taskId: response.data.taskId,
         task: result.taskInfo,
       });
       fetchConnection();
@@ -326,7 +326,7 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
       <Stack direction="row" justifyContent="space-between" alignItems="center">
         <Typography variant="h5">Connection</Typography>
         <Stack direction="row" spacing={1} alignItems="center">
-          <HealthChip health={conn.health_state}/>
+          <HealthChip health={conn.healthState}/>
           <StateChip state={conn.state}/>
           <IconButton aria-label="actions" onClick={openMenu} size="small">
             <MoreVertIcon/>
@@ -374,14 +374,14 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
         </Alert>
       )}
 
-      {conn.health_state === ConnectionHealthState.UNHEALTHY && (
+      {conn.healthState === ConnectionHealthState.UNHEALTHY && (
         <Alert severity="warning">
           This connection requires re-authentication before it can be used.
         </Alert>
       )}
-      {conn.health_state !== ConnectionHealthState.UNHEALTHY && conn.setup_step_id && (
+      {conn.healthState !== ConnectionHealthState.UNHEALTHY && conn.setupStepId && (
         <Alert severity="warning">
-          This connection requires setup at {conn.setup_step_id} before it can be used.
+          This connection requires setup at {conn.setupStepId} before it can be used.
         </Alert>
       )}
 
@@ -415,11 +415,11 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
       <Stack direction={{xs: 'column', sm: 'row'}} spacing={4}>
         <Box>
           <Typography variant="subtitle2" color="text.secondary">Created</Typography>
-          <Typography variant="body1">{dayjs(conn.created_at).format('MMM DD, YYYY, h:mm A')}</Typography>
+          <Typography variant="body1">{dayjs(conn.createdAt).format('MMM DD, YYYY, h:mm A')}</Typography>
         </Box>
         <Box>
           <Typography variant="subtitle2" color="text.secondary">Updated</Typography>
-          <Typography variant="body1">{dayjs(conn.updated_at).format('MMM DD, YYYY, h:mm A')}</Typography>
+          <Typography variant="body1">{dayjs(conn.updatedAt).format('MMM DD, YYYY, h:mm A')}</Typography>
         </Box>
       </Stack>
 

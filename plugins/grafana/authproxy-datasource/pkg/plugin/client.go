@@ -108,22 +108,22 @@ func (c *authProxyClient) queryMetrics(ctx context.Context, req metricsQueryRequ
 func (c *authProxyClient) listRequestEvents(ctx context.Context, filters requestEventFilters) ([]requestEvent, error) {
 	q := url.Values{}
 	addString(q, "namespace", filters.Namespace)
-	addString(q, "request_type", filters.RequestType)
-	addString(q, "correlation_id", filters.CorrelationID)
-	addString(q, "connection_id", filters.ConnectionID)
-	addString(q, "connector_type", filters.ConnectorType)
-	addString(q, "connector_id", filters.ConnectorID)
+	addString(q, "requestType", filters.RequestType)
+	addString(q, "correlationId", filters.CorrelationID)
+	addString(q, "connectionId", filters.ConnectionID)
+	addString(q, "connectorType", filters.ConnectorType)
+	addString(q, "connectorId", filters.ConnectorID)
 	addString(q, "method", filters.Method)
 	if filters.StatusCode != 0 {
-		q.Set("status_code", strconv.Itoa(filters.StatusCode))
+		q.Set("statusCode", strconv.Itoa(filters.StatusCode))
 	}
-	addString(q, "status_code_range", filters.StatusCodeRange)
-	addString(q, "timestamp_range", filters.TimestampRange)
+	addString(q, "statusCodeRange", filters.StatusCodeRange)
+	addString(q, "timestampRange", filters.TimestampRange)
 	addString(q, "path", filters.Path)
-	addString(q, "path_regex", filters.PathRegex)
-	addString(q, "label_selector", filters.LabelSelector)
-	addString(q, "response_source", filters.ResponseSource)
-	addString(q, "rate_limit_id", filters.RateLimitID)
+	addString(q, "pathRegex", filters.PathRegex)
+	addString(q, "labelSelector", filters.LabelSelector)
+	addString(q, "responseSource", filters.ResponseSource)
+	addString(q, "rateLimitId", filters.RateLimitID)
 	q.Set("limit", "500")
 
 	var out listResponse[requestEvent]
@@ -137,7 +137,7 @@ func (c *authProxyClient) variableValues(ctx context.Context, opts variableQuery
 	q := url.Values{}
 	q.Set("limit", "500")
 	addString(q, "namespace", opts.Namespace)
-	addString(q, "label_selector", opts.LabelSelector)
+	addString(q, "labelSelector", opts.LabelSelector)
 
 	apiPath := ""
 	switch opts.Type {
@@ -147,7 +147,7 @@ func (c *authProxyClient) variableValues(ctx context.Context, opts variableQuery
 		apiPath = "/connectors"
 	case "connections":
 		apiPath = "/connections"
-		addString(q, "connector_id", opts.ConnectorID)
+		addString(q, "connectorId", opts.ConnectorID)
 	case "actors":
 		apiPath = "/actors"
 	case "rate_limits":

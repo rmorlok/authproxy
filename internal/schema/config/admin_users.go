@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/rmorlok/authproxy/internal/util"
 	"gopkg.in/yaml.v3"
 )
 
@@ -40,7 +41,7 @@ func (au *AdminUsers) MarshalJSON() ([]byte, error) {
 func (au *AdminUsers) UnmarshalJSON(data []byte) error {
 	if len(data) >= 2 && data[0] == '[' && data[len(data)-1] == ']' {
 		var adminUsersList AdminUsersList
-		err := json.Unmarshal(data, &adminUsersList)
+		err := util.DecodeJSONStrict(data, &adminUsersList)
 		au.InnerVal = adminUsersList
 		return err
 	}
@@ -53,13 +54,13 @@ func (au *AdminUsers) UnmarshalJSON(data []byte) error {
 
 	var t AdminUsersType
 
-	if _, ok := valueMap["keys_path"]; ok {
+	if _, ok := valueMap["keysPath"]; ok {
 		t = &AdminUsersExternalSource{}
 	} else {
-		return fmt.Errorf("invalid structure for admin users; must be list or have keys_path")
+		return fmt.Errorf("invalid structure for admin users; must be list or have keysPath")
 	}
 
-	if err := json.Unmarshal(data, t); err != nil {
+	if err := util.DecodeJSONStrict(data, t); err != nil {
 		return err
 	}
 
@@ -81,7 +82,7 @@ func (au *AdminUsers) MarshalYAML() (interface{}, error) {
 func (au *AdminUsers) UnmarshalYAML(value *yaml.Node) error {
 	if value.Kind == yaml.SequenceNode {
 		var adminUsersList AdminUsersList
-		err := value.Decode(&adminUsersList)
+		err := util.DecodeYAMLNodeStrict(value, &adminUsersList)
 		au.InnerVal = adminUsersList
 		return err
 	}
@@ -92,7 +93,7 @@ func (au *AdminUsers) UnmarshalYAML(value *yaml.Node) error {
 	}
 
 	var adminUsersExternalSource AdminUsersExternalSource
-	if err := value.Decode(&adminUsersExternalSource); err != nil {
+	if err := util.DecodeYAMLNodeStrict(value, &adminUsersExternalSource); err != nil {
 		return err
 	}
 

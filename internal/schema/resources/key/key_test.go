@@ -13,7 +13,7 @@ func TestKey(t *testing.T) {
 	t.Run("yaml parse", func(t *testing.T) {
 		t.Run("shared", func(t *testing.T) {
 			data := `
-shared_key:
+sharedKey:
   value: some-key-value
 `
 			var key Key
@@ -31,7 +31,7 @@ shared_key:
 		})
 		t.Run("public", func(t *testing.T) {
 			data := `
-public_key:
+publicKey:
   value: some-key-value
 `
 			var key Key
@@ -49,7 +49,7 @@ public_key:
 		})
 		t.Run("private", func(t *testing.T) {
 			data := `
-private_key:
+privateKey:
   value: some-key-value
 `
 			var key Key
@@ -67,9 +67,9 @@ private_key:
 		})
 		t.Run("public private", func(t *testing.T) {
 			data := `
-public_key:
+publicKey:
   value: some-key-value-1
-private_key:
+privateKey:
   value: some-key-value-2
 `
 			var key Key

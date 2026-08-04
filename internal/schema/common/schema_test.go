@@ -435,22 +435,22 @@ func TestSchema(t *testing.T) {
 				{
 					Name:  "public url",
 					Valid: true,
-					Data:  `{"test": {"public_url": "https://example.com/image.png"}}`,
+					Data:  `{"test": {"publicUrl": "https://example.com/image.png"}}`,
 				},
 				{
 					Name:  "public url - other attributes",
 					Valid: false,
-					Data:  `{"test": {"public_url": "https://example.com/image.png", "other": "value"}}`,
+					Data:  `{"test": {"publicUrl": "https://example.com/image.png", "other": "value"}}`,
 				},
 				{
 					Name:  "base64",
 					Valid: true,
-					Data:  `{"test": {"base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=", "mime_type": "image/png"}}`,
+					Data:  `{"test": {"base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=", "mimeType": "image/png"}}`,
 				},
 				{
 					Name:  "base64 - other attributes",
 					Valid: false,
-					Data:  `{"test": {"base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=", "mime_type": "image/png", "other": "value"}}`,
+					Data:  `{"test": {"base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=", "mimeType": "image/png", "other": "value"}}`,
 				},
 				{
 					Name:  "base64 - missing mime type",
@@ -460,7 +460,7 @@ func TestSchema(t *testing.T) {
 				{
 					Name:  "base64 - missing data",
 					Valid: false,
-					Data:  `{"test": {"mime_type": "image/png"}}`,
+					Data:  `{"test": {"mimeType": "image/png"}}`,
 				},
 			},
 		},
@@ -538,67 +538,67 @@ func TestSchema(t *testing.T) {
 				{
 					Name:  "env var",
 					Valid: true,
-					Data:  `{"test": {"env_var": "SOME_ENV_VAR"}}`,
+					Data:  `{"test": {"envVar": "SOME_ENV_VAR"}}`,
 				},
 				{
 					Name:  "env var - default",
 					Valid: true,
-					Data:  `{"test": {"env_var": "SOME_ENV_VAR", "default": "some string"}}`,
+					Data:  `{"test": {"envVar": "SOME_ENV_VAR", "default": "some string"}}`,
 				},
 				{
 					Name:  "env var - default - doesn't coerce number to string",
 					Valid: false,
-					Data:  `{"test": {"env_var": "SOME_ENV_VAR", "default": 8080}}`,
+					Data:  `{"test": {"envVar": "SOME_ENV_VAR", "default": 8080}}`,
 				},
 				{
 					Name:  "env var - default - doesn't coerce bool to string",
 					Valid: false,
-					Data:  `{"test": {"env_var": "SOME_ENV_VAR", "default": true}}`,
+					Data:  `{"test": {"envVar": "SOME_ENV_VAR", "default": true}}`,
 				},
 				{
 					Name:  "env var - other attributes",
 					Valid: false,
-					Data:  `{"test": {"env_var": "SOME_ENV_VAR", "default": "some string", "other": "value"}}`,
+					Data:  `{"test": {"envVar": "SOME_ENV_VAR", "default": "some string", "other": "value"}}`,
 				},
 				{
 					Name:  "env var base64",
 					Valid: true,
-					Data:  `{"test": {"env_var_base64": "SOME_ENV_VAR"}}`,
+					Data:  `{"test": {"envVarBase64": "SOME_ENV_VAR"}}`,
 				},
 				{
 					Name:  "env var base64 - default",
 					Valid: true,
-					Data:  `{"test": {"env_var_base64": "SOME_ENV_VAR", "default": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII="}}`,
+					Data:  `{"test": {"envVarBase64": "SOME_ENV_VAR", "default": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII="}}`,
 				},
 				{
 					Name:  "env var base64 - other attributes",
 					Valid: false,
-					Data:  `{"test": {"env_var_base64": "SOME_ENV_VAR", "default": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=", "other": "value"}}`,
+					Data:  `{"test": {"envVarBase64": "SOME_ENV_VAR", "default": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=", "other": "value"}}`,
 				},
 				{
 					Name:  "templated env vars",
 					Valid: true,
-					Data:  `{"test": {"template_env_vars": "https://{{HOST}}.example.com/api"}}`,
+					Data:  `{"test": {"templateEnvVars": "https://{{HOST}}.example.com/api"}}`,
 				},
 				{
 					Name:  "templated env vars - default",
 					Valid: true,
-					Data:  `{"test": {"template_env_vars": "https://{{HOST}}.example.com/api", "default": "https://default.example.com/api"}}`,
+					Data:  `{"test": {"templateEnvVars": "https://{{HOST}}.example.com/api", "default": "https://default.example.com/api"}}`,
 				},
 				{
 					Name:  "templated env vars - default - doesn't coerce number to string",
 					Valid: false,
-					Data:  `{"test": {"template_env_vars": "https://{{HOST}}.example.com/api", "default": 8080}}`,
+					Data:  `{"test": {"templateEnvVars": "https://{{HOST}}.example.com/api", "default": 8080}}`,
 				},
 				{
 					Name:  "templated env vars - default - doesn't coerce bool to string",
 					Valid: false,
-					Data:  `{"test": {"template_env_vars": "https://{{HOST}}.example.com/api", "default": true}}`,
+					Data:  `{"test": {"templateEnvVars": "https://{{HOST}}.example.com/api", "default": true}}`,
 				},
 				{
 					Name:  "templated env vars - other attributes",
 					Valid: false,
-					Data:  `{"test": {"template_env_vars": "https://{{HOST}}.example.com/api", "default": "https://default.example.com/api", "other": "value"}}`,
+					Data:  `{"test": {"templateEnvVars": "https://{{HOST}}.example.com/api", "default": "https://default.example.com/api", "other": "value"}}`,
 				},
 				{
 					Name:  "file",
@@ -671,27 +671,27 @@ func TestSchema(t *testing.T) {
 				{
 					Name:  "env var",
 					Valid: true,
-					Data:  `{"test": {"env_var": "SOME_ENV_VAR"}}`,
+					Data:  `{"test": {"envVar": "SOME_ENV_VAR"}}`,
 				},
 				{
 					Name:  "env var - default",
 					Valid: true,
-					Data:  `{"test": {"env_var": "SOME_ENV_VAR", "default": 1985}}`,
+					Data:  `{"test": {"envVar": "SOME_ENV_VAR", "default": 1985}}`,
 				},
 				{
 					Name:  "env var - default with string",
 					Valid: false,
-					Data:  `{"test": {"env_var": "SOME_ENV_VAR", "default": "some string"}}`,
+					Data:  `{"test": {"envVar": "SOME_ENV_VAR", "default": "some string"}}`,
 				},
 				{
 					Name:  "env var - default bool",
 					Valid: false,
-					Data:  `{"test": {"env_var": "SOME_ENV_VAR", "default": true}}`,
+					Data:  `{"test": {"envVar": "SOME_ENV_VAR", "default": true}}`,
 				},
 				{
 					Name:  "env var - other attributes",
 					Valid: false,
-					Data:  `{"test": {"env_var": "SOME_ENV_VAR", "default": "some string", "other": "value"}}`,
+					Data:  `{"test": {"envVar": "SOME_ENV_VAR", "default": "some string", "other": "value"}}`,
 				},
 			},
 		},
@@ -769,57 +769,57 @@ func TestSchema(t *testing.T) {
 				{
 					Name:  "env var",
 					Valid: true,
-					Data:  `{"test": {"env_var": "SOME_ENV_VAR"}}`,
+					Data:  `{"test": {"envVar": "SOME_ENV_VAR"}}`,
 				},
 				{
 					Name:  "env var - default",
 					Valid: true,
-					Data:  `{"test": {"env_var": "SOME_ENV_VAR", "default": "some string"}}`,
+					Data:  `{"test": {"envVar": "SOME_ENV_VAR", "default": "some string"}}`,
 				},
 				{
 					Name:  "env var - default - doesn't coerce number to string",
 					Valid: false,
-					Data:  `{"test": {"env_var": "SOME_ENV_VAR", "default": 8080}}`,
+					Data:  `{"test": {"envVar": "SOME_ENV_VAR", "default": 8080}}`,
 				},
 				{
 					Name:  "env var - default - doesn't coerce bool to string",
 					Valid: false,
-					Data:  `{"test": {"env_var": "SOME_ENV_VAR", "default": true}}`,
+					Data:  `{"test": {"envVar": "SOME_ENV_VAR", "default": true}}`,
 				},
 				{
 					Name:  "env var - other attributes",
 					Valid: false,
-					Data:  `{"test": {"env_var": "SOME_ENV_VAR", "default": "some string", "other": "value"}}`,
+					Data:  `{"test": {"envVar": "SOME_ENV_VAR", "default": "some string", "other": "value"}}`,
 				},
 				{
 					Name:  "env var base64",
 					Valid: true,
-					Data:  `{"test": {"env_var_base64": "SOME_ENV_VAR"}}`,
+					Data:  `{"test": {"envVarBase64": "SOME_ENV_VAR"}}`,
 				},
 				{
 					Name:  "env var base64 - default",
 					Valid: true,
-					Data:  `{"test": {"env_var_base64": "SOME_ENV_VAR", "default": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII="}}`,
+					Data:  `{"test": {"envVarBase64": "SOME_ENV_VAR", "default": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII="}}`,
 				},
 				{
 					Name:  "env var base64 - other attributes",
 					Valid: false,
-					Data:  `{"test": {"env_var_base64": "SOME_ENV_VAR", "default": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=", "other": "value"}}`,
+					Data:  `{"test": {"envVarBase64": "SOME_ENV_VAR", "default": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=", "other": "value"}}`,
 				},
 				{
 					Name:  "templated env vars",
 					Valid: true,
-					Data:  `{"test": {"template_env_vars": "{{SOME_BOOL}}"}}`,
+					Data:  `{"test": {"templateEnvVars": "{{SOME_BOOL}}"}}`,
 				},
 				{
 					Name:  "templated env vars - default",
 					Valid: true,
-					Data:  `{"test": {"template_env_vars": "{{SOME_BOOL}}", "default": "false"}}`,
+					Data:  `{"test": {"templateEnvVars": "{{SOME_BOOL}}", "default": "false"}}`,
 				},
 				{
 					Name:  "templated env vars - other attributes",
 					Valid: false,
-					Data:  `{"test": {"template_env_vars": "{{SOME_BOOL}}", "default": "false", "other": "value"}}`,
+					Data:  `{"test": {"templateEnvVars": "{{SOME_BOOL}}", "default": "false", "other": "value"}}`,
 				},
 				{
 					Name:  "file",
@@ -857,12 +857,12 @@ func TestSchema(t *testing.T) {
 				{
 					Name:  "access key",
 					Valid: true,
-					Data:  `{"test": {"type": "access_key", "access_key_id": {"env_var": "AWS_ACCESS_KEY_ID"}, "secret_access_key": {"env_var": "AWS_SECRET_ACCESS_KEY"}}}`,
+					Data:  `{"test": {"type": "access_key", "accessKeyId": {"envVar": "AWS_ACCESS_KEY_ID"}, "secretAccessKey": {"envVar": "AWS_SECRET_ACCESS_KEY"}}}`,
 				},
 				{
 					Name:  "access key missing secret",
 					Valid: false,
-					Data:  `{"test": {"type": "access_key", "access_key_id": {"env_var": "AWS_ACCESS_KEY_ID"}}}`,
+					Data:  `{"test": {"type": "access_key", "accessKeyId": {"envVar": "AWS_ACCESS_KEY_ID"}}}`,
 				},
 				{
 					Name:  "unknown type",

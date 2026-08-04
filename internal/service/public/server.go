@@ -154,7 +154,7 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 	var api *gin.RouterGroup
 	if service.EnableMarketplaceApis() {
 		if api == nil {
-			api = server.Group("/api/v1")
+			api = server.Group("/api/v1", common_routes.RejectSnakeCaseQueryParams())
 		}
 
 		routesSession := common_routes.NewSessionRoutes(
@@ -207,7 +207,7 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 
 	if service.EnableProxy() {
 		if api == nil {
-			api = server.Group("/api/v1")
+			api = server.Group("/api/v1", common_routes.RejectSnakeCaseQueryParams())
 		}
 
 		proxyRoutes := common_routes.NewConnectionsProxyRoutes(

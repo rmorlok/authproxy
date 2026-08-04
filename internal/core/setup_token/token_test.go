@@ -74,7 +74,7 @@ func TestMint_RejectsInvalidInputs(t *testing.T) {
 		ttl  time.Duration
 	}{
 		{
-			name: "empty connection_id",
+			name: "empty connectionId",
 			in:   setup_token.MintInput{StepId: "x", ActorId: apid.New(apid.PrefixActor), Intent: setup_token.IntentAdvance},
 			ttl:  time.Minute,
 		},

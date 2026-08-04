@@ -220,8 +220,8 @@ func (r *oauthMigrationRig) authorizeAndDeliverCallback(t *testing.T, redirectUR
 
 	parsed, err := url.Parse(redirectURL)
 	require.NoError(t, err)
-	stateID := parsed.Query().Get("state_id")
-	require.NotEmpty(t, stateID, "redirect should embed state_id: %s", redirectURL)
+	stateID := parsed.Query().Get("stateId")
+	require.NotEmpty(t, stateID, "redirect should embed stateId: %s", redirectURL)
 
 	authorize := r.provider.Authorize(helpers.AuthorizeRequest{
 		ClientID:    r.clientKey,

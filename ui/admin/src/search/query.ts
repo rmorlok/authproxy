@@ -31,8 +31,8 @@ const typeAliases: Record<string, SearchResourceType> = {
     keys: 'key',
     'rate-limit': 'rate_limit',
     'rate-limits': 'rate_limit',
-    rate_limit: 'rate_limit',
-    rate_limits: 'rate_limit',
+    rateLimit: 'rate_limit',
+    rateLimits: 'rate_limit',
 };
 
 const directResourceRoutes: Array<[string, string]> = [

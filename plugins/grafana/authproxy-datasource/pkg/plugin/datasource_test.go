@@ -95,8 +95,8 @@ func TestQueryDataRequestEvents(t *testing.T) {
 		require.Equal(t, http.MethodGet, r.Method)
 		require.Equal(t, "/api/v1/metrics/request-events", r.URL.Path)
 		require.Equal(t, "root/demo", r.URL.Query().Get("namespace"))
-		require.Equal(t, "5xx", r.URL.Query().Get("status_code_range"))
-		require.Equal(t, "env=demo", r.URL.Query().Get("label_selector"))
+		require.Equal(t, "5xx", r.URL.Query().Get("statusCodeRange"))
+		require.Equal(t, "env=demo", r.URL.Query().Get("labelSelector"))
 		require.Equal(t, "500", r.URL.Query().Get("limit"))
 
 		writeJSON(t, w, listResponse[requestEvent]{Items: []requestEvent{{
@@ -193,7 +193,7 @@ func TestQueryDataVariables(t *testing.T) {
 				require.Equal(t, http.MethodGet, r.Method)
 				require.Equal(t, tt.wantPath, r.URL.Path)
 				require.Equal(t, "500", r.URL.Query().Get("limit"))
-				require.Equal(t, tt.wantConnector, r.URL.Query().Get("connector_id"))
+				require.Equal(t, tt.wantConnector, r.URL.Query().Get("connectorId"))
 				writeJSON(t, w, tt.response)
 			})
 			defer server.Close()

@@ -23,8 +23,8 @@ const (
 )
 
 type archiveConnectorWorkflowInputV1 struct {
-	ConnectorID apid.ID       `json:"connector_id"` // ConnectorID is the durable identifier for the connector to archive.
-	Timeout     time.Duration `json:"timeout"`      // Timeout is the maximum duration allowed for child disconnect workflows.
+	ConnectorID apid.ID       `json:"connectorId"` // ConnectorID is the durable identifier for the connector to archive.
+	Timeout     time.Duration `json:"timeout"`     // Timeout is the maximum duration allowed for child disconnect workflows.
 }
 
 func (s *service) startArchiveConnectorWorkflow(

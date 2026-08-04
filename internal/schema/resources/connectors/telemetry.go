@@ -15,7 +15,7 @@ type ConnectorTelemetry struct {
 	// unknown headers, log them in ways that surface internal trace IDs, or
 	// use them in unexpected ways. Only enable when the destination is
 	// known to handle W3C trace context gracefully.
-	PropagateTraceContext *bool `json:"propagate_trace_context,omitempty" yaml:"propagate_trace_context,omitempty"`
+	PropagateTraceContext *bool `json:"propagateTraceContext,omitempty" yaml:"propagateTraceContext,omitempty"`
 }
 
 // Clone returns a deep copy. Safe to call on nil.

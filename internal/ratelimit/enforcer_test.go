@@ -213,7 +213,7 @@ func TestEnforcer_SingleRuleRejects_SyntheticRetryAfterAndAttribution(t *testing
 	body, _ := io.ReadAll(resp.Body)
 	var parsed map[string]any
 	require.NoError(t, json.Unmarshal(body, &parsed))
-	require.Equal(t, "rl_a", parsed["rate_limit_id"])
+	require.Equal(t, "rl_a", parsed["rateLimitId"])
 
 	// Attribution stamped on the rejected request.
 	require.Equal(t, app_metrics.ResponseSourceRateLimit, attr2.Source)

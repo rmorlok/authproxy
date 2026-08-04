@@ -26,11 +26,11 @@ interface FormStep {
 function formStepFromResponse(response: ConnectionSetupFormResponse): FormStep {
     return {
         connectionId: response.id,
-        stepId: response.step_id,
-        stepTitle: response.step_title,
-        stepDescription: response.step_description,
-        jsonSchema: response.json_schema,
-        uiSchema: response.ui_schema,
+        stepId: response.stepId,
+        stepTitle: response.stepTitle,
+        stepDescription: response.stepDescription,
+        jsonSchema: response.jsonSchema,
+        uiSchema: response.uiSchema,
     };
 }
 
@@ -54,7 +54,7 @@ function applySetupResponse(state: ConnectionsState, response: ConnectionSetupRe
         state.verifyError = {
             connectionId: response.id,
             message: response.error,
-            canRetry: response.can_retry,
+            canRetry: response.canRetry,
         };
         state.verifyingConnectionId = null;
         state.currentFormStep = null;
@@ -303,8 +303,8 @@ export const connectionsSlice = createSlice({
                 if (idx !== -1) {
                     state.items[idx] = {
                         ...state.items[idx],
-                        setup_step_id: undefined,
-                        setup_error: undefined,
+                        setupStepId: undefined,
+                        setupError: undefined,
                     };
                 }
             })
@@ -367,7 +367,7 @@ export const connectionsSlice = createSlice({
             })
             .addCase(disconnectConnectionAsync.fulfilled, (state, action) => {
                 state.disconnectingConnection = false;
-                state.currentTaskId = action.payload.task_id;
+                state.currentTaskId = action.payload.taskId;
 
                 // Update the connection in the items array
                 const index = state.items.findIndex(conn => conn.id === action.payload.connection.id);

@@ -13,11 +13,11 @@ export interface Key {
   name: string;
   namespace: string;
   state: KeyState;
-  key_data?: KeyData;
+  keyData?: KeyData;
   labels?: Record<string, string>;
   annotations?: Record<string, string>;
-  created_at: string;
-  updated_at: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type KeyData = Record<string, unknown>;
@@ -25,7 +25,7 @@ export type KeyData = Record<string, unknown>;
 export interface CreateKeyRequest {
     namespace: string;
     name?: string;
-    key_data?: KeyData;
+    keyData?: KeyData;
     labels?: Record<string, string>;
     annotations?: Record<string, string>;
 }
@@ -33,7 +33,7 @@ export interface CreateKeyRequest {
 export interface UpdateKeyRequest {
     name?: string;
     state?: KeyState;
-    key_data?: KeyData;
+    keyData?: KeyData;
     labels?: Record<string, string>;
     annotations?: Record<string, string>;
 }
@@ -44,8 +44,8 @@ export interface ListKeysParams {
   limit?: number;
   state?: KeyState;
   namespace?: string;
-  label_selector?: string;
-  order_by?: string;
+  labelSelector?: string;
+  orderBy?: string;
 }
 
 export interface KeyLabel {
