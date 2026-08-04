@@ -284,7 +284,7 @@ connectors:
               required:
                 - calendar_id
               properties:
-                calendarId:
+                calendar_id:
                   type: string
                   title: Calendar
                   x-data-source: calendars
@@ -307,7 +307,7 @@ connectors:
             jsonSchema:
               type: object
               properties:
-                includeDeclined:
+                include_declined:
                   type: boolean
                   title: Include declined events
             uiSchema:
