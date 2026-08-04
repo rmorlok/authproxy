@@ -10,15 +10,12 @@ import (
 func mustApplyTestConfigInternal(cfg config.C) (config.C, Client, *miniredis.Miniredis) {
 	// Avoid shared singletons for test cases, while still going through wireup logic
 	miniredisServerPrevious := miniredisServer
-	miniredisClientPrevious := miniredisClient
 	miniredisErrPrevious := miniredisErr
 	defer func() {
 		miniredisServer = miniredisServerPrevious
-		miniredisClient = miniredisClientPrevious
 		miniredisErr = miniredisErrPrevious
 	}()
 	miniredisServer = nil
-	miniredisClient = nil
 	miniredisErr = nil
 
 	if cfg == nil {

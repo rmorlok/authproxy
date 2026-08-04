@@ -39,6 +39,11 @@ func Serve(cfg config.C) {
 	dm.GetTelemetry()
 	defer dm.ShutdownTelemetry()
 
+	// The Asynq server shares this client's connection pool. Register this
+	// before starting it so the pool is closed only after its shutdown has
+	// completed.
+	defer dm.GetRedisClient().Close()
+
 	workerConfig := cfg.GetRoot().Worker
 	router := apgin.ForService(
 		&workerConfig,
