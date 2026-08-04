@@ -145,7 +145,7 @@ func TestProxyRevocation_UserRevocationFlipsUnhealthy(t *testing.T) {
 	// so we assert what the provider actually returns.
 	assert.Equal(t, "provider_4xx_other", failed[0]["category"],
 		"category reflects the test provider's non-RFC error string ('Refresh token revoked')")
-	assert.Equal(t, connID, failed[0]["connectionId"])
+	assert.Equal(t, connID, failed[0]["connection_id"])
 	assert.Equal(t, float64(400), failed[0]["provider_status_code"])
 	assert.Equal(t, "Refresh token revoked", failed[0]["provider_error"])
 
@@ -242,7 +242,7 @@ func TestProxyRevocation_AccessOnlyRevocationSelfHealsViaRefresh(t *testing.T) {
 	succeeded := rig.logCapture.RecordsWithMessage(t, tokenRefreshSuccessMessage)
 	require.Lenf(t, succeeded, 1,
 		"self-heal must emit exactly one refresh-succeeded event; got %d", len(succeeded))
-	assert.Equal(t, connID, succeeded[0]["connectionId"])
+	assert.Equal(t, connID, succeeded[0]["connection_id"])
 
 	// Exactly one refresh-token POST on the wire — the 401-retry
 	// path fires once and the replay succeeds, so no further refresh
