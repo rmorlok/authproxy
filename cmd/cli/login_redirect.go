@@ -26,11 +26,11 @@ func httpServerForLoginRedirect(
 		if req.Method != "GET" || req.URL.Path != loginRedirectPath {
 			configProps := make([]string, 0)
 			if marketplaceUrl != "" {
-				configProps = append(configProps, "<tt>host_application.initiate_session_url</tt>")
+				configProps = append(configProps, "<tt>hostApplication.initiateSessionUrl</tt>")
 			}
 
 			if adminUiUrl != "" {
-				configProps = append(configProps, "<tt>admin_api.ui.initiate_session_url</tt>")
+				configProps = append(configProps, "<tt>adminApi.ui.initiateSessionUrl</tt>")
 			}
 
 			log.Printf("[404] %s %s", req.Method, req.URL)
@@ -147,11 +147,11 @@ func cmdMarketplaceLoginRedirect() *cobra.Command {
 
 			validRedirectUrl := fmt.Sprintf("%s://%s:%d%s", proto, ip, port, loginRedirectPath)
 			if marketplaceUrl != "" {
-				log.Printf("Configure host_application.initiate_session_url to %s", validRedirectUrl)
+				log.Printf("Configure hostApplication.initiateSessionUrl to %s", validRedirectUrl)
 			}
 
 			if adminUiUrl != "" {
-				log.Printf("Configure admin_api.ui.initiate_session_url to %s", validRedirectUrl)
+				log.Printf("Configure adminApi.ui.initiateSessionUrl to %s", validRedirectUrl)
 			}
 
 			server := &http.Server{
