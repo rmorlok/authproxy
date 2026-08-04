@@ -52,7 +52,7 @@ func httpServerForLoginRedirect(
 			return
 		}
 
-		returnTo := req.URL.Query().Get("returnTo")
+		returnTo := req.URL.Query().Get("returnToUrl")
 
 		if returnTo == "" {
 			log.Printf("[400] %s %s", req.Method, req.URL)
@@ -67,7 +67,7 @@ func httpServerForLoginRedirect(
 	</head>
 	<body>
 		<h1>No Return To Specified</h1>
-		<p>Request did not include the <tt>returnTo</tt> query parameter to specify path to return auth token.</p>
+		<p>Request did not include the <tt>returnToUrl</tt> query parameter to specify path to return auth token.</p>
 	</body>
 </html>
 `))
