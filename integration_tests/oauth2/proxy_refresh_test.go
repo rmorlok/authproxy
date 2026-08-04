@@ -229,10 +229,10 @@ func TestProxyRefresh_ExpiredAccessTokenRefreshes(t *testing.T) {
 	assert.Equalf(t, 1, refreshCalls,
 		"expected exactly one grant_type=refresh_token call; got %d", refreshCalls)
 
-	// Structured success event with the right connectionId.
+	// Structured success event with the right connection_id log attribute.
 	succeeded := rig.logCapture.RecordsWithMessage(t, tokenRefreshSuccessMessage)
 	require.Lenf(t, succeeded, 1, "expected exactly one refresh-succeeded event; got %d", len(succeeded))
-	assert.Equal(t, connID, succeeded[0]["connectionId"])
+	assert.Equal(t, connID, succeeded[0]["connection_id"])
 
 	// No refresh-failed event — even one would corrupt dashboards.
 	assert.Empty(t, rig.logCapture.RecordsWithMessage(t, tokenRefreshFailureMessage),
@@ -319,7 +319,7 @@ func TestProxyRefresh_NoRefreshTokenFlipsUnhealthy(t *testing.T) {
 	failed := rig.logCapture.RecordsWithMessage(t, tokenRefreshFailureMessage)
 	require.Lenf(t, failed, 1, "expected exactly one refresh-failed event; got %d", len(failed))
 	assert.Equal(t, "no_refresh_token", failed[0]["category"])
-	assert.Equal(t, connID, failed[0]["connectionId"])
+	assert.Equal(t, connID, failed[0]["connection_id"])
 
 	// Health-state-changed event with reason=refresh_no_refresh_token.
 	// This is what dashboards correlate with the refresh-failure event.
