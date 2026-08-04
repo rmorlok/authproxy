@@ -101,25 +101,6 @@ export const columns: GridColDef<Connector>[] = [
         sortable: false,
     },
     {
-        field: 'versions',
-        headerName: 'Num Versions',
-        flex: 0.4,
-        minWidth: 80,
-        sortable: false,
-    },
-    {
-        field: 'states',
-        headerName: 'States',
-        flex: 0.4,
-        minWidth: 80,
-        sortable: false,
-        renderCell: (params) => {
-            return (<div>
-                {(params.value as ConnectorVersionState[]).map((v) => renderState(v))}
-            </div>);
-        },
-    },
-    {
         field: 'createdAt',
         headerName: 'Created At',
         flex: 1,
