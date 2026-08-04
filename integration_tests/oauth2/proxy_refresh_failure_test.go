@@ -159,7 +159,7 @@ func TestProxyRefreshFailure_Scenarios(t *testing.T) {
 			require.Lenf(t, failed, 1, "expected exactly one refresh-failed event; got %d (%v)", len(failed), failed)
 			event := failed[0]
 			assert.Equal(t, tc.expectedCategory, event["category"], "failure category mismatch")
-			assert.Equal(t, connID, event["connectionId"])
+			assert.Equal(t, connID, event["connection_id"])
 			if tc.expectedStatusCode != 0 {
 				assert.Equal(t, float64(tc.expectedStatusCode), event["provider_status_code"],
 					"provider_status_code mismatch for %s", tc.name)

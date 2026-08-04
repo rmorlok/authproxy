@@ -165,7 +165,7 @@ func TestTokenRefreshTimeout_RetriesAndExhausts(t *testing.T) {
 	require.Lenf(t, failed, 1, "exhausted refresh timeout must emit exactly one refresh-failed event; got %d (%v)", len(failed), failed)
 	event := failed[0]
 	assert.Equal(t, "network_error", event["category"])
-	assert.Equal(t, connID, event["connectionId"])
+	assert.Equal(t, connID, event["connection_id"])
 	assert.Equalf(t, float64(tokenRefreshMaxAttempts), event["attempts"],
 		"failure event should record attempts=tokenRefreshMaxAttempts on exhaustion")
 	_, hasStatus := event["provider_status_code"]
