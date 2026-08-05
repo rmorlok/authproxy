@@ -133,7 +133,7 @@ func (r *KeysRoutes) get(gctx *gin.Context) {
 		return
 	}
 
-	resp, err := KeyToJson(ctx, r.core, ek)
+	resp, err := KeyToJsonOmitUnconfiguredData(ctx, r.core, ek)
 	if err != nil {
 		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
@@ -527,7 +527,7 @@ func (r *KeysRoutes) update(gctx *gin.Context) {
 		return
 	}
 
-	resp, err := KeyToJson(ctx, r.core, ek)
+	resp, err := KeyToJsonOmitUnconfiguredData(ctx, r.core, ek)
 	if err != nil {
 		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
