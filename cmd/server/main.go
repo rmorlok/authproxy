@@ -75,6 +75,20 @@ func runServices(noBanner bool, servicesList string) error {
 		banner()
 	}
 
+	// Each service also performs migrations when it starts so it remains safe
+	// to run independently. When this command starts several services in one
+	// process, finish the first migration pass before fanning out. This avoids
+	// a newly created database being observed in golang-migrate's dirty state
+	// by another service while the first service is still applying migrations.
+	migrationDM := service.NewDependencyManager("migrations", cfg)
+	migrationDM.GetTelemetry()
+	defer migrationDM.ShutdownTelemetry()
+	defer migrationDM.GetRedisClient().Close()
+	defer migrationDM.ShutdownDatabase()
+	defer migrationDM.ShutdownWorkflowRuntime()
+	defer migrationDM.GetEncryptService().Shutdown()
+	migrationDM.AutoMigrateAll()
+
 	wg := new(sync.WaitGroup)
 	for _, server := range servers {
 		wg.Add(1)
