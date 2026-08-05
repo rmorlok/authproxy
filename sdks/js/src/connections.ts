@@ -25,6 +25,7 @@ export enum ConnectionHealthState {
 }
 
 export interface UpdateConnectionRequest {
+    name?: string;
     labels?: Record<string, string>;
     annotations?: Record<string, string>;
 }
@@ -50,6 +51,7 @@ export interface ConnectionAnnotation {
 export interface Connection {
     id: string;
     namespace: string;
+    name: string;
     connector: Connector;
     state: ConnectionState;
     health_state: ConnectionHealthState;

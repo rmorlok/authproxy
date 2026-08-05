@@ -1980,7 +1980,7 @@ paths:
     patch:
       consumes:
       - application/json
-      description: Update a connection's name or labels
+      description: Update a connection's name, labels, or annotations
       parameters:
       - description: Connection UUID
         in: path

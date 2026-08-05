@@ -85,6 +85,7 @@ export interface RateLimitDefinition {
 export interface RateLimit {
     id: string;
     namespace: string;
+    name: string;
     definition: RateLimitDefinition;
     labels?: Record<string, string>;
     annotations?: Record<string, string>;
@@ -100,6 +101,7 @@ export interface CreateRateLimitRequest {
 }
 
 export interface UpdateRateLimitRequest {
+    name?: string;
     definition?: RateLimitDefinition;
     labels?: Record<string, string>;
     annotations?: Record<string, string>;

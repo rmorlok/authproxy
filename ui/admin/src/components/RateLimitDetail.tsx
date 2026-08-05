@@ -16,17 +16,18 @@ import DialogActions from '@mui/material/DialogActions';
 import Button from '@mui/material/Button';
 import Switch from '@mui/material/Switch';
 import FormControlLabel from '@mui/material/FormControlLabel';
-import MoreVertIcon from '@mui/icons-material/MoreVert';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import Tooltip from '@mui/material/Tooltip';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
 import dayjs from 'dayjs';
 import {
     RateLimit, rateLimits, RateLimitMode, RateLimitDefinition,
 } from '@authproxy/api';
 import { useNavigate } from 'react-router-dom';
-import AnnotationsEditor from './AnnotationsEditor';
 import RateLimitDefinitionEditor from './RateLimitDefinitionEditor';
 import { EMPTY_DEFINITION } from './RateLimitDefinitionForm';
+import ResourceIdentifier from './ResourceIdentifier';
+import ResourceMetadataMenuItems from './ResourceMetadataMenuItems';
+import AnnotationsEditor from './AnnotationsEditor';
 
 function ModeChip({ mode }: { mode: RateLimitMode }) {
     const color = mode === RateLimitMode.ENFORCE ? 'warning' : 'info';
@@ -77,15 +78,6 @@ export default function RateLimitDetail({ rateLimitId }: { rateLimitId: string }
 
     // Pending state for the inline mode toggle.
     const [modePending, setModePending] = useState(false);
-
-    const [copied, setCopied] = useState(false);
-    const handleCopyId = async () => {
-        try {
-            await navigator.clipboard.writeText(rl?.id || '');
-            setCopied(true);
-            setTimeout(() => setCopied(false), 1500);
-        } catch (_e) { /* ignore */ }
-    };
 
     const fetchRl = () => {
         setLoading(true);
@@ -215,7 +207,28 @@ export default function RateLimitDetail({ rateLimitId }: { rateLimitId: string }
                     <IconButton aria-label="actions" onClick={openMenu} size="small">
                         <MoreVertIcon />
                     </IconButton>
-                    <Menu anchorEl={menuAnchorEl} open={Boolean(menuAnchorEl)} onClose={closeMenu}>
+                    <Menu anchorEl={menuAnchorEl} open={Boolean(menuAnchorEl)} onClose={closeMenu} keepMounted>
+                        <ResourceMetadataMenuItems
+                            resource="rate limit"
+                            name={rl.name}
+                            labels={rl.labels}
+                            annotations={rl.annotations}
+                            onCloseMenu={closeMenu}
+                            onRename={async (name) => {
+                                const response = await rateLimits.update(rl.id, {name});
+                                setRl(response.data);
+                            }}
+                            onUpdateLabels={async (labels) => {
+                                const response = await rateLimits.update(rl.id, {labels});
+                                setRl(response.data);
+                            }}
+                            onUpdateAnnotations={async (annotations) => {
+                                const response = await rateLimits.update(rl.id, {annotations});
+                                setRl(response.data);
+                            }}
+                            disabled={actionLoading || modePending}
+                        />
+                        <Divider />
                         <MenuItem onClick={onClickEditDefinition}>Edit definition...</MenuItem>
                         <Divider />
                         <MenuItem onClick={onClickDelete} sx={{ color: 'error.main' }}>Delete</MenuItem>
@@ -225,28 +238,11 @@ export default function RateLimitDetail({ rateLimitId }: { rateLimitId: string }
 
             {actionError && <Alert severity="error" onClose={() => setActionError(null)}>{actionError}</Alert>}
 
+            <ResourceIdentifier value={rl.id} copyLabel="Copy rate limit id" />
+
             <Box>
-                <Typography variant="subtitle2" color="text.secondary">ID</Typography>
-                <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
-                    <Typography
-                        variant="body1"
-                        component="code"
-                        sx={{
-                            wordBreak: 'break-all',
-                            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-                            bgcolor: 'action.hover',
-                            px: 1, py: 0.5, borderRadius: 0.5,
-                            fontSize: '0.9rem',
-                        }}
-                    >
-                        {rl.id}
-                    </Typography>
-                    <Tooltip title={copied ? 'Copied!' : 'Copy'} placement="top">
-                        <IconButton size="small" aria-label="Copy rate limit id" onClick={handleCopyId}>
-                            <ContentCopyIcon fontSize="inherit" />
-                        </IconButton>
-                    </Tooltip>
-                </Stack>
+                <Typography variant="subtitle2" color="text.secondary">Name</Typography>
+                <Typography variant="body1">{rl.name}</Typography>
             </Box>
 
             <Box>
@@ -333,17 +329,7 @@ export default function RateLimitDetail({ rateLimitId }: { rateLimitId: string }
                 )}
             </Box>
 
-            <AnnotationsEditor
-                annotations={rl.annotations}
-                onPut={async (key, value) => {
-                    await rateLimits.putAnnotation(rl.id, key, value);
-                    fetchRl();
-                }}
-                onDelete={async (key) => {
-                    await rateLimits.deleteAnnotation(rl.id, key);
-                    fetchRl();
-                }}
-            />
+            <AnnotationsEditor annotations={rl.annotations} readOnly onPut={async () => {}} onDelete={async () => {}} />
 
             {/* Edit-definition dialog */}
             <Dialog open={editDefOpen} onClose={() => !actionLoading && setEditDefOpen(false)} fullWidth maxWidth="md">

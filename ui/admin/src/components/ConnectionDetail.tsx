@@ -19,9 +19,7 @@ import InputLabel from '@mui/material/InputLabel';
 import Select from '@mui/material/Select';
 import FormHelperText from '@mui/material/FormHelperText';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import dayjs from 'dayjs';
-import Tooltip from '@mui/material/Tooltip';
 import {
   Connection,
   connections,
@@ -39,7 +37,9 @@ import {
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import { Link } from "react-router-dom";
-import AnnotationsEditor from "./AnnotationsEditor";
+import ResourceIdentifier from './ResourceIdentifier';
+import ResourceMetadataMenuItems from './ResourceMetadataMenuItems';
+import AnnotationsEditor from './AnnotationsEditor';
 
 const CONNECTION_MIGRATION_TIMEOUT_SECONDS = 600;
 
@@ -100,18 +100,6 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
   const [migrationVersionsError, setMigrationVersionsError] = useState<string | null>(null);
   const [selectedMigrationVersion, setSelectedMigrationVersion] = useState<number | ''>('');
   const [migrationStatus, setMigrationStatus] = useState<MigrationStatus | null>(null);
-
-  // Copy-to-clipboard UI state for connection ID
-  const [copied, setCopied] = useState(false);
-  const handleCopyId = async () => {
-    try {
-      await navigator.clipboard.writeText(conn?.id || '');
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch (_e: any) {
-      // ignore
-    }
-  };
 
   const stateOptions = useMemo(() => Object.values(ConnectionState), []);
   const eligibleMigrationVersions = useMemo(() => {
@@ -330,7 +318,28 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
           <IconButton aria-label="actions" onClick={openMenu} size="small">
             <MoreVertIcon/>
           </IconButton>
-          <Menu anchorEl={menuAnchorEl} open={Boolean(menuAnchorEl)} onClose={closeMenu}>
+          <Menu anchorEl={menuAnchorEl} open={Boolean(menuAnchorEl)} onClose={closeMenu} keepMounted>
+            <ResourceMetadataMenuItems
+              resource="connection"
+              name={conn.name}
+              labels={conn.labels}
+              annotations={conn.annotations}
+              onCloseMenu={closeMenu}
+              onRename={async (name) => {
+                const response = await connections.update(conn.id, {name});
+                setConn(response.data);
+              }}
+              onUpdateLabels={async (labels) => {
+                const response = await connections.update(conn.id, {labels});
+                setConn(response.data);
+              }}
+              onUpdateAnnotations={async (annotations) => {
+                const response = await connections.update(conn.id, {annotations});
+                setConn(response.data);
+              }}
+              disabled={actionLoading || migrationInProgress}
+            />
+            <Divider/>
             <MenuItem onClick={onClickDisconnect} disabled={!canBeDisconnected(conn) || actionLoading || migrationInProgress}>Disconnect</MenuItem>
             <MenuItem onClick={onClickMigration} disabled={actionLoading || migrationInProgress}>Change version…</MenuItem>
             <Divider/>
@@ -375,31 +384,11 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
         </Alert>
       )}
 
+      <ResourceIdentifier value={conn.id} copyLabel="Copy connection id"/>
+
       <Box>
-        <Typography variant="subtitle2" color="text.secondary">Connection ID</Typography>
-        <Stack direction="row" spacing={1} alignItems="center" sx={{mt: 0.5}}>
-          <Typography
-            variant="body1"
-            component="code"
-            sx={{
-              wordBreak: 'break-all',
-              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Roboto Mono", monospace',
-              bgcolor: 'action.hover',
-              px: 1,
-              py: 0.5,
-              borderRadius: 0.5,
-              fontSize: '0.9rem',
-              letterSpacing: '0.02em',
-            }}
-          >
-            {conn.id}
-          </Typography>
-          <Tooltip title={copied ? 'Copied!' : 'Copy'} placement="top">
-            <IconButton size="small" aria-label="Copy connection id" onClick={handleCopyId}>
-              <ContentCopyIcon fontSize="inherit" />
-            </IconButton>
-          </Tooltip>
-        </Stack>
+        <Typography variant="subtitle2" color="text.secondary">Name</Typography>
+        <Typography variant="body1">{conn.name}</Typography>
       </Box>
 
       <Stack direction={{xs: 'column', sm: 'row'}} spacing={4}>
@@ -460,17 +449,7 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
         )}
       </Box>
 
-      <AnnotationsEditor
-        annotations={conn.annotations}
-        onPut={async (key, value) => {
-          await connections.putAnnotation(conn.id, key, value);
-          fetchConnection();
-        }}
-        onDelete={async (key) => {
-          await connections.deleteAnnotation(conn.id, key);
-          fetchConnection();
-        }}
-      />
+      <AnnotationsEditor annotations={conn.annotations} readOnly onPut={async () => {}} onDelete={async () => {}}/>
 
       {/* Disconnect confirmation dialog */}
       <Dialog open={confirmDisconnectOpen} onClose={() => !actionLoading && setConfirmDisconnectOpen(false)}>

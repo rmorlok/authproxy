@@ -11,6 +11,7 @@ export enum KeyState {
 export interface Key {
   id: string;
   namespace: string;
+  name: string;
   state: KeyState;
   key_data?: KeyData;
   labels?: Record<string, string>;
@@ -29,6 +30,7 @@ export interface CreateKeyRequest {
 }
 
 export interface UpdateKeyRequest {
+    name?: string;
     state?: KeyState;
     key_data?: KeyData;
     labels?: Record<string, string>;

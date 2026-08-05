@@ -38,6 +38,7 @@ export interface NamespaceAnnotation {
 
 export interface Namespace {
   path: string;
+  name: string;
   state: NamespaceState;
   key_id?: string;
   labels?: Record<string, string>;

@@ -6,6 +6,7 @@ export interface ConnectorVersion {
     id: string;
     version: number;
     namespace: string;
+    name: string;
     state: ConnectorVersionState;
     definition: Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
     labels?: Record<string, string>;
@@ -18,6 +19,7 @@ export interface Connector {
     id: string;
     version: number;
     namespace: string;
+    name: string;
     state: ConnectorVersionState;
     display_name: string;
     description: string;
@@ -74,6 +76,13 @@ export interface ConnectorLifecycleResponse {
     connector_id: string;
 }
 
+export interface UpdateConnectorRequest {
+    name?: string;
+    definition?: Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+    labels?: Record<string, string>;
+    annotations?: Record<string, string>;
+}
+
 /**
  * Get a list of all available connectors
  */
@@ -86,6 +95,13 @@ export const listConnectors = (params: ListConnectorsParams) => {
  */
 export const getConnector = (id: string) => {
     return client.get<Connector>(`/api/v1/connectors/${id}`);
+};
+
+/**
+ * Update a connector's logical name or its draft-version metadata.
+ */
+export const updateConnector = (id: string, request: UpdateConnectorRequest) => {
+    return client.patch<ConnectorVersion>(`/api/v1/connectors/${id}`, request);
 };
 
 /**
@@ -204,6 +220,7 @@ export const deleteConnectorVersionAnnotation = (id: string, version: number, an
 export const connectors = {
     list: listConnectors,
     get: getConnector,
+    update: updateConnector,
     listVersions: listConnectorVersions,
     getVersion: getConnectorVersion,
     force_version_state: forceConnectorVersionState,

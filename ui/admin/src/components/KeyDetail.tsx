@@ -18,12 +18,12 @@ import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
 import Select from '@mui/material/Select';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import dayjs from 'dayjs';
-import Tooltip from '@mui/material/Tooltip';
 import {Key, keys, KeyState, UpdateKeyRequest} from '@authproxy/api';
 import { useNavigate } from "react-router-dom";
-import AnnotationsEditor from "./AnnotationsEditor";
+import ResourceIdentifier from './ResourceIdentifier';
+import ResourceMetadataMenuItems from './ResourceMetadataMenuItems';
+import AnnotationsEditor from './AnnotationsEditor';
 import KeyDataForm, {
   buildKeyDataPayload,
   createEmptyKeyDataFormState,
@@ -68,33 +68,7 @@ export default function KeyDetail({keyId}: { keyId: string }) {
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  // Copy-to-clipboard
-  const [copied, setCopied] = useState(false);
-  const handleCopyId = async () => {
-    try {
-      await navigator.clipboard.writeText(ek?.id || '');
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch (_e: any) {
-      // ignore
-    }
-  };
-
   const stateOptions = useMemo(() => Object.values(KeyState), []);
-
-  const fetchKey = () => {
-    setLoading(true);
-    setError(null);
-    keys.get(keyId)
-      .then(res => {
-        setEk(res.data);
-      })
-      .catch(err => {
-        const msg = err?.response?.data?.error || err.message || 'Failed to load key';
-        setError(msg);
-      })
-      .finally(() => setLoading(false));
-  };
 
   useEffect(() => {
     let cancelled = false;
@@ -219,7 +193,28 @@ export default function KeyDetail({keyId}: { keyId: string }) {
           <IconButton aria-label="actions" onClick={openMenu} size="small">
             <MoreVertIcon/>
           </IconButton>
-          <Menu anchorEl={menuAnchorEl} open={Boolean(menuAnchorEl)} onClose={closeMenu}>
+          <Menu anchorEl={menuAnchorEl} open={Boolean(menuAnchorEl)} onClose={closeMenu} keepMounted>
+            <ResourceMetadataMenuItems
+              resource="key"
+              name={ek.name}
+              labels={ek.labels}
+              annotations={ek.annotations}
+              onCloseMenu={closeMenu}
+              onRename={async (name) => {
+                const response = await keys.update(ek.id, {name});
+                setEk(response.data);
+              }}
+              onUpdateLabels={async (labels) => {
+                const response = await keys.update(ek.id, {labels});
+                setEk(response.data);
+              }}
+              onUpdateAnnotations={async (annotations) => {
+                const response = await keys.update(ek.id, {annotations});
+                setEk(response.data);
+              }}
+              disabled={actionLoading}
+            />
+            <Divider/>
             <MenuItem onClick={onClickEdit}>Edit...</MenuItem>
             <Divider/>
             <MenuItem onClick={onClickDelete} sx={{color: 'error.main'}}>Delete</MenuItem>
@@ -229,31 +224,11 @@ export default function KeyDetail({keyId}: { keyId: string }) {
 
       {actionError && <Alert severity="error">{actionError}</Alert>}
 
+      <ResourceIdentifier value={ek.id} copyLabel="Copy key id"/>
+
       <Box>
-        <Typography variant="subtitle2" color="text.secondary">ID</Typography>
-        <Stack direction="row" spacing={1} alignItems="center" sx={{mt: 0.5}}>
-          <Typography
-            variant="body1"
-            component="code"
-            sx={{
-              wordBreak: 'break-all',
-              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Roboto Mono", monospace',
-              bgcolor: 'action.hover',
-              px: 1,
-              py: 0.5,
-              borderRadius: 0.5,
-              fontSize: '0.9rem',
-              letterSpacing: '0.02em',
-            }}
-          >
-            {ek.id}
-          </Typography>
-          <Tooltip title={copied ? 'Copied!' : 'Copy'} placement="top">
-            <IconButton size="small" aria-label="Copy key id" onClick={handleCopyId}>
-              <ContentCopyIcon fontSize="inherit" />
-            </IconButton>
-          </Tooltip>
-        </Stack>
+        <Typography variant="subtitle2" color="text.secondary">Name</Typography>
+        <Typography variant="body1">{ek.name}</Typography>
       </Box>
 
       <Box>
@@ -301,17 +276,7 @@ export default function KeyDetail({keyId}: { keyId: string }) {
         )}
       </Box>
 
-      <AnnotationsEditor
-        annotations={ek.annotations}
-        onPut={async (key, value) => {
-          await keys.putAnnotation(ek.id, key, value);
-          fetchKey();
-        }}
-        onDelete={async (key) => {
-          await keys.deleteAnnotation(ek.id, key);
-          fetchKey();
-        }}
-      />
+      <AnnotationsEditor annotations={ek.annotations} readOnly onPut={async () => {}} onDelete={async () => {}}/>
 
       <Dialog open={editOpen} onClose={closeEditDialog} fullWidth maxWidth="md">
         <DialogTitle>Edit key</DialogTitle>
