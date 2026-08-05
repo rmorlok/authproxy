@@ -544,51 +544,57 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
             </Box>
           )}
           {!migrationVersionsLoading && !migrationVersionsError && (
-            <FormControl fullWidth sx={{mt: 2}}>
-              <InputLabel id="target-version-label" htmlFor="target-version">Target version</InputLabel>
-              <Select
-                native
-                inputProps={{
-                  id: 'target-version',
-                  'aria-labelledby': 'target-version-label',
-                }}
-                labelId="target-version-label"
-                label="Target version"
-                value={selectedMigrationVersion}
-                onChange={(event) => {
-                  const value = String(event.target.value);
-                  setSelectedMigrationVersion(value === '' ? '' : Number(value));
-                }}
-              >
-                <option aria-label="None" value="" />
-                {eligibleMigrationVersions.map((version) => (
-                  <option key={version.version} value={version.version}>
-                    v{version.version} ({version.state})
-                  </option>
-                ))}
-              </Select>
-              {eligibleMigrationVersions.length === 0 ? (
-                <FormHelperText>No other active or primary versions are available.</FormHelperText>
-              ) : (
+            eligibleMigrationVersions.length === 0 ? (
+              <Alert severity="info" sx={{mt: 2}}>
+                No other active or primary versions are available.
+              </Alert>
+            ) : (
+              <FormControl fullWidth sx={{mt: 2}}>
+                <InputLabel id="target-version-label" htmlFor="target-version">Target version</InputLabel>
+                <Select
+                  native
+                  inputProps={{
+                    id: 'target-version',
+                    'aria-labelledby': 'target-version-label',
+                  }}
+                  labelId="target-version-label"
+                  label="Target version"
+                  value={selectedMigrationVersion}
+                  onChange={(event) => {
+                    const value = String(event.target.value);
+                    setSelectedMigrationVersion(value === '' ? '' : Number(value));
+                  }}
+                >
+                  <option aria-label="None" value="" />
+                  {eligibleMigrationVersions.map((version) => (
+                    <option key={version.version} value={version.version}>
+                      v{version.version} ({version.state})
+                    </option>
+                  ))}
+                </Select>
                 <FormHelperText>
                   {selectedMigrationActionLabel === 'Rollback'
                     ? 'An earlier target version rolls this connection back.'
                     : 'The migration can require setup or re-authentication after it completes.'}
                 </FormHelperText>
-              )}
-            </FormControl>
+              </FormControl>
+            )
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setMigrationOpen(false)} disabled={actionLoading}>Cancel</Button>
-          <Button
-            variant="contained"
-            startIcon={actionLoading ? <CircularProgress size={16}/> : <SwapHorizIcon/>}
-            disabled={!selectedMigrationTarget || migrationVersionsLoading || actionLoading}
-            onClick={() => void onConfirmMigration()}
-          >
-            {selectedMigrationTarget ? `${selectedMigrationActionLabel} to v${selectedMigrationTarget.version}` : 'Change version'}
+          <Button onClick={() => setMigrationOpen(false)} disabled={actionLoading}>
+            {eligibleMigrationVersions.length === 0 && !migrationVersionsLoading && !migrationVersionsError ? 'Close' : 'Cancel'}
           </Button>
+          {eligibleMigrationVersions.length > 0 && (
+            <Button
+              variant="contained"
+              startIcon={actionLoading ? <CircularProgress size={16}/> : <SwapHorizIcon/>}
+              disabled={!selectedMigrationTarget || migrationVersionsLoading || actionLoading}
+              onClick={() => void onConfirmMigration()}
+            >
+              {selectedMigrationTarget ? `${selectedMigrationActionLabel} to v${selectedMigrationTarget.version}` : 'Change version'}
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
     </Stack>
