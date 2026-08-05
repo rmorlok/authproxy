@@ -392,11 +392,17 @@ export default function RequestDetail({requestId, record, onClose, showOpenFullP
     let heading = (<Typography variant="h6">Request Detail</Typography>);
     if (!loading && !error && data) {
         heading = (
-            <Box sx={{p: 0}}>
+            <Box sx={{p: 0, flex: 1, minWidth: 0}}>
             <Stack spacing={1}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <HttpStatusChip value={data.res.sc} size="medium" sx={{ fontSize: '0.9rem' }}/>
-                    <Typography variant="h6">{data.req.m} {data.req.u}</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+                    <HttpStatusChip value={data.res.sc} size="medium" sx={{ fontSize: '0.9rem', flexShrink: 0 }}/>
+                    <Typography
+                        variant="h6"
+                        noWrap
+                        title={`${data.req.m} ${data.req.u}`}
+                        sx={{minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis'}}>
+                        {data.req.m} {data.req.u}
+                    </Typography>
                     {!data.full && (<Tooltip title="only partial data is stored"><Chip label="abridged" size="small" sx={{ fontSize: '0.7rem' }}/></Tooltip>) }
                 </Box>
                 {data.res.err && (
@@ -410,7 +416,7 @@ export default function RequestDetail({requestId, record, onClose, showOpenFullP
         <Box sx={{flex: 1}} role="presentation">
             <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{p: 1.5, pl: 0}}>
                 {heading}
-                <Stack direction="row" spacing={1} alignItems="center">
+                <Stack direction="row" spacing={1} alignItems="center" sx={{flexShrink: 0}}>
                     {/* Copy full menu */}
                     {data && (
                         <>
