@@ -11,55 +11,48 @@ import (
 )
 
 var miniredisServer *miniredis.Miniredis
-var miniredisClient *redis.Client
 var miniredisMutex sync.Mutex
 var miniredisErr error
 
-// NewMiniredis creates a new redis connection to a miniredis instance.
+// NewMiniredis creates a Redis client connected to the shared miniredis
+// instance. Each caller receives its own client and is responsible for
+// closing it.
 //
 // Parameters:
-// - redisConfig: the configuration for the miniredis instance
-// - opts: optional functional options (e.g. WithTelemetry) for instrumenting
-//   the client with OTel tracing and / or metrics
+//   - redisConfig: the configuration for the miniredis instance
+//   - opts: optional functional options (e.g. WithTelemetry) for instrumenting
+//     the client with OTel tracing and / or metrics
 func NewMiniredis(redisConfig *config.RedisMiniredis, opts ...Option) (Client, error) {
 	resolved := resolveOpts(opts)
+	miniredisMutex.Lock()
 	if miniredisServer == nil {
-		miniredisMutex.Lock()
-		defer miniredisMutex.Unlock()
-
-		// Check again now that we are the primary
-		if miniredisServer == nil {
-			var err error
-			// Create a new instance of miniredis for testing purposes
-			miniredisServer, err = miniredis.Run()
-			if err != nil {
-				miniredisErr = fmt.Errorf("failed to start miniredis server: %w", err)
-			}
-
-			// Configure the Redis client to use the miniredis instance
-			miniredisClient = redis.NewClient(&redis.Options{
-				Addr:     miniredisServer.Addr(),
-				Protocol: 2, // Needed because RESP3 is unstable for Redis Search
-			})
-
-			if err := instrumentClient(miniredisClient, resolved); err != nil {
-				miniredisServer.Close()
-				miniredisErr = err
-				return nil, miniredisErr
-			}
-
-			// Test the connection to ensure it's working
-			_, err = miniredisClient.Ping(context.Background()).Result()
-			if err != nil {
-				miniredisServer.Close()
-				miniredisErr = fmt.Errorf("failed to connect to miniredis client: %w", err)
-			}
+		var err error
+		miniredisServer, err = miniredis.Run()
+		if err != nil {
+			miniredisErr = fmt.Errorf("failed to start miniredis server: %w", err)
 		}
 	}
+	server := miniredisServer
+	err := miniredisErr
+	miniredisMutex.Unlock()
 
-	if miniredisErr != nil {
-		return nil, miniredisErr
+	if err != nil {
+		return nil, err
 	}
 
-	return miniredisClient, nil
+	client := redis.NewClient(&redis.Options{
+		Addr:     server.Addr(),
+		Protocol: 2, // Needed because RESP3 is unstable for Redis Search
+	})
+	if err := instrumentClient(client, resolved); err != nil {
+		_ = client.Close()
+		return nil, err
+	}
+
+	if _, err := client.Ping(context.Background()).Result(); err != nil {
+		_ = client.Close()
+		return nil, fmt.Errorf("failed to connect to miniredis client: %w", err)
+	}
+
+	return client, nil
 }

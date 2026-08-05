@@ -164,11 +164,11 @@ func cmdSigningProxy() *cobra.Command {
 
 				validRedirectUrl := fmt.Sprintf("%s://%s:%d%s", proto, ip, port, loginRedirectPath)
 				if marketplaceUrl != "" {
-					log.Printf("Configure host_application.initiate_session_url to %s", validRedirectUrl)
+					log.Printf("Configure hostApplication.initiateSessionUrl to %s", validRedirectUrl)
 				}
 
 				if adminUiUrl != "" {
-					log.Printf("Configure admin_api.ui.initiate_session_url to %s", validRedirectUrl)
+					log.Printf("Configure adminApi.ui.initiateSessionUrl to %s", validRedirectUrl)
 				}
 
 				marketplaceRedirectHandler := httpServerForLoginRedirect(validRedirectUrl, marketplaceUrl, adminUiUrl, tb)

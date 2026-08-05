@@ -247,7 +247,7 @@ describe('ConnectionList', () => {
                     jsonSchema: {
                         type: 'object',
                         properties: {
-                            calendarId: {
+                            calendar_id: {
                                 type: 'string',
                                 title: 'Calendar',
                                 enum: ['primary'],

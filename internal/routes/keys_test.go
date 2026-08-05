@@ -183,7 +183,29 @@ func TestKeys(t *testing.T) {
 			require.Equal(t, created.Id, resp.Id)
 			require.Equal(t, "root", resp.Namespace)
 			require.Equal(t, schemaapi.KeyStateActive, resp.State)
+			require.NotNil(t, resp.KeyData)
 			require.Equal(t, "test", resp.Labels["env"])
+		})
+
+		t.Run("global key omits configuration-backed key data", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				fmt.Sprintf("/keys/%s", database.GlobalKeyID),
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp KeyJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, database.GlobalKeyID, resp.Id)
+			require.Nil(t, resp.KeyData)
 		})
 
 		t.Run("redacts key data by default", func(t *testing.T) {

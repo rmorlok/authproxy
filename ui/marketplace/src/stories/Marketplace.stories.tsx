@@ -162,7 +162,7 @@ const setupStep = {
     type: 'object',
     required: ['calendar_id'],
     properties: {
-      calendarId: {
+      calendar_id: {
         type: 'string',
         title: 'Calendar',
         enum: ['primary', 'product', 'support'],
