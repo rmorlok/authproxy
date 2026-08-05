@@ -197,6 +197,25 @@ describe('ConnectionDetail', () => {
     expect(await screen.findByText('Rollback to v1 completed.')).toBeTruthy();
   });
 
+  it('explains when no other connector versions are eligible instead of rendering an empty selector', async () => {
+    const user = userEvent.setup();
+    vi.mocked(connectors.listVersions).mockResolvedValue({
+      status: 200,
+      data: {items: [{...connectorVersions[2]}]},
+    } as any);
+    renderConnectionDetail();
+
+    await screen.findByText('Connection');
+    await user.click(screen.getByRole('button', {name: 'actions'}));
+    await user.click(screen.getByRole('menuitem', {name: 'Change version…'}));
+
+    const dialog = await screen.findByRole('dialog', {name: 'Change connection version'});
+    expect(within(dialog).queryByRole('combobox', {name: 'Target version'})).toBeNull();
+    expect(within(dialog).getByRole('alert').textContent).toContain('No other active or primary versions are available.');
+    expect(within(dialog).getByRole('button', {name: 'Close'})).toBeTruthy();
+    expect(within(dialog).queryByRole('button', {name: 'Change version'})).toBeNull();
+  });
+
   it('renames the connection while keeping its id as the route identity', async () => {
     const user = userEvent.setup();
     renderConnectionDetail();
