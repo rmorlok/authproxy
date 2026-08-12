@@ -8,14 +8,17 @@ import Avatar from '@mui/material/Avatar';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import Drawer from '@mui/material/Drawer';
+import Menu from '@mui/material/Menu';
 import MuiLink from '@mui/material/Link';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
+import IconButton from '@mui/material/IconButton';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import LinkOffIcon from '@mui/icons-material/LinkOff';
 import ArchiveIcon from '@mui/icons-material/Archive';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
 import dayjs from 'dayjs';
 import {
   Connector,
@@ -29,6 +32,8 @@ import {
 import {Link, useNavigate} from 'react-router-dom';
 import {StateChip} from "./StateChip";
 import ConnectorVersionDetail from "./ConnectorVersionDetail";
+import ResourceIdentifier from './ResourceIdentifier';
+import ResourceMetadataMenuItems from './ResourceMetadataMenuItems';
 import AnnotationsEditor from "./AnnotationsEditor";
 import ResourceNameEditor from './ResourceNameEditor';
 
@@ -57,6 +62,8 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
   const [versionsError, setVersionsError] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
   const [selectedVersion, setSelectedVersion] = useState<number | undefined>(initialVersion);
+  const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
+  const [metadataNotice, setMetadataNotice] = useState<string | null>(null);
   const navigate = useNavigate();
   const actionInProgress = lifecycleStatus?.state === 'starting' || lifecycleStatus?.state === 'polling';
 
@@ -189,6 +196,9 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
 
   const lifecycleActionLabel = lifecycleStatus?.action === 'archive' ? 'Archive' : 'Disconnect all';
 
+  const openMenu = (event: React.MouseEvent<HTMLButtonElement>) => setMenuAnchorEl(event.currentTarget);
+  const closeMenu = () => setMenuAnchorEl(null);
+
   if (loading) return (<Box sx={{display: 'flex', justifyContent: 'center', p: 4}}><CircularProgress/></Box>);
   if (error) return (<Alert severity="error">{error}</Alert>);
   if (!conn) return null;
@@ -206,6 +216,31 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
           }}
         />
         <StateChip state={conn.state}/>
+        <Box sx={{flexGrow: 1}}/>
+        <IconButton aria-label="actions" onClick={openMenu} size="small">
+          <MoreVertIcon/>
+        </IconButton>
+        <Menu anchorEl={menuAnchorEl} open={Boolean(menuAnchorEl)} onClose={closeMenu} keepMounted>
+          <ResourceMetadataMenuItems
+            resource="connector"
+            name={conn.name}
+            labels={conn.labels}
+            annotations={conn.annotations}
+            onCloseMenu={closeMenu}
+            includeRename={false}
+            onUpdateLabels={async (labels) => {
+              await connectors.update(conn.id, {labels});
+              setMetadataNotice('Label changes were saved to a draft connector version.');
+              refreshConnectorData();
+            }}
+            onUpdateAnnotations={async (annotations) => {
+              await connectors.update(conn.id, {annotations});
+              setMetadataNotice('Annotation changes were saved to a draft connector version.');
+              refreshConnectorData();
+            }}
+            disabled={actionInProgress}
+          />
+        </Menu>
       </Stack>
 
       {conn.displayName && (
@@ -219,6 +254,8 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
       {conn.highlight && (
         <Alert severity="info">{conn.highlight}</Alert>
       )}
+
+      {metadataNotice && <Alert severity="info" onClose={() => setMetadataNotice(null)}>{metadataNotice}</Alert>}
 
       {conn.statusPageUrl && (
         <MuiLink href={conn.statusPageUrl} target="_blank" rel="noopener noreferrer" underline="hover" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
@@ -282,10 +319,7 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
       </Box>
 
       <Stack direction={{xs: 'column', sm: 'row'}} spacing={4}>
-        <Box>
-          <Typography variant="subtitle2" color="text.secondary">Connector ID</Typography>
-          <Typography variant="body1" sx={{wordBreak: 'break-all'}}>{conn.id}</Typography>
-        </Box>
+        <ResourceIdentifier value={conn.id} copyLabel="Copy connector id"/>
         <Box>
           <Typography variant="subtitle2" color="text.secondary">Labels</Typography>
           {conn.labels && Object.keys(conn.labels).length > 0 ? (
@@ -304,12 +338,7 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
         </Box>
       </Stack>
 
-      <AnnotationsEditor
-        annotations={conn.annotations}
-        readOnly
-        onPut={async () => {}}
-        onDelete={async () => {}}
-      />
+      <AnnotationsEditor annotations={conn.annotations} readOnly onPut={async () => {}} onDelete={async () => {}}/>
 
       <Stack direction={{xs: 'column', sm: 'row'}} spacing={4}>
         <Box>

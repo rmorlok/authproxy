@@ -15,6 +15,9 @@ import InputLabel from '@mui/material/InputLabel';
 import Select from '@mui/material/Select';
 import ListSubheader from '@mui/material/ListSubheader';
 import MenuItem from '@mui/material/MenuItem';
+import Menu from '@mui/material/Menu';
+import IconButton from '@mui/material/IconButton';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
 import {Link as RouterLink} from 'react-router-dom';
 import Link from '@mui/material/Link';
 import dayjs from 'dayjs';
@@ -27,6 +30,8 @@ import {
   keys,
   NAMESPACE_PATH_SEPARATOR,
 } from '@authproxy/api';
+import ResourceIdentifier from './ResourceIdentifier';
+import ResourceMetadataMenuItems from './ResourceMetadataMenuItems';
 import AnnotationsEditor from "./AnnotationsEditor";
 import ResourceNameEditor from './ResourceNameEditor';
 
@@ -59,6 +64,7 @@ export default function NamespaceDetail({namespacePath}: { namespacePath: string
   const [selectedKeyId, setSelectedKeyId] = useState<string>('');
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
 
   const ancestorPaths = getStrictAncestorPaths(namespacePath);
   const isRoot = ancestorPaths.length === 0;
@@ -151,6 +157,9 @@ export default function NamespaceDetail({namespacePath}: { namespacePath: string
   if (error) return (<Alert severity="error">{error}</Alert>);
   if (!ns) return null;
 
+  const openMenu = (event: React.MouseEvent<HTMLButtonElement>) => setMenuAnchorEl(event.currentTarget);
+  const closeMenu = () => setMenuAnchorEl(null);
+
   // Group keys by namespace for the selector
   const keysByNamespace: Record<string, Key[]> = {};
   for (const ek of ancestorKeys) {
@@ -160,21 +169,37 @@ export default function NamespaceDetail({namespacePath}: { namespacePath: string
 
   return (
     <Stack spacing={2} sx={{p: 2}}>
-      <Typography variant="h5">Namespace</Typography>
+      <Stack direction="row" justifyContent="space-between" alignItems="center">
+        <Typography variant="h5">Namespace</Typography>
+        <IconButton aria-label="actions" onClick={openMenu} size="small">
+          <MoreVertIcon/>
+        </IconButton>
+        <Menu anchorEl={menuAnchorEl} open={Boolean(menuAnchorEl)} onClose={closeMenu} keepMounted>
+          <ResourceMetadataMenuItems
+            resource="namespace"
+            name={ns.name}
+            labels={ns.labels}
+            annotations={ns.annotations}
+            onCloseMenu={closeMenu}
+            renameDisabledReason="Namespace names are derived from their immutable paths."
+            onUpdateLabels={async (labels) => {
+              await namespaces.update(namespacePath, {labels});
+              fetchNamespace();
+            }}
+            onUpdateAnnotations={async (annotations) => {
+              await namespaces.update(namespacePath, {annotations});
+              fetchNamespace();
+            }}
+            disabled={actionLoading}
+          />
+        </Menu>
+      </Stack>
 
       <ResourceNameEditor name={ns.name} resourceType="Namespace"/>
 
       {actionError && <Alert severity="error">{actionError}</Alert>}
 
-      <Box>
-        <Typography variant="subtitle2" color="text.secondary">Path</Typography>
-        <Typography variant="body1" component="code" sx={{
-          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-          bgcolor: 'action.hover', px: 1, py: 0.5, borderRadius: 0.5, fontSize: '0.9rem',
-        }}>
-          {ns.path}
-        </Typography>
-      </Box>
+      <ResourceIdentifier label="Path" value={ns.path} copyLabel="Copy namespace path"/>
 
       <Box>
         <Typography variant="subtitle2" color="text.secondary">State</Typography>
@@ -205,17 +230,7 @@ export default function NamespaceDetail({namespacePath}: { namespacePath: string
         )}
       </Box>
 
-      <AnnotationsEditor
-        annotations={ns.annotations}
-        onPut={async (key, value) => {
-          await namespaces.putAnnotation(namespacePath, key, value);
-          fetchNamespace();
-        }}
-        onDelete={async (key) => {
-          await namespaces.deleteAnnotation(namespacePath, key);
-          fetchNamespace();
-        }}
-      />
+      <AnnotationsEditor annotations={ns.annotations} readOnly onPut={async () => {}} onDelete={async () => {}}/>
 
       <Box>
         <Typography variant="subtitle2" color="text.secondary">Key</Typography>

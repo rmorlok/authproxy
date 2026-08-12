@@ -1070,7 +1070,7 @@ func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 }
 
 // @Summary		Update connection
-// @Description	Update a connection's name or labels
+// @Description	Update a connection's name, labels, or annotations
 // @Tags			connections
 // @Accept			json
 // @Produce		json
@@ -1112,6 +1112,13 @@ func (r *ConnectionsRoutes) update(gctx *gin.Context) {
 	if req.Labels != nil {
 		if err := database.ValidateUserLabels(req.Labels); err != nil {
 			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid labels: %s", err.Error()))
+			val.MarkErrorReturn()
+			return
+		}
+	}
+	if req.Annotations != nil {
+		if err := database.Annotations(req.Annotations).Validate(); err != nil {
+			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid annotations: %s", err.Error()))
 			val.MarkErrorReturn()
 			return
 		}
@@ -1165,6 +1172,23 @@ func (r *ConnectionsRoutes) update(gctx *gin.Context) {
 		}
 
 		// Re-fetch connection to get updated state with connector info
+		c, err = r.core.GetConnection(ctx, id)
+		if err != nil {
+			apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+			val.MarkErrorReturn()
+			return
+		}
+	}
+
+	if req.Annotations != nil {
+		_, err = r.db.UpdateConnectionAnnotations(ctx, id, req.Annotations)
+		if err != nil {
+			apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+			val.MarkErrorReturn()
+			return
+		}
+
+		// Re-fetch connection to get updated state with connector info.
 		c, err = r.core.GetConnection(ctx, id)
 		if err != nil {
 			apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))

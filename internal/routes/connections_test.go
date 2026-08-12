@@ -730,6 +730,30 @@ func TestConnections(t *testing.T) {
 			require.Equal(t, u, resp.Id)
 			require.Equal(t, ConnectionState(database.ConnectionStateSetup), resp.State)
 		})
+
+		t.Run("success with annotations", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPatch,
+				"/connections/"+u.String(),
+				util.JsonToReader(map[string]interface{}{
+					"annotations": map[string]string{"owner": "platform"},
+				}),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp ConnectionJson
+			err = json.Unmarshal(w.Body.Bytes(), &resp)
+			require.NoError(t, err)
+			require.Equal(t, "platform", resp.Annotations["owner"])
+		})
 	})
 
 	t.Run("get connection labels", func(t *testing.T) {

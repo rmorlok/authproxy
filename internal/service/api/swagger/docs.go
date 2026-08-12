@@ -1331,7 +1331,7 @@ const docTemplateApi = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Update a connection's name or labels",
+                "description": "Update a connection's name, labels, or annotations",
                 "consumes": [
                     "application/json"
                 ],

@@ -68,10 +68,6 @@ export interface ListConnectorVersionsParams {
     orderBy?: string;
 }
 
-export interface UpdateConnectorRequest {
-    name?: string;
-}
-
 export interface ConnectorLifecycleRequest {
     timeoutSeconds?: number;
 }
@@ -79,6 +75,13 @@ export interface ConnectorLifecycleRequest {
 export interface ConnectorLifecycleResponse {
     taskId: string;
     connectorId: string;
+}
+
+export interface UpdateConnectorRequest {
+    name?: string;
+    definition?: Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+    labels?: Record<string, string>;
+    annotations?: Record<string, string>;
 }
 
 /**
@@ -96,10 +99,10 @@ export const getConnector = (id: string) => {
 };
 
 /**
- * Update connector-level fields shared by every definition version.
+ * Update a connector name and/or its draft-version metadata.
  */
 export const updateConnector = (id: string, request: UpdateConnectorRequest) => {
-    return client.patch<Connector>(`/api/v1/connectors/${id}`, request);
+    return client.patch<ConnectorVersion>(`/api/v1/connectors/${id}`, request);
 };
 
 /**
