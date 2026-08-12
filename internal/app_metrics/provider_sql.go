@@ -171,10 +171,16 @@ func (s *sqlRecordStore) StoreRecords(ctx context.Context, records []*LogRecord)
 	return nil
 }
 
-func (s *sqlRecordStore) Migrate(ctx context.Context) error {
+func (s *sqlRecordStore) Migrate(ctx context.Context) (resultErr error) {
 	provider := string(s.cfg.GetProvider())
 	s.logger.Info("running app metrics database migrations", "provider", provider)
-	defer s.logger.Info("app metrics database migrations complete")
+	defer func() {
+		if resultErr != nil {
+			s.logger.Error("app metrics database migrations failed", "provider", provider, "error", resultErr)
+			return
+		}
+		s.logger.Info("app metrics database migrations complete", "provider", provider)
+	}()
 
 	d, err := iofs.New(appMetricsMigrationsFs, fmt.Sprintf("migrations/%s", provider))
 	if err != nil {
@@ -198,7 +204,7 @@ func (s *sqlRecordStore) Migrate(ctx context.Context) error {
 		}
 	}()
 
-	err = m.Up()
+	err = util.RunMigrationsUp(ctx, m)
 	if err != nil {
 		if errors.Is(err, migrate.ErrNoChange) {
 			s.logger.Info("no app metrics migrations required")

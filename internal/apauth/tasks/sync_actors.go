@@ -54,18 +54,17 @@ func (s *service) SyncConfiguredActorsExternalSource(ctx context.Context) error 
 			apredis.MutexOptionDetailedLockMetadata(),
 		)
 
-		if err := m.Lock(ctx); err != nil {
+		err := apredis.RunWithMutex(ctx, m, defaultSyncLockDuration, func(lockCtx context.Context) error {
+			return s.syncConfiguredActors(lockCtx, actors.All(), LabelValuePublicKeyDir)
+		})
+		if err != nil {
 			if apredis.MutexIsErrNotObtained(err) {
 				s.logger.Info("another sync is in progress, skipping this run")
 				return nil
 			}
-			return fmt.Errorf("failed to acquire sync lock: %w", err)
+			return fmt.Errorf("failed to run synchronized actor sync: %w", err)
 		}
-		defer func() {
-			if err := m.Unlock(ctx); err != nil {
-				s.logger.Warn("failed to release sync lock", "error", err)
-			}
-		}()
+		return nil
 	}
 
 	return s.syncConfiguredActors(ctx, actors.All(), LabelValuePublicKeyDir)

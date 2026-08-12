@@ -26,6 +26,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/rmorlok/authproxy/internal/aptelemetry"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
+	"github.com/rmorlok/authproxy/internal/util"
 )
 
 const (
@@ -125,11 +126,18 @@ type MigrateOption func(*migrateOptions)
 
 type migrateOptions struct {
 	postgresDB *sql.DB
+	ctx        context.Context
 }
 
 func WithPostgresMigrationDB(db *sql.DB) MigrateOption {
 	return func(o *migrateOptions) {
 		o.postgresDB = db
+	}
+}
+
+func WithMigrationContext(ctx context.Context) MigrateOption {
+	return func(o *migrateOptions) {
+		o.ctx = ctx
 	}
 }
 
@@ -142,6 +150,9 @@ func Migrate(root *sconfig.Root, logger *slog.Logger, opts ...MigrateOption) err
 	for _, opt := range opts {
 		opt(migrateOpts)
 	}
+	if migrateOpts.ctx == nil {
+		migrateOpts.ctx = context.Background()
+	}
 
 	switch cfg := root.Database.InnerVal.(type) {
 	case *sconfig.DatabaseSqlite:
@@ -150,20 +161,20 @@ func Migrate(root *sconfig.Root, logger *slog.Logger, opts ...MigrateOption) err
 			return fmt.Errorf("open workflow sqlite database: %w", err)
 		}
 		defer db.Close()
-		return migrateDB(db, "sqlite", "migrations/sqlite")
+		return migrateDB(migrateOpts.ctx, db, "sqlite", "migrations/sqlite")
 	case *sconfig.DatabasePostgres:
 		db := migrateOpts.postgresDB
 		if db == nil {
 			return fmt.Errorf("workflow postgres database handle is required")
 		}
 
-		return migrateDB(db, "postgres", "migrations/postgres")
+		return migrateDB(migrateOpts.ctx, db, "postgres", "migrations/postgres")
 	default:
 		return fmt.Errorf("workflow database provider %q is not supported", root.Database.GetProvider())
 	}
 }
 
-func migrateDB(db *sql.DB, driverName string, sourcePath string) error {
+func migrateDB(ctx context.Context, db *sql.DB, driverName string, sourcePath string) error {
 	var (
 		driver migratedatabase.Driver
 		err    error
@@ -193,7 +204,7 @@ func migrateDB(db *sql.DB, driverName string, sourcePath string) error {
 	if err != nil {
 		return fmt.Errorf("creating workflow migration: %w", err)
 	}
-	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+	if err := util.RunMigrationsUp(ctx, m); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return fmt.Errorf("running workflow migrations: %w", err)
 	}
 
