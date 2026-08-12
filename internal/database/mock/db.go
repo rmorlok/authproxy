@@ -894,36 +894,6 @@ func (mr *MockDBMockRecorder) GetConnectorDefinitionVersion(ctx, id, version int
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnectorDefinitionVersion", reflect.TypeOf((*MockDB)(nil).GetConnectorDefinitionVersion), ctx, id, version)
 }
 
-// GetConnectorDefinitionVersionForLabels mocks base method.
-func (m *MockDB) GetConnectorDefinitionVersionForLabels(ctx context.Context, labelSelector string) (*database.ConnectorWithDefinition, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetConnectorDefinitionVersionForLabels", ctx, labelSelector)
-	ret0, _ := ret[0].(*database.ConnectorWithDefinition)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetConnectorDefinitionVersionForLabels indicates an expected call of GetConnectorDefinitionVersionForLabels.
-func (mr *MockDBMockRecorder) GetConnectorDefinitionVersionForLabels(ctx, labelSelector interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnectorDefinitionVersionForLabels", reflect.TypeOf((*MockDB)(nil).GetConnectorDefinitionVersionForLabels), ctx, labelSelector)
-}
-
-// GetConnectorDefinitionVersionForLabelsAndVersion mocks base method.
-func (m *MockDB) GetConnectorDefinitionVersionForLabelsAndVersion(ctx context.Context, labelSelector string, version uint64) (*database.ConnectorWithDefinition, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetConnectorDefinitionVersionForLabelsAndVersion", ctx, labelSelector, version)
-	ret0, _ := ret[0].(*database.ConnectorWithDefinition)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetConnectorDefinitionVersionForLabelsAndVersion indicates an expected call of GetConnectorDefinitionVersionForLabelsAndVersion.
-func (mr *MockDBMockRecorder) GetConnectorDefinitionVersionForLabelsAndVersion(ctx, labelSelector, version interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnectorDefinitionVersionForLabelsAndVersion", reflect.TypeOf((*MockDB)(nil).GetConnectorDefinitionVersionForLabelsAndVersion), ctx, labelSelector, version)
-}
-
 // GetConnectorDefinitionVersionForState mocks base method.
 func (m *MockDB) GetConnectorDefinitionVersionForState(ctx context.Context, id apid.ID, state database.ConnectorDefinitionVersionState) (*database.ConnectorWithDefinition, error) {
 	m.ctrl.T.Helper()

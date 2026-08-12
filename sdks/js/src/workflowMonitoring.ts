@@ -2,8 +2,8 @@ import { AxiosRequestConfig } from 'axios';
 import { client } from './client';
 
 export interface WorkflowInstance {
-  instance_id: string;
-  execution_id: string;
+  instanceId: string;
+  executionId: string;
   parent?: WorkflowInstance;
 }
 
@@ -11,20 +11,20 @@ export type WorkflowInstanceState = 'active' | 'continued_as_new' | 'finished' |
 
 export interface WorkflowInstanceRef {
   instance?: WorkflowInstance;
-  created_at?: string;
-  completed_at?: string;
+  createdAt?: string;
+  completedAt?: string;
   state: WorkflowInstanceState;
   queue: string;
 }
 
 export interface WorkflowHistoryEvent {
   id?: string;
-  sequence_id?: number;
+  sequenceId?: number;
   type?: string;
   timestamp?: string;
-  schedule_event_id?: number;
+  scheduleEventId?: number;
   attributes?: unknown;
-  visible_at?: string;
+  visibleAt?: string;
 }
 
 export interface WorkflowInstanceInfo extends WorkflowInstanceRef {
@@ -32,7 +32,7 @@ export interface WorkflowInstanceInfo extends WorkflowInstanceRef {
 }
 
 export interface WorkflowInstanceTree extends WorkflowInstanceRef {
-  workflow_name?: string;
+  workflowName?: string;
   error?: boolean;
   children?: WorkflowInstanceTree[];
 }

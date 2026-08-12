@@ -300,7 +300,7 @@ actors:
   existingSecret: ""
   mountPath: /etc/authproxy/keys/actors
   # -- ACL permissions granted to every actor in the Secret. Mirrors
-  # AuthProxy's `system_auth.actors.permissions` block.
+  # AuthProxy's `systemAuth.actors.permissions` block.
   permissions:
     - namespace: "root.**"
       resources: ["*"]
@@ -308,7 +308,7 @@ actors:
 
 # -- Host application integration. AuthProxy redirects unauthenticated
 # users (e.g. anyone landing on the marketplace UI) to this URL with a
-# `return_to` query param so the host app can establish a session and
+# `returnToUrl` query param so the host app can establish a session and
 # bounce back. Required by the AuthProxy server's config validator —
 # leave the placeholder set, but point at a real host login URL for any
 # deployment that actually fronts a UI.
@@ -317,7 +317,7 @@ hostApplication:
 
 # -- Application metrics + HTTP request-event capture. The AuthProxy
 # server always wires up a metrics storage service, so the rendered
-# config must contain an `app_metrics` block with a database
+# config must contain an `appMetrics` block with a database
 # reference. By default the chart points it at the main `database`
 # block above — fine for small deploys, override for production
 # data-warehouse setups (e.g. a separate ClickHouse). Was named
@@ -325,22 +325,22 @@ hostApplication:
 # server's config schema.
 appMetrics:
   # -- Reuse the main `database` block. When true, the chart copies the
-  # main database section into `app_metrics.database`. Set to false to
+  # main database section into `appMetrics.database`. Set to false to
   # configure a dedicated `database:` block below.
   shareMainDatabase: true
-  # -- Run app_metrics schema migrations at startup.
+  # -- Run appMetrics schema migrations at startup.
   autoMigrate: true
-  # -- Dedicated database block for app_metrics. Only consulted when
+  # -- Dedicated database block for appMetrics. Only consulted when
   # `shareMainDatabase` is false. Same field shape as the top-level
   # `database` block (provider, host, port, etc.).
   database: {}
   # -- Secret whose values are exposed to the AuthProxy container for a
   # dedicated app-metrics database. The rendered app-metrics config can
-  # reference a value with `{ env_var: NAME }` without storing credentials in
+  # reference a value with `{ envVar: NAME }` without storing credentials in
   # the ConfigMap.
   existingSecret: ""
   # -- Full request/response recording mode (`never` or `always`).
-  # Lives under `request_events` in the rendered server config.
+  # Lives under `requestEvents` in the rendered server config.
   fullRequestRecording: never
 
 # -- Connector registry. AuthProxy refuses to start without the connectors
@@ -353,9 +353,6 @@ connectors:
   # connector schema docs for the format. Leave empty to manage connectors
   # exclusively through the admin API.
   loadFromList: []
-  # -- Labels used to identify connectors across reloads (matching the
-  # AuthProxy `connectors.identifying_labels` field).
-  identifyingLabels: []
 
 # -- Free-form config overlay merged on top of the rendered AuthProxy YAML.
 # Use this for fields the chart hasn't promoted to typed values yet.

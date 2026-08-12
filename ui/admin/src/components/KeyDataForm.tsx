@@ -45,38 +45,38 @@ export const keySourceTypes: { label: string; value: KeySourceType }[] = [
 const keySourceTypeLabels = new Map(keySourceTypes.map(opt => [opt.value, opt.label]));
 
 const providerFieldNames = [
-  'num_bytes',
+  'numBytes',
   'value',
   'base64',
-  'env_var',
-  'env_var_base64',
+  'envVar',
+  'envVarBase64',
   'path',
-  'aws_secret_id',
-  'aws_secret_key',
-  'aws_region',
-  'aws_kms_key_id',
-  'aws_kms_endpoint',
-  'cache_ttl',
-  'gcp_secret_name',
-  'gcp_project',
-  'gcp_secret_version',
-  'gcp_kms_key_name',
-  'gcp_location',
-  'gcp_key_ring',
-  'gcp_crypto_key',
-  'gcp_kms_endpoint',
-  'gcp_credentials_file',
-  'gcp_credentials_json',
-  'vault_address',
-  'vault_token',
-  'vault_path',
-  'vault_key',
-  'vault_namespace',
-  'vault_transit_mount_path',
-  'vault_transit_key_name',
+  'awsSecretId',
+  'awsSecretKey',
+  'awsRegion',
+  'awsKmsKeyId',
+  'awsKmsEndpoint',
+  'cacheTtl',
+  'gcpSecretName',
+  'gcpProject',
+  'gcpSecretVersion',
+  'gcpKmsKeyName',
+  'gcpLocation',
+  'gcpKeyRing',
+  'gcpCryptoKey',
+  'gcpKmsEndpoint',
+  'gcpCredentialsFile',
+  'gcpCredentialsJson',
+  'vaultAddress',
+  'vaultToken',
+  'vaultPath',
+  'vaultKey',
+  'vaultNamespace',
+  'vaultTransitMountPath',
+  'vaultTransitKeyName',
 ];
 
-const displayFieldNames = providerFieldNames.filter(key => key !== 'num_bytes');
+const displayFieldNames = providerFieldNames.filter(key => key !== 'numBytes');
 
 function stringField(fields: Record<string, string>, key: string): string {
   return fields[key]?.trim() || '';
@@ -111,7 +111,7 @@ function valueToString(value: unknown): string {
 
   const record = asRecord(value);
   if (!record) return '';
-  for (const key of ['value', 'base64', 'env_var', 'env_var_base64', 'path']) {
+  for (const key of ['value', 'base64', 'envVar', 'envVarBase64', 'path']) {
     if (hasOwn(record, key)) return valueToString(record[key]);
   }
   return '';
@@ -139,15 +139,15 @@ function keySourceTypeFromConfig(config?: KeyData): KeySourceType {
 
   if (hasOwn(data, 'value')) return 'value';
   if (hasOwn(data, 'base64')) return 'base64';
-  if (hasOwn(data, 'env_var')) return 'env_var';
-  if (hasOwn(data, 'env_var_base64')) return 'env_var_base64';
+  if (hasOwn(data, 'envVar')) return 'env_var';
+  if (hasOwn(data, 'envVarBase64')) return 'env_var_base64';
   if (hasOwn(data, 'path')) return 'file';
-  if (hasOwn(data, 'vault_transit_key_name')) return 'hashicorp_vault_transit';
-  if (hasOwn(data, 'vault_address')) return 'hashicorp_vault';
-  if (hasOwn(data, 'aws_kms_key_id')) return 'aws_kms';
-  if (hasOwn(data, 'aws_secret_id')) return 'aws_secret';
-  if (hasOwn(data, 'gcp_kms_key_name') || hasOwn(data, 'gcp_crypto_key')) return 'gcp_kms';
-  if (hasOwn(data, 'gcp_secret_name')) return 'gcp_secret';
+  if (hasOwn(data, 'vaultTransitKeyName')) return 'hashicorp_vault_transit';
+  if (hasOwn(data, 'vaultAddress')) return 'hashicorp_vault';
+  if (hasOwn(data, 'awsKmsKeyId')) return 'aws_kms';
+  if (hasOwn(data, 'awsSecretId')) return 'aws_secret';
+  if (hasOwn(data, 'gcpKmsKeyName') || hasOwn(data, 'gcpCryptoKey')) return 'gcp_kms';
+  if (hasOwn(data, 'gcpSecretName')) return 'gcp_secret';
   return 'random';
 }
 
@@ -160,8 +160,8 @@ export function createEmptyKeyDataFormState(): KeyDataFormState {
   return {
     type: 'random',
     fields: {
-      num_bytes: '32',
-      aws_credentials_type: 'implicit',
+      numBytes: '32',
+      awsCredentialsType: 'implicit',
     },
   };
 }
@@ -176,11 +176,11 @@ export function keyDataFormStateFromConfig(config?: KeyData): KeyDataFormState {
     setStringField(fields, field, data[field]);
   }
 
-  const awsCredentials = asRecord(data.aws_credentials);
+  const awsCredentials = asRecord(data.awsCredentials);
   if (awsCredentials) {
-    setStringField(fields, 'aws_credentials_type', awsCredentials.type);
-    setStringField(fields, 'aws_access_key_id', awsCredentials.access_key_id);
-    setStringField(fields, 'aws_secret_access_key', awsCredentials.secret_access_key);
+    setStringField(fields, 'awsCredentialsType', awsCredentials.type);
+    setStringField(fields, 'awsAccessKeyId', awsCredentials.accessKeyId);
+    setStringField(fields, 'awsSecretAccessKey', awsCredentials.secretAccessKey);
   }
 
   return {
@@ -200,8 +200,8 @@ export function keyDataDisplayFields(config?: KeyData): { key: string; value: st
       value: isRedactedPlaceholder(value) ? 'configured' : value,
     });
   }
-  if (state.fields.aws_credentials_type && state.fields.aws_credentials_type !== 'implicit') {
-    entries.push({key: 'aws_credentials_type', value: state.fields.aws_credentials_type});
+  if (state.fields.awsCredentialsType && state.fields.awsCredentialsType !== 'implicit') {
+    entries.push({key: 'awsCredentialsType', value: state.fields.awsCredentialsType});
   }
   return entries;
 }
@@ -211,11 +211,11 @@ export function buildKeyDataPayload(state: KeyDataFormState): Record<string, unk
 
   switch (state.type) {
     case 'random': {
-      const raw = stringField(fields, 'num_bytes');
+      const raw = stringField(fields, 'numBytes');
       const numBytes = raw ? parseInt(raw, 10) : 32;
       return {
         random: true,
-        num_bytes: Number.isFinite(numBytes) && numBytes > 0 ? numBytes : 32,
+        numBytes: Number.isFinite(numBytes) && numBytes > 0 ? numBytes : 32,
       };
     }
     case 'value':
@@ -223,60 +223,60 @@ export function buildKeyDataPayload(state: KeyDataFormState): Record<string, unk
     case 'base64':
       return compact({base64: secretPayloadValue(fields.base64)});
     case 'env_var':
-      return compact({env_var: fields.env_var});
+      return compact({envVar: fields.envVar});
     case 'env_var_base64':
-      return compact({env_var_base64: fields.env_var_base64});
+      return compact({envVarBase64: fields.envVarBase64});
     case 'file':
       return compact({path: fields.path});
     case 'aws_secret':
       return withAwsCredentials(compact({
-        aws_secret_id: fields.aws_secret_id,
-        aws_region: fields.aws_region,
-        aws_secret_key: fields.aws_secret_key,
-        cache_ttl: fields.cache_ttl,
+        awsSecretId: fields.awsSecretId,
+        awsRegion: fields.awsRegion,
+        awsSecretKey: fields.awsSecretKey,
+        cacheTtl: fields.cacheTtl,
       }), fields);
     case 'aws_kms':
       return withAwsCredentials(compact({
-        aws_kms_key_id: fields.aws_kms_key_id,
-        aws_region: fields.aws_region,
-        aws_kms_endpoint: fields.aws_kms_endpoint,
-        cache_ttl: fields.cache_ttl,
+        awsKmsKeyId: fields.awsKmsKeyId,
+        awsRegion: fields.awsRegion,
+        awsKmsEndpoint: fields.awsKmsEndpoint,
+        cacheTtl: fields.cacheTtl,
       }), fields);
     case 'gcp_secret':
       return compact({
-        gcp_secret_name: fields.gcp_secret_name,
-        gcp_project: fields.gcp_project,
-        gcp_secret_version: fields.gcp_secret_version,
-        cache_ttl: fields.cache_ttl,
+        gcpSecretName: fields.gcpSecretName,
+        gcpProject: fields.gcpProject,
+        gcpSecretVersion: fields.gcpSecretVersion,
+        cacheTtl: fields.cacheTtl,
       });
     case 'gcp_kms':
       return compact({
-        gcp_kms_key_name: fields.gcp_kms_key_name,
-        gcp_project: fields.gcp_project,
-        gcp_location: fields.gcp_location,
-        gcp_key_ring: fields.gcp_key_ring,
-        gcp_crypto_key: fields.gcp_crypto_key,
-        gcp_kms_endpoint: fields.gcp_kms_endpoint,
-        gcp_credentials_file: fields.gcp_credentials_file,
-        gcp_credentials_json: secretPayloadValue(fields.gcp_credentials_json),
-        cache_ttl: fields.cache_ttl,
+        gcpKmsKeyName: fields.gcpKmsKeyName,
+        gcpProject: fields.gcpProject,
+        gcpLocation: fields.gcpLocation,
+        gcpKeyRing: fields.gcpKeyRing,
+        gcpCryptoKey: fields.gcpCryptoKey,
+        gcpKmsEndpoint: fields.gcpKmsEndpoint,
+        gcpCredentialsFile: fields.gcpCredentialsFile,
+        gcpCredentialsJson: secretPayloadValue(fields.gcpCredentialsJson),
+        cacheTtl: fields.cacheTtl,
       });
     case 'hashicorp_vault':
       return compact({
-        vault_address: fields.vault_address,
-        vault_token: secretPayloadValue(fields.vault_token),
-        vault_path: fields.vault_path,
-        vault_key: fields.vault_key,
-        cache_ttl: fields.cache_ttl,
+        vaultAddress: fields.vaultAddress,
+        vaultToken: secretPayloadValue(fields.vaultToken),
+        vaultPath: fields.vaultPath,
+        vaultKey: fields.vaultKey,
+        cacheTtl: fields.cacheTtl,
       });
     case 'hashicorp_vault_transit':
       return compact({
-        vault_address: fields.vault_address,
-        vault_token: secretPayloadValue(fields.vault_token),
-        vault_namespace: fields.vault_namespace,
-        vault_transit_mount_path: fields.vault_transit_mount_path,
-        vault_transit_key_name: fields.vault_transit_key_name,
-        cache_ttl: fields.cache_ttl,
+        vaultAddress: fields.vaultAddress,
+        vaultToken: secretPayloadValue(fields.vaultToken),
+        vaultNamespace: fields.vaultNamespace,
+        vaultTransitMountPath: fields.vaultTransitMountPath,
+        vaultTransitKeyName: fields.vaultTransitKeyName,
+        cacheTtl: fields.cacheTtl,
       });
     default:
       return undefined;
@@ -284,15 +284,15 @@ export function buildKeyDataPayload(state: KeyDataFormState): Record<string, unk
 }
 
 function withAwsCredentials(payload: Record<string, unknown>, fields: Record<string, string>): Record<string, unknown> {
-  const credentialsType = stringField(fields, 'aws_credentials_type');
+  const credentialsType = stringField(fields, 'awsCredentialsType');
   if (credentialsType === 'access_key') {
-    payload.aws_credentials = compact({
+    payload.awsCredentials = compact({
       type: 'access_key',
-      access_key_id: secretPayloadValue(fields.aws_access_key_id),
-      secret_access_key: secretPayloadValue(fields.aws_secret_access_key),
+      accessKeyId: secretPayloadValue(fields.awsAccessKeyId),
+      secretAccessKey: secretPayloadValue(fields.awsSecretAccessKey),
     });
   } else if (credentialsType === 'implicit') {
-    payload.aws_credentials = {type: 'implicit'};
+    payload.awsCredentials = {type: 'implicit'};
   }
   return payload;
 }
@@ -310,14 +310,14 @@ export function validateKeyDataFormState(state: KeyDataFormState): string | null
     return isRedactedPlaceholder(fields[field]) ? `${label} must be re-entered or cleared to update key data` : null;
   };
   const awsCredentialsError = (): string | null => {
-    if (stringField(fields, 'aws_credentials_type') !== 'access_key') return null;
-    return requiredSecret('aws_access_key_id', 'AWS Access Key ID') ||
-      requiredSecret('aws_secret_access_key', 'AWS Secret Access Key');
+    if (stringField(fields, 'awsCredentialsType') !== 'access_key') return null;
+    return requiredSecret('awsAccessKeyId', 'AWS Access Key ID') ||
+      requiredSecret('awsSecretAccessKey', 'AWS Secret Access Key');
   };
 
   switch (state.type) {
     case 'random': {
-      const numBytes = parseInt(stringField(fields, 'num_bytes') || '32', 10);
+      const numBytes = parseInt(stringField(fields, 'numBytes') || '32', 10);
       return Number.isFinite(numBytes) && numBytes > 0 ? null : 'Number of Bytes must be greater than zero';
     }
     case 'value':
@@ -325,36 +325,36 @@ export function validateKeyDataFormState(state: KeyDataFormState): string | null
     case 'base64':
       return requiredSecret('base64', 'Base64 Encoded Key');
     case 'env_var':
-      return required('env_var', 'Environment Variable Name');
+      return required('envVar', 'Environment Variable Name');
     case 'env_var_base64':
-      return required('env_var_base64', 'Base64 Environment Variable Name');
+      return required('envVarBase64', 'Base64 Environment Variable Name');
     case 'file':
       return required('path', 'File Path');
     case 'aws_secret':
-      return required('aws_secret_id', 'AWS Secret ID') || awsCredentialsError();
+      return required('awsSecretId', 'AWS Secret ID') || awsCredentialsError();
     case 'aws_kms':
-      return required('aws_kms_key_id', 'AWS KMS Key ID') || awsCredentialsError();
+      return required('awsKmsKeyId', 'AWS KMS Key ID') || awsCredentialsError();
     case 'gcp_secret':
-      return required('gcp_secret_name', 'GCP Secret Name');
+      return required('gcpSecretName', 'GCP Secret Name');
     case 'gcp_kms': {
-      const credentialsJSONError = optionalSecret('gcp_credentials_json', 'GCP Credentials JSON');
+      const credentialsJSONError = optionalSecret('gcpCredentialsJson', 'GCP Credentials JSON');
       if (credentialsJSONError) return credentialsJSONError;
-      if (stringField(fields, 'gcp_kms_key_name')) return null;
-      return required('gcp_project', 'GCP Project') ||
-        required('gcp_location', 'GCP Location') ||
-        required('gcp_key_ring', 'GCP Key Ring') ||
-        required('gcp_crypto_key', 'GCP Crypto Key');
+      if (stringField(fields, 'gcpKmsKeyName')) return null;
+      return required('gcpProject', 'GCP Project') ||
+        required('gcpLocation', 'GCP Location') ||
+        required('gcpKeyRing', 'GCP Key Ring') ||
+        required('gcpCryptoKey', 'GCP Crypto Key');
     }
     case 'hashicorp_vault':
-      return required('vault_address', 'Vault Address') ||
-        requiredSecret('vault_token', 'Vault Token') ||
-        required('vault_path', 'Vault Path') ||
-        required('vault_key', 'Vault Key');
+      return required('vaultAddress', 'Vault Address') ||
+        requiredSecret('vaultToken', 'Vault Token') ||
+        required('vaultPath', 'Vault Path') ||
+        required('vaultKey', 'Vault Key');
     case 'hashicorp_vault_transit': {
-      const vaultTokenError = optionalSecret('vault_token', 'Vault Token');
+      const vaultTokenError = optionalSecret('vaultToken', 'Vault Token');
       if (vaultTokenError) return vaultTokenError;
-      return required('vault_address', 'Vault Address') ||
-        required('vault_transit_key_name', 'Vault Transit Key Name');
+      return required('vaultAddress', 'Vault Address') ||
+        required('vaultTransitKeyName', 'Vault Transit Key Name');
     }
     default:
       return 'Unsupported key source';
@@ -374,8 +374,8 @@ export default function KeyDataForm({
     onChange({
       type,
       fields: {
-        num_bytes: '32',
-        aws_credentials_type: 'implicit',
+        numBytes: '32',
+        awsCredentialsType: 'implicit',
       },
     });
   };
@@ -428,8 +428,8 @@ function renderKeySourceFields(
           {...common}
           label="Number of Bytes"
           type="number"
-          value={fieldValue('num_bytes', '32')}
-          onChange={(e) => updateField('num_bytes', e.target.value)}
+          value={fieldValue('numBytes', '32')}
+          onChange={(e) => updateField('numBytes', e.target.value)}
         />
       );
     case 'value':
@@ -455,8 +455,8 @@ function renderKeySourceFields(
         <TextField
           {...common}
           label="Environment Variable Name"
-          value={fieldValue('env_var')}
-          onChange={(e) => updateField('env_var', e.target.value)}
+          value={fieldValue('envVar')}
+          onChange={(e) => updateField('envVar', e.target.value)}
         />
       );
     case 'env_var_base64':
@@ -464,8 +464,8 @@ function renderKeySourceFields(
         <TextField
           {...common}
           label="Base64 Environment Variable Name"
-          value={fieldValue('env_var_base64')}
-          onChange={(e) => updateField('env_var_base64', e.target.value)}
+          value={fieldValue('envVarBase64')}
+          onChange={(e) => updateField('envVarBase64', e.target.value)}
         />
       );
     case 'file':
@@ -483,26 +483,26 @@ function renderKeySourceFields(
           <TextField
             {...common}
             label="AWS Secret ID"
-            value={fieldValue('aws_secret_id')}
-            onChange={(e) => updateField('aws_secret_id', e.target.value)}
+            value={fieldValue('awsSecretId')}
+            onChange={(e) => updateField('awsSecretId', e.target.value)}
           />
           <TextField
             {...common}
             label="AWS Region"
-            value={fieldValue('aws_region')}
-            onChange={(e) => updateField('aws_region', e.target.value)}
+            value={fieldValue('awsRegion')}
+            onChange={(e) => updateField('awsRegion', e.target.value)}
           />
           <TextField
             {...common}
             label="AWS Secret Key"
-            value={fieldValue('aws_secret_key')}
-            onChange={(e) => updateField('aws_secret_key', e.target.value)}
+            value={fieldValue('awsSecretKey')}
+            onChange={(e) => updateField('awsSecretKey', e.target.value)}
           />
           <TextField
             {...common}
             label="Cache TTL"
-            value={fieldValue('cache_ttl')}
-            onChange={(e) => updateField('cache_ttl', e.target.value)}
+            value={fieldValue('cacheTtl')}
+            onChange={(e) => updateField('cacheTtl', e.target.value)}
           />
           {renderAwsCredentials(value, updateField, disabled)}
         </Stack>
@@ -513,26 +513,26 @@ function renderKeySourceFields(
           <TextField
             {...common}
             label="AWS KMS Key ID"
-            value={fieldValue('aws_kms_key_id')}
-            onChange={(e) => updateField('aws_kms_key_id', e.target.value)}
+            value={fieldValue('awsKmsKeyId')}
+            onChange={(e) => updateField('awsKmsKeyId', e.target.value)}
           />
           <TextField
             {...common}
             label="AWS Region"
-            value={fieldValue('aws_region')}
-            onChange={(e) => updateField('aws_region', e.target.value)}
+            value={fieldValue('awsRegion')}
+            onChange={(e) => updateField('awsRegion', e.target.value)}
           />
           <TextField
             {...common}
             label="AWS KMS Endpoint"
-            value={fieldValue('aws_kms_endpoint')}
-            onChange={(e) => updateField('aws_kms_endpoint', e.target.value)}
+            value={fieldValue('awsKmsEndpoint')}
+            onChange={(e) => updateField('awsKmsEndpoint', e.target.value)}
           />
           <TextField
             {...common}
             label="Cache TTL"
-            value={fieldValue('cache_ttl')}
-            onChange={(e) => updateField('cache_ttl', e.target.value)}
+            value={fieldValue('cacheTtl')}
+            onChange={(e) => updateField('cacheTtl', e.target.value)}
           />
           {renderAwsCredentials(value, updateField, disabled)}
         </Stack>
@@ -543,26 +543,26 @@ function renderKeySourceFields(
           <TextField
             {...common}
             label="GCP Secret Name"
-            value={fieldValue('gcp_secret_name')}
-            onChange={(e) => updateField('gcp_secret_name', e.target.value)}
+            value={fieldValue('gcpSecretName')}
+            onChange={(e) => updateField('gcpSecretName', e.target.value)}
           />
           <TextField
             {...common}
             label="GCP Project"
-            value={fieldValue('gcp_project')}
-            onChange={(e) => updateField('gcp_project', e.target.value)}
+            value={fieldValue('gcpProject')}
+            onChange={(e) => updateField('gcpProject', e.target.value)}
           />
           <TextField
             {...common}
             label="GCP Secret Version"
-            value={fieldValue('gcp_secret_version')}
-            onChange={(e) => updateField('gcp_secret_version', e.target.value)}
+            value={fieldValue('gcpSecretVersion')}
+            onChange={(e) => updateField('gcpSecretVersion', e.target.value)}
           />
           <TextField
             {...common}
             label="Cache TTL"
-            value={fieldValue('cache_ttl')}
-            onChange={(e) => updateField('cache_ttl', e.target.value)}
+            value={fieldValue('cacheTtl')}
+            onChange={(e) => updateField('cacheTtl', e.target.value)}
           />
         </Stack>
       );
@@ -572,58 +572,58 @@ function renderKeySourceFields(
           <TextField
             {...common}
             label="GCP KMS Key Name"
-            value={fieldValue('gcp_kms_key_name')}
-            onChange={(e) => updateField('gcp_kms_key_name', e.target.value)}
+            value={fieldValue('gcpKmsKeyName')}
+            onChange={(e) => updateField('gcpKmsKeyName', e.target.value)}
           />
           <TextField
             {...common}
             label="GCP Project"
-            value={fieldValue('gcp_project')}
-            onChange={(e) => updateField('gcp_project', e.target.value)}
+            value={fieldValue('gcpProject')}
+            onChange={(e) => updateField('gcpProject', e.target.value)}
           />
           <TextField
             {...common}
             label="GCP Location"
-            value={fieldValue('gcp_location')}
-            onChange={(e) => updateField('gcp_location', e.target.value)}
+            value={fieldValue('gcpLocation')}
+            onChange={(e) => updateField('gcpLocation', e.target.value)}
           />
           <TextField
             {...common}
             label="GCP Key Ring"
-            value={fieldValue('gcp_key_ring')}
-            onChange={(e) => updateField('gcp_key_ring', e.target.value)}
+            value={fieldValue('gcpKeyRing')}
+            onChange={(e) => updateField('gcpKeyRing', e.target.value)}
           />
           <TextField
             {...common}
             label="GCP Crypto Key"
-            value={fieldValue('gcp_crypto_key')}
-            onChange={(e) => updateField('gcp_crypto_key', e.target.value)}
+            value={fieldValue('gcpCryptoKey')}
+            onChange={(e) => updateField('gcpCryptoKey', e.target.value)}
           />
           <TextField
             {...common}
             label="GCP KMS Endpoint"
-            value={fieldValue('gcp_kms_endpoint')}
-            onChange={(e) => updateField('gcp_kms_endpoint', e.target.value)}
+            value={fieldValue('gcpKmsEndpoint')}
+            onChange={(e) => updateField('gcpKmsEndpoint', e.target.value)}
           />
           <TextField
             {...common}
             label="GCP Credentials File"
-            value={fieldValue('gcp_credentials_file')}
-            onChange={(e) => updateField('gcp_credentials_file', e.target.value)}
+            value={fieldValue('gcpCredentialsFile')}
+            onChange={(e) => updateField('gcpCredentialsFile', e.target.value)}
           />
           <TextField
             {...common}
             label="GCP Credentials JSON"
-            value={fieldValue('gcp_credentials_json')}
-            onChange={(e) => updateField('gcp_credentials_json', e.target.value)}
+            value={fieldValue('gcpCredentialsJson')}
+            onChange={(e) => updateField('gcpCredentialsJson', e.target.value)}
             multiline
             minRows={3}
           />
           <TextField
             {...common}
             label="Cache TTL"
-            value={fieldValue('cache_ttl')}
-            onChange={(e) => updateField('cache_ttl', e.target.value)}
+            value={fieldValue('cacheTtl')}
+            onChange={(e) => updateField('cacheTtl', e.target.value)}
           />
         </Stack>
       );
@@ -633,32 +633,32 @@ function renderKeySourceFields(
           <TextField
             {...common}
             label="Vault Address"
-            value={fieldValue('vault_address')}
-            onChange={(e) => updateField('vault_address', e.target.value)}
+            value={fieldValue('vaultAddress')}
+            onChange={(e) => updateField('vaultAddress', e.target.value)}
           />
           <TextField
             {...common}
             label="Vault Token"
-            value={fieldValue('vault_token')}
-            onChange={(e) => updateField('vault_token', e.target.value)}
+            value={fieldValue('vaultToken')}
+            onChange={(e) => updateField('vaultToken', e.target.value)}
           />
           <TextField
             {...common}
             label="Vault Path"
-            value={fieldValue('vault_path')}
-            onChange={(e) => updateField('vault_path', e.target.value)}
+            value={fieldValue('vaultPath')}
+            onChange={(e) => updateField('vaultPath', e.target.value)}
           />
           <TextField
             {...common}
             label="Vault Key"
-            value={fieldValue('vault_key')}
-            onChange={(e) => updateField('vault_key', e.target.value)}
+            value={fieldValue('vaultKey')}
+            onChange={(e) => updateField('vaultKey', e.target.value)}
           />
           <TextField
             {...common}
             label="Cache TTL"
-            value={fieldValue('cache_ttl')}
-            onChange={(e) => updateField('cache_ttl', e.target.value)}
+            value={fieldValue('cacheTtl')}
+            onChange={(e) => updateField('cacheTtl', e.target.value)}
           />
         </Stack>
       );
@@ -668,38 +668,38 @@ function renderKeySourceFields(
           <TextField
             {...common}
             label="Vault Address"
-            value={fieldValue('vault_address')}
-            onChange={(e) => updateField('vault_address', e.target.value)}
+            value={fieldValue('vaultAddress')}
+            onChange={(e) => updateField('vaultAddress', e.target.value)}
           />
           <TextField
             {...common}
             label="Vault Token"
-            value={fieldValue('vault_token')}
-            onChange={(e) => updateField('vault_token', e.target.value)}
+            value={fieldValue('vaultToken')}
+            onChange={(e) => updateField('vaultToken', e.target.value)}
           />
           <TextField
             {...common}
             label="Vault Namespace"
-            value={fieldValue('vault_namespace')}
-            onChange={(e) => updateField('vault_namespace', e.target.value)}
+            value={fieldValue('vaultNamespace')}
+            onChange={(e) => updateField('vaultNamespace', e.target.value)}
           />
           <TextField
             {...common}
             label="Vault Transit Mount Path"
-            value={fieldValue('vault_transit_mount_path')}
-            onChange={(e) => updateField('vault_transit_mount_path', e.target.value)}
+            value={fieldValue('vaultTransitMountPath')}
+            onChange={(e) => updateField('vaultTransitMountPath', e.target.value)}
           />
           <TextField
             {...common}
             label="Vault Transit Key Name"
-            value={fieldValue('vault_transit_key_name')}
-            onChange={(e) => updateField('vault_transit_key_name', e.target.value)}
+            value={fieldValue('vaultTransitKeyName')}
+            onChange={(e) => updateField('vaultTransitKeyName', e.target.value)}
           />
           <TextField
             {...common}
             label="Cache TTL"
-            value={fieldValue('cache_ttl')}
-            onChange={(e) => updateField('cache_ttl', e.target.value)}
+            value={fieldValue('cacheTtl')}
+            onChange={(e) => updateField('cacheTtl', e.target.value)}
           />
         </Stack>
       );
@@ -713,7 +713,7 @@ function renderAwsCredentials(
   updateField: (field: string, value: string) => void,
   disabled?: boolean,
 ) {
-  const credentialsType = value.fields.aws_credentials_type || 'implicit';
+  const credentialsType = value.fields.awsCredentialsType || 'implicit';
   return (
     <Stack spacing={2}>
       <FormControl fullWidth disabled={disabled}>
@@ -722,7 +722,7 @@ function renderAwsCredentials(
           labelId="aws-credentials-type-label"
           value={credentialsType}
           label="AWS Credentials"
-          onChange={(e) => updateField('aws_credentials_type', e.target.value)}
+          onChange={(e) => updateField('awsCredentialsType', e.target.value)}
         >
           <MenuItem value="">Default</MenuItem>
           <MenuItem value="implicit">Implicit</MenuItem>
@@ -735,15 +735,15 @@ function renderAwsCredentials(
             fullWidth
             disabled={disabled}
             label="AWS Access Key ID"
-            value={value.fields.aws_access_key_id || ''}
-            onChange={(e) => updateField('aws_access_key_id', e.target.value)}
+            value={value.fields.awsAccessKeyId || ''}
+            onChange={(e) => updateField('awsAccessKeyId', e.target.value)}
           />
           <TextField
             fullWidth
             disabled={disabled}
             label="AWS Secret Access Key"
-            value={value.fields.aws_secret_access_key || ''}
-            onChange={(e) => updateField('aws_secret_access_key', e.target.value)}
+            value={value.fields.awsSecretAccessKey || ''}
+            onChange={(e) => updateField('awsSecretAccessKey', e.target.value)}
           />
         </Stack>
       )}

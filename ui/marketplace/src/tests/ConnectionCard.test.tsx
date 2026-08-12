@@ -92,26 +92,28 @@ const renderConnectionCard = (connection: Connection, store = createMockStore(ro
 describe('ConnectionCard', () => {
     const mockConnector: Connector = {
         id: 'google-calendar',
+        name: 'google-calendar',
         namespace: 'root',
         version: 1,
         state: ConnectorVersionState.ACTIVE,
-        display_name: 'Google Calendar',
+        displayName: 'Google Calendar',
         description: 'Connect to your Google Calendar to manage events and appointments.',
         highlight: undefined,
         logo: 'https://example.com/google-calendar-logo.png',
-        has_configure: false,
-        created_at: '2023-04-01T12:00:00Z',
-        updated_at: '2023-04-01T12:00:00Z',
+        hasConfigure: false,
+        createdAt: '2023-04-01T12:00:00Z',
+        updatedAt: '2023-04-01T12:00:00Z',
     };
 
     const baseConnection: Connection = {
         id: '123e4567-e89b-12d3-a456-426614174000',
+        name: 'primary-calendar',
         namespace: 'root',
         connector: mockConnector,
         state: ConnectionState.CONFIGURED,
-        health_state: ConnectionHealthState.HEALTHY,
-        created_at: '2023-04-01T12:00:00Z',
-        updated_at: '2023-04-01T12:00:00Z',
+        healthState: ConnectionHealthState.HEALTHY,
+        createdAt: '2023-04-01T12:00:00Z',
+        updatedAt: '2023-04-01T12:00:00Z',
     };
 
     beforeEach(() => {
@@ -122,7 +124,7 @@ describe('ConnectionCard', () => {
         vi.mocked(tasks.pollForTaskFinalized).mockReset();
         vi.mocked(connections.disconnect).mockResolvedValue({
             data: {
-                task_id: 'task-123',
+                taskId: 'task-123',
                 connection: {
                     ...baseConnection,
                     state: ConnectionState.DISCONNECTING,
@@ -201,11 +203,11 @@ describe('ConnectionCard', () => {
             data: {
                 id: setupConnection.id,
                 type: 'form',
-                step_id: 'calendar',
-                step_title: 'Select a Calendar',
-                step_description: 'Choose which calendar should be managed.',
-                json_schema: {type: 'object'},
-                ui_schema: {type: 'VerticalLayout'},
+                stepId: 'calendar',
+                stepTitle: 'Select a Calendar',
+                stepDescription: 'Choose which calendar should be managed.',
+                jsonSchema: {type: 'object'},
+                uiSchema: {type: 'VerticalLayout'},
             },
         } as any);
 
@@ -233,9 +235,9 @@ describe('ConnectionCard', () => {
             ...baseConnection,
             connector: {
                 ...mockConnector,
-                has_configure: true,
+                hasConfigure: true,
             },
-            health_state: ConnectionHealthState.UNHEALTHY,
+            healthState: ConnectionHealthState.UNHEALTHY,
         };
 
         renderConnectionCard(unhealthyConnection, store);
@@ -263,7 +265,7 @@ describe('ConnectionCard', () => {
             ...baseConnection,
             connector: {
                 ...mockConnector,
-                has_configure: true,
+                hasConfigure: true,
             },
         };
 

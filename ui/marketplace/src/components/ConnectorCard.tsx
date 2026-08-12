@@ -37,7 +37,7 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
       <ConnectorLogo connector={connector} variant="media" />
       <CardContent sx={{ flexGrow: 1, width: '100%' }}>
         <Typography gutterBottom variant="h5" component="div">
-          {connector.display_name}
+          {connector.displayName}
         </Typography>
         {displayText && (
           <Box sx={{
@@ -89,7 +89,7 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
         <CardActionArea
           onClick={() => onDetails(connector.id)}
           sx={{ flexGrow: 1, alignItems: 'stretch', display: 'flex', flexDirection: 'column' }}
-          aria-label={`View ${connector.display_name} details`}
+          aria-label={`View ${connector.displayName} details`}
         >
           {cardBody}
         </CardActionArea>

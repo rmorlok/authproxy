@@ -35,27 +35,27 @@ type RequestEventsRoutes struct {
 type ListRequestEventsQuery struct {
 	Cursor     *string `form:"cursor"`
 	LimitVal   *int32  `form:"limit"`
-	OrderByVal *string `form:"order_by"`
+	OrderByVal *string `form:"orderBy"`
 
 	/*
 	 * Filters
 	 */
 	Namespace                *string  `form:"namespace"`
-	RequestType              *string  `form:"request_type"`
-	CorrelationId            *string  `form:"correlation_id"`
-	ConnectionId             *apid.ID `form:"connection_id" swaggertype:"string"`
-	ConnectorType            *string  `form:"connector_type"`
-	ConnectorId              *apid.ID `form:"connector_id" swaggertype:"string"`
-	ConnectorVersion         *uint64  `form:"connector_version"`
+	RequestType              *string  `form:"requestType"`
+	CorrelationId            *string  `form:"correlationId"`
+	ConnectionId             *apid.ID `form:"connectionId" swaggertype:"string"`
+	ConnectorType            *string  `form:"connectorType"`
+	ConnectorId              *apid.ID `form:"connectorId" swaggertype:"string"`
+	ConnectorVersion         *uint64  `form:"connectorVersion"`
 	Method                   *string  `form:"method"`
-	StatusCode               *int     `form:"status_code"`
-	StatusCodeRangeInclusive *string  `form:"status_code_range"`
-	TimestampRange           *string  `form:"timestamp_range"`
+	StatusCode               *int     `form:"statusCode"`
+	StatusCodeRangeInclusive *string  `form:"statusCodeRange"`
+	TimestampRange           *string  `form:"timestampRange"`
 	Path                     *string  `form:"path"`
-	PathRegex                *string  `form:"path_regex"`
-	LabelSelector            *string  `form:"label_selector"`
-	ResponseSource           *string  `form:"response_source"`
-	RateLimitId              *apid.ID `form:"rate_limit_id" swaggertype:"string"`
+	PathRegex                *string  `form:"pathRegex"`
+	LabelSelector            *string  `form:"labelSelector"`
+	ResponseSource           *string  `form:"responseSource"`
+	RateLimitId              *apid.ID `form:"rateLimitId" swaggertype:"string"`
 }
 
 func (q *ListRequestEventsQuery) ApplyToBuilder(
@@ -582,21 +582,21 @@ func (r *RequestEventsRoutes) get(gctx *gin.Context) {
 // @Produce		json
 // @Param			cursor				query		string	false	"Pagination cursor"
 // @Param			limit				query		integer	false	"Maximum number of results to return"
-// @Param			order_by			query		string	false	"Order by field (e.g., 'timestamp:desc')"
+// @Param			orderBy			query		string	false	"Order by field (e.g., 'timestamp:desc')"
 // @Param			namespace			query		string	false	"Filter by namespace"
-// @Param			request_type		query		string	false	"Filter by request type"
-// @Param			correlation_id		query		string	false	"Filter by correlation ID"
-// @Param			connection_id		query		string	false	"Filter by connection UUID"
-// @Param			connector_type		query		string	false	"Filter by connector type"
-// @Param			connector_id		query		string	false	"Filter by connector UUID"
-// @Param			connector_version	query		integer	false	"Filter by connector version"
+// @Param			requestType		query		string	false	"Filter by request type"
+// @Param			correlationId		query		string	false	"Filter by correlation ID"
+// @Param			connectionId		query		string	false	"Filter by connection UUID"
+// @Param			connectorType		query		string	false	"Filter by connector type"
+// @Param			connectorId		query		string	false	"Filter by connector UUID"
+// @Param			connectorVersion	query		integer	false	"Filter by connector version"
 // @Param			method				query		string	false	"Filter by HTTP method"
-// @Param			status_code			query		integer	false	"Filter by exact status code"
-// @Param			status_code_range	query		string	false	"Filter by status code range (e.g., '200-299')"
-// @Param			timestamp_range		query		string	false	"Filter by timestamp range"
+// @Param			statusCode			query		integer	false	"Filter by exact status code"
+// @Param			statusCodeRange	query		string	false	"Filter by status code range (e.g., '200-299')"
+// @Param			timestampRange		query		string	false	"Filter by timestamp range"
 // @Param			path				query		string	false	"Filter by exact path"
-// @Param			path_regex			query		string	false	"Filter by path regex"
-// @Param			label_selector		query		string	false	"Filter by label selector (e.g., 'env=prod,team=api')"
+// @Param			pathRegex			query		string	false	"Filter by path regex"
+// @Param			labelSelector		query		string	false	"Filter by label selector (e.g., 'env=prod,team=api')"
 // @Success		200					{object}	OpenAPIListRequestEventsResponse
 // @Failure		400					{object}	ErrorResponse
 // @Failure		401					{object}	ErrorResponse
@@ -693,7 +693,7 @@ func (r *RequestEventsRoutes) queryMetrics(gctx *gin.Context) {
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
 	var req sapi.MetricsQueryRequestJson
-	if err := gctx.ShouldBindJSON(&req); err != nil {
+	if err := bindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return

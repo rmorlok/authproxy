@@ -31,8 +31,8 @@ const (
 const maxRevokeAttempts = 3
 
 type disconnectConnectionWorkflowInputV1 struct {
-	ConnectionID apid.ID       `json:"connection_id"` // ConnectionID is the durable identifier for the connection to disconnect.
-	Timeout      time.Duration `json:"timeout"`       // Timeout is the maximum duration allowed for the disconnect workflow.
+	ConnectionID apid.ID       `json:"connectionId"` // ConnectionID is the durable identifier for the connection to disconnect.
+	Timeout      time.Duration `json:"timeout"`      // Timeout is the maximum duration allowed for the disconnect workflow.
 }
 
 func disconnectConnectionWorkflowV1(ctx wflib.Context, input disconnectConnectionWorkflowInputV1) error {

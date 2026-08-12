@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/rmorlok/authproxy/internal/util"
 	"gopkg.in/yaml.v3"
 )
 
@@ -57,7 +58,7 @@ func adminUsersListUnmarshalYAML(value *yaml.Node) (AdminUsersList, error) {
 	var results []*AdminUser
 	for _, childNode := range value.Content {
 		var adminUser AdminUser
-		if err := childNode.Decode(&adminUser); err != nil {
+		if err := util.DecodeYAMLNodeStrict(childNode, &adminUser); err != nil {
 			return nil, err
 		}
 		results = append(results, &adminUser)

@@ -28,6 +28,7 @@ func TestConnectorRoundtrip(t *testing.T) {
 			name: "Basic Connector with API Key Auth",
 			connector: Connector{
 				Id:          testID,
+				Name:        "test-connector",
 				Labels:      map[string]string{"type": "test-type"},
 				Version:     1,
 				State:       "primary",
@@ -133,4 +134,11 @@ func TestConnectorRoundtrip(t *testing.T) {
 			assert.True(t, cmp.Equal(tc.connector, unmarshaledConnector), "Connector diff: %s", diff)
 		})
 	}
+}
+
+func TestConnectorHashIgnoresLogicalName(t *testing.T) {
+	connector := &Connector{Name: "before", DisplayName: "Test Connector"}
+	before := connector.Hash()
+	connector.Name = "after"
+	require.Equal(t, before, connector.Hash())
 }

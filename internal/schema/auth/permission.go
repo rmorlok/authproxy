@@ -13,7 +13,7 @@ const PermissionWildcard = "*"
 type Permission struct {
 	Namespace   string   `json:"namespace" yaml:"namespace"`
 	Resources   []string `json:"resources" yaml:"resources"`
-	ResourceIds []string `json:"resource_ids,omitempty" yaml:"resource_ids,omitempty"`
+	ResourceIds []string `json:"resourceIds,omitempty" yaml:"resourceIds,omitempty"`
 	Verbs       []string `json:"verbs" yaml:"verbs"`
 }
 

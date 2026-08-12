@@ -32,7 +32,8 @@ import {
 } from '@authproxy/api';
 import ResourceIdentifier from './ResourceIdentifier';
 import ResourceMetadataMenuItems from './ResourceMetadataMenuItems';
-import AnnotationsEditor from './AnnotationsEditor';
+import AnnotationsEditor from "./AnnotationsEditor";
+import ResourceNameEditor from './ResourceNameEditor';
 
 function StateChip({state}: { state: NamespaceState }) {
   const colors: Record<string, "default" | "success" | "error" | "info" | "warning" | "primary" | "secondary"> = {
@@ -194,14 +195,11 @@ export default function NamespaceDetail({namespacePath}: { namespacePath: string
         </Menu>
       </Stack>
 
+      <ResourceNameEditor name={ns.name} resourceType="Namespace"/>
+
       {actionError && <Alert severity="error">{actionError}</Alert>}
 
       <ResourceIdentifier label="Path" value={ns.path} copyLabel="Copy namespace path"/>
-
-      <Box>
-        <Typography variant="subtitle2" color="text.secondary">Name</Typography>
-        <Typography variant="body1">{ns.name}</Typography>
-      </Box>
 
       <Box>
         <Typography variant="subtitle2" color="text.secondary">State</Typography>
@@ -211,11 +209,11 @@ export default function NamespaceDetail({namespacePath}: { namespacePath: string
       <Stack direction={{xs: 'column', sm: 'row'}} spacing={4}>
         <Box>
           <Typography variant="subtitle2" color="text.secondary">Created</Typography>
-          <Typography variant="body1">{dayjs(ns.created_at).format('MMM DD, YYYY, h:mm A')}</Typography>
+          <Typography variant="body1">{dayjs(ns.createdAt).format('MMM DD, YYYY, h:mm A')}</Typography>
         </Box>
         <Box>
           <Typography variant="subtitle2" color="text.secondary">Updated</Typography>
-          <Typography variant="body1">{dayjs(ns.updated_at).format('MMM DD, YYYY, h:mm A')}</Typography>
+          <Typography variant="body1">{dayjs(ns.updatedAt).format('MMM DD, YYYY, h:mm A')}</Typography>
         </Box>
       </Stack>
 
@@ -236,14 +234,14 @@ export default function NamespaceDetail({namespacePath}: { namespacePath: string
 
       <Box>
         <Typography variant="subtitle2" color="text.secondary">Key</Typography>
-        {ns.key_id ? (
+        {ns.keyId ? (
           <Stack direction="row" spacing={1} alignItems="center" sx={{mt: 0.5}}>
-            <Link component={RouterLink} to={`/keys/${ns.key_id}`}>
+            <Link component={RouterLink} to={`/keys/${ns.keyId}`}>
               <Typography variant="body1" component="code" sx={{
                 fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
                 fontSize: '0.9rem',
               }}>
-                {ns.key_id}
+                {ns.keyId}
               </Typography>
             </Link>
             <Button size="small" onClick={openSelector} disabled={actionLoading || isRoot}>Change Key</Button>
@@ -285,7 +283,7 @@ export default function NamespaceDetail({namespacePath}: { namespacePath: string
                     <ListSubheader key={`header-${p}`}>{p}</ListSubheader>,
                     ...keys.map(ek => (
                       <MenuItem key={ek.id} value={ek.id}>
-                        {ek.id}
+                        {ek.name} · {ek.id}
                       </MenuItem>
                     )),
                   ];

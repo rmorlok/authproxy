@@ -10,8 +10,16 @@ import {
 import dayjs from 'dayjs';
 import {useQueryState, parseAsInteger, parseAsString} from 'nuqs'
 import {useNavigate} from 'react-router-dom';
+import {toSnakeCase} from '../util';
 
 export const columns: GridColDef<Actor>[] = [
+    {
+        field: 'name',
+        headerName: 'Name',
+        flex: 0.8,
+        minWidth: 120,
+        sortable: true,
+    },
     {
         field: 'id',
         headerName: 'ID',
@@ -20,7 +28,7 @@ export const columns: GridColDef<Actor>[] = [
         sortable: true,
     },
     {
-        field: 'external_id',
+        field: 'externalId',
         headerName: 'External ID',
         flex: 0.4,
         minWidth: 80,
@@ -41,14 +49,14 @@ export const columns: GridColDef<Actor>[] = [
         sortable: true,
     },
     {
-        field: 'super_admin',
+        field: 'superAdmin',
         headerName: 'Super Admin',
         flex: 0.5,
         minWidth: 80,
         sortable: true,
     },
     {
-        field: 'created_at',
+        field: 'createdAt',
         headerName: 'Created At',
         flex: 1,
         minWidth: 80,
@@ -59,7 +67,7 @@ export const columns: GridColDef<Actor>[] = [
 
     },
     {
-        field: 'updated_at',
+        field: 'updatedAt',
         headerName: 'Updated At',
         flex: 1,
         minWidth: 100,
@@ -81,7 +89,7 @@ export default function Actors() {
     const [error, setError] = useState<string | null>(null);
 
     const [page, setPage] = useQueryState<number>('page', parseAsInteger.withDefault(1));
-    const [pageSize, setPageSize] = useQueryState<number>('page_size', parseAsInteger.withDefault(defaultPageSize));
+    const [pageSize, setPageSize] = useQueryState<number>('pageSize', parseAsInteger.withDefault(defaultPageSize));
     const [sort, setSort] = useQueryState<string>('sort', parseAsString.withDefault(''));
 
     const [hasNextPage, setHasNextPage] = useState<boolean>(false);
@@ -96,7 +104,7 @@ export default function Actors() {
         } else {
             const sortField = sortModel[0].field;
             const sortDir = sortModel[0].sort === 'desc' ? 'desc' : 'asc';
-            setSort(`${sortField} ${sortDir}`);
+            setSort(`${toSnakeCase(sortField)} ${sortDir}`);
         }
     }, []);
 
@@ -140,7 +148,7 @@ export default function Actors() {
                 const prevResp = responsesCacheRef.current[responsesCacheRef.current.length - 1];
 
                 const params: ListActorsParams = prevResp?.cursor ? {cursor: prevResp.cursor} : {
-                    order_by: sort || undefined,
+                    orderBy: sort || undefined,
                     limit: pageSize,
                 };
 

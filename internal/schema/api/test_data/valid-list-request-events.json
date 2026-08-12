@@ -3,7 +3,7 @@
     {
       "namespace": "root.acme",
       "type": "proxy",
-      "request_id": "req_test550e8400abcde",
+      "requestId": "req_test550e8400abcde",
       "timestamp": "2026-01-02T03:04:05Z",
       "duration": 150,
       "method": "GET",

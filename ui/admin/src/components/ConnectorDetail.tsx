@@ -34,7 +34,8 @@ import {StateChip} from "./StateChip";
 import ConnectorVersionDetail from "./ConnectorVersionDetail";
 import ResourceIdentifier from './ResourceIdentifier';
 import ResourceMetadataMenuItems from './ResourceMetadataMenuItems';
-import AnnotationsEditor from './AnnotationsEditor';
+import AnnotationsEditor from "./AnnotationsEditor";
+import ResourceNameEditor from './ResourceNameEditor';
 
 const CONNECTOR_LIFECYCLE_TIMEOUT_SECONDS = 600;
 
@@ -90,7 +91,7 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
     let cancelled = false;
     setVersionsError(null);
     setVersions([]);
-    connectors.listVersions(connectorId, { limit: 100, order_by: 'version desc' })
+    connectors.listVersions(connectorId, { limit: 100, orderBy: 'version desc' })
       .then(resp => {
         if (cancelled) return;
         setVersions(resp.data.items || []);
@@ -145,7 +146,7 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
 
     setLifecycleStatus({action, state: 'starting'});
     try {
-      const request = {timeout_seconds: CONNECTOR_LIFECYCLE_TIMEOUT_SECONDS};
+      const request = {timeoutSeconds: CONNECTOR_LIFECYCLE_TIMEOUT_SECONDS};
       const response = action === 'archive'
         ? await connectors.archive(conn.id, request)
         : await connectors.disconnectAll(conn.id, request);
@@ -153,10 +154,10 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
       setLifecycleStatus({
         action,
         state: 'polling',
-        taskId: response.data.task_id,
+        taskId: response.data.taskId,
       });
 
-      const result = await tasks.pollForTaskFinalized(response.data.task_id, {
+      const result = await tasks.pollForTaskFinalized(response.data.taskId, {
         initialDelay: 1000,
         maxDelay: 5000,
         maxAttempts: 140,
@@ -167,7 +168,7 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
         setLifecycleStatus({
           action,
           state: 'failed',
-          taskId: response.data.task_id,
+          taskId: response.data.taskId,
           task: result.taskInfo,
           message: result.taskInfo?.state === TaskState.FAILED
             ? 'Workflow failed before completing.'
@@ -180,7 +181,7 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
       setLifecycleStatus({
         action,
         state: 'completed',
-        taskId: response.data.task_id,
+        taskId: response.data.taskId,
         task: result.taskInfo,
       });
       refreshConnectorData();
@@ -205,8 +206,15 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
   return (
     <Stack spacing={2} sx={{p: 2}}>
       <Stack direction="row" spacing={2} alignItems="center">
-        {conn.logo && <Avatar alt={conn.display_name} src={conn.logo} sx={{width: 40, height: 40}} />}
-        <Typography variant="h5">{conn.display_name || conn.labels?.type || 'Unnamed Connector'}</Typography>
+        {conn.logo && <Avatar alt={conn.displayName} src={conn.logo} sx={{width: 40, height: 40}} />}
+        <ResourceNameEditor
+          name={conn.name}
+          resourceType="Connector"
+          onRename={async (name) => {
+            await connectors.update(conn.id, {name});
+            refreshConnectorData();
+          }}
+        />
         <StateChip state={conn.state}/>
         <Box sx={{flexGrow: 1}}/>
         <IconButton aria-label="actions" onClick={openMenu} size="small">
@@ -219,10 +227,7 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
             labels={conn.labels}
             annotations={conn.annotations}
             onCloseMenu={closeMenu}
-            onRename={async (name) => {
-              await connectors.update(conn.id, {name});
-              refreshConnectorData();
-            }}
+            includeRename={false}
             onUpdateLabels={async (labels) => {
               await connectors.update(conn.id, {labels});
               setMetadataNotice('Label changes were saved to a draft connector version.');
@@ -238,6 +243,10 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
         </Menu>
       </Stack>
 
+      {conn.displayName && (
+        <Typography variant="body2" color="text.secondary">Definition display name: {conn.displayName}</Typography>
+      )}
+
       {conn.description && (
         <Typography variant="body1" color="text.secondary">{conn.description}</Typography>
       )}
@@ -248,8 +257,8 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
 
       {metadataNotice && <Alert severity="info" onClose={() => setMetadataNotice(null)}>{metadataNotice}</Alert>}
 
-      {conn.status_page_url && (
-        <MuiLink href={conn.status_page_url} target="_blank" rel="noopener noreferrer" underline="hover" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+      {conn.statusPageUrl && (
+        <MuiLink href={conn.statusPageUrl} target="_blank" rel="noopener noreferrer" underline="hover" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
           Status Page <OpenInNewIcon fontSize="inherit" />
         </MuiLink>
       )}
@@ -312,10 +321,6 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
       <Stack direction={{xs: 'column', sm: 'row'}} spacing={4}>
         <ResourceIdentifier value={conn.id} copyLabel="Copy connector id"/>
         <Box>
-          <Typography variant="subtitle2" color="text.secondary">Name</Typography>
-          <Typography variant="body1">{conn.name}</Typography>
-        </Box>
-        <Box>
           <Typography variant="subtitle2" color="text.secondary">Labels</Typography>
           {conn.labels && Object.keys(conn.labels).length > 0 ? (
             <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{ mt: 0.5 }}>
@@ -358,7 +363,7 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
                 <Stack direction="row" spacing={1} alignItems="center">
                   <Typography variant="body1">v{v.version}</Typography>
                   <StateChip state={v.state} />
-                  <Typography variant="body2" color="text.secondary">{dayjs(v.created_at).format('MMM DD, YYYY')}</Typography>
+                  <Typography variant="body2" color="text.secondary">{dayjs(v.createdAt).format('MMM DD, YYYY')}</Typography>
                 </Stack>
                 <Stack direction="row" spacing={1}>
                   <Button size="small" onClick={() => onRowClick(v)}>View Definition</Button>

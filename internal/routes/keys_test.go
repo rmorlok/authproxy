@@ -87,7 +87,7 @@ func TestKeys(t *testing.T) {
 	createKey := func(t *testing.T, tu *TestSetup, namespace string, labels map[string]string) KeyJson {
 		body := map[string]interface{}{
 			"namespace": namespace,
-			"key_data": map[string]interface{}{
+			"keyData": map[string]interface{}{
 				"value": "test-key-data-value",
 			},
 		}
@@ -183,7 +183,29 @@ func TestKeys(t *testing.T) {
 			require.Equal(t, created.Id, resp.Id)
 			require.Equal(t, "root", resp.Namespace)
 			require.Equal(t, schemaapi.KeyStateActive, resp.State)
+			require.NotNil(t, resp.KeyData)
 			require.Equal(t, "test", resp.Labels["env"])
+		})
+
+		t.Run("global key omits configuration-backed key data", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				fmt.Sprintf("/keys/%s", database.GlobalKeyID),
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp KeyJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, database.GlobalKeyID, resp.Id)
+			require.Nil(t, resp.KeyData)
 		})
 
 		t.Run("redacts key data by default", func(t *testing.T) {
@@ -204,7 +226,7 @@ func TestKeys(t *testing.T) {
 
 			var raw map[string]any
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &raw))
-			keyData := raw["key_data"].(map[string]any)
+			keyData := raw["keyData"].(map[string]any)
 			require.Equal(t, strings.Repeat("*", len("test-key-data-value")), keyData["value"])
 		})
 
@@ -249,9 +271,9 @@ func TestKeys(t *testing.T) {
 		t.Run("unauthorized", func(t *testing.T) {
 			body := map[string]interface{}{
 				"namespace": "root",
-				"key_data": map[string]interface{}{
-					"type":      "raw",
-					"raw_bytes": "dGVzdC1rZXktZGF0YQ==",
+				"keyData": map[string]interface{}{
+					"type":     "raw",
+					"rawBytes": "dGVzdC1rZXktZGF0YQ==",
 				},
 			}
 			jsonBody, _ := json.Marshal(body)
@@ -267,9 +289,9 @@ func TestKeys(t *testing.T) {
 		t.Run("forbidden wrong verb", func(t *testing.T) {
 			body := map[string]interface{}{
 				"namespace": "root",
-				"key_data": map[string]interface{}{
-					"type":      "raw",
-					"raw_bytes": "dGVzdC1rZXktZGF0YQ==",
+				"keyData": map[string]interface{}{
+					"type":     "raw",
+					"rawBytes": "dGVzdC1rZXktZGF0YQ==",
 				},
 			}
 			jsonBody, _ := json.Marshal(body)
@@ -290,9 +312,9 @@ func TestKeys(t *testing.T) {
 
 		t.Run("bad request - missing namespace", func(t *testing.T) {
 			body := map[string]interface{}{
-				"key_data": map[string]interface{}{
-					"type":      "raw",
-					"raw_bytes": "dGVzdC1rZXktZGF0YQ==",
+				"keyData": map[string]interface{}{
+					"type":     "raw",
+					"rawBytes": "dGVzdC1rZXktZGF0YQ==",
 				},
 			}
 			jsonBody, _ := json.Marshal(body)
@@ -315,9 +337,9 @@ func TestKeys(t *testing.T) {
 		t.Run("forbidden namespace not allowed", func(t *testing.T) {
 			body := map[string]interface{}{
 				"namespace": "root.restricted",
-				"key_data": map[string]interface{}{
-					"type":      "raw",
-					"raw_bytes": "dGVzdC1rZXktZGF0YQ==",
+				"keyData": map[string]interface{}{
+					"type":     "raw",
+					"rawBytes": "dGVzdC1rZXktZGF0YQ==",
 				},
 			}
 			jsonBody, _ := json.Marshal(body)
@@ -506,7 +528,7 @@ func TestKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
-				"/keys?label_selector=env%3Dprod",
+				"/keys?labelSelector=env%3Dprod",
 				nil,
 				"root",
 				"some-actor",
@@ -616,7 +638,7 @@ func TestKeys(t *testing.T) {
 		})
 
 		t.Run("bad request - redacted key data placeholder", func(t *testing.T) {
-			body := `{"key_data": {"value": "***"}}`
+			body := `{"keyData": {"value": "***"}}`
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPatch,
@@ -1838,7 +1860,7 @@ func TestKeys(t *testing.T) {
 			body := map[string]interface{}{
 				"namespace": "root",
 				"name":      name,
-				"key_data":  map[string]interface{}{"value": "named-key-data"},
+				"keyData":   map[string]interface{}{"value": "named-key-data"},
 			}
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(

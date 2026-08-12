@@ -28,9 +28,10 @@ vi.mock('@authproxy/api', () => {
 
 const rootNamespace = {
     path: ROOT_NAMESPACE_PATH,
+    name: ROOT_NAMESPACE_PATH,
     state: NamespaceState.ACTIVE,
-    created_at: '2026-06-20T00:00:00.000Z',
-    updated_at: '2026-06-20T00:00:00.000Z',
+    createdAt: '2026-06-20T00:00:00.000Z',
+    updatedAt: '2026-06-20T00:00:00.000Z',
 };
 
 function createStore() {
@@ -73,7 +74,7 @@ describe('namespacesSlice namespace path handling', () => {
         expect(store.getState().namespaces.currentPath).toBe(ROOT_NAMESPACE_PATH);
         expect(namespaces.getByPath).toHaveBeenCalledWith(ROOT_NAMESPACE_PATH);
         expect(namespaces.list).toHaveBeenCalledWith({
-            children_of: ROOT_NAMESPACE_PATH,
+            childrenOf: ROOT_NAMESPACE_PATH,
             limit: 100,
         });
     });
@@ -90,7 +91,7 @@ describe('namespacesSlice namespace path handling', () => {
 
         expect(namespaces.list).toHaveBeenCalledTimes(1);
         expect(namespaces.list).toHaveBeenCalledWith({
-            children_of: ROOT_NAMESPACE_PATH,
+            childrenOf: ROOT_NAMESPACE_PATH,
             limit: 100,
         });
         expect(store.getState().namespaces.children).toEqual([child]);

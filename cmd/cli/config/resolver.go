@@ -11,8 +11,8 @@ import (
 	"github.com/rmorlok/authproxy/internal/apauth/jwt"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/schema/config"
+	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 )
 
 const grafanaDefaultExpiresIn = 90 * 24 * time.Hour
@@ -319,14 +319,14 @@ func readPermissionsFile(path string) ([]aschema.Permission, error) {
 	}
 
 	var direct []aschema.Permission
-	if err := yaml.Unmarshal(data, &direct); err == nil && len(direct) > 0 {
+	if err := util.DecodeYAMLStrict(data, &direct); err == nil && len(direct) > 0 {
 		return direct, nil
 	}
 
 	var wrapped struct {
 		Permissions []aschema.Permission `json:"permissions" yaml:"permissions"`
 	}
-	if err := yaml.Unmarshal(data, &wrapped); err != nil {
+	if err := util.DecodeYAMLStrict(data, &wrapped); err != nil {
 		return nil, fmt.Errorf("failed to parse permissions file %q: %w", path, err)
 	}
 	if len(wrapped.Permissions) == 0 {

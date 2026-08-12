@@ -14,7 +14,7 @@ import (
 // are unset or empty; in that case the optional Default is used. If neither the templated value
 // nor the default is available, HasValue returns false and GetValue returns an error.
 type StringValueTemplatedEnvVars struct {
-	Template string  `json:"template_env_vars" yaml:"template_env_vars"`
+	Template string  `json:"templateEnvVars" yaml:"templateEnvVars"`
 	Default  *string `json:"default,omitempty" yaml:"default,omitempty"`
 }
 

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+
+	"github.com/rmorlok/authproxy/internal/util"
 )
 
 func (sv *IntegerValue) MarshalJSON() ([]byte, error) {
@@ -35,13 +37,13 @@ func (sv *IntegerValue) UnmarshalJSON(data []byte) error {
 
 	if _, ok := valueMap["value"]; ok {
 		svi = &IntegerValueDirect{}
-	} else if _, ok := valueMap["env_var"]; ok {
+	} else if _, ok := valueMap["envVar"]; ok {
 		svi = &IntegerValueEnvVar{}
 	} else {
-		return fmt.Errorf("invalid structure for value type; does not match direct value, value attribute, or env_var")
+		return fmt.Errorf("invalid structure for value type; does not match direct value, value attribute, or envVar")
 	}
 
-	if err := json.Unmarshal(data, svi); err != nil {
+	if err := util.DecodeJSONStrict(data, svi); err != nil {
 		return err
 	}
 

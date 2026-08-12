@@ -27,6 +27,7 @@ This regenerates Swagger docs and checks the integration-tests module is consist
 
 ### Working with pull requests
 
+- **Open PRs; do not merge them.** Cut a pull request for completed changes, but never merge a PR unless the user's prompt explicitly instructs you to do so.
 - **Apply the issue's labels to the PR.** When opening a PR that closes a labelled issue, copy those labels onto the PR (e.g. `gh pr create --label "project:api-key"`). Keeps project-tracking views consistent and surfaces the PR in the same dashboards as the issue.
 - **Tag the PR with the local clone it came from.** Several clones of this repo coexist on the same machine (`~/src/authproxy1`, `~/src/authproxy2`, …) and it's useful to know which one produced a given PR. Take the current directory's basename — if it matches `authproxy<N>` (single-digit suffix `0-9`) — and apply a `clone:authproxy<N>` label. Create the label first if it doesn't exist (`gh label create clone:authproxy<N> --color BFD4F2`). If the basename doesn't match the `authproxy<N>` pattern (e.g. a fork, a feature-named worktree), skip this label.
 - **Respond to PR review comments after addressing them.** When you push a change that resolves a review comment, reply on the original comment thread describing what changed (link to the commit if useful). Don't leave the reviewer guessing whether their feedback landed.
@@ -61,7 +62,7 @@ The final arg is the service to run: `admin-api`, `api`, `public`, `worker`, or 
 # JWT-signing reverse proxy to the AuthProxy server itself (dev tool).
 go run ./cmd/cli signing-proxy --enableLoginRedirect=true --proxyTo=api
 
-# Connection-scoped streaming reverse proxy through /_proxy_raw.
+# Connection-scoped streaming reverse proxy through /_proxyRaw.
 go run ./cmd/cli proxy --connection cxn_xxx --upstream-base https://api.openai.com
 
 # One-shot through curl or wget. Everything after `curl`/`wget` is

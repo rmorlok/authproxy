@@ -1,10 +1,8 @@
-# $schema: ./schema.json
-
 labels:
   type: asana
-display_name: Asana
+displayName: Asana
 logo:
-  public_url: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Asana_logo.svg/2880px-Asana_logo.svg.png
+  publicUrl: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Asana_logo.svg/2880px-Asana_logo.svg.png
 description: |
   Allow our agent organize your work
 probes:
@@ -15,15 +13,15 @@ probes:
       url: https://example.com/test-endpoint-1
   - id: test-endpoint-2
     period: 25h
-    proxy_http:
+    proxyHttp:
       method: GET
       url: https://example.com/test-endpoint-2
 auth:
   type: OAuth2
-  client_id:
-    env_var: ASANA_CLIENT_ID
-  client_secret:
-    env_var: ASANA_CLIENT_SECRET
+  clientId:
+    envVar: ASANA_CLIENT_ID
+  clientSecret:
+    envVar: ASANA_CLIENT_SECRET
   authorization:
     endpoint: https://app.asana.com/-/oauth_authorize
   token:

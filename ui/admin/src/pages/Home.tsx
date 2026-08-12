@@ -44,33 +44,33 @@ import type {DashboardTimeRange} from '../metrics/timeRange';
 
 const queries: MetricsQueryRef[] = [
     {
-        ref_id: 'connections-total',
+        refId: 'connections-total',
         metric: 'resources.connections',
         aggregation: 'count',
     },
     {
-        ref_id: 'connections-by-state',
+        refId: 'connections-by-state',
         metric: 'resources.connections',
         aggregation: 'count',
-        group_by: ['state'],
+        groupBy: ['state'],
     },
     {
-        ref_id: 'actors-total',
+        refId: 'actors-total',
         metric: 'resources.actors',
         aggregation: 'count',
     },
     {
-        ref_id: 'request-events',
+        refId: 'request-events',
         metric: 'request_events',
         aggregation: 'count',
     },
     {
-        ref_id: 'request-errors',
+        refId: 'request-errors',
         metric: 'request_events.errors',
         aggregation: 'count',
     },
     {
-        ref_id: 'rate-limits-total',
+        refId: 'rate-limits-total',
         metric: 'resources.rate_limits',
         aggregation: 'count',
     },

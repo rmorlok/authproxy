@@ -3,7 +3,7 @@ package common
 import "fmt"
 
 type ImageBase64 struct {
-	MimeType string `json:"mime_type" yaml:"mime_type"`
+	MimeType string `json:"mimeType" yaml:"mimeType"`
 	Base64   string `json:"base64" yaml:"base64"`
 }
 

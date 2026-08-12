@@ -6,7 +6,7 @@
       "namespace": "root.acme",
       "state": "primary",
       "definition": {
-        "display_name": "Salesforce",
+        "displayName": "Salesforce",
         "logo": "https://example.com/logo.png",
         "description": "Salesforce CRM integration",
         "auth": {
@@ -16,8 +16,8 @@
           "service": "salesforce"
         }
       },
-      "created_at": "2026-05-25T12:00:00Z",
-      "updated_at": "2026-05-25T12:30:00Z"
+      "createdAt": "2026-05-25T12:00:00Z",
+      "updatedAt": "2026-05-25T12:30:00Z"
     }
   ],
   "cursor": "next-page"

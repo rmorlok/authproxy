@@ -52,7 +52,7 @@ via the rig; this file is the one place where the token endpoint must
 - Connection lands in `state=created`, `setup_step=auth_failed`,
   `setup_error` populated (contains `access_denied`).
 - No token row persisted.
-- 302 redirect to `return_to_url?setup=pending&connection_id=<id>` so
+- 302 redirect to `returnToUrl?setup=pending&connectionId=<id>` so
   the marketplace UI re-renders the connection in its failed state.
 - **Zero POSTs to `/token`** — the load-bearing assertion. A single
   call here would mean the proxy missed the `error=` signal and
@@ -77,7 +77,7 @@ code was structurally unparseable.
 - Connection lands in `state=created`, `setup_step=auth_failed`,
   `setup_error` populated (contains `no code in query`).
 - No token row persisted.
-- 302 redirect to `return_to_url?setup=pending&connection_id=<id>`.
+- 302 redirect to `returnToUrl?setup=pending&connectionId=<id>`.
 - **Zero POSTs to `/token`** — there is no material for the POST
   (the only thing it could POST is the code, and there isn't one).
 

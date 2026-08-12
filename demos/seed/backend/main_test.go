@@ -34,7 +34,7 @@ func TestUpsertConnectorCreatesAndPublishesMissingSeed(t *testing.T) {
 		switch r.Method + " " + r.URL.Path {
 		case "GET /api/v1/connectors":
 			require.Equal(t, defaultNamespace, r.URL.Query().Get("namespace"))
-			require.Equal(t, seedLabelKey+"=demo-noauth", r.URL.Query().Get("label_selector"))
+			require.Equal(t, seedLabelKey+"=demo-noauth", r.URL.Query().Get("labelSelector"))
 			writeJSON(t, w, api.ListConnectorsResponseJson{})
 		case "POST /api/v1/connectors":
 			var req api.CreateConnectorRequestJson
@@ -44,7 +44,7 @@ func TestUpsertConnectorCreatesAndPublishesMissingSeed(t *testing.T) {
 			require.Equal(t, "demo-noauth", req.Labels[seedLabelKey])
 			require.Equal(t, "true", req.Labels["demo"])
 			writeJSON(t, w, connectorVersion(req.Definition, req.Labels, api.ConnectorVersionStateDraft, 1))
-		case "PUT /api/v1/connectors/cxr_testgmail0000001/versions/1/_force_state":
+		case "PUT /api/v1/connectors/cxr_testgmail0000001/versions/1/_forceState":
 			forcedPrimary = true
 			writeJSON(t, w, connectorVersion(seed.Definition, connectorLabels(seed), api.ConnectorVersionStatePrimary, 1))
 		default:
@@ -111,7 +111,7 @@ func TestUpsertConnectorPublishesNewVersionWhenDefinitionChanges(t *testing.T) {
 			require.NotNil(t, req.Labels)
 			require.Equal(t, "demo-noauth", (*req.Labels)[seedLabelKey])
 			writeJSON(t, w, connectorVersion(*req.Definition, *req.Labels, api.ConnectorVersionStateDraft, 2))
-		case "PUT /api/v1/connectors/cxr_testgmail0000001/versions/2/_force_state":
+		case "PUT /api/v1/connectors/cxr_testgmail0000001/versions/2/_forceState":
 			forcedPrimary = true
 			writeJSON(t, w, connectorVersion(seed.Definition, connectorLabels(seed), api.ConnectorVersionStatePrimary, 2))
 		default:
@@ -213,13 +213,13 @@ func TestPostOAuth2TestProviderTreatsDuplicateAsAlreadyPresent(t *testing.T) {
 
 func TestSeedConfigParsesOAuthConnectorSetupVariants(t *testing.T) {
 	data := []byte(`
-oauth2_test_provider:
-  base_url: http://go-oauth2-server
+oauth2TestProvider:
+  baseUrl: http://go-oauth2-server
   clients:
     - key: demo-oauth-simple
       secret: demo-oauth-simple-secret
-      redirect_uri: https://marketplace.example.test/oauth2/callback
-      token_endpoint_auth_method: client_secret_post
+      redirectUri: https://marketplace.example.test/oauth2/callback
+      tokenEndpointAuthMethod: client_secret_post
       scope: read profile resources
   users:
     - username: demo-oauth-user@example.test
@@ -228,36 +228,36 @@ connectors:
   - key: demo-oauth-tenant
     namespace: root
     definition:
-      display_name: Demo OAuth Tenant
+      displayName: Demo OAuth Tenant
       description: Demo OAuth connector with pre-connect config
       labels:
         type: demo-oauth-tenant
       auth:
         type: OAuth2
-        client_id: demo-oauth-tenant
-        client_secret: demo-oauth-tenant-secret
+        clientId: demo-oauth-tenant
+        clientSecret: demo-oauth-tenant-secret
         authorization:
           endpoint: https://example.test/oauth2/web/authorize
-          query_overrides:
+          queryOverrides:
             tenant: "{{cfg.tenant}}"
         token:
           endpoint: http://go-oauth2-server/v1/oauth/tokens
         scopes:
           - id: read
             reason: Read demo data
-      setup_flow:
+      setupFlow:
         preconnect:
           steps:
             - id: tenant
               title: Choose tenant
-              json_schema:
+              jsonSchema:
                 type: object
                 required:
                   - tenant
                 properties:
                   tenant:
                     type: string
-              ui_schema:
+              uiSchema:
                 type: VerticalLayout
                 elements:
                   - type: Control
@@ -274,9 +274,9 @@ connectors:
 
 func TestSeedConfigParsesAPIKeyConnector(t *testing.T) {
 	data := []byte(`
-oauth2_test_provider:
-  base_url: http://go-oauth2-server
-  api_key_resource_policies:
+oauth2TestProvider:
+  baseUrl: http://go-oauth2-server
+  apiKeyResourcePolicies:
     - path: /test/api-key-resource/demo-api-key
       key: demo-api-key
       placement: bearer
@@ -284,7 +284,7 @@ connectors:
   - key: demo-api-key
     namespace: root
     definition:
-      display_name: Demo API Key
+      displayName: Demo API Key
       description: Demo API key connector
       labels:
         type: demo-api-key
@@ -294,7 +294,7 @@ connectors:
           type: bearer
       probes:
         - id: verify-api-key
-          proxy_http:
+          proxyHttp:
             method: GET
             url: http://go-oauth2-server/test/api-key-resource/demo-api-key
 `)
@@ -310,7 +310,7 @@ func mustConnector(t *testing.T, displayName string) config.Connector {
 	t.Helper()
 
 	data := []byte(`
-display_name: "` + displayName + `"
+displayName: "` + displayName + `"
 description: "Seeded test connector"
 labels:
   type: demo-noauth

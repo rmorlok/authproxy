@@ -71,10 +71,10 @@ export const loadCurrent = createAsyncThunk<
 
         let current: Namespace = {
             path: currentPath,
-            name: currentPath.split(NAMESPACE_PATH_SEPARATOR).at(-1) || ROOT_NAMESPACE_PATH,
+            name: currentPath.split(NAMESPACE_PATH_SEPARATOR).pop() || currentPath,
             state: NamespaceState.ACTIVE,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
         };
 
         const response = await namespaces.getByPath(currentPath);
@@ -109,7 +109,7 @@ export const loadCurrentChildren = createAsyncThunk<
         const currentPath = normalizeNamespacePath(path);
 
         const params: ListNamespaceParams = {
-            children_of: currentPath,
+            childrenOf: currentPath,
             limit: 100,
         };
 

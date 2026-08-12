@@ -4,6 +4,7 @@ import { ListResponse } from './common';
 // Actor models
 
 export interface UpdateActorRequest {
+    name?: string;
     labels?: Record<string, string>;
     annotations?: Record<string, string>;
 }
@@ -28,17 +29,19 @@ export interface ActorAnnotation {
 
 export interface Actor {
   id: string;
+  name: string;
   namespace: string;
   labels?: Record<string, string>;
   annotations?: Record<string, string>;
-  external_id: string;
-  created_at: string;
-  updated_at: string;
+  externalId: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CreateActorRequest {
     namespace: string;
-    external_id: string;
+    name?: string;
+    externalId: string;
     labels?: Record<string, string>;
     annotations?: Record<string, string>;
 }
@@ -47,12 +50,13 @@ export interface CreateActorRequest {
  * Parameters used for listing actors.
  */
 export interface ListActorsParams {
-  external_id?: string;
+  name?: string;
+  externalId?: string;
   namespace?: string;
-  label_selector?: string;
+  labelSelector?: string;
   cursor?: string;
   limit?: number;
-  order_by?: string;
+  orderBy?: string;
 }
 
 /**

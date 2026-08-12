@@ -16,6 +16,7 @@ func cmdListConnections() *cobra.Command {
 		resolver *config.Resolver
 		out      Output[routes2.ConnectionJson]
 
+		name  string
 		state string
 		order string
 	)
@@ -50,12 +51,7 @@ func cmdListConnections() *cobra.Command {
 				SetResult(&response).
 				SetError(&apiErr)
 
-			if state != "" {
-				req.SetQueryParam("state", state)
-			}
-			if order != "" {
-				req.SetQueryParam("order_by", order)
-			}
+			setConnectionListQuery(req, name, state, order, "")
 
 			resp, err = req.Get(connectionsUrl)
 
@@ -69,16 +65,19 @@ func cmdListConnections() *cobra.Command {
 			out.EmitAll(response.Items)
 
 			for response.Cursor != "" && !out.ShouldStop() {
-				resp, err = signer.SignRestyRequest(client.R()).
+				cursor := response.Cursor
+				response = routes2.ListConnectionResponseJson{}
+				req = signer.SignRestyRequest(client.R()).
 					SetResult(&response).
-					SetError(&apiErr).
-					SetQueryParam("cursor", response.Cursor).
-					Get(connectionsUrl)
+					SetError(&apiErr)
+				setConnectionListQuery(req, name, state, order, cursor)
+				resp, err = req.Get(connectionsUrl)
 				if err != nil {
 					return err
 				} else if resp.IsError() {
 					return errors.New(apiErr.Error)
 				}
+				out.EmitAll(response.Items)
 			}
 
 			return nil
@@ -88,8 +87,24 @@ func cmdListConnections() *cobra.Command {
 	resolver = config.WithConfigParams(cmd)
 	out = OutputMultiple[routes2.ConnectionJson](cmd)
 
+	cmd.Flags().StringVar(&name, "name", "", "Only show connections with this exact name")
 	cmd.Flags().StringVar(&state, "state", "", "Only show connections in the specified state")
 	cmd.Flags().StringVar(&order, "order", "", "Order records by the specified field. Should be of the form \"field DESC|ASC\".")
 
 	return cmd
+}
+
+func setConnectionListQuery(req *resty.Request, name, state, order, cursor string) {
+	if name != "" {
+		req.SetQueryParam("name", name)
+	}
+	if state != "" {
+		req.SetQueryParam("state", state)
+	}
+	if order != "" {
+		req.SetQueryParam("orderBy", order)
+	}
+	if cursor != "" {
+		req.SetQueryParam("cursor", cursor)
+	}
 }

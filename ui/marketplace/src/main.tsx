@@ -16,15 +16,15 @@ configureClient({
 
 // Construct auth parameters from either window variable or URL query parameter
 const params: ApiSessionInitiateRequest = {
-    return_to_url: window.location.href,
+    returnToUrl: window.location.href,
 };
 if ((window as any).AUTHPROXY_AUTH_TOKEN) {
-    params.auth_token = (window as any).AUTHPROXY_AUTH_TOKEN;
+    params.authToken = (window as any).AUTHPROXY_AUTH_TOKEN;
 } else {
     const urlParams = new URLSearchParams(window.location.search);
-    const authToken = urlParams.get('auth_token');
+    const authToken = urlParams.get('authToken');
     if (authToken) {
-        params.auth_token = authToken;
+        params.authToken = authToken;
     }
 }
 

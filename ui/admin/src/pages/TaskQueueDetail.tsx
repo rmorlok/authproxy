@@ -75,7 +75,7 @@ export default function TaskQueueDetail() {
     const [queueInfoState, setQueueInfoState] = useState<QueueInfo | null>(null);
     const [tabIndex, setTabIndex] = useQueryState<number>('tab', parseAsInteger.withDefault(0));
     const [page, setPage] = useQueryState<number>('page', parseAsInteger.withDefault(1));
-    const [pageSize, setPageSize] = useQueryState<number>('page_size', parseAsInteger.withDefault(30));
+    const [pageSize, setPageSize] = useQueryState<number>('pageSize', parseAsInteger.withDefault(30));
     const [autoRefresh, setAutoRefresh] = useState(true);
 
     const [history, setHistory] = useState<DailyStats[]>([]);
@@ -306,10 +306,10 @@ export default function TaskQueueDetail() {
             headerName: 'Retried',
             flex: 0.5,
             minWidth: 80,
-            renderCell: (params) => `${params.row.retried}/${params.row.max_retry}`,
+            renderCell: (params) => `${params.row.retried}/${params.row.maxRetry}`,
         },
         {
-            field: 'last_err',
+            field: 'lastErr',
             headerName: 'Last Error',
             flex: 1.2,
             minWidth: 120,
@@ -324,11 +324,11 @@ export default function TaskQueueDetail() {
             ) : null,
         },
         {
-            field: 'next_process_at',
+            field: 'nextProcessAt',
             headerName: 'Next Process At',
             flex: 0.8,
             minWidth: 140,
-            renderCell: (params) => params.value || params.row.completed_at || '-',
+            renderCell: (params) => params.value || params.row.completedAt || '-',
         },
         {
             field: 'actions',

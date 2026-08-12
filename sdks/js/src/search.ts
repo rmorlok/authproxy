@@ -17,25 +17,26 @@ export interface SearchLabelMatch {
 }
 
 export interface SearchResourceSummary {
-    resource_type: SearchResourceType;
-    resource_id: string;
+    resourceType: SearchResourceType;
+    resourceId: string;
+    name: string;
     namespace: string;
     labels: Record<string, string>;
-    matched_labels: SearchLabelMatch[];
-    updated_at: string;
+    matchedLabels: SearchLabelMatch[];
+    updatedAt: string;
 }
 
 export interface SearchResourcesResponse {
     items: SearchResourceSummary[];
-    truncated_types: SearchResourceType[];
-    incomplete_types: SearchResourceType[];
+    truncatedTypes: SearchResourceType[];
+    incompleteTypes: SearchResourceType[];
 }
 
 export interface SearchResourcesParams {
     mode?: SearchMode;
-    resource_type?: SearchResourceType[];
+    resourceType?: SearchResourceType[];
     q?: string;
-    label_selector?: string;
+    labelSelector?: string;
     namespace?: string;
     limit?: number;
 }

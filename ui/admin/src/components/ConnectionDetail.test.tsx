@@ -20,10 +20,11 @@ vi.mock('@authproxy/api', () => {
   const connectionApi = {
     deleteAnnotation: vi.fn(),
     disconnect: vi.fn(),
-    force_state: vi.fn(),
+    forceState: vi.fn(),
     get: vi.fn(),
     migrateVersion: vi.fn(),
     putAnnotation: vi.fn(),
+    update: vi.fn(),
   };
   const connectorApi = {
     listVersions: vi.fn(),
@@ -68,31 +69,33 @@ vi.mock('@authproxy/api', () => {
 
 const connection = {
   id: 'cxn_test',
+  name: 'production-crm',
   namespace: 'root',
   state: ConnectionState.CONFIGURED,
-  health_state: ConnectionHealthState.HEALTHY,
+  healthState: ConnectionHealthState.HEALTHY,
   connector: {
     id: 'cxr_test',
+    name: 'example-connector',
     version: 2,
     namespace: 'root',
     state: ConnectorVersionState.ACTIVE,
-    display_name: 'Example connector',
+    displayName: 'Example connector',
     description: '',
     logo: '',
-    has_configure: false,
-    created_at: '2026-07-25T00:00:00.000Z',
-    updated_at: '2026-07-25T00:00:00.000Z',
+    hasConfigure: false,
+    createdAt: '2026-07-25T00:00:00.000Z',
+    updatedAt: '2026-07-25T00:00:00.000Z',
   },
-  created_at: '2026-07-25T00:00:00.000Z',
-  updated_at: '2026-07-25T00:00:00.000Z',
+  createdAt: '2026-07-25T00:00:00.000Z',
+  updatedAt: '2026-07-25T00:00:00.000Z',
 };
 
 const connectorVersions = [
-  {id: 'cxr_test', version: 4, state: ConnectorVersionState.DRAFT},
-  {id: 'cxr_test', version: 3, state: ConnectorVersionState.PRIMARY},
-  {id: 'cxr_test', version: 2, state: ConnectorVersionState.ACTIVE},
-  {id: 'cxr_test', version: 1, state: ConnectorVersionState.ACTIVE},
-  {id: 'cxr_test', version: 0, state: ConnectorVersionState.ARCHIVED},
+  {id: 'cxr_test', name: 'example-connector', version: 4, state: ConnectorVersionState.DRAFT},
+  {id: 'cxr_test', name: 'example-connector', version: 3, state: ConnectorVersionState.PRIMARY},
+  {id: 'cxr_test', name: 'example-connector', version: 2, state: ConnectorVersionState.ACTIVE},
+  {id: 'cxr_test', name: 'example-connector', version: 1, state: ConnectorVersionState.ACTIVE},
+  {id: 'cxr_test', name: 'example-connector', version: 0, state: ConnectorVersionState.ARCHIVED},
 ];
 
 function renderConnectionDetail() {
@@ -110,11 +113,15 @@ describe('ConnectionDetail', () => {
     vi.mocked(connections.migrateVersion).mockResolvedValue({
       status: 200,
       data: {
-        task_id: 'task_test',
-        connection_id: connection.id,
-        source_version: 2,
-        target_version: 3,
+        taskId: 'task_test',
+        connectionId: connection.id,
+        sourceVersion: 2,
+        targetVersion: 3,
       },
+    } as any);
+    vi.mocked(connections.update).mockResolvedValue({
+      status: 200,
+      data: {...connection, name: 'customer-crm'},
     } as any);
     vi.mocked(tasks.pollForTaskFinalized).mockResolvedValue({
       result: PollForTaskResult.FINALIZED,
@@ -135,7 +142,7 @@ describe('ConnectionDetail', () => {
         status: 200,
         data: {
           ...connection,
-          health_state: ConnectionHealthState.UNHEALTHY,
+          healthState: ConnectionHealthState.UNHEALTHY,
         },
       } as any);
     renderConnectionDetail();
@@ -155,8 +162,8 @@ describe('ConnectionDetail', () => {
 
     await waitFor(() => {
       expect(connections.migrateVersion).toHaveBeenCalledWith(connection.id, {
-        target_version: 3,
-        timeout_seconds: 600,
+        targetVersion: 3,
+        timeoutSeconds: 600,
       });
     });
     expect(tasks.pollForTaskFinalized).toHaveBeenCalledWith('task_test', {
@@ -183,10 +190,45 @@ describe('ConnectionDetail', () => {
 
     await waitFor(() => {
       expect(connections.migrateVersion).toHaveBeenCalledWith(connection.id, {
-        target_version: 1,
-        timeout_seconds: 600,
+        targetVersion: 1,
+        timeoutSeconds: 600,
       });
     });
     expect(await screen.findByText('Rollback to v1 completed.')).toBeTruthy();
+  });
+
+  it('explains when no other connector versions are eligible instead of rendering an empty selector', async () => {
+    const user = userEvent.setup();
+    vi.mocked(connectors.listVersions).mockResolvedValue({
+      status: 200,
+      data: {items: [{...connectorVersions[2]}]},
+    } as any);
+    renderConnectionDetail();
+
+    await screen.findByText('Connection');
+    await user.click(screen.getByRole('button', {name: 'actions'}));
+    await user.click(screen.getByRole('menuitem', {name: 'Change version…'}));
+
+    const dialog = await screen.findByRole('dialog', {name: 'Change connection version'});
+    expect(within(dialog).queryByRole('combobox', {name: 'Target version'})).toBeNull();
+    expect(within(dialog).getByRole('alert').textContent).toContain('No other active or primary versions are available.');
+    expect(within(dialog).getByRole('button', {name: 'Close'})).toBeTruthy();
+    expect(within(dialog).queryByRole('button', {name: 'Change version'})).toBeNull();
+  });
+
+  it('renames the connection while keeping its id as the route identity', async () => {
+    const user = userEvent.setup();
+    renderConnectionDetail();
+
+    await screen.findByRole('heading', {name: 'production-crm'});
+    await user.click(screen.getByRole('button', {name: 'Rename connection'}));
+    const input = screen.getByRole('textbox', {name: 'Name'});
+    await user.clear(input);
+    await user.type(input, 'customer-crm');
+    await user.click(screen.getByRole('button', {name: 'Save'}));
+
+    await waitFor(() => expect(connections.update).toHaveBeenCalledWith('cxn_test', {name: 'customer-crm'}));
+    expect(await screen.findByRole('heading', {name: 'customer-crm'})).toBeTruthy();
+    expect(screen.getByText('cxn_test')).toBeTruthy();
   });
 });

@@ -134,7 +134,7 @@ export function CommandPaletteProvider({
     const navigate = useNavigate();
     const dispatch = useDispatch<AppDispatch>();
     const currentNamespace = useSelector(selectCurrentNamespacePath);
-    const actorId = useSelector((state: RootState) => state.auth?.actor_id ?? null);
+    const actorId = useSelector((state: RootState) => state.auth?.actorId ?? null);
     const [isOpen, setIsOpen] = React.useState(false);
     const [query, setQuery] = React.useState('');
     const [cacheVersion, setCacheVersion] = React.useState(0);
@@ -179,15 +179,15 @@ export function CommandPaletteProvider({
         setSeedError(false);
         void search({
             mode: 'seed',
-            resource_type: ALL_RESOURCE_TYPES,
+            resourceType: ALL_RESOURCE_TYPES,
             namespace: namespaceAndChildren(currentNamespace),
             limit: 50,
         }, {signal: controller.signal}).then((response) => {
             if (controller.signal.aborted) return;
             cache.put(seedScopeKey, response.data.items);
             cache.markSeeded(seedScopeKey, uniqueTypes([
-                ...response.data.truncated_types,
-                ...response.data.incomplete_types,
+                ...response.data.truncatedTypes,
+                ...response.data.incompleteTypes,
             ]));
             setCacheVersion((value) => value + 1);
             setSeedError(false);
@@ -217,9 +217,9 @@ export function CommandPaletteProvider({
             setRemote((state) => state.queryKey === queryKey ? {...state, loading: true} : state);
             void search({
                 mode: 'query',
-                resource_type: parsed.resourceTypes.length > 0 ? parsed.resourceTypes : undefined,
+                resourceType: parsed.resourceTypes.length > 0 ? parsed.resourceTypes : undefined,
                 q: parsed.text || undefined,
-                label_selector: parsed.labelSelector || undefined,
+                labelSelector: parsed.labelSelector || undefined,
                 namespace: parsed.scope === 'current' ? namespaceAndChildren(currentNamespace) : undefined,
                 limit: SEARCH_RESULT_LIMIT,
             }, {signal: controller.signal}).then((response) => {
@@ -230,8 +230,8 @@ export function CommandPaletteProvider({
                 setRemote({
                     queryKey,
                     items: response.data.items,
-                    truncatedTypes: response.data.truncated_types,
-                    incompleteTypes: response.data.incomplete_types,
+                    truncatedTypes: response.data.truncatedTypes,
+                    incompleteTypes: response.data.incompleteTypes,
                     loading: false,
                     error: false,
                     completed: true,
@@ -288,8 +288,8 @@ export function CommandPaletteProvider({
 
     const selectResource = React.useCallback((item: SearchResourceSummary) => {
         setIsOpen(false);
-        if (item.resource_type === 'namespace') {
-            dispatch(setCurrentNamespace(item.resource_id));
+        if (item.resourceType === 'namespace') {
+            dispatch(setCurrentNamespace(item.resourceId));
             navigate('/namespace');
             return;
         }
@@ -383,18 +383,18 @@ export function CommandPaletteProvider({
                             <Command.Group heading="Resources">
                                 {visibleResources.map((item) => (
                                     <Command.Item
-                                        key={`${item.resource_type}:${item.resource_id}`}
-                                        value={`${item.resource_type}:${item.resource_id}`}
+                                        key={`${item.resourceType}:${item.resourceId}`}
+                                        value={`${item.resourceType}:${item.resourceId}`}
                                         onSelect={() => selectResource(item)}
                                     >
-                                        <ResourceTypeBadge type={item.resource_type} />
+                                        <ResourceTypeBadge type={item.resourceType} />
                                         <Box sx={{minWidth: 0, flex: 1}}>
                                             <Typography variant="body2" fontWeight={600} noWrap>
-                                                {resourceTitle(item, parsed.text)}
+                                                {item.name}
                                             </Typography>
                                             <Typography variant="caption" color="text.secondary" noWrap component="div">
-                                                {item.resource_id}
-                                                {item.namespace && item.resource_type !== 'namespace' ? ` · ${item.namespace}` : ''}
+                                                {item.resourceId}
+                                                {item.namespace && item.resourceType !== 'namespace' ? ` · ${item.namespace}` : ''}
                                             </Typography>
                                         </Box>
                                     </Command.Item>
@@ -497,48 +497,16 @@ function StatusRow({children, color = 'text.secondary'}: React.PropsWithChildren
     );
 }
 
-function resourceTitle(item: SearchResourceSummary, searchText: string): string {
-    const needle = searchText.toLowerCase();
-    const candidates = [
-        ...item.matched_labels,
-        ...Object.entries(item.labels).map(([key, value]) => ({key, value})),
-    ].filter((candidate, index, all) =>
-        Boolean(candidate.value) &&
-        all.findIndex((other) => other.key === candidate.key && other.value === candidate.value) === index,
-    );
-    if (needle) {
-        const queryMatch = candidates
-            .filter((candidate) => candidate.value.toLowerCase().includes(needle))
-            .sort((left, right) =>
-                titleMatchRank(left.value, needle) - titleMatchRank(right.value, needle) ||
-                left.key.localeCompare(right.key),
-            )[0];
-        if (queryMatch) return queryMatch.value;
-    }
-    const matched = item.matched_labels.find((label) => label.value)?.value;
-    if (matched) return matched;
-    if (item.labels.name) return item.labels.name;
-    const label = Object.entries(item.labels).sort(([left], [right]) => left.localeCompare(right))[0]?.[1];
-    return label || item.resource_id;
-}
-
-function titleMatchRank(value: string, needle: string): number {
-    const normalized = value.toLowerCase();
-    if (normalized === needle) return 0;
-    if (normalized.startsWith(needle)) return 1;
-    return 2;
-}
-
 function resourcePath(item: SearchResourceSummary): string {
-    if (item.resource_type === 'namespace') return '/namespace';
+    if (item.resourceType === 'namespace') return '/namespace';
     const routes: Record<Exclude<SearchResourceType, 'namespace'>, string> = {
         actor: '/actors/',
         connection: '/connections/',
         connector: '/connectors/',
         key: '/keys/',
-        rate_limit: '/rate-limits/',
+		'rate_limit': '/rate-limits/',
     };
-    return routes[item.resource_type] + encodeURIComponent(item.resource_id);
+    return routes[item.resourceType] + encodeURIComponent(item.resourceId);
 }
 
 function uniqueTypes(types: SearchResourceType[]): SearchResourceType[] {

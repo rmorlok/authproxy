@@ -93,7 +93,7 @@ export default function () {
 }
 
 function rawProxy(connection, upstreamUrl) {
-  const url = `${apiUrl}/api/v1/connections/${encodeURIComponent(connection.connection_id)}/_proxy_raw`;
+  const url = `${apiUrl}/api/v1/connections/${encodeURIComponent(connection.connection_id)}/_proxyRaw`;
   return http.request(proxyMethod, url, null, {
     timeout: requestTimeout,
     headers: {

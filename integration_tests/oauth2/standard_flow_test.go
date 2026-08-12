@@ -74,7 +74,7 @@ func TestStandardAuthorizationCodeFlow(t *testing.T) {
 	})
 	require.NotEmpty(t, user.ID)
 
-	// Sign a marketplace auth_token for the test actor. The SPA's
+	// Sign a marketplace authToken for the test actor. The SPA's
 	// session._initiate exchanges this for a SESSION-ID cookie on first load.
 	authToken, err := env.PublicAuthUtil.GenerateBearerToken(
 		context.Background(),
@@ -87,7 +87,7 @@ func TestStandardAuthorizationCodeFlow(t *testing.T) {
 	// 1. Open the marketplace, signed in as the test actor.
 	browserCtx, _ := helpers.NewBrowser(t)
 
-	connectorsURL := env.PublicURL + "/connectors?auth_token=" + url.QueryEscape(authToken)
+	connectorsURL := env.PublicURL + "/connectors?authToken=" + url.QueryEscape(authToken)
 	require.NoError(t, chromedp.Run(browserCtx,
 		chromedp.Navigate(connectorsURL),
 		// The Connect button only renders after the SPA's session._initiate
@@ -115,7 +115,7 @@ func TestStandardAuthorizationCodeFlow(t *testing.T) {
 
 	// 4. Click Allow. The provider redirects back to the proxy's callback,
 	//    which exchanges the code for tokens and lands the browser on
-	//    return_to_url (the marketplace's /connections page). Wait for the
+	//    returnToUrl (the marketplace's /connections page). Wait for the
 	//    "Your Connections" heading rendered by ConnectionList so we don't
 	//    inspect the URL mid-navigation.
 	expectedReturnPrefix := env.PublicURL + "/connections"
@@ -127,7 +127,7 @@ func TestStandardAuthorizationCodeFlow(t *testing.T) {
 	var finalURL string
 	require.NoError(t, chromedp.Run(browserCtx, chromedp.Location(&finalURL)))
 	assert.Truef(t, strings.HasPrefix(finalURL, expectedReturnPrefix),
-		"expected to land on return_to_url (%s), got %q", expectedReturnPrefix, finalURL)
+		"expected to land on returnToUrl (%s), got %q", expectedReturnPrefix, finalURL)
 
 	// 5. Locate the new connection. The marketplace creates one new connection
 	//    per Connect click, so we list and pick the only one.

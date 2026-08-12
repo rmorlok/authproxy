@@ -27,10 +27,10 @@ type OpenAPIListNotificationsResponseJson = schemaapiopenapi.ListNotificationsRe
 
 type ListNotificationsRequestQuery struct {
 	LimitVal      *uint64 `form:"limit"`
-	IncludeViewed *bool   `form:"include_viewed"`
+	IncludeViewed *bool   `form:"includeViewed"`
 	State         *string `form:"state"`
 	NamespaceVal  *string `form:"namespace"`
-	LabelSelector *string `form:"label_selector"`
+	LabelSelector *string `form:"labelSelector"`
 }
 
 // @Summary		List notifications
@@ -38,10 +38,10 @@ type ListNotificationsRequestQuery struct {
 // @Tags			notifications
 // @Produce		json
 // @Param			limit			query		int		false	"Maximum number of notifications to return"
-// @Param			include_viewed	query		bool	false	"Include notifications the actor has already viewed"
+// @Param			includeViewed	query		bool	false	"Include notifications the actor has already viewed"
 // @Param			state			query		string	false	"Notification state; defaults to active"
 // @Param			namespace		query		string	false	"Filter by namespace"
-// @Param			label_selector	query		string	false	"Filter by denormalized resource label selector"
+// @Param			labelSelector	query		string	false	"Filter by denormalized resource label selector"
 // @Success		200				{object}	OpenAPIListNotificationsResponseJson
 // @Failure		400				{object}	ErrorResponse
 // @Failure		401				{object}	ErrorResponse
@@ -135,7 +135,7 @@ func (r *NotificationsRoutes) markViewedBatch(gctx *gin.Context) {
 	ra := auth.MustGetAuthFromGinContext(gctx)
 
 	var req MarkNotificationsViewedRequestJson
-	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+	if err := bindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		return
 	}

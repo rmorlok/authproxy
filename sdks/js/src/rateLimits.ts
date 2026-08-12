@@ -28,14 +28,14 @@ export interface RateLimitPathMatch {
 }
 
 export interface RateLimitSelector {
-    label_selector?: string;
+    labelSelector?: string;
     methods?: string[];
-    path_match?: RateLimitPathMatch;
+    pathMatch?: RateLimitPathMatch;
     /**
      * When omitted, defaults to ['proxy', 'probe']. An explicit empty list is
      * rejected at validation.
      */
-    request_types?: string[];
+    requestTypes?: string[];
 }
 
 export interface RateLimitBucket {
@@ -62,7 +62,7 @@ export interface RateLimitSlidingWindow {
 export interface RateLimitTokenBucket {
     capacity: number;
     /** Tokens per second; may be fractional (e.g. 0.5). */
-    refill_rate: number;
+    refillRate: number;
 }
 
 /**
@@ -70,9 +70,9 @@ export interface RateLimitTokenBucket {
  * Terraform provider) validate this at write time.
  */
 export interface RateLimitAlgorithm {
-    fixed_window?: RateLimitFixedWindow;
-    sliding_window?: RateLimitSlidingWindow;
-    token_bucket?: RateLimitTokenBucket;
+    fixedWindow?: RateLimitFixedWindow;
+    slidingWindow?: RateLimitSlidingWindow;
+    tokenBucket?: RateLimitTokenBucket;
 }
 
 export interface RateLimitDefinition {
@@ -84,17 +84,18 @@ export interface RateLimitDefinition {
 
 export interface RateLimit {
     id: string;
-    namespace: string;
     name: string;
+    namespace: string;
     definition: RateLimitDefinition;
     labels?: Record<string, string>;
     annotations?: Record<string, string>;
-    created_at: string;
-    updated_at: string;
+    createdAt: string;
+    updatedAt: string;
 }
 
 export interface CreateRateLimitRequest {
     namespace: string;
+    name?: string;
     definition: RateLimitDefinition;
     labels?: Record<string, string>;
     annotations?: Record<string, string>;
@@ -108,11 +109,12 @@ export interface UpdateRateLimitRequest {
 }
 
 export interface ListRateLimitsParams {
+    name?: string;
     cursor?: string;
     limit?: number;
     namespace?: string;
-    label_selector?: string;
-    order_by?: string;
+    labelSelector?: string;
+    orderBy?: string;
 }
 
 /**
@@ -160,42 +162,42 @@ export const deleteRateLimit = (id: string) => {
  */
 export interface DryRunRateLimitRequest {
     request: ProxyRequest;
-    request_type: string;
+    requestType: string;
     context: {
-        connection_id?: string;
-        actor_id?: string;
+        connectionId?: string;
+        actorId?: string;
         namespace?: string;
     };
 }
 
 export interface DryRunRateLimitMatch {
-    rate_limit_id: string;
+    rateLimitId: string;
     namespace: string;
-    effective_mode: string;
-    bucket_key: string;
-    algorithm_summary: string;
-    would_allow: boolean;
+    effectiveMode: string;
+    bucketKey: string;
+    algorithmSummary: string;
+    wouldAllow: boolean;
     remaining: number;
-    retry_after_ms: number;
+    retryAfterMs: number;
     /**
      * True when the runtime fail-opened on a Redis error during Peek.
      * The UI should surface this as "couldn't read counter; runtime
      * would fail-open" so operators know the would_allow isn't
      * trustworthy.
      */
-    peek_failed: boolean;
+    peekFailed: boolean;
 }
 
 export interface DryRunRateLimitNotMatched {
-    rate_limit_id: string;
+    rateLimitId: string;
     namespace: string;
     reason: string;
 }
 
 export interface DryRunRateLimitResponse {
-    request_label_snapshot: Record<string, string>;
+    requestLabelSnapshot: Record<string, string>;
     matched: DryRunRateLimitMatch[];
-    not_matched: DryRunRateLimitNotMatched[];
+    notMatched: DryRunRateLimitNotMatched[];
 }
 
 /**
@@ -206,7 +208,7 @@ export interface DryRunRateLimitResponse {
  * traffic.
  */
 export const dryRunRateLimit = (req: DryRunRateLimitRequest) => {
-    return client.post<DryRunRateLimitResponse>('/api/v1/rate-limits/_dry_run', req);
+    return client.post<DryRunRateLimitResponse>('/api/v1/rate-limits/_dryRun', req);
 };
 
 // --- Label & annotation sub-resources, identical shape to keys. ---

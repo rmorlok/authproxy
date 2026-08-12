@@ -1,15 +1,15 @@
 basePath: /api/v1
 definitions:
-  github_com_rmorlok_authproxy_internal_schema_api.ActorJson:
+  api.ActorJson:
     description: Actor identity within a namespace
     properties:
       annotations:
         additionalProperties:
           type: string
         type: object
-      created_at:
+      createdAt:
         type: string
-      external_id:
+      externalId:
         example: user-123
         type: string
       id:
@@ -25,25 +25,25 @@ definitions:
       namespace:
         example: root.acme
         type: string
-      updated_at:
+      updatedAt:
         type: string
     type: object
-  github_com_rmorlok_authproxy_internal_schema_api.ConnectorJson:
+  api.ConnectorJson:
     description: Connector API summary response
     properties:
       annotations:
         additionalProperties:
           type: string
         type: object
-      created_at:
+      createdAt:
         type: string
       description:
         example: Salesforce CRM integration
         type: string
-      display_name:
+      displayName:
         example: Salesforce
         type: string
-      has_configure:
+      hasConfigure:
         example: false
         type: boolean
       highlight:
@@ -68,16 +68,16 @@ definitions:
       state:
         example: primary
         type: string
-      status_page_url:
+      statusPageUrl:
         example: https://status.salesforce.com
         type: string
-      updated_at:
+      updatedAt:
         type: string
       version:
         example: 1
         type: integer
     type: object
-  github_com_rmorlok_authproxy_internal_schema_api.MetricsSchemaMetricJson:
+  api.MetricsSchemaMetricJson:
     description: Supported metric definition
     properties:
       aggregations:
@@ -86,7 +86,7 @@ definitions:
         items:
           type: string
         type: array
-      group_by:
+      groupBy:
         example:
         - method
         - response_status_code
@@ -100,16 +100,16 @@ definitions:
         example: request_events
         type: string
     type: object
-  github_com_rmorlok_authproxy_internal_schema_api.NamespaceJson:
+  api.NamespaceJson:
     description: Namespace for organizing resources
     properties:
       annotations:
         additionalProperties:
           type: string
         type: object
-      created_at:
+      createdAt:
         type: string
-      key_id:
+      keyId:
         example: key_test550e8400abcd
         type: string
       labels:
@@ -127,7 +127,7 @@ definitions:
       state:
         example: active
         type: string
-      updated_at:
+      updatedAt:
         type: string
     type: object
   routes.ActorJson:
@@ -137,9 +137,9 @@ definitions:
         additionalProperties:
           type: string
         type: object
-      created_at:
+      createdAt:
         type: string
-      external_id:
+      externalId:
         example: user-123
         type: string
       id:
@@ -155,7 +155,7 @@ definitions:
       namespace:
         example: root.acme
         type: string
-      updated_at:
+      updatedAt:
         type: string
     type: object
   routes.ConnectionScopesJson:
@@ -188,17 +188,17 @@ definitions:
         description: Connection UUID.
         example: cxn_test550e8400abcde
         type: string
-      json_schema:
+      jsonSchema:
         description: JSON Schema defining the form fields.
         type: object
-      step_description:
+      stepDescription:
         description: Step description.
         type: string
-      step_id:
+      stepId:
         description: Step ID being submitted.
         example: preconnect:0
         type: string
-      step_title:
+      stepTitle:
         description: Step title.
         example: Choose workspace
         type: string
@@ -206,7 +206,7 @@ definitions:
         description: Response type.
         example: form
         type: string
-      ui_schema:
+      uiSchema:
         description: UI Schema for JSON Forms rendering.
         type: object
     type: object
@@ -217,7 +217,7 @@ definitions:
         description: Connection UUID.
         example: cxn_test550e8400abcde
         type: string
-      redirect_url:
+      redirectUrl:
         description: URL to redirect the user to.
         example: https://oauth.provider.com/authorize?...
         type: string
@@ -233,15 +233,15 @@ definitions:
         additionalProperties:
           type: string
         type: object
-      created_at:
+      createdAt:
         type: string
       description:
         example: Salesforce CRM integration
         type: string
-      display_name:
+      displayName:
         example: Salesforce
         type: string
-      has_configure:
+      hasConfigure:
         example: false
         type: boolean
       highlight:
@@ -266,10 +266,10 @@ definitions:
       state:
         example: primary
         type: string
-      status_page_url:
+      statusPageUrl:
         example: https://status.salesforce.com
         type: string
-      updated_at:
+      updatedAt:
         type: string
       version:
         example: 1
@@ -282,7 +282,7 @@ definitions:
         additionalProperties:
           type: string
         type: object
-      external_id:
+      externalId:
         example: user-123
         type: string
       labels:
@@ -330,7 +330,7 @@ definitions:
         description: Error message.
         example: Bad Request
         type: string
-      stack_trace:
+      stackTrace:
         description: Stack trace, only populated in debug mode.
         type: string
     type: object
@@ -351,16 +351,16 @@ definitions:
   routes.InitiateConnectionRequest:
     description: Request to initiate a connection
     properties:
-      connector_id:
+      connectorId:
         description: ID of the connector to initiate the connection for.
         example: cxr_test550e8400abcde
         type: string
-      connector_version:
+      connectorVersion:
         description: Version of the connector to initiate connection for; if not specified
           defaults to the primary version.
         example: 1
         type: integer
-      into_namespace:
+      intoNamespace:
         description: |-
           The namespace to create the connection in. Must be the namespace of connector or a child namespace of that
           namespace. Defaults to the connector namespace if not specified.
@@ -371,7 +371,7 @@ definitions:
           connection ID.
         example: production-crm
         type: string
-      return_to_url:
+      returnToUrl:
         description: The URL to return to after the connection is completed.
         example: https://example.com/callback
         type: string
@@ -401,9 +401,9 @@ definitions:
         additionalProperties:
           type: string
         type: object
-      created_at:
+      createdAt:
         type: string
-      key_id:
+      keyId:
         example: key_test550e8400abcd
         type: string
       labels:
@@ -421,7 +421,7 @@ definitions:
       state:
         example: active
         type: string
-      updated_at:
+      updatedAt:
         type: string
     type: object
   routes.OpenAPIConnectionJson:
@@ -432,9 +432,9 @@ definitions:
           type: string
         type: object
       connector: {}
-      created_at:
+      createdAt:
         type: string
-      health_state:
+      healthState:
         example: healthy
         type: string
       id:
@@ -450,31 +450,31 @@ definitions:
       namespace:
         example: root.acme
         type: string
-      setup_error:
+      setupError:
         type: string
-      setup_step_id:
+      setupStepId:
         example: tenant
         type: string
       state:
         example: configured
         type: string
-      updated_at:
+      updatedAt:
         type: string
     type: object
   routes.OpenAPIConnectorLifecycleRequestJson:
     description: Request to run a connector lifecycle operation
     properties:
-      timeout_seconds:
+      timeoutSeconds:
         example: 600
         type: integer
     type: object
   routes.OpenAPIConnectorLifecycleResponseJson:
     description: Response for connector lifecycle operation
     properties:
-      connector_id:
+      connectorId:
         example: cxr_test550e8400abcde
         type: string
-      task_id:
+      taskId:
         type: string
     type: object
   routes.OpenAPIConnectorVersionJson:
@@ -484,7 +484,7 @@ definitions:
         additionalProperties:
           type: string
         type: object
-      created_at:
+      createdAt:
         type: string
       definition: {}
       id:
@@ -503,7 +503,7 @@ definitions:
       state:
         example: primary
         type: string
-      updated_at:
+      updatedAt:
         type: string
       version:
         example: 1
@@ -548,7 +548,7 @@ definitions:
         additionalProperties:
           type: string
         type: object
-      key_data:
+      keyData:
         additionalProperties: true
         type: object
       labels:
@@ -586,7 +586,7 @@ definitions:
   routes.OpenAPIDisconnectConnectionRequestJson:
     description: Request body for connection disconnect operations
     properties:
-      timeout_seconds:
+      timeoutSeconds:
         example: 600
         type: integer
     type: object
@@ -594,7 +594,7 @@ definitions:
     description: Response for disconnect operation
     properties:
       connection: {}
-      task_id:
+      taskId:
         type: string
     type: object
   routes.OpenAPIDryRunRequestJson:
@@ -603,7 +603,7 @@ definitions:
     properties:
       context: {}
       request: {}
-      request_type:
+      requestType:
         example: proxy
         type: string
     type: object
@@ -613,10 +613,10 @@ definitions:
       matched:
         items: {}
         type: array
-      not_matched:
+      notMatched:
         items: {}
         type: array
-      request_label_snapshot:
+      requestLabelSnapshot:
         additionalProperties:
           type: string
         type: object
@@ -628,12 +628,12 @@ definitions:
         additionalProperties:
           type: string
         type: object
-      created_at:
+      createdAt:
         type: string
       id:
         example: key_test550e8400abcd
         type: string
-      key_data:
+      keyData:
         type: object
       labels:
         additionalProperties:
@@ -648,7 +648,7 @@ definitions:
       state:
         example: active
         type: string
-      updated_at:
+      updatedAt:
         type: string
     type: object
   routes.OpenAPIListActorsResponseJson:
@@ -660,7 +660,7 @@ definitions:
       items:
         description: List of actors.
         items:
-          $ref: '#/definitions/github_com_rmorlok_authproxy_internal_schema_api.ActorJson'
+          $ref: '#/definitions/api.ActorJson'
         type: array
     type: object
   routes.OpenAPIListConnectionResponseJson:
@@ -692,7 +692,7 @@ definitions:
       items:
         description: List of connectors.
         items:
-          $ref: '#/definitions/github_com_rmorlok_authproxy_internal_schema_api.ConnectorJson'
+          $ref: '#/definitions/api.ConnectorJson'
         type: array
     type: object
   routes.OpenAPIListKeysResponseJson:
@@ -713,7 +713,7 @@ definitions:
       items:
         description: List of namespaces.
         items:
-          $ref: '#/definitions/github_com_rmorlok_authproxy_internal_schema_api.NamespaceJson'
+          $ref: '#/definitions/api.NamespaceJson'
         type: array
     type: object
   routes.OpenAPIListNotificationsResponseJson:
@@ -750,39 +750,39 @@ definitions:
     properties:
       metrics:
         items:
-          $ref: '#/definitions/github_com_rmorlok_authproxy_internal_schema_api.MetricsSchemaMetricJson'
+          $ref: '#/definitions/api.MetricsSchemaMetricJson'
         type: array
     type: object
   routes.OpenAPIMigrateConnectionVersionRequestJson:
     description: Request body for connection connector-version migration operations
     properties:
-      target_version:
+      targetVersion:
         example: 3
         type: integer
-      timeout_seconds:
+      timeoutSeconds:
         example: 600
         type: integer
     type: object
   routes.OpenAPIMigrateConnectionVersionResponseJson:
     description: Response for connection connector-version migration operation
     properties:
-      connection_id:
+      connectionId:
         example: cxn_test550e8400abcde
         type: string
-      source_version:
+      sourceVersion:
         example: 1
         type: integer
-      target_version:
+      targetVersion:
         example: 3
         type: integer
-      task_id:
+      taskId:
         type: string
     type: object
   routes.OpenAPIProxyResponseJson:
     description: Response from a proxied HTTP request
     properties:
-      body_json: {}
-      body_raw:
+      bodyJson: {}
+      bodyRaw:
         items:
           type: integer
         type: array
@@ -790,7 +790,7 @@ definitions:
         additionalProperties:
           type: string
         type: object
-      status_code:
+      statusCode:
         example: 200
         type: integer
     type: object
@@ -801,7 +801,7 @@ definitions:
         additionalProperties:
           type: string
         type: object
-      created_at:
+      createdAt:
         type: string
       definition:
         additionalProperties: {}
@@ -819,19 +819,19 @@ definitions:
       namespace:
         example: root.acme
         type: string
-      updated_at:
+      updatedAt:
         type: string
     type: object
   routes.OpenAPIRequestEventsEntry:
     description: HTTP request events entry
     properties:
-      connection_id:
+      connectionId:
         type: string
-      connector_id:
+      connectorId:
         type: string
-      connector_version:
+      connectorVersion:
         type: integer
-      correlation_id:
+      correlationId:
         type: string
       duration:
         example: 150
@@ -852,24 +852,24 @@ definitions:
       path:
         example: /v1/users
         type: string
-      rate_limit_bucket:
+      rateLimitBucket:
         additionalProperties:
           type: string
         type: object
-      rate_limit_id:
+      rateLimitId:
         type: string
-      rate_limit_matched:
+      rateLimitMatched:
         items: {}
         type: array
-      rate_limit_mode:
+      rateLimitMode:
         type: string
-      request_id:
+      requestId:
         example: req_test550e8400abcde
         type: string
-      response_source:
+      responseSource:
         example: upstream
         type: string
-      response_status_code:
+      responseStatusCode:
         example: 200
         type: integer
       scheme:
@@ -883,7 +883,7 @@ definitions:
     type: object
   routes.OpenAPISearchResourcesResponseJson:
     properties:
-      incomplete_types:
+      incompleteTypes:
         items:
           type: string
         type: array
@@ -897,7 +897,7 @@ definitions:
               additionalProperties:
                 type: string
               type: object
-            matched_labels:
+            matchedLabels:
               items:
                 properties:
                   key:
@@ -908,20 +908,23 @@ definitions:
                     type: string
                 type: object
               type: array
+            name:
+              example: production-crm
+              type: string
             namespace:
               example: root.acme
               type: string
-            resource_id:
+            resourceId:
               example: cxn_test550e8400abcde
               type: string
-            resource_type:
+            resourceType:
               example: connection
               type: string
-            updated_at:
+            updatedAt:
               type: string
           type: object
         type: array
-      truncated_types:
+      truncatedTypes:
         items:
           type: string
         type: array
@@ -936,7 +939,7 @@ definitions:
         type: string
       type:
         type: string
-      updated_at:
+      updatedAt:
         type: string
     type: object
   routes.OpenAPIUpdateConnectorRequestJson:
@@ -975,7 +978,7 @@ definitions:
         additionalProperties:
           type: string
         type: object
-      key_data:
+      keyData:
         additionalProperties: true
         type: object
       labels:
@@ -1010,8 +1013,8 @@ definitions:
   routes.ProxyRequest:
     description: Request to proxy or simulate an HTTP request
     properties:
-      body_json: {}
-      body_raw:
+      bodyJson: {}
+      bodyRaw:
         items:
           type: integer
         type: array
@@ -1036,29 +1039,29 @@ definitions:
     type: object
   routes.ReauthConnectionRequest:
     properties:
-      return_to_url:
+      returnToUrl:
         type: string
     type: object
   routes.RetryConnectionRequest:
     properties:
-      return_to_url:
+      returnToUrl:
         type: string
     type: object
   routes.SessionInitiateFailureResponse:
     properties:
-      redirect_url:
+      redirectUrl:
         example: https://example.com/auth
         type: string
     type: object
   routes.SessionInitiateParams:
     properties:
-      return_to_url:
+      returnToUrl:
         example: https://example.com/return
         type: string
     type: object
   routes.SessionInitiateSuccessResponse:
     properties:
-      actor_id:
+      actorId:
         example: act_test550e8400abcde
         type: string
     type: object
@@ -1068,13 +1071,13 @@ definitions:
       data:
         description: Data is the form data submitted by the user for the current step.
         type: object
-      return_to_url:
+      returnToUrl:
         description: |-
           ReturnToUrl is required when the next step after form submission is an auth redirect.
           The client should provide this so the OAuth callback knows where to return.
         example: https://example.com/callback
         type: string
-      step_id:
+      stepId:
         description: StepId is the id of the step being submitted. Must match the
           current setup step's id.
         example: preconnect:0
@@ -1147,7 +1150,7 @@ paths:
         type: integer
       - description: Filter by external ID
         in: query
-        name: external_id
+        name: externalId
         type: string
       - description: Filter by exact resource name
         in: query
@@ -1159,11 +1162,11 @@ paths:
         type: string
       - description: Filter by label selector
         in: query
-        name: label_selector
+        name: labelSelector
         type: string
       - description: Order by field (e.g., 'created_at:asc')
         in: query
-        name: order_by
+        name: orderBy
         type: string
       produces:
       - application/json
@@ -1701,7 +1704,7 @@ paths:
       summary: Set a label for an actor
       tags:
       - actors
-  /actors/external-id/{external_id}:
+  /actors/external-id/{externalId}:
     delete:
       consumes:
       - application/json
@@ -1709,7 +1712,7 @@ paths:
       parameters:
       - description: External ID of the actor
         in: path
-        name: external_id
+        name: externalId
         required: true
         type: string
       - description: Namespace (defaults to authenticated actor's namespace)
@@ -1749,7 +1752,7 @@ paths:
       parameters:
       - description: External ID of the actor
         in: path
-        name: external_id
+        name: externalId
         required: true
         type: string
       - description: Namespace (defaults to authenticated actor's namespace)
@@ -1791,7 +1794,7 @@ paths:
       parameters:
       - description: External ID of the actor
         in: path
-        name: external_id
+        name: externalId
         required: true
         type: string
       - description: Namespace (defaults to authenticated actor's namespace)
@@ -1856,7 +1859,7 @@ paths:
         type: string
       - description: Filter by connector ID
         in: query
-        name: connector_id
+        name: connectorId
         type: string
       - description: Filter by namespace
         in: query
@@ -1868,11 +1871,11 @@ paths:
         type: string
       - description: Filter by label selector
         in: query
-        name: label_selector
+        name: labelSelector
         type: string
       - description: Order by field (e.g., 'created_at:asc')
         in: query
-        name: order_by
+        name: orderBy
         type: string
       produces:
       - application/json
@@ -2061,7 +2064,7 @@ paths:
       summary: Abort connection setup
       tags:
       - connections
-  /connections/{id}/_cancel_setup:
+  /connections/{id}/_cancelSetup:
     post:
       description: Abandon a reconfigure attempt on a ready connection by clearing
         setup_step and setup_error. The connection remains ready and its previously
@@ -2094,7 +2097,7 @@ paths:
       summary: Cancel in-flight setup
       tags:
       - connections
-  /connections/{id}/_data_source/{source_id}:
+  /connections/{id}/_dataSource/{sourceId}:
     get:
       description: Fetch dynamic options for a data source defined in the current
         setup step
@@ -2106,7 +2109,7 @@ paths:
         type: string
       - description: Data Source ID
         in: path
-        name: source_id
+        name: sourceId
         required: true
         type: string
       produces:
@@ -2179,7 +2182,7 @@ paths:
       summary: Disconnect connection
       tags:
       - connections
-  /connections/{id}/_force_state:
+  /connections/{id}/_forceState:
     put:
       consumes:
       - application/json
@@ -2228,7 +2231,7 @@ paths:
       summary: Force connection state
       tags:
       - connections
-  /connections/{id}/_migrate_version:
+  /connections/{id}/_migrateVersion:
     post:
       consumes:
       - application/json
@@ -2455,7 +2458,7 @@ paths:
       summary: Retry connection setup
       tags:
       - connections
-  /connections/{id}/_setup_step:
+  /connections/{id}/_setupStep:
     get:
       description: Get the current setup step for a connection, used to resume an
         interrupted setup flow
@@ -2467,7 +2470,7 @@ paths:
         type: string
       - description: URL to return to after a resumed redirect step
         in: query
-        name: return_to_url
+        name: returnToUrl
         type: string
       produces:
       - application/json
@@ -2946,11 +2949,11 @@ paths:
         type: string
       - description: Filter by label selector
         in: query
-        name: label_selector
+        name: labelSelector
         type: string
       - description: Order by field (e.g., 'created_at:asc')
         in: query
-        name: order_by
+        name: orderBy
         type: string
       produces:
       - application/json
@@ -3163,7 +3166,7 @@ paths:
       summary: Archive connector
       tags:
       - connectors
-  /connectors/{id}/_disconnect_all:
+  /connectors/{id}/_disconnectAll:
     post:
       consumes:
       - application/json
@@ -3611,11 +3614,11 @@ paths:
         type: string
       - description: Filter by label selector
         in: query
-        name: label_selector
+        name: labelSelector
         type: string
       - description: Order by field (e.g., 'version:desc')
         in: query
-        name: order_by
+        name: orderBy
         type: string
       produces:
       - application/json
@@ -3793,7 +3796,7 @@ paths:
       summary: Update connector version
       tags:
       - connectors
-  /connectors/{id}/versions/{version}/_force_state:
+  /connectors/{id}/versions/{version}/_forceState:
     put:
       consumes:
       - application/json
@@ -4293,11 +4296,11 @@ paths:
         type: string
       - description: Filter by label selector
         in: query
-        name: label_selector
+        name: labelSelector
         type: string
       - description: Order by field (e.g., 'state:asc')
         in: query
-        name: order_by
+        name: orderBy
         type: string
       produces:
       - application/json
@@ -4879,7 +4882,7 @@ paths:
         type: integer
       - description: Order by field (e.g., 'timestamp:desc')
         in: query
-        name: order_by
+        name: orderBy
         type: string
       - description: Filter by namespace
         in: query
@@ -4887,27 +4890,27 @@ paths:
         type: string
       - description: Filter by request type
         in: query
-        name: request_type
+        name: requestType
         type: string
       - description: Filter by correlation ID
         in: query
-        name: correlation_id
+        name: correlationId
         type: string
       - description: Filter by connection UUID
         in: query
-        name: connection_id
+        name: connectionId
         type: string
       - description: Filter by connector type
         in: query
-        name: connector_type
+        name: connectorType
         type: string
       - description: Filter by connector UUID
         in: query
-        name: connector_id
+        name: connectorId
         type: string
       - description: Filter by connector version
         in: query
-        name: connector_version
+        name: connectorVersion
         type: integer
       - description: Filter by HTTP method
         in: query
@@ -4915,15 +4918,15 @@ paths:
         type: string
       - description: Filter by exact status code
         in: query
-        name: status_code
+        name: statusCode
         type: integer
       - description: Filter by status code range (e.g., '200-299')
         in: query
-        name: status_code_range
+        name: statusCodeRange
         type: string
       - description: Filter by timestamp range
         in: query
-        name: timestamp_range
+        name: timestampRange
         type: string
       - description: Filter by exact path
         in: query
@@ -4931,11 +4934,11 @@ paths:
         type: string
       - description: Filter by path regex
         in: query
-        name: path_regex
+        name: pathRegex
         type: string
       - description: Filter by label selector (e.g., 'env=prod,team=api')
         in: query
-        name: label_selector
+        name: labelSelector
         type: string
       produces:
       - application/json
@@ -5044,7 +5047,7 @@ paths:
         type: string
       - description: Filter to children of a parent namespace
         in: query
-        name: children_of
+        name: childrenOf
         type: string
       - description: Filter by namespace path pattern
         in: query
@@ -5056,11 +5059,11 @@ paths:
         type: string
       - description: Filter by label selector
         in: query
-        name: label_selector
+        name: labelSelector
         type: string
       - description: Order by field (e.g., 'path:asc')
         in: query
-        name: order_by
+        name: orderBy
         type: string
       produces:
       - application/json
@@ -5561,7 +5564,7 @@ paths:
         type: integer
       - description: Include notifications the actor has already viewed
         in: query
-        name: include_viewed
+        name: includeViewed
         type: boolean
       - description: Notification state; defaults to active
         in: query
@@ -5573,7 +5576,7 @@ paths:
         type: string
       - description: Filter by denormalized resource label selector
         in: query
-        name: label_selector
+        name: labelSelector
         type: string
       produces:
       - application/json
@@ -5704,11 +5707,11 @@ paths:
         type: string
       - description: Filter by label selector
         in: query
-        name: label_selector
+        name: labelSelector
         type: string
       - description: Order by field (e.g., 'created_at:desc')
         in: query
-        name: order_by
+        name: orderBy
         type: string
       produces:
       - application/json
@@ -5773,7 +5776,7 @@ paths:
       summary: Create rate limit
       tags:
       - rate_limits
-  /rate-limits/_dry_run:
+  /rate-limits/_dryRun:
     post:
       consumes:
       - application/json
@@ -6283,8 +6286,8 @@ paths:
       - rate_limits
   /search/resources:
     get:
-      description: Search durable resources by label value and exact label selector,
-        or seed a bounded recent-resource cache
+      description: Search durable resources by first-class name, label value, and
+        exact label selector, or seed a bounded recent-resource cache
       parameters:
       - description: 'Search mode: query or seed'
         in: query
@@ -6295,15 +6298,16 @@ paths:
         in: query
         items:
           type: string
-        name: resource_type
+        name: resourceType
         type: array
-      - description: Case-insensitive literal label-value substring (minimum 3 characters)
+      - description: Case-insensitive literal resource-name or label-value substring
+          (minimum 3 characters)
         in: query
         name: q
         type: string
       - description: Exact Kubernetes-style label selector
         in: query
-        name: label_selector
+        name: labelSelector
         type: string
       - description: Namespace matcher
         in: query

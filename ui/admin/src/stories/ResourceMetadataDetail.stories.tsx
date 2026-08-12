@@ -14,8 +14,8 @@ const namespace = {
   state: 'active',
   labels: {team: 'payments', 'apxy/ns/team': 'platform'},
   annotations: {owner: 'Payments Platform', runbook: 'go/payments'},
-  created_at: '2026-08-05T15:30:00Z',
-  updated_at: '2026-08-05T15:45:00Z',
+  createdAt: '2026-08-05T15:30:00Z',
+  updatedAt: '2026-08-05T15:45:00Z',
 };
 
 const connector = {
@@ -24,15 +24,15 @@ const connector = {
   namespace: 'root.payments',
   name: 'stripe',
   state: 'primary',
-  display_name: 'Stripe',
+  displayName: 'Stripe',
   description: 'Payment processing for the Acme platform.',
   highlight: 'Production connector',
   logo: '',
-  has_configure: true,
+  hasConfigure: true,
   labels: {provider: 'stripe', 'apxy/ns/team': 'payments'},
   annotations: {owner: 'Payments Platform', runbook: 'go/payments/stripe'},
-  created_at: '2026-08-05T15:30:00Z',
-  updated_at: '2026-08-05T15:45:00Z',
+  createdAt: '2026-08-05T15:30:00Z',
+  updatedAt: '2026-08-05T15:45:00Z',
 };
 
 const connection = {
@@ -40,12 +40,12 @@ const connection = {
   namespace: 'root.payments',
   name: 'stripe-production',
   state: 'configured',
-  health_state: 'healthy',
+  healthState: 'healthy',
   connector,
   labels: {environment: 'production', 'apxy/ns/team': 'payments'},
   annotations: {owner: 'Payments Platform', runbook: 'go/payments/stripe'},
-  created_at: '2026-08-05T15:30:00Z',
-  updated_at: '2026-08-05T15:45:00Z',
+  createdAt: '2026-08-05T15:30:00Z',
+  updatedAt: '2026-08-05T15:45:00Z',
 };
 
 const key = {
@@ -53,11 +53,11 @@ const key = {
   namespace: 'root.payments',
   name: 'payments-primary',
   state: 'active',
-  key_data: {type: 'aes-gcm'},
+  keyData: {type: 'aes-gcm'},
   labels: {environment: 'production', 'apxy/ns/team': 'payments'},
   annotations: {owner: 'Payments Platform', rotation: 'quarterly'},
-  created_at: '2026-08-05T15:30:00Z',
-  updated_at: '2026-08-05T15:45:00Z',
+  createdAt: '2026-08-05T15:30:00Z',
+  updatedAt: '2026-08-05T15:45:00Z',
 };
 
 const rateLimit = {
@@ -66,19 +66,19 @@ const rateLimit = {
   name: 'public-api',
   definition: {
     mode: 'enforce',
-    selector: {methods: ['GET', 'POST'], request_types: ['proxy']},
+    selector: {methods: ['GET', 'POST'], requestTypes: ['proxy']},
     bucket: {dimensions: ['actor']},
-    algorithm: {token_bucket: {capacity: 100, refill_rate: 20}},
+    algorithm: {tokenBucket: {capacity: 100, refillRate: 20}},
   },
   labels: {scope: 'public-api', 'apxy/ns/team': 'payments'},
   annotations: {owner: 'Payments Platform', runbook: 'go/payments/rate-limits'},
-  created_at: '2026-08-05T15:30:00Z',
-  updated_at: '2026-08-05T15:45:00Z',
+  createdAt: '2026-08-05T15:30:00Z',
+  updatedAt: '2026-08-05T15:45:00Z',
 };
 
 const connectorVersion = {
   ...connector,
-  definition: {display_name: 'Stripe', setup_flow: {steps: []}},
+  definition: {displayName: 'Stripe', setupFlow: {steps: []}},
 };
 
 configureClient({

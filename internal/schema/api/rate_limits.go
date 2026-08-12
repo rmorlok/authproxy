@@ -18,8 +18,8 @@ type RateLimitJson struct {
 	Definition  rlschema.RateLimit  `json:"definition" yaml:"definition"`
 	Labels      map[string]string   `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Annotations map[string]string   `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	CreatedAt   time.Time           `json:"created_at" yaml:"created_at"`
-	UpdatedAt   time.Time           `json:"updated_at" yaml:"updated_at"`
+	CreatedAt   time.Time           `json:"createdAt" yaml:"createdAt"`
+	UpdatedAt   time.Time           `json:"updatedAt" yaml:"updatedAt"`
 }
 
 type ListRateLimitsResponseJson struct {
@@ -57,8 +57,8 @@ type ProxyRequestJson struct {
 	Method   string                       `json:"method" yaml:"method" example:"GET"`
 	Headers  map[string]common.HeadersVal `json:"headers,omitempty" yaml:"headers,omitempty" swaggertype:"object"`
 	Labels   map[string]string            `json:"labels,omitempty" yaml:"labels,omitempty"`
-	BodyRaw  []byte                       `json:"body_raw,omitempty" yaml:"body_raw,omitempty"`
-	BodyJson interface{}                  `json:"body_json,omitempty" yaml:"body_json,omitempty"`
+	BodyRaw  []byte                       `json:"bodyRaw,omitempty" yaml:"bodyRaw,omitempty"`
+	BodyJson interface{}                  `json:"bodyJson,omitempty" yaml:"bodyJson,omitempty"`
 }
 
 // DryRunRequestJson is the request body for POST /rate-limits/_dry_run.
@@ -66,36 +66,36 @@ type ProxyRequestJson struct {
 //	@Description	Request to simulate rate-limit matching
 type DryRunRequestJson struct {
 	Request     ProxyRequestJson  `json:"request" yaml:"request"`
-	RequestType string            `json:"request_type" yaml:"request_type" example:"proxy"`
+	RequestType string            `json:"requestType" yaml:"requestType" example:"proxy"`
 	Context     DryRunContextJson `json:"context" yaml:"context"`
 }
 
 type DryRunContextJson struct {
-	ConnectionId *apid.ID `json:"connection_id,omitempty" yaml:"connection_id,omitempty" swaggertype:"string"`
-	ActorId      *apid.ID `json:"actor_id,omitempty" yaml:"actor_id,omitempty" swaggertype:"string"`
+	ConnectionId *apid.ID `json:"connectionId,omitempty" yaml:"connectionId,omitempty" swaggertype:"string"`
+	ActorId      *apid.ID `json:"actorId,omitempty" yaml:"actorId,omitempty" swaggertype:"string"`
 	Namespace    *string  `json:"namespace,omitempty" yaml:"namespace,omitempty" example:"root.acme"`
 }
 
 type DryRunResponseJson struct {
-	RequestLabelSnapshot map[string]string      `json:"request_label_snapshot" yaml:"request_label_snapshot"`
+	RequestLabelSnapshot map[string]string      `json:"requestLabelSnapshot" yaml:"requestLabelSnapshot"`
 	Matched              []DryRunMatchJson      `json:"matched" yaml:"matched"`
-	NotMatched           []DryRunNotMatchedJson `json:"not_matched" yaml:"not_matched"`
+	NotMatched           []DryRunNotMatchedJson `json:"notMatched" yaml:"notMatched"`
 }
 
 type DryRunMatchJson struct {
-	RateLimitId      apid.ID `json:"rate_limit_id" yaml:"rate_limit_id" swaggertype:"string" example:"rl_test550e8400abcde"`
+	RateLimitId      apid.ID `json:"rateLimitId" yaml:"rateLimitId" swaggertype:"string" example:"rl_test550e8400abcde"`
 	Namespace        string  `json:"namespace" yaml:"namespace" example:"root.acme"`
-	EffectiveMode    string  `json:"effective_mode" yaml:"effective_mode" example:"enforce"`
-	BucketKey        string  `json:"bucket_key" yaml:"bucket_key" example:"rate_limit:rl_test550e8400abcde:actor:act_test"`
-	AlgorithmSummary string  `json:"algorithm_summary" yaml:"algorithm_summary" example:"fixed_window window=1m limit=100"`
-	WouldAllow       bool    `json:"would_allow" yaml:"would_allow" example:"true"`
+	EffectiveMode    string  `json:"effectiveMode" yaml:"effectiveMode" example:"enforce"`
+	BucketKey        string  `json:"bucketKey" yaml:"bucketKey" example:"rate_limit:rl_test550e8400abcde:actor:act_test"`
+	AlgorithmSummary string  `json:"algorithmSummary" yaml:"algorithmSummary" example:"fixed_window window=1m limit=100"`
+	WouldAllow       bool    `json:"wouldAllow" yaml:"wouldAllow" example:"true"`
 	Remaining        int     `json:"remaining" yaml:"remaining" example:"99"`
-	RetryAfterMs     int64   `json:"retry_after_ms" yaml:"retry_after_ms" example:"0"`
-	PeekFailed       bool    `json:"peek_failed" yaml:"peek_failed" example:"false"`
+	RetryAfterMs     int64   `json:"retryAfterMs" yaml:"retryAfterMs" example:"0"`
+	PeekFailed       bool    `json:"peekFailed" yaml:"peekFailed" example:"false"`
 }
 
 type DryRunNotMatchedJson struct {
-	RateLimitId apid.ID `json:"rate_limit_id" yaml:"rate_limit_id" swaggertype:"string" example:"rl_test550e8400abcde"`
+	RateLimitId apid.ID `json:"rateLimitId" yaml:"rateLimitId" swaggertype:"string" example:"rl_test550e8400abcde"`
 	Namespace   string  `json:"namespace" yaml:"namespace" example:"root.acme"`
 	Reason      string  `json:"reason" yaml:"reason" example:"method did not match"`
 }

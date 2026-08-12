@@ -8,16 +8,17 @@ import {Connector, ConnectorVersionState} from '@authproxy/api';
 describe('ConnectorCard', () => {
     const mockConnector: Connector = {
         id: 'google-calendar',
+        name: 'google-calendar',
         namespace: 'root',
         version: 1,
         state: ConnectorVersionState.ACTIVE,
-        display_name: 'Google Calendar',
+        displayName: 'Google Calendar',
         description: 'Connect to your Google Calendar to manage events and appointments.',
         highlight: 'Manage events and appointments from Google Calendar.',
         logo: 'https://example.com/google-calendar-logo.png',
-        has_configure: false,
-        created_at: '2023-04-01T12:00:00Z',
-        updated_at: '2023-04-01T12:00:00Z',
+        hasConfigure: false,
+        createdAt: '2023-04-01T12:00:00Z',
+        updatedAt: '2023-04-01T12:00:00Z',
     };
 
     const mockOnConnect = vi.fn();
@@ -122,7 +123,7 @@ describe('ConnectorCard', () => {
     test('renders initials when the connector has no logo', () => {
         render(
             <ConnectorCard
-                connector={{...mockConnector, display_name: 'No Logo Connector', logo: ''}}
+                connector={{...mockConnector, displayName: 'No Logo Connector', logo: ''}}
                 onConnect={mockOnConnect}
                 isConnecting={false}
             />

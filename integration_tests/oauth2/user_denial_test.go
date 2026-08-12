@@ -86,7 +86,7 @@ func TestUserDenialFlow(t *testing.T) {
 
 	// 1. Marketplace boot + Connect click — same as the happy path up through
 	//    the provider's consent screen.
-	connectorsURL := env.PublicURL + "/connectors?auth_token=" + url.QueryEscape(authToken)
+	connectorsURL := env.PublicURL + "/connectors?authToken=" + url.QueryEscape(authToken)
 	require.NoError(t, chromedp.Run(browserCtx,
 		chromedp.Navigate(connectorsURL),
 		chromedp.WaitVisible(`//button[normalize-space()='Connect']`, chromedp.BySearch),
@@ -119,8 +119,8 @@ func TestUserDenialFlow(t *testing.T) {
 	var finalURL string
 	require.NoError(t, chromedp.Run(browserCtx, chromedp.Location(&finalURL)))
 	assert.Truef(t, strings.HasPrefix(finalURL, expectedReturnPrefix),
-		"expected to land on return_to_url (%s), got %q", expectedReturnPrefix, finalURL)
-	// The proxy redirects with ?setup=pending&connection_id=... but the SPA
+		"expected to land on returnToUrl (%s), got %q", expectedReturnPrefix, finalURL)
+	// The proxy redirects with ?setup=pending&connectionId=... but the SPA
 	// strips those params from the URL as soon as it consumes them
 	// (ui/marketplace/src/components/ConnectionList.tsx). Reading Location()
 	// here would race that cleanup, so we don't assert the suffix — the

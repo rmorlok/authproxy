@@ -697,7 +697,7 @@ func TestTaskMonitoringRoutes(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPost,
-				"/task-monitoring/queues/default/archived/_run-all",
+				"/task-monitoring/queues/default/archived/_runAll",
 				nil,
 				"root",
 				"some-actor",
@@ -724,7 +724,7 @@ func TestTaskMonitoringRoutes(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPost,
-				"/task-monitoring/queues/default/retry/_run-all",
+				"/task-monitoring/queues/default/retry/_runAll",
 				nil,
 				"root",
 				"some-actor",

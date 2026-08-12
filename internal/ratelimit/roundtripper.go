@@ -212,7 +212,7 @@ func (rt *RoundTripper) getConfig() *connectors.RateLimiting {
 
 func (rt *RoundTripper) syntheticTooManyRequests(retryAfter time.Duration) *http.Response {
 	retryAfterSeconds := int(math.Ceil(retryAfter.Seconds()))
-	body := fmt.Sprintf(`{"error":"rate limited","retry_after_seconds":%d}`, retryAfterSeconds)
+	body := fmt.Sprintf(`{"error":"rate limited","retryAfterSeconds":%d}`, retryAfterSeconds)
 
 	return &http.Response{
 		StatusCode: http.StatusTooManyRequests,

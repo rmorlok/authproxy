@@ -3,6 +3,8 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/rmorlok/authproxy/internal/util"
 )
 
 func (r *Redis) MarshalJSON() ([]byte, error) {
@@ -36,7 +38,7 @@ func (r *Redis) UnmarshalJSON(data []byte) error {
 		t = &RedisReal{}
 	}
 
-	if err := json.Unmarshal(data, t); err != nil {
+	if err := util.DecodeJSONStrict(data, t); err != nil {
 		return err
 	}
 

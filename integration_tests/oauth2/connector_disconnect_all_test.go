@@ -115,7 +115,7 @@ func (r *connectorDisconnectAllRig) completeAuthFlow(t *testing.T, connector con
 	connID, redirectURL := r.env.InitiateOAuth2Connection(t, connector.id, r.returnToURL)
 	parsed, err := url.Parse(redirectURL)
 	require.NoError(t, err)
-	stateID := parsed.Query().Get("state_id")
+	stateID := parsed.Query().Get("stateId")
 	require.NotEmpty(t, stateID)
 
 	authResp := r.provider.Authorize(helpers.AuthorizeRequest{
@@ -144,7 +144,7 @@ func (r *connectorDisconnectAllRig) disconnectAll(t *testing.T, connectorID apid
 	})
 	require.NoError(t, err)
 
-	path := "/api/v1/connectors/" + connectorID.String() + "/_disconnect_all"
+	path := "/api/v1/connectors/" + connectorID.String() + "/_disconnectAll"
 	req, err := r.env.ApiAuthUtil.NewSignedRequestForActorExternalId(
 		http.MethodPost,
 		path,

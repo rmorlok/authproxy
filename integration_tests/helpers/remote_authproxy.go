@@ -129,7 +129,7 @@ func (h *RemoteAuthProxy) ListConnectors(t *testing.T, labelSelector string) []s
 
 	endpoint := h.PublicURL + "/api/v1/connectors?limit=100"
 	if labelSelector != "" {
-		endpoint += "&label_selector=" + url.QueryEscape(labelSelector)
+		endpoint += "&labelSelector=" + url.QueryEscape(labelSelector)
 	}
 
 	var list schemaapi.ListConnectorsResponseJson
@@ -153,7 +153,7 @@ func (h *RemoteAuthProxy) ForceConnectorVersionState(t *testing.T, connectorID a
 		t,
 		h.AdminActorExternalID,
 		http.MethodPut,
-		fmt.Sprintf("%s/api/v1/connectors/%s/versions/%d/_force_state", h.AdminURL, connectorID, version),
+		fmt.Sprintf("%s/api/v1/connectors/%s/versions/%d/_forceState", h.AdminURL, connectorID, version),
 		schemaapi.ForceConnectorVersionStateRequestJson{State: state},
 		true,
 		http.StatusOK,
@@ -217,7 +217,7 @@ func (h *RemoteAuthProxy) WaitForSetupComplete(t *testing.T, connectionID string
 			Type  schemaapi.ConnectionSetupResponseType `json:"type"`
 			Error string                                `json:"error,omitempty"`
 		}
-		h.doSigned(t, h.UserActorExternalID, http.MethodGet, h.PublicURL+"/api/v1/connections/"+connectionID+"/_setup_step", nil, true, http.StatusOK, &generic)
+		h.doSigned(t, h.UserActorExternalID, http.MethodGet, h.PublicURL+"/api/v1/connections/"+connectionID+"/_setupStep", nil, true, http.StatusOK, &generic)
 		lastType = generic.Type
 		lastError = generic.Error
 

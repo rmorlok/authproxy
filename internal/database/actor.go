@@ -665,13 +665,13 @@ type listActorsFilters struct {
 	s                 *service              `json:"-"`
 	LimitVal          uint64                `json:"limit"`
 	Offset            uint64                `json:"offset"`
-	OrderByFieldVal   *ActorOrderByField    `json:"order_by_field"`
-	OrderByVal        *pagination.OrderBy   `json:"order_by"`
-	IncludeDeletedVal bool                  `json:"include_deleted,omitempty"`
-	ExternalIdVal     *string               `json:"external_id,omitempty"`
+	OrderByFieldVal   *ActorOrderByField    `json:"orderByField"`
+	OrderByVal        *pagination.OrderBy   `json:"orderBy"`
+	IncludeDeletedVal bool                  `json:"includeDeleted,omitempty"`
+	ExternalIdVal     *string               `json:"externalId,omitempty"`
 	NameVal           *scommon.ResourceName `json:"name,omitempty"`
-	NamespaceMatchers []string              `json:"namespace_matchers,omitempty"`
-	LabelSelectorVal  *string               `json:"label_selector,omitempty"`
+	NamespaceMatchers []string              `json:"namespaceMatchers,omitempty"`
+	LabelSelectorVal  *string               `json:"labelSelector,omitempty"`
 	Errors            *multierror.Error     `json:"-"`
 }
 

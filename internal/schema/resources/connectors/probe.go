@@ -38,7 +38,7 @@ type Probe struct {
 	Cron *string `json:"cron,omitempty" yaml:"cron,omitempty"`
 
 	// ProxyHttp defines the probe as using an Authenticated HTTP proxy call as the probe.
-	ProxyHttp *ProbeHttp `json:"proxy_http,omitempty" yaml:"proxy_http,omitempty"`
+	ProxyHttp *ProbeHttp `json:"proxyHttp,omitempty" yaml:"proxyHttp,omitempty"`
 
 	// Http defines the probe as using a raw HTTP request as the probe.
 	Http *ProbeHttp `json:"http,omitempty" yaml:"http,omitempty"`
@@ -51,13 +51,13 @@ type Probe struct {
 	// FailureThreshold is the number of consecutive failures that must occur
 	// before the connection's health_state flips to unhealthy. Defaults to
 	// DefaultProbeFailureThreshold when omitted. Must be ≥ 1 when set.
-	FailureThreshold *int `json:"failure_threshold,omitempty" yaml:"failure_threshold,omitempty"`
+	FailureThreshold *int `json:"failureThreshold,omitempty" yaml:"failureThreshold,omitempty"`
 
 	// RecoveryThreshold is the number of consecutive successes that must occur,
 	// while the connection is unhealthy, before health_state flips back to
 	// healthy. Defaults to DefaultProbeRecoveryThreshold when omitted. Must be
 	// ≥ 1 when set.
-	RecoveryThreshold *int `json:"recovery_threshold,omitempty" yaml:"recovery_threshold,omitempty"`
+	RecoveryThreshold *int `json:"recoveryThreshold,omitempty" yaml:"recoveryThreshold,omitempty"`
 }
 
 // EffectiveFailureThreshold returns the configured failure threshold, falling
@@ -94,7 +94,7 @@ func (p *Probe) ValidateWithJavascript(vc *common.ValidationContext, library *ap
 	}
 
 	if typeCount != 1 {
-		result = multierror.Append(result, vc.NewErrorf("exactly one of proxy_http or http must be defined"))
+		result = multierror.Append(result, vc.NewErrorf("exactly one of proxyHttp or http must be defined"))
 	}
 
 	if err := p.If.Validate(vc.PushField("if"), connectorPredicateValidationContext(library)); err != nil {

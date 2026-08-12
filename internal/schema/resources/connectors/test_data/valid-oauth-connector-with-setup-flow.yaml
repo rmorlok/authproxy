@@ -1,18 +1,16 @@
-# $schema: ./schema.json
-
 labels:
   type: acme-crm
-display_name: Acme CRM
+displayName: Acme CRM
 logo:
-  public_url: https://example.com/acme-logo.png
+  publicUrl: https://example.com/acme-logo.png
 description: |
   Connect to Acme CRM to manage your customer data
 auth:
   type: OAuth2
-  client_id:
-    env_var: ACME_CLIENT_ID
-  client_secret:
-    env_var: ACME_CLIENT_SECRET
+  clientId:
+    envVar: ACME_CLIENT_ID
+  clientSecret:
+    envVar: ACME_CLIENT_SECRET
   authorization:
     endpoint: https://login.acme.com/oauth/authorize
   token:
@@ -20,13 +18,13 @@ auth:
   scopes:
     - id: read
       reason: Read access to your data
-setup_flow:
+setupFlow:
   preconnect:
     steps:
       - id: tenant
-        title: "Enter your Acme tenant"
-        description: "Provide your Acme subdomain to connect to your account"
-        json_schema:
+        title: Enter your Acme tenant
+        description: Provide your Acme subdomain to connect to your account
+        jsonSchema:
           type: object
           required:
             - tenant
@@ -35,7 +33,7 @@ setup_flow:
               type: string
               title: Tenant subdomain
               minLength: 1
-        ui_schema:
+        uiSchema:
           type: VerticalLayout
           elements:
             - type: Control
@@ -43,9 +41,9 @@ setup_flow:
   configure:
     steps:
       - id: select_workspace
-        title: "Select Workspace"
-        description: "Choose which workspace to sync data from"
-        json_schema:
+        title: Select Workspace
+        description: Choose which workspace to sync data from
+        jsonSchema:
           type: object
           required:
             - workspace_id
@@ -53,23 +51,23 @@ setup_flow:
             workspace_id:
               type: string
               title: Workspace
-        ui_schema:
+        uiSchema:
           type: VerticalLayout
           elements:
             - type: Control
               scope: "#/properties/workspace_id"
-        data_sources:
+        dataSources:
           workspaces:
-            proxy_request:
+            proxyRequest:
               method: GET
-              url: "https://api.acme.com/v1/workspaces"
+              url: https://api.acme.com/v1/workspaces
             transform: "data.map(w => ({ value: w.id, label: w.name }))"
       - id: sync_options
-        title: "Sync Options"
+        title: Sync Options
         if:
           javascript: |
             cfg.region === "eu" && labels["apxy/cxr/type"] === "acme-crm"
-        json_schema:
+        jsonSchema:
           type: object
           properties:
             sync_frequency:
@@ -79,7 +77,7 @@ setup_flow:
                 - hourly
                 - daily
                 - weekly
-        ui_schema:
+        uiSchema:
           type: VerticalLayout
           elements:
             - type: Control

@@ -14,9 +14,13 @@ import (
 
 type Connector struct {
 	// Id is the global id for this connector. This does not change version to version. In the config file, this can
-	// be omitted if there is only one instance of a particular type of connector. If there are multiple connectors that
-	// share the same identifying labels, the ids would need to be explicitly defined.
+	// be omitted when Name is specified; the logical connector is then reconciled by name within its namespace.
 	Id apid.ID `json:"id" yaml:"id"`
+
+	// Name is the mutable name of the logical connector. Config entries without an explicit ID must specify a name so
+	// AuthProxy can reconcile the same logical connector across reloads. When an ID is specified and name is omitted,
+	// a newly created connector defaults its name to the ID.
+	Name common.ResourceName `json:"name,omitempty" yaml:"name,omitempty" swaggerignore:"true"`
 
 	// Version is the logical version of the connector. When auth materially changes, such as adding new scopes,
 	// changing client ids/secrets, adding configuration settings, etc. the logical version of the connector must change
@@ -37,7 +41,7 @@ type Connector struct {
 	State string `json:"state,omitempty" yaml:"state,omitempty"`
 
 	// DisplayName is the human readable name of the connector. This is displayed to the user in the marketplace portal.
-	DisplayName string `json:"display_name" yaml:"display_name"`
+	DisplayName string `json:"displayName" yaml:"displayName"`
 
 	// Logo is the logo of the connector. This is displayed to the user in the marketplace portal.
 	Logo *common.Image `json:"logo" yaml:"logo"`
@@ -50,19 +54,19 @@ type Connector struct {
 
 	// StatusPageUrl is a URL to the status page for the external service this connector integrates with.
 	// This helps users track 3rd party outages that may affect their connections.
-	StatusPageUrl string `json:"status_page_url,omitempty" yaml:"status_page_url,omitempty"`
+	StatusPageUrl string `json:"statusPageUrl,omitempty" yaml:"statusPageUrl,omitempty"`
 
 	// MarketplaceUrl is a URL to the marketplace listing for this connector's external service.
 	// For example, this could link to the app's listing in the service's app marketplace.
-	MarketplaceUrl string `json:"marketplace_url,omitempty" yaml:"marketplace_url,omitempty"`
+	MarketplaceUrl string `json:"marketplaceUrl,omitempty" yaml:"marketplaceUrl,omitempty"`
 
 	// DeveloperConsoleUrl is a URL to the developer console for this connector's external service.
 	// This is where developers manage their app's configuration, API keys, etc.
-	DeveloperConsoleUrl string `json:"developer_console_url,omitempty" yaml:"developer_console_url,omitempty"`
+	DeveloperConsoleUrl string `json:"developerConsoleUrl,omitempty" yaml:"developerConsoleUrl,omitempty"`
 
 	// OAuthClientUrl is a URL to the OAuth client management page for this connector's external service.
 	// This is typically a sub-page of the developer console where the OAuth client credentials are managed.
-	OAuthClientUrl string `json:"oauth_client_url,omitempty" yaml:"oauth_client_url,omitempty"`
+	OAuthClientUrl string `json:"oauthClientUrl,omitempty" yaml:"oauthClientUrl,omitempty"`
 
 	// Auth is how this connector authenticates. Possible values are of type OAuth2 or APIKey. See individual
 	// documentation for each struct for more details.
@@ -79,14 +83,14 @@ type Connector struct {
 
 	// RateLimiting configures how 429 rate limiting responses from the 3rd party are handled.
 	// If unset, default behavior is enabled (parse Retry-After header, 60s default backoff).
-	RateLimiting *RateLimiting `json:"rate_limiting,omitempty" yaml:"rate_limiting,omitempty"`
+	RateLimiting *RateLimiting `json:"rateLimiting,omitempty" yaml:"rateLimiting,omitempty"`
 
 	// Probes are a list of probes to run against connections of this connector type to validation the connection.
 	Probes []Probe `json:"probes,omitempty" yaml:"probes,omitempty"`
 
 	// SetupFlow defines the multi-step setup flow for configuring connections.
 	// Includes optional preconnect forms (before auth) and configure forms (after auth).
-	SetupFlow *SetupFlow `json:"setup_flow,omitempty" yaml:"setup_flow,omitempty"`
+	SetupFlow *SetupFlow `json:"setupFlow,omitempty" yaml:"setupFlow,omitempty"`
 
 	// Labels are the labels for the connector.
 	Labels map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
@@ -133,6 +137,11 @@ func (c *Connector) Clone() *Connector {
 
 func (c *Connector) Validate(vc *common.ValidationContext) error {
 	result := &multierror.Error{}
+	if c.Name != "" {
+		if err := c.Name.Validate(); err != nil {
+			result = multierror.Append(result, vc.NewErrorfForField("name", "%v", err))
+		}
+	}
 	javascript, err := apjs.CompileAndValidateLibrary(c.Javascript)
 	if err != nil {
 		result = multierror.Append(result, vc.NewErrorfForField("javascript", "invalid connector javascript: %v", err))
@@ -194,25 +203,18 @@ func (c *Connector) Validate(vc *common.ValidationContext) error {
 	return result.ErrorOrNil()
 }
 
-// GetIdentifyingLabelValues returns the values for the specified identifying labels.
-func (c *Connector) GetIdentifyingLabelValues(identifyingLabels []string) map[string]string {
-	result := make(map[string]string)
-	if c == nil || c.Labels == nil {
-		return result
-	}
-	for _, key := range identifyingLabels {
-		if v, ok := c.Labels[key]; ok {
-			result[key] = v
-		}
-	}
-	return result
-}
-
 // Hash computes a semantic hash of the connector data. It does not account for data that is not stored in the
 // configuration directly (e.g. environment variables referenced). A change in the hash implies that a new version
 // must be created if the existing version is already live.
 func (c *Connector) Hash() string {
-	jsonData, err := json.Marshal(c)
+	if c == nil {
+		return ""
+	}
+	definition := c.Clone()
+	// Name belongs to the logical connector rather than an individual
+	// definition version, so a rename must not change the definition hash.
+	definition.Name = ""
+	jsonData, err := json.Marshal(definition)
 	if err != nil {
 		return ""
 	}
@@ -228,6 +230,11 @@ func (c *Connector) HasId() bool {
 	}
 
 	return c.Id != apid.Nil
+}
+
+// HasName returns true when the configuration explicitly specifies a name.
+func (c *Connector) HasName() bool {
+	return c != nil && c.Name != ""
 }
 
 // HasVersion returns true if the connector has a version. This implies that the configuration set a version explicitly.

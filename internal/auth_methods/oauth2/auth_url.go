@@ -43,7 +43,7 @@ func (o *oAuth2Connection) getPublicRedirectUrl(ctx context.Context, stateId api
 	}
 
 	query := u.Query()
-	query.Set("state_id", stateId.String())
+	query.Set("stateId", stateId.String())
 	auth.SetJwtQueryParm(query, tokenString)
 
 	u.Path += "/oauth2/redirect"

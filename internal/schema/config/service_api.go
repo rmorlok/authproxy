@@ -15,21 +15,16 @@ func (s *ServiceApi) UnmarshalYAML(value *yaml.Node) error {
 	if value.Kind != yaml.MappingNode {
 		return fmt.Errorf("service worker expected a mapping node, got %s", KindToString(value.Kind))
 	}
+	if err := validateYAMLMappingFields(value, httpServiceYAMLFields...); err != nil {
+		return err
+	}
 
 	hs, err := httpServiceUnmarshalYAML(value)
 	if err != nil {
 		return err
 	}
 
-	// Let the rest unmarshall normally
-	type RawType ServiceApi
-	raw := (*RawType)(s)
-	if err := value.Decode(raw); err != nil {
-		return err
-	}
-
-	// Set the custom unmarshalled types
-	raw.ServiceHttp = hs
+	s.ServiceHttp = hs
 
 	return nil
 }

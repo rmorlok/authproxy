@@ -28,6 +28,7 @@ interface ResourceMetadataMenuItemsProps {
   onRename?: (name: string) => Promise<void>;
   onUpdateLabels: (labels: Record<string, string>) => Promise<void>;
   onUpdateAnnotations: (annotations: Record<string, string>) => Promise<void>;
+  includeRename?: boolean;
   renameDisabledReason?: string;
   disabled?: boolean;
 }
@@ -41,6 +42,7 @@ export default function ResourceMetadataMenuItems({
   onRename,
   onUpdateLabels,
   onUpdateAnnotations,
+  includeRename = true,
   renameDisabledReason,
   disabled,
 }: ResourceMetadataMenuItemsProps) {
@@ -128,13 +130,13 @@ export default function ResourceMetadataMenuItems({
 
   return (
     <>
-      {onRename ? (
+      {includeRename && (onRename ? (
         <MenuItem onClick={() => openDialog('rename')} disabled={disabled}>Rename…</MenuItem>
       ) : (
         <Tooltip title={renameDisabledReason || `This ${resource} cannot be renamed`} placement="left">
           <span><MenuItem disabled>Rename…</MenuItem></span>
         </Tooltip>
-      )}
+      ))}
       <MenuItem onClick={() => openDialog('labels')} disabled={disabled}>Edit labels…</MenuItem>
       <MenuItem onClick={() => openDialog('annotations')} disabled={disabled}>Edit annotations…</MenuItem>
 

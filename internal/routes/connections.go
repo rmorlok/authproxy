@@ -87,7 +87,7 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
 	var req coreIface.InitiateConnectionRequest
-	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+	if err := bindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
@@ -147,7 +147,7 @@ func (r *ConnectionsRoutes) submit(gctx *gin.Context) {
 	}
 
 	var req coreIface.SubmitConnectionRequest
-	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+	if err := bindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
@@ -168,13 +168,13 @@ func (r *ConnectionsRoutes) submit(gctx *gin.Context) {
 // @Tags			connections
 // @Produce		json
 // @Param			id	path		string	true	"Connection ID"
-// @Param			return_to_url	query	string	false	"URL to return to after a resumed redirect step"
+// @Param			returnToUrl	query	string	false	"URL to return to after a resumed redirect step"
 // @Success		200	{object}	ConnectionSetupComplete
 // @Failure		400	{object}	ErrorResponse
 // @Failure		401	{object}	ErrorResponse
 // @Failure		404	{object}	ErrorResponse
 // @Security		BearerAuth
-// @Router			/connections/{id}/_setup_step [get]
+// @Router			/connections/{id}/_setupStep [get]
 func (r *ConnectionsRoutes) getSetupStep(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
@@ -208,7 +208,7 @@ func (r *ConnectionsRoutes) getSetupStep(gctx *gin.Context) {
 		return
 	}
 
-	resp, err := c.GetCurrentSetupStepResponse(ctx, gctx.Query("return_to_url"))
+	resp, err := c.GetCurrentSetupStepResponse(ctx, gctx.Query("returnToUrl"))
 	if err != nil {
 		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
@@ -223,13 +223,13 @@ func (r *ConnectionsRoutes) getSetupStep(gctx *gin.Context) {
 // @Tags			connections
 // @Produce		json
 // @Param			id			path		string	true	"Connection ID"
-// @Param			source_id	path		string	true	"Data Source ID"
+// @Param			sourceId	path		string	true	"Data Source ID"
 // @Success		200	{array}		DataSourceOptionJson
 // @Failure		400	{object}	ErrorResponse
 // @Failure		401	{object}	ErrorResponse
 // @Failure		404	{object}	ErrorResponse
 // @Security		BearerAuth
-// @Router			/connections/{id}/_data_source/{source_id} [get]
+// @Router			/connections/{id}/_dataSource/{sourceId} [get]
 func (r *ConnectionsRoutes) getDataSource(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
@@ -247,9 +247,9 @@ func (r *ConnectionsRoutes) getDataSource(gctx *gin.Context) {
 		return
 	}
 
-	sourceId := gctx.Param("source_id")
+	sourceId := gctx.Param("sourceId")
 	if sourceId == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("source_id is required"))
+		apgin.WriteError(gctx, nil, httperr.BadRequest("sourceId is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -303,11 +303,11 @@ type ListConnectionRequestQuery struct {
 	Cursor        *string                   `form:"cursor"`
 	LimitVal      *int32                    `form:"limit"`
 	StateVal      *database.ConnectionState `form:"state"`
-	ConnectorId   *string                   `form:"connector_id"`
+	ConnectorId   *string                   `form:"connectorId"`
 	NamespaceVal  *string                   `form:"namespace"`
 	NameVal       *string                   `form:"name"`
-	LabelSelector *string                   `form:"label_selector"`
-	OrderByVal    *string                   `form:"order_by"`
+	LabelSelector *string                   `form:"labelSelector"`
+	OrderByVal    *string                   `form:"orderBy"`
 }
 
 // @Summary		List connections
@@ -318,11 +318,11 @@ type ListConnectionRequestQuery struct {
 // @Param			cursor			query		string	false	"Pagination cursor"
 // @Param			limit			query		integer	false	"Maximum number of results to return"
 // @Param			state			query		string	false	"Filter by connection state"
-// @Param			connector_id	query		string	false	"Filter by connector ID"
+// @Param			connectorId	query		string	false	"Filter by connector ID"
 // @Param			namespace		query		string	false	"Filter by namespace"
 // @Param			name			query		string	false	"Filter by exact resource name"
-// @Param			label_selector	query		string	false	"Filter by label selector"
-// @Param			order_by		query		string	false	"Order by field (e.g., 'created_at:asc')"
+// @Param			labelSelector	query		string	false	"Filter by label selector"
+// @Param			orderBy		query		string	false	"Order by field (e.g., 'created_at:asc')"
 // @Success		200				{object}	OpenAPIListConnectionResponseJson
 // @Failure		400				{object}	ErrorResponse
 // @Failure		401				{object}	ErrorResponse
@@ -365,12 +365,12 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 		if req.ConnectorId != nil {
 			connectorId, err := apid.Parse(*req.ConnectorId)
 			if err != nil {
-				apgin.WriteError(gctx, nil, httperr.BadRequest("invalid connector_id format", httperr.WithInternalErr(err)))
+				apgin.WriteError(gctx, nil, httperr.BadRequest("invalid connectorId format", httperr.WithInternalErr(err)))
 				val.MarkErrorReturn()
 				return
 			}
 			if err := connectorId.ValidatePrefix(apid.PrefixConnectorVersion); err != nil {
-				apgin.WriteError(gctx, nil, httperr.BadRequest("invalid connector_id prefix", httperr.WithInternalErr(err)))
+				apgin.WriteError(gctx, nil, httperr.BadRequest("invalid connectorId prefix", httperr.WithInternalErr(err)))
 				val.MarkErrorReturn()
 				return
 			}
@@ -569,7 +569,7 @@ func (r *ConnectionsRoutes) parseConnectionDisconnectRequest(gctx *gin.Context) 
 
 	req := DisconnectConnectionRequestJson{}
 	if gctx.Request.Body != http.NoBody && gctx.Request.ContentLength != 0 {
-		if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+		if err := bindJSONBody(gctx, &req); err != nil {
 			apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 			val.MarkErrorReturn()
 			return coreIface.ConnectionDisconnectOptions{}, false
@@ -579,7 +579,7 @@ func (r *ConnectionsRoutes) parseConnectionDisconnectRequest(gctx *gin.Context) 
 	timeout := defaultConnectorLifecycleTimeout
 	if req.TimeoutSeconds != nil {
 		if *req.TimeoutSeconds <= 0 {
-			apgin.WriteError(gctx, nil, httperr.BadRequest("timeout_seconds must be greater than zero"))
+			apgin.WriteError(gctx, nil, httperr.BadRequest("timeoutSeconds must be greater than zero"))
 			val.MarkErrorReturn()
 			return coreIface.ConnectionDisconnectOptions{}, false
 		}
@@ -603,7 +603,7 @@ func (r *ConnectionsRoutes) parseConnectionDisconnectRequest(gctx *gin.Context) 
 // @Failure		404		{object}	ErrorResponse
 // @Failure		500		{object}	ErrorResponse
 // @Security		BearerAuth
-// @Router			/connections/{id}/_migrate_version [post]
+// @Router			/connections/{id}/_migrateVersion [post]
 func (r *ConnectionsRoutes) migrateVersion(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
@@ -665,13 +665,13 @@ func (r *ConnectionsRoutes) parseConnectionMigrationRequest(gctx *gin.Context) (
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
 	req := MigrateConnectionVersionRequestJson{}
-	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+	if err := bindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return coreIface.ConnectionMigrationOptions{}, false
 	}
 	if req.TargetVersion == 0 {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("target_version is required"))
+		apgin.WriteError(gctx, nil, httperr.BadRequest("targetVersion is required"))
 		val.MarkErrorReturn()
 		return coreIface.ConnectionMigrationOptions{}, false
 	}
@@ -679,7 +679,7 @@ func (r *ConnectionsRoutes) parseConnectionMigrationRequest(gctx *gin.Context) (
 	timeout := defaultConnectorLifecycleTimeout
 	if req.TimeoutSeconds != nil {
 		if *req.TimeoutSeconds <= 0 {
-			apgin.WriteError(gctx, nil, httperr.BadRequest("timeout_seconds must be greater than zero"))
+			apgin.WriteError(gctx, nil, httperr.BadRequest("timeoutSeconds must be greater than zero"))
 			val.MarkErrorReturn()
 			return coreIface.ConnectionMigrationOptions{}, false
 		}
@@ -810,7 +810,7 @@ func (r *ConnectionsRoutes) reconfigure(gctx *gin.Context) {
 // @Failure		401	{object}	ErrorResponse
 // @Failure		404	{object}	ErrorResponse
 // @Security		BearerAuth
-// @Router			/connections/{id}/_cancel_setup [post]
+// @Router			/connections/{id}/_cancelSetup [post]
 func (r *ConnectionsRoutes) cancelSetup(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
@@ -854,7 +854,7 @@ func (r *ConnectionsRoutes) cancelSetup(gctx *gin.Context) {
 }
 
 type RetryConnectionRequest struct {
-	ReturnToUrl string `json:"return_to_url,omitempty"`
+	ReturnToUrl string `json:"returnToUrl,omitempty"`
 }
 
 // @Summary		Retry connection setup
@@ -904,7 +904,7 @@ func (r *ConnectionsRoutes) retry(gctx *gin.Context) {
 	}
 
 	var req RetryConnectionRequest
-	// Body is optional — return_to_url is only needed when the connector has no preconnect steps.
+	// Body is optional — returnToUrl is only needed when the connector has no preconnect steps.
 	if err := bindOptionalJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
@@ -922,7 +922,7 @@ func (r *ConnectionsRoutes) retry(gctx *gin.Context) {
 }
 
 type ReauthConnectionRequest struct {
-	ReturnToUrl string `json:"return_to_url,omitempty"`
+	ReturnToUrl string `json:"returnToUrl,omitempty"`
 }
 
 // @Summary		Re-authenticate a connection
@@ -972,7 +972,7 @@ func (r *ConnectionsRoutes) reauth(gctx *gin.Context) {
 	}
 
 	var req ReauthConnectionRequest
-	// Body is optional — return_to_url is only needed for OAuth2 connectors with no preconnect steps.
+	// Body is optional — returnToUrl is only needed for OAuth2 connectors with no preconnect steps.
 	if err := bindOptionalJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
@@ -1003,7 +1003,7 @@ func (r *ConnectionsRoutes) reauth(gctx *gin.Context) {
 // @Failure		404		{object}	ErrorResponse
 // @Failure		500		{object}	ErrorResponse
 // @Security		BearerAuth
-// @Router			/connections/{id}/_force_state [put]
+// @Router			/connections/{id}/_forceState [put]
 func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
@@ -1022,7 +1022,7 @@ func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 	}
 
 	req := ForceStateRequestJson{}
-	err = gctx.BindJSON(&req)
+	err = bindJSONBody(gctx, &req)
 	if err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
@@ -1103,7 +1103,7 @@ func (r *ConnectionsRoutes) update(gctx *gin.Context) {
 	}
 
 	var req UpdateConnectionRequestJson
-	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+	if err := bindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
@@ -1445,7 +1445,7 @@ func (r *ConnectionsRoutes) Register(g gin.IRouter) {
 		r.submit,
 	)
 	g.GET(
-		"/connections/:id/_setup_step",
+		"/connections/:id/_setupStep",
 		r.auth.NewRequiredBuilder().
 			ForResource("connections").
 			ForVerbs("create", "update").
@@ -1454,7 +1454,7 @@ func (r *ConnectionsRoutes) Register(g gin.IRouter) {
 		r.getSetupStep,
 	)
 	g.GET(
-		"/connections/:id/_data_source/:source_id",
+		"/connections/:id/_dataSource/:sourceId",
 		r.auth.NewRequiredBuilder().
 			ForResource("connections").
 			ForVerbs("create", "update").
@@ -1490,7 +1490,7 @@ func (r *ConnectionsRoutes) Register(g gin.IRouter) {
 		r.reconfigure,
 	)
 	g.POST(
-		"/connections/:id/_migrate_version",
+		"/connections/:id/_migrateVersion",
 		r.auth.NewRequiredBuilder().
 			ForResource("connections").
 			ForVerb("update").
@@ -1499,7 +1499,7 @@ func (r *ConnectionsRoutes) Register(g gin.IRouter) {
 		r.migrateVersion,
 	)
 	g.POST(
-		"/connections/:id/_cancel_setup",
+		"/connections/:id/_cancelSetup",
 		r.auth.NewRequiredBuilder().
 			ForResource("connections").
 			ForVerb("update").
@@ -1526,7 +1526,7 @@ func (r *ConnectionsRoutes) Register(g gin.IRouter) {
 		r.reauth,
 	)
 	g.PUT(
-		"/connections/:id/_force_state",
+		"/connections/:id/_forceState",
 		r.auth.NewRequiredBuilder().
 			ForResource("connections").
 			ForVerb("force_state").

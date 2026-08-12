@@ -50,17 +50,17 @@ export interface ConnectionAnnotation {
 
 export interface Connection {
     id: string;
-    namespace: string;
     name: string;
+    namespace: string;
     connector: Connector;
     state: ConnectionState;
-    health_state: ConnectionHealthState;
-    setup_step_id?: string;
-    setup_error?: string;
+    healthState: ConnectionHealthState;
+    setupStepId?: string;
+    setupError?: string;
     labels?: Record<string, string>;
     annotations?: Record<string, string>;
-    created_at: string;
-    updated_at: string;
+    createdAt: string;
+    updatedAt: string;
 }
 
 export function canBeDisconnected(connection: Connection): boolean {
@@ -72,8 +72,9 @@ export function canBeDisconnected(connection: Connection): boolean {
 
 // Request models
 export interface InitiateConnectionRequest {
-    connector_id: string;
-    return_to_url: string;
+    connectorId: string;
+    name?: string;
+    returnToUrl: string;
     labels?: Record<string, string>;
 }
 
@@ -92,16 +93,16 @@ export interface ConnectionSetupResponse {
 
 export interface ConnectionSetupRedirectResponse extends ConnectionSetupResponse {
     type: ConnectionSetupResponseType.REDIRECT;
-    redirect_url: string;
+    redirectUrl: string;
 }
 
 export interface ConnectionSetupFormResponse extends ConnectionSetupResponse {
     type: ConnectionSetupResponseType.FORM;
-    step_id: string;
-    step_title?: string;
-    step_description?: string;
-    json_schema: Record<string, unknown>;
-    ui_schema: Record<string, unknown>;
+    stepId: string;
+    stepTitle?: string;
+    stepDescription?: string;
+    jsonSchema: Record<string, unknown>;
+    uiSchema: Record<string, unknown>;
 }
 
 export interface ConnectionSetupCompleteResponse extends ConnectionSetupResponse {
@@ -115,7 +116,7 @@ export interface ConnectionSetupVerifyingResponse extends ConnectionSetupRespons
 export interface ConnectionSetupErrorResponse extends ConnectionSetupResponse {
     type: ConnectionSetupResponseType.ERROR;
     error: string;
-    can_retry: boolean;
+    canRetry: boolean;
 }
 
 export function isRedirectResponse(response: ConnectionSetupResponse): response is ConnectionSetupRedirectResponse {
@@ -139,17 +140,17 @@ export function isErrorResponse(response: ConnectionSetupResponse): response is 
 }
 
 export interface SubmitConnectionRequest {
-    step_id: string;
+    stepId: string;
     data: unknown;
-    return_to_url?: string;
+    returnToUrl?: string;
 }
 
 export interface RetryConnectionRequest {
-    return_to_url?: string;
+    returnToUrl?: string;
 }
 
 export interface ReauthConnectionRequest {
-    return_to_url?: string;
+    returnToUrl?: string;
 }
 
 export interface DataSourceOption {
@@ -159,24 +160,24 @@ export interface DataSourceOption {
 
 // Disconnect models
 export interface DisconnectConnectionRequest {
-    timeout_seconds?: number;
+    timeoutSeconds?: number;
 }
 
 export interface DisconnectResponseJson {
-    task_id: string;
+    taskId: string;
     connection: Connection;
 }
 
 export interface MigrateConnectionVersionRequest {
-    target_version: number;
-    timeout_seconds?: number;
+    targetVersion: number;
+    timeoutSeconds?: number;
 }
 
 export interface MigrateConnectionVersionResponseJson {
-    task_id: string;
-    connection_id: string;
-    source_version: number;
-    target_version: number;
+    taskId: string;
+    connectionId: string;
+    sourceVersion: number;
+    targetVersion: number;
 }
 
 export interface ForceConnectionStateRequest {
@@ -189,12 +190,13 @@ export type ForceConnectionStateResponse = Connection;
  * Parameters used for listing connections.
  */
 export interface ListConnectionsParams {
+    name?: string;
     state?: ConnectionState;
     namespace?: string;
-    label_selector?: string;
+    labelSelector?: string;
     cursor?: string;
     limit?: number;
-    order_by?: string;
+    orderBy?: string;
 }
 
 /**
@@ -217,11 +219,13 @@ export const getConnection = (id: string) => {
 export const initiateConnection = (
     connectorId: string,
     returnToUrl: string,
-    labels?: Record<string, string>
+    labels?: Record<string, string>,
+    name?: string,
 ) => {
     const request: InitiateConnectionRequest = {
-        connector_id: connectorId,
-        return_to_url: returnToUrl,
+        connectorId: connectorId,
+        name,
+        returnToUrl: returnToUrl,
         labels,
     };
 
@@ -241,9 +245,9 @@ export const submitConnection = (
     returnToUrl?: string
 ) => {
     const request: SubmitConnectionRequest = {
-        step_id: stepId,
+        stepId: stepId,
         data,
-        return_to_url: returnToUrl,
+        returnToUrl: returnToUrl,
     };
 
     return client.post<ConnectionSetupResponse>(
@@ -267,7 +271,7 @@ export const disconnectConnection = (id: string, request?: DisconnectConnectionR
  */
 export const migrateConnectionVersion = (id: string, request: MigrateConnectionVersionRequest) => {
     return client.post<MigrateConnectionVersionResponseJson>(
-        `/api/v1/connections/${id}/_migrate_version`,
+        `/api/v1/connections/${id}/_migrateVersion`,
         request
     );
 };
@@ -280,7 +284,7 @@ export const forceConnectionState = (id: string, state: ConnectionState) => {
         state: state,
     };
     return client.put<ForceConnectionStateResponse>(
-        `/api/v1/connections/${id}/_force_state`,
+        `/api/v1/connections/${id}/_forceState`,
         request
     );
 };
@@ -360,8 +364,8 @@ export const abortConnection = (id: string) => {
  */
 export const getSetupStep = (connectionId: string, returnToUrl?: string) => {
     return client.get<ConnectionSetupResponse>(
-        `/api/v1/connections/${connectionId}/_setup_step`,
-        returnToUrl ? {params: {return_to_url: returnToUrl}} : undefined
+        `/api/v1/connections/${connectionId}/_setupStep`,
+        returnToUrl ? {params: {returnToUrl: returnToUrl}} : undefined
     );
 };
 
@@ -369,7 +373,7 @@ export const getSetupStep = (connectionId: string, returnToUrl?: string) => {
  * Get data source options for a connection setup step
  */
 export const getDataSource = (connectionId: string, sourceId: string) => {
-    return client.get<DataSourceOption[]>(`/api/v1/connections/${connectionId}/_data_source/${sourceId}`);
+    return client.get<DataSourceOption[]>(`/api/v1/connections/${connectionId}/_dataSource/${sourceId}`);
 };
 
 /**
@@ -384,17 +388,17 @@ export const reconfigureConnection = (id: string) => {
  * The connection remains ready and its previously stored configuration continues to apply.
  */
 export const cancelSetupConnection = (id: string) => {
-    return client.post<void>(`/api/v1/connections/${id}/_cancel_setup`);
+    return client.post<void>(`/api/v1/connections/${id}/_cancelSetup`);
 };
 
 /**
  * Retry a connection that failed during setup, including auth-phase failures and probe
  * verification failures. For connectors with preconnect steps, returns to preconnect:0 so the
  * user can correct inputs. For connectors without preconnect steps, re-initiates OAuth
- * (return_to_url is required in that case).
+ * (returnToUrl is required in that case).
  */
 export const retryConnection = (id: string, returnToUrl?: string) => {
-    const request: RetryConnectionRequest = { return_to_url: returnToUrl };
+    const request: RetryConnectionRequest = { returnToUrl: returnToUrl };
     return client.post<ConnectionSetupResponse>(
         `/api/v1/connections/${id}/_retry`,
         request
@@ -406,10 +410,10 @@ export const retryConnection = (id: string, returnToUrl?: string) => {
  * recovery action when a connection has flipped to unhealthy. For api-key connectors, returns the
  * credentials form (no prior values pre-filled); on submit the existing credential is rotated
  * atomically. For OAuth2 connectors, restarts at preconnect:0 if defined, otherwise re-initiates
- * the OAuth redirect (return_to_url is required in that case).
+ * the OAuth redirect (returnToUrl is required in that case).
  */
 export const reauthConnection = (id: string, returnToUrl?: string) => {
-    const request: ReauthConnectionRequest = { return_to_url: returnToUrl };
+    const request: ReauthConnectionRequest = { returnToUrl: returnToUrl };
     return client.post<ConnectionSetupResponse>(
         `/api/v1/connections/${id}/_reauth`,
         request
@@ -424,7 +428,7 @@ export const connections = {
     disconnect: disconnectConnection,
     migrateVersion: migrateConnectionVersion,
     abort: abortConnection,
-    force_state: forceConnectionState,
+    forceState: forceConnectionState,
     update: updateConnection,
     getSetupStep: getSetupStep,
     getDataSource: getDataSource,

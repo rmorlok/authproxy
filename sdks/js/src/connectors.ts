@@ -4,33 +4,33 @@ import {ListResponse} from './common';
 // Connector models
 export interface ConnectorVersion {
     id: string;
+    name: string;
     version: number;
     namespace: string;
-    name: string;
     state: ConnectorVersionState;
     definition: Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
     labels?: Record<string, string>;
     annotations?: Record<string, string>;
-    created_at: string;
-    updated_at: string;
+    createdAt: string;
+    updatedAt: string;
 }
 
 export interface Connector {
     id: string;
+    name: string;
     version: number;
     namespace: string;
-    name: string;
     state: ConnectorVersionState;
-    display_name: string;
+    displayName: string;
     description: string;
     highlight?: string;
-    status_page_url?: string;
+    statusPageUrl?: string;
     logo: string;
-    has_configure: boolean;
+    hasConfigure: boolean;
     labels?: Record<string, string>;
     annotations?: Record<string, string>;
-    created_at: string;
-    updated_at: string;
+    createdAt: string;
+    updatedAt: string;
 }
 
 export interface PutConnectorAnnotationRequest {
@@ -50,30 +50,31 @@ export enum ConnectorVersionState {
 }
 
 export interface ListConnectorsParams {
+    name?: string;
     state?: ConnectorVersionState;
     namespace?: string;
-    label_selector?: string;
+    labelSelector?: string;
     cursor?: string;
     limit?: number;
-    order_by?: string;
+    orderBy?: string;
 }
 
 export interface ListConnectorVersionsParams {
     state?: ConnectorVersionState;
     namespace?: string;
-    label_selector?: string;
+    labelSelector?: string;
     cursor?: string;
     limit?: number;
-    order_by?: string;
+    orderBy?: string;
 }
 
 export interface ConnectorLifecycleRequest {
-    timeout_seconds?: number;
+    timeoutSeconds?: number;
 }
 
 export interface ConnectorLifecycleResponse {
-    task_id: string;
-    connector_id: string;
+    taskId: string;
+    connectorId: string;
 }
 
 export interface UpdateConnectorRequest {
@@ -98,7 +99,7 @@ export const getConnector = (id: string) => {
 };
 
 /**
- * Update a connector's logical name or its draft-version metadata.
+ * Update a connector name and/or its draft-version metadata.
  */
 export const updateConnector = (id: string, request: UpdateConnectorRequest) => {
     return client.patch<ConnectorVersion>(`/api/v1/connectors/${id}`, request);
@@ -136,7 +137,7 @@ export type ForceConnectorVersionStateResponse = ConnectorVersion;
 export const forceConnectorVersionState = (id: string, version: number, state: ConnectorVersionState) => {
     const request: ForceConnectorVersionStateRequest = { state };
     return client.put<ForceConnectorVersionStateResponse>(
-        `/api/v1/connectors/${id}/versions/${version}/_force_state`,
+        `/api/v1/connectors/${id}/versions/${version}/_forceState`,
         request
     );
 };
@@ -146,7 +147,7 @@ export const forceConnectorVersionState = (id: string, version: number, state: C
  */
 export const disconnectAllConnectorConnections = (id: string, request?: ConnectorLifecycleRequest) => {
     return client.post<ConnectorLifecycleResponse>(
-        `/api/v1/connectors/${id}/_disconnect_all`,
+        `/api/v1/connectors/${id}/_disconnectAll`,
         request
     );
 };
@@ -223,7 +224,7 @@ export const connectors = {
     update: updateConnector,
     listVersions: listConnectorVersions,
     getVersion: getConnectorVersion,
-    force_version_state: forceConnectorVersionState,
+    forceVersionState: forceConnectorVersionState,
     disconnectAll: disconnectAllConnectorConnections,
     archive: archiveConnector,
     getAnnotations: getConnectorAnnotations,

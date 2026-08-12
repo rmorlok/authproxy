@@ -34,37 +34,37 @@ const (
 )
 
 type loadtestBackgroundSummary struct {
-	ProfileName             string                 `json:"profile_name,omitempty"`
+	ProfileName             string                 `json:"profileName,omitempty"`
 	Scenario                string                 `json:"scenario"`
 	Queue                   string                 `json:"queue,omitempty"`
 	Percent                 *int                   `json:"percent,omitempty"`
-	TaskType                string                 `json:"task_type,omitempty"`
-	TaskID                  string                 `json:"task_id,omitempty"`
-	TaskQueue               string                 `json:"task_queue,omitempty"`
-	ExpectedExpiringTokens  int                    `json:"expected_expiring_tokens,omitempty"`
-	SchedulerTaskConfigs    int                    `json:"scheduler_task_configs,omitempty"`
-	SchedulerProbeTasks     int                    `json:"scheduler_probe_tasks,omitempty"`
-	StartedAt               time.Time              `json:"started_at"`
-	FinishedAt              time.Time              `json:"finished_at"`
-	DurationSeconds         float64                `json:"duration_seconds"`
-	EnqueueDurationSeconds  float64                `json:"enqueue_duration_seconds,omitempty"`
-	WaitDurationSeconds     float64                `json:"wait_duration_seconds,omitempty"`
-	ProcessedDelta          int                    `json:"processed_delta,omitempty"`
-	FailedDelta             int                    `json:"failed_delta,omitempty"`
-	ProcessedRatePerSecond  float64                `json:"processed_rate_per_second,omitempty"`
+	TaskType                string                 `json:"taskType,omitempty"`
+	TaskID                  string                 `json:"taskId,omitempty"`
+	TaskQueue               string                 `json:"taskQueue,omitempty"`
+	ExpectedExpiringTokens  int                    `json:"expectedExpiringTokens,omitempty"`
+	SchedulerTaskConfigs    int                    `json:"schedulerTaskConfigs,omitempty"`
+	SchedulerProbeTasks     int                    `json:"schedulerProbeTasks,omitempty"`
+	StartedAt               time.Time              `json:"startedAt"`
+	FinishedAt              time.Time              `json:"finishedAt"`
+	DurationSeconds         float64                `json:"durationSeconds"`
+	EnqueueDurationSeconds  float64                `json:"enqueueDurationSeconds,omitempty"`
+	WaitDurationSeconds     float64                `json:"waitDurationSeconds,omitempty"`
+	ProcessedDelta          int                    `json:"processedDelta,omitempty"`
+	FailedDelta             int                    `json:"failedDelta,omitempty"`
+	ProcessedRatePerSecond  float64                `json:"processedRatePerSecond,omitempty"`
 	Before                  *loadtestQueueSnapshot `json:"before,omitempty"`
 	After                   *loadtestQueueSnapshot `json:"after,omitempty"`
-	MaxObserved             *loadtestQueueSnapshot `json:"max_observed,omitempty"`
-	MemoryBefore            loadtestMemorySnapshot `json:"memory_before"`
-	MemoryAfter             loadtestMemorySnapshot `json:"memory_after"`
-	MemoryDeltaAllocBytes   int64                  `json:"memory_delta_alloc_bytes"`
-	MemoryDeltaSysBytes     int64                  `json:"memory_delta_sys_bytes"`
-	SchedulerTaskTypeCounts map[string]int         `json:"scheduler_task_type_counts,omitempty"`
+	MaxObserved             *loadtestQueueSnapshot `json:"maxObserved,omitempty"`
+	MemoryBefore            loadtestMemorySnapshot `json:"memoryBefore"`
+	MemoryAfter             loadtestMemorySnapshot `json:"memoryAfter"`
+	MemoryDeltaAllocBytes   int64                  `json:"memoryDeltaAllocBytes"`
+	MemoryDeltaSysBytes     int64                  `json:"memoryDeltaSysBytes"`
+	SchedulerTaskTypeCounts map[string]int         `json:"schedulerTaskTypeCounts,omitempty"`
 	Artifacts               map[string]string      `json:"artifacts,omitempty"`
 }
 
 type loadtestQueueSnapshot struct {
-	CapturedAt       time.Time `json:"captured_at"`
+	CapturedAt       time.Time `json:"capturedAt"`
 	Queue            string    `json:"queue"`
 	Size             int       `json:"size"`
 	Pending          int       `json:"pending"`
@@ -76,20 +76,20 @@ type loadtestQueueSnapshot struct {
 	Aggregating      int       `json:"aggregating"`
 	Processed        int       `json:"processed"`
 	Failed           int       `json:"failed"`
-	ProcessedTotal   int       `json:"processed_total"`
-	FailedTotal      int       `json:"failed_total"`
-	MemoryUsage      int64     `json:"memory_usage"`
-	LatencySeconds   float64   `json:"latency_seconds"`
-	InFlightAndRetry int       `json:"in_flight_and_retry"`
+	ProcessedTotal   int       `json:"processedTotal"`
+	FailedTotal      int       `json:"failedTotal"`
+	MemoryUsage      int64     `json:"memoryUsage"`
+	LatencySeconds   float64   `json:"latencySeconds"`
+	InFlightAndRetry int       `json:"inFlightAndRetry"`
 }
 
 type loadtestMemorySnapshot struct {
-	AllocBytes      uint64 `json:"alloc_bytes"`
-	TotalAllocBytes uint64 `json:"total_alloc_bytes"`
-	SysBytes        uint64 `json:"sys_bytes"`
-	HeapAllocBytes  uint64 `json:"heap_alloc_bytes"`
-	HeapSysBytes    uint64 `json:"heap_sys_bytes"`
-	NumGC           uint32 `json:"num_gc"`
+	AllocBytes      uint64 `json:"allocBytes"`
+	TotalAllocBytes uint64 `json:"totalAllocBytes"`
+	SysBytes        uint64 `json:"sysBytes"`
+	HeapAllocBytes  uint64 `json:"heapAllocBytes"`
+	HeapSysBytes    uint64 `json:"heapSysBytes"`
+	NumGC           uint32 `json:"numGc"`
 }
 
 func cmdBackground() *cobra.Command {

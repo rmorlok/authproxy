@@ -12,15 +12,22 @@
         },
         "required": {
           "oneOf": [
-            { "type": "boolean" },
-            { "$ref": "../../common/schema.json#/$defs/Predicate" }
+            {
+              "type": "boolean"
+            },
+            {
+              "$ref": "../../common/schema.json#/$defs/Predicate"
+            }
           ]
         },
         "reason": {
           "type": "string"
         }
       },
-      "required": ["id", "reason"],
+      "required": [
+        "id",
+        "reason"
+      ],
       "type": "object"
     },
     "Authorization": {
@@ -28,7 +35,7 @@
         "endpoint": {
           "type": "string"
         },
-        "query_overrides": {
+        "queryOverrides": {
           "type": "object"
         },
         "template": {
@@ -38,14 +45,19 @@
           "$ref": "#/$defs/PKCE"
         }
       },
-      "required": ["endpoint"],
+      "required": [
+        "endpoint"
+      ],
       "additionalProperties": false,
       "type": "object"
     },
     "PKCE": {
       "properties": {
         "method": {
-          "enum": ["S256", "plain"]
+          "enum": [
+            "S256",
+            "plain"
+          ]
         }
       },
       "additionalProperties": false,
@@ -56,26 +68,28 @@
         "endpoint": {
           "type": "string"
         },
-        "query_overrides": {
+        "queryOverrides": {
           "type": "object"
         },
-        "form_overrides": {
+        "formOverrides": {
           "type": "object"
         },
-        "refresh_timeout": {
+        "refreshTimeout": {
           "$ref": "../../common/schema.json#/$defs/HumanDuration"
         },
-        "refresh_in_background": {
+        "refreshInBackground": {
           "type": "boolean"
         },
-        "refresh_time_before_expiry": {
+        "refreshTimeBeforeExpiry": {
           "$ref": "../../common/schema.json#/$defs/HumanDuration"
         },
-        "auth_in_body": {
+        "authInBody": {
           "type": "boolean"
         }
       },
-      "required": ["endpoint"],
+      "required": [
+        "endpoint"
+      ],
       "additionalProperties": false,
       "type": "object"
     },
@@ -84,17 +98,23 @@
         "endpoint": {
           "type": "string"
         },
-        "query_overrides": {
+        "queryOverrides": {
           "type": "object"
         },
-        "form_overrides": {
+        "formOverrides": {
           "type": "object"
         },
-        "supported_tokens": {
-          "enum": ["access_token", "refresh_token", "both"]
+        "supportedTokens": {
+          "enum": [
+            "access_token",
+            "refresh_token",
+            "both"
+          ]
         }
       },
-      "required": ["endpoint"],
+      "required": [
+        "endpoint"
+      ],
       "additionalProperties": false,
       "type": "object"
     }
@@ -103,17 +123,24 @@
     "type": {
       "const": "OAuth2"
     },
-    "client_id": {
+    "clientId": {
       "$ref": "../../common/schema.json#/$defs/StringValue"
     },
-    "client_secret": {
+    "clientSecret": {
       "$ref": "../../common/schema.json#/$defs/StringValue"
     },
-    "grant_type": {
-      "enum": ["authorization_code", "client_credentials"]
+    "grantType": {
+      "enum": [
+        "authorization_code",
+        "client_credentials"
+      ]
     },
-    "token_endpoint_auth_method": {
-      "enum": ["client_secret_post", "client_secret_basic", "none"]
+    "tokenEndpointAuthMethod": {
+      "enum": [
+        "client_secret_post",
+        "client_secret_basic",
+        "none"
+      ]
     },
     "authorization": {
       "$ref": "#/$defs/Authorization"
@@ -121,19 +148,19 @@
     "token": {
       "$ref": "#/$defs/Token"
     },
-    "initiate_to_redirect_ttl": {
+    "initiateToRedirectTtl": {
       "$ref": "../../common/schema.json#/$defs/HumanDuration"
     },
-    "round_trip_ttl": {
+    "roundTripTtl": {
       "$ref": "../../common/schema.json#/$defs/HumanDuration"
     },
-    "refresh_tokens_in_background": {
+    "refreshTokensInBackground": {
       "type": "boolean"
     },
-    "refresh_tokens_time_before_expiry": {
+    "refreshTokensTimeBeforeExpiry": {
       "$ref": "../../common/schema.json#/$defs/HumanDuration"
     },
-    "refresh_tokens_cron_schedule": {
+    "refreshTokensCronSchedule": {
       "type": "string"
     },
     "revocation": {
@@ -145,10 +172,10 @@
         "$ref": "#/$defs/Scope"
       }
     },
-    "scope_separator": {
+    "scopeSeparator": {
       "type": "string"
     },
-    "default_scopes": {
+    "defaultScopes": {
       "type": "array",
       "items": {
         "type": "string"

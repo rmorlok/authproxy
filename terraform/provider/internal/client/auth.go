@@ -36,8 +36,8 @@ func signJWT(privateKeyPath, username string) (string, error) {
 		"iat":           now.Unix(),
 		"exp":           now.Add(1 * time.Hour).Unix(),
 		"namespace":     "root",
-		"actor_signed":  true,
-		"system_signed": false,
+		"actorSigned":  true,
+		"systemSigned": false,
 	}
 
 	token := jwt.NewWithClaims(method, claims)

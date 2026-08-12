@@ -13,9 +13,9 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apctx"
-	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/encfield"
+	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 )
 
@@ -32,9 +32,9 @@ type Encrypt interface {
 // session is the object stored in redis to track the session
 type session struct {
 	Id              apid.ID   `json:"id"`
-	ActorId         apid.ID   `json:"actor_id"`
+	ActorId         apid.ID   `json:"actorId"`
 	ValidXsrfValues []string  `json:"-"` // Serialized separately in a different key
-	ExpiresAt       time.Time `json:"expires_at"`
+	ExpiresAt       time.Time `json:"expiresAt"`
 }
 
 func (s *session) MarshalBinary() ([]byte, error) {
@@ -64,7 +64,7 @@ func (s *session) GetSessionId() sessionId {
 // data in the session itself so that sessions can't be hijacked by changing data in redis
 type sessionId struct {
 	Id      apid.ID `json:"id"`
-	ActorId apid.ID `json:"actor_id"`
+	ActorId apid.ID `json:"actorId"`
 }
 
 func (s *sessionId) GetSessionCookieId(e Encrypt) (string, error) {

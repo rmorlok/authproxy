@@ -5,19 +5,25 @@
     "step": "15m"
   },
   "namespace": "root.**",
-  "label_selector": "env=prod",
+  "labelSelector": "env=prod",
   "queries": [
     {
-      "ref_id": "requests",
+      "refId": "requests",
       "metric": "request_events",
       "aggregation": "count",
-      "group_by": ["method", "response_status_code"]
+      "groupBy": [
+        "method",
+        "response_status_code"
+      ]
     },
     {
-      "ref_id": "connections",
+      "refId": "connections",
       "metric": "resources.connections",
       "aggregation": "count",
-      "group_by": ["state", "health_state"]
+      "groupBy": [
+        "state",
+        "health_state"
+      ]
     }
   ]
 }

@@ -332,10 +332,10 @@ func TestKeyDataGcpKMS_KeyDataSerialization(t *testing.T) {
 	t.Run("json", func(t *testing.T) {
 		var kd KeyData
 		require.NoError(t, json.Unmarshal([]byte(`{
-			"gcp_kms_key_name": "projects/test-project/locations/global/keyRings/authproxy/cryptoKeys/dek-wrapper",
-			"gcp_kms_endpoint": "localhost:8085",
-			"gcp_credentials_json": {"env_var": "GCP_CREDS_JSON"},
-			"cache_ttl": "5m"
+			"gcpKmsKeyName": "projects/test-project/locations/global/keyRings/authproxy/cryptoKeys/dek-wrapper",
+			"gcpKmsEndpoint": "localhost:8085",
+			"gcpCredentialsJson": {"envVar": "GCP_CREDS_JSON"},
+			"cacheTtl": "5m"
 		}`), &kd))
 
 		gcpKMS, ok := kd.InnerVal.(*KeyDataGcpKMS)
@@ -349,12 +349,12 @@ func TestKeyDataGcpKMS_KeyDataSerialization(t *testing.T) {
 	t.Run("yaml", func(t *testing.T) {
 		var kd KeyData
 		require.NoError(t, yaml.Unmarshal([]byte(`
-gcp_project: test-project
-gcp_location: global
-gcp_key_ring: authproxy
-gcp_crypto_key: dek-wrapper
-gcp_credentials_file: /tmp/gcp-creds.json
-cache_ttl: 5m
+gcpProject: test-project
+gcpLocation: global
+gcpKeyRing: authproxy
+gcpCryptoKey: dek-wrapper
+gcpCredentialsFile: /tmp/gcp-creds.json
+cacheTtl: 5m
 `), &kd))
 
 		gcpKMS, ok := kd.InnerVal.(*KeyDataGcpKMS)

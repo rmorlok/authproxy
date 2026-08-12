@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -17,8 +18,10 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/encfield"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
+	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/test_utils"
 	"github.com/stretchr/testify/require"
@@ -57,11 +60,12 @@ func setupResourceSearchRoute(t *testing.T, decorate func(database.DB) database.
 	return resourceSearchRouteSetup{gin: router, db: db, authUtil: authUtil, routes: searchRoutes}
 }
 
-func createSearchActor(t *testing.T, db database.DB, namespace string, labels database.Labels) *database.Actor {
+func createSearchActor(t *testing.T, db database.DB, namespace, name string, labels database.Labels) *database.Actor {
 	t.Helper()
 	require.NoError(t, db.EnsureNamespaceByPath(t.Context(), namespace))
 	actor := &database.Actor{
 		Id:         apid.New(apid.PrefixActor),
+		Name:       scommon.ResourceName(name),
 		Namespace:  namespace,
 		ExternalId: "search-" + apid.New(apid.PrefixActor).String(),
 		Labels:     labels,
@@ -88,12 +92,12 @@ func signedSearchRequest(t *testing.T, setup resourceSearchRouteSetup, rawURL st
 
 func TestResourceSearchRouteQueryAndPermissions(t *testing.T) {
 	setup := setupResourceSearchRoute(t, nil)
-	allowed := createSearchActor(t, setup.db, "root.team", database.Labels{"name": "payments-service", "env": "prod"})
-	_ = createSearchActor(t, setup.db, "root.other", database.Labels{"name": "payments-service", "env": "prod"})
+	allowed := createSearchActor(t, setup.db, "root.team", "payments-service", database.Labels{"env": "prod"})
+	_ = createSearchActor(t, setup.db, "root.other", "payments-service", database.Labels{"env": "prod"})
 
 	t.Run("requires authentication", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		req, err := http.NewRequest(http.MethodGet, "/search/resources?q=payments&resource_type=actor", nil)
+		req, err := http.NewRequest(http.MethodGet, "/search/resources?q=payments&resourceType=actor", nil)
 		require.NoError(t, err)
 		setup.gin.ServeHTTP(w, req)
 		require.Equal(t, http.StatusUnauthorized, w.Code)
@@ -107,7 +111,7 @@ func TestResourceSearchRouteQueryAndPermissions(t *testing.T) {
 			ResourceIds: []string{allowed.Id.String()},
 			Verbs:       []string{"list", "get"},
 		}}
-		req := signedSearchRequest(t, setup, "/search/resources?q=payments&resource_type=actor&namespace=root.team.**", permissions)
+		req := signedSearchRequest(t, setup, "/search/resources?q=payments&resourceType=actor&namespace=root.team.**", permissions)
 		setup.gin.ServeHTTP(w, req)
 		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 
@@ -115,8 +119,110 @@ func TestResourceSearchRouteQueryAndPermissions(t *testing.T) {
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
 		require.Len(t, response.Items, 1)
 		require.Equal(t, allowed.Id.String(), response.Items[0].ResourceId)
-		require.Equal(t, map[string]string{"env": "prod", "name": "payments-service"}, response.Items[0].Labels)
+		require.Equal(t, "payments-service", response.Items[0].Name)
+		require.Equal(t, map[string]string{"env": "prod"}, response.Items[0].Labels)
 	})
+}
+
+func TestResourceNamesEndToEndAcrossVersionsAndAuthorization(t *testing.T) {
+	setup := setupResourceSearchRoute(t, nil)
+	ctx := t.Context()
+	for _, ns := range []string{"root.allowed", "root.hidden"} {
+		require.NoError(t, setup.db.EnsureNamespaceByPath(ctx, ns))
+	}
+
+	createConnectorVersion := func(id apid.ID, ns, name string, version uint64, state database.ConnectorDefinitionVersionState) {
+		t.Helper()
+		require.NoError(t, setup.db.UpsertConnectorDefinitionVersion(ctx, &database.ConnectorWithDefinition{
+			Id:        id,
+			Name:      scommon.ResourceName(name),
+			Namespace: ns,
+			Version:   version,
+			State:     state,
+			EncryptedDefinition: encfield.EncryptedField{
+				ID:   apid.New(apid.PrefixDataEncryptionKey),
+				Data: fmt.Sprintf("definition-%d", version),
+			},
+		}))
+	}
+
+	allowedConnectorID := apid.New(apid.PrefixConnector)
+	createConnectorVersion(allowedConnectorID, "root.allowed", "payments-provider", 1, database.ConnectorDefinitionVersionStatePrimary)
+	createConnectorVersion(allowedConnectorID, "root.allowed", "", 2, database.ConnectorDefinitionVersionStateDraft)
+	hiddenConnectorID := apid.New(apid.PrefixConnector)
+	createConnectorVersion(hiddenConnectorID, "root.hidden", "billing-provider", 1, database.ConnectorDefinitionVersionStatePrimary)
+
+	connectionID := apid.New(apid.PrefixConnection)
+	require.NoError(t, setup.db.CreateConnection(ctx, &database.Connection{
+		Id:               connectionID,
+		Name:             "payments-live",
+		Namespace:        "root.allowed",
+		ConnectorId:      allowedConnectorID,
+		ConnectorVersion: 1,
+		State:            database.ConnectionStateConfigured,
+	}))
+
+	// Rename by immutable IDs, then drive the same reconciliation that the
+	// targeted background task performs for connector descendants.
+	require.NoError(t, setup.db.UpdateConnectorName(ctx, allowedConnectorID, "billing-provider"))
+	_, err := setup.db.UpdateConnectionName(ctx, connectionID, "billing-live")
+	require.NoError(t, err)
+	require.NoError(t, setup.db.RefreshConnectionsForConnector(ctx, allowedConnectorID))
+
+	versions := setup.db.ListConnectorDefinitionVersionsBuilder().
+		ForName("billing-provider").
+		ForNamespaceMatchers([]string{"root.allowed"}).
+		FetchPage(ctx)
+	require.NoError(t, versions.Error)
+	require.Len(t, versions.Results, 2)
+	for _, version := range versions.Results {
+		require.Equal(t, allowedConnectorID, version.Id)
+		require.Equal(t, scommon.ResourceName("billing-provider"), version.Name)
+		require.Equal(t, "billing-provider", version.Labels["apxy/cxr/-/name"])
+	}
+
+	connections := setup.db.ListConnectionsBuilder().
+		ForName("billing-live").
+		ForNamespaceMatchers([]string{"root.allowed"}).
+		FetchPage(ctx)
+	require.NoError(t, connections.Error)
+	require.Len(t, connections.Results, 1)
+	require.Equal(t, connectionID, connections.Results[0].Id)
+	require.Equal(t, "billing-live", connections.Results[0].Labels["apxy/cxn/-/name"])
+	require.Equal(t, "billing-provider", connections.Results[0].Labels["apxy/cxr/-/name"])
+
+	permissions := []aschema.Permission{{
+		Namespace: "root.allowed",
+		Resources: []string{"connectors", "connections"},
+		Verbs:     []string{"list", "get"},
+	}}
+	w := httptest.NewRecorder()
+	setup.gin.ServeHTTP(w, signedSearchRequest(
+		t,
+		setup,
+		"/search/resources?q=billing-provider&resourceType=connector&namespace=root.**",
+		permissions,
+	))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var response schemaapi.SearchResourcesResponseJson
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+	require.Len(t, response.Items, 1, "the hidden duplicate and extra connector version must not leak")
+	require.Equal(t, allowedConnectorID.String(), response.Items[0].ResourceId)
+	require.Equal(t, "billing-provider", response.Items[0].Name)
+	require.Equal(t, "root.allowed", response.Items[0].Namespace)
+
+	w = httptest.NewRecorder()
+	setup.gin.ServeHTTP(w, signedSearchRequest(
+		t,
+		setup,
+		"/search/resources?q=billing-live&resourceType=connection&namespace=root.**",
+		permissions,
+	))
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+	require.Len(t, response.Items, 1)
+	require.Equal(t, connectionID.String(), response.Items[0].ResourceId)
+	require.Equal(t, "billing-live", response.Items[0].Name)
 }
 
 func TestResourceSearchRouteValidation(t *testing.T) {
@@ -127,10 +233,10 @@ func TestResourceSearchRouteValidation(t *testing.T) {
 		"/search/resources?q=ab",
 		"/search/resources?mode=invalid&q=valid",
 		"/search/resources?mode=seed&q=invalid",
-		"/search/resources?q=valid&resource_type=unknown",
-		"/search/resources?label_selector=" + url.QueryEscape("bad key=value"),
-		"/search/resources?label_selector=" + url.QueryEscape(","),
-		"/search/resources?label_selector=" + url.QueryEscape("env=prod,"),
+		"/search/resources?q=valid&resourceType=unknown",
+		"/search/resources?labelSelector=" + url.QueryEscape("bad key=value"),
+		"/search/resources?labelSelector=" + url.QueryEscape(","),
+		"/search/resources?labelSelector=" + url.QueryEscape("env=prod,"),
 		"/search/resources?q=valid&limit=51",
 	}
 	for _, rawURL := range tests {
@@ -160,8 +266,9 @@ func TestResourceSearchRouteSeedCoversRemainingTypes(t *testing.T) {
 				return database.SearchResourcesResult{Items: []database.SearchResource{{
 					ResourceType: params.ResourceType,
 					ResourceID:   resourceID,
+					Name:         "seed",
 					Namespace:    "root.seed",
-					Labels:       database.Labels{"name": "seed"},
+					Labels:       database.Labels{},
 					UpdatedAt:    time.Date(2026, 7, 12, 12, 0, 0, 0, time.UTC),
 				}}}, nil
 			},
@@ -172,7 +279,7 @@ func TestResourceSearchRouteSeedCoversRemainingTypes(t *testing.T) {
 	setup.gin.ServeHTTP(w, signedSearchRequest(
 		t,
 		setup,
-		"/search/resources?mode=seed&resource_type=namespace&resource_type=key&resource_type=rate_limit&limit=50",
+		"/search/resources?mode=seed&resourceType=namespace&resourceType=key&resourceType=rate_limit&limit=50",
 		aschema.AllPermissions(),
 	))
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
@@ -180,6 +287,9 @@ func TestResourceSearchRouteSeedCoversRemainingTypes(t *testing.T) {
 	var response schemaapi.SearchResourcesResponseJson
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
 	require.Len(t, response.Items, 3)
+	for _, item := range response.Items {
+		require.Equal(t, "seed", item.Name)
+	}
 	require.Empty(t, response.TruncatedTypes)
 	require.Empty(t, response.IncompleteTypes)
 
@@ -209,7 +319,7 @@ func TestResourceSearchRouteReturnsIncompleteTypes(t *testing.T) {
 		}
 	})
 	w := httptest.NewRecorder()
-	setup.gin.ServeHTTP(w, signedSearchRequest(t, setup, "/search/resources?q=payments&resource_type=actor", aschema.AllPermissions()))
+	setup.gin.ServeHTTP(w, signedSearchRequest(t, setup, "/search/resources?q=payments&resourceType=actor", aschema.AllPermissions()))
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	var response schemaapi.SearchResourcesResponseJson
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
@@ -235,7 +345,7 @@ func TestResourceSearchRouteOverallDeadlineDoesNotWaitForIgnoredCancellation(t *
 	setup.routes.overallTimeout = 20 * time.Millisecond
 
 	w := httptest.NewRecorder()
-	setup.gin.ServeHTTP(w, signedSearchRequest(t, setup, "/search/resources?q=payments&resource_type=actor", aschema.AllPermissions()))
+	setup.gin.ServeHTTP(w, signedSearchRequest(t, setup, "/search/resources?q=payments&resourceType=actor", aschema.AllPermissions()))
 	close(release)
 
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
@@ -254,6 +364,6 @@ func TestResourceSearchRouteUnexpectedDatabaseFailure(t *testing.T) {
 		}
 	})
 	w := httptest.NewRecorder()
-	setup.gin.ServeHTTP(w, signedSearchRequest(t, setup, "/search/resources?q=payments&resource_type=actor", aschema.AllPermissions()))
+	setup.gin.ServeHTTP(w, signedSearchRequest(t, setup, "/search/resources?q=payments&resourceType=actor", aschema.AllPermissions()))
 	require.Equal(t, http.StatusInternalServerError, w.Code, w.Body.String())
 }

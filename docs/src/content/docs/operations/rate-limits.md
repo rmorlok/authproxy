@@ -14,7 +14,7 @@ Both can fire on the same request and both stamp the request log so you can tell
 | Need | Use |
 |---|---|
 | Stop hammering a 3rd party that just returned 429. | The reactive limiter — built in, no configuration required for the common case. |
-| Tune what counts as a "retryable" 429 and how aggressively to back off. | Configure `rate_limiting` on the connector definition. |
+| Tune what counts as a "retryable" 429 and how aggressively to back off. | Configure `rateLimiting` on the connector definition. |
 | Cap your own usage to stay below a known 3rd-party quota. | Define a rate-limit resource with `enforce` mode. |
 | Cap per-actor / per-team / per-cohort usage so noisy neighbours don't drain a shared quota. | Define a rate-limit resource with bucket dimensions. |
 | Roll out a new limit safely — see how many requests it *would have* rejected before turning it on. | Define a rate-limit resource with `observe` mode. |
@@ -40,9 +40,9 @@ Authorization: Bearer <admin token>
   "definition": {
     "mode": "enforce",
     "selector": {
-      "label_selector": "apxy/cxr/type=salesforce",
+      "labelSelector": "apxy/cxr/type=salesforce",
       "methods": ["POST", "PATCH", "PUT"],
-      "path_match": {
+      "pathMatch": {
         "kind": "prefix",
         "value": "/services/data/"
       }
@@ -51,7 +51,7 @@ Authorization: Bearer <admin token>
       "dimensions": ["actor", "labels/team"]
     },
     "algorithm": {
-      "token_bucket": { "capacity": 60, "refill_rate": 1.0 }
+      "tokenBucket": { "capacity": 60, "refillRate": 1.0 }
     }
   }
 }
@@ -59,7 +59,7 @@ Authorization: Bearer <admin token>
 
 The response carries the server-assigned id (e.g., `rl_AbcXyz…`), the materialised label set (including the implicit `apxy/rl/-/id` / `apxy/rl/-/ns` and any carried-forward namespace labels — see [Labels](/concepts/labels-and-annotations/)), and timestamps.
 
-Update with `PATCH /api/v1/rate-limits/{id}` (the request body can carry any of `definition`, `labels`, `annotations`; omit fields you don't want to change). Delete with `DELETE /api/v1/rate-limits/{id}`. List with `GET /api/v1/rate-limits` (supports `namespace`, `label_selector`, and pagination cursor params).
+Update with `PATCH /api/v1/rate-limits/{id}` (the request body can carry any of `definition`, `labels`, `annotations`; omit fields you don't want to change). Delete with `DELETE /api/v1/rate-limits/{id}`. List with `GET /api/v1/rate-limits` (supports `namespace`, `labelSelector`, and pagination cursor params).
 
 Labels and annotations also have sub-resource endpoints — see [Labels — API surface](/concepts/labels-and-annotations/#api-surface).
 
@@ -109,24 +109,24 @@ The `selector` block decides which requests the rule applies to. All clauses are
 
 | Clause | What it matches | Default if omitted |
 |---|---|---|
-| `label_selector` | Per-request label snapshot via [K8s-style selector syntax](/concepts/labels-and-annotations/#label-selectors). | Match any. |
+| `labelSelector` | Per-request label snapshot via [K8s-style selector syntax](/concepts/labels-and-annotations/#label-selectors). | Match any. |
 | `methods` | HTTP verb (exact, upper-case). | Match any. |
-| `path_match` | Final upstream URL path (after connector templating / rewriting). Three flavours: `prefix`, `glob` (`*` doesn't cross `/`), `regex`. | Match any. |
-| `request_types` | What kind of traffic — `proxy`, `probe`, `oauth2_token_exchange`, etc. | `[proxy, probe]`. |
+| `pathMatch` | Final upstream URL path (after connector templating / rewriting). Three flavours: `prefix`, `glob` (`*` doesn't cross `/`), `regex`. | Match any. |
+| `requestTypes` | What kind of traffic — `proxy`, `probe`, `oauth2_token_exchange`, etc. | `[proxy, probe]`. |
 
 ### Examples
 
 **By actor and tenant**, via the per-request label snapshot:
 ```json
 "selector": {
-  "label_selector": "apxy/act/-/id=act_AbcXyz,app.example.com/tenant-id=tenant-42"
+  "labelSelector": "apxy/act/-/id=act_AbcXyz,app.example.com/tenant-id=tenant-42"
 }
 ```
 
 **By connector type** — pin the rule to all Salesforce connections in the namespace:
 ```json
 "selector": {
-  "label_selector": "apxy/cxr/type=salesforce"
+  "labelSelector": "apxy/cxr/type=salesforce"
 }
 ```
 
@@ -136,14 +136,14 @@ The `selector` block decides which requests the rule applies to. All clauses are
 ```json
 "selector": {
   "methods": ["POST", "PATCH", "PUT"],
-  "path_match": { "kind": "prefix", "value": "/services/data/" }
+  "pathMatch": { "kind": "prefix", "value": "/services/data/" }
 }
 ```
 
 **By specific operation** — regex when prefix / glob aren't precise enough:
 ```json
 "selector": {
-  "path_match": {
+  "pathMatch": {
     "kind": "regex",
     "value": "^/v1/users/[0-9]+/permissions$"
   }
@@ -155,10 +155,10 @@ The `selector` block decides which requests the rule applies to. All clauses are
 Most rules govern user-driven `proxy` traffic and connector-defined `probe` traffic — that's the default. **OAuth2 token exchange / refresh / revocation are *not* governed by default** because rate-limiting your own auth flows is usually a self-inflicted outage. If you do need to throttle those (e.g., a 3rd party that throttles refresh aggressively), opt in explicitly:
 
 ```json
-"selector": { "request_types": ["oauth2_refresh"] }
+"selector": { "requestTypes": ["oauth2_refresh"] }
 ```
 
-An explicit empty `request_types: []` is rejected at validation — omit the field to use the default.
+An explicit empty `requestTypes: []` is rejected at validation — omit the field to use the default.
 
 ## Buckets — projecting requests into independent counters
 
@@ -190,45 +190,45 @@ A missing-but-referenced dimension resolves to `""`. So a rule that buckets by `
 
 Pick exactly one algorithm. Each makes a different tradeoff between accuracy, memory, and burst tolerance.
 
-### `fixed_window`
+### `fixedWindow`
 
 A counter that resets at boundaries derived from `floor(now / window)`.
 
 ```json
-{ "fixed_window": { "window": "1m", "limit": 100 } }
+{ "fixedWindow": { "window": "1m", "limit": 100 } }
 ```
 
 Simple and cheap. Susceptible to **boundary bursts** — a client can fire `limit` calls in the last 100 ms of one window and another `limit` in the first 100 ms of the next, getting `2 × limit` in a 200 ms interval.
 
-### `sliding_window` — `log` mode
+### `slidingWindow` — `log` mode
 
 A precise sliding window. Stores a timestamped log of recent allowed requests and removes entries older than `window` on each evaluation.
 
 ```json
-{ "sliding_window": { "window": "1m", "limit": 100, "mode": "log" } }
+{ "slidingWindow": { "window": "1m", "limit": 100, "mode": "log" } }
 ```
 
 Exactly `limit` requests permitted in any rolling `window` interval. Most accurate; most memory (a sorted set per bucket).
 
-### `sliding_window` — `counter` mode
+### `slidingWindow` — `counter` mode
 
 An approximation using two adjacent fixed-window counters, weighted by how far into the current window we are. Cheaper than `log` mode; accurate to a small constant factor.
 
 ```json
-{ "sliding_window": { "window": "1m", "limit": 100, "mode": "counter" } }
+{ "slidingWindow": { "window": "1m", "limit": 100, "mode": "counter" } }
 ```
 
 Use when you need sliding-window semantics without the per-request memory cost.
 
-### `token_bucket`
+### `tokenBucket`
 
 A bucket of tokens refilled at a constant rate. Each request consumes one token; if the bucket is empty, the request is rejected.
 
 ```json
-{ "token_bucket": { "capacity": 60, "refill_rate": 1.0 } }
+{ "tokenBucket": { "capacity": 60, "refillRate": 1.0 } }
 ```
 
-`capacity` is the burst — the max tokens the bucket can hold. `refill_rate` is tokens per second (may be fractional, e.g. `0.5` = one new token every two seconds). New buckets start full so first-time callers get the configured burst capacity rather than instantly hitting an empty pool.
+`capacity` is the burst — the max tokens the bucket can hold. `refillRate` is tokens per second (may be fractional, e.g. `0.5` = one new token every two seconds). New buckets start full so first-time callers get the configured burst capacity rather than instantly hitting an empty pool.
 
 ## `enforce` vs. `observe` mode
 
@@ -251,11 +251,11 @@ When an `enforce`-mode rule rejects a proxy request, AuthProxy returns:
 | `Retry-After` header | Seconds until the next request from this bucket would be permitted (window remainder for window algorithms; time-to-next-token for token bucket). |
 | `X-Authproxy-Ratelimited` header | `true` — distinguishes any AuthProxy synthetic 429 from a real upstream 429. |
 | `X-Authproxy-Ratelimit` header | The firing rule's id (e.g., `rl_AbcXyz…`). |
-| Body | JSON: `{ "error": "rate limited", "rate_limit_id": "<id>", "retry_after_seconds": <n> }` |
+| Body | JSON: `{ "error": "rate limited", "rateLimitId": "<id>", "retryAfterSeconds": <n> }` |
 
 Your application should treat 429 as a transient error and back off according to `Retry-After`. The `X-Authproxy-Ratelimit` header lets you correlate a 429 with the specific rule for support / debugging.
 
-The connector-level reactive limiter ([below](#connector-level-reactive-429-handling)) also produces a 429 with `X-Authproxy-Ratelimited: true` but **no** `X-Authproxy-Ratelimit` header (it has no rule id). Use the request log's `response_source` field (`upstream` / `connector_rate_limiter` / `rate_limit`) to disambiguate after the fact.
+The connector-level reactive limiter ([below](#connector-level-reactive-429-handling)) also produces a 429 with `X-Authproxy-Ratelimited: true` but **no** `X-Authproxy-Ratelimit` header (it has no rule id). Use the request log's `responseSource` field (`upstream` / `connector_rate_limiter` / `rate_limit`) to disambiguate after the fact.
 
 ## Multiple matching rules
 
@@ -263,7 +263,7 @@ A request can match several rules at once — e.g., one rule at the root namespa
 
 - **Most-restrictive wins.** If more than one `enforce`-mode rule rejects, the one with the longest `Retry-After` is the one whose id ends up in `X-Authproxy-Ratelimit` and in the response body. The caller sees a single 429 with the most pessimistic wait.
 - **Observe rules never reject** but still evaluate (and increment their counters). Their decisions are recorded in the request log so you can see what would have happened.
-- **The full match set lives on the log entry.** Every rule that matched — firing, observe, or didn't-reject — is recorded under `rate_limit_matched` on the request log entry. See [Request log attribution](#request-log-attribution).
+- **The full match set lives on the log entry.** Every rule that matched — firing, observe, or didn't-reject — is recorded under `rateLimitMatched` on the request log entry. See [Request log attribution](#request-log-attribution).
 
 Composition is "all apply" — there is no priority field, no specificity scoring, no first-match-wins. Layer org-wide caps at the root namespace with per-team caps at child namespaces and they stack cleanly.
 
@@ -279,20 +279,20 @@ Permission to create / read / update / delete a rate limit follows the standard 
 
 The reactive limiter is built into every connector. When a 3rd party returns 429, AuthProxy parses the response, blocks the connection for the suggested wait, and short-circuits subsequent requests on that connection with its own 429 until the cool-down expires. This prevents you from hammering an API that has already told you to slow down.
 
-Configuration lives on the connector definition under `rate_limiting`. Every field has a sensible default — you only need to set the ones you want to override.
+Configuration lives on the connector definition under `rateLimiting`. Every field has a sensible default — you only need to set the ones you want to override.
 
 ```yaml
 # In a connector definition YAML
-rate_limiting:
+rateLimiting:
   disabled: false                       # Set true to pass 429s through unchanged
-  retry_after_headers: ["Retry-After"]  # Headers to check, in priority order
-  max_retry_after: 15m                  # Cap on any wait
-  default_retry_after: 60s              # Fallback when no parseable header found
-  exponential_backoff:                  # Used on consecutive 429s without a header
-    initial_interval: 1s
+  retryAfterHeaders: ["Retry-After"]  # Headers to check, in priority order
+  maxRetryAfter: 15m                  # Cap on any wait
+  defaultRetryAfter: 60s              # Fallback when no parseable header found
+  exponentialBackoff:                  # Used on consecutive 429s without a header
+    initialInterval: 1s
     multiplier: 2.0
-    max_interval: 5m
-    jitter_fraction: 0.1
+    maxInterval: 5m
+    jitterFraction: 0.1
 ```
 
 | Field | Default | What it does |
@@ -306,13 +306,13 @@ rate_limiting:
 | `exponential_backoff.max_interval` | `5m` | Cap on the per-step backoff. |
 | `exponential_backoff.jitter_fraction` | `0.1` | Each computed backoff is uniformly sampled in `[(1−j)·t, (1+j)·t]`. Prevents thundering-herd retries. |
 
-When the reactive limiter short-circuits a request, the synthetic 429 carries `X-Authproxy-Ratelimited: true` and shows up in the request log with `response_source: connector_rate_limiter`. No `X-Authproxy-Ratelimit` header (there's no rule id — this is opportunistic, not a configured rule).
+When the reactive limiter short-circuits a request, the synthetic 429 carries `X-Authproxy-Ratelimited: true` and shows up in the request log with `responseSource: connector_rate_limiter`. No `X-Authproxy-Ratelimit` header (there's no rule id — this is opportunistic, not a configured rule).
 
 ## Request log attribution
 
-Every 429 — real upstream, connector-level reactive, or rate-limit resource — is recorded on the request log with a `response_source` field so you can tell them apart:
+Every 429 — real upstream, connector-level reactive, or rate-limit resource — is recorded on the request log with a `responseSource` field so you can tell them apart:
 
-| `response_source` | Means |
+| `responseSource` | Means |
 |---|---|
 | `upstream` (default) | The response (incl. any 429) came from the 3rd party. |
 | `connector_rate_limiter` | The connector-level reactive limiter short-circuited the request because the connection was in cool-down. No upstream call was made. |
@@ -322,18 +322,18 @@ When a rate-limit resource is involved (firing or in observe-mode), the request 
 
 | Field | When populated | Notes |
 |---|---|---|
-| `rate_limit_id` | Any time a rate-limit rule matched (incl. observe-only). | The most-restrictive firing rule, or the first observe match if none fired. |
-| `rate_limit_mode` | Same. | `enforce` or `observe`. |
-| `rate_limit_bucket` | Same. | The resolved dimension → value map for the matched rule. |
-| `rate_limit_matched` | Same. | Full list of every rule that matched: `[{id, mode, bucket}, …]` — observe rules included. |
+| `rateLimitId` | Any time a rate-limit rule matched (incl. observe-only). | The most-restrictive firing rule, or the first observe match if none fired. |
+| `rateLimitMode` | Same. | `enforce` or `observe`. |
+| `rateLimitBucket` | Same. | The resolved dimension → value map for the matched rule. |
+| `rateLimitMatched` | Same. | Full list of every rule that matched: `[{id, mode, bucket}, …]` — observe rules included. |
 
-The list endpoint accepts `response_source` and `rate_limit_id` filters so you can scope a request-log search to "every request rejected by `rl_AbcXyz`" or "every 429 that came from upstream".
+The list endpoint accepts `responseSource` and `rateLimitId` filters so you can scope a request-log search to "every request rejected by `rl_AbcXyz`" or "every 429 that came from upstream".
 
 ```http
-GET /api/v1/metrics/request-events?response_source=rate_limit&rate_limit_id=rl_AbcXyz
+GET /api/v1/metrics/request-events?responseSource=rate_limit&rateLimitId=rl_AbcXyz
 ```
 
-The admin UI surfaces `response_source` as a column (chip-rendered with a colour for synthetic-429 sources) and `rate_limit_id` as a hidden-by-default column with a link to the rate-limit detail page.
+The admin UI surfaces `responseSource` as a column (chip-rendered with a colour for synthetic-429 sources) and `rateLimitId` as a hidden-by-default column with a link to the rate-limit detail page.
 
 ## Implementation reference
 
@@ -421,9 +421,9 @@ Operationally:
 
 Both systems can fire on the same request. The order is determined by the middleware chain ([above](#architecture)):
 
-1. **Enforcer first.** If a proxy-side rule rejects, you get a 429 with `response_source: rate_limit` — the request never reaches the reactive limiter.
-2. **Reactive limiter second.** If the enforcer passed through but the connection is in cool-down from a prior real upstream 429, you get a 429 with `response_source: connector_rate_limiter`.
-3. **Upstream third.** If both passed through, the upstream call happens. A real upstream 429 returns with `response_source: upstream` and the reactive limiter records the cool-down for next time.
+1. **Enforcer first.** If a proxy-side rule rejects, you get a 429 with `responseSource: rate_limit` — the request never reaches the reactive limiter.
+2. **Reactive limiter second.** If the enforcer passed through but the connection is in cool-down from a prior real upstream 429, you get a 429 with `responseSource: connector_rate_limiter`.
+3. **Upstream third.** If both passed through, the upstream call happens. A real upstream 429 returns with `responseSource: upstream` and the reactive limiter records the cool-down for next time.
 
 This ordering means proxy-side rule rejections "win" over connector cool-down rejections. From an attribution standpoint that's the right call — operators configured the rule intentionally, while cool-down is opportunistic.
 

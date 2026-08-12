@@ -11,18 +11,54 @@ The development configuration demonstrates the full server shape at
 
 | Block | Purpose |
 |---|---|
-| `public`, `api`, `admin_api`, `worker` | Enabled services, ports, TLS, UI, and health behavior |
-| `host_application`, `marketplace` | Browser login handoff and Marketplace URL |
-| `system_auth` | JWT, actors, global encryption key, and DEK policy |
+| `public`, `api`, `adminApi`, `worker` | Enabled services, ports, TLS, UI, and health behavior |
+| `hostApplication`, `marketplace` | Browser login handoff and Marketplace URL |
+| `systemAuth` | JWT, actors, global encryption key, and DEK policy |
 | `database`, `redis` | Primary database and distributed state |
-| `app_metrics` | Request-event, resource-metric, and optional blob storage |
-| `connectors` | Connector loading, migration, and identifying labels |
+| `appMetrics` | Request-event, resource-metric, and optional blob storage |
+| `connectors` | Connector loading and name-based reconciliation |
 | `tasks` | Task retention and worker behavior |
 | `telemetry` | OTLP exporter, signals, sampling, and label projection |
 
 Fields can use AuthProxy value sources such as direct development values,
 environment variables, and file paths. Never put production credentials or
 key material directly in a committed YAML file.
+
+## Configured connector identity
+
+Give every connector loaded from YAML a stable `name` when you omit its
+immutable `id`:
+
+```yaml
+connectors:
+  autoMigrate: true
+  loadFromList:
+    - name: google-drive
+      namespace: root.integrations
+      labels:
+        type: google-drive
+      displayName: Google Drive
+      logo:
+        publicUrl: https://example.com/google-drive.svg
+      description: Connect to Google Drive.
+      auth:
+        type: no-auth
+```
+
+At startup, AuthProxy reconciles this entry to the live connector whose exact
+name is `google-drive` in `root.integrations`. Labels are ordinary selectable
+metadata and do not participate in identity. Multiple configured versions use
+the same name and namespace.
+
+An entry with an explicit `id` may omit `name`; a newly created connector then
+defaults its name to the ID. To rename an existing configured connector, keep
+its ID fixed and change `name`. Changing the name of an ID-less entry describes
+a new connector, so the old config-managed connector enters the normal orphan
+cleanup flow.
+
+The former `connectors.identifyingLabels` setting has been removed. Delete it
+from existing configuration and add a stable `name` to every connector entry
+that does not already specify `id`.
 
 ## Kubernetes values
 

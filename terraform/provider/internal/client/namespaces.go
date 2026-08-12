@@ -9,11 +9,11 @@ import (
 type Namespace struct {
 	Path        string            `json:"path"`
 	State       string            `json:"state"`
-	KeyId       *string           `json:"key_id,omitempty"`
+	KeyId       *string           `json:"keyId,omitempty"`
 	Labels      map[string]string `json:"labels,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`
-	CreatedAt   time.Time         `json:"created_at"`
-	UpdatedAt   time.Time         `json:"updated_at"`
+	CreatedAt   time.Time         `json:"createdAt"`
+	UpdatedAt   time.Time         `json:"updatedAt"`
 }
 
 type CreateNamespaceRequest struct {

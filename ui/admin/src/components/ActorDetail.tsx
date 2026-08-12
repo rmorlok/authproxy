@@ -11,6 +11,7 @@ import dayjs from 'dayjs';
 import Tooltip from '@mui/material/Tooltip';
 import {Actor, actors} from '@authproxy/api';
 import AnnotationsEditor from "./AnnotationsEditor";
+import ResourceNameEditor from './ResourceNameEditor';
 
 export default function ActorDetail({actorId}: { actorId: string }) {
   const [loading, setLoading] = useState(true);
@@ -68,6 +69,15 @@ export default function ActorDetail({actorId}: { actorId: string }) {
     <Stack spacing={2} sx={{p: 2}}>
       <Typography variant="h5">Actor</Typography>
 
+      <ResourceNameEditor
+        name={actor.name}
+        resourceType="Actor"
+        onRename={async (name) => {
+          const response = await actors.update(actor.id, {name});
+          setActor(response.data);
+        }}
+      />
+
       <Box>
         <Typography variant="subtitle2" color="text.secondary">ID</Typography>
         <Stack direction="row" spacing={1} alignItems="center" sx={{mt: 0.5}}>
@@ -98,7 +108,7 @@ export default function ActorDetail({actorId}: { actorId: string }) {
       <Stack direction={{xs: 'column', sm: 'row'}} spacing={4}>
         <Box>
           <Typography variant="subtitle2" color="text.secondary">External ID</Typography>
-          <Typography variant="body1">{actor.external_id}</Typography>
+          <Typography variant="body1">{actor.externalId}</Typography>
         </Box>
         <Box>
           <Typography variant="subtitle2" color="text.secondary">Namespace</Typography>
@@ -109,11 +119,11 @@ export default function ActorDetail({actorId}: { actorId: string }) {
       <Stack direction={{xs: 'column', sm: 'row'}} spacing={4}>
         <Box>
           <Typography variant="subtitle2" color="text.secondary">Created</Typography>
-          <Typography variant="body1">{dayjs(actor.created_at).format('MMM DD, YYYY, h:mm A')}</Typography>
+          <Typography variant="body1">{dayjs(actor.createdAt).format('MMM DD, YYYY, h:mm A')}</Typography>
         </Box>
         <Box>
           <Typography variant="subtitle2" color="text.secondary">Updated</Typography>
-          <Typography variant="body1">{dayjs(actor.updated_at).format('MMM DD, YYYY, h:mm A')}</Typography>
+          <Typography variant="body1">{dayjs(actor.updatedAt).format('MMM DD, YYYY, h:mm A')}</Typography>
         </Box>
       </Stack>
 

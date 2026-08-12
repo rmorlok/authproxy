@@ -10,9 +10,9 @@ import (
 )
 
 type ConfiguredActorsExternalSource struct {
-	KeysPath         string               `json:"keys_path" yaml:"keys_path"`
+	KeysPath         string               `json:"keysPath" yaml:"keysPath"`
 	Permissions      []aschema.Permission `json:"permissions,omitempty" yaml:"permissions,omitempty"`
-	SyncCronSchedule string               `json:"sync_cron_schedule,omitempty" yaml:"sync_cron_schedule,omitempty"`
+	SyncCronSchedule string               `json:"syncCronSchedule,omitempty" yaml:"syncCronSchedule,omitempty"`
 }
 
 func (s *ConfiguredActorsExternalSource) All() []*ConfiguredActor {

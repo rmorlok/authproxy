@@ -262,7 +262,7 @@ func (env *IntegrationTestEnv) ReauthOAuth2Connection(t *testing.T, connectionID
 	t.Helper()
 
 	body, err := jsonMarshal(struct {
-		ReturnToUrl string `json:"return_to_url,omitempty"`
+		ReturnToUrl string `json:"returnToUrl,omitempty"`
 	}{
 		ReturnToUrl: returnToUrl,
 	})
@@ -285,7 +285,7 @@ func (env *IntegrationTestEnv) ReauthOAuth2Connection(t *testing.T, connectionID
 }
 
 // FollowOAuth2Redirect issues an in-process GET to the public service's
-// `/oauth2/redirect` endpoint with the same state_id and signed JWT the user's
+// `/oauth2/redirect` endpoint with the same stateId and signed JWT the user's
 // browser would carry, and returns the Location header — the URL of the OAuth
 // provider's authorize endpoint. The proxy generates the upstream URL from the
 // connector config, so callers can assert on its query parameters.
@@ -317,7 +317,7 @@ func (env *IntegrationTestEnv) FollowOAuth2Redirect(t *testing.T, redirectURL st
 
 // DeliverOAuth2Callback issues an in-process GET to the public service's
 // `/oauth2/callback` endpoint and returns the final Location header — typically
-// the test's return_to_url on success, or error_pages.internal_error on
+// the test's returnToUrl on success, or error_pages.internal_error on
 // rejection. By default the request is signed as actor "test-actor" in the root
 // namespace; pass WithActor(...) to mirror a specific tenant's browser session.
 func (env *IntegrationTestEnv) DeliverOAuth2Callback(t *testing.T, callbackURL string, opts ...OAuth2Option) string {
@@ -359,15 +359,15 @@ func (env *IntegrationTestEnv) DeliverOAuth2Callback(t *testing.T, callbackURL s
 type OAuth2StateForTest struct {
 	Id                     apid.ID               `json:"id"`
 	Namespace              string                `json:"namespace"`
-	ActorId                apid.ID               `json:"actor_id"`
-	ConnectorId            apid.ID               `json:"connector_id"`
-	ConnectorVersion       uint64                `json:"connector_version"`
-	ConnectionId           apid.ID               `json:"connection_id"`
-	ReturnToUrl            string                `json:"return_to"`
-	CancelSessionAfterAuth bool                  `json:"cancel_session_after_auth"`
-	ExpiresAt              time.Time             `json:"expires_at"`
-	PKCECodeVerifier       string                `json:"pkce_code_verifier,omitempty"`
-	PKCEMethod             connectors.PKCEMethod `json:"pkce_method,omitempty"`
+	ActorId                apid.ID               `json:"actorId"`
+	ConnectorId            apid.ID               `json:"connectorId"`
+	ConnectorVersion       uint64                `json:"connectorVersion"`
+	ConnectionId           apid.ID               `json:"connectionId"`
+	ReturnToUrl            string                `json:"returnToUrl"`
+	CancelSessionAfterAuth bool                  `json:"cancelSessionAfterAuth"`
+	ExpiresAt              time.Time             `json:"expiresAt"`
+	PKCECodeVerifier       string                `json:"pkceCodeVerifier,omitempty"`
+	PKCEMethod             connectors.PKCEMethod `json:"pkceMethod,omitempty"`
 }
 
 // WriteOAuth2StateForTest encrypts and stores a synthetic OAuth2 state

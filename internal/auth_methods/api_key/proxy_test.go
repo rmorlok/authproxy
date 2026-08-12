@@ -46,7 +46,7 @@ func TestResolveAuth_UsesPlacementSnapshotWhenPresent(t *testing.T) {
 		&database.ApiKeyCredential{
 			Id:                   apid.New(apid.PrefixApiKeyCredential),
 			ConnectionId:         connectionId,
-			EncryptedCredentials: encfield.EncryptedField{ID: "dek_fake", Data: `{"api_key":"sk-snapshot"}`},
+			EncryptedCredentials: encfield.EncryptedField{ID: "dek_fake", Data: `{"apiKey":"sk-snapshot"}`},
 			PlacementSnapshot: &cschema.ApiKeyPlacement{
 				Type:       cschema.ApiKeyPlacementHeader,
 				HeaderName: "X-API-Key",
@@ -74,7 +74,7 @@ func TestResolveAuth_FailsWhenPlacementSnapshotMissing(t *testing.T) {
 		&database.ApiKeyCredential{
 			Id:                   apid.New(apid.PrefixApiKeyCredential),
 			ConnectionId:         connectionId,
-			EncryptedCredentials: encfield.EncryptedField{ID: "dek_fake", Data: `{"api_key":"sk-live"}`},
+			EncryptedCredentials: encfield.EncryptedField{ID: "dek_fake", Data: `{"apiKey":"sk-live"}`},
 			// PlacementSnapshot: nil
 		}, nil,
 	)
@@ -134,7 +134,7 @@ func TestResolveAuth_BasicPlacementResolvesUsername(t *testing.T) {
 			ConnectionId: connectionId,
 			EncryptedCredentials: encfield.EncryptedField{
 				ID:   "dek_fake",
-				Data: `{"api_key":"pw","username":"u"}`,
+				Data: `{"apiKey":"pw","username":"u"}`,
 			},
 			PlacementSnapshot: &cschema.ApiKeyPlacement{
 				Type:          cschema.ApiKeyPlacementBasic,

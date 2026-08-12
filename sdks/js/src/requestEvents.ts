@@ -23,7 +23,7 @@ export enum ResponseSource {
 }
 
 // A single rate-limit rule that matched a request. The full set of
-// matches is stored on RequestEventRecord.rate_limit_matched so observers
+// matches is stored on RequestEventRecord.rateLimitMatched so observers
 // can see every rule that contributed to the decision, not just the one
 // that ultimately rejected the request.
 export interface RateLimitMatch {
@@ -37,28 +37,28 @@ export interface RateLimitMatch {
 export interface RequestEventRecord {
     namespace: string; // The namespace of the request
     type: RequestType; // The type of request (global, proxy, oauth, public)
-    request_id: string; // The ID of the request (randomly generated UUID)
-    correlation_id: string; // Correlation ID for the request as supplied by the proxy caller
+    requestId: string; // The ID of the request (randomly generated UUID)
+    correlationId: string; // Correlation ID for the request as supplied by the proxy caller
     timestamp: string; // Timestamp of the request
     duration: number; // Duration of the request in milliseconds
-    connection_id: string; // The ID of the connection that handled the request, if applicable
-    connector_id: string; // The ID of the connector that handled the request, if applicable
-    connector_version: number; // The version of the connector that handled the request, if applicable
+    connectionId: string; // The ID of the connection that handled the request, if applicable
+    connectorId: string; // The ID of the connector that handled the request, if applicable
+    connectorVersion: number; // The version of the connector that handled the request, if applicable
     method: string; // The HTTP method of the request
     host: string; // The host of the request
     scheme: string; // The scheme of the request (http, https)
     path: string; // The path of the request
-    request_http_version?: string; // The HTTP version of the request
-    request_size_bytes?: number; // The size of the request in bytes
-    request_mime_type?: string; // The MIME type of the request
-    response_status_code?: number; // The HTTP status code of the response
-    response_error?: string; // The error message if the response was an error (could not make HTTP call)
-    response_http_version?: string; // The HTTP version of the response
-    response_size_bytes?: number; // The size of the response in bytes
-    response_mime_type?: string; // The MIME type of the response
-    internal_timeout?: boolean; // If there was an internal timeout while capture full response size/body
-    request_cancelled?: boolean; // If the caller cancelled the request before the full body was consumed
-    full_request_recorded?: boolean; // If the full request body was recorded; This means you may be able to get the full request
+    requestHttpVersion?: string; // The HTTP version of the request
+    requestSizeBytes?: number; // The size of the request in bytes
+    requestMimeType?: string; // The MIME type of the request
+    responseStatusCode?: number; // The HTTP status code of the response
+    responseError?: string; // The error message if the response was an error (could not make HTTP call)
+    responseHttpVersion?: string; // The HTTP version of the response
+    responseSizeBytes?: number; // The size of the response in bytes
+    responseMimeType?: string; // The MIME type of the response
+    internalTimeout?: boolean; // If there was an internal timeout while capture full response size/body
+    requestCancelled?: boolean; // If the caller cancelled the request before the full body was consumed
+    fullRequestRecorded?: boolean; // If the full request body was recorded; This means you may be able to get the full request
     labels?: Record<string, string>; // Labels associated with the request (merged from connection and per-request labels)
 
     // Rate-limit attribution. Defaults to ResponseSource.UPSTREAM for any
@@ -66,11 +66,11 @@ export interface RequestEventRecord {
     // rate_limit_* fields are populated when a proxy-side RateLimit
     // resource matched the request — they remain empty for upstream and
     // connector_rate_limiter responses.
-    response_source?: ResponseSource;
-    rate_limit_id?: string; // ID of the RateLimit resource that fired (when response_source = rate_limit)
-    rate_limit_mode?: string; // 'enforce' or 'observe' (when response_source = rate_limit)
-    rate_limit_bucket?: Record<string, string>; // Resolved bucket dimensions for the firing rule
-    rate_limit_matched?: RateLimitMatch[]; // Full set of rate-limit rules that matched this request
+    responseSource?: ResponseSource;
+    rateLimitId?: string; // ID of the RateLimit resource that fired (when response_source = rate_limit)
+    rateLimitMode?: string; // 'enforce' or 'observe' (when response_source = rate_limit)
+    rateLimitBucket?: Record<string, string>; // Resolved bucket dimensions for the firing rule
+    rateLimitMatched?: RateLimitMatch[]; // Full set of rate-limit rules that matched this request
 }
 
 // RequestEvent is the full data for a single request event. It contains header and body data.
@@ -107,28 +107,28 @@ export interface RequestEvent {
 export interface ListRequestEventsParams {
     cursor?: string;
     limit?: number;
-    order_by?: string;
+    orderBy?: string;
 
     /*
      * Filters
      */
 
     namespace?: string;
-    request_type?: RequestType;
-    label_selector?: string;
-    correlation_id?: string;
-    connection_id?: string;
-    connector_type?: string;
-    connector_id?: string;
-    connector_version?: number;
+    requestType?: RequestType;
+    labelSelector?: string;
+    correlationId?: string;
+    connectionId?: string;
+    connectorType?: string;
+    connectorId?: string;
+    connectorVersion?: number;
     method?: string;
-    status_code?: number;
-    status_code_range?: string; // Changed to string to match Go's format (e.g., "200-299")
-    timestamp_range?: string;
+    statusCode?: number;
+    statusCodeRange?: string; // Changed to string to match Go's format (e.g., "200-299")
+    timestampRange?: string;
     path?: string;
-    path_regex?: string; // Changed to string to match Go's format
-    response_source?: ResponseSource; // Filter by who produced the response
-    rate_limit_id?: string; // Filter for entries that fired a specific RateLimit resource
+    pathRegex?: string; // Changed to string to match Go's format
+    responseSource?: ResponseSource; // Filter by who produced the response
+    rateLimitId?: string; // Filter for entries that fired a specific RateLimit resource
 }
 
 /**

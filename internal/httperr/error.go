@@ -75,7 +75,7 @@ func IsClientClosedRequest(ctx context.Context, err error) bool {
 // ErrorResponse is the standardized JSON error response format.
 type ErrorResponse struct {
 	Error      string `json:"error"`
-	StackTrace string `json:"stack_trace,omitempty"`
+	StackTrace string `json:"stackTrace,omitempty"`
 }
 
 // ToErrorResponse converts the error to a JSON-serializable ErrorResponse.

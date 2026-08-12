@@ -30,7 +30,7 @@ const mockConnector: Connector = {
   version: 1,
   state: ConnectorVersionState.ACTIVE,
   type: 'oauth',
-  display_name: 'Google Calendar',
+  displayName: 'Google Calendar',
   description: 'Connect to your Google Calendar to manage events and appointments.',
   highlight: 'Manage events and appointments from Google Calendar.',
   logo: logoDataUri('Google Calendar', '#1a73e8'),
@@ -96,7 +96,7 @@ export const WideLogo: Story = {
   args: {
     connector: {
       ...mockConnector,
-      display_name: 'Wide Format Systems',
+      displayName: 'Wide Format Systems',
       highlight: 'A wide logo should scale down inside the card without being cut off.',
       logo: wideLogoDataUri('Wide Format Systems'),
     },

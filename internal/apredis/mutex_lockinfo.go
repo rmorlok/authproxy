@@ -10,8 +10,8 @@ import (
 type lockInfo struct {
 	Hostname    string `json:"hostname,omitempty"`
 	ProcessID   int    `json:"pid,omitempty"`
-	GoRoutineID string `json:"goroutine_id,omitempty"`
-	ThreadID    string `json:"thread_id,omitempty"`
+	GoRoutineID string `json:"goroutineId,omitempty"`
+	ThreadID    string `json:"threadId,omitempty"`
 	Environment string `json:"environment,omitempty"` // e.g., "prod", "staging"
 	Region      string `json:"region,omitempty"`      // e.g., "us-west-2"
 	Container   string `json:"container,omitempty"`   // For containerized environments

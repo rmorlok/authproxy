@@ -27,12 +27,13 @@ vi.mock('@authproxy/api', () => {
 
 const initialKey = {
   id: 'key_test',
+  name: 'primary-key',
   namespace: 'root.dev',
   state: KeyState.ACTIVE,
-  key_data: {
-    aws_kms_key_id: 'alias/authproxy',
-    aws_region: 'us-east-1',
-    aws_credentials: {
+  keyData: {
+    awsKmsKeyId: 'alias/authproxy',
+    awsRegion: 'us-east-1',
+    awsCredentials: {
       type: 'implicit',
     },
   },
@@ -42,8 +43,8 @@ const initialKey = {
   annotations: {
     owner: 'platform',
   },
-  created_at: '2026-06-20T00:00:00.000Z',
-  updated_at: '2026-06-20T00:00:00.000Z',
+  createdAt: '2026-06-20T00:00:00.000Z',
+  updatedAt: '2026-06-20T00:00:00.000Z',
 };
 
 function renderKeyDetail() {
@@ -140,10 +141,10 @@ describe('KeyDetail', () => {
     await waitFor(() => {
       expect(keys.update).toHaveBeenCalledWith('key_test', {
         state: KeyState.ACTIVE,
-        key_data: {
-          aws_kms_key_id: 'alias/authproxy-v2',
-          aws_region: 'us-east-1',
-          aws_credentials: {
+        keyData: {
+          awsKmsKeyId: 'alias/authproxy-v2',
+          awsRegion: 'us-east-1',
+          awsCredentials: {
             type: 'implicit',
           },
         },

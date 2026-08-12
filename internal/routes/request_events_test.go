@@ -111,7 +111,7 @@ func TestRequestEventsRoutes(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
-				"/metrics/request-events?status_code_range=5xx",
+				"/metrics/request-events?statusCodeRange=5xx",
 				nil,
 				"root",
 				"some-actor",
@@ -136,7 +136,7 @@ func TestRequestEventsRoutes(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
-				"/metrics/request-events?status_code_range=$status",
+				"/metrics/request-events?statusCodeRange=$status",
 				nil,
 				"root",
 				"some-actor",
@@ -432,7 +432,7 @@ func TestRequestEventsRoutes(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
-				"/metrics/request-events?label_selector=env%3Dprod%2Cteam%3Dapi",
+				"/metrics/request-events?labelSelector=env%3Dprod%2Cteam%3Dapi",
 				nil,
 				"root",
 				"some-actor",
@@ -601,14 +601,14 @@ func TestRequestEventsRoutes(t *testing.T) {
 					"end":   end.Format(time.RFC3339),
 					"step":  "15m",
 				},
-				"namespace":      "root.tenant.**",
-				"label_selector": "env=prod",
+				"namespace":     "root.tenant.**",
+				"labelSelector": "env=prod",
 				"queries": []map[string]any{
 					{
-						"ref_id":      "requests",
+						"refId":       "requests",
 						"metric":      "request_events",
 						"aggregation": "count",
-						"group_by":    []string{"method"},
+						"groupBy":     []string{"method"},
 					},
 				},
 			}
@@ -687,10 +687,10 @@ func TestRequestEventsRoutes(t *testing.T) {
 			w := httptest.NewRecorder()
 			req := newMetricsRequest(t, validBody(map[string]any{"queries": []map[string]any{
 				{
-					"ref_id":      "connections",
+					"refId":       "connections",
 					"metric":      "resources.connections",
 					"aggregation": "count",
-					"group_by":    []string{"state", "health_state"},
+					"groupBy":     []string{"state", "health_state"},
 				},
 			}}), aschema.PermissionsSingle("root.**", "app-metrics", "query"))
 
@@ -764,11 +764,11 @@ func TestRequestEventsRoutes(t *testing.T) {
 				}}),
 			},
 			{name: "invalid namespace", body: validBody(map[string]any{"namespace": "bad"})},
-			{name: "invalid label selector", body: validBody(map[string]any{"label_selector": "bad key=value"})},
-			{name: "invalid metric", body: validBody(map[string]any{"queries": []map[string]any{{"ref_id": "x", "metric": "nope", "aggregation": "count"}}})},
-			{name: "invalid aggregation", body: validBody(map[string]any{"queries": []map[string]any{{"ref_id": "x", "metric": "request_events", "aggregation": "avg"}}})},
-			{name: "invalid group_by", body: validBody(map[string]any{"queries": []map[string]any{{"ref_id": "x", "metric": "request_events", "aggregation": "count", "group_by": []string{"path"}}}})},
-			{name: "invalid resource group_by", body: validBody(map[string]any{"queries": []map[string]any{{"ref_id": "x", "metric": "resources.actors", "aggregation": "count", "group_by": []string{"state"}}}})},
+			{name: "invalid label selector", body: validBody(map[string]any{"labelSelector": "bad key=value"})},
+			{name: "invalid metric", body: validBody(map[string]any{"queries": []map[string]any{{"refId": "x", "metric": "nope", "aggregation": "count"}}})},
+			{name: "invalid aggregation", body: validBody(map[string]any{"queries": []map[string]any{{"refId": "x", "metric": "request_events", "aggregation": "avg"}}})},
+			{name: "invalid groupBy", body: validBody(map[string]any{"queries": []map[string]any{{"refId": "x", "metric": "request_events", "aggregation": "count", "groupBy": []string{"path"}}}})},
+			{name: "invalid resource groupBy", body: validBody(map[string]any{"queries": []map[string]any{{"refId": "x", "metric": "resources.actors", "aggregation": "count", "groupBy": []string{"state"}}}})},
 			{name: "empty queries", body: validBody(map[string]any{"queries": []map[string]any{}})},
 		}
 

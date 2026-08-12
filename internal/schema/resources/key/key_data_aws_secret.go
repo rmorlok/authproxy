@@ -19,11 +19,11 @@ type awsSecretsManagerClient interface {
 
 // KeyDataAwsSecret retrieves an AES key from AWS Secrets Manager.
 type KeyDataAwsSecret struct {
-	AwsSecretID  string                 `json:"aws_secret_id" yaml:"aws_secret_id"`
-	AwsSecretKey string                 `json:"aws_secret_key,omitempty" yaml:"aws_secret_key,omitempty"`
-	AwsRegion    string                 `json:"aws_region,omitempty" yaml:"aws_region,omitempty"`
-	Credentials  *common.AwsCredentials `json:"aws_credentials,omitempty" yaml:"aws_credentials,omitempty"`
-	CacheTTL     string                 `json:"cache_ttl,omitempty" yaml:"cache_ttl,omitempty"`
+	AwsSecretID  string                 `json:"awsSecretId" yaml:"awsSecretId"`
+	AwsSecretKey string                 `json:"awsSecretKey,omitempty" yaml:"awsSecretKey,omitempty"`
+	AwsRegion    string                 `json:"awsRegion,omitempty" yaml:"awsRegion,omitempty"`
+	Credentials  *common.AwsCredentials `json:"awsCredentials,omitempty" yaml:"awsCredentials,omitempty"`
+	CacheTTL     string                 `json:"cacheTtl,omitempty" yaml:"cacheTtl,omitempty"`
 
 	cache keyDataCache
 

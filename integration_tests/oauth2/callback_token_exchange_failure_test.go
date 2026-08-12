@@ -109,8 +109,8 @@ func (r *tokenExchangeFailureRig) initiateAndMintCode(t *testing.T) (connectionI
 	connID, redirectURL := r.env.InitiateOAuth2Connection(t, r.connectorID, r.returnToURL)
 	parsed, err := url.Parse(redirectURL)
 	require.NoError(t, err)
-	stateID = parsed.Query().Get("state_id")
-	require.NotEmpty(t, stateID, "InitiateOAuth2Connection should embed state_id: %s", redirectURL)
+	stateID = parsed.Query().Get("stateId")
+	require.NotEmpty(t, stateID, "InitiateOAuth2Connection should embed stateId: %s", redirectURL)
 
 	authResp := r.provider.Authorize(helpers.AuthorizeRequest{
 		ClientID:    r.clientKey,
@@ -160,19 +160,19 @@ func (r *tokenExchangeFailureRig) requireAuthFailedConnection(t *testing.T, conn
 }
 
 // requireRedirectToReturnURL asserts the proxy 302'd back to the
-// connection's return_to_url with the setup-pending annotation. This is
+// connection's returnToUrl with the setup-pending annotation. This is
 // the post-failure redirect the marketplace UI uses to re-render the
 // connection in its auth_failed state.
 func (r *tokenExchangeFailureRig) requireRedirectToReturnURL(t *testing.T, connectionID, location string) {
 	t.Helper()
 	require.Truef(t, strings.HasPrefix(location, r.returnToURL),
-		"failure should redirect to return_to_url with setup=pending; got %q", location)
+		"failure should redirect to returnToUrl with setup=pending; got %q", location)
 	parsed, err := url.Parse(location)
 	require.NoError(t, err)
 	assert.Equal(t, "pending", parsed.Query().Get("setup"),
 		"failure redirect should carry setup=pending so the UI re-renders the connection")
-	assert.Equal(t, connectionID, parsed.Query().Get("connection_id"),
-		"failure redirect should carry connection_id so the UI knows which connection failed")
+	assert.Equal(t, connectionID, parsed.Query().Get("connectionId"),
+		"failure redirect should carry connectionId so the UI knows which connection failed")
 }
 
 // requireOneTokenCallObserved asserts exactly one /token call hit the

@@ -83,8 +83,8 @@ func TestCallbackRejection_ActorMismatch(t *testing.T) {
 	connID, redirectURL := env.InitiateOAuth2Connection(t, connectorID, returnTo, helpers.WithActor(attackerExternalID, sconfig.RootNamespace))
 	parsed, err := url.Parse(redirectURL)
 	require.NoError(t, err)
-	stateID := parsed.Query().Get("state_id")
-	require.NotEmpty(t, stateID, "InitiateOAuth2ConnectionAsActor should embed state_id in redirect URL: %s", redirectURL)
+	stateID := parsed.Query().Get("stateId")
+	require.NotEmpty(t, stateID, "InitiateOAuth2ConnectionAsActor should embed stateId in redirect URL: %s", redirectURL)
 
 	// 2. Mint a code via the test provider's /test/authorize. The provider
 	//    doesn't care which proxy actor owns the state — it's validating
@@ -106,7 +106,7 @@ func TestCallbackRejection_ActorMismatch(t *testing.T) {
 	require.NotEmpty(t, code, "provider should issue a code on approve; got %s", authResp.RedirectURL)
 
 	// 3. Victim's marketplace session: open chromedp, navigate to
-	//    /connectors?auth_token=<victim>. The SPA bootstrap calls
+	//    /connectors?authToken=<victim>. The SPA bootstrap calls
 	//    /session/_initiate, which exchanges the JWT for a SESSION-ID
 	//    cookie scoped to the victim. We wait for the Connect button as
 	//    the bootstrap-complete signal — same marker standard_flow_test
@@ -118,7 +118,7 @@ func TestCallbackRejection_ActorMismatch(t *testing.T) {
 
 	browserCtx, _ := helpers.NewBrowser(t)
 
-	connectorsURL := env.PublicURL + "/connectors?auth_token=" + url.QueryEscape(victimAuthToken)
+	connectorsURL := env.PublicURL + "/connectors?authToken=" + url.QueryEscape(victimAuthToken)
 	require.NoError(t, chromedp.Run(browserCtx,
 		chromedp.Navigate(connectorsURL),
 		chromedp.WaitVisible(`//button[normalize-space()='Connect']`, chromedp.BySearch),
@@ -145,7 +145,7 @@ func TestCallbackRejection_ActorMismatch(t *testing.T) {
 		"victim's browser should land on error_pages.internal_error after actor_mismatch rejection; got %q", finalURL)
 
 	// 5. Exactly one rejection event with category=actor_mismatch, carrying
-	//    the state id. The actor_id field reflects the calling actor (the
+	//    the state id. The actorId field reflects the calling actor (the
 	//    victim) so SOC analysts see who was hit by the link.
 	events := logCapture.RecordsWithMessage(t, rejectionEventMessage)
 	require.Lenf(t, events, 1, "expected exactly one rejection event; got %d (%v)", len(events), events)

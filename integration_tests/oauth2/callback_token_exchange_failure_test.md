@@ -20,7 +20,7 @@ real configured provider, the provider rejects the token request, and
 the proxy needs to surface that rejection cleanly:
 
 - The user must land somewhere recoverable. The proxy 302s back to the
-  connection's `return_to_url` with `setup=pending&connection_id=…` so
+  connection's `returnToUrl` with `setup=pending&connectionId=…` so
   the marketplace UI re-renders the connection in its `auth_failed`
   state and offers retry/cancel.
 - No partial credentials must persist. A failed exchange must leave the
@@ -38,7 +38,7 @@ the proxy needs to surface that rejection cleanly:
 
 For every scripted case:
 
-- **302 to `return_to_url?setup=pending&connection_id=<id>`.** The
+- **302 to `returnToUrl?setup=pending&connectionId=<id>`.** The
   proxy did not send the user to `error_pages.internal_error` — that
   is the state-validation failure path, not this one.
 - **Exactly one `oauth token exchange failed` event** with the
@@ -133,7 +133,7 @@ here).
 | `env.InitiateOAuth2Connection(t, connectorID, returnToUrl)` | Materialize the connection row + Redis state envelope. The default actor (`test-actor` in the root namespace) is fine — these tests don't exercise multi-tenant boundaries. |
 | `provider.Authorize(AuthorizeRequest{…, Decision: Approve})`| Mint a real authorization code without booting a browser. The token endpoint is the failure point under test, not the authorize endpoint. |
 | `provider.Script(clientKey, EndpointToken, ScriptAction{Status, Body, …})` | Enqueue the next token-endpoint response. Status + Body together let any RFC §5.2 shape be reproduced; `BodyTemplate: BodyMalformedJSON` covers the unparseable-200 case without hand-rolling JSON garbage. |
-| `env.DeliverOAuth2Callback(t, callbackURL)`                 | In-process GET to `/oauth2/callback`. Returns the `Location` header — typically `return_to_url?setup=pending&connection_id=…` after an auth failure. |
+| `env.DeliverOAuth2Callback(t, callbackURL)`                 | In-process GET to `/oauth2/callback`. Returns the `Location` header — typically `returnToUrl?setup=pending&connectionId=…` after an auth failure. |
 | `logCapture.RecordsWithMessage(t, tokenExchangeFailureMessage)` | Surface the structured failure events for category + status + provider_error assertions. |
 | `provider.Requests(EndpointToken, …)`                       | Confirm exactly one `/token` call hit the provider — proves the failure was at the token endpoint, not earlier. |
 
@@ -152,7 +152,7 @@ sequenceDiagram
     T->>API: POST /api/v1/connections/_initiate
     API->>R: write encrypted state envelope
     API->>DB: insert connection (created)
-    API-->>T: { connection_id, redirect_url with state_id }
+    API-->>T: { connectionId, redirect_url with state_id }
 
     T->>P: POST /test/authorize (decision=approve, state=state_id)
     P-->>T: { redirect_url with code + state_id }
@@ -166,7 +166,7 @@ sequenceDiagram
     PUB->>PUB: classifyTokenEndpointStatus → category, provider_error
     PUB->>PUB: emitTokenExchangeFailure (one log event)
     PUB->>DB: HandleAuthFailed → setup_step=auth_failed,<br/>setup_error="received status code <N>: …"
-    PUB-->>T: 302 → return_to_url?setup=pending&connection_id=…
+    PUB-->>T: 302 → returnToUrl?setup=pending&connectionId=…
 ```
 
 ## What is *not* covered here

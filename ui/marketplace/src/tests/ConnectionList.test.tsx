@@ -41,26 +41,28 @@ function createStore(preloadedState?: any) {
 
 const connector: Connector = {
     id: 'google-calendar',
+    name: 'google-calendar',
     namespace: 'root',
     version: 1,
     state: ConnectorVersionState.ACTIVE,
-    display_name: 'Google Calendar',
+    displayName: 'Google Calendar',
     description: 'Calendar app',
     highlight: undefined,
     logo: 'https://example.com/logo.png',
-    has_configure: false,
-    created_at: '2023-04-01T12:00:00Z',
-    updated_at: '2023-04-01T12:00:00Z',
+    hasConfigure: false,
+    createdAt: '2023-04-01T12:00:00Z',
+    updatedAt: '2023-04-01T12:00:00Z',
 };
 
 const makeConnection = (overrides: Partial<Connection> = {}): Connection => ({
     id: 'c-1',
+    name: 'primary-calendar',
     namespace: 'root',
     connector: connector,
     state: ConnectionState.CONFIGURED,
-    health_state: ConnectionHealthState.HEALTHY,
-    created_at: '2024-01-01T00:00:00Z',
-    updated_at: '2024-01-01T00:00:00Z',
+    healthState: ConnectionHealthState.HEALTHY,
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2024-01-01T00:00:00Z',
     ...overrides,
 });
 

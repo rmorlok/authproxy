@@ -22,7 +22,7 @@ import (
 // internal/auth_methods/oauth2/state.go:203-213. The check fires when the
 // caller's actor id matches the state's actor id but the namespaces differ
 // — a configuration that the natural _initiate flow can't produce because
-// actor ids are allocated per (namespace, external_id). The only realistic
+// actor ids are allocated per (namespace, externalId). The only realistic
 // way to land in this state is via a corrupted state envelope (e.g., a
 // secondary AuthProxy instance writing into the same Redis with a colliding
 // actor id), so the test injects a synthetic state envelope directly.
@@ -134,7 +134,7 @@ func TestCallbackRejection_NamespaceMismatchActor(t *testing.T) {
 // state injection.
 //
 // Scenario: bob owns a connection in tenant-b. An attacker forges a state
-// envelope that points the connection_id at bob's connection but claims
+// envelope that points the connectionId at bob's connection but claims
 // the state belongs to alice in tenant-a, and delivers the callback as
 // alice. The actor-id and actor-namespace checks pass (alice signs her
 // own JWT into tenant-a, state claims tenant-a), but the connection
@@ -188,7 +188,7 @@ func TestCallbackRejection_NamespaceMismatchConnection(t *testing.T) {
 
 	// Materialize alice's actor by initiating a throwaway connection in
 	// tenant-a (we don't reference this connection in the synthetic state;
-	// we only need alice's actor_id so the actor-id check passes).
+	// we only need alice's actorId so the actor-id check passes).
 	_, _ = env.InitiateOAuth2Connection(t, connectorID, "https://example.com/return", helpers.WithActor(aliceExternalID, tenantA))
 	alice, err := env.Db.GetActorByExternalId(ctx, tenantA, aliceExternalID)
 	require.NoError(t, err)

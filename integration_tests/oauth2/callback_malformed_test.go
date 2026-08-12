@@ -16,7 +16,7 @@ import (
 // callback URLs whose query-param shape violates RFC 6749 §4.1.2 (the
 // `code` xor `error` contract). Both shapes share the same observable
 // rejection signature — auth_failed connection, single failure log
-// event, no token persisted, redirect to return_to_url — but pin
+// event, no token persisted, redirect to returnToUrl — but pin
 // different category strings and exercise different branches of
 // callback.go:117-134.
 //
@@ -41,7 +41,7 @@ import (
 //     reaches the token endpoint.
 //
 // Both cases reuse `tokenExchangeFailureRig` because the post-failure
-// observables (auth_failed setup step, failure log, return_to_url
+// observables (auth_failed setup step, failure log, returnToUrl
 // redirect) are identical to the rest of the token-exchange rejection
 // suite — only the trigger differs. See
 // `callback_token_exchange_failure_test.go` for the canonical example.

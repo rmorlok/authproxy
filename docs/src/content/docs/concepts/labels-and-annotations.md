@@ -25,13 +25,13 @@ Content-Type: application/json
 List all connections in production for that tenant:
 
 ```http
-GET /api/v1/connections?label_selector=app.example.com/tenant-id=tenant-42,app.example.com/env=production
+GET /api/v1/connections?labelSelector=app.example.com/tenant-id=tenant-42,app.example.com/env=production
 ```
 
 Find every request log entry produced by that tenant:
 
 ```http
-GET /api/v1/metrics/request-events?label_selector=app.example.com/tenant-id=tenant-42
+GET /api/v1/metrics/request-events?labelSelector=app.example.com/tenant-id=tenant-42
 ```
 
 You did not have to write a separate "AuthProxy connection id → my tenant id" mapping table. The label travelled with the connection onto every request log entry automatically (see [Carry-forward](#carry-forward--how-labels-flow-through-the-hierarchy)).
@@ -44,8 +44,8 @@ Every namespace-scoped resource carries `labels` and `annotations` columns:
 |---|---|
 | `namespace` | Top of the hierarchy. Its labels carry forward to every resource defined in it. |
 | `actor` | Users / service accounts. Labels carry forward to requests an actor initiates. |
-| `connector` (versioned) | Each version is a separate resource with its own labels. |
-| `connection` | Inherits labels from its connector version, plus the namespace. |
+| `connector` | The logical connector owns one label set and name shared by every definition version. |
+| `connection` | Inherits labels and identity from its logical connector, plus the namespace. |
 | `encryption_key` | Inherits from its namespace. |
 | `rate_limit` | Inherits from its namespace. See [Rate limits](/operations/rate-limits/). |
 | `request_log` entry | The frozen label snapshot of the request that produced it. |
@@ -72,11 +72,13 @@ The `apxy/` prefix is reserved. User-written labels under that prefix are reject
 
 ### Identifier labels
 
-Every resource gets two implicit labels stamped on create / update:
+Every resource gets three implicit labels stamped on create and refreshed on
+update:
 
 | Label key | Value |
 |---|---|
 | `apxy/<rt>/-/id` | This resource's id |
+| `apxy/<rt>/-/name` | This resource's current name |
 | `apxy/<rt>/-/ns` | This resource's namespace path |
 
 The `<rt>` token comes from the resource's apid prefix (strip the trailing `_`):
@@ -86,18 +88,27 @@ The `<rt>` token comes from the resource's apid prefix (strip the trailing `_`):
 | Namespace | `ns` |
 | Actor | `act` |
 | Connection | `cxn` |
-| Connector version | `cxr` |
-| Encryption key | `ek` |
+| Connector | `cxr` |
+| Key | `key` |
 | Rate limit | `rl` |
 
 For example, a connection with id `cxn_abc123` in namespace `root.acme` always carries:
 
 ```
 apxy/cxn/-/id: cxn_abc123
+apxy/cxn/-/name: production-crm
 apxy/cxn/-/ns: root.acme
 ```
 
-These are useful for **selecting the resource by its own id** (e.g., from a per-request snapshot when you don't have the connection id directly to hand) and for joining audit data across resources.
+For namespaces, `apxy/ns/-/id` and `apxy/ns/-/ns` contain the full path while
+`apxy/ns/-/name` contains its final segment. Connector identity labels use the
+logical connector's ID and name, so every connector version projects the same
+`apxy/cxr/-/name` value.
+
+These labels are useful for selecting a resource by ID or name from a
+per-request snapshot and for joining audit data across resources. The normal
+API `name` filter queries the first-class name column directly; it does not rely
+on this label mirror.
 
 ### Carry-forward labels
 
@@ -111,7 +122,7 @@ The hierarchy looks like this:
 namespace
    ├── actor                            (labels carry forward through "act/")
    ├── encryption_key                   (labels carry forward through "ns/")
-   ├── connector (version)              (labels carry forward through "cxr/")
+   ├── connector                        (labels carry forward through "cxr/")
    │      └── connection                (labels carry forward through "cxn/")
    ├── rate_limit                       (labels carry forward through "ns/")
    └── (child namespace)                (labels carry forward through "ns/")
@@ -142,6 +153,7 @@ app.example.com/cohort: beta             # user-set
 apxy/ns/team:           alpha            # carried from parent namespace
 apxy/ns/env:            prod             # carried from root (transitively)
 apxy/cxn/-/id:          cxn_…            # implicit identifier
+apxy/cxn/-/name:        production-crm   # implicit mutable name
 apxy/cxn/-/ns:          root.acme        # implicit identifier
 ```
 
@@ -154,6 +166,12 @@ There are two propagation paths:
 1. **Targeted refresh.** Admin API mutators (e.g., updating a namespace's labels) enqueue a background task that re-derives every descendant's `apxy/` mirror — running each row's update in its own short transaction so concurrent reads aren't blocked. Typical latency: seconds to a few minutes, longer for deep fan-outs.
 2. **Daily consistency checker.** A scheduled job walks every resource type, compares the on-disk labels to what the carry-forward rule would compute, and corrects any drift. Belt-and-braces for the targeted refresh; the worst-case bound is "next daily run plus the time the walk itself takes" — minutes to hours.
 
+A rename updates the resource's own `apxy/<rt>/-/name` label in the same write.
+Copies carried to descendants use the same eventual reconciliation paths. For
+example, renaming a connector immediately changes the connector projection, then
+`apxy/cxr/-/name` on existing connections is refreshed by the targeted job or
+the daily consistency checker.
+
 **Operational implications:**
 
 - Treat carry-forward labels as eventually-consistent reads. Application logic that needs to observe a fresh parent-label change should not rely on a child's mirrored `apxy/<parent>/...` having caught up yet.
@@ -162,19 +180,23 @@ There are two propagation paths:
 
 ## Per-request label snapshot
 
-When an application sends a request through the proxy, AuthProxy assembles a **label snapshot** for that request. This is what gets recorded on the request log entry and what label selectors evaluate against (e.g., the `label_selector` clause on a [rate limit](/operations/rate-limits/)).
+When an application sends a request through the proxy, AuthProxy assembles a **label snapshot** for that request. This is what gets recorded on the request log entry and what label selectors evaluate against (e.g., the `labelSelector` clause on a [rate limit](/operations/rate-limits/)).
 
 The snapshot is the union of:
 
 1. **The connection's labels** (which already include namespace + connector carry-forward — see above).
-2. **The actor's contribution**, if the request was initiated by an authenticated actor. The actor's user labels are re-keyed under `apxy/act/<key>`, plus the actor's own identifier labels (`apxy/act/-/id`, `apxy/act/-/ns`). Other `apxy/*` entries on the actor (e.g. its own namespace's `apxy/ns/*`) are **not** forwarded — those describe the actor's home context, not the request's.
+2. **The actor's contribution**, if the request was initiated by an authenticated actor. The actor's user labels are re-keyed under `apxy/act/<key>`, plus the actor's own identity labels (`apxy/act/-/id`, `apxy/act/-/name`, `apxy/act/-/ns`). Other `apxy/*` entries on the actor (e.g. its own namespace's `apxy/ns/*`) are **not** forwarded — those describe the actor's home context, not the request's.
 3. **Per-request labels** supplied by the caller in the `labels` field of a proxy request. These are user labels only; `apxy/`-prefixed keys are rejected so callers can't impersonate system labels.
 
-The composed snapshot is then stamped onto the request log entry's `labels` field, frozen at that point in time.
+The composed snapshot is then stamped onto the request log entry's `labels`
+field, frozen at that point in time. A later resource rename does not rewrite
+past request events. New requests see the connection's materialized labels as
+they exist when the request starts, so a carried connector or namespace name
+may briefly remain at its pre-rename value while reconciliation runs.
 
 ## Label selectors
 
-Anywhere the API takes a `label_selector` query parameter, the syntax is Kubernetes-style:
+Anywhere the API takes a `labelSelector` query parameter, the syntax is Kubernetes-style:
 
 | Form | Matches |
 |---|---|
@@ -197,6 +219,9 @@ apxy/ns/-/id=root.acme
 
 # Every request log entry from connections of type "salesforce":
 apxy/cxr/type=salesforce
+
+# Every request log entry from the logical connector currently named salesforce:
+apxy/cxr/-/name=salesforce
 ```
 
 ## API surface

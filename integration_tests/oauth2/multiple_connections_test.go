@@ -146,7 +146,7 @@ func completeAuthFlowWithRedirect(t *testing.T, r *proxyRefreshRig, connID, redi
 
 	parsed, err := url.Parse(redirectURL)
 	require.NoError(t, err)
-	stateID := parsed.Query().Get("state_id")
+	stateID := parsed.Query().Get("stateId")
 	require.NotEmpty(t, stateID)
 
 	authResp := r.provider.Authorize(helpers.AuthorizeRequest{
@@ -168,7 +168,7 @@ func completeAuthFlowWithRedirect(t *testing.T, r *proxyRefreshRig, connID, redi
 		callbackOpts...,
 	)
 	require.Truef(t, strings.HasPrefix(loc, r.returnToURL),
-		"auth flow should land on return_to_url; got %q", loc)
+		"auth flow should land on returnToUrl; got %q", loc)
 	return connID
 }
 

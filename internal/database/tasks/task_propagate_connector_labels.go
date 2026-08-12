@@ -14,7 +14,7 @@ const taskTypePropagateConnectorLabels = "database:propagate_connector_labels"
 // PropagateConnectorLabelsPayload is the asynq task payload for
 // taskTypePropagateConnectorLabels.
 type PropagateConnectorLabelsPayload struct {
-	ConnectorId apid.ID `json:"connector_id"`
+	ConnectorId apid.ID `json:"connectorId"`
 }
 
 // NewPropagateConnectorLabelsTask returns an asynq task that, when

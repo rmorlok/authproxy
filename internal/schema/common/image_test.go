@@ -87,7 +87,7 @@ func TestImage(t *testing.T) {
 						IsDirectString: false,
 					},
 					data: `
-public_url: https://example.com/image.png
+publicUrl: https://example.com/image.png
 `,
 				},
 				{
@@ -97,7 +97,7 @@ public_url: https://example.com/image.png
 						MimeType: "image/png",
 					},
 					data: `
-mime_type: image/png
+mimeType: image/png
 base64: ywAAAAAAQABAAACAUwAOw==
 `,
 				},
@@ -127,7 +127,7 @@ base64: ywAAAAAAQABAAACAUwAOw==
 			})
 			t.Run("public url", func(t *testing.T) {
 				data := `
-public_url: https://example.com/image.png
+publicUrl: https://example.com/image.png
 `
 				var image Image
 				err := yaml.Unmarshal([]byte(data), &image)
@@ -138,7 +138,7 @@ public_url: https://example.com/image.png
 			})
 			t.Run("base64", func(t *testing.T) {
 				data := `
-mime_type: image/png
+mimeType: image/png
 base64: iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/wcAAwAB/1J8qkwAAAAASUVORK5CYII=`
 				var image Image
 				err := yaml.Unmarshal([]byte(data), &image)
@@ -162,14 +162,14 @@ base64: iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/wcAAwAB/1J8
 				data := &ImagePublicUrl{
 					PublicUrl: "https://example.com/image.png",
 				}
-				require.Equal(t, "public_url: https://example.com/image.png\n", MustMarshalToYamlString(data))
+				require.Equal(t, "publicUrl: https://example.com/image.png\n", MustMarshalToYamlString(data))
 			})
 			t.Run("base64", func(t *testing.T) {
 				data := &ImageBase64{
 					MimeType: "image/png",
 					Base64:   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/wcAAwAB/1J8qkwAAAAASUVORK5CYII=",
 				}
-				require.Equal(t, `mime_type: image/png
+				require.Equal(t, `mimeType: image/png
 base64: iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/wcAAwAB/1J8qkwAAAAASUVORK5CYII=
 `, MustMarshalToYamlString(data))
 			})
@@ -196,7 +196,7 @@ base64: iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/wcAAwAB/1J8
 						PublicUrl:      "https://example.com/image.png",
 						IsDirectString: false,
 					},
-					data: `{"public_url":"https://example.com/image.png"}`,
+					data: `{"publicUrl":"https://example.com/image.png"}`,
 				},
 				{
 					name: "base64",
@@ -204,7 +204,7 @@ base64: iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/wcAAwAB/1J8
 						Base64:   "ywAAAAAAQABAAACAUwAOw==",
 						MimeType: "image/png",
 					},
-					data: `{"mime_type":"image/png","base64":"ywAAAAAAQABAAACAUwAOw=="}`,
+					data: `{"mimeType":"image/png","base64":"ywAAAAAAQABAAACAUwAOw=="}`,
 				},
 			}
 

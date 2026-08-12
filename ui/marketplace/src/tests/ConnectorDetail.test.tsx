@@ -33,10 +33,11 @@ vi.mock('@authproxy/api', async () => {
 
 const connector: Connector = {
   id: 'google-calendar',
+  name: 'google-calendar',
   namespace: 'root',
   version: 1,
   state: ConnectorVersionState.ACTIVE,
-  display_name: 'Google Calendar',
+  displayName: 'Google Calendar',
   description: `Google Calendar lets agents coordinate scheduling.
 
 | Capability | Supported |
@@ -45,9 +46,9 @@ const connector: Connector = {
 | Create events | Yes |`,
   highlight: 'Coordinate meetings from Google Calendar.',
   logo: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg"/%3E',
-  has_configure: false,
-  created_at: '2023-04-01T12:00:00Z',
-  updated_at: '2023-04-01T12:00:00Z',
+  hasConfigure: false,
+  createdAt: '2023-04-01T12:00:00Z',
+  updatedAt: '2023-04-01T12:00:00Z',
 };
 
 const baseConnectionsState = {
@@ -76,7 +77,7 @@ function renderConnectorDetail(preloadedState: any, connectorId = 'google-calend
       toasts: toastsReducer,
     }),
     preloadedState: {
-      auth: { actor_id: 'actor_test', status: 'authenticated' },
+      auth: { actorId: 'actor_test', status: 'authenticated' },
       toasts: { items: [] },
       ...preloadedState,
     },

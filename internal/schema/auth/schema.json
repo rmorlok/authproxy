@@ -17,7 +17,7 @@
           },
           "description": "The types of resources this permission applies to. May include an asterisk (*) to match all resource types."
         },
-        "resource_ids": {
+        "resourceIds": {
           "type": "array",
           "items": {
             "type": "string"

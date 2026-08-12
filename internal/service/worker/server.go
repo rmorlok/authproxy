@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 	"time"
 
 	workflowworker "github.com/cschleiden/go-workflows/worker"
@@ -38,6 +41,11 @@ func Serve(cfg config.C) {
 	// Initialise telemetry early; flush last so other shutdowns can still emit.
 	dm.GetTelemetry()
 	defer dm.ShutdownTelemetry()
+
+	// The Asynq server shares this client's connection pool. Register this
+	// before starting it so the pool is closed only after its shutdown has
+	// completed.
+	defer dm.GetRedisClient().Close()
 
 	workerConfig := cfg.GetRoot().Worker
 	router := apgin.ForService(
@@ -104,6 +112,12 @@ func Serve(cfg config.C) {
 	defer dm.GetEncryptService().Shutdown()
 	defer dm.ShutdownWorkflowRuntime()
 
+	// The workflow worker has no shutdown method; cancelling the context
+	// passed to Start stops its pollers so WaitForCompletion can drain and
+	// return. Keep its context separate from the Asynq BaseContext so Asynq
+	// can continue its own graceful in-flight task shutdown.
+	workflowCtx, stopWorkflow := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stopWorkflow()
 	ctx := context.Background()
 
 	// Build the asynq telemetry surface (middleware + scheduler-sync
@@ -210,13 +224,9 @@ func Serve(cfg config.C) {
 	go func() {
 		defer wg.Done()
 		workflowRunning = true
-		if err := workflowWorker.Start(ctx); err != nil {
+		if err := runWorkflowWorker(workflowCtx, workflowWorker); err != nil {
 			workflowHasError = true
-			log.Fatalf("could not start workflow worker: %v", err)
-		}
-		if err := workflowWorker.WaitForCompletion(); err != nil {
-			workflowHasError = true
-			log.Fatalf("workflow worker failed while waiting for completion: %v", err)
+			log.Fatalf("workflow worker failed: %v", err)
 		}
 		workflowRunning = false
 		logger.Info("Workflow worker shutdown complete")
@@ -274,6 +284,21 @@ func Serve(cfg config.C) {
 	wg.Wait()
 	logger.Info("Worker shutting down")
 	defer logger.Info("Worker shutdown complete")
+}
+
+type workflowWorker interface {
+	Start(context.Context) error
+	WaitForCompletion() error
+}
+
+func runWorkflowWorker(ctx context.Context, worker workflowWorker) error {
+	if err := worker.Start(ctx); err != nil {
+		return fmt.Errorf("start workflow worker: %w", err)
+	}
+	if err := worker.WaitForCompletion(); err != nil {
+		return fmt.Errorf("wait for workflow worker completion: %w", err)
+	}
+	return nil
 }
 
 func workflowOptionsFromConfig(ctx context.Context, workerConfig *schemaConfig.ServiceWorker) *workflowworker.Options {

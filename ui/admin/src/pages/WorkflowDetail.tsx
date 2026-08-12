@@ -32,7 +32,7 @@ import {
 
 const stateColors: Record<string, 'primary' | 'secondary' | 'success' | 'warning' | 'default'> = {
     active: 'primary',
-    continued_as_new: 'warning',
+    continuedAsNew: 'warning',
     finished: 'success',
 };
 
@@ -54,7 +54,7 @@ function TreeNode({node, depth = 0}: { node: WorkflowInstanceTree; depth?: numbe
     return (
         <Box sx={{pl: depth * 2, py: 0.75}}>
             <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                <Typography variant="body2" fontWeight={600}>{node.workflow_name || node.instance?.instance_id || 'Workflow'}</Typography>
+                <Typography variant="body2" fontWeight={600}>{node.workflowName || node.instance?.instanceId || 'Workflow'}</Typography>
                 <Chip
                     label={node.state || 'unknown'}
                     size="small"
@@ -65,11 +65,11 @@ function TreeNode({node, depth = 0}: { node: WorkflowInstanceTree; depth?: numbe
                 {node.queue && <Typography variant="caption" color="text.secondary">{node.queue}</Typography>}
             </Stack>
             <Typography variant="caption" color="text.secondary">
-                {node.instance?.instance_id || '-'} / {node.instance?.execution_id || '-'}
+                {node.instance?.instanceId || '-'} / {node.instance?.executionId || '-'}
             </Typography>
             {node.children?.map((child) => (
                 <TreeNode
-                    key={`${child.instance?.instance_id ?? ''}:${child.instance?.execution_id ?? ''}`}
+                    key={`${child.instance?.instanceId ?? ''}:${child.instance?.executionId ?? ''}`}
                     node={child}
                     depth={depth + 1}
                 />
@@ -144,7 +144,7 @@ export default function WorkflowDetail() {
     };
 
     const historyColumns: GridColDef<WorkflowHistoryEvent>[] = [
-        {field: 'sequence_id', headerName: 'Seq', flex: 0.35, minWidth: 70},
+        {field: 'sequenceId', headerName: 'Seq', flex: 0.35, minWidth: 70},
         {field: 'type', headerName: 'Type', flex: 0.9, minWidth: 180},
         {
             field: 'timestamp',
@@ -153,7 +153,7 @@ export default function WorkflowDetail() {
             minWidth: 170,
             renderCell: (params) => formatTimestamp(params.value as string | undefined),
         },
-        {field: 'schedule_event_id', headerName: 'Schedule Event', flex: 0.5, minWidth: 120},
+        {field: 'scheduleEventId', headerName: 'Schedule Event', flex: 0.5, minWidth: 120},
         {
             field: 'attributes',
             headerName: 'Attributes',
@@ -233,11 +233,11 @@ export default function WorkflowDetail() {
                                 <Typography variant="body2"><strong>Instance ID:</strong> {decodedInstanceId}</Typography>
                                 <Typography variant="body2"><strong>Execution ID:</strong> {decodedExecutionId}</Typography>
                                 <Typography variant="body2"><strong>Queue:</strong> {info?.queue || '-'}</Typography>
-                                <Typography variant="body2"><strong>Created:</strong> {formatTimestamp(info?.created_at)}</Typography>
-                                <Typography variant="body2"><strong>Completed:</strong> {formatTimestamp(info?.completed_at)}</Typography>
+                                <Typography variant="body2"><strong>Created:</strong> {formatTimestamp(info?.createdAt)}</Typography>
+                                <Typography variant="body2"><strong>Completed:</strong> {formatTimestamp(info?.completedAt)}</Typography>
                                 {info?.instance?.parent && (
                                     <Typography variant="body2">
-                                        <strong>Parent:</strong> {info.instance.parent.instance_id} / {info.instance.parent.execution_id}
+                                        <strong>Parent:</strong> {info.instance.parent.instanceId} / {info.instance.parent.executionId}
                                     </Typography>
                                 )}
                             </Stack>
@@ -268,7 +268,7 @@ export default function WorkflowDetail() {
                                 autoHeight
                                 rows={history}
                                 columns={historyColumns}
-                                getRowId={(row) => `${row.sequence_id ?? ''}:${row.id ?? ''}:${row.type ?? ''}`}
+                                getRowId={(row) => `${row.sequenceId ?? ''}:${row.id ?? ''}:${row.type ?? ''}`}
                                 loading={loading}
                                 hideFooterSelectedRowCount
                                 density="compact"

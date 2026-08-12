@@ -16,7 +16,7 @@ func TestAdminUser(t *testing.T) {
 			data := `
 username: bobdole
 key:
-  public_key:
+  publicKey:
     value: some-key-value
 `
 			var au AdminUser
@@ -54,7 +54,7 @@ permissions:
       - get
       - disconnect
 key:
-  public_key:
+  publicKey:
     value: some-key-value
 `
 			var au AdminUser

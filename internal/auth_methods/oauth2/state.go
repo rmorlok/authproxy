@@ -24,25 +24,25 @@ import (
 type state struct {
 	Id                     apid.ID   `json:"id"`
 	Namespace              string    `json:"namespace"`
-	ActorId                apid.ID   `json:"actor_id"`
-	ConnectorId            apid.ID   `json:"connector_id"`
-	ConnectorVersion       uint64    `json:"connector_version"`
-	ConnectionId           apid.ID   `json:"connection_id"`
-	ReturnToUrl            string    `json:"return_to"`
-	CancelSessionAfterAuth bool      `json:"cancel_session_after_auth"`
-	ExpiresAt              time.Time `json:"expires_at"`
+	ActorId                apid.ID   `json:"actorId"`
+	ConnectorId            apid.ID   `json:"connectorId"`
+	ConnectorVersion       uint64    `json:"connectorVersion"`
+	ConnectionId           apid.ID   `json:"connectionId"`
+	ReturnToUrl            string    `json:"returnToUrl"`
+	CancelSessionAfterAuth bool      `json:"cancelSessionAfterAuth"`
+	ExpiresAt              time.Time `json:"expiresAt"`
 
 	// PKCECodeVerifier is the RFC 7636 §4.1 high-entropy per-flow secret.
 	// Empty when PKCE is not enabled for this connector. Stored alongside
 	// the rest of the state record (same TTL, same AES-GCM envelope) — the
 	// verifier never leaves the proxy except as the matching value sent to
 	// the token endpoint during the code exchange.
-	PKCECodeVerifier string `json:"pkce_code_verifier,omitempty"`
+	PKCECodeVerifier string `json:"pkceCodeVerifier,omitempty"`
 	// PKCEMethod records which challenge transformation was used when the
 	// authorize URL was emitted. Persisting it (rather than re-reading the
 	// connector at callback time) means a connector reconfig mid-flow
 	// can't silently break the exchange.
-	PKCEMethod sconfig.PKCEMethod `json:"pkce_method,omitempty"`
+	PKCEMethod sconfig.PKCEMethod `json:"pkceMethod,omitempty"`
 }
 
 func (s *state) IsValid() bool {

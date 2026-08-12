@@ -18,6 +18,7 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import Tooltip from '@mui/material/Tooltip';
 import Alert from '@mui/material/Alert';
+import TextField from '@mui/material/TextField';
 import {
     listRateLimits, RateLimit, RateLimitMode, RateLimitDefinition,
     ListResponse, ListRateLimitsParams, namespaceAndChildren,
@@ -30,21 +31,22 @@ import {useQueryState, parseAsInteger, parseAsStringLiteral, parseAsString} from
 import {useNavigate} from "react-router-dom";
 import {useSelector} from "react-redux";
 import {selectCurrentNamespacePath} from "../store/namespacesSlice";
+import {toSnakeCase} from '../util';
 
 // Summarise the algorithm variant in one short string. Keeps the column
 // scannable instead of showing the full JSON.
 function algorithmSummary(def: RateLimitDefinition): string {
-    if (def.algorithm.fixed_window) {
-        const fw = def.algorithm.fixed_window;
+    if (def.algorithm.fixedWindow) {
+        const fw = def.algorithm.fixedWindow;
         return `fixed ${fw.limit}/${fw.window}`;
     }
-    if (def.algorithm.sliding_window) {
-        const sw = def.algorithm.sliding_window;
+    if (def.algorithm.slidingWindow) {
+        const sw = def.algorithm.slidingWindow;
         return `sliding(${sw.mode}) ${sw.limit}/${sw.window}`;
     }
-    if (def.algorithm.token_bucket) {
-        const tb = def.algorithm.token_bucket;
-        return `token bucket ${tb.capacity} @ ${tb.refill_rate}/s`;
+    if (def.algorithm.tokenBucket) {
+        const tb = def.algorithm.tokenBucket;
+        return `token bucket ${tb.capacity} @ ${tb.refillRate}/s`;
     }
     return '—';
 }
@@ -54,14 +56,14 @@ function selectorSummary(def: RateLimitDefinition): string {
     if (def.selector.methods && def.selector.methods.length > 0) {
         parts.push(def.selector.methods.join('|'));
     }
-    if (def.selector.path_match) {
-        parts.push(`${def.selector.path_match.kind}:${def.selector.path_match.value}`);
+    if (def.selector.pathMatch) {
+        parts.push(`${def.selector.pathMatch.kind}:${def.selector.pathMatch.value}`);
     }
-    if (def.selector.label_selector) {
-        parts.push(def.selector.label_selector);
+    if (def.selector.labelSelector) {
+        parts.push(def.selector.labelSelector);
     }
-    if (def.selector.request_types && def.selector.request_types.length > 0) {
-        parts.push(`types=${def.selector.request_types.join(',')}`);
+    if (def.selector.requestTypes && def.selector.requestTypes.length > 0) {
+        parts.push(`types=${def.selector.requestTypes.join(',')}`);
     }
     return parts.length === 0 ? 'any' : parts.join(' · ');
 }
@@ -90,7 +92,7 @@ export default function RateLimits() {
     const [error, setError] = useState<string | null>(null);
 
     const [page, setPage] = useQueryState<number>('page', parseAsInteger.withDefault(1));
-    const [pageSize, setPageSize] = useQueryState<number>('page_size', parseAsInteger.withDefault(defaultPageSize));
+    const [pageSize, setPageSize] = useQueryState<number>('pageSize', parseAsInteger.withDefault(defaultPageSize));
     const [modeFilter, setModeFilter] = useQueryState<string>('mode', parseAsStringLiteral(modeVals).withDefault(''));
     const [sort, setSort] = useQueryState<string>('sort', parseAsString.withDefault(''));
 
@@ -104,6 +106,7 @@ export default function RateLimits() {
     const [createOpen, setCreateOpen] = useState(false);
     const [createLoading, setCreateLoading] = useState(false);
     const [createError, setCreateError] = useState<string | null>(null);
+    const [createName, setCreateName] = useState('');
     const [createDef, setCreateDef] = useState<RateLimitDefinition>(EMPTY_DEFINITION);
 
     const responsesCacheRef = useRef<ListResponse<RateLimit>[]>([]);
@@ -125,7 +128,7 @@ export default function RateLimits() {
         } else {
             const sortField = sortModel[0].field;
             const sortDir = sortModel[0].sort === 'desc' ? 'desc' : 'asc';
-            setSort(`${sortField} ${sortDir}`);
+            setSort(`${toSnakeCase(sortField)} ${sortDir}`);
         }
     }, []);
 
@@ -166,7 +169,7 @@ export default function RateLimits() {
 
                 const params: ListRateLimitsParams = prevResp?.cursor ? {cursor: prevResp.cursor} : {
                     namespace: namespaceAndChildren(ns),
-                    order_by: sort || undefined,
+                    orderBy: sort || undefined,
                     limit: pageSize,
                 };
 
@@ -254,10 +257,12 @@ export default function RateLimits() {
         try {
             const request: CreateRateLimitRequest = {
                 namespace: ns,
+                name: createName.trim() || undefined,
                 definition: createDef,
             };
             await createRateLimit(request);
             setCreateOpen(false);
+            setCreateName('');
             setCreateDef(EMPTY_DEFINITION);
             resetPagination();
             fetchPage(1);
@@ -270,6 +275,13 @@ export default function RateLimits() {
     };
 
     const columns: GridColDef<RateLimit>[] = useMemo(() => [
+        {
+            field: 'name',
+            headerName: 'Name',
+            flex: 0.6,
+            minWidth: 140,
+            sortable: true,
+        },
         {
             field: 'id',
             headerName: 'ID',
@@ -350,7 +362,7 @@ export default function RateLimits() {
             sortable: false,
         },
         {
-            field: 'created_at',
+            field: 'createdAt',
             headerName: 'Created',
             flex: 0.6,
             minWidth: 160,
@@ -364,7 +376,7 @@ export default function RateLimits() {
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
                 <Typography component="h2" variant="h6">Rate Limits</Typography>
                 <Stack direction="row" spacing={1}>
-                    <Button variant="outlined" size="small" onClick={() => navigate('/rate-limits/_dry_run')}>
+                    <Button variant="outlined" size="small" onClick={() => navigate('/rate-limits/_dryRun')}>
                         Dry run
                     </Button>
                     <Button variant="contained" size="small" onClick={() => setCreateOpen(true)}>
@@ -421,6 +433,15 @@ export default function RateLimits() {
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                         Will be created in namespace <Chip size="small" label={ns || 'root'} />.
                     </Typography>
+                    <TextField
+                        label="Name"
+                        value={createName}
+                        onChange={(event) => setCreateName(event.target.value)}
+                        helperText="Optional; defaults to the generated immutable ID."
+                        disabled={createLoading}
+                        fullWidth
+                        sx={{mb: 2}}
+                    />
                     <RateLimitDefinitionEditor value={createDef} onChange={setCreateDef} />
                     {createError && <Alert severity="error" sx={{ mt: 2 }}>{createError}</Alert>}
                 </DialogContent>

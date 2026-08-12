@@ -174,7 +174,7 @@ type ListQueueHistoryResponseJson = schemaapi.ListQueueHistoryResponseJson
 
 type taskListCursor struct {
 	Page     int    `json:"page"`
-	PageSize int    `json:"page_size"`
+	PageSize int    `json:"pageSize"`
 	Queue    string `json:"queue"`
 	State    string `json:"state"`
 }
@@ -377,7 +377,7 @@ func (r *TaskMonitoringRoutes) getTask(gctx *gin.Context) {
 	val.MarkValidated()
 
 	queue := gctx.Param("queue")
-	taskId := gctx.Param("task_id")
+	taskId := gctx.Param("taskId")
 
 	if queue == "" || taskId == "" {
 		apgin.WriteError(gctx, nil, httperr.BadRequest("queue and task_id are required"))
@@ -434,7 +434,7 @@ func (r *TaskMonitoringRoutes) runTask(gctx *gin.Context) {
 	val.MarkValidated()
 
 	queue := gctx.Param("queue")
-	taskId := gctx.Param("task_id")
+	taskId := gctx.Param("taskId")
 
 	if err := r.inspector.RunTask(queue, taskId); err != nil {
 		apgin.WriteError(gctx, nil, httperr.InternalServerErrorMsg("failed to run task", httperr.WithInternalErr(err)))
@@ -449,7 +449,7 @@ func (r *TaskMonitoringRoutes) archiveTask(gctx *gin.Context) {
 	val.MarkValidated()
 
 	queue := gctx.Param("queue")
-	taskId := gctx.Param("task_id")
+	taskId := gctx.Param("taskId")
 
 	if err := r.inspector.ArchiveTask(queue, taskId); err != nil {
 		apgin.WriteError(gctx, nil, httperr.InternalServerErrorMsg("failed to archive task", httperr.WithInternalErr(err)))
@@ -463,7 +463,7 @@ func (r *TaskMonitoringRoutes) cancelTask(gctx *gin.Context) {
 	val := auth.MustGetValidatorFromGinContext(gctx)
 	val.MarkValidated()
 
-	taskId := gctx.Param("task_id")
+	taskId := gctx.Param("taskId")
 
 	if err := r.inspector.CancelProcessing(taskId); err != nil {
 		apgin.WriteError(gctx, nil, httperr.InternalServerErrorMsg("failed to cancel task", httperr.WithInternalErr(err)))
@@ -478,7 +478,7 @@ func (r *TaskMonitoringRoutes) deleteTask(gctx *gin.Context) {
 	val.MarkValidated()
 
 	queue := gctx.Param("queue")
-	taskId := gctx.Param("task_id")
+	taskId := gctx.Param("taskId")
 
 	if err := r.inspector.DeleteTask(queue, taskId); err != nil {
 		apgin.WriteError(gctx, nil, httperr.InternalServerErrorMsg("failed to delete task", httperr.WithInternalErr(err)))
@@ -612,7 +612,7 @@ func (r *TaskMonitoringRoutes) Register(g gin.IRouter) {
 		r.listTasksByState,
 	)
 	g.GET(
-		"/task-monitoring/queues/:queue/tasks/:state/:task_id",
+		"/task-monitoring/queues/:queue/tasks/:state/:taskId",
 		r.auth.NewRequiredBuilder().
 			ForResource("task_monitoring").
 			ForVerb("get").
@@ -638,7 +638,7 @@ func (r *TaskMonitoringRoutes) Register(g gin.IRouter) {
 
 	// Mutating manage endpoints
 	g.POST(
-		"/task-monitoring/queues/:queue/tasks/:task_id/_run",
+		"/task-monitoring/queues/:queue/tasks/:taskId/_run",
 		r.auth.NewRequiredBuilder().
 			ForResource("task_monitoring").
 			ForVerb("manage").
@@ -646,7 +646,7 @@ func (r *TaskMonitoringRoutes) Register(g gin.IRouter) {
 		r.runTask,
 	)
 	g.POST(
-		"/task-monitoring/queues/:queue/tasks/:task_id/_archive",
+		"/task-monitoring/queues/:queue/tasks/:taskId/_archive",
 		r.auth.NewRequiredBuilder().
 			ForResource("task_monitoring").
 			ForVerb("manage").
@@ -654,7 +654,7 @@ func (r *TaskMonitoringRoutes) Register(g gin.IRouter) {
 		r.archiveTask,
 	)
 	g.POST(
-		"/task-monitoring/queues/:queue/tasks/:task_id/_cancel",
+		"/task-monitoring/queues/:queue/tasks/:taskId/_cancel",
 		r.auth.NewRequiredBuilder().
 			ForResource("task_monitoring").
 			ForVerb("manage").
@@ -662,7 +662,7 @@ func (r *TaskMonitoringRoutes) Register(g gin.IRouter) {
 		r.cancelTask,
 	)
 	g.DELETE(
-		"/task-monitoring/queues/:queue/tasks/:task_id",
+		"/task-monitoring/queues/:queue/tasks/:taskId",
 		r.auth.NewRequiredBuilder().
 			ForResource("task_monitoring").
 			ForVerb("manage").
@@ -686,7 +686,7 @@ func (r *TaskMonitoringRoutes) Register(g gin.IRouter) {
 		r.unpauseQueue,
 	)
 	g.POST(
-		"/task-monitoring/queues/:queue/archived/_run-all",
+		"/task-monitoring/queues/:queue/archived/_runAll",
 		r.auth.NewRequiredBuilder().
 			ForResource("task_monitoring").
 			ForVerb("manage").
@@ -694,7 +694,7 @@ func (r *TaskMonitoringRoutes) Register(g gin.IRouter) {
 		r.runAllArchivedTasks,
 	)
 	g.POST(
-		"/task-monitoring/queues/:queue/retry/_run-all",
+		"/task-monitoring/queues/:queue/retry/_runAll",
 		r.auth.NewRequiredBuilder().
 			ForResource("task_monitoring").
 			ForVerb("manage").

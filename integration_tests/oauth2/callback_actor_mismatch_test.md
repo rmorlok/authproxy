@@ -37,7 +37,7 @@ the victim's session credentials. That delivery vector is exactly
 what a phishing link looks like in the wild, and chromedp + the real
 marketplace bootstrap is the closest possible reproduction:
 
-- The victim's browser hits `/connectors?auth_token=<victim JWT>`.
+- The victim's browser hits `/connectors?authToken=<victim JWT>`.
 - The marketplace SPA calls `/api/v1/session/_initiate`, which mints
   a `SESSION-ID` cookie scoped to the victim.
 - The browser then follows the forged callback URL. The cookie
@@ -59,7 +59,7 @@ look like.
   `<h1>Example Domain</h1>` element as the load signal.
 - **Exactly one `oauth callback rejected` log event** with
   `category=actor_mismatch` and `state_id` matching the minted state.
-  The `actor_id` field on the event reflects the *calling* actor
+  The `actorId` field on the event reflects the *calling* actor
   (the victim) so a SOC analyst can see who clicked the link.
 - **No `oauth2_tokens` row** exists for the connection.
 - **Connection state is unchanged** — still `created`, with `setup_step`
@@ -75,7 +75,7 @@ look like.
 | `env.InitiateOAuth2Connection(t, connectorID, returnTo, helpers.WithActor("alice-attacker-…", root))` | Initiates the connection programmatically as the attacker — signs the request with a JWT carrying the attacker's external id. |
 | `provider.Authorize(...)` (`/test/authorize`)               | Mints the OAuth code without a browser. The provider doesn't care which proxy actor owns the state — it validates against its own client/user records — so the attacker can drive this leg programmatically. |
 | `env.PublicAuthUtil.GenerateBearerToken(ctx, "bob-victim-…", root, allPerms)` | Mints the JWT the victim's browser will present to the marketplace. |
-| chromedp navigation to `/connectors?auth_token=<victim JWT>` | Triggers the marketplace SPA's `_initiate` call, which sets the victim's `SESSION-ID` cookie. We wait on the `Connect` button as the bootstrap-complete signal. |
+| chromedp navigation to `/connectors?authToken=<victim JWT>` | Triggers the marketplace SPA's `_initiate` call, which sets the victim's `SESSION-ID` cookie. We wait on the `Connect` button as the bootstrap-complete signal. |
 | chromedp navigation to the forged `/oauth2/callback?state=…&code=…` | Delivers the callback under the victim's cookie. The public service identifies the victim; state validation detects the actor mismatch and 302s to the error page. |
 | `chromedp.Location(&finalURL)`                              | Reads the URL the browser landed on after the 302. |
 | `logCapture.RecordsWithMessage(t, rejectionEventMessage)`   | Surfaces the structured rejection event for assertions. |
@@ -105,8 +105,8 @@ sequenceDiagram
     P-->>T: { redirect_url with code + state_id }
 
     Note over T,P: Victim leg — driven by chromedp
-    T->>VIC: navigate /connectors?auth_token=<victim JWT>
-    VIC->>PUB: GET /connectors?auth_token=…
+    T->>VIC: navigate /connectors?authToken=<victim JWT>
+    VIC->>PUB: GET /connectors?authToken=…
     VIC->>PUB: POST /api/v1/session/_initiate (auto by SPA)
     PUB-->>VIC: SESSION-ID cookie (scoped to victim)
     VIC->>PUB: GET /api/v1/connectors?limit=… (SPA bootstrap)

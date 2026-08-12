@@ -16,6 +16,7 @@ import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import Alert from '@mui/material/Alert';
+import TextField from '@mui/material/TextField';
 import AddIcon from '@mui/icons-material/Add';
 import {
     listKeys, KeyState, Key, ListResponse,
@@ -26,6 +27,7 @@ import {useQueryState, parseAsInteger, parseAsStringLiteral, parseAsString} from
 import {useNavigate} from "react-router-dom";
 import {useSelector} from "react-redux";
 import {selectCurrentNamespacePath} from "../store/namespacesSlice";
+import {toSnakeCase} from '../util';
 import KeyDataForm, {
     buildKeyDataPayload,
     createEmptyKeyDataFormState,
@@ -50,6 +52,13 @@ function renderState(state: KeyState) {
 }
 
 export const columns: GridColDef<Key>[] = [
+    {
+        field: 'name',
+        headerName: 'Name',
+        flex: 0.7,
+        minWidth: 120,
+        sortable: true,
+    },
     {
         field: 'id',
         headerName: 'ID',
@@ -91,7 +100,7 @@ export const columns: GridColDef<Key>[] = [
         },
     },
     {
-        field: 'created_at',
+        field: 'createdAt',
         headerName: 'Created At',
         flex: 1,
         minWidth: 80,
@@ -101,7 +110,7 @@ export const columns: GridColDef<Key>[] = [
         }
     },
     {
-        field: 'updated_at',
+        field: 'updatedAt',
         headerName: 'Updated At',
         flex: 1,
         minWidth: 100,
@@ -129,7 +138,7 @@ export default function Keys() {
     const [error, setError] = useState<string | null>(null);
 
     const [page, setPage] = useQueryState<number>('page', parseAsInteger.withDefault(1));
-    const [pageSize, setPageSize] = useQueryState<number>('page_size', parseAsInteger.withDefault(defaultPageSize));
+    const [pageSize, setPageSize] = useQueryState<number>('pageSize', parseAsInteger.withDefault(defaultPageSize));
     const [stateFilter, setStateFilter] = useQueryState<string>('state', parseAsStringLiteral(stateVals).withDefault(''));
     const [sort, setSort] = useQueryState<string>('sort', parseAsString.withDefault(''));
 
@@ -139,6 +148,7 @@ export default function Keys() {
     const [createOpen, setCreateOpen] = useState(false);
     const [createLoading, setCreateLoading] = useState(false);
     const [createError, setCreateError] = useState<string | null>(null);
+    const [createName, setCreateName] = useState('');
     const [createKeyData, setCreateKeyData] = useState<KeyDataFormState>(createEmptyKeyDataFormState());
     const [createLabelRows, setCreateLabelRows] = useState<KeyValueRow[]>([]);
     const [createAnnotationRows, setCreateAnnotationRows] = useState<KeyValueRow[]>([]);
@@ -162,7 +172,7 @@ export default function Keys() {
         } else {
             const sortField = sortModel[0].field;
             const sortDir = sortModel[0].sort === 'desc' ? 'desc' : 'asc';
-            setSort(`${sortField} ${sortDir}`);
+            setSort(`${toSnakeCase(sortField)} ${sortDir}`);
         }
     }, []);
 
@@ -204,7 +214,7 @@ export default function Keys() {
                 const params: ListKeysParams = prevResp?.cursor ? {cursor: prevResp.cursor} : {
                     state: (stateFilter as KeyState) || undefined,
                     namespace: namespaceAndChildren(ns),
-                    order_by: sort || undefined,
+                    orderBy: sort || undefined,
                     limit: pageSize,
                 };
 
@@ -271,7 +281,8 @@ export default function Keys() {
         try {
             const request: CreateKeyRequest = {
                 namespace: ns,
-                key_data: buildKeyDataPayload(createKeyData),
+                name: createName.trim() || undefined,
+                keyData: buildKeyDataPayload(createKeyData),
                 labels: rowsToMap(createLabelRows),
                 annotations: rowsToMap(createAnnotationRows),
             };
@@ -290,6 +301,7 @@ export default function Keys() {
 
     const resetCreateDialog = () => {
         setCreateError(null);
+        setCreateName('');
         setCreateKeyData(createEmptyKeyDataFormState());
         setCreateLabelRows([]);
         setCreateAnnotationRows([]);
@@ -407,6 +419,14 @@ export default function Keys() {
                         Namespace: {ns}
                     </Typography>
                     <Stack spacing={3}>
+                        <TextField
+                            label="Name"
+                            value={createName}
+                            onChange={(event) => setCreateName(event.target.value)}
+                            helperText="Optional; defaults to the generated immutable ID."
+                            disabled={createLoading}
+                            fullWidth
+                        />
                         <KeyDataForm value={createKeyData} onChange={setCreateKeyData} disabled={createLoading}/>
                         <KeyValueRowsEditor
                             title="Labels"

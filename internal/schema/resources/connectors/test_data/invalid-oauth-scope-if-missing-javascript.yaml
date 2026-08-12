@@ -1,15 +1,13 @@
-# $schema: ./schema.json
-
 labels:
   type: google-drive
-display_name: Google Drive
+displayName: Google Drive
 description: Invalid scope predicate example
 auth:
   type: OAuth2
-  client_id:
-    env_var: GOOGLE_CLIENT_ID
-  client_secret:
-    env_var: GOOGLE_CLIENT_SECRET
+  clientId:
+    envVar: GOOGLE_CLIENT_ID
+  clientSecret:
+    envVar: GOOGLE_CLIENT_SECRET
   authorization:
     endpoint: https://accounts.google.com/o/oauth2/v2/auth
   token:

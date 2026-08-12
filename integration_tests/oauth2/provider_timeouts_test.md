@@ -66,7 +66,7 @@ should still cover the property — the failure surfaces the same way
 - Connection lands in `state=created`, `setup_step=auth_failed`,
   `setup_error` populated.
 - No token row persisted.
-- 302 redirect to `return_to_url?setup=pending&connection_id=<id>` so
+- 302 redirect to `returnToUrl?setup=pending&connectionId=<id>` so
   the marketplace UI re-renders the connection in its failed state.
 
 ### `TestTokenRefreshTimeout_RetriesAndExhausts`

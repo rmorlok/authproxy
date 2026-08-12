@@ -35,3 +35,44 @@ func TestWorkflowOptionsFromConfigOverridesConfiguredValues(t *testing.T) {
 	require.Equal(t, 6, options.MaxParallelActivityTasks)
 	require.Equal(t, 7*time.Second, options.WorkflowHeartbeatInterval)
 }
+
+func TestRunWorkflowWorkerStopsWhenContextIsCancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	worker := &blockingWorkflowWorker{started: make(chan struct{})}
+	done := make(chan error, 1)
+	go func() {
+		done <- runWorkflowWorker(ctx, worker)
+	}()
+
+	select {
+	case <-worker.started:
+	case <-time.After(time.Second):
+		t.Fatal("workflow worker did not start")
+	}
+
+	cancel()
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("workflow worker did not stop after context cancellation")
+	}
+}
+
+type blockingWorkflowWorker struct {
+	ctx     context.Context
+	started chan struct{}
+}
+
+func (w *blockingWorkflowWorker) Start(ctx context.Context) error {
+	w.ctx = ctx
+	close(w.started)
+	return nil
+}
+
+func (w *blockingWorkflowWorker) WaitForCompletion() error {
+	<-w.ctx.Done()
+	return nil
+}

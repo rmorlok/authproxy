@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 
+	"github.com/rmorlok/authproxy/internal/util"
 	"gopkg.in/yaml.v3"
 )
 
@@ -53,7 +54,7 @@ fieldLoop:
 		return fmt.Errorf("invalid structure for logging; missing type field")
 	}
 
-	if err := value.Decode(loggingConfig); err != nil {
+	if err := util.DecodeYAMLNodeStrict(value, loggingConfig); err != nil {
 		return err
 	}
 

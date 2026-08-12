@@ -94,7 +94,7 @@ const ConnectionDetail: React.FC<ConnectionDetailProps> = ({ connectionId: provi
   const canReauth =
     connection?.state === ConnectionState.CONFIGURED &&
     (presentation?.requiresReconnection || !presentation?.requiresSetup);
-  const canReconfigure = connection?.state === ConnectionState.CONFIGURED && connector?.has_configure && !presentation?.requiresSetup;
+  const canReconfigure = connection?.state === ConnectionState.CONFIGURED && connector?.hasConfigure && !presentation?.requiresSetup;
   const canDisconnect = connection ? canBeDisconnected(connection) : false;
   const body = connector?.description || connector?.highlight || '';
 
@@ -112,8 +112,8 @@ const ConnectionDetail: React.FC<ConnectionDetailProps> = ({ connectionId: provi
     })).then((action) => {
       if (action.meta.requestStatus === 'fulfilled') {
         const response = action.payload as any;
-        if (isRedirectResponse(response) && response.redirect_url) {
-          window.location.href = response.redirect_url;
+        if (isRedirectResponse(response) && response.redirectUrl) {
+          window.location.href = response.redirectUrl;
           return;
         }
         if (isCompleteResponse(response)) {
@@ -133,7 +133,7 @@ const ConnectionDetail: React.FC<ConnectionDetailProps> = ({ connectionId: provi
       if (action.meta.requestStatus === 'fulfilled') {
         const response = action.payload as any;
         if (isRedirectResponse(response)) {
-          window.location.href = response.redirect_url;
+          window.location.href = response.redirectUrl;
         }
       }
     });
@@ -193,10 +193,10 @@ const ConnectionDetail: React.FC<ConnectionDetailProps> = ({ connectionId: provi
       if (
         responsePayload &&
         typeof responsePayload === 'object' &&
-        'task_id' in responsePayload
+		'taskId' in responsePayload
       ) {
         const taskPollResult =
-          await tasks.pollForTaskFinalized((responsePayload as DisconnectResponseJson).task_id);
+          await tasks.pollForTaskFinalized((responsePayload as DisconnectResponseJson).taskId);
         if (taskPollResult.result !== PollForTaskResult.FINALIZED) {
           dispatch(addToast({
             message: 'Error while checking for status of disconnect',
@@ -233,7 +233,7 @@ const ConnectionDetail: React.FC<ConnectionDetailProps> = ({ connectionId: provi
       if (action.meta.requestStatus === 'fulfilled') {
         const response = action.payload as any;
         if (isRedirectResponse(response)) {
-          window.location.href = response.redirect_url;
+          window.location.href = response.redirectUrl;
         } else {
           dispatch(fetchConnectionsAsync());
         }
@@ -278,7 +278,7 @@ const ConnectionDetail: React.FC<ConnectionDetailProps> = ({ connectionId: provi
               <Box
                 component="img"
                 src={connector.logo}
-                alt={`${connector.display_name} logo`}
+                alt={`${connector.displayName} logo`}
                 sx={{
                   width: 88,
                   height: 88,
@@ -294,7 +294,7 @@ const ConnectionDetail: React.FC<ConnectionDetailProps> = ({ connectionId: provi
             ) : (
               <Box
                 role="img"
-                aria-label={`${connector.display_name} logo`}
+                aria-label={`${connector.displayName} logo`}
                 sx={{
                   width: 88,
                   height: 88,
@@ -308,13 +308,13 @@ const ConnectionDetail: React.FC<ConnectionDetailProps> = ({ connectionId: provi
                 }}
               >
                 <Typography variant="h4" component="span" sx={{ fontWeight: 700 }}>
-                  {connectorInitials(connector.display_name)}
+                  {connectorInitials(connector.displayName)}
                 </Typography>
               </Box>
             )}
             <Box sx={{ minWidth: 0 }}>
               <Typography variant="h3" component="h1" sx={{ mb: 1 }}>
-                {connector.display_name}
+                {connector.displayName}
               </Typography>
               <Box
                 sx={{
@@ -444,7 +444,7 @@ const ConnectionDetail: React.FC<ConnectionDetailProps> = ({ connectionId: provi
         <DialogTitle>Disconnect Confirmation</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Are you sure you want to disconnect from {connector?.display_name || 'this connector'}?
+            Are you sure you want to disconnect from {connector?.displayName || 'this connector'}?
           </DialogContentText>
         </DialogContent>
         <DialogActions>

@@ -3,14 +3,29 @@
     {
       "metric": "request_events",
       "kind": "counter",
-      "aggregations": ["count"],
-      "group_by": ["type", "method", "response_status_code", "response_source", "connector_id"]
+      "aggregations": [
+        "count"
+      ],
+      "groupBy": [
+        "type",
+        "method",
+        "response_status_code",
+        "response_source",
+        "connector_id"
+      ]
     },
     {
       "metric": "resources.connections",
       "kind": "gauge",
-      "aggregations": ["count"],
-      "group_by": ["state", "health_state", "connector_id", "connector_version"]
+      "aggregations": [
+        "count"
+      ],
+      "groupBy": [
+        "state",
+        "health_state",
+        "connector_id",
+        "connector_version"
+      ]
     }
   ]
 }

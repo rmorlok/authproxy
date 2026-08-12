@@ -35,10 +35,10 @@ func TestDatabase(t *testing.T) {
       password: secret
       database: authproxy
       sslmode: disable
-      max_open_conns: 25
-      max_idle_conns: 5
-      conn_max_lifetime: 30m
-      conn_max_idle_time: 5m
+      maxOpenConns: 25
+      maxIdleConns: 5
+      connMaxLifetime: 30m
+      connMaxIdleTime: 5m
       params:
         application_name: authproxy-tests
 `

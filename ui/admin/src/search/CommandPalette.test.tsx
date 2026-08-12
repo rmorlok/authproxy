@@ -75,7 +75,7 @@ describe('CommandPalette', () => {
         Element.prototype.scrollIntoView = vi.fn();
         searchResourcesMock.mockResolvedValue({
             status: 200,
-            data: {items: [], truncated_types: [], incomplete_types: []},
+            data: {items: [], truncatedTypes: [], incompleteTypes: []},
         } as any);
     });
 
@@ -116,7 +116,7 @@ describe('CommandPalette', () => {
             if (params.mode === 'seed') {
                 return Promise.resolve({
                     status: 200,
-                    data: {items: [], truncated_types: ['connection'], incomplete_types: []},
+                    data: {items: [], truncatedTypes: ['connection'], incompleteTypes: []},
                 });
             }
             if (params.q === 'pay') {
@@ -127,15 +127,16 @@ describe('CommandPalette', () => {
                 status: 200,
                 data: {
                     items: [{
-                        resource_type: 'connection',
-                        resource_id: 'cxn_payroll',
+                        resourceType: 'connection',
+                        resourceId: 'cxn_payroll',
+                        name: 'Payroll',
                         namespace: 'root',
                         labels: {name: 'Payroll'},
-                        matched_labels: [{key: 'name', value: 'Payroll'}],
-                        updated_at: '2026-07-12T00:00:00Z',
+                        matchedLabels: [{key: 'name', value: 'Payroll'}],
+                        updatedAt: '2026-07-12T00:00:00Z',
                     }],
-                    truncated_types: [],
-                    incomplete_types: [],
+                    truncatedTypes: [],
+                    incompleteTypes: [],
                 },
             });
         });
@@ -154,15 +155,16 @@ describe('CommandPalette', () => {
             status: 200,
             data: {
                 items: [{
-                    resource_type: 'connection',
-                    resource_id: 'cxn_stale',
+                    resourceType: 'connection',
+                    resourceId: 'cxn_stale',
+                    name: 'Stale',
                     namespace: 'root',
                     labels: {name: 'Stale'},
-                    matched_labels: [{key: 'name', value: 'Stale'}],
-                    updated_at: '2026-07-12T00:00:00Z',
+                    matchedLabels: [{key: 'name', value: 'Stale'}],
+                    updatedAt: '2026-07-12T00:00:00Z',
                 }],
-                truncated_types: [],
-                incomplete_types: [],
+                truncatedTypes: [],
+                incompleteTypes: [],
             },
         });
         await Promise.resolve();
@@ -197,7 +199,7 @@ describe('CommandPalette', () => {
         await waitFor(() => expect(searchResourcesMock).toHaveBeenCalledWith(
             expect.objectContaining({
                 mode: 'query',
-                label_selector: 'apxy/cxn/-/ns=root',
+                labelSelector: 'apxy/cxn/-/ns=root',
             }),
             expect.anything(),
         ));
@@ -209,15 +211,16 @@ describe('CommandPalette', () => {
             status: 200,
             data: {
                 items: [{
-                    resource_type: 'connection',
-                    resource_id: 'cxn_payments',
+                    resourceType: 'connection',
+                    resourceId: 'cxn_payments',
+                    name: 'Payments',
                     namespace: 'root',
                     labels: {env: 'prod', name: 'Payments'},
-                    matched_labels: [],
-                    updated_at: '2026-07-12T00:00:00Z',
+                    matchedLabels: [],
+                    updatedAt: '2026-07-12T00:00:00Z',
                 }],
-                truncated_types: [],
-                incomplete_types: [],
+                truncatedTypes: [],
+                incompleteTypes: [],
             },
         } as any);
         renderPalette();
@@ -242,12 +245,12 @@ describe('CommandPalette', () => {
             if (params.mode === 'seed') {
                 return Promise.resolve({
                     status: 200,
-                    data: {items: [], truncated_types: ['connection'], incomplete_types: []},
+                    data: {items: [], truncatedTypes: ['connection'], incompleteTypes: []},
                 });
             }
             return Promise.resolve({
                 status: 200,
-                data: {items: [], truncated_types: ['connection'], incomplete_types: ['actor']},
+                data: {items: [], truncatedTypes: ['connection'], incompleteTypes: ['actor']},
             });
         });
         renderPalette({debounceMs: 0});
@@ -275,7 +278,7 @@ describe('CommandPalette', () => {
             if (params.mode === 'seed') {
                 return Promise.resolve({
                     status: 200,
-                    data: {items: [], truncated_types: ['connection'], incomplete_types: []},
+                    data: {items: [], truncatedTypes: ['connection'], incompleteTypes: []},
                 });
             }
             return Promise.reject(new Error('offline'));

@@ -23,6 +23,7 @@ import { useNavigate } from 'react-router-dom';
 import {useQueryState, parseAsInteger, parseAsStringLiteral, parseAsString} from 'nuqs'
 import {useSelector} from "react-redux";
 import {selectCurrentNamespacePath} from "../store/namespacesSlice";
+import {toSnakeCase} from '../util';
 
 function renderState(state: ConnectionState) {
     const colors: Record<ConnectionState, "default" | "success" | "error" | "info" | "warning" | "primary" | "secondary"> = {
@@ -37,6 +38,12 @@ function renderState(state: ConnectionState) {
 }
 
 export const columns: GridColDef<Connection>[] = [
+    { field: 'name',
+        headerName: 'Name',
+        flex: 0.8,
+        minWidth: 120,
+        sortable: true,
+    },
     { field: 'id',
         headerName: 'ID',
         flex: 0.8,
@@ -76,6 +83,14 @@ export const columns: GridColDef<Connection>[] = [
         },
     },
     {
+        field: 'connector.name',
+        headerName: 'Connector Name',
+        flex: 0.6,
+        minWidth: 100,
+        sortable: false,
+        valueGetter: (_, row) => row.connector.name,
+    },
+    {
         field: 'connector.id',
         headerName: 'Connector ID',
         flex: 0.8,
@@ -92,7 +107,7 @@ export const columns: GridColDef<Connection>[] = [
         valueGetter: (_, row) => row.connector.version,
     },
     {
-        field: 'created_at',
+        field: 'createdAt',
         headerName: 'Created At',
         headerAlign: 'right',
         align: 'right',
@@ -105,7 +120,7 @@ export const columns: GridColDef<Connection>[] = [
 
     },
     {
-        field: 'updated_at',
+        field: 'updatedAt',
         headerName: 'Updated At',
         headerAlign: 'right',
         align: 'right',
@@ -139,7 +154,7 @@ export default function Connections() {
     const [error, setError] = useState<string | null>(null);
 
     const [page, setPage] = useQueryState<number>('page', parseAsInteger.withDefault(1));
-    const [pageSize, setPageSize] = useQueryState<number>('page_size', parseAsInteger.withDefault(defaultPageSize));
+    const [pageSize, setPageSize] = useQueryState<number>('pageSize', parseAsInteger.withDefault(defaultPageSize));
     const [stateFilter, setStateFilter] = useQueryState<string>('state', parseAsStringLiteral(stateVals).withDefault('')); // empty = all
     const [sort, setSort] = useQueryState<string>('sort', parseAsString.withDefault(''));
 
@@ -172,7 +187,7 @@ export default function Connections() {
         } else {
             const sortField = sortModel[0].field;
             const sortDir = sortModel[0].sort === 'desc' ? 'desc' : 'asc';
-            setSort(`${sortField} ${sortDir}`);
+            setSort(`${toSnakeCase(sortField)} ${sortDir}`);
         }
     }, []);
 
@@ -218,7 +233,7 @@ export default function Connections() {
                 const params: ListConnectionsParams = prevResp?.cursor ? {cursor: prevResp.cursor} : {
                     state: (stateFilter as ConnectionState) || undefined,
                     namespace: namespaceAndChildren(ns),
-                    order_by: sort || undefined,
+                    orderBy: sort || undefined,
                     limit: pageSize,
                 };
 

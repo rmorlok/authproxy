@@ -168,7 +168,7 @@ const ConnectorDetail: React.FC<ConnectorDetailProps> = ({ connectorId }) => {
               <Box
                 component="img"
                 src={connector.logo}
-                alt={`${connector.display_name} logo`}
+                alt={`${connector.displayName} logo`}
                 sx={{
                   width: 88,
                   height: 88,
@@ -184,7 +184,7 @@ const ConnectorDetail: React.FC<ConnectorDetailProps> = ({ connectorId }) => {
             ) : (
               <Box
                 role="img"
-                aria-label={`${connector.display_name} logo`}
+                aria-label={`${connector.displayName} logo`}
                 sx={{
                   width: 88,
                   height: 88,
@@ -198,13 +198,13 @@ const ConnectorDetail: React.FC<ConnectorDetailProps> = ({ connectorId }) => {
                 }}
               >
                 <Typography variant="h4" component="span" sx={{ fontWeight: 700 }}>
-                  {connectorInitials(connector.display_name)}
+                  {connectorInitials(connector.displayName)}
                 </Typography>
               </Box>
             )}
             <Box sx={{ minWidth: 0 }}>
               <Typography variant="h3" component="h1" sx={{ mb: 1 }}>
-                {connector.display_name}
+                {connector.displayName}
               </Typography>
               {connector.highlight && (
                 <Typography variant="body1" color="text.secondary">

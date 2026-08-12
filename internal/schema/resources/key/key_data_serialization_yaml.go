@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	"github.com/rmorlok/authproxy/internal/util"
 	"gopkg.in/yaml.v3"
 )
 
@@ -35,37 +36,37 @@ func (kd *KeyData) UnmarshalYAML(value *yaml.Node) error {
 		keyData = &KeyDataValue{}
 	case keys["base64"]:
 		keyData = &KeyDataBase64Val{}
-	case keys["env_var"]:
+	case keys["envVar"]:
 		keyData = &KeyDataEnvVar{}
-	case keys["env_var_base64"]:
+	case keys["envVarBase64"]:
 		keyData = &KeyDataEnvBase64Var{}
 	case keys["path"]:
 		keyData = &KeyDataFile{}
-	case keys["random"] || keys["num_bytes"]:
+	case keys["random"] || keys["numBytes"]:
 		keyData = &KeyDataRandomBytes{}
-	case keys["vault_transit_key_name"]:
+	case keys["vaultTransitKeyName"]:
 		keyData = &KeyDataVaultTransit{}
-	case keys["vault_address"]:
+	case keys["vaultAddress"]:
 		keyData = &KeyDataVault{}
-	case keys["aws_kms_key_id"]:
+	case keys["awsKmsKeyId"]:
 		keyData = &KeyDataAwsKMS{}
-	case keys["aws_secret_id"]:
+	case keys["awsSecretId"]:
 		keyData = &KeyDataAwsSecret{}
-	case keys["gcp_kms_key_name"] || keys["gcp_crypto_key"]:
+	case keys["gcpKmsKeyName"] || keys["gcpCryptoKey"]:
 		keyData = &KeyDataGcpKMS{}
-	case keys["gcp_secret_name"]:
+	case keys["gcpSecretName"]:
 		keyData = &KeyDataGcpSecret{}
-	case keys["mock_id"]:
+	case keys["mockId"]:
 		keyData = &KeyDataMock{}
-	case keys["mock_kms_id"]:
+	case keys["mockKmsId"]:
 		keyData = &KeyDataMockKMS{}
 	}
 
 	if keyData == nil {
-		return fmt.Errorf("invalid structure for key data type; does not match value, base64, env_var, env_var_base64, path, random, num_bytes, vault_address, vault_transit_key_name, aws_kms_key_id, aws_secret_id, gcp_kms_key_name, gcp_secret_name, mock_id, mock_kms_id")
+		return fmt.Errorf("invalid structure for key data type; does not match value, base64, envVar, envVarBase64, path, random, numBytes, vaultAddress, vaultTransitKeyName, awsKmsKeyId, awsSecretId, gcpKmsKeyName, gcpSecretName, mockId, mockKmsId")
 	}
 
-	if err := value.Decode(keyData); err != nil {
+	if err := util.DecodeYAMLNodeStrict(value, keyData); err != nil {
 		return err
 	}
 

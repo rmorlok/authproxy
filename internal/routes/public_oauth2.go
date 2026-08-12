@@ -87,7 +87,7 @@ func (r *PublicOauth2Routes) callback(gctx *gin.Context) {
 }
 
 type RedirectParams struct {
-	StateId string `form:"state_id"`
+	StateId string `form:"stateId"`
 }
 
 func (r *PublicOauth2Routes) redirect(gctx *gin.Context) {
@@ -121,7 +121,7 @@ func (r *PublicOauth2Routes) redirect(gctx *gin.Context) {
 	if req.StateId == "" {
 		r.cfg.GetRoot().ErrorPages.RenderErrorOrRedirect(gctx, sconfig.ErrorTemplateValues{
 			Error: sconfig.ErrorPageInternalError,
-		}, errors.New("state_id is required"))
+		}, errors.New("stateId is required"))
 		return
 	}
 
@@ -129,7 +129,7 @@ func (r *PublicOauth2Routes) redirect(gctx *gin.Context) {
 	if err != nil {
 		r.cfg.GetRoot().ErrorPages.RenderErrorOrRedirect(gctx, sconfig.ErrorTemplateValues{
 			Error: sconfig.ErrorPageInternalError,
-		}, fmt.Errorf("failed to parse state_id: %w", err))
+		}, fmt.Errorf("failed to parse stateId: %w", err))
 		return
 	}
 
@@ -172,7 +172,7 @@ func (r *PublicOauth2Routes) Register(g *gin.Engine) {
 		Build()
 
 	g.GET("/oauth2/callback", mw, r.callback)
-	g.GET("/oauth2/redirect", mw, r.redirect)
+	g.GET("/oauth2/redirect", mw, RejectSnakeCaseQueryParams(), r.redirect)
 }
 
 func NewPublicOauth2Routes(

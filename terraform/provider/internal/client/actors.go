@@ -9,15 +9,15 @@ import (
 type Actor struct {
 	Id          string            `json:"id"`
 	Namespace   string            `json:"namespace"`
-	ExternalId  string            `json:"external_id"`
+	ExternalId  string            `json:"externalId"`
 	Labels      map[string]string `json:"labels,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`
-	CreatedAt   time.Time         `json:"created_at"`
-	UpdatedAt   time.Time         `json:"updated_at"`
+	CreatedAt   time.Time         `json:"createdAt"`
+	UpdatedAt   time.Time         `json:"updatedAt"`
 }
 
 type CreateActorRequest struct {
-	ExternalId  string            `json:"external_id"`
+	ExternalId  string            `json:"externalId"`
 	Namespace   string            `json:"namespace"`
 	Labels      map[string]string `json:"labels,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`

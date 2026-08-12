@@ -137,7 +137,7 @@ real host-signed session and a test connector before admitting users.
 | `blobStorage`, `s3` | Optional full request/response payload storage |
 | `jwt`, `actors`, `encryptionKeys` | Secret mounts and key paths |
 | `hostApplication` | Browser-session redirect back to the embedding app |
-| `connectors` | Seeded connector definitions and identifying labels |
+| `connectors` | Seeded, named connector definitions |
 | `appMetrics` | Request events, resource metrics, and optional full recording |
 | `config` | Advanced free-form overlay, including telemetry settings not yet typed by the chart |
 

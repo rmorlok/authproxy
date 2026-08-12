@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 
+	"github.com/rmorlok/authproxy/internal/util"
 	"gopkg.in/yaml.v3"
 )
 
@@ -50,7 +51,7 @@ fieldLoop:
 		return fmt.Errorf("invalid structure for database; missing provider field")
 	}
 
-	if err := value.Decode(database); err != nil {
+	if err := util.DecodeYAMLNodeStrict(value, database); err != nil {
 		return err
 	}
 

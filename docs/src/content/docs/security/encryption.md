@@ -52,7 +52,7 @@ replace permission checks or datastore access controls.
 
 ```mermaid
 flowchart TD
-    Global["Global key<br/>system_auth.global_aes_key"]
+    Global["Global key<br/>systemAuth.globalAesKey"]
     Tenant["Logical key<br/>root.tenants.acme"]
     App["Logical key<br/>root.tenants.acme.billing"]
     GDEK["Current and retained DEKs"]
@@ -148,10 +148,10 @@ The default policy ensures every active data-encryption key has a current DEK
 and rotates it after 90 days:
 
 ```yaml
-system_auth:
-  data_encryption_keys:
-    ensure_current: true
-    rotation_interval: 2160h
+systemAuth:
+  dataEncryptionKeys:
+    ensureCurrent: true
+    rotationInterval: 2160h
 ```
 
 The normal worker schedule runs DEK generation and key sync every 15 minutes,
@@ -161,7 +161,7 @@ contains the detailed data model, migration history, and implementation checks.
 
 ## Operational Requirements
 
-- Configure a durable `system_auth.global_aes_key`; do not rely on an
+- Configure a durable `systemAuth.globalAesKey`; do not rely on an
   ephemeral startup key in production.
 - Keep fake encryption disabled. With `dev_settings.fake_encryption`, values
   labeled as encrypted are stored as plaintext.

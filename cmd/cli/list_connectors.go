@@ -16,6 +16,7 @@ func cmdListConnectors() *cobra.Command {
 		resolver *config.Resolver
 		out      Output[routes2.ConnectorJson]
 
+		name  string
 		state string
 		typ   string
 		order string
@@ -51,15 +52,7 @@ func cmdListConnectors() *cobra.Command {
 				SetResult(&response).
 				SetError(&apiErr)
 
-			if typ != "" {
-				req.SetQueryParam("type", typ)
-			}
-			if state != "" {
-				req.SetQueryParam("state", state)
-			}
-			if order != "" {
-				req.SetQueryParam("order_by", order)
-			}
+			setConnectorListQuery(req, name, state, typ, order, "")
 
 			resp, err = req.Get(connectionsUrl)
 
@@ -73,16 +66,19 @@ func cmdListConnectors() *cobra.Command {
 			out.EmitAll(response.Items)
 
 			for response.Cursor != "" && !out.ShouldStop() {
-				resp, err = signer.SignRestyRequest(client.R()).
+				cursor := response.Cursor
+				response = routes2.ListConnectorsResponseJson{}
+				req = signer.SignRestyRequest(client.R()).
 					SetResult(&response).
-					SetError(&apiErr).
-					SetQueryParam("cursor", response.Cursor).
-					Get(connectionsUrl)
+					SetError(&apiErr)
+				setConnectorListQuery(req, name, state, typ, order, cursor)
+				resp, err = req.Get(connectionsUrl)
 				if err != nil {
 					return err
 				} else if resp.IsError() {
 					return errors.New(apiErr.Error)
 				}
+				out.EmitAll(response.Items)
 			}
 
 			return nil
@@ -92,9 +88,28 @@ func cmdListConnectors() *cobra.Command {
 	resolver = config.WithConfigParams(cmd)
 	out = OutputMultiple[routes2.ConnectorJson](cmd)
 
+	cmd.Flags().StringVar(&name, "name", "", "Only show connectors with this exact name")
 	cmd.Flags().StringVar(&state, "state", "", "Only show connectors in the specified state")
 	cmd.Flags().StringVar(&typ, "type", "", "Only show connectors of the specified type")
 	cmd.Flags().StringVar(&order, "order", "", "Order records by the specified field. Should be of the form \"field DESC|ASC\".")
 
 	return cmd
+}
+
+func setConnectorListQuery(req *resty.Request, name, state, typ, order, cursor string) {
+	if name != "" {
+		req.SetQueryParam("name", name)
+	}
+	if typ != "" {
+		req.SetQueryParam("type", typ)
+	}
+	if state != "" {
+		req.SetQueryParam("state", state)
+	}
+	if order != "" {
+		req.SetQueryParam("orderBy", order)
+	}
+	if cursor != "" {
+		req.SetQueryParam("cursor", cursor)
+	}
 }

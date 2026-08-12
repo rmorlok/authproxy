@@ -13,10 +13,10 @@ import (
 
 // KeyDataGcpSecret retrieves an AES key from GCP Secret Manager.
 type KeyDataGcpSecret struct {
-	GcpSecretName    string `json:"gcp_secret_name" yaml:"gcp_secret_name"`
-	GcpProject       string `json:"gcp_project,omitempty" yaml:"gcp_project,omitempty"`
-	GcpSecretVersion string `json:"gcp_secret_version,omitempty" yaml:"gcp_secret_version,omitempty"`
-	CacheTTL         string `json:"cache_ttl,omitempty" yaml:"cache_ttl,omitempty"`
+	GcpSecretName    string `json:"gcpSecretName" yaml:"gcpSecretName"`
+	GcpProject       string `json:"gcpProject,omitempty" yaml:"gcpProject,omitempty"`
+	GcpSecretVersion string `json:"gcpSecretVersion,omitempty" yaml:"gcpSecretVersion,omitempty"`
+	CacheTTL         string `json:"cacheTtl,omitempty" yaml:"cacheTtl,omitempty"`
 
 	cache keyDataCache
 }

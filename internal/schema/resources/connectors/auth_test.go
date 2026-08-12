@@ -50,10 +50,10 @@ func TestAuth(t *testing.T) {
 				},
 				ExpectedYaml: `
 					type: OAuth2
-					client_id:
+					clientId:
 						value: some-client-id
-					client_secret:
-						env_var: GOOGLE_DRIVE_CLIENT_SECRET
+					clientSecret:
+						envVar: GOOGLE_DRIVE_CLIENT_SECRET
 					scopes:
 						- id: https://www.googleapis.com/auth/drive.readonly
 						  reason: |
@@ -100,10 +100,10 @@ func TestAuth(t *testing.T) {
 				},
 				ExpectedYaml: `
 					type: OAuth2
-					client_id:
+					clientId:
 						value: some-client-id
-					client_secret:
-						env_var: GOOGLE_DRIVE_CLIENT_SECRET
+					clientSecret:
+						envVar: GOOGLE_DRIVE_CLIENT_SECRET
 					scopes:
 						- id: https://www.googleapis.com/auth/drive.readonly
 						  required: true

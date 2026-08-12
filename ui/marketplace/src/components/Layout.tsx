@@ -112,17 +112,17 @@ const Layout: React.FC = () => {
   };
 
   const handleNotificationAction = (notification: Notification) => {
-    if (!notification.action_url || !notification.can_action) {
+    if (!notification.actionUrl || !notification.canAction) {
       return;
     }
     handleNotificationsClose();
 
-    const route = routeFromActionUrl(notification.action_url);
+    const route = routeFromActionUrl(notification.actionUrl);
     if (route) {
       navigate(route);
       return;
     }
-    window.location.href = notification.action_url;
+    window.location.href = notification.actionUrl;
   };
 
   const toastsContent = toasts.length == 0 ? '' : toasts.map((toast, i) => (
@@ -176,7 +176,7 @@ const Layout: React.FC = () => {
           sx: { mt: 0.5 },
         }}
       />
-      {notification.can_action && notification.action_url && (
+      {notification.canAction && notification.actionUrl && (
         <Button
           size="small"
           variant="outlined"

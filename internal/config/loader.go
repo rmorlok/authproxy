@@ -8,7 +8,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util"
-	"gopkg.in/yaml.v3"
 )
 
 func LoadConfig(path string) (C, error) {
@@ -37,7 +36,7 @@ func LoadConfig(path string) (C, error) {
 	}
 
 	var root sconfig.Root
-	if err := yaml.Unmarshal(content, &root); err != nil {
+	if err := util.DecodeYAMLStrict(content, &root); err != nil {
 		return nil, err
 	}
 

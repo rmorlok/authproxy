@@ -69,18 +69,18 @@ type Selector struct {
 	// LabelSelector is a Kubernetes-style selector string evaluated against
 	// the per-request label snapshot. Parsing is the runtime layer's
 	// responsibility; this schema only ensures it is non-pathological.
-	LabelSelector string `json:"label_selector,omitempty" yaml:"label_selector,omitempty"`
+	LabelSelector string `json:"labelSelector,omitempty" yaml:"labelSelector,omitempty"`
 
 	// Methods restricts the rule to specific HTTP verbs. Empty / nil means any.
 	Methods []string `json:"methods,omitempty" yaml:"methods,omitempty"`
 
 	// PathMatch restricts the rule to a path on the final upstream URL.
-	PathMatch *PathMatch `json:"path_match,omitempty" yaml:"path_match,omitempty"`
+	PathMatch *PathMatch `json:"pathMatch,omitempty" yaml:"pathMatch,omitempty"`
 
 	// RequestTypes restricts the rule to specific request types. nil means
 	// "use DefaultRequestTypes()". An explicit empty slice is rejected at
 	// validation so an operator can't accidentally create an inert rule.
-	RequestTypes []common.RequestType `json:"request_types,omitempty" yaml:"request_types,omitempty"`
+	RequestTypes []common.RequestType `json:"requestTypes,omitempty" yaml:"requestTypes,omitempty"`
 }
 
 // EffectiveRequestTypes returns RequestTypes when set, otherwise the default.

@@ -3,6 +3,7 @@ package common
 import (
 	"fmt"
 
+	"github.com/rmorlok/authproxy/internal/util"
 	"gopkg.in/yaml.v3"
 )
 
@@ -35,7 +36,7 @@ fieldLoop:
 		keyNode := value.Content[j]
 
 		switch keyNode.Value {
-		case "public_url":
+		case "publicUrl":
 			inner = &ImagePublicUrl{}
 			break fieldLoop
 		case "base64":
@@ -45,10 +46,10 @@ fieldLoop:
 	}
 
 	if inner == nil {
-		return fmt.Errorf("invalid structure for image type; does not match base64 or public_url")
+		return fmt.Errorf("invalid structure for image type; does not match base64 or publicUrl")
 	}
 
-	if err := value.Decode(inner); err != nil {
+	if err := util.DecodeYAMLNodeStrict(value, inner); err != nil {
 		return err
 	}
 

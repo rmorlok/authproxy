@@ -8,7 +8,7 @@ const DefaultSetupTtl = 24 * time.Hour
 type Connections struct {
 	// SetupTtl is the maximum time a connection can remain in an incomplete setup state
 	// before it is automatically cleaned up. Defaults to 24 hours.
-	SetupTtl *HumanDuration `json:"setup_ttl,omitempty" yaml:"setup_ttl,omitempty"`
+	SetupTtl *HumanDuration `json:"setupTtl,omitempty" yaml:"setupTtl,omitempty"`
 }
 
 // GetSetupTtlOrDefault returns the configured setup TTL, or 24 hours if not configured.

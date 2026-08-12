@@ -40,46 +40,46 @@ generate_local_config() {
 
   loadtest_log "generating local SQLite/miniredis background config: $path"
   cat > "$path" <<EOF
-host_application:
-  initiate_session_url: http://placeholder.invalid/login
+hostApplication:
+  initiateSessionUrl: http://placeholder.invalid/login
 
 connections:
-  setup_ttl: 1s
+  setupTtl: 1s
 
 tasks:
-  default_retention: 24h
+  defaultRetention: 24h
 
 database:
   provider: sqlite
-  auto_migrate: true
+  autoMigrate: true
   path: $sqlite_path
 
 redis:
   provider: miniredis
 
-system_auth:
-  jwt_signing_key:
-    public_key:
+systemAuth:
+  jwtSigningKey:
+    publicKey:
       path: $REPO_ROOT/dev_config/system.pub
-    private_key:
+    privateKey:
       path: $REPO_ROOT/dev_config/system
   actors:
-    keys_path: $REPO_ROOT/dev_config/keys/admin
+    keysPath: $REPO_ROOT/dev_config/keys/admin
     permissions:
       - namespace: root.**
         resources:
           - "*"
         verbs:
           - "*"
-  global_aes_key:
+  globalAesKey:
     path: $REPO_ROOT/dev_config/keys/global_aes.key
 
 connectors:
-  auto_migrate: false
-  load_from_list: []
+  autoMigrate: false
+  loadFromList: []
 
-app_metrics:
-  auto_migrate: false
+appMetrics:
+  autoMigrate: false
   database:
     provider: sqlite
     path: $sqlite_path
@@ -212,7 +212,7 @@ run_refresh_sweep() {
       --periodic-probe-percent 0 \
       --stale-setup-connections 0
     run_background_scenario "$variant" refresh-sweep "$pct"
-  done < <(profile_percent_values oauth_tokens_expiring_percent)
+  done < <(profile_percent_values oauthTokensExpiringPercent)
 }
 
 run_scheduler_sync() {
@@ -225,7 +225,7 @@ run_scheduler_sync() {
       --periodic-probe-percent "$pct" \
       --stale-setup-connections 0
     run_background_scenario "$variant" scheduler-sync "$pct"
-  done < <(profile_percent_values periodic_probe_percent)
+  done < <(profile_percent_values periodicProbePercent)
 }
 
 run_resource_snapshot() {

@@ -15,7 +15,7 @@ func TestAdminUsersExternalSource(t *testing.T) {
 	t.Run("yaml parse", func(t *testing.T) {
 		t.Run("standard path", func(t *testing.T) {
 			data := `
-keys_path: some/path/to/keys
+keysPath: some/path/to/keys
 `
 			var adminUsersExternalSource AdminUsersExternalSource
 			err := yaml.Unmarshal([]byte(data), &adminUsersExternalSource)

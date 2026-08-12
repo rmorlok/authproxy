@@ -25,7 +25,7 @@ type Actor struct {
 
 	Id          apid.ID              `json:"-"` // This is the database ID of the actor. It cannot be set in the JWT directly.
 	Name        scommon.ResourceName `json:"name,omitempty"`
-	ExternalId  string               `json:"external_id"`
+	ExternalId  string               `json:"externalId"`
 	Namespace   string               `json:"namespace,omitempty"`
 	Labels      map[string]string    `json:"labels,omitempty"`
 	Annotations map[string]string    `json:"annotations,omitempty"`

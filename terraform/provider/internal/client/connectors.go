@@ -12,14 +12,14 @@ type Connector struct {
 	Version     uint64            `json:"version"`
 	Namespace   string            `json:"namespace"`
 	State       string            `json:"state"`
-	DisplayName string            `json:"display_name"`
+	DisplayName string            `json:"displayName"`
 	Highlight   string            `json:"highlight,omitempty"`
 	Description string            `json:"description"`
 	Logo        string            `json:"logo"`
 	Labels      map[string]string `json:"labels,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`
-	CreatedAt   time.Time         `json:"created_at"`
-	UpdatedAt   time.Time         `json:"updated_at"`
+	CreatedAt   time.Time         `json:"createdAt"`
+	UpdatedAt   time.Time         `json:"updatedAt"`
 	Versions    int64             `json:"versions,omitempty"`
 }
 
@@ -31,8 +31,8 @@ type ConnectorVersion struct {
 	Definition  json.RawMessage   `json:"definition"`
 	Labels      map[string]string `json:"labels,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`
-	CreatedAt   time.Time         `json:"created_at"`
-	UpdatedAt   time.Time         `json:"updated_at"`
+	CreatedAt   time.Time         `json:"createdAt"`
+	UpdatedAt   time.Time         `json:"updatedAt"`
 }
 
 type CreateConnectorRequest struct {
@@ -100,7 +100,7 @@ func (c *Client) CreateConnectorVersion(ctx context.Context, id string, req Crea
 }
 
 func (c *Client) ForceConnectorVersionState(ctx context.Context, id string, version uint64, state string) error {
-	return c.put(ctx, fmt.Sprintf("/api/v1/connectors/%s/versions/%d/_force_state", id, version), ForceStateRequest{State: state}, nil)
+	return c.put(ctx, fmt.Sprintf("/api/v1/connectors/%s/versions/%d/_forceState", id, version), ForceStateRequest{State: state}, nil)
 }
 
 func (c *Client) ListConnectorVersions(ctx context.Context, id string) (*ListConnectorVersionsResponse, error) {

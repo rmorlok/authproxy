@@ -11,7 +11,7 @@
 
 1. Migrate from version 1 to version 2 and confirm the connection requires
    reauthentication.
-2. Target version 1 with `_migrate_version` and wait for the rollback
+2. Target version 1 with `_migrateVersion` and wait for the rollback
    workflow.
 
 ## Assertions

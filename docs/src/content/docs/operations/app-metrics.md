@@ -2,26 +2,26 @@
 title: Application Metrics
 ---
 
-AuthProxy stores Admin UI-facing application metrics in the `app_metrics` store. This store includes request-event records, optional full request/response payloads, and periodic resource snapshots used for time-series dashboards.
+AuthProxy stores Admin UI-facing application metrics in the `appMetrics` store. This store includes request-event records, optional full request/response payloads, and periodic resource snapshots used for time-series dashboards.
 
 ## Configuration
 
-`app_metrics` is required because request-event listing and metrics queries are routed through it. In development the store can use the same SQLite or Postgres database as the primary application database; app_metrics tracks its migrations in `app_metrics_schema_migrations` so it does not conflict with the primary `schema_migrations` table. Deployed environments should prefer ClickHouse or a dedicated Postgres database when request volume is high.
+`appMetrics` is required because request-event listing and metrics queries are routed through it. In development the store can use the same SQLite or Postgres database as the primary application database; appMetrics tracks its migrations in `app_metrics_schema_migrations` so it does not conflict with the primary `schema_migrations` table. Deployed environments should prefer ClickHouse or a dedicated Postgres database when request volume is high.
 
 ```yaml
-app_metrics:
-  resource_snapshot_interval: 15m
+appMetrics:
+  resourceSnapshotInterval: 15m
   database:
     provider: clickhouse
-    auto_migrate: true
+    autoMigrate: true
     addresses:
       - localhost:8123
     database: authproxy
     user: authproxy
     password: authproxy
-  request_events:
-    full_request_recording: never
-  blob_storage:
+  requestEvents:
+    fullRequestRecording: never
+  blobStorage:
     provider: s3
     bucket: authproxy-request-logs
 ```
@@ -30,10 +30,10 @@ Key settings:
 
 | Setting | Purpose |
 |---|---|
-| `app_metrics.database` | Database for request events and resource sample tables; can be shared with the primary application database for development. |
-| `app_metrics.resource_snapshot_interval` | Cadence for the worker snapshot job. Defaults to `15m`. |
-| `app_metrics.request_events.full_request_recording` | `never` (default) or `always`; controls whether full request/response bodies are captured. |
-| `app_metrics.blob_storage` | Stores full request/response payloads when capture is enabled. |
+| `appMetrics.database` | Database for request events and resource sample tables; can be shared with the primary application database for development. |
+| `appMetrics.resourceSnapshotInterval` | Cadence for the worker snapshot job. Defaults to `15m`. |
+| `appMetrics.requestEvents.fullRequestRecording` | `never` (default) or `always`; controls whether full request/response bodies are captured. |
+| `appMetrics.blobStorage` | Stores full request/response payloads when capture is enabled. |
 
 The resource snapshot worker stores live resources at each interval. Deleted resources remain visible in historical time slices where they were sampled, but they are excluded from later snapshots.
 
@@ -45,7 +45,7 @@ source, rate-limit id, label selector, and timestamp range. Fetch one event at
 `GET /api/v1/metrics/request-events/{id}`.
 
 Full request and response payloads are separate encrypted blobs and exist only
-when `full_request_recording` is `always`. Keep recording at `never` unless the
+when `fullRequestRecording` is `always`. Keep recording at `never` unless the
 debugging or audit requirement justifies the additional sensitive data,
 storage, access control, and retention burden.
 
@@ -61,13 +61,13 @@ Use `POST /api/v1/metrics/query` with a time range, optional namespace matcher, 
     "step": "15m"
   },
   "namespace": "root.**",
-  "label_selector": "env=prod",
+  "labelSelector": "env=prod",
   "queries": [
     {
-      "ref_id": "connections",
+      "refId": "connections",
       "metric": "resources.connections",
       "aggregation": "count",
-      "group_by": ["state", "health_state"]
+      "groupBy": ["state", "health_state"]
     }
   ]
 }
@@ -79,12 +79,12 @@ Responses are returned as labeled time series:
 {
   "series": [
     {
-      "ref_id": "connections",
+      "refId": "connections",
       "metric": "resources.connections",
       "aggregation": "count",
       "labels": {
         "state": "configured",
-        "health_state": "healthy"
+        "healthState": "healthy"
       },
       "points": [
         {"timestamp": "2026-05-25T12:00:00Z", "value": 4}
@@ -116,3 +116,6 @@ Resource metrics are computed from periodic app-metrics resource samples.
 | `resources.rate_limits` | `count` | `mode`, `namespace` |
 
 All metric queries accept the same namespace matcher and label selector fields. Label selectors evaluate against the frozen labels stored with the request event or resource sample, not the current live resource.
+Implicit `apxy/<rt>/-/name` labels therefore preserve the name captured in that
+sample or request snapshot. Renaming a live resource does not rewrite
+historical metrics data.

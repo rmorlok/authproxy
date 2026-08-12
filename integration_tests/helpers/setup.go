@@ -373,7 +373,7 @@ func Setup(t *testing.T, opts SetupOptions) *IntegrationTestEnv {
 			// Use localhost (not 127.0.0.1) so env.PublicURL matches what
 			// Public.GetBaseUrl() returns — the proxy's OAuth `redirect_uri`
 			// is built from GetBaseUrl(), and the SPA's same-origin
-			// return_to_url depends on the browser starting from the same
+			// returnToUrl depends on the browser starting from the same
 			// host name we register at the provider.
 			publicPort := publicListener.Addr().(*net.TCPAddr).Port
 			env.PublicURL = fmt.Sprintf("http://localhost:%d", publicPort)
@@ -485,7 +485,7 @@ func (env *IntegrationTestEnv) DoProxyRequest(t *testing.T, connectionID, target
 	return w
 }
 
-// DoProxyRawRequest performs a streaming /_proxy_raw request through the
+// DoProxyRawRequest performs a streaming /_proxyRaw request through the
 // integration test environment. The upstream URL is carried in the
 // X-AuthProxy-Upstream-URL header per the raw-proxy contract; body and
 // extraHeaders are forwarded as-is to the upstream. forceChunked, when
@@ -502,7 +502,7 @@ func (env *IntegrationTestEnv) DoProxyRawRequest(
 	t.Helper()
 	require.Truef(t, env.ApiGin != nil || env.ServerURL != "", "DoProxyRawRequest requires either in-process gin or a running HTTP server")
 
-	path := "/api/v1/connections/" + connectionID + "/_proxy_raw"
+	path := "/api/v1/connections/" + connectionID + "/_proxyRaw"
 
 	var bodyReader io.Reader
 	if body != nil {
@@ -593,7 +593,7 @@ func (env *IntegrationTestEnv) DoProxyRawStreamingRequest(
 	t.Helper()
 	require.NotEmptyf(t, env.ServerURL, "DoProxyRawStreamingRequest requires StartHTTPServer=true")
 
-	path := "/api/v1/connections/" + connectionID + "/_proxy_raw"
+	path := "/api/v1/connections/" + connectionID + "/_proxyRaw"
 	abs, err := url.Parse(env.ServerURL + path)
 	require.NoError(t, err)
 

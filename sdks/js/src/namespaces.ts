@@ -40,19 +40,19 @@ export interface Namespace {
   path: string;
   name: string;
   state: NamespaceState;
-  key_id?: string;
+  keyId?: string;
   labels?: Record<string, string>;
   annotations?: Record<string, string>;
-  created_at: string;
-  updated_at: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface NamespaceKeyResponse {
-  key_id: string;
+  keyId: string;
 }
 
 export interface SetNamespaceKeyRequest {
-  key_id: string;
+  keyId: string;
 }
 
 export interface CreateNamespaceRequest {
@@ -65,13 +65,14 @@ export interface CreateNamespaceRequest {
  * Parameters used for listing namespaces.
  */
 export interface ListNamespaceParams {
+  name?: string;
   state?: NamespaceState;
   namespace?: string;
-  label_selector?: string;
+  labelSelector?: string;
   cursor?: string;
   limit?: number;
-  order_by?: string;
-  children_of?: string;
+  orderBy?: string;
+  childrenOf?: string;
 }
 
 /**
@@ -159,7 +160,7 @@ export const getNamespaceKey = (path: string) => {
  * Set the key for a namespace
  */
 export const setNamespaceKey = (path: string, keyId: string) => {
-  const request: SetNamespaceKeyRequest = { key_id: keyId };
+  const request: SetNamespaceKeyRequest = { keyId: keyId };
   return client.put<Namespace>(`/api/v1/namespaces/${path}/key`, request);
 };
 

@@ -24,7 +24,7 @@ func newVerifyConnectionTask(connectionId apid.ID) (*asynq.Task, error) {
 }
 
 type verifyConnectionTaskPayload struct {
-	ConnectionId apid.ID `json:"connection_id"`
+	ConnectionId apid.ID `json:"connectionId"`
 }
 
 // verifyConnection runs all probes for a connection and advances the setup flow based on the

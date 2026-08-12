@@ -1,7 +1,7 @@
 {
   "namespace": "root.acme",
-  "key_data": {
-    "num_bytes": 32
+  "keyData": {
+    "numBytes": 32
   },
   "labels": {
     "scope": "tenant"

@@ -402,7 +402,7 @@ func (o *oAuth2Connection) appendSetupPendingToReturnUrl(raw string) string {
 	}
 	q := returnUrl.Query()
 	q.Set("setup", "pending")
-	q.Set("connection_id", string(o.connection.GetId()))
+	q.Set("connectionId", string(o.connection.GetId()))
 	returnUrl.RawQuery = q.Encode()
 	return returnUrl.String()
 }

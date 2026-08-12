@@ -87,8 +87,8 @@ type ListConnectorsRequestQueryParams struct {
 	StateVal      *database.ConnectorDefinitionVersionState `form:"state"`
 	NamespaceVal  *string                                   `form:"namespace"`
 	NameVal       *string                                   `form:"name"`
-	LabelSelector *string                                   `form:"label_selector"`
-	OrderByVal    *string                                   `form:"order_by"`
+	LabelSelector *string                                   `form:"labelSelector"`
+	OrderByVal    *string                                   `form:"orderBy"`
 }
 
 func ConnectorVersionToJson(c connIface.Connector) ConnectorVersionJson {
@@ -114,8 +114,8 @@ type ListConnectorVersionsRequestQueryParams struct {
 	StateVal      *database.ConnectorDefinitionVersionState `form:"state"`
 	NamespaceVal  *string                                   `form:"namespace"`
 	NameVal       *string                                   `form:"name"`
-	LabelSelector *string                                   `form:"label_selector"`
-	OrderByVal    *string                                   `form:"order_by"`
+	LabelSelector *string                                   `form:"labelSelector"`
+	OrderByVal    *string                                   `form:"orderBy"`
 }
 
 // connectorVersionID is the composite identifier used by the version-level
@@ -223,8 +223,8 @@ func (r *ConnectorsRoutes) get(gctx *gin.Context) {
 // @Param			state			query		string	false	"Filter by connector state"
 // @Param			namespace		query		string	false	"Filter by namespace"
 // @Param			name			query		string	false	"Filter by exact resource name"
-// @Param			label_selector	query		string	false	"Filter by label selector"
-// @Param			order_by		query		string	false	"Order by field (e.g., 'created_at:asc')"
+// @Param			labelSelector	query		string	false	"Filter by label selector"
+// @Param			orderBy		query		string	false	"Order by field (e.g., 'created_at:asc')"
 // @Success		200				{object}	OpenAPIListConnectorsResponseJson
 // @Failure		400				{object}	ErrorResponse
 // @Failure		401				{object}	ErrorResponse
@@ -383,8 +383,8 @@ func (r *ConnectorsRoutes) getVersion(gctx *gin.Context) {
 // @Param			state			query		string	false	"Filter by version state"
 // @Param			namespace		query		string	false	"Filter by namespace"
 // @Param			name			query		string	false	"Filter by exact resource name"
-// @Param			label_selector	query		string	false	"Filter by label selector"
-// @Param			order_by		query		string	false	"Order by field (e.g., 'version:desc')"
+// @Param			labelSelector	query		string	false	"Filter by label selector"
+// @Param			orderBy		query		string	false	"Order by field (e.g., 'version:desc')"
 // @Success		200				{object}	OpenAPIListConnectorVersionsResponseJson
 // @Failure		400				{object}	ErrorResponse
 // @Failure		401				{object}	ErrorResponse
@@ -515,7 +515,7 @@ func (r *ConnectorsRoutes) createConnector(gctx *gin.Context) {
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
 	var req CreateConnectorRequestJson
-	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+	if err := bindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
@@ -605,7 +605,7 @@ func (r *ConnectorsRoutes) updateConnector(gctx *gin.Context) {
 	}
 
 	var req UpdateConnectorRequestJson
-	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+	if err := bindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
@@ -779,7 +779,7 @@ func (r *ConnectorsRoutes) createVersion(gctx *gin.Context) {
 	var req CreateConnectorVersionRequestJson
 	// Support a blank post to create a new draft version of the connector
 	if gctx.Request.ContentLength > 0 {
-		if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+		if err := bindJSONBody(gctx, &req); err != nil {
 			apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
@@ -870,7 +870,7 @@ func (r *ConnectorsRoutes) updateVersion(gctx *gin.Context) {
 	version := connectorVersionId.Version
 
 	var req UpdateConnectorRequestJson
-	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+	if err := bindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
@@ -1123,7 +1123,7 @@ func (r *ConnectorsRoutes) deleteVersionLabel(gctx *gin.Context) {
 // @Failure		404		{object}	ErrorResponse
 // @Failure		500		{object}	ErrorResponse
 // @Security		BearerAuth
-// @Router			/connectors/{id}/versions/{version}/_force_state [put]
+// @Router			/connectors/{id}/versions/{version}/_forceState [put]
 func (r *ConnectorsRoutes) forceVersionState(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
@@ -1138,7 +1138,7 @@ func (r *ConnectorsRoutes) forceVersionState(gctx *gin.Context) {
 	version := connectorVersionId.Version
 
 	req := ForceConnectorVersionStateRequestJson{}
-	if err := gctx.BindJSON(&req); err != nil {
+	if err := bindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
@@ -1210,7 +1210,7 @@ func (r *ConnectorsRoutes) parseLifecycleRequest(gctx *gin.Context) (connIface.C
 
 	req := ConnectorLifecycleRequestJson{}
 	if gctx.Request.Body != http.NoBody && gctx.Request.ContentLength != 0 {
-		if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+		if err := bindJSONBody(gctx, &req); err != nil {
 			apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 			val.MarkErrorReturn()
 			return connIface.ConnectorLifecycleOptions{}, false
@@ -1220,7 +1220,7 @@ func (r *ConnectorsRoutes) parseLifecycleRequest(gctx *gin.Context) (connIface.C
 	timeout := defaultConnectorLifecycleTimeout
 	if req.TimeoutSeconds != nil {
 		if *req.TimeoutSeconds <= 0 {
-			apgin.WriteError(gctx, nil, httperr.BadRequest("timeout_seconds must be greater than zero"))
+			apgin.WriteError(gctx, nil, httperr.BadRequest("timeoutSeconds must be greater than zero"))
 			val.MarkErrorReturn()
 			return connIface.ConnectorLifecycleOptions{}, false
 		}
@@ -1275,7 +1275,7 @@ func (r *ConnectorsRoutes) writeLifecycleTaskResponse(
 // @Failure		500		{object}	ErrorResponse
 // @Failure		501		{object}	ErrorResponse
 // @Security		BearerAuth
-// @Router			/connectors/{id}/_disconnect_all [post]
+// @Router			/connectors/{id}/_disconnectAll [post]
 func (r *ConnectorsRoutes) disconnectAll(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
@@ -1580,7 +1580,7 @@ func (r *ConnectorsRoutes) Register(g gin.IRouter) {
 			Build(),
 		r.createVersion,
 	)
-	g.POST("/connectors/:id/_disconnect_all",
+	g.POST("/connectors/:id/_disconnectAll",
 		r.authService.NewRequiredBuilder().
 			ForResource("connectors").
 			ForIdField("id").
@@ -1604,7 +1604,7 @@ func (r *ConnectorsRoutes) Register(g gin.IRouter) {
 			Build(),
 		r.updateVersion,
 	)
-	g.PUT("/connectors/:id/versions/:version/_force_state",
+	g.PUT("/connectors/:id/versions/:version/_forceState",
 		r.authService.NewRequiredBuilder().
 			ForResource("connectors").
 			ForIdField("id").

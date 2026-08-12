@@ -59,14 +59,14 @@ For every case:
   `unhealthy`. The marketplace UI keys reconnect prompts off this column.
 - **Structured refresh-failed event.** Exactly one
   `oauth token refresh failed` record with the expected `category`,
-  `connection_id`, and (where applicable) `provider_status_code` /
+  `connectionId`, and (where applicable) `provider_status_code` /
   `provider_error`. Operators alert on `category=…` rather than parsing
   message strings — silent category renames break dashboards.
 - **Structured health-transition event.** Exactly one
   `connection health state changed` record with
   `previous_health_state=healthy`, `health_state=unhealthy`, and
   `reason=refresh_<category>`. Joining this against the refresh-failed
-  event by `connection_id` is what the operational dashboards do.
+  event by `connectionId` is what the operational dashboards do.
 - **No success event.** Even a single
   `oauth token refresh succeeded` event would corrupt
   success/failure ratios.
