@@ -381,10 +381,10 @@ func (dm *DependencyManager) AutoMigrateDatabase() {
 			}
 
 			if err := workflows.Migrate(
+				ctx,
 				dm.GetConfigRoot(),
 				dm.GetLogBuilder().WithComponent("workflows").Build(),
 				workflows.WithPostgresMigrationDB(dm.GetSQLDB()),
-				workflows.WithMigrationContext(ctx),
 			); err != nil {
 				return fmt.Errorf("failed to migrate workflow database: %w", err)
 			}

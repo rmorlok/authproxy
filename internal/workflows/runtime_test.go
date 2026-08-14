@@ -25,7 +25,7 @@ func TestMigrateSqliteAndRuntimePing(t *testing.T) {
 	}
 	logger := slog.New(slog.DiscardHandler)
 
-	require.NoError(t, Migrate(root, logger))
+	require.NoError(t, Migrate(context.Background(), root, logger))
 
 	db, err := sql.Open("sqlite", "file:"+dbPath)
 	require.NoError(t, err)

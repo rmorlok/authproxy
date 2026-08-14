@@ -163,6 +163,8 @@ func TestRunWithMutexRenewsRedisLeaseBeyondInitialDuration(t *testing.T) {
 		require.Eventually(t, func() bool {
 			return miniredisServer.TTL(key) > 80*time.Second
 		}, time.Second, time.Millisecond)
+		require.Eventually(t, fakeClock.HasWaiters, time.Second, time.Millisecond,
+			"renewal timer was not reset after refreshing the lease")
 	}
 
 	competitor := NewMutex(r, key, MutexOptionLockFor(leaseDuration), MutexOptionNoRetry())

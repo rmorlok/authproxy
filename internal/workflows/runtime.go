@@ -126,7 +126,6 @@ type MigrateOption func(*migrateOptions)
 
 type migrateOptions struct {
 	postgresDB *sql.DB
-	ctx        context.Context
 }
 
 func WithPostgresMigrationDB(db *sql.DB) MigrateOption {
@@ -135,13 +134,7 @@ func WithPostgresMigrationDB(db *sql.DB) MigrateOption {
 	}
 }
 
-func WithMigrationContext(ctx context.Context) MigrateOption {
-	return func(o *migrateOptions) {
-		o.ctx = ctx
-	}
-}
-
-func Migrate(root *sconfig.Root, logger *slog.Logger, opts ...MigrateOption) error {
+func Migrate(ctx context.Context, root *sconfig.Root, logger *slog.Logger, opts ...MigrateOption) error {
 	if root == nil || root.Database == nil {
 		return fmt.Errorf("database configuration is required")
 	}
@@ -149,9 +142,6 @@ func Migrate(root *sconfig.Root, logger *slog.Logger, opts ...MigrateOption) err
 	migrateOpts := &migrateOptions{}
 	for _, opt := range opts {
 		opt(migrateOpts)
-	}
-	if migrateOpts.ctx == nil {
-		migrateOpts.ctx = context.Background()
 	}
 
 	switch cfg := root.Database.InnerVal.(type) {
@@ -161,14 +151,14 @@ func Migrate(root *sconfig.Root, logger *slog.Logger, opts ...MigrateOption) err
 			return fmt.Errorf("open workflow sqlite database: %w", err)
 		}
 		defer db.Close()
-		return migrateDB(migrateOpts.ctx, db, "sqlite", "migrations/sqlite")
+		return migrateDB(ctx, db, "sqlite", "migrations/sqlite")
 	case *sconfig.DatabasePostgres:
 		db := migrateOpts.postgresDB
 		if db == nil {
 			return fmt.Errorf("workflow postgres database handle is required")
 		}
 
-		return migrateDB(migrateOpts.ctx, db, "postgres", "migrations/postgres")
+		return migrateDB(ctx, db, "postgres", "migrations/postgres")
 	default:
 		return fmt.Errorf("workflow database provider %q is not supported", root.Database.GetProvider())
 	}
