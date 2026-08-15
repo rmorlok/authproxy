@@ -23,6 +23,7 @@ kubectl create secret generic authproxy-encryption \
 # 2. Install from the GHCR OCI registry.
 helm install authproxy oci://ghcr.io/rmorlok/charts/authproxy \
   --version <chart-version> \
+  --wait --wait-for-jobs \
   --set database.provider=postgres \
   --set database.host=postgres.example.com \
   --set database.existingSecret=authproxy-db \
@@ -40,14 +41,14 @@ application version (`image.tag`).
 
 ```bash
 # Inspect available versions:
-helm show chart oci://ghcr.io/rmorlok/charts/authproxy --version 0.1.2
+helm show chart oci://ghcr.io/rmorlok/charts/authproxy --version 0.1.3
 
 # Pull a tarball locally:
-helm pull oci://ghcr.io/rmorlok/charts/authproxy --version 0.1.2
+helm pull oci://ghcr.io/rmorlok/charts/authproxy --version 0.1.3
 
 # Install:
 helm install authproxy oci://ghcr.io/rmorlok/charts/authproxy \
-  --version 0.1.2 \
+  --version 0.1.3 \
   -f my-values.yaml
 ```
 
@@ -59,6 +60,7 @@ The chart exposes typed values for the common connectivity blocks. See
 | Section          | Purpose                                                              |
 |------------------|----------------------------------------------------------------------|
 | `image`          | Container image repository, tag, pull policy                         |
+| `migrationJob`   | Explicit per-release schema migration Job controls                    |
 | `services.*`     | Per-service enable toggles (`api`, `adminApi`, `public`, `worker`)   |
 | `autoscaling`    | Optional native autoscaling/v2 HPA for the chart release             |
 | `keda`           | Optional KEDA controller dependency; disabled by default              |
@@ -95,11 +97,32 @@ For disposable environments, set `blobStorage.provider=filesystem`; the chart
 mounts an `emptyDir` at `blobStorage.filesystem.path` by default. Persistent
 deployments should continue to use S3-compatible storage.
 
+### Database migration Job
+
+Every release revision renders a dedicated Job that runs `authproxy migrate
+all` with the same image, ConfigMap, credentials, service account, and key
+mounts as the application Deployment. Install and upgrade with
+`--wait --wait-for-jobs` so a failed migration blocks the release:
+
+```bash
+helm upgrade --install authproxy oci://ghcr.io/rmorlok/charts/authproxy \
+  -f my-values.yaml \
+  --wait --wait-for-jobs
+```
+
+Inspect a failure with `kubectl logs job/<release>-authproxy-migrate-<revision>`.
+The Job does not force dirty versions. Disable `migrationJob.enabled` only when
+an external release process runs the same explicit migration command first.
+
 ## Independent Service Scaling
 
 The chart renders one Deployment for the enabled service set. For production or
 load-test environments that need independent scale curves, install the chart
 multiple times with different `services` toggles:
+
+Choose one release as the migration owner (`migrationJob.enabled=true`) and set
+`migrationJob.enabled=false` on every other role release. Install or upgrade
+the owner first and wait for its Job before updating the remaining roles.
 
 ```bash
 helm upgrade --install authproxy-api oci://ghcr.io/rmorlok/charts/authproxy \

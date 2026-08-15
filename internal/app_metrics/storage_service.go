@@ -144,30 +144,6 @@ func (ss *StorageService) Ping(ctx context.Context) bool {
 	return true
 }
 
-// Migrate runs any necessary schema migrations for the storage backend.
-func (ss *StorageService) Migrate(ctx context.Context) error {
-	ss.logger.Info("running app metrics migrations")
-	defer ss.logger.Info("app metrics migrations complete")
-
-	if m, ok := ss.store.(migratable); ok {
-		ss.logger.Info("running store migrations")
-		if err := m.Migrate(ctx); err != nil {
-			return err
-		}
-	}
-
-	if util.SameInstance(ss.store, ss.fullStore) {
-		return nil
-	}
-
-	if m, ok := ss.fullStore.(migratable); ok {
-		ss.logger.Info("running full store migrations")
-		return m.Migrate(ctx)
-	}
-
-	return nil
-}
-
 // NewStorageService that will store app metrics records and full request/response details.
 // dbOpts are forwarded to the underlying DB constructors — pass
 // sqlh.WithTelemetry(...) to instrument the request-events database tier.

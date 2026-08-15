@@ -83,7 +83,7 @@ template syntax.
 */}}
 
 {{/* --- database --- */}}
-{{- $db := dict "provider" .Values.database.provider "autoMigrate" .Values.database.autoMigrate -}}
+{{- $db := dict "provider" .Values.database.provider -}}
 {{- if eq .Values.database.provider "postgres" -}}
 {{-   $_ := set $db "host" (tpl .Values.database.host $) -}}
 {{-   $_ := set $db "port" .Values.database.port -}}
@@ -119,7 +119,7 @@ template syntax.
 {{- end -}}
 
 {{/* --- connectors block (required by validator; empty list is acceptable) --- */}}
-{{- $connectors := dict "autoMigrate" .Values.connectors.autoMigrate "loadFromList" .Values.connectors.loadFromList -}}
+{{- $connectors := dict "loadFromList" .Values.connectors.loadFromList -}}
 {{- $_ := set $cfg "connectors" $connectors -}}
 
 {{/* --- appMetrics (server unconditionally wires up the metrics store) --- */}}
@@ -152,7 +152,6 @@ template syntax.
 {{- end -}}
 
 {{- $appMetrics := dict
-      "autoMigrate" .Values.appMetrics.autoMigrate
       "database" $metricsDb
       "requestEvents" (dict
         "fullRequestRecording" .Values.appMetrics.fullRequestRecording) -}}

@@ -51,7 +51,6 @@ tasks:
 
 database:
   provider: sqlite
-  autoMigrate: true
   path: $sqlite_path
 
 redis:
@@ -75,11 +74,9 @@ systemAuth:
     path: $REPO_ROOT/dev_config/keys/global_aes.key
 
 connectors:
-  autoMigrate: false
   loadFromList: []
 
 appMetrics:
-  autoMigrate: false
   database:
     provider: sqlite
     path: $sqlite_path

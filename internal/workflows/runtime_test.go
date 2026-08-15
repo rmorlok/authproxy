@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/migration"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/stretchr/testify/require"
@@ -25,7 +27,17 @@ func TestMigrateSqliteAndRuntimePing(t *testing.T) {
 	}
 	logger := slog.New(slog.DiscardHandler)
 
-	require.NoError(t, Migrate(context.Background(), root, logger))
+	require.NoError(t, RunMigrations(
+		context.Background(),
+		root,
+		logger,
+		migration.DirectionUp,
+		nil,
+	))
+	status := MigrationStatus(context.Background(), root)
+	require.Equal(t, migration.StateCurrent, status.State)
+	require.Equal(t, uint(3), status.AvailableVersion)
+	require.Equal(t, uint(3), *status.CurrentVersion)
 
 	db, err := sql.Open("sqlite", "file:"+dbPath)
 	require.NoError(t, err)
@@ -70,4 +82,22 @@ func TestNewRuntimePostgresBorrowedDBIsNotClosed(t *testing.T) {
 
 	require.NoError(t, runtime.Close())
 	require.NoError(t, db.Ping())
+}
+
+func TestMigrationStatusCurrentForConfiguredProvider(t *testing.T) {
+	cfg, _, rawDB := database.MustApplyBlankTestDbConfigRaw(t, nil)
+	root := cfg.GetRoot()
+	require.NoError(t, RunMigrations(
+		context.Background(),
+		root,
+		slog.New(slog.DiscardHandler),
+		migration.DirectionUp,
+		nil,
+		WithPostgresMigrationDB(rawDB),
+	))
+
+	status := MigrationStatus(context.Background(), root)
+	require.NoError(t, status.Err)
+	require.True(t, status.Compatible())
+	require.Equal(t, status.AvailableVersion, *status.CurrentVersion)
 }

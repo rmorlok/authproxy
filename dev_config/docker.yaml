@@ -61,7 +61,6 @@ errorPages:
 
 database:
   provider: postgres
-  autoMigrate: true
   host: postgres
   port: 5432
   user: postgres
@@ -79,7 +78,6 @@ appMetrics:
     fullRequestRecording: always
   database:
     provider: clickhouse
-    autoMigrate: true
     user: authproxy
     password: authproxy
     addresses:
@@ -105,7 +103,6 @@ oauth:
   roundTripTtl: 60m
 
 connectors:
-  autoMigrate: true
   autoMigrationLockDuration: 30s
   loadFromList:
   #

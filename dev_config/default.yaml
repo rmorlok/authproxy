@@ -72,7 +72,6 @@ errorPages:
 
 database:
   provider: postgres
-  autoMigrate: true
   host: localhost
   port: 5432
   user: postgres
@@ -91,11 +90,9 @@ appMetrics:
   # fullRequestRecording: never
   #  database:
   #    provider: sqlite
-  #    autoMigrate: true
   #    path: ./dev_config/app_metrics.db
   database:
     provider: clickhouse
-    autoMigrate: true
     user: authproxy
     password: authproxy
     addresses:
@@ -174,7 +171,6 @@ telemetry:
     injectOutboundDefault: false
 
 connectors:
-  autoMigrate: true
   autoMigrationLockDuration: 30s
   loadFromList:
   #

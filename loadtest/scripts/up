@@ -127,6 +127,7 @@ install_release() {
   helm upgrade --install "$release" "$chart" \
     --namespace "$namespace" \
     --wait \
+    --wait-for-jobs \
     "--timeout=$helm_timeout" \
     -f "$common_values" \
     -f "$values_file" \

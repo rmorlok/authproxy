@@ -22,6 +22,7 @@ import (
 	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
+	"github.com/rmorlok/authproxy/internal/migration"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
@@ -220,10 +221,12 @@ func Setup(t *testing.T, opts SetupOptions) *IntegrationTestEnv {
 	// MustApplyBlankTestDbConfig reads connection info from POSTGRES_TEST_* env vars
 	// and updates cfg.GetRoot().Database to point at the new isolated database.
 	cfg, _, rawDb := database.MustApplyBlankTestDbConfigRaw(t, cfg)
-	require.NoError(t, workflows.Migrate(
+	require.NoError(t, workflows.RunMigrations(
 		context.Background(),
 		cfg.GetRoot(),
 		cfg.GetRoot().GetRootLogger(),
+		migration.DirectionUp,
+		nil,
 		workflows.WithPostgresMigrationDB(rawDb),
 	))
 
@@ -286,22 +289,17 @@ func Setup(t *testing.T, opts SetupOptions) *IntegrationTestEnv {
 	serviceId := string(opts.Service)
 	dm := service.NewDependencyManager(serviceId, cfg)
 
-	dm.AutoMigrateDatabase()
+	require.NoError(t, dm.MigrateSchemas(context.Background(), migration.TargetAll, migration.DirectionUp, nil))
 
 	// Each test gets an isolated database via pgtestdb but shares the same Redis.
 	// Passing nil for Redis bypasses shared locks/sentinels so this test's
 	// database is always seeded with a current DEK and then synced, regardless of
 	// what other packages are doing concurrently.
 	//
-	// This must happen before AutoMigrateAppMetricsService because that call
-	// can trigger GetEncryptService(), which starts the syncLoop goroutine that
-	// immediately tries to read the current global DEK from the database.
 	require.NoError(t, encrypt.GenerateDataEncryptionKeysToDatabase(context.Background(), cfg, dm.GetDatabase(), dm.GetLogger(), nil))
 	require.NoError(t, encrypt.SyncKeysToDatabase(context.Background(), cfg, dm.GetDatabase(), dm.GetLogger(), nil))
 
-	dm.AutoMigrateAppMetricsService()
-	dm.AutoMigrateCore()
-	dm.AutoMigratePredefinedActors()
+	require.NoError(t, dm.ReconcileDevelopmentData(context.Background()))
 
 	// Get the appropriate server
 	var httpServer *http.Server

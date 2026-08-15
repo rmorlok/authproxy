@@ -26,7 +26,6 @@ type DatabaseClickhouse struct {
 	User                      *StringValue     `json:"user,omitempty" yaml:"user,omitempty"`
 	Password                  *StringValue     `json:"password,omitempty" yaml:"password,omitempty"`
 	Protocol                  *string          `json:"protocol,omitempty" yaml:"protocol,omitempty"`
-	AutoMigrate               bool             `json:"autoMigrate,omitempty" yaml:"autoMigrate,omitempty"`
 	AutoMigrationLockDuration *HumanDuration   `json:"autoMigrationLockDuration,omitempty" yaml:"autoMigrationLockDuration,omitempty"`
 }
 
@@ -44,10 +43,6 @@ func (d *DatabaseClickhouse) GetProtocol() clickhouse.Protocol {
 		return clickhouse.Native
 	}
 	return clickhouse.HTTP
-}
-
-func (d *DatabaseClickhouse) GetAutoMigrate() bool {
-	return d.AutoMigrate
 }
 
 func (d *DatabaseClickhouse) GetAutoMigrationLockDuration() time.Duration {

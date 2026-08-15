@@ -287,6 +287,8 @@ jobs:
           echo "manifest=${manifest}" >> "$GITHUB_OUTPUT"
 
           grep -Fq "image: ghcr.io/rmorlok/authproxy:${IMAGE_TAG}" "${manifest}"
+          grep -Fq "name: ${RELEASE_NAME}-authproxy-migrate" "${manifest}"
+          grep -Fq -- "- migrate" "${manifest}"
           grep -Fq "image: ghcr.io/rmorlok/authproxy-demo-shell:${IMAGE_TAG}" "${manifest}"
           grep -Fq "image: ghcr.io/rmorlok/authproxy-demo-grafana:${IMAGE_TAG}" "${manifest}"
           grep -Fq "image: docker.io/grafana/otel-lgtm:0.8.6" "${manifest}"
@@ -306,17 +308,23 @@ jobs:
           grep -Fq "uid: tempo" "${manifest}"
           grep -Fq "uid: loki" "${manifest}"
 
-      - name: Apply Kustomize manifest
+      - name: Apply migration prerequisites
         run: |
           set -euo pipefail
           manifest="${{ steps.render.outputs.manifest }}"
 
           kubectl create namespace "${RELEASE_NS}" --dry-run=client -o yaml \
             | kubectl apply -f -
-          kubectl -n "${RELEASE_NS}" apply -f "${manifest}"
+          kubectl -n "${RELEASE_NS}" delete job "${RELEASE_NAME}-authproxy-migrate" \
+            --ignore-not-found --wait=true
+
+          # Keep the new AuthProxy workload and migration Job out of this
+          # apply. Existing AuthProxy pods continue running until the new
+          # schema has migrated successfully.
+          kubectl -n "${RELEASE_NS}" apply -f "${manifest}" \
+            -l 'app.kubernetes.io/component notin (authproxy,migration)'
 
           deployments=(
-            "${RELEASE_NAME}-authproxy"
             "${RELEASE_NAME}-demo-shell"
             "${RELEASE_NAME}-grafana"
             "${RELEASE_NAME}-otel-lgtm"
@@ -328,7 +336,7 @@ jobs:
               -p "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"demo.authproxy.net/image-revision\":\"${{ steps.tag.outputs.sha }}\"}}}}}"
           done
 
-      - name: Wait for workload rollouts
+      - name: Wait for migration prerequisites
         timeout-minutes: 10
         run: |
           set -euo pipefail
@@ -337,6 +345,54 @@ jobs:
             "${RELEASE_NAME}-redis-master" \
             "${RELEASE_NAME}-minio" \
             "${RELEASE_NAME}-otel-lgtm" \
+          ; do
+            echo "Waiting for $d..."
+            kubectl -n "${RELEASE_NS}" rollout status "deployment/$d" --timeout=10m
+          done
+
+      - name: Wait for database migration
+        timeout-minutes: 16
+        run: |
+          set -euo pipefail
+          manifest="${{ steps.render.outputs.manifest }}"
+          job="${RELEASE_NAME}-authproxy-migrate"
+
+          kubectl -n "${RELEASE_NS}" apply -f "${manifest}" \
+            -l 'app.kubernetes.io/component=migration'
+          kubectl -n "${RELEASE_NS}" patch "job/${job}" --type merge -p '{"spec":{"suspend":false}}'
+          deadline=$((SECONDS + 900))
+          while (( SECONDS < deadline )); do
+            conditions="$(kubectl -n "${RELEASE_NS}" get "job/${job}" -o jsonpath='{range .status.conditions[*]}{.type}={.status}{"\n"}{end}')"
+            if grep -Fq 'Complete=True' <<<"${conditions}"; then
+              kubectl -n "${RELEASE_NS}" logs "job/${job}"
+              exit 0
+            fi
+            if grep -Fq 'Failed=True' <<<"${conditions}"; then
+              echo "Migration Job failed" >&2
+              break
+            fi
+            sleep 5
+          done
+          kubectl -n "${RELEASE_NS}" logs "job/${job}" --all-containers=true || true
+          kubectl -n "${RELEASE_NS}" describe "job/${job}" || true
+          exit 1
+
+      - name: Apply AuthProxy workload
+        run: |
+          set -euo pipefail
+          manifest="${{ steps.render.outputs.manifest }}"
+
+          kubectl -n "${RELEASE_NS}" apply -f "${manifest}" \
+            -l 'app.kubernetes.io/component=authproxy'
+          kubectl -n "${RELEASE_NS}" patch "deployment/${RELEASE_NAME}-authproxy" \
+            --type merge \
+            -p "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"demo.authproxy.net/image-revision\":\"${{ steps.tag.outputs.sha }}\"}}}}}"
+
+      - name: Wait for workload rollouts
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          for d in \
             "${RELEASE_NAME}-authproxy" \
             "${RELEASE_NAME}-demo-shell" \
             "${RELEASE_NAME}-go-oauth2-server" \

@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/rmorlok/authproxy/internal/database"
 	encryptpkg "github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/loadtest/seeder"
+	"github.com/rmorlok/authproxy/internal/migration"
+	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/service"
 	"github.com/spf13/cobra"
 )
@@ -48,12 +51,21 @@ func cmdSeed() *cobra.Command {
 
 			if migrate {
 				if distributedMigrationLocks {
-					dm.AutoMigrateDatabase()
-					dm.AutoMigrateGenerateDataEncryptionKeys()
-					dm.AutoMigrateSyncKeysToDatabase()
+					if err := dm.RunProductionMigration(ctx, migration.TargetMainDatabase, migration.DirectionUp, nil); err != nil {
+						return err
+					}
 				} else {
-					if err := dm.GetDatabase().Migrate(ctx); err != nil {
+					if err := database.RunMigrations(
+						ctx,
+						dm.GetConfigRoot().Database,
+						dm.GetLogger(),
+						migration.DirectionUp,
+						nil,
+					); err != nil {
 						return fmt.Errorf("failed to migrate database: %w", err)
+					}
+					if err := dm.GetDatabase().EnsureNamespaceByPath(ctx, namespace.Root); err != nil {
+						return fmt.Errorf("failed to ensure root namespace: %w", err)
 					}
 					if err := encryptpkg.GenerateDataEncryptionKeysToDatabase(ctx, cfg, dm.GetDatabase(), dm.GetLogger(), nil); err != nil {
 						return fmt.Errorf("failed to generate data encryption keys: %w", err)

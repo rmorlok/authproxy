@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/rmorlok/authproxy/internal/migration"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/stretchr/testify/require"
 )
@@ -24,8 +25,13 @@ func TestSQLMigrateUsesAppMetricsSchemaMigrationsTable(t *testing.T) {
 	`)
 	require.NoError(t, err)
 
-	store, _, _ := buildSqlStorePairNoMigrate(t, cfg)
-	require.NoError(t, store.(*sqlRecordStore).Migrate(context.Background()))
+	require.NoError(t, RunMigrations(
+		context.Background(),
+		cfg,
+		newTestHarnessLogger(),
+		migration.DirectionUp,
+		nil,
+	))
 
 	var mainVersion int
 	require.NoError(t, db.QueryRow("SELECT version FROM schema_migrations").Scan(&mainVersion))
@@ -34,4 +40,27 @@ func TestSQLMigrateUsesAppMetricsSchemaMigrationsTable(t *testing.T) {
 	var appMetricsVersion int
 	require.NoError(t, db.QueryRow("SELECT version FROM app_metrics_schema_migrations").Scan(&appMetricsVersion))
 	require.Greater(t, appMetricsVersion, 0)
+
+	status := MigrationStatus(context.Background(), cfg)
+	require.Equal(t, migration.StateCurrent, status.State)
+	require.Equal(t, uint(5), status.AvailableVersion)
+	require.Equal(t, uint(5), *status.CurrentVersion)
+}
+
+func TestMigrationStatusCurrentForConfiguredProvider(t *testing.T) {
+	store, _, _ := MustNewBlankRequestEventsStore(t)
+	var cfg *sconfig.Database
+	switch concrete := store.(type) {
+	case *sqlRecordStore:
+		cfg = concrete.cfg
+	case *clickhouseRecordStore:
+		cfg = &sconfig.Database{InnerVal: concrete.cfg}
+	default:
+		t.Fatalf("unexpected record store type %T", store)
+	}
+
+	status := MigrationStatus(context.Background(), cfg)
+	require.NoError(t, status.Err)
+	require.True(t, status.Compatible())
+	require.Equal(t, status.AvailableVersion, *status.CurrentVersion)
 }

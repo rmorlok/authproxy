@@ -47,7 +47,6 @@ type IActorDataExtended interface {
 //go:generate mockgen -source=./interface.go -destination=./mock/db.go -package=mock
 type DB interface {
 	SetCursorEncryptor(e pagination.CursorEncryptor)
-	Migrate(ctx context.Context) error
 	Ping(ctx context.Context) bool
 	SearchResources(ctx context.Context, params SearchResourcesParams) (SearchResourcesResult, error)
 

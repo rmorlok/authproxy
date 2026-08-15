@@ -16,10 +16,6 @@ const (
 
 // AppMetrics are the settings for application metrics storage and capture.
 type AppMetrics struct {
-	// AutoMigrate controls if the migration to build the indexes for app metrics happens automatically on startup.
-	// If this value is not specified in the config, it defaults to true.
-	AutoMigrate *bool `json:"autoMigrate,omitempty" yaml:"autoMigrate,omitempty"`
-
 	// Database is the database provider for app metrics. This can be the same database as the main database but would
 	// typically be a data warehouse in production.
 	Database *Database `json:"database" yaml:"database"`
@@ -78,14 +74,6 @@ func (d *AppMetrics) Validate(vc *common.ValidationContext) error {
 	}
 
 	return result.ErrorOrNil()
-}
-
-func (d *AppMetrics) GetAutoMigrate() bool {
-	if d == nil || d.AutoMigrate == nil {
-		return true
-	}
-
-	return *d.AutoMigrate
 }
 
 func (d *AppMetrics) GetResourceSnapshotInterval() time.Duration {

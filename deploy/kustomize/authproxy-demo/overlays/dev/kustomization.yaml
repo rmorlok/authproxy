@@ -23,5 +23,6 @@ images:
     newTag: main
 
 patches:
+  - path: authproxy-development.yaml
   - path: authproxy-secrets.yaml
   - path: demo-shell-env.yaml

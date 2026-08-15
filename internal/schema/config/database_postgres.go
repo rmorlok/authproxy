@@ -27,7 +27,6 @@ type DatabasePostgres struct {
 	MaxIdleConns              *IntegerValue     `json:"maxIdleConns,omitempty" yaml:"maxIdleConns,omitempty"`
 	ConnMaxLifetime           *HumanDuration    `json:"connMaxLifetime,omitempty" yaml:"connMaxLifetime,omitempty"`
 	ConnMaxIdleTime           *HumanDuration    `json:"connMaxIdleTime,omitempty" yaml:"connMaxIdleTime,omitempty"`
-	AutoMigrate               bool              `json:"autoMigrate,omitempty" yaml:"autoMigrate,omitempty"`
 	AutoMigrationLockDuration *HumanDuration    `json:"autoMigrationLockDuration,omitempty" yaml:"autoMigrationLockDuration,omitempty"`
 	SoftDeleteRetention       *HumanDuration    `json:"softDeleteRetention,omitempty" yaml:"softDeleteRetention,omitempty"`
 }
@@ -38,10 +37,6 @@ func (d *DatabasePostgres) GetProvider() DatabaseProvider {
 
 func (d *DatabasePostgres) GetDriver() string {
 	return "postgres"
-}
-
-func (d *DatabasePostgres) GetAutoMigrate() bool {
-	return d.AutoMigrate
 }
 
 func (d *DatabasePostgres) GetAutoMigrationLockDuration() time.Duration {

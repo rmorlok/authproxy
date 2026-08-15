@@ -11,7 +11,6 @@ import (
 type DatabaseSqlite struct {
 	Provider                  DatabaseProvider `json:"provider" yaml:"provider"`
 	Path                      string           `json:"path" yaml:"path"`
-	AutoMigrate               bool             `json:"autoMigrate,omitempty" yaml:"autoMigrate,omitempty"`
 	AutoMigrationLockDuration *HumanDuration   `json:"autoMigrationLockDuration,omitempty" yaml:"autoMigrationLockDuration,omitempty"`
 	SoftDeleteRetention       *HumanDuration   `json:"softDeleteRetention,omitempty" yaml:"softDeleteRetention,omitempty"`
 }
@@ -22,10 +21,6 @@ func (d *DatabaseSqlite) GetProvider() DatabaseProvider {
 
 func (d *DatabaseSqlite) GetDriver() string {
 	return "sqlite3"
-}
-
-func (d *DatabaseSqlite) GetAutoMigrate() bool {
-	return d.AutoMigrate
 }
 
 func (d *DatabaseSqlite) GetAutoMigrationLockDuration() time.Duration {

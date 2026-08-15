@@ -114,6 +114,7 @@ services:
 
   server:
     build: .
+    command: ["serve", "--auto-migrate", "--config=/app/dev_config/docker.yaml", "all"]
     ports:
       - "8080:8080"
       - "8081:8081"

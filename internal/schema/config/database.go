@@ -18,7 +18,6 @@ const (
 // DatabaseImpl is the interface implemented by concrete database configurations.
 type DatabaseImpl interface {
 	GetProvider() DatabaseProvider
-	GetAutoMigrate() bool
 	GetAutoMigrationLockDuration() time.Duration
 	GetSoftDeleteRetention() *time.Duration
 	GetUri() string
@@ -38,13 +37,6 @@ func (d *Database) GetProvider() DatabaseProvider {
 		return ""
 	}
 	return d.InnerVal.GetProvider()
-}
-
-func (d *Database) GetAutoMigrate() bool {
-	if d == nil || d.InnerVal == nil {
-		return false
-	}
-	return d.InnerVal.GetAutoMigrate()
 }
 
 func (d *Database) GetAutoMigrationLockDuration() time.Duration {

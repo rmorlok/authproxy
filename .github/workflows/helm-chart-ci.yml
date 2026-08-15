@@ -86,7 +86,7 @@ jobs:
           keda_manifest="$(mktemp)"
 
           helm template authproxy deploy/charts/authproxy \
-            -f deploy/charts/authproxy/ci/sqlite-redis-values.yaml \
+            -f deploy/charts/authproxy/ci/postgres-redis-values.yaml \
             >"${disabled_manifest}"
           if grep -q "kind: HorizontalPodAutoscaler" "${disabled_manifest}"; then
             echo "HPA rendered even though autoscaling.enabled is false" >&2
@@ -96,9 +96,16 @@ jobs:
             echo "KEDA rendered even though keda.enabled is false" >&2
             exit 1
           fi
+          grep -q "name: authproxy-migrate-1" "${disabled_manifest}"
+          grep -q -- "- migrate" "${disabled_manifest}"
+          grep -q -- "- all" "${disabled_manifest}"
+          if grep -q "autoMigrate" "${disabled_manifest}"; then
+            echo "Removed autoMigrate configuration rendered by Helm" >&2
+            exit 1
+          fi
 
           helm template authproxy deploy/charts/authproxy \
-            -f deploy/charts/authproxy/ci/sqlite-redis-values.yaml \
+            -f deploy/charts/authproxy/ci/postgres-redis-values.yaml \
             --set keda.enabled=true \
             >"${keda_controller_manifest}"
           grep -q "kind: CustomResourceDefinition" "${keda_controller_manifest}"
@@ -107,7 +114,7 @@ jobs:
           grep -q "name: keda-operator" "${keda_controller_manifest}"
 
           helm template authproxy deploy/charts/authproxy \
-            -f deploy/charts/authproxy/ci/sqlite-redis-values.yaml \
+            -f deploy/charts/authproxy/ci/postgres-redis-values.yaml \
             --set keda.enabled=false \
             --set autoscaling.enabled=true \
             --set autoscaling.minReplicas=2 \
@@ -117,7 +124,7 @@ jobs:
           grep -q "kind: HorizontalPodAutoscaler" "${native_hpa_manifest}"
 
           helm template authproxy deploy/charts/authproxy \
-            -f deploy/charts/authproxy/ci/sqlite-redis-values.yaml \
+            -f deploy/charts/authproxy/ci/postgres-redis-values.yaml \
             -f deploy/charts/authproxy/ci/autoscaling-render.yaml \
             >"${keda_manifest}"
           grep -q "apiVersion: keda.sh/v1alpha1" "${keda_manifest}"
@@ -156,10 +163,17 @@ jobs:
           grep -q "host: demo-postgresql" "${demo_manifest}"
           grep -q "address: demo-redis-master:6379" "${demo_manifest}"
           grep -q "secretName: demo-jwt" "${demo_manifest}"
+          grep -q "name: demo-authproxy-migrate" "${demo_manifest}"
+          grep -q "suspend: true" "${demo_manifest}"
 
           grep -q "name: dev-authproxy" "${dev_manifest}"
           grep -q "provider: miniredis" "${dev_manifest}"
           grep -q "provider: filesystem" "${dev_manifest}"
+          grep -q -- "- --auto-migrate" "${dev_manifest}"
+          if grep -q "authproxy-migrate" "${dev_manifest}"; then
+            echo "Kustomize dev render included a cross-pod SQLite migration Job" >&2
+            exit 1
+          fi
 
           if grep -Eq "name: dev-(postgresql|redis-master|minio)$" "${dev_manifest}"; then
             echo "Kustomize dev render leaked backing service workloads" >&2
@@ -241,11 +255,11 @@ jobs:
         if: steps.changed.outputs.found == 'true'
         run: kubectl create namespace authproxy-ct
 
-      - name: Deploy in-cluster Redis sidecar
+      - name: Deploy in-cluster database dependencies
         if: steps.changed.outputs.found == 'true'
         run: |
           # Deployed into the same namespace as `ct install` so the chart's
-          # `redis:6379` short-name resolves via in-namespace DNS.
+          # short service names resolve via in-namespace DNS.
           kubectl apply -n authproxy-ct -f - <<'EOF'
           apiVersion: apps/v1
           kind: Deployment
@@ -277,8 +291,43 @@ jobs:
               - port: 6379
                 targetPort: redis
                 name: redis
+          ---
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: postgres
+            labels: { app: postgres }
+          spec:
+            replicas: 1
+            selector: { matchLabels: { app: postgres } }
+            template:
+              metadata: { labels: { app: postgres } }
+              spec:
+                containers:
+                  - name: postgres
+                    image: postgres:16-alpine
+                    env:
+                      - { name: POSTGRES_DB, value: authproxy }
+                      - { name: POSTGRES_USER, value: authproxy }
+                      - { name: POSTGRES_PASSWORD, value: authproxy }
+                    ports: [{ name: postgres, containerPort: 5432 }]
+                    readinessProbe:
+                      exec: { command: ["pg_isready", "-U", "authproxy", "-d", "authproxy"] }
+                      periodSeconds: 2
+          ---
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: postgres
+          spec:
+            selector: { app: postgres }
+            ports:
+              - port: 5432
+                targetPort: postgres
+                name: postgres
           EOF
           kubectl -n authproxy-ct rollout status deployment/redis --timeout=60s
+          kubectl -n authproxy-ct rollout status deployment/postgres --timeout=60s
 
       - name: Generate crypto material + apply as K8s Secrets
         if: steps.changed.outputs.found == 'true'
@@ -304,6 +353,8 @@ jobs:
             --from-file=system.pub="$workdir/system.pub"
           kubectl -n authproxy-ct create secret generic authproxy-encryption \
             --from-file=global_aes.key="$workdir/global_aes.key"
+          kubectl -n authproxy-ct create secret generic authproxy-db \
+            --from-literal=AUTHPROXY_DB_PASSWORD=authproxy
           # Actor keypair files mount as <actors.mountPath>/<key>; key names
           # carry no slashes (K8s Secret data keys can't), so files like
           # `ci` and `ci.pub` are how the actors loader reads pairs.
@@ -314,9 +365,11 @@ jobs:
       - name: ct install
         if: steps.changed.outputs.found == 'true'
         # chart-testing auto-installs each chart once per
-        # <chart>/ci/*-values.yaml file. AuthProxy's sqlite/redis CI
+        # <chart>/ci/*-values.yaml file. AuthProxy's Postgres/Redis CI
         # values point at the local image loaded above and provide the
-        # minimum config needed for the runtime validator.
+        # minimum config needed for the runtime validator. Keep install-only
+        # flags out of helm-extra-args because ct also forwards these arguments
+        # to helm test and helm uninstall.
         run: |
           ct install \
             --config .github/ct.yaml \

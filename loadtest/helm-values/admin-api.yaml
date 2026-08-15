@@ -1,17 +1,11 @@
 replicaCount: 1
 
+migrationJob:
+  enabled: true
+
 services:
   adminApi:
     enabled: true
-
-database:
-  autoMigrate: true
-
-connectors:
-  autoMigrate: true
-
-appMetrics:
-  autoMigrate: true
 
 resources:
   requests:

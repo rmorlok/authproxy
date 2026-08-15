@@ -31,7 +31,6 @@ immutable `id`:
 
 ```yaml
 connectors:
-  autoMigrate: true
   loadFromList:
     - name: google-drive
       namespace: root.integrations
@@ -45,7 +44,8 @@ connectors:
         type: no-auth
 ```
 
-At startup, AuthProxy reconciles this entry to the live connector whose exact
+With the development-only `serve --auto-migrate` option, AuthProxy reconciles
+this entry to the live connector whose exact
 name is `google-drive` in `root.integrations`. Labels are ordinary selectable
 metadata and do not participate in identity. Multiple configured versions use
 the same name and namespace.
