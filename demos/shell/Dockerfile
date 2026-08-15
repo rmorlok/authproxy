@@ -24,6 +24,7 @@ COPY package.json yarn.lock .yarnrc.yml ./
 # to succeed — copy them all even though we only build one here.
 COPY blog/package.json blog/package.json
 COPY docs/package.json docs/package.json
+COPY docs/screenshots docs/screenshots
 COPY ui ui
 COPY sdks sdks
 COPY demos demos
