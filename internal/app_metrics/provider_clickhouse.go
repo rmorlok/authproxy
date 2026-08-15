@@ -13,7 +13,6 @@ import (
 	sq "github.com/Masterminds/squirrel"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/httpf"
-	"github.com/rmorlok/authproxy/internal/migration"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/sqlh"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -121,16 +120,6 @@ func (s *clickhouseRecordStore) StoreRecords(ctx context.Context, records []*Log
 
 func (s *clickhouseRecordStore) StoreRecord(ctx context.Context, record *LogRecord) error {
 	return s.StoreRecords(ctx, []*LogRecord{record})
-}
-
-func (s *clickhouseRecordStore) Migrate(ctx context.Context) (resultErr error) {
-	return RunMigrations(
-		ctx,
-		&config.Database{InnerVal: s.cfg},
-		s.logger,
-		migration.DirectionUp,
-		nil,
-	)
 }
 
 func (s *clickhouseRecordStore) Ping(ctx context.Context) bool {

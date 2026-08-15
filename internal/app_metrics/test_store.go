@@ -17,6 +17,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/peterldowns/pgtestdb"
 	"github.com/peterldowns/pgtestdb/migrators/golangmigrator"
+	"github.com/rmorlok/authproxy/internal/migration"
 	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util"
@@ -238,7 +239,7 @@ func mustNewBlankClickhouseRequestEventsStore(t testing.TB) (RecordStore, Record
 	logger := newTestHarnessLogger()
 	store := NewClickhouseRecordStore(cfg, logger).(*clickhouseRecordStore)
 	t.Cleanup(func() { _ = store.db.Close() })
-	if err := store.Migrate(context.Background()); err != nil {
+	if err := RunMigrations(context.Background(), cfg, logger, migration.DirectionUp, nil); err != nil {
 		t.Fatalf("failed to migrate clickhouse app_metrics test database: %v", err)
 	}
 
@@ -255,7 +256,7 @@ func mustBuildSqlStorePair(t testing.TB, cfg *sconfig.Database) (RecordStore, Re
 	t.Helper()
 
 	store, retriever, rawDb := buildSqlStorePairNoMigrate(t, cfg)
-	if err := store.(*sqlRecordStore).Migrate(context.Background()); err != nil {
+	if err := RunMigrations(context.Background(), cfg, newTestHarnessLogger(), migration.DirectionUp, nil); err != nil {
 		t.Fatalf("failed to migrate app_metrics test database: %v", err)
 	}
 	return store, retriever, rawDb

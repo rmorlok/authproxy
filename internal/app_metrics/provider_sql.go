@@ -15,7 +15,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"
-	"github.com/rmorlok/authproxy/internal/migration"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/sqlh"
 	"github.com/rmorlok/authproxy/internal/util"
@@ -165,10 +164,6 @@ func (s *sqlRecordStore) StoreRecords(ctx context.Context, records []*LogRecord)
 	}
 
 	return nil
-}
-
-func (s *sqlRecordStore) Migrate(ctx context.Context) (resultErr error) {
-	return RunMigrations(ctx, s.cfg, s.logger, migration.DirectionUp, nil)
 }
 
 func (s *sqlRecordStore) Ping(ctx context.Context) bool {

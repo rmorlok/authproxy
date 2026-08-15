@@ -46,6 +46,9 @@ func MigrationStatus(ctx context.Context, cfg *config.Database) migration.Status
 	)
 }
 
+// RunMigrations runs any necessary schema migrations for the app metrics
+// database. This will run on clickhouse, postgres, or sqlite depending on
+// the provider in the configuration.
 func RunMigrations(
 	ctx context.Context,
 	cfg *config.Database,

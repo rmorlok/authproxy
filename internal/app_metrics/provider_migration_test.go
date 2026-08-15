@@ -25,8 +25,13 @@ func TestSQLMigrateUsesAppMetricsSchemaMigrationsTable(t *testing.T) {
 	`)
 	require.NoError(t, err)
 
-	store, _, _ := buildSqlStorePairNoMigrate(t, cfg)
-	require.NoError(t, store.(*sqlRecordStore).Migrate(context.Background()))
+	require.NoError(t, RunMigrations(
+		context.Background(),
+		cfg,
+		newTestHarnessLogger(),
+		migration.DirectionUp,
+		nil,
+	))
 
 	var mainVersion int
 	require.NoError(t, db.QueryRow("SELECT version FROM schema_migrations").Scan(&mainVersion))
