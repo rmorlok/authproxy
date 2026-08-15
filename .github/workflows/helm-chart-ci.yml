@@ -365,12 +365,14 @@ jobs:
       - name: ct install
         if: steps.changed.outputs.found == 'true'
         # chart-testing auto-installs each chart once per
-        # <chart>/ci/*-values.yaml file. AuthProxy's sqlite/redis CI
+        # <chart>/ci/*-values.yaml file. AuthProxy's Postgres/Redis CI
         # values point at the local image loaded above and provide the
-        # minimum config needed for the runtime validator.
+        # minimum config needed for the runtime validator. Keep install-only
+        # flags out of helm-extra-args because ct also forwards these arguments
+        # to helm test and helm uninstall.
         run: |
           ct install \
             --config .github/ct.yaml \
             --target-branch main \
             --namespace authproxy-ct \
-            --helm-extra-args "--timeout=5m --wait-for-jobs"
+            --helm-extra-args "--timeout=5m"
