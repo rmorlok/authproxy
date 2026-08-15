@@ -279,6 +279,9 @@
         },
         "uiSchema": {
           "type": "object"
+        },
+        "data": {
+          "type": "object"
         }
       },
       "required": [

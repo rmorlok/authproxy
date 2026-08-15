@@ -13,6 +13,7 @@ export interface ConnectionFormStepProps {
     stepDescription?: string;
     jsonSchema: Record<string, unknown>;
     uiSchema: Record<string, unknown>;
+    initialData?: Record<string, unknown>;
     onSubmit: (connectionId: string, data: unknown) => void;
     onCancel: () => void;
     isSubmitting: boolean;
@@ -85,11 +86,12 @@ const ConnectionFormStep: React.FC<ConnectionFormStepProps> = ({
     stepDescription,
     jsonSchema,
     uiSchema,
+    initialData,
     onSubmit,
     onCancel,
     isSubmitting,
 }) => {
-    const [data, setData] = useState<unknown>({});
+    const [data, setData] = useState<unknown>(() => initialData ?? {});
     const [hasErrors, setHasErrors] = useState(true);
     const [shouldShowValidation, setShouldShowValidation] = useState(false);
     const [dataSourceOptions, setDataSourceOptions] = useState<Record<string, DataSourceOption[]>>({});

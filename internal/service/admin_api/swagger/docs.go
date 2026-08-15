@@ -8428,6 +8428,10 @@ const docTemplateadmin_api = `{
             "description": "Form response for connection setup",
             "type": "object",
             "properties": {
+                "data": {
+                    "description": "Existing values for fields in this step. Present when reconfiguring a\nconfigured connection so clients can initialize the form without exposing\nconfiguration values owned by other setup steps.",
+                    "type": "object"
+                },
                 "id": {
                     "description": "Connection UUID.",
                     "type": "string",

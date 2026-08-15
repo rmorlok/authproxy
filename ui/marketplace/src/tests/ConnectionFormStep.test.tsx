@@ -1,5 +1,5 @@
 import * as React from 'react';
-import {render, screen} from '@testing-library/react';
+import {render, screen, waitFor} from '@testing-library/react';
 import '@testing-library/jest-dom';
 import userEvent from '@testing-library/user-event';
 import {describe, expect, test, vi} from 'vitest';
@@ -26,6 +26,27 @@ const requiredTextStep = {
 };
 
 describe('ConnectionFormStep', () => {
+    test('shows existing values and submits them without requiring changes', async () => {
+        const user = userEvent.setup();
+        const onSubmit = vi.fn();
+
+        render(
+            <ConnectionFormStep
+                {...requiredTextStep}
+                initialData={{tenant: 'existing-tenant'}}
+                onSubmit={onSubmit}
+                onCancel={vi.fn()}
+                isSubmitting={false}
+            />,
+        );
+
+        expect(screen.getByLabelText(/Demo tenant/i)).toHaveValue('existing-tenant');
+        await waitFor(() => expect(screen.getByRole('button', {name: /Save and verify/i})).toBeEnabled());
+        await user.click(screen.getByRole('button', {name: /Save and verify/i}));
+
+        expect(onSubmit).toHaveBeenCalledWith('cxn_preconnect', {tenant: 'existing-tenant'});
+    });
+
     test('hides required validation until the user changes the field', async () => {
         const user = userEvent.setup();
 

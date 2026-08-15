@@ -15,5 +15,8 @@
     "workspace": {
       "ui:widget": "select"
     }
+  },
+  "data": {
+    "workspace": "existing-workspace"
   }
 }

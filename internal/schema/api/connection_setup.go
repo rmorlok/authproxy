@@ -122,6 +122,11 @@ type ConnectionSetupForm struct {
 
 	// UI Schema for JSON Forms rendering.
 	UiSchema json.RawMessage `json:"uiSchema" yaml:"uiSchema" swaggertype:"object"`
+
+	// Existing values for fields in this step. Present when reconfiguring a
+	// configured connection so clients can initialize the form without exposing
+	// configuration values owned by other setup steps.
+	Data json.RawMessage `json:"data,omitempty" yaml:"data,omitempty" swaggertype:"object"`
 }
 
 func (icf *ConnectionSetupForm) GetId() apid.ID {

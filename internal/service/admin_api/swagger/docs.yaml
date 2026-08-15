@@ -184,6 +184,12 @@ definitions:
   routes.ConnectionSetupForm:
     description: Form response for connection setup
     properties:
+      data:
+        description: |-
+          Existing values for fields in this step. Present when reconfiguring a
+          configured connection so clients can initialize the form without exposing
+          configuration values owned by other setup steps.
+        type: object
       id:
         description: Connection UUID.
         example: cxn_test550e8400abcde
