@@ -358,7 +358,7 @@ jobs:
           grep -Fq "namespace: ${RELEASE_NS}" "${manifest}"
           grep -Fq "image: ghcr.io/rmorlok/authproxy-demo-seed:${{ steps.env.outputs.image_tag }}" "${manifest}"
           grep -Fq "value: http://dev-authproxy:8082" "${manifest}"
-          grep -Fq "base_url: http://dev-go-oauth2-server" "${manifest}"
+          grep -Fq "baseUrl: http://dev-go-oauth2-server" "${manifest}"
 
       - name: Run seed job
         env:

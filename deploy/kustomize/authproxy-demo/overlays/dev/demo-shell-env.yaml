@@ -20,6 +20,8 @@ spec:
               value: https://marketplace.branch.dev.authproxy.net
             - name: AUTHPROXY_ADMIN_UI_URL
               value: https://admin.branch.dev.authproxy.net
+            - name: AUTHPROXY_GO_OAUTH2_SERVER_URL
+              value: https://oauth2.branch.dev.authproxy.net
       volumes:
         - name: admin-key
           secret:

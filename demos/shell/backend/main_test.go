@@ -56,6 +56,12 @@ func TestLoadTelemetryLinksAllowsExplicitURLsWithoutGrafanaBaseURL(t *testing.T)
 	}, links)
 }
 
+func TestLoadOAuthProviderURL(t *testing.T) {
+	t.Setenv("AUTHPROXY_GO_OAUTH2_SERVER_URL", " https://oauth2.demo.example.test/ ")
+
+	require.Equal(t, "https://oauth2.demo.example.test", loadOAuthProviderURL())
+}
+
 func TestConfigHandlerReturnsTelemetryLinks(t *testing.T) {
 	links := []telemetryLink{{
 		Label:       "Grafana",
@@ -65,14 +71,19 @@ func TestConfigHandlerReturnsTelemetryLinks(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/config.json", nil)
 
-	configHandler(settings{telemetryLinks: links}).ServeHTTP(rec, req)
+	configHandler(settings{
+		oauthProviderURL: "https://oauth2.demo.example.test",
+		telemetryLinks:   links,
+	}).ServeHTTP(rec, req)
 
 	require.Equal(t, http.StatusOK, rec.Code)
 	require.Equal(t, "application/json", rec.Header().Get("Content-Type"))
 
 	var body struct {
-		TelemetryLinks []telemetryLink `json:"telemetryLinks"`
+		OAuthProviderURL string          `json:"oauthProviderUrl"`
+		TelemetryLinks   []telemetryLink `json:"telemetryLinks"`
 	}
 	require.NoError(t, json.NewDecoder(rec.Body).Decode(&body))
+	require.Equal(t, "https://oauth2.demo.example.test", body.OAuthProviderURL)
 	require.Equal(t, links, body.TelemetryLinks)
 }
