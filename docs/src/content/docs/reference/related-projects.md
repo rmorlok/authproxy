@@ -1,6 +1,6 @@
 ---
 title: Related projects
-description: Compare AuthProxy with unified APIs, embedded iPaaS products, API and MCP gateways, workflow platforms, and open-source integration frameworks.
+description: Compare AuthProxy with unified APIs, embedded iPaaS products, zero-trust access platforms, API and MCP gateways, workflow platforms, and open-source integration frameworks.
 ---
 
 This is a research index for products adjacent to AuthProxy. Vendor packaging,
@@ -13,7 +13,8 @@ The landscape splits into a few overlapping domains:
 - **Embedded iPaaS**: Integration infrastructure designed to be embedded into your SaaS product for customer-facing integrations.
 - **Traditional iPaaS / Workflow Automation**: Internal automation platforms with large connector catalogs and visual builders.
 - **Webhook / Event Gateways**: Reliability infrastructure for receiving, routing, observing, replaying, and delivering asynchronous events.
-- **API, AI, and MCP Gateways**: Traffic policy, model routing, tool aggregation, or identity-aware access for APIs and agent infrastructure.
+- **Zero-trust Access / Identity-aware Proxies**: Resource-level access for humans and workloads, enforced from identity and request context rather than network location.
+- **API, AI, and MCP Gateways**: Traffic policy, model routing, or tool aggregation for APIs and agent infrastructure.
 - **Open-source Frameworks / Building Blocks**: Libraries or frameworks for teams that want full control.
 
 Below are summaries and comparison tables for the projects in this repo's list. Connector counts are taken from the vendors' public catalogs or docs when available; when not available, it's noted explicitly.
@@ -44,6 +45,11 @@ That produces different tradeoffs from adjacent categories:
   rate limits, routing, and observability at a shared network boundary.
   AuthProxy instead owns each application's tenant-facing connection setup,
   provider credential lifecycle, and authenticated native-API forwarding.
+- A **zero-trust access platform or identity-aware proxy** decides which human,
+  workload, or agent can reach a protected resource, often across private
+  networks and multiple protocols. AuthProxy decides which application actor
+  owns and can use each third-party API connection; it is not a VPN, ZTNA, or
+  general infrastructure-access product.
 - A **secret manager or credential proxy** protects secret access. AuthProxy
   adds OAuth callbacks and refresh, user-facing setup, connector versions,
   health, rate limits, and request-event context.
@@ -147,6 +153,73 @@ token refresh, or arbitrary authenticated access to a provider's native API.
 
 ---
 
+## Zero-trust access and identity-aware proxies
+
+Zero trust is a security architecture rather than a precise product category.
+[NIST SP 800-207](https://csrc.nist.gov/pubs/sp/800/207/final) describes it in
+terms of protecting resources without granting implicit trust from network
+location or ownership. For this index, the category is intentionally narrower:
+platforms whose primary data plane authenticates human or workload identities
+and enforces policy when they access protected infrastructure, applications,
+or APIs.
+
+| Product | Primary boundary | Resource coverage | Identity and upstream credentials | Self-hosting | Notes |
+| --- | --- | --- | --- | --- | --- |
+| [Octelium](https://github.com/octelium/octelium) | Unified ZTNA and identity-aware proxy | HTTP APIs, AI/MCP endpoints, SSH, Kubernetes, PostgreSQL/MySQL, DNS, TCP/UDP services, and managed containers | Human and workload Users access Services with cluster-issued identity; Services can inject stored upstream credentials, including OAuth2 client-credentials tokens | Yes (Apache-2.0 clients/APIs/SDK; AGPLv3 cluster; separate enterprise repository) | Kubernetes-based; private WireGuard/QUIC and public clientless access; per-request L7-aware ABAC, dynamic routing, and access logs. |
+| [Teleport](https://goteleport.com/platform/zero-trust-access/) | Infrastructure identity and access proxy | Servers, databases, Kubernetes, cloud resources, applications, and MCP servers | Short-lived human/workload identity; optional signed JWT to an MCP upstream | Yes (AGPL-3.0 source; restricted Community binaries; commercial editions) | RBAC/ABAC, JIT access, device trust, audit events, and session recording for enrolled resources. |
+
+### Zero-trust access product notes
+
+- **Octelium**: A self-hosted, single-tenant access platform built around a
+  Kubernetes Cluster. An administrator defines an upstream resource as a
+  Service; human or workload Users reach it through private WireGuard/QUIC or
+  public clientless paths; the Vigil identity-aware proxy asks the Octovigil
+  policy decision point to authorize each request. Application-aware modes add
+  policy and audit context for HTTP, SSH, Kubernetes, PostgreSQL, MySQL, DNS,
+  and other protocols. Its secretless HTTP mode injects basic, bearer, or
+  custom-header credentials and can obtain OAuth2 client-credentials tokens.
+  The documented model is administrator-provisioned Services, Secrets, Users,
+  and Policies rather than a provider connector catalog or customer-facing
+  OAuth connection flow. The repository describes the client tools, APIs, and
+  Go SDK as Apache-2.0 and the cluster components as AGPLv3. Its Secrets
+  documentation says the default Cluster stores Secret data in plaintext;
+  operators can implement a custom storage integration through a gRPC
+  interface, while managed encryption-at-rest integrations and the web console
+  are commercial features. See:
+  https://octelium.com/docs/octelium/latest/overview/how-octelium-works,
+  https://octelium.com/docs/octelium/latest/management/core/service/secretless,
+  https://octelium.com/docs/octelium/latest/management/core/service/http,
+  https://octelium.com/docs/octelium/latest/management/core/secret, and
+  https://github.com/octelium/octelium.
+- **Teleport**: Infrastructure identity platform that treats MCP servers as
+  protected resources alongside databases, Kubernetes clusters, applications,
+  and other infrastructure. Teleport enrolls existing STDIO, SSE, or
+  streamable-HTTP MCP servers, authenticates users and workloads, applies
+  RBAC/ABAC and JIT access, and emits per-tool audit events and session
+  recordings. It can pass Teleport-signed JWT identity to an upstream MCP
+  server, but it does not create tools, translate REST APIs into MCP, or manage
+  each end user's third-party OAuth connection. MCP enrollment, proxying,
+  identity controls, and per-tool audit are listed for Community and Enterprise
+  editions. The repository source is AGPL-3.0, while distributed Community
+  binaries use a commercial license with company-size and revenue restrictions.
+  See: https://goteleport.com/platform/zero-trust-access/,
+  https://goteleport.com/docs/enroll-resources/mcp-access/, and
+  https://goteleport.com/docs/feature-matrix/.
+
+Octelium has the strongest AuthProxy overlap in this category: both can keep
+HTTP credentials away from callers, inject them at a proxy, apply request-level
+policy, and preserve the upstream's native API. The ownership model is the key
+difference. Octelium primarily governs which Users can reach an
+administrator-defined Service and is much broader across networks and
+protocols. AuthProxy primarily lets an application give each actor or tenant
+its own connection, including embedded OAuth2 authorization-code setup,
+refresh and revocation, connector-version lifecycle, and health management.
+The products can also be complementary: Octelium can govern workforce or
+infrastructure access around an AuthProxy deployment while AuthProxy owns the
+application's tenant-facing provider connections.
+
+---
+
 ## API, AI, and MCP gateways
 
 “MCP gateway” is not one product category with a settled scope. Current
@@ -161,7 +234,8 @@ products use the term for at least three different boundaries:
   its LLM gateway.
 - An **identity-aware access proxy** enrolls existing MCP servers and governs
   which humans or agents can reach them, with RBAC and audit trails. Teleport
-  follows this model.
+  and Octelium follow this model and are covered in the zero-trust access
+  section above.
 
 These are worth tracking because they can sit next to AuthProxy in an agent
 architecture, and some are beginning to overlap with credential lifecycle.
@@ -176,7 +250,6 @@ They do not all provide customer-facing API integrations.
 | [LiteLLM](https://www.litellm.ai/) | LLM inference gateway | 100+ model providers | Centrally managed provider credentials | Yes (OSS self-host; cloud option) | Model routing, auth, quotas, and spend controls; not an MCP tool gateway. |
 | [Bifrost](https://docs.getbifrost.ai/) | LLM inference + MCP tool gateway | 20+ model providers; arbitrary MCP servers | Provider keys; shared or per-user MCP OAuth | Yes (open source; Apache-2.0) | Acts as an MCP client and server, filters tools, and gates execution or autonomous agent mode. |
 | [Kong](https://konghq.com/) | API, AI, and MCP traffic gateway | User-managed APIs and MCP servers | Gateway auth; OAuth or credential pass-through for MCP | Yes (Apache-2.0 core; commercial editions) | Proxies APIs and MCP servers, converts REST operations into tools, aggregates tools, and applies traffic policy. MCP proxy features require AI Gateway Enterprise. |
-| [Teleport](https://goteleport.com/use-cases/secure-model-context-protocol/) | Identity-aware infrastructure and MCP access proxy | Enrolled MCP servers and infrastructure resources | Short-lived user/workload identity; optional signed JWT to upstream | Yes (AGPL-3.0 source; restricted Community binaries; commercial editions) | RBAC/ABAC, JIT access, per-tool audit events, and session recording for existing MCP servers. |
 | [Agent Vault](https://github.com/Infisical/agent-vault) | Credential proxy for AI agents | Any HTTPS service (no connector catalog) | User-registered credentials injected at the network layer | Yes (open source; MIT) | Keeps credentials out of agent processes and constrains network access. |
 
 ### API, AI, and MCP gateway product notes
@@ -188,18 +261,17 @@ They do not all provide customer-facing API integrations.
 - **LiteLLM**: Open-source LLM gateway supporting 100+ provider integrations, with spend tracking and routing. OSS page highlights self-hosting with no data sent to LiteLLM servers; docs show running the proxy via Docker or CLI. See: https://www.litellm.ai/oss and https://docs.litellm.ai/.
 - **Bifrost**: Apache-2.0 AI gateway with OpenAI-compatible APIs and routing across 20+ model providers. Its MCP subsystem connects to STDIO, HTTP, or SSE servers, exposes aggregated tools through an MCP Gateway URL, filters tools per request, client, or virtual key, and separates tool suggestions from explicit execution by default. It also supports shared OAuth with automatic refresh and per-user OAuth for upstream MCP servers. This overlaps AuthProxy's token lifecycle for MCP-native integrations, but Bifrost is centered on model requests and MCP tool execution rather than embedded setup for arbitrary native APIs. See: https://github.com/maximhq/bifrost, https://docs.getbifrost.ai/mcp/overview, and https://docs.getbifrost.ai/mcp/connecting-to-servers.
 - **Kong**: General-purpose API gateway available as an Apache-2.0 core, commercial self-managed editions, and the Konnect managed control plane. Kong centralizes routing and plugins for authentication, authorization, rate limiting, transformations, and observability across APIs. Its enterprise AI MCP Proxy can front existing MCP servers, convert OpenAPI-described REST operations into MCP tools, aggregate tool sets, and apply per-tool ACLs and standard Kong policies. This is a traffic and protocol control plane, not a tenant connection lifecycle: upstream APIs, MCP servers, identities, and credentials must still be provisioned. See: https://github.com/Kong/kong, https://developer.konghq.com/mcp/, and https://developer.konghq.com/plugins/ai-mcp-proxy/.
-- **Teleport**: Infrastructure identity platform that treats MCP servers as protected resources alongside databases, Kubernetes clusters, applications, and other infrastructure. Teleport enrolls existing STDIO, SSE, or streamable-HTTP MCP servers, authenticates users and workloads, applies RBAC/ABAC and JIT access, and emits per-tool audit events and session recordings. It can pass Teleport-signed JWT identity to an upstream MCP server, but it does not create tools, translate REST APIs into MCP, or manage each end user's third-party OAuth connection. MCP enrollment, proxying, identity controls, and per-tool audit are listed for Community and Enterprise editions. The repository source is AGPL-3.0, while distributed Community binaries use a commercial license with company-size and revenue restrictions. See: https://goteleport.com/use-cases/secure-model-context-protocol/, https://goteleport.com/docs/enroll-resources/mcp-access/, and https://goteleport.com/docs/feature-matrix/.
 - **Agent Vault**: Open-source HTTP credential proxy by Infisical, purpose-built for AI agents. Agents get a scoped session and a local `HTTPS_PROXY`; Agent Vault injects the credential at the network layer so credentials are never returned to the agent. Works with any HTTP-speaking agent (Claude Code, Cursor, Codex, custom Python/TypeScript, sandboxed processes) and any HTTPS API — there is no prebuilt connector catalog; you register your own services and credentials. Ships as a binary, Docker image, or from source; MIT-licensed with a separate `ee/` directory for enterprise features. Offers a container-sandbox mode (iptables-locked egress through the proxy) and an SDK for orchestrating sandboxed agents (Docker/Daytona/E2B). See: https://github.com/Infisical/agent-vault, https://docs.agent-vault.dev, and https://infisical.com/blog/agent-vault-the-open-source-credential-proxy-and-vault-for-agents.
 
 For AuthProxy, the most direct MCP-gateway overlap is Bifrost's per-user OAuth
 and token refresh for upstream MCP servers. Kong overlaps at the authenticated
-proxy and policy layer, while Teleport overlaps in identity, authorization, and
-audit. AuthProxy remains distinct when the product needs an embeddable
-connection UI, versioned connector definitions, health and lifecycle
-management, and unrestricted forwarding to each provider's native API. An MCP
-gateway could consume tools backed by AuthProxy connections, or AuthProxy could
-sit behind Kong or Teleport when broader traffic or infrastructure policy is
-required.
+proxy and policy layer. The zero-trust access platforms above overlap in
+identity, authorization, and audit. AuthProxy remains distinct when the product
+needs an embeddable connection UI, versioned connector definitions, health and
+lifecycle management, and unrestricted forwarding to each provider's native
+API. An MCP gateway could consume tools backed by AuthProxy connections, or
+AuthProxy could sit behind a gateway or access platform when broader traffic or
+infrastructure policy is required.
 
 ---
 
@@ -244,6 +316,8 @@ required.
 | Svix | Outbound webhook delivery | API-first + application portal | Core product | Applications, endpoints, event types, and delivery policies | Yes (MIT server) |
 | Convoy | Bidirectional webhook gateway | API + operator UI | Core product | Sources, subscriptions, endpoints, and delivery policies | Yes (Elastic License 2.0) |
 | Hook0 | Outbound webhook delivery | API + UI | Core product | Applications, event types, subscriptions, and endpoints | Yes (SSPL-1.0) |
+| Octelium | Zero-trust access and identity-aware proxy | Declarative config + CLI; enterprise web console | Access logs and protocol-aware auditing | Services, Users, Secrets, and Policies; no provider connector catalog | Yes (Apache-2.0 clients/APIs/SDK; AGPLv3 cluster) |
+| Teleport | Identity-aware infrastructure and MCP access | CLI/config + management UI | Proxies and audits MCP tool access | Enrolled MCP servers and infrastructure resources | Yes (AGPL-3.0 source; restricted Community binaries; commercial editions) |
 | Composio | AI agent tool access | Code-first | Triggers supported | Toolkits + MCP servers | Not stated in docs |
 | Metorial | MCP integration platform | Code-first | N/A (agent tool calls) | MCP servers (hosted or OSS) | Yes (open source; self-hostable) |
 | Pica | Auth + actions for AI & SaaS | Code-first + embeddable UI | Webhooks supported | AuthKit + Passthrough API | No public self-host option |
@@ -251,6 +325,5 @@ required.
 | LiteLLM | LLM gateway | Code-first | N/A | Provider integrations | Yes (OSS self-host; cloud option) |
 | Bifrost | LLM and MCP tool gateway | Code-first + management UI | MCP client/server and tool execution | Model providers + upstream MCP servers | Yes (Apache-2.0) |
 | Kong | API, AI, and MCP traffic gateway | API/declarative config + management UI | Proxies, converts, and aggregates MCP tools | User-managed APIs, services, and MCP servers | Yes (Apache-2.0 core; MCP proxy is Enterprise) |
-| Teleport | Identity-aware infrastructure and MCP access | CLI/config + management UI | Proxies and audits MCP tool access | Enrolled MCP servers and infrastructure resources | Yes (AGPL-3.0 source; restricted Community binaries; commercial editions) |
 | Agent Vault | Credential brokerage for AI agents | Code-first (CLI + SDK) | N/A (network-layer proxy) | User-registered services + credentials; no prebuilt connectors | Yes (OSS MIT; binary or Docker) |
 | Apache Camel | Routing, mediation, and protocol integration framework | Code-first DSLs + Karavan low-code tooling | Routes, timers, polling, messaging components, Kamelets | Components, route DSLs, Kamelets | Yes (OSS library/runtime; Camel K on Kubernetes) |
