@@ -19,12 +19,12 @@ func TestLoadTelemetryLinksFromGrafanaBaseURL(t *testing.T) {
 	require.Equal(t, []telemetryLink{
 		{
 			Label:       "Grafana",
-			Description: "Open the demo observability workspace.",
+			Description: "Open the demo observability workspace and navigate Grafana as you wish.",
 			URL:         "https://demo.example.test/grafana",
 		},
 		{
 			Label:       "App metrics",
-			Description: "View request, resource, connection, and rate-limit telemetry.",
+			Description: "View request, resource, connection, and rate-limit telemetry. Go to the dashboard for the AuthProxy Grafana data source plugin.",
 			URL:         "https://demo.example.test/grafana/d/authproxy-app-metrics-demo/authproxy-app-metrics?orgId=1&from=now-1h&to=now",
 		},
 		{
@@ -45,7 +45,7 @@ func TestLoadTelemetryLinksAllowsExplicitURLsWithoutGrafanaBaseURL(t *testing.T)
 	require.Equal(t, []telemetryLink{
 		{
 			Label:       "App metrics",
-			Description: "View request, resource, connection, and rate-limit telemetry.",
+			Description: "View request, resource, connection, and rate-limit telemetry. Go to the dashboard for the AuthProxy Grafana data source plugin.",
 			URL:         "https://grafana.example.test/d/app",
 		},
 		{
