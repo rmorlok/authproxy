@@ -18,7 +18,10 @@ import (
 	"github.com/rmorlok/authproxy/internal/workflows"
 )
 
-func (dm *DependencyManager) MigrationStatuses(ctx context.Context, target migration.Target) []migration.Status {
+func (dm *DependencyManager) MigrationStatuses(
+	ctx context.Context,
+	target migration.Target,
+) []migration.Status {
 	if target == migration.TargetAll {
 		statuses := make([]migration.Status, 0, len(migration.OrderedTargets))
 		for _, currentTarget := range migration.OrderedTargets {
@@ -26,23 +29,41 @@ func (dm *DependencyManager) MigrationStatuses(ctx context.Context, target migra
 		}
 		return statuses
 	}
+
 	return []migration.Status{dm.migrationStatus(ctx, target)}
 }
 
-func (dm *DependencyManager) migrationStatus(ctx context.Context, target migration.Target) migration.Status {
+func (dm *DependencyManager) migrationStatus(
+	ctx context.Context,
+	target migration.Target,
+) migration.Status {
 	root := dm.GetConfigRoot()
+
 	switch target {
 	case migration.TargetMainDatabase:
 		return database.MigrationStatus(ctx, root.Database)
+
 	case migration.TargetWorkflows:
 		return workflows.MigrationStatus(ctx, root)
+
 	case migration.TargetAppMetrics:
 		if root.AppMetrics == nil {
-			return migration.UnavailableStatus(target, "", 0, fmt.Errorf("app metrics configuration is required"))
+			return migration.UnavailableStatus(
+				target,
+				"", // provider
+				0,  // available
+				fmt.Errorf("app metrics configuration is required"),
+			)
 		}
 		return app_metrics.MigrationStatus(ctx, root.AppMetrics.Database)
+
 	default:
-		return migration.UnavailableStatus(target, "", 0, fmt.Errorf("unknown migration database %q", target))
+		return migration.UnavailableStatus(
+			target,
+			"", // provider
+			0,  // available
+			fmt.Errorf("unknown migration database %q", target),
+		)
 	}
 }
 
@@ -53,9 +74,11 @@ func (dm *DependencyManager) VerifyMigrations(ctx context.Context) error {
 			result = errors.Join(result, err)
 		}
 	}
+
 	if result != nil {
 		return fmt.Errorf("schema compatibility verification failed: %w", result)
 	}
+
 	return nil
 }
 
@@ -73,27 +96,76 @@ func (dm *DependencyManager) MigrateSchemas(
 		return dm.migrateTargetWithLock(ctx, target, direction, version)
 	}
 
+	//
+	// Migrate all targets in the correct order.
+	//
+
 	if direction == migration.DirectionDown {
-		if err := dm.migrateTargetWithLock(ctx, migration.TargetAppMetrics, direction, nil); err != nil {
+		// Reversed order from up direction
+
+		// metrics
+		if err := dm.migrateTargetWithLock(
+			ctx,
+			migration.TargetAppMetrics,
+			direction, // down
+			nil,       // version
+		); err != nil {
 			return err
 		}
+
 		return dm.withMainDatabaseMigrationLock(ctx, func(ctx context.Context) error {
-			if err := dm.migrateTarget(ctx, migration.TargetWorkflows, direction, nil); err != nil {
+			// workflows database (part of main database)
+			if err := dm.migrateTarget(
+				ctx,
+				migration.TargetWorkflows,
+				direction, // down
+				nil,       // version
+			); err != nil {
 				return err
 			}
-			return dm.migrateTarget(ctx, migration.TargetMainDatabase, direction, nil)
+
+			// main database
+			return dm.migrateTarget(
+				ctx,
+				migration.TargetMainDatabase,
+				direction, // down
+				nil,       // version
+			)
 		})
 	}
 
-	if err := dm.withMainDatabaseMigrationLock(ctx, func(ctx context.Context) error {
-		if err := dm.migrateTarget(ctx, migration.TargetMainDatabase, direction, nil); err != nil {
-			return err
-		}
-		return dm.migrateTarget(ctx, migration.TargetWorkflows, direction, nil)
-	}); err != nil {
+	if err := dm.withMainDatabaseMigrationLock(
+		ctx,
+		func(ctx context.Context) error {
+			// main database
+			if err := dm.migrateTarget(
+				ctx,
+				migration.TargetMainDatabase,
+				direction, // up
+				nil,       // version
+			); err != nil {
+				return err
+			}
+
+			// workflows database (part of main database)
+			return dm.migrateTarget(
+				ctx,
+				migration.TargetWorkflows,
+				direction, // up
+				nil,       // version
+			)
+		},
+	); err != nil {
 		return err
 	}
-	return dm.migrateTargetWithLock(ctx, migration.TargetAppMetrics, direction, nil)
+
+	// metrics database
+	return dm.migrateTargetWithLock(
+		ctx,
+		migration.TargetAppMetrics,
+		direction, // up
+		nil,       // version
+	)
 }
 
 func (dm *DependencyManager) migrateTargetWithLock(
@@ -107,18 +179,23 @@ func (dm *DependencyManager) migrateTargetWithLock(
 		return dm.withMainDatabaseMigrationLock(ctx, func(ctx context.Context) error {
 			return dm.migrateTarget(ctx, target, direction, version)
 		})
+
 	case migration.TargetAppMetrics:
 		root := dm.GetConfigRoot()
 		lockDuration := root.AppMetrics.Database.GetAutoMigrationLockDuration()
 		return dm.withMigrationLock(ctx, app_metrics.MigrateMutexKeyName, lockDuration, func(ctx context.Context) error {
 			return dm.migrateTarget(ctx, target, direction, version)
 		})
+
 	default:
 		return fmt.Errorf("unknown migration database %q", target)
 	}
 }
 
-func (dm *DependencyManager) withMainDatabaseMigrationLock(ctx context.Context, fn func(context.Context) error) error {
+func (dm *DependencyManager) withMainDatabaseMigrationLock(
+	ctx context.Context,
+	fn func(context.Context) error,
+) error {
 	return dm.withMigrationLock(
 		ctx,
 		database.MigrateMutexKeyName,
@@ -145,9 +222,11 @@ func (dm *DependencyManager) withMigrationLock(
 		apredis.MutexOptionRetryExponentialBackoff(100*time.Millisecond, 5*time.Second),
 		apredis.MutexOptionDetailedLockMetadata(),
 	)
+
 	if err := apredis.RunWithMutex(ctx, mutex, duration, fn); err != nil {
 		return fmt.Errorf("migration lock %q: %w", key, err)
 	}
+
 	return nil
 }
 
@@ -166,14 +245,18 @@ func (dm *DependencyManager) migrateTarget(
 	if err != nil {
 		return err
 	}
+
 	logger := logBuilder.WithComponent("migrations").Build()
+
 	started := time.Now()
+
 	requestedVersion := "latest"
 	if direction == migration.DirectionDown && version == nil {
 		requestedVersion = "previous"
 	} else if version != nil {
 		requestedVersion = fmt.Sprint(*version)
 	}
+
 	logger.Info(
 		"starting schema migration",
 		"target", target,
@@ -183,6 +266,7 @@ func (dm *DependencyManager) migrateTarget(
 		"direction", direction,
 		"requested_version", requestedVersion,
 	)
+
 	err = nil
 	switch target {
 	case migration.TargetMainDatabase:
@@ -197,16 +281,22 @@ func (dm *DependencyManager) migrateTarget(
 	if err != nil {
 		return fmt.Errorf("migrate %s: %w", target, err)
 	}
+
 	result := dm.migrationStatus(ctx, target)
 	if result.Err != nil {
 		return fmt.Errorf("inspect %s after migration: %w", target, result.Err)
 	}
+
 	if version != nil && (result.CurrentVersion == nil || *result.CurrentVersion != *version) {
-		return fmt.Errorf("%s migration finished at version %s instead of requested version %d", target, result.CurrentVersionString(), *version)
+		return fmt.Errorf(
+			"%s migration finished at version %s instead of requested version %d",
+			target, result.CurrentVersionString(), *version)
 	}
+
 	if direction == migration.DirectionUp && version == nil && !result.Compatible() {
 		return migration.IncompatibleError(result)
 	}
+
 	logger.Info(
 		"schema migration complete",
 		"target", target,
@@ -214,6 +304,7 @@ func (dm *DependencyManager) migrateTarget(
 		"available_version", result.AvailableVersion,
 		"duration", time.Since(started),
 	)
+
 	return nil
 }
 
