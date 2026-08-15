@@ -26,13 +26,13 @@ type ActorID = 'demo-user' | 'fresh-user';
 const MARKETPLACE_ACTORS: Array<{ id: ActorID; label: string; description: string }> = [
   {
     id: 'demo-user',
-    label: 'Demo user',
+    label: 'Existing demo user',
     description: 'A pre-configured end user with a working demo connection to explore.',
   },
   {
     id: 'fresh-user',
     label: 'Fresh user',
-    description: 'Start with an empty Marketplace and create a connection from scratch.',
+    description: 'Start with an empty Marketplace and create a connection from scratch. This also demonstrates how actors in the system are dynamically created based on JWTs.',
   },
 ];
 
@@ -93,6 +93,7 @@ function CredentialNotice() {
   return (
     <aside className="credential-notice" aria-label="Demo OAuth credentials">
       <p className="eyebrow">Fake OAuth account</p>
+      <p>You can use these credentials when connecting new OAuth connections:</p>
       <p>
         <strong>Username</strong> <code>demo-oauth-user@example.test</code>
         <br />

@@ -127,14 +127,14 @@ func loadTelemetryLinks() []telemetryLink {
 	if grafanaURL != "" {
 		links = append(links, telemetryLink{
 			Label:       "Grafana",
-			Description: "Open the demo observability workspace.",
+			Description: "Open the demo observability workspace and navigate Grafana as you wish.",
 			URL:         grafanaURL,
 		})
 	}
 	if appMetricsURL != "" {
 		links = append(links, telemetryLink{
 			Label:       "App metrics",
-			Description: "View request, resource, connection, and rate-limit telemetry.",
+			Description: "View request, resource, connection, and rate-limit telemetry. Go to the dashboard for the AuthProxy Grafana data source plugin.",
 			URL:         appMetricsURL,
 		})
 	}
