@@ -134,8 +134,8 @@ jobs:
           grep -Fq "namespace: ${RELEASE_NS}" "${manifest}"
           grep -Fq "image: ghcr.io/rmorlok/authproxy-demo-seed:${IMAGE_TAG}" "${manifest}"
           grep -Fq "value: http://${RELEASE_NAME}-authproxy:8082" "${manifest}"
-          grep -Fq "base_url: http://${RELEASE_NAME}-go-oauth2-server" "${manifest}"
-          grep -Fq "redirect_uri: https://marketplace.${DEMO_HOSTNAME}/oauth2/callback" "${manifest}"
+          grep -Fq "baseUrl: http://${RELEASE_NAME}-go-oauth2-server" "${manifest}"
+          grep -Fq "redirectUri: https://marketplace.${DEMO_HOSTNAME}/oauth2/callback" "${manifest}"
         env:
           IMAGE_TAG: ${{ steps.tag.outputs.tag }}
 
