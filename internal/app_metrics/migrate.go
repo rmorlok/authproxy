@@ -104,7 +104,11 @@ func RunMigrations(
 	defer func() {
 		sourceErr, dbErr := migrator.Close()
 		if sourceErr != nil || dbErr != nil {
-			logger.Warn("failed to close app metrics migrator", "source_err", sourceErr, "db_err", dbErr)
+			logger.Warn(
+				"failed to close app metrics migrator",
+				"source_err", sourceErr,
+				"db_err", dbErr,
+			)
 		}
 	}()
 
@@ -130,7 +134,12 @@ func newMigrationDriver(
 		if err != nil {
 			return nil, "", err
 		}
-		driver, err := postgres.WithInstance(db, &postgres.Config{MigrationsTable: appMetricsMigrationsTable})
+		driver, err := postgres.WithInstance(
+			db,
+			&postgres.Config{
+				MigrationsTable: appMetricsMigrationsTable,
+			},
+		)
 		if err != nil {
 			_ = db.Close()
 		}
@@ -141,7 +150,12 @@ func newMigrationDriver(
 		if err != nil {
 			return nil, "", err
 		}
-		driver, err := sqlite3.WithInstance(db, &sqlite3.Config{MigrationsTable: appMetricsMigrationsTable})
+		driver, err := sqlite3.WithInstance(
+			db,
+			&sqlite3.Config{
+				MigrationsTable: appMetricsMigrationsTable,
+			},
+		)
 		if err != nil {
 			_ = db.Close()
 		}
