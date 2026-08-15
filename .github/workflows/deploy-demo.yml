@@ -328,39 +328,6 @@ jobs:
               -p "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"demo.authproxy.net/image-revision\":\"${{ steps.tag.outputs.sha }}\"}}}}}"
           done
 
-      - name: Collect deploy diagnostics (on failure)
-        if: failure()
-        run: |
-          set +e
-          echo "## Applied resources"
-          kubectl -n "${RELEASE_NS}" get all,ingress,certificate,order,challenge -o wide
-          echo
-          echo "## Deployments"
-          for d in \
-            "${RELEASE_NAME}-authproxy" \
-            "${RELEASE_NAME}-demo-shell" \
-            "${RELEASE_NAME}-go-oauth2-server" \
-            "${RELEASE_NAME}-postgresql" \
-            "${RELEASE_NAME}-redis-master" \
-            "${RELEASE_NAME}-minio" \
-            "${RELEASE_NAME}-grafana" \
-            "${RELEASE_NAME}-otel-lgtm" \
-          ; do
-            kubectl -n "${RELEASE_NS}" describe "deployment/$d"
-            echo
-          done
-          echo "## Recent pod logs"
-          for selector in authproxy demo-shell go-oauth2-server grafana otel-lgtm; do
-            kubectl -n "${RELEASE_NS}" logs \
-              -l "app.kubernetes.io/name=${selector}" \
-              --all-containers --tail=120
-            echo
-          done
-          echo "## Recent events"
-          kubectl -n "${RELEASE_NS}" get events \
-            --sort-by='.lastTimestamp' \
-            | tail -n 100
-
       - name: Wait for workload rollouts
         timeout-minutes: 10
         run: |
@@ -452,6 +419,39 @@ jobs:
           cd integration_tests
           SMOKE_ADMIN_KEY="${workdir}/demo-shell.private" \
             go test -tags smoke ./smoke -run TestRemoteOAuth2ProxySmoke -count=1 -v
+
+      - name: Collect deploy diagnostics (on failure)
+        if: failure()
+        run: |
+          set +e
+          echo "## Applied resources"
+          kubectl -n "${RELEASE_NS}" get all,ingress,certificate,order,challenge -o wide
+          echo
+          echo "## Deployments"
+          for d in \
+            "${RELEASE_NAME}-authproxy" \
+            "${RELEASE_NAME}-demo-shell" \
+            "${RELEASE_NAME}-go-oauth2-server" \
+            "${RELEASE_NAME}-postgresql" \
+            "${RELEASE_NAME}-redis-master" \
+            "${RELEASE_NAME}-minio" \
+            "${RELEASE_NAME}-grafana" \
+            "${RELEASE_NAME}-otel-lgtm" \
+          ; do
+            kubectl -n "${RELEASE_NS}" describe "deployment/$d"
+            echo
+          done
+          echo "## Recent pod logs"
+          for selector in authproxy demo-shell go-oauth2-server grafana otel-lgtm; do
+            kubectl -n "${RELEASE_NS}" logs \
+              -l "app.kubernetes.io/name=${selector}" \
+              --all-containers --tail=120
+            echo
+          done
+          echo "## Recent events"
+          kubectl -n "${RELEASE_NS}" get events \
+            --sort-by='.lastTimestamp' \
+            | tail -n 100
 
       - name: Summary
         if: always()
