@@ -77,6 +77,34 @@ func newTestHarnessLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 }
 
+// postgresAppMetricsMigrator configures pgtestdb's golang-migrate adapter to
+// create the same migrations table used by the production app-metrics path.
+type postgresAppMetricsMigrator struct {
+	*golangmigrator.GolangMigrator
+}
+
+func (m *postgresAppMetricsMigrator) Hash() (string, error) {
+	hash, err := m.GolangMigrator.Hash()
+	if err != nil {
+		return "", err
+	}
+	return hash + ":" + appMetricsMigrationsTable, nil
+}
+
+func (m *postgresAppMetricsMigrator) Migrate(
+	ctx context.Context,
+	db *sql.DB,
+	templateConfig pgtestdb.Config,
+) error {
+	options, err := url.ParseQuery(templateConfig.Options)
+	if err != nil {
+		return fmt.Errorf("parse postgres test database options: %w", err)
+	}
+	options.Set("x-migrations-table", appMetricsMigrationsTable)
+	templateConfig.Options = options.Encode()
+	return m.GolangMigrator.Migrate(ctx, db, templateConfig)
+}
+
 func mustNewBlankSqliteRequestEventsStore(t testing.TB) (RecordStore, RecordRetriever, *sql.DB) {
 	t.Helper()
 
@@ -117,10 +145,12 @@ func mustNewBlankPostgresRequestEventsStore(t testing.TB) (RecordStore, RecordRe
 		ForceTerminateConnections: true,
 	}
 
-	migrator := golangmigrator.New(
-		"migrations/postgres",
-		golangmigrator.WithFS(appMetricsMigrationsFs),
-	)
+	migrator := &postgresAppMetricsMigrator{
+		GolangMigrator: golangmigrator.New(
+			"migrations/postgres",
+			golangmigrator.WithFS(appMetricsMigrationsFs),
+		),
+	}
 
 	testDbConfig := pgtestdb.Custom(t, adminConfig, migrator)
 
@@ -156,21 +186,6 @@ func mustNewBlankPostgresRequestEventsStore(t testing.TB) (RecordStore, RecordRe
 		SSLMode:  scommon.NewStringValueDirectInline(sslMode),
 		Params:   params,
 	}}
-
-	// pgtestdb's golang-migrate adapter always uses schema_migrations. Production
-	// app-metrics migrations use their own table so they can share a database
-	// with the main schema; align the cloned test database with that layout.
-	setupDB, err := sql.Open(cfg.GetDriver(), cfg.GetDsn())
-	if err != nil {
-		t.Fatalf("failed to open postgres app_metrics test database: %v", err)
-	}
-	if _, err := setupDB.Exec(`ALTER TABLE schema_migrations RENAME TO app_metrics_schema_migrations`); err != nil {
-		_ = setupDB.Close()
-		t.Fatalf("failed to rename postgres app_metrics migration table: %v", err)
-	}
-	if err := setupDB.Close(); err != nil {
-		t.Fatalf("failed to close postgres app_metrics setup database: %v", err)
-	}
 
 	// pgtestdb already ran the migrator against the per-test database, so the
 	// SQL store can be built without re-migrating.
