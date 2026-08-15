@@ -156,6 +156,21 @@ func mustNewBlankPostgresRequestEventsStore(t testing.TB) (RecordStore, RecordRe
 		Params:   params,
 	}}
 
+	// pgtestdb's golang-migrate adapter always uses schema_migrations. Production
+	// app-metrics migrations use their own table so they can share a database
+	// with the main schema; align the cloned test database with that layout.
+	setupDB, err := sql.Open(cfg.GetDriver(), cfg.GetDsn())
+	if err != nil {
+		t.Fatalf("failed to open postgres app_metrics test database: %v", err)
+	}
+	if _, err := setupDB.Exec(`ALTER TABLE schema_migrations RENAME TO app_metrics_schema_migrations`); err != nil {
+		_ = setupDB.Close()
+		t.Fatalf("failed to rename postgres app_metrics migration table: %v", err)
+	}
+	if err := setupDB.Close(); err != nil {
+		t.Fatalf("failed to close postgres app_metrics setup database: %v", err)
+	}
+
 	// pgtestdb already ran the migrator against the per-test database, so the
 	// SQL store can be built without re-migrating.
 	return buildSqlStorePairNoMigrate(t, cfg)

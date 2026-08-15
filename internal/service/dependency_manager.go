@@ -8,15 +8,12 @@ import (
 	"math"
 	"os"
 	"sync"
-	"time"
 
 	"github.com/hibiken/asynq"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/mitchellh/go-homedir"
 	"github.com/rmorlok/authproxy/internal/apasynq"
-	"github.com/rmorlok/authproxy/internal/apauth/tasks"
-	authSync "github.com/rmorlok/authproxy/internal/apauth/tasks"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/app_metrics"
 	"github.com/rmorlok/authproxy/internal/apredis"
@@ -66,6 +63,7 @@ type DependencyManager struct {
 
 	rootLogger     *slog.Logger
 	rootLoggerOnce sync.Once
+	rootLoggerErr  error
 
 	// Rate-limit cache + refresher are owned by the dependency manager so
 	// the lifecycle is tied to the proxy process. The cache is populated
@@ -169,11 +167,23 @@ func (dm *DependencyManager) GetServiceId() string {
 }
 
 func (dm *DependencyManager) GetLogBuilder() aplog.Builder {
+	builder, err := dm.GetLogBuilderWithError()
+	if err != nil {
+		panic(err)
+	}
+	return builder
+}
+
+func (dm *DependencyManager) GetLogBuilderWithError() (aplog.Builder, error) {
 	if dm.logBuilder == nil {
-		dm.logBuilder = aplog.NewBuilder(dm.GetRootLogger())
+		logger, err := dm.GetRootLoggerWithError()
+		if err != nil {
+			return nil, err
+		}
+		dm.logBuilder = aplog.NewBuilder(logger)
 	}
 
-	return dm.logBuilder
+	return dm.logBuilder, nil
 }
 
 // GetRootLogger returns the application-wide root slog.Logger, wrapped with
@@ -187,74 +197,138 @@ func (dm *DependencyManager) GetLogBuilder() aplog.Builder {
 // bridge picks up the live LoggerProvider regardless of call order in the
 // service's Serve func.
 func (dm *DependencyManager) GetRootLogger() *slog.Logger {
+	logger, err := dm.GetRootLoggerWithError()
+	if err != nil {
+		panic(err)
+	}
+	return logger
+}
+
+func (dm *DependencyManager) GetRootLoggerWithError() (*slog.Logger, error) {
 	dm.rootLoggerOnce.Do(func() {
-		providers := dm.GetTelemetry()
+		providers, err := dm.GetTelemetryWithError()
+		if err != nil {
+			dm.rootLoggerErr = err
+			return
+		}
 		dm.rootLogger = aplog.WrapWithTelemetry(
 			dm.GetConfigRoot().GetRootLogger(),
 			providers,
 			dm.GetConfigRoot().Telemetry,
 		)
 	})
-	return dm.rootLogger
+	if dm.rootLoggerErr != nil {
+		return nil, dm.rootLoggerErr
+	}
+	return dm.rootLogger, nil
 }
 
 func (dm *DependencyManager) GetLogger() *slog.Logger {
+	logger, err := dm.GetLoggerWithError()
+	if err != nil {
+		panic(err)
+	}
+	return logger
+}
+
+func (dm *DependencyManager) GetLoggerWithError() (*slog.Logger, error) {
 	if dm.logger == nil {
-		b := dm.GetLogBuilder()
+		b, err := dm.GetLogBuilderWithError()
+		if err != nil {
+			return nil, err
+		}
 		b = b.WithService(dm.serviceId)
 		dm.logger = b.Build()
 	}
 
-	return dm.logger
+	return dm.logger, nil
 }
 
 func (dm *DependencyManager) GetRedisClient() apredis.Client {
+	client, err := dm.GetRedisClientWithError()
+	if err != nil {
+		panic(err)
+	}
+	return client
+}
+
+func (dm *DependencyManager) GetRedisClientWithError() (apredis.Client, error) {
 	if dm.r == nil {
-		var err error
+		telemetry, err := dm.GetTelemetryWithError()
+		if err != nil {
+			return nil, err
+		}
 		dm.r, err = apredis.NewForRoot(
 			context.Background(),
 			dm.GetConfig().GetRoot(),
-			apredis.WithTelemetry(dm.GetTelemetry(), dm.GetConfigRoot().Telemetry),
+			apredis.WithTelemetry(telemetry, dm.GetConfigRoot().Telemetry),
 		)
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
 	}
 
-	return dm.r
+	return dm.r, nil
 }
 
 func (dm *DependencyManager) GetDatabase() database.DB {
+	db, err := dm.GetDatabaseWithError()
+	if err != nil {
+		panic(err)
+	}
+	return db
+}
+
+func (dm *DependencyManager) GetDatabaseWithError() (database.DB, error) {
 	if dm.db == nil {
-		var err error
+		sqlDB, err := dm.GetSQLDBWithError()
+		if err != nil {
+			return nil, err
+		}
+		logger, err := dm.GetLoggerWithError()
+		if err != nil {
+			return nil, err
+		}
 		dm.db, err = database.NewService(
-			dm.GetSQLDB(),
+			sqlDB,
 			dm.GetConfigRoot().Database.InnerVal,
-			dm.GetLogger(),
+			logger,
 		)
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
 	}
 
-	return dm.db
+	return dm.db, nil
 }
 
 func (dm *DependencyManager) GetSQLDB() *sql.DB {
+	db, err := dm.GetSQLDBWithError()
+	if err != nil {
+		panic(err)
+	}
+	return db
+}
+
+func (dm *DependencyManager) GetSQLDBWithError() (*sql.DB, error) {
 	if dm.sqlDB == nil {
 		db, err := dm.openConfiguredSQLDB()
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
 		dm.sqlDB = db
 	}
-	return dm.sqlDB
+	return dm.sqlDB, nil
 }
 
 func (dm *DependencyManager) openConfiguredSQLDB() (*sql.DB, error) {
 	root := dm.GetConfigRoot()
 	if root == nil || root.Database == nil || root.Database.InnerVal == nil {
 		return nil, fmt.Errorf("database configuration is required")
+	}
+	telemetry, err := dm.GetTelemetryWithError()
+	if err != nil {
+		return nil, err
 	}
 
 	switch cfg := root.Database.InnerVal.(type) {
@@ -266,14 +340,14 @@ func (dm *DependencyManager) openConfiguredSQLDB() (*sql.DB, error) {
 			"sqlite3",
 			cfg.GetDsn(),
 			sqlh.DBSystemSQLite,
-			sqlh.WithTelemetry(dm.GetTelemetry(), root.Telemetry),
+			sqlh.WithTelemetry(telemetry, root.Telemetry),
 		)
 	case *sconfig.DatabasePostgres:
 		db, err := sqlh.OpenInstrumentedSQL(
 			"pgx",
 			cfg.GetDsn(),
 			sqlh.DBSystemPostgreSQL,
-			sqlh.WithTelemetry(dm.GetTelemetry(), root.Telemetry),
+			sqlh.WithTelemetry(telemetry, root.Telemetry),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to open postgres database '%s': %w", cfg.GetDsn(), err)
@@ -363,40 +437,6 @@ func (dm *DependencyManager) ShutdownDatabase() {
 	dm.sqlDB = nil
 }
 
-// AutoMigrateDatabase will attempt to migrate the database if the root config has auto migrate enabled.
-func (dm *DependencyManager) AutoMigrateDatabase() {
-	if dm.GetConfigRoot().Database.GetAutoMigrate() {
-		lockDuration := dm.GetConfigRoot().Database.GetAutoMigrationLockDuration()
-		m := apredis.NewMutex(
-			dm.GetRedisClient(),
-			database.MigrateMutexKeyName,
-			apredis.MutexOptionLockFor(lockDuration),
-			apredis.MutexOptionRetryFor(lockDuration+1*time.Second),
-			apredis.MutexOptionRetryExponentialBackoff(100*time.Millisecond, 5*time.Second),
-			apredis.MutexOptionDetailedLockMetadata(),
-		)
-		err := apredis.RunWithMutex(context.Background(), m, lockDuration, func(ctx context.Context) error {
-			if err := dm.GetDatabase().Migrate(ctx); err != nil {
-				return err
-			}
-
-			if err := workflows.Migrate(
-				ctx,
-				dm.GetConfigRoot(),
-				dm.GetLogBuilder().WithComponent("workflows").Build(),
-				workflows.WithPostgresMigrationDB(dm.GetSQLDB()),
-			); err != nil {
-				return fmt.Errorf("failed to migrate workflow database: %w", err)
-			}
-			return nil
-		})
-		if err != nil {
-			dm.GetLogger().Error("automatic database migration failed", "lock_key", database.MigrateMutexKeyName, "error", err)
-			panic(fmt.Errorf("failed to automatically migrate database: %w", err))
-		}
-	}
-}
-
 func (dm *DependencyManager) GetAppMetricsService() *app_metrics.StorageService {
 	ctx := context.Background()
 	var err error
@@ -476,31 +516,6 @@ func (dm *DependencyManager) GetHttpf() httpf.F {
 	}
 
 	return dm.httpf
-}
-
-func (dm *DependencyManager) AutoMigrateAppMetricsService() {
-	if dm.GetConfigRoot().AppMetrics.GetAutoMigrate() {
-		var dbConfig *sconfig.Database
-		if dm.GetConfigRoot().AppMetrics != nil {
-			dbConfig = dm.GetConfigRoot().AppMetrics.Database
-		}
-		lockDuration := dbConfig.GetAutoMigrationLockDuration()
-		m := apredis.NewMutex(
-			dm.GetRedisClient(),
-			app_metrics.MigrateMutexKeyName,
-			apredis.MutexOptionLockFor(lockDuration),
-			apredis.MutexOptionRetryFor(lockDuration+1*time.Second),
-			apredis.MutexOptionRetryExponentialBackoff(100*time.Millisecond, 5*time.Second),
-			apredis.MutexOptionDetailedLockMetadata(),
-		)
-		err := apredis.RunWithMutex(context.Background(), m, lockDuration, func(ctx context.Context) error {
-			return dm.GetAppMetricsService().Migrate(ctx)
-		})
-		if err != nil {
-			dm.GetLogger().Error("automatic app metrics migration failed", "lock_key", app_metrics.MigrateMutexKeyName, "error", err)
-			panic(fmt.Errorf("failed to automatically migrate app metrics: %w", err))
-		}
-	}
 }
 
 func (dm *DependencyManager) GetEncryptService() encrypt.E {
@@ -589,6 +604,14 @@ func (dm *DependencyManager) ShutdownWorkflowRuntime() {
 // other dependencies on this manager. Use ShutdownTelemetry to flush and tear
 // down before exit.
 func (dm *DependencyManager) GetTelemetry() *aptelemetry.Providers {
+	telemetry, err := dm.GetTelemetryWithError()
+	if err != nil {
+		panic(err)
+	}
+	return telemetry
+}
+
+func (dm *DependencyManager) GetTelemetryWithError() (*aptelemetry.Providers, error) {
 	dm.telemetryOnce.Do(func() {
 		providers, err := aptelemetry.New(
 			context.Background(),
@@ -604,16 +627,29 @@ func (dm *DependencyManager) GetTelemetry() *aptelemetry.Providers {
 	})
 
 	if dm.telemetryErr != nil {
-		panic(fmt.Errorf("failed to initialise telemetry: %w", dm.telemetryErr))
+		return nil, fmt.Errorf("failed to initialise telemetry: %w", dm.telemetryErr)
 	}
 
-	return dm.telemetry
+	return dm.telemetry, nil
 }
 
 func (dm *DependencyManager) GetDataEncryptionKeyTelemetry() *encrypt.DataEncryptionKeyTelemetry {
+	telemetry, err := dm.GetDataEncryptionKeyTelemetryWithError()
+	if err != nil {
+		panic(err)
+	}
+	return telemetry
+}
+
+func (dm *DependencyManager) GetDataEncryptionKeyTelemetryWithError() (*encrypt.DataEncryptionKeyTelemetry, error) {
 	dm.dataEncryptionKeyTelemetryOnce.Do(func() {
+		providers, err := dm.GetTelemetryWithError()
+		if err != nil {
+			dm.dataEncryptionKeyTelemetryErr = err
+			return
+		}
 		tel, err := encrypt.NewDataEncryptionKeyTelemetry(
-			dm.GetTelemetry(),
+			providers,
 			dm.GetConfigRoot().Telemetry,
 		)
 		if err != nil {
@@ -624,10 +660,10 @@ func (dm *DependencyManager) GetDataEncryptionKeyTelemetry() *encrypt.DataEncryp
 	})
 
 	if dm.dataEncryptionKeyTelemetryErr != nil {
-		panic(fmt.Errorf("failed to initialise data encryption key telemetry: %w", dm.dataEncryptionKeyTelemetryErr))
+		return nil, fmt.Errorf("failed to initialise data encryption key telemetry: %w", dm.dataEncryptionKeyTelemetryErr)
 	}
 
-	return dm.dataEncryptionKeyTelemetry
+	return dm.dataEncryptionKeyTelemetry, nil
 }
 
 // ShutdownTelemetry flushes and tears down OTel providers if they were
@@ -690,113 +726,4 @@ func (dm *DependencyManager) StartRateLimitRefresher(ctx context.Context) (stop 
 		dm.rateLimitCache,
 		dm.GetLogBuilder().WithComponent("ratelimit-refresher").Build(),
 	)
-}
-
-// TODO: this automigrate should not be specific to the connectors config
-func (dm *DependencyManager) AutoMigrateCore() {
-	if dm.GetConfigRoot().Connectors.GetAutoMigrate() {
-		lockDuration := dm.GetConfigRoot().Connectors.GetAutoMigrationLockDurationOrDefault()
-		m := apredis.NewMutex(
-			dm.GetRedisClient(),
-			core.MigrateMutexKeyName,
-			apredis.MutexOptionLockFor(lockDuration),
-			apredis.MutexOptionRetryFor(lockDuration+1*time.Second),
-			apredis.MutexOptionRetryExponentialBackoff(100*time.Millisecond, 5*time.Second),
-			apredis.MutexOptionDetailedLockMetadata(),
-		)
-		err := apredis.RunWithMutex(context.Background(), m, lockDuration, func(ctx context.Context) error {
-			return dm.GetCoreService().Migrate(ctx)
-		})
-		if err != nil {
-			panic(err)
-		}
-	}
-}
-
-// AutoMigratePredefinedActors synchronizes actors from ConfiguredActorsList configuration to the database.
-// This only runs for ConfiguredActorsList configuration (not ConfiguredActorsExternalSource which uses cron).
-// Uses a distributed Redis lock to ensure only one instance performs the migration.
-func (dm *DependencyManager) AutoMigratePredefinedActors() {
-	actors := dm.GetConfigRoot().SystemAuth.Actors
-	if actors == nil {
-		return
-	}
-
-	if _, ok := actors.InnerVal.(*sconfig.ConfiguredActorsExternalSource); ok {
-		// Don't actually run the sync here, just enqueue a task to run immediately.
-		task := authSync.NewSyncActorsExternalSourceTask()
-		_, err := dm.GetAsyncClient().Enqueue(task)
-		if err != nil {
-			panic(fmt.Errorf("failed to enqueue sync actors external source task: %w", err))
-		}
-
-		return
-	}
-
-	if _, ok := actors.InnerVal.(sconfig.ConfiguredActorsList); !ok {
-		// There aren't any other value types that we migrate
-		return
-	}
-
-	const lockDuration = 30 * time.Second
-	m := apredis.NewMutex(
-		dm.GetRedisClient(),
-		"actor_sync:migrate",
-		apredis.MutexOptionLockFor(lockDuration),
-		apredis.MutexOptionRetryFor(lockDuration+1*time.Second),
-		apredis.MutexOptionRetryExponentialBackoff(100*time.Millisecond, 5*time.Second),
-		apredis.MutexOptionDetailedLockMetadata(),
-	)
-	err := apredis.RunWithMutex(context.Background(), m, lockDuration, func(ctx context.Context) error {
-		svc := tasks.NewService(
-			dm.GetConfig(),
-			dm.GetDatabase(),
-			dm.GetRedisClient(),
-			dm.GetEncryptService(),
-			dm.GetLogger(),
-		)
-		return svc.SyncActorList(ctx)
-	})
-	if err != nil {
-		panic(fmt.Errorf("failed to sync actors from config list: %w", err))
-	}
-}
-
-// AutoMigrateGenerateDataEncryptionKeys ensures current DEKs exist before any
-// service constructs the runtime encryption cache.
-func (dm *DependencyManager) AutoMigrateGenerateDataEncryptionKeys() {
-	if err := encrypt.GenerateDataEncryptionKeysToDatabase(
-		context.Background(),
-		dm.GetConfig(),
-		dm.GetDatabase(),
-		dm.GetLogger(),
-		dm.GetRedisClient(),
-		encrypt.WithGenerateDataEncryptionKeysTelemetry(dm.GetDataEncryptionKeyTelemetry()),
-	); err != nil {
-		panic(fmt.Errorf("failed to generate data encryption keys: %w", err))
-	}
-}
-
-// AutoMigrateSyncKeysToDatabase syncs key wrapping state into the database.
-// Uses a Redis sentinel to avoid redundant runs across processes.
-func (dm *DependencyManager) AutoMigrateSyncKeysToDatabase() {
-	if err := encrypt.SyncKeysToDatabase(
-		context.Background(),
-		dm.GetConfig(),
-		dm.GetDatabase(),
-		dm.GetLogger(),
-		dm.GetRedisClient(),
-		encrypt.WithSyncKeysTelemetry(dm.GetDataEncryptionKeyTelemetry()),
-	); err != nil {
-		panic(fmt.Errorf("failed to sync keys to database: %w", err))
-	}
-}
-
-func (dm *DependencyManager) AutoMigrateAll() {
-	dm.AutoMigrateDatabase()
-	dm.AutoMigrateGenerateDataEncryptionKeys()
-	dm.AutoMigrateSyncKeysToDatabase()
-	dm.AutoMigrateAppMetricsService()
-	dm.AutoMigrateCore()
-	dm.AutoMigratePredefinedActors()
 }

@@ -11,14 +11,11 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 	sq "github.com/Masterminds/squirrel"
-	"github.com/golang-migrate/migrate/v4"
-	chmigrate "github.com/golang-migrate/migrate/v4/database/clickhouse"
-	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/httpf"
+	"github.com/rmorlok/authproxy/internal/migration"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/sqlh"
-	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
@@ -127,68 +124,13 @@ func (s *clickhouseRecordStore) StoreRecord(ctx context.Context, record *LogReco
 }
 
 func (s *clickhouseRecordStore) Migrate(ctx context.Context) (resultErr error) {
-	s.logger.Info("running clickhouse app metrics migrations")
-	defer func() {
-		if resultErr != nil {
-			s.logger.Error("clickhouse app metrics migrations failed", "error", resultErr)
-			return
-		}
-		s.logger.Info("clickhouse app metrics migrations complete")
-	}()
-
-	src, err := iofs.New(appMetricsMigrationsFs, "migrations/clickhouse")
-	if err != nil {
-		return fmt.Errorf("failed to load clickhouse app metrics migrations: %w", err)
-	}
-
-	var dbName string
-	if s.cfg.Database != nil {
-		dbName, err = s.cfg.Database.GetValue(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to resolve clickhouse database name: %w", err)
-		}
-	}
-
-	// The clickhouse migrate driver takes ownership of the *sql.DB it's given
-	// and closes it when the migrator does — so we must hand it a dedicated
-	// connection rather than the long-lived store handle.
-	chOpts, err := s.cfg.ToClickhouseOptions()
-	if err != nil {
-		return fmt.Errorf("failed to derive clickhouse options for migration: %w", err)
-	}
-	migrationConn := sql.OpenDB(clickhouse.Connector(chOpts))
-
-	driver, err := chmigrate.WithInstance(migrationConn, &chmigrate.Config{
-		DatabaseName:          dbName,
-		MigrationsTable:       appMetricsMigrationsTable,
-		MultiStatementEnabled: true,
-	})
-	if err != nil {
-		_ = migrationConn.Close()
-		return fmt.Errorf("failed to setup clickhouse app metrics migration driver: %w", err)
-	}
-
-	m, err := migrate.NewWithInstance("iofs", src, "clickhouse", driver)
-	if err != nil {
-		_ = migrationConn.Close()
-		return fmt.Errorf("failed to setup clickhouse app metrics migrator: %w", err)
-	}
-	defer func() {
-		sourceErr, dbErr := m.Close()
-		if sourceErr != nil || dbErr != nil {
-			s.logger.Warn("failed to close clickhouse migrator", "source_err", sourceErr, "db_err", dbErr)
-		}
-	}()
-
-	if err := util.RunMigrationsUp(ctx, m); err != nil {
-		if errors.Is(err, migrate.ErrNoChange) {
-			s.logger.Info("no clickhouse app metrics migrations required")
-			return nil
-		}
-		return fmt.Errorf("failed to migrate clickhouse app metrics database: %w", err)
-	}
-
-	return nil
+	return RunMigrations(
+		ctx,
+		&config.Database{InnerVal: s.cfg},
+		s.logger,
+		migration.DirectionUp,
+		nil,
+	)
 }
 
 func (s *clickhouseRecordStore) Ping(ctx context.Context) bool {

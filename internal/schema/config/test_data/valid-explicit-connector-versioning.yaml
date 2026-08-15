@@ -1,5 +1,4 @@
 connectors:
-  autoMigrate: true
   autoMigrationLockDuration: 30s
   loadFromList:
     - name: asana

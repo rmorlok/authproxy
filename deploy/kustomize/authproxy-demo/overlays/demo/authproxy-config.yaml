@@ -16,7 +16,6 @@ worker:
   healthCheckPort: 8083
 database:
   provider: postgres
-  autoMigrate: true
   host: demo-postgresql
   port: 5432
   user: authproxy
@@ -33,13 +32,17 @@ redis:
 hostApplication:
   initiateSessionUrl: https://demo.authproxy.net/
 connectors:
-  autoMigrate: true
   loadFromList: []
 appMetrics:
-  autoMigrate: true
   database:
-    provider: sqlite
-    path: /tmp/authproxy-app-metrics.db
+    provider: postgres
+    host: demo-postgresql
+    port: 5432
+    user: authproxy
+    database: authproxy
+    sslmode: disable
+    password:
+      envVar: AUTHPROXY_DB_PASSWORD
   blobStorage:
     provider: s3
     endpoint: http://demo-minio:9000

@@ -13,7 +13,6 @@ import (
 //
 // Note that the schema for this object is in the parent package.
 type Connectors struct {
-	AutoMigrate               *bool                 `json:"autoMigrate,omitempty" yaml:"autoMigrate,omitempty"`
 	AutoMigrationLockDuration *common.HumanDuration `json:"autoMigrationLockDuration,omitempty" yaml:"autoMigrationLockDuration,omitempty"`
 	LoadFromList              []Connector           `json:"loadFromList,omitempty" yaml:"loadFromList,omitempty"`
 }
@@ -22,13 +21,6 @@ func FromList(c []Connector) *Connectors {
 	return &Connectors{
 		LoadFromList: c,
 	}
-}
-
-func (c *Connectors) GetAutoMigrate() bool {
-	if c.AutoMigrate == nil {
-		return true
-	}
-	return *c.AutoMigrate
 }
 
 func (c *Connectors) GetAutoMigrationLockDurationOrDefault() time.Duration {

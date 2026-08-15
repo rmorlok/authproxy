@@ -12,7 +12,9 @@ ghcr.io/rmorlok/authproxy:<tag>
 
 The image contains the Go server and embedded Marketplace and Admin UI assets.
 Its default command starts all services with `dev_config/docker.yaml`; a real
-deployment should mount or generate its own configuration and Secrets.
+deployment should mount or generate its own configuration and Secrets. The
+default command performs read-only schema verification; it never migrates a
+database unless the operator explicitly supplies `serve --auto-migrate`.
 
 Published tag forms include:
 

@@ -1,80 +1,104 @@
 ---
-title: Automatic migrations
-description: Understand how AuthProxy coordinates schema migrations and startup reconciliation across service processes.
+title: Database migrations
+description: Inspect and migrate AuthProxy schemas safely before starting production services.
 ---
 
-AuthProxy can apply database migrations automatically when a service starts.
-Every enabled service may start at the same time, so automatic migration uses
-Redis mutexes to ensure that only one process migrates each storage target.
+AuthProxy verifies every configured schema before opening a listener or starting
+a worker. Normal `serve` processes never change schemas. Run migrations as an
+explicit deployment step before starting or updating production workloads.
 
-## Configure automatic migration
+## Inspect schema status
 
-The primary database and application-metrics store have independent switches
-and independent locks:
+Report every migration target without changing a database:
 
-~~~yaml
-database:
-  provider: postgres
-  autoMigrate: true
-  autoMigrationLockDuration: 2m
-  # ...
+```sh
+authproxy migrate status --config=/etc/authproxy/config.yaml
+```
 
-app_metrics:
-  autoMigrate: true
-  database:
-    provider: clickhouse
-    autoMigrationLockDuration: 2m
-    # ...
-~~~
+Limit the report to one target by adding `main-database`, `workflows`, or
+`app-metrics`:
 
-The `autoMigrationLockDuration` value is the Redis lease duration.
-AuthProxy refreshes the lease while migration is running, so it is not a
-maximum migration runtime. Contending processes wait for a bounded period
-based on the same duration and then fail startup rather than continuing
-without exclusivity.
+```sh
+authproxy migrate status app-metrics --config=/etc/authproxy/config.yaml
+```
 
-## Lock targets and providers
+The report includes the provider, current version, highest version available in
+the AuthProxy binary, dirty flag, and compatibility state. The command exits
+non-zero when a requested target is missing, behind, ahead, dirty, or
+unavailable. Inspection is read-only and does not create a missing SQLite file
+or migration table.
 
-The primary relational schema and workflow schema share
-`db-migrate-lock` and run sequentially. The application-metrics
-schema uses the separate `app-metrics-migrate-lock`, because it may
-live in a different database and should not block an unrelated primary
-migration.
+## Apply migrations
 
-The Redis contract is the same for SQLite, PostgreSQL, and ClickHouse:
+Upgrade every target to its latest version in dependency order:
 
-1. acquire the target mutex;
-2. refresh it every third of the lease duration;
-3. apply all migrations;
-4. release the mutex and report any release failure.
+```sh
+authproxy migrate all --config=/etc/authproxy/config.yaml
+```
 
-If a refresh fails, AuthProxy cancels the migration context, asks the migration
-runner to stop at its next safe boundary, and fails startup. It never treats an
-expired or unconfirmed lease as successful migration ownership.
+The order is `main-database`, `workflows`, then `app-metrics`. Processing stops
+at the first failure. Earlier targets remain migrated because independent
+databases cannot share a transaction.
 
-PostgreSQL also retains the advisory lock supplied by its migration driver.
-That database-native lock provides defense in depth and interoperability with
-other processes that use the same migration driver. Redis supplies the
-provider-independent coordination needed by SQLite and ClickHouse.
+Target one schema or an exact version when needed:
 
-## Startup reconciliation
+```sh
+authproxy migrate main-database
+authproxy migrate main-database up 16
+authproxy migrate workflows down
+authproxy migrate workflows down 2
+```
 
-Schema migration is followed by reconciliation of encryption keys, configured
-connectors, namespaces, and configured actors. These operations use distinct
-renewable Redis mutexes because they may include database cleanup or calls to
-external key providers. A key-sync sentinel additionally suppresses redundant
-work; the sentinel controls frequency, while the mutex prevents overlap.
+`up` is the default direction. Without a version, `up` selects the latest
+available version and `down` rolls back one version. A supplied version is an
+absolute target version. Exact versions are not accepted with `all`, because
+the three targets have independent version sequences. `all down` rolls back
+one version in reverse dependency order: app metrics, workflows, then the main
+database.
 
-Failures acquiring, refreshing, or releasing these mutexes are surfaced as
-startup or task errors; automatic database migration logs also identify its
-lock key. Successful database migration, no-change outcomes, and original
-migration failures are logged separately.
+AuthProxy does not automatically force or repair a dirty schema. Diagnose the
+failed migration and restore or repair the database deliberately before
+retrying.
 
-## Production rollout
+## Local automatic migration
 
-Automatic migration is convenient for local, demo, and controlled deployments.
-For a multi-replica production rollout, keep database backups current and
-ensure all replicas use the same Redis service. Prefer a deployment workflow
-that runs migration as an explicit pre-rollout step and starts application
-replicas only after it succeeds; dedicated migration-job packaging is tracked
-separately from the automatic startup path.
+For a disposable development environment, migration and configuration
+reconciliation can run once before service fan-out:
+
+```sh
+go run ./cmd/server serve --auto-migrate \
+  --config=./dev_config/default.yaml all
+```
+
+`--auto-migrate` is intentionally a CLI-only option and is unsafe for
+production. It upgrades all schemas, initializes required encryption-key
+state, reconciles configured connectors and actors, verifies compatibility,
+and only then starts the requested services. Omitting it performs read-only
+verification only.
+
+## Locks and concurrency
+
+The main and workflow schemas share the renewable Redis lock
+`db-migrate-lock`; app metrics uses `app-metrics-migrate-lock`. The lock lease
+is refreshed every third of its configured duration. PostgreSQL migration
+drivers also retain their native advisory lock. Concurrent migration processes
+therefore serialize across SQLite, PostgreSQL, and ClickHouse while retaining
+the database-native protection available in PostgreSQL.
+
+`database.autoMigrationLockDuration`,
+`appMetrics.database.autoMigrationLockDuration`, and
+`connectors.autoMigrationLockDuration` tune lock leases. They do not enable
+automatic migration.
+
+## Kubernetes deployments
+
+The Helm chart and demo Kustomize manifests include a dedicated migration Job
+that uses the same image, configuration, credentials, and mounted key material
+as the AuthProxy workload. Wait for that Job to succeed before waiting for or
+promoting the AuthProxy Deployment. A failed Job stops the rollout and its pod
+logs contain the target-specific migration error.
+
+For Helm, use `--wait --wait-for-jobs`; every release revision renders a new
+migration Job. Application pods may be scheduled concurrently, but mandatory
+startup verification prevents them from opening listeners or starting workers
+until the Job has made every schema current.

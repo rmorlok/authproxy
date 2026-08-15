@@ -41,6 +41,13 @@ serviceAccount:
 # different `services` blocks (see chart README for examples).
 replicaCount: 1
 
+# -- Dedicated schema migration Job. The Job uses the release image and
+# configuration and must succeed before the application rollout is promoted.
+migrationJob:
+  enabled: true
+  backoffLimit: 3
+  activeDeadlineSeconds: 900
+
 # -- HorizontalPodAutoscaler configuration. Disabled by default so existing
 # installs keep using `replicaCount`. When enabled, the Deployment omits
 # `spec.replicas` and the HPA owns the desired replica count. Install this
@@ -216,8 +223,6 @@ database:
   user: authproxy
   # -- Postgres SSL mode (`disable`, `require`, `verify-ca`, `verify-full`).
   sslmode: require
-  # -- Run schema migrations at startup.
-  autoMigrate: true
   # -- Secret holding the database password. Must contain a key named
   # `AUTHPROXY_DB_PASSWORD` (the env var the rendered config references).
   # The chart wires it via `envFrom`; the password never appears in the
@@ -328,8 +333,6 @@ appMetrics:
   # main database section into `appMetrics.database`. Set to false to
   # configure a dedicated `database:` block below.
   shareMainDatabase: true
-  # -- Run appMetrics schema migrations at startup.
-  autoMigrate: true
   # -- Dedicated database block for appMetrics. Only consulted when
   # `shareMainDatabase` is false. Same field shape as the top-level
   # `database` block (provider, host, port, etc.).
@@ -347,8 +350,6 @@ appMetrics:
 # block — supply at least an empty `loadFromList` even when you intend to
 # manage connectors through the admin API at runtime.
 connectors:
-  # -- Run connector schema migrations at startup.
-  autoMigrate: true
   # -- Inline connector definitions loaded at boot. See the AuthProxy
   # connector schema docs for the format. Leave empty to manage connectors
   # exclusively through the admin API.

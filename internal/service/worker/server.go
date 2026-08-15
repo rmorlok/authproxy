@@ -107,7 +107,6 @@ func Serve(cfg config.C) {
 		c.PureJSON(status, response)
 	})
 
-	dm.AutoMigrateAll()
 	defer dm.ShutdownDatabase()
 	defer dm.GetEncryptService().Shutdown()
 	defer dm.ShutdownWorkflowRuntime()

@@ -13,7 +13,6 @@ appMetrics:
   resourceSnapshotInterval: 15m
   database:
     provider: clickhouse
-    autoMigrate: true
     addresses:
       - localhost:8123
     database: authproxy
@@ -37,8 +36,9 @@ Key settings:
 
 The resource snapshot worker stores live resources at each interval. Deleted resources remain visible in historical time slices where they were sampled, but they are excluded from later snapshots.
 
-See [Automatic migrations](/operations/migrations/) for startup locking and
-lease-renewal behavior across SQLite, PostgreSQL, and ClickHouse.
+See [Database migrations](/operations/migrations/) for status inspection,
+explicit migration commands, and locking behavior across SQLite, PostgreSQL,
+and ClickHouse.
 
 ## Request events
 

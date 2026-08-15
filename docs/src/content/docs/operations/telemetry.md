@@ -260,7 +260,7 @@ A one-command local observability stack ships under a new `observability` compos
 ```bash
 docker compose --profile observability up -d
 export AUTHPROXY_OTEL_ENDPOINT=http://localhost:4317
-go run ./cmd/server serve --config=./dev_config/default.yaml all
+go run ./cmd/server serve --auto-migrate --config=./dev_config/default.yaml all
 ```
 
 Grafana is at <http://localhost:3000> — no login required. A pre-provisioned dashboard (**AuthProxy — Proxy RED + Inbound HTTP**) lives under the `AuthProxy` folder. The full operator runbook with query examples, persistence notes, and limitations is in [`dev_config/observability/README.md`](https://github.com/rmorlok/authproxy/blob/main/dev_config/observability/README.md).

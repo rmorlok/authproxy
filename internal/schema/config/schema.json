@@ -60,9 +60,6 @@
     },
     "Connectors": {
       "properties": {
-        "autoMigrate": {
-          "type": "boolean"
-        },
         "autoMigrationLockDuration": {
           "$ref": "../common/schema.json#/$defs/HumanDuration"
         },
@@ -160,9 +157,6 @@
         "path": {
           "type": "string"
         },
-        "autoMigrate": {
-          "type": "boolean"
-        },
         "autoMigrationLockDuration": {
           "$ref": "../common/schema.json#/$defs/HumanDuration"
         },
@@ -211,9 +205,6 @@
             }
           }
         },
-        "autoMigrate": {
-          "type": "boolean"
-        },
         "autoMigrationLockDuration": {
           "$ref": "../common/schema.json#/$defs/HumanDuration"
         },
@@ -260,9 +251,6 @@
             "http",
             "native"
           ]
-        },
-        "autoMigrate": {
-          "type": "boolean"
         },
         "autoMigrationLockDuration": {
           "$ref": "../common/schema.json#/$defs/HumanDuration"
@@ -375,9 +363,6 @@
     },
     "AppMetrics": {
       "properties": {
-        "autoMigrate": {
-          "type": "boolean"
-        },
         "database": {
           "$ref": "#/$defs/DatabaseOrWarehouse"
         },

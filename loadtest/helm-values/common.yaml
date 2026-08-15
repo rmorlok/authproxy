@@ -6,6 +6,9 @@ image:
 serviceAccount:
   create: true
 
+migrationJob:
+  enabled: false
+
 # `up` installs or reuses one cluster-level KEDA controller before these role
 # releases. Do not render a controller for each independently scaled release.
 keda:
@@ -35,7 +38,6 @@ database:
   database: authproxy
   user: authproxy
   sslmode: disable
-  autoMigrate: false
   existingSecret: authproxy-load-db
 
 redis:
@@ -69,12 +71,10 @@ blobStorage:
     emptyDir: true
 
 connectors:
-  autoMigrate: false
   loadFromList: []
 
 appMetrics:
   shareMainDatabase: false
-  autoMigrate: true
   existingSecret: authproxy-load-clickhouse
   database:
     provider: clickhouse

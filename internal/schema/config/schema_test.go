@@ -128,6 +128,16 @@ func Test_SchemaAppMetricsShape(t *testing.T) {
 		},
 	}))
 
+	require.Error(t, schema.Validate(map[string]any{
+		"appMetrics": map[string]any{
+			"autoMigrate": true,
+			"database": map[string]any{
+				"provider": "sqlite",
+				"path":     "./tmp/app_metrics.db",
+			},
+		},
+	}))
+
 	require.NoError(t, schema.Validate(map[string]any{
 		"connections": map[string]any{
 			"setupTtl": "1s",
@@ -381,8 +391,8 @@ func TestSchemaDefinitions(t *testing.T) {
 					Data:  `{"test": {"provider": "sqlite", "path": "/data/db.sqlite"}}`,
 				},
 				{
-					Name:  "sqlite with auto_migrate",
-					Valid: true,
+					Name:  "sqlite rejects removed auto_migrate",
+					Valid: false,
 					Data:  `{"test": {"provider": "sqlite", "path": "/data/db.sqlite", "autoMigrate": true}}`,
 				},
 				{
@@ -401,8 +411,8 @@ func TestSchemaDefinitions(t *testing.T) {
 					Data:  `{"test": {"provider": "postgres", "host": "example", "port": 1234, "user": "bobdole", "password": "secret", "sslmode": "disable"}}`,
 				},
 				{
-					Name:  "postgres with auto_migrate",
-					Valid: true,
+					Name:  "postgres rejects removed auto_migrate",
+					Valid: false,
 					Data:  `{"test": {"provider": "postgres", "host": "localhost", "autoMigrate": true}}`,
 				},
 				{
@@ -454,8 +464,8 @@ func TestSchemaDefinitions(t *testing.T) {
 					Data:  `{"test": {"provider": "sqlite", "path": "/data/db.sqlite"}}`,
 				},
 				{
-					Name:  "sqlite with auto_migrate",
-					Valid: true,
+					Name:  "sqlite warehouse rejects removed auto_migrate",
+					Valid: false,
 					Data:  `{"test": {"provider": "sqlite", "path": "/data/db.sqlite", "autoMigrate": true}}`,
 				},
 				{
@@ -474,8 +484,8 @@ func TestSchemaDefinitions(t *testing.T) {
 					Data:  `{"test": {"provider": "postgres", "host": "example", "port": 1234, "user": "bobdole", "password": "secret", "sslmode": "disable"}}`,
 				},
 				{
-					Name:  "postgres with auto_migrate",
-					Valid: true,
+					Name:  "postgres warehouse rejects removed auto_migrate",
+					Valid: false,
 					Data:  `{"test": {"provider": "postgres", "host": "localhost", "autoMigrate": true}}`,
 				},
 				{
@@ -504,8 +514,8 @@ func TestSchemaDefinitions(t *testing.T) {
 					Data:  `{"test": {"provider": "clickhouse", "addressList": "host1,host2", "user": "bobdole", "password": "secret", "database": "authproxy"}}`,
 				},
 				{
-					Name:  "clickhouse with auto_migrate",
-					Valid: true,
+					Name:  "clickhouse rejects removed auto_migrate",
+					Valid: false,
 					Data:  `{"test": {"provider": "clickhouse", "address": "localhost", "autoMigrate": true}}`,
 				},
 				{
@@ -991,8 +1001,8 @@ func TestSchemaDefinitions(t *testing.T) {
 					Data:  `{"test": {"identifyingLabels": ["type", "region"]}}`,
 				},
 				{
-					Name:  "with auto_migrate",
-					Valid: true,
+					Name:  "rejects removed auto_migrate",
+					Valid: false,
 					Data:  `{"test": {"autoMigrate": true, "autoMigrationLockDuration": "30s"}}`,
 				},
 				{

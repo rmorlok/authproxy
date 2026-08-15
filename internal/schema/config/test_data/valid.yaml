@@ -39,7 +39,6 @@ errorPages:
   internalError: https://example.com
 database:
   provider: sqlite
-  autoMigrate: true
   autoMigrationLockDuration: 30s
   path: ./tmp/dev.db
 logging:
@@ -51,7 +50,6 @@ appMetrics:
     fullRequestRecording: always
   database:
     provider: sqlite
-    autoMigrate: true
     path: ./tmp/app_metrics.db
 redis:
   provider: redis
@@ -59,7 +57,6 @@ redis:
 oauth:
   roundTripTtl: 60m
 connectors:
-  autoMigrate: true
   autoMigrationLockDuration: 30s
   loadFromList:
     - name: google-drive

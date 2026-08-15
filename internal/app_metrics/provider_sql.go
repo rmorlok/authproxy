@@ -12,14 +12,10 @@ import (
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
-	"github.com/golang-migrate/migrate/v4"
-	migratedb "github.com/golang-migrate/migrate/v4/database"
-	"github.com/golang-migrate/migrate/v4/database/postgres"
-	"github.com/golang-migrate/migrate/v4/database/sqlite3"
-	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"
+	"github.com/rmorlok/authproxy/internal/migration"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/sqlh"
 	"github.com/rmorlok/authproxy/internal/util"
@@ -172,77 +168,7 @@ func (s *sqlRecordStore) StoreRecords(ctx context.Context, records []*LogRecord)
 }
 
 func (s *sqlRecordStore) Migrate(ctx context.Context) (resultErr error) {
-	provider := string(s.cfg.GetProvider())
-	s.logger.Info("running app metrics database migrations", "provider", provider)
-	defer func() {
-		if resultErr != nil {
-			s.logger.Error("app metrics database migrations failed", "provider", provider, "error", resultErr)
-			return
-		}
-		s.logger.Info("app metrics database migrations complete", "provider", provider)
-	}()
-
-	d, err := iofs.New(appMetricsMigrationsFs, fmt.Sprintf("migrations/%s", provider))
-	if err != nil {
-		return fmt.Errorf("failed to load app metrics migrations for '%s': %w", provider, err)
-	}
-
-	driver, err := s.newMigrationDriver()
-	if err != nil {
-		return fmt.Errorf("failed to setup app metrics migration driver: %w", err)
-	}
-
-	m, err := migrate.NewWithInstance("iofs", d, provider, driver)
-	if err != nil {
-		_ = driver.Close()
-		return fmt.Errorf("failed to setup app metrics migrations: %w", err)
-	}
-	defer func() {
-		sourceErr, dbErr := m.Close()
-		if sourceErr != nil || dbErr != nil {
-			s.logger.Warn("failed to close migrator", "source_err", sourceErr, "db_err", dbErr)
-		}
-	}()
-
-	err = util.RunMigrationsUp(ctx, m)
-	if err != nil {
-		if errors.Is(err, migrate.ErrNoChange) {
-			s.logger.Info("no app metrics migrations required")
-			return nil
-		}
-		return fmt.Errorf("failed to migrate app metrics database: %w", err)
-	}
-
-	return nil
-}
-
-func (s *sqlRecordStore) newMigrationDriver() (migratedb.Driver, error) {
-	migrationConn, err := sql.Open(s.cfg.GetDriver(), s.cfg.GetDsn())
-	if err != nil {
-		return nil, err
-	}
-
-	switch s.cfg.GetProvider() {
-	case config.DatabaseProviderPostgres:
-		driver, err := postgres.WithInstance(migrationConn, &postgres.Config{
-			MigrationsTable: appMetricsMigrationsTable,
-		})
-		if err != nil {
-			_ = migrationConn.Close()
-		}
-		return driver, err
-	case config.DatabaseProviderSqlite:
-		driver, err := sqlite3.WithInstance(migrationConn, &sqlite3.Config{
-			MigrationsTable: appMetricsMigrationsTable,
-		})
-		if err != nil {
-			_ = migrationConn.Close()
-		}
-		return driver, err
-	default:
-		_ = migrationConn.Close()
-		return nil, fmt.Errorf("unsupported SQL app metrics provider %q", s.cfg.GetProvider())
-	}
+	return RunMigrations(ctx, s.cfg, s.logger, migration.DirectionUp, nil)
 }
 
 func (s *sqlRecordStore) Ping(ctx context.Context) bool {

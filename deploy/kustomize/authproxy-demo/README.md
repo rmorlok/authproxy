@@ -10,7 +10,9 @@ workloads. Overlays choose backing services and public hostnames:
 - `overlays/demo` targets `demo.authproxy.net` and includes Postgres, Redis,
   and MinIO backing workloads.
 - `overlays/dev` targets an example per-branch namespace and keeps the slim
-  dev profile: SQLite, embedded miniredis, and filesystem blob storage.
+  dev profile: SQLite, embedded miniredis, and filesystem blob storage. Its
+  disposable pod-local database uses `serve --auto-migrate`; it removes the
+  dedicated Job because a separate pod cannot migrate that SQLite file.
 
 Render locally:
 
@@ -27,6 +29,13 @@ Prometheus, Tempo, and Loki datasources, and sample app metrics dashboard
 provisioned from Kustomize ConfigMaps. Prometheus, Tempo, Loki, and the OTel
 Collector are provided by the internal `otel-lgtm` workload; AuthProxy exports
 OTLP/gRPC telemetry to `demo-otel-lgtm:4317`.
+
+The demo manifest also includes `<env>-authproxy-migrate`. Deployment workflows
+delete the completed Job from the previous release, apply only the release
+prerequisites, wait for PostgreSQL and Redis, apply and unsuspend the migration
+Job, then require it to complete before applying the new AuthProxy workload.
+When applying the rendered demo manifest manually, patch `spec.suspend=false` on
+`<env>-authproxy-migrate` only after those dependencies are ready.
 
 During the Helm-to-Kustomize cutover, `Deploy Demo` preserves the operator
 Secrets listed below, uninstalls any legacy `demo` / `authproxy-demo` Helm

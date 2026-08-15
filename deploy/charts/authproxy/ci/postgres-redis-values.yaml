@@ -1,7 +1,7 @@
 # chart-testing values for the helm-chart-ci workflow.
 #
 # Minimum-deps profile per A5 (#287):
-#   - SQLite database (no external DB)
+#   - PostgreSQL so the migration Job and Deployment share durable schema state
 #   - real Redis as a tiny in-cluster Deployment (applied by the workflow
 #     before `ct install`, addressable at `redis:6379` in the test namespace)
 #   - JWT + encryption key Secrets are generated and applied by the workflow
@@ -19,8 +19,13 @@ image:
   pullPolicy: Never
 
 database:
-  provider: sqlite
-  path: /tmp/authproxy.db
+  provider: postgres
+  host: postgres
+  port: 5432
+  database: authproxy
+  user: authproxy
+  sslmode: disable
+  existingSecret: authproxy-db
 
 redis:
   address: redis:6379
@@ -40,7 +45,6 @@ hostApplication:
   initiateSessionUrl: http://placeholder.invalid/login
 
 connectors:
-  autoMigrate: true
   loadFromList: []
 
 # Faster probes so the helm test pod's rollout wait doesn't stall.

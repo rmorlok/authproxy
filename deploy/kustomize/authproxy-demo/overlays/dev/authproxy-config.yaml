@@ -16,17 +16,14 @@ worker:
   healthCheckPort: 8083
 database:
   provider: sqlite
-  autoMigrate: true
   path: /tmp/authproxy-dev.db
 redis:
   provider: miniredis
 hostApplication:
   initiateSessionUrl: https://branch.dev.authproxy.net/
 connectors:
-  autoMigrate: true
   loadFromList: []
 appMetrics:
-  autoMigrate: true
   database:
     provider: sqlite
     path: /tmp/authproxy-dev.db.app-metrics

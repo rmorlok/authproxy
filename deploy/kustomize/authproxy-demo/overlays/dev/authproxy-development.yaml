@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: authproxy
+spec:
+  template:
+    spec:
+      containers:
+        - name: authproxy
+          args:
+            - serve
+            - --auto-migrate
+            - --config=/etc/authproxy/config.yaml
+            - admin-api,api,public,worker
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: authproxy-migrate
+$patch: delete
