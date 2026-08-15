@@ -1,6 +1,23 @@
 /* eslint-disable react/react-in-jsx-scope -- Vite uses the automatic JSX runtime. */
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
 
+const adminPreview = new URL(
+  '../../../../docs/screenshots/admin-ui-rate-limits/03-populated-list.png',
+  import.meta.url,
+).href;
+const marketplacePreview = new URL(
+  '../../../../docs/screenshots/marketplace-visual-coverage/available-connectors-desktop.png',
+  import.meta.url,
+).href;
+const telemetryPreview = new URL(
+  '../../../../docs/screenshots/app-metrics-home-dashboard/home-dashboard.png',
+  import.meta.url,
+).href;
+const oauthPreview = new URL(
+  '../../../../docs/screenshots/marketplace-setup-flows/setup-dialog.png',
+  import.meta.url,
+).href;
+
 type Experience = 'admin' | 'marketplace' | 'telemetry' | 'oauth-provider';
 type ActorID = 'demo-user' | 'fresh-user';
 
@@ -25,6 +42,7 @@ const EXPERIENCES: Array<{
   label: string;
   description: string;
   preview: string;
+  previewImage: string;
 }> = [
   {
     id: 'admin',
@@ -32,6 +50,7 @@ const EXPERIENCES: Array<{
     label: 'Admin UI',
     description: 'Configure namespaces, actors, connectors, tasks, encryption keys, and rate limits.',
     preview: 'admin',
+    previewImage: adminPreview,
   },
   {
     id: 'marketplace',
@@ -39,6 +58,7 @@ const EXPERIENCES: Array<{
     label: 'Integration Marketplace',
     description: 'Browse the seeded connector catalog and walk through an end-user connection flow.',
     preview: 'marketplace',
+    previewImage: marketplacePreview,
   },
   {
     id: 'telemetry',
@@ -46,6 +66,7 @@ const EXPERIENCES: Array<{
     label: 'Telemetry',
     description: 'Review demo traffic, performance, traces, logs, and metrics in Grafana.',
     preview: 'telemetry',
+    previewImage: telemetryPreview,
   },
   {
     id: 'oauth-provider',
@@ -53,6 +74,7 @@ const EXPERIENCES: Array<{
     label: 'Demo OAuth Provider',
     description: 'Open the disposable OAuth provider used by the Marketplace connector examples.',
     preview: 'oauth',
+    previewImage: oauthPreview,
   },
 ];
 
@@ -84,12 +106,16 @@ function CredentialNotice() {
   );
 }
 
-function ExperiencePreview({ kind }: { kind: string }) {
+function ExperiencePreview({
+  kind,
+  image,
+}: {
+  kind: string;
+  image: string;
+}) {
   return (
     <span className={`experience-preview preview-${kind}`} aria-hidden="true">
-      <span />
-      <span />
-      <span />
+      <img src={image} alt="" />
     </span>
   );
 }
@@ -216,11 +242,12 @@ export function App() {
           </>
         )}
 
-        <fieldset className="step">
-          <legend>
-            <span>Step 1</span> What would you like to explore?
-          </legend>
-          <div className="experience-grid">
+        <section className="step" aria-labelledby="experience-heading">
+          <div className="step-heading">
+            <p className="eyebrow">Step 1</p>
+            <h2 id="experience-heading">What would you like to explore?</h2>
+          </div>
+          <div className="experience-grid" role="radiogroup" aria-labelledby="experience-heading">
             {EXPERIENCES.map((option) => (
               <label
                 className={`experience-card ${experience === option.id ? 'is-selected' : ''}`}
@@ -233,14 +260,17 @@ export function App() {
                   checked={experience === option.id}
                   onChange={() => selectExperience(option.id)}
                 />
-                <ExperiencePreview kind={option.preview} />
+                <ExperiencePreview
+                  kind={option.preview}
+                  image={option.previewImage}
+                />
                 <span className="eyebrow">{option.eyebrow}</span>
                 <span className="card-title">{option.label}</span>
                 <span className="card-description">{option.description}</span>
               </label>
             ))}
           </div>
-        </fieldset>
+        </section>
 
         {experience === 'admin' && (
           <section className="journey-summary" aria-live="polite">
