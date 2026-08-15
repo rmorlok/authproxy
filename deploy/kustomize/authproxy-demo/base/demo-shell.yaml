@@ -37,6 +37,8 @@ spec:
               value: https://marketplace.demo.authproxy.net
             - name: AUTHPROXY_ADMIN_UI_URL
               value: https://admin.demo.authproxy.net
+            - name: AUTHPROXY_GO_OAUTH2_SERVER_URL
+              value: https://oauth2.demo.authproxy.net
           readinessProbe:
             httpGet:
               path: /healthz

@@ -2,9 +2,9 @@
 
 AuthProxy is normally embedded in a host application that handles user
 authentication. The demo environment needs a stand-in for that host —
-something with a "pick your demo identity" dropdown that mints a JWT
-vouching for the selected user and redirects them into the AuthProxy
-marketplace or admin UI.
+something that guides a visitor to an AuthProxy surface. It mints a JWT
+vouching for the chosen Marketplace user (or the fixed demo administrator)
+before redirecting them into the appropriate AuthProxy UI.
 
 **Never ship this to customers.** It only lives in the demo environment.
 
@@ -13,8 +13,8 @@ marketplace or admin UI.
 ```
    ┌──────────────────────┐        POST /sso         ┌──────────────────────┐
    │  Frontend (Vite)     │  ─────────────────────►  │  Backend (Go)         │
-   │  actor + destination │                          │  - signs JWT          │
-   │  dropdowns           │                          │  - 303 redirect       │
+   │  guided demo journey │                          │  - signs JWT          │
+   │  radio-card choices  │                          │  - 303 redirect       │
    └──────────────────────┘                          └──────────┬───────────┘
                                                                 │
                                                                 ▼
@@ -88,10 +88,11 @@ the embedded build at the same root.
 
 ### 4. Drive the flow
 
-Open <http://localhost:8888>. Pick `demo-admin` + Admin UI → submit →
-you're redirected to the AuthProxy admin UI as `demo-admin` with a fresh
-session. Pick `fresh-user` + Marketplace → empty marketplace, no
-connections.
+Open <http://localhost:8888>. Choose **Admin UI** → submit → you're redirected
+to the AuthProxy admin UI as `demo-admin` with a fresh session. Choose
+**Integration Marketplace**, then **Fresh user** → submit → an empty
+Marketplace opens with no connections. When configured, the shell also links
+directly to Grafana's telemetry views and the demo OAuth provider.
 
 ## Local smoke via docker-compose
 
@@ -130,14 +131,16 @@ The backend reads the following env vars:
 | `AUTHPROXY_GRAFANA_URL`   | ⛔        | Optional Grafana base URL; enables telemetry links in the shell             |
 | `AUTHPROXY_GRAFANA_APP_METRICS_URL` | ⛔ | Optional override for the app-metrics dashboard link                        |
 | `AUTHPROXY_GRAFANA_EXPLORE_URL` | ⛔   | Optional override for the Grafana Explore link                              |
+| `AUTHPROXY_GO_OAUTH2_SERVER_URL` | ⛔ | Optional direct URL for the disposable OAuth provider; enables its shell card |
 | `DEV_FRONTEND_URL`        | ⛔        | If set, `GET /` redirects here instead of serving the embedded build        |
 | `PORT`                    | ⛔        | Default `8888`                                                              |
 
 The frontend reads `/config.json` from the backend at runtime. When
 `AUTHPROXY_GRAFANA_URL` is set, the backend returns links to Grafana,
-the provisioned AuthProxy App Metrics dashboard, and Explore. In Vite
-dev mode, `/config.json` and `/sso` are proxied to the backend; override
-`AUTHPROXY_DEMO_SHELL_BACKEND_URL` if the backend is not on
+the provisioned AuthProxy App Metrics dashboard, and Explore. When
+`AUTHPROXY_GO_OAUTH2_SERVER_URL` is set, it enables the disposable OAuth
+provider card. In Vite dev mode, `/config.json` and `/sso` are proxied to the
+backend; override `AUTHPROXY_DEMO_SHELL_BACKEND_URL` if the backend is not on
 `http://localhost:8888`.
 
 ## Why one signing key, not three

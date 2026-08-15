@@ -15,10 +15,12 @@ other private information.
 AuthProxy is designed to use the host application's identity. The demo has no
 host product, so the **Demo Shell** stands in for one:
 
-1. You choose an example actor and a destination.
-2. The shell signs a short-lived, one-time JWT identifying that actor.
-3. The browser is redirected to the Marketplace or Admin UI with the token.
-4. AuthProxy validates the signature and exchanges the token for a UI session.
+1. You choose an AuthProxy surface to explore.
+2. For the Marketplace, you choose the demo user who will own the connection;
+   the Admin UI always uses the demo administrator.
+3. The shell signs a short-lived, one-time JWT identifying that actor.
+4. The browser is redirected to the Marketplace or Admin UI with the token.
+5. AuthProxy validates the signature and exchanges the token for a UI session.
 
 ```mermaid
 sequenceDiagram
@@ -27,7 +29,7 @@ sequenceDiagram
     participant UI as Marketplace or Admin UI
     participant AP as AuthProxy
 
-    User->>Shell: Choose actor and destination
+    User->>Shell: Choose a demo journey and actor when needed
     Shell->>Shell: Sign nonce JWT for actor
     Shell-->>UI: Redirect with authToken
     UI->>AP: POST /session/_initiate
@@ -44,8 +46,9 @@ production version of this handoff.
 
 ## Marketplace
 
-Open the Marketplace through the
-[Demo Shell](https://demo.authproxy.net/) or visit the
+Choose **Integration Marketplace** in the [Demo Shell](https://demo.authproxy.net/),
+then choose **Demo user** to explore a preconfigured user or **Fresh user** to
+begin with an empty Marketplace. You can also visit the
 [Marketplace directly](https://marketplace.demo.authproxy.net/) if you already
 have a demo session.
 
@@ -72,13 +75,13 @@ either:
 - **Register** on the provider login page to create your own disposable
   account.
 
-The provider is reached as part of the connector flow; its hostname is not a
-standalone demo homepage. Accounts and tokens exist only to exercise OAuth
+You can also choose **Demo OAuth Provider** in the Demo Shell to open its
+standalone test sign-in. Accounts and tokens exist only to exercise OAuth
 behavior in this test environment.
 
 ## Admin UI
 
-Choose **Demo admin** and **Admin UI** in the Demo Shell.
+Choose **Admin UI** in the Demo Shell. It always opens as `demo-admin`.
 
 ![Managing AuthProxy in the Admin UI](../images/admin-walkthrough.gif)
 
@@ -88,7 +91,8 @@ encryption keys, and rate limits.
 
 ## Grafana
 
-[Open Grafana](https://demo.authproxy.net/grafana) with anonymous viewer
+Choose **Telemetry** in the Demo Shell, then select the Grafana view you want
+to open. [Grafana](https://demo.authproxy.net/grafana) has anonymous viewer
 access. The workspace includes:
 
 - an [AuthProxy app-metrics dashboard](https://demo.authproxy.net/grafana/d/authproxy-app-metrics-demo/authproxy-app-metrics?orgId=1&from=now-1h&to=now)

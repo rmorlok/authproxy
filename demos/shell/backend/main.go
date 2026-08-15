@@ -8,10 +8,10 @@
 // as a query parameter. AuthProxy validates the signature against the
 // admin's stored public key and establishes a session.
 //
-// The demo shell short-circuits the "actual auth" step: it presents three
-// well-known demo actor identities as a dropdown and signs a JWT for the
-// picked one. **Not** something you'd ship to customers — lives only in
-// the demo environment.
+// The demo shell short-circuits the "actual auth" step: it guides a visitor
+// to a demo surface and, when that surface needs an AuthProxy session, signs
+// a JWT for the selected well-known demo actor. **Not** something you'd ship
+// to customers — lives only in the demo environment.
 package main
 
 import (
@@ -61,6 +61,7 @@ type settings struct {
 	authUrl             string
 	destinationUrls     map[string]string
 	devFrontendUrl      string
+	oauthProviderURL    string
 	telemetryLinks      []telemetryLink
 	tokenTtl            time.Duration
 }
@@ -96,11 +97,16 @@ func loadSettings() settings {
 		// DEV_FRONTEND_URL=http://localhost:5175 makes GET / proxy to a
 		// running vite dev server for HMR. Empty in production — frontend
 		// is served from the embedded FS.
-		devFrontendUrl:  os.Getenv("DEV_FRONTEND_URL"),
-		destinationUrls: destURLs,
-		telemetryLinks:  loadTelemetryLinks(),
-		tokenTtl:        15 * time.Minute,
+		devFrontendUrl:   os.Getenv("DEV_FRONTEND_URL"),
+		destinationUrls:  destURLs,
+		oauthProviderURL: loadOAuthProviderURL(),
+		telemetryLinks:   loadTelemetryLinks(),
+		tokenTtl:         15 * time.Minute,
 	}
+}
+
+func loadOAuthProviderURL() string {
+	return strings.TrimRight(strings.TrimSpace(os.Getenv("AUTHPROXY_GO_OAUTH2_SERVER_URL")), "/")
 }
 
 func loadTelemetryLinks() []telemetryLink {
@@ -207,7 +213,8 @@ func ssoHandler(s settings, logger *slog.Logger) http.HandlerFunc {
 
 func configHandler(s settings) http.HandlerFunc {
 	type response struct {
-		TelemetryLinks []telemetryLink `json:"telemetryLinks"`
+		OAuthProviderURL string          `json:"oauthProviderUrl"`
+		TelemetryLinks   []telemetryLink `json:"telemetryLinks"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -217,7 +224,10 @@ func configHandler(s settings) http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(response{TelemetryLinks: s.telemetryLinks}); err != nil {
+		if err := json.NewEncoder(w).Encode(response{
+			OAuthProviderURL: s.oauthProviderURL,
+			TelemetryLinks:   s.telemetryLinks,
+		}); err != nil {
 			http.Error(w, "internal error", http.StatusInternalServerError)
 		}
 	}
