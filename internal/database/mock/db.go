@@ -1365,20 +1365,6 @@ func (mr *MockDBMockRecorder) MarkNotificationsViewed(ctx, notificationIDs, acto
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkNotificationsViewed", reflect.TypeOf((*MockDB)(nil).MarkNotificationsViewed), ctx, notificationIDs, actorID)
 }
 
-// Migrate mocks base method.
-func (m *MockDB) Migrate(ctx context.Context) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Migrate", ctx)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Migrate indicates an expected call of Migrate.
-func (mr *MockDBMockRecorder) Migrate(ctx interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Migrate", reflect.TypeOf((*MockDB)(nil).Migrate), ctx)
-}
-
 // NewestConnectorDefinitionVersionForId mocks base method.
 func (m *MockDB) NewestConnectorDefinitionVersionForId(ctx context.Context, id apid.ID) (*database.ConnectorWithDefinition, error) {
 	m.ctrl.T.Helper()

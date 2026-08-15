@@ -8,6 +8,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/encfield"
+	"github.com/rmorlok/authproxy/internal/migration"
 	"github.com/rmorlok/authproxy/internal/sqlh"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -646,8 +647,14 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				_, db := MustApplyBlankTestDbConfig(t, nil)
-				err := db.Migrate(ctx)
+				cfg, db := MustApplyBlankTestDbConfig(t, nil)
+				err := RunMigrations(
+					ctx,
+					cfg.GetRoot().Database,
+					cfg.GetRoot().GetRootLogger(),
+					migration.DirectionUp,
+					nil,
+				)
 				require.NoError(t, err)
 
 				dbRaw := db.(*service)

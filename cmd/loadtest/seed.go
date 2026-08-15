@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/rmorlok/authproxy/internal/database"
 	encryptpkg "github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/loadtest/seeder"
 	"github.com/rmorlok/authproxy/internal/migration"
@@ -54,7 +55,13 @@ func cmdSeed() *cobra.Command {
 						return err
 					}
 				} else {
-					if err := dm.GetDatabase().Migrate(ctx); err != nil {
+					if err := database.RunMigrations(
+						ctx,
+						dm.GetConfigRoot().Database,
+						dm.GetLogger(),
+						migration.DirectionUp,
+						nil,
+					); err != nil {
 						return fmt.Errorf("failed to migrate database: %w", err)
 					}
 					if err := dm.GetDatabase().EnsureNamespaceByPath(ctx, namespace.Root); err != nil {

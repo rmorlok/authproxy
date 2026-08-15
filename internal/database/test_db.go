@@ -19,6 +19,7 @@ import (
 	"github.com/peterldowns/pgtestdb"
 	"github.com/peterldowns/pgtestdb/migrators/golangmigrator"
 	"github.com/rmorlok/authproxy/internal/config"
+	"github.com/rmorlok/authproxy/internal/migration"
 	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util"
@@ -133,7 +134,13 @@ func mustApplyBlankSqliteTestDbConfig(t testing.TB, cfg config.C) (config.C, DB,
 		t.Fatalf("failed to construct sqlite test database: %v", err)
 	}
 
-	if err := db.Migrate(context.Background()); err != nil {
+	if err := RunMigrations(
+		context.Background(),
+		root.Database,
+		root.GetRootLogger(),
+		migration.DirectionUp,
+		nil,
+	); err != nil {
 		t.Fatalf("failed to migrate sqlite test database: %v", err)
 	}
 

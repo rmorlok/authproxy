@@ -22,21 +22,39 @@ const MigrateMutexKeyName = "db-migrate-lock"
 
 const migrationsTable = "schema_migrations"
 
-func MigrationStatus(ctx context.Context, cfg *config.Database) migration.Status {
+// MigrationStatus returns the status of the database migrations for the main
+// application database.
+func MigrationStatus(
+	ctx context.Context,
+	cfg *config.Database,
+) migration.Status {
 	if cfg == nil || cfg.InnerVal == nil {
-		return migration.UnavailableStatus(migration.TargetMainDatabase, "", 0, fmt.Errorf("database configuration is required"))
+		return migration.UnavailableStatus(
+			migration.TargetMainDatabase,
+			"", // provider
+			0,  // available version
+			fmt.Errorf("database configuration is required"),
+		)
 	}
-	latest, err := migration.LatestVersion(migrationsFs, fmt.Sprintf("migrations/%s", cfg.GetProvider()))
+
+	latest, err := migration.LatestVersion(
+		migrationsFs,
+		fmt.Sprintf("migrations/%s", cfg.GetProvider()),
+	)
 	if err != nil {
 		return migration.UnavailableStatus(migration.TargetMainDatabase, cfg.GetProvider(), 0, err)
 	}
-	return migration.Inspect(ctx, migration.TargetMainDatabase, cfg, migrationsTable, latest)
+
+	return migration.Inspect(
+		ctx,
+		migration.TargetMainDatabase,
+		cfg,
+		migrationsTable,
+		latest,
+	)
 }
 
-func (s *service) Migrate(ctx context.Context) (resultErr error) {
-	return RunMigrations(ctx, &config.Database{InnerVal: s.cfg}, s.logger, migration.DirectionUp, nil)
-}
-
+// RunMigrations runs database migrations for the main application database.
 func RunMigrations(
 	ctx context.Context,
 	cfg *config.Database,
@@ -44,16 +62,31 @@ func RunMigrations(
 	direction migration.Direction,
 	version *uint,
 ) (resultErr error) {
-	logger.Info("running database migrations", "provider", cfg.GetProvider(), "direction", direction, "version", version)
+	logger.Info(
+		"running database migrations",
+		"provider", cfg.GetProvider(),
+		"direction", direction,
+		"version", version,
+	)
 	defer func() {
 		if resultErr != nil {
-			logger.Error("database migrations failed", "provider", cfg.GetProvider(), "error", resultErr)
+			logger.Error(
+				"database migrations failed",
+				"provider", cfg.GetProvider(),
+				"error", resultErr,
+			)
 			return
 		}
-		logger.Info("database migrations complete", "provider", cfg.GetProvider())
+		logger.Info(
+			"database migrations complete",
+			"provider", cfg.GetProvider(),
+		)
 	}()
 
-	d, err := iofs.New(migrationsFs, fmt.Sprintf("migrations/%s", cfg.GetProvider()))
+	d, err := iofs.New(
+		migrationsFs,
+		fmt.Sprintf("migrations/%s", cfg.GetProvider()),
+	)
 	if err != nil {
 		return fmt.Errorf("failed to load database migrations for '%s': %w", cfg.GetProvider(), err)
 	}
@@ -65,7 +98,11 @@ func RunMigrations(
 	defer func() {
 		sourceErr, dbErr := m.Close()
 		if sourceErr != nil || dbErr != nil {
-			logger.Warn("failed to close migrator", "source_err", sourceErr, "db_err", dbErr)
+			logger.Warn(
+				"failed to close migrator",
+				"source_err", sourceErr,
+				"db_err", dbErr,
+			)
 		}
 	}()
 
