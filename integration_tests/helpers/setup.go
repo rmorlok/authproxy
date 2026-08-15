@@ -221,10 +221,12 @@ func Setup(t *testing.T, opts SetupOptions) *IntegrationTestEnv {
 	// MustApplyBlankTestDbConfig reads connection info from POSTGRES_TEST_* env vars
 	// and updates cfg.GetRoot().Database to point at the new isolated database.
 	cfg, _, rawDb := database.MustApplyBlankTestDbConfigRaw(t, cfg)
-	require.NoError(t, workflows.Migrate(
+	require.NoError(t, workflows.RunMigrations(
 		context.Background(),
 		cfg.GetRoot(),
 		cfg.GetRoot().GetRootLogger(),
+		migration.DirectionUp,
+		nil,
 		workflows.WithPostgresMigrationDB(rawDb),
 	))
 

@@ -27,7 +27,13 @@ func TestMigrateSqliteAndRuntimePing(t *testing.T) {
 	}
 	logger := slog.New(slog.DiscardHandler)
 
-	require.NoError(t, Migrate(context.Background(), root, logger))
+	require.NoError(t, RunMigrations(
+		context.Background(),
+		root,
+		logger,
+		migration.DirectionUp,
+		nil,
+	))
 	status := MigrationStatus(context.Background(), root)
 	require.Equal(t, migration.StateCurrent, status.State)
 	require.Equal(t, uint(3), status.AvailableVersion)
