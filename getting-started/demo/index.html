@@ -81,7 +81,9 @@ other private information.</p>
 <p>AuthProxy is designed to use the host application’s identity. The demo has no
 host product, so the <strong>Demo Shell</strong> stands in for one:</p>
 <ol>
-<li>You choose an example actor and a destination.</li>
+<li>You choose an AuthProxy surface to explore.</li>
+<li>For the Marketplace, you choose the demo user who will own the connection;
+the Admin UI always uses the demo administrator.</li>
 <li>The shell signs a short-lived, one-time JWT identifying that actor.</li>
 <li>The browser is redirected to the Marketplace or Admin UI with the token.</li>
 <li>AuthProxy validates the signature and exchanges the token for a UI session.</li>
@@ -92,7 +94,7 @@ host product, so the <strong>Demo Shell</strong> stands in for one:</p>
     participant UI as Marketplace or Admin UI
     participant AP as AuthProxy
 
-    User-&gt;&gt;Shell: Choose actor and destination
+    User-&gt;&gt;Shell: Choose a demo journey and actor when needed
     Shell-&gt;&gt;Shell: Sign nonce JWT for actor
     Shell--&gt;&gt;UI: Redirect with authToken
     UI-&gt;&gt;AP: POST /session/_initiate
@@ -104,8 +106,9 @@ do not rely on any identity having a permanently empty or populated account.</p>
 <p>See <a href="/integration/host-application/">host application integration</a> for the
 production version of this handoff.</p>
 <div class="sl-heading-wrapper level-h2"><h2 id="marketplace">Marketplace</h2><a class="sl-anchor-link" href="#marketplace"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Marketplace”</span></a></div>
-<p>Open the Marketplace through the
-<a href="https://demo.authproxy.net/">Demo Shell</a> or visit the
+<p>Choose <strong>Integration Marketplace</strong> in the <a href="https://demo.authproxy.net/">Demo Shell</a>,
+then choose <strong>Demo user</strong> to explore a preconfigured user or <strong>Fresh user</strong> to
+begin with an empty Marketplace. You can also visit the
 <a href="https://marketplace.demo.authproxy.net/">Marketplace directly</a> if you already
 have a demo session.</p>
 <p><img alt="Creating a connection in the Marketplace" loading="lazy" decoding="async" width="1528" height="1224" src="/_astro/marketplace-connect.CmnhhMIi_fDksK.webp" srcset=""></p>
@@ -150,17 +153,18 @@ either:</p>
 <li><strong>Register</strong> on the provider login page to create your own disposable
 account.</li>
 </ul>
-<p>The provider is reached as part of the connector flow; its hostname is not a
-standalone demo homepage. Accounts and tokens exist only to exercise OAuth
+<p>You can also choose <strong>Demo OAuth Provider</strong> in the Demo Shell to open its
+standalone test sign-in. Accounts and tokens exist only to exercise OAuth
 behavior in this test environment.</p>
 <div class="sl-heading-wrapper level-h2"><h2 id="admin-ui">Admin UI</h2><a class="sl-anchor-link" href="#admin-ui"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Admin UI”</span></a></div>
-<p>Choose <strong>Demo admin</strong> and <strong>Admin UI</strong> in the Demo Shell.</p>
+<p>Choose <strong>Admin UI</strong> in the Demo Shell. It always opens as <code dir="auto">demo-admin</code>.</p>
 <p><img alt="Managing AuthProxy in the Admin UI" loading="lazy" decoding="async" width="1508" height="960" src="/_astro/admin-walkthrough.B2J0IDk7_Z1zrulW.webp" srcset=""></p>
 <p>The Admin UI exposes namespaces, actors, connectors and immutable connector
 versions, connections, request events, background tasks and workflows,
 encryption keys, and rate limits.</p>
 <div class="sl-heading-wrapper level-h2"><h2 id="grafana">Grafana</h2><a class="sl-anchor-link" href="#grafana"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Grafana”</span></a></div>
-<p><a href="https://demo.authproxy.net/grafana">Open Grafana</a> with anonymous viewer
+<p>Choose <strong>Telemetry</strong> in the Demo Shell, then select the Grafana view you want
+to open. <a href="https://demo.authproxy.net/grafana">Grafana</a> has anonymous viewer
 access. The workspace includes:</p>
 <ul>
 <li>an <a href="https://demo.authproxy.net/grafana/d/authproxy-app-metrics-demo/authproxy-app-metrics?orgId=1&amp;from=now-1h&amp;to=now">AuthProxy app-metrics dashboard</a>
@@ -176,4 +180,4 @@ then adjust the dashboard time range if a panel is empty.</p>
 <li><a href="/integration/">Embed AuthProxy in a host application</a></li>
 <li><a href="/development/quick-start/">Run AuthProxy locally</a></li>
 </ul>
-</div><footer class="sl-flex astro-nntpd7kr"><div class="meta sl-flex astro-nntpd7kr"><a href="https://github.com/rmorlok/authproxy/edit/main/docs/src/content/docs/getting-started/demo.md" class="sl-flex print:hidden astro-56gmmyul"><svg aria-hidden="true" class="astro-56gmmyul astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.2em;"><path d="M22 7.24a1 1 0 0 0-.29-.71l-4.24-4.24a1 1 0 0 0-1.1-.22 1 1 0 0 0-.32.22l-2.83 2.83L2.29 16.05a1 1 0 0 0-.29.71V21a1 1 0 0 0 1 1h4.24a1 1 0 0 0 .76-.29l10.87-10.93L21.71 8c.1-.1.17-.2.22-.33a1 1 0 0 0 0-.24v-.14l.07-.05ZM6.83 20H4v-2.83l9.93-9.93 2.83 2.83L6.83 20ZM18.17 8.66l-2.83-2.83 1.42-1.41 2.82 2.82-1.41 1.42Z"/></svg>Edit page</a><p>Last updated: <time datetime="2026-08-04T16:32:18.000Z">Aug 4, 2026</time></p></div><div class="pagination-links print:hidden astro-anvk7qgk" dir="ltr"><a href="/" rel="prev" class="astro-anvk7qgk"><svg aria-hidden="true" class="astro-anvk7qgk astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17 11H9.41l3.3-3.29a1.004 1.004 0 1 0-1.42-1.42l-5 5a1 1 0 0 0-.21.33 1 1 0 0 0 0 .76 1 1 0 0 0 .21.33l5 5a1.002 1.002 0 0 0 1.639-.325 1 1 0 0 0-.219-1.095L9.41 13H17a1 1 0 0 0 0-2Z"/></svg><span class="astro-anvk7qgk">Previous<br class="astro-anvk7qgk"><span class="link-title astro-anvk7qgk">Documentation home</span></span></a><a href="/development/quick-start/" rel="next" class="astro-anvk7qgk"><svg aria-hidden="true" class="astro-anvk7qgk astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17.92 11.62a1.001 1.001 0 0 0-.21-.33l-5-5a1.003 1.003 0 1 0-1.42 1.42l3.3 3.29H7a1 1 0 0 0 0 2h7.59l-3.3 3.29a1.002 1.002 0 0 0 .325 1.639 1 1 0 0 0 1.095-.219l5-5a1 1 0 0 0 .21-.33 1 1 0 0 0 0-.76Z"/></svg><span class="astro-anvk7qgk">Next<br class="astro-anvk7qgk"><span class="link-title astro-anvk7qgk">Development quick start</span></span></a></div></footer></div></div></main></div></div></div></div></body></html>
+</div><footer class="sl-flex astro-nntpd7kr"><div class="meta sl-flex astro-nntpd7kr"><a href="https://github.com/rmorlok/authproxy/edit/main/docs/src/content/docs/getting-started/demo.md" class="sl-flex print:hidden astro-56gmmyul"><svg aria-hidden="true" class="astro-56gmmyul astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.2em;"><path d="M22 7.24a1 1 0 0 0-.29-.71l-4.24-4.24a1 1 0 0 0-1.1-.22 1 1 0 0 0-.32.22l-2.83 2.83L2.29 16.05a1 1 0 0 0-.29.71V21a1 1 0 0 0 1 1h4.24a1 1 0 0 0 .76-.29l10.87-10.93L21.71 8c.1-.1.17-.2.22-.33a1 1 0 0 0 0-.24v-.14l.07-.05ZM6.83 20H4v-2.83l9.93-9.93 2.83 2.83L6.83 20ZM18.17 8.66l-2.83-2.83 1.42-1.41 2.82 2.82-1.41 1.42Z"/></svg>Edit page</a><p>Last updated: <time datetime="2026-08-15T16:04:25.000Z">Aug 15, 2026</time></p></div><div class="pagination-links print:hidden astro-anvk7qgk" dir="ltr"><a href="/" rel="prev" class="astro-anvk7qgk"><svg aria-hidden="true" class="astro-anvk7qgk astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17 11H9.41l3.3-3.29a1.004 1.004 0 1 0-1.42-1.42l-5 5a1 1 0 0 0-.21.33 1 1 0 0 0 0 .76 1 1 0 0 0 .21.33l5 5a1.002 1.002 0 0 0 1.639-.325 1 1 0 0 0-.219-1.095L9.41 13H17a1 1 0 0 0 0-2Z"/></svg><span class="astro-anvk7qgk">Previous<br class="astro-anvk7qgk"><span class="link-title astro-anvk7qgk">Documentation home</span></span></a><a href="/development/quick-start/" rel="next" class="astro-anvk7qgk"><svg aria-hidden="true" class="astro-anvk7qgk astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17.92 11.62a1.001 1.001 0 0 0-.21-.33l-5-5a1.003 1.003 0 1 0-1.42 1.42l3.3 3.29H7a1 1 0 0 0 0 2h7.59l-3.3 3.29a1.002 1.002 0 0 0 .325 1.639 1 1 0 0 0 1.095-.219l5-5a1 1 0 0 0 .21-.33 1 1 0 0 0 0-.76Z"/></svg><span class="astro-anvk7qgk">Next<br class="astro-anvk7qgk"><span class="link-title astro-anvk7qgk">Development quick start</span></span></a></div></footer></div></div></main></div></div></div></div></body></html>
