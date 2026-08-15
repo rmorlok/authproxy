@@ -221,6 +221,7 @@ func Setup(t *testing.T, opts SetupOptions) *IntegrationTestEnv {
 	// and updates cfg.GetRoot().Database to point at the new isolated database.
 	cfg, _, rawDb := database.MustApplyBlankTestDbConfigRaw(t, cfg)
 	require.NoError(t, workflows.Migrate(
+		context.Background(),
 		cfg.GetRoot(),
 		cfg.GetRoot().GetRootLogger(),
 		workflows.WithPostgresMigrationDB(rawDb),

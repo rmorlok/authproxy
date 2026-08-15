@@ -18,6 +18,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/sqlh"
+	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
@@ -125,9 +126,15 @@ func (s *clickhouseRecordStore) StoreRecord(ctx context.Context, record *LogReco
 	return s.StoreRecords(ctx, []*LogRecord{record})
 }
 
-func (s *clickhouseRecordStore) Migrate(ctx context.Context) error {
+func (s *clickhouseRecordStore) Migrate(ctx context.Context) (resultErr error) {
 	s.logger.Info("running clickhouse app metrics migrations")
-	defer s.logger.Info("clickhouse app metrics migrations complete")
+	defer func() {
+		if resultErr != nil {
+			s.logger.Error("clickhouse app metrics migrations failed", "error", resultErr)
+			return
+		}
+		s.logger.Info("clickhouse app metrics migrations complete")
+	}()
 
 	src, err := iofs.New(appMetricsMigrationsFs, "migrations/clickhouse")
 	if err != nil {
@@ -173,7 +180,7 @@ func (s *clickhouseRecordStore) Migrate(ctx context.Context) error {
 		}
 	}()
 
-	if err := m.Up(); err != nil {
+	if err := util.RunMigrationsUp(ctx, m); err != nil {
 		if errors.Is(err, migrate.ErrNoChange) {
 			s.logger.Info("no clickhouse app metrics migrations required")
 			return nil

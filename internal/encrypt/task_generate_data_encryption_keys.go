@@ -129,25 +129,24 @@ func generateDataEncryptionKeysToDatabase(
 	redis apredis.Client,
 	opts ...GenerateDataEncryptionKeysOption,
 ) error {
-	logger.Info("generating data encryption keys")
-	defer logger.Info("generating data encryption keys complete")
-	options := newGenerateDataEncryptionKeysOptions(opts)
-
 	if redis != nil {
+		const lockDuration = 30 * time.Second
 		m := apredis.NewMutex(
 			redis,
 			"encrypt:generate_deks",
-			apredis.MutexOptionLockFor(30*time.Second),
-			apredis.MutexOptionRetryFor(31*time.Second),
+			apredis.MutexOptionLockFor(lockDuration),
+			apredis.MutexOptionRetryFor(lockDuration+1*time.Second),
 			apredis.MutexOptionRetryExponentialBackoff(100*time.Millisecond, 5*time.Second),
 			apredis.MutexOptionDetailedLockMetadata(),
 		)
-		err := m.Lock(context.Background())
-		if err != nil {
-			return errors.Wrap(err, "failed to establish lock for data encryption key generation")
-		}
-		defer m.Unlock(context.Background())
+		return apredis.RunWithMutex(ctx, m, lockDuration, func(lockCtx context.Context) error {
+			return generateDataEncryptionKeysToDatabase(lockCtx, cfg, db, logger, nil, opts...)
+		})
 	}
+
+	logger.Info("generating data encryption keys")
+	defer logger.Info("generating data encryption keys complete")
+	options := newGenerateDataEncryptionKeysOptions(opts)
 
 	if cfg == nil || cfg.GetRoot() == nil {
 		return errors.New("no configuration available")

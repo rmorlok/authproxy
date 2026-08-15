@@ -366,33 +366,34 @@ func (dm *DependencyManager) ShutdownDatabase() {
 // AutoMigrateDatabase will attempt to migrate the database if the root config has auto migrate enabled.
 func (dm *DependencyManager) AutoMigrateDatabase() {
 	if dm.GetConfigRoot().Database.GetAutoMigrate() {
-		func() {
-			m := apredis.NewMutex(
-				dm.GetRedisClient(),
-				database.MigrateMutexKeyName,
-				apredis.MutexOptionLockFor(dm.GetConfigRoot().Database.GetAutoMigrationLockDuration()),
-				apredis.MutexOptionRetryFor(dm.GetConfigRoot().Database.GetAutoMigrationLockDuration()+1*time.Second),
-				apredis.MutexOptionRetryExponentialBackoff(100*time.Millisecond, 5*time.Second),
-				apredis.MutexOptionDetailedLockMetadata(),
-			)
-			err := m.Lock(context.Background())
-			if err != nil {
-				panic(fmt.Errorf("failed to establish lock for database migration: %w", err))
-			}
-			defer m.Unlock(context.Background())
-
-			if err := dm.GetDatabase().Migrate(context.Background()); err != nil {
-				panic(err)
+		lockDuration := dm.GetConfigRoot().Database.GetAutoMigrationLockDuration()
+		m := apredis.NewMutex(
+			dm.GetRedisClient(),
+			database.MigrateMutexKeyName,
+			apredis.MutexOptionLockFor(lockDuration),
+			apredis.MutexOptionRetryFor(lockDuration+1*time.Second),
+			apredis.MutexOptionRetryExponentialBackoff(100*time.Millisecond, 5*time.Second),
+			apredis.MutexOptionDetailedLockMetadata(),
+		)
+		err := apredis.RunWithMutex(context.Background(), m, lockDuration, func(ctx context.Context) error {
+			if err := dm.GetDatabase().Migrate(ctx); err != nil {
+				return err
 			}
 
 			if err := workflows.Migrate(
+				ctx,
 				dm.GetConfigRoot(),
 				dm.GetLogBuilder().WithComponent("workflows").Build(),
 				workflows.WithPostgresMigrationDB(dm.GetSQLDB()),
 			); err != nil {
-				panic(fmt.Errorf("failed to migrate workflow database: %w", err))
+				return fmt.Errorf("failed to migrate workflow database: %w", err)
 			}
-		}()
+			return nil
+		})
+		if err != nil {
+			dm.GetLogger().Error("automatic database migration failed", "lock_key", database.MigrateMutexKeyName, "error", err)
+			panic(fmt.Errorf("failed to automatically migrate database: %w", err))
+		}
 	}
 }
 
@@ -479,10 +480,25 @@ func (dm *DependencyManager) GetHttpf() httpf.F {
 
 func (dm *DependencyManager) AutoMigrateAppMetricsService() {
 	if dm.GetConfigRoot().AppMetrics.GetAutoMigrate() {
-		store := dm.GetAppMetricsService()
-		err := store.Migrate(context.Background())
+		var dbConfig *sconfig.Database
+		if dm.GetConfigRoot().AppMetrics != nil {
+			dbConfig = dm.GetConfigRoot().AppMetrics.Database
+		}
+		lockDuration := dbConfig.GetAutoMigrationLockDuration()
+		m := apredis.NewMutex(
+			dm.GetRedisClient(),
+			app_metrics.MigrateMutexKeyName,
+			apredis.MutexOptionLockFor(lockDuration),
+			apredis.MutexOptionRetryFor(lockDuration+1*time.Second),
+			apredis.MutexOptionRetryExponentialBackoff(100*time.Millisecond, 5*time.Second),
+			apredis.MutexOptionDetailedLockMetadata(),
+		)
+		err := apredis.RunWithMutex(context.Background(), m, lockDuration, func(ctx context.Context) error {
+			return dm.GetAppMetricsService().Migrate(ctx)
+		})
 		if err != nil {
-			panic(err)
+			dm.GetLogger().Error("automatic app metrics migration failed", "lock_key", app_metrics.MigrateMutexKeyName, "error", err)
+			panic(fmt.Errorf("failed to automatically migrate app metrics: %w", err))
 		}
 	}
 }
@@ -679,25 +695,21 @@ func (dm *DependencyManager) StartRateLimitRefresher(ctx context.Context) (stop 
 // TODO: this automigrate should not be specific to the connectors config
 func (dm *DependencyManager) AutoMigrateCore() {
 	if dm.GetConfigRoot().Connectors.GetAutoMigrate() {
-		func() {
-			m := apredis.NewMutex(
-				dm.GetRedisClient(),
-				core.MigrateMutexKeyName,
-				apredis.MutexOptionLockFor(dm.GetConfigRoot().Connectors.GetAutoMigrationLockDurationOrDefault()),
-				apredis.MutexOptionRetryFor(dm.GetConfigRoot().Connectors.GetAutoMigrationLockDurationOrDefault()+1*time.Second),
-				apredis.MutexOptionRetryExponentialBackoff(100*time.Millisecond, 5*time.Second),
-				apredis.MutexOptionDetailedLockMetadata(),
-			)
-			err := m.Lock(context.Background())
-			if err != nil {
-				panic(err)
-			}
-			defer m.Unlock(context.Background())
-
-			if err := dm.GetCoreService().Migrate(context.Background()); err != nil {
-				panic(err)
-			}
-		}()
+		lockDuration := dm.GetConfigRoot().Connectors.GetAutoMigrationLockDurationOrDefault()
+		m := apredis.NewMutex(
+			dm.GetRedisClient(),
+			core.MigrateMutexKeyName,
+			apredis.MutexOptionLockFor(lockDuration),
+			apredis.MutexOptionRetryFor(lockDuration+1*time.Second),
+			apredis.MutexOptionRetryExponentialBackoff(100*time.Millisecond, 5*time.Second),
+			apredis.MutexOptionDetailedLockMetadata(),
+		)
+		err := apredis.RunWithMutex(context.Background(), m, lockDuration, func(ctx context.Context) error {
+			return dm.GetCoreService().Migrate(ctx)
+		})
+		if err != nil {
+			panic(err)
+		}
 	}
 }
 
@@ -726,21 +738,16 @@ func (dm *DependencyManager) AutoMigratePredefinedActors() {
 		return
 	}
 
-	func() {
-		m := apredis.NewMutex(
-			dm.GetRedisClient(),
-			"actor_sync:migrate",
-			apredis.MutexOptionLockFor(30*time.Second),
-			apredis.MutexOptionRetryFor(31*time.Second),
-			apredis.MutexOptionRetryExponentialBackoff(100*time.Millisecond, 5*time.Second),
-			apredis.MutexOptionDetailedLockMetadata(),
-		)
-		err := m.Lock(context.Background())
-		if err != nil {
-			panic(fmt.Errorf("failed to establish lock for admin users migration: %w", err))
-		}
-		defer m.Unlock(context.Background())
-
+	const lockDuration = 30 * time.Second
+	m := apredis.NewMutex(
+		dm.GetRedisClient(),
+		"actor_sync:migrate",
+		apredis.MutexOptionLockFor(lockDuration),
+		apredis.MutexOptionRetryFor(lockDuration+1*time.Second),
+		apredis.MutexOptionRetryExponentialBackoff(100*time.Millisecond, 5*time.Second),
+		apredis.MutexOptionDetailedLockMetadata(),
+	)
+	err := apredis.RunWithMutex(context.Background(), m, lockDuration, func(ctx context.Context) error {
 		svc := tasks.NewService(
 			dm.GetConfig(),
 			dm.GetDatabase(),
@@ -748,11 +755,11 @@ func (dm *DependencyManager) AutoMigratePredefinedActors() {
 			dm.GetEncryptService(),
 			dm.GetLogger(),
 		)
-
-		if err := svc.SyncActorList(context.Background()); err != nil {
-			panic(fmt.Errorf("failed to sync actors from config list: %w", err))
-		}
-	}()
+		return svc.SyncActorList(ctx)
+	})
+	if err != nil {
+		panic(fmt.Errorf("failed to sync actors from config list: %w", err))
+	}
 }
 
 // AutoMigrateGenerateDataEncryptionKeys ensures current DEKs exist before any

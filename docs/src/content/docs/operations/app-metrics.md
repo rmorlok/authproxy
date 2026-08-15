@@ -37,6 +37,9 @@ Key settings:
 
 The resource snapshot worker stores live resources at each interval. Deleted resources remain visible in historical time slices where they were sampled, but they are excluded from later snapshots.
 
+See [Automatic migrations](/operations/migrations/) for startup locking and
+lease-renewal behavior across SQLite, PostgreSQL, and ClickHouse.
+
 ## Request events
 
 List request-event metadata with `GET /api/v1/metrics/request-events`. Filters

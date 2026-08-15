@@ -2,6 +2,7 @@ package apredis
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -14,6 +15,16 @@ type Mutex interface {
 	Extend(context.Context, time.Duration) error
 	Unlock(context.Context) error
 }
+
+var (
+	// ErrMutexNotLocked is returned when an operation requires an acquired mutex.
+	ErrMutexNotLocked = errors.New("mutex not locked")
+	// ErrMutexLeaseLost indicates that a mutex could not be refreshed and its
+	// exclusive ownership can no longer be guaranteed.
+	ErrMutexLeaseLost = errors.New("mutex lease lost")
+)
+
+const mutexCleanupTimeout = 5 * time.Second
 
 type MutexOption func(m *mutex)
 
@@ -99,14 +110,7 @@ func MutexOptionNoRetry() MutexOption {
 func MutexOptionRetryFor(d time.Duration) MutexOption {
 	return func(m *mutex) {
 		m.lockContextCancellation = func(ctx context.Context) (context.Context, context.CancelFunc) {
-			// Check if the context currently has a more aggressive deadline, and if so, respect that
-			if currentDeadline, ok := ctx.Deadline(); !ok {
-				desiredDeadline := apctx.GetClock(ctx).Now().Add(d)
-				if desiredDeadline.After(currentDeadline) {
-					return ctx, func() {}
-				}
-			}
-
+			// context.WithTimeout automatically preserves an earlier parent deadline.
 			return context.WithTimeout(ctx, d)
 		}
 	}
@@ -129,7 +133,7 @@ func NewMutex(r Client, key string, options ...MutexOption) Mutex {
 }
 
 func MutexIsErrNotObtained(err error) bool {
-	return err == redislock.ErrNotObtained
+	return errors.Is(err, redislock.ErrNotObtained)
 }
 
 type mutex struct {
@@ -172,12 +176,14 @@ func (m *mutex) Lock(ctx context.Context) error {
 
 func (m *mutex) Extend(ctx context.Context, d time.Duration) error {
 	if m.lock == nil {
-		return fmt.Errorf("mutex '%s' not locked", m.key)
+		return fmt.Errorf("mutex '%s': %w", m.key, ErrMutexNotLocked)
 	}
 
 	err := m.lock.Refresh(ctx, d, m.opts())
-	if err != nil {
-		// We no longer hold the lock
+	if errors.Is(err, redislock.ErrNotObtained) {
+		// Redis confirmed that this token no longer owns the lock. Preserve the
+		// handle for transient transport errors so a later release can still be
+		// attempted safely with the same token.
 		m.lock = nil
 	}
 
@@ -186,8 +192,113 @@ func (m *mutex) Extend(ctx context.Context, d time.Duration) error {
 
 func (m *mutex) Unlock(ctx context.Context) error {
 	if m.lock == nil {
-		return fmt.Errorf("mutex '%s' not locked", m.key)
+		return fmt.Errorf("mutex '%s': %w", m.key, ErrMutexNotLocked)
 	}
 
-	return m.lock.Release(ctx)
+	err := m.lock.Release(ctx)
+	if err == nil || errors.Is(err, redislock.ErrLockNotHeld) {
+		m.lock = nil
+	}
+	return err
+}
+
+// RunWithMutex executes operation while continuously refreshing an acquired
+// Redis mutex. If the lease can no longer be refreshed, the operation context
+// is cancelled and ErrMutexLeaseLost is returned. Renewal is decoupled from
+// parent cancellation and remains active until the operation returns, giving
+// the operation time to stop without silently outliving the lease.
+func RunWithMutex(
+	ctx context.Context,
+	m Mutex,
+	leaseDuration time.Duration,
+	operation func(context.Context) error,
+) (resultErr error) {
+	if m == nil {
+		return errors.New("mutex is required")
+	}
+	if leaseDuration <= 0 {
+		return fmt.Errorf("mutex lease duration must be greater than zero: %s", leaseDuration)
+	}
+	if operation == nil {
+		return errors.New("mutex operation is required")
+	}
+
+	if err := m.Lock(ctx); err != nil {
+		return fmt.Errorf("failed to acquire mutex: %w", err)
+	}
+
+	operationCtx, cancelOperation := context.WithCancelCause(ctx)
+	renewCtx, stopRenewal := context.WithCancel(context.WithoutCancel(ctx))
+	renewalDone := make(chan error, 1)
+	renewalReady := make(chan struct{})
+	go func() {
+		renewalDone <- renewMutex(renewCtx, m, leaseDuration, cancelOperation, renewalReady)
+	}()
+	<-renewalReady
+
+	defer func() {
+		panicValue := recover()
+
+		stopRenewal()
+		renewalErr := <-renewalDone
+		cancelOperation(context.Canceled)
+
+		cleanupCtx, cancelCleanup := context.WithTimeout(context.WithoutCancel(ctx), mutexCleanupTimeout)
+		unlockErr := m.Unlock(cleanupCtx)
+		cancelCleanup()
+
+		// A confirmed lease loss clears the mutex handle. The resulting
+		// ErrMutexNotLocked does not add information beyond ErrMutexLeaseLost.
+		if errors.Is(renewalErr, ErrMutexLeaseLost) && errors.Is(unlockErr, ErrMutexNotLocked) {
+			unlockErr = nil
+		}
+
+		if renewalErr != nil {
+			resultErr = errors.Join(resultErr, renewalErr)
+		}
+		if unlockErr != nil {
+			resultErr = errors.Join(resultErr, fmt.Errorf("failed to release mutex: %w", unlockErr))
+		}
+
+		if panicValue != nil {
+			panic(panicValue)
+		}
+	}()
+
+	resultErr = operation(operationCtx)
+	return resultErr
+}
+
+func renewMutex(
+	ctx context.Context,
+	m Mutex,
+	leaseDuration time.Duration,
+	cancelOperation context.CancelCauseFunc,
+	ready chan<- struct{},
+) error {
+	refreshInterval := leaseDuration / 3
+	if refreshInterval <= 0 {
+		refreshInterval = leaseDuration
+	}
+
+	timer := apctx.GetClock(ctx).NewTimer(refreshInterval)
+	defer timer.Stop()
+	close(ready)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-timer.C():
+			refreshCtx, cancelRefresh := context.WithTimeout(ctx, refreshInterval)
+			err := m.Extend(refreshCtx, leaseDuration)
+			cancelRefresh()
+			if err != nil {
+				leaseErr := fmt.Errorf("%w: failed to refresh mutex: %w", ErrMutexLeaseLost, err)
+				cancelOperation(leaseErr)
+				return leaseErr
+			}
+			timer.Reset(refreshInterval)
+		}
+	}
 }

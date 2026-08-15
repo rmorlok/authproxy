@@ -6,6 +6,10 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 )
 
+// MigrateMutexKeyName coordinates automatic app-metrics migrations across
+// service processes, regardless of the configured database provider.
+const MigrateMutexKeyName = "app-metrics-migrate-lock"
+
 // RecordStore handles persisting LogRecord metadata to a storage backend.
 type RecordStore interface {
 	// StoreRecord persists a LogRecord to the storage backend.

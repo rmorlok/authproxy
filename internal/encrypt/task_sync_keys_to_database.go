@@ -277,36 +277,50 @@ func syncKeysToDatabase(
 	redis apredis.Client,
 	opts ...SyncKeysOption,
 ) error {
-	logger.Info("syncing data encryption key wrapping to database")
-	defer logger.Info("syncing data encryption key wrapping to database complete")
-	options := newSyncKeysOptions(opts)
-
-	if err := ensureRootNamespaceHasKeySet(ctx, db); err != nil {
-		return errors.Wrap(err, "failed to ensure root namespace uses global key")
-	}
-
 	if redis != nil {
-		// Redis can be skipped in test cases
+		// Redis can be skipped in test cases. The sentinel avoids redundant
+		// work; the renewable mutex prevents overlapping work.
 		val, err := redis.Get(ctx, sentinelKey).Result()
 		if err == nil && val != "" {
 			logger.Info("skipping key sync: recently synced")
 			return nil
 		}
 
+		const lockDuration = 30 * time.Second
 		m := apredis.NewMutex(
 			redis,
 			"encrypt:sync_keys",
-			apredis.MutexOptionLockFor(30*time.Second),
-			apredis.MutexOptionRetryFor(31*time.Second),
+			apredis.MutexOptionLockFor(lockDuration),
+			apredis.MutexOptionRetryFor(lockDuration+1*time.Second),
 			apredis.MutexOptionRetryExponentialBackoff(100*time.Millisecond, 5*time.Second),
 			apredis.MutexOptionDetailedLockMetadata(),
 		)
-		err = m.Lock(context.Background())
-		if err != nil {
-			logger.Info("failed to establish redis lock")
-			return errors.Wrap(err, "failed to establish lock for data encryption key wrapping sync")
-		}
-		defer m.Unlock(context.Background())
+		return apredis.RunWithMutex(ctx, m, lockDuration, func(lockCtx context.Context) error {
+			// Another owner may have completed while this caller waited.
+			val, getErr := redis.Get(lockCtx, sentinelKey).Result()
+			if getErr == nil && val != "" {
+				logger.Info("skipping key sync: recently synced")
+				return nil
+			}
+
+			if syncErr := syncKeysToDatabase(lockCtx, cfg, db, logger, nil, opts...); syncErr != nil {
+				return syncErr
+			}
+
+			now := apctx.GetClock(lockCtx).Now()
+			if setErr := redis.Set(lockCtx, sentinelKey, fmt.Sprintf("%d", now.Unix()), sentinelTTL).Err(); setErr != nil {
+				logger.Warn("failed to set key sync sentinel", "error", setErr)
+			}
+			return nil
+		})
+	}
+
+	logger.Info("syncing data encryption key wrapping to database")
+	defer logger.Info("syncing data encryption key wrapping to database complete")
+	options := newSyncKeysOptions(opts)
+
+	if err := ensureRootNamespaceHasKeySet(ctx, db); err != nil {
+		return errors.Wrap(err, "failed to ensure root namespace uses global key")
 	}
 
 	if cfg == nil || cfg.GetRoot() == nil {
@@ -428,14 +442,6 @@ func syncKeysToDatabase(
 	err = reconcileNamespaceEncryptionTargets(ctx, db, logger)
 	if err != nil {
 		result = multierror.Append(result, errors.Wrap(err, "failed to update namespace target data encryption keys"))
-	}
-
-	// Set sentinel after successful sync
-	if redis != nil {
-		now := apctx.GetClock(ctx).Now()
-		if setErr := redis.Set(ctx, sentinelKey, fmt.Sprintf("%d", now.Unix()), sentinelTTL).Err(); setErr != nil {
-			logger.Warn("failed to set key sync sentinel", "error", setErr)
-		}
 	}
 
 	return result.ErrorOrNil()

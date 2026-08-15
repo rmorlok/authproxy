@@ -26,6 +26,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/rmorlok/authproxy/internal/aptelemetry"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
+	"github.com/rmorlok/authproxy/internal/util"
 )
 
 const (
@@ -133,7 +134,7 @@ func WithPostgresMigrationDB(db *sql.DB) MigrateOption {
 	}
 }
 
-func Migrate(root *sconfig.Root, logger *slog.Logger, opts ...MigrateOption) error {
+func Migrate(ctx context.Context, root *sconfig.Root, logger *slog.Logger, opts ...MigrateOption) error {
 	if root == nil || root.Database == nil {
 		return fmt.Errorf("database configuration is required")
 	}
@@ -150,20 +151,20 @@ func Migrate(root *sconfig.Root, logger *slog.Logger, opts ...MigrateOption) err
 			return fmt.Errorf("open workflow sqlite database: %w", err)
 		}
 		defer db.Close()
-		return migrateDB(db, "sqlite", "migrations/sqlite")
+		return migrateDB(ctx, db, "sqlite", "migrations/sqlite")
 	case *sconfig.DatabasePostgres:
 		db := migrateOpts.postgresDB
 		if db == nil {
 			return fmt.Errorf("workflow postgres database handle is required")
 		}
 
-		return migrateDB(db, "postgres", "migrations/postgres")
+		return migrateDB(ctx, db, "postgres", "migrations/postgres")
 	default:
 		return fmt.Errorf("workflow database provider %q is not supported", root.Database.GetProvider())
 	}
 }
 
-func migrateDB(db *sql.DB, driverName string, sourcePath string) error {
+func migrateDB(ctx context.Context, db *sql.DB, driverName string, sourcePath string) error {
 	var (
 		driver migratedatabase.Driver
 		err    error
@@ -193,7 +194,7 @@ func migrateDB(db *sql.DB, driverName string, sourcePath string) error {
 	if err != nil {
 		return fmt.Errorf("creating workflow migration: %w", err)
 	}
-	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+	if err := util.RunMigrationsUp(ctx, m); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return fmt.Errorf("running workflow migrations: %w", err)
 	}
 

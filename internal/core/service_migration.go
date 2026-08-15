@@ -89,7 +89,7 @@ func (s *service) MigrateNamespaces(ctx context.Context) error {
 
 	for _, nsPath := range toCreatePaths {
 		s.logger.Info("migrating namespace", "namespace", nsPath)
-		err := s.db.CreateNamespace(context.Background(), &database.Namespace{
+		err := s.db.CreateNamespace(ctx, &database.Namespace{
 			Path:   nsPath,
 			State:  database.NamespaceStateActive,
 			Labels: make(database.Labels),
