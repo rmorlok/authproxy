@@ -5,6 +5,9 @@ title: Design notes
 These pages preserve implementation plans, migrations, and known product gaps.
 They are contributor context, not stable user-facing contracts.
 
+- [Kubernetes-style resource API migration](/development/design/kubernetes-resource-api/) —
+  accepted target contract, route and payload inventory, deliberate protocol
+  exceptions, and feature-branch sequencing for the breaking v1 migration.
 - [OAuth provider identity changes](/development/design/oauth-provider-identity/) — current gap
   and target behavior for enforcing a stable provider account during
   reauthentication.
