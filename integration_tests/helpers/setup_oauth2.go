@@ -22,22 +22,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// OAuth2Option configures an OAuth2 helper invocation. The same option type
-// is shared across the OAuth2 helpers (InitiateOAuth2Connection,
-// DeliverOAuth2Callback, …) so callers learn one pattern. Each helper applies
-// the fields that are meaningful to it and ignores the rest.
-type OAuth2Option func(*oauth2Options)
+// ActorOption configures the actor used by an integration-test helper. The
+// same option type is shared by helpers for every authentication method, so
+// callers can use one pattern to select an actor and namespace.
+type ActorOption func(*actorOptions)
 
-// oauth2Options is the resolved configuration produced by applying the
-// caller-supplied OAuth2Option values on top of the defaults each helper
+// actorOptions is the resolved configuration produced by applying the
+// caller-supplied ActorOption values on top of the defaults each helper
 // installs (default actor "test-actor" in the root namespace).
-type oauth2Options struct {
+type actorOptions struct {
 	actorExternalID string
 	actorNamespace  string
 }
 
-func (env *IntegrationTestEnv) resolveOAuth2Options(opts []OAuth2Option) oauth2Options {
-	cfg := oauth2Options{
+func (env *IntegrationTestEnv) resolveActorOptions(opts []ActorOption) actorOptions {
+	cfg := actorOptions{
 		actorExternalID: "test-actor",
 		actorNamespace:  sconfig.RootNamespace,
 	}
@@ -47,14 +46,14 @@ func (env *IntegrationTestEnv) resolveOAuth2Options(opts []OAuth2Option) oauth2O
 	return cfg
 }
 
-// WithActor signs the OAuth2 helper request as the named actor in the given
-// namespace. Mirrors the JWT a real browser session for that actor would
-// carry. Defaults are actor "test-actor" in sconfig.RootNamespace.
+// WithActor signs a helper request as the named actor in the given namespace.
+// It mirrors the JWT a real browser session for that actor would carry.
+// Defaults are actor "test-actor" in sconfig.RootNamespace.
 //
 // Caller is responsible for ensuring a non-root namespace already exists
 // (see env.Core.CreateNamespace) before signing into it.
-func WithActor(externalID, namespace string) OAuth2Option {
-	return func(c *oauth2Options) {
+func WithActor(externalID, namespace string) ActorOption {
+	return func(c *actorOptions) {
 		c.actorExternalID = externalID
 		c.actorNamespace = namespace
 	}
@@ -197,12 +196,12 @@ func (env *IntegrationTestEnv) ForgeOAuth2CallbackURL(state, code string) string
 //
 // Caller is responsible for ensuring the actor's namespace exists (via
 // env.Core.CreateNamespace or its ancestors) when it is not the root namespace.
-func (env *IntegrationTestEnv) InitiateOAuth2Connection(t *testing.T, connectorID apid.ID, returnToUrl string, opts ...OAuth2Option) (connectionID, redirectURL string) {
+func (env *IntegrationTestEnv) InitiateOAuth2Connection(t *testing.T, connectorID apid.ID, returnToUrl string, opts ...ActorOption) (connectionID, redirectURL string) {
 	t.Helper()
 	require.Truef(t, env.ApiGin != nil || env.ServerURL != "",
 		"InitiateOAuth2Connection requires either in-process gin or a running HTTP server")
 
-	cfg := env.resolveOAuth2Options(opts)
+	cfg := env.resolveActorOptions(opts)
 
 	// Land the connection in the actor's namespace by default. Without
 	// IntoNamespace, the API places the connection in the connector's
@@ -258,7 +257,7 @@ func (env *IntegrationTestEnv) InitiateOAuth2Connection(t *testing.T, connectorI
 // existing connection and returns the proxy redirect URL. The supplied
 // return-to URL is carried through the OAuth callback after successful token
 // exchange.
-func (env *IntegrationTestEnv) ReauthOAuth2Connection(t *testing.T, connectionID, returnToUrl string, opts ...OAuth2Option) string {
+func (env *IntegrationTestEnv) ReauthOAuth2Connection(t *testing.T, connectionID, returnToUrl string, opts ...ActorOption) string {
 	t.Helper()
 
 	body, err := jsonMarshal(struct {
@@ -273,7 +272,7 @@ func (env *IntegrationTestEnv) ReauthOAuth2Connection(t *testing.T, connectionID
 		http.MethodPost,
 		"/api/v1/connections/"+connectionID+"/_reauth",
 		body,
-		env.resolveOAuth2Options(opts),
+		env.resolveActorOptions(opts),
 	)
 	require.Equalf(t, http.StatusOK, w.Code, "reauth failed: %s", w.Body.String())
 
@@ -320,11 +319,11 @@ func (env *IntegrationTestEnv) FollowOAuth2Redirect(t *testing.T, redirectURL st
 // the test's returnToUrl on success, or error_pages.internal_error on
 // rejection. By default the request is signed as actor "test-actor" in the root
 // namespace; pass WithActor(...) to mirror a specific tenant's browser session.
-func (env *IntegrationTestEnv) DeliverOAuth2Callback(t *testing.T, callbackURL string, opts ...OAuth2Option) string {
+func (env *IntegrationTestEnv) DeliverOAuth2Callback(t *testing.T, callbackURL string, opts ...ActorOption) string {
 	t.Helper()
 	require.NotNil(t, env.PublicGin, "DeliverOAuth2Callback requires SetupOptions.IncludePublic=true")
 
-	cfg := env.resolveOAuth2Options(opts)
+	cfg := env.resolveActorOptions(opts)
 
 	parsed, err := url.Parse(callbackURL)
 	require.NoError(t, err)

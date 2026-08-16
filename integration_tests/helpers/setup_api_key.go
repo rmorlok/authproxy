@@ -107,12 +107,12 @@ func NewApiKeyConnector(connectorID apid.ID, displayName string, opts ApiKeyConn
 // step), not a redirect. Returns the new connection id and the form payload.
 // Signed by default as actor "test-actor" in the root namespace; pass
 // WithActor(...) to mirror a specific tenant.
-func (env *IntegrationTestEnv) InitiateApiKeyConnection(t *testing.T, connectorID apid.ID, opts ...OAuth2Option) (connectionID string, form *coreIface.ConnectionSetupForm) {
+func (env *IntegrationTestEnv) InitiateApiKeyConnection(t *testing.T, connectorID apid.ID, opts ...ActorOption) (connectionID string, form *coreIface.ConnectionSetupForm) {
 	t.Helper()
 	require.Truef(t, env.ApiGin != nil || env.ServerURL != "",
 		"InitiateApiKeyConnection requires either in-process gin or a running HTTP server")
 
-	cfg := env.resolveOAuth2Options(opts)
+	cfg := env.resolveActorOptions(opts)
 
 	body, err := jsonMarshal(coreIface.InitiateConnectionRequest{
 		ConnectorId:   connectorID,
@@ -139,9 +139,9 @@ func (env *IntegrationTestEnv) InitiateApiKeyConnection(t *testing.T, connectorI
 // SubmitApiKeyCredentials POSTs to /api/v1/connections/{id}/_submit with the
 // supplied step id and field data. Returns the response body so callers can
 // inspect what shape came back (form / verifying / complete).
-func (env *IntegrationTestEnv) SubmitApiKeyCredentials(t *testing.T, connectionID, stepID string, data map[string]any, opts ...OAuth2Option) *httptest.ResponseRecorder {
+func (env *IntegrationTestEnv) SubmitApiKeyCredentials(t *testing.T, connectionID, stepID string, data map[string]any, opts ...ActorOption) *httptest.ResponseRecorder {
 	t.Helper()
-	cfg := env.resolveOAuth2Options(opts)
+	cfg := env.resolveActorOptions(opts)
 
 	rawData, err := json.Marshal(data)
 	require.NoError(t, err)
@@ -158,9 +158,9 @@ func (env *IntegrationTestEnv) SubmitApiKeyCredentials(t *testing.T, connectionI
 // ReauthConnection POSTs to /api/v1/connections/{id}/_reauth and returns the
 // raw response. For api-key connectors the response is a form (credentials
 // step) the user fills in to rotate the key.
-func (env *IntegrationTestEnv) ReauthConnection(t *testing.T, connectionID string, opts ...OAuth2Option) *httptest.ResponseRecorder {
+func (env *IntegrationTestEnv) ReauthConnection(t *testing.T, connectionID string, opts ...ActorOption) *httptest.ResponseRecorder {
 	t.Helper()
-	cfg := env.resolveOAuth2Options(opts)
+	cfg := env.resolveActorOptions(opts)
 
 	// Body is optional for api-key; sending an empty struct exercises the
 	// JSON unmarshal path on the route.
@@ -212,7 +212,7 @@ func (env *IntegrationTestEnv) DecryptApiKeyCredential(t *testing.T, connectionI
 // doSignedRequest signs an admin-namespace request as the configured actor
 // and dispatches it through either the in-process gin engine or the real
 // HTTP server, returning a recorder uniformly.
-func (env *IntegrationTestEnv) doSignedRequest(t *testing.T, method, path string, body io.Reader, cfg oauth2Options) *httptest.ResponseRecorder {
+func (env *IntegrationTestEnv) doSignedRequest(t *testing.T, method, path string, body io.Reader, cfg actorOptions) *httptest.ResponseRecorder {
 	t.Helper()
 
 	req, err := env.ApiAuthUtil.NewSignedRequestForActorExternalId(

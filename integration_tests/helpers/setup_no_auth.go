@@ -15,13 +15,13 @@ import (
 func (env *IntegrationTestEnv) InitiateNoAuthConnection(
 	t *testing.T,
 	connectorID apid.ID,
-	opts ...OAuth2Option,
+	opts ...ActorOption,
 ) string {
 	t.Helper()
 	require.Truef(t, env.ApiGin != nil || env.ServerURL != "",
 		"InitiateNoAuthConnection requires either in-process gin or a running HTTP server")
 
-	cfg := env.resolveOAuth2Options(opts)
+	cfg := env.resolveActorOptions(opts)
 	body, err := jsonMarshal(coreIface.InitiateConnectionRequest{
 		ConnectorId:   connectorID,
 		IntoNamespace: cfg.actorNamespace,

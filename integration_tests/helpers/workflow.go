@@ -66,11 +66,11 @@ func RequireWorkflowTaskCompleted(
 	env *IntegrationTestEnv,
 	taskID string,
 	timeout time.Duration,
-	opts ...OAuth2Option,
+	opts ...ActorOption,
 ) schemaapi.TaskInfoJson {
 	t.Helper()
 
-	cfg := env.resolveOAuth2Options(opts)
+	cfg := env.resolveActorOptions(opts)
 	var lastStatus int
 	var lastBody string
 	var lastState schemaapi.TaskState
@@ -138,6 +138,6 @@ func RequireWorkflowTaskCompleted(
 }
 
 // RootActor returns helper options for the default integration-test actor.
-func RootActor() OAuth2Option {
+func RootActor() ActorOption {
 	return WithActor("test-actor", sconfig.RootNamespace)
 }

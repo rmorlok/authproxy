@@ -141,7 +141,7 @@ func completeAuthFlowAsActor(t *testing.T, r *proxyRefreshRig, actorExternalID, 
 	)
 }
 
-func completeAuthFlowWithRedirect(t *testing.T, r *proxyRefreshRig, connID, redirectURL, providerUserID string, callbackOpts ...helpers.OAuth2Option) string {
+func completeAuthFlowWithRedirect(t *testing.T, r *proxyRefreshRig, connID, redirectURL, providerUserID string, callbackOpts ...helpers.ActorOption) string {
 	t.Helper()
 
 	parsed, err := url.Parse(redirectURL)
