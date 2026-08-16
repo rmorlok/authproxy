@@ -53,6 +53,7 @@ func TestReauthConnection(t *testing.T) {
 		}, nil)
 		conn.State = database.ConnectionStateConfigured
 		conn.s.encrypt = encrypt.NewFakeEncryptService(false)
+
 		// Even if a configuration field happens to collide with the synthesized
 		// credential form, reauth must never reflect it into the response.
 		setConnectionConfigFixture(t, conn, map[string]any{"api_key": priorApiKey})

@@ -106,7 +106,8 @@ func (c *connection) renderStepResponse(
 	case iface.ManifestStepTypeForm:
 		data, err := c.getReconfigureFormData(ctx, step.Id(), step.JsonSchema())
 		if err != nil {
-			return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to get existing form data: %w", err))
+			return nil, httperr.InternalServerError(
+				httperr.WithInternalErrorf("failed to get existing form data: %w", err))
 		}
 		return &iface.ConnectionSetupForm{
 			Id:              c.GetId(),
@@ -151,14 +152,20 @@ func (c *connection) renderStepResponse(
 // the current form step. A reconfigure keeps the connection in Configured state,
 // which distinguishes it from initial setup and lets resumed/subsequent steps
 // receive their existing values too.
-func (c *connection) getReconfigureFormData(ctx context.Context, stepId string, schema json.RawMessage) (json.RawMessage, error) {
+func (c *connection) getReconfigureFormData(
+	ctx context.Context,
+	stepId string,
+	schema json.RawMessage,
+) (json.RawMessage, error) {
 	if c.GetState() != database.ConnectionStateConfigured {
 		return nil, nil
 	}
+
 	connector := c.connector.GetDefinition()
 	if connector == nil || connector.SetupFlow == nil || connector.SetupFlow.Configure == nil {
 		return nil, nil
 	}
+
 	isConfigureStep := false
 	for i := range connector.SetupFlow.Configure.Steps {
 		step := &connector.SetupFlow.Configure.Steps[i]
@@ -197,6 +204,7 @@ func (c *connection) getReconfigureFormData(ctx context.Context, stepId string, 
 	if err != nil {
 		return nil, fmt.Errorf("encode existing form data: %w", err)
 	}
+
 	return encoded, nil
 }
 
