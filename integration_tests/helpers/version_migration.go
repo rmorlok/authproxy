@@ -27,7 +27,7 @@ func (env *IntegrationTestEnv) CreateConnector(
 	definition sconfig.Connector,
 	labels map[string]string,
 	annotations map[string]string,
-	opts ...OAuth2Option,
+	opts ...ActorOption,
 ) schemaapi.ConnectorVersionJson {
 	t.Helper()
 
@@ -39,7 +39,7 @@ func (env *IntegrationTestEnv) CreateConnector(
 	})
 	require.NoError(t, err)
 
-	w := env.doSignedRequest(t, http.MethodPost, "/api/v1/connectors", body, env.resolveOAuth2Options(opts))
+	w := env.doSignedRequest(t, http.MethodPost, "/api/v1/connectors", body, env.resolveActorOptions(opts))
 	require.Equalf(t, http.StatusCreated, w.Code, "create connector failed: %s", w.Body.String())
 
 	var out schemaapi.ConnectorVersionJson
@@ -55,7 +55,7 @@ func (env *IntegrationTestEnv) CreateDraftConnectorVersion(
 	definition sconfig.Connector,
 	labels map[string]string,
 	annotations map[string]string,
-	opts ...OAuth2Option,
+	opts ...ActorOption,
 ) schemaapi.ConnectorVersionJson {
 	t.Helper()
 
@@ -71,7 +71,7 @@ func (env *IntegrationTestEnv) CreateDraftConnectorVersion(
 	require.NoError(t, err)
 
 	path := fmt.Sprintf("/api/v1/connectors/%s/versions", connectorID)
-	w := env.doSignedRequest(t, http.MethodPost, path, body, env.resolveOAuth2Options(opts))
+	w := env.doSignedRequest(t, http.MethodPost, path, body, env.resolveActorOptions(opts))
 	require.Equalf(t, http.StatusCreated, w.Code, "create connector version failed: %s", w.Body.String())
 
 	var out schemaapi.ConnectorVersionJson
@@ -86,7 +86,7 @@ func (env *IntegrationTestEnv) ForceConnectorVersionState(
 	connectorID apid.ID,
 	version uint64,
 	state schemaapi.ConnectorVersionState,
-	opts ...OAuth2Option,
+	opts ...ActorOption,
 ) schemaapi.ConnectorVersionJson {
 	t.Helper()
 
@@ -94,7 +94,7 @@ func (env *IntegrationTestEnv) ForceConnectorVersionState(
 	require.NoError(t, err)
 
 	path := fmt.Sprintf("/api/v1/connectors/%s/versions/%d/_forceState", connectorID, version)
-	w := env.doSignedRequest(t, http.MethodPut, path, body, env.resolveOAuth2Options(opts))
+	w := env.doSignedRequest(t, http.MethodPut, path, body, env.resolveActorOptions(opts))
 	require.Equalf(t, http.StatusOK, w.Code, "force connector version state failed: %s", w.Body.String())
 
 	var out schemaapi.ConnectorVersionJson
@@ -111,7 +111,7 @@ func (env *IntegrationTestEnv) PublishConnectorVersion(
 	definition sconfig.Connector,
 	labels map[string]string,
 	annotations map[string]string,
-	opts ...OAuth2Option,
+	opts ...ActorOption,
 ) schemaapi.ConnectorVersionJson {
 	t.Helper()
 
@@ -126,7 +126,7 @@ func (env *IntegrationTestEnv) MigrateConnectionVersion(
 	connectionID string,
 	targetVersion uint64,
 	timeoutSeconds int64,
-	opts ...OAuth2Option,
+	opts ...ActorOption,
 ) schemaapi.MigrateConnectionVersionResponseJson {
 	t.Helper()
 
@@ -138,7 +138,7 @@ func (env *IntegrationTestEnv) MigrateConnectionVersion(
 	require.NoError(t, err)
 
 	path := "/api/v1/connections/" + connectionID + "/_migrateVersion"
-	w := env.doSignedRequest(t, http.MethodPost, path, body, env.resolveOAuth2Options(opts))
+	w := env.doSignedRequest(t, http.MethodPost, path, body, env.resolveActorOptions(opts))
 	require.Equalf(t, http.StatusOK, w.Code, "migrate connection version failed: %s", w.Body.String())
 
 	var out schemaapi.MigrateConnectionVersionResponseJson
@@ -157,7 +157,7 @@ func (env *IntegrationTestEnv) MigrateConnectionVersionAndWait(
 	connectionID string,
 	targetVersion uint64,
 	timeout time.Duration,
-	opts ...OAuth2Option,
+	opts ...ActorOption,
 ) schemaapi.MigrateConnectionVersionResponseJson {
 	t.Helper()
 
@@ -177,7 +177,7 @@ func (env *IntegrationTestEnv) SubmitSetupForm(
 	connectionID string,
 	stepID string,
 	data map[string]any,
-	opts ...OAuth2Option,
+	opts ...ActorOption,
 ) *httptest.ResponseRecorder {
 	t.Helper()
 
@@ -189,7 +189,7 @@ func (env *IntegrationTestEnv) SubmitSetupForm(
 	})
 	require.NoError(t, err)
 
-	return env.doSignedRequest(t, http.MethodPost, "/api/v1/connections/"+connectionID+"/_submit", body, env.resolveOAuth2Options(opts))
+	return env.doSignedRequest(t, http.MethodPost, "/api/v1/connections/"+connectionID+"/_submit", body, env.resolveActorOptions(opts))
 }
 
 // DecryptConnectionConfiguration reads and decrypts a connection's current
@@ -219,7 +219,7 @@ func (env *IntegrationTestEnv) ListNotifications(
 	t *testing.T,
 	state schemaapi.NotificationState,
 	includeViewed bool,
-	opts ...OAuth2Option,
+	opts ...ActorOption,
 ) []schemaapi.NotificationJson {
 	t.Helper()
 
@@ -235,7 +235,7 @@ func (env *IntegrationTestEnv) ListNotifications(
 		path += "?" + encoded
 	}
 
-	w := env.doSignedRequest(t, http.MethodGet, path, nil, env.resolveOAuth2Options(opts))
+	w := env.doSignedRequest(t, http.MethodGet, path, nil, env.resolveActorOptions(opts))
 	require.Equalf(t, http.StatusOK, w.Code, "list notifications failed: %s", w.Body.String())
 
 	var out schemaapi.ListNotificationsResponseJson
@@ -250,7 +250,7 @@ func (env *IntegrationTestEnv) ListConnectionNotifications(
 	connectionID string,
 	state schemaapi.NotificationState,
 	includeViewed bool,
-	opts ...OAuth2Option,
+	opts ...ActorOption,
 ) []schemaapi.NotificationJson {
 	t.Helper()
 
@@ -274,7 +274,7 @@ func (env *IntegrationTestEnv) RequireSingleActiveConnectionNotification(
 	t *testing.T,
 	connectionID string,
 	keySuffix string,
-	opts ...OAuth2Option,
+	opts ...ActorOption,
 ) schemaapi.NotificationJson {
 	t.Helper()
 
@@ -290,7 +290,7 @@ func (env *IntegrationTestEnv) RequireSingleActiveConnectionNotification(
 func (env *IntegrationTestEnv) RequireNoActiveConnectionNotifications(
 	t *testing.T,
 	connectionID string,
-	opts ...OAuth2Option,
+	opts ...ActorOption,
 ) {
 	t.Helper()
 	require.Empty(t, env.ListConnectionNotifications(t, connectionID, schemaapi.NotificationStateActive, false, opts...))
@@ -302,7 +302,7 @@ func (env *IntegrationTestEnv) RequireResolvedConnectionNotification(
 	t *testing.T,
 	connectionID string,
 	keySuffix string,
-	opts ...OAuth2Option,
+	opts ...ActorOption,
 ) schemaapi.NotificationJson {
 	t.Helper()
 
