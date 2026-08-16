@@ -21,6 +21,7 @@ interface FormStep {
     stepDescription?: string;
     jsonSchema: Record<string, unknown>;
     uiSchema: Record<string, unknown>;
+    data?: Record<string, unknown>;
 }
 
 function formStepFromResponse(response: ConnectionSetupFormResponse): FormStep {
@@ -31,6 +32,7 @@ function formStepFromResponse(response: ConnectionSetupFormResponse): FormStep {
         stepDescription: response.stepDescription,
         jsonSchema: response.jsonSchema,
         uiSchema: response.uiSchema,
+        data: response.data,
     };
 }
 

@@ -104,6 +104,11 @@ func (c *connection) renderStepResponse(
 ) (iface.ConnectionSetupResponse, error) {
 	switch step.Type() {
 	case iface.ManifestStepTypeForm:
+		data, err := c.getReconfigureFormData(ctx, step.Id(), step.JsonSchema())
+		if err != nil {
+			return nil, httperr.InternalServerError(
+				httperr.WithInternalErrorf("failed to get existing form data: %w", err))
+		}
 		return &iface.ConnectionSetupForm{
 			Id:              c.GetId(),
 			Type:            iface.ConnectionSetupResponseTypeForm,
@@ -112,6 +117,7 @@ func (c *connection) renderStepResponse(
 			StepDescription: step.Description(),
 			JsonSchema:      json.RawMessage(step.JsonSchema()),
 			UiSchema:        json.RawMessage(step.UiSchema()),
+			Data:            data,
 		}, nil
 
 	case iface.ManifestStepTypeRedirect:
@@ -140,6 +146,66 @@ func (c *connection) renderStepResponse(
 
 	}
 	return nil, httperr.InternalServerError(httperr.WithInternalErrorf("unsupported manifest step type %q", step.Type()))
+}
+
+// getReconfigureFormData returns only the stored configuration fields owned by
+// the current form step. A reconfigure keeps the connection in Configured state,
+// which distinguishes it from initial setup and lets resumed/subsequent steps
+// receive their existing values too.
+func (c *connection) getReconfigureFormData(
+	ctx context.Context,
+	stepId string,
+	schema json.RawMessage,
+) (json.RawMessage, error) {
+	if c.GetState() != database.ConnectionStateConfigured {
+		return nil, nil
+	}
+
+	connector := c.connector.GetDefinition()
+	if connector == nil || connector.SetupFlow == nil || connector.SetupFlow.Configure == nil {
+		return nil, nil
+	}
+
+	isConfigureStep := false
+	for i := range connector.SetupFlow.Configure.Steps {
+		step := &connector.SetupFlow.Configure.Steps[i]
+		if step.Id == stepId && step.Type.Normalized() == cschema.SetupFlowStepTypeForm {
+			isConfigureStep = true
+			break
+		}
+	}
+	if !isConfigureStep {
+		return nil, nil
+	}
+
+	configuration, err := c.GetConfiguration(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var parsed struct {
+		Properties map[string]json.RawMessage `json:"properties"`
+	}
+	if err := json.Unmarshal(schema, &parsed); err != nil {
+		return nil, fmt.Errorf("parse form schema: %w", err)
+	}
+
+	data := make(map[string]any)
+	for name := range parsed.Properties {
+		if value, ok := configuration[name]; ok {
+			data[name] = value
+		}
+	}
+	if len(data) == 0 {
+		return nil, nil
+	}
+
+	encoded, err := json.Marshal(data)
+	if err != nil {
+		return nil, fmt.Errorf("encode existing form data: %w", err)
+	}
+
+	return encoded, nil
 }
 
 // renderResumeResponse returns the response shape for the connection's

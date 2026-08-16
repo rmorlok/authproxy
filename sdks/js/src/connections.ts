@@ -103,6 +103,7 @@ export interface ConnectionSetupFormResponse extends ConnectionSetupResponse {
     stepDescription?: string;
     jsonSchema: Record<string, unknown>;
     uiSchema: Record<string, unknown>;
+    data?: Record<string, unknown>;
 }
 
 export interface ConnectionSetupCompleteResponse extends ConnectionSetupResponse {

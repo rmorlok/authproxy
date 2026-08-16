@@ -54,6 +54,10 @@ func TestReauthConnection(t *testing.T) {
 		conn.State = database.ConnectionStateConfigured
 		conn.s.encrypt = encrypt.NewFakeEncryptService(false)
 
+		// Even if a configuration field happens to collide with the synthesized
+		// credential form, reauth must never reflect it into the response.
+		setConnectionConfigFixture(t, conn, map[string]any{"api_key": priorApiKey})
+
 		db.EXPECT().GetConnection(gomock.Any(), conn.Id).Return(&conn.Connection, nil).AnyTimes()
 		db.EXPECT().GetConnectorDefinitionVersion(gomock.Any(), conn.connector.Id, conn.connector.Version).Return(&database.ConnectorWithDefinition{
 			Id:                  conn.connector.Id,

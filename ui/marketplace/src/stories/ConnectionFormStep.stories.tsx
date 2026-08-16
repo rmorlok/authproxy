@@ -131,6 +131,49 @@ export const Submitting: Story = {
     },
 };
 
+export const ReconfigureWithExistingSelections: Story = {
+    args: {
+        connectionId: 'cxn_google_calendar',
+        stepTitle: 'Select a Calendar',
+        stepDescription: 'Your current selection is shown. Save it unchanged or choose another calendar.',
+        jsonSchema: {
+            type: 'object',
+            properties: {
+                calendar: {
+                    type: 'string',
+                    title: 'Calendar',
+                    enum: ['primary', 'product', 'support'],
+                },
+                syncDirection: {
+                    type: 'string',
+                    title: 'Sync direction',
+                    enum: ['two-way', 'import-only', 'export-only'],
+                },
+            },
+            required: ['calendar', 'syncDirection'],
+        },
+        uiSchema: {
+            type: 'VerticalLayout',
+            elements: [
+                { type: 'Control', scope: '#/properties/calendar' },
+                { type: 'Control', scope: '#/properties/syncDirection' },
+            ],
+        },
+        initialData: {
+            calendar: 'product',
+            syncDirection: 'two-way',
+        },
+    },
+};
+
+export const ReconfigureWithoutExistingSelections: Story = {
+    args: {
+        ...ReconfigureWithExistingSelections.args,
+        stepDescription: 'Before the fix, reconfigure opened without the stored selections.',
+        initialData: undefined,
+    },
+};
+
 export const MinimalForm: Story = {
     args: {
         jsonSchema: {

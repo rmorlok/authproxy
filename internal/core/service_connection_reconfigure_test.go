@@ -74,6 +74,10 @@ func TestReconfigure(t *testing.T) {
 			},
 		})
 		conn.State = database.ConnectionStateConfigured
+		setConnectionConfigFixture(t, conn, map[string]any{
+			"workspace_id": "existing-workspace",
+			"region":       "not-owned-by-this-step",
+		})
 
 		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewSetupStep("workspace"))).Return(nil)
 
@@ -81,6 +85,8 @@ func TestReconfigure(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, resp)
 		assert.Equal(t, iface.ConnectionSetupResponseTypeForm, resp.GetType())
+		form := resp.(*iface.ConnectionSetupForm)
+		assert.JSONEq(t, `{"workspace_id":"existing-workspace"}`, string(form.Data))
 	})
 
 	t.Run("returns first configure step when preconnect steps also exist", func(t *testing.T) {

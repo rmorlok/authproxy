@@ -18,6 +18,7 @@ interface SetupStep {
   stepDescription?: string;
   jsonSchema: Record<string, unknown>;
   uiSchema: Record<string, unknown>;
+  data?: Record<string, unknown>;
 }
 
 interface ConnectionSetupDialogProps {
@@ -61,11 +62,13 @@ const ConnectionSetupDialog: React.FC<ConnectionSetupDialogProps> = ({
         )}
         {currentFormStep && (
           <ConnectionFormStep
+            key={`${currentFormStep.connectionId}:${currentFormStep.stepId}`}
             connectionId={currentFormStep.connectionId}
             stepTitle={currentFormStep.stepTitle}
             stepDescription={currentFormStep.stepDescription}
             jsonSchema={currentFormStep.jsonSchema}
             uiSchema={currentFormStep.uiSchema}
+            initialData={currentFormStep.data}
             onSubmit={onSubmit}
             onCancel={onCancel}
             isSubmitting={isSubmittingForm}
