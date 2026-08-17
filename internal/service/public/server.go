@@ -116,6 +116,8 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 		c.PureJSON(status, response)
 	})
 
+	registerMarketplaceConfigRoute(server, root.Marketplace)
+
 	routesError := common_routes.NewErrorRoutes(dm.GetConfig())
 	routesError.Register(server)
 

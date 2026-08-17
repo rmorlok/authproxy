@@ -50,6 +50,9 @@ func (r *Root) Validate() error {
 	if err := r.HostApplication.Validate(vc.PushField("host_application")); err != nil {
 		result = multierror.Append(result, err)
 	}
+	if err := r.Marketplace.Validate(vc.PushField("marketplace")); err != nil {
+		result = multierror.Append(result, err)
+	}
 
 	if err := r.Telemetry.Validate(vc.PushField("telemetry")); err != nil {
 		result = multierror.Append(result, err)

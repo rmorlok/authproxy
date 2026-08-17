@@ -513,6 +513,14 @@
       "properties": {
         "baseUrl": {
           "$ref": "../common/schema.json#/$defs/StringValue"
+        },
+        "colorMode": {
+          "enum": [
+            "light",
+            "dark",
+            "system"
+          ],
+          "type": "string"
         }
       },
       "additionalProperties": false,

@@ -38,6 +38,7 @@ hostApplication:
 
 marketplace:
   baseUrl: http://localhost:5173
+  colorMode: system
 
 systemAuth:
   jwtSigningKey:

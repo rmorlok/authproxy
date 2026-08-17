@@ -25,6 +25,7 @@ hostApplication:
   initiateSessionUrl: http://127.0.0.1:8888/login-redirect
 marketplace:
   baseUrl: http://localhost:5173
+  colorMode: system
 systemAuth:
   jwtSigningKey:
     publicKey:

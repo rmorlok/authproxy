@@ -1097,6 +1097,26 @@ func TestSchemaDefinitions(t *testing.T) {
 					Data:  `{"test": {"baseUrl": {"envVar": "MARKETPLACE_URL"}}}`,
 				},
 				{
+					Name:  "light color mode",
+					Valid: true,
+					Data:  `{"test": {"colorMode": "light"}}`,
+				},
+				{
+					Name:  "dark color mode",
+					Valid: true,
+					Data:  `{"test": {"colorMode": "dark"}}`,
+				},
+				{
+					Name:  "system color mode",
+					Valid: true,
+					Data:  `{"test": {"colorMode": "system"}}`,
+				},
+				{
+					Name:  "invalid color mode",
+					Valid: false,
+					Data:  `{"test": {"colorMode": "sepia"}}`,
+				},
+				{
 					Name:  "extra property",
 					Valid: false,
 					Data:  `{"test": {"extra": "field"}}`,

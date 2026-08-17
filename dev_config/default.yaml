@@ -49,6 +49,7 @@ marketplace:
   baseUrl:
     envVar: AUTHPROXY_MARKETPLACE_BASE_URL
     default: http://localhost:5173
+  colorMode: system
 
 systemAuth:
   jwtSigningKey:
