@@ -2,9 +2,15 @@
 title: Labels and Annotations
 ---
 
-AuthProxy attaches Kubernetes-style **labels** (key=value metadata) and **annotations** (free-form key=value pairs) to every long-lived resource. Labels are the lightweight integration surface between AuthProxy and your host application: tag a connection with your tenant id, search for it later by selector, and have the same tag appear automatically on every request log entry that connection produces.
+AuthProxy attaches Kubernetes-style **labels** (key=value metadata) and 
+**annotations** (free-form key=value pairs) to every long-lived resource. 
+Labels are the lightweight integration surface between AuthProxy and your host
+application: tag a connection with your tenant id, search for it later by 
+selector, and have the same tag appear automatically on every request log 
+entry that connection produces.
 
-This page is the reference for the label system — what labels exist, how they propagate, and how to query them.
+This page is the reference for the label system — what labels exist, how 
+they propagate, and how to query them.
 
 ## Quick start
 
@@ -34,7 +40,9 @@ Find every request log entry produced by that tenant:
 GET /api/v1/metrics/request-events?labelSelector=app.example.com/tenant-id=tenant-42
 ```
 
-You did not have to write a separate "AuthProxy connection id → my tenant id" mapping table. The label travelled with the connection onto every request log entry automatically (see [Carry-forward](#carry-forward--how-labels-flow-through-the-hierarchy)).
+You did not have to write a separate "AuthProxy connection id → my tenant id" 
+mapping table. The label travelled with the connection onto every request log 
+entry automatically (see [Carry-forward](#carry-forward--how-labels-flow-through-the-hierarchy)).
 
 ## Where labels and annotations live
 
@@ -54,7 +62,7 @@ Request log entries store the per-request label snapshot (the values that were a
 
 ## Label vs. annotation
 
-Both are `map[string]string`. The differences are operational:
+Both labels and annotations are key-value data. The differences are operational:
 
 | | Labels | Annotations |
 |---|---|---|
@@ -64,11 +72,15 @@ Both are `map[string]string`. The differences are operational:
 | Value format | Up to 63 chars, alphanumeric + `-_.` | Anything — up to a 256 KB total cap per resource |
 | Carry forward? | Yes (see below) | No |
 
-Use labels for things you'll search by. Use annotations for things you want to attach but never filter on (long descriptions, ticket links, ownership emails, etc.).
+Use labels for things you'll search by. Use annotations for things you want to 
+attach but never filter on (long descriptions, ticket links, ownership emails, etc.).
 
 ## System labels — the `apxy/` namespace
 
-The `apxy/` prefix is reserved. User-written labels under that prefix are rejected at validation; in exchange, AuthProxy auto-populates a small set of system labels on every resource so consumers can locate, join, and filter by structural identity.
+The `apxy/` prefix is reserved. User-written labels under that prefix are 
+rejected at validation; in exchange, AuthProxy auto-populates a small set of 
+system labels on every resource so consumers can locate, join, and filter by 
+structural identity.
 
 ### Identifier labels
 
@@ -112,7 +124,15 @@ on this label mirror.
 
 ### Carry-forward labels
 
-When a parent resource's labels appear on a child, they are **re-keyed** under the parent's resource-type token so they don't collide with the child's own keys. This is the central abstraction of label propagation; see the next section.
+AuthProxy automatically carries forward labels from parent entities to the
+child entities. So labels from a connector are applied to connections created
+from that connector (with the-rekeying rules defined below). The purpose of this
+is to provide a flexible system where labels denormalize the metatadata so you can
+query child items in a way that would otherwise require a join.
+
+When a parent resource's labels appear on a child, they are **re-keyed** under 
+the parent's resource-type token so they don't collide with the child's own keys. 
+This is the central abstraction of label propagation; see the next section.
 
 ## Carry-forward — how labels flow through the hierarchy
 
@@ -130,13 +150,17 @@ namespace
 
 ### The rule
 
-When a child resource is created, every parent's user labels are copied onto the child, **re-keyed** under `apxy/<parent_rt>/<original_key>`:
+When a child resource is created, every parent's user labels are copied onto 
+the child, **re-keyed** under `apxy/<parent_rt>/<original_key>`:
 
 - Parent namespace `root.acme` has label `team=alpha`
 - Connection created in `root.acme` gets a materialised label `apxy/ns/team=alpha`
 - A request through that connection gets the same `apxy/ns/team=alpha` recorded in its log entry
 
-Anything already on the parent under `apxy/...` is **forwarded as-is** (no double-prefixing). So if `root.acme` itself inherited `apxy/ns/team=alpha` from `root` (which had `team=alpha`), the connection still ends up with `apxy/ns/team=alpha` — not `apxy/ns/apxy/ns/team`.
+Anything already on the parent under `apxy/...` is **forwarded as-is** (no 
+double-prefixing). So if `root.acme` itself inherited `apxy/ns/team=alpha` 
+from `root` (which had `team=alpha`), the connection still ends up with 
+`apxy/ns/team=alpha` — not `apxy/ns/apxy/ns/team`.
 
 ### Worked example
 
@@ -240,11 +264,3 @@ Annotations have the same shape under `/annotations`.
 The resource-level `PATCH` endpoint additionally supports replacing the entire user-label set in one shot via a top-level `labels` field. `PUT`s on the sub-resource path use merge semantics; `PATCH` on the parent with `labels` populated is a full replace.
 
 System (`apxy/`) labels survive a full replace — only user labels are replaced.
-
-## Implementation notes
-
-- **Validation.** Labels are validated on every write: keys follow `[<prefix>/]<name>` where the prefix is a DNS subdomain (max 253 chars) and the name is 1–63 chars from `[a-zA-Z0-9_.-]`, with values up to 63 chars. The `apxy/` prefix is reserved on user input.
-- **Storage.** Labels are stored as a JSON column (`jsonb` on Postgres, `text` on SQLite, `String` on Clickhouse for the request log). Label selectors compile to provider-specific JSON predicates.
-- **Annotations** share the same encoding but cap at 256 KB total per resource; values are not further validated.
-- **Propagation transactions.** Each carry-forward update runs in its own short transaction so long-fan-out updates do not hold long-running locks. The daily consistency checker uses a rate-limited enumerator to bound resource use even on large fleets.
-- **What's not carried forward.** Annotations don't propagate. Per-request labels don't end up on the connection. Once a request log entry is written, its label snapshot is frozen — future label changes on the connection don't backfill old log entries.
