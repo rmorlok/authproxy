@@ -48,14 +48,14 @@ jobs:
       PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version-file: integration_tests/go.mod
 
       - name: Resolve environment names
         id: env
@@ -176,7 +176,7 @@ jobs:
           done
 
       - name: Assume GH Actions role via OIDC
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
@@ -408,7 +408,7 @@ jobs:
 
       - name: Post smoke failure comment
         if: failure() && steps.smoke.outcome == 'failure'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           SMOKE_LOG_PATH: ${{ steps.smoke.outputs.log_path }}
           DEV_URL: https://${{ steps.env.outputs.hostname }}/
@@ -469,7 +469,7 @@ jobs:
             }
 
       - name: Post dev environment comment
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           DEV_URL: https://${{ steps.env.outputs.hostname }}/
           RELEASE_NS: ${{ steps.env.outputs.namespace }}
@@ -610,7 +610,7 @@ jobs:
           echo "Hostname:  https://${hostname}/"
 
       - name: Assume GH Actions role via OIDC
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}

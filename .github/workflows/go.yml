@@ -22,17 +22,17 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - name: Set up Go
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v6
       with:
         go-version: '1.24'
 
     - name: golangci-lint
-      uses: golangci/golangci-lint-action@v6
+      uses: golangci/golangci-lint-action@v9
       with:
-        version: latest
+        version: v2.13.0
 
     - name: Check route JSON rendering guardrails
       run: go run ./tools/check-gin-json-rendering
@@ -40,12 +40,12 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - name: Set up Go
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v6
       with:
-        go-version: '1.24'
+        go-version-file: terraform/provider/go.mod
 
     - name: Build
       run: go build -v ./...
@@ -104,10 +104,10 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - name: Set up Go
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v6
       with:
         go-version: '1.24'
 
@@ -170,17 +170,18 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - name: Set up Go
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v6
       with:
-        go-version: '1.24'
+        go-version-file: integration_tests/go.mod
 
     - name: Set up Node + Yarn
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v5
       with:
         node-version: '20'
+        package-manager-cache: false
 
     - name: Install marketplace deps + build
       run: |
@@ -189,7 +190,7 @@ jobs:
         yarn workspace @authproxy/marketplace build
 
     - name: Install Chrome for chromedp
-      uses: browser-actions/setup-chrome@v1
+      uses: browser-actions/setup-chrome@v2
       with:
         chrome-version: stable
 
