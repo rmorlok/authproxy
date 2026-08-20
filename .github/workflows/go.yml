@@ -32,7 +32,7 @@ jobs:
     - name: golangci-lint
       uses: golangci/golangci-lint-action@v9
       with:
-        version: latest
+        version: v2.13.0
 
     - name: Check route JSON rendering guardrails
       run: go run ./tools/check-gin-json-rendering
