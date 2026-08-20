@@ -4,10 +4,58 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/google/uuid"
+	authjwt "github.com/rmorlok/authproxy/internal/apauth/jwt"
 	"github.com/stretchr/testify/require"
 )
+
+func TestActorExternalID(t *testing.T) {
+	t.Run("keeps well-known actor external IDs stable", func(t *testing.T) {
+		require.Equal(t, "demo-admin", actorExternalID("demo-admin"))
+		require.Equal(t, "demo-user", actorExternalID("demo-user"))
+	})
+
+	t.Run("generates a new external ID for every fresh user", func(t *testing.T) {
+		first := actorExternalID(freshUserSelection)
+		second := actorExternalID(freshUserSelection)
+
+		require.NotEqual(t, first, second)
+		for _, externalID := range []string{first, second} {
+			suffix, found := strings.CutPrefix(externalID, freshUserSelection+"-")
+			require.True(t, found)
+			require.NoError(t, uuid.Validate(suffix))
+		}
+	})
+}
+
+func TestSignTokenForFreshUserIncludesActorForJustInTimeProvisioning(t *testing.T) {
+	externalID := actorExternalID(freshUserSelection)
+	keyDir := filepath.Join("..", "..", "..", "test_data", "admin_user_keys")
+	token, err := signTokenForFreshUser(settings{
+		jwtPrivateKeyPath: filepath.Join(keyDir, "bobdole"),
+		tokenTtl:          time.Minute,
+	}, externalID)
+	require.NoError(t, err)
+
+	claims, err := authjwt.NewJwtTokenParserBuilder().
+		WithPublicKeyPath(filepath.Join(keyDir, "bobdole.pub")).
+		Parse(token)
+	require.NoError(t, err)
+	require.Equal(t, externalID, claims.Subject)
+	require.False(t, claims.ActorSigned)
+	require.NotNil(t, claims.Actor)
+	require.Equal(t, externalID, claims.Actor.ExternalId)
+	require.Equal(t, "root", claims.Actor.Namespace)
+	require.Equal(t, map[string]string{"demo": "true", "role": "user"}, claims.Actor.Labels)
+	require.Len(t, claims.Actor.Permissions, 1)
+	require.Equal(t, []string{"*"}, claims.Actor.Permissions[0].Resources)
+	require.Equal(t, []string{"*"}, claims.Actor.Permissions[0].Verbs)
+}
 
 func TestLoadTelemetryLinksFromGrafanaBaseURL(t *testing.T) {
 	t.Setenv("AUTHPROXY_GRAFANA_URL", "https://demo.example.test/grafana/")

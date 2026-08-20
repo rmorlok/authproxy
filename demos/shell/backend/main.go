@@ -2,16 +2,15 @@
 // demo environment.
 //
 // AuthProxy is normally embedded in a host application that handles user
-// authentication; the host signs a JWT vouching for the authenticated user
-// using an admin signing key registered with AuthProxy, then redirects the
-// user to the appropriate AuthProxy UI (marketplace or admin) with the JWT
-// as a query parameter. AuthProxy validates the signature against the
-// admin's stored public key and establishes a session.
+// authentication; the host signs a JWT vouching for the authenticated user,
+// then redirects the user to the appropriate AuthProxy UI (marketplace or
+// admin) with the JWT as a query parameter. AuthProxy validates the signature
+// and establishes a session.
 //
 // The demo shell short-circuits the "actual auth" step: it guides a visitor
 // to a demo surface and, when that surface needs an AuthProxy session, signs
-// a JWT for the selected well-known demo actor. **Not** something you'd ship
-// to customers — lives only in the demo environment.
+// a JWT for the selected demo identity. **Not** something you'd ship to
+// customers — lives only in the demo environment.
 package main
 
 import (
@@ -27,18 +26,23 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/demos/shell/backend/embed"
+	"github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apauth/jwt"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 )
 
-// demoActors enumerates the three identities the shell can sign JWTs for.
-// The same three are expected to exist as ConfiguredActors on the AuthProxy
-// side (the umbrella chart's seed job pre-creates them — see #A11).
-var demoActors = map[string]struct{}{
-	"demo-admin": {},
-	"demo-user":  {},
-	"fresh-user": {},
+const freshUserSelection = "fresh-user"
+
+// demoActorSelections enumerates the identities the shell UI can request.
+// fresh-user is a selector rather than a literal actor external ID; each
+// request for it is resolved to a new external ID before the JWT is signed.
+var demoActorSelections = map[string]struct{}{
+	"demo-admin":       {},
+	"demo-user":        {},
+	freshUserSelection: {},
 }
 
 // demoDestinations maps the UI's `destination` form field to the env var
@@ -61,6 +65,7 @@ type settings struct {
 	authUrl             string
 	destinationUrls     map[string]string
 	devFrontendUrl      string
+	jwtPrivateKeyPath   string
 	oauthProviderURL    string
 	telemetryLinks      []telemetryLink
 	tokenTtl            time.Duration
@@ -90,6 +95,7 @@ func loadSettings() settings {
 		addr:                ":" + port,
 		adminPrivateKeyPath: mustGetenv("ADMIN_PRIVATE_KEY_PATH"),
 		adminUsername:       mustGetenv("ADMIN_USERNAME"),
+		jwtPrivateKeyPath:   mustGetenv("AUTHPROXY_JWT_PRIVATE_KEY_PATH"),
 		// AUTHPROXY_AUTH_URL isn't strictly required for the redirect itself
 		// (the destination URLs are what we redirect to) but it's kept here
 		// in case future routes need to call back into AuthProxy directly.
@@ -149,13 +155,11 @@ func loadTelemetryLinks() []telemetryLink {
 	return links
 }
 
-// signTokenFor mints a JWT signed by the admin keypair, claiming the
-// picked actor's external_id. AuthProxy validates the signature against
-// the admin's stored public key and — because the admin has trust to
-// vouch for arbitrary actors — establishes a session for that actor.
-func signTokenFor(s settings, actorExternalId string) (string, error) {
+// signTokenFor mints a JWT for a well-known actor that already exists in
+// AuthProxy and has the demo shell's public key configured.
+func signTokenFor(s settings, actorExternalID string) (string, error) {
 	b := jwt.NewJwtTokenBuilder().
-		WithActorExternalId(actorExternalId).
+		WithActorExternalId(actorExternalID).
 		WithActorSigned().
 		WithServiceIds(config.AllServiceIds()).
 		WithNonce().
@@ -163,6 +167,41 @@ func signTokenFor(s settings, actorExternalId string) (string, error) {
 		WithPrivateKeyPath(s.adminPrivateKeyPath)
 
 	return b.Token()
+}
+
+// signTokenForFreshUser includes the complete actor claim so AuthProxy creates
+// the never-before-seen actor during authentication. Just-in-time actor claims
+// are signed with the host JWT key rather than an existing actor's key.
+func signTokenForFreshUser(s settings, actorExternalID string) (string, error) {
+	return jwt.NewJwtTokenBuilder().
+		WithActor(&core.Actor{
+			ExternalId: actorExternalID,
+			Namespace:  config.RootNamespace,
+			Labels: map[string]string{
+				"demo": "true",
+				"role": "user",
+			},
+			Permissions: []aschema.Permission{
+				{
+					Namespace: "root.**",
+					Resources: []string{"*"},
+					Verbs:     []string{"*"},
+				},
+			},
+		}).
+		WithServiceIds(config.AllServiceIds()).
+		WithNonce().
+		WithExpiresIn(s.tokenTtl).
+		WithPrivateKeyPath(s.jwtPrivateKeyPath).
+		Token()
+}
+
+func actorExternalID(selection string) string {
+	if selection == freshUserSelection {
+		return freshUserSelection + "-" + uuid.NewString()
+	}
+
+	return selection
 }
 
 func ssoHandler(s settings, logger *slog.Logger) http.HandlerFunc {
@@ -176,10 +215,10 @@ func ssoHandler(s settings, logger *slog.Logger) http.HandlerFunc {
 			return
 		}
 
-		actor := strings.TrimSpace(r.FormValue("actor"))
+		actorSelection := strings.TrimSpace(r.FormValue("actor"))
 		destination := strings.TrimSpace(r.FormValue("destination"))
 
-		if _, ok := demoActors[actor]; !ok {
+		if _, ok := demoActorSelections[actorSelection]; !ok {
 			http.Error(w, "unknown actor", http.StatusBadRequest)
 			return
 		}
@@ -189,7 +228,14 @@ func ssoHandler(s settings, logger *slog.Logger) http.HandlerFunc {
 			return
 		}
 
-		token, err := signTokenFor(s, actor)
+		actor := actorExternalID(actorSelection)
+		var token string
+		var err error
+		if actorSelection == freshUserSelection {
+			token, err = signTokenForFreshUser(s, actor)
+		} else {
+			token, err = signTokenFor(s, actor)
+		}
 		if err != nil {
 			logger.Error("failed to sign token", "err", err, "actor", actor)
 			http.Error(w, "internal error", http.StatusInternalServerError)

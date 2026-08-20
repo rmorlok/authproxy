@@ -37,9 +37,11 @@ sequenceDiagram
     AP-->>UI: Session cookie and UI configuration
 ```
 
-`demo-admin`, `demo-user`, and `fresh-user` demonstrate distinct host
-identities. Connection data is shared and changes as visitors use the demo, so
-do not rely on any identity having a permanently empty or populated account.
+`demo-admin` and `demo-user` demonstrate pre-provisioned host identities. Every
+**Fresh user** launch generates a new `fresh-user-<uuid>` external ID and
+provisions that actor during the JWT handoff, so it starts without connections.
+Connection data for the pre-provisioned identities is shared and changes as
+visitors use the demo.
 
 See [host application integration](/integration/host-application/) for the
 production version of this handoff.
