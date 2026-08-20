@@ -51,6 +51,17 @@ func (c *stateTestCore) GetConnection(_ context.Context, _ apid.ID) (coreIface.C
 	return c.conn, nil
 }
 
+type stateTestConnection struct {
+	coreIface.Connection
+	id        apid.ID
+	namespace string
+	connector coreIface.Connector
+}
+
+func (c *stateTestConnection) GetId() apid.ID                    { return c.id }
+func (c *stateTestConnection) GetNamespace() string              { return c.namespace }
+func (c *stateTestConnection) GetConnector() coreIface.Connector { return c.connector }
+
 func newStateTestEncrypt(t *testing.T) encrypt.E {
 	t.Helper()
 	cfg := config.FromRoot(&sconfig.Root{
@@ -63,27 +74,68 @@ func newStateTestEncrypt(t *testing.T) encrypt.E {
 	return e
 }
 
-func TestState_RoundTripPreservesNamespace(t *testing.T) {
+func TestState_RoundTripPreservesNamespaces(t *testing.T) {
 	ctx := context.Background()
 	_, r := apredis.MustApplyTestConfig(nil)
 	e := encrypt.NewFakeEncryptService(false)
 
 	original := &state{
-		Id:           apid.New(apid.PrefixOauth2State),
-		Namespace:    "root.tenant-a",
-		ActorId:      apid.New(apid.PrefixActor),
-		ConnectorId:  apid.New(apid.PrefixConnectorVersion),
-		ConnectionId: apid.New(apid.PrefixConnection),
-		ExpiresAt:    time.Now().Add(time.Minute).UTC(),
-		ReturnToUrl:  "https://example.com/return",
+		Id:                  apid.New(apid.PrefixOauth2State),
+		ActorNamespace:      "root.tenant-a",
+		ConnectionNamespace: "root.tenant-a.user-a",
+		ActorId:             apid.New(apid.PrefixActor),
+		ConnectorId:         apid.New(apid.PrefixConnectorVersion),
+		ConnectionId:        apid.New(apid.PrefixConnection),
+		ExpiresAt:           time.Now().Add(time.Minute).UTC(),
+		ReturnToUrl:         "https://example.com/return",
 	}
 	require.NoError(t, writeStateToRedis(ctx, r, e, original, time.Minute))
 
 	loaded, err := readStateFromRedis(ctx, r, e, original.Id)
 	require.NoError(t, err)
-	assert.Equal(t, original.Namespace, loaded.Namespace)
+	assert.Equal(t, original.ActorNamespace, loaded.GetActorNamespace())
+	assert.Equal(t, original.ConnectionNamespace, loaded.GetConnectionNamespace())
 	assert.Equal(t, original.ActorId, loaded.ActorId)
 	assert.Equal(t, original.ConnectionId, loaded.ConnectionId)
+}
+
+func TestState_LegacyNamespaceAppliesToActorAndConnection(t *testing.T) {
+	s := &state{LegacyNamespace: "root.tenant-a"}
+
+	assert.Equal(t, "root.tenant-a", s.GetActorNamespace())
+	assert.Equal(t, "root.tenant-a", s.GetConnectionNamespace())
+}
+
+func TestSaveStateCapturesDistinctActorAndConnectionNamespaces(t *testing.T) {
+	ctx := context.Background()
+	_, r := apredis.MustApplyTestConfig(nil)
+	e := encrypt.NewFakeEncryptService(false)
+	connector := &mockCore.Connector{
+		Id:      apid.New(apid.PrefixConnectorVersion),
+		Version: 1,
+	}
+	connection := &stateTestConnection{
+		id:        apid.New(apid.PrefixConnection),
+		namespace: "root.smoke.smoke-user",
+		connector: connector,
+	}
+	o := &oAuth2Connection{
+		cfg:        config.FromRoot(&sconfig.Root{}),
+		r:          r,
+		encrypt:    e,
+		connection: connection,
+	}
+	actor := stateTestActor{
+		id:        apid.New(apid.PrefixActor),
+		namespace: "root.smoke",
+	}
+	stateId := apid.New(apid.PrefixOauth2State)
+
+	require.NoError(t, o.saveStateToRedis(ctx, actor, stateId, "https://example.com/return"))
+	loaded, err := readStateFromRedis(ctx, r, e, stateId)
+	require.NoError(t, err)
+	assert.Equal(t, "root.smoke", loaded.GetActorNamespace())
+	assert.Equal(t, "root.smoke.smoke-user", loaded.GetConnectionNamespace())
 }
 
 func TestState_RedisValueIsCiphertext(t *testing.T) {
@@ -92,19 +144,21 @@ func TestState_RedisValueIsCiphertext(t *testing.T) {
 	e := newStateTestEncrypt(t)
 
 	s := &state{
-		Id:           apid.New(apid.PrefixOauth2State),
-		Namespace:    "root.tenant-a",
-		ActorId:      apid.New(apid.PrefixActor),
-		ConnectorId:  apid.New(apid.PrefixConnectorVersion),
-		ConnectionId: apid.New(apid.PrefixConnection),
-		ExpiresAt:    time.Now().Add(time.Minute).UTC(),
+		Id:                  apid.New(apid.PrefixOauth2State),
+		ActorNamespace:      "root.tenant-a",
+		ConnectionNamespace: "root.tenant-a.user-a",
+		ActorId:             apid.New(apid.PrefixActor),
+		ConnectorId:         apid.New(apid.PrefixConnectorVersion),
+		ConnectionId:        apid.New(apid.PrefixConnection),
+		ExpiresAt:           time.Now().Add(time.Minute).UTC(),
 	}
 	require.NoError(t, writeStateToRedis(ctx, r, e, s, time.Minute))
 
 	raw, err := r.Get(ctx, getStateRedisKey(s.Id)).Result()
 	require.NoError(t, err)
 	// Sanity: the raw blob must NOT contain the namespace string in plaintext.
-	assert.NotContains(t, raw, s.Namespace, "namespace must not appear in cleartext in redis")
+	assert.NotContains(t, raw, s.ActorNamespace, "actor namespace must not appear in cleartext in redis")
+	assert.NotContains(t, raw, s.ConnectionNamespace, "connection namespace must not appear in cleartext in redis")
 	assert.NotContains(t, raw, s.ActorId.String(), "actor id must not appear in cleartext in redis")
 }
 
@@ -114,12 +168,13 @@ func TestState_TamperedCiphertextFailsToDecrypt(t *testing.T) {
 	e := newStateTestEncrypt(t)
 
 	s := &state{
-		Id:           apid.New(apid.PrefixOauth2State),
-		Namespace:    "root.tenant-a",
-		ActorId:      apid.New(apid.PrefixActor),
-		ConnectorId:  apid.New(apid.PrefixConnectorVersion),
-		ConnectionId: apid.New(apid.PrefixConnection),
-		ExpiresAt:    time.Now().Add(time.Minute).UTC(),
+		Id:                  apid.New(apid.PrefixOauth2State),
+		ActorNamespace:      "root.tenant-a",
+		ConnectionNamespace: "root.tenant-a.user-a",
+		ActorId:             apid.New(apid.PrefixActor),
+		ConnectorId:         apid.New(apid.PrefixConnectorVersion),
+		ConnectionId:        apid.New(apid.PrefixConnection),
+		ExpiresAt:           time.Now().Add(time.Minute).UTC(),
 	}
 	require.NoError(t, writeStateToRedis(ctx, r, e, s, time.Minute))
 
@@ -143,7 +198,7 @@ func TestState_TamperedCiphertextFailsToDecrypt(t *testing.T) {
 	assert.Contains(t, err.Error(), "decrypt")
 }
 
-func TestState_IsValidRequiresNamespace(t *testing.T) {
+func TestState_IsValidRequiresActorAndConnectionNamespaces(t *testing.T) {
 	base := state{
 		ActorId:      apid.New(apid.PrefixActor),
 		ConnectorId:  apid.New(apid.PrefixConnectorVersion),
@@ -151,12 +206,22 @@ func TestState_IsValidRequiresNamespace(t *testing.T) {
 		ExpiresAt:    time.Now().Add(time.Minute),
 	}
 
-	withNs := base
-	withNs.Namespace = "root.tenant-a"
-	require.True(t, withNs.IsValid(), "state with all fields populated must be valid")
+	withNamespaces := base
+	withNamespaces.ActorNamespace = "root.tenant-a"
+	withNamespaces.ConnectionNamespace = "root.tenant-a.user-a"
+	require.True(t, withNamespaces.IsValid(), "state with all fields populated must be valid")
 
-	withoutNs := base
-	require.False(t, withoutNs.IsValid(), "empty namespace must invalidate the state")
+	withoutActorNamespace := withNamespaces
+	withoutActorNamespace.ActorNamespace = ""
+	require.False(t, withoutActorNamespace.IsValid(), "empty actor namespace must invalidate the state")
+
+	withoutConnectionNamespace := withNamespaces
+	withoutConnectionNamespace.ConnectionNamespace = ""
+	require.False(t, withoutConnectionNamespace.IsValid(), "empty connection namespace must invalidate the state")
+
+	legacy := base
+	legacy.LegacyNamespace = "root.tenant-a"
+	require.True(t, legacy.IsValid(), "legacy namespace must remain valid for in-flight states")
 }
 
 func TestGetOAuth2State_RejectsEmptyNamespaceInState(t *testing.T) {
@@ -171,7 +236,6 @@ func TestGetOAuth2State_RejectsEmptyNamespaceInState(t *testing.T) {
 	// when the inbound actor's namespace happens to be empty too.
 	s := &state{
 		Id:           stateId,
-		Namespace:    "",
 		ActorId:      actorId,
 		ConnectorId:  apid.New(apid.PrefixConnectorVersion),
 		ConnectionId: apid.New(apid.PrefixConnection),
@@ -196,19 +260,20 @@ func TestGetOAuth2State_RejectsNamespaceMismatchOnActor(t *testing.T) {
 	stateId := apid.New(apid.PrefixOauth2State)
 	actorId := apid.New(apid.PrefixActor)
 	s := &state{
-		Id:           stateId,
-		Namespace:    "root.tenant-a",
-		ActorId:      actorId,
-		ConnectorId:  apid.New(apid.PrefixConnectorVersion),
-		ConnectionId: apid.New(apid.PrefixConnection),
-		ExpiresAt:    time.Now().Add(time.Minute).UTC(),
+		Id:                  stateId,
+		ActorNamespace:      "root.tenant-a",
+		ConnectionNamespace: "root.tenant-a.user-a",
+		ActorId:             actorId,
+		ConnectorId:         apid.New(apid.PrefixConnectorVersion),
+		ConnectionId:        apid.New(apid.PrefixConnection),
+		ExpiresAt:           time.Now().Add(time.Minute).UTC(),
 	}
 	require.NoError(t, writeStateToRedis(ctx, r, e, s, time.Minute))
 
 	// The state was created against tenant-a but the inbound actor claims tenant-b.
 	// Even with a matching actor id, the namespace check must reject.
 	actor := stateTestActor{id: actorId, namespace: "root.tenant-b"}
-	core := &stateTestCore{conn: &mockCore.Connection{Namespace: "root.tenant-b"}}
+	core := &stateTestCore{conn: &mockCore.Connection{Namespace: "root.tenant-a.user-a"}}
 
 	_, err := getOAuth2State(ctx, cfg, nil, r, core, nil, e, logger, actor, stateId)
 	require.Error(t, err)
@@ -224,12 +289,13 @@ func TestGetOAuth2State_RejectsNamespaceMismatchOnConnection(t *testing.T) {
 	stateId := apid.New(apid.PrefixOauth2State)
 	actorId := apid.New(apid.PrefixActor)
 	s := &state{
-		Id:           stateId,
-		Namespace:    "root.tenant-a",
-		ActorId:      actorId,
-		ConnectorId:  apid.New(apid.PrefixConnectorVersion),
-		ConnectionId: apid.New(apid.PrefixConnection),
-		ExpiresAt:    time.Now().Add(time.Minute).UTC(),
+		Id:                  stateId,
+		ActorNamespace:      "root.tenant-a",
+		ConnectionNamespace: "root.tenant-a.user-a",
+		ActorId:             actorId,
+		ConnectorId:         apid.New(apid.PrefixConnectorVersion),
+		ConnectionId:        apid.New(apid.PrefixConnection),
+		ExpiresAt:           time.Now().Add(time.Minute).UTC(),
 	}
 	require.NoError(t, writeStateToRedis(ctx, r, e, s, time.Minute))
 
@@ -237,11 +303,54 @@ func TestGetOAuth2State_RejectsNamespaceMismatchOnConnection(t *testing.T) {
 	// namespace — likely because the state was crafted against another tenant's
 	// connection id. Reject before we reach the auth-method dispatch.
 	actor := stateTestActor{id: actorId, namespace: "root.tenant-a"}
-	core := &stateTestCore{conn: &mockCore.Connection{Namespace: "root.tenant-b"}}
+	core := &stateTestCore{conn: &mockCore.Connection{Namespace: "root.tenant-b.user-a"}}
 
 	_, err := getOAuth2State(ctx, cfg, nil, r, core, nil, e, logger, actor, stateId)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "connection namespace")
+}
+
+func TestGetOAuth2State_AcceptsDistinctActorAndConnectionNamespaces(t *testing.T) {
+	ctx := context.Background()
+	cfg, r := apredis.MustApplyTestConfig(nil)
+	e := encrypt.NewFakeEncryptService(false)
+	logger := slog.New(slog.NewTextHandler(testWriter{t}, nil))
+
+	stateId := apid.New(apid.PrefixOauth2State)
+	actorId := apid.New(apid.PrefixActor)
+	connectorId := apid.New(apid.PrefixConnectorVersion)
+	connectionId := apid.New(apid.PrefixConnection)
+	s := &state{
+		Id:                  stateId,
+		ActorNamespace:      "root.smoke",
+		ConnectionNamespace: "root.smoke.smoke-user",
+		ActorId:             actorId,
+		ConnectorId:         connectorId,
+		ConnectionId:        connectionId,
+		ExpiresAt:           time.Now().Add(time.Minute).UTC(),
+	}
+	require.NoError(t, writeStateToRedis(ctx, r, e, s, time.Minute))
+
+	connector := &mockCore.Connector{
+		Id: connectorId,
+		Definition: &sconfig.Connector{
+			Id: connectorId,
+			Auth: &sconfig.Auth{InnerVal: &sconfig.AuthOAuth2{
+				Type: sconfig.AuthTypeOAuth2,
+			}},
+		},
+	}
+	connection := &stateTestConnection{
+		id:        connectionId,
+		namespace: "root.smoke.smoke-user",
+		connector: connector,
+	}
+	actor := stateTestActor{id: actorId, namespace: "root.smoke"}
+	core := &stateTestCore{conn: connection}
+
+	o2, err := getOAuth2State(ctx, cfg, nil, r, core, nil, e, logger, actor, stateId)
+	require.NoError(t, err)
+	assert.NotNil(t, o2)
 }
 
 // testWriter routes slog output through t.Log so it shows up under -v.
@@ -281,12 +390,13 @@ func TestGetOAuth2State_EmitsRejectionEvent_TamperedState(t *testing.T) {
 	stateId := apid.New(apid.PrefixOauth2State)
 	actor := stateTestActor{id: apid.New(apid.PrefixActor), namespace: "root.tenant-a"}
 	s := &state{
-		Id:           stateId,
-		Namespace:    "root.tenant-a",
-		ActorId:      actor.id,
-		ConnectorId:  apid.New(apid.PrefixConnectorVersion),
-		ConnectionId: apid.New(apid.PrefixConnection),
-		ExpiresAt:    time.Now().Add(time.Minute).UTC(),
+		Id:                  stateId,
+		ActorNamespace:      "root.tenant-a",
+		ConnectionNamespace: "root.tenant-a.user-a",
+		ActorId:             actor.id,
+		ConnectorId:         apid.New(apid.PrefixConnectorVersion),
+		ConnectionId:        apid.New(apid.PrefixConnection),
+		ExpiresAt:           time.Now().Add(time.Minute).UTC(),
 	}
 	require.NoError(t, writeStateToRedis(ctx, r, e, s, time.Minute))
 
@@ -318,18 +428,19 @@ func TestGetOAuth2State_EmitsRejectionEvent_ActorMismatch(t *testing.T) {
 	stateId := apid.New(apid.PrefixOauth2State)
 	stateActorId := apid.New(apid.PrefixActor)
 	s := &state{
-		Id:           stateId,
-		Namespace:    "root.tenant-a",
-		ActorId:      stateActorId,
-		ConnectorId:  apid.New(apid.PrefixConnectorVersion),
-		ConnectionId: apid.New(apid.PrefixConnection),
-		ExpiresAt:    time.Now().Add(time.Minute).UTC(),
+		Id:                  stateId,
+		ActorNamespace:      "root.tenant-a",
+		ConnectionNamespace: "root.tenant-a.user-a",
+		ActorId:             stateActorId,
+		ConnectorId:         apid.New(apid.PrefixConnectorVersion),
+		ConnectionId:        apid.New(apid.PrefixConnection),
+		ExpiresAt:           time.Now().Add(time.Minute).UTC(),
 	}
 	require.NoError(t, writeStateToRedis(ctx, r, e, s, time.Minute))
 
 	// Inbound actor differs from the actor recorded on the state.
 	actor := stateTestActor{id: apid.New(apid.PrefixActor), namespace: "root.tenant-a"}
-	core := &stateTestCore{conn: &mockCore.Connection{Namespace: "root.tenant-a"}}
+	core := &stateTestCore{conn: &mockCore.Connection{Namespace: "root.tenant-a.user-a"}}
 
 	_, err := getOAuth2State(ctx, cfg, nil, r, core, nil, e, logger, actor, stateId)
 	require.Error(t, err)
@@ -349,17 +460,18 @@ func TestGetOAuth2State_EmitsRejectionEvent_NamespaceMismatchActor(t *testing.T)
 	stateId := apid.New(apid.PrefixOauth2State)
 	actorId := apid.New(apid.PrefixActor)
 	s := &state{
-		Id:           stateId,
-		Namespace:    "root.tenant-a",
-		ActorId:      actorId,
-		ConnectorId:  apid.New(apid.PrefixConnectorVersion),
-		ConnectionId: apid.New(apid.PrefixConnection),
-		ExpiresAt:    time.Now().Add(time.Minute).UTC(),
+		Id:                  stateId,
+		ActorNamespace:      "root.tenant-a",
+		ConnectionNamespace: "root.tenant-a.user-a",
+		ActorId:             actorId,
+		ConnectorId:         apid.New(apid.PrefixConnectorVersion),
+		ConnectionId:        apid.New(apid.PrefixConnection),
+		ExpiresAt:           time.Now().Add(time.Minute).UTC(),
 	}
 	require.NoError(t, writeStateToRedis(ctx, r, e, s, time.Minute))
 
 	actor := stateTestActor{id: actorId, namespace: "root.tenant-b"}
-	core := &stateTestCore{conn: &mockCore.Connection{Namespace: "root.tenant-b"}}
+	core := &stateTestCore{conn: &mockCore.Connection{Namespace: "root.tenant-a.user-a"}}
 
 	_, err := getOAuth2State(ctx, cfg, nil, r, core, nil, e, logger, actor, stateId)
 	require.Error(t, err)
@@ -379,17 +491,18 @@ func TestGetOAuth2State_EmitsRejectionEvent_NamespaceMismatchConnection(t *testi
 	stateId := apid.New(apid.PrefixOauth2State)
 	actorId := apid.New(apid.PrefixActor)
 	s := &state{
-		Id:           stateId,
-		Namespace:    "root.tenant-a",
-		ActorId:      actorId,
-		ConnectorId:  apid.New(apid.PrefixConnectorVersion),
-		ConnectionId: apid.New(apid.PrefixConnection),
-		ExpiresAt:    time.Now().Add(time.Minute).UTC(),
+		Id:                  stateId,
+		ActorNamespace:      "root.tenant-a",
+		ConnectionNamespace: "root.tenant-a.user-a",
+		ActorId:             actorId,
+		ConnectorId:         apid.New(apid.PrefixConnectorVersion),
+		ConnectionId:        apid.New(apid.PrefixConnection),
+		ExpiresAt:           time.Now().Add(time.Minute).UTC(),
 	}
 	require.NoError(t, writeStateToRedis(ctx, r, e, s, time.Minute))
 
 	actor := stateTestActor{id: actorId, namespace: "root.tenant-a"}
-	core := &stateTestCore{conn: &mockCore.Connection{Namespace: "root.tenant-b"}}
+	core := &stateTestCore{conn: &mockCore.Connection{Namespace: "root.tenant-b.user-a"}}
 
 	_, err := getOAuth2State(ctx, cfg, nil, r, core, nil, e, logger, actor, stateId)
 	require.Error(t, err)
