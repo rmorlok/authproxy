@@ -10,13 +10,16 @@ import (
 )
 
 type ConfiguredActorsExternalSource struct {
-	KeysPath              string               `json:"keysPath" yaml:"keysPath"`
-	Permissions           []aschema.Permission `json:"permissions,omitempty" yaml:"permissions,omitempty"`
-	NamespaceByExternalId map[string]string    `json:"namespaceByExternalId,omitempty" yaml:"namespaceByExternalId,omitempty"`
-	SyncCronSchedule      string               `json:"syncCronSchedule,omitempty" yaml:"syncCronSchedule,omitempty"`
+	KeysPath         string               `json:"keysPath" yaml:"keysPath"`
+	Permissions      []aschema.Permission `json:"permissions,omitempty" yaml:"permissions,omitempty"`
+	SyncCronSchedule string               `json:"syncCronSchedule,omitempty" yaml:"syncCronSchedule,omitempty"`
 }
 
 func (s *ConfiguredActorsExternalSource) All() []*ConfiguredActor {
+	return s.AllInNamespace(RootNamespace)
+}
+
+func (s *ConfiguredActorsExternalSource) AllInNamespace(namespace string) []*ConfiguredActor {
 	entries, err := os.ReadDir(s.KeysPath)
 	if err != nil {
 		panic(err)
@@ -32,7 +35,6 @@ func (s *ConfiguredActorsExternalSource) All() []*ConfiguredActor {
 		// Check if the file has the desired extension
 		if strings.HasSuffix(entry.Name(), ".pub") {
 			externalId := strings.TrimSuffix(entry.Name(), ".pub")
-			namespace := s.NamespaceByExternalId[externalId]
 			actors = append(actors, &ConfiguredActor{
 				ExternalId: externalId,
 				Namespace:  namespace,

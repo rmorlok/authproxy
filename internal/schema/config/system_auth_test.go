@@ -21,8 +21,6 @@ func TestSystemAuth(t *testing.T) {
       path: ./dev_config/keys/system
   actors:
     keysPath: ./dev_config/keys/actors
-    namespaceByExternalId:
-      smoke-user: root.smoke
 `
 			expected := SystemAuth{
 				JwtSigningKey: &Key{
@@ -42,9 +40,6 @@ func TestSystemAuth(t *testing.T) {
 				Actors: &ConfiguredActors{
 					InnerVal: &ConfiguredActorsExternalSource{
 						KeysPath: "./dev_config/keys/actors",
-						NamespaceByExternalId: map[string]string{
-							"smoke-user": "root.smoke",
-						},
 					},
 				},
 			}
@@ -53,6 +48,36 @@ func TestSystemAuth(t *testing.T) {
 			err := yaml.Unmarshal([]byte(data), &sa)
 			assert.NoError(err)
 			assert.Equal(expected, sa)
+		})
+		t.Run("namespaced actor paths", func(t *testing.T) {
+			data := `
+cookieDomain: localhost:8080
+jwtSigningKey:
+  publicKey:
+    path: ./dev_config/keys/system.pub
+  privateKey:
+    path: ./dev_config/keys/system
+actors:
+  root:
+    keysPath: ./dev_config/keys/actors/root
+  root.smoke:
+    keysPath: ./dev_config/keys/actors/smoke
+    permissions:
+      - namespace: root.smoke.{{external_id}}
+        resources: [connections]
+        verbs: [create]
+  syncCronSchedule: "* * * * *"
+`
+			var sa SystemAuth
+			err := yaml.Unmarshal([]byte(data), &sa)
+			assert.NoError(err)
+
+			sources, ok := sa.Actors.InnerVal.(*ConfiguredActorsExternalSources)
+			assert.True(ok)
+			assert.Equal("* * * * *", sources.SyncCronSchedule)
+			assert.Equal("./dev_config/keys/actors/root", sources.Sources["root"].KeysPath)
+			assert.Equal("./dev_config/keys/actors/smoke", sources.Sources["root.smoke"].KeysPath)
+			assert.Equal("root.smoke.{{external_id}}", sources.Sources["root.smoke"].Permissions[0].Namespace)
 		})
 		t.Run("actors list", func(t *testing.T) {
 			data := `

@@ -3,6 +3,8 @@ package tasks
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -262,14 +264,20 @@ func TestSyncConfiguredActorsExternalSource(t *testing.T) {
 	}
 
 	t.Run("syncs actors from external source", func(t *testing.T) {
+		smokeKeysPath := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(smokeKeysPath, "smoke-user.pub"), []byte("test-public-key"), 0o600))
 		actors := &sconfig.ConfiguredActors{
-			InnerVal: &sconfig.ConfiguredActorsExternalSource{
-				KeysPath: tu.TestDataPath("admin_user_keys"),
-				NamespaceByExternalId: map[string]string{
-					"bobdole": "root.smoke",
-				},
-				Permissions: []aschema.Permission{
-					{Namespace: "root", Resources: []string{"connections"}, Verbs: []string{"list", "get"}},
+			InnerVal: &sconfig.ConfiguredActorsExternalSources{
+				Sources: map[string]*sconfig.ConfiguredActorsExternalSource{
+					"root": {
+						KeysPath: tu.TestDataPath("admin_user_keys"),
+					},
+					"root.smoke": {
+						KeysPath: smokeKeysPath,
+						Permissions: []aschema.Permission{
+							{Namespace: "root.smoke.{{external_id}}", Resources: []string{"connections"}, Verbs: []string{"create"}},
+						},
+					},
 				},
 			},
 		}
@@ -281,17 +289,19 @@ func TestSyncConfiguredActorsExternalSource(t *testing.T) {
 		err := svc.SyncConfiguredActorsExternalSource(ctx)
 		require.NoError(t, err)
 
-		// Verify bobdole was created (one of the .pub files in test data)
-		bobdole, err := db.GetActorByExternalId(ctx, "root.smoke", "bobdole")
+		// Verify a root actor was created from the root source.
+		bobdole, err := db.GetActorByExternalId(ctx, "root", "bobdole")
 		require.NoError(t, err)
 		require.NotNil(t, bobdole.EncryptedKey)
 		require.Equal(t, LabelValuePublicKeyDir, bobdole.Labels[LabelConfiguredActorSyncSource])
 
-		// Verify billclinton was created
-		billclinton, err := db.GetActorByExternalId(ctx, "root", "billclinton")
+		// Verify the smoke actor was created in its source's namespace with the
+		// source-specific, templated permissions.
+		smokeUser, err := db.GetActorByExternalId(ctx, "root.smoke", "smoke-user")
 		require.NoError(t, err)
-		require.NotNil(t, billclinton.EncryptedKey)
-		require.Equal(t, LabelValuePublicKeyDir, billclinton.Labels[LabelConfiguredActorSyncSource])
+		require.NotNil(t, smokeUser.EncryptedKey)
+		require.Equal(t, LabelValuePublicKeyDir, smokeUser.Labels[LabelConfiguredActorSyncSource])
+		require.Equal(t, "root.smoke.{{external_id}}", smokeUser.Permissions[0].Namespace)
 	})
 
 	t.Run("deletes stale actors from external source", func(t *testing.T) {

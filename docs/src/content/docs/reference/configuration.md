@@ -63,21 +63,45 @@ that does not already specify `id`.
 ## Configured actor namespaces
 
 Configured actors live in `root` unless a namespace is specified. Inline actor
-entries accept `namespace` directly. For actors discovered from a public-key
-directory, map individual external IDs with `namespaceByExternalId`:
+entries accept `namespace` directly. For actors discovered from public-key
+directories, key each source by the namespace that owns its actors:
+
+```yaml
+systemAuth:
+  actors:
+    root:
+      keysPath: /etc/authproxy/keys/actors/root
+      permissions:
+        - namespace: root.**
+          resources: ["*"]
+          verbs: ["*"]
+    root.smoke:
+      keysPath: /etc/authproxy/keys/actors/smoke
+      permissions:
+        - namespace: root.smoke
+          resources: [connectors]
+          verbs: [list]
+        - namespace: root.smoke.{{external_id}}
+          resources: [connections]
+          verbs: [create, get, proxy]
+    syncCronSchedule: "* * * * *"
+```
+
+Every `.pub` file in a source directory creates an actor in that source's
+namespace. For example,
+`/etc/authproxy/keys/actors/smoke/smoke-user.pub` creates `smoke-user` in
+`root.smoke`. Permissions are source-specific, and permission namespaces can
+use actor templates such as `{{external_id}}`. Development migration creates
+each configured actor namespace and its missing parents before synchronization.
+
+The single-directory form remains available and creates all discovered actors
+in `root`:
 
 ```yaml
 systemAuth:
   actors:
     keysPath: /etc/authproxy/keys/actors
-    namespaceByExternalId:
-      smoke-user: root.smoke
 ```
-
-The key file for this example is
-`/etc/authproxy/keys/actors/smoke-user.pub`. Development migration creates the
-configured actor namespace and its missing parents before actor synchronization.
-Other keys in the directory continue to create actors in `root`.
 
 ## Kubernetes values
 

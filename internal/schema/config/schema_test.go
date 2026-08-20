@@ -814,14 +814,24 @@ func TestSchemaDefinitions(t *testing.T) {
 					Data:  `{"test": {"keysPath": "/keys/actors", "permissions": [{"namespace": "root.**", "resources": ["*"], "verbs": ["*"]}]}}`,
 				},
 				{
-					Name:  "external source with actor namespaces",
+					Name:  "namespaced external sources",
 					Valid: true,
-					Data:  `{"test": {"keysPath": "/keys/actors", "namespaceByExternalId": {"smoke-user": "root.smoke"}}}`,
+					Data:  `{"test": {"root": {"keysPath": "/keys/actors/root"}, "root.smoke": {"keysPath": "/keys/actors/smoke", "permissions": [{"namespace": "root.smoke.{{external_id}}", "resources": ["connections"], "verbs": ["create"]}]}, "syncCronSchedule": "*/5 * * * *"}}`,
 				},
 				{
-					Name:  "external source with invalid actor namespace",
+					Name:  "namespaced external source with invalid namespace",
 					Valid: false,
-					Data:  `{"test": {"keysPath": "/keys/actors", "namespaceByExternalId": {"smoke-user": "smoke"}}}`,
+					Data:  `{"test": {"smoke": {"keysPath": "/keys/actors/smoke"}}}`,
+				},
+				{
+					Name:  "namespaced external source missing keys path",
+					Valid: false,
+					Data:  `{"test": {"root.smoke": {"permissions": [{"namespace": "root.smoke", "resources": ["connectors"], "verbs": ["list"]}]}}}`,
+				},
+				{
+					Name:  "namespaced external source requires a source",
+					Valid: false,
+					Data:  `{"test": {"syncCronSchedule": "*/5 * * * *"}}`,
 				},
 				{
 					Name:  "external source with sync cron",

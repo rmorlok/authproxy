@@ -241,10 +241,18 @@ jobs:
             echo "Reusing ${RELEASE_NAME}-actors"
           fi
 
-          smoke_user_public="$(base64 < "${workdir}/demo-shell.pub" | tr -d '\n')"
-          kubectl -n "${RELEASE_NS}" patch secret "${RELEASE_NAME}-actors" \
-            --type merge \
-            --patch "{\"data\":{\"smoke-user.pub\":\"${smoke_user_public}\"}}"
+          stale_smoke_public="$(kubectl -n "${RELEASE_NS}" get secret "${RELEASE_NAME}-actors" \
+            -o jsonpath='{.data.smoke-user\.pub}')"
+          if [ -n "${stale_smoke_public}" ]; then
+            kubectl -n "${RELEASE_NS}" patch secret "${RELEASE_NAME}-actors" \
+              --type json \
+              --patch='[{"op":"remove","path":"/data/smoke-user.pub"}]'
+          fi
+
+          kubectl -n "${RELEASE_NS}" create secret generic "${RELEASE_NAME}-smoke-actors" \
+            --from-file=smoke-user.pub="${workdir}/demo-shell.pub" \
+            --dry-run=client -o yaml \
+            | kubectl apply -f -
 
       - name: Clear stale seed job
         env:

@@ -29,7 +29,7 @@ func (s *service) SyncActorList(ctx context.Context) error {
 	return s.syncConfiguredActors(ctx, actors.All(), LabelValueConfigList)
 }
 
-// SyncConfiguredActorsExternalSource synchronizes actors from ConfiguredActorsExternalSource configuration to the database.
+// SyncConfiguredActorsExternalSource synchronizes actors from external source configuration to the database.
 // This function uses a distributed lock to prevent concurrent syncs across multiple workers.
 func (s *service) SyncConfiguredActorsExternalSource(ctx context.Context) error {
 	actors := s.cfg.GetRoot().SystemAuth.Actors
@@ -38,8 +38,10 @@ func (s *service) SyncConfiguredActorsExternalSource(ctx context.Context) error 
 		return nil
 	}
 
-	// Check if this is a ConfiguredActorsExternalSource
-	if _, ok := actors.InnerVal.(*sconfig.ConfiguredActorsExternalSource); !ok {
+	// Check if this is a single or namespaced external source configuration.
+	switch actors.InnerVal.(type) {
+	case *sconfig.ConfiguredActorsExternalSource, *sconfig.ConfiguredActorsExternalSources:
+	default:
 		s.logger.Debug("actors is not an external source type, skipping external source sync")
 		return nil
 	}

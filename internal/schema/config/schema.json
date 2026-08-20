@@ -1126,33 +1126,69 @@
           }
         },
         {
+          "$ref": "#/$defs/ConfiguredActorsExternalSource"
+        },
+        {
           "type": "object",
           "properties": {
-            "keysPath": {
-              "type": "string"
-            },
-            "permissions": {
-              "type": "array",
-              "items": {
-                "$ref": "../auth/schema.json#/$defs/Permission"
-              }
-            },
-            "namespaceByExternalId": {
-              "type": "object",
-              "additionalProperties": {
-                "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath"
-              }
-            },
             "syncCronSchedule": {
               "type": "string"
             }
           },
-          "required": [
-            "keysPath"
-          ],
-          "additionalProperties": false
+          "patternProperties": {
+            "^root(?:\\.[a-zA-Z0-9_]+[a-zA-Z0-9_\\-]*)*$": {
+              "$ref": "#/$defs/ConfiguredActorsNamespacedExternalSource"
+            }
+          },
+          "additionalProperties": false,
+          "minProperties": 1,
+          "not": {
+            "required": [
+              "syncCronSchedule"
+            ],
+            "maxProperties": 1
+          }
         }
       ]
+    },
+    "ConfiguredActorsExternalSource": {
+      "type": "object",
+      "properties": {
+        "keysPath": {
+          "type": "string"
+        },
+        "permissions": {
+          "type": "array",
+          "items": {
+            "$ref": "../auth/schema.json#/$defs/Permission"
+          }
+        },
+        "syncCronSchedule": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "keysPath"
+      ],
+      "additionalProperties": false
+    },
+    "ConfiguredActorsNamespacedExternalSource": {
+      "type": "object",
+      "properties": {
+        "keysPath": {
+          "type": "string"
+        },
+        "permissions": {
+          "type": "array",
+          "items": {
+            "$ref": "../auth/schema.json#/$defs/Permission"
+          }
+        }
+      },
+      "required": [
+        "keysPath"
+      ],
+      "additionalProperties": false
     }
   },
   "properties": {

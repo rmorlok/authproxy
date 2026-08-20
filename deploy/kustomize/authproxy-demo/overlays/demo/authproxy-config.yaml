@@ -93,13 +93,27 @@ systemAuth:
   globalAesKey:
     path: /etc/authproxy/keys/encryption/global_aes.key
   actors:
-    keysPath: /etc/authproxy/keys/actors
-    namespaceByExternalId:
-      smoke-user: root.smoke
+    root:
+      keysPath: /etc/authproxy/keys/actors/root
+      permissions:
+        - namespace: root.**
+          resources:
+            - "*"
+          verbs:
+            - "*"
+    root.smoke:
+      keysPath: /etc/authproxy/keys/actors/smoke
+      permissions:
+        - namespace: root.smoke
+          resources:
+            - connectors
+          verbs:
+            - list
+        - namespace: root.smoke.{{external_id}}
+          resources:
+            - connections
+          verbs:
+            - create
+            - get
+            - proxy
     syncCronSchedule: "* * * * *"
-    permissions:
-      - namespace: root.**
-        resources:
-          - "*"
-        verbs:
-          - "*"

@@ -66,7 +66,7 @@ func (ca *ConfiguredActors) UnmarshalJSON(data []byte) error {
 	if _, ok := valueMap["keysPath"]; ok {
 		t = &ConfiguredActorsExternalSource{}
 	} else {
-		return fmt.Errorf("invalid structure for actors; must be list or have keysPath")
+		t = &ConfiguredActorsExternalSources{}
 	}
 
 	if err := util.DecodeJSONStrict(data, t); err != nil {
@@ -101,12 +101,22 @@ func (ca *ConfiguredActors) UnmarshalYAML(value *yaml.Node) error {
 		return fmt.Errorf("actors expected a sequence node or mapping node, got %s", KindToString(value.Kind))
 	}
 
-	var actorsExternalSource ConfiguredActorsExternalSource
-	if err := util.DecodeYAMLNodeStrict(value, &actorsExternalSource); err != nil {
+	var t ConfiguredActorsType
+	for i := 0; i < len(value.Content); i += 2 {
+		if value.Content[i].Value == "keysPath" {
+			t = &ConfiguredActorsExternalSource{}
+			break
+		}
+	}
+	if t == nil {
+		t = &ConfiguredActorsExternalSources{}
+	}
+
+	if err := util.DecodeYAMLNodeStrict(value, t); err != nil {
 		return err
 	}
 
-	ca.InnerVal = &actorsExternalSource
+	ca.InnerVal = t
 	return nil
 }
 
