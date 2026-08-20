@@ -11,6 +11,7 @@ import dayjs from 'dayjs';
 import Tooltip from '@mui/material/Tooltip';
 import {Actor, actors} from '@authproxy/api';
 import AnnotationsEditor from "./AnnotationsEditor";
+import ActorPermissionsEditor from './ActorPermissionsEditor';
 import ResourceNameEditor from './ResourceNameEditor';
 
 export default function ActorDetail({actorId}: { actorId: string }) {
@@ -115,6 +116,14 @@ export default function ActorDetail({actorId}: { actorId: string }) {
           <Typography variant="body1">{actor.namespace}</Typography>
         </Box>
       </Stack>
+
+      <ActorPermissionsEditor
+        permissions={actor.permissions}
+        onSave={async (permissions) => {
+          const response = await actors.update(actor.id, {permissions});
+          setActor(response.data);
+        }}
+      />
 
       <Stack direction={{xs: 'column', sm: 'row'}} spacing={4}>
         <Box>

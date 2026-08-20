@@ -3,8 +3,16 @@ import { ListResponse } from './common';
 
 // Actor models
 
+export interface Permission {
+  namespace: string;
+  resources: string[];
+  resourceIds?: string[];
+  verbs: string[];
+}
+
 export interface UpdateActorRequest {
     name?: string;
+    permissions?: Permission[];
     labels?: Record<string, string>;
     annotations?: Record<string, string>;
 }
@@ -34,6 +42,7 @@ export interface Actor {
   labels?: Record<string, string>;
   annotations?: Record<string, string>;
   externalId: string;
+  permissions: Permission[];
   createdAt: string;
   updatedAt: string;
 }
