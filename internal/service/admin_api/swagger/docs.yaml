@@ -25,6 +25,10 @@ definitions:
       namespace:
         example: root.acme
         type: string
+      permissions:
+        items:
+          $ref: '#/definitions/auth.Permission'
+        type: array
       updatedAt:
         type: string
     type: object
@@ -130,6 +134,23 @@ definitions:
       updatedAt:
         type: string
     type: object
+  auth.Permission:
+    properties:
+      namespace:
+        type: string
+      resourceIds:
+        items:
+          type: string
+        type: array
+      resources:
+        items:
+          type: string
+        type: array
+      verbs:
+        items:
+          type: string
+        type: array
+    type: object
   routes.ActorJson:
     description: Actor identity within a namespace
     properties:
@@ -155,6 +176,10 @@ definitions:
       namespace:
         example: root.acme
         type: string
+      permissions:
+        items:
+          $ref: '#/definitions/auth.Permission'
+        type: array
       updatedAt:
         type: string
     type: object
@@ -1103,6 +1128,10 @@ definitions:
       name:
         example: billing-service
         type: string
+      permissions:
+        items:
+          $ref: '#/definitions/auth.Permission'
+        type: array
     type: object
   routes.UpdateConnectionRequestJson:
     description: Request to update a connection's labels and annotations

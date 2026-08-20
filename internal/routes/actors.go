@@ -18,6 +18,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/routes/key_value"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	schemaapiopenapi "github.com/rmorlok/authproxy/internal/schema/api/openapi"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/util"
@@ -46,16 +47,35 @@ type ListActorsResponseJson = schemaapi.ListActorsResponseJson
 type OpenAPIListActorsResponseJson = schemaapiopenapi.ListActorsResponseJson
 
 func DatabaseActorToJson(a *database.Actor) ActorJson {
+	permissions := a.GetPermissions()
+	if permissions == nil {
+		permissions = aschema.NoPermissions()
+	}
+
 	return ActorJson{
 		Id:          a.Id,
 		Namespace:   a.GetNamespace(),
 		Name:        a.GetName(),
+		Permissions: permissions,
 		Labels:      a.GetLabels(),
 		Annotations: a.GetAnnotations(),
 		ExternalId:  a.ExternalId,
 		CreatedAt:   a.CreatedAt,
 		UpdatedAt:   a.UpdatedAt,
 	}
+}
+
+func validateActorPermissions(permissions []aschema.Permission) *httperr.Error {
+	for i, permission := range permissions {
+		if err := permission.Validate(); err != nil {
+			return httperr.BadRequest(
+				fmt.Sprintf("invalid permission %d: %s", i+1, err.Error()),
+				httperr.WithInternalErr(err),
+			)
+		}
+	}
+
+	return nil
 }
 
 type ListActorsRequestQuery struct {
@@ -608,6 +628,12 @@ func (r *ActorsRoutes) update(gctx *gin.Context) {
 		}
 	}
 
+	if httpErr := validateActorPermissions(req.Permissions); httpErr != nil {
+		apgin.WriteError(gctx, r.logger, httpErr)
+		val.MarkErrorReturn()
+		return
+	}
+
 	// Get the existing actor
 	existingActor, err := r.db.GetActor(ctx, id)
 	if err != nil {
@@ -657,6 +683,10 @@ func (r *ActorsRoutes) update(gctx *gin.Context) {
 
 	if req.Labels != nil {
 		existingActor.Labels = req.Labels
+	}
+
+	if req.Permissions != nil {
+		existingActor.Permissions = database.Permissions(req.Permissions)
 	}
 
 	if req.Annotations != nil {
@@ -737,6 +767,12 @@ func (r *ActorsRoutes) updateByExternalId(gctx *gin.Context) {
 		}
 	}
 
+	if httpErr := validateActorPermissions(req.Permissions); httpErr != nil {
+		apgin.WriteError(gctx, r.logger, httpErr)
+		val.MarkErrorReturn()
+		return
+	}
+
 	// Get the existing actor
 	existingActor, err := r.db.GetActorByExternalId(ctx, namespace, externalId)
 	if err != nil {
@@ -765,6 +801,10 @@ func (r *ActorsRoutes) updateByExternalId(gctx *gin.Context) {
 
 	if req.Labels != nil {
 		existingActor.Labels = req.Labels
+	}
+
+	if req.Permissions != nil {
+		existingActor.Permissions = database.Permissions(req.Permissions)
 	}
 
 	if req.Annotations != nil {

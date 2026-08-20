@@ -8204,6 +8204,12 @@ const docTemplateApi = `{
                     "type": "string",
                     "example": "root.acme"
                 },
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/auth.Permission"
+                    }
+                },
                 "updatedAt": {
                     "type": "string"
                 }
@@ -8351,6 +8357,32 @@ const docTemplateApi = `{
                 }
             }
         },
+        "auth.Permission": {
+            "type": "object",
+            "properties": {
+                "namespace": {
+                    "type": "string"
+                },
+                "resourceIds": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "resources": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "verbs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
         "routes.ActorJson": {
             "description": "Actor identity within a namespace",
             "type": "object",
@@ -8385,6 +8417,12 @@ const docTemplateApi = `{
                 "namespace": {
                     "type": "string",
                     "example": "root.acme"
+                },
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/auth.Permission"
+                    }
                 },
                 "updatedAt": {
                     "type": "string"
@@ -9710,6 +9748,12 @@ const docTemplateApi = `{
                 "name": {
                     "type": "string",
                     "example": "billing-service"
+                },
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/auth.Permission"
+                    }
                 }
             }
         },
