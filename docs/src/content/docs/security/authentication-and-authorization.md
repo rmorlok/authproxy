@@ -112,6 +112,9 @@ The dimensions are:
   with `*` as a wildcard; and
 - `resource_ids`: an optional restriction to named resources.
 
+See [Permission Resources and Verbs](/security/permission-resources-and-verbs/)
+for the complete matrix of exact resource and verb strings.
+
 Actor permissions are additive: any actor permission that matches can allow an
 operation. If a JWT also carries permissions, those permissions are
 restrictions. The action must be allowed by both the actor's stored permissions
