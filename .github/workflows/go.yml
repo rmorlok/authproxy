@@ -45,7 +45,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v6
       with:
-        go-version: '1.24'
+        go-version-file: terraform/provider/go.mod
 
     - name: Build
       run: go build -v ./...
@@ -175,7 +175,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v6
       with:
-        go-version: '1.24'
+        go-version-file: integration_tests/go.mod
 
     - name: Set up Node + Yarn
       uses: actions/setup-node@v5
