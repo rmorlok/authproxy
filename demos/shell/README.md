@@ -24,9 +24,10 @@ before redirecting them into the appropriate AuthProxy UI.
                             └──────────────────────────────────────────────────┘
 ```
 
-The backend holds **one** admin private key. AuthProxy's auth model
-trusts an admin-signed JWT to represent any actor `externalId` — so
-one key is enough to "be" any of the three demo identities.
+The backend holds the demo actor private key for pre-provisioned identities and
+the host JWT private key for just-in-time provisioning. Selecting **Fresh user**
+creates a random `fresh-user-<uuid>` external ID, includes the complete actor in
+the JWT, and lets AuthProxy create that actor during session initiation.
 
 ## Running locally
 
@@ -73,6 +74,7 @@ yarn workspace @authproxy/demo-shell dev
 ```bash
 ADMIN_USERNAME=demo-shell \
 ADMIN_PRIVATE_KEY_PATH=./demos/shell/dev_keys/demo-shell \
+AUTHPROXY_JWT_PRIVATE_KEY_PATH=./dev_config/keys/system \
 AUTHPROXY_ADMIN_UI_URL=http://localhost:5174 \
 AUTHPROXY_MARKETPLACE_URL=http://localhost:5173 \
 AUTHPROXY_AUTH_URL=http://localhost:8080 \
@@ -91,8 +93,9 @@ the embedded build at the same root.
 Open <http://localhost:8888>. Choose **Admin UI** → submit → you're redirected
 to the AuthProxy admin UI as `demo-admin` with a fresh session. Choose
 **Integration Marketplace**, then **Fresh user** → submit → an empty
-Marketplace opens with no connections. When configured, the shell also links
-directly to Grafana's telemetry views and the demo OAuth provider.
+Marketplace opens with no connections under a newly generated actor external
+ID. When configured, the shell also links directly to Grafana's telemetry
+views and the demo OAuth provider.
 
 ## Local smoke via docker-compose
 
@@ -125,6 +128,7 @@ The backend reads the following env vars:
 |---------------------------|----------|-----------------------------------------------------------------------------|
 | `ADMIN_USERNAME`          | ✅        | externalId of the admin actor whose key is mounted at `ADMIN_PRIVATE_KEY_PATH` |
 | `ADMIN_PRIVATE_KEY_PATH`  | ✅        | File path; PEM RSA or EC                                                    |
+| `AUTHPROXY_JWT_PRIVATE_KEY_PATH` | ✅ | Host JWT private key used to provision each randomly generated fresh actor |
 | `AUTHPROXY_ADMIN_UI_URL`  | ✅        | Base URL of the admin SPA                                                   |
 | `AUTHPROXY_MARKETPLACE_URL` | ✅      | Base URL of the marketplace SPA                                             |
 | `AUTHPROXY_AUTH_URL`      | ⛔        | Optional today; kept for future routes that call back into AuthProxy        |
@@ -143,14 +147,13 @@ provider card. In Vite dev mode, `/config.json` and `/sso` are proxied to the
 backend; override `AUTHPROXY_DEMO_SHELL_BACKEND_URL` if the backend is not on
 `http://localhost:8888`.
 
-## Why one signing key, not three
+## Why two signing paths
 
-It's tempting to give the demo shell one keypair per demo identity. The
-existing AuthProxy auth model already covers the multi-identity case via
-admin-actor vouching: an admin's JWT can represent any actor `externalId`
-and AuthProxy will trust the user assignment. That's the same
-pattern `cmd/cli/sign-marketplace-login-url` uses, so the demo shell
-mirrors it.
+The pre-provisioned identities use actor-signed JWTs and the shared demo actor
+key. A random fresh actor cannot have a public key provisioned ahead of time,
+so that path uses the host JWT key and includes a complete actor claim. This is
+the just-in-time provisioning pattern described in the host application
+integration guide.
 
 ## Why this lives in `demos/`, not `cmd/` or `internal/`
 

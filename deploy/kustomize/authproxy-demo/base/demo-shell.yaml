@@ -31,6 +31,8 @@ spec:
               value: demo-shell
             - name: ADMIN_PRIVATE_KEY_PATH
               value: /etc/authproxy/demo-shell/private
+            - name: AUTHPROXY_JWT_PRIVATE_KEY_PATH
+              value: /etc/authproxy/jwt/system
             - name: AUTHPROXY_AUTH_URL
               value: https://marketplace.demo.authproxy.net
             - name: AUTHPROXY_MARKETPLACE_URL
@@ -49,6 +51,9 @@ spec:
             - name: admin-key
               mountPath: /etc/authproxy/demo-shell
               readOnly: true
+            - name: jwt-key
+              mountPath: /etc/authproxy/jwt
+              readOnly: true
       volumes:
         - name: admin-key
           secret:
@@ -56,6 +61,12 @@ spec:
             items:
               - key: private
                 path: private
+        - name: jwt-key
+          secret:
+            secretName: authproxy-jwt-placeholder
+            items:
+              - key: system
+                path: system
 ---
 apiVersion: v1
 kind: Service
