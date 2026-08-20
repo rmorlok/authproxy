@@ -1,6 +1,8 @@
 package core
 
 import (
+	"errors"
+	"fmt"
 	"slices"
 
 	"github.com/rmorlok/authproxy/internal/aptmpl"
@@ -52,16 +54,66 @@ func matchesNamespace(actor *Actor, p aschema.Permission, targetNamespace string
 		return false
 	}
 
-	if targetNamespace == namespace.SkipPermissionChecks {
-		return true
-	}
-
-	matcher, ok := renderValidPermissionNamespace(actor, p.Namespace)
+	matcher, ok := constrainPermissionNamespaceToActor(actor, p.Namespace)
 	if !ok {
 		return false
 	}
 
+	if targetNamespace == namespace.SkipPermissionChecks {
+		return true
+	}
+
 	return namespace.Matches(matcher, targetNamespace)
+}
+
+// constrainPermissionNamespaceToActor renders a permission namespace and intersects it with
+// the namespace subtree owned by the actor. Keeping this constraint in the authorization path
+// ensures legacy or corrupted permissions cannot grant access above or beside the actor's
+// namespace even if they bypass write-time validation.
+func constrainPermissionNamespaceToActor(actor *Actor, permissionNamespace string) (string, bool) {
+	if actor == nil || namespace.ValidatePath(actor.Namespace) != nil {
+		return "", false
+	}
+
+	rendered, ok := renderValidPermissionNamespace(actor, permissionNamespace)
+	if !ok {
+		return "", false
+	}
+
+	actorNamespaceMatcher := actor.Namespace + namespace.WildcardSuffix
+	return namespace.ConstrainMatcher(actorNamespaceMatcher, rendered)
+}
+
+// ValidatePermissionForActor validates a permission and verifies that its rendered namespace
+// is entirely contained by the actor's namespace subtree.
+func ValidatePermissionForActor(actor *Actor, permission aschema.Permission) error {
+	if err := permission.Validate(); err != nil {
+		return err
+	}
+
+	if actor == nil {
+		return errors.New("actor is required")
+	}
+
+	if err := namespace.ValidatePath(actor.Namespace); err != nil {
+		return fmt.Errorf("invalid actor namespace: %w", err)
+	}
+
+	rendered, ok := renderValidPermissionNamespace(actor, permission.Namespace)
+	if !ok {
+		return fmt.Errorf("permission namespace %q could not be rendered to a valid namespace matcher", permission.Namespace)
+	}
+
+	constrained, ok := constrainPermissionNamespaceToActor(actor, permission.Namespace)
+	if !ok || constrained != rendered {
+		return fmt.Errorf(
+			"permission namespace %q must be at or below actor namespace %q",
+			rendered,
+			actor.Namespace,
+		)
+	}
+
+	return nil
 }
 
 // renderPermissionNamespace applies templating to a given namespace string and returns

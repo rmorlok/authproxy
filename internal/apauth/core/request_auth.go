@@ -112,7 +112,7 @@ func (ra *RequestAuth) GetNamespacesAllowed(resource, verb string) []string {
 			slices.Contains(permission.Verbs, aschema.PermissionWildcard)
 
 		if appliesToResource && appliesToVerb {
-			if ns, ok := renderValidPermissionNamespace(ra.actor, permission.Namespace); ok {
+			if ns, ok := constrainPermissionNamespaceToActor(ra.actor, permission.Namespace); ok {
 				candidateNamespaces = append(candidateNamespaces, ns)
 			}
 		}

@@ -6,8 +6,15 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/apid"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
+	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/stretchr/testify/require"
 )
+
+func setRootActorNamespaceIfUnset(ra *RequestAuth) {
+	if ra != nil && ra.actor != nil && ra.actor.Namespace == "" {
+		ra.actor.Namespace = namespace.Root
+	}
+}
 
 func TestActorFromContext(t *testing.T) {
 	t.Run("returns nil for context without auth", func(t *testing.T) {
@@ -114,6 +121,63 @@ func TestRequestAuth_Allows(t *testing.T) {
 			resource:  "connections",
 			verb:      "get",
 			allowed:   true,
+		},
+		{
+			name: "over-broad stored permission allows only within actor namespace",
+			ra: NewAuthenticatedRequestAuth(&Actor{
+				Id:         apid.New(apid.PrefixActor),
+				ExternalId: "user",
+				Namespace:  "root.acme.tenant_1",
+				Permissions: []aschema.Permission{
+					{
+						Namespace: "root.**",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+				},
+			}),
+			namespace: "root.acme.tenant_1.project",
+			resource:  "connections",
+			verb:      "get",
+			allowed:   true,
+		},
+		{
+			name: "over-broad stored permission denies outside actor namespace",
+			ra: NewAuthenticatedRequestAuth(&Actor{
+				Id:         apid.New(apid.PrefixActor),
+				ExternalId: "user",
+				Namespace:  "root.acme.tenant_1",
+				Permissions: []aschema.Permission{
+					{
+						Namespace: "root.**",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+				},
+			}),
+			namespace: "root.acme.tenant_2",
+			resource:  "connections",
+			verb:      "get",
+			allowed:   false,
+		},
+		{
+			name: "invalid actor namespace fails closed",
+			ra: NewAuthenticatedRequestAuth(&Actor{
+				Id:         apid.New(apid.PrefixActor),
+				ExternalId: "user",
+				Namespace:  "invalid",
+				Permissions: []aschema.Permission{
+					{
+						Namespace: "root.**",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+				},
+			}),
+			namespace: "root.acme.tenant_1",
+			resource:  "connections",
+			verb:      "get",
+			allowed:   false,
 		},
 		{
 			name: "actor with wildcard resource permission",
@@ -287,6 +351,7 @@ func TestRequestAuth_Allows(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			setRootActorNamespaceIfUnset(tt.ra)
 			result := tt.ra.Allows(tt.namespace, tt.resource, tt.verb, tt.resourceId)
 			require.Equal(t, tt.allowed, result)
 		})
@@ -455,6 +520,7 @@ func TestRequestAuth_AllowsWithRequestPermissions(t *testing.T) {
 				&Actor{
 					Id:          apid.New(apid.PrefixActor),
 					ExternalId:  "user",
+					Namespace:   namespace.Root,
 					Permissions: tt.actorPermissions,
 				},
 				tt.requestPermissions,
@@ -565,6 +631,7 @@ func TestRequestAuth_AllowsReason(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			setRootActorNamespaceIfUnset(tt.ra)
 			allowed, reason := tt.ra.AllowsReason(tt.namespace, tt.resource, tt.verb, tt.resourceId)
 			require.Equal(t, tt.allowed, allowed)
 			if tt.reasonContains != "" {
@@ -648,6 +715,42 @@ func TestRequestAuth_GetNamespacesAllowedForResource(t *testing.T) {
 			resource:   "connections",
 			verb:       "get",
 			namespaces: []string{"root.other"},
+		},
+		{
+			name: "over-broad stored permission is constrained to actor namespace",
+			ra: NewAuthenticatedRequestAuth(&Actor{
+				Id:         apid.New(apid.PrefixActor),
+				ExternalId: "user",
+				Namespace:  "root.acme.tenant_1",
+				Permissions: []aschema.Permission{
+					{
+						Namespace: "root.**",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+				},
+			}),
+			resource:   "connections",
+			verb:       "get",
+			namespaces: []string{"root.acme.tenant_1.**"},
+		},
+		{
+			name: "stored sibling permission is omitted",
+			ra: NewAuthenticatedRequestAuth(&Actor{
+				Id:         apid.New(apid.PrefixActor),
+				ExternalId: "user",
+				Namespace:  "root.acme.tenant_1",
+				Permissions: []aschema.Permission{
+					{
+						Namespace: "root.acme.tenant_2.**",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+				},
+			}),
+			resource:   "connections",
+			verb:       "get",
+			namespaces: []string{},
 		},
 		{
 			name: "templated permission",
@@ -1206,6 +1309,7 @@ func TestRequestAuth_GetNamespacesAllowedForResource(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			setRootActorNamespaceIfUnset(tt.ra)
 			namespaces := tt.ra.GetNamespacesAllowed(tt.resource, tt.verb)
 			require.Equal(t, tt.namespaces, namespaces)
 		})
