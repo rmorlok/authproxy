@@ -171,6 +171,16 @@ jobs:
             fi
           done
 
+          smoke_user_public="$(kubectl -n "${RELEASE_NS}" get secret "${RELEASE_NAME}-actors" \
+            -o jsonpath='{.data.demo-shell\.pub}')"
+          if [ -z "${smoke_user_public}" ]; then
+            echo "Configured demo-shell actor public key is empty" >&2
+            exit 1
+          fi
+          kubectl -n "${RELEASE_NS}" patch secret "${RELEASE_NAME}-actors" \
+            --type merge \
+            --patch "{\"data\":{\"smoke-user.pub\":\"${smoke_user_public}\"}}"
+
           kubectl -n "${RELEASE_NS}" get secret "${secrets[@]}" -o json \
             | jq 'del(
                 .metadata.resourceVersion,

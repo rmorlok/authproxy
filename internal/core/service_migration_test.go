@@ -1866,4 +1866,29 @@ func TestMigration(t *testing.T) {
 			})
 		})
 	})
+
+	t.Run("namespaces", func(t *testing.T) {
+		t.Run("includes configured actor namespaces", func(t *testing.T) {
+			cleanup := setup(t, []cschema.Connector{})
+			defer cleanup()
+
+			cfg.GetRoot().SystemAuth.Actors = &cfgschema.ConfiguredActors{
+				InnerVal: cfgschema.ConfiguredActorsList{{
+					ExternalId: "smoke-user",
+					Namespace:  "root.smoke",
+					Key: &cfgschema.Key{
+						InnerVal: &cfgschema.KeyShared{
+							SharedKey: &cfgschema.KeyData{
+								InnerVal: &cfgschema.KeyDataBase64Val{Base64: "dGVzdA=="},
+							},
+						},
+					},
+				}},
+			}
+
+			require.NoError(t, service.Migrate(context.Background()))
+			_, err := db.GetNamespace(context.Background(), "root.smoke")
+			require.NoError(t, err)
+		})
+	})
 }

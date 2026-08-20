@@ -87,6 +87,60 @@ func TestSyncActorsList(t *testing.T) {
 		require.NotNil(t, bob.EncryptedKey)
 	})
 
+	t.Run("syncs actor into configured namespace", func(t *testing.T) {
+		actors := &sconfig.ConfiguredActors{
+			InnerVal: sconfig.ConfiguredActorsList{
+				{
+					ExternalId: "smoke-user",
+					Namespace:  "root.smoke",
+					Key: &sconfig.Key{
+						InnerVal: &sconfig.KeyShared{
+							SharedKey: &sconfig.KeyData{
+								InnerVal: &sconfig.KeyDataBase64Val{Base64: "dGVzdA=="},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		cfg := setup(t, actors)
+		require.NoError(t, db.EnsureNamespaceByPath(ctx, "root.smoke"))
+		svc := NewService(cfg, db, redis, enc, cfg.GetRootLogger())
+
+		require.NoError(t, svc.SyncActorList(ctx))
+		_, err := db.GetActorByExternalId(ctx, "root.smoke", "smoke-user")
+		require.NoError(t, err)
+		_, err = db.GetActorByExternalId(ctx, "root", "smoke-user")
+		require.ErrorIs(t, err, database.ErrNotFound)
+	})
+
+	t.Run("removes stale actor after namespace changes", func(t *testing.T) {
+		key := &sconfig.Key{InnerVal: &sconfig.KeyShared{SharedKey: &sconfig.KeyData{InnerVal: &sconfig.KeyDataBase64Val{Base64: "dGVzdA=="}}}}
+		actors := &sconfig.ConfiguredActors{
+			InnerVal: sconfig.ConfiguredActorsList{{ExternalId: "smoke-user", Key: key}},
+		}
+
+		cfg := setup(t, actors)
+		svc := NewService(cfg, db, redis, enc, cfg.GetRootLogger())
+		require.NoError(t, svc.SyncActorList(ctx))
+
+		require.NoError(t, db.EnsureNamespaceByPath(ctx, "root.smoke"))
+		cfg.GetRoot().SystemAuth.Actors = &sconfig.ConfiguredActors{
+			InnerVal: sconfig.ConfiguredActorsList{{
+				ExternalId: "smoke-user",
+				Namespace:  "root.smoke",
+				Key:        key,
+			}},
+		}
+		require.NoError(t, svc.SyncActorList(ctx))
+
+		_, err := db.GetActorByExternalId(ctx, "root", "smoke-user")
+		require.ErrorIs(t, err, database.ErrNotFound)
+		_, err = db.GetActorByExternalId(ctx, "root.smoke", "smoke-user")
+		require.NoError(t, err)
+	})
+
 	t.Run("deletes stale actors", func(t *testing.T) {
 		actors := &sconfig.ConfiguredActors{
 			InnerVal: sconfig.ConfiguredActorsList{
@@ -211,6 +265,9 @@ func TestSyncConfiguredActorsExternalSource(t *testing.T) {
 		actors := &sconfig.ConfiguredActors{
 			InnerVal: &sconfig.ConfiguredActorsExternalSource{
 				KeysPath: tu.TestDataPath("admin_user_keys"),
+				NamespaceByExternalId: map[string]string{
+					"bobdole": "root.smoke",
+				},
 				Permissions: []aschema.Permission{
 					{Namespace: "root", Resources: []string{"connections"}, Verbs: []string{"list", "get"}},
 				},
@@ -218,13 +275,14 @@ func TestSyncConfiguredActorsExternalSource(t *testing.T) {
 		}
 
 		cfg := setup(t, actors)
+		require.NoError(t, db.EnsureNamespaceByPath(ctx, "root.smoke"))
 		svc := NewService(cfg, db, redis, enc, cfg.GetRootLogger())
 
 		err := svc.SyncConfiguredActorsExternalSource(ctx)
 		require.NoError(t, err)
 
 		// Verify bobdole was created (one of the .pub files in test data)
-		bobdole, err := db.GetActorByExternalId(ctx, "root", "bobdole")
+		bobdole, err := db.GetActorByExternalId(ctx, "root.smoke", "bobdole")
 		require.NoError(t, err)
 		require.NotNil(t, bobdole.EncryptedKey)
 		require.Equal(t, LabelValuePublicKeyDir, bobdole.Labels[LabelConfiguredActorSyncSource])

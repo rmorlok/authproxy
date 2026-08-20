@@ -60,6 +60,25 @@ The former `connectors.identifyingLabels` setting has been removed. Delete it
 from existing configuration and add a stable `name` to every connector entry
 that does not already specify `id`.
 
+## Configured actor namespaces
+
+Configured actors live in `root` unless a namespace is specified. Inline actor
+entries accept `namespace` directly. For actors discovered from a public-key
+directory, map individual external IDs with `namespaceByExternalId`:
+
+```yaml
+systemAuth:
+  actors:
+    keysPath: /etc/authproxy/keys/actors
+    namespaceByExternalId:
+      smoke-user: root.smoke
+```
+
+The key file for this example is
+`/etc/authproxy/keys/actors/smoke-user.pub`. Development migration creates the
+configured actor namespace and its missing parents before actor synchronization.
+Other keys in the directory continue to create actors in `root`.
+
 ## Kubernetes values
 
 The Helm chart exposes typed values for common deployment settings and merges

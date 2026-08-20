@@ -21,6 +21,8 @@ func TestSystemAuth(t *testing.T) {
       path: ./dev_config/keys/system
   actors:
     keysPath: ./dev_config/keys/actors
+    namespaceByExternalId:
+      smoke-user: root.smoke
 `
 			expected := SystemAuth{
 				JwtSigningKey: &Key{
@@ -40,6 +42,9 @@ func TestSystemAuth(t *testing.T) {
 				Actors: &ConfiguredActors{
 					InnerVal: &ConfiguredActorsExternalSource{
 						KeysPath: "./dev_config/keys/actors",
+						NamespaceByExternalId: map[string]string{
+							"smoke-user": "root.smoke",
+						},
 					},
 				},
 			}
@@ -59,6 +64,7 @@ jwtSigningKey:
     path: ./dev_config/keys/system
 actors:
   - externalId: bobdole
+    namespace: root.admins
     key:
       publicKey:
         path: ./dev_config/keys/actors/bobdole.pub
@@ -82,6 +88,7 @@ actors:
 					InnerVal: ConfiguredActorsList{
 						&ConfiguredActor{
 							ExternalId: "bobdole",
+							Namespace:  "root.admins",
 							Key: &Key{
 								InnerVal: &KeyPublicPrivate{
 									PublicKey: &KeyData{

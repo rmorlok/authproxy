@@ -53,6 +53,9 @@ func (s *service) MigrateNamespaces(ctx context.Context) error {
 	for _, configConnector := range cfgRoot.Connectors.GetConnectors() {
 		namespaces = append(namespaces, configConnector.GetNamespace())
 	}
+	for _, configuredActor := range cfgRoot.SystemAuth.Actors.All() {
+		namespaces = append(namespaces, configuredActor.GetNamespace())
+	}
 
 	prefixOrderedList := namespace.SplitPathsToPrefixes(namespaces)
 

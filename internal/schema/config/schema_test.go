@@ -758,7 +758,7 @@ func TestSchemaDefinitions(t *testing.T) {
 				{
 					Name:  "with permissions",
 					Valid: true,
-					Data:  `{"test": {"externalId": "actor-1", "key": {"sharedKey": {"value": "secret"}}, "permissions": [{"namespace": "root", "resources": ["*"], "verbs": ["*"]}]}}`,
+					Data:  `{"test": {"externalId": "actor-1", "namespace": "root.operators", "key": {"sharedKey": {"value": "secret"}}, "permissions": [{"namespace": "root", "resources": ["*"], "verbs": ["*"]}]}}`,
 				},
 				{
 					Name:  "with labels",
@@ -774,6 +774,11 @@ func TestSchemaDefinitions(t *testing.T) {
 					Name:  "missing key",
 					Valid: false,
 					Data:  `{"test": {"externalId": "actor-1"}}`,
+				},
+				{
+					Name:  "invalid namespace",
+					Valid: false,
+					Data:  `{"test": {"externalId": "actor-1", "namespace": "other", "key": {"sharedKey": {"value": "secret"}}}}`,
 				},
 			},
 		},
@@ -807,6 +812,16 @@ func TestSchemaDefinitions(t *testing.T) {
 					Name:  "external source with permissions",
 					Valid: true,
 					Data:  `{"test": {"keysPath": "/keys/actors", "permissions": [{"namespace": "root.**", "resources": ["*"], "verbs": ["*"]}]}}`,
+				},
+				{
+					Name:  "external source with actor namespaces",
+					Valid: true,
+					Data:  `{"test": {"keysPath": "/keys/actors", "namespaceByExternalId": {"smoke-user": "root.smoke"}}}`,
+				},
+				{
+					Name:  "external source with invalid actor namespace",
+					Valid: false,
+					Data:  `{"test": {"keysPath": "/keys/actors", "namespaceByExternalId": {"smoke-user": "smoke"}}}`,
 				},
 				{
 					Name:  "external source with sync cron",

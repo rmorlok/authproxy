@@ -42,6 +42,9 @@ systemAuth:
     path: /etc/authproxy/keys/encryption/global_aes.key
   actors:
     keysPath: /etc/authproxy/keys/actors
+    namespaceByExternalId:
+      smoke-user: root.smoke
+    syncCronSchedule: "* * * * *"
     permissions:
       - namespace: root.**
         resources:

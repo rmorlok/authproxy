@@ -16,6 +16,7 @@ import (
 	"github.com/rmorlok/authproxy/integration_tests/helpers"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/schema/api"
+	"github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -25,6 +26,34 @@ var (
 	smokeAdminKey = flag.String("admin-key", os.Getenv("SMOKE_ADMIN_KEY"), "admin actor private key PEM, or a path to it")
 )
 
+const (
+	smokeConnectorNamespace  = "root.smoke"
+	smokeUserExternalID      = "smoke-user"
+	smokeConnectionNamespace = "root.smoke.smoke-user"
+)
+
+func newRemoteSmokeRig(t *testing.T) *helpers.RemoteAuthProxy {
+	t.Helper()
+
+	rig := helpers.NewRemoteAuthProxy(t, helpers.RemoteAuthProxyOptions{
+		BaseURL:             *smokeBaseURL,
+		AdminPrivateKey:     *smokeAdminKey,
+		AdminActorNamespace: config.RootNamespace,
+		UserActorExternalID: smokeUserExternalID,
+		UserActorNamespace:  smokeConnectorNamespace,
+		ConnectorNamespace:  smokeConnectorNamespace,
+		ConnectionNamespace: smokeConnectionNamespace,
+	})
+	rig.EnsureNamespace(t, smokeConnectorNamespace)
+	rig.EnsureNamespace(t, smokeConnectionNamespace)
+	rig.WaitForUserReady(t, 3*time.Minute)
+
+	actor := rig.GetActorByExternalID(t, smokeConnectorNamespace, smokeUserExternalID)
+	require.Equal(t, smokeConnectorNamespace, actor.Namespace)
+	require.Equal(t, smokeUserExternalID, actor.ExternalId)
+	return rig
+}
+
 func TestRemoteOAuth2ProxySmoke(t *testing.T) {
 	if *smokeBaseURL == "" {
 		t.Skip("set SMOKE_BASE_URL or pass -base-url")
@@ -33,10 +62,7 @@ func TestRemoteOAuth2ProxySmoke(t *testing.T) {
 		t.Skip("set SMOKE_ADMIN_KEY or pass -admin-key")
 	}
 
-	rig := helpers.NewRemoteAuthProxy(t, helpers.RemoteAuthProxyOptions{
-		BaseURL:         *smokeBaseURL,
-		AdminPrivateKey: *smokeAdminKey,
-	})
+	rig := newRemoteSmokeRig(t)
 	provider := helpers.NewOAuth2TestProviderAt(t, rig.ProviderURL)
 
 	startedAt := time.Now().Add(-1 * time.Second)
@@ -129,10 +155,7 @@ func TestRemoteSeededConnectorsSmoke(t *testing.T) {
 		t.Skip("set SMOKE_ADMIN_KEY or pass -admin-key")
 	}
 
-	rig := helpers.NewRemoteAuthProxy(t, helpers.RemoteAuthProxyOptions{
-		BaseURL:         *smokeBaseURL,
-		AdminPrivateKey: *smokeAdminKey,
-	})
+	rig := newRemoteSmokeRig(t)
 	provider := helpers.NewOAuth2TestProviderAt(t, rig.ProviderURL)
 
 	t.Run("catalog contains expected seeded connectors", func(t *testing.T) {

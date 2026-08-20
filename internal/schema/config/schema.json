@@ -1093,6 +1093,9 @@
         "externalId": {
           "type": "string"
         },
+        "namespace": {
+          "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath"
+        },
         "key": {
           "$ref": "../resources/key/schema.json#/$defs/Key"
         },
@@ -1132,6 +1135,12 @@
               "type": "array",
               "items": {
                 "$ref": "../auth/schema.json#/$defs/Permission"
+              }
+            },
+            "namespaceByExternalId": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath"
               }
             },
             "syncCronSchedule": {

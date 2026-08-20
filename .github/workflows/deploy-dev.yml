@@ -241,6 +241,11 @@ jobs:
             echo "Reusing ${RELEASE_NAME}-actors"
           fi
 
+          smoke_user_public="$(base64 < "${workdir}/demo-shell.pub" | tr -d '\n')"
+          kubectl -n "${RELEASE_NS}" patch secret "${RELEASE_NAME}-actors" \
+            --type merge \
+            --patch "{\"data\":{\"smoke-user.pub\":\"${smoke_user_public}\"}}"
+
       - name: Clear stale seed job
         env:
           RELEASE_NS: ${{ steps.env.outputs.namespace }}
