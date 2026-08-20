@@ -159,17 +159,52 @@ func (h *RemoteAuthProxy) WaitForUserReady(t *testing.T, timeout time.Duration) 
 
 func (h *RemoteAuthProxy) CreateConnector(t *testing.T, connector sconfig.Connector) schemaapi.ConnectorVersionJson {
 	t.Helper()
+	return h.CreateConnectorWithLabels(t, connector, map[string]string{"smoke": "true"})
+}
+
+func (h *RemoteAuthProxy) CreateConnectorWithLabels(t *testing.T, connector sconfig.Connector, labels map[string]string) schemaapi.ConnectorVersionJson {
+	t.Helper()
 
 	var created schemaapi.ConnectorVersionJson
 	h.doSigned(t, h.AdminActorExternalID, h.AdminActorNamespace, http.MethodPost, h.AdminURL+"/api/v1/connectors", schemaapi.CreateConnectorRequestJson{
 		Namespace:  h.ConnectorNamespace,
 		Definition: connector,
-		Labels: map[string]string{
-			"smoke": "true",
-		},
+		Labels:     labels,
 	}, true, http.StatusCreated, &created)
 	require.Equal(t, h.ConnectorNamespace, created.Namespace)
 	return created
+}
+
+func (h *RemoteAuthProxy) ListConnectorsAsAdmin(t *testing.T, namespace, labelSelector string) []schemaapi.ConnectorJson {
+	t.Helper()
+
+	query := url.Values{"limit": []string{"100"}, "namespace": []string{namespace}}
+	if labelSelector != "" {
+		query.Set("labelSelector", labelSelector)
+	}
+	endpoint := h.AdminURL + "/api/v1/connectors?" + query.Encode()
+
+	var list schemaapi.ListConnectorsResponseJson
+	h.doSigned(t, h.AdminActorExternalID, h.AdminActorNamespace, http.MethodGet, endpoint, nil, true, http.StatusOK, &list)
+	return list.Items
+}
+
+func (h *RemoteAuthProxy) GetConnectorVersionAsAdmin(t *testing.T, connectorID apid.ID, version uint64) schemaapi.ConnectorVersionJson {
+	t.Helper()
+
+	var connector schemaapi.ConnectorVersionJson
+	h.doSigned(
+		t,
+		h.AdminActorExternalID,
+		h.AdminActorNamespace,
+		http.MethodGet,
+		fmt.Sprintf("%s/api/v1/connectors/%s/versions/%d", h.AdminURL, connectorID, version),
+		nil,
+		true,
+		http.StatusOK,
+		&connector,
+	)
+	return connector
 }
 
 func (h *RemoteAuthProxy) ListConnectors(t *testing.T, labelSelector string) []schemaapi.ConnectorJson {
