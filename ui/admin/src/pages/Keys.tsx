@@ -28,6 +28,7 @@ import {useNavigate} from "react-router-dom";
 import {useSelector} from "react-redux";
 import {selectCurrentNamespacePath} from "../store/namespacesSlice";
 import {toSnakeCase} from '../util';
+import {ResourceLabelChips} from '../components/ResourceMetadataFields';
 import KeyDataForm, {
     buildKeyDataPayload,
     createEmptyKeyDataFormState,
@@ -87,17 +88,7 @@ export const columns: GridColDef<Key>[] = [
         flex: 0.7,
         minWidth: 120,
         sortable: false,
-        renderCell: (params) => {
-            const labels = params.value as Record<string, string> | undefined;
-            if (!labels || Object.keys(labels).length === 0) return null;
-            return (
-                <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{ py: 0.5 }}>
-                    {Object.entries(labels).map(([key, value]) => (
-                        <Chip key={key} label={`${key}: ${value}`} size="small" variant="outlined" />
-                    ))}
-                </Stack>
-            );
-        },
+        renderCell: (params) => <ResourceLabelChips labels={params.value as Record<string, string> | undefined}/>,
     },
     {
         field: 'createdAt',

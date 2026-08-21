@@ -92,5 +92,9 @@ describe('ConnectorDetail', () => {
     const count = screen.getByText('Versions').parentElement;
     expect(count).not.toBeNull();
     expect(within(count!).getByText('4')).toBeTruthy();
+
+    const namespace = screen.getByText('Namespace').parentElement;
+    expect(namespace).not.toBeNull();
+    expect(within(namespace!).getByText('root')).toBeTruthy();
   });
 });

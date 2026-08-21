@@ -6,10 +6,10 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 import Avatar from '@mui/material/Avatar';
-import Chip from '@mui/material/Chip';
 import IconButton from '@mui/material/IconButton';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
+import Divider from '@mui/material/Divider';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
@@ -28,6 +28,9 @@ import {connectors, ConnectorVersion, ConnectorVersionState} from '@authproxy/ap
 import AnnotationsEditor from "./AnnotationsEditor";
 import YAML from 'yaml';
 import {StateChip} from "./StateChip";
+import ResourceIdentifier from './ResourceIdentifier';
+import ResourceMetadataMenuItems from './ResourceMetadataMenuItems';
+import {ResourceLabels, ResourceNamespace} from './ResourceMetadataFields';
 import CodeMirror from "@uiw/react-codemirror";
 import { yaml as yamlMode } from "@codemirror/lang-yaml";
 import { json as jsonMode } from "@codemirror/lang-json";
@@ -72,21 +75,6 @@ export default function ConnectorVersionDetail(
     const [actionError, setActionError] = useState<string | null>(null);
 
     const stateOptions = useMemo(() => Object.values(ConnectorVersionState), []);
-
-    const fetchConnectorVersion = () => {
-        if (!connectorId || !version) return;
-        setLoading(true);
-        setError(null);
-        connectors.getVersion(connectorId, version)
-            .then(res => {
-                setCv(res.data);
-            })
-            .catch(err => {
-                const msg = err?.response?.data?.error || err.message || 'Failed to load connector';
-                setError(msg);
-            })
-            .finally(() => setLoading(false));
-    };
 
     useEffect(() => {
         if (!cv?.definition) {
@@ -143,9 +131,9 @@ export default function ConnectorVersionDetail(
         setActionError(null);
         setActionLoading(true);
         try {
-            await connectors.forceVersionState(cv.id, cv.version, selectedState as ConnectorVersionState);
+            const response = await connectors.forceVersionState(cv.id, cv.version, selectedState as ConnectorVersionState);
+            setCv(response.data);
             setForceStateOpen(false);
-            fetchConnectorVersion();
         } catch (err: any) {
             const msg = err?.response?.data?.error || err.message || 'Failed to force state';
             setActionError(msg);
@@ -212,7 +200,24 @@ export default function ConnectorVersionDetail(
                 <IconButton aria-label="actions" onClick={openMenu} size="small">
                     <MoreVertIcon/>
                 </IconButton>
-                <Menu anchorEl={menuAnchorEl} open={Boolean(menuAnchorEl)} onClose={closeMenu}>
+                <Menu anchorEl={menuAnchorEl} open={Boolean(menuAnchorEl)} onClose={closeMenu} keepMounted>
+                    <ResourceMetadataMenuItems
+                        resource="connector version"
+                        labels={cv.labels}
+                        annotations={cv.annotations}
+                        onCloseMenu={closeMenu}
+                        includeRename={false}
+                        onUpdateLabels={async (labels) => {
+                            const response = await connectors.updateVersion(cv.id, cv.version, {labels});
+                            setCv(response.data);
+                        }}
+                        onUpdateAnnotations={async (annotations) => {
+                            const response = await connectors.updateVersion(cv.id, cv.version, {annotations});
+                            setCv(response.data);
+                        }}
+                        disabled={cv.state !== ConnectorVersionState.DRAFT || actionLoading}
+                    />
+                    <Divider/>
                     <MenuItem onClick={onClickForceState}>Force state…</MenuItem>
                 </Menu>
             </Stack>
@@ -245,50 +250,17 @@ export default function ConnectorVersionDetail(
             )}
 
             <Stack direction={{xs: 'column', sm: 'row'}} spacing={4}>
-                <Box>
-                    <Typography variant="subtitle2" color="text.secondary">Connector ID</Typography>
-                    <Typography variant="body1" sx={{wordBreak: 'break-all'}}>{cv.id}</Typography>
-                </Box>
-                <Box>
-                    <Typography variant="subtitle2" color="text.secondary">Labels</Typography>
-                    {cv.labels && Object.keys(cv.labels).length > 0 ? (
-                        <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{ mt: 0.5 }}>
-                            {Object.entries(cv.labels).map(([key, value]) => (
-                                <Chip key={key} label={`${key}: ${value}`} size="small" variant="outlined" />
-                            ))}
-                        </Stack>
-                    ) : (
-                        <Typography variant="body2" color="text.secondary">No labels</Typography>
-                    )}
-                </Box>
+                <ResourceIdentifier label="Connector ID" value={cv.id} copyLabel="Copy connector id"/>
+                <ResourceNamespace namespace={cv.namespace}/>
                 <Box>
                     <Typography variant="subtitle2" color="text.secondary">Version</Typography>
                     <Typography variant="body1">{cv.version}</Typography>
                 </Box>
             </Stack>
 
-            <AnnotationsEditor
-                annotations={cv.annotations}
-                readOnly={cv.state !== ConnectorVersionState.DRAFT}
-                onPut={async (key, value) => {
-                    await connectors.putVersionAnnotation(cv.id, cv.version, key, value);
-                    if (connectorId && version) {
-                        fetchConnectorVersion();
-                    } else {
-                        const res = await connectors.getVersion(cv.id, cv.version);
-                        setCv(res.data);
-                    }
-                }}
-                onDelete={async (key) => {
-                    await connectors.deleteVersionAnnotation(cv.id, cv.version, key);
-                    if (connectorId && version) {
-                        fetchConnectorVersion();
-                    } else {
-                        const res = await connectors.getVersion(cv.id, cv.version);
-                        setCv(res.data);
-                    }
-                }}
-            />
+            <ResourceLabels labels={cv.labels}/>
+
+            <AnnotationsEditor annotations={cv.annotations} readOnly onPut={async () => {}} onDelete={async () => {}}/>
 
             <Box sx={{mt: 1, mb: 1}}>
                 <ToggleButtonGroup

@@ -148,6 +148,9 @@ describe('ConnectionDetail', () => {
     renderConnectionDetail();
 
     await screen.findByText('Connection');
+    const namespace = screen.getByText('Namespace').parentElement;
+    expect(namespace).not.toBeNull();
+    expect(within(namespace!).getByText('root')).toBeTruthy();
     await user.click(screen.getByRole('button', {name: 'actions'}));
     await user.click(screen.getByRole('menuitem', {name: 'Change version…'}));
 

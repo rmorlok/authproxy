@@ -6,7 +6,6 @@ import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 import Avatar from '@mui/material/Avatar';
 import Button from '@mui/material/Button';
-import Chip from '@mui/material/Chip';
 import Drawer from '@mui/material/Drawer';
 import Menu from '@mui/material/Menu';
 import MuiLink from '@mui/material/Link';
@@ -36,6 +35,7 @@ import ResourceIdentifier from './ResourceIdentifier';
 import ResourceMetadataMenuItems from './ResourceMetadataMenuItems';
 import AnnotationsEditor from "./AnnotationsEditor";
 import ResourceNameEditor from './ResourceNameEditor';
+import {ResourceLabels, ResourceNamespace} from './ResourceMetadataFields';
 
 const CONNECTOR_LIFECYCLE_TIMEOUT_SECONDS = 600;
 
@@ -320,23 +320,14 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
 
       <Stack direction={{xs: 'column', sm: 'row'}} spacing={4}>
         <ResourceIdentifier value={conn.id} copyLabel="Copy connector id"/>
-        <Box>
-          <Typography variant="subtitle2" color="text.secondary">Labels</Typography>
-          {conn.labels && Object.keys(conn.labels).length > 0 ? (
-            <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{ mt: 0.5 }}>
-              {Object.entries(conn.labels).map(([key, value]) => (
-                <Chip key={key} label={`${key}: ${value}`} size="small" variant="outlined" />
-              ))}
-            </Stack>
-          ) : (
-            <Typography variant="body2" color="text.secondary">No labels</Typography>
-          )}
-        </Box>
+        <ResourceNamespace namespace={conn.namespace}/>
         <Box>
           <Typography variant="subtitle2" color="text.secondary">Version</Typography>
           <Typography variant="body1">{conn.version}</Typography>
         </Box>
       </Stack>
+
+      <ResourceLabels labels={conn.labels}/>
 
       <AnnotationsEditor annotations={conn.annotations} readOnly onPut={async () => {}} onDelete={async () => {}}/>
 

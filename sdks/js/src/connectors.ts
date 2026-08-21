@@ -84,6 +84,12 @@ export interface UpdateConnectorRequest {
     annotations?: Record<string, string>;
 }
 
+export interface UpdateConnectorVersionRequest {
+    definition?: Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+    labels?: Record<string, string>;
+    annotations?: Record<string, string>;
+}
+
 /**
  * Get a list of all available connectors
  */
@@ -123,6 +129,13 @@ export const listConnectorVersions = (
  */
 export const getConnectorVersion = (id: string, version: number) => {
     return client.get<ConnectorVersion>(`/api/v1/connectors/${id}/versions/${version}`);
+};
+
+/**
+ * Update the definition or metadata for a draft connector version.
+ */
+export const updateConnectorVersion = (id: string, version: number, request: UpdateConnectorVersionRequest) => {
+    return client.patch<ConnectorVersion>(`/api/v1/connectors/${id}/versions/${version}`, request);
 };
 
 export interface ForceConnectorVersionStateRequest {
@@ -224,6 +237,7 @@ export const connectors = {
     update: updateConnector,
     listVersions: listConnectorVersions,
     getVersion: getConnectorVersion,
+    updateVersion: updateConnectorVersion,
     forceVersionState: forceConnectorVersionState,
     disconnectAll: disconnectAllConnectorConnections,
     archive: archiveConnector,

@@ -24,6 +24,7 @@ import {useQueryState, parseAsInteger, parseAsStringLiteral, parseAsString} from
 import {useSelector} from "react-redux";
 import {selectCurrentNamespacePath} from "../store/namespacesSlice";
 import {toSnakeCase} from '../util';
+import {ResourceLabelChips} from '../components/ResourceMetadataFields';
 
 function renderState(state: ConnectionState) {
     const colors: Record<ConnectionState, "default" | "success" | "error" | "info" | "warning" | "primary" | "secondary"> = {
@@ -65,22 +66,20 @@ export const columns: GridColDef<Connection>[] = [
         renderCell: (params) => renderState(params.value as ConnectionState),
     },
     {
+        field: 'labels',
+        headerName: 'Labels',
+        flex: 0.7,
+        minWidth: 120,
+        sortable: false,
+        renderCell: (params) => <ResourceLabelChips labels={params.value as Record<string, string> | undefined}/>,
+    },
+    {
         field: 'connector.labels',
         headerName: 'Connector Labels',
         flex: 0.7,
         minWidth: 120,
         sortable: false,
-        renderCell: (params) => {
-            const labels = params.row.connector?.labels as Record<string, string> | undefined;
-            if (!labels || Object.keys(labels).length === 0) return null;
-            return (
-                <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{ py: 0.5 }}>
-                    {Object.entries(labels).map(([key, value]) => (
-                        <Chip key={key} label={`${key}: ${value}`} size="small" variant="outlined" />
-                    ))}
-                </Stack>
-            );
-        },
+        renderCell: (params) => <ResourceLabelChips labels={params.row.connector?.labels}/>,
     },
     {
         field: 'connector.name',

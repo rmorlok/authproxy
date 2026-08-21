@@ -5,12 +5,15 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import {DataGrid, GridColDef, GridSortModel} from '@mui/x-data-grid';
 import {
-    listActors, Actor, ListResponse, ListActorsParams
+    listActors, Actor, ListResponse, ListActorsParams, namespaceAndChildren
 } from '@authproxy/api';
 import dayjs from 'dayjs';
 import {useQueryState, parseAsInteger, parseAsString} from 'nuqs'
 import {useNavigate} from 'react-router-dom';
 import {toSnakeCase} from '../util';
+import {useSelector} from 'react-redux';
+import {selectCurrentNamespacePath} from '../store/namespacesSlice';
+import {ResourceLabelChips} from '../components/ResourceMetadataFields';
 
 export const columns: GridColDef<Actor>[] = [
     {
@@ -35,25 +38,19 @@ export const columns: GridColDef<Actor>[] = [
         sortable: true,
     },
     {
-        field: 'email',
-        headerName: 'Email',
-        flex: 0.3,
-        minWidth: 60,
-        sortable: true,
+        field: 'namespace',
+        headerName: 'Namespace',
+        flex: 0.5,
+        minWidth: 90,
+        sortable: false,
     },
     {
-        field: 'admin',
-        headerName: 'Admin',
-        flex: 0.5,
-        minWidth: 80,
-        sortable: true,
-    },
-    {
-        field: 'superAdmin',
-        headerName: 'Super Admin',
-        flex: 0.5,
-        minWidth: 80,
-        sortable: true,
+        field: 'labels',
+        headerName: 'Labels',
+        flex: 0.7,
+        minWidth: 120,
+        sortable: false,
+        renderCell: (params) => <ResourceLabelChips labels={params.value as Record<string, string> | undefined}/>,
     },
     {
         field: 'createdAt',
@@ -81,6 +78,7 @@ export const columns: GridColDef<Actor>[] = [
 
 export default function Actors() {
     const navigate = useNavigate();
+    const ns = useSelector(selectCurrentNamespacePath);
     const defaultPageSize = 20;
 
     const [rows, setRows] = useState<Actor[]>([]);
@@ -148,6 +146,7 @@ export default function Actors() {
                 const prevResp = responsesCacheRef.current[responsesCacheRef.current.length - 1];
 
                 const params: ListActorsParams = prevResp?.cursor ? {cursor: prevResp.cursor} : {
+                    namespace: namespaceAndChildren(ns),
                     orderBy: sort || undefined,
                     limit: pageSize,
                 };
@@ -183,11 +182,11 @@ export default function Actors() {
         // Reset cursors/cache and immediately fetch first page to ensure initial load
         resetPagination();
         fetchPage(1);
-    }, [pageSize, sort]);
+    }, [ns, pageSize, sort]);
 
     useEffect(() => {
         fetchPage(page);
-    }, [page, pageSize, sort]); // TODO: only page?
+    }, [page]);
 
     return (
         <Box sx={{width: '100%', maxWidth: {sm: '100%', md: '1700px'}}}>

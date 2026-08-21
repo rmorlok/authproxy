@@ -1,10 +1,12 @@
 import * as React from 'react';
 import type {Meta, StoryObj} from '@storybook/react';
 import Box from '@mui/material/Box';
-import {configureClient} from '@authproxy/api';
+import {configureClient, ConnectorVersionState} from '@authproxy/api';
 import NamespaceDetail from '../components/NamespaceDetail';
 import ConnectorDetail from '../components/ConnectorDetail';
+import ConnectorVersionDetail from '../components/ConnectorVersionDetail';
 import ConnectionDetail from '../components/ConnectionDetail';
+import ActorDetail from '../components/ActorDetail';
 import KeyDetail from '../components/KeyDetail';
 import RateLimitDetail from '../components/RateLimitDetail';
 
@@ -48,6 +50,24 @@ const connection = {
   updatedAt: '2026-08-05T15:45:00Z',
 };
 
+const actor = {
+  id: 'act_payments_service',
+  namespace: 'root.payments',
+  name: 'payments-service',
+  externalId: 'service:payments-api',
+  permissions: [
+    {
+      namespace: 'root.payments.**',
+      resources: ['connections', 'connectors'],
+      verbs: ['get', 'list', 'proxy'],
+    },
+  ],
+  labels: {team: 'payments', 'apxy/ns/team': 'platform'},
+  annotations: {owner: 'Payments Platform', runbook: 'go/payments/actors'},
+  createdAt: '2026-08-05T15:30:00Z',
+  updatedAt: '2026-08-05T15:45:00Z',
+};
+
 const key = {
   id: 'key_payments_primary',
   namespace: 'root.payments',
@@ -81,6 +101,12 @@ const connectorVersion = {
   definition: {displayName: 'Stripe', setupFlow: {steps: []}},
 };
 
+const draftConnectorVersion = {
+  ...connectorVersion,
+  version: 4,
+  state: ConnectorVersionState.DRAFT,
+};
+
 configureClient({
   axiosConfigOverride: {
     adapter: async (config) => ({
@@ -109,8 +135,16 @@ export const Connector: Story = {
   render: () => <DetailCanvas><ConnectorDetail connectorId={connector.id}/></DetailCanvas>,
 };
 
+export const ConnectorVersion: Story = {
+  render: () => <DetailCanvas><ConnectorVersionDetail connectorVersion={draftConnectorVersion}/></DetailCanvas>,
+};
+
 export const Connection: Story = {
   render: () => <DetailCanvas><ConnectionDetail connectionId={connection.id}/></DetailCanvas>,
+};
+
+export const Actor: Story = {
+  render: () => <DetailCanvas><ActorDetail actorId={actor.id}/></DetailCanvas>,
 };
 
 export const Key: Story = {
@@ -130,6 +164,7 @@ function responseData(url: string) {
   if (url === `/api/v1/connectors/${connector.id}`) return connector;
   if (url === `/api/v1/connectors/${connector.id}/versions`) return {items: [connectorVersion]};
   if (url === `/api/v1/connections/${connection.id}`) return connection;
+  if (url === `/api/v1/actors/${actor.id}`) return actor;
   if (url === `/api/v1/keys/${key.id}`) return key;
   if (url === `/api/v1/rate-limits/${rateLimit.id}`) return rateLimit;
   return {};

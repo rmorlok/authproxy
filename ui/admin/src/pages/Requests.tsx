@@ -24,6 +24,7 @@ import {useQueryState, parseAsInteger, parseAsStringLiteral, parseAsString} from
 import RequestDetail from "../components/RequestDetail";
 import {useSelector} from "react-redux";
 import {selectCurrentNamespacePath} from "../store/namespacesSlice";
+import {ResourceLabelChips} from '../components/ResourceMetadataFields';
 
 export const columns: (GridColDef<RequestEventRecord> & {hideInitial?: boolean})[] = [
     {
@@ -139,17 +140,7 @@ export const columns: (GridColDef<RequestEventRecord> & {hideInitial?: boolean})
         sortable: false,
         minWidth: 200,
         hideInitial: true,
-        renderCell: (params) => {
-            const labels = params.value as Record<string, string> | undefined;
-            if (!labels || Object.keys(labels).length === 0) return null;
-            return (
-                <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', gap: 0.5 }}>
-                    {Object.entries(labels).map(([k, v]) => (
-                        <Chip key={k} label={`${k}=${v}`} size="small" variant="outlined" />
-                    ))}
-                </Stack>
-            );
-        },
+        renderCell: (params) => <ResourceLabelChips labels={params.value as Record<string, string> | undefined}/>,
     },
     {
         field: 'host',

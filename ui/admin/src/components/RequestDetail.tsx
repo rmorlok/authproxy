@@ -27,6 +27,7 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import {Duration, HttpStatusChip} from '../util'
 import {getRequestEvent, RequestEvent, RequestEventRecord} from '@authproxy/api';
 import Chip from "@mui/material/Chip";
+import {ResourceLabelChips} from './ResourceMetadataFields';
 
 function requestEventFromRecord(record: RequestEventRecord): RequestEvent {
     const reqHeaders: Record<string, string[]> = {};
@@ -464,6 +465,9 @@ export default function RequestDetail({requestId, record, onClose, showOpenFullP
                                 <Table size="small">
                                     <TableBody>
                                         <TableRow><TableCell>ID</TableCell><TableCell>{data.id}</TableCell></TableRow>
+                                        {data.ns && (
+                                            <TableRow><TableCell>Namespace</TableCell><TableCell>{data.ns}</TableCell></TableRow>
+                                        )}
                                         {data.cid && (
                                             <TableRow><TableCell>Correlation
                                                 ID</TableCell><TableCell>{data.cid}</TableCell></TableRow>
@@ -490,11 +494,7 @@ export default function RequestDetail({requestId, record, onClose, showOpenFullP
                                             <TableRow>
                                                 <TableCell>Labels</TableCell>
                                                 <TableCell>
-                                                    <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', gap: 0.5 }}>
-                                                        {Object.entries(record.labels).map(([k, v]) => (
-                                                            <Chip key={k} label={`${k}=${v}`} size="small" variant="outlined" />
-                                                        ))}
-                                                    </Stack>
+                                                    <ResourceLabelChips labels={record.labels}/>
                                                 </TableCell>
                                             </TableRow>
                                         )}
