@@ -19,11 +19,11 @@ import (
 
 // TestCallbackRejection_NamespaceMismatchActor exercises the
 // `namespace_mismatch_actor` defense-in-depth check at
-// internal/auth_methods/oauth2/state.go:203-213. The check fires when the
+// internal/auth_methods/oauth2/state.go. The check fires when the
 // caller's actor id matches the state's actor id but the namespaces differ
 // — a configuration that the natural _initiate flow can't produce because
 // actor ids are allocated per (namespace, externalId). The only realistic
-// way to land in this state is via a corrupted state envelope (e.g., a
+// way to land in this state is via a forged state envelope (e.g., a
 // secondary AuthProxy instance writing into the same Redis with a colliding
 // actor id), so the test injects a synthetic state envelope directly.
 //
@@ -85,18 +85,19 @@ func TestCallbackRejection_NamespaceMismatchActor(t *testing.T) {
 	// state id so the assertion targets exactly the synthetic value.
 	forgedStateID := apid.New(apid.PrefixOauth2State)
 	env.WriteOAuth2StateForTest(t, helpers.OAuth2StateForTest{
-		Id:               forgedStateID,
-		Namespace:        lyingNamespace,
-		ActorId:          alice.Id,
-		ConnectorId:      conn.ConnectorId,
-		ConnectorVersion: conn.ConnectorVersion,
-		ConnectionId:     conn.Id,
-		ReturnToUrl:      "https://example.com/return",
-		ExpiresAt:        time.Now().Add(5 * time.Minute),
+		Id:                  forgedStateID,
+		ActorNamespace:      lyingNamespace,
+		ConnectionNamespace: conn.Namespace,
+		ActorId:             alice.Id,
+		ConnectorId:         conn.ConnectorId,
+		ConnectorVersion:    conn.ConnectorVersion,
+		ConnectionId:        conn.Id,
+		ReturnToUrl:         "https://example.com/return",
+		ExpiresAt:           time.Now().Add(5 * time.Minute),
 	}, 5*time.Minute)
 
 	// Deliver the callback as alice in tenant-a. The actor-id check passes
-	// (alice signed her own JWT), but s.Namespace ("tenant-b") doesn't
+	// (alice signed her own JWT), but s.ActorNamespace ("tenant-b") doesn't
 	// match the caller's namespace ("tenant-a") — fires
 	// `namespace_mismatch_actor` before the connection lookup runs.
 	loc := env.DeliverOAuth2Callback(t,
@@ -127,11 +128,11 @@ func TestCallbackRejection_NamespaceMismatchActor(t *testing.T) {
 
 // TestCallbackRejection_NamespaceMismatchConnection exercises the
 // `namespace_mismatch_connection` defense-in-depth check at
-// internal/auth_methods/oauth2/state.go:232-242. The check fires when
-// state.Namespace and the *connection's* namespace disagree — even
-// after the caller-vs-state namespace check passes. A natural _initiate
-// always produces matching namespaces, so this also requires synthetic
-// state injection.
+// internal/auth_methods/oauth2/state.go. The check fires when
+// state.ConnectionNamespace and the *connection's* namespace disagree —
+// even after the caller-vs-state actor namespace check passes. A natural
+// _initiate always captures both actual namespaces, so this also requires
+// synthetic state injection.
 //
 // Scenario: bob owns a connection in tenant-b. An attacker forges a state
 // envelope that points the connectionId at bob's connection but claims
@@ -193,20 +194,21 @@ func TestCallbackRejection_NamespaceMismatchConnection(t *testing.T) {
 	alice, err := env.Db.GetActorByExternalId(ctx, tenantA, aliceExternalID)
 	require.NoError(t, err)
 
-	// Synthetic state: ActorId+Namespace agree with alice's caller
+	// Synthetic state: ActorId+ActorNamespace agree with alice's caller
 	// identity, but ConnectionId points at bob's connection in tenant-b.
-	// The first two checks pass; the third (state.Namespace vs
+	// The first two checks pass; the third (state.ConnectionNamespace vs
 	// connection.Namespace) rejects.
 	forgedStateID := apid.New(apid.PrefixOauth2State)
 	env.WriteOAuth2StateForTest(t, helpers.OAuth2StateForTest{
-		Id:               forgedStateID,
-		Namespace:        tenantA,
-		ActorId:          alice.Id,
-		ConnectorId:      bobConn.ConnectorId,
-		ConnectorVersion: bobConn.ConnectorVersion,
-		ConnectionId:     bobConn.Id,
-		ReturnToUrl:      "https://example.com/return",
-		ExpiresAt:        time.Now().Add(5 * time.Minute),
+		Id:                  forgedStateID,
+		ActorNamespace:      tenantA,
+		ConnectionNamespace: tenantA,
+		ActorId:             alice.Id,
+		ConnectorId:         bobConn.ConnectorId,
+		ConnectorVersion:    bobConn.ConnectorVersion,
+		ConnectionId:        bobConn.Id,
+		ReturnToUrl:         "https://example.com/return",
+		ExpiresAt:           time.Now().Add(5 * time.Minute),
 	}, 5*time.Minute)
 
 	loc := env.DeliverOAuth2Callback(t,

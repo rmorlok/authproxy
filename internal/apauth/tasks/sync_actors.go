@@ -29,7 +29,7 @@ func (s *service) SyncActorList(ctx context.Context) error {
 	return s.syncConfiguredActors(ctx, actors.All(), LabelValueConfigList)
 }
 
-// SyncConfiguredActorsExternalSource synchronizes actors from ConfiguredActorsExternalSource configuration to the database.
+// SyncConfiguredActorsExternalSource synchronizes actors from external source configuration to the database.
 // This function uses a distributed lock to prevent concurrent syncs across multiple workers.
 func (s *service) SyncConfiguredActorsExternalSource(ctx context.Context) error {
 	actors := s.cfg.GetRoot().SystemAuth.Actors
@@ -38,8 +38,8 @@ func (s *service) SyncConfiguredActorsExternalSource(ctx context.Context) error 
 		return nil
 	}
 
-	// Check if this is a ConfiguredActorsExternalSource
-	if _, ok := actors.InnerVal.(*sconfig.ConfiguredActorsExternalSource); !ok {
+	// Check if this is a namespaced external source configuration.
+	if _, ok := actors.InnerVal.(*sconfig.ConfiguredActorsExternalSources); !ok {
 		s.logger.Debug("actors is not an external source type, skipping external source sync")
 		return nil
 	}
@@ -72,13 +72,20 @@ func (s *service) SyncConfiguredActorsExternalSource(ctx context.Context) error 
 
 // syncConfiguredActors performs the actual sync of configured actors to the database.
 func (s *service) syncConfiguredActors(ctx context.Context, actors []*sconfig.ConfiguredActor, sourceLabel string) error {
-	// Build a set of expected external IDs
-	expectedExternalIds := make(map[string]bool)
+	type actorIdentity struct {
+		namespace  string
+		externalId string
+	}
+
+	// Actor external IDs are unique only within a namespace. Track both so
+	// moving a configured actor removes the stale copy from its old namespace.
+	expectedActors := make(map[actorIdentity]struct{}, len(actors))
 
 	// Upsert each configured actor
 	for _, actor := range actors {
 		externalId := actor.ExternalId
-		expectedExternalIds[externalId] = true
+		namespace := actor.GetNamespace()
+		expectedActors[actorIdentity{namespace: namespace, externalId: externalId}] = struct{}{}
 
 		// Serialize and encrypt the key
 		var encryptedKey *encfield.EncryptedField
@@ -105,7 +112,7 @@ func (s *service) syncConfiguredActors(ctx context.Context, actors []*sconfig.Co
 
 		// Create actor data with labels and encrypted key
 		actorData := &configuredActorData{
-			namespace:    "root",
+			namespace:    namespace,
 			externalId:   externalId,
 			labels:       labels,
 			permissions:  actor.Permissions,
@@ -127,7 +134,9 @@ func (s *service) syncConfiguredActors(ctx context.Context, actors []*sconfig.Co
 		Enumerate(ctx, func(result pagination.PageResult[*database.Actor]) (keepGoing pagination.KeepGoing, err error) {
 			for _, dbActor := range result.Results {
 				// Only delete actors with matching source label that aren't in current config
-				if dbActor.Labels[LabelConfiguredActorSyncSource] == sourceLabel && !expectedExternalIds[dbActor.ExternalId] {
+				identity := actorIdentity{namespace: dbActor.Namespace, externalId: dbActor.ExternalId}
+				_, expected := expectedActors[identity]
+				if dbActor.Labels[LabelConfiguredActorSyncSource] == sourceLabel && !expected {
 					s.logger.Info("deleting stale configured actor", "external_id", dbActor.ExternalId)
 					if err := s.db.DeleteActor(ctx, dbActor.Id); err != nil {
 						return pagination.Stop, fmt.Errorf("failed to delete stale actor %s: %w", dbActor.ExternalId, err)

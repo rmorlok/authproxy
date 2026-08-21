@@ -16,6 +16,8 @@ import (
 	"github.com/rmorlok/authproxy/integration_tests/helpers"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/schema/api"
+	"github.com/rmorlok/authproxy/internal/schema/common"
+	"github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -25,6 +27,82 @@ var (
 	smokeAdminKey = flag.String("admin-key", os.Getenv("SMOKE_ADMIN_KEY"), "admin actor private key PEM, or a path to it")
 )
 
+const (
+	smokeConnectorNamespace  = "root.smoke"
+	smokeUserExternalID      = "smoke-user"
+	smokeConnectionNamespace = "root.smoke.smoke-user"
+)
+
+func newRemoteSmokeRig(t *testing.T) *helpers.RemoteAuthProxy {
+	t.Helper()
+
+	rig := helpers.NewRemoteAuthProxy(t, helpers.RemoteAuthProxyOptions{
+		BaseURL:             *smokeBaseURL,
+		AdminPrivateKey:     *smokeAdminKey,
+		AdminActorNamespace: config.RootNamespace,
+		UserActorExternalID: smokeUserExternalID,
+		UserActorNamespace:  smokeConnectorNamespace,
+		ConnectorNamespace:  smokeConnectorNamespace,
+		ConnectionNamespace: smokeConnectionNamespace,
+	})
+	rig.EnsureNamespace(t, smokeConnectorNamespace)
+	rig.EnsureNamespace(t, smokeConnectionNamespace)
+	rig.WaitForUserReady(t, 3*time.Minute)
+
+	actor := rig.GetActorByExternalID(t, smokeConnectorNamespace, smokeUserExternalID)
+	require.Equal(t, smokeConnectorNamespace, actor.Namespace)
+	require.Equal(t, smokeUserExternalID, actor.ExternalId)
+	return rig
+}
+
+func cloneSeededConnectorsIntoSmokeNamespace(
+	t *testing.T,
+	rig *helpers.RemoteAuthProxy,
+	provider *helpers.OAuth2TestProvider,
+	oauthClientID string,
+	oauthClientSecret string,
+) string {
+	t.Helper()
+
+	sources := rig.ListConnectorsAsAdmin(t, config.RootNamespace, "demo=true")
+	require.NotEmpty(t, sources, "the demo seed job did not create any root connectors")
+	suffix := time.Now().UnixNano()
+	runID := fmt.Sprintf("%d", suffix)
+	const runLabel = "smoke.authproxy.net/run-id"
+	for i, source := range sources {
+		detailed := rig.GetConnectorVersionAsAdmin(t, source.Id, source.Version)
+		definition := detailed.Definition
+		definition.Id = apid.New(apid.PrefixConnectorVersion)
+		definition.Version = 1
+		definition.Name = common.ResourceName(fmt.Sprintf("%s-smoke-%d-%d", source.Name, suffix, i))
+		namespace := smokeConnectorNamespace
+		definition.Namespace = &namespace
+		if source.Labels["demo.authproxy.net/seed-key"] == "demo-oauth-simple" {
+			replacement := helpers.NewOAuth2Connector(definition.Id, string(definition.Name), provider, helpers.OAuth2ConnectorOptions{
+				ClientID:     oauthClientID,
+				ClientSecret: oauthClientSecret,
+				Scopes:       []string{"read", "profile"},
+			})
+			definition.Auth = replacement.Auth
+		}
+
+		labels := make(map[string]string, len(source.Labels)+1)
+		for key, value := range source.Labels {
+			if !strings.HasPrefix(key, "apxy/") {
+				labels[key] = value
+			}
+		}
+		labels["smoke"] = "true"
+		labels[runLabel] = runID
+		created := rig.CreateConnectorWithLabels(t, definition, labels)
+		rig.ForceConnectorVersionState(t, created.Id, created.Version, string(api.ConnectorVersionStatePrimary))
+		t.Cleanup(func() {
+			rig.ForceConnectorVersionState(t, created.Id, created.Version, string(api.ConnectorVersionStateArchived))
+		})
+	}
+	return runLabel + "=" + runID
+}
+
 func TestRemoteOAuth2ProxySmoke(t *testing.T) {
 	if *smokeBaseURL == "" {
 		t.Skip("set SMOKE_BASE_URL or pass -base-url")
@@ -33,10 +111,7 @@ func TestRemoteOAuth2ProxySmoke(t *testing.T) {
 		t.Skip("set SMOKE_ADMIN_KEY or pass -admin-key")
 	}
 
-	rig := helpers.NewRemoteAuthProxy(t, helpers.RemoteAuthProxyOptions{
-		BaseURL:         *smokeBaseURL,
-		AdminPrivateKey: *smokeAdminKey,
-	})
+	rig := newRemoteSmokeRig(t)
 	provider := helpers.NewOAuth2TestProviderAt(t, rig.ProviderURL)
 
 	startedAt := time.Now().Add(-1 * time.Second)
@@ -129,21 +204,30 @@ func TestRemoteSeededConnectorsSmoke(t *testing.T) {
 		t.Skip("set SMOKE_ADMIN_KEY or pass -admin-key")
 	}
 
-	rig := helpers.NewRemoteAuthProxy(t, helpers.RemoteAuthProxyOptions{
-		BaseURL:         *smokeBaseURL,
-		AdminPrivateKey: *smokeAdminKey,
-	})
+	rig := newRemoteSmokeRig(t)
 	provider := helpers.NewOAuth2TestProviderAt(t, rig.ProviderURL)
+	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
+	oauthClientID := "seeded-smoke-client-" + suffix
+	oauthClientSecret := "seeded-smoke-secret-" + suffix
+	client := provider.CreateClient(helpers.CreateClientRequest{
+		Key:                     oauthClientID,
+		Secret:                  oauthClientSecret,
+		RedirectURI:             rig.PublicURL + "/oauth2/callback",
+		TokenEndpointAuthMethod: helpers.TokenEndpointAuthPost,
+		Scope:                   "read profile resources",
+	})
+	require.Equal(t, oauthClientID, client.Key)
+
+	runSelector := cloneSeededConnectorsIntoSmokeNamespace(t, rig, provider, oauthClientID, oauthClientSecret)
+	items := rig.ListConnectors(t, runSelector)
+	bySeedKey := map[string]api.ConnectorJson{}
+	for _, item := range items {
+		if key := item.Labels["demo.authproxy.net/seed-key"]; key != "" {
+			bySeedKey[key] = item
+		}
+	}
 
 	t.Run("catalog contains expected seeded connectors", func(t *testing.T) {
-		items := rig.ListConnectors(t, "demo=true")
-		bySeedKey := map[string]api.ConnectorJson{}
-		for _, item := range items {
-			if key := item.Labels["demo.authproxy.net/seed-key"]; key != "" {
-				bySeedKey[key] = item
-			}
-		}
-
 		expected := map[string]string{
 			"demo-readme-noauth":   "Demo README Resource",
 			"demo-api-key-bearer":  "Demo API Key: Bearer Token",
@@ -161,17 +245,18 @@ func TestRemoteSeededConnectorsSmoke(t *testing.T) {
 
 	t.Run("seeded basic OAuth connector completes and proxies", func(t *testing.T) {
 		startedAt := time.Now().Add(-1 * time.Second)
-		connector := rig.FindConnectorBySeedKey(t, "demo-oauth-simple")
+		connector, ok := bySeedKey["demo-oauth-simple"]
+		require.True(t, ok, "isolated seeded OAuth connector was not created")
 		connectionID, redirectURL := rig.InitiateOAuth2Connection(t, connector.Id, rig.PublicURL+"/connections")
 
 		authorizeURL := rig.FollowOAuth2Redirect(t, redirectURL)
 		authorizeParams := parseQuery(t, authorizeURL)
-		require.Equal(t, "demo-oauth-simple", authorizeParams.Get("client_id"))
+		require.Equal(t, oauthClientID, authorizeParams.Get("client_id"))
 		require.Equal(t, rig.PublicURL+"/oauth2/callback", authorizeParams.Get("redirect_uri"))
 		require.NotEmpty(t, authorizeParams.Get("state"))
 
 		callback := provider.Authorize(helpers.AuthorizeRequest{
-			ClientID:    "demo-oauth-simple",
+			ClientID:    oauthClientID,
 			Username:    "demo-oauth-user@example.test",
 			RedirectURI: authorizeParams.Get("redirect_uri"),
 			Scope:       authorizeParams.Get("scope"),
@@ -183,20 +268,22 @@ func TestRemoteSeededConnectorsSmoke(t *testing.T) {
 		finalLocation := rig.DeliverOAuth2Callback(t, callback.RedirectURL)
 		assert.Truef(t, strings.HasPrefix(finalLocation, rig.PublicURL+"/connections"),
 			"expected callback to land on marketplace connections page, got %q", finalLocation)
+		rig.WaitForSetupComplete(t, connectionID, 30*time.Second)
 
 		proxyResp := rig.DoProxyRequest(t, connectionID, provider.ResourceURL("/echo"), http.MethodGet)
 		require.Equal(t, http.StatusOK, proxyResp.StatusCode)
 
 		tokenReqs := provider.Requests(helpers.RequestsFilter{
 			Endpoint: helpers.EndpointToken,
-			ClientID: "demo-oauth-simple",
+			ClientID: oauthClientID,
 			Since:    startedAt,
 		})
 		require.NotEmpty(t, tokenReqs, "provider should record seeded OAuth token exchange")
 	})
 
 	t.Run("seeded API key connector completes and proxies", func(t *testing.T) {
-		connector := rig.FindConnectorBySeedKey(t, "demo-api-key-bearer")
+		connector, ok := bySeedKey["demo-api-key-bearer"]
+		require.True(t, ok, "isolated seeded API-key connector was not created")
 		connectionID, stepID := rig.InitiateAPIKeyConnection(t, connector.Id)
 		respType := rig.SubmitAPIKeyCredentials(t, connectionID, stepID, "demo-api-key")
 		switch respType {

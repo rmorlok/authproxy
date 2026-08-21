@@ -3,6 +3,8 @@ package tasks
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -17,6 +19,16 @@ import (
 	"github.com/stretchr/testify/require"
 	clock "k8s.io/utils/clock/testing"
 )
+
+func externalActorsInRoot(keysPath string) *sconfig.ConfiguredActors {
+	return &sconfig.ConfiguredActors{
+		InnerVal: &sconfig.ConfiguredActorsExternalSources{
+			Sources: map[string]*sconfig.ConfiguredActorsExternalSource{
+				sconfig.RootNamespace: {KeysPath: keysPath},
+			},
+		},
+	}
+}
 
 func TestSyncActorsList(t *testing.T) {
 	var db database.DB
@@ -85,6 +97,60 @@ func TestSyncActorsList(t *testing.T) {
 		bob, err := db.GetActorByExternalId(ctx, "root", "bob")
 		require.NoError(t, err)
 		require.NotNil(t, bob.EncryptedKey)
+	})
+
+	t.Run("syncs actor into configured namespace", func(t *testing.T) {
+		actors := &sconfig.ConfiguredActors{
+			InnerVal: sconfig.ConfiguredActorsList{
+				{
+					ExternalId: "smoke-user",
+					Namespace:  "root.smoke",
+					Key: &sconfig.Key{
+						InnerVal: &sconfig.KeyShared{
+							SharedKey: &sconfig.KeyData{
+								InnerVal: &sconfig.KeyDataBase64Val{Base64: "dGVzdA=="},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		cfg := setup(t, actors)
+		require.NoError(t, db.EnsureNamespaceByPath(ctx, "root.smoke"))
+		svc := NewService(cfg, db, redis, enc, cfg.GetRootLogger())
+
+		require.NoError(t, svc.SyncActorList(ctx))
+		_, err := db.GetActorByExternalId(ctx, "root.smoke", "smoke-user")
+		require.NoError(t, err)
+		_, err = db.GetActorByExternalId(ctx, "root", "smoke-user")
+		require.ErrorIs(t, err, database.ErrNotFound)
+	})
+
+	t.Run("removes stale actor after namespace changes", func(t *testing.T) {
+		key := &sconfig.Key{InnerVal: &sconfig.KeyShared{SharedKey: &sconfig.KeyData{InnerVal: &sconfig.KeyDataBase64Val{Base64: "dGVzdA=="}}}}
+		actors := &sconfig.ConfiguredActors{
+			InnerVal: sconfig.ConfiguredActorsList{{ExternalId: "smoke-user", Key: key}},
+		}
+
+		cfg := setup(t, actors)
+		svc := NewService(cfg, db, redis, enc, cfg.GetRootLogger())
+		require.NoError(t, svc.SyncActorList(ctx))
+
+		require.NoError(t, db.EnsureNamespaceByPath(ctx, "root.smoke"))
+		cfg.GetRoot().SystemAuth.Actors = &sconfig.ConfiguredActors{
+			InnerVal: sconfig.ConfiguredActorsList{{
+				ExternalId: "smoke-user",
+				Namespace:  "root.smoke",
+				Key:        key,
+			}},
+		}
+		require.NoError(t, svc.SyncActorList(ctx))
+
+		_, err := db.GetActorByExternalId(ctx, "root", "smoke-user")
+		require.ErrorIs(t, err, database.ErrNotFound)
+		_, err = db.GetActorByExternalId(ctx, "root.smoke", "smoke-user")
+		require.NoError(t, err)
 	})
 
 	t.Run("deletes stale actors", func(t *testing.T) {
@@ -164,11 +230,7 @@ func TestSyncActorsList(t *testing.T) {
 	})
 
 	t.Run("skips sync for non-list actors", func(t *testing.T) {
-		actors := &sconfig.ConfiguredActors{
-			InnerVal: &sconfig.ConfiguredActorsExternalSource{
-				KeysPath: "/tmp/keys",
-			},
-		}
+		actors := externalActorsInRoot("/tmp/keys")
 
 		cfg := setup(t, actors)
 		svc := NewService(cfg, db, redis, enc, cfg.GetRootLogger())
@@ -208,41 +270,49 @@ func TestSyncConfiguredActorsExternalSource(t *testing.T) {
 	}
 
 	t.Run("syncs actors from external source", func(t *testing.T) {
+		smokeKeysPath := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(smokeKeysPath, "smoke-user.pub"), []byte("test-public-key"), 0o600))
 		actors := &sconfig.ConfiguredActors{
-			InnerVal: &sconfig.ConfiguredActorsExternalSource{
-				KeysPath: tu.TestDataPath("admin_user_keys"),
-				Permissions: []aschema.Permission{
-					{Namespace: "root", Resources: []string{"connections"}, Verbs: []string{"list", "get"}},
+			InnerVal: &sconfig.ConfiguredActorsExternalSources{
+				Sources: map[string]*sconfig.ConfiguredActorsExternalSource{
+					"root": {
+						KeysPath: tu.TestDataPath("admin_user_keys"),
+					},
+					"root.smoke": {
+						KeysPath: smokeKeysPath,
+						Permissions: []aschema.Permission{
+							{Namespace: "root.smoke.{{external_id}}", Resources: []string{"connections"}, Verbs: []string{"create"}},
+						},
+					},
 				},
 			},
 		}
 
 		cfg := setup(t, actors)
+		require.NoError(t, db.EnsureNamespaceByPath(ctx, "root.smoke"))
 		svc := NewService(cfg, db, redis, enc, cfg.GetRootLogger())
 
 		err := svc.SyncConfiguredActorsExternalSource(ctx)
 		require.NoError(t, err)
 
-		// Verify bobdole was created (one of the .pub files in test data)
+		// Verify a root actor was created from the root source.
 		bobdole, err := db.GetActorByExternalId(ctx, "root", "bobdole")
 		require.NoError(t, err)
 		require.NotNil(t, bobdole.EncryptedKey)
 		require.Equal(t, LabelValuePublicKeyDir, bobdole.Labels[LabelConfiguredActorSyncSource])
 
-		// Verify billclinton was created
-		billclinton, err := db.GetActorByExternalId(ctx, "root", "billclinton")
+		// Verify the smoke actor was created in its source's namespace with the
+		// source-specific, templated permissions.
+		smokeUser, err := db.GetActorByExternalId(ctx, "root.smoke", "smoke-user")
 		require.NoError(t, err)
-		require.NotNil(t, billclinton.EncryptedKey)
-		require.Equal(t, LabelValuePublicKeyDir, billclinton.Labels[LabelConfiguredActorSyncSource])
+		require.NotNil(t, smokeUser.EncryptedKey)
+		require.Equal(t, LabelValuePublicKeyDir, smokeUser.Labels[LabelConfiguredActorSyncSource])
+		require.Equal(t, "root.smoke.{{external_id}}", smokeUser.Permissions[0].Namespace)
 	})
 
 	t.Run("deletes stale actors from external source", func(t *testing.T) {
 		// First sync with external source to create actors
-		actors := &sconfig.ConfiguredActors{
-			InnerVal: &sconfig.ConfiguredActorsExternalSource{
-				KeysPath: tu.TestDataPath("admin_user_keys"),
-			},
-		}
+		actors := externalActorsInRoot(tu.TestDataPath("admin_user_keys"))
 
 		cfg := setup(t, actors)
 		svc := NewService(cfg, db, redis, enc, cfg.GetRootLogger())
@@ -279,11 +349,7 @@ func TestSyncConfiguredActorsExternalSource(t *testing.T) {
 	})
 
 	t.Run("does not delete actors from different sync source", func(t *testing.T) {
-		actors := &sconfig.ConfiguredActors{
-			InnerVal: &sconfig.ConfiguredActorsExternalSource{
-				KeysPath: tu.TestDataPath("admin_user_keys"),
-			},
-		}
+		actors := externalActorsInRoot(tu.TestDataPath("admin_user_keys"))
 
 		cfg := setup(t, actors)
 		svc := NewService(cfg, db, redis, enc, cfg.GetRootLogger())
@@ -308,11 +374,7 @@ func TestSyncConfiguredActorsExternalSource(t *testing.T) {
 	})
 
 	t.Run("encrypted key can be decrypted", func(t *testing.T) {
-		actors := &sconfig.ConfiguredActors{
-			InnerVal: &sconfig.ConfiguredActorsExternalSource{
-				KeysPath: tu.TestDataPath("admin_user_keys"),
-			},
-		}
+		actors := externalActorsInRoot(tu.TestDataPath("admin_user_keys"))
 
 		cfg := setup(t, actors)
 		svc := NewService(cfg, db, redis, enc, cfg.GetRootLogger())
@@ -376,11 +438,7 @@ func TestSyncConfiguredActorsExternalSource(t *testing.T) {
 	})
 
 	t.Run("skips sync when lock already held", func(t *testing.T) {
-		actors := &sconfig.ConfiguredActors{
-			InnerVal: &sconfig.ConfiguredActorsExternalSource{
-				KeysPath: tu.TestDataPath("admin_user_keys"),
-			},
-		}
+		actors := externalActorsInRoot(tu.TestDataPath("admin_user_keys"))
 
 		cfg := setup(t, actors)
 
@@ -405,11 +463,7 @@ func TestSyncConfiguredActorsExternalSource(t *testing.T) {
 	})
 
 	t.Run("works without redis", func(t *testing.T) {
-		actors := &sconfig.ConfiguredActors{
-			InnerVal: &sconfig.ConfiguredActorsExternalSource{
-				KeysPath: tu.TestDataPath("admin_user_keys"),
-			},
-		}
+		actors := externalActorsInRoot(tu.TestDataPath("admin_user_keys"))
 
 		cfg := setup(t, actors)
 

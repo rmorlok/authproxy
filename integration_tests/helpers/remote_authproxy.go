@@ -28,8 +28,11 @@ type RemoteAuthProxyOptions struct {
 	ProviderURL string
 
 	AdminActorExternalID string
+	AdminActorNamespace  string
 	UserActorExternalID  string
-	Namespace            string
+	UserActorNamespace   string
+	ConnectorNamespace   string
+	ConnectionNamespace  string
 
 	AdminPrivateKey string
 }
@@ -40,8 +43,11 @@ type RemoteAuthProxy struct {
 	ProviderURL string
 
 	AdminActorExternalID string
+	AdminActorNamespace  string
 	UserActorExternalID  string
-	Namespace            string
+	UserActorNamespace   string
+	ConnectorNamespace   string
+	ConnectionNamespace  string
 
 	privateKey string
 	client     *http.Client
@@ -76,13 +82,25 @@ func NewRemoteAuthProxy(t *testing.T, opts RemoteAuthProxyOptions) *RemoteAuthPr
 	if adminActor == "" {
 		adminActor = "demo-shell"
 	}
+	adminActorNamespace := opts.AdminActorNamespace
+	if adminActorNamespace == "" {
+		adminActorNamespace = sconfig.RootNamespace
+	}
 	userActor := opts.UserActorExternalID
 	if userActor == "" {
 		userActor = "fresh-user"
 	}
-	namespace := opts.Namespace
-	if namespace == "" {
-		namespace = sconfig.RootNamespace
+	userActorNamespace := opts.UserActorNamespace
+	if userActorNamespace == "" {
+		userActorNamespace = sconfig.RootNamespace
+	}
+	connectorNamespace := opts.ConnectorNamespace
+	if connectorNamespace == "" {
+		connectorNamespace = sconfig.RootNamespace
+	}
+	connectionNamespace := opts.ConnectionNamespace
+	if connectionNamespace == "" {
+		connectionNamespace = userActorNamespace
 	}
 
 	return &RemoteAuthProxy{
@@ -90,37 +108,102 @@ func NewRemoteAuthProxy(t *testing.T, opts RemoteAuthProxyOptions) *RemoteAuthPr
 		PublicURL:            strings.TrimRight(publicURL, "/"),
 		ProviderURL:          strings.TrimRight(providerURL, "/"),
 		AdminActorExternalID: adminActor,
+		AdminActorNamespace:  adminActorNamespace,
 		UserActorExternalID:  userActor,
-		Namespace:            namespace,
+		UserActorNamespace:   userActorNamespace,
+		ConnectorNamespace:   connectorNamespace,
+		ConnectionNamespace:  connectionNamespace,
 		privateKey:           opts.AdminPrivateKey,
 		client:               &http.Client{Timeout: 30 * time.Second},
 	}
 }
 
-func (h *RemoteAuthProxy) CreateActor(t *testing.T, externalID string, labels map[string]string) schemaapi.ActorJson {
+func (h *RemoteAuthProxy) EnsureNamespace(t *testing.T, namespace string) {
 	t.Helper()
 
+	endpoint := h.AdminURL + "/api/v1/namespaces/" + url.PathEscape(namespace)
+	resp := h.doSignedAllowing(t, h.AdminActorExternalID, h.AdminActorNamespace, http.MethodGet, endpoint, nil, true, []int{http.StatusOK, http.StatusNotFound}, nil)
+	if resp.StatusCode == http.StatusOK {
+		return
+	}
+
+	h.doSignedAllowing(t, h.AdminActorExternalID, h.AdminActorNamespace, http.MethodPost, h.AdminURL+"/api/v1/namespaces", schemaapi.CreateNamespaceRequestJson{
+		Path: namespace,
+	}, true, []int{http.StatusOK, http.StatusConflict}, nil)
+}
+
+func (h *RemoteAuthProxy) GetActorByExternalID(t *testing.T, namespace, externalID string) schemaapi.ActorJson {
+	t.Helper()
+
+	endpoint := h.AdminURL + "/api/v1/actors/external-id/" + url.PathEscape(externalID) + "?namespace=" + url.QueryEscape(namespace)
 	var actor schemaapi.ActorJson
-	h.doSigned(t, h.AdminActorExternalID, http.MethodPost, h.AdminURL+"/api/v1/actors", schemaapi.CreateActorRequestJson{
-		ExternalId: externalID,
-		Namespace:  h.Namespace,
-		Labels:     labels,
-	}, true, http.StatusCreated, &actor)
+	h.doSigned(t, h.AdminActorExternalID, h.AdminActorNamespace, http.MethodGet, endpoint, nil, true, http.StatusOK, &actor)
 	return actor
+}
+
+func (h *RemoteAuthProxy) WaitForUserReady(t *testing.T, timeout time.Duration) {
+	t.Helper()
+
+	deadline := time.Now().Add(timeout)
+	var last remoteResponse
+	for time.Now().Before(deadline) {
+		last = h.doSignedAllowing(t, h.UserActorExternalID, h.UserActorNamespace, http.MethodGet, h.PublicURL+"/api/v1/connectors?limit=1", nil, true, []int{http.StatusOK, http.StatusUnauthorized}, nil)
+		if last.StatusCode == http.StatusOK {
+			return
+		}
+		time.Sleep(1 * time.Second)
+	}
+	require.FailNowf(t, "smoke user did not become ready", "actor %q in namespace %q was not ready within %s; last response: %s", h.UserActorExternalID, h.UserActorNamespace, timeout, string(last.Body))
 }
 
 func (h *RemoteAuthProxy) CreateConnector(t *testing.T, connector sconfig.Connector) schemaapi.ConnectorVersionJson {
 	t.Helper()
+	return h.CreateConnectorWithLabels(t, connector, map[string]string{"smoke": "true"})
+}
+
+func (h *RemoteAuthProxy) CreateConnectorWithLabels(t *testing.T, connector sconfig.Connector, labels map[string]string) schemaapi.ConnectorVersionJson {
+	t.Helper()
 
 	var created schemaapi.ConnectorVersionJson
-	h.doSigned(t, h.AdminActorExternalID, http.MethodPost, h.AdminURL+"/api/v1/connectors", schemaapi.CreateConnectorRequestJson{
-		Namespace:  h.Namespace,
+	h.doSigned(t, h.AdminActorExternalID, h.AdminActorNamespace, http.MethodPost, h.AdminURL+"/api/v1/connectors", schemaapi.CreateConnectorRequestJson{
+		Namespace:  h.ConnectorNamespace,
 		Definition: connector,
-		Labels: map[string]string{
-			"smoke": "true",
-		},
+		Labels:     labels,
 	}, true, http.StatusCreated, &created)
+	require.Equal(t, h.ConnectorNamespace, created.Namespace)
 	return created
+}
+
+func (h *RemoteAuthProxy) ListConnectorsAsAdmin(t *testing.T, namespace, labelSelector string) []schemaapi.ConnectorJson {
+	t.Helper()
+
+	query := url.Values{"limit": []string{"100"}, "namespace": []string{namespace}}
+	if labelSelector != "" {
+		query.Set("labelSelector", labelSelector)
+	}
+	endpoint := h.AdminURL + "/api/v1/connectors?" + query.Encode()
+
+	var list schemaapi.ListConnectorsResponseJson
+	h.doSigned(t, h.AdminActorExternalID, h.AdminActorNamespace, http.MethodGet, endpoint, nil, true, http.StatusOK, &list)
+	return list.Items
+}
+
+func (h *RemoteAuthProxy) GetConnectorVersionAsAdmin(t *testing.T, connectorID apid.ID, version uint64) schemaapi.ConnectorVersionJson {
+	t.Helper()
+
+	var connector schemaapi.ConnectorVersionJson
+	h.doSigned(
+		t,
+		h.AdminActorExternalID,
+		h.AdminActorNamespace,
+		http.MethodGet,
+		fmt.Sprintf("%s/api/v1/connectors/%s/versions/%d", h.AdminURL, connectorID, version),
+		nil,
+		true,
+		http.StatusOK,
+		&connector,
+	)
+	return connector
 }
 
 func (h *RemoteAuthProxy) ListConnectors(t *testing.T, labelSelector string) []schemaapi.ConnectorJson {
@@ -132,7 +215,7 @@ func (h *RemoteAuthProxy) ListConnectors(t *testing.T, labelSelector string) []s
 	}
 
 	var list schemaapi.ListConnectorsResponseJson
-	h.doSigned(t, h.UserActorExternalID, http.MethodGet, endpoint, nil, true, http.StatusOK, &list)
+	h.doSigned(t, h.UserActorExternalID, h.UserActorNamespace, http.MethodGet, endpoint, nil, true, http.StatusOK, &list)
 	return list.Items
 }
 
@@ -151,6 +234,7 @@ func (h *RemoteAuthProxy) ForceConnectorVersionState(t *testing.T, connectorID a
 	h.doSigned(
 		t,
 		h.AdminActorExternalID,
+		h.AdminActorNamespace,
 		http.MethodPut,
 		fmt.Sprintf("%s/api/v1/connectors/%s/versions/%d/_forceState", h.AdminURL, connectorID, version),
 		schemaapi.ForceConnectorVersionStateRequestJson{State: state},
@@ -165,13 +249,14 @@ func (h *RemoteAuthProxy) InitiateOAuth2Connection(t *testing.T, connectorID api
 	t.Helper()
 
 	var redirect schemaapi.ConnectionSetupRedirect
-	h.doSigned(t, h.UserActorExternalID, http.MethodPost, h.PublicURL+"/api/v1/connections/_initiate", schemaapi.InitiateConnectionRequest{
+	h.doSigned(t, h.UserActorExternalID, h.UserActorNamespace, http.MethodPost, h.PublicURL+"/api/v1/connections/_initiate", schemaapi.InitiateConnectionRequest{
 		ConnectorId:   connectorID,
-		IntoNamespace: h.Namespace,
+		IntoNamespace: h.ConnectionNamespace,
 		ReturnToUrl:   returnToURL,
 	}, true, http.StatusOK, &redirect)
 	require.Equal(t, schemaapi.ConnectionSetupResponseTypeRedirect, redirect.Type)
 	require.NotEmpty(t, redirect.RedirectUrl)
+	require.Equal(t, h.ConnectionNamespace, h.GetConnection(t, redirect.Id.String()).Namespace)
 	return redirect.Id.String(), redirect.RedirectUrl
 }
 
@@ -179,13 +264,22 @@ func (h *RemoteAuthProxy) InitiateAPIKeyConnection(t *testing.T, connectorID api
 	t.Helper()
 
 	var form schemaapi.ConnectionSetupForm
-	h.doSigned(t, h.UserActorExternalID, http.MethodPost, h.PublicURL+"/api/v1/connections/_initiate", schemaapi.InitiateConnectionRequest{
+	h.doSigned(t, h.UserActorExternalID, h.UserActorNamespace, http.MethodPost, h.PublicURL+"/api/v1/connections/_initiate", schemaapi.InitiateConnectionRequest{
 		ConnectorId:   connectorID,
-		IntoNamespace: h.Namespace,
+		IntoNamespace: h.ConnectionNamespace,
 	}, true, http.StatusOK, &form)
 	require.Equal(t, schemaapi.ConnectionSetupResponseTypeForm, form.Type)
 	require.NotEmpty(t, form.StepId)
+	require.Equal(t, h.ConnectionNamespace, h.GetConnection(t, form.Id.String()).Namespace)
 	return form.Id.String(), form.StepId
+}
+
+func (h *RemoteAuthProxy) GetConnection(t *testing.T, connectionID string) schemaapi.ConnectionJson {
+	t.Helper()
+
+	var connection schemaapi.ConnectionJson
+	h.doSigned(t, h.UserActorExternalID, h.UserActorNamespace, http.MethodGet, h.PublicURL+"/api/v1/connections/"+connectionID, nil, true, http.StatusOK, &connection)
+	return connection
 }
 
 func (h *RemoteAuthProxy) SubmitAPIKeyCredentials(t *testing.T, connectionID, stepID, apiKey string) schemaapi.ConnectionSetupResponseType {
@@ -197,7 +291,7 @@ func (h *RemoteAuthProxy) SubmitAPIKeyCredentials(t *testing.T, connectionID, st
 	var generic struct {
 		Type schemaapi.ConnectionSetupResponseType `json:"type"`
 	}
-	h.doSigned(t, h.UserActorExternalID, http.MethodPost, h.PublicURL+"/api/v1/connections/"+connectionID+"/_submit", schemaapi.SubmitConnectionRequest{
+	h.doSigned(t, h.UserActorExternalID, h.UserActorNamespace, http.MethodPost, h.PublicURL+"/api/v1/connections/"+connectionID+"/_submit", schemaapi.SubmitConnectionRequest{
 		StepId: stepID,
 		Data:   rawData,
 	}, true, http.StatusOK, &generic)
@@ -216,7 +310,7 @@ func (h *RemoteAuthProxy) WaitForSetupComplete(t *testing.T, connectionID string
 			Type  schemaapi.ConnectionSetupResponseType `json:"type"`
 			Error string                                `json:"error,omitempty"`
 		}
-		h.doSigned(t, h.UserActorExternalID, http.MethodGet, h.PublicURL+"/api/v1/connections/"+connectionID+"/_setupStep", nil, true, http.StatusOK, &generic)
+		h.doSigned(t, h.UserActorExternalID, h.UserActorNamespace, http.MethodGet, h.PublicURL+"/api/v1/connections/"+connectionID+"/_setupStep", nil, true, http.StatusOK, &generic)
 		lastType = generic.Type
 		lastError = generic.Error
 
@@ -235,7 +329,7 @@ func (h *RemoteAuthProxy) WaitForSetupComplete(t *testing.T, connectionID string
 func (h *RemoteAuthProxy) FollowOAuth2Redirect(t *testing.T, redirectURL string) string {
 	t.Helper()
 
-	resp := h.doSigned(t, h.UserActorExternalID, http.MethodGet, redirectURL, nil, false, http.StatusFound, nil)
+	resp := h.doSigned(t, h.UserActorExternalID, h.UserActorNamespace, http.MethodGet, redirectURL, nil, false, http.StatusFound, nil)
 	loc := resp.Header.Get("Location")
 	require.NotEmpty(t, loc, "OAuth2 redirect response should include Location")
 	return loc
@@ -244,7 +338,7 @@ func (h *RemoteAuthProxy) FollowOAuth2Redirect(t *testing.T, redirectURL string)
 func (h *RemoteAuthProxy) DeliverOAuth2Callback(t *testing.T, callbackURL string) string {
 	t.Helper()
 
-	resp := h.doSigned(t, h.UserActorExternalID, http.MethodGet, callbackURL, nil, false, http.StatusFound, nil)
+	resp := h.doSigned(t, h.UserActorExternalID, h.UserActorNamespace, http.MethodGet, callbackURL, nil, false, http.StatusFound, nil)
 	loc := resp.Header.Get("Location")
 	require.NotEmpty(t, loc, "OAuth2 callback response should include Location")
 	return loc
@@ -254,14 +348,19 @@ func (h *RemoteAuthProxy) DoProxyRequest(t *testing.T, connectionID, targetURL, 
 	t.Helper()
 
 	var proxyResp schemaapi.ProxyResponseJson
-	h.doSigned(t, h.UserActorExternalID, http.MethodPost, h.PublicURL+"/api/v1/connections/"+connectionID+"/_proxy", schemaapi.ProxyRequestJson{
+	h.doSigned(t, h.UserActorExternalID, h.UserActorNamespace, http.MethodPost, h.PublicURL+"/api/v1/connections/"+connectionID+"/_proxy", schemaapi.ProxyRequestJson{
 		URL:    targetURL,
 		Method: method,
 	}, true, http.StatusOK, &proxyResp)
 	return proxyResp
 }
 
-func (h *RemoteAuthProxy) doSigned(t *testing.T, actorExternalID, method, rawURL string, body any, followRedirects bool, wantStatus int, out any) remoteResponse {
+func (h *RemoteAuthProxy) doSigned(t *testing.T, actorExternalID, actorNamespace, method, rawURL string, body any, followRedirects bool, wantStatus int, out any) remoteResponse {
+	t.Helper()
+	return h.doSignedAllowing(t, actorExternalID, actorNamespace, method, rawURL, body, followRedirects, []int{wantStatus}, out)
+}
+
+func (h *RemoteAuthProxy) doSignedAllowing(t *testing.T, actorExternalID, actorNamespace, method, rawURL string, body any, followRedirects bool, wantStatuses []int, out any) remoteResponse {
 	t.Helper()
 
 	var bodyReader io.Reader
@@ -278,7 +377,7 @@ func (h *RemoteAuthProxy) doSigned(t *testing.T, actorExternalID, method, rawURL
 		req.Header.Set("Content-Type", "application/json")
 	}
 
-	signer, err := h.signer(actorExternalID)
+	signer, err := h.signer(actorExternalID, actorNamespace)
 	require.NoError(t, err, "build JWT signer for %s", actorExternalID)
 	signer.SignAuthHeader(req)
 
@@ -298,7 +397,7 @@ func (h *RemoteAuthProxy) doSigned(t *testing.T, actorExternalID, method, rawURL
 
 	respBody, err := io.ReadAll(resp.Body)
 	require.NoError(t, err, "read response body")
-	require.Equalf(t, wantStatus, resp.StatusCode, "%s %s returned %d: %s", method, rawURL, resp.StatusCode, string(respBody))
+	require.Containsf(t, wantStatuses, resp.StatusCode, "%s %s returned %d: %s", method, rawURL, resp.StatusCode, string(respBody))
 
 	if out != nil {
 		require.NoError(t, json.Unmarshal(respBody, out), "decode response from %s %s: %s", method, rawURL, string(respBody))
@@ -311,13 +410,13 @@ func (h *RemoteAuthProxy) doSigned(t *testing.T, actorExternalID, method, rawURL
 	}
 }
 
-func (h *RemoteAuthProxy) signer(actorExternalID string) (jwt.Signer, error) {
+func (h *RemoteAuthProxy) signer(actorExternalID, actorNamespace string) (jwt.Signer, error) {
 	builder := jwt.NewJwtTokenBuilder().
 		WithActorExternalId(actorExternalID).
-		WithNamespace(h.Namespace).
+		WithNamespace(actorNamespace).
 		WithActorSigned().
 		WithServiceIds(sconfig.AllServiceIds()).
-		WithPermissions(AllPermissionsForNamespace(h.Namespace)).
+		WithPermissions(AllPermissionsForNamespace(actorNamespace)).
 		WithExpiresIn(15 * time.Minute)
 
 	if looksLikePath(h.privateKey) {

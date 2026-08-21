@@ -305,7 +305,7 @@ actors:
   existingSecret: ""
   mountPath: /etc/authproxy/keys/actors
   # -- ACL permissions granted to every actor in the Secret. Mirrors
-  # AuthProxy's `systemAuth.actors.permissions` block.
+  # AuthProxy's `systemAuth.actors.root.permissions` block.
   permissions:
     - namespace: "root.**"
       resources: ["*"]

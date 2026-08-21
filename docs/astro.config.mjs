@@ -96,6 +96,7 @@ export default defineConfig({
           items: [
             'security',
             'security/authentication-and-authorization',
+            'security/permission-resources-and-verbs',
             'security/encryption',
           ],
         },

@@ -408,7 +408,8 @@ func (dm *DependencyManager) reconcileConfiguredActors(ctx context.Context) erro
 	if actors == nil {
 		return nil
 	}
-	if _, ok := actors.InnerVal.(*sconfig.ConfiguredActorsExternalSource); ok {
+	switch actors.InnerVal.(type) {
+	case *sconfig.ConfiguredActorsExternalSources:
 		if _, err := dm.GetAsyncClient().Enqueue(tasks.NewSyncActorsExternalSourceTask()); err != nil {
 			return fmt.Errorf("enqueue configured actor synchronization: %w", err)
 		}
