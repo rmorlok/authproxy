@@ -3,6 +3,8 @@
 package smoke
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"net/http"
@@ -16,6 +18,7 @@ import (
 	"github.com/rmorlok/authproxy/integration_tests/helpers"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/schema/api"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/stretchr/testify/assert"
@@ -23,35 +26,63 @@ import (
 )
 
 var (
-	smokeBaseURL  = flag.String("base-url", os.Getenv("SMOKE_BASE_URL"), "base AuthProxy demo URL, e.g. https://demo.authproxy.net")
-	smokeAdminKey = flag.String("admin-key", os.Getenv("SMOKE_ADMIN_KEY"), "admin actor private key PEM, or a path to it")
+	smokeBaseURL   = flag.String("base-url", os.Getenv("SMOKE_BASE_URL"), "base AuthProxy demo URL, e.g. https://demo.authproxy.net")
+	smokeGlobalKey = flag.String("global-key", os.Getenv("SMOKE_GLOBAL_KEY"), "AuthProxy global key, or a path to it")
 )
 
-const (
-	smokeConnectorNamespace  = "root.smoke"
-	smokeUserExternalID      = "smoke-user"
-	smokeConnectionNamespace = "root.smoke.smoke-user"
-)
+const smokeConnectorNamespace = "root.smoke"
+
+func newSmokeUserExternalID(t *testing.T) string {
+	t.Helper()
+
+	var entropy [4]byte
+	_, err := rand.Read(entropy[:])
+	require.NoError(t, err)
+	return fmt.Sprintf("smoke-user-%s-%s", time.Now().UTC().Format("20060102T150405Z"), hex.EncodeToString(entropy[:]))
+}
+
+func smokeUserPermissions(connectionNamespace string) []aschema.Permission {
+	return []aschema.Permission{
+		{
+			Namespace: smokeConnectorNamespace,
+			Resources: []string{"connectors"},
+			Verbs:     []string{"list"},
+		},
+		{
+			Namespace: connectionNamespace,
+			Resources: []string{"connections"},
+			Verbs:     []string{"create", "get", "proxy"},
+		},
+	}
+}
 
 func newRemoteSmokeRig(t *testing.T) *helpers.RemoteAuthProxy {
 	t.Helper()
 
+	userExternalID := newSmokeUserExternalID(t)
+	connectionNamespace := smokeConnectorNamespace + "." + userExternalID
+	permissions := smokeUserPermissions(connectionNamespace)
 	rig := helpers.NewRemoteAuthProxy(t, helpers.RemoteAuthProxyOptions{
-		BaseURL:             *smokeBaseURL,
-		AdminPrivateKey:     *smokeAdminKey,
-		AdminActorNamespace: config.RootNamespace,
-		UserActorExternalID: smokeUserExternalID,
-		UserActorNamespace:  smokeConnectorNamespace,
-		ConnectorNamespace:  smokeConnectorNamespace,
-		ConnectionNamespace: smokeConnectionNamespace,
+		BaseURL:              *smokeBaseURL,
+		GlobalKey:            *smokeGlobalKey,
+		AdminActorNamespace:  config.RootNamespace,
+		UserActorExternalID:  userExternalID,
+		UserActorNamespace:   smokeConnectorNamespace,
+		UserActorPermissions: permissions,
+		ConnectorNamespace:   smokeConnectorNamespace,
+		ConnectionNamespace:  connectionNamespace,
 	})
 	rig.EnsureNamespace(t, smokeConnectorNamespace)
-	rig.EnsureNamespace(t, smokeConnectionNamespace)
-	rig.WaitForUserReady(t, 3*time.Minute)
+	rig.EnsureNamespace(t, connectionNamespace)
+	rig.ProvisionUserFromJWT(t)
 
-	actor := rig.GetActorByExternalID(t, smokeConnectorNamespace, smokeUserExternalID)
+	actor := rig.GetActorByExternalID(t, smokeConnectorNamespace, userExternalID)
 	require.Equal(t, smokeConnectorNamespace, actor.Namespace)
-	require.Equal(t, smokeUserExternalID, actor.ExternalId)
+	require.Equal(t, userExternalID, actor.ExternalId)
+	require.Equal(t, permissions, actor.Permissions)
+	t.Cleanup(func() {
+		rig.DeleteActorByExternalIDAsAdmin(t, smokeConnectorNamespace, userExternalID)
+	})
 	return rig
 }
 
@@ -107,8 +138,8 @@ func TestRemoteOAuth2ProxySmoke(t *testing.T) {
 	if *smokeBaseURL == "" {
 		t.Skip("set SMOKE_BASE_URL or pass -base-url")
 	}
-	if *smokeAdminKey == "" {
-		t.Skip("set SMOKE_ADMIN_KEY or pass -admin-key")
+	if *smokeGlobalKey == "" {
+		t.Skip("set SMOKE_GLOBAL_KEY or pass -global-key")
 	}
 
 	rig := newRemoteSmokeRig(t)
@@ -200,8 +231,8 @@ func TestRemoteSeededConnectorsSmoke(t *testing.T) {
 	if *smokeBaseURL == "" {
 		t.Skip("set SMOKE_BASE_URL or pass -base-url")
 	}
-	if *smokeAdminKey == "" {
-		t.Skip("set SMOKE_ADMIN_KEY or pass -admin-key")
+	if *smokeGlobalKey == "" {
+		t.Skip("set SMOKE_GLOBAL_KEY or pass -global-key")
 	}
 
 	rig := newRemoteSmokeRig(t)

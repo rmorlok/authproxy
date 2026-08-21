@@ -171,12 +171,6 @@ jobs:
             fi
           done
 
-          smoke_user_public="$(kubectl -n "${RELEASE_NS}" get secret "${RELEASE_NAME}-actors" \
-            -o jsonpath='{.data.demo-shell\.pub}')"
-          if [ -z "${smoke_user_public}" ]; then
-            echo "Configured demo-shell actor public key is empty" >&2
-            exit 1
-          fi
           stale_smoke_public="$(kubectl -n "${RELEASE_NS}" get secret "${RELEASE_NAME}-actors" \
             -o jsonpath='{.data.smoke-user\.pub}')"
           if [ -n "${stale_smoke_public}" ]; then
@@ -184,13 +178,8 @@ jobs:
               --type json \
               --patch='[{"op":"remove","path":"/data/smoke-user.pub"}]'
           fi
-          smoke_user_key="${RUNNER_TEMP}/smoke-user.pub"
-          printf '%s' "${smoke_user_public}" | base64 -d > "${smoke_user_key}"
-          kubectl -n "${RELEASE_NS}" create secret generic "${RELEASE_NAME}-smoke-actors" \
-            --from-file=smoke-user.pub="${smoke_user_key}" \
-            --dry-run=client -o yaml \
-            | kubectl apply -f -
-          secrets+=("${RELEASE_NAME}-smoke-actors")
+          kubectl -n "${RELEASE_NS}" delete secret "${RELEASE_NAME}-smoke-actors" \
+            --ignore-not-found
 
           kubectl -n "${RELEASE_NS}" get secret "${secrets[@]}" -o json \
             | jq 'del(
@@ -487,14 +476,14 @@ jobs:
           workdir="$(mktemp -d)"
           trap 'rm -rf "${workdir}"' EXIT
 
-          kubectl -n "${RELEASE_NS}" get secret "${RELEASE_NAME}-demo-shell-key" \
-            -o jsonpath='{.data.private}' \
-            | base64 -d > "${workdir}/demo-shell.private"
-          chmod 600 "${workdir}/demo-shell.private"
+          kubectl -n "${RELEASE_NS}" get secret "${RELEASE_NAME}-encryption" \
+            -o jsonpath='{.data.global_aes\.key}' \
+            | base64 -d > "${workdir}/global_aes.key"
+          chmod 600 "${workdir}/global_aes.key"
 
           echo "Smoke-testing ${SMOKE_BASE_URL}"
           cd integration_tests
-          SMOKE_ADMIN_KEY="${workdir}/demo-shell.private" \
+          SMOKE_GLOBAL_KEY="${workdir}/global_aes.key" \
             go test -tags smoke ./smoke -run TestRemoteOAuth2ProxySmoke -count=1 -v
 
       - name: Collect deploy diagnostics (on failure)

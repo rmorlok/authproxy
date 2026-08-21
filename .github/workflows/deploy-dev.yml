@@ -249,10 +249,8 @@ jobs:
               --patch='[{"op":"remove","path":"/data/smoke-user.pub"}]'
           fi
 
-          kubectl -n "${RELEASE_NS}" create secret generic "${RELEASE_NAME}-smoke-actors" \
-            --from-file=smoke-user.pub="${workdir}/demo-shell.pub" \
-            --dry-run=client -o yaml \
-            | kubectl apply -f -
+          kubectl -n "${RELEASE_NS}" delete secret "${RELEASE_NAME}-smoke-actors" \
+            --ignore-not-found
 
       - name: Clear stale seed job
         env:
@@ -405,17 +403,17 @@ jobs:
           workdir="$(mktemp -d)"
           trap 'rm -rf "${workdir}"' EXIT
 
-          kubectl -n "${RELEASE_NS}" get secret "${RELEASE_NAME}-demo-shell-key" \
-            -o jsonpath='{.data.private}' \
-            | base64 -d > "${workdir}/demo-shell.private"
-          chmod 600 "${workdir}/demo-shell.private"
+          kubectl -n "${RELEASE_NS}" get secret "${RELEASE_NAME}-encryption" \
+            -o jsonpath='{.data.global_aes\.key}' \
+            | base64 -d > "${workdir}/global_aes.key"
+          chmod 600 "${workdir}/global_aes.key"
 
           log_path="${RUNNER_TEMP}/authproxy-smoke.log"
           echo "log_path=${log_path}" >> "$GITHUB_OUTPUT"
           {
             echo "Smoke-testing ${SMOKE_BASE_URL}"
             cd integration_tests
-            SMOKE_ADMIN_KEY="${workdir}/demo-shell.private" \
+            SMOKE_GLOBAL_KEY="${workdir}/global_aes.key" \
               go test -tags smoke ./smoke -run TestRemote -count=1 -v
           } 2>&1 | tee "${log_path}"
 

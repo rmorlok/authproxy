@@ -13,9 +13,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apauth/jwt"
 	"github.com/rmorlok/authproxy/internal/apid"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/stretchr/testify/require"
 )
@@ -34,7 +36,8 @@ type RemoteAuthProxyOptions struct {
 	ConnectorNamespace   string
 	ConnectionNamespace  string
 
-	AdminPrivateKey string
+	GlobalKey            string
+	UserActorPermissions []aschema.Permission
 }
 
 type RemoteAuthProxy struct {
@@ -49,8 +52,9 @@ type RemoteAuthProxy struct {
 	ConnectorNamespace   string
 	ConnectionNamespace  string
 
-	privateKey string
-	client     *http.Client
+	globalKey            string
+	userActorPermissions []aschema.Permission
+	client               *http.Client
 }
 
 type remoteResponse struct {
@@ -63,7 +67,11 @@ func NewRemoteAuthProxy(t *testing.T, opts RemoteAuthProxyOptions) *RemoteAuthPr
 	t.Helper()
 
 	require.NotEmpty(t, opts.BaseURL, "base URL is required")
-	require.NotEmpty(t, opts.AdminPrivateKey, "admin private key is required")
+	require.NotEmpty(t, opts.GlobalKey, "global key is required")
+	require.NotEmpty(t, opts.UserActorPermissions, "user actor permissions are required")
+	for i, permission := range opts.UserActorPermissions {
+		require.NoErrorf(t, permission.Validate(), "user actor permission %d is invalid", i)
+	}
 
 	adminURL := opts.AdminURL
 	if adminURL == "" {
@@ -113,7 +121,8 @@ func NewRemoteAuthProxy(t *testing.T, opts RemoteAuthProxyOptions) *RemoteAuthPr
 		UserActorNamespace:   userActorNamespace,
 		ConnectorNamespace:   connectorNamespace,
 		ConnectionNamespace:  connectionNamespace,
-		privateKey:           opts.AdminPrivateKey,
+		globalKey:            opts.GlobalKey,
+		userActorPermissions: opts.UserActorPermissions,
 		client:               &http.Client{Timeout: 30 * time.Second},
 	}
 }
@@ -141,19 +150,17 @@ func (h *RemoteAuthProxy) GetActorByExternalID(t *testing.T, namespace, external
 	return actor
 }
 
-func (h *RemoteAuthProxy) WaitForUserReady(t *testing.T, timeout time.Duration) {
+func (h *RemoteAuthProxy) ProvisionUserFromJWT(t *testing.T) {
 	t.Helper()
 
-	deadline := time.Now().Add(timeout)
-	var last remoteResponse
-	for time.Now().Before(deadline) {
-		last = h.doSignedAllowing(t, h.UserActorExternalID, h.UserActorNamespace, http.MethodGet, h.PublicURL+"/api/v1/connectors?limit=1", nil, true, []int{http.StatusOK, http.StatusUnauthorized}, nil)
-		if last.StatusCode == http.StatusOK {
-			return
-		}
-		time.Sleep(1 * time.Second)
-	}
-	require.FailNowf(t, "smoke user did not become ready", "actor %q in namespace %q was not ready within %s; last response: %s", h.UserActorExternalID, h.UserActorNamespace, timeout, string(last.Body))
+	h.doSigned(t, h.UserActorExternalID, h.UserActorNamespace, http.MethodGet, h.PublicURL+"/api/v1/connectors?limit=1", nil, true, http.StatusOK, nil)
+}
+
+func (h *RemoteAuthProxy) DeleteActorByExternalIDAsAdmin(t *testing.T, namespace, externalID string) {
+	t.Helper()
+
+	endpoint := h.AdminURL + "/api/v1/actors/external-id/" + url.PathEscape(externalID) + "?namespace=" + url.QueryEscape(namespace)
+	h.doSigned(t, h.AdminActorExternalID, h.AdminActorNamespace, http.MethodDelete, endpoint, nil, true, http.StatusNoContent, nil)
 }
 
 func (h *RemoteAuthProxy) CreateConnector(t *testing.T, connector sconfig.Connector) schemaapi.ConnectorVersionJson {
@@ -412,17 +419,29 @@ func (h *RemoteAuthProxy) doSignedAllowing(t *testing.T, actorExternalID, actorN
 
 func (h *RemoteAuthProxy) signer(actorExternalID, actorNamespace string) (jwt.Signer, error) {
 	builder := jwt.NewJwtTokenBuilder().
-		WithActorExternalId(actorExternalID).
-		WithNamespace(actorNamespace).
-		WithActorSigned().
+		WithSystemSigned().
 		WithServiceIds(sconfig.AllServiceIds()).
-		WithPermissions(AllPermissionsForNamespace(actorNamespace)).
 		WithExpiresIn(15 * time.Minute)
 
-	if looksLikePath(h.privateKey) {
-		builder = builder.WithPrivateKeyPath(h.privateKey)
+	if actorExternalID == h.UserActorExternalID && actorNamespace == h.UserActorNamespace {
+		builder = builder.
+			WithActor(&core.Actor{
+				ExternalId:  actorExternalID,
+				Namespace:   actorNamespace,
+				Permissions: h.userActorPermissions,
+			}).
+			WithPermissions(h.userActorPermissions)
 	} else {
-		builder = builder.WithPrivateKeyString(h.privateKey)
+		builder = builder.
+			WithActorExternalId(actorExternalID).
+			WithNamespace(actorNamespace).
+			WithPermissions(AllPermissionsForNamespace(actorNamespace))
+	}
+
+	if looksLikePath(h.globalKey) {
+		builder = builder.WithSecretKeyPath(h.globalKey)
+	} else {
+		builder = builder.WithSecretKeyString(h.globalKey)
 	}
 
 	return builder.Signer()
