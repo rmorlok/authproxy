@@ -15,14 +15,13 @@ import {
     ConnectionState,
     listConnections,
     ListConnectionsParams,
-    ListResponse,
-    namespaceAndChildren
+    ListResponse
 } from '@authproxy/api';
 import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
 import {useQueryState, parseAsInteger, parseAsStringLiteral, parseAsString} from 'nuqs'
 import {useSelector} from "react-redux";
-import {selectCurrentNamespacePath} from "../store/namespacesSlice";
+import {selectCurrentNamespaceMatcher} from "../store/namespacesSlice";
 import {toSnakeCase} from '../util';
 
 function renderState(state: ConnectionState) {
@@ -146,7 +145,7 @@ export default function Connections() {
     ], []);
     const stateVals = useMemo(() => stateOptions.map(opt => opt.value), [stateOptions]);
     const navigate = useNavigate();
-    const ns = useSelector(selectCurrentNamespacePath);
+    const namespaceMatcher = useSelector(selectCurrentNamespaceMatcher);
 
     const [rows, setRows] = useState<Connection[]>([]);
     const [rowCount, setRowCount] = useState<number>(-1);
@@ -232,7 +231,7 @@ export default function Connections() {
 
                 const params: ListConnectionsParams = prevResp?.cursor ? {cursor: prevResp.cursor} : {
                     state: (stateFilter as ConnectionState) || undefined,
-                    namespace: namespaceAndChildren(ns),
+                    namespace: namespaceMatcher,
                     orderBy: sort || undefined,
                     limit: pageSize,
                 };
@@ -268,7 +267,7 @@ export default function Connections() {
         // Reset cursors/cache and immediately fetch first page to ensure initial load
         resetPagination();
         fetchPage(1);
-    }, [ns, pageSize, sort, stateFilter]);
+    }, [namespaceMatcher, pageSize, sort, stateFilter]);
 
     useEffect(() => {
         fetchPage(page);

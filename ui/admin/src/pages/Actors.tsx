@@ -10,6 +10,8 @@ import {
 import dayjs from 'dayjs';
 import {useQueryState, parseAsInteger, parseAsString} from 'nuqs'
 import {useNavigate} from 'react-router-dom';
+import {useSelector} from 'react-redux';
+import {selectCurrentNamespaceMatcher} from '../store/namespacesSlice';
 import {toSnakeCase} from '../util';
 
 export const columns: GridColDef<Actor>[] = [
@@ -67,6 +69,7 @@ export const columns: GridColDef<Actor>[] = [
 
 export default function Actors() {
     const navigate = useNavigate();
+    const namespaceMatcher = useSelector(selectCurrentNamespaceMatcher);
     const defaultPageSize = 20;
 
     const [rows, setRows] = useState<Actor[]>([]);
@@ -134,6 +137,7 @@ export default function Actors() {
                 const prevResp = responsesCacheRef.current[responsesCacheRef.current.length - 1];
 
                 const params: ListActorsParams = prevResp?.cursor ? {cursor: prevResp.cursor} : {
+                    namespace: namespaceMatcher,
                     orderBy: sort || undefined,
                     limit: pageSize,
                 };
@@ -169,7 +173,7 @@ export default function Actors() {
         // Reset cursors/cache and immediately fetch first page to ensure initial load
         resetPagination();
         fetchPage(1);
-    }, [pageSize, sort]);
+    }, [namespaceMatcher, pageSize, sort]);
 
     useEffect(() => {
         fetchPage(page);
