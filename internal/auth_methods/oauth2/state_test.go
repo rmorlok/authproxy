@@ -3,6 +3,7 @@ package oauth2
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"log/slog"
 	"testing"
 	"time"
@@ -93,17 +94,10 @@ func TestState_RoundTripPreservesNamespaces(t *testing.T) {
 
 	loaded, err := readStateFromRedis(ctx, r, e, original.Id)
 	require.NoError(t, err)
-	assert.Equal(t, original.ActorNamespace, loaded.GetActorNamespace())
-	assert.Equal(t, original.ConnectionNamespace, loaded.GetConnectionNamespace())
+	assert.Equal(t, original.ActorNamespace, loaded.ActorNamespace)
+	assert.Equal(t, original.ConnectionNamespace, loaded.ConnectionNamespace)
 	assert.Equal(t, original.ActorId, loaded.ActorId)
 	assert.Equal(t, original.ConnectionId, loaded.ConnectionId)
-}
-
-func TestState_LegacyNamespaceAppliesToActorAndConnection(t *testing.T) {
-	s := &state{LegacyNamespace: "root.tenant-a"}
-
-	assert.Equal(t, "root.tenant-a", s.GetActorNamespace())
-	assert.Equal(t, "root.tenant-a", s.GetConnectionNamespace())
 }
 
 func TestSaveStateCapturesDistinctActorAndConnectionNamespaces(t *testing.T) {
@@ -134,8 +128,8 @@ func TestSaveStateCapturesDistinctActorAndConnectionNamespaces(t *testing.T) {
 	require.NoError(t, o.saveStateToRedis(ctx, actor, stateId, "https://example.com/return"))
 	loaded, err := readStateFromRedis(ctx, r, e, stateId)
 	require.NoError(t, err)
-	assert.Equal(t, "root.smoke", loaded.GetActorNamespace())
-	assert.Equal(t, "root.smoke.smoke-user", loaded.GetConnectionNamespace())
+	assert.Equal(t, "root.smoke", loaded.ActorNamespace)
+	assert.Equal(t, "root.smoke.smoke-user", loaded.ConnectionNamespace)
 }
 
 func TestState_RedisValueIsCiphertext(t *testing.T) {
@@ -220,8 +214,8 @@ func TestState_IsValidRequiresActorAndConnectionNamespaces(t *testing.T) {
 	require.False(t, withoutConnectionNamespace.IsValid(), "empty connection namespace must invalidate the state")
 
 	legacy := base
-	legacy.LegacyNamespace = "root.tenant-a"
-	require.True(t, legacy.IsValid(), "legacy namespace must remain valid for in-flight states")
+	require.NoError(t, json.Unmarshal([]byte(`{"namespace":"root.tenant-a"}`), &legacy))
+	require.False(t, legacy.IsValid(), "legacy namespace-only state must be invalid")
 }
 
 func TestGetOAuth2State_RejectsEmptyNamespaceInState(t *testing.T) {

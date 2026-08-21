@@ -181,7 +181,7 @@ func (o *oAuth2Connection) tokenExchangeAttrsFromConn(err error) tokenExchangeAt
 	if o.state != nil {
 		attrs.StateId = o.state.Id
 		attrs.ActorId = o.state.ActorId
-		attrs.Namespace = o.state.GetConnectionNamespace()
+		attrs.Namespace = o.state.ConnectionNamespace
 	}
 	return attrs
 }

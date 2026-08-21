@@ -22,12 +22,9 @@ import (
 )
 
 type state struct {
-	Id                  apid.ID `json:"id"`
-	ActorNamespace      string  `json:"actorNamespace,omitempty"`
-	ConnectionNamespace string  `json:"connectionNamespace,omitempty"`
-	// LegacyNamespace keeps OAuth flows created before actor and connection
-	// namespaces were stored independently valid across a rolling deployment.
-	LegacyNamespace        string    `json:"namespace,omitempty"`
+	Id                     apid.ID   `json:"id"`
+	ActorNamespace         string    `json:"actorNamespace,omitempty"`
+	ConnectionNamespace    string    `json:"connectionNamespace,omitempty"`
 	ActorId                apid.ID   `json:"actorId"`
 	ConnectorId            apid.ID   `json:"connectorId"`
 	ConnectorVersion       uint64    `json:"connectorVersion"`
@@ -50,21 +47,7 @@ type state struct {
 }
 
 func (s *state) IsValid() bool {
-	return s.GetActorNamespace() != "" && s.GetConnectionNamespace() != "" && s.ActorId != apid.Nil && s.ConnectorId != apid.Nil && s.ConnectionId != apid.Nil && !s.ExpiresAt.IsZero()
-}
-
-func (s *state) GetActorNamespace() string {
-	if s.ActorNamespace != "" {
-		return s.ActorNamespace
-	}
-	return s.LegacyNamespace
-}
-
-func (s *state) GetConnectionNamespace() string {
-	if s.ConnectionNamespace != "" {
-		return s.ConnectionNamespace
-	}
-	return s.LegacyNamespace
+	return s.ActorNamespace != "" && s.ConnectionNamespace != "" && s.ActorId != apid.Nil && s.ConnectorId != apid.Nil && s.ConnectionId != apid.Nil && !s.ExpiresAt.IsZero()
 }
 
 // writeStateToRedis encrypts the state with the global key (AES-GCM AEAD)
@@ -211,7 +194,7 @@ func getOAuth2State(
 			StateId:      stateId,
 			ActorId:      actor.GetId(),
 			ConnectionId: s.ConnectionId,
-			Namespace:    s.GetActorNamespace(),
+			Namespace:    s.ActorNamespace,
 			Err:          err,
 		})
 		return nil, err
@@ -223,7 +206,7 @@ func getOAuth2State(
 			StateId:      stateId,
 			ActorId:      actor.GetId(),
 			ConnectionId: s.ConnectionId,
-			Namespace:    s.GetActorNamespace(),
+			Namespace:    s.ActorNamespace,
 			Err:          err,
 		})
 		return nil, err
@@ -235,19 +218,19 @@ func getOAuth2State(
 			StateId:      stateId,
 			ActorId:      actor.GetId(),
 			ConnectionId: s.ConnectionId,
-			Namespace:    s.GetActorNamespace(),
+			Namespace:    s.ActorNamespace,
 			Err:          err,
 		})
 		return nil, err
 	}
 
-	if s.GetActorNamespace() != actor.GetNamespace() {
-		err := fmt.Errorf("actor namespace %q does not match state actor namespace %q", actor.GetNamespace(), s.GetActorNamespace())
+	if s.ActorNamespace != actor.GetNamespace() {
+		err := fmt.Errorf("actor namespace %q does not match state actor namespace %q", actor.GetNamespace(), s.ActorNamespace)
 		emitCallbackRejection(ctx, logger, rejectionNamespaceMismatchActor, rejectionAttrs{
 			StateId:      stateId,
 			ActorId:      actor.GetId(),
 			ConnectionId: s.ConnectionId,
-			Namespace:    s.GetActorNamespace(),
+			Namespace:    s.ActorNamespace,
 			Err:          err,
 		})
 		return nil, err
@@ -261,7 +244,7 @@ func getOAuth2State(
 				StateId:      stateId,
 				ActorId:      actor.GetId(),
 				ConnectionId: s.ConnectionId,
-				Namespace:    s.GetConnectionNamespace(),
+				Namespace:    s.ConnectionNamespace,
 				Err:          notFoundErr,
 			})
 			return nil, notFoundErr
@@ -270,13 +253,13 @@ func getOAuth2State(
 		return nil, fmt.Errorf("failed to get connection %s for state %s: %w", s.ConnectionId.String(), stateId.String(), err)
 	}
 
-	if s.GetConnectionNamespace() != connection.GetNamespace() {
-		err := fmt.Errorf("connection namespace %q does not match state connection namespace %q", connection.GetNamespace(), s.GetConnectionNamespace())
+	if s.ConnectionNamespace != connection.GetNamespace() {
+		err := fmt.Errorf("connection namespace %q does not match state connection namespace %q", connection.GetNamespace(), s.ConnectionNamespace)
 		emitCallbackRejection(ctx, logger, rejectionNamespaceMismatchConnection, rejectionAttrs{
 			StateId:      stateId,
 			ActorId:      actor.GetId(),
 			ConnectionId: s.ConnectionId,
-			Namespace:    s.GetConnectionNamespace(),
+			Namespace:    s.ConnectionNamespace,
 			Err:          err,
 		})
 		return nil, err
@@ -290,7 +273,7 @@ func getOAuth2State(
 			StateId:      stateId,
 			ActorId:      actor.GetId(),
 			ConnectionId: s.ConnectionId,
-			Namespace:    s.GetConnectionNamespace(),
+			Namespace:    s.ConnectionNamespace,
 			Err:          err,
 		})
 		return nil, err
