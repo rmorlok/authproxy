@@ -36,7 +36,7 @@ const (
 	// cannot trust a state we cannot fully validate.
 	rejectionStateLoadError rejectionCategory = "state_load_error"
 	// rejectionStateInvalid — the decrypted state was missing required
-	// fields per state.IsValid (empty namespace, zero ids, etc.).
+	// fields per state.IsValid (empty actor/connection namespace, zero ids, etc.).
 	rejectionStateInvalid rejectionCategory = "state_invalid"
 	// rejectionExpiredState — the state's ExpiresAt is in the past.
 	rejectionExpiredState rejectionCategory = "expired_state"
@@ -45,12 +45,13 @@ const (
 	// complete someone else's flow.
 	rejectionActorMismatch rejectionCategory = "actor_mismatch"
 	// rejectionNamespaceMismatchActor — the inbound actor's namespace does
-	// not match the state's namespace. Cross-tenant probe via a stolen or
-	// guessed state id.
+	// not match the actor namespace recorded on the state. Cross-tenant probe
+	// via a stolen or guessed state id.
 	rejectionNamespaceMismatchActor rejectionCategory = "namespace_mismatch_actor"
 	// rejectionNamespaceMismatchConnection — the connection referenced by
-	// the state lives in a different namespace than the state itself.
-	// State was crafted against another tenant's connection id.
+	// the state lives in a different namespace than the connection namespace
+	// recorded on the state. State was crafted against another tenant's
+	// connection id.
 	rejectionNamespaceMismatchConnection rejectionCategory = "namespace_mismatch_connection"
 	// rejectionConnectionNotFound — the connection id on the state has no
 	// matching record. Usually a deleted connection or a fabricated id.

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	apauth "github.com/rmorlok/authproxy/internal/apauth/core"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -20,7 +21,10 @@ import (
 
 // InitiateConnection starts the process of initiating the connection. This method provides auth validation as part of
 // the logic.
-func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConnectionRequest) (iface.ConnectionSetupResponse, error) {
+func (s *service) InitiateConnection(
+	ctx context.Context,
+	req iface.InitiateConnectionRequest,
+) (iface.ConnectionSetupResponse, error) {
 	val := auth.MustGetValidatorFromContext(ctx)
 	if err := req.Validate(); err != nil {
 		val.MarkErrorReturn()
@@ -60,8 +64,13 @@ func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConn
 		return nil, httperr.BadRequestf("target namespace '%s' is not a child of the connector's namespace '%s'", targetNamespace, c.GetNamespace())
 	}
 
-	// Primary validation for the request -- make sure the user can initiate connections in the target namespace with
-	// the specified connector id.
+	actor := apauth.ActorFromContext(ctx)
+	if !namespace.IsSameOrChild(actor.GetNamespace(), targetNamespace) {
+		return nil, httperr.Forbidden("connection namespace must be child of creating actor")
+	}
+
+	// Primary validation for the request -- make sure the user can initiate
+	// connections in the target namespace with the specified connector id.
 	if err := val.ValidateNamespaceResourceId(targetNamespace, c.GetId().String()); err != nil {
 		val.MarkErrorReturn()
 		return nil, httperr.Forbidden(err.Error(), httperr.WithInternalErr(err))

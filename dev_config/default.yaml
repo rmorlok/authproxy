@@ -57,13 +57,14 @@ systemAuth:
     privateKey:
       path: ./dev_config/keys/system
   actors:
-    keysPath: ./dev_config/keys/admin
-    permissions:
-      - namespace: root.**
-        resources:
-          - "*"
-        verbs:
-          - "*"
+    root:
+      keysPath: ./dev_config/keys/admin
+      permissions:
+        - namespace: root.**
+          resources:
+            - "*"
+          verbs:
+            - "*"
   globalAesKey:
     path: ./dev_config/keys/global_aes.key
 

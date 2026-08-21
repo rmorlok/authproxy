@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	apauth "github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aplog"
@@ -28,7 +29,12 @@ func (s *service) CreateConnection(
 	)
 
 	if !ns.IsSameOrChild(c.GetNamespace(), namespace) {
-		return nil, httperr.BadRequestErr(errors.New("connections must be created in the same or child namespace of the connector"))
+		return nil, httperr.BadRequest("connections must be created in the same or child namespace of the connector")
+	}
+
+	actor := apauth.ActorFromContext(ctx)
+	if !ns.IsSameOrChild(actor.GetNamespace(), namespace) {
+		return nil, httperr.Forbidden("connection namespace must be child of creating actor")
 	}
 
 	id := apctx.GetIdGenerator(ctx).New(apid.PrefixConnection)

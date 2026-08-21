@@ -55,25 +55,11 @@ func (ca *ConfiguredActors) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	// If it's not a string, it should be an object
-	var valueMap map[string]interface{}
-	if err := json.Unmarshal(data, &valueMap); err != nil {
-		return fmt.Errorf("failed to unmarshal string value: %v", err)
-	}
-
-	var t ConfiguredActorsType
-
-	if _, ok := valueMap["keysPath"]; ok {
-		t = &ConfiguredActorsExternalSource{}
-	} else {
-		return fmt.Errorf("invalid structure for actors; must be list or have keysPath")
-	}
-
-	if err := util.DecodeJSONStrict(data, t); err != nil {
+	var sources ConfiguredActorsExternalSources
+	if err := util.DecodeJSONStrict(data, &sources); err != nil {
 		return err
 	}
-
-	ca.InnerVal = t
+	ca.InnerVal = &sources
 
 	return nil
 }
@@ -101,12 +87,11 @@ func (ca *ConfiguredActors) UnmarshalYAML(value *yaml.Node) error {
 		return fmt.Errorf("actors expected a sequence node or mapping node, got %s", KindToString(value.Kind))
 	}
 
-	var actorsExternalSource ConfiguredActorsExternalSource
-	if err := util.DecodeYAMLNodeStrict(value, &actorsExternalSource); err != nil {
+	var sources ConfiguredActorsExternalSources
+	if err := util.DecodeYAMLNodeStrict(value, &sources); err != nil {
 		return err
 	}
-
-	ca.InnerVal = &actorsExternalSource
+	ca.InnerVal = &sources
 	return nil
 }
 

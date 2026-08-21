@@ -31,7 +31,8 @@ systemAuth:
     privateKey:
       path: ./dev_config/keys/system
   actors:
-    keysPath: ./dev_config/keys/admin
+    root:
+      keysPath: ./dev_config/keys/admin
   globalAesKey:
     envVarBase64: GLOBAL_AES_KEY
 errorPages:

@@ -758,7 +758,7 @@ func TestSchemaDefinitions(t *testing.T) {
 				{
 					Name:  "with permissions",
 					Valid: true,
-					Data:  `{"test": {"externalId": "actor-1", "key": {"sharedKey": {"value": "secret"}}, "permissions": [{"namespace": "root", "resources": ["*"], "verbs": ["*"]}]}}`,
+					Data:  `{"test": {"externalId": "actor-1", "namespace": "root.operators", "key": {"sharedKey": {"value": "secret"}}, "permissions": [{"namespace": "root", "resources": ["*"], "verbs": ["*"]}]}}`,
 				},
 				{
 					Name:  "with labels",
@@ -774,6 +774,11 @@ func TestSchemaDefinitions(t *testing.T) {
 					Name:  "missing key",
 					Valid: false,
 					Data:  `{"test": {"externalId": "actor-1"}}`,
+				},
+				{
+					Name:  "invalid namespace",
+					Valid: false,
+					Data:  `{"test": {"externalId": "actor-1", "namespace": "other", "key": {"sharedKey": {"value": "secret"}}}}`,
 				},
 			},
 		},
@@ -799,18 +804,38 @@ func TestSchemaDefinitions(t *testing.T) {
 					Data:  `{"test": [{"externalId": "actor-1", "key": {"sharedKey": {"value": "secret"}}}]}`,
 				},
 				{
-					Name:  "external source",
-					Valid: true,
+					Name:  "legacy external source",
+					Valid: false,
 					Data:  `{"test": {"keysPath": "/keys/actors"}}`,
 				},
 				{
-					Name:  "external source with permissions",
-					Valid: true,
+					Name:  "legacy external source with permissions",
+					Valid: false,
 					Data:  `{"test": {"keysPath": "/keys/actors", "permissions": [{"namespace": "root.**", "resources": ["*"], "verbs": ["*"]}]}}`,
 				},
 				{
-					Name:  "external source with sync cron",
+					Name:  "namespaced external sources",
 					Valid: true,
+					Data:  `{"test": {"root": {"keysPath": "/keys/actors/root"}, "root.smoke": {"keysPath": "/keys/actors/smoke", "permissions": [{"namespace": "root.smoke.{{external_id}}", "resources": ["connections"], "verbs": ["create"]}]}, "syncCronSchedule": "*/5 * * * *"}}`,
+				},
+				{
+					Name:  "namespaced external source with invalid namespace",
+					Valid: false,
+					Data:  `{"test": {"smoke": {"keysPath": "/keys/actors/smoke"}}}`,
+				},
+				{
+					Name:  "namespaced external source missing keys path",
+					Valid: false,
+					Data:  `{"test": {"root.smoke": {"permissions": [{"namespace": "root.smoke", "resources": ["connectors"], "verbs": ["list"]}]}}}`,
+				},
+				{
+					Name:  "namespaced external source requires a source",
+					Valid: false,
+					Data:  `{"test": {"syncCronSchedule": "*/5 * * * *"}}`,
+				},
+				{
+					Name:  "legacy external source with sync cron",
+					Valid: false,
 					Data:  `{"test": {"keysPath": "/keys/actors", "syncCronSchedule": "*/5 * * * *"}}`,
 				},
 				{
@@ -960,7 +985,7 @@ func TestSchemaDefinitions(t *testing.T) {
 				{
 					Name:  "actors as external source",
 					Valid: true,
-					Data:  `{"test": {"actors": {"keysPath": "/keys/actors"}}}`,
+					Data:  `{"test": {"actors": {"root": {"keysPath": "/keys/actors"}}}}`,
 				},
 				{
 					Name:  "actors as inline list",
