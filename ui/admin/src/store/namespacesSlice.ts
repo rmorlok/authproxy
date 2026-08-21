@@ -2,6 +2,7 @@ import {createAsyncThunk, createSlice, PayloadAction} from '@reduxjs/toolkit';
 import type {RootState, AppThunk} from './store';
 import {
     namespaces, ListNamespaceParams, Namespace, NAMESPACE_PATH_SEPARATOR, ROOT_NAMESPACE_PATH, NamespaceState,
+    namespaceAndChildren,
 } from '@authproxy/api';
 
 interface NamespacesState {
@@ -170,6 +171,8 @@ export const namespacesSlice = createSlice({
 
 // Selectors
 export const selectCurrentNamespacePath = (state: RootState) => state.namespaces.currentPath;
+export const selectCurrentNamespaceMatcher = (state: RootState) =>
+    namespaceAndChildren(selectCurrentNamespacePath(state));
 export const selectCurrentNamespace = (state: RootState) => state.namespaces.current;
 export const selectCurrentNamespaceChildren = (state: RootState) => state.namespaces.children;
 export const selectCurrentNamespaceChildrenHasMore = (state: RootState) => state.namespaces.childrenHasMore;

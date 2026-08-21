@@ -5,6 +5,7 @@ import namespaceReducer, {
     isValidNamespacePath,
     loadCurrentChildren,
     normalizeNamespacePath,
+    selectCurrentNamespaceMatcher,
     setCurrentNamespace,
 } from './namespacesSlice';
 
@@ -22,6 +23,7 @@ vi.mock('@authproxy/api', () => {
             DISCONNECTING: 'disconnecting',
             DISCONNECTED: 'disconnected',
         },
+        namespaceAndChildren: (path: string) => `${path}.**`,
         namespaces: apiNamespaces,
     };
 });
@@ -64,6 +66,16 @@ describe('namespacesSlice namespace path handling', () => {
         expect(normalizeNamespacePath('action.refresh')).toBe(ROOT_NAMESPACE_PATH);
         expect(normalizeNamespacePath('root..platform')).toBe(ROOT_NAMESPACE_PATH);
         expect(normalizeNamespacePath(null)).toBe(ROOT_NAMESPACE_PATH);
+    });
+
+    it('builds the resource-list matcher from the selected namespace', () => {
+        const store = createStore();
+
+        expect(selectCurrentNamespaceMatcher(store.getState() as any)).toBe('root.**');
+
+        store.dispatch(setCurrentNamespace('root.platform') as any);
+
+        expect(selectCurrentNamespaceMatcher(store.getState() as any)).toBe('root.platform.**');
     });
 
     it('loads root instead of a malformed namespace path', () => {
