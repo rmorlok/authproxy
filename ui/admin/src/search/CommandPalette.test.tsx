@@ -98,7 +98,7 @@ describe('CommandPalette', () => {
         ));
 
         await user.type(input, 'work');
-        expect(await screen.findByText('Workflows')).toBeTruthy();
+        expect(await screen.findByText('Internal Workflows')).toBeTruthy();
         await user.clear(input);
         await user.type(input, 'cxn_customer');
         await user.keyboard('{Enter}');
@@ -291,6 +291,6 @@ describe('CommandPalette', () => {
         expect(await screen.findByText(/Server search is unavailable/)).toBeTruthy();
         await user.clear(input);
         await user.type(input, 'work');
-        expect(await screen.findByText('Workflows')).toBeTruthy();
+        expect(await screen.findByText('Internal Workflows')).toBeTruthy();
     });
 });
