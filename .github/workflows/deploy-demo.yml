@@ -2,8 +2,8 @@
 name: Deploy Demo
 
 # Auto-deploys the hosted demo environment after Build Image publishes
-# main-branch images. Demo deploys are rendered with Kustomize; seeding is
-# intentionally handled by the manual Seed Demo workflow.
+# main-branch images. Demo deploys are rendered with Kustomize and the catalog
+# seed job runs after the application and TLS endpoints are ready.
 #
 # Trust + auth: this workflow assumes the `authproxy-eks-gh-actions`
 # IAM role via OIDC. The role's trust policy (from
@@ -48,7 +48,7 @@ jobs:
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     environment: gha-eks
-    timeout-minutes: 35
+    timeout-minutes: 45
 
     env:
       RELEASE_NAME: demo
@@ -99,6 +99,7 @@ jobs:
             authproxy
             authproxy-demo-shell
             authproxy-demo-grafana
+            authproxy-demo-seed
           )
 
           echo "${{ secrets.GITHUB_TOKEN }}" \
@@ -150,6 +151,8 @@ jobs:
         run: |
           set -euo pipefail
           secrets_manifest="${RUNNER_TEMP}/demo-preserved-secrets.json"
+          workdir="$(mktemp -d)"
+          trap 'rm -rf "${workdir}"' EXIT
 
           kubectl create namespace "${RELEASE_NS}" --dry-run=client -o yaml \
             | kubectl apply -f -
@@ -171,13 +174,24 @@ jobs:
             fi
           done
 
-          stale_smoke_public="$(kubectl -n "${RELEASE_NS}" get secret "${RELEASE_NAME}-actors" \
-            -o jsonpath='{.data.smoke-user\.pub}')"
-          if [ -n "${stale_smoke_public}" ]; then
-            kubectl -n "${RELEASE_NS}" patch secret "${RELEASE_NAME}-actors" \
-              --type json \
-              --patch='[{"op":"remove","path":"/data/smoke-user.pub"}]'
-          fi
+          kubectl -n "${RELEASE_NS}" get secret "${RELEASE_NAME}-demo-shell-key" \
+            -o jsonpath='{.data.demo-shell\.pub}' \
+            | base64 -d > "${workdir}/demo-shell.pub"
+          kubectl -n "${RELEASE_NS}" create secret generic "${RELEASE_NAME}-actors" \
+            --from-file=demo-admin.pub="${workdir}/demo-shell.pub" \
+            --from-file=grafana.pub="${workdir}/demo-shell.pub" \
+            --dry-run=client -o yaml \
+            | kubectl apply -f -
+
+          for stale_actor in demo-shell demo-user fresh-user smoke-user; do
+            stale_public="$(kubectl -n "${RELEASE_NS}" get secret "${RELEASE_NAME}-actors" \
+              -o "jsonpath={.data.${stale_actor}\\.pub}")"
+            if [ -n "${stale_public}" ]; then
+              kubectl -n "${RELEASE_NS}" patch secret "${RELEASE_NAME}-actors" \
+                --type json \
+                --patch="[{\"op\":\"remove\",\"path\":\"/data/${stale_actor}.pub\"}]"
+            fi
+          done
           kubectl -n "${RELEASE_NS}" delete secret "${RELEASE_NAME}-smoke-actors" \
             --ignore-not-found
 
@@ -434,6 +448,59 @@ jobs:
             kubectl -n "${RELEASE_NS}" get certificate,order,challenge || true
             exit 1
           done
+
+      - name: Render seed job
+        id: seed
+        env:
+          IMAGE_TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          manifest="${RUNNER_TEMP}/demo-seed.yaml"
+
+          perl -0pi -e 's#(name: ghcr\.io/rmorlok/authproxy-demo-seed\n\s+newTag: )main#${1}$ENV{IMAGE_TAG}#g' \
+            "${KUSTOMIZE_OVERLAY}/seed/kustomization.yaml"
+          kubectl kustomize "${KUSTOMIZE_OVERLAY}/seed" > "${manifest}"
+
+          echo "manifest=${manifest}" >> "$GITHUB_OUTPUT"
+          grep -Fq "namespace: ${RELEASE_NS}" "${manifest}"
+          grep -Fq "image: ghcr.io/rmorlok/authproxy-demo-seed:${IMAGE_TAG}" "${manifest}"
+          grep -Fq "value: http://${RELEASE_NAME}-authproxy:8082" "${manifest}"
+          grep -Fq "namespace: root.demo" "${manifest}"
+
+      - name: Run seed job
+        run: |
+          set -euo pipefail
+          manifest="${{ steps.seed.outputs.manifest }}"
+
+          kubectl -n "${RELEASE_NS}" delete "job/${RELEASE_NAME}-seed" \
+            --ignore-not-found --wait=false
+
+          for _ in $(seq 1 24); do
+            if ! kubectl -n "${RELEASE_NS}" get "job/${RELEASE_NAME}-seed" >/dev/null 2>&1; then
+              break
+            fi
+            echo "Waiting for stale ${RELEASE_NAME}-seed Job to be deleted..."
+            sleep 5
+          done
+
+          if kubectl -n "${RELEASE_NS}" get "job/${RELEASE_NAME}-seed" >/dev/null 2>&1; then
+            echo "Timed out waiting for stale ${RELEASE_NAME}-seed Job to delete." >&2
+            exit 1
+          fi
+
+          kubectl -n "${RELEASE_NS}" apply -f "${manifest}"
+
+          if ! kubectl -n "${RELEASE_NS}" wait \
+            --for=condition=complete "job/${RELEASE_NAME}-seed" \
+            --timeout=10m; then
+            kubectl -n "${RELEASE_NS}" describe "job/${RELEASE_NAME}-seed" || true
+            kubectl -n "${RELEASE_NS}" logs "job/${RELEASE_NAME}-seed" \
+              --all-containers --tail=-1 || true
+            exit 1
+          fi
+
+          kubectl -n "${RELEASE_NS}" logs "job/${RELEASE_NAME}-seed" \
+            --all-containers --tail=-1
 
       - name: Smoke test telemetry links
         timeout-minutes: 2

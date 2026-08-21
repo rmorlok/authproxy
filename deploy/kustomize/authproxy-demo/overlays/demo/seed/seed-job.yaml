@@ -23,7 +23,7 @@ spec:
             - name: ADMIN_API_URL
               value: "http://demo-authproxy:8082"
             - name: ADMIN_USERNAME
-              value: "demo-shell"
+              value: "demo-admin"
             - name: ADMIN_PRIVATE_KEY_PATH
               value: "/etc/authproxy/demo-shell/private"
             - name: SEED_CONFIG_PATH

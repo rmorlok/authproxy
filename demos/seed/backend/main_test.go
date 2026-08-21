@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/go-resty/resty/v2"
@@ -12,13 +14,146 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/schema/api"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/schema/config"
+	"github.com/rmorlok/authproxy/internal/util"
 )
 
 var testConnectorID = apid.MustParse("cxr_testgmail0000001")
 
 const testBaseURL = "http://seed.test"
+
+func demoUserSeed() ActorSeed {
+	return ActorSeed{
+		ExternalId: "demo-user",
+		Namespace:  "root.demo",
+		Permissions: []aschema.Permission{
+			{
+				Namespace: "root.demo",
+				Resources: []string{"connectors"},
+				Verbs:     []string{"list"},
+			},
+			{
+				Namespace: "root.demo.{{external_id}}",
+				Resources: []string{"connections"},
+				Verbs:     []string{"create", "list", "get", "update", "disconnect"},
+			},
+		},
+		Labels: map[string]string{"demo": "true", "role": "user"},
+	}
+}
+
+func TestUpsertNamespaceCreatesMissingNamespace(t *testing.T) {
+	seed := NamespaceSeed{Path: "root.demo", Labels: map[string]string{"demo": "true"}}
+	client := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method + " " + r.URL.Path {
+		case "GET /api/v1/namespaces/root.demo":
+			w.WriteHeader(http.StatusNotFound)
+		case "POST /api/v1/namespaces":
+			var req api.CreateNamespaceRequestJson
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
+			require.Equal(t, seed.Path, req.Path)
+			require.Equal(t, seed.Labels, req.Labels)
+			writeJSON(t, w, api.NamespaceJson{Path: seed.Path, Labels: seed.Labels})
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
+		}
+	}))
+
+	action, err := upsertNamespace(client, testBaseURL, seed)
+	require.NoError(t, err)
+	require.Equal(t, seedCreated, action)
+}
+
+func TestUpsertNamespaceVerifiesExistingNamespace(t *testing.T) {
+	seed := NamespaceSeed{Path: "root.demo", Labels: map[string]string{"demo": "true"}}
+	client := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(t, w, api.NamespaceJson{Path: seed.Path, Labels: seed.Labels})
+	}))
+
+	action, err := upsertNamespace(client, testBaseURL, seed)
+	require.NoError(t, err)
+	require.Equal(t, seedAlreadyPresent, action)
+}
+
+func TestUpsertActorCreatesThenAppliesPermissions(t *testing.T) {
+	seed := demoUserSeed()
+	client := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method + " " + r.URL.Path {
+		case "GET /api/v1/actors/external-id/demo-user":
+			require.Equal(t, seed.Namespace, r.URL.Query().Get("namespace"))
+			w.WriteHeader(http.StatusNotFound)
+		case "POST /api/v1/actors":
+			var req api.CreateActorRequestJson
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
+			require.Equal(t, seed.ExternalId, req.ExternalId)
+			require.Equal(t, seed.Namespace, req.Namespace)
+			writeJSON(t, w, api.ActorJson{ExternalId: seed.ExternalId, Namespace: seed.Namespace})
+		case "PATCH /api/v1/actors/external-id/demo-user":
+			require.Equal(t, seed.Namespace, r.URL.Query().Get("namespace"))
+			var req api.UpdateActorRequestJson
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
+			require.Equal(t, seed.Permissions, req.Permissions)
+			require.Equal(t, seed.Labels, req.Labels)
+			writeJSON(t, w, api.ActorJson{
+				ExternalId:  seed.ExternalId,
+				Namespace:   seed.Namespace,
+				Permissions: seed.Permissions,
+				Labels:      seed.Labels,
+			})
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
+		}
+	}))
+
+	action, err := upsertActor(client, testBaseURL, seed)
+	require.NoError(t, err)
+	require.Equal(t, seedCreated, action)
+}
+
+func TestUpsertActorVerifiesExistingActorWithoutChangingIt(t *testing.T) {
+	seed := demoUserSeed()
+	client := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodGet, r.Method)
+		writeJSON(t, w, api.ActorJson{
+			ExternalId:  seed.ExternalId,
+			Namespace:   seed.Namespace,
+			Permissions: seed.Permissions,
+			Labels:      seed.Labels,
+		})
+	}))
+
+	action, err := upsertActor(client, testBaseURL, seed)
+	require.NoError(t, err)
+	require.Equal(t, seedAlreadyPresent, action)
+}
+
+func TestUpsertActorReconcilesDrift(t *testing.T) {
+	seed := demoUserSeed()
+	client := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			writeJSON(t, w, api.ActorJson{
+				ExternalId:  seed.ExternalId,
+				Namespace:   seed.Namespace,
+				Permissions: aschema.AllPermissions(),
+				Labels:      seed.Labels,
+			})
+		case http.MethodPatch:
+			var req api.UpdateActorRequestJson
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
+			require.Equal(t, seed.Permissions, req.Permissions)
+			writeJSON(t, w, api.ActorJson{})
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
+		}
+	}))
+
+	action, err := upsertActor(client, testBaseURL, seed)
+	require.NoError(t, err)
+	require.Equal(t, seedUpdated, action)
+}
 
 func TestUpsertConnectorCreatesAndPublishesMissingSeed(t *testing.T) {
 	seed := ConnectorSeed{
@@ -123,6 +258,52 @@ func TestUpsertConnectorPublishesNewVersionWhenDefinitionChanges(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, connectorUpdated, action)
 	require.True(t, forcedPrimary)
+}
+
+func TestArchiveLegacySeededConnectorsArchivesActiveSeed(t *testing.T) {
+	seed := ConnectorSeed{
+		Key:       "demo-noauth",
+		Namespace: "root.demo",
+	}
+	archived := false
+	client := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method + " " + r.URL.Path {
+		case "GET /api/v1/connectors":
+			require.Equal(t, "root", r.URL.Query().Get("namespace"))
+			require.Equal(t, seedLabelKey+"=demo-noauth", r.URL.Query().Get("labelSelector"))
+			writeJSON(t, w, api.ListConnectorsResponseJson{Items: []api.ConnectorJson{{
+				Id:        testConnectorID,
+				Namespace: "root",
+				State:     api.ConnectorVersionStatePrimary,
+			}}})
+		case "POST /api/v1/connectors/cxr_testgmail0000001/_archive":
+			archived = true
+			writeJSON(t, w, map[string]any{"connectorId": testConnectorID})
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
+		}
+	}))
+
+	count, err := archiveLegacySeededConnectors(client, testBaseURL, seed, []string{"root", "root.demo"})
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
+	require.True(t, archived)
+}
+
+func TestArchiveLegacySeededConnectorsSkipsArchivedSeed(t *testing.T) {
+	seed := ConnectorSeed{Key: "demo-noauth", Namespace: "root.demo"}
+	client := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodGet, r.Method)
+		writeJSON(t, w, api.ListConnectorsResponseJson{Items: []api.ConnectorJson{{
+			Id:        testConnectorID,
+			Namespace: "root",
+			State:     api.ConnectorVersionStateArchived,
+		}}})
+	}))
+
+	count, err := archiveLegacySeededConnectors(client, testBaseURL, seed, []string{"root"})
+	require.NoError(t, err)
+	require.Zero(t, count)
 }
 
 func TestSeedOAuth2TestProviderSeedsClientsUsersAndPolicies(t *testing.T) {
@@ -303,6 +484,48 @@ connectors:
 	require.NotNil(t, cfg.OAuth2TestProvider)
 	require.Len(t, cfg.OAuth2TestProvider.APIKeyResourcePolicies, 1)
 	require.Len(t, cfg.Connectors, 1)
+	require.NoError(t, cfg.Connectors[0].Definition.Validate(&common.ValidationContext{}))
+}
+
+func TestDeploymentSeedConfigsUseIsolatedDemoResources(t *testing.T) {
+	paths := []string{
+		filepath.Join("..", "..", "..", "deploy", "kustomize", "authproxy-demo", "overlays", "demo", "seed", "seed-config.yaml"),
+		filepath.Join("..", "..", "..", "deploy", "kustomize", "authproxy-demo", "overlays", "dev", "seed", "seed-config.yaml"),
+	}
+
+	for _, path := range paths {
+		t.Run(filepath.Base(filepath.Dir(filepath.Dir(path))), func(t *testing.T) {
+			data, err := os.ReadFile(path)
+			require.NoError(t, err)
+
+			var configMap struct {
+				Data map[string]string `yaml:"data"`
+			}
+			require.NoError(t, yaml.Unmarshal(data, &configMap))
+
+			var cfg SeedConfig
+			require.NoError(t, util.DecodeYAMLStrict([]byte(configMap.Data["seed.yaml"]), &cfg))
+			require.Equal(t, []NamespaceSeed{{Path: "root.demo", Labels: map[string]string{"demo": "true"}}}, cfg.Namespaces)
+			require.Equal(t, []string{"root"}, cfg.LegacyConnectorNamespaces)
+			require.Len(t, cfg.Actors, 1)
+			require.Equal(t, demoUserSeed(), cfg.Actors[0])
+			require.Len(t, cfg.Connectors, 5)
+			for _, connector := range cfg.Connectors {
+				require.Equal(t, "root.demo", connectorNamespace(connector))
+			}
+		})
+	}
+}
+
+func TestComposeSeedConfigUsesIsolatedDemoResources(t *testing.T) {
+	path := filepath.Join("..", "..", "shell", "compose", "seed.yaml")
+	cfg, err := loadConfig(path)
+	require.NoError(t, err)
+	require.Len(t, cfg.Namespaces, 1)
+	require.Equal(t, "root.demo", cfg.Namespaces[0].Path)
+	require.Equal(t, []ActorSeed{demoUserSeed()}, cfg.Actors)
+	require.Len(t, cfg.Connectors, 1)
+	require.Equal(t, "root.demo", connectorNamespace(cfg.Connectors[0]))
 	require.NoError(t, cfg.Connectors[0].Definition.Validate(&common.ValidationContext{}))
 }
 

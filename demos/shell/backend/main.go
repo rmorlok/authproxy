@@ -36,6 +36,8 @@ import (
 
 const freshUserSelection = "fresh-user"
 
+const demoNamespace = "root.demo"
+
 // demoActorSelections enumerates the identities the shell UI can request.
 // fresh-user is a selector rather than a literal actor external ID; each
 // request for it is resolved to a new external ID before the JWT is signed.
@@ -155,11 +157,10 @@ func loadTelemetryLinks() []telemetryLink {
 	return links
 }
 
-// signTokenFor mints a JWT for a well-known actor that already exists in
-// AuthProxy and has the demo shell's public key configured.
-func signTokenFor(s settings, actorExternalID string) (string, error) {
+// signAdminToken mints a self-signed JWT for the pre-provisioned demo admin.
+func signAdminToken(s settings) (string, error) {
 	b := jwt.NewJwtTokenBuilder().
-		WithActorExternalId(actorExternalID).
+		WithActorExternalId(s.adminUsername).
 		WithActorSigned().
 		WithServiceIds(config.AllServiceIds()).
 		WithNonce().
@@ -169,6 +170,38 @@ func signTokenFor(s settings, actorExternalID string) (string, error) {
 	return b.Token()
 }
 
+// demoMarketplacePermissions is the minimum access needed by the Marketplace.
+// The connection namespace is rendered from the authenticated actor so demo
+// users cannot list or operate on another user's connections.
+func demoMarketplacePermissions() []aschema.Permission {
+	return []aschema.Permission{
+		{
+			Namespace: demoNamespace,
+			Resources: []string{"connectors"},
+			Verbs:     []string{"list"},
+		},
+		{
+			Namespace: demoNamespace + ".{{external_id}}",
+			Resources: []string{"connections"},
+			Verbs:     []string{"create", "list", "get", "update", "disconnect"},
+		},
+	}
+}
+
+// signTokenForDemoUser mints a subject-only JWT for the API-provisioned demo
+// user. The actor's namespace and permissions remain authoritative in the
+// database; the system JWT key only vouches for the subject.
+func signTokenForDemoUser(s settings) (string, error) {
+	return jwt.NewJwtTokenBuilder().
+		WithActorExternalId("demo-user").
+		WithNamespace(demoNamespace).
+		WithServiceIds(config.AllServiceIds()).
+		WithNonce().
+		WithExpiresIn(s.tokenTtl).
+		WithPrivateKeyPath(s.jwtPrivateKeyPath).
+		Token()
+}
+
 // signTokenForFreshUser includes the complete actor claim so AuthProxy creates
 // the never-before-seen actor during authentication. Just-in-time actor claims
 // are signed with the host JWT key rather than an existing actor's key.
@@ -176,18 +209,12 @@ func signTokenForFreshUser(s settings, actorExternalID string) (string, error) {
 	return jwt.NewJwtTokenBuilder().
 		WithActor(&core.Actor{
 			ExternalId: actorExternalID,
-			Namespace:  config.RootNamespace,
+			Namespace:  demoNamespace,
 			Labels: map[string]string{
 				"demo": "true",
 				"role": "user",
 			},
-			Permissions: []aschema.Permission{
-				{
-					Namespace: "root.**",
-					Resources: []string{"*"},
-					Verbs:     []string{"*"},
-				},
-			},
+			Permissions: demoMarketplacePermissions(),
 		}).
 		WithServiceIds(config.AllServiceIds()).
 		WithNonce().
@@ -231,10 +258,13 @@ func ssoHandler(s settings, logger *slog.Logger) http.HandlerFunc {
 		actor := actorExternalID(actorSelection)
 		var token string
 		var err error
-		if actorSelection == freshUserSelection {
+		switch actorSelection {
+		case freshUserSelection:
 			token, err = signTokenForFreshUser(s, actor)
-		} else {
-			token, err = signTokenFor(s, actor)
+		case "demo-user":
+			token, err = signTokenForDemoUser(s)
+		case "demo-admin":
+			token, err = signAdminToken(s)
 		}
 		if err != nil {
 			logger.Error("failed to sign token", "err", err, "actor", actor)

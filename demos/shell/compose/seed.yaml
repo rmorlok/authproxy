@@ -1,0 +1,41 @@
+namespaces:
+  - path: root.demo
+    labels:
+      demo: "true"
+actors:
+  - externalId: demo-user
+    namespace: root.demo
+    permissions:
+      - namespace: root.demo
+        resources:
+          - connectors
+        verbs:
+          - list
+      - namespace: root.demo.{{external_id}}
+        resources:
+          - connections
+        verbs:
+          - create
+          - list
+          - get
+          - update
+          - disconnect
+    labels:
+      demo: "true"
+      role: user
+connectors:
+  - key: demo-compose-noauth
+    namespace: root.demo
+    definition:
+      displayName: Demo Compose NoAuth
+      description: A local no-auth connector for exercising the demo Marketplace.
+      highlight: Connect without third-party credentials.
+      labels:
+        demo: "true"
+        type: demo-compose-noauth
+      auth:
+        type: no-auth
+    labels:
+      auth_method: no_auth
+      demo: "true"
+      showcase: local-compose

@@ -2,14 +2,14 @@
 // against a running AuthProxy admin API. Run as a Helm post-install /
 // post-upgrade hook from the authproxy-demo umbrella chart.
 //
-// Idempotency model: for each desired actor, first GET it by
-// external_id; if AuthProxy returns 404, POST it. For each desired
-// connector, list by the stable demo seed label, create it when absent,
-// or publish a new version when the definition changes. Re-running the
-// seed job is a no-op once the state matches.
+// Idempotency model: namespaces and actors are created when absent and
+// verified against the desired state when present. For each desired connector,
+// list by the stable demo seed label, create it when absent, or publish a new
+// version when the definition changes. Re-running the seed job is a no-op once
+// the state matches.
 //
-// Auth: signs requests as the demo-shell admin actor using the same
-// keypair the demo-shell itself uses. AuthProxy already trusts that
+// Auth: signs requests as the demo-admin actor using the same keypair the
+// demo-shell uses for that actor. AuthProxy already trusts that
 // actor to create/list other actors via the admin-api access scope.
 package main
 
@@ -28,22 +28,32 @@ import (
 	"github.com/go-resty/resty/v2"
 	"github.com/rmorlok/authproxy/internal/apauth/jwt"
 	"github.com/rmorlok/authproxy/internal/schema/api"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util"
 )
 
 // SeedConfig is the YAML shape the binary consumes.
 type SeedConfig struct {
-	Actors             []ActorSeed             `yaml:"actors"`
-	OAuth2TestProvider *OAuth2TestProviderSeed `yaml:"oauth2TestProvider"`
-	Connectors         []ConnectorSeed         `yaml:"connectors"`
+	Namespaces                []NamespaceSeed         `yaml:"namespaces"`
+	Actors                    []ActorSeed             `yaml:"actors"`
+	OAuth2TestProvider        *OAuth2TestProviderSeed `yaml:"oauth2TestProvider"`
+	Connectors                []ConnectorSeed         `yaml:"connectors"`
+	LegacyConnectorNamespaces []string                `yaml:"legacyConnectorNamespaces"`
+}
+
+type NamespaceSeed struct {
+	Path        string            `yaml:"path"`
+	Labels      map[string]string `yaml:"labels,omitempty"`
+	Annotations map[string]string `yaml:"annotations,omitempty"`
 }
 
 type ActorSeed struct {
-	ExternalId  string            `yaml:"externalId"`
-	Namespace   string            `yaml:"namespace,omitempty"`
-	Labels      map[string]string `yaml:"labels,omitempty"`
-	Annotations map[string]string `yaml:"annotations,omitempty"`
+	ExternalId  string               `yaml:"externalId"`
+	Namespace   string               `yaml:"namespace,omitempty"`
+	Permissions []aschema.Permission `yaml:"permissions"`
+	Labels      map[string]string    `yaml:"labels,omitempty"`
+	Annotations map[string]string    `yaml:"annotations,omitempty"`
 }
 
 type ConnectorSeed struct {
@@ -115,6 +125,7 @@ type seedAction string
 const (
 	seedCreated        seedAction = "created"
 	seedAlreadyPresent seedAction = "already-present"
+	seedUpdated        seedAction = "updated"
 )
 
 func mustGetenv(key string) string {
@@ -169,27 +180,79 @@ func newSignedClient(s settings) (*resty.Client, error) {
 	return c, nil
 }
 
-// upsertActor creates the actor if it doesn't already exist by
-// external_id. Returns true when a create was performed, false on
-// no-op.
-func upsertActor(c *resty.Client, baseUrl string, a ActorSeed) (created bool, err error) {
+func upsertNamespace(c *resty.Client, baseUrl string, ns NamespaceSeed) (seedAction, error) {
+	var existing api.NamespaceJson
+	getResp, err := c.R().
+		SetHeader("Accept", "application/json").
+		SetResult(&existing).
+		Get(fmt.Sprintf("%s/api/v1/namespaces/%s", baseUrl, ns.Path))
+	if err != nil {
+		return "", fmt.Errorf("GET namespace %q: %w", ns.Path, err)
+	}
+
+	switch getResp.StatusCode() {
+	case http.StatusOK:
+		if !stringMapsEqual(ns.Labels, existing.Labels) ||
+			!stringMapsEqual(ns.Annotations, existing.Annotations) {
+			return "", fmt.Errorf("namespace %q exists but does not match the configured labels and annotations", ns.Path)
+		}
+		return seedAlreadyPresent, nil
+	case http.StatusNotFound:
+		// fall through to create
+	default:
+		return "", fmt.Errorf("GET namespace %q returned %d: %s", ns.Path, getResp.StatusCode(), getResp.String())
+	}
+
+	postResp, err := c.R().
+		SetHeader("Content-Type", "application/json").
+		SetBody(api.CreateNamespaceRequestJson{
+			Path:        ns.Path,
+			Labels:      ns.Labels,
+			Annotations: ns.Annotations,
+		}).
+		Post(fmt.Sprintf("%s/api/v1/namespaces", baseUrl))
+	if err != nil {
+		return "", fmt.Errorf("POST namespace %q: %w", ns.Path, err)
+	}
+	if postResp.StatusCode() >= 400 {
+		return "", fmt.Errorf("POST namespace %q returned %d: %s", ns.Path, postResp.StatusCode(), postResp.String())
+	}
+	return seedCreated, nil
+}
+
+// upsertActor creates the actor if it doesn't already exist by external_id and
+// reconciles its mutable state when necessary.
+func upsertActor(c *resty.Client, baseUrl string, a ActorSeed) (seedAction, error) {
 	// GET by external_id (with optional namespace).
-	getReq := c.R().SetHeader("Accept", "application/json")
+	var existing api.ActorJson
+	getReq := c.R().SetHeader("Accept", "application/json").SetResult(&existing)
 	if a.Namespace != "" {
 		getReq.SetQueryParam("namespace", a.Namespace)
 	}
 	getResp, err := getReq.Get(fmt.Sprintf("%s/api/v1/actors/external-id/%s", baseUrl, a.ExternalId))
 	if err != nil {
-		return false, fmt.Errorf("GET actor %q: %w", a.ExternalId, err)
+		return "", fmt.Errorf("GET actor %q: %w", a.ExternalId, err)
 	}
 
 	switch getResp.StatusCode() {
 	case http.StatusOK:
-		return false, nil
+		if existing.Namespace != a.Namespace ||
+			existing.ExternalId != a.ExternalId {
+			return "", fmt.Errorf("actor %q exists in namespace %q but does not match the configured state", a.ExternalId, a.Namespace)
+		}
+		if !reflect.DeepEqual(existing.Permissions, a.Permissions) ||
+			!stringMapsEqual(existing.Labels, a.Labels) ||
+			!stringMapsEqual(existing.Annotations, a.Annotations) {
+			if err := updateActor(c, baseUrl, a); err != nil {
+				return "", err
+			}
+			return seedUpdated, nil
+		}
+		return seedAlreadyPresent, nil
 	case http.StatusNotFound:
 		// fall through to create
 	default:
-		return false, fmt.Errorf("GET actor %q returned %d: %s", a.ExternalId, getResp.StatusCode(), getResp.String())
+		return "", fmt.Errorf("GET actor %q returned %d: %s", a.ExternalId, getResp.StatusCode(), getResp.String())
 	}
 
 	body := api.CreateActorRequestJson{
@@ -203,12 +266,35 @@ func upsertActor(c *resty.Client, baseUrl string, a ActorSeed) (created bool, er
 		SetBody(body).
 		Post(fmt.Sprintf("%s/api/v1/actors", baseUrl))
 	if err != nil {
-		return false, fmt.Errorf("POST actor %q: %w", a.ExternalId, err)
+		return "", fmt.Errorf("POST actor %q: %w", a.ExternalId, err)
 	}
 	if postResp.StatusCode() >= 400 {
-		return false, fmt.Errorf("POST actor %q returned %d: %s", a.ExternalId, postResp.StatusCode(), postResp.String())
+		return "", fmt.Errorf("POST actor %q returned %d: %s", a.ExternalId, postResp.StatusCode(), postResp.String())
 	}
-	return true, nil
+
+	if err := updateActor(c, baseUrl, a); err != nil {
+		return "", err
+	}
+	return seedCreated, nil
+}
+
+func updateActor(c *resty.Client, baseUrl string, a ActorSeed) error {
+	patchResp, err := c.R().
+		SetHeader("Content-Type", "application/json").
+		SetQueryParam("namespace", a.Namespace).
+		SetBody(api.UpdateActorRequestJson{
+			Permissions: a.Permissions,
+			Labels:      a.Labels,
+			Annotations: a.Annotations,
+		}).
+		Patch(fmt.Sprintf("%s/api/v1/actors/external-id/%s", baseUrl, a.ExternalId))
+	if err != nil {
+		return fmt.Errorf("PATCH actor %q permissions: %w", a.ExternalId, err)
+	}
+	if patchResp.StatusCode() >= 400 {
+		return fmt.Errorf("PATCH actor %q permissions returned %d: %s", a.ExternalId, patchResp.StatusCode(), patchResp.String())
+	}
+	return nil
 }
 
 func seedOAuth2TestProvider(c *resty.Client, seed OAuth2TestProviderSeed) error {
@@ -378,6 +464,44 @@ func listSeededConnector(c *resty.Client, baseUrl string, seed ConnectorSeed) (*
 	return &list.Items[0], nil
 }
 
+func archiveLegacySeededConnectors(c *resty.Client, baseUrl string, seed ConnectorSeed, legacyNamespaces []string) (int, error) {
+	archived := 0
+	for _, legacyNamespace := range legacyNamespaces {
+		if legacyNamespace == connectorNamespace(seed) {
+			continue
+		}
+
+		legacySeed := seed
+		legacySeed.Namespace = legacyNamespace
+		legacy, err := listSeededConnector(c, baseUrl, legacySeed)
+		if err != nil {
+			return archived, err
+		}
+		if legacy == nil || legacy.State == api.ConnectorVersionStateArchived {
+			continue
+		}
+
+		resp, err := c.R().
+			SetHeader("Content-Type", "application/json").
+			SetBody(map[string]any{}).
+			Post(fmt.Sprintf("%s/api/v1/connectors/%s/_archive", baseUrl, legacy.Id))
+		if err != nil {
+			return archived, fmt.Errorf("POST archive legacy connector seed %q in %q: %w", seed.Key, legacyNamespace, err)
+		}
+		if resp.StatusCode() >= 400 {
+			return archived, fmt.Errorf(
+				"POST archive legacy connector seed %q in %q returned %d: %s",
+				seed.Key,
+				legacyNamespace,
+				resp.StatusCode(),
+				resp.String(),
+			)
+		}
+		archived++
+	}
+	return archived, nil
+}
+
 func getConnectorVersion(c *resty.Client, baseUrl string, connector api.ConnectorJson) (*api.ConnectorVersionJson, error) {
 	var version api.ConnectorVersionJson
 	resp, err := c.R().
@@ -513,11 +637,28 @@ func run(logger *slog.Logger) error {
 	}
 	providerClient := resty.New().SetTimeout(30 * time.Second)
 
+	for _, ns := range cfg.Namespaces {
+		deadline := time.Now().Add(seedRetryTimeout)
+		var action seedAction
+		for attempt := 1; ; attempt++ {
+			action, err = upsertNamespace(client, s.adminApiUrl, ns)
+			if err == nil {
+				break
+			}
+			if time.Now().After(deadline) {
+				return fmt.Errorf("upsert namespace %q after %s: %w", ns.Path, seedRetryTimeout, err)
+			}
+			logger.Warn("namespace seed attempt failed; retrying", "path", ns.Path, "attempt", attempt, "err", err)
+			time.Sleep(seedRetryInterval)
+		}
+		logger.Info("namespace seed complete", "path", ns.Path, "action", action)
+	}
+
 	for _, a := range cfg.Actors {
 		deadline := time.Now().Add(seedRetryTimeout)
-		var created bool
+		var action seedAction
 		for attempt := 1; ; attempt++ {
-			created, err = upsertActor(client, s.adminApiUrl, a)
+			action, err = upsertActor(client, s.adminApiUrl, a)
 			if err == nil {
 				break
 			}
@@ -532,9 +673,12 @@ func run(logger *slog.Logger) error {
 			)
 			time.Sleep(seedRetryInterval)
 		}
-		if created {
+		switch action {
+		case seedCreated:
 			logger.Info("actor created", "external_id", a.ExternalId, "namespace", a.Namespace)
-		} else {
+		case seedUpdated:
+			logger.Info("actor updated", "external_id", a.ExternalId, "namespace", a.Namespace)
+		case seedAlreadyPresent:
 			logger.Info("actor already present", "external_id", a.ExternalId, "namespace", a.Namespace)
 		}
 	}
@@ -568,8 +712,17 @@ func run(logger *slog.Logger) error {
 	for _, connector := range cfg.Connectors {
 		deadline := time.Now().Add(seedRetryTimeout)
 		var action connectorAction
+		var legacyArchived int
 		for attempt := 1; ; attempt++ {
 			action, err = upsertConnector(client, s.adminApiUrl, connector)
+			if err == nil {
+				legacyArchived, err = archiveLegacySeededConnectors(
+					client,
+					s.adminApiUrl,
+					connector,
+					cfg.LegacyConnectorNamespaces,
+				)
+			}
 			if err == nil {
 				break
 			}
@@ -592,6 +745,9 @@ func run(logger *slog.Logger) error {
 			logger.Info("connector updated", "key", connector.Key, "namespace", connectorNamespace(connector))
 		case connectorAlreadyPresent:
 			logger.Info("connector already present", "key", connector.Key, "namespace", connectorNamespace(connector))
+		}
+		if legacyArchived > 0 {
+			logger.Info("legacy connector archived", "key", connector.Key, "count", legacyArchived)
 		}
 	}
 	return nil

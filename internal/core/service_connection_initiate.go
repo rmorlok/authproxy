@@ -52,6 +52,18 @@ func (s *service) InitiateConnection(
 	targetNamespace := c.GetNamespace()
 	if req.HasIntoNamespace() {
 		targetNamespace = req.IntoNamespace
+	} else if val.ValidateNamespaceResourceId(targetNamespace, c.GetId().String()) != nil {
+		// Existing clients omit intoNamespace. When their permissions grant
+		// connection creation in one exact child namespace, use that unambiguous
+		// destination rather than forcing every client to duplicate tenancy
+		// routing logic.
+		if inferred, ok := inferConnectionNamespace(
+			c.GetNamespace(),
+			apauth.ActorFromContext(ctx).GetNamespace(),
+			val.GetEffectiveNamespaceMatchers(nil),
+		); ok {
+			targetNamespace = inferred
+		}
 	}
 
 	if err := namespace.ValidatePath(targetNamespace); err != nil {
@@ -115,4 +127,19 @@ func (s *service) InitiateConnection(
 	}
 
 	return connection.advanceToStep(ctx, first, flow, req.ReturnToUrl)
+}
+
+func inferConnectionNamespace(connectorNamespace, actorNamespace string, allowedNamespaces []string) (string, bool) {
+	if len(allowedNamespaces) != 1 {
+		return "", false
+	}
+
+	candidate := allowedNamespaces[0]
+	if namespace.ValidatePath(candidate) != nil ||
+		!namespace.IsSameOrChild(connectorNamespace, candidate) ||
+		!namespace.IsSameOrChild(actorNamespace, candidate) {
+		return "", false
+	}
+
+	return candidate, true
 }

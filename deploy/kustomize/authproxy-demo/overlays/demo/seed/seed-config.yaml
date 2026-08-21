@@ -4,27 +4,33 @@ metadata:
   name: seed-config
 data:
   seed.yaml: |
+    namespaces:
+      - path: root.demo
+        labels:
+          demo: "true"
     actors:
-      - externalId: demo-admin
-        namespace: root
-        labels:
-          demo: "true"
-          role: admin
       - externalId: demo-user
-        namespace: root
+        namespace: root.demo
+        permissions:
+          - namespace: root.demo
+            resources:
+              - connectors
+            verbs:
+              - list
+          - namespace: root.demo.{{external_id}}
+            resources:
+              - connections
+            verbs:
+              - create
+              - list
+              - get
+              - update
+              - disconnect
         labels:
           demo: "true"
           role: user
-      - externalId: fresh-user
-        namespace: root
-        labels:
-          demo: "true"
-          role: user
-      - externalId: grafana
-        namespace: root
-        labels:
-          demo: "true"
-          role: datasource
+    legacyConnectorNamespaces:
+      - root
     oauth2TestProvider:
       apiKeyResourcePolicies:
         - key: demo-api-key
@@ -78,7 +84,7 @@ data:
           auth_method: no_auth
           demo: "true"
           showcase: catalog
-        namespace: root
+        namespace: root.demo
       - definition:
           auth:
             placement:
@@ -109,7 +115,7 @@ data:
           auth_method: api-key
           demo: "true"
           showcase: api-key
-        namespace: root
+        namespace: root.demo
       - definition:
           auth:
             authorization:
@@ -142,7 +148,7 @@ data:
           auth_method: oauth2
           demo: "true"
           showcase: simple-oauth
-        namespace: root
+        namespace: root.demo
       - definition:
           auth:
             authorization:
@@ -202,7 +208,7 @@ data:
           auth_method: oauth2
           demo: "true"
           showcase: preconnect
-        namespace: root
+        namespace: root.demo
       - definition:
           auth:
             authorization:
@@ -273,4 +279,4 @@ data:
           auth_method: oauth2
           demo: "true"
           showcase: postconnect-configure
-        namespace: root
+        namespace: root.demo

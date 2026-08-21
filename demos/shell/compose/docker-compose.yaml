@@ -39,8 +39,8 @@ services:
     volumes:
       # Mount the demo-shell's public key into AuthProxy's actors
       # directory so dev_config/docker.yaml's `keys_path: ...keys/admin`
-      # picks it up and registers `demo-shell` as an admin actor.
-      - ./keys/demo-shell.pub:/app/dev_config/keys/admin/demo-shell.pub:ro
+      # picks it up and registers `demo-admin` as an admin actor.
+      - ./keys/demo-shell.pub:/app/dev_config/keys/admin/demo-admin.pub:ro
       # Use the same local-only keypair as the host JWT key so the shell can
       # provision a new actor for each Fresh user launch.
       - ./keys/demo-shell:/app/dev_config/keys/system:ro
@@ -55,7 +55,7 @@ services:
     ports:
       - "8888:8888"
     environment:
-      ADMIN_USERNAME: demo-shell
+      ADMIN_USERNAME: demo-admin
       ADMIN_PRIVATE_KEY_PATH: /keys/demo-shell
       AUTHPROXY_JWT_PRIVATE_KEY_PATH: /keys/demo-shell
       # URLs the BROWSER reaches — must be host-mapped, not container DNS.
@@ -64,5 +64,19 @@ services:
       AUTHPROXY_ADMIN_UI_URL: http://localhost:8082
     volumes:
       - ./keys/demo-shell:/keys/demo-shell:ro
+    depends_on:
+      authproxy: { condition: service_started }
+
+  demo-seed:
+    image: ghcr.io/rmorlok/authproxy-demo-seed:${IMAGE_TAG:-main}
+    pull_policy: always
+    environment:
+      ADMIN_API_URL: http://authproxy:8082
+      ADMIN_USERNAME: demo-admin
+      ADMIN_PRIVATE_KEY_PATH: /keys/demo-shell
+      SEED_CONFIG_PATH: /seed/seed.yaml
+    volumes:
+      - ./keys/demo-shell:/keys/demo-shell:ro
+      - ./seed.yaml:/seed/seed.yaml:ro
     depends_on:
       authproxy: { condition: service_started }

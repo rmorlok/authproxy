@@ -1,9 +1,8 @@
 # schema: https://json.schemastore.org/github-workflow.json
 name: Seed Demo
 
-# Manually reseeds the persistent demo environment. This is intentionally
-# decoupled from Deploy Demo so demo data can be refreshed on demand
-# without rolling the application.
+# Manually reruns the same seed process used by Deploy Demo, so demo data can
+# also be verified or refreshed on demand without rolling the application.
 on:
   workflow_dispatch:
     inputs:

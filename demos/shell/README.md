@@ -24,16 +24,24 @@ before redirecting them into the appropriate AuthProxy UI.
                             └──────────────────────────────────────────────────┘
 ```
 
-The backend holds the demo actor private key for pre-provisioned identities and
-the host JWT private key for just-in-time provisioning. Selecting **Fresh user**
-creates a random `fresh-user-<uuid>` external ID, includes the complete actor in
-the JWT, and lets AuthProxy create that actor during session initiation.
+The backend holds the demo administrator's private key and the system JWT
+private key. The pre-provisioned `demo-admin` continues to self-sign. The
+API-provisioned `demo-user` receives a subject-only system-key-signed token, so
+its stored actor permissions remain authoritative. Selecting **Fresh user**
+creates a random `fresh-user-<uuid>` external ID and includes the complete,
+least-privilege actor in a system-key-signed JWT so AuthProxy can create it
+during session initiation.
+
+Demo Marketplace actors live in `root.demo`. They can list the demo connectors
+there and manage connections only in `root.demo.<external_id>`, isolating each
+user's connections from every other demo user.
 
 ## Running locally
 
 Pre-requisites:
 - AuthProxy server running locally (`go run ./cmd/server serve --config=./dev_config/default.yaml all`)
-- A configured admin actor in your AuthProxy config that the demo shell can use as its signing identity
+- A configured `demo-admin` actor in your AuthProxy config that the demo shell can use as its signing identity
+- A `root.demo` namespace, seeded demo connectors, and an API-created `demo-user` actor (the hosted deployment's seed job provisions these)
 - Node + Yarn pinned via Volta (see root `package.json`)
 
 ### 1. Generate the demo admin keypair (one-time, local)
@@ -49,7 +57,7 @@ Add the public key as an admin actor in `dev_config/default.yaml`:
 ```yaml
 systemAuth:
   actors:
-    - externalId: demo-shell
+    - externalId: demo-admin
       key:
         publicKey:
           path: ./demos/shell/dev_keys/demo-shell.pub
@@ -72,7 +80,7 @@ yarn workspace @authproxy/demo-shell dev
 ### 3. Start the demo-shell backend
 
 ```bash
-ADMIN_USERNAME=demo-shell \
+ADMIN_USERNAME=demo-admin \
 ADMIN_PRIVATE_KEY_PATH=./demos/shell/dev_keys/demo-shell \
 AUTHPROXY_JWT_PRIVATE_KEY_PATH=./dev_config/keys/system \
 AUTHPROXY_ADMIN_UI_URL=http://localhost:5174 \
@@ -99,8 +107,8 @@ views and the demo OAuth provider.
 
 ## Local smoke via docker-compose
 
-Self-contained recipe that pulls `authproxy` + `authproxy-demo-shell`
-from GHCR — no local Go / Node toolchain required.
+Lightweight recipe that pulls `authproxy` + `authproxy-demo-shell` from GHCR —
+no local Go / Node toolchain required.
 
 ```bash
 cd demos/shell/compose
@@ -113,11 +121,13 @@ The recipe wires:
 - `authproxy:main` (postgres + redis + AuthProxy) on ports 8080/8081/8082
 - `authproxy-demo-shell:main` on port 8888, mounting the generated
   private key + pointing at the host-mapped AuthProxy URLs
+- `authproxy-demo-seed:main` as a one-shot job that creates `root.demo`,
+  `demo-user`, and a local no-auth demo connector
 
 `./keys/demo-shell.pub` is bind-mounted into AuthProxy's actors directory
 so `dev_config/docker.yaml`'s `keys_path` picks it up and registers
-`demo-shell` as an admin actor. The smoke recipe lives entirely under
-`demos/shell/compose/` — pin to a non-`:main` image via
+`demo-admin` as an admin actor. The recipe lives entirely under
+`demos/shell/compose/` — pin all three application images to a non-`:main` tag via
 `IMAGE_TAG=pr-NNN docker compose up` when testing branches.
 
 ## Configuration reference
