@@ -36,8 +36,9 @@ type RemoteAuthProxyOptions struct {
 	ConnectorNamespace   string
 	ConnectionNamespace  string
 
-	GlobalKey            string
-	UserActorPermissions []aschema.Permission
+	GlobalKey             string
+	AdminActorPermissions []aschema.Permission
+	UserActorPermissions  []aschema.Permission
 }
 
 type RemoteAuthProxy struct {
@@ -52,9 +53,10 @@ type RemoteAuthProxy struct {
 	ConnectorNamespace   string
 	ConnectionNamespace  string
 
-	globalKey            string
-	userActorPermissions []aschema.Permission
-	client               *http.Client
+	globalKey             string
+	adminActorPermissions []aschema.Permission
+	userActorPermissions  []aschema.Permission
+	client                *http.Client
 }
 
 type remoteResponse struct {
@@ -68,6 +70,10 @@ func NewRemoteAuthProxy(t *testing.T, opts RemoteAuthProxyOptions) *RemoteAuthPr
 
 	require.NotEmpty(t, opts.BaseURL, "base URL is required")
 	require.NotEmpty(t, opts.GlobalKey, "global key is required")
+	require.NotEmpty(t, opts.AdminActorPermissions, "admin actor permissions are required")
+	for i, permission := range opts.AdminActorPermissions {
+		require.NoErrorf(t, permission.Validate(), "admin actor permission %d is invalid", i)
+	}
 	require.NotEmpty(t, opts.UserActorPermissions, "user actor permissions are required")
 	for i, permission := range opts.UserActorPermissions {
 		require.NoErrorf(t, permission.Validate(), "user actor permission %d is invalid", i)
@@ -112,18 +118,19 @@ func NewRemoteAuthProxy(t *testing.T, opts RemoteAuthProxyOptions) *RemoteAuthPr
 	}
 
 	return &RemoteAuthProxy{
-		AdminURL:             strings.TrimRight(adminURL, "/"),
-		PublicURL:            strings.TrimRight(publicURL, "/"),
-		ProviderURL:          strings.TrimRight(providerURL, "/"),
-		AdminActorExternalID: adminActor,
-		AdminActorNamespace:  adminActorNamespace,
-		UserActorExternalID:  userActor,
-		UserActorNamespace:   userActorNamespace,
-		ConnectorNamespace:   connectorNamespace,
-		ConnectionNamespace:  connectionNamespace,
-		globalKey:            opts.GlobalKey,
-		userActorPermissions: opts.UserActorPermissions,
-		client:               &http.Client{Timeout: 30 * time.Second},
+		AdminURL:              strings.TrimRight(adminURL, "/"),
+		PublicURL:             strings.TrimRight(publicURL, "/"),
+		ProviderURL:           strings.TrimRight(providerURL, "/"),
+		AdminActorExternalID:  adminActor,
+		AdminActorNamespace:   adminActorNamespace,
+		UserActorExternalID:   userActor,
+		UserActorNamespace:    userActorNamespace,
+		ConnectorNamespace:    connectorNamespace,
+		ConnectionNamespace:   connectionNamespace,
+		globalKey:             opts.GlobalKey,
+		adminActorPermissions: opts.AdminActorPermissions,
+		userActorPermissions:  opts.UserActorPermissions,
+		client:                &http.Client{Timeout: 30 * time.Second},
 	}
 }
 
@@ -423,20 +430,22 @@ func (h *RemoteAuthProxy) signer(actorExternalID, actorNamespace string) (jwt.Si
 		WithServiceIds(sconfig.AllServiceIds()).
 		WithExpiresIn(15 * time.Minute)
 
-	if actorExternalID == h.UserActorExternalID && actorNamespace == h.UserActorNamespace {
-		builder = builder.
-			WithActor(&core.Actor{
-				ExternalId:  actorExternalID,
-				Namespace:   actorNamespace,
-				Permissions: h.userActorPermissions,
-			}).
-			WithPermissions(h.userActorPermissions)
-	} else {
-		builder = builder.
-			WithActorExternalId(actorExternalID).
-			WithNamespace(actorNamespace).
-			WithPermissions(aschema.AllPermissions())
+	var permissions []aschema.Permission
+	switch {
+	case actorExternalID == h.AdminActorExternalID && actorNamespace == h.AdminActorNamespace:
+		permissions = h.adminActorPermissions
+	case actorExternalID == h.UserActorExternalID && actorNamespace == h.UserActorNamespace:
+		permissions = h.userActorPermissions
+	default:
+		return nil, fmt.Errorf("no permissions configured for actor %q in namespace %q", actorExternalID, actorNamespace)
 	}
+	builder = builder.
+		WithActor(&core.Actor{
+			ExternalId:  actorExternalID,
+			Namespace:   actorNamespace,
+			Permissions: permissions,
+		}).
+		WithPermissions(permissions)
 
 	if looksLikePath(h.globalKey) {
 		builder = builder.WithSecretKeyPath(h.globalKey)

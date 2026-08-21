@@ -32,13 +32,50 @@ var (
 
 const smokeConnectorNamespace = "root.smoke"
 
-func newSmokeUserExternalID(t *testing.T) string {
+func newSmokeActorExternalID(t *testing.T, prefix string) string {
 	t.Helper()
 
 	var entropy [4]byte
 	_, err := rand.Read(entropy[:])
 	require.NoError(t, err)
-	return fmt.Sprintf("smoke-user-%s-%s", time.Now().UTC().Format("20060102T150405Z"), hex.EncodeToString(entropy[:]))
+	return fmt.Sprintf("%s-%s-%s", prefix, time.Now().UTC().Format("20060102T150405Z"), hex.EncodeToString(entropy[:]))
+}
+
+func smokeAdminPermissions(adminExternalID, userExternalID, connectionNamespace string) []aschema.Permission {
+	return []aschema.Permission{
+		{
+			Namespace:   config.RootNamespace,
+			Resources:   []string{"actors"},
+			ResourceIds: []string{adminExternalID},
+			Verbs:       []string{"get", "delete"},
+		},
+		{
+			Namespace: config.RootNamespace,
+			Resources: []string{"connectors"},
+			Verbs:     []string{"list", "list/versions"},
+		},
+		{
+			Namespace: smokeConnectorNamespace,
+			Resources: []string{"namespaces"},
+			Verbs:     []string{"get", "create"},
+		},
+		{
+			Namespace: connectionNamespace,
+			Resources: []string{"namespaces"},
+			Verbs:     []string{"get", "create"},
+		},
+		{
+			Namespace:   smokeConnectorNamespace,
+			Resources:   []string{"actors"},
+			ResourceIds: []string{userExternalID},
+			Verbs:       []string{"get", "delete"},
+		},
+		{
+			Namespace: smokeConnectorNamespace,
+			Resources: []string{"connectors"},
+			Verbs:     []string{"create", "force_state"},
+		},
+	}
 }
 
 func smokeUserPermissions(connectionNamespace string) []aschema.Permission {
@@ -59,27 +96,39 @@ func smokeUserPermissions(connectionNamespace string) []aschema.Permission {
 func newRemoteSmokeRig(t *testing.T) *helpers.RemoteAuthProxy {
 	t.Helper()
 
-	userExternalID := newSmokeUserExternalID(t)
+	adminExternalID := newSmokeActorExternalID(t, "smoke-admin")
+	userExternalID := newSmokeActorExternalID(t, "smoke-user")
 	connectionNamespace := smokeConnectorNamespace + "." + userExternalID
-	permissions := smokeUserPermissions(connectionNamespace)
+	adminPermissions := smokeAdminPermissions(adminExternalID, userExternalID, connectionNamespace)
+	userPermissions := smokeUserPermissions(connectionNamespace)
 	rig := helpers.NewRemoteAuthProxy(t, helpers.RemoteAuthProxyOptions{
-		BaseURL:              *smokeBaseURL,
-		GlobalKey:            *smokeGlobalKey,
-		AdminActorNamespace:  config.RootNamespace,
-		UserActorExternalID:  userExternalID,
-		UserActorNamespace:   smokeConnectorNamespace,
-		UserActorPermissions: permissions,
-		ConnectorNamespace:   smokeConnectorNamespace,
-		ConnectionNamespace:  connectionNamespace,
+		BaseURL:               *smokeBaseURL,
+		GlobalKey:             *smokeGlobalKey,
+		AdminActorExternalID:  adminExternalID,
+		AdminActorNamespace:   config.RootNamespace,
+		AdminActorPermissions: adminPermissions,
+		UserActorExternalID:   userExternalID,
+		UserActorNamespace:    smokeConnectorNamespace,
+		UserActorPermissions:  userPermissions,
+		ConnectorNamespace:    smokeConnectorNamespace,
+		ConnectionNamespace:   connectionNamespace,
 	})
 	rig.EnsureNamespace(t, smokeConnectorNamespace)
+	adminActor := rig.GetActorByExternalID(t, config.RootNamespace, adminExternalID)
+	require.Equal(t, config.RootNamespace, adminActor.Namespace)
+	require.Equal(t, adminExternalID, adminActor.ExternalId)
+	require.Equal(t, adminPermissions, adminActor.Permissions)
+	t.Cleanup(func() {
+		rig.DeleteActorByExternalIDAsAdmin(t, config.RootNamespace, adminExternalID)
+	})
+
 	rig.EnsureNamespace(t, connectionNamespace)
 	rig.ProvisionUserFromJWT(t)
 
 	actor := rig.GetActorByExternalID(t, smokeConnectorNamespace, userExternalID)
 	require.Equal(t, smokeConnectorNamespace, actor.Namespace)
 	require.Equal(t, userExternalID, actor.ExternalId)
-	require.Equal(t, permissions, actor.Permissions)
+	require.Equal(t, userPermissions, actor.Permissions)
 	t.Cleanup(func() {
 		rig.DeleteActorByExternalIDAsAdmin(t, smokeConnectorNamespace, userExternalID)
 	})
