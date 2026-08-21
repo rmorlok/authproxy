@@ -3,18 +3,22 @@
 package oauth2
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/cookiejar"
 	"net/url"
 	"testing"
 	"time"
 
-	"github.com/chromedp/chromedp"
 	"github.com/rmorlok/authproxy/integration_tests/helpers"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/auth_methods/oauth2"
 	"github.com/rmorlok/authproxy/internal/database"
-	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
+	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -60,12 +64,11 @@ func TestCallbackRejection_CrossNamespace(t *testing.T) {
 
 	logCapture := helpers.NewLogCapture()
 	env := helpers.Setup(t, helpers.SetupOptions{
-		Service:            helpers.ServiceTypeAPI,
-		StartHTTPServer:    true,
-		IncludePublic:      true,
-		ServeMarketplaceUI: true,
-		Connectors:         []sconfig.Connector{connector},
-		LogCapture:         logCapture,
+		Service:         helpers.ServiceTypeAPI,
+		StartHTTPServer: true,
+		IncludePublic:   true,
+		Connectors:      []sconfig.Connector{connector},
+		LogCapture:      logCapture,
 	})
 	defer env.Cleanup()
 
@@ -118,21 +121,50 @@ func TestCallbackRejection_CrossNamespace(t *testing.T) {
 	code := providerCallback.Query().Get("code")
 	require.NotEmpty(t, code, "provider should issue a code on approve; got %s", authResp.RedirectURL)
 
-	// 3. Victim bob's marketplace session in tenant-b. Same externalId
-	//    as alice but a different namespace, so the auth middleware
-	//    materializes a separate actor row with a different actorId.
+	// 3. Establish victim bob's browser-style session in tenant-b. Same
+	//    externalId as alice but a different namespace, so the auth
+	//    middleware materializes a separate actor row with a different actorId.
 	bobAuthToken, err := env.PublicAuthUtil.GenerateBearerToken(
-		ctx, sharedExternalID, tenantB, aschema.AllPermissions(),
+		ctx, sharedExternalID, tenantB, helpers.AllPermissionsForNamespace(tenantB),
 	)
 	require.NoError(t, err)
 
-	browserCtx, _ := helpers.NewBrowser(t)
+	jar, err := cookiejar.New(nil)
+	require.NoError(t, err)
+	browserClient := &http.Client{
+		Jar: jar,
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	sessionBody, err := json.Marshal(schemaapi.SessionInitiateParams{ReturnToUrl: env.PublicURL + "/connectors"})
+	require.NoError(t, err)
+	sessionReq, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodPost,
+		env.PublicURL+"/api/v1/session/_initiate",
+		bytes.NewReader(sessionBody),
+	)
+	require.NoError(t, err)
+	sessionReq.Header.Set("Authorization", "Bearer "+bobAuthToken)
+	sessionReq.Header.Set("Content-Type", "application/json")
+	sessionResp, err := browserClient.Do(sessionReq)
+	require.NoError(t, err)
+	_, readErr := io.Copy(io.Discard, sessionResp.Body)
+	require.NoError(t, readErr)
+	require.NoError(t, sessionResp.Body.Close())
+	require.Equal(t, http.StatusOK, sessionResp.StatusCode)
 
-	connectorsURL := env.PublicURL + "/connectors?authToken=" + url.QueryEscape(bobAuthToken)
-	require.NoError(t, chromedp.Run(browserCtx,
-		chromedp.Navigate(connectorsURL),
-		chromedp.WaitVisible(`//button[normalize-space()='Connect']`, chromedp.BySearch),
-	))
+	publicURL, err := url.Parse(env.PublicURL)
+	require.NoError(t, err)
+	hasSessionCookie := false
+	for _, cookie := range jar.Cookies(publicURL) {
+		if cookie.Name == "SESSION-ID" {
+			hasSessionCookie = true
+			break
+		}
+	}
+	require.True(t, hasSessionCookie, "session initiation should set a SESSION-ID cookie")
 
 	// 4. Bob's browser follows the forged callback link. The browser
 	//    carries bob's SESSION-ID cookie, so the public service
@@ -144,15 +176,12 @@ func TestCallbackRejection_CrossNamespace(t *testing.T) {
 	errorPageURL := env.Cfg.GetRoot().ErrorPages.InternalError
 	require.NotEmpty(t, errorPageURL, "test config must set error_pages.internal_error")
 
-	require.NoError(t, chromedp.Run(browserCtx,
-		chromedp.Navigate(forgedURL),
-		chromedp.WaitVisible(`h1`, chromedp.ByQuery),
-	))
-
-	var finalURL string
-	require.NoError(t, chromedp.Run(browserCtx, chromedp.Location(&finalURL)))
-	assert.Equalf(t, errorPageURL, finalURL,
-		"bob's browser should land on error_pages.internal_error after rejection; got %q", finalURL)
+	callbackResp, err := browserClient.Get(forgedURL)
+	require.NoError(t, err)
+	defer callbackResp.Body.Close()
+	require.Equal(t, http.StatusFound, callbackResp.StatusCode)
+	assert.Equalf(t, errorPageURL, callbackResp.Header.Get("Location"),
+		"bob's browser should be redirected to error_pages.internal_error after rejection")
 
 	// 5. Exactly one rejection event with category=actor_mismatch.
 	events := logCapture.RecordsWithMessage(t, rejectionEventMessage)

@@ -75,26 +75,24 @@ For every test:
 - **Provider observed zero `/token` calls.** The token exchange
   path was short-circuited by state validation.
 
-## Test 1 — `TestCallbackRejection_CrossNamespace` (chromedp)
+## Test 1 — `TestCallbackRejection_CrossNamespace` (session cookie)
 
 Bug-bounty shape, multi-tenant flavor. Drives the victim leg through
-chromedp + the marketplace SPA bootstrap so the test mirrors the
-attacker-sends-link-to-victim delivery vector.
+the public session endpoint with a cookie jar so the callback is delivered
+with the same `SESSION-ID` cookie a browser would carry.
 
 | Step | Action |
 | ---- | ------ |
 | Setup | Create namespaces `root.tenant-a-<suffix>`, `root.tenant-b-<suffix>`. |
 | Attacker | Alice (externalId = `user-123-<suffix>`) initiates in tenant-a. State has `Namespace=tenant-a`, `ActorId=act_alice`. |
 | Provider | `/test/authorize` issues a code under alice's stateId. |
-| Victim | Bob (externalId = `user-123-<suffix>`, same as alice) bootstraps via `/connectors?authToken=<bob>` in tenant-b. Browser holds `SESSION-ID` cookie scoped to bob. |
-| Forge | Browser navigates to the cross-tenant callback URL. |
+| Victim | Bob (externalId = `user-123-<suffix>`, same as alice) exchanges his tenant-b bearer token at `/session/_initiate`. The cookie jar holds the resulting `SESSION-ID` cookie scoped to bob. |
+| Forge | The cookie-aware client requests the cross-tenant callback URL. |
 | Reject | Public service identifies bob (act_bob in tenant-b); `s.ActorId (act_alice) != act_bob` → `actor_mismatch`. |
 
-**Why chromedp:** the saved feedback (cross-actor / cross-tenant
-tests prefer chromedp) applies — this is the realistic delivery
-vector for the bug-bounty submission shape. Direct-HTTP would
-exercise the same `state.ActorId` check but wouldn't mirror how the
-attack actually shows up.
+**Why a cookie jar:** the test still exercises the production session exchange
+and callback cookie path, without assuming a tenant-b actor can list the
+root-scoped connector in the marketplace UI.
 
 ## Test 2 — `TestCallbackRejection_NamespaceMismatchActor` (synthetic state, direct HTTP)
 
@@ -145,19 +143,19 @@ data even when the forgery names the victim's connection id.
 | -------------------------------------------------------- | ---------------- |
 | `env.Core.CreateNamespace(ctx, "root.tenant-x-…", nil)`  | Pre-creates child namespaces for multi-tenant tests. |
 | `env.InitiateOAuth2Connection(t, …, helpers.WithActor(ext, ns))` | Initiates as a named actor in a named namespace; sets `IntoNamespace` so the connection lives in the actor's tenant. |
-| `env.PublicAuthUtil.GenerateBearerToken(ctx, ext, ns, perms)` | Mints a JWT for any namespace; used to bootstrap the chromedp marketplace session. |
+| `env.PublicAuthUtil.GenerateBearerToken(ctx, ext, ns, perms)` | Mints a JWT for any namespace; used to establish the victim's public session. |
 | `env.WriteOAuth2StateForTest(t, OAuth2StateForTest{…}, ttl)` | Encrypts a synthetic state envelope via `env.DM.GetEncryptService().EncryptGlobal` and writes it to Redis at `oauth2:state:<id>`. The shape of `OAuth2StateForTest` mirrors the unexported production `state` struct. |
 | `env.DeliverOAuth2Callback(t, url, helpers.WithActor(ext, ns))` | Delivers the callback signed as a specific actor in a specific namespace; mirrors the JWT a real browser session would carry. |
 | `logCapture.RecordsWithMessage(t, rejectionEventMessage)` | Surfaces the structured rejection event for category assertions. |
 
-## Sequence — Test 1 (chromedp)
+## Sequence — Test 1 (session cookie)
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant T as Test
     participant ATK as Alice (tenant-a)
-    participant VIC as Bob's browser<br/>(chromedp, tenant-b)
+    participant VIC as Bob's cookie-aware client<br/>(tenant-b)
     participant PUB as Public service
     participant API as API service
     participant DB as Postgres
@@ -171,10 +169,11 @@ sequenceDiagram
     T->>P: POST /test/authorize (decision=approve)
     P-->>T: redirect URL with code + state_id
 
-    T->>VIC: navigate /connectors?authToken=<bob@tenant-b>
-    VIC->>PUB: SPA bootstrap → SESSION-ID cookie for bob@tenant-b
+    T->>VIC: configure bearer token for bob@tenant-b
+    VIC->>PUB: POST /session/_initiate
+    PUB-->>VIC: SESSION-ID cookie for bob@tenant-b
 
-    T->>VIC: navigate /oauth2/callback?state=…&code=…
+    T->>VIC: request /oauth2/callback?state=…&code=…
     VIC->>PUB: GET /oauth2/callback (carries bob's cookie)
     PUB->>R: GET state envelope
     PUB->>PUB: s.ActorId(act_alice) ≠ caller(act_bob)

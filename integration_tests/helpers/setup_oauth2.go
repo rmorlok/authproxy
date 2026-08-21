@@ -19,6 +19,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	nschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/stretchr/testify/require"
 )
 
@@ -57,6 +58,16 @@ func WithActor(externalID, namespace string) ActorOption {
 		c.actorExternalID = externalID
 		c.actorNamespace = namespace
 	}
+}
+
+// AllPermissionsForNamespace grants broad test permissions at or below the
+// supplied namespace without allowing the actor to escape its namespace.
+func AllPermissionsForNamespace(namespace string) []aschema.Permission {
+	return aschema.PermissionsSingle(
+		namespace+nschema.WildcardSuffix,
+		aschema.PermissionWildcard,
+		aschema.PermissionWildcard,
+	)
 }
 
 // OAuth2ConnectorOptions configures NewOAuth2Connector. Endpoints default to
@@ -222,7 +233,7 @@ func (env *IntegrationTestEnv) InitiateOAuth2Connection(t *testing.T, connectorI
 		body,
 		cfg.actorNamespace,
 		cfg.actorExternalID,
-		aschema.AllPermissions(),
+		AllPermissionsForNamespace(cfg.actorNamespace),
 	)
 	require.NoError(t, err)
 
@@ -334,7 +345,7 @@ func (env *IntegrationTestEnv) DeliverOAuth2Callback(t *testing.T, callbackURL s
 		nil,
 		cfg.actorNamespace,
 		cfg.actorExternalID,
-		aschema.AllPermissions(),
+		AllPermissionsForNamespace(cfg.actorNamespace),
 	)
 	require.NoError(t, err)
 

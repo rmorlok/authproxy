@@ -14,7 +14,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/auth_methods/api_key"
 	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
-	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/stretchr/testify/require"
@@ -221,7 +220,7 @@ func (env *IntegrationTestEnv) doSignedRequest(t *testing.T, method, path string
 		body,
 		cfg.actorNamespace,
 		cfg.actorExternalID,
-		aschema.AllPermissions(),
+		AllPermissionsForNamespace(cfg.actorNamespace),
 	)
 	require.NoError(t, err)
 

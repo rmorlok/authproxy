@@ -16,7 +16,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/apauth/jwt"
 	"github.com/rmorlok/authproxy/internal/apid"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
-	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/stretchr/testify/require"
 )
@@ -318,7 +317,7 @@ func (h *RemoteAuthProxy) signer(actorExternalID string) (jwt.Signer, error) {
 		WithNamespace(h.Namespace).
 		WithActorSigned().
 		WithServiceIds(sconfig.AllServiceIds()).
-		WithPermissions(aschema.AllPermissions()).
+		WithPermissions(AllPermissionsForNamespace(h.Namespace)).
 		WithExpiresIn(15 * time.Minute)
 
 	if looksLikePath(h.privateKey) {
