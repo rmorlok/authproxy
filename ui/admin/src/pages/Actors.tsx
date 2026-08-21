@@ -35,24 +35,10 @@ export const columns: GridColDef<Actor>[] = [
         sortable: true,
     },
     {
-        field: 'email',
-        headerName: 'Email',
-        flex: 0.3,
-        minWidth: 60,
-        sortable: true,
-    },
-    {
-        field: 'admin',
-        headerName: 'Admin',
+        field: 'namespace',
+        headerName: 'Namespace',
         flex: 0.5,
-        minWidth: 80,
-        sortable: true,
-    },
-    {
-        field: 'superAdmin',
-        headerName: 'Super Admin',
-        flex: 0.5,
-        minWidth: 80,
+        minWidth: 90,
         sortable: true,
     },
     {
