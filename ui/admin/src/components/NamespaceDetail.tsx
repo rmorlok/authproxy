@@ -34,6 +34,7 @@ import ResourceIdentifier from './ResourceIdentifier';
 import ResourceMetadataMenuItems from './ResourceMetadataMenuItems';
 import AnnotationsEditor from "./AnnotationsEditor";
 import ResourceNameEditor from './ResourceNameEditor';
+import {ResourceLabels} from './ResourceMetadataFields';
 
 function StateChip({state}: { state: NamespaceState }) {
   const colors: Record<string, "default" | "success" | "error" | "info" | "warning" | "primary" | "secondary"> = {
@@ -217,18 +218,7 @@ export default function NamespaceDetail({namespacePath}: { namespacePath: string
         </Box>
       </Stack>
 
-      <Box>
-        <Typography variant="subtitle2" color="text.secondary">Labels</Typography>
-        {ns.labels && Object.keys(ns.labels).length > 0 ? (
-          <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{mt: 0.5}}>
-            {Object.entries(ns.labels).map(([key, value]) => (
-              <Chip key={key} label={`${key}: ${value}`} size="small" variant="outlined"/>
-            ))}
-          </Stack>
-        ) : (
-          <Typography variant="body2" color="text.secondary">No labels</Typography>
-        )}
-      </Box>
+      <ResourceLabels labels={ns.labels}/>
 
       <AnnotationsEditor annotations={ns.annotations} readOnly onPut={async () => {}} onDelete={async () => {}}/>
 

@@ -83,6 +83,7 @@ describe('Actors table columns', () => {
             'id',
             'externalId',
             'namespace',
+            'labels',
             'createdAt',
             'updatedAt',
         ]);

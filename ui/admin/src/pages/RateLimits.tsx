@@ -32,6 +32,7 @@ import {useNavigate} from "react-router-dom";
 import {useSelector} from "react-redux";
 import {selectCurrentNamespaceMatcher, selectCurrentNamespacePath} from "../store/namespacesSlice";
 import {toSnakeCase} from '../util';
+import {ResourceLabelChips} from '../components/ResourceMetadataFields';
 
 // Summarise the algorithm variant in one short string. Keeps the column
 // scannable instead of showing the full JSON.
@@ -361,6 +362,14 @@ export default function RateLimits() {
             flex: 0.5,
             minWidth: 110,
             sortable: false,
+        },
+        {
+            field: 'labels',
+            headerName: 'Labels',
+            flex: 0.7,
+            minWidth: 140,
+            sortable: false,
+            renderCell: (params) => <ResourceLabelChips labels={params.value as Record<string, string> | undefined}/>,
         },
         {
             field: 'createdAt',

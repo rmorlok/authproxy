@@ -13,6 +13,7 @@ import {useNavigate} from 'react-router-dom';
 import {useSelector} from 'react-redux';
 import {selectCurrentNamespaceMatcher} from '../store/namespacesSlice';
 import {toSnakeCase} from '../util';
+import {ResourceLabelChips} from '../components/ResourceMetadataFields';
 
 export const columns: GridColDef<Actor>[] = [
     {
@@ -42,6 +43,14 @@ export const columns: GridColDef<Actor>[] = [
         flex: 0.5,
         minWidth: 90,
         sortable: true,
+    },
+    {
+        field: 'labels',
+        headerName: 'Labels',
+        flex: 0.7,
+        minWidth: 120,
+        sortable: false,
+        renderCell: (params) => <ResourceLabelChips labels={params.value as Record<string, string> | undefined}/>,
     },
     {
         field: 'createdAt',
@@ -177,7 +186,7 @@ export default function Actors() {
 
     useEffect(() => {
         fetchPage(page);
-    }, [page, pageSize, sort]); // TODO: only page?
+    }, [page]);
 
     return (
         <Box sx={{width: '100%', maxWidth: {sm: '100%', md: '1700px'}}}>
