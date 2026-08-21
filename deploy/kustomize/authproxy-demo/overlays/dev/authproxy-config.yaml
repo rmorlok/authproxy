@@ -49,19 +49,4 @@ systemAuth:
             - "*"
           verbs:
             - "*"
-    root.smoke:
-      keysPath: /etc/authproxy/keys/actors/smoke
-      permissions:
-        - namespace: root.smoke
-          resources:
-            - connectors
-          verbs:
-            - list
-        - namespace: root.smoke.{{external_id}}
-          resources:
-            - connections
-          verbs:
-            - create
-            - get
-            - proxy
     syncCronSchedule: "* * * * *"
