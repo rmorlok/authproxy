@@ -93,15 +93,8 @@ namespace. For example,
 `root.smoke`. Permissions are source-specific, and permission namespaces can
 use actor templates such as `{{external_id}}`. Development migration creates
 each configured actor namespace and its missing parents before synchronization.
-
-The single-directory form remains available and creates all discovered actors
-in `root`:
-
-```yaml
-systemAuth:
-  actors:
-    keysPath: /etc/authproxy/keys/actors
-```
+Directory sources must always be keyed by namespace; the former
+single-directory actor source shape is not supported.
 
 ## Kubernetes values
 

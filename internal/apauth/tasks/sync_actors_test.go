@@ -20,6 +20,16 @@ import (
 	clock "k8s.io/utils/clock/testing"
 )
 
+func externalActorsInRoot(keysPath string) *sconfig.ConfiguredActors {
+	return &sconfig.ConfiguredActors{
+		InnerVal: &sconfig.ConfiguredActorsExternalSources{
+			Sources: map[string]*sconfig.ConfiguredActorsExternalSource{
+				sconfig.RootNamespace: {KeysPath: keysPath},
+			},
+		},
+	}
+}
+
 func TestSyncActorsList(t *testing.T) {
 	var db database.DB
 	var redis apredis.Client
@@ -220,11 +230,7 @@ func TestSyncActorsList(t *testing.T) {
 	})
 
 	t.Run("skips sync for non-list actors", func(t *testing.T) {
-		actors := &sconfig.ConfiguredActors{
-			InnerVal: &sconfig.ConfiguredActorsExternalSource{
-				KeysPath: "/tmp/keys",
-			},
-		}
+		actors := externalActorsInRoot("/tmp/keys")
 
 		cfg := setup(t, actors)
 		svc := NewService(cfg, db, redis, enc, cfg.GetRootLogger())
@@ -306,11 +312,7 @@ func TestSyncConfiguredActorsExternalSource(t *testing.T) {
 
 	t.Run("deletes stale actors from external source", func(t *testing.T) {
 		// First sync with external source to create actors
-		actors := &sconfig.ConfiguredActors{
-			InnerVal: &sconfig.ConfiguredActorsExternalSource{
-				KeysPath: tu.TestDataPath("admin_user_keys"),
-			},
-		}
+		actors := externalActorsInRoot(tu.TestDataPath("admin_user_keys"))
 
 		cfg := setup(t, actors)
 		svc := NewService(cfg, db, redis, enc, cfg.GetRootLogger())
@@ -347,11 +349,7 @@ func TestSyncConfiguredActorsExternalSource(t *testing.T) {
 	})
 
 	t.Run("does not delete actors from different sync source", func(t *testing.T) {
-		actors := &sconfig.ConfiguredActors{
-			InnerVal: &sconfig.ConfiguredActorsExternalSource{
-				KeysPath: tu.TestDataPath("admin_user_keys"),
-			},
-		}
+		actors := externalActorsInRoot(tu.TestDataPath("admin_user_keys"))
 
 		cfg := setup(t, actors)
 		svc := NewService(cfg, db, redis, enc, cfg.GetRootLogger())
@@ -376,11 +374,7 @@ func TestSyncConfiguredActorsExternalSource(t *testing.T) {
 	})
 
 	t.Run("encrypted key can be decrypted", func(t *testing.T) {
-		actors := &sconfig.ConfiguredActors{
-			InnerVal: &sconfig.ConfiguredActorsExternalSource{
-				KeysPath: tu.TestDataPath("admin_user_keys"),
-			},
-		}
+		actors := externalActorsInRoot(tu.TestDataPath("admin_user_keys"))
 
 		cfg := setup(t, actors)
 		svc := NewService(cfg, db, redis, enc, cfg.GetRootLogger())
@@ -444,11 +438,7 @@ func TestSyncConfiguredActorsExternalSource(t *testing.T) {
 	})
 
 	t.Run("skips sync when lock already held", func(t *testing.T) {
-		actors := &sconfig.ConfiguredActors{
-			InnerVal: &sconfig.ConfiguredActorsExternalSource{
-				KeysPath: tu.TestDataPath("admin_user_keys"),
-			},
-		}
+		actors := externalActorsInRoot(tu.TestDataPath("admin_user_keys"))
 
 		cfg := setup(t, actors)
 
@@ -473,11 +463,7 @@ func TestSyncConfiguredActorsExternalSource(t *testing.T) {
 	})
 
 	t.Run("works without redis", func(t *testing.T) {
-		actors := &sconfig.ConfiguredActors{
-			InnerVal: &sconfig.ConfiguredActorsExternalSource{
-				KeysPath: tu.TestDataPath("admin_user_keys"),
-			},
-		}
+		actors := externalActorsInRoot(tu.TestDataPath("admin_user_keys"))
 
 		cfg := setup(t, actors)
 

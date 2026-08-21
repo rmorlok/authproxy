@@ -804,13 +804,13 @@ func TestSchemaDefinitions(t *testing.T) {
 					Data:  `{"test": [{"externalId": "actor-1", "key": {"sharedKey": {"value": "secret"}}}]}`,
 				},
 				{
-					Name:  "external source",
-					Valid: true,
+					Name:  "legacy external source",
+					Valid: false,
 					Data:  `{"test": {"keysPath": "/keys/actors"}}`,
 				},
 				{
-					Name:  "external source with permissions",
-					Valid: true,
+					Name:  "legacy external source with permissions",
+					Valid: false,
 					Data:  `{"test": {"keysPath": "/keys/actors", "permissions": [{"namespace": "root.**", "resources": ["*"], "verbs": ["*"]}]}}`,
 				},
 				{
@@ -834,8 +834,8 @@ func TestSchemaDefinitions(t *testing.T) {
 					Data:  `{"test": {"syncCronSchedule": "*/5 * * * *"}}`,
 				},
 				{
-					Name:  "external source with sync cron",
-					Valid: true,
+					Name:  "legacy external source with sync cron",
+					Valid: false,
 					Data:  `{"test": {"keysPath": "/keys/actors", "syncCronSchedule": "*/5 * * * *"}}`,
 				},
 				{
@@ -985,7 +985,7 @@ func TestSchemaDefinitions(t *testing.T) {
 				{
 					Name:  "actors as external source",
 					Valid: true,
-					Data:  `{"test": {"actors": {"keysPath": "/keys/actors"}}}`,
+					Data:  `{"test": {"actors": {"root": {"keysPath": "/keys/actors"}}}}`,
 				},
 				{
 					Name:  "actors as inline list",

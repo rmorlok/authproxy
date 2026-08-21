@@ -1126,9 +1126,6 @@
           }
         },
         {
-          "$ref": "#/$defs/ConfiguredActorsExternalSource"
-        },
-        {
           "type": "object",
           "properties": {
             "syncCronSchedule": {
@@ -1137,7 +1134,7 @@
           },
           "patternProperties": {
             "^root(?:\\.[a-zA-Z0-9_]+[a-zA-Z0-9_\\-]*)*$": {
-              "$ref": "#/$defs/ConfiguredActorsNamespacedExternalSource"
+              "$ref": "#/$defs/ConfiguredActorsExternalSource"
             }
           },
           "additionalProperties": false,
@@ -1152,27 +1149,6 @@
       ]
     },
     "ConfiguredActorsExternalSource": {
-      "type": "object",
-      "properties": {
-        "keysPath": {
-          "type": "string"
-        },
-        "permissions": {
-          "type": "array",
-          "items": {
-            "$ref": "../auth/schema.json#/$defs/Permission"
-          }
-        },
-        "syncCronSchedule": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "keysPath"
-      ],
-      "additionalProperties": false
-    },
-    "ConfiguredActorsNamespacedExternalSource": {
       "type": "object",
       "properties": {
         "keysPath": {

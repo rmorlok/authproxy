@@ -36,6 +36,12 @@ func TestConfiguredActorsExternalSources(t *testing.T) {
 		require.ErrorContains(t, err, "invalid actor source namespace")
 	})
 
+	t.Run("rejects legacy single source", func(t *testing.T) {
+		var actors ConfiguredActors
+		err := json.Unmarshal([]byte(`{"keysPath": "/keys/root"}`), &actors)
+		require.ErrorContains(t, err, "invalid actor source namespace")
+	})
+
 	t.Run("loads every source into its namespace", func(t *testing.T) {
 		rootKeys := t.TempDir()
 		smokeKeys := t.TempDir()

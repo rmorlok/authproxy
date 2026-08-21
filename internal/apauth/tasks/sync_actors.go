@@ -38,10 +38,8 @@ func (s *service) SyncConfiguredActorsExternalSource(ctx context.Context) error 
 		return nil
 	}
 
-	// Check if this is a single or namespaced external source configuration.
-	switch actors.InnerVal.(type) {
-	case *sconfig.ConfiguredActorsExternalSource, *sconfig.ConfiguredActorsExternalSources:
-	default:
+	// Check if this is a namespaced external source configuration.
+	if _, ok := actors.InnerVal.(*sconfig.ConfiguredActorsExternalSources); !ok {
 		s.logger.Debug("actors is not an external source type, skipping external source sync")
 		return nil
 	}

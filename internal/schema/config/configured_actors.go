@@ -55,25 +55,11 @@ func (ca *ConfiguredActors) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	// If it's not a string, it should be an object
-	var valueMap map[string]interface{}
-	if err := json.Unmarshal(data, &valueMap); err != nil {
-		return fmt.Errorf("failed to unmarshal string value: %v", err)
-	}
-
-	var t ConfiguredActorsType
-
-	if _, ok := valueMap["keysPath"]; ok {
-		t = &ConfiguredActorsExternalSource{}
-	} else {
-		t = &ConfiguredActorsExternalSources{}
-	}
-
-	if err := util.DecodeJSONStrict(data, t); err != nil {
+	var sources ConfiguredActorsExternalSources
+	if err := util.DecodeJSONStrict(data, &sources); err != nil {
 		return err
 	}
-
-	ca.InnerVal = t
+	ca.InnerVal = &sources
 
 	return nil
 }
@@ -101,22 +87,11 @@ func (ca *ConfiguredActors) UnmarshalYAML(value *yaml.Node) error {
 		return fmt.Errorf("actors expected a sequence node or mapping node, got %s", KindToString(value.Kind))
 	}
 
-	var t ConfiguredActorsType
-	for i := 0; i < len(value.Content); i += 2 {
-		if value.Content[i].Value == "keysPath" {
-			t = &ConfiguredActorsExternalSource{}
-			break
-		}
-	}
-	if t == nil {
-		t = &ConfiguredActorsExternalSources{}
-	}
-
-	if err := util.DecodeYAMLNodeStrict(value, t); err != nil {
+	var sources ConfiguredActorsExternalSources
+	if err := util.DecodeYAMLNodeStrict(value, &sources); err != nil {
 		return err
 	}
-
-	ca.InnerVal = t
+	ca.InnerVal = &sources
 	return nil
 }
 

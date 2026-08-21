@@ -11,7 +11,7 @@ func TestSystemAuth(t *testing.T) {
 	assert := require.New(t)
 
 	t.Run("yaml parse", func(t *testing.T) {
-		t.Run("actors path", func(t *testing.T) {
+		t.Run("namespaced actor path", func(t *testing.T) {
 			data := `
   cookieDomain: localhost:8080
   jwtSigningKey:
@@ -20,7 +20,8 @@ func TestSystemAuth(t *testing.T) {
     privateKey:
       path: ./dev_config/keys/system
   actors:
-    keysPath: ./dev_config/keys/actors
+    root:
+      keysPath: ./dev_config/keys/actors
 `
 			expected := SystemAuth{
 				JwtSigningKey: &Key{
@@ -38,8 +39,10 @@ func TestSystemAuth(t *testing.T) {
 					},
 				},
 				Actors: &ConfiguredActors{
-					InnerVal: &ConfiguredActorsExternalSource{
-						KeysPath: "./dev_config/keys/actors",
+					InnerVal: &ConfiguredActorsExternalSources{
+						Sources: map[string]*ConfiguredActorsExternalSource{
+							"root": {KeysPath: "./dev_config/keys/actors"},
+						},
 					},
 				},
 			}
@@ -48,6 +51,15 @@ func TestSystemAuth(t *testing.T) {
 			err := yaml.Unmarshal([]byte(data), &sa)
 			assert.NoError(err)
 			assert.Equal(expected, sa)
+		})
+		t.Run("rejects legacy actor path", func(t *testing.T) {
+			data := `
+actors:
+  keysPath: ./dev_config/keys/actors
+`
+			var sa SystemAuth
+			err := yaml.Unmarshal([]byte(data), &sa)
+			assert.ErrorContains(err, "invalid actor source namespace")
 		})
 		t.Run("namespaced actor paths", func(t *testing.T) {
 			data := `

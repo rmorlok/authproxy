@@ -56,19 +56,14 @@ func (th *taskHandler) GetCronTasks() []*asynq.PeriodicTaskConfig {
 		return nil
 	}
 
-	var cronspec string
-	switch sources := actors.InnerVal.(type) {
-	case *sconfig.ConfiguredActorsExternalSource:
-		cronspec = sources.GetSyncCronScheduleOrDefault()
-	case *sconfig.ConfiguredActorsExternalSources:
-		cronspec = sources.GetSyncCronScheduleOrDefault()
-	default:
+	sources, ok := actors.InnerVal.(*sconfig.ConfiguredActorsExternalSources)
+	if !ok {
 		return nil
 	}
 
 	return []*asynq.PeriodicTaskConfig{
 		{
-			Cronspec: cronspec,
+			Cronspec: sources.GetSyncCronScheduleOrDefault(),
 			Task:     NewSyncActorsExternalSourceTask(),
 		},
 		{
