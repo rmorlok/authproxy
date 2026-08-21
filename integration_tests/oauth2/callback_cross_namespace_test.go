@@ -19,6 +19,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/auth_methods/oauth2"
 	"github.com/rmorlok/authproxy/internal/database"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -126,7 +127,7 @@ func TestCallbackRejection_CrossNamespace(t *testing.T) {
 	//    externalId as alice but a different namespace, so the auth
 	//    middleware materializes a separate actor row with a different actorId.
 	bobAuthToken, err := env.PublicAuthUtil.GenerateBearerToken(
-		ctx, sharedExternalID, tenantB, helpers.AllPermissionsForNamespace(tenantB),
+		ctx, sharedExternalID, tenantB, aschema.AllPermissionsForNamespace(tenantB),
 	)
 	require.NoError(t, err)
 

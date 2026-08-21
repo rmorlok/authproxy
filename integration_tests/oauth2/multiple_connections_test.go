@@ -16,6 +16,7 @@ import (
 	"github.com/rmorlok/authproxy/integration_tests/helpers"
 	"github.com/rmorlok/authproxy/internal/apid"
 	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -189,7 +190,7 @@ func doProxyRequestAsActor(t *testing.T, env *helpers.IntegrationTestEnv, connec
 		bytes.NewReader(body),
 		namespace,
 		actorExternalID,
-		helpers.AllPermissionsForNamespace(namespace),
+		aschema.AllPermissionsForNamespace(namespace),
 	)
 	require.NoError(t, err)
 
