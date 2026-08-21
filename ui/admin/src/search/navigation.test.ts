@@ -14,7 +14,12 @@ describe('Admin navigation catalog', () => {
     });
 
     it('keeps internal tasks and workflows at the bottom of the main navigation', () => {
-        expect(adminNavigationItems.filter((item) => item.section === 'main').slice(-2).map((item) => item.label))
-            .toEqual(['Internal Tasks', 'Internal Workflows']);
+        expect(adminNavigationItems.filter((item) => item.section === 'main').slice(-2).map((item) => [
+            item.label,
+            item.path,
+        ])).toEqual([
+            ['Internal Tasks', '/internal-tasks'],
+            ['Internal Workflows', '/internal-workflows'],
+        ]);
     });
 });

@@ -135,7 +135,7 @@ export default function Workflows() {
     const handleWorkflowClick: GridEventListener<'rowClick'> = (params) => {
         const instance = params.row.instance;
         if (!instance) return;
-        navigate(`/workflows/${encodeURIComponent(instance.instanceId)}/${encodeURIComponent(instance.executionId)}`);
+        navigate(`/internal-workflows/${encodeURIComponent(instance.instanceId)}/${encodeURIComponent(instance.executionId)}`);
     };
 
     const columns: GridColDef<WorkflowInstanceRef>[] = [

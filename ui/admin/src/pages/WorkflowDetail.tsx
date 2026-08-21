@@ -135,7 +135,7 @@ export default function WorkflowDetail() {
         try {
             await removeWorkflowInstance(decodedInstanceId, decodedExecutionId);
             setConfirmRemoveOpen(false);
-            navigate('/workflows');
+            navigate('/internal-workflows');
         } catch {
             setActionError('Failed to remove workflow instance');
         } finally {

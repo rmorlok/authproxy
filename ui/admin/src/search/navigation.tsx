@@ -31,8 +31,8 @@ export const adminNavigationItems: AdminNavigationItem[] = [
     {label: 'Keys', icon: KeyRoundedIcon, path: '/keys', keywords: ['encryption'], section: 'main'},
     {label: 'Rate Limits', icon: SpeedRoundedIcon, path: '/rate-limits', keywords: ['quota'], section: 'main'},
     {label: 'Actors', icon: PeopleRoundedIcon, path: '/actors', keywords: ['users'], section: 'main'},
-    {label: 'Internal Tasks', icon: AssignmentRoundedIcon, path: '/tasks', keywords: ['queues', 'jobs'], section: 'main'},
-    {label: 'Internal Workflows', icon: AccountTreeRoundedIcon, path: '/workflows', keywords: ['executions'], section: 'main'},
+    {label: 'Internal Tasks', icon: AssignmentRoundedIcon, path: '/internal-tasks', keywords: ['queues', 'jobs'], section: 'main'},
+    {label: 'Internal Workflows', icon: AccountTreeRoundedIcon, path: '/internal-workflows', keywords: ['executions'], section: 'main'},
     {
         label: 'Settings',
         icon: SettingsRoundedIcon,

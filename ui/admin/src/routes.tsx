@@ -185,44 +185,44 @@ export const router = createBrowserRouter([
                 ],
             },
             {
-                path: 'tasks',
+                path: 'internal-tasks',
                 element: <TasksPage />,
                 handle: { title: 'Internal Tasks' }
             },
             {
-                path: 'tasks/queues/:queue',
+                path: 'internal-tasks/queues/:queue',
                 element: <TaskQueueDetailPage />,
                 handle: [
                     {
                         title: 'Internal Tasks',
-                        path: (_params: Params<string>) => `/tasks`,
+                        path: (_params: Params<string>) => `/internal-tasks`,
                     },
                     {
                         title: 'Queues',
-                        path: (_params: Params<string>) => `/tasks`,
+                        path: (_params: Params<string>) => `/internal-tasks`,
                     },
                     {
                         attr: 'queue',
-                        path: (params: Params<string>) => `/tasks/queues/${params.queue}`,
+                        path: (params: Params<string>) => `/internal-tasks/queues/${params.queue}`,
                     },
                 ],
             },
             {
-                path: 'workflows',
+                path: 'internal-workflows',
                 element: <WorkflowsPage />,
                 handle: { title: 'Internal Workflows' }
             },
             {
-                path: 'workflows/:instanceId/:executionId',
+                path: 'internal-workflows/:instanceId/:executionId',
                 element: <WorkflowDetailPage />,
                 handle: [
                     {
                         title: 'Internal Workflows',
-                        path: (_params: Params<string>) => `/workflows`,
+                        path: (_params: Params<string>) => `/internal-workflows`,
                     },
                     {
                         attr: 'instanceId',
-                        path: (params: Params<string>) => `/workflows/${params.instanceId}/${params.executionId}`,
+                        path: (params: Params<string>) => `/internal-workflows/${params.instanceId}/${params.executionId}`,
                     },
                 ],
             },
