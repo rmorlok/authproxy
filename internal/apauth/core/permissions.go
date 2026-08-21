@@ -66,11 +66,15 @@ func matchesNamespace(actor *Actor, p aschema.Permission, targetNamespace string
 	return namespace.Matches(matcher, targetNamespace)
 }
 
-// constrainPermissionNamespaceToActor renders a permission namespace and intersects it with
-// the namespace subtree owned by the actor. Keeping this constraint in the authorization path
-// ensures legacy or corrupted permissions cannot grant access above or beside the actor's
-// namespace even if they bypass write-time validation.
-func constrainPermissionNamespaceToActor(actor *Actor, permissionNamespace string) (string, bool) {
+// constrainPermissionNamespaceToActor renders a permission namespace and
+// intersects it with the namespace subtree owned by the actor. Keeping this
+// constraint in the authorization path ensures corrupted permissions cannot
+// grant access above or beside the actor's namespace even if they bypass
+// write-time validation.
+func constrainPermissionNamespaceToActor(
+	actor *Actor,
+	permissionNamespace string,
+) (constrainedNs string, ok bool) {
 	if actor == nil || namespace.ValidatePath(actor.Namespace) != nil {
 		return "", false
 	}
@@ -84,9 +88,12 @@ func constrainPermissionNamespaceToActor(actor *Actor, permissionNamespace strin
 	return namespace.ConstrainMatcher(actorNamespaceMatcher, rendered)
 }
 
-// ValidatePermissionForActor validates a permission and verifies that its rendered namespace
-// is entirely contained by the actor's namespace subtree.
-func ValidatePermissionForActor(actor *Actor, permission aschema.Permission) error {
+// ValidatePermissionForActor validates a permission and verifies that its
+// rendered namespace is entirely contained by the actor's namespace subtree.
+func ValidatePermissionForActor(
+	actor *Actor,
+	permission aschema.Permission,
+) error {
 	if err := permission.Validate(); err != nil {
 		return err
 	}
