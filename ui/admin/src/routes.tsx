@@ -187,14 +187,14 @@ export const router = createBrowserRouter([
             {
                 path: 'tasks',
                 element: <TasksPage />,
-                handle: { title: 'Tasks' }
+                handle: { title: 'Internal Tasks' }
             },
             {
                 path: 'tasks/queues/:queue',
                 element: <TaskQueueDetailPage />,
                 handle: [
                     {
-                        title: 'Tasks',
+                        title: 'Internal Tasks',
                         path: (_params: Params<string>) => `/tasks`,
                     },
                     {
@@ -210,14 +210,14 @@ export const router = createBrowserRouter([
             {
                 path: 'workflows',
                 element: <WorkflowsPage />,
-                handle: { title: 'Workflows' }
+                handle: { title: 'Internal Workflows' }
             },
             {
                 path: 'workflows/:instanceId/:executionId',
                 element: <WorkflowDetailPage />,
                 handle: [
                     {
-                        title: 'Workflows',
+                        title: 'Internal Workflows',
                         path: (_params: Params<string>) => `/workflows`,
                     },
                     {

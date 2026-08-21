@@ -9,7 +9,12 @@ describe('Admin navigation catalog', () => {
     });
 
     it('finds commands by their local keywords', () => {
-        expect(matchingNavigationItems('jobs').map((item) => item.label)).toEqual(['Tasks']);
+        expect(matchingNavigationItems('jobs').map((item) => item.label)).toEqual(['Internal Tasks']);
         expect(matchingNavigationItems('integrations').map((item) => item.label)).toEqual(['Connectors']);
+    });
+
+    it('keeps internal tasks and workflows at the bottom of the main navigation', () => {
+        expect(adminNavigationItems.filter((item) => item.section === 'main').slice(-2).map((item) => item.label))
+            .toEqual(['Internal Tasks', 'Internal Workflows']);
     });
 });
