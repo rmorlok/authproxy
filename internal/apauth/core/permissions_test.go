@@ -327,6 +327,34 @@ func TestPermission_AllowsForActor(t *testing.T) {
 			allowed:   false,
 		},
 
+		// Actor namespace constraints apply independently of the permission matcher.
+		{
+			name: "actor namespace denies target allowed by exact permission",
+			p: aschema.Permission{
+				Namespace: "root.acme.tenant_2",
+				Resources: []string{"connections"},
+				Verbs:     []string{"get"},
+			},
+			namespace: "root.acme.tenant_2",
+			resource:  "connections",
+			verb:      "get",
+			actor:     &Actor{Namespace: "root.acme.tenant_1"},
+			allowed:   false,
+		},
+		{
+			name: "actor namespace denies target allowed by wildcard permission",
+			p: aschema.Permission{
+				Namespace: "root.acme.**",
+				Resources: []string{"connections"},
+				Verbs:     []string{"get"},
+			},
+			namespace: "root.acme.tenant_2.project",
+			resource:  "connections",
+			verb:      "get",
+			actor:     &Actor{Namespace: "root.acme.tenant_1"},
+			allowed:   false,
+		},
+
 		// Resource matching
 		{
 			name: "resource match",
