@@ -190,7 +190,7 @@ func doProxyRequestAsActor(t *testing.T, env *helpers.IntegrationTestEnv, connec
 		bytes.NewReader(body),
 		namespace,
 		actorExternalID,
-		aschema.AllPermissions(),
+		aschema.AllPermissionsForNamespace(namespace),
 	)
 	require.NoError(t, err)
 

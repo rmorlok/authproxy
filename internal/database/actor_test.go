@@ -201,6 +201,105 @@ func TestActor(t *testing.T) {
 			require.Equal(t, actor.Name, retrieved.Name)
 		})
 
+		t.Run("validates permission namespaces against the actor namespace", func(t *testing.T) {
+			setup(t)
+			require.NoError(t, db.EnsureNamespaceByPath(ctx, "root.acme.tenant_1"))
+
+			tests := []struct {
+				name                string
+				permissionNamespace string
+				labels              map[string]string
+				wantErr             bool
+			}{
+				{name: "same namespace", permissionNamespace: "root.acme.tenant_1"},
+				{name: "same namespace wildcard", permissionNamespace: "root.acme.tenant_1.**"},
+				{name: "descendant namespace", permissionNamespace: "root.acme.tenant_1.project.**"},
+				{
+					name:                "rendered same namespace",
+					permissionNamespace: "root.acme.{{labels.tenant}}.**",
+					labels:              map[string]string{"tenant": "tenant_1"},
+				},
+				{name: "root wildcard", permissionNamespace: "root.**", wantErr: true},
+				{name: "ancestor wildcard", permissionNamespace: "root.acme.**", wantErr: true},
+				{name: "sibling namespace", permissionNamespace: "root.acme.tenant_2.**", wantErr: true},
+				{name: "similar prefix", permissionNamespace: "root.acme.tenant_10.**", wantErr: true},
+				{
+					name:                "rendered sibling namespace",
+					permissionNamespace: "root.acme.{{labels.tenant}}.**",
+					labels:              map[string]string{"tenant": "tenant_2"},
+					wantErr:             true,
+				},
+				{
+					name:                "unresolved template",
+					permissionNamespace: "root.acme.{{labels.missing}}.**",
+					wantErr:             true,
+				},
+			}
+
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					actor, err := db.UpsertActor(ctx, &core.Actor{
+						ExternalId: "permission-test-" + tt.name,
+						Namespace:  "root.acme.tenant_1",
+						Labels:     tt.labels,
+						Permissions: []aschema.Permission{
+							{
+								Namespace: tt.permissionNamespace,
+								Resources: []string{"connections"},
+								Verbs:     []string{"get"},
+							},
+						},
+					})
+					if tt.wantErr {
+						require.Error(t, err)
+						require.Nil(t, actor)
+						stored, lookupErr := db.GetActorByExternalId(ctx, "root.acme.tenant_1", "permission-test-"+tt.name)
+						require.ErrorIs(t, lookupErr, ErrNotFound)
+						require.Nil(t, stored)
+					} else {
+						require.NoError(t, err)
+						require.NotNil(t, actor)
+					}
+				})
+			}
+		})
+
+		t.Run("rejects an invalid permission update without changing stored permissions", func(t *testing.T) {
+			setup(t)
+			require.NoError(t, db.EnsureNamespaceByPath(ctx, "root.acme.tenant_1"))
+
+			validPermissions := []aschema.Permission{
+				{
+					Namespace: "root.acme.tenant_1.**",
+					Resources: []string{"connections"},
+					Verbs:     []string{"get"},
+				},
+			}
+			actor, err := db.UpsertActor(ctx, &core.Actor{
+				ExternalId:  "permission-update-test",
+				Namespace:   "root.acme.tenant_1",
+				Permissions: validPermissions,
+			})
+			require.NoError(t, err)
+
+			_, err = db.UpsertActor(ctx, &core.Actor{
+				ExternalId: "permission-update-test",
+				Namespace:  "root.acme.tenant_1",
+				Permissions: []aschema.Permission{
+					{
+						Namespace: "root.**",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+				},
+			})
+			require.ErrorContains(t, err, "must be at or below actor namespace")
+
+			stored, err := db.GetActor(ctx, actor.Id)
+			require.NoError(t, err)
+			require.Equal(t, Permissions(validPermissions), stored.Permissions)
+		})
+
 		t.Run("updates existing", func(t *testing.T) {
 			t.Run("permissions", func(t *testing.T) {
 				setup(t)

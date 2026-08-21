@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/hashicorp/go-multierror"
+	nschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 )
 
 // Wildcard constant for resources and verbs that matches any value.
@@ -67,13 +68,17 @@ func NoPermissions() []Permission {
 
 // AllPermissions returns a permission that matches all resources and verbs.
 func AllPermissions() []Permission {
-	return []Permission{
-		{
-			Namespace: "root.**",
-			Resources: []string{"*"},
-			Verbs:     []string{"*"},
-		},
-	}
+	return AllPermissionsForNamespace(nschema.Root)
+}
+
+// AllPermissionsForNamespace returns a permission that matches all resources
+// and verbs at or below the supplied namespace.
+func AllPermissionsForNamespace(namespace string) []Permission {
+	return PermissionsSingle(
+		namespace+nschema.WildcardSuffix,
+		PermissionWildcard,
+		PermissionWildcard,
+	)
 }
 
 // PermissionsSingle returns a permission that matches the specified resource and verb.

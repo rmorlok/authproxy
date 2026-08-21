@@ -221,7 +221,7 @@ func (env *IntegrationTestEnv) doSignedRequest(t *testing.T, method, path string
 		body,
 		cfg.actorNamespace,
 		cfg.actorExternalID,
-		aschema.AllPermissions(),
+		aschema.AllPermissionsForNamespace(cfg.actorNamespace),
 	)
 	require.NoError(t, err)
 

@@ -222,7 +222,7 @@ func (env *IntegrationTestEnv) InitiateOAuth2Connection(t *testing.T, connectorI
 		body,
 		cfg.actorNamespace,
 		cfg.actorExternalID,
-		aschema.AllPermissions(),
+		aschema.AllPermissionsForNamespace(cfg.actorNamespace),
 	)
 	require.NoError(t, err)
 
@@ -334,7 +334,7 @@ func (env *IntegrationTestEnv) DeliverOAuth2Callback(t *testing.T, callbackURL s
 		nil,
 		cfg.actorNamespace,
 		cfg.actorExternalID,
-		aschema.AllPermissions(),
+		aschema.AllPermissionsForNamespace(cfg.actorNamespace),
 	)
 	require.NoError(t, err)
 

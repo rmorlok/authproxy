@@ -327,6 +327,34 @@ func TestPermission_AllowsForActor(t *testing.T) {
 			allowed:   false,
 		},
 
+		// Actor namespace constraints apply independently of the permission matcher.
+		{
+			name: "actor namespace denies target allowed by exact permission",
+			p: aschema.Permission{
+				Namespace: "root.acme.tenant_2",
+				Resources: []string{"connections"},
+				Verbs:     []string{"get"},
+			},
+			namespace: "root.acme.tenant_2",
+			resource:  "connections",
+			verb:      "get",
+			actor:     &Actor{Namespace: "root.acme.tenant_1"},
+			allowed:   false,
+		},
+		{
+			name: "actor namespace denies target allowed by wildcard permission",
+			p: aschema.Permission{
+				Namespace: "root.acme.**",
+				Resources: []string{"connections"},
+				Verbs:     []string{"get"},
+			},
+			namespace: "root.acme.tenant_2.project",
+			resource:  "connections",
+			verb:      "get",
+			actor:     &Actor{Namespace: "root.acme.tenant_1"},
+			allowed:   false,
+		},
+
 		// Resource matching
 		{
 			name: "resource match",
@@ -580,8 +608,84 @@ func TestPermission_AllowsForActor(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.actor == nil {
+				tt.actor = &Actor{}
+			}
+			if tt.actor.Namespace == "" {
+				tt.actor.Namespace = namespace.Root
+			}
 			result := allowsForActor(tt.actor, tt.p, tt.namespace, tt.resource, tt.verb, tt.resourceId)
 			require.Equal(t, tt.allowed, result)
+		})
+	}
+}
+
+func TestValidatePermissionForActor(t *testing.T) {
+	actor := &Actor{
+		Namespace:  "root.acme.tenant_1",
+		ExternalId: "bob",
+		Labels:     map[string]string{"tenant": "tenant_1", "other_tenant": "tenant_2"},
+	}
+
+	tests := []struct {
+		name                string
+		permissionNamespace string
+		wantErr             string
+	}{
+		{name: "actor namespace", permissionNamespace: "root.acme.tenant_1"},
+		{name: "actor namespace wildcard", permissionNamespace: "root.acme.tenant_1.**"},
+		{name: "descendant namespace", permissionNamespace: "root.acme.tenant_1.project"},
+		{name: "descendant namespace wildcard", permissionNamespace: "root.acme.tenant_1.project.**"},
+		{name: "rendered actor namespace", permissionNamespace: "root.acme.{{labels.tenant}}.**"},
+		{
+			name:                "root wildcard",
+			permissionNamespace: "root.**",
+			wantErr:             "must be at or below actor namespace",
+		},
+		{
+			name:                "ancestor wildcard",
+			permissionNamespace: "root.acme.**",
+			wantErr:             "must be at or below actor namespace",
+		},
+		{
+			name:                "ancestor exact",
+			permissionNamespace: "root.acme",
+			wantErr:             "must be at or below actor namespace",
+		},
+		{
+			name:                "sibling namespace",
+			permissionNamespace: "root.acme.tenant_2.**",
+			wantErr:             "must be at or below actor namespace",
+		},
+		{
+			name:                "similar prefix is not a descendant",
+			permissionNamespace: "root.acme.tenant_10.**",
+			wantErr:             "must be at or below actor namespace",
+		},
+		{
+			name:                "rendered sibling namespace",
+			permissionNamespace: "root.acme.{{labels.other_tenant}}.**",
+			wantErr:             "must be at or below actor namespace",
+		},
+		{
+			name:                "unresolved template",
+			permissionNamespace: "root.acme.{{labels.missing}}.**",
+			wantErr:             "could not be rendered",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidatePermissionForActor(actor, aschema.Permission{
+				Namespace: tt.permissionNamespace,
+				Resources: []string{"connections"},
+				Verbs:     []string{"get"},
+			})
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, tt.wantErr)
+			}
 		})
 	}
 }
@@ -722,6 +826,12 @@ func TestPermissionsAllowForActor(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.actor == nil {
+				tt.actor = &Actor{}
+			}
+			if tt.actor.Namespace == "" {
+				tt.actor.Namespace = namespace.Root
+			}
 			result := permissionsAllowForActor(tt.actor, tt.permissions, tt.namespace, tt.resource, tt.verb, tt.resourceId)
 			require.Equal(t, tt.allowed, result)
 		})
@@ -961,6 +1071,12 @@ func TestPermissionsAllowWithRestrictions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.actor == nil {
+				tt.actor = &Actor{}
+			}
+			if tt.actor.Namespace == "" {
+				tt.actor.Namespace = namespace.Root
+			}
 			result := permissionsAllowWithRestrictionsForActor(
 				tt.actor,
 				tt.actorPermissions,
