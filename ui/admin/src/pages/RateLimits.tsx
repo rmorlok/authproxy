@@ -21,7 +21,7 @@ import Alert from '@mui/material/Alert';
 import TextField from '@mui/material/TextField';
 import {
     listRateLimits, RateLimit, RateLimitMode, RateLimitDefinition,
-    ListResponse, ListRateLimitsParams, namespaceAndChildren,
+    ListResponse, ListRateLimitsParams,
     createRateLimit, updateRateLimit, CreateRateLimitRequest,
 } from '@authproxy/api';
 import RateLimitDefinitionEditor from '../components/RateLimitDefinitionEditor';
@@ -30,7 +30,7 @@ import dayjs from 'dayjs';
 import {useQueryState, parseAsInteger, parseAsStringLiteral, parseAsString} from 'nuqs'
 import {useNavigate} from "react-router-dom";
 import {useSelector} from "react-redux";
-import {selectCurrentNamespacePath} from "../store/namespacesSlice";
+import {selectCurrentNamespaceMatcher, selectCurrentNamespacePath} from "../store/namespacesSlice";
 import {toSnakeCase} from '../util';
 import {ResourceLabelChips} from '../components/ResourceMetadataFields';
 
@@ -86,6 +86,7 @@ export default function RateLimits() {
     const navigate = useNavigate();
     const modeVals = useMemo(() => modeOptions.map(opt => opt.value), [modeOptions]);
     const ns = useSelector(selectCurrentNamespacePath);
+    const namespaceMatcher = useSelector(selectCurrentNamespaceMatcher);
 
     const [rows, setRows] = useState<RateLimit[]>([]);
     const [rowCount, setRowCount] = useState<number>(-1);
@@ -169,7 +170,7 @@ export default function RateLimits() {
                 const prevResp = responsesCacheRef.current[responsesCacheRef.current.length - 1];
 
                 const params: ListRateLimitsParams = prevResp?.cursor ? {cursor: prevResp.cursor} : {
-                    namespace: namespaceAndChildren(ns),
+                    namespace: namespaceMatcher,
                     orderBy: sort || undefined,
                     limit: pageSize,
                 };
@@ -211,7 +212,7 @@ export default function RateLimits() {
     useEffect(() => {
         resetPagination();
         fetchPage(1);
-    }, [ns, pageSize, sort, modeFilter]);
+    }, [namespaceMatcher, pageSize, sort, modeFilter]);
 
     useEffect(() => {
         fetchPage(page);

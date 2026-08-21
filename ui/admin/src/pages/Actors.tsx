@@ -5,14 +5,14 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import {DataGrid, GridColDef, GridSortModel} from '@mui/x-data-grid';
 import {
-    listActors, Actor, ListResponse, ListActorsParams, namespaceAndChildren
+    listActors, Actor, ListResponse, ListActorsParams
 } from '@authproxy/api';
 import dayjs from 'dayjs';
 import {useQueryState, parseAsInteger, parseAsString} from 'nuqs'
 import {useNavigate} from 'react-router-dom';
-import {toSnakeCase} from '../util';
 import {useSelector} from 'react-redux';
-import {selectCurrentNamespacePath} from '../store/namespacesSlice';
+import {selectCurrentNamespaceMatcher} from '../store/namespacesSlice';
+import {toSnakeCase} from '../util';
 import {ResourceLabelChips} from '../components/ResourceMetadataFields';
 
 export const columns: GridColDef<Actor>[] = [
@@ -42,7 +42,7 @@ export const columns: GridColDef<Actor>[] = [
         headerName: 'Namespace',
         flex: 0.5,
         minWidth: 90,
-        sortable: false,
+        sortable: true,
     },
     {
         field: 'labels',
@@ -78,7 +78,7 @@ export const columns: GridColDef<Actor>[] = [
 
 export default function Actors() {
     const navigate = useNavigate();
-    const ns = useSelector(selectCurrentNamespacePath);
+    const namespaceMatcher = useSelector(selectCurrentNamespaceMatcher);
     const defaultPageSize = 20;
 
     const [rows, setRows] = useState<Actor[]>([]);
@@ -146,7 +146,7 @@ export default function Actors() {
                 const prevResp = responsesCacheRef.current[responsesCacheRef.current.length - 1];
 
                 const params: ListActorsParams = prevResp?.cursor ? {cursor: prevResp.cursor} : {
-                    namespace: namespaceAndChildren(ns),
+                    namespace: namespaceMatcher,
                     orderBy: sort || undefined,
                     limit: pageSize,
                 };
@@ -182,7 +182,7 @@ export default function Actors() {
         // Reset cursors/cache and immediately fetch first page to ensure initial load
         resetPagination();
         fetchPage(1);
-    }, [ns, pageSize, sort]);
+    }, [namespaceMatcher, pageSize, sort]);
 
     useEffect(() => {
         fetchPage(page);

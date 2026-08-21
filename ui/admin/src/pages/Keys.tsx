@@ -20,13 +20,13 @@ import TextField from '@mui/material/TextField';
 import AddIcon from '@mui/icons-material/Add';
 import {
     listKeys, KeyState, Key, ListResponse,
-    ListKeysParams, namespaceAndChildren, createKey, CreateKeyRequest
+    ListKeysParams, createKey, CreateKeyRequest
 } from '@authproxy/api';
 import dayjs from 'dayjs';
 import {useQueryState, parseAsInteger, parseAsStringLiteral, parseAsString} from 'nuqs'
 import {useNavigate} from "react-router-dom";
 import {useSelector} from "react-redux";
-import {selectCurrentNamespacePath} from "../store/namespacesSlice";
+import {selectCurrentNamespaceMatcher, selectCurrentNamespacePath} from "../store/namespacesSlice";
 import {toSnakeCase} from '../util';
 import {ResourceLabelChips} from '../components/ResourceMetadataFields';
 import KeyDataForm, {
@@ -122,6 +122,7 @@ export default function Keys() {
     const navigate = useNavigate();
     const stateVals = useMemo(() => stateOptions.map(opt => opt.value), [stateOptions]);
     const ns = useSelector(selectCurrentNamespacePath);
+    const namespaceMatcher = useSelector(selectCurrentNamespaceMatcher);
 
     const [rows, setRows] = useState<Key[]>([]);
     const [rowCount, setRowCount] = useState<number>(-1);
@@ -204,7 +205,7 @@ export default function Keys() {
 
                 const params: ListKeysParams = prevResp?.cursor ? {cursor: prevResp.cursor} : {
                     state: (stateFilter as KeyState) || undefined,
-                    namespace: namespaceAndChildren(ns),
+                    namespace: namespaceMatcher,
                     orderBy: sort || undefined,
                     limit: pageSize,
                 };
@@ -238,7 +239,7 @@ export default function Keys() {
     useEffect(() => {
         resetPagination();
         fetchPage(1);
-    }, [ns, pageSize, sort, stateFilter]);
+    }, [namespaceMatcher, pageSize, sort, stateFilter]);
 
     useEffect(() => {
         fetchPage(page);

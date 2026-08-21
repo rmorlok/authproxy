@@ -23,7 +23,7 @@ import {HttpStatusChip, Duration, toSnakeCase} from '../util';
 import {useQueryState, parseAsInteger, parseAsStringLiteral, parseAsString} from 'nuqs'
 import RequestDetail from "../components/RequestDetail";
 import {useSelector} from "react-redux";
-import {selectCurrentNamespacePath} from "../store/namespacesSlice";
+import {selectCurrentNamespaceMatcher} from "../store/namespacesSlice";
 import {ResourceLabelChips} from '../components/ResourceMetadataFields';
 
 export const columns: (GridColDef<RequestEventRecord> & {hideInitial?: boolean})[] = [
@@ -245,7 +245,7 @@ export default function Requests() {
         { label: 'Public', value: RequestType.PUBLIC },
     ], []);
     const stateVals = useMemo(() => stateOptions.map(opt => opt.value), [stateOptions]);
-    const ns = useSelector(selectCurrentNamespacePath);
+    const namespaceMatcher = useSelector(selectCurrentNamespaceMatcher);
 
     const [rows, setRows] = useState<RequestEventRecord[]>([]);
     const [rowCount, setRowCount] = useState<number>(-1);
@@ -333,7 +333,7 @@ export default function Requests() {
                 const prevResp = responsesCacheRef.current[responsesCacheRef.current.length - 1];
 
                 const params: ListRequestEventsParams = prevResp?.cursor ? {cursor: prevResp.cursor} : {
-                    namespace: ns + ".**",
+                    namespace: namespaceMatcher,
                     requestType: (typeFilter as RequestType) || undefined,
                     labelSelector: labelSelector || undefined,
                     orderBy: sort || undefined,
@@ -371,7 +371,7 @@ export default function Requests() {
         // Reset cursors/cache and immediately fetch first page to ensure initial load
         resetPagination();
         fetchPage(1);
-    }, [ns, pageSize, sort, typeFilter, labelSelector]);
+    }, [namespaceMatcher, pageSize, sort, typeFilter, labelSelector]);
 
     useEffect(() => {
         fetchPage(page);
