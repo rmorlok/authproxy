@@ -20,8 +20,8 @@ vi.mock('@authproxy/api', () => {
         ROOT_NAMESPACE_PATH: 'root',
         NamespaceState: {
             ACTIVE: 'active',
-            DISCONNECTING: 'disconnecting',
-            DISCONNECTED: 'disconnected',
+            DESTROYING: 'destroying',
+            DESTROYED: 'destroyed',
         },
         namespaceAndChildren: (path: string) => `${path}.**`,
         namespaces: apiNamespaces,

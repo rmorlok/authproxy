@@ -11,6 +11,7 @@ describe('Admin navigation catalog', () => {
     it('finds commands by their local keywords', () => {
         expect(matchingNavigationItems('jobs').map((item) => item.label)).toEqual(['Internal Tasks']);
         expect(matchingNavigationItems('integrations').map((item) => item.label)).toEqual(['Connectors']);
+        expect(matchingNavigationItems('namespace').map((item) => item.label)).toEqual(['Namespaces']);
     });
 
     it('keeps internal tasks and workflows at the bottom of the main navigation', () => {

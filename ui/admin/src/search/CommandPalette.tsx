@@ -11,10 +11,11 @@ import {alpha, styled} from '@mui/material/styles';
 import Typography from '@mui/material/Typography';
 import type {SearchResourceSummary, SearchResourceType} from '@authproxy/api';
 import {namespaceAndChildren, searchResources} from '@authproxy/api';
-import {useDispatch, useSelector} from 'react-redux';
+import {useSelector} from 'react-redux';
 import {useNavigate} from 'react-router-dom';
-import type {AppDispatch, RootState} from '../store';
-import {selectCurrentNamespacePath, setCurrentNamespace} from '../store/namespacesSlice';
+import type {RootState} from '../store';
+import {selectCurrentNamespacePath} from '../store/namespacesSlice';
+import {namespaceDetailPath} from '../util';
 import {
     filterCachedResources,
     mergeSearchResults,
@@ -132,7 +133,6 @@ export function CommandPaletteProvider({
     search = searchResources,
 }: CommandPaletteProviderProps) {
     const navigate = useNavigate();
-    const dispatch = useDispatch<AppDispatch>();
     const currentNamespace = useSelector(selectCurrentNamespacePath);
     const actorId = useSelector((state: RootState) => state.auth?.actorId ?? null);
     const [isOpen, setIsOpen] = React.useState(false);
@@ -288,22 +288,14 @@ export function CommandPaletteProvider({
 
     const selectResource = React.useCallback((item: SearchResourceSummary) => {
         setIsOpen(false);
-        if (item.resourceType === 'namespace') {
-            dispatch(setCurrentNamespace(item.resourceId));
-            navigate('/namespace');
-            return;
-        }
         navigate(resourcePath(item));
-    }, [dispatch, navigate]);
+    }, [navigate]);
 
     const selectDirect = React.useCallback(() => {
         if (!parsed.direct) return;
         setIsOpen(false);
-        if (parsed.direct.kind === 'namespace' && parsed.direct.namespace) {
-            dispatch(setCurrentNamespace(parsed.direct.namespace));
-        }
         navigate(parsed.direct.path);
-    }, [dispatch, navigate, parsed.direct]);
+    }, [navigate, parsed.direct]);
 
     const context = React.useMemo(() => ({open, close}), [close, open]);
 
@@ -498,7 +490,7 @@ function StatusRow({children, color = 'text.secondary'}: React.PropsWithChildren
 }
 
 function resourcePath(item: SearchResourceSummary): string {
-    if (item.resourceType === 'namespace') return '/namespace';
+    if (item.resourceType === 'namespace') return namespaceDetailPath(item.resourceId);
     const routes: Record<Exclude<SearchResourceType, 'namespace'>, string> = {
         actor: '/actors/',
         connection: '/connections/',

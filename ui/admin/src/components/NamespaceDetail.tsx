@@ -39,8 +39,8 @@ import {ResourceLabels} from './ResourceMetadataFields';
 function StateChip({state}: { state: NamespaceState }) {
   const colors: Record<string, "default" | "success" | "error" | "info" | "warning" | "primary" | "secondary"> = {
     [NamespaceState.ACTIVE]: 'success',
-    [NamespaceState.DISCONNECTING]: 'warning',
-    [NamespaceState.DISCONNECTED]: 'default',
+    [NamespaceState.DESTROYING]: 'warning',
+    [NamespaceState.DESTROYED]: 'default',
   };
   return <Chip label={state} color={colors[state] || 'default'} size="small"/>;
 }
