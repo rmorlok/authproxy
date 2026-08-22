@@ -48,7 +48,10 @@ jobs:
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     environment: gha-eks
-    timeout-minutes: 35
+    # Manual deploys without an explicit tag may start while Build Image is
+    # still publishing the current commit. Leave enough time for that wait
+    # plus the normal rollout and smoke tests.
+    timeout-minutes: 65
 
     env:
       RELEASE_NAME: demo
@@ -104,7 +107,17 @@ jobs:
           echo "${{ secrets.GITHUB_TOKEN }}" \
             | docker login "${REGISTRY}" -u "${{ github.actor }}" --password-stdin >/dev/null
 
-          deadline=$((SECONDS + 5 * 60))
+          verify_timeout_minutes=5
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] \
+            && [ -z "${{ inputs.image_tag }}" ]; then
+            # A manual deploy of the current commit can race its Build Image
+            # run. The automatic workflow_run path and explicit rollback tags
+            # should already be published, so they retain the short timeout.
+            verify_timeout_minutes=30
+          fi
+
+          echo "Waiting up to ${verify_timeout_minutes} minutes for ${tag} in GHCR."
+          deadline=$((SECONDS + verify_timeout_minutes * 60))
           while true; do
             missing=()
             for image in "${images[@]}"; do
