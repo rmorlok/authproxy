@@ -1,0 +1,94 @@
+# schema: https://json.schemastore.org/github-workflow.json
+name: Build AuthProxy Multi-Architecture
+
+# Main builds start only after the deployment-gating amd64 images have been
+# published by Build Image. Release tags run directly so their semver and
+# latest tags are generated from the tag ref. This workflow never gates the
+# hosted demo deployment.
+
+on:
+  workflow_run:
+    workflows: ["Build Image"]
+    branches: [main]
+    types: [completed]
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: build-authproxy-multiarch-${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref }}
+  # Only the newest main image is useful. Tags and explicit manual builds are
+  # release operations and remain non-cancellable.
+  cancel-in-progress: ${{ github.event_name == 'workflow_run' }}
+
+env:
+  REGISTRY: ghcr.io
+  DOCKER_METADATA_SHORT_SHA_LENGTH: 8
+  BUILD_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+
+jobs:
+  build-authproxy-multiarch:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event != 'pull_request')
+    name: build-and-push (authproxy amd64+arm64, Dockerfile)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.BUILD_SHA }}
+
+      - name: Resolve image tag
+        id: ref
+        run: |
+          set -euo pipefail
+          echo "sha_tag=sha-$(git rev-parse --short=8 HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          # workflow_run normally exposes the default branch's current SHA,
+          # which can move past the commit that produced the fast images.
+          # Read labels from the explicitly checked-out triggering commit.
+          context: ${{ github.event_name == 'workflow_run' && 'git' || 'workflow' }}
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/authproxy
+          tags: |
+            type=ref,event=branch,enable=${{ github.event_name != 'workflow_run' }}
+            type=raw,value=main,enable=${{ github.event_name == 'workflow_run' }}
+            type=raw,value=${{ steps.ref.outputs.sha_tag }}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=authproxy
+          cache-to: type=gha,scope=authproxy,mode=max
