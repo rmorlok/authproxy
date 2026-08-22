@@ -68,10 +68,6 @@ jobs:
         id: meta
         uses: docker/metadata-action@v6
         with:
-          # workflow_run normally exposes the default branch's current SHA,
-          # which can move past the commit that produced the fast images.
-          # Read labels from the explicitly checked-out triggering commit.
-          context: ${{ github.event_name == 'workflow_run' && 'git' || 'workflow' }}
           images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/authproxy
           tags: |
             type=ref,event=branch,enable=${{ github.event_name != 'workflow_run' }}
@@ -80,6 +76,11 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+          # workflow_run can expose a newer default-branch SHA than the build
+          # that triggered it. Override only the revision label; using Git as
+          # the full metadata context fails because checkout is detached.
+          labels: |
+            org.opencontainers.image.revision=${{ env.BUILD_SHA }}
 
       - name: Build and push
         uses: docker/build-push-action@v7
