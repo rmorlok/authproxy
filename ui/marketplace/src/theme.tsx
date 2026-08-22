@@ -1,4 +1,4 @@
-import { createTheme } from '@mui/material/styles';
+import { createTheme, PaletteMode } from '@mui/material/styles';
 import { red } from '@mui/material/colors';
 
 export const marketplaceTokens = {
@@ -38,11 +38,12 @@ export const marketplaceTokens = {
 
 // A custom theme for this app. Keep brand colors in MUI's palette and marketplace
 // layout/status conventions in marketplaceTokens so a host app can replace either layer.
-const theme = createTheme({
+export const createMarketplaceTheme = (mode: PaletteMode) => createTheme({
   shape: {
     borderRadius: 8,
   },
   palette: {
+    mode,
     primary: {
       main: '#556cd6',
     },
@@ -88,5 +89,7 @@ const theme = createTheme({
     },
   },
 });
+
+const theme = createMarketplaceTheme('light');
 
 export default theme;
