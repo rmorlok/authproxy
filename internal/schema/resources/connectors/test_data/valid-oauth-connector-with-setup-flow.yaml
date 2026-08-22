@@ -51,6 +51,7 @@ setupFlow:
             workspace_id:
               type: string
               title: Workspace
+              x-data-source: workspaces
         uiSchema:
           type: VerticalLayout
           elements:

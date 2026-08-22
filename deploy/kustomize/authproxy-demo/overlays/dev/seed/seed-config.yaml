@@ -262,7 +262,7 @@ data:
                           credentials.
                         title: Demo resource
                         type: string
-                        x-data-source: demo_resources
+                        x-data-source: demoResources
                     required:
                       - resource_id
                     type: object
