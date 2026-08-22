@@ -9,8 +9,8 @@ export const NAMESPACE_PATH_SEPARATOR = '.';
 
 export enum NamespaceState {
     ACTIVE = 'active',
-    DISCONNECTING = 'disconnecting',
-    DISCONNECTED = 'disconnected',
+    DESTROYING = 'destroying',
+    DESTROYED = 'destroyed',
 }
 
 export interface UpdateNamespaceRequest {

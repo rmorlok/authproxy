@@ -11,6 +11,7 @@ import NamespaceSelector, {
     validateNamespaceLeafName,
 } from './NamespaceSelector';
 import {NamespaceState, namespaces, ROOT_NAMESPACE_PATH} from '@authproxy/api';
+import {MemoryRouter, useLocation} from 'react-router-dom';
 
 const openCommandPalette = vi.hoisted(() => vi.fn());
 
@@ -30,8 +31,8 @@ vi.mock('@authproxy/api', () => {
         ROOT_NAMESPACE_PATH: 'root',
         NamespaceState: {
             ACTIVE: 'active',
-            DISCONNECTING: 'disconnecting',
-            DISCONNECTED: 'disconnected',
+            DESTROYING: 'destroying',
+            DESTROYED: 'destroyed',
         },
         namespaces: apiNamespaces,
     };
@@ -45,16 +46,28 @@ const rootNamespace = {
     updatedAt: '2026-06-20T00:00:00.000Z',
 };
 
-function renderSelector({childrenHasMore = false}: {childrenHasMore?: boolean} = {}) {
+function CurrentPath() {
+    return <output aria-label="current path">{useLocation().pathname}</output>;
+}
+
+function renderSelector({
+    childrenHasMore = false,
+    currentPath = ROOT_NAMESPACE_PATH,
+}: {childrenHasMore?: boolean; currentPath?: string} = {}) {
+    const currentNamespace = {
+        ...rootNamespace,
+        path: currentPath,
+        name: currentPath.split('.').at(-1) || currentPath,
+    };
     const store = configureStore({
         reducer: {
             namespaces: namespaceReducer,
         },
         preloadedState: {
             namespaces: {
-                currentPath: ROOT_NAMESPACE_PATH,
+                currentPath,
                 hasInitialized: true,
-                current: rootNamespace,
+                current: currentNamespace,
                 status: 'succeeded' as const,
                 error: null,
                 children: [],
@@ -67,7 +80,10 @@ function renderSelector({childrenHasMore = false}: {childrenHasMore?: boolean} =
 
     render(
         <Provider store={store}>
-            <NamespaceSelector />
+            <MemoryRouter initialEntries={['/home']}>
+                <NamespaceSelector />
+                <CurrentPath/>
+            </MemoryRouter>
         </Provider>,
     );
 
@@ -125,5 +141,31 @@ describe('NamespaceSelector', () => {
         await user.click(await screen.findByText('Search more namespaces'));
 
         expect(openCommandPalette).toHaveBeenCalledWith('type:namespace scope:current ');
+    });
+
+    it('opens the selected namespace resource without changing scope', async () => {
+        const user = userEvent.setup();
+        const store = renderSelector({currentPath: 'root.platform'});
+
+        await user.click(screen.getByRole('combobox', {name: 'Select namespace'}));
+        await user.click(await screen.findByText('View Current'));
+
+        expect(screen.getByLabelText('current path').textContent).toBe('/namespaces/root.platform');
+        expect(store.getState().namespaces.currentPath).toBe('root.platform');
+    });
+
+    it('offers go to root outside root and hides it at root', async () => {
+        const user = userEvent.setup();
+        const store = renderSelector({currentPath: 'root.platform'});
+
+        await user.click(screen.getByRole('combobox', {name: 'Select namespace'}));
+        await user.click(await screen.findByText('Go to root'));
+
+        await waitFor(() => expect(store.getState().namespaces.currentPath).toBe(ROOT_NAMESPACE_PATH));
+
+        cleanup();
+        renderSelector();
+        await user.click(screen.getByRole('combobox', {name: 'Select namespace'}));
+        expect(screen.queryByText('Go to root')).toBeNull();
     });
 });

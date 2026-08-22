@@ -24,7 +24,7 @@ export interface AdminNavigationItem {
 
 export const adminNavigationItems: AdminNavigationItem[] = [
     {label: 'Home', icon: HomeRoundedIcon, path: '/home', keywords: ['dashboard'], section: 'main'},
-    {label: 'Namespace', icon: AccountTreeRoundedIcon, path: '/namespace', keywords: ['tenant'], section: 'main'},
+    {label: 'Namespaces', icon: AccountTreeRoundedIcon, path: '/namespaces', keywords: ['namespace', 'tenant'], section: 'main'},
     {label: 'Connectors', icon: PowerRoundedIcon, path: '/connectors', keywords: ['integrations'], section: 'main'},
     {label: 'Connections', icon: LinkRoundedIcon, path: '/connections', keywords: ['accounts'], section: 'main'},
     {label: 'Requests', icon: HttpRoundedIcon, path: '/requests', keywords: ['events', 'logs'], section: 'main'},

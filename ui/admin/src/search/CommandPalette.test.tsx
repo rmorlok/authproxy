@@ -30,6 +30,7 @@ function Trigger() {
             <button onClick={() => palette.open()}>Open search</button>
             <button onClick={() => palette.open('type:namespace')}>Search namespaces</button>
             <button onClick={() => palette.open('type:connection pay')}>Search connections</button>
+            <button onClick={() => palette.open('root.platform')}>Open namespace</button>
             <button onClick={() => palette.open('type:bogus')}>Invalid search</button>
         </>
     );
@@ -104,6 +105,22 @@ describe('CommandPalette', () => {
         await user.keyboard('{Enter}');
 
         expect(screen.getByLabelText('current path').textContent).toBe('/connections/cxn_customer');
+        await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    });
+
+    it('routes namespace paths to namespace resource details', async () => {
+        const user = userEvent.setup();
+        renderPalette();
+
+        await user.click(screen.getByRole('button', {name: 'Open namespace'}));
+        await screen.findByPlaceholderText('Search resources or enter a command…');
+        await waitFor(() => expect(searchResourcesMock).toHaveBeenCalledWith(
+            expect.objectContaining({mode: 'seed'}),
+            expect.anything(),
+        ));
+        await user.keyboard('{Enter}');
+
+        expect(screen.getByLabelText('current path').textContent).toBe('/namespaces/root.platform');
         await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     });
 

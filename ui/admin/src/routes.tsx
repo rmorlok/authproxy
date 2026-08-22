@@ -20,7 +20,8 @@ import TasksPage from "./pages/Tasks";
 import TaskQueueDetailPage from "./pages/TaskQueueDetail";
 import WorkflowsPage from "./pages/Workflows";
 import WorkflowDetailPage from "./pages/WorkflowDetail";
-import NamespaceDetailPage from "./pages/NamespaceDetail";
+import NamespaceDetailPage, {CurrentNamespaceDetailRedirect} from "./pages/NamespaceDetail";
+import NamespacesPage from "./pages/Namespaces";
 import AboutPage from "./pages/About";
 import * as React from "react";
 
@@ -161,9 +162,27 @@ export const router = createBrowserRouter([
                 ],
             },
             {
-                path: 'namespace',
+                path: 'namespaces',
+                element: (<ListParent><NamespacesPage /></ListParent>),
+                handle: {title: 'Namespaces'},
+            },
+            {
+                path: 'namespaces/:path',
                 element: <NamespaceDetailPage />,
-                handle: { title: 'Namespace' }
+                handle: [
+                    {
+                        title: 'Namespaces',
+                        path: (_params: Params<string>) => '/namespaces',
+                    },
+                    {
+                        attr: 'path',
+                        path: (params: Params<string>) => `/namespaces/${encodeURIComponent(params.path || '')}`,
+                    },
+                ],
+            },
+            {
+                path: 'namespace',
+                element: <CurrentNamespaceDetailRedirect />,
             },
             {
                 path: 'actors',

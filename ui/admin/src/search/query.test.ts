@@ -16,7 +16,7 @@ describe('search query parser', () => {
     it('routes namespace paths directly', () => {
         expect(directSearchDestination('root.acmeTeam')).toEqual({
             kind: 'namespace',
-            path: '/namespace',
+            path: '/namespaces/root.acmeTeam',
             namespace: 'root.acmeTeam',
         });
     });
