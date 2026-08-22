@@ -260,52 +260,6 @@ func TestUpsertConnectorPublishesNewVersionWhenDefinitionChanges(t *testing.T) {
 	require.True(t, forcedPrimary)
 }
 
-func TestArchiveLegacySeededConnectorsArchivesActiveSeed(t *testing.T) {
-	seed := ConnectorSeed{
-		Key:       "demo-noauth",
-		Namespace: "root.demo",
-	}
-	archived := false
-	client := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method + " " + r.URL.Path {
-		case "GET /api/v1/connectors":
-			require.Equal(t, "root", r.URL.Query().Get("namespace"))
-			require.Equal(t, seedLabelKey+"=demo-noauth", r.URL.Query().Get("labelSelector"))
-			writeJSON(t, w, api.ListConnectorsResponseJson{Items: []api.ConnectorJson{{
-				Id:        testConnectorID,
-				Namespace: "root",
-				State:     api.ConnectorVersionStatePrimary,
-			}}})
-		case "POST /api/v1/connectors/cxr_testgmail0000001/_archive":
-			archived = true
-			writeJSON(t, w, map[string]any{"connectorId": testConnectorID})
-		default:
-			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
-		}
-	}))
-
-	count, err := archiveLegacySeededConnectors(client, testBaseURL, seed, []string{"root", "root.demo"})
-	require.NoError(t, err)
-	require.Equal(t, 1, count)
-	require.True(t, archived)
-}
-
-func TestArchiveLegacySeededConnectorsSkipsArchivedSeed(t *testing.T) {
-	seed := ConnectorSeed{Key: "demo-noauth", Namespace: "root.demo"}
-	client := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, http.MethodGet, r.Method)
-		writeJSON(t, w, api.ListConnectorsResponseJson{Items: []api.ConnectorJson{{
-			Id:        testConnectorID,
-			Namespace: "root",
-			State:     api.ConnectorVersionStateArchived,
-		}}})
-	}))
-
-	count, err := archiveLegacySeededConnectors(client, testBaseURL, seed, []string{"root"})
-	require.NoError(t, err)
-	require.Zero(t, count)
-}
-
 func TestSeedOAuth2TestProviderSeedsClientsUsersAndPolicies(t *testing.T) {
 	seen := map[string]int{}
 	client := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -506,7 +460,6 @@ func TestDeploymentSeedConfigsUseIsolatedDemoResources(t *testing.T) {
 			var cfg SeedConfig
 			require.NoError(t, util.DecodeYAMLStrict([]byte(configMap.Data["seed.yaml"]), &cfg))
 			require.Equal(t, []NamespaceSeed{{Path: "root.demo", Labels: map[string]string{"demo": "true"}}}, cfg.Namespaces)
-			require.Equal(t, []string{"root"}, cfg.LegacyConnectorNamespaces)
 			require.Len(t, cfg.Actors, 1)
 			require.Equal(t, demoUserSeed(), cfg.Actors[0])
 			require.Len(t, cfg.Connectors, 5)

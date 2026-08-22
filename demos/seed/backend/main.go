@@ -35,11 +35,10 @@ import (
 
 // SeedConfig is the YAML shape the binary consumes.
 type SeedConfig struct {
-	Namespaces                []NamespaceSeed         `yaml:"namespaces"`
-	Actors                    []ActorSeed             `yaml:"actors"`
-	OAuth2TestProvider        *OAuth2TestProviderSeed `yaml:"oauth2TestProvider"`
-	Connectors                []ConnectorSeed         `yaml:"connectors"`
-	LegacyConnectorNamespaces []string                `yaml:"legacyConnectorNamespaces"`
+	Namespaces         []NamespaceSeed         `yaml:"namespaces"`
+	Actors             []ActorSeed             `yaml:"actors"`
+	OAuth2TestProvider *OAuth2TestProviderSeed `yaml:"oauth2TestProvider"`
+	Connectors         []ConnectorSeed         `yaml:"connectors"`
 }
 
 type NamespaceSeed struct {
@@ -464,44 +463,6 @@ func listSeededConnector(c *resty.Client, baseUrl string, seed ConnectorSeed) (*
 	return &list.Items[0], nil
 }
 
-func archiveLegacySeededConnectors(c *resty.Client, baseUrl string, seed ConnectorSeed, legacyNamespaces []string) (int, error) {
-	archived := 0
-	for _, legacyNamespace := range legacyNamespaces {
-		if legacyNamespace == connectorNamespace(seed) {
-			continue
-		}
-
-		legacySeed := seed
-		legacySeed.Namespace = legacyNamespace
-		legacy, err := listSeededConnector(c, baseUrl, legacySeed)
-		if err != nil {
-			return archived, err
-		}
-		if legacy == nil || legacy.State == api.ConnectorVersionStateArchived {
-			continue
-		}
-
-		resp, err := c.R().
-			SetHeader("Content-Type", "application/json").
-			SetBody(map[string]any{}).
-			Post(fmt.Sprintf("%s/api/v1/connectors/%s/_archive", baseUrl, legacy.Id))
-		if err != nil {
-			return archived, fmt.Errorf("POST archive legacy connector seed %q in %q: %w", seed.Key, legacyNamespace, err)
-		}
-		if resp.StatusCode() >= 400 {
-			return archived, fmt.Errorf(
-				"POST archive legacy connector seed %q in %q returned %d: %s",
-				seed.Key,
-				legacyNamespace,
-				resp.StatusCode(),
-				resp.String(),
-			)
-		}
-		archived++
-	}
-	return archived, nil
-}
-
 func getConnectorVersion(c *resty.Client, baseUrl string, connector api.ConnectorJson) (*api.ConnectorVersionJson, error) {
 	var version api.ConnectorVersionJson
 	resp, err := c.R().
@@ -712,17 +673,8 @@ func run(logger *slog.Logger) error {
 	for _, connector := range cfg.Connectors {
 		deadline := time.Now().Add(seedRetryTimeout)
 		var action connectorAction
-		var legacyArchived int
 		for attempt := 1; ; attempt++ {
 			action, err = upsertConnector(client, s.adminApiUrl, connector)
-			if err == nil {
-				legacyArchived, err = archiveLegacySeededConnectors(
-					client,
-					s.adminApiUrl,
-					connector,
-					cfg.LegacyConnectorNamespaces,
-				)
-			}
 			if err == nil {
 				break
 			}
@@ -745,9 +697,6 @@ func run(logger *slog.Logger) error {
 			logger.Info("connector updated", "key", connector.Key, "namespace", connectorNamespace(connector))
 		case connectorAlreadyPresent:
 			logger.Info("connector already present", "key", connector.Key, "namespace", connectorNamespace(connector))
-		}
-		if legacyArchived > 0 {
-			logger.Info("legacy connector archived", "key", connector.Key, "count", legacyArchived)
 		}
 	}
 	return nil

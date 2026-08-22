@@ -25,7 +25,7 @@ before redirecting them into the appropriate AuthProxy UI.
 ```
 
 The backend holds the demo administrator's private key and the system JWT
-private key. The pre-provisioned `demo-admin` continues to self-sign. The
+private key. The pre-provisioned `demo-admin` self-signs. The
 API-provisioned `demo-user` receives a subject-only system-key-signed token, so
 its stored actor permissions remain authoritative. Selecting **Fresh user**
 creates a random `fresh-user-<uuid>` external ID and includes the complete,

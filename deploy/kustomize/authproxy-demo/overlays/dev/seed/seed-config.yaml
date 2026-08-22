@@ -29,8 +29,6 @@ data:
         labels:
           demo: "true"
           role: user
-    legacyConnectorNamespaces:
-      - root
     oauth2TestProvider:
       apiKeyResourcePolicies:
         - key: demo-api-key
