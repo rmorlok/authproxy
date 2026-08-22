@@ -66,15 +66,89 @@ func TestUpsertNamespaceCreatesMissingNamespace(t *testing.T) {
 	require.Equal(t, seedCreated, action)
 }
 
-func TestUpsertNamespaceVerifiesExistingNamespace(t *testing.T) {
+func TestUpsertNamespaceIgnoresSystemManagedLabels(t *testing.T) {
 	seed := NamespaceSeed{Path: "root.demo", Labels: map[string]string{"demo": "true"}}
 	client := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(t, w, api.NamespaceJson{Path: seed.Path, Labels: seed.Labels})
+		require.Equal(t, http.MethodGet, r.Method)
+		writeJSON(t, w, api.NamespaceJson{
+			Path: seed.Path,
+			Labels: map[string]string{
+				"demo":           "true",
+				"apxy/ns/-/id":   "root.demo",
+				"apxy/ns/-/name": "demo",
+				"apxy/ns/-/ns":   "root.demo",
+			},
+		})
 	}))
 
 	action, err := upsertNamespace(client, testBaseURL, seed)
 	require.NoError(t, err)
 	require.Equal(t, seedAlreadyPresent, action)
+}
+
+func TestUpsertNamespaceReconcilesUserMetadata(t *testing.T) {
+	seed := NamespaceSeed{
+		Path:        "root.demo",
+		Labels:      map[string]string{"demo": "true"},
+		Annotations: map[string]string{"description": "Demo resources"},
+	}
+	client := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method + " " + r.URL.Path {
+		case "GET /api/v1/namespaces/root.demo":
+			writeJSON(t, w, api.NamespaceJson{
+				Path: seed.Path,
+				Labels: map[string]string{
+					"demo":         "false",
+					"apxy/ns/-/id": "root.demo",
+				},
+				Annotations: map[string]string{"description": "Stale description"},
+			})
+		case "PATCH /api/v1/namespaces/root.demo":
+			var req api.UpdateNamespaceRequestJson
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
+			require.Equal(t, seed.Labels, req.Labels)
+			require.Equal(t, seed.Annotations, req.Annotations)
+			writeJSON(t, w, api.NamespaceJson{
+				Path:        seed.Path,
+				Labels:      seed.Labels,
+				Annotations: seed.Annotations,
+			})
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
+		}
+	}))
+
+	action, err := upsertNamespace(client, testBaseURL, seed)
+	require.NoError(t, err)
+	require.Equal(t, seedUpdated, action)
+}
+
+func TestUpsertNamespaceClearsUnconfiguredUserMetadata(t *testing.T) {
+	seed := NamespaceSeed{Path: "root.demo"}
+	client := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method + " " + r.URL.Path {
+		case "GET /api/v1/namespaces/root.demo":
+			writeJSON(t, w, api.NamespaceJson{
+				Path:        seed.Path,
+				Labels:      map[string]string{"legacy": "true"},
+				Annotations: map[string]string{"legacy": "true"},
+			})
+		case "PATCH /api/v1/namespaces/root.demo":
+			var req api.UpdateNamespaceRequestJson
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
+			require.NotNil(t, req.Labels)
+			require.Empty(t, req.Labels)
+			require.NotNil(t, req.Annotations)
+			require.Empty(t, req.Annotations)
+			writeJSON(t, w, api.NamespaceJson{Path: seed.Path})
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
+		}
+	}))
+
+	action, err := upsertNamespace(client, testBaseURL, seed)
+	require.NoError(t, err)
+	require.Equal(t, seedUpdated, action)
 }
 
 func TestUpsertActorCreatesThenAppliesPermissions(t *testing.T) {

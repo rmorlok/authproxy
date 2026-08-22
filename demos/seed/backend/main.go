@@ -3,7 +3,7 @@
 // post-upgrade hook from the authproxy-demo umbrella chart.
 //
 // Idempotency model: namespaces and actors are created when absent and
-// verified against the desired state when present. For each desired connector,
+// reconciled to the desired state when present. For each desired connector,
 // list by the stable demo seed label, create it when absent, or publish a new
 // version when the definition changes. Re-running the seed job is a no-op once
 // the state matches.
@@ -191,11 +191,14 @@ func upsertNamespace(c *resty.Client, baseUrl string, ns NamespaceSeed) (seedAct
 
 	switch getResp.StatusCode() {
 	case http.StatusOK:
-		if !stringMapsEqual(ns.Labels, existing.Labels) ||
-			!stringMapsEqual(ns.Annotations, existing.Annotations) {
-			return "", fmt.Errorf("namespace %q exists but does not match the configured labels and annotations", ns.Path)
+		if stringMapsEqual(ns.Labels, userLabels(existing.Labels)) &&
+			stringMapsEqual(ns.Annotations, existing.Annotations) {
+			return seedAlreadyPresent, nil
 		}
-		return seedAlreadyPresent, nil
+		if err := updateNamespace(c, baseUrl, ns); err != nil {
+			return "", err
+		}
+		return seedUpdated, nil
 	case http.StatusNotFound:
 		// fall through to create
 	default:
@@ -217,6 +220,32 @@ func upsertNamespace(c *resty.Client, baseUrl string, ns NamespaceSeed) (seedAct
 		return "", fmt.Errorf("POST namespace %q returned %d: %s", ns.Path, postResp.StatusCode(), postResp.String())
 	}
 	return seedCreated, nil
+}
+
+func updateNamespace(c *resty.Client, baseUrl string, ns NamespaceSeed) error {
+	labels := ns.Labels
+	if labels == nil {
+		labels = map[string]string{}
+	}
+	annotations := ns.Annotations
+	if annotations == nil {
+		annotations = map[string]string{}
+	}
+
+	patchResp, err := c.R().
+		SetHeader("Content-Type", "application/json").
+		SetBody(api.UpdateNamespaceRequestJson{
+			Labels:      labels,
+			Annotations: annotations,
+		}).
+		Patch(fmt.Sprintf("%s/api/v1/namespaces/%s", baseUrl, ns.Path))
+	if err != nil {
+		return fmt.Errorf("PATCH namespace %q: %w", ns.Path, err)
+	}
+	if patchResp.StatusCode() >= 400 {
+		return fmt.Errorf("PATCH namespace %q returned %d: %s", ns.Path, patchResp.StatusCode(), patchResp.String())
+	}
+	return nil
 }
 
 // upsertActor creates the actor if it doesn't already exist by external_id and
@@ -426,6 +455,18 @@ func stringMapsEqual(a, b map[string]string) bool {
 		}
 	}
 	return true
+}
+
+func userLabels(labels map[string]string) map[string]string {
+	// AuthProxy materializes reserved identity and inherited labels in API
+	// responses. Seed configuration owns only labels that callers can set.
+	result := make(map[string]string)
+	for key, value := range labels {
+		if !strings.HasPrefix(key, "apxy/") {
+			result[key] = value
+		}
+	}
+	return result
 }
 
 func normalizeForJSON(v any) any {
