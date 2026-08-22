@@ -465,6 +465,7 @@ func TestDeploymentSeedConfigsUseIsolatedDemoResources(t *testing.T) {
 			require.Len(t, cfg.Connectors, 5)
 			for _, connector := range cfg.Connectors {
 				require.Equal(t, "root.demo", connectorNamespace(connector))
+				require.NoError(t, connector.Definition.Validate(&common.ValidationContext{}))
 			}
 		})
 	}
