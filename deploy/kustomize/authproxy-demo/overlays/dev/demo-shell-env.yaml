@@ -11,7 +11,7 @@ spec:
             - name: PORT
               value: "8888"
             - name: ADMIN_USERNAME
-              value: demo-shell
+              value: demo-admin
             - name: ADMIN_PRIVATE_KEY_PATH
               value: /etc/authproxy/demo-shell/private
             - name: AUTHPROXY_JWT_PRIVATE_KEY_PATH

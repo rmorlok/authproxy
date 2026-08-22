@@ -48,6 +48,9 @@ func TestConnections(t *testing.T) {
 	connectorVersion := uint64(1)
 	oauthConnectorId := apid.MustParse("cxr_test0000000000002")
 	oauthConnectorVersion := uint64(1)
+	demoConnectorId := apid.MustParse("cxr_test0000000000003")
+	demoConnectorVersion := uint64(1)
+	demoConnectorNamespace := "root.demo"
 
 	setup := func(t *testing.T, cfg config.C) (*TestSetup, func()) {
 		cfg = config.FromRoot(&sconfig.Root{
@@ -67,6 +70,13 @@ func TestConnections(t *testing.T) {
 						Auth: &sconfig.Auth{InnerVal: &sconfig.AuthOAuth2{
 							Type: sconfig.AuthTypeOAuth2,
 						}},
+					},
+					{
+						Id:          demoConnectorId,
+						Version:     demoConnectorVersion,
+						Namespace:   &demoConnectorNamespace,
+						Labels:      map[string]string{"type": "demo-connector"},
+						DisplayName: "Demo Connector",
 					},
 				},
 			},
@@ -554,6 +564,34 @@ func TestConnections(t *testing.T) {
 
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusForbidden, w.Code)
+		})
+
+		t.Run("infers an exact permitted child namespace when omitted", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			connectionNamespace := "root.demo.some-actor"
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost,
+				"/connections/_initiate",
+				util.JsonToReader(map[string]interface{}{
+					"connectorId": demoConnectorId.String(),
+					"returnToUrl": "https://example.com/callback",
+				}),
+				demoConnectorNamespace,
+				"some-actor",
+				aschema.PermissionsSingle(connectionNamespace, "connections", "create"),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+			var resp struct {
+				Id apid.ID `json:"id"`
+			}
+			require.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
+			created, err := tu.Db.GetConnection(context.Background(), resp.Id)
+			require.NoError(t, err)
+			require.Equal(t, connectionNamespace, created.Namespace)
 		})
 	})
 

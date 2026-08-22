@@ -52,6 +52,22 @@ func (s *service) InitiateConnection(
 	targetNamespace := c.GetNamespace()
 	if req.HasIntoNamespace() {
 		targetNamespace = req.IntoNamespace
+	} else if val.ValidateNamespaceResourceId(targetNamespace, c.GetId().String()) != nil {
+		// If the `intoNamespace` option is not specified, attempt to infer where
+		// the connection should be placed based on the actor's permissions.
+		// Try to colocate the connection with the connector first (use the
+		// connector's namespace). If that is not possible, see if the actor has
+		// a single namespace they are authorized to create connections in that
+		// is a child of the connector's namespace. If so, use that. If permissions
+		// would be ambiguous, reject and force the client to specify. This covers
+		// the common case where actors can only connect into their own namespace.
+		if inferred, ok := inferConnectionNamespace(
+			c.GetNamespace(),
+			apauth.ActorFromContext(ctx).GetNamespace(),
+			val.GetEffectiveNamespaceMatchers(nil),
+		); ok {
+			targetNamespace = inferred
+		}
 	}
 
 	if err := namespace.ValidatePath(targetNamespace); err != nil {
@@ -115,4 +131,24 @@ func (s *service) InitiateConnection(
 	}
 
 	return connection.advanceToStep(ctx, first, flow, req.ReturnToUrl)
+}
+
+// inferConnectionNamespace returns an inferred connection namespace only when
+// the actor has one exact, unambiguous namespace in which they can create the
+// connection and that namespace is a child of both the connector and actor
+// namespaces. Ambiguous, wildcard, unrelated, and invalid namespaces cannot be
+// inferred, requiring the client to specify intoNamespace explicitly.
+func inferConnectionNamespace(connectorNamespace, actorNamespace string, allowedNamespaces []string) (string, bool) {
+	if len(allowedNamespaces) != 1 {
+		return "", false
+	}
+
+	candidate := allowedNamespaces[0]
+	if namespace.ValidatePath(candidate) != nil ||
+		!namespace.IsSameOrChild(connectorNamespace, candidate) ||
+		!namespace.IsSameOrChild(actorNamespace, candidate) {
+		return "", false
+	}
+
+	return candidate, true
 }

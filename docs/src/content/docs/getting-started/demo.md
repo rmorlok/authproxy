@@ -37,11 +37,15 @@ sequenceDiagram
     AP-->>UI: Session cookie and UI configuration
 ```
 
-`demo-admin` and `demo-user` demonstrate pre-provisioned host identities. Every
-**Fresh user** launch generates a new `fresh-user-<uuid>` external ID and
-provisions that actor during the JWT handoff, so it starts without connections.
-Connection data for the pre-provisioned identities is shared and changes as
-visitors use the demo.
+`demo-admin` is a pre-provisioned, self-signing administrator. `demo-user` is
+provisioned through the API, while its subject-only JWT is signed by the host's
+system JWT key. Every **Fresh user** launch generates a new
+`fresh-user-<uuid>` external ID and provisions that actor from a full actor
+claim signed by the same host key.
+
+Marketplace actors and connectors live in `root.demo`. Each user's connections
+live in `root.demo.<external_id>`, so fresh users start empty and no demo user
+can see or operate on another user's connections.
 
 See [host application integration](/integration/host-application/) for the
 production version of this handoff.

@@ -228,14 +228,17 @@ func TestDisconnectConnectionWorkflowV1ForcesOnTimeout(t *testing.T) {
 	connectionId := apid.New(apid.PrefixConnection)
 	workflowTester := tester.NewWorkflowTester[any](disconnectConnectionWorkflowV1)
 
-	revokeActivity := func(ctx context.Context, _ apid.ID) error {
-		<-ctx.Done()
-		return ctx.Err()
+	revokeActivity := func(context.Context, apid.ID) error {
+		return nil
 	}
 	forceActivity := func(context.Context, apid.ID) error {
 		return nil
 	}
 
+	// OnActivityByName uses revokeActivity to determine the activity signature;
+	// the mock behavior comes from Run and Return. Keep the mock active well
+	// beyond the workflow timeout so the timer wins deterministically instead of
+	// racing an immediate mocked cancellation.
 	workflowTester.
 		OnActivityByName(
 			ActivityNameDisconnectConnectionRevokeCredentialsV1,
@@ -243,8 +246,11 @@ func TestDisconnectConnectionWorkflowV1ForcesOnTimeout(t *testing.T) {
 			testifymock.Anything,
 			connectionId,
 		).
+		Run(func(testifymock.Arguments) {
+			time.Sleep(250 * time.Millisecond)
+		}).
 		Return(context.Canceled).
-		Maybe()
+		Once()
 	workflowTester.
 		OnActivityByName(
 			ActivityNameDisconnectConnectionForceV1,
@@ -257,7 +263,7 @@ func TestDisconnectConnectionWorkflowV1ForcesOnTimeout(t *testing.T) {
 
 	workflowTester.Execute(context.Background(), disconnectConnectionWorkflowInputV1{
 		ConnectionID: connectionId,
-		Timeout:      time.Millisecond,
+		Timeout:      25 * time.Millisecond,
 	})
 
 	require.True(t, workflowTester.WorkflowFinished())

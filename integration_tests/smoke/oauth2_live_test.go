@@ -31,6 +31,7 @@ var (
 )
 
 const smokeConnectorNamespace = "root.smoke"
+const demoConnectorNamespace = "root.demo"
 
 func newSmokeActorExternalID(t *testing.T, prefix string) string {
 	t.Helper()
@@ -50,7 +51,7 @@ func smokeAdminPermissions(adminExternalID, userExternalID, connectionNamespace 
 			Verbs:       []string{"get", "delete"},
 		},
 		{
-			Namespace: config.RootNamespace,
+			Namespace: demoConnectorNamespace,
 			Resources: []string{"connectors"},
 			Verbs:     []string{"list", "list/versions"},
 		},
@@ -144,8 +145,8 @@ func cloneSeededConnectorsIntoSmokeNamespace(
 ) string {
 	t.Helper()
 
-	sources := rig.ListConnectorsAsAdmin(t, config.RootNamespace, "demo=true")
-	require.NotEmpty(t, sources, "the demo seed job did not create any root connectors")
+	sources := rig.ListConnectorsAsAdmin(t, demoConnectorNamespace, "demo=true")
+	require.NotEmpty(t, sources, "the demo seed job did not create any root.demo connectors")
 	suffix := time.Now().UnixNano()
 	runID := fmt.Sprintf("%d", suffix)
 	const runLabel = "smoke.authproxy.net/run-id"

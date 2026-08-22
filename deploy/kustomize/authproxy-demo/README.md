@@ -22,8 +22,8 @@ kubectl kustomize deploy/kustomize/authproxy-demo/overlays/dev
 ```
 
 `Deploy Demo` renders `overlays/demo`, rewrites the checked-out overlay with
-the selected image tag and configured hostname, and applies the resulting
-manifest with `kubectl apply`. The demo overlay includes Grafana at
+the selected image tag and configured hostname, applies the resulting
+manifest with `kubectl apply`, and then runs the seed job. The demo overlay includes Grafana at
 `https://<hostname>/grafana` with the bundled AuthProxy datasource plugin,
 Prometheus, Tempo, and Loki datasources, and sample app metrics dashboard
 provisioned from Kustomize ConfigMaps. Prometheus, Tempo, Loki, and the OTel
@@ -61,8 +61,8 @@ Set the `DEMO_GRAFANA_ADMIN_USER` repo variable and
 password is unset, the first deploy generates a random password and stores it
 in the cluster Secret.
 
-Seeding is intentionally not part of the Kustomize deployment apply. Run the
-`Seed Demo` GitHub Actions workflow to reseed the persistent demo environment
-on demand; it renders `overlays/demo/seed` and applies the resulting Job.
-Dev seeding will be run by the per-branch deploy workflow after the environment
-is applied.
+Both demo and dev deployment workflows run their seed job after the environment
+is ready. The job idempotently provisions `root.demo`, verifies or creates the
+least-privilege `demo-user`, publishes demo connectors in `root.demo`, and
+archives legacy seeded connectors from `root`. The `Seed Demo` GitHub Actions
+workflow remains available to rerun the same job on demand.

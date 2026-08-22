@@ -230,24 +230,21 @@ jobs:
             echo "Reusing ${RELEASE_NAME}-demo-shell-key"
           fi
 
-          if ! kubectl -n "${RELEASE_NS}" get secret "${RELEASE_NAME}-actors" >/dev/null 2>&1; then
-            kubectl -n "${RELEASE_NS}" create secret generic "${RELEASE_NAME}-actors" \
-              --from-file=demo-shell.pub="${workdir}/demo-shell.pub" \
-              --from-file=demo-admin.pub="${workdir}/demo-shell.pub" \
-              --from-file=demo-user.pub="${workdir}/demo-shell.pub" \
-              --from-file=fresh-user.pub="${workdir}/demo-shell.pub" \
-              --from-file=grafana.pub="${workdir}/demo-shell.pub"
-          else
-            echo "Reusing ${RELEASE_NAME}-actors"
-          fi
+          kubectl -n "${RELEASE_NS}" create secret generic "${RELEASE_NAME}-actors" \
+            --from-file=demo-admin.pub="${workdir}/demo-shell.pub" \
+            --from-file=grafana.pub="${workdir}/demo-shell.pub" \
+            --dry-run=client -o yaml \
+            | kubectl apply -f -
 
-          stale_smoke_public="$(kubectl -n "${RELEASE_NS}" get secret "${RELEASE_NAME}-actors" \
-            -o jsonpath='{.data.smoke-user\.pub}')"
-          if [ -n "${stale_smoke_public}" ]; then
-            kubectl -n "${RELEASE_NS}" patch secret "${RELEASE_NAME}-actors" \
-              --type json \
-              --patch='[{"op":"remove","path":"/data/smoke-user.pub"}]'
-          fi
+          for stale_actor in demo-shell demo-user fresh-user smoke-user; do
+            stale_public="$(kubectl -n "${RELEASE_NS}" get secret "${RELEASE_NAME}-actors" \
+              -o "jsonpath={.data.${stale_actor}\\.pub}")"
+            if [ -n "${stale_public}" ]; then
+              kubectl -n "${RELEASE_NS}" patch secret "${RELEASE_NAME}-actors" \
+                --type json \
+                --patch="[{\"op\":\"remove\",\"path\":\"/data/${stale_actor}.pub\"}]"
+            fi
+          done
 
           kubectl -n "${RELEASE_NS}" delete secret "${RELEASE_NAME}-smoke-actors" \
             --ignore-not-found
