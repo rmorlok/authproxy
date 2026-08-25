@@ -2,18 +2,18 @@ apiVersion: v2
 name: authproxy-bootstrap
 description: |
   Cluster bootstrap layer for an AuthProxy EKS install: ingress-nginx,
-  cert-manager, external-dns, metrics-server, plus a Let's Encrypt
-  ClusterIssuer. Helm-of-helms — depends on each upstream chart.
+  cert-manager, external-dns, metrics-server, EBS storage, plus a Let's
+  Encrypt ClusterIssuer. Helm-of-helms — depends on each upstream chart.
 type: application
 
 # Chart version follows its own semver, decoupled from the upstreams
 # below. Bumped when bootstrap surface (values, ClusterIssuer config,
 # pinned versions) changes.
-version: 0.1.0
+version: 0.2.0
 
 # appVersion has no single meaning for a meta-chart; the upstream
 # chart versions in `dependencies` are what actually matters.
-appVersion: "0.1.0"
+appVersion: "0.2.0"
 
 home: https://github.com/rmorlok/authproxy
 sources:
@@ -30,6 +30,7 @@ keywords:
   - cert-manager
   - external-dns
   - metrics-server
+  - ebs-csi
 
 annotations:
   category: Infrastructure

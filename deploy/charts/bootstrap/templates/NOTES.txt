@@ -3,6 +3,7 @@
   operator-facing checklist: confirm IRSA wiring, verify components are
   healthy, and run the throwaway echo smoke test.
 */ -}}
+{{- $storageClass := mergeOverwrite (dict "enabled" true "name" "gp3") (.Values.storageClass | default dict) -}}
 authproxy-bootstrap installed.
 
 Next steps
@@ -19,12 +20,18 @@ Next steps
 
      kubectl get pods -n kube-system -l 'app.kubernetes.io/name in (ingress-nginx,cert-manager,external-dns,metrics-server)'
 
-3. Confirm the ClusterIssuer reached Ready (cert-manager has to register
+{{ if $storageClass.enabled }}
+3. Confirm the default EBS CSI storage class exists:
+
+     kubectl get storageclass {{ $storageClass.name }}
+
+{{ end }}
+{{ if $storageClass.enabled }}4{{ else }}3{{ end }}. Confirm the ClusterIssuer reached Ready (cert-manager has to register
    with Let's Encrypt — takes ~10-30s):
 
      kubectl get clusterissuer {{ .Values.clusterIssuer.name }} -o wide
 
-4. Smoke test — apply examples/hello-echo.yaml from this chart's source
+{{ if $storageClass.enabled }}5{{ else }}4{{ end }}. Smoke test — apply examples/hello-echo.yaml from this chart's source
    tree, then watch DNS + TLS land:
 
      kubectl apply -f deploy/charts/bootstrap/examples/hello-echo.yaml
