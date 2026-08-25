@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: go-oauth2-server
-          image: ghcr.io/rmorlok/go-oauth2-server@sha256:d1e5bdae007259b0c02255f26efce595f23eb2142e7da8caa3dac544dd445cb3
+          image: ghcr.io/rmorlok/go-oauth2-server@sha256:7b5e621fe57ed4b882a014b613b9d0c5dd58aefb52eab881556da40a61b4a5fa
           imagePullPolicy: IfNotPresent
           command:
             - go-oauth2-server
