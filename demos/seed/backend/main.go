@@ -74,12 +74,14 @@ type OAuth2TestProviderSeed struct {
 	APIKeyResourcePolicies []APIKeyResourcePolicy     `yaml:"apiKeyResourcePolicies,omitempty"`
 }
 
+// The provider control-plane API uses snake_case JSON. The seed file remains
+// camelCase YAML to match the rest of the demo configuration surface.
 type OAuth2TestProviderClient struct {
 	Key                     string `json:"key" yaml:"key"`
 	Secret                  string `json:"secret,omitempty" yaml:"secret,omitempty"`
-	RedirectURI             string `json:"redirectUri,omitempty" yaml:"redirectUri,omitempty"`
-	TokenEndpointAuthMethod string `json:"tokenEndpointAuthMethod,omitempty" yaml:"tokenEndpointAuthMethod,omitempty"`
-	RequirePKCE             bool   `json:"requirePkce,omitempty" yaml:"requirePkce,omitempty"`
+	RedirectURI             string `json:"redirect_uri,omitempty" yaml:"redirectUri,omitempty"`
+	TokenEndpointAuthMethod string `json:"token_endpoint_auth_method,omitempty" yaml:"tokenEndpointAuthMethod,omitempty"`
+	RequirePKCE             bool   `json:"require_pkce,omitempty" yaml:"requirePkce,omitempty"`
 	Scope                   string `json:"scope,omitempty" yaml:"scope,omitempty"`
 }
 
@@ -88,20 +90,20 @@ type OAuth2TestProviderUser struct {
 	Password    string `json:"password,omitempty" yaml:"password,omitempty"`
 	Role        string `json:"role,omitempty" yaml:"role,omitempty"`
 	Email       string `json:"email,omitempty" yaml:"email,omitempty"`
-	DisplayName string `json:"displayName,omitempty" yaml:"displayName,omitempty"`
+	DisplayName string `json:"display_name,omitempty" yaml:"displayName,omitempty"`
 	Sub         string `json:"sub,omitempty" yaml:"sub,omitempty"`
 }
 
 type OAuth2ResourcePolicy struct {
 	Path          string `json:"path" yaml:"path"`
-	RequiredScope string `json:"requiredScope" yaml:"requiredScope"`
+	RequiredScope string `json:"required_scope" yaml:"requiredScope"`
 }
 
 type APIKeyResourcePolicy struct {
 	Path       string `json:"path" yaml:"path"`
 	Key        string `json:"key" yaml:"key"`
 	Placement  string `json:"placement,omitempty" yaml:"placement,omitempty"`
-	HeaderName string `json:"headerName,omitempty" yaml:"headerName,omitempty"`
+	HeaderName string `json:"header_name,omitempty" yaml:"headerName,omitempty"`
 	Prefix     string `json:"prefix,omitempty" yaml:"prefix,omitempty"`
 }
 

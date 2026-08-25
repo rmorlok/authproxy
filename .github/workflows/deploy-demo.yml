@@ -564,7 +564,9 @@ jobs:
           echo "Smoke-testing ${SMOKE_BASE_URL}"
           cd integration_tests
           SMOKE_GLOBAL_KEY="${workdir}/global_aes.key" \
-            go test -tags smoke ./smoke -run TestRemoteOAuth2ProxySmoke -count=1 -v
+            go test -tags smoke ./smoke \
+              -run 'TestRemote(OAuth2Proxy|SeededOAuthConnector)Smoke' \
+              -count=1 -v
 
       - name: Collect deploy diagnostics (on failure)
         if: failure()
