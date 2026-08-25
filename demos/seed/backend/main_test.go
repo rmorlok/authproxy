@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -340,27 +341,56 @@ func TestSeedOAuth2TestProviderSeedsClientsUsersAndPolicies(t *testing.T) {
 		seen[r.Method+" "+r.URL.Path]++
 		switch r.Method + " " + r.URL.Path {
 		case "POST /test/clients":
-			var req OAuth2TestProviderClient
+			var req struct {
+				Key                     string `json:"key"`
+				Secret                  string `json:"secret"`
+				RedirectURI             string `json:"redirect_uri"`
+				TokenEndpointAuthMethod string `json:"token_endpoint_auth_method"`
+				RequirePKCE             bool   `json:"require_pkce"`
+				Scope                   string `json:"scope"`
+			}
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
 			require.Equal(t, "demo-oauth-simple", req.Key)
+			require.Equal(t, "secret", req.Secret)
 			require.Equal(t, "https://marketplace.example.test/oauth2/callback", req.RedirectURI)
+			require.Equal(t, "client_secret_post", req.TokenEndpointAuthMethod)
+			require.True(t, req.RequirePKCE)
+			require.Equal(t, "read", req.Scope)
 			w.WriteHeader(http.StatusCreated)
 		case "POST /test/users":
-			var req OAuth2TestProviderUser
+			var req struct {
+				Username    string `json:"username"`
+				Password    string `json:"password"`
+				DisplayName string `json:"display_name"`
+			}
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
 			require.Equal(t, "demo-oauth-user@example.test", req.Username)
+			require.Equal(t, "demo-password", req.Password)
+			require.Equal(t, "Demo OAuth User", req.DisplayName)
 			w.WriteHeader(http.StatusCreated)
 		case "POST /test/resource-policy":
-			var req OAuth2ResourcePolicy
+			var req struct {
+				Path          string `json:"path"`
+				RequiredScope string `json:"required_scope"`
+			}
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
 			require.Equal(t, "/test/resource/demo-resources", req.Path)
+			require.Equal(t, "read", req.RequiredScope)
 			w.WriteHeader(http.StatusNoContent)
 		case "POST /test/api-key-resource-policy":
-			var req APIKeyResourcePolicy
+			var req struct {
+				Path       string `json:"path"`
+				Key        string `json:"key"`
+				Placement  string `json:"placement"`
+				HeaderName string `json:"header_name"`
+				Prefix     string `json:"prefix"`
+			}
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
 			require.Equal(t, "/test/api-key-resource/demo-api-key", req.Path)
 			require.Equal(t, "demo-api-key", req.Key)
-			require.Equal(t, "bearer", req.Placement)
+			require.Equal(t, "header", req.Placement)
+			require.Equal(t, "X-Demo-Key", req.HeaderName)
+			require.Equal(t, "Token ", req.Prefix)
 			w.WriteHeader(http.StatusNoContent)
 		default:
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
@@ -374,20 +404,24 @@ func TestSeedOAuth2TestProviderSeedsClientsUsersAndPolicies(t *testing.T) {
 			Secret:                  "secret",
 			RedirectURI:             "https://marketplace.example.test/oauth2/callback",
 			TokenEndpointAuthMethod: "client_secret_post",
+			RequirePKCE:             true,
 			Scope:                   "read",
 		}},
 		Users: []OAuth2TestProviderUser{{
-			Username: "demo-oauth-user@example.test",
-			Password: "demo-password",
+			Username:    "demo-oauth-user@example.test",
+			Password:    "demo-password",
+			DisplayName: "Demo OAuth User",
 		}},
 		ResourcePolicies: []OAuth2ResourcePolicy{{
 			Path:          "/test/resource/demo-resources",
 			RequiredScope: "read",
 		}},
 		APIKeyResourcePolicies: []APIKeyResourcePolicy{{
-			Path:      "/test/api-key-resource/demo-api-key",
-			Key:       "demo-api-key",
-			Placement: "bearer",
+			Path:       "/test/api-key-resource/demo-api-key",
+			Key:        "demo-api-key",
+			Placement:  "header",
+			HeaderName: "X-Demo-Key",
+			Prefix:     "Token ",
 		}},
 	})
 	require.NoError(t, err)
@@ -533,14 +567,33 @@ func TestDeploymentSeedConfigsUseIsolatedDemoResources(t *testing.T) {
 
 			var cfg SeedConfig
 			require.NoError(t, util.DecodeYAMLStrict([]byte(configMap.Data["seed.yaml"]), &cfg))
+			require.NotNil(t, cfg.OAuth2TestProvider)
 			require.Equal(t, []NamespaceSeed{{Path: "root.demo", Labels: map[string]string{"demo": "true"}}}, cfg.Namespaces)
 			require.Len(t, cfg.Actors, 1)
 			require.Equal(t, demoUserSeed(), cfg.Actors[0])
 			require.Len(t, cfg.Connectors, 5)
+
+			providerClients := make(map[string]OAuth2TestProviderClient, len(cfg.OAuth2TestProvider.Clients))
+			for _, client := range cfg.OAuth2TestProvider.Clients {
+				providerClients[client.Key] = client
+			}
+			oauthConnectorCount := 0
 			for _, connector := range cfg.Connectors {
 				require.Equal(t, "root.demo", connectorNamespace(connector))
 				require.NoError(t, connector.Definition.Validate(&common.ValidationContext{}))
+
+				oauthAuth, ok := connector.Definition.Auth.Inner().(*config.AuthOAuth2)
+				if !ok {
+					continue
+				}
+				oauthConnectorCount++
+				clientID, err := oauthAuth.ClientId.GetValue(context.Background())
+				require.NoError(t, err)
+				providerClient, ok := providerClients[clientID]
+				require.Truef(t, ok, "OAuth connector %q references unseeded provider client %q", connector.Key, clientID)
+				require.Equal(t, string(oauthAuth.GetTokenEndpointAuthMethodOrDefault()), providerClient.TokenEndpointAuthMethod)
 			}
+			require.Equal(t, 3, oauthConnectorCount)
 		})
 	}
 }

@@ -82,6 +82,11 @@ func smokeAdminPermissions(adminExternalID, userExternalID, connectionNamespace 
 func smokeUserPermissions(connectionNamespace string) []aschema.Permission {
 	return []aschema.Permission{
 		{
+			Namespace: demoConnectorNamespace,
+			Resources: []string{"connectors"},
+			Verbs:     []string{"list"},
+		},
+		{
 			Namespace: smokeConnectorNamespace,
 			Resources: []string{"connectors"},
 			Verbs:     []string{"list"},
@@ -275,6 +280,53 @@ func TestRemoteOAuth2ProxySmoke(t *testing.T) {
 	}
 	require.Truef(t, strings.HasPrefix(strings.ToLower(authHeader), "bearer "),
 		"proxied resource call should use bearer auth, got %q", authHeader)
+}
+
+func TestRemoteSeededOAuthConnectorSmoke(t *testing.T) {
+	if *smokeBaseURL == "" {
+		t.Skip("set SMOKE_BASE_URL or pass -base-url")
+	}
+	if *smokeGlobalKey == "" {
+		t.Skip("set SMOKE_GLOBAL_KEY or pass -global-key")
+	}
+
+	rig := newRemoteSmokeRig(t)
+	provider := helpers.NewOAuth2TestProviderAt(t, rig.ProviderURL)
+	connector := rig.FindConnectorBySeedKey(t, "demo-oauth-simple")
+
+	startedAt := time.Now().Add(-1 * time.Second)
+	connectionID, redirectURL := rig.InitiateOAuth2Connection(t, connector.Id, rig.PublicURL+"/connections")
+	authorizeURL := rig.FollowOAuth2Redirect(t, redirectURL)
+	authorizeParams := parseQuery(t, authorizeURL)
+	clientID := authorizeParams.Get("client_id")
+	require.NotEmpty(t, clientID)
+	require.Equal(t, rig.PublicURL+"/oauth2/callback", authorizeParams.Get("redirect_uri"))
+	require.NotEmpty(t, authorizeParams.Get("state"))
+
+	callback := provider.Authorize(helpers.AuthorizeRequest{
+		ClientID:    clientID,
+		Username:    "demo-oauth-user@example.test",
+		RedirectURI: authorizeParams.Get("redirect_uri"),
+		Scope:       authorizeParams.Get("scope"),
+		State:       authorizeParams.Get("state"),
+		Decision:    helpers.AuthorizeApprove,
+	})
+	require.NotEmpty(t, callback.RedirectURL)
+
+	finalLocation := rig.DeliverOAuth2Callback(t, callback.RedirectURL)
+	assert.Truef(t, strings.HasPrefix(finalLocation, rig.PublicURL+"/connections"),
+		"expected callback to land on marketplace connections page, got %q", finalLocation)
+	rig.WaitForSetupComplete(t, connectionID, 30*time.Second)
+
+	proxyResp := rig.DoProxyRequest(t, connectionID, provider.ResourceURL("/echo"), http.MethodGet)
+	require.Equal(t, http.StatusOK, proxyResp.StatusCode)
+
+	tokenReqs := provider.Requests(helpers.RequestsFilter{
+		Endpoint: helpers.EndpointToken,
+		ClientID: clientID,
+		Since:    startedAt,
+	})
+	require.NotEmpty(t, tokenReqs, "provider should record the seeded client token exchange")
 }
 
 func TestRemoteSeededConnectorsSmoke(t *testing.T) {

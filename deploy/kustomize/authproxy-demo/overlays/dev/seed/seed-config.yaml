@@ -36,17 +36,19 @@ data:
           placement: bearer
       baseUrl: http://dev-go-oauth2-server
       clients:
-        - key: demo-oauth-simple
+        # Versioned IDs replace clients previously seeded with the wrong JSON
+        # field names; the provider's test API intentionally rejects updates.
+        - key: demo-oauth-simple-v2
           redirectUri: https://marketplace.branch.dev.authproxy.net/oauth2/callback
           scope: read profile resources
           secret: demo-oauth-simple-secret
           tokenEndpointAuthMethod: client_secret_post
-        - key: demo-oauth-tenant
+        - key: demo-oauth-tenant-v2
           redirectUri: https://marketplace.branch.dev.authproxy.net/oauth2/callback
           scope: read profile resources
           secret: demo-oauth-tenant-secret
           tokenEndpointAuthMethod: client_secret_post
-        - key: demo-oauth-configure
+        - key: demo-oauth-configure-v2
           redirectUri: https://marketplace.branch.dev.authproxy.net/oauth2/callback
           scope: read profile resources
           secret: demo-oauth-configure-secret
@@ -118,8 +120,9 @@ data:
           auth:
             authorization:
               endpoint: https://oauth2.branch.dev.authproxy.net/web/authorize
-            clientId: demo-oauth-simple
+            clientId: demo-oauth-simple-v2
             clientSecret: demo-oauth-simple-secret
+            tokenEndpointAuthMethod: client_secret_post
             scopes:
               - id: read
                 reason: Read basic profile information from the demo provider.
@@ -153,8 +156,9 @@ data:
               endpoint: https://oauth2.branch.dev.authproxy.net/web/authorize
               queryOverrides:
                 tenant: "{{cfg.tenant}}"
-            clientId: demo-oauth-tenant
+            clientId: demo-oauth-tenant-v2
             clientSecret: demo-oauth-tenant-secret
+            tokenEndpointAuthMethod: client_secret_post
             scopes:
               - id: read
                 reason: Read access after the selected tenant has authorized the app.
@@ -211,8 +215,9 @@ data:
           auth:
             authorization:
               endpoint: https://oauth2.branch.dev.authproxy.net/web/authorize
-            clientId: demo-oauth-configure
+            clientId: demo-oauth-configure-v2
             clientSecret: demo-oauth-configure-secret
+            tokenEndpointAuthMethod: client_secret_post
             scopes:
               - id: read
                 reason: Complete the OAuth flow against the demo provider.
