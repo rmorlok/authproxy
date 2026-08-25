@@ -6,6 +6,7 @@
 #   cert-manager        — passthrough values forwarded to the upstream chart
 #   external-dns        — passthrough values forwarded to the upstream chart
 #   metrics-server      — passthrough values forwarded to the upstream chart
+#   storageClass        — default encrypted EBS CSI StorageClass
 #   clusterIssuer       — Let's Encrypt prod ClusterIssuer config (this chart's own template)
 
 global:
@@ -117,6 +118,20 @@ metrics-server:
   enabled: true
   args:
     - --kubelet-preferred-address-types=InternalIP
+
+# --- EBS CSI StorageClass (this chart's own template) -----------------------
+storageClass:
+  # -- Create an EBS CSI StorageClass for persistent workload storage.
+  enabled: true
+  name: gp3
+  # -- Mark this class as the cluster default for PVCs that omit storageClassName.
+  default: true
+  type: gp3
+  encrypted: true
+  fsType: ext4
+  reclaimPolicy: Delete
+  volumeBindingMode: WaitForFirstConsumer
+  allowVolumeExpansion: true
 
 # --- ClusterIssuer (this chart's own template) ------------------------------
 clusterIssuer:
