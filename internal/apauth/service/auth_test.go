@@ -25,6 +25,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/httperr"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/test_utils"
 	"github.com/rmorlok/authproxy/internal/util"
@@ -910,6 +911,13 @@ func TestAuth(t *testing.T) {
 
 					gctx.PureJSON(http.StatusOK, gin.H{"ok": true})
 				}).
+				WithRequiredAuthRoute(http.MethodGet, "/session-permissions", func(gctx *gin.Context, _ A) {
+					ra := GetAuthFromGinContext(gctx)
+					gctx.PureJSON(http.StatusOK, gin.H{
+						"allowsList":   ra.Allows("root", "connections", "list", ""),
+						"allowsCreate": ra.Allows("root", "connections", "create", ""),
+					})
+				}).
 				WithGetPingRequiredAuthRoute("/ping-get").
 				WithPostPingRequiredAuthRoute("/ping-post").
 				Build()
@@ -995,6 +1003,77 @@ func TestAuth(t *testing.T) {
 			resp, statusCode, debugHeader = ts.POST(ctx, "/ping-post", gin.H{})
 			require.Equal(t, http.StatusForbidden, statusCode, debugHeader) // Requires xsrf
 			require.Equal(t, 1, ts.GetPingCount())
+		})
+
+		t.Run("preserves scoped jwt permissions", func(t *testing.T) {
+			ts := setup(t)
+			actorPermissions := []aschema.Permission{{
+				Namespace: "root.**",
+				Resources: []string{"connections"},
+				Verbs:     []string{"list", "create"},
+			}}
+			tokenPermissions := aschema.PermissionsSingle("root.**", "connections", "list")
+			s := jwt.NewJwtTokenBuilder().
+				WithActor(&core.Actor{
+					ExternalId:  "scoped-session-user",
+					Namespace:   "root",
+					Permissions: actorPermissions,
+				}).
+				WithPermissions(tokenPermissions).
+				WithServiceId(ts.Service).
+				MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
+				MustSignerCtx(ctx)
+
+			_, statusCode, debugHeader := ts.GET(ctx, s.SignUrlQuery("/initiate-session"))
+			require.Equal(t, http.StatusOK, statusCode, debugHeader)
+
+			resp, statusCode, debugHeader := ts.GET(ctx, "/session-permissions")
+			require.Equal(t, http.StatusOK, statusCode, debugHeader)
+			require.Equal(t, gin.H{
+				"allowsList":   true,
+				"allowsCreate": false,
+			}, resp)
+		})
+
+		t.Run("scoped jwt refreshes existing same actor session", func(t *testing.T) {
+			ts := setup(t)
+			actor := &core.Actor{
+				ExternalId: "rescope-session-user",
+				Namespace:  "root",
+				Permissions: []aschema.Permission{{
+					Namespace: "root.**",
+					Resources: []string{"connections"},
+					Verbs:     []string{"list", "create"},
+				}},
+			}
+
+			unscoped := jwt.NewJwtTokenBuilder().
+				WithActor(actor).
+				WithServiceId(ts.Service).
+				MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
+				MustSignerCtx(ctx)
+			_, statusCode, debugHeader := ts.GET(ctx, unscoped.SignUrlQuery("/initiate-session"))
+			require.Equal(t, http.StatusOK, statusCode, debugHeader)
+
+			resp, statusCode, debugHeader := ts.GET(ctx, "/session-permissions")
+			require.Equal(t, http.StatusOK, statusCode, debugHeader)
+			require.Equal(t, true, resp["allowsCreate"])
+
+			scoped := jwt.NewJwtTokenBuilder().
+				WithActor(actor).
+				WithPermissions(aschema.PermissionsSingle("root.**", "connections", "list")).
+				WithServiceId(ts.Service).
+				MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
+				MustSignerCtx(ctx)
+			_, statusCode, debugHeader = ts.GET(ctx, scoped.SignUrlQuery("/initiate-session"))
+			require.Equal(t, http.StatusOK, statusCode, debugHeader)
+
+			resp, statusCode, debugHeader = ts.GET(ctx, "/session-permissions")
+			require.Equal(t, http.StatusOK, statusCode, debugHeader)
+			require.Equal(t, gin.H{
+				"allowsList":   true,
+				"allowsCreate": false,
+			}, resp)
 		})
 	})
 	t.Run("session initiate via post", func(t *testing.T) {

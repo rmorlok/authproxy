@@ -89,8 +89,9 @@ func (r *SessionRoutes) initiate(gctx *gin.Context) {
 
 	logger.Debug("request was authenticated")
 
-	if !ra.IsSession() {
-		logger.Debug("existing request was not in a session, creating one")
+	hasJwt := gctx.GetHeader(auth.JwtHeaderKey) != "" || gctx.Query(auth.JwtQueryParam) != ""
+	if !ra.IsSession() || hasJwt {
+		logger.Debug("creating or refreshing session from jwt", "existingSession", ra.IsSession())
 		err := r.authService.EstablishGinSession(gctx, ra)
 		if err != nil {
 			apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErrorf("failed to establish gin session: %w", err)))
