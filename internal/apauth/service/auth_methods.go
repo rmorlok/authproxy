@@ -22,11 +22,12 @@ import (
 
 // keyForToken loads an appropriate key to sign or verify a given token. This accounts for the
 // fact that admin users will verify with different keys to sign/verify tokens.
-// For admin users, the key is retrieved from the database where it is stored encrypted.
-func (s *service) keyForToken(ctx context.Context, claims *jwt2.AuthProxyClaims) (*config.Key, error) {
+// For admin users, the key is retrieved from the database where it is stored encrypted. The
+// boolean return value indicates whether the returned key is actor-specific.
+func (s *service) keyForToken(ctx context.Context, claims *jwt2.AuthProxyClaims) (*config.Key, bool, error) {
 	// If no database is configured, fall back to JWT signing key
 	if s.db == nil {
-		return s.config.GetRoot().SystemAuth.JwtSigningKey, nil
+		return s.config.GetRoot().SystemAuth.JwtSigningKey, false, nil
 	}
 
 	// Check actor cache first, then fall back to database
@@ -38,44 +39,45 @@ func (s *service) keyForToken(ctx context.Context, claims *jwt2.AuthProxyClaims)
 		if err != nil {
 			if errors.Is(err, database.ErrNotFound) {
 				// Actor does not exist. Fall back to JWT signing key
-				return s.config.GetRoot().SystemAuth.JwtSigningKey, nil
+				return s.config.GetRoot().SystemAuth.JwtSigningKey, false, nil
 			}
-			return nil, fmt.Errorf("failed to get actor: %w", err)
+			return nil, false, fmt.Errorf("failed to get actor: %w", err)
 		}
 		cache.Put(actor)
 	}
 
 	if actor.EncryptedKey == nil {
 		// Actor is not configured with self-signing key
-		return s.config.GetRoot().SystemAuth.JwtSigningKey, nil
+		return s.config.GetRoot().SystemAuth.JwtSigningKey, false, nil
 	}
 
 	// Decrypt the key JSON
 	decrypted, err := s.encrypt.DecryptString(ctx, *actor.EncryptedKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decrypt actor key: %w", err)
+		return nil, true, fmt.Errorf("failed to decrypt actor key: %w", err)
 	}
 
 	// Unmarshal to *config.Key
 	var key config.Key
 	if err := json.Unmarshal([]byte(decrypted), &key); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal actor key: %w", err)
+		return nil, true, fmt.Errorf("failed to unmarshal actor key: %w", err)
 	}
 
-	return &key, nil
+	return &key, true, nil
 }
 
 // keyForActorSignedToken returns the key for verifying an actor-signed token.
 // For actors with their own key, returns the actor's key.
-// Falls back to GlobalAESKey if no key is found.
-func (s *service) keyForActorSignedToken(ctx context.Context, claims *jwt2.AuthProxyClaims) (*config.Key, error) {
+// Falls back to GlobalAESKey if no key is found. The boolean return value indicates whether the
+// returned key is actor-specific.
+func (s *service) keyForActorSignedToken(ctx context.Context, claims *jwt2.AuthProxyClaims) (*config.Key, bool, error) {
 	// If no database or encrypt service, fall back to GlobalAESKey
 	if s.db == nil || s.encrypt == nil {
 		return &config.Key{
 			InnerVal: &config.KeyShared{
 				SharedKey: s.config.GetRoot().SystemAuth.GlobalAESKey,
 			},
-		}, nil
+		}, false, nil
 	}
 
 	// Check actor cache first, then fall back to database
@@ -91,9 +93,9 @@ func (s *service) keyForActorSignedToken(ctx context.Context, claims *jwt2.AuthP
 					InnerVal: &config.KeyShared{
 						SharedKey: s.config.GetRoot().SystemAuth.GlobalAESKey,
 					},
-				}, nil
+				}, false, nil
 			}
-			return nil, fmt.Errorf("failed to get actor: %w", err)
+			return nil, false, fmt.Errorf("failed to get actor: %w", err)
 		}
 		cache.Put(actor)
 	}
@@ -104,22 +106,22 @@ func (s *service) keyForActorSignedToken(ctx context.Context, claims *jwt2.AuthP
 			InnerVal: &config.KeyShared{
 				SharedKey: s.config.GetRoot().SystemAuth.GlobalAESKey,
 			},
-		}, nil
+		}, false, nil
 	}
 
 	// Decrypt the key JSON
 	decrypted, err := s.encrypt.DecryptString(ctx, *actor.EncryptedKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decrypt actor key: %w", err)
+		return nil, true, fmt.Errorf("failed to decrypt actor key: %w", err)
 	}
 
 	// Unmarshal to *config.Key
 	var key config.Key
 	if err := json.Unmarshal([]byte(decrypted), &key); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal actor key: %w", err)
+		return nil, true, fmt.Errorf("failed to unmarshal actor key: %w", err)
 	}
 
-	return &key, nil
+	return &key, true, nil
 }
 
 // Token mints a signed JWT with the specified claims. The token will be self-signed using the GlobalAESKey. The
@@ -154,6 +156,7 @@ func (s *service) Token(ctx context.Context, claims *jwt2.AuthProxyClaims) (stri
 
 // Parse token string and verify.
 func (s *service) Parse(ctx context.Context, tokenString string) (*jwt2.AuthProxyClaims, error) {
+	actorKeySelected := false
 	claims, err := jwt2.NewJwtTokenParserBuilder().
 		WithKeySelector(func(ctx context.Context, unverified *jwt2.AuthProxyClaims) (kd config.KeyDataType, isShared bool, err error) {
 			if unverified.SystemSigned {
@@ -165,7 +168,8 @@ func (s *service) Parse(ctx context.Context, tokenString string) (*jwt2.AuthProx
 			if unverified.ActorSigned {
 				// Actor-signed tokens are minted externally (e.g. CLI) using
 				// the actor's private key. Look up the actor's public key to verify.
-				key, err := s.keyForActorSignedToken(ctx, unverified)
+				key, isActorKey, err := s.keyForActorSignedToken(ctx, unverified)
+				actorKeySelected = isActorKey
 				if err != nil {
 					return nil, false, fmt.Errorf("failed to get key: %w", err)
 				}
@@ -179,7 +183,8 @@ func (s *service) Parse(ctx context.Context, tokenString string) (*jwt2.AuthProx
 			}
 
 			// For non-self-signed tokens, use keyForToken
-			key, err := s.keyForToken(ctx, unverified)
+			key, isActorKey, err := s.keyForToken(ctx, unverified)
+			actorKeySelected = isActorKey
 			if err != nil {
 				return nil, false, fmt.Errorf("failed to get key: %w", err)
 			}
@@ -195,6 +200,18 @@ func (s *service) Parse(ctx context.Context, tokenString string) (*jwt2.AuthProx
 			return nil, false, errors.New("invalid key type")
 		}).
 		ParseCtx(ctx, tokenString)
+	if err != nil && actorKeySelected {
+		// An actor-specific key takes precedence, but host applications may also sign tokens for
+		// that actor with the global JWT signing key. Retry only when actor-key selection was the
+		// failing path; system-signed tokens and actors without keys retain their existing behavior.
+		fallbackClaims, fallbackErr := jwt2.NewJwtTokenParserBuilder().
+			WithConfigKey(ctx, s.config.GetRoot().SystemAuth.JwtSigningKey).
+			ParseCtx(ctx, tokenString)
+		if fallbackErr == nil {
+			claims = fallbackClaims
+			err = nil
+		}
+	}
 	if err != nil {
 		return nil, fmt.Errorf("can't parse token: %w", err)
 	}
