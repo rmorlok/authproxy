@@ -36,6 +36,8 @@ connectors:
       namespace: root.integrations
       labels:
         type: google-drive
+      annotations:
+        example.com/owner: integrations@example.com
       displayName: Google Drive
       logo:
         publicUrl: https://example.com/google-drive.svg
@@ -46,9 +48,10 @@ connectors:
 
 With the development-only `serve --auto-migrate` option, AuthProxy reconciles
 this entry to the live connector whose exact
-name is `google-drive` in `root.integrations`. Labels are ordinary selectable
-metadata and do not participate in identity. Multiple configured versions use
-the same name and namespace.
+name is `google-drive` in `root.integrations`. Labels are selectable metadata;
+annotations are non-selectable metadata for values such as ownership details,
+descriptions, and links. Neither participates in connector identity. Multiple
+configured versions use the same name and namespace.
 
 An entry with an explicit `id` may omit `name`; a newly created connector then
 defaults its name to the ID. To rename an existing configured connector, keep

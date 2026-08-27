@@ -4,6 +4,8 @@ connectors:
     - name: asana
       labels:
         type: asana
+      annotations:
+        example.com/owner: integrations@example.com
       id: D21753F8-2E91-43E7-ADEF-8ED80A6086AC
       version: 1
       displayName: Asana

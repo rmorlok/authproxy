@@ -30,6 +30,7 @@ func TestConnectorRoundtrip(t *testing.T) {
 				Id:          testID,
 				Name:        "test-connector",
 				Labels:      map[string]string{"type": "test-type"},
+				Annotations: map[string]string{"example.com/owner": "integration-team@example.com"},
 				Version:     1,
 				State:       "primary",
 				DisplayName: "Test Connector",
@@ -141,4 +142,13 @@ func TestConnectorHashIgnoresLogicalName(t *testing.T) {
 	before := connector.Hash()
 	connector.Name = "after"
 	require.Equal(t, before, connector.Hash())
+}
+
+func TestConnectorCloneCopiesAnnotations(t *testing.T) {
+	original := &Connector{Annotations: map[string]string{"example.com/owner": "before"}}
+	clone := original.Clone()
+
+	clone.Annotations["example.com/owner"] = "after"
+
+	require.Equal(t, "before", original.Annotations["example.com/owner"])
 }

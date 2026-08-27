@@ -1,5 +1,7 @@
 labels:
   type: openweathermap
+annotations:
+  example.com/owner: integrations@example.com
 displayName: OpenWeatherMap
 logo:
   publicUrl: https://example.com/owm.png

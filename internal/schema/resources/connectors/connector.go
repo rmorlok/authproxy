@@ -95,6 +95,9 @@ type Connector struct {
 	// Labels are the labels for the connector.
 	Labels map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 
+	// Annotations are the annotations for the connector.
+	Annotations map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+
 	// Telemetry carries per-connector overrides for OpenTelemetry behaviour
 	// on outbound calls routed through this connector. See ConnectorTelemetry.
 	Telemetry *ConnectorTelemetry `json:"telemetry,omitempty" yaml:"telemetry,omitempty"`
@@ -127,6 +130,13 @@ func (c *Connector) Clone() *Connector {
 		clone.Labels = make(map[string]string, len(c.Labels))
 		for k, v := range c.Labels {
 			clone.Labels[k] = v
+		}
+	}
+
+	if c.Annotations != nil {
+		clone.Annotations = make(map[string]string, len(c.Annotations))
+		for k, v := range c.Annotations {
+			clone.Annotations[k] = v
 		}
 	}
 
