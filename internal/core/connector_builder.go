@@ -30,6 +30,7 @@ func (b *connectorBuilder) WithConfig(c *config.Connector) *connectorBuilder {
 			v.Id = c.Id
 			v.Namespace = c.GetNamespace()
 			v.Labels = c.Labels
+			v.Annotations = c.Annotations
 		},
 	}, b.versionSetters...)
 

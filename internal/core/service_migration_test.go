@@ -105,6 +105,36 @@ func TestMigration(t *testing.T) {
 		})
 
 		t.Run("names reconcile connector identity", func(t *testing.T) {
+			t.Run("annotation changes preserve the generated connector id", func(t *testing.T) {
+				cleanup := setup(t, []cschema.Connector{{
+					Name:        "configured",
+					Labels:      map[string]string{"type": "test"},
+					Annotations: map[string]string{"example.com/owner": "before@example.com"},
+					DisplayName: "Configured connector",
+				}})
+				defer cleanup()
+
+				require.NoError(t, service.MigrateConnectors(context.Background()))
+				first := db.ListConnectorsBuilder().ForName("configured").FetchPage(context.Background())
+				require.NoError(t, first.Error)
+				require.Len(t, first.Results, 1)
+				generatedID := first.Results[0].Id
+				require.Equal(t, "before@example.com", first.Results[0].Annotations["example.com/owner"])
+
+				cfg.GetRoot().Connectors.LoadFromList[0].Annotations["example.com/owner"] = "after@example.com"
+				require.NoError(t, service.MigrateConnectors(context.Background()))
+
+				result := db.ListConnectorsBuilder().ForName("configured").FetchPage(context.Background())
+				require.NoError(t, result.Error)
+				require.Len(t, result.Results, 1)
+				require.Equal(t, generatedID, result.Results[0].Id)
+				require.Equal(t, "after@example.com", result.Results[0].Annotations["example.com/owner"])
+
+				versions := db.ListConnectorDefinitionVersionsBuilder().ForId(generatedID).FetchPage(context.Background())
+				require.NoError(t, versions.Error)
+				require.Len(t, versions.Results, 2)
+			})
+
 			t.Run("label changes preserve the generated connector id", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{{
 					Name:        "configured",

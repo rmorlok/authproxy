@@ -362,6 +362,12 @@
         "type": "string"
       }
     },
+    "annotations": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
     "version": {
       "type": "integer"
     },
