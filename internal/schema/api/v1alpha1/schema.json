@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/schema/api/v1alpha1/schema.json",
+  "$defs": {
+    "ListMeta": {
+      "type": "object",
+      "properties": {
+        "resourceVersion": { "type": "string" },
+        "continue": { "type": "string" },
+        "remainingItemCount": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "ResourceList": {
+      "allOf": [
+        { "$ref": "../../resources/meta/schema.json#/$defs/TypeMeta" },
+        {
+          "type": "object",
+          "required": ["metadata", "items"],
+          "properties": {
+            "kind": { "type": "string", "pattern": "^[A-Z][A-Za-z0-9]*List$" },
+            "metadata": { "$ref": "#/$defs/ListMeta" },
+            "items": { "type": "array", "items": { "type": "object" } }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "ActionMeta": {
+      "type": "object",
+      "required": ["target"],
+      "properties": {
+        "target": { "$ref": "../../resources/meta/schema.json#/$defs/ObjectReference" }
+      },
+      "additionalProperties": false
+    },
+    "Action": {
+      "allOf": [
+        { "$ref": "../../resources/meta/schema.json#/$defs/TypeMeta" },
+        {
+          "type": "object",
+          "required": ["metadata", "spec"],
+          "properties": {
+            "metadata": { "$ref": "#/$defs/ActionMeta" },
+            "spec": {},
+            "status": {}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    }
+  }
+}

@@ -1,0 +1,247 @@
+package meta
+
+import (
+	"fmt"
+	"reflect"
+	"time"
+
+	"github.com/hashicorp/go-multierror"
+	"github.com/rmorlok/authproxy/internal/schema/common"
+)
+
+// ValidationMode identifies the source or lifecycle operation whose metadata
+// policy is being applied.
+type ValidationMode string
+
+const (
+	ValidationModeCreate      ValidationMode = "create"
+	ValidationModeUpdate      ValidationMode = "update"
+	ValidationModeConfig      ValidationMode = "config"
+	ValidationModePersistence ValidationMode = "persistence"
+	ValidationModeResponse    ValidationMode = "response"
+)
+
+func (m ValidationMode) Validate() error {
+	switch m {
+	case ValidationModeCreate, ValidationModeUpdate, ValidationModeConfig, ValidationModePersistence, ValidationModeResponse:
+		return nil
+	default:
+		return fmt.Errorf("unknown metadata validation mode %q", m)
+	}
+}
+
+// ValidationOptions supplies resource-specific requirements while retaining a
+// single shared implementation for lifecycle and metadata rules.
+type ValidationOptions struct {
+	Mode               ValidationMode
+	Path               *common.ValidationContext
+	ExpectedAPIVersion APIVersion
+	ExpectedKind       Kind
+	RequireID          bool
+	RequireName        bool
+	RequireNamespace   bool
+	IDValidator        func(string) error
+}
+
+// UpdateOptions selects the resource-specific metadata fields that are
+// immutable in addition to ID, generation, and createdAt.
+type UpdateOptions struct {
+	ImmutableName      bool
+	ImmutableNamespace bool
+}
+
+func validationPath(path *common.ValidationContext) *common.ValidationContext {
+	if path == nil {
+		return &common.ValidationContext{Path: "$"}
+	}
+	return path
+}
+
+func ValidateTypeMeta(value TypeMeta, expectedVersion APIVersion, expectedKind Kind, path *common.ValidationContext) error {
+	vc := validationPath(path)
+	var result *multierror.Error
+	if value.APIVersion == "" {
+		result = multierror.Append(result, vc.NewErrorForField("apiVersion", "is required"))
+	} else if err := value.APIVersion.Validate(); err != nil {
+		result = multierror.Append(result, vc.NewErrorfForField("apiVersion", "%v", err))
+	} else if expectedVersion != "" && value.APIVersion != expectedVersion {
+		result = multierror.Append(result, vc.NewErrorfForField("apiVersion", "must be %q, got %q", expectedVersion, value.APIVersion))
+	}
+	if value.Kind == "" {
+		result = multierror.Append(result, vc.NewErrorForField("kind", "is required"))
+	} else if err := value.Kind.Validate(); err != nil {
+		result = multierror.Append(result, vc.NewErrorfForField("kind", "%v", err))
+	} else if expectedKind != "" && value.Kind != expectedKind {
+		result = multierror.Append(result, vc.NewErrorfForField("kind", "must be %q, got %q", expectedKind, value.Kind))
+	}
+	return result.ErrorOrNil()
+}
+
+// ValidateStatus enforces the shared rule that status is server-owned on API
+// and configuration writes. Resource packages remain responsible for the
+// contents of their status types.
+func ValidateStatus(value any, mode ValidationMode, path *common.ValidationContext) error {
+	if err := mode.Validate(); err != nil {
+		return validationPath(path).NewError(err.Error())
+	}
+	if mode == ValidationModePersistence || mode == ValidationModeResponse || isZeroValue(value) {
+		return nil
+	}
+	return validationPath(path).NewErrorForField("status", "is server-owned")
+}
+
+func isZeroValue(value any) bool {
+	if value == nil {
+		return true
+	}
+	return reflect.ValueOf(value).IsZero()
+}
+
+func ValidateObjectReference(value ObjectReference, path *common.ValidationContext) error {
+	vc := validationPath(path)
+	var result *multierror.Error
+	if err := ValidateTypeMeta(TypeMeta{APIVersion: value.APIVersion, Kind: value.Kind}, "", "", vc); err != nil {
+		result = multierror.Append(result, err)
+	}
+	if value.ID == "" && value.Name == "" {
+		result = multierror.Append(result, vc.NewError("must contain id or name"))
+	}
+	if value.Name != "" {
+		if err := value.Name.Validate(); err != nil {
+			result = multierror.Append(result, vc.NewErrorfForField("name", "%v", err))
+		}
+	}
+	return result.ErrorOrNil()
+}
+
+func ValidateCondition(value Condition, path *common.ValidationContext) error {
+	vc := validationPath(path)
+	var result *multierror.Error
+	if value.Type == "" {
+		result = multierror.Append(result, vc.NewErrorForField("type", "is required"))
+	}
+	switch value.Status {
+	case ConditionTrue, ConditionFalse, ConditionUnknown:
+	default:
+		result = multierror.Append(result, vc.NewErrorfForField("status", "must be one of %q, %q, or %q", ConditionTrue, ConditionFalse, ConditionUnknown))
+	}
+	if value.LastTransitionTime.IsZero() {
+		result = multierror.Append(result, vc.NewErrorForField("lastTransitionTime", "is required"))
+	}
+	return result.ErrorOrNil()
+}
+
+func ValidateObjectMeta(value ObjectMeta, options ValidationOptions) error {
+	vc := validationPath(options.Path).PushField("metadata")
+	var result *multierror.Error
+	if err := options.Mode.Validate(); err != nil {
+		result = multierror.Append(result, validationPath(options.Path).NewError(err.Error()))
+	}
+
+	if options.RequireID && value.ID == "" {
+		result = multierror.Append(result, vc.NewErrorForField("id", "is required"))
+	}
+	if value.ID != "" && options.IDValidator != nil {
+		if err := options.IDValidator(value.ID); err != nil {
+			result = multierror.Append(result, vc.NewErrorfForField("id", "%v", err))
+		}
+	}
+	if options.RequireName && value.Name == "" {
+		result = multierror.Append(result, vc.NewErrorForField("name", "is required"))
+	} else if value.Name != "" {
+		if err := value.Name.Validate(); err != nil {
+			result = multierror.Append(result, vc.NewErrorfForField("name", "%v", err))
+		}
+	}
+	if options.RequireNamespace && value.Namespace == "" {
+		result = multierror.Append(result, vc.NewErrorForField("namespace", "is required"))
+	}
+
+	switch options.Mode {
+	case ValidationModeCreate:
+		if value.ID != "" {
+			result = multierror.Append(result, vc.NewErrorForField("id", "is server-owned on create"))
+		}
+		if value.Generation != 0 {
+			result = multierror.Append(result, vc.NewErrorForField("generation", "is server-owned on create"))
+		}
+		result = appendTimestampWriteErrors(result, vc, value)
+	case ValidationModeUpdate:
+		result = appendTimestampWriteErrors(result, vc, value)
+	case ValidationModeConfig:
+		result = appendTimestampWriteErrors(result, vc, value)
+	}
+
+	labelValidator := ValidateUserLabels
+	if options.Mode == ValidationModePersistence || options.Mode == ValidationModeResponse {
+		labelValidator = ValidateLabels
+	}
+	if err := labelValidator(value.Labels); err != nil {
+		result = multierror.Append(result, vc.NewErrorfForField("labels", "%v", err))
+	}
+	if err := ValidateAnnotations(value.Annotations); err != nil {
+		result = multierror.Append(result, vc.NewErrorfForField("annotations", "%v", err))
+	}
+	return result.ErrorOrNil()
+}
+
+func appendTimestampWriteErrors(result *multierror.Error, vc *common.ValidationContext, value ObjectMeta) *multierror.Error {
+	if value.CreatedAt != nil {
+		result = multierror.Append(result, vc.NewErrorForField("createdAt", "is server-owned"))
+	}
+	if value.UpdatedAt != nil {
+		result = multierror.Append(result, vc.NewErrorForField("updatedAt", "is server-owned"))
+	}
+	return result
+}
+
+func ValidateResource(value TypeMeta, metadata ObjectMeta, options ValidationOptions) error {
+	var result *multierror.Error
+	if err := ValidateTypeMeta(value, options.ExpectedAPIVersion, options.ExpectedKind, options.Path); err != nil {
+		result = multierror.Append(result, err)
+	}
+	if err := ValidateObjectMeta(metadata, options); err != nil {
+		result = multierror.Append(result, err)
+	}
+	return result.ErrorOrNil()
+}
+
+func ValidateMetadataUpdate(before, after ObjectMeta, options UpdateOptions, path *common.ValidationContext) error {
+	vc := validationPath(path).PushField("metadata")
+	var result *multierror.Error
+	if before.ID != after.ID {
+		result = multierror.Append(result, vc.NewErrorForField("id", "is immutable"))
+	}
+	if before.Generation != after.Generation {
+		result = multierror.Append(result, vc.NewErrorForField("generation", "is immutable"))
+	}
+	if !equalTimePointers(before.CreatedAt, after.CreatedAt) {
+		result = multierror.Append(result, vc.NewErrorForField("createdAt", "is immutable"))
+	}
+	if options.ImmutableName && before.Name != after.Name {
+		result = multierror.Append(result, vc.NewErrorForField("name", "is immutable"))
+	}
+	if options.ImmutableNamespace && before.Namespace != after.Namespace {
+		result = multierror.Append(result, vc.NewErrorForField("namespace", "is immutable"))
+	}
+	return result.ErrorOrNil()
+}
+
+func ValidateTypeMetaUpdate(before, after TypeMeta, path *common.ValidationContext) error {
+	vc := validationPath(path)
+	var result *multierror.Error
+	if before.APIVersion != after.APIVersion {
+		result = multierror.Append(result, vc.NewErrorForField("apiVersion", "is immutable"))
+	}
+	if before.Kind != after.Kind {
+		result = multierror.Append(result, vc.NewErrorForField("kind", "is immutable"))
+	}
+	return result.ErrorOrNil()
+}
+
+func equalTimePointers(left, right *time.Time) bool {
+	if left == nil || right == nil {
+		return left == nil && right == nil
+	}
+	return left.Equal(*right)
+}

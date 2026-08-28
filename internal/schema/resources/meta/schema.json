@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/schema/resources/meta/schema.json",
+  "$defs": {
+    "APIVersion": {
+      "type": "string",
+      "const": "authproxy.net/v1alpha1"
+    },
+    "Kind": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Za-z0-9]*$"
+    },
+    "TypeMeta": {
+      "type": "object",
+      "required": ["apiVersion", "kind"],
+      "properties": {
+        "apiVersion": { "$ref": "#/$defs/APIVersion" },
+        "kind": { "$ref": "#/$defs/Kind" }
+      }
+    },
+    "Resource": {
+      "description": "Open base envelope for composition by a concrete resource schema. The concrete schema must close unevaluated properties.",
+      "allOf": [
+        { "$ref": "#/$defs/TypeMeta" },
+        {
+          "type": "object",
+          "required": ["metadata", "spec"],
+          "properties": {
+            "metadata": { "$ref": "#/$defs/ObjectMeta" },
+            "spec": { "type": "object" },
+            "status": { "type": "object" }
+          }
+        }
+      ]
+    },
+    "LabelKey": {
+      "type": "string",
+      "anyOf": [
+        {
+          "pattern": "^(([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)*[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?/)?[A-Za-z0-9]([A-Za-z0-9._-]{0,61}[A-Za-z0-9])?$"
+        },
+        {
+          "pattern": "^apxy/([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?|-)(/([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?|-))*/[A-Za-z0-9]([A-Za-z0-9._-]{0,61}[A-Za-z0-9])?$"
+        }
+      ]
+    },
+    "Labels": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/LabelKey" },
+      "additionalProperties": {
+        "type": "string",
+        "maxLength": 253,
+        "pattern": "^[A-Za-z0-9._-]*$"
+      }
+    },
+    "Annotations": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/LabelKey" },
+      "additionalProperties": { "type": "string" }
+    },
+    "ObjectMeta": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "$ref": "../../common/schema.json#/$defs/ResourceName" },
+        "namespace": { "type": "string", "minLength": 1 },
+        "generation": { "type": "integer", "minimum": 1 },
+        "labels": { "$ref": "#/$defs/Labels" },
+        "annotations": { "$ref": "#/$defs/Annotations" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    },
+    "ObjectMetaPatch": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "$ref": "../../common/schema.json#/$defs/ResourceName" },
+        "namespace": { "type": "string", "minLength": 1 },
+        "generation": { "type": "integer", "minimum": 1 },
+        "labels": { "$ref": "#/$defs/Labels" },
+        "annotations": { "$ref": "#/$defs/Annotations" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    },
+    "ObjectReference": {
+      "allOf": [
+        { "$ref": "#/$defs/TypeMeta" },
+        {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "name": { "$ref": "../../common/schema.json#/$defs/ResourceName" },
+            "namespace": { "type": "string", "minLength": 1 },
+            "generation": { "type": "integer", "minimum": 1 }
+          },
+          "anyOf": [
+            { "required": ["id"] },
+            { "required": ["name"] }
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "Condition": {
+      "type": "object",
+      "required": ["type", "status", "lastTransitionTime"],
+      "properties": {
+        "type": { "type": "string", "minLength": 1 },
+        "status": { "type": "string", "enum": ["True", "False", "Unknown"] },
+        "observedGeneration": { "type": "integer", "minimum": 1 },
+        "lastTransitionTime": { "type": "string", "format": "date-time" },
+        "reason": { "type": "string" },
+        "message": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
