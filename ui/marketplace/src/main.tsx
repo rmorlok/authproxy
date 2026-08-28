@@ -1,13 +1,12 @@
 import * as React from 'react';
 import * as ReactDOM from 'react-dom/client';
-import {ThemeProvider} from '@emotion/react';
-import {CssBaseline} from '@mui/material';
-import theme from './theme';
 import App from './App';
 import { Provider } from 'react-redux';
 import { store } from './store';
 import {initiateSessionAsync} from "./store";
 import { configureClient, ApiSessionInitiateRequest } from '@authproxy/api';
+import MarketplaceThemeProvider from './MarketplaceThemeProvider';
+import { loadMarketplaceColorMode } from './marketplaceConfig';
 
 // Configure the shared SDK client for the Public UI (marketplace)
 configureClient({
@@ -35,13 +34,14 @@ if (!(import.meta.env.DEV && window.location.pathname === '/dev')) {
     store.dispatch(initiateSessionAsync(params));
 }
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-    <React.StrictMode>
-        <Provider store={store}>
-            <ThemeProvider theme={theme}>
-                <CssBaseline/>
-                <App/>
-            </ThemeProvider>
-        </Provider>
-    </React.StrictMode>,
-);
+void loadMarketplaceColorMode().then((colorMode) => {
+    ReactDOM.createRoot(document.getElementById('root')!).render(
+        <React.StrictMode>
+            <Provider store={store}>
+                <MarketplaceThemeProvider colorMode={colorMode}>
+                    <App/>
+                </MarketplaceThemeProvider>
+            </Provider>
+        </React.StrictMode>,
+    );
+});
