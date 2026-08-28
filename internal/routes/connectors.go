@@ -23,6 +23,7 @@ import (
 	schemaapiopenapi "github.com/rmorlok/authproxy/internal/schema/api/openapi"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	smeta "github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/tasks"
 	"github.com/rmorlok/authproxy/internal/util"
@@ -539,7 +540,7 @@ func (r *ConnectorsRoutes) createConnector(gctx *gin.Context) {
 		return
 	}
 
-	if err := database.ValidateUserLabels(req.Labels); err != nil {
+	if err := smeta.ValidateUserLabels(req.Labels); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid labels: %s", err.Error()))
 		val.MarkErrorReturn()
 		return
@@ -617,7 +618,7 @@ func (r *ConnectorsRoutes) updateConnector(gctx *gin.Context) {
 	}
 
 	if req.Labels != nil {
-		if err := database.ValidateUserLabels(*req.Labels); err != nil {
+		if err := smeta.ValidateUserLabels(*req.Labels); err != nil {
 			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid labels: %s", err.Error()))
 			val.MarkErrorReturn()
 			return
@@ -802,7 +803,7 @@ func (r *ConnectorsRoutes) createVersion(gctx *gin.Context) {
 	var labels map[string]string
 	if req.Labels != nil {
 		labels = *req.Labels
-		if err := database.ValidateUserLabels(labels); err != nil {
+		if err := smeta.ValidateUserLabels(labels); err != nil {
 			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid labels: %s", err.Error()))
 			val.MarkErrorReturn()
 			return
@@ -888,7 +889,7 @@ func (r *ConnectorsRoutes) updateVersion(gctx *gin.Context) {
 	}
 
 	if req.Labels != nil {
-		if err := database.ValidateUserLabels(*req.Labels); err != nil {
+		if err := smeta.ValidateUserLabels(*req.Labels); err != nil {
 			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid labels: %s", err.Error()))
 			val.MarkErrorReturn()
 			return

@@ -19,34 +19,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 )
 
-// Kubernetes-style label restrictions
-const (
-	// LabelKeyNameMaxLength is the maximum length for the name portion of a label key
-	LabelKeyNameMaxLength = smeta.LabelKeyNameMaxLength
-
-	// LabelKeyPrefixMaxLength is the maximum length for the optional prefix portion of a label key
-	LabelKeyPrefixMaxLength = smeta.LabelKeyPrefixMaxLength
-
-	// LabelValueMaxLength is the maximum length for a label value
-	LabelValueMaxLength = smeta.LabelValueMaxLength
-
-	// ApxyLabelValueMaxLength is the maximum length for a label value stored
-	// under an apxy/-prefixed key. System-managed labels such as
-	// apxy/<rt>/-/ns can hold a namespace path that may exceed the standard
-	// LabelValueMaxLength. User-supplied values are still capped at
-	// LabelValueMaxLength via ValidateLabelValue.
-	ApxyLabelValueMaxLength = smeta.SystemLabelValueMaxLength
-
-	// ApxyReservedPrefix is the reserved label-key prefix for system-managed
-	// labels (implicit identifier labels and parent carry-forward labels).
-	// User-supplied label keys may not begin with this prefix.
-	ApxyReservedPrefix = smeta.SystemLabelPrefix
-
-	// ApxyImplicitSegment is the segment used inside apxy/ keys to mark an
-	// implicit identifier label, e.g. apxy/<rt>/-/id.
-	ApxyImplicitSegment = smeta.SystemLabelSentinel
-)
-
 // Labels is a map of key-value pairs following Kubernetes label restrictions.
 // Keys follow the format [prefix/]name where:
 // - prefix (optional): valid DNS subdomain, max 253 characters
@@ -92,89 +64,14 @@ func (l *Labels) Scan(value interface{}) error {
 	}
 }
 
-// ValidateLabelKey validates a single label key.
-//
-// Two grammars are accepted:
-//
-//  1. Standard Kubernetes-style key: [prefix/]name
-//     - prefix (optional): valid DNS subdomain, max 253 characters
-//     - name (required): 1-63 characters, must start/end with alphanumeric,
-//     may contain '-', '_', '.'
-//
-//  2. Reserved apxy/ multi-segment key: apxy/<seg>(/<seg>)*/<name>
-//     - each <seg> is a DNS-label-like token or the literal "-" sentinel
-//     - <name> follows the standard name rule above
-//     - total prefix portion (everything before the final '/') still capped
-//     at LabelKeyPrefixMaxLength characters
-//
-// This function accepts apxy/ keys; user-input call sites should use
-// ValidateUserLabelKey to additionally reject the reserved namespace.
-func ValidateLabelKey(key string) error {
-	return smeta.ValidateLabelKey(key)
-}
-
-// ValidateUserLabelKey validates a label key supplied directly by an end user.
-// In addition to the rules of ValidateLabelKey, it rejects any key in the
-// reserved apxy/ namespace — those keys are managed by the system and may not
-// be set, modified, or deleted through user-input endpoints.
-func ValidateUserLabelKey(key string) error {
-	return smeta.ValidateUserLabelKey(key)
-}
-
-// ValidateLabelValue validates a single label value according to Kubernetes restrictions.
-// - 0-63 characters (can be empty)
-// - if non-empty: must start and end with alphanumeric, may contain alphanumeric, '-', '_', '.'
-func ValidateLabelValue(value string) error {
-	return smeta.ValidateLabelValue(value)
-}
-
-// ValidateApxyLabelValue validates a label value stored under an apxy/-prefixed
-// key. It allows up to ApxyLabelValueMaxLength characters so namespace paths
-// (e.g. root.foo.bar.baz...) can fit, including the leading underscores and
-// trailing hyphens accepted in namespace path segments.
-func ValidateApxyLabelValue(value string) error {
-	return smeta.ValidateSystemLabelValue(value)
-}
-
-// ValidateLabels validates all labels in a map. apxy/-prefixed keys are
-// accepted (use ValidateUserLabels at user-input boundaries instead) and
-// values stored under apxy/ keys are validated against the longer
-// ApxyLabelValueMaxLength cap.
-func ValidateLabels(labels map[string]string) error {
-	return smeta.ValidateLabels(labels)
-}
-
-// validateValueForKey retains the database selector helper while delegating
-// the actual metadata grammar to the resource schema package.
-func validateValueForKey(key, value string) error {
-	if strings.HasPrefix(key, ApxyReservedPrefix) {
-		return smeta.ValidateSystemLabelValue(value)
-	}
-	return smeta.ValidateLabelValue(value)
-}
-
-// ValidateUserLabels validates a labels map supplied by a user. It applies
-// the same key/value rules as ValidateLabels but rejects any key in the
-// reserved apxy/ namespace.
-func ValidateUserLabels(labels map[string]string) error {
-	return smeta.ValidateUserLabels(labels)
-}
-
-// ValidateUserLabelDeletionKeys validates a list of keys passed to a
-// user-facing label-deletion endpoint. Keys must be well-formed and must not
-// reference the reserved apxy/ namespace.
-func ValidateUserLabelDeletionKeys(keys []string) error {
-	return smeta.ValidateUserLabelDeletionKeys(keys)
-}
-
 // Validate validates all labels (system mode — apxy/ keys allowed, with the
-// longer ApxyLabelValueMaxLength value cap for those keys).
+// longer SystemLabelValueMaxLength value cap for those keys).
 func (l Labels) Validate() error {
 	if l == nil {
 		return nil
 	}
 
-	return ValidateLabels(map[string]string(l))
+	return smeta.ValidateLabels(map[string]string(l))
 }
 
 // Get returns the value for a label key, and whether the key exists.
@@ -409,9 +306,9 @@ func BuildImplicitResourceLabelsForToken(rt, id string, name scommon.ResourceNam
 		name = scommon.ResourceName(id)
 	}
 	return Labels{
-		fmt.Sprintf("%s%s/%s/id", ApxyReservedPrefix, rt, ApxyImplicitSegment):   id,
-		fmt.Sprintf("%s%s/%s/name", ApxyReservedPrefix, rt, ApxyImplicitSegment): string(name),
-		fmt.Sprintf("%s%s/%s/ns", ApxyReservedPrefix, rt, ApxyImplicitSegment):   namespacePath,
+		fmt.Sprintf("%s%s/%s/id", smeta.SystemLabelPrefix, rt, smeta.SystemLabelSentinel):   id,
+		fmt.Sprintf("%s%s/%s/name", smeta.SystemLabelPrefix, rt, smeta.SystemLabelSentinel): string(name),
+		fmt.Sprintf("%s%s/%s/ns", smeta.SystemLabelPrefix, rt, smeta.SystemLabelSentinel):   namespacePath,
 	}
 }
 
@@ -535,7 +432,7 @@ func (s *service) updateResourceNameAndSelfLabels(
 // Either map may be nil if its half is empty.
 func SplitUserAndApxyLabels(labels Labels) (user, apxy Labels) {
 	for k, v := range labels {
-		if strings.HasPrefix(k, ApxyReservedPrefix) {
+		if strings.HasPrefix(k, smeta.SystemLabelPrefix) {
 			if apxy == nil {
 				apxy = make(Labels)
 			}
@@ -646,11 +543,11 @@ func BuildCarriedLabels(parentRt string, parentLabels Labels) Labels {
 	}
 	out := make(Labels, len(parentLabels))
 	for k, v := range parentLabels {
-		if strings.HasPrefix(k, ApxyReservedPrefix) {
+		if strings.HasPrefix(k, smeta.SystemLabelPrefix) {
 			out[k] = v
 			continue
 		}
-		out[fmt.Sprintf("%s%s/%s", ApxyReservedPrefix, parentRt, k)] = v
+		out[fmt.Sprintf("%s%s/%s", smeta.SystemLabelPrefix, parentRt, k)] = v
 	}
 	return out
 }

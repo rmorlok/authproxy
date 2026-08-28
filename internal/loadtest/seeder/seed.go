@@ -17,6 +17,7 @@ import (
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	smeta "github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	nschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 )
 
@@ -597,8 +598,8 @@ func slugForNamespace(value string) string {
 
 func slugForLabelValue(value string) string {
 	slug := slugForID(value)
-	if len(slug) > database.LabelValueMaxLength {
-		return slug[:database.LabelValueMaxLength]
+	if len(slug) > smeta.LabelValueMaxLength {
+		return slug[:smeta.LabelValueMaxLength]
 	}
 	return slug
 }

@@ -1,7 +1,6 @@
 package database
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/rmorlok/authproxy/internal/apid"
@@ -9,248 +8,7 @@ import (
 )
 
 func TestLabels(t *testing.T) {
-	t.Run("ValidateLabelKey", func(t *testing.T) {
-		t.Run("valid keys", func(t *testing.T) {
-			validKeys := []string{
-				"a",
-				"A",
-				"0",
-				"key",
-				"Key",
-				"KEY",
-				"my-key",
-				"my_key",
-				"my.key",
-				"my-key.name",
-				"a1",
-				"1a",
-				"a-1",
-				"a_1",
-				"a.1",
-				"app.kubernetes.io",
-				"example.com/my-key",
-				"app.kubernetes.io/name",
-				"my-company.com/component",
-				"a" + strings.Repeat("b", 61) + "c", // exactly 63 chars
-			}
-
-			for _, key := range validKeys {
-				t.Run(key, func(t *testing.T) {
-					err := ValidateLabelKey(key)
-					require.NoError(t, err, "key %q should be valid", key)
-				})
-			}
-		})
-
-		t.Run("invalid keys", func(t *testing.T) {
-			invalidKeys := []struct {
-				key    string
-				reason string
-			}{
-				{"", "empty key"},
-				{"-key", "starts with hyphen"},
-				{"key-", "ends with hyphen"},
-				{"_key", "starts with underscore"},
-				{"key_", "ends with underscore"},
-				{".key", "starts with dot"},
-				{"key.", "ends with dot"},
-				{"my key", "contains space"},
-				{"my@key", "contains invalid character"},
-				{"my#key", "contains invalid character"},
-				{"/name", "empty prefix"},
-				{"example.com/", "empty name after prefix"},
-				{strings.Repeat("a", 64), "name too long (64 chars)"},
-				{strings.Repeat("a", 254) + "/name", "prefix too long"},
-				{"invalid..prefix/name", "double dot in prefix"},
-				{"-invalid.prefix/name", "prefix starts with hyphen"},
-			}
-
-			for _, tc := range invalidKeys {
-				t.Run(tc.reason, func(t *testing.T) {
-					err := ValidateLabelKey(tc.key)
-					require.Error(t, err, "key %q should be invalid: %s", tc.key, tc.reason)
-				})
-			}
-		})
-
-		t.Run("apxy/ multi-segment keys", func(t *testing.T) {
-			t.Run("valid", func(t *testing.T) {
-				validKeys := []string{
-					"apxy/cxr/-/id",
-					"apxy/cxr/-/ns",
-					"apxy/cxn/-/id",
-					"apxy/ns/-/id",
-					"apxy/cxr/type",
-					"apxy/cxr/my-key",
-					"apxy/cxr/my.key",
-					"apxy/cxr/my_key",
-					"apxy/ns/dog",
-					"apxy/cxr/cxn/userkey",
-				}
-				for _, key := range validKeys {
-					t.Run(key, func(t *testing.T) {
-						require.NoError(t, ValidateLabelKey(key), "key %q should be valid", key)
-					})
-				}
-			})
-
-			t.Run("invalid", func(t *testing.T) {
-				invalidKeys := []struct {
-					key    string
-					reason string
-				}{
-					{"apxy/", "no segments after apxy/"},
-					{"apxy//id", "empty intermediate segment"},
-					{"apxy/cxr//id", "empty intermediate segment in middle"},
-					{"apxy/cxr/", "empty name"},
-					{"apxy/cxr/-/", "empty name after sentinel"},
-					{"apxy/cx@r/id", "invalid character in segment"},
-					{"apxy/cxr/-/-bad", "name starts with hyphen"},
-				}
-				for _, tc := range invalidKeys {
-					t.Run(tc.reason, func(t *testing.T) {
-						err := ValidateLabelKey(tc.key)
-						require.Error(t, err, "key %q should be invalid: %s", tc.key, tc.reason)
-					})
-				}
-			})
-		})
-	})
-
-	t.Run("ValidateUserLabelKey", func(t *testing.T) {
-		t.Run("rejects apxy/ prefix", func(t *testing.T) {
-			err := ValidateUserLabelKey("apxy/cxr/type")
-			require.Error(t, err)
-			require.Contains(t, err.Error(), "reserved")
-		})
-
-		t.Run("accepts non-apxy keys", func(t *testing.T) {
-			require.NoError(t, ValidateUserLabelKey("my-key"))
-			require.NoError(t, ValidateUserLabelKey("example.com/key"))
-		})
-
-		t.Run("still rejects invalid keys", func(t *testing.T) {
-			require.Error(t, ValidateUserLabelKey("-bad"))
-			require.Error(t, ValidateUserLabelKey(""))
-		})
-	})
-
-	t.Run("ValidateUserLabels", func(t *testing.T) {
-		t.Run("rejects map containing apxy/ key", func(t *testing.T) {
-			err := ValidateUserLabels(map[string]string{
-				"good":         "ok",
-				"apxy/cxr/bad": "nope",
-			})
-			require.Error(t, err)
-			require.Contains(t, err.Error(), "reserved")
-		})
-
-		t.Run("accepts pure user labels", func(t *testing.T) {
-			require.NoError(t, ValidateUserLabels(map[string]string{
-				"team": "platform",
-				"env":  "prod",
-			}))
-		})
-	})
-
-	t.Run("ValidateUserLabelDeletionKeys", func(t *testing.T) {
-		t.Run("rejects apxy/ keys", func(t *testing.T) {
-			err := ValidateUserLabelDeletionKeys([]string{"team", "apxy/cxr/type"})
-			require.Error(t, err)
-			require.Contains(t, err.Error(), "reserved")
-		})
-
-		t.Run("accepts user keys", func(t *testing.T) {
-			require.NoError(t, ValidateUserLabelDeletionKeys([]string{"team", "env"}))
-		})
-	})
-
-	t.Run("ValidateLabelValue", func(t *testing.T) {
-		t.Run("valid values", func(t *testing.T) {
-			validValues := []string{
-				"", // empty is valid
-				"a",
-				"A",
-				"0",
-				"value",
-				"Value",
-				"VALUE",
-				"my-value",
-				"my_value",
-				"my.value",
-				"v1.2.3",
-				"a1",
-				"1a",
-				"a" + strings.Repeat("b", 61) + "c", // exactly 63 chars
-			}
-
-			for _, value := range validValues {
-				t.Run("value_"+value, func(t *testing.T) {
-					err := ValidateLabelValue(value)
-					require.NoError(t, err, "value %q should be valid", value)
-				})
-			}
-		})
-
-		t.Run("invalid values", func(t *testing.T) {
-			invalidValues := []struct {
-				value  string
-				reason string
-			}{
-				{"-value", "starts with hyphen"},
-				{"value-", "ends with hyphen"},
-				{"_value", "starts with underscore"},
-				{"value_", "ends with underscore"},
-				{".value", "starts with dot"},
-				{"value.", "ends with dot"},
-				{"my value", "contains space"},
-				{"my@value", "contains invalid character"},
-				{strings.Repeat("a", 64), "value too long (64 chars)"},
-			}
-
-			for _, tc := range invalidValues {
-				t.Run(tc.reason, func(t *testing.T) {
-					err := ValidateLabelValue(tc.value)
-					require.Error(t, err, "value %q should be invalid: %s", tc.value, tc.reason)
-				})
-			}
-		})
-	})
-
-	t.Run("ValidateLabels", func(t *testing.T) {
-		t.Run("valid labels", func(t *testing.T) {
-			labels := Labels{
-				"app":                      "myapp",
-				"version":                  "v1.2.3",
-				"app.kubernetes.io/name":   "myapp",
-				"example.com/my-component": "frontend",
-				"empty-value":              "",
-			}
-			require.NoError(t, ValidateLabels(labels))
-		})
-		t.Run("invalid value", func(t *testing.T) {
-			labels := Labels{
-				"app":                      "**bad**",
-				"version":                  "v1.2.3",
-				"app.kubernetes.io/name":   "myapp",
-				"example.com/my-component": "frontend",
-				"empty-value":              "",
-			}
-			require.Error(t, ValidateLabels(labels))
-		})
-		t.Run("invalid key", func(t *testing.T) {
-			labels := Labels{
-				"-bad":                     "myapp",
-				"version":                  "v1.2.3",
-				"app.kubernetes.io/name":   "myapp",
-				"example.com/my-component": "frontend",
-				"empty-value":              "",
-			}
-			require.Error(t, ValidateLabels(labels))
-		})
-	})
-
-	t.Run("Labels.Validate", func(t *testing.T) {
+	t.Run("Validate", func(t *testing.T) {
 		t.Run("valid labels", func(t *testing.T) {
 			labels := Labels{
 				"app":                      "myapp",
@@ -272,32 +30,12 @@ func TestLabels(t *testing.T) {
 			require.NoError(t, labels.Validate())
 		})
 
-		t.Run("invalid key", func(t *testing.T) {
-			labels := Labels{
-				"valid-key":   "value",
-				"invalid key": "value",
-			}
-			err := labels.Validate()
-			require.Error(t, err)
-			require.Contains(t, err.Error(), "invalid key")
-		})
-
-		t.Run("invalid value", func(t *testing.T) {
-			labels := Labels{
-				"valid-key": "invalid value",
-			}
-			err := labels.Validate()
-			require.Error(t, err)
-			require.Contains(t, err.Error(), "invalid label value")
-		})
-
-		t.Run("multiple errors", func(t *testing.T) {
+		t.Run("delegates validation", func(t *testing.T) {
 			labels := Labels{
 				"invalid key": "invalid value",
 			}
 			err := labels.Validate()
 			require.Error(t, err)
-			// Should have errors for both key and value
 			require.Contains(t, err.Error(), "invalid label key")
 			require.Contains(t, err.Error(), "invalid label value")
 		})
@@ -606,43 +344,6 @@ func TestMergeUpsertLabels(t *testing.T) {
 	t.Run("returns nil when both inputs are empty", func(t *testing.T) {
 		require.Nil(t, MergeUpsertLabels(nil, nil))
 		require.Nil(t, MergeUpsertLabels(Labels{}, Labels{}))
-	})
-}
-
-func TestApxyLabelValueValidation(t *testing.T) {
-	// A namespace path that exceeds the standard 63-char user-value cap.
-	longPath := "root." + strings.Repeat("a", 60) + ".more"
-	require.Greater(t, len(longPath), LabelValueMaxLength)
-
-	t.Run("user-mode rejects long values", func(t *testing.T) {
-		require.Error(t, ValidateLabelValue(longPath))
-	})
-
-	t.Run("apxy mode accepts long namespace path", func(t *testing.T) {
-		require.NoError(t, ValidateApxyLabelValue(longPath))
-	})
-
-	t.Run("apxy mode accepts namespace name boundaries", func(t *testing.T) {
-		require.NoError(t, ValidateApxyLabelValue("_billing-"))
-		require.Error(t, ValidateLabelValue("_billing-"))
-	})
-
-	t.Run("apxy mode rejects values exceeding apxy cap", func(t *testing.T) {
-		// 254 chars: starts/ends alphanumeric so the regex is the only constraint.
-		tooLong := "a" + strings.Repeat("b", 252) + "c"
-		require.Equal(t, ApxyLabelValueMaxLength+1, len(tooLong))
-		require.Error(t, ValidateApxyLabelValue(tooLong))
-	})
-
-	t.Run("ValidateLabels uses apxy cap for apxy keys only", func(t *testing.T) {
-		// Long value under an apxy/ key is valid.
-		require.NoError(t, ValidateLabels(map[string]string{
-			"apxy/cxn/-/ns": longPath,
-		}))
-		// Same long value under a user key is rejected.
-		require.Error(t, ValidateLabels(map[string]string{
-			"team": longPath,
-		}))
 	})
 }
 

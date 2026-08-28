@@ -12,6 +12,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
+	smeta "github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"gopkg.in/h2non/gentleman.v2"
 	"gopkg.in/h2non/gentleman.v2/plugins/transport"
 )
@@ -143,10 +144,10 @@ func (f *clientFactory) ForActor(actor Actor) F {
 	actorContribution := make(map[string]string)
 	actToken := database.ApidPrefixToLabelToken(apid.PrefixActor)
 	for k, v := range actor.GetLabels() {
-		if strings.HasPrefix(k, database.ApxyReservedPrefix) {
+		if strings.HasPrefix(k, smeta.SystemLabelPrefix) {
 			continue
 		}
-		actorContribution[fmt.Sprintf("%s%s/%s", database.ApxyReservedPrefix, actToken, k)] = v
+		actorContribution[fmt.Sprintf("%s%s/%s", smeta.SystemLabelPrefix, actToken, k)] = v
 	}
 	for k, v := range database.BuildImplicitResourceLabels(actor.GetId(), actor.GetName(), actor.GetNamespace()) {
 		actorContribution[k] = v
@@ -194,7 +195,7 @@ func (f *clientFactory) ForLabels(labels map[string]string) F {
 	// ProxyRequest.Validate already rejects apxy/ keys; this is
 	// defense-in-depth against internal callers that might bypass it.
 	for k, v := range labels {
-		if strings.HasPrefix(k, database.ApxyReservedPrefix) {
+		if strings.HasPrefix(k, smeta.SystemLabelPrefix) {
 			continue
 		}
 		ri.Labels[k] = v

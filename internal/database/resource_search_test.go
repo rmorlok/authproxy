@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/rmorlok/authproxy/internal/apid"
+	smeta "github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/stretchr/testify/require"
 )
 
@@ -226,9 +227,9 @@ func TestSearchResourcesSeedCoversNamespaceKeyAndRateLimit(t *testing.T) {
 	}
 }
 
-func TestParseLabelSelectorAllowsLongApxyValues(t *testing.T) {
+func TestParseLabelSelectorAllowsLongSystemValues(t *testing.T) {
 	value := "root." + strings.Repeat("segment.", 12) + "tail"
-	require.Greater(t, len(value), LabelValueMaxLength)
+	require.Greater(t, len(value), smeta.LabelValueMaxLength)
 
 	tests := []struct {
 		operator string
