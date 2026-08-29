@@ -83,18 +83,23 @@ func (s *Scheme) RegisteredGVKs() []GVK {
 	if s == nil {
 		return nil
 	}
+
 	s.mu.RLock()
+
 	result := make([]GVK, 0, len(s.factories))
 	for gvk := range s.factories {
 		result = append(result, gvk)
 	}
+
 	s.mu.RUnlock()
+
 	sort.Slice(result, func(i, j int) bool {
 		if result[i].APIVersion != result[j].APIVersion {
 			return result[i].APIVersion < result[j].APIVersion
 		}
 		return result[i].Kind < result[j].Kind
 	})
+
 	return result
 }
 
@@ -103,17 +108,21 @@ func (s *Scheme) DecodeJSON(data []byte) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	factory, err := s.resolve(typeMeta)
 	if err != nil {
 		return nil, err
 	}
+
 	result := factory()
 	if err := validateFactoryResult(result); err != nil {
 		return nil, fmt.Errorf("decode %s: registered factory %w", GVK{typeMeta.APIVersion, typeMeta.Kind}, err)
 	}
+
 	if err := util.DecodeJSONStrict(data, result); err != nil {
 		return nil, fmt.Errorf("decode %s JSON: %w", GVK{typeMeta.APIVersion, typeMeta.Kind}, err)
 	}
+
 	return result, nil
 }
 
@@ -123,12 +132,15 @@ func (s *Scheme) DecodeYAML(data []byte) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	if len(results) == 0 {
 		return nil, fmt.Errorf("decode YAML: expected one document, got none")
 	}
+
 	if len(results) != 1 {
 		return nil, fmt.Errorf("decode YAML: expected one document, got %d", len(results))
 	}
+
 	return results[0], nil
 }
 
@@ -136,59 +148,81 @@ func (s *Scheme) DecodeYAML(data []byte) (any, error) {
 // dispatches every remaining document independently by GVK.
 func (s *Scheme) DecodeYAMLDocuments(data []byte) ([]any, error) {
 	decoder := yaml.NewDecoder(bytes.NewReader(data))
+
 	var results []any
 	for document := 1; ; document++ {
 		var node yaml.Node
+
 		if err := decoder.Decode(&node); err != nil {
 			if err == io.EOF {
 				break
 			}
 			return nil, fmt.Errorf("decode YAML document %d: %w", document, err)
 		}
+
 		if yamlDocumentEmpty(&node) {
 			continue
 		}
+
 		payload, err := yaml.Marshal(&node)
 		if err != nil {
 			return nil, fmt.Errorf("encode YAML document %d: %w", document, err)
 		}
+
 		result, err := s.decodeYAMLDocument(payload)
 		if err != nil {
 			return nil, fmt.Errorf("decode YAML document %d: %w", document, err)
 		}
+
 		results = append(results, result)
 	}
+
 	return results, nil
 }
 
 func (s *Scheme) decodeYAMLDocument(data []byte) (any, error) {
 	var typeMeta meta.TypeMeta
+
+	// Get the type metadata (kind, api version) from the YAML document so we
+	// use that metadata to load the appropriate factory to load the rest of
+	// the data.
 	if err := yaml.Unmarshal(data, &typeMeta); err != nil {
 		return nil, fmt.Errorf("decode type metadata: %w", err)
 	}
+
 	if err := validatePresentTypeMeta(typeMeta); err != nil {
 		return nil, err
 	}
+
 	factory, err := s.resolve(typeMeta)
 	if err != nil {
 		return nil, err
 	}
+
 	result := factory()
 	if err := validateFactoryResult(result); err != nil {
 		return nil, fmt.Errorf("decode %s: registered factory %w", GVK{typeMeta.APIVersion, typeMeta.Kind}, err)
 	}
+
 	if err := util.DecodeYAMLStrict(data, result); err != nil {
 		return nil, fmt.Errorf("decode %s YAML: %w", GVK{typeMeta.APIVersion, typeMeta.Kind}, err)
 	}
+
 	return result, nil
 }
 
+// decodeJSONTypeMeta decodes the type metadata (API version and kind) from
+// JSON so that information can be used to look up the appropriate struct in
+// the registered factories for decoding.
 func decodeJSONTypeMeta(data []byte) (meta.TypeMeta, error) {
 	var raw map[string]json.RawMessage
+
 	decoder := json.NewDecoder(bytes.NewReader(data))
+
 	if err := decoder.Decode(&raw); err != nil {
 		return meta.TypeMeta{}, fmt.Errorf("decode type metadata: %w", err)
 	}
+
 	var extra any
 	if err := decoder.Decode(&extra); err != io.EOF {
 		if err == nil {
@@ -203,19 +237,27 @@ func decodeJSONTypeMeta(data []byte) (meta.TypeMeta, error) {
 			return meta.TypeMeta{}, (&common.ValidationContext{Path: "$"}).NewErrorfForField("apiVersion", "must be a string: %v", err)
 		}
 	}
+
 	if value, exists := raw["kind"]; exists {
 		if err := json.Unmarshal(value, &result.Kind); err != nil {
 			return meta.TypeMeta{}, (&common.ValidationContext{Path: "$"}).NewErrorfForField("kind", "must be a string: %v", err)
 		}
 	}
+
 	if err := validatePresentTypeMeta(result); err != nil {
 		return meta.TypeMeta{}, err
 	}
+
 	return result, nil
 }
 
 func validatePresentTypeMeta(value meta.TypeMeta) error {
-	return meta.ValidateTypeMeta(value, "", "", &common.ValidationContext{Path: "$"})
+	return meta.ValidateTypeMeta(
+		value,
+		"", // expectedVersion
+		"", // expectedKind
+		&common.ValidationContext{Path: "$"},
+	)
 }
 
 func (s *Scheme) resolve(value meta.TypeMeta) (Factory, error) {
