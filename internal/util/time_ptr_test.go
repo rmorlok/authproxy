@@ -22,3 +22,17 @@ func TestEqualTimePointers(t *testing.T) {
 		ToPtr(time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC))),
 	)
 }
+
+func TestUtcTimePointer(t *testing.T) {
+	assert.Nil(t, UtcTimePointer(nil))
+	assert.Equal(
+		t,
+		time.Date(2023, time.January, 1, 0, 0, 0, 0, time.UTC),
+		*UtcTimePointer(ToPtr(time.Date(2023, time.January, 1, 0, 0, 0, 0, time.UTC))),
+	)
+	assert.Equal(
+		t,
+		time.Date(2023, time.January, 1, 1, 0, 0, 0, time.UTC),
+		*UtcTimePointer(ToPtr(time.Date(2023, time.January, 1, 2, 0, 0, 0, time.FixedZone("foo", int(time.Hour/time.Second))))),
+	)
+}

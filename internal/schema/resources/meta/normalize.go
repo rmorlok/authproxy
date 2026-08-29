@@ -2,35 +2,43 @@ package meta
 
 import (
 	"fmt"
-	"time"
+	"maps"
 
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	"github.com/rmorlok/authproxy/internal/util"
 )
 
 // NormalizeObjectMeta returns a deep copy with timestamps normalized to UTC.
 // It deliberately does not trim or case-fold names, namespaces, labels, or
 // annotations because those values are case-sensitive resource data.
 func NormalizeObjectMeta(value ObjectMeta) ObjectMeta {
-	value.Labels = cloneStringMap(value.Labels)
-	value.Annotations = cloneStringMap(value.Annotations)
-	value.CreatedAt = utcTimePointer(value.CreatedAt)
-	value.UpdatedAt = utcTimePointer(value.UpdatedAt)
+	value.Labels = maps.Clone(value.Labels)
+	value.Annotations = maps.Clone(value.Annotations)
+	value.CreatedAt = util.UtcTimePointer(value.CreatedAt)
+	value.UpdatedAt = util.UtcTimePointer(value.UpdatedAt)
 	return value
 }
 
 // ApplyObjectMetaDefaults fills only zero or nil fields. Explicit empty maps
 // are preserved, so callers can distinguish "not supplied" from "supplied but
 // empty" before or after defaulting.
-func ApplyObjectMetaDefaults(value, defaults ObjectMeta, mode ValidationMode, path *common.ValidationContext) (ObjectMeta, error) {
+func ApplyObjectMetaDefaults(
+	value, defaults ObjectMeta,
+	mode ValidationMode,
+	path *common.ValidationContext,
+) (ObjectMeta, error) {
 	if err := mode.Validate(); err != nil {
 		return ObjectMeta{}, validationPath(path).NewError(err.Error())
 	}
+
 	if err := validateDefaultsForMode(defaults, mode, path); err != nil {
 		return ObjectMeta{}, err
 	}
 
 	value = NormalizeObjectMeta(value)
 	defaults = NormalizeObjectMeta(defaults)
+
+	// Apply defaults for values that aren't populated
 	if value.ID == "" {
 		value.ID = defaults.ID
 	}
@@ -55,27 +63,39 @@ func ApplyObjectMetaDefaults(value, defaults ObjectMeta, mode ValidationMode, pa
 	if value.UpdatedAt == nil {
 		value.UpdatedAt = defaults.UpdatedAt
 	}
+
 	return value, nil
 }
 
-func validateDefaultsForMode(defaults ObjectMeta, mode ValidationMode, path *common.ValidationContext) error {
+func validateDefaultsForMode(
+	defaults ObjectMeta,
+	mode ValidationMode,
+	path *common.ValidationContext,
+) error {
 	vc := validationPath(path).PushField("metadata")
+
 	if mode == ValidationModeCreate {
 		if defaults.ID != "" {
 			return vc.NewErrorForField("id", "cannot be defaulted in create context")
 		}
+
 		if defaults.Generation != 0 {
 			return vc.NewErrorForField("generation", "cannot be defaulted in create context")
 		}
 	}
-	if mode == ValidationModeCreate || mode == ValidationModeUpdate || mode == ValidationModeConfig {
+
+	if mode == ValidationModeCreate ||
+		mode == ValidationModeUpdate ||
+		mode == ValidationModeConfig {
 		if defaults.CreatedAt != nil {
 			return vc.NewErrorForField("createdAt", fmt.Sprintf("cannot be defaulted in %s context", mode))
 		}
+
 		if defaults.UpdatedAt != nil {
 			return vc.NewErrorForField("updatedAt", fmt.Sprintf("cannot be defaulted in %s context", mode))
 		}
 	}
+
 	return nil
 }
 
@@ -83,8 +103,12 @@ func validateDefaultsForMode(defaults ObjectMeta, mode ValidationMode, path *com
 // original metadata. Call ValidateMetadataUpdate and the applicable lifecycle
 // validation after applying it so attempts to modify immutable or server-owned
 // fields fail instead of being silently discarded.
-func ApplyObjectMetaPatch(original ObjectMeta, patch ObjectMetaPatch) ObjectMeta {
+func ApplyObjectMetaPatch(
+	original ObjectMeta,
+	patch ObjectMetaPatch,
+) ObjectMeta {
 	result := NormalizeObjectMeta(original)
+
 	if patch.ID != nil {
 		result.ID = *patch.ID
 	}
@@ -98,35 +122,17 @@ func ApplyObjectMetaPatch(original ObjectMeta, patch ObjectMetaPatch) ObjectMeta
 		result.Generation = *patch.Generation
 	}
 	if patch.Labels != nil {
-		result.Labels = cloneStringMap(*patch.Labels)
+		result.Labels = maps.Clone(*patch.Labels)
 	}
 	if patch.Annotations != nil {
-		result.Annotations = cloneStringMap(*patch.Annotations)
+		result.Annotations = maps.Clone(*patch.Annotations)
 	}
 	if patch.CreatedAt != nil {
-		result.CreatedAt = utcTimePointer(patch.CreatedAt)
+		result.CreatedAt = util.UtcTimePointer(patch.CreatedAt)
 	}
 	if patch.UpdatedAt != nil {
-		result.UpdatedAt = utcTimePointer(patch.UpdatedAt)
+		result.UpdatedAt = util.UtcTimePointer(patch.UpdatedAt)
 	}
-	return result
-}
 
-func cloneStringMap(values map[string]string) map[string]string {
-	if values == nil {
-		return nil
-	}
-	result := make(map[string]string, len(values))
-	for key, value := range values {
-		result[key] = value
-	}
 	return result
-}
-
-func utcTimePointer(value *time.Time) *time.Time {
-	if value == nil {
-		return nil
-	}
-	normalized := value.UTC()
-	return &normalized
 }

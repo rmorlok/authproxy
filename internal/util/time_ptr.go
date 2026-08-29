@@ -11,3 +11,14 @@ func EqualTimePointers(left, right *time.Time) bool {
 
 	return left.Equal(*right)
 }
+
+// UtcTimePointer converts the passed time to UTC if present passing nil
+// through.
+func UtcTimePointer(value *time.Time) *time.Time {
+	if value == nil {
+		return nil
+	}
+
+	normalized := value.UTC()
+	return &normalized
+}
