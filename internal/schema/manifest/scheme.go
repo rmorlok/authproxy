@@ -7,7 +7,6 @@ import (
 	"io"
 	"reflect"
 	"sort"
-	"strings"
 	"sync"
 
 	"github.com/rmorlok/authproxy/internal/schema/common"
@@ -48,12 +47,23 @@ func (s *Scheme) Register(gvk GVK, factory Factory) error {
 	if s == nil {
 		return fmt.Errorf("manifest scheme is nil")
 	}
-	if err := meta.ValidateTypeMeta(meta.TypeMeta{APIVersion: gvk.APIVersion, Kind: gvk.Kind}, "", "", nil); err != nil {
+
+	if err := meta.ValidateTypeMeta(
+		meta.TypeMeta{
+			APIVersion: gvk.APIVersion,
+			Kind:       gvk.Kind,
+		},
+		"",  // expectedVersion
+		"",  // expectedKind
+		nil, // path
+	); err != nil {
 		return fmt.Errorf("invalid registration %s: %w", gvk, err)
 	}
+
 	if factory == nil {
 		return fmt.Errorf("register %s: factory is required", gvk)
 	}
+
 	sample := factory()
 	if err := validateFactoryResult(sample); err != nil {
 		return fmt.Errorf("register %s: %w", gvk, err)
@@ -61,11 +71,13 @@ func (s *Scheme) Register(gvk GVK, factory Factory) error {
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
 	if _, exists := s.factories[gvk]; exists {
 		return fmt.Errorf("register %s: already registered", gvk)
 	}
 	s.factories[gvk] = factory
 	s.versions[gvk.APIVersion] = struct{}{}
+
 	return nil
 }
 
@@ -160,7 +172,7 @@ func (s *Scheme) DecodeYAMLDocuments(data []byte) ([]any, error) {
 			return nil, fmt.Errorf("decode YAML document %d: %w", document, err)
 		}
 
-		if yamlDocumentEmpty(&node) {
+		if util.YamlDocumentEmpty(&node) {
 			continue
 		}
 
@@ -264,27 +276,24 @@ func (s *Scheme) resolve(value meta.TypeMeta) (Factory, error) {
 	if s == nil {
 		return nil, fmt.Errorf("manifest scheme is nil")
 	}
+
 	gvk := GVK{APIVersion: value.APIVersion, Kind: value.Kind}
+
 	s.mu.RLock()
 	factory, exists := s.factories[gvk]
 	_, versionExists := s.versions[value.APIVersion]
 	s.mu.RUnlock()
+
 	if exists {
 		return factory, nil
 	}
+
 	vc := &common.ValidationContext{Path: "$"}
 	if !versionExists {
 		return nil, vc.NewErrorfForField("apiVersion", "unsupported value %q", value.APIVersion)
 	}
-	return nil, vc.NewErrorfForField("kind", "unsupported value %q for apiVersion %q", value.Kind, value.APIVersion)
-}
 
-func yamlDocumentEmpty(node *yaml.Node) bool {
-	if node == nil || len(node.Content) == 0 {
-		return true
-	}
-	value := node.Content[0]
-	return value.Kind == yaml.ScalarNode && value.Tag == "!!null" && strings.TrimSpace(value.Value) == ""
+	return nil, vc.NewErrorfForField("kind", "unsupported value %q for apiVersion %q", value.Kind, value.APIVersion)
 }
 
 func validateFactoryResult(value any) error {

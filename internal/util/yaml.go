@@ -3,6 +3,7 @@ package util
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -20,4 +21,14 @@ func YamlBytesToJSON(yamlData []byte) ([]byte, error) {
 	}
 
 	return j, nil
+}
+
+// YamlDocumentEmpty reports whether the specified YAML document has no content.
+func YamlDocumentEmpty(node *yaml.Node) bool {
+	if node == nil || len(node.Content) == 0 {
+		return true
+	}
+
+	value := node.Content[0]
+	return value.Kind == yaml.ScalarNode && value.Tag == "!!null" && strings.TrimSpace(value.Value) == ""
 }
