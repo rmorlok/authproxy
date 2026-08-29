@@ -20,21 +20,26 @@ func CanonicalSpecJSON(spec any) ([]byte, error) {
 
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.UseNumber()
+
 	var normalized any
 	if err := decoder.Decode(&normalized); err != nil {
 		return nil, fmt.Errorf("decode marshaled spec: %w", err)
 	}
+
 	var extra any
 	if err := decoder.Decode(&extra); err != io.EOF {
 		if err == nil {
 			return nil, fmt.Errorf("decode marshaled spec: unexpected additional JSON value")
 		}
+
 		return nil, fmt.Errorf("decode marshaled spec: %w", err)
 	}
+
 	canonical, err := json.Marshal(normalized)
 	if err != nil {
 		return nil, fmt.Errorf("marshal canonical spec: %w", err)
 	}
+
 	return canonical, nil
 }
 
@@ -46,6 +51,7 @@ func SemanticSpecHash(spec any) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	digest := sha256.Sum256(canonical)
 	return hex.EncodeToString(digest[:]), nil
 }
