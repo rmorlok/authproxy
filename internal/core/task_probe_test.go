@@ -24,10 +24,7 @@ import (
 // the connection is already healthy) no health-state transition fires.
 func TestRunProbe_Success(t *testing.T) {
 	connectionId := apid.New(apid.PrefixConnection)
-	connectorId := apid.New(apid.PrefixConnectorVersion)
-	connector := &cschema.Connector{
-		Id:          connectorId,
-		Version:     1,
+	connector := &cschema.ConnectorDefinition{
 		DisplayName: "probe-success-test",
 		Auth:        &cschema.Auth{InnerVal: &cschema.AuthApiKey{Type: cschema.AuthTypeAPIKey}},
 		Probes: []cschema.Probe{{
@@ -43,8 +40,8 @@ func TestRunProbe_Success(t *testing.T) {
 		Namespace:        "root",
 		State:            database.ConnectionStateConfigured,
 		HealthState:      database.ConnectionHealthStateHealthy,
-		ConnectorId:      connector.Id,
-		ConnectorVersion: connector.Version,
+		ConnectorId:      apid.New(apid.PrefixConnectorVersion),
+		ConnectorVersion: 1,
 	}
 
 	svc, db, _, ctrl := setupVerifyTest(t, connectionId, conn, connector)
@@ -75,9 +72,7 @@ func TestRunProbe_Success(t *testing.T) {
 func TestRunProbe_FailureBelowThreshold(t *testing.T) {
 	connectionId := apid.New(apid.PrefixConnection)
 	threshold := 3
-	connector := &cschema.Connector{
-		Id:          apid.New(apid.PrefixConnectorVersion),
-		Version:     1,
+	connector := &cschema.ConnectorDefinition{
 		DisplayName: "probe-failure-test",
 		Auth:        &cschema.Auth{InnerVal: &cschema.AuthApiKey{Type: cschema.AuthTypeAPIKey}},
 		Probes: []cschema.Probe{{
@@ -94,8 +89,8 @@ func TestRunProbe_FailureBelowThreshold(t *testing.T) {
 		Namespace:        "root",
 		State:            database.ConnectionStateConfigured,
 		HealthState:      database.ConnectionHealthStateHealthy,
-		ConnectorId:      connector.Id,
-		ConnectorVersion: connector.Version,
+		ConnectorId:      apid.New(apid.PrefixConnectorVersion),
+		ConnectorVersion: 1,
 	}
 
 	svc, db, _, ctrl := setupVerifyTest(t, connectionId, conn, connector)
@@ -128,9 +123,7 @@ func TestRunProbe_FailureBelowThreshold(t *testing.T) {
 func TestRunProbe_FailureCrossesThreshold(t *testing.T) {
 	connectionId := apid.New(apid.PrefixConnection)
 	threshold := 1
-	connector := &cschema.Connector{
-		Id:          apid.New(apid.PrefixConnectorVersion),
-		Version:     1,
+	connector := &cschema.ConnectorDefinition{
 		DisplayName: "probe-threshold-test",
 		Auth:        &cschema.Auth{InnerVal: &cschema.AuthApiKey{Type: cschema.AuthTypeAPIKey}},
 		Probes: []cschema.Probe{{
@@ -147,8 +140,8 @@ func TestRunProbe_FailureCrossesThreshold(t *testing.T) {
 		Namespace:        "root",
 		State:            database.ConnectionStateConfigured,
 		HealthState:      database.ConnectionHealthStateHealthy,
-		ConnectorId:      connector.Id,
-		ConnectorVersion: connector.Version,
+		ConnectorId:      apid.New(apid.PrefixConnectorVersion),
+		ConnectorVersion: 1,
 	}
 
 	svc, db, _, ctrl := setupVerifyTest(t, connectionId, conn, connector)
@@ -178,9 +171,7 @@ func TestRunProbe_FailureCrossesThreshold(t *testing.T) {
 // condition (the probe will never appear on retry).
 func TestRunProbe_ProbeNotFound(t *testing.T) {
 	connectionId := apid.New(apid.PrefixConnection)
-	connector := &cschema.Connector{
-		Id:          apid.New(apid.PrefixConnectorVersion),
-		Version:     1,
+	connector := &cschema.ConnectorDefinition{
 		DisplayName: "missing-probe-test",
 		Auth:        &cschema.Auth{InnerVal: &cschema.AuthApiKey{Type: cschema.AuthTypeAPIKey}},
 		// No probes — the lookup for "ping" must fail.
@@ -190,8 +181,8 @@ func TestRunProbe_ProbeNotFound(t *testing.T) {
 		Namespace:        "root",
 		State:            database.ConnectionStateConfigured,
 		HealthState:      database.ConnectionHealthStateHealthy,
-		ConnectorId:      connector.Id,
-		ConnectorVersion: connector.Version,
+		ConnectorId:      apid.New(apid.PrefixConnectorVersion),
+		ConnectorVersion: 1,
 	}
 
 	svc, _, _, ctrl := setupVerifyTest(t, connectionId, conn, connector)
@@ -205,9 +196,7 @@ func TestRunProbe_ProbeNotFound(t *testing.T) {
 
 func TestRunProbe_DisabledProbeSkipsRetry(t *testing.T) {
 	connectionId := apid.New(apid.PrefixConnection)
-	connector := &cschema.Connector{
-		Id:          apid.New(apid.PrefixConnectorVersion),
-		Version:     1,
+	connector := &cschema.ConnectorDefinition{
 		DisplayName: "disabled-probe-test",
 		Auth:        &cschema.Auth{InnerVal: &cschema.AuthApiKey{Type: cschema.AuthTypeAPIKey}},
 		Probes: []cschema.Probe{{
@@ -224,8 +213,8 @@ func TestRunProbe_DisabledProbeSkipsRetry(t *testing.T) {
 		Namespace:        "root",
 		State:            database.ConnectionStateConfigured,
 		HealthState:      database.ConnectionHealthStateHealthy,
-		ConnectorId:      connector.Id,
-		ConnectorVersion: connector.Version,
+		ConnectorId:      apid.New(apid.PrefixConnectorVersion),
+		ConnectorVersion: 1,
 	}
 
 	svc, _, _, ctrl := setupVerifyTest(t, connectionId, conn, connector)

@@ -1,19 +1,26 @@
-labels:
-  type: conditional-no-script
-displayName: Conditional Setup
-logo:
-  publicUrl: https://example.com/conditional.png
-description: |
-  Connector with an invalid conditional setup step.
-auth:
-  type: no-auth
-setupFlow:
-  configure:
-    steps:
-      - id: advanced_options
-        if: {}
-        jsonSchema:
-          type: object
-          properties:
-            sync_mode:
-              type: string
+apiVersion: authproxy.net/v1alpha1
+kind: Connector
+metadata:
+  name: setup-flow-if-missing-javascript
+  labels:
+    type: conditional-no-script
+spec:
+  definition:
+    displayName: Conditional Setup
+    logo:
+      publicUrl: https://example.com/conditional.png
+    description: 'Connector with an invalid conditional setup step.
+
+'
+    auth:
+      type: no-auth
+    setupFlow:
+      configure:
+        steps:
+        - id: advanced_options
+          if: {}
+          jsonSchema:
+            type: object
+            properties:
+              sync_mode:
+                type: string

@@ -26,7 +26,7 @@ type IActorData interface {
 type Factory interface {
 	NewOAuth2(connection coreIface.Connection) OAuth2Connection
 	NewAuthenticator(connection coreIface.Connection) auth_methods.Authenticator
-	ManifestSetupSteps(connection coreIface.Connection, connector *cschema.Connector) []coreIface.ManifestSetupStep
+	ManifestSetupSteps(connection coreIface.Connection, connector *cschema.ConnectorDefinition) []coreIface.ManifestSetupStep
 	GetOAuth2State(ctx context.Context, actor IActorData, stateId apid.ID) (OAuth2Connection, error)
 }
 

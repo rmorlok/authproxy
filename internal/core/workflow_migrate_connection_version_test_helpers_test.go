@@ -56,16 +56,13 @@ func migrationTestDBConnectorVersion(
 	connectorID apid.ID,
 	version uint64,
 	state database.ConnectorDefinitionVersionState,
-	def cschema.Connector,
+	def cschema.ConnectorDefinition,
 ) *database.ConnectorWithDefinition {
 	t.Helper()
 
 	if def.Auth == nil {
 		def.Auth = cschema.NewNoAuth()
 	}
-	def.Id = connectorID
-	def.Version = version
-
 	raw, err := json.Marshal(def)
 	require.NoError(t, err)
 	encrypted, err := e.EncryptStringForEntity(

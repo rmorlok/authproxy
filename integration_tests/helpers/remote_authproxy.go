@@ -116,7 +116,7 @@ func (h *RemoteAuthProxy) CreateConnector(t *testing.T, connector sconfig.Connec
 	var created schemaapi.ConnectorVersionJson
 	h.doSigned(t, h.AdminActorExternalID, http.MethodPost, h.AdminURL+"/api/v1/connectors", schemaapi.CreateConnectorRequestJson{
 		Namespace:  h.Namespace,
-		Definition: connector,
+		Definition: connector.Spec.Definition,
 		Labels: map[string]string{
 			"smoke": "true",
 		},

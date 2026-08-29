@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
@@ -100,6 +101,42 @@ func (s *service) MigrateNamespaces(ctx context.Context) error {
 	}
 
 	s.logger.Info("finished migrating namespaces", "migrated_count", len(prefixOrderedList))
+
+	return nil
+}
+
+func (s *service) syncConfiguredConnectorEnvelope(
+	ctx context.Context,
+	configured *config.Connector,
+	existing *database.ConnectorWithDefinition,
+) error {
+	if existing == nil {
+		return nil
+	}
+
+	storedUserLabels, _ := database.SplitUserAndApxyLabels(existing.Labels)
+	if !maps.Equal(map[string]string(storedUserLabels), configured.Metadata.Labels) {
+		if _, err := s.db.UpdateConnectorLabels(ctx, existing.Id, configured.Metadata.Labels); err != nil {
+			return fmt.Errorf("failed to update configured connector labels: %w", err)
+		}
+		s.enqueueConnectorLabelPropagation(ctx, existing.Id)
+	}
+
+	if !maps.Equal(map[string]string(existing.Annotations), configured.Metadata.Annotations) {
+		if _, err := s.db.UpdateConnectorAnnotations(ctx, existing.Id, configured.Metadata.Annotations); err != nil {
+			return fmt.Errorf("failed to update configured connector annotations: %w", err)
+		}
+	}
+
+	desiredState := database.ConnectorDefinitionVersionStatePrimary
+	if configured.Spec.Release.DesiredState != "" {
+		desiredState = database.ConnectorDefinitionVersionState(configured.Spec.Release.DesiredState)
+	}
+	if existing.State != desiredState {
+		if err := s.db.SetConnectorDefinitionVersionState(ctx, existing.Id, existing.Version, desiredState); err != nil {
+			return fmt.Errorf("failed to update configured connector release state: %w", err)
+		}
+	}
 
 	return nil
 }
@@ -271,72 +308,72 @@ func (s *service) precheckConnectorForMigration(ctx context.Context, configConne
 
 	if configConnector.HasId() {
 		if configConnector.HasName() {
-			byName, err := s.connectorForConfigName(ctx, configConnector.GetNamespace(), configConnector.Name)
+			byName, err := s.connectorForConfigName(ctx, configConnector.GetNamespace(), configConnector.Metadata.Name)
 			if err != nil && !errors.Is(err, database.ErrNotFound) {
 				return fmt.Errorf("failed to check connector name during precheck: %w", err)
 			}
-			if byName != nil && byName.Id != configConnector.Id {
-				return fmt.Errorf("connector name %q already belongs to connector %s in namespace %q", configConnector.Name, byName.Id, configConnector.GetNamespace())
+			if byName != nil && byName.Id != configConnector.GetId() {
+				return fmt.Errorf("connector name %q already belongs to connector %s in namespace %q", configConnector.Metadata.Name, byName.Id, configConnector.GetNamespace())
 			}
 		}
 
 		if configConnector.HasVersion() {
-			existingVersion, err := s.db.GetConnectorDefinitionVersion(ctx, configConnector.Id, configConnector.Version)
+			existingVersion, err := s.db.GetConnectorDefinitionVersion(ctx, configConnector.GetId(), configConnector.Metadata.Generation)
 			if err != nil && !errors.Is(err, database.ErrNotFound) {
 				return fmt.Errorf("failed to check for existing connector for precheck: %w", err)
 			}
 
 			if errors.Is(err, database.ErrNotFound) {
 				// Check for other versions that might exist
-				newestVersion, err := s.db.NewestConnectorDefinitionVersionForId(ctx, configConnector.Id)
+				newestVersion, err := s.db.NewestConnectorDefinitionVersionForId(ctx, configConnector.GetId())
 				if err != nil && !errors.Is(err, database.ErrNotFound) {
 					return fmt.Errorf("failed to get newest version of connector for precheck: %w", err)
 				}
 
 				if newestVersion != nil {
-					if newestVersion.Version+1 != configConnector.Version {
-						return fmt.Errorf("connector %s currently has version %d and cannot be incremented to %d", configConnector.Id, newestVersion.Version, configConnector.Version)
+					if newestVersion.Version+1 != configConnector.Metadata.Generation {
+						return fmt.Errorf("connector %s currently has version %d and cannot be incremented to %d", configConnector.GetId(), newestVersion.Version, configConnector.Metadata.Generation)
 					}
 
 					if newestVersion.Namespace != configConnector.GetNamespace() {
-						return fmt.Errorf("connector %s currently has namespace path '%s' and cannot be changed to '%s'", configConnector.Id, newestVersion.Namespace, configConnector.GetNamespace())
+						return fmt.Errorf("connector %s currently has namespace path '%s' and cannot be changed to '%s'", configConnector.GetId(), newestVersion.Namespace, configConnector.GetNamespace())
 					}
 				}
 
-				if newestVersion == nil && configConnector.Version != 1 {
-					return fmt.Errorf("connector %s does does not have previous versions and must start with version 1", configConnector.Id)
+				if newestVersion == nil && configConnector.Metadata.Generation != 1 {
+					return fmt.Errorf("connector %s does does not have previous versions and must start with version 1", configConnector.GetId())
 				}
 			} else {
-				if configConnector.State == "" {
+				if configConnector.Spec.Release.DesiredState == "" {
 					// Unless specified, this is trying to be the primary version; important for hash
-					configConnector.State = string(database.ConnectorDefinitionVersionStatePrimary)
+					configConnector.Spec.Release.DesiredState = "primary"
 				}
 
 				if existingVersion.Namespace != configConnector.GetNamespace() {
-					return fmt.Errorf("connector %s currently has namespace '%s' and cannot be changed to %s", configConnector.Id, existingVersion.Namespace, configConnector.GetNamespace())
+					return fmt.Errorf("connector %s currently has namespace '%s' and cannot be changed to %s", configConnector.GetId(), existingVersion.Namespace, configConnector.GetNamespace())
 				}
 
 				if existingVersion.State != database.ConnectorDefinitionVersionStateDraft {
-					matches, hashErr := s.connectorVersionHashEquals(existingVersion, configConnector.Hash())
+					matches, hashErr := s.connectorVersionHashEquals(existingVersion, configConnector.DefinitionHash())
 					if hashErr != nil {
 						return hashErr
 					}
 					if !matches {
-						return fmt.Errorf("connector %s version %d has been published and cannot be modified", configConnector.Id, configConnector.Version)
+						return fmt.Errorf("connector %s version %d has been published and cannot be modified", configConnector.GetId(), configConnector.Metadata.Generation)
 					}
 				}
 			}
 		} else {
-			existingVersion, err := s.db.NewestConnectorDefinitionVersionForId(ctx, configConnector.Id)
+			existingVersion, err := s.db.NewestConnectorDefinitionVersionForId(ctx, configConnector.GetId())
 			if err != nil && !errors.Is(err, database.ErrNotFound) {
 				return fmt.Errorf("failed to get newest version of connector for precheck: %w", err)
 			}
 			if existingVersion != nil && existingVersion.Namespace != configConnector.GetNamespace() {
-				return fmt.Errorf("connector %s currently has namespace path %q and cannot be changed to %q", configConnector.Id, existingVersion.Namespace, configConnector.GetNamespace())
+				return fmt.Errorf("connector %s currently has namespace path %q and cannot be changed to %q", configConnector.GetId(), existingVersion.Namespace, configConnector.GetNamespace())
 			}
 		}
 	} else {
-		existingConnector, err := s.connectorForConfigName(ctx, configConnector.GetNamespace(), configConnector.Name)
+		existingConnector, err := s.connectorForConfigName(ctx, configConnector.GetNamespace(), configConnector.Metadata.Name)
 		if err != nil && !errors.Is(err, database.ErrNotFound) {
 			return fmt.Errorf("failed to check for existing connector by name during precheck: %w", err)
 		}
@@ -344,7 +381,7 @@ func (s *service) precheckConnectorForMigration(ctx context.Context, configConne
 		if configConnector.HasVersion() {
 			var existingVersion *database.ConnectorWithDefinition
 			if existingConnector != nil {
-				existingVersion, err = s.db.GetConnectorDefinitionVersion(ctx, existingConnector.Id, configConnector.Version)
+				existingVersion, err = s.db.GetConnectorDefinitionVersion(ctx, existingConnector.Id, configConnector.Metadata.Generation)
 				if err != nil && !errors.Is(err, database.ErrNotFound) {
 					return fmt.Errorf("failed to check for existing connector version for precheck: %w", err)
 				}
@@ -352,31 +389,31 @@ func (s *service) precheckConnectorForMigration(ctx context.Context, configConne
 
 			if existingVersion == nil {
 				if existingConnector == nil {
-					if configConnector.Version != 1 {
-						return fmt.Errorf("connector %q in namespace %q does not have previous versions and must start with version 1", configConnector.Name, configConnector.GetNamespace())
+					if configConnector.Metadata.Generation != 1 {
+						return fmt.Errorf("connector %q in namespace %q does not have previous versions and must start with version 1", configConnector.Metadata.Name, configConnector.GetNamespace())
 					}
 				} else {
 					newestVersion, err := s.db.NewestConnectorDefinitionVersionForId(ctx, existingConnector.Id)
 					if err != nil && !errors.Is(err, database.ErrNotFound) {
 						return fmt.Errorf("failed to get newest version of connector for precheck: %w", err)
 					}
-					if newestVersion != nil && newestVersion.Version+1 != configConnector.Version {
-						return fmt.Errorf("connector %q in namespace %q currently has version %d and cannot be incremented to %d", configConnector.Name, configConnector.GetNamespace(), newestVersion.Version, configConnector.Version)
+					if newestVersion != nil && newestVersion.Version+1 != configConnector.Metadata.Generation {
+						return fmt.Errorf("connector %q in namespace %q currently has version %d and cannot be incremented to %d", configConnector.Metadata.Name, configConnector.GetNamespace(), newestVersion.Version, configConnector.Metadata.Generation)
 					}
 				}
 			} else {
-				if configConnector.State == "" {
+				if configConnector.Spec.Release.DesiredState == "" {
 					// Unless specified, this is trying to be the primary version; important for hash
-					configConnector.State = string(database.ConnectorDefinitionVersionStatePrimary)
+					configConnector.Spec.Release.DesiredState = "primary"
 				}
 
 				if existingVersion.State != database.ConnectorDefinitionVersionStateDraft {
-					matches, hashErr := s.connectorVersionHashEquals(existingVersion, configConnector.Hash())
+					matches, hashErr := s.connectorVersionHashEquals(existingVersion, configConnector.DefinitionHash())
 					if hashErr != nil {
 						return hashErr
 					}
 					if !matches {
-						return fmt.Errorf("connector %q in namespace %q version %d has been published and cannot be modified", configConnector.Name, configConnector.GetNamespace(), configConnector.Version)
+						return fmt.Errorf("connector %q in namespace %q version %d has been published and cannot be modified", configConnector.Metadata.Name, configConnector.GetNamespace(), configConnector.Metadata.Generation)
 					}
 				}
 			}
@@ -391,13 +428,13 @@ func (s *service) precheckConnectorForMigration(ctx context.Context, configConne
 // database, whether newly generated or matched against an existing row) so the
 // caller can track which connectors are config-managed and detect orphans.
 func (s *service) syncConfiguredConnectorName(ctx context.Context, configConnector *config.Connector, existingVersion *database.ConnectorWithDefinition) error {
-	if existingVersion == nil || !configConnector.HasId() || !configConnector.HasName() || existingVersion.Name == configConnector.Name {
+	if existingVersion == nil || !configConnector.HasId() || !configConnector.HasName() || existingVersion.Name == configConnector.Metadata.Name {
 		return nil
 	}
-	if err := s.UpdateConnectorName(ctx, configConnector.Id, configConnector.Name); err != nil {
-		return fmt.Errorf("failed to rename configured connector %s to %q: %w", configConnector.Id, configConnector.Name, err)
+	if err := s.UpdateConnectorName(ctx, configConnector.GetId(), configConnector.Metadata.Name); err != nil {
+		return fmt.Errorf("failed to rename configured connector %s to %q: %w", configConnector.GetId(), configConnector.Metadata.Name, err)
 	}
-	existingVersion.Name = configConnector.Name
+	existingVersion.Name = configConnector.Metadata.Name
 	return nil
 }
 
@@ -406,33 +443,40 @@ func (s *service) migrateConnector(ctx context.Context, configConnector *config.
 
 	id := apctx.GetIdGenerator(ctx).New(apid.PrefixConnector)
 	if configConnector.HasId() {
-		id = configConnector.Id
+		id = configConnector.GetId()
 	}
 
 	version := uint64(1)
 	if configConnector.HasVersion() {
-		version = configConnector.Version
+		version = configConnector.Metadata.Generation
 	}
 
 	state := database.ConnectorDefinitionVersionStatePrimary
-	if configConnector.State != "" {
-		state = database.ConnectorDefinitionVersionState(configConnector.State)
+	if configConnector.Spec.Release.DesiredState != "" {
+		state = database.ConnectorDefinitionVersionState(configConnector.Spec.Release.DesiredState)
 	}
 
 	var existingVersion *database.ConnectorWithDefinition
 	var err error
 	matchesExisting := func(candidate *Connector) (bool, error) {
-		return s.connectorVersionHashEquals(existingVersion, candidate.Hash)
+		matches, err := s.connectorVersionHashEquals(existingVersion, candidate.Hash)
+		if err != nil || !matches {
+			return matches, err
+		}
+		if err := s.syncConfiguredConnectorEnvelope(ctx, configConnector, existingVersion); err != nil {
+			return false, err
+		}
+		return true, nil
 	}
 
 	if configConnector.HasId() && configConnector.HasVersion() {
-		existingVersion, err = s.db.GetConnectorDefinitionVersion(ctx, configConnector.Id, configConnector.Version)
+		existingVersion, err = s.db.GetConnectorDefinitionVersion(ctx, configConnector.GetId(), configConnector.Metadata.Generation)
 		if err != nil && !errors.Is(err, database.ErrNotFound) {
 			return apid.Nil, fmt.Errorf("failed to get connector version: %w", err)
 		}
 		existingConnector := existingVersion
 		if existingConnector == nil && configConnector.HasName() {
-			existingConnector, err = s.db.NewestConnectorDefinitionVersionForId(ctx, configConnector.Id)
+			existingConnector, err = s.db.NewestConnectorDefinitionVersionForId(ctx, configConnector.GetId())
 			if err != nil && !errors.Is(err, database.ErrNotFound) {
 				return apid.Nil, fmt.Errorf("failed to get connector for rename: %w", err)
 			}
@@ -461,7 +505,7 @@ func (s *service) migrateConnector(ctx context.Context, configConnector *config.
 			}
 		}
 	} else if configConnector.HasId() {
-		existingVersion, err = s.db.NewestConnectorDefinitionVersionForId(ctx, configConnector.Id)
+		existingVersion, err = s.db.NewestConnectorDefinitionVersionForId(ctx, configConnector.GetId())
 		if err != nil && !errors.Is(err, database.ErrNotFound) {
 			return apid.Nil, fmt.Errorf("failed to get newest version of connector: %w", err)
 		}
@@ -493,13 +537,13 @@ func (s *service) migrateConnector(ctx context.Context, configConnector *config.
 	} else if configConnector.HasVersion() {
 		// Pattern C: version and name, no ID - resolve the logical connector by
 		// exact name within its namespace, then address the version by its ID.
-		existingConnector, lookupErr := s.connectorForConfigName(ctx, configConnector.GetNamespace(), configConnector.Name)
+		existingConnector, lookupErr := s.connectorForConfigName(ctx, configConnector.GetNamespace(), configConnector.Metadata.Name)
 		if lookupErr != nil && !errors.Is(lookupErr, database.ErrNotFound) {
 			return apid.Nil, fmt.Errorf("failed to get connector by name: %w", lookupErr)
 		}
 		if existingConnector != nil {
 			id = existingConnector.Id
-			existingVersion, err = s.db.GetConnectorDefinitionVersion(ctx, id, configConnector.Version)
+			existingVersion, err = s.db.GetConnectorDefinitionVersion(ctx, id, configConnector.Metadata.Generation)
 			if err != nil && !errors.Is(err, database.ErrNotFound) {
 				return apid.Nil, fmt.Errorf("failed to get connector version by name: %w", err)
 			}
@@ -528,7 +572,7 @@ func (s *service) migrateConnector(ctx context.Context, configConnector *config.
 	} else {
 		// Pattern D: name only - resolve the logical connector by exact name
 		// within its namespace and let definition changes auto-increment version.
-		existingVersion, err = s.connectorForConfigName(ctx, configConnector.GetNamespace(), configConnector.Name)
+		existingVersion, err = s.connectorForConfigName(ctx, configConnector.GetNamespace(), configConnector.Metadata.Name)
 		if err != nil && !errors.Is(err, database.ErrNotFound) {
 			return apid.Nil, fmt.Errorf("failed to get connector by name: %w", err)
 		}
@@ -569,7 +613,7 @@ func (s *service) migrateConnector(ctx context.Context, configConnector *config.
 	}
 	// Name is config reconciliation metadata for the logical connector, not
 	// part of the encrypted definition assembled by connectorBuilder.
-	c.ConnectorWithDefinition.Name = configConnector.Name
+	c.ConnectorWithDefinition.Name = configConnector.Metadata.Name
 
 	// Final check, though this should be duplicative
 	if existingVersion != nil {

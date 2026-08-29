@@ -40,7 +40,7 @@ func (s *stubProxy) ProxyRequestRaw(ctx context.Context, _ httpf.RequestType, _ 
 // probe code under test exercises the real iface.Proxy contract without
 // going through resolveAuthenticator (which would require a fully wired
 // auth-method factory).
-func newProbeTestConnection(t *testing.T, ctrl *gomock.Controller, def cschema.Connector) (*connection, *stubProxy) {
+func newProbeTestConnection(t *testing.T, ctrl *gomock.Controller, def cschema.ConnectorDefinition) (*connection, *stubProxy) {
 	t.Helper()
 	s, _, _, _, _, _ := FullMockService(t, ctrl)
 	c := NewTestConnector(def)
@@ -89,7 +89,7 @@ func TestProbeHttp_ProxyHttp_Success(t *testing.T) {
 			URL:    "https://example.com/health",
 		},
 	}
-	conn, proxy := newProbeTestConnection(t, ctrl, cschema.Connector{Probes: []cschema.Probe{*probeCfg}})
+	conn, proxy := newProbeTestConnection(t, ctrl, cschema.ConnectorDefinition{Probes: []cschema.Probe{*probeCfg}})
 	proxy.resp = &iface.ProxyResponse{StatusCode: 200}
 
 	probe := NewProbe(probeCfg, conn.s, conn.connector, conn)
@@ -129,7 +129,7 @@ func TestProbeHttp_ProxyHttp_Non2xxIsFailure(t *testing.T) {
 					URL:    "https://example.com/health",
 				},
 			}
-			conn, proxy := newProbeTestConnection(t, ctrl, cschema.Connector{Probes: []cschema.Probe{*probeCfg}})
+			conn, proxy := newProbeTestConnection(t, ctrl, cschema.ConnectorDefinition{Probes: []cschema.Probe{*probeCfg}})
 			proxy.resp = &iface.ProxyResponse{StatusCode: tc.status}
 
 			probe := NewProbe(probeCfg, conn.s, conn.connector, conn)
@@ -160,7 +160,7 @@ func TestProbeHttp_ProxyHttp_2xxRangeIsSuccess(t *testing.T) {
 					URL:    "https://example.com/health",
 				},
 			}
-			conn, proxy := newProbeTestConnection(t, ctrl, cschema.Connector{Probes: []cschema.Probe{*probeCfg}})
+			conn, proxy := newProbeTestConnection(t, ctrl, cschema.ConnectorDefinition{Probes: []cschema.Probe{*probeCfg}})
 			proxy.resp = &iface.ProxyResponse{StatusCode: status}
 
 			probe := NewProbe(probeCfg, conn.s, conn.connector, conn)
@@ -183,7 +183,7 @@ func TestProbeHttp_ProxyHttp_TransportErrorIsFailure(t *testing.T) {
 			URL:    "https://example.com/health",
 		},
 	}
-	conn, proxy := newProbeTestConnection(t, ctrl, cschema.Connector{Probes: []cschema.Probe{*probeCfg}})
+	conn, proxy := newProbeTestConnection(t, ctrl, cschema.ConnectorDefinition{Probes: []cschema.Probe{*probeCfg}})
 	proxy.err = errors.New("dial tcp: connection refused")
 
 	probe := NewProbe(probeCfg, conn.s, conn.connector, conn)
@@ -204,7 +204,7 @@ func TestProbeHttp_RawHttp_Success(t *testing.T) {
 	h := mockH.NewFactoryWithMockingClient(ctrl)
 	s, _, _, _, _, _ := FullMockService(t, ctrl)
 	s.httpf = h
-	c := NewTestConnector(cschema.Connector{})
+	c := NewTestConnector(cschema.ConnectorDefinition{})
 	logger := slog.New(slog.NewTextHandler(testWriter{t}, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	conn := &connection{
 		Connection: database.Connection{
@@ -244,7 +244,7 @@ func TestProbeHttp_RawHttp_Non2xxIsFailure(t *testing.T) {
 	h := mockH.NewFactoryWithMockingClient(ctrl)
 	s, _, _, _, _, _ := FullMockService(t, ctrl)
 	s.httpf = h
-	c := NewTestConnector(cschema.Connector{})
+	c := NewTestConnector(cschema.ConnectorDefinition{})
 	logger := slog.New(slog.NewTextHandler(testWriter{t}, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	conn := &connection{
 		Connection: database.Connection{

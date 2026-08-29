@@ -10,7 +10,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	dbtasks "github.com/rmorlok/authproxy/internal/database/tasks"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
-	"github.com/rmorlok/authproxy/internal/util"
 )
 
 // enqueueConnectorLabelPropagation enqueues an asynq task that
@@ -29,7 +28,7 @@ func (s *service) enqueueConnectorLabelPropagation(ctx context.Context, id apid.
 	}
 }
 
-func (s *service) UpdateDraftConnectorVersion(ctx context.Context, id apid.ID, version uint64, definition *cschema.Connector, labels map[string]string, annotations map[string]string) (iface.Connector, error) {
+func (s *service) UpdateDraftConnectorVersion(ctx context.Context, id apid.ID, version uint64, definition *cschema.ConnectorDefinition, labels map[string]string, annotations map[string]string) (iface.Connector, error) {
 	existing, err := s.db.GetConnectorDefinitionVersion(ctx, id, version)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
@@ -42,14 +41,8 @@ func (s *service) UpdateDraftConnectorVersion(ctx context.Context, id apid.ID, v
 		return nil, ErrNotDraft
 	}
 
-	def := definition.Clone()
-	def.Id = id
-	def.Version = version
-	def.Namespace = util.ToPtr(existing.Namespace)
-	def.State = string(database.ConnectorDefinitionVersionStateDraft)
-
 	c, err := newConnectorBuilder(s).
-		WithConfig(def).
+		WithDefinition(definition).
 		WithId(id).
 		WithVersion(version).
 		WithState(database.ConnectorDefinitionVersionStateDraft).
@@ -69,6 +62,8 @@ func (s *service) UpdateDraftConnectorVersion(ctx context.Context, id apid.ID, v
 	} else {
 		c.ConnectorWithDefinition.Annotations = existing.Annotations
 	}
+	c.ConnectorWithDefinition.Namespace = existing.Namespace
+	c.ConnectorWithDefinition.Name = existing.Name
 
 	if err := s.db.UpsertConnectorDefinitionVersion(ctx, &c.ConnectorWithDefinition); err != nil {
 		return nil, fmt.Errorf("failed to upsert connector version: %w", err)
@@ -111,13 +106,8 @@ func (s *service) GetOrCreateDraftConnectorVersion(ctx context.Context, id apid.
 	def := latestDef.Clone()
 
 	newVersion := latest.Version + 1
-	def.Id = id
-	def.Version = newVersion
-	def.Namespace = util.ToPtr(latest.Namespace)
-	def.State = string(database.ConnectorDefinitionVersionStateDraft)
-
 	c, err := newConnectorBuilder(s).
-		WithConfig(def).
+		WithDefinition(def).
 		WithId(id).
 		WithVersion(newVersion).
 		WithState(database.ConnectorDefinitionVersionStateDraft).
@@ -128,6 +118,8 @@ func (s *service) GetOrCreateDraftConnectorVersion(ctx context.Context, id apid.
 
 	c.ConnectorWithDefinition.Labels = latest.Labels
 	c.ConnectorWithDefinition.Annotations = latest.Annotations
+	c.ConnectorWithDefinition.Namespace = latest.Namespace
+	c.ConnectorWithDefinition.Name = latest.Name
 
 	if err := s.db.UpsertConnectorDefinitionVersion(ctx, &c.ConnectorWithDefinition); err != nil {
 		return nil, fmt.Errorf("failed to upsert connector version: %w", err)

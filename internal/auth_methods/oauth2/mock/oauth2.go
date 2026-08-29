@@ -179,7 +179,7 @@ func (mr *MockFactoryMockRecorder) GetOAuth2State(ctx, actor, stateId interface{
 }
 
 // ManifestSetupSteps mocks base method.
-func (m *MockFactory) ManifestSetupSteps(connection iface.Connection, connector *connectors.Connector) []iface.ManifestSetupStep {
+func (m *MockFactory) ManifestSetupSteps(connection iface.Connection, connector *connectors.ConnectorDefinition) []iface.ManifestSetupStep {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ManifestSetupSteps", connection, connector)
 	ret0, _ := ret[0].([]iface.ManifestSetupStep)

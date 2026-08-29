@@ -32,5 +32,5 @@ type Factory interface {
 	// the Placement; OAuth2 may inspect grant type once #352 lands). The
 	// connector is guaranteed by the caller to have an Auth whose Inner
 	// matches the method registering this factory.
-	ManifestSetupSteps(connection coreIface.Connection, connector *cschema.Connector) []coreIface.ManifestSetupStep
+	ManifestSetupSteps(connection coreIface.Connection, connector *cschema.ConnectorDefinition) []coreIface.ManifestSetupStep
 }

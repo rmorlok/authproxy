@@ -65,25 +65,7 @@
         },
         "loadFromList": {
           "items": {
-            "allOf": [
-              {
-                "$ref": "../resources/connectors/schema.json"
-              },
-              {
-                "anyOf": [
-                  {
-                    "required": [
-                      "id"
-                    ]
-                  },
-                  {
-                    "required": [
-                      "name"
-                    ]
-                  }
-                ]
-              }
-            ]
+            "$ref": "../resources/connectors/schema.json"
           },
           "type": "array"
         }

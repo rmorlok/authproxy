@@ -22,7 +22,7 @@ const (
 // reruns the full target probe set because config, auth, labels, and
 // annotations can change outcomes for probes that existed on the source
 // version too.
-func targetProbeIDs(def *cschema.Connector) []string {
+func targetProbeIDs(def *cschema.ConnectorDefinition) []string {
 	if def == nil {
 		return nil
 	}

@@ -9,9 +9,6 @@
     "description": "Salesforce CRM integration",
     "auth": {
       "type": "no-auth"
-    },
-    "labels": {
-      "service": "salesforce"
     }
   },
   "labels": {

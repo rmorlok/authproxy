@@ -86,6 +86,29 @@ func TestConnectorRenameDoesNotRewriteVersions(t *testing.T) {
 	require.ErrorContains(t, err, "cannot modify connector name")
 }
 
+func TestConnectorMetadataUpdatesDoNotRewriteVersions(t *testing.T) {
+	_, db, rawDB := MustApplyBlankTestDbConfigRaw(t, nil)
+	ctx := context.Background()
+	id := apid.New(apid.PrefixConnectorVersion)
+	connector := testConnectorWithDefinition(id, "root", "configured", 1)
+	connector.Labels = Labels{"environment": "demo"}
+	connector.Annotations = Annotations{"example.com/owner": "integrations"}
+	require.NoError(t, db.UpsertConnectorDefinitionVersion(ctx, connector))
+
+	originalDefinitions := connectorDefinitionPayloads(t, rawDB, id)
+	updated, err := db.UpdateConnectorLabels(ctx, id, map[string]string{"environment": "production"})
+	require.NoError(t, err)
+	userLabels, _ := SplitUserAndApxyLabels(updated.Labels)
+	require.Equal(t, Labels{"environment": "production"}, userLabels)
+
+	updated, err = db.UpdateConnectorAnnotations(ctx, id, map[string]string{"example.com/owner": "platform"})
+	require.NoError(t, err)
+	require.Equal(t, Annotations{"example.com/owner": "platform"}, updated.Annotations)
+
+	require.Equal(t, originalDefinitions, connectorDefinitionPayloads(t, rawDB, id))
+	require.Equal(t, 1, sqlhMustCountConnectorDefinitionVersions(t, rawDB, id))
+}
+
 func TestConnectorRejectsNamespaceFork(t *testing.T) {
 	_, db := MustApplyBlankTestDbConfig(t, nil)
 	ctx := context.Background()

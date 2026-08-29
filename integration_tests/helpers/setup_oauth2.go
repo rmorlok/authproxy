@@ -147,16 +147,13 @@ func NewOAuth2Connector(connectorID apid.ID, displayName string, provider *OAuth
 		}
 	}
 
-	return sconfig.Connector{
-		Id:          connectorID,
-		Version:     1,
-		Labels:      map[string]string{"type": displayName},
+	return NewConfiguredConnector(connectorID, displayName, connectors.ConnectorDefinition{
 		DisplayName: displayName,
 		Auth: &connectors.Auth{
 			InnerVal: auth,
 		},
 		Probes: opts.Probes,
-	}
+	})
 }
 
 // PublicOAuthCallbackURL returns the URL the proxy emits as the OAuth `redirect_uri`.

@@ -27,6 +27,51 @@
         }
       }
     },
+    "ExponentialBackoff": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "initialInterval": {
+          "$ref": "../../common/schema.json#/$defs/HumanDuration"
+        },
+        "multiplier": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "maxInterval": {
+          "$ref": "../../common/schema.json#/$defs/HumanDuration"
+        },
+        "jitterFraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "RateLimiting": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "retryAfterHeaders": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "maxRetryAfter": {
+          "$ref": "../../common/schema.json#/$defs/HumanDuration"
+        },
+        "defaultRetryAfter": {
+          "$ref": "../../common/schema.json#/$defs/HumanDuration"
+        },
+        "exponentialBackoff": {
+          "$ref": "#/$defs/ExponentialBackoff"
+        }
+      }
+    },
     "ApiKeyPlacement": {
       "type": "object",
       "additionalProperties": false,
@@ -344,80 +389,104 @@
         }
       },
       "additionalProperties": false
-    }
-  },
-  "properties": {
-    "id": {
-      "$ref": "../../common/schema.json#/$defs/UUID"
     },
-    "name": {
-      "$ref": "../../common/schema.json#/$defs/ResourceName"
-    },
-    "namespace": {
-      "$ref": "../namespace/schema.json#/$defs/NamespacePath"
-    },
-    "labels": {
+    "ConnectorDefinition": {
       "type": "object",
-      "additionalProperties": {
-        "type": "string"
-      }
-    },
-    "version": {
-      "type": "integer"
-    },
-    "state": {
-      "type": "string"
-    },
-    "displayName": {
-      "type": "string"
-    },
-    "logo": {
-      "$ref": "../../common/schema.json#/$defs/Image"
-    },
-    "highlight": {
-      "type": "string"
-    },
-    "description": {
-      "type": "string"
-    },
-    "auth": {
-      "oneOf": [
-        {
-          "$ref": "./schema-oauth.json"
+      "properties": {
+        "displayName": { "type": "string" },
+        "logo": { "$ref": "../../common/schema.json#/$defs/Image" },
+        "highlight": { "type": "string" },
+        "description": { "type": "string" },
+        "statusPageUrl": { "type": "string" },
+        "marketplaceUrl": { "type": "string" },
+        "developerConsoleUrl": { "type": "string" },
+        "oauthClientUrl": { "type": "string" },
+        "auth": {
+          "oneOf": [
+            { "$ref": "./schema-oauth.json" },
+            { "$ref": "#/$defs/AuthApiKey" },
+            { "$ref": "#/$defs/AuthNoAuth" }
+          ]
         },
-        {
-          "$ref": "#/$defs/AuthApiKey"
+        "javascript": { "type": "string" },
+        "migrations": { "$ref": "#/$defs/Migrations" },
+        "rateLimiting": { "$ref": "#/$defs/RateLimiting" },
+        "probes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Probe" }
         },
-        {
-          "$ref": "#/$defs/AuthNoAuth"
+        "setupFlow": { "$ref": "#/$defs/SetupFlow" },
+        "telemetry": { "$ref": "#/$defs/ConnectorTelemetry" }
+      },
+      "required": ["displayName", "logo", "auth"],
+      "additionalProperties": false
+    },
+    "ConnectorReleaseSpec": {
+      "type": "object",
+      "properties": {
+        "desiredState": {
+          "type": "string",
+          "enum": ["draft", "primary"]
         }
-      ]
+      },
+      "additionalProperties": false
     },
-    "javascript": {
-      "type": "string"
+    "ConnectorSpec": {
+      "type": "object",
+      "properties": {
+        "release": { "$ref": "#/$defs/ConnectorReleaseSpec" },
+        "definition": { "$ref": "#/$defs/ConnectorDefinition" }
+      },
+      "required": ["definition"],
+      "additionalProperties": false
     },
-    "migrations": {
-      "$ref": "#/$defs/Migrations"
+    "ConnectorReleaseStatus": {
+      "type": "object",
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": ["draft", "primary", "active", "archived"]
+        }
+      },
+      "required": ["state"],
+      "additionalProperties": false
     },
-    "probes": {
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/Probe"
-      }
-    },
-    "setupFlow": {
-      "$ref": "#/$defs/SetupFlow"
-    },
-    "telemetry": {
-      "$ref": "#/$defs/ConnectorTelemetry"
+    "ConnectorStatus": {
+      "type": "object",
+      "properties": {
+        "release": { "$ref": "#/$defs/ConnectorReleaseStatus" }
+      },
+      "required": ["release"],
+      "additionalProperties": false
     }
   },
-  "required": [
-    "labels",
-    "displayName",
-    "logo",
-    "auth"
+  "allOf": [
+    { "$ref": "../meta/schema.json#/$defs/Resource" },
+    {
+      "type": "object",
+      "properties": {
+        "apiVersion": { "const": "authproxy.net/v1alpha1" },
+        "kind": { "const": "Connector" },
+        "metadata": {
+          "allOf": [
+            { "$ref": "../meta/schema.json#/$defs/ObjectMeta" },
+            {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string", "pattern": "^cxr_" },
+                "namespace": { "$ref": "../namespace/schema.json#/$defs/NamespacePath" }
+              },
+              "anyOf": [
+                { "required": ["id"] },
+                { "required": ["name"] }
+              ]
+            }
+          ]
+        },
+        "spec": { "$ref": "#/$defs/ConnectorSpec" },
+        "status": { "$ref": "#/$defs/ConnectorStatus" }
+      }
+    }
   ],
-  "additionalProperties": false,
-  "type": "object"
+  "unevaluatedProperties": false
 }

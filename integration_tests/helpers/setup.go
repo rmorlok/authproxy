@@ -27,6 +27,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/rmorlok/authproxy/internal/service"
 	"github.com/rmorlok/authproxy/internal/service/admin_api"
 	api_service "github.com/rmorlok/authproxy/internal/service/api"
@@ -416,10 +417,7 @@ func Setup(t *testing.T, opts SetupOptions) *IntegrationTestEnv {
 
 // NewNoAuthConnector creates a connector configuration for a NoAuth service.
 func NewNoAuthConnector(connectorID apid.ID, displayName string, rateLimiting *connectors.RateLimiting) sconfig.Connector {
-	return sconfig.Connector{
-		Id:          connectorID,
-		Version:     1,
-		Labels:      map[string]string{"type": displayName},
+	return NewConfiguredConnector(connectorID, displayName, connectors.ConnectorDefinition{
 		DisplayName: displayName,
 		Auth: &connectors.Auth{
 			InnerVal: &connectors.AuthNoAuth{
@@ -427,6 +425,18 @@ func NewNoAuthConnector(connectorID apid.ID, displayName string, rateLimiting *c
 			},
 		},
 		RateLimiting: rateLimiting,
+	})
+}
+
+func NewConfiguredConnector(connectorID apid.ID, displayName string, definition connectors.ConnectorDefinition) sconfig.Connector {
+	return sconfig.Connector{
+		TypeMeta: meta.NewTypeMeta(connectors.ConnectorKind),
+		Metadata: meta.ObjectMeta{
+			ID:         connectorID.String(),
+			Generation: 1,
+			Labels:     map[string]string{"type": displayName},
+		},
+		Spec: connectors.ConnectorSpec{Definition: definition},
 	}
 }
 

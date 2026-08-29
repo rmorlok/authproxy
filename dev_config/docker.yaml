@@ -108,33 +108,38 @@ connectors:
   #
   # Root
   #
-  - name: google-drive
-    labels:
-      type: google-drive
-      env: prod
-    displayName: Google Drive
-    logo:
-      publicUrl: https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Google_Drive_icon_%282020%29.svg/1024px-Google_Drive_icon_%282020%29.svg.png?20221103153031
-    highlight: |
-      Have the agent track your work in Google Drive.
-    description: |
-      This integration connects Google Drive to Acme app.
-    auth:
-      type: OAuth2
-      clientId:
-        envVar: GOOGLE_CLIENT_ID
-      clientSecret:
-        envVar: GOOGLE_CLIENT_SECRET
-      authorization:
-        endpoint: https://accounts.google.com/o/oauth2/v2/auth
-        queryOverrides:
-          prompt: consent
-      token:
-        endpoint: https://oauth2.googleapis.com/token
-      revocation:
-        endpoint: https://oauth2.googleapis.com/revoke
-        supportedTokens: refresh_token
-      scopes:
-        - id: https://www.googleapis.com/auth/drive.readonly
-          reason: |
-            We need to be able to view the files
+  - apiVersion: authproxy.net/v1alpha1
+    kind: Connector
+    metadata:
+      name: google-drive
+      labels:
+        type: google-drive
+        env: prod
+    spec:
+      definition:
+        displayName: Google Drive
+        logo:
+          publicUrl: https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Google_Drive_icon_%282020%29.svg/1024px-Google_Drive_icon_%282020%29.svg.png?20221103153031
+        highlight: |
+          Have the agent track your work in Google Drive.
+        description: |
+          This integration connects Google Drive to Acme app.
+        auth:
+          type: OAuth2
+          clientId:
+            envVar: GOOGLE_CLIENT_ID
+          clientSecret:
+            envVar: GOOGLE_CLIENT_SECRET
+          authorization:
+            endpoint: https://accounts.google.com/o/oauth2/v2/auth
+            queryOverrides:
+              prompt: consent
+          token:
+            endpoint: https://oauth2.googleapis.com/token
+          revocation:
+            endpoint: https://oauth2.googleapis.com/revoke
+            supportedTokens: refresh_token
+          scopes:
+            - id: https://www.googleapis.com/auth/drive.readonly
+              reason: |
+                We need to be able to view the files

@@ -30,11 +30,7 @@ import (
 func TestWorkflowDisconnectConnection(t *testing.T) {
 	ctx := context.Background()
 	connectionId := apid.New(apid.PrefixConnection)
-	connectorId := apid.New(apid.PrefixConnectorVersion)
-
-	apiKeyConnector := &cschema.Connector{
-		Id:          connectorId,
-		Version:     1,
+	apiKeyConnector := &cschema.ConnectorDefinition{
 		DisplayName: "Test Connector",
 		Auth:        &cschema.Auth{InnerVal: &cschema.AuthApiKey{Type: cschema.AuthTypeAPIKey}},
 	}
@@ -92,9 +88,7 @@ func TestWorkflowDisconnectConnection(t *testing.T) {
 	})
 
 	t.Run("retries revocation up to 3 times then proceeds with disconnect", func(t *testing.T) {
-		oauthConnector := &cschema.Connector{
-			Id:          apid.New(apid.PrefixConnectorVersion),
-			Version:     1,
+		oauthConnector := &cschema.ConnectorDefinition{
 			DisplayName: "OAuth Connector",
 			Auth: &cschema.Auth{InnerVal: &cschema.AuthOAuth2{
 				Type: cschema.AuthTypeOAuth2,

@@ -24,7 +24,7 @@ const OAuth2ClientCredentialsStepId = "apxy:auth:oauth2_client_credentials"
 // connection. authorization_code emits a redirect step; client_credentials
 // emits a credential form that stores the submitted client id / secret and
 // performs the token endpoint exchange on submit.
-func (f *factory) ManifestSetupSteps(connection coreIface.Connection, connector *cschema.Connector) []coreIface.ManifestSetupStep {
+func (f *factory) ManifestSetupSteps(connection coreIface.Connection, connector *cschema.ConnectorDefinition) []coreIface.ManifestSetupStep {
 	if connector == nil || connector.Auth == nil {
 		return nil
 	}

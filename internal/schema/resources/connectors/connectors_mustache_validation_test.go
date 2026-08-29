@@ -9,9 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func newOAuthConnector(oauth *AuthOAuth2, sf *SetupFlow) *Connector {
-	return &Connector{
-		Labels:      map[string]string{"type": "test"},
+func newOAuthConnector(oauth *AuthOAuth2, sf *SetupFlow) *ConnectorDefinition {
+	return &ConnectorDefinition{
 		DisplayName: "Test",
 		Description: "Test",
 		Auth:        &Auth{InnerVal: oauth},
@@ -317,8 +316,7 @@ func TestValidateMustacheReferences_NonOAuthSkipped(t *testing.T) {
 	vc := &common.ValidationContext{}
 
 	t.Run("api key connector with no data sources is skipped", func(t *testing.T) {
-		c := &Connector{
-			Labels:      map[string]string{"type": "api"},
+		c := &ConnectorDefinition{
 			DisplayName: "API",
 			Description: "API",
 			Auth:        &Auth{InnerVal: &AuthApiKey{Type: AuthTypeAPIKey}},

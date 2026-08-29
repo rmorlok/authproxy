@@ -169,12 +169,12 @@ func newOAuthMigrationRig(t *testing.T, name string) *oauthMigrationRig {
 	return rig
 }
 
-func (r *oauthMigrationRig) connectorDefinition(displayName string, scopes []string) sconfig.Connector {
+func (r *oauthMigrationRig) connectorDefinition(displayName string, scopes []string) sconfig.ConnectorDefinition {
 	return helpers.NewOAuth2Connector(r.connectorID, displayName, r.provider, helpers.OAuth2ConnectorOptions{
 		ClientID:     r.clientKey,
 		ClientSecret: r.clientSecret,
 		Scopes:       scopes,
-	})
+	}).Spec.Definition
 }
 
 func (r *oauthMigrationRig) createHealthyReadConnection(t *testing.T) string {

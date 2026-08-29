@@ -1,11 +1,18 @@
-labels:
-  type: sendgrid
-displayName: SendGrid
-logo:
-  publicUrl: https://example.com/sendgrid.png
-description: |
-  Send transactional email through SendGrid.
-auth:
-  type: api-key
-  placement:
-    type: bearer
+apiVersion: authproxy.net/v1alpha1
+kind: Connector
+metadata:
+  name: api-key-bearer
+  labels:
+    type: sendgrid
+spec:
+  definition:
+    displayName: SendGrid
+    logo:
+      publicUrl: https://example.com/sendgrid.png
+    description: 'Send transactional email through SendGrid.
+
+'
+    auth:
+      type: api-key
+      placement:
+        type: bearer

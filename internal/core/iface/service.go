@@ -91,18 +91,18 @@ type C interface {
 	ListConnectorVersionsFromCursor(ctx context.Context, cursor string) (ListConnectorVersionsExecutor, error)
 
 	// CreateConnectorVersion creates a new connector with version 1 in draft state.
-	CreateConnectorVersion(ctx context.Context, namespace string, name scommon.ResourceName, definition *cschema.Connector, labels map[string]string, annotations map[string]string) (Connector, error)
+	CreateConnectorVersion(ctx context.Context, namespace string, name scommon.ResourceName, definition *cschema.ConnectorDefinition, labels map[string]string, annotations map[string]string) (Connector, error)
 
 	// UpdateConnectorName renames a logical connector without changing its definition-version history.
 	UpdateConnectorName(ctx context.Context, id apid.ID, name scommon.ResourceName) error
 
 	// CreateDraftConnectorVersion creates a new draft version for an existing connector.
 	// Returns ErrDraftAlreadyExists if a draft version already exists.
-	CreateDraftConnectorVersion(ctx context.Context, id apid.ID, definition *cschema.Connector, labels map[string]string, annotations map[string]string) (Connector, error)
+	CreateDraftConnectorVersion(ctx context.Context, id apid.ID, definition *cschema.ConnectorDefinition, labels map[string]string, annotations map[string]string) (Connector, error)
 
 	// UpdateDraftConnectorVersion updates an existing draft version.
 	// Returns ErrNotDraft if the version is not in draft state.
-	UpdateDraftConnectorVersion(ctx context.Context, id apid.ID, version uint64, definition *cschema.Connector, labels map[string]string, annotations map[string]string) (Connector, error)
+	UpdateDraftConnectorVersion(ctx context.Context, id apid.ID, version uint64, definition *cschema.ConnectorDefinition, labels map[string]string, annotations map[string]string) (Connector, error)
 
 	// GetOrCreateDraftConnectorVersion returns the existing draft version, or creates a new one by cloning the latest version.
 	GetOrCreateDraftConnectorVersion(ctx context.Context, id apid.ID) (Connector, error)

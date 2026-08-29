@@ -48,16 +48,16 @@ type ListConnectorsResponseJson struct {
 //
 //	@Description	Detailed connector version information
 type ConnectorVersionJson struct {
-	Id          apid.ID               `json:"id" yaml:"id" swaggertype:"string" example:"cxr_test550e8400abcde"`
-	Version     uint64                `json:"version" yaml:"version" example:"1"`
-	Namespace   string                `json:"namespace" yaml:"namespace" example:"root.acme"`
-	Name        common.ResourceName   `json:"name" yaml:"name" swaggertype:"string" example:"salesforce"`
-	State       ConnectorVersionState `json:"state" yaml:"state" swaggertype:"string" example:"primary"`
-	Definition  cschema.Connector     `json:"definition" yaml:"definition"`
-	Labels      map[string]string     `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Annotations map[string]string     `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	CreatedAt   time.Time             `json:"createdAt" yaml:"createdAt"`
-	UpdatedAt   time.Time             `json:"updatedAt" yaml:"updatedAt"`
+	Id          apid.ID                     `json:"id" yaml:"id" swaggertype:"string" example:"cxr_test550e8400abcde"`
+	Version     uint64                      `json:"version" yaml:"version" example:"1"`
+	Namespace   string                      `json:"namespace" yaml:"namespace" example:"root.acme"`
+	Name        common.ResourceName         `json:"name" yaml:"name" swaggertype:"string" example:"salesforce"`
+	State       ConnectorVersionState       `json:"state" yaml:"state" swaggertype:"string" example:"primary"`
+	Definition  cschema.ConnectorDefinition `json:"definition" yaml:"definition"`
+	Labels      map[string]string           `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Annotations map[string]string           `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	CreatedAt   time.Time                   `json:"createdAt" yaml:"createdAt"`
+	UpdatedAt   time.Time                   `json:"updatedAt" yaml:"updatedAt"`
 }
 
 type ListConnectorVersionsResponseJson struct {
@@ -69,21 +69,21 @@ type ListConnectorVersionsResponseJson struct {
 //
 //	@Description	Request to create a new connector
 type CreateConnectorRequestJson struct {
-	Namespace   string               `json:"namespace" yaml:"namespace" example:"root.acme"`
-	Name        *common.ResourceName `json:"name,omitempty" yaml:"name,omitempty" swaggertype:"string" example:"salesforce"`
-	Definition  cschema.Connector    `json:"definition" yaml:"definition"`
-	Labels      map[string]string    `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Annotations map[string]string    `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	Namespace   string                      `json:"namespace" yaml:"namespace" example:"root.acme"`
+	Name        *common.ResourceName        `json:"name,omitempty" yaml:"name,omitempty" swaggertype:"string" example:"salesforce"`
+	Definition  cschema.ConnectorDefinition `json:"definition" yaml:"definition"`
+	Labels      map[string]string           `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Annotations map[string]string           `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 }
 
 // UpdateConnectorRequestJson is the request body for PATCH /connectors/:id.
 //
 //	@Description	Request to update a logical connector
 type UpdateConnectorRequestJson struct {
-	Name        *common.ResourceName `json:"name,omitempty" yaml:"name,omitempty" swaggertype:"string" example:"salesforce"`
-	Definition  *cschema.Connector   `json:"definition,omitempty" yaml:"definition,omitempty"`
-	Labels      *map[string]string   `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Annotations *map[string]string   `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	Name        *common.ResourceName         `json:"name,omitempty" yaml:"name,omitempty" swaggertype:"string" example:"salesforce"`
+	Definition  *cschema.ConnectorDefinition `json:"definition,omitempty" yaml:"definition,omitempty"`
+	Labels      *map[string]string           `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Annotations *map[string]string           `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 }
 
 // UpdateConnectorVersionRequestJson is the request body for PATCH /connectors/:id/versions/:version.
@@ -91,18 +91,18 @@ type UpdateConnectorRequestJson struct {
 //
 //	@Description Request to update a connector definition version
 type UpdateConnectorVersionRequestJson struct {
-	Definition  *cschema.Connector `json:"definition,omitempty" yaml:"definition,omitempty"`
-	Labels      *map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Annotations *map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	Definition  *cschema.ConnectorDefinition `json:"definition,omitempty" yaml:"definition,omitempty"`
+	Labels      *map[string]string           `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Annotations *map[string]string           `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 }
 
 // CreateConnectorVersionRequestJson is the request body for POST /connectors/:id/versions.
 //
 //	@Description	Request to create a new draft connector version
 type CreateConnectorVersionRequestJson struct {
-	Definition  *cschema.Connector `json:"definition,omitempty" yaml:"definition,omitempty"`
-	Labels      *map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Annotations *map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	Definition  *cschema.ConnectorDefinition `json:"definition,omitempty" yaml:"definition,omitempty"`
+	Labels      *map[string]string           `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Annotations *map[string]string           `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 }
 
 // ConnectorLifecycleRequestJson is the request body for connector-level

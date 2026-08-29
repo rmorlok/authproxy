@@ -50,15 +50,11 @@ func TestUpdateDraftConnectorVersion(t *testing.T) {
 
 		// Re-fetch
 		newLabels := map[string]string{"env": "new"}
-		mock.MockConnectorRetrival(ctx, db, e, &cschema.Connector{
-			Id:          id,
-			Version:     2,
-			State:       string(database.ConnectorDefinitionVersionStateDraft),
+		mock.MockConnectorRetrival(ctx, db, e, connectorResourceForMock(id, 2, database.ConnectorDefinitionVersionStateDraft, newLabels, cschema.ConnectorDefinition{
 			DisplayName: "Updated",
-			Labels:      newLabels,
-		})
+		}))
 
-		definition := &cschema.Connector{
+		definition := &cschema.ConnectorDefinition{
 			DisplayName: "Updated",
 		}
 
@@ -98,15 +94,11 @@ func TestUpdateDraftConnectorVersion(t *testing.T) {
 			UpsertConnectorDefinitionVersion(gomock.Any(), gomock.Any()).
 			Return(nil)
 
-		mock.MockConnectorRetrival(ctx, db, e, &cschema.Connector{
-			Id:          id,
-			Version:     1,
-			State:       string(database.ConnectorDefinitionVersionStateDraft),
+		mock.MockConnectorRetrival(ctx, db, e, connectorResourceForMock(id, 1, database.ConnectorDefinitionVersionStateDraft, existingLabels, cschema.ConnectorDefinition{
 			DisplayName: "Test",
-			Labels:      existingLabels,
-		})
+		}))
 
-		definition := &cschema.Connector{
+		definition := &cschema.ConnectorDefinition{
 			DisplayName: "Test",
 		}
 
@@ -126,7 +118,7 @@ func TestUpdateDraftConnectorVersion(t *testing.T) {
 			GetConnectorDefinitionVersion(gomock.Any(), id, uint64(1)).
 			Return(nil, database.ErrNotFound)
 
-		_, err := s.UpdateDraftConnectorVersion(ctx, id, 1, &cschema.Connector{DisplayName: "Test"}, nil, nil)
+		_, err := s.UpdateDraftConnectorVersion(ctx, id, 1, &cschema.ConnectorDefinition{DisplayName: "Test"}, nil, nil)
 		require.Error(t, err)
 		require.ErrorIs(t, err, ErrNotFound)
 	})
@@ -142,7 +134,7 @@ func TestUpdateDraftConnectorVersion(t *testing.T) {
 			GetConnectorDefinitionVersion(gomock.Any(), id, uint64(1)).
 			Return(nil, errors.New("connection refused"))
 
-		_, err := s.UpdateDraftConnectorVersion(ctx, id, 1, &cschema.Connector{DisplayName: "Test"}, nil, nil)
+		_, err := s.UpdateDraftConnectorVersion(ctx, id, 1, &cschema.ConnectorDefinition{DisplayName: "Test"}, nil, nil)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "failed to get connector version")
 	})
@@ -162,7 +154,7 @@ func TestUpdateDraftConnectorVersion(t *testing.T) {
 				State:   database.ConnectorDefinitionVersionStatePrimary,
 			}, nil)
 
-		_, err := s.UpdateDraftConnectorVersion(ctx, id, 1, &cschema.Connector{DisplayName: "Test"}, nil, nil)
+		_, err := s.UpdateDraftConnectorVersion(ctx, id, 1, &cschema.ConnectorDefinition{DisplayName: "Test"}, nil, nil)
 		require.Error(t, err)
 		require.ErrorIs(t, err, ErrNotDraft)
 	})
@@ -191,7 +183,7 @@ func TestUpdateDraftConnectorVersion(t *testing.T) {
 			UpsertConnectorDefinitionVersion(gomock.Any(), gomock.Any()).
 			Return(errors.New("write failed"))
 
-		_, err := s.UpdateDraftConnectorVersion(ctx, id, 1, &cschema.Connector{DisplayName: "Test"}, nil, nil)
+		_, err := s.UpdateDraftConnectorVersion(ctx, id, 1, &cschema.ConnectorDefinition{DisplayName: "Test"}, nil, nil)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "failed to upsert connector version")
 	})
@@ -206,9 +198,7 @@ func TestGetOrCreateDraftConnectorVersion(t *testing.T) {
 		ctx := context.Background()
 		encryptedDef := encfield.EncryptedField{ID: "dek_test", Data: "existing-encrypted-def"}
 
-		existingDef := &cschema.Connector{
-			Id:          id,
-			Version:     2,
+		existingDef := &cschema.ConnectorDefinition{
 			DisplayName: "Existing Draft",
 		}
 		defJson, _ := json.Marshal(existingDef)
@@ -243,9 +233,7 @@ func TestGetOrCreateDraftConnectorVersion(t *testing.T) {
 		ctx := context.Background()
 		encryptedDef := encfield.EncryptedField{ID: "dek_test", Data: "latest-encrypted-def"}
 
-		latestDef := &cschema.Connector{
-			Id:          id,
-			Version:     3,
+		latestDef := &cschema.ConnectorDefinition{
 			DisplayName: "Latest Version",
 		}
 		latestDefJson, _ := json.Marshal(latestDef)
@@ -283,13 +271,9 @@ func TestGetOrCreateDraftConnectorVersion(t *testing.T) {
 			Return(nil)
 
 		// Re-fetch
-		mock.MockConnectorRetrival(ctx, db, e, &cschema.Connector{
-			Id:          id,
-			Version:     4,
-			State:       string(database.ConnectorDefinitionVersionStateDraft),
+		mock.MockConnectorRetrival(ctx, db, e, connectorResourceForMock(id, 4, database.ConnectorDefinitionVersionStateDraft, map[string]string{"env": "prod"}, cschema.ConnectorDefinition{
 			DisplayName: "Latest Version",
-			Labels:      map[string]string{"env": "prod"},
-		})
+		}))
 
 		result, err := s.GetOrCreateDraftConnectorVersion(ctx, id)
 		require.NoError(t, err)
@@ -363,9 +347,7 @@ func TestGetOrCreateDraftConnectorVersion(t *testing.T) {
 		ctx := context.Background()
 		encryptedDef := encfield.EncryptedField{ID: "dek_test", Data: "latest-encrypted-def"}
 
-		latestDef := &cschema.Connector{
-			Id:          id,
-			Version:     1,
+		latestDef := &cschema.ConnectorDefinition{
 			DisplayName: "Test",
 		}
 		latestDefJson, _ := json.Marshal(latestDef)

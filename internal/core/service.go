@@ -133,7 +133,7 @@ func (s *service) buildAuthMethodFactories() map[cschema.AuthType]auth_methods.F
 // auth type. Returns nil if no factory is registered (i.e. an auth type
 // the core service was not wired for); callers fall back to their own
 // not-implemented handling.
-func (s *service) getAuthMethodFactory(connector *cschema.Connector) auth_methods.Factory {
+func (s *service) getAuthMethodFactory(connector *cschema.ConnectorDefinition) auth_methods.Factory {
 	if connector == nil || connector.Auth == nil {
 		return nil
 	}

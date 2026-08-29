@@ -31,6 +31,28 @@ func TestTypeMetaSerializationIsTopLevelWhenEmbedded(t *testing.T) {
 	require.Contains(t, string(yamlBytes), "apiVersion: authproxy.net/v1alpha1\nkind: Widget\nmetadata:")
 }
 
+func TestCloneObjectMetaDeepCopiesMutableValues(t *testing.T) {
+	createdAt := time.Date(2026, 8, 28, 10, 0, 0, 0, time.UTC)
+	updatedAt := createdAt.Add(time.Minute)
+	original := ObjectMeta{
+		Labels:      map[string]string{"environment": "demo"},
+		Annotations: map[string]string{"example.com/owner": "integrations"},
+		CreatedAt:   &createdAt,
+		UpdatedAt:   &updatedAt,
+	}
+
+	clone := CloneObjectMeta(original)
+	clone.Labels["environment"] = "production"
+	clone.Annotations["example.com/owner"] = "platform"
+	*clone.CreatedAt = clone.CreatedAt.Add(time.Hour)
+	*clone.UpdatedAt = clone.UpdatedAt.Add(time.Hour)
+
+	require.Equal(t, "demo", original.Labels["environment"])
+	require.Equal(t, "integrations", original.Annotations["example.com/owner"])
+	require.Equal(t, createdAt, *original.CreatedAt)
+	require.Equal(t, updatedAt, *original.UpdatedAt)
+}
+
 func TestAPIVersionParsing(t *testing.T) {
 	parsed, err := ParseAPIVersion("authproxy.net/v1alpha1")
 	require.NoError(t, err)

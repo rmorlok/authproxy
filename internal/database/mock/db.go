@@ -1918,6 +1918,36 @@ func (mr *MockDBMockRecorder) UpdateConnectionName(ctx, id, name interface{}) *g
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateConnectionName", reflect.TypeOf((*MockDB)(nil).UpdateConnectionName), ctx, id, name)
 }
 
+// UpdateConnectorAnnotations mocks base method.
+func (m *MockDB) UpdateConnectorAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*database.Connector, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateConnectorAnnotations", ctx, id, annotations)
+	ret0, _ := ret[0].(*database.Connector)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateConnectorAnnotations indicates an expected call of UpdateConnectorAnnotations.
+func (mr *MockDBMockRecorder) UpdateConnectorAnnotations(ctx, id, annotations interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateConnectorAnnotations", reflect.TypeOf((*MockDB)(nil).UpdateConnectorAnnotations), ctx, id, annotations)
+}
+
+// UpdateConnectorLabels mocks base method.
+func (m *MockDB) UpdateConnectorLabels(ctx context.Context, id apid.ID, labels map[string]string) (*database.Connector, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateConnectorLabels", ctx, id, labels)
+	ret0, _ := ret[0].(*database.Connector)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateConnectorLabels indicates an expected call of UpdateConnectorLabels.
+func (mr *MockDBMockRecorder) UpdateConnectorLabels(ctx, id, labels interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateConnectorLabels", reflect.TypeOf((*MockDB)(nil).UpdateConnectorLabels), ctx, id, labels)
+}
+
 // UpdateConnectorName mocks base method.
 func (m *MockDB) UpdateConnectorName(ctx context.Context, id apid.ID, name common.ResourceName) error {
 	m.ctrl.T.Helper()

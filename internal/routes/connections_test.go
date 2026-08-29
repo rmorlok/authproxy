@@ -29,6 +29,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/routes/key_value"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
+	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/rmorlok/authproxy/internal/test_utils"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/stretchr/testify/assert"
@@ -53,21 +54,15 @@ func TestConnections(t *testing.T) {
 		cfg = config.FromRoot(&sconfig.Root{
 			Connectors: &sconfig.Connectors{
 				LoadFromList: []sconfig.Connector{
-					{
-						Id:          connectorId,
-						Version:     connectorVersion,
-						Labels:      map[string]string{"type": "test-connector"},
+					configuredConnectorResource(connectorId, connectorVersion, "root", map[string]string{"type": "test-connector"}, cschema.ConnectorDefinition{
 						DisplayName: "Test Connector",
-					},
-					{
-						Id:          oauthConnectorId,
-						Version:     oauthConnectorVersion,
-						Labels:      map[string]string{"type": "oauth2-connector"},
+					}),
+					configuredConnectorResource(oauthConnectorId, oauthConnectorVersion, "root", map[string]string{"type": "oauth2-connector"}, cschema.ConnectorDefinition{
 						DisplayName: "OAuth2 Test Connector",
 						Auth: &sconfig.Auth{InnerVal: &sconfig.AuthOAuth2{
 							Type: sconfig.AuthTypeOAuth2,
 						}},
-					},
+					}),
 				},
 			},
 		})

@@ -1,9 +1,16 @@
-labels:
-  type: invalid-no-placement
-displayName: Invalid (missing placement)
-logo:
-  publicUrl: https://example.com/x.png
-description: |
-  api-key auth without a placement block must be rejected.
-auth:
-  type: api-key
+apiVersion: authproxy.net/v1alpha1
+kind: Connector
+metadata:
+  name: api-key-missing-placement
+  labels:
+    type: invalid-no-placement
+spec:
+  definition:
+    displayName: Invalid (missing placement)
+    logo:
+      publicUrl: https://example.com/x.png
+    description: 'api-key auth without a placement block must be rejected.
+
+'
+    auth:
+      type: api-key

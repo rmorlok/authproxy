@@ -2,9 +2,8 @@ package core
 
 import (
 	"context"
-	"crypto/sha1"
-	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -16,6 +15,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/rmorlok/authproxy/internal/util"
 )
 
@@ -27,7 +27,7 @@ type Connector struct {
 
 	s     *service
 	defMu sync.RWMutex
-	def   *cschema.Connector
+	def   *cschema.ConnectorDefinition
 
 	jsMu     sync.RWMutex
 	jsLib    *apjs.Library
@@ -73,7 +73,7 @@ func (c *Connector) GetHash() string {
 	return util.Must(c.getHash())
 }
 
-func (c *Connector) GetDefinition() *cschema.Connector {
+func (c *Connector) GetDefinition() *cschema.ConnectorDefinition {
 	return util.Must(c.getDefinition())
 }
 
@@ -93,7 +93,7 @@ func (c *Connector) GetAnnotations() map[string]string {
 	return c.ConnectorWithDefinition.Annotations
 }
 
-func (c *Connector) getDefinition() (*cschema.Connector, error) {
+func (c *Connector) getDefinition() (*cschema.ConnectorDefinition, error) {
 	c.defMu.RLock()
 	if c.def != nil {
 		defer c.defMu.RUnlock()
@@ -109,7 +109,7 @@ func (c *Connector) getDefinition() (*cschema.Connector, error) {
 			return nil, err
 		}
 
-		var def cschema.Connector
+		var def cschema.ConnectorDefinition
 		err = json.Unmarshal([]byte(decrypted), &def)
 		if err != nil {
 			return nil, err
@@ -124,24 +124,22 @@ func (c *Connector) getHash() (string, error) {
 	if c.Hash != "" {
 		return c.Hash, nil
 	}
-	decrypted, err := c.s.encrypt.DecryptString(context.Background(), c.ConnectorWithDefinition.EncryptedDefinition)
+	definition, err := c.getDefinition()
 	if err != nil {
 		return "", err
 	}
-	hash := sha1.Sum([]byte(decrypted))
-	return hex.EncodeToString(hash[:])[:7], nil
+	return meta.SemanticSpecHash(definition)
 }
 
-func (c *Connector) setDefinition(def *cschema.Connector) error {
+func (c *Connector) setDefinition(def *cschema.ConnectorDefinition) error {
 	c.defMu.Lock()
+	if def == nil {
+		c.defMu.Unlock()
+		return fmt.Errorf("connector definition is required")
+	}
 
-	// A connector name belongs to the logical connector row. Keep it out of
-	// the encrypted, version-specific definition so renaming never changes the
-	// definition hash or produces stale duplicated metadata in API responses.
 	storedDefinition := def.Clone()
-	storedDefinition.Name = ""
-
-	jsonBytes, err := json.Marshal(storedDefinition)
+	jsonBytes, err := meta.CanonicalSpecJSON(storedDefinition)
 	if err != nil {
 		c.defMu.Unlock()
 		return err
@@ -152,7 +150,11 @@ func (c *Connector) setDefinition(def *cschema.Connector) error {
 		c.defMu.Unlock()
 		return err
 	}
-	c.Hash = storedDefinition.Hash()
+	c.Hash, err = meta.SemanticSpecHash(storedDefinition)
+	if err != nil {
+		c.defMu.Unlock()
+		return err
+	}
 	c.ConnectorWithDefinition.EncryptedDefinition = encrypted
 	c.def = storedDefinition
 	c.defMu.Unlock()

@@ -16,4 +16,3 @@ type apiKeyConnection struct {
 	logger     *slog.Logger
 	connection coreIface.Connection
 }
-
