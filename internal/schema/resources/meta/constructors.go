@@ -2,7 +2,10 @@ package meta
 
 import "time"
 
-func NewObjectReference(typeMeta TypeMeta, metadata ObjectMeta) ObjectReference {
+func NewObjectReference(
+	typeMeta TypeMeta,
+	metadata ObjectMeta,
+) ObjectReference {
 	return ObjectReference{
 		APIVersion: typeMeta.APIVersion,
 		Kind:       typeMeta.Kind,
@@ -13,7 +16,13 @@ func NewObjectReference(typeMeta TypeMeta, metadata ObjectMeta) ObjectReference 
 	}
 }
 
-func NewCondition(conditionType string, status ConditionStatus, observedGeneration uint64, reason, message string, transitionTime time.Time) Condition {
+func NewCondition(
+	conditionType string,
+	status ConditionStatus,
+	observedGeneration uint64,
+	reason, message string,
+	transitionTime time.Time,
+) Condition {
 	return Condition{
 		Type:               conditionType,
 		Status:             status,
@@ -32,11 +41,14 @@ func UpsertCondition(conditions []Condition, next Condition) []Condition {
 		if result[i].Type != next.Type {
 			continue
 		}
+
 		if result[i].Status == next.Status {
 			next.LastTransitionTime = result[i].LastTransitionTime
 		}
+
 		result[i] = next
 		return result
 	}
+
 	return append(result, next)
 }
