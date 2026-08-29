@@ -18,18 +18,24 @@ import (
 // Returns nil if the connector is not an api-key connector (defensive — the
 // registry resolution should already guarantee this) or if the placement is
 // missing.
-func (f *factory) ManifestSetupSteps(connection coreIface.Connection, connector *cschema.Connector) []coreIface.ManifestSetupStep {
+func (f *factory) ManifestSetupSteps(
+	connection coreIface.Connection,
+	connector *cschema.ConnectorDefinition,
+) []coreIface.ManifestSetupStep {
 	if connector == nil || connector.Auth == nil {
 		return nil
 	}
+
 	ak, ok := connector.Auth.Inner().(*cschema.AuthApiKey)
 	if !ok {
 		return nil
 	}
+
 	spec := synthesizeCredentialsStep(ak.Placement)
 	if spec == nil {
 		return nil
 	}
+
 	placement := ak.Placement
 	return []coreIface.ManifestSetupStep{
 		coreIface.NewFormStep(coreIface.FormStepConfig{

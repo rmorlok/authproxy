@@ -120,15 +120,12 @@ func assertWorkflowTaskPolls(
 	require.Equal(t, workflowExecutionID, tu.Workflow.requestedInstance.ExecutionID)
 }
 
-func redactionTestConnector() sconfig.Connector {
+func redactionTestConnector() sconfig.ConnectorDefinition {
 	return redactionTestConnectorWithSecret("client-secret")
 }
 
-func redactionTestConnectorWithSecret(secret string) sconfig.Connector {
-	return sconfig.Connector{
-		Id:          apid.MustParse("cxr_test0000000000001"),
-		Version:     1,
-		Namespace:   util.ToPtr("root"),
+func redactionTestConnectorWithSecret(secret string) sconfig.ConnectorDefinition {
+	return sconfig.ConnectorDefinition{
 		DisplayName: "Secret Connector",
 		Description: "Connector with a client secret",
 		Auth: &cschema.Auth{InnerVal: &cschema.AuthOAuth2{
@@ -237,18 +234,12 @@ func TestConnectors(t *testing.T) {
 
 		if len(root.Connectors.LoadFromList) == 0 {
 			root.Connectors.LoadFromList = []sconfig.Connector{
-				{
-					Id:          apid.MustParse("cxr_test0000000000001"),
-					Namespace:   util.ToPtr("root"),
-					Labels:      map[string]string{"type": "test-connector"},
+				configuredConnectorResource(apid.MustParse("cxr_test0000000000001"), 0, "root", map[string]string{"type": "test-connector"}, cschema.ConnectorDefinition{
 					DisplayName: "Test ConnectorJson",
-				},
-				{
-					Id:          apid.MustParse("cxr_test2000000000002"),
-					Namespace:   util.ToPtr("root.child"),
-					Labels:      map[string]string{"type": "test-connector-2"},
+				}),
+				configuredConnectorResource(apid.MustParse("cxr_test2000000000002"), 0, "root.child", map[string]string{"type": "test-connector-2"}, cschema.ConnectorDefinition{
 					DisplayName: "Test ConnectorJson 2",
-				},
+				}),
 			}
 		}
 
@@ -702,18 +693,12 @@ func TestConnectors(t *testing.T) {
 				cfg := config.FromRoot(&sconfig.Root{
 					Connectors: &sconfig.Connectors{
 						LoadFromList: []sconfig.Connector{
-							{
-								Id:          apid.MustParse("cxr_test0000000000123"),
-								Version:     1,
-								Labels:      map[string]string{"type": "test-connector", "env": "dev"},
+							configuredConnectorResource(apid.MustParse("cxr_test0000000000123"), 1, "root", map[string]string{"type": "test-connector", "env": "dev"}, cschema.ConnectorDefinition{
 								DisplayName: "Test Connector",
-							},
-							{
-								Id:          connectorId,
-								Version:     1,
-								Labels:      map[string]string{"type": "test-connector", "env": "prod"},
+							}),
+							configuredConnectorResource(connectorId, 1, "root", map[string]string{"type": "test-connector", "env": "prod"}, cschema.ConnectorDefinition{
 								DisplayName: "Test Connector",
-							},
+							}),
 						},
 					},
 				})
@@ -861,7 +846,7 @@ func TestConnectors(t *testing.T) {
 				tu := setup(t, config.FromRoot(&sconfig.Root{
 					Connectors: &sconfig.Connectors{
 						LoadFromList: []sconfig.Connector{
-							redactionTestConnector(),
+							configuredConnectorResource(apid.MustParse("cxr_test0000000000001"), 1, "root", nil, redactionTestConnector()),
 						},
 					},
 				}))
@@ -892,7 +877,7 @@ func TestConnectors(t *testing.T) {
 				tu := setup(t, config.FromRoot(&sconfig.Root{
 					Connectors: &sconfig.Connectors{
 						LoadFromList: []sconfig.Connector{
-							redactionTestConnector(),
+							configuredConnectorResource(apid.MustParse("cxr_test0000000000001"), 1, "root", nil, redactionTestConnector()),
 						},
 					},
 				}))
@@ -994,7 +979,7 @@ func TestConnectors(t *testing.T) {
 			tu := setup(t, nil)
 			body := CreateConnectorRequestJson{
 				Namespace:  "root",
-				Definition: cschema.Connector{DisplayName: "New Connector"},
+				Definition: cschema.ConnectorDefinition{DisplayName: "New Connector"},
 			}
 			jsonBody, _ := json.Marshal(body)
 			w := httptest.NewRecorder()
@@ -1010,7 +995,7 @@ func TestConnectors(t *testing.T) {
 			tu := setup(t, nil)
 			body := CreateConnectorRequestJson{
 				Namespace:  "root",
-				Definition: cschema.Connector{DisplayName: "New Connector"},
+				Definition: cschema.ConnectorDefinition{DisplayName: "New Connector"},
 			}
 			jsonBody, _ := json.Marshal(body)
 			w := httptest.NewRecorder()
@@ -1033,7 +1018,7 @@ func TestConnectors(t *testing.T) {
 			tu := setup(t, nil)
 			body := CreateConnectorRequestJson{
 				Namespace:  "!!invalid!!",
-				Definition: cschema.Connector{DisplayName: "New Connector"},
+				Definition: cschema.ConnectorDefinition{DisplayName: "New Connector"},
 			}
 			jsonBody, _ := json.Marshal(body)
 			w := httptest.NewRecorder()
@@ -1056,7 +1041,7 @@ func TestConnectors(t *testing.T) {
 			tu := setup(t, nil)
 			body := CreateConnectorRequestJson{
 				Namespace: "root",
-				Definition: cschema.Connector{
+				Definition: cschema.ConnectorDefinition{
 					DisplayName: "Bad Connector",
 					Probes:      []cschema.Probe{{}}, // Empty probe fails validation
 				},
@@ -1081,9 +1066,6 @@ func TestConnectors(t *testing.T) {
 		t.Run("rejects redacted placeholders in secret fields", func(t *testing.T) {
 			tu := setup(t, nil)
 			def := redactionTestConnectorWithSecret("***")
-			def.Id = apid.Nil
-			def.Version = 0
-			def.Namespace = nil
 			body := CreateConnectorRequestJson{
 				Namespace:  "root",
 				Definition: def,
@@ -1110,7 +1092,7 @@ func TestConnectors(t *testing.T) {
 			tu := setup(t, nil)
 			body := CreateConnectorRequestJson{
 				Namespace: "root",
-				Definition: cschema.Connector{
+				Definition: cschema.ConnectorDefinition{
 					DisplayName: "New Connector",
 					Description: "A brand new connector",
 				},
@@ -1148,7 +1130,7 @@ func TestConnectors(t *testing.T) {
 			tu := setup(t, nil)
 			body := CreateConnectorRequestJson{
 				Namespace: "root",
-				Definition: cschema.Connector{
+				Definition: cschema.ConnectorDefinition{
 					DisplayName: "New Connector",
 					Description: "A brand new connector",
 				},
@@ -1179,7 +1161,7 @@ func TestConnectors(t *testing.T) {
 		t.Run("unauthorized", func(t *testing.T) {
 			tu := setup(t, nil)
 			body := UpdateConnectorRequestJson{
-				Definition: &cschema.Connector{DisplayName: "Updated"},
+				Definition: &cschema.ConnectorDefinition{DisplayName: "Updated"},
 			}
 			jsonBody, _ := json.Marshal(body)
 			w := httptest.NewRecorder()
@@ -1194,7 +1176,7 @@ func TestConnectors(t *testing.T) {
 		t.Run("not found", func(t *testing.T) {
 			tu := setup(t, nil)
 			body := UpdateConnectorRequestJson{
-				Definition: &cschema.Connector{DisplayName: "Updated"},
+				Definition: &cschema.ConnectorDefinition{DisplayName: "Updated"},
 			}
 			jsonBody, _ := json.Marshal(body)
 			w := httptest.NewRecorder()
@@ -1216,7 +1198,7 @@ func TestConnectors(t *testing.T) {
 		t.Run("invalid definition", func(t *testing.T) {
 			tu := setup(t, nil)
 			body := UpdateConnectorRequestJson{
-				Definition: &cschema.Connector{
+				Definition: &cschema.ConnectorDefinition{
 					DisplayName: "Bad",
 					Probes:      []cschema.Probe{{}},
 				},
@@ -1241,7 +1223,7 @@ func TestConnectors(t *testing.T) {
 		t.Run("valid - creates draft and updates", func(t *testing.T) {
 			tu := setup(t, nil)
 			body := UpdateConnectorRequestJson{
-				Definition: &cschema.Connector{DisplayName: "Updated Connector"},
+				Definition: &cschema.ConnectorDefinition{DisplayName: "Updated Connector"},
 			}
 			jsonBody, _ := json.Marshal(body)
 			w := httptest.NewRecorder()
@@ -1272,7 +1254,7 @@ func TestConnectors(t *testing.T) {
 			tu := setup(t, nil)
 			newLabels := map[string]string{"env": "staging"}
 			body := UpdateConnectorRequestJson{
-				Definition: &cschema.Connector{DisplayName: "With Labels"},
+				Definition: &cschema.ConnectorDefinition{DisplayName: "With Labels"},
 				Labels:     &newLabels,
 			}
 			jsonBody, _ := json.Marshal(body)
@@ -1386,7 +1368,7 @@ func TestConnectors(t *testing.T) {
 
 		t.Run("invalid definition", func(t *testing.T) {
 			tu := setup(t, nil)
-			def := cschema.Connector{
+			def := cschema.ConnectorDefinition{
 				DisplayName: "Bad",
 				Probes:      []cschema.Probe{{}},
 			}
@@ -1412,7 +1394,7 @@ func TestConnectors(t *testing.T) {
 
 		t.Run("valid - with custom definition", func(t *testing.T) {
 			tu := setup(t, nil)
-			def := cschema.Connector{DisplayName: "Custom Version"}
+			def := cschema.ConnectorDefinition{DisplayName: "Custom Version"}
 			body := CreateConnectorVersionRequestJson{
 				Definition: &def,
 			}
@@ -1445,7 +1427,7 @@ func TestConnectors(t *testing.T) {
 		t.Run("unauthorized", func(t *testing.T) {
 			tu := setup(t, nil)
 			body := UpdateConnectorRequestJson{
-				Definition: &cschema.Connector{DisplayName: "Updated"},
+				Definition: &cschema.ConnectorDefinition{DisplayName: "Updated"},
 			}
 			jsonBody, _ := json.Marshal(body)
 			w := httptest.NewRecorder()
@@ -1460,7 +1442,7 @@ func TestConnectors(t *testing.T) {
 		t.Run("not found", func(t *testing.T) {
 			tu := setup(t, nil)
 			body := UpdateConnectorRequestJson{
-				Definition: &cschema.Connector{DisplayName: "Updated"},
+				Definition: &cschema.ConnectorDefinition{DisplayName: "Updated"},
 			}
 			jsonBody, _ := json.Marshal(body)
 			w := httptest.NewRecorder()
@@ -1483,7 +1465,7 @@ func TestConnectors(t *testing.T) {
 			tu := setup(t, nil)
 			// Version 1 was migrated as primary, not draft
 			body := UpdateConnectorRequestJson{
-				Definition: &cschema.Connector{DisplayName: "Updated"},
+				Definition: &cschema.ConnectorDefinition{DisplayName: "Updated"},
 			}
 			jsonBody, _ := json.Marshal(body)
 			w := httptest.NewRecorder()
@@ -1526,7 +1508,7 @@ func TestConnectors(t *testing.T) {
 
 			// Try to update with invalid definition
 			body := UpdateConnectorRequestJson{
-				Definition: &cschema.Connector{
+				Definition: &cschema.ConnectorDefinition{
 					DisplayName: "Bad",
 					Probes:      []cschema.Probe{{}},
 				},
@@ -1572,7 +1554,7 @@ func TestConnectors(t *testing.T) {
 
 			// Now update it
 			body := UpdateConnectorRequestJson{
-				Definition: &cschema.Connector{DisplayName: "Updated Draft"},
+				Definition: &cschema.ConnectorDefinition{DisplayName: "Updated Draft"},
 			}
 			jsonBody, _ := json.Marshal(body)
 			w = httptest.NewRecorder()
@@ -2281,7 +2263,7 @@ func TestConnectors(t *testing.T) {
 				// First create a connector with annotations via POST
 				createBody, _ := json.Marshal(CreateConnectorRequestJson{
 					Namespace:   "root",
-					Definition:  cschema.Connector{DisplayName: "Annotated Connector"},
+					Definition:  cschema.ConnectorDefinition{DisplayName: "Annotated Connector"},
 					Annotations: map[string]string{"my-annotation": "some-value"},
 				})
 				w := httptest.NewRecorder()

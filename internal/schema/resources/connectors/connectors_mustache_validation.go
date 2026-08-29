@@ -21,7 +21,7 @@ const cfgPrefix = "cfg."
 //
 // {{labels.X}} and {{annotations.X}} references are not validated since those are set
 // freely on each connection and are not constrained by the connector definition.
-func (c *Connector) validateMustacheReferences(vc *common.ValidationContext) error {
+func (c *ConnectorDefinition) validateMustacheReferences(vc *common.ValidationContext) error {
 	if c == nil || c.Auth == nil {
 		return nil
 	}

@@ -1,23 +1,30 @@
-labels:
-  type: asana
-displayName: Asana (Basic)
-logo:
-  publicUrl: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Asana_logo.svg/2880px-Asana_logo.svg.png
-description: |
-  OAuth2 connector that authenticates to the token endpoint via HTTP Basic
-  (RFC 6749 §2.3.1).
-auth:
-  type: OAuth2
-  tokenEndpointAuthMethod: client_secret_basic
-  clientId:
-    envVar: ASANA_CLIENT_ID
-  clientSecret:
-    envVar: ASANA_CLIENT_SECRET
-  authorization:
-    endpoint: https://app.asana.com/-/oauth_authorize
-  token:
-    endpoint: https://app.asana.com/-/oauth_token
-  scopes:
-    - id: projects:read
-      reason: |
-        We need access to see the projects
+apiVersion: authproxy.net/v1alpha1
+kind: Connector
+metadata:
+  name: oauth-connector-basic
+  labels:
+    type: asana
+spec:
+  definition:
+    displayName: Asana (Basic)
+    logo:
+      publicUrl: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Asana_logo.svg/2880px-Asana_logo.svg.png
+    description: |
+      OAuth2 connector that authenticates to the token endpoint via HTTP Basic
+      (RFC 6749 §2.3.1).
+    auth:
+      type: OAuth2
+      tokenEndpointAuthMethod: client_secret_basic
+      clientId:
+        envVar: ASANA_CLIENT_ID
+      clientSecret:
+        envVar: ASANA_CLIENT_SECRET
+      authorization:
+        endpoint: https://app.asana.com/-/oauth_authorize
+      token:
+        endpoint: https://app.asana.com/-/oauth_token
+      scopes:
+      - id: projects:read
+        reason: 'We need access to see the projects
+
+'

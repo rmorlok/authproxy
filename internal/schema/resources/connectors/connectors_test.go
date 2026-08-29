@@ -5,21 +5,24 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/schema/common"
-	"github.com/rmorlok/authproxy/internal/util"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/stretchr/testify/require"
 )
 
 func testConfiguredConnector(id apid.ID, namespace, name string, version uint64) Connector {
 	connector := Connector{
-		Id:          id,
-		Name:        common.ResourceName(name),
-		Version:     version,
-		DisplayName: "Test Connector",
-		Description: "Test Description",
-		Labels:      map[string]string{"type": "shared-label-value"},
-	}
-	if namespace != "" {
-		connector.Namespace = util.ToPtr(namespace)
+		TypeMeta: meta.NewTypeMeta(ConnectorKind),
+		Metadata: meta.ObjectMeta{
+			ID:         id.String(),
+			Name:       common.ResourceName(name),
+			Namespace:  namespace,
+			Generation: version,
+			Labels:     map[string]string{"type": "shared-label-value"},
+		},
+		Spec: ConnectorSpec{Definition: ConnectorDefinition{
+			DisplayName: "Test Connector",
+			Description: "Test Description",
+		}},
 	}
 	return connector
 }

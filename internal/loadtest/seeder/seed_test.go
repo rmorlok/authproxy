@@ -156,7 +156,7 @@ func TestSeedWritesArtifactsAndIsConnectionIdempotent(t *testing.T) {
 }
 
 func TestConnectorDefinitionUsesProviderTokenEndpoint(t *testing.T) {
-	connector := connectorDefinition("con_loadtest", 1, "root", "smoke", "http://go-oauth2-server")
+	connector := connectorDefinition("smoke", "http://go-oauth2-server")
 	oauth, ok := connector.Auth.InnerVal.(*cschema.AuthOAuth2)
 	require.True(t, ok)
 

@@ -6,139 +6,109 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/rmorlok/authproxy/internal/apid"
-	"github.com/stretchr/testify/assert"
+	"github.com/rmorlok/authproxy/internal/schema/common"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
-
-	"github.com/rmorlok/authproxy/internal/schema/common"
 )
 
-func TestConnectorRoundtrip(t *testing.T) {
-	// Create test UUID for consistent testing
-	testID := apid.MustParse("cxr_test12345678abcd")
+func testConnectorResource() Connector {
 	refreshInBackground := true
 	refreshDuration := common.HumanDuration{Duration: 5 * time.Minute}
-
-	testCases := []struct {
-		name      string
-		connector Connector
-	}{
-		{
-			name: "Basic Connector with API Key Auth",
-			connector: Connector{
-				Id:          testID,
-				Name:        "test-connector",
-				Labels:      map[string]string{"type": "test-type"},
-				Version:     1,
-				State:       "primary",
-				DisplayName: "Test Connector",
-				Logo: common.NewPublicUrlImage(common.ImagePublicUrl{
-					PublicUrl: "https://example.com/logo.png",
-				}),
-				Description: "Test description",
-				Auth: &Auth{
-					InnerVal: &AuthApiKey{
-						Type: AuthTypeAPIKey,
-					},
-				},
+	return Connector{
+		TypeMeta: meta.NewTypeMeta(ConnectorKind),
+		Metadata: meta.ObjectMeta{
+			ID:         "cxr_test12345678abcd",
+			Name:       "test-connector",
+			Namespace:  "root",
+			Generation: 2,
+			Labels:     map[string]string{"type": "oauth2-type"},
+			Annotations: map[string]string{
+				"example.com/owner": "integrations",
 			},
 		},
-		{
-			name: "Connector with OAuth2 Auth and Direct String Values",
-			connector: Connector{
-				Id:          testID,
-				Labels:      map[string]string{"type": "oauth2-type"},
-				Version:     2,
-				State:       "draft",
+		Spec: ConnectorSpec{
+			Release: ConnectorReleaseSpec{DesiredState: ConnectorReleaseStateDraft},
+			Definition: ConnectorDefinition{
 				DisplayName: "OAuth2 Connector",
 				Logo: common.NewBase64Image(common.ImageBase64{
 					MimeType: "image/png",
-					Base64:   "dGVzdCBiYXNlNjQgZGF0YQ==", // "test base64 data"
+					Base64:   "dGVzdCBiYXNlNjQgZGF0YQ==",
 				}),
 				Description: "OAuth2 description",
-				Auth: &Auth{
-					InnerVal: &AuthOAuth2{
-						Type: AuthTypeOAuth2,
-						ClientId: &common.StringValue{InnerVal: &common.StringValueDirect{
-							Value: "client-id-value",
-						}},
-						ClientSecret: &common.StringValue{InnerVal: &common.StringValueDirect{
-							Value: "client-secret-value",
-						}},
-						Scopes: []Scope{
-							{
-								Id:       "scope1",
-								Required: NewScopeRequiredBool(true),
-								Reason:   "Required for basic functionality",
-							},
-							{
-								Id:       "scope2",
-								Required: NewScopeRequiredBool(false),
-								Reason:   "Optional for advanced features",
-							},
-						},
-						Authorization: AuthOauth2Authorization{
-							Endpoint: "https://example.com/auth",
-							QueryOverrides: map[string]string{
-								"key1": "value1",
-								"key2": "value2",
-							},
-						},
-						Token: AuthOauth2Token{
-							Endpoint: "https://example.com/token",
-							QueryOverrides: map[string]string{
-								"token_key": "token_value",
-							},
-							FormOverrides: map[string]string{
-								"form_key": "form_value",
-							},
-							RefreshTimeout:          &refreshDuration,
-							RefreshInBackground:     &refreshInBackground,
-							RefreshTimeBeforeExpiry: &refreshDuration,
-						},
+				Auth: &Auth{InnerVal: &AuthOAuth2{
+					Type:   AuthTypeOAuth2,
+					Scopes: []Scope{},
+					ClientId: &common.StringValue{InnerVal: &common.StringValueDirect{
+						Value: "client-id-value",
+					}},
+					ClientSecret: &common.StringValue{InnerVal: &common.StringValueDirect{
+						Value: "client-secret-value",
+					}},
+					Authorization: AuthOauth2Authorization{Endpoint: "https://example.com/auth"},
+					Token: AuthOauth2Token{
+						Endpoint:                "https://example.com/token",
+						RefreshTimeout:          &refreshDuration,
+						RefreshInBackground:     &refreshInBackground,
+						RefreshTimeBeforeExpiry: &refreshDuration,
 					},
-				},
+				}},
 			},
 		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name+" YAML", func(t *testing.T) {
-			// Marshal to YAML
-			yamlData, err := yaml.Marshal(tc.connector)
-			require.NoError(t, err, "Failed to marshal connector to YAML")
-
-			// Unmarshal from YAML
-			var unmarshaledConnector Connector
-			err = yaml.Unmarshal(yamlData, &unmarshaledConnector)
-			require.NoError(t, err, "Failed to unmarshal connector from YAML")
-
-			// Compare original and unmarshaled connectors
-			diff := cmp.Diff(tc.connector, unmarshaledConnector)
-			assert.True(t, cmp.Equal(tc.connector, unmarshaledConnector), "Connector diff: %s", diff)
-		})
-
-		t.Run(tc.name+" JSON", func(t *testing.T) {
-			// Marshal to JSON
-			jsonData, err := json.Marshal(tc.connector)
-			require.NoError(t, err, "Failed to marshal connector to JSON")
-
-			// Unmarshal from JSON
-			var unmarshaledConnector Connector
-			err = json.Unmarshal(jsonData, &unmarshaledConnector)
-			require.NoError(t, err, "Failed to unmarshal connector from JSON")
-
-			// Compare original and unmarshaled connectors
-			diff := cmp.Diff(tc.connector, unmarshaledConnector)
-			assert.True(t, cmp.Equal(tc.connector, unmarshaledConnector), "Connector diff: %s", diff)
-		})
+		Status: &ConnectorStatus{
+			Release: ConnectorReleaseStatus{State: ConnectorReleaseStateDraft},
+		},
 	}
 }
 
-func TestConnectorHashIgnoresLogicalName(t *testing.T) {
-	connector := &Connector{Name: "before", DisplayName: "Test Connector"}
-	before := connector.Hash()
-	connector.Name = "after"
-	require.Equal(t, before, connector.Hash())
+func TestConnectorRoundtrip(t *testing.T) {
+	expected := testConnectorResource()
+
+	t.Run("YAML", func(t *testing.T) {
+		data, err := yaml.Marshal(expected)
+		require.NoError(t, err)
+		require.Contains(t, string(data), "apiVersion: authproxy.net/v1alpha1\nkind: Connector\nmetadata:")
+
+		var actual Connector
+		require.NoError(t, yaml.Unmarshal(data, &actual))
+		require.Empty(t, cmp.Diff(expected, actual))
+	})
+
+	t.Run("JSON", func(t *testing.T) {
+		data, err := json.Marshal(expected)
+		require.NoError(t, err)
+
+		var actual Connector
+		require.NoError(t, json.Unmarshal(data, &actual))
+		require.Empty(t, cmp.Diff(expected, actual))
+	})
+}
+
+func TestConnectorDefinitionHashOnlyTracksDefinition(t *testing.T) {
+	connector := testConnectorResource()
+	before := connector.DefinitionHash()
+
+	connector.Metadata.ID = "cxr_other12345678abc"
+	connector.Metadata.Name = "renamed"
+	connector.Metadata.Generation++
+	connector.Metadata.Labels["env"] = "prod"
+	connector.Metadata.Annotations["example.com/owner"] = "platform"
+	connector.Spec.Release.DesiredState = ConnectorReleaseStatePrimary
+	connector.Status.Release.State = ConnectorReleaseStatePrimary
+	require.Equal(t, before, connector.DefinitionHash())
+
+	connector.Spec.Definition.Description = "changed provider behavior"
+	require.NotEqual(t, before, connector.DefinitionHash())
+}
+
+func TestConnectorValidation(t *testing.T) {
+	connector := testConnectorResource()
+	connector.Status = nil
+	require.NoError(t, connector.Validate(nil))
+
+	connector.Spec.Release.DesiredState = ConnectorReleaseStateArchived
+	require.ErrorContains(t, connector.Validate(nil), "spec.release.desiredState")
+
+	connector = testConnectorResource()
+	require.ErrorContains(t, connector.Validate(nil), "status: is server-owned")
 }

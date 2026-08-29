@@ -42,7 +42,7 @@ func newTestApiKeyConnection(
 	s.r = nil
 	s.authMethodFactories[cschema.AuthTypeAPIKey] = api_key.NewFactory(db, e, s.httpf, s.logger)
 
-	connector := cschema.Connector{
+	connector := cschema.ConnectorDefinition{
 		Auth: &cschema.Auth{InnerVal: &cschema.AuthApiKey{
 			Type:      cschema.AuthTypeAPIKey,
 			Placement: placement,
@@ -256,7 +256,7 @@ func TestApiKeySubmit_PreconnectFieldNamedApiKeyIsNotTreatedAsCredential(t *test
 	s.r = nil
 	s.authMethodFactories[cschema.AuthTypeAPIKey] = api_key.NewFactory(db, e, s.httpf, s.logger)
 
-	connector := cschema.Connector{
+	connector := cschema.ConnectorDefinition{
 		Auth: &cschema.Auth{InnerVal: &cschema.AuthApiKey{
 			Type:      cschema.AuthTypeAPIKey,
 			Placement: &cschema.ApiKeyPlacement{Type: cschema.ApiKeyPlacementBearer},
@@ -329,7 +329,7 @@ func TestApiKeySubmit_TransitionsToConfigureWhenNoProbes(t *testing.T) {
 		Id:         "workspace",
 		JsonSchema: common.RawJSON(`{"type":"object","properties":{"workspace_id":{"type":"string"}}}`),
 	}
-	connector := cschema.Connector{
+	connector := cschema.ConnectorDefinition{
 		Auth: &cschema.Auth{InnerVal: &cschema.AuthApiKey{
 			Type:      cschema.AuthTypeAPIKey,
 			Placement: &cschema.ApiKeyPlacement{Type: cschema.ApiKeyPlacementBearer},

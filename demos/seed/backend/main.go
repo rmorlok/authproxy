@@ -50,11 +50,11 @@ type ConnectorSeed struct {
 	// Key is the stable seed identity. AuthProxy generates connector IDs
 	// for API-created connectors, so the seed job stores this key as an
 	// API label and uses it for future idempotent upgrades.
-	Key         string            `yaml:"key"`
-	Namespace   string            `yaml:"namespace,omitempty"`
-	Definition  config.Connector  `yaml:"definition"`
-	Labels      map[string]string `yaml:"labels,omitempty"`
-	Annotations map[string]string `yaml:"annotations,omitempty"`
+	Key         string                     `yaml:"key"`
+	Namespace   string                     `yaml:"namespace,omitempty"`
+	Definition  config.ConnectorDefinition `yaml:"definition"`
+	Labels      map[string]string          `yaml:"labels,omitempty"`
+	Annotations map[string]string          `yaml:"annotations,omitempty"`
 }
 
 type OAuth2TestProviderSeed struct {
@@ -299,9 +299,6 @@ func connectorNamespace(seed ConnectorSeed) string {
 	if seed.Namespace != "" {
 		return seed.Namespace
 	}
-	if seed.Definition.Namespace != nil && *seed.Definition.Namespace != "" {
-		return *seed.Definition.Namespace
-	}
 	return defaultNamespace
 }
 
@@ -314,21 +311,8 @@ func connectorLabels(seed ConnectorSeed) map[string]string {
 	return labels
 }
 
-func connectorDefinitionsEqual(want config.Connector, got api.ConnectorVersionJson) bool {
-	namespace := got.Namespace
-	normalizedWant := want
-	normalizedWant.Id = got.Id
-	normalizedWant.Version = got.Version
-	normalizedWant.Namespace = &namespace
-	normalizedWant.State = string(got.State)
-
-	normalizedGot := got.Definition
-	normalizedGot.Id = got.Id
-	normalizedGot.Version = got.Version
-	normalizedGot.Namespace = &namespace
-	normalizedGot.State = string(got.State)
-
-	return reflect.DeepEqual(normalizeForJSON(normalizedWant), normalizeForJSON(normalizedGot))
+func connectorDefinitionsEqual(want config.ConnectorDefinition, got api.ConnectorVersionJson) bool {
+	return reflect.DeepEqual(normalizeForJSON(want), normalizeForJSON(got.Definition))
 }
 
 func stringMapsEqual(a, b map[string]string) bool {

@@ -53,7 +53,7 @@ func newTestConnectionWithSetupFlowAndAsynq(t *testing.T, ctrl *gomock.Controlle
 	s.encrypt = e
 	s.r = nil
 
-	connector := cschema.Connector{
+	connector := cschema.ConnectorDefinition{
 		SetupFlow: sf,
 	}
 	c := NewTestConnector(connector)
@@ -162,7 +162,7 @@ func TestSubmitForm(t *testing.T) {
 		conn, db := newTestConnectionWithSetupFlow(t, ctrl, sf)
 		// Promote the no-auth connector to OAuth2 so the manifest emits the
 		// authorize redirect step after the last preconnect step.
-		conn.connector = NewTestConnector(cschema.Connector{
+		conn.connector = NewTestConnector(cschema.ConnectorDefinition{
 			Auth:      &cschema.Auth{InnerVal: &cschema.AuthOAuth2{Type: cschema.AuthTypeOAuth2}},
 			SetupFlow: sf,
 		})
@@ -362,7 +362,7 @@ func TestGetCurrentSetupStepResponse(t *testing.T) {
 				},
 			},
 		})
-		conn.connector = NewTestConnector(cschema.Connector{
+		conn.connector = NewTestConnector(cschema.ConnectorDefinition{
 			Auth: &cschema.Auth{InnerVal: &cschema.AuthOAuth2{Type: cschema.AuthTypeOAuth2}},
 			SetupFlow: &cschema.SetupFlow{
 				Preconnect: &cschema.SetupFlowPhase{

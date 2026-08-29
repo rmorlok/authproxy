@@ -56,7 +56,7 @@ func TestGetAuthMethodFactory_ReturnsRegisteredFactoryForEachAuthType(t *testing
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			connector := &cschema.Connector{Auth: &cschema.Auth{InnerVal: tc.auth}}
+			connector := &cschema.ConnectorDefinition{Auth: &cschema.Auth{InnerVal: tc.auth}}
 			factory := svc.getAuthMethodFactory(connector)
 			assert.NotNil(t, factory)
 			tc.assertOk(t, factory)
@@ -70,11 +70,11 @@ func TestGetAuthMethodFactory_NilOrMissingReturnsNil(t *testing.T) {
 	svc, _, _, _, _, _ := FullMockService(t, ctrl)
 
 	assert.Nil(t, svc.getAuthMethodFactory(nil))
-	assert.Nil(t, svc.getAuthMethodFactory(&cschema.Connector{}))
+	assert.Nil(t, svc.getAuthMethodFactory(&cschema.ConnectorDefinition{}))
 	// Empty the registry to assert that an unknown type also resolves to nil
 	// — independent of whether the production registry would have populated it.
 	svc.authMethodFactories = nil
-	assert.Nil(t, svc.getAuthMethodFactory(&cschema.Connector{
+	assert.Nil(t, svc.getAuthMethodFactory(&cschema.ConnectorDefinition{
 		Auth: &cschema.Auth{InnerVal: &cschema.AuthOAuth2{Type: cschema.AuthTypeOAuth2}},
 	}))
 }

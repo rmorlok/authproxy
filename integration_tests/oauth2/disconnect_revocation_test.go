@@ -52,7 +52,7 @@ func newDisconnectRevocationRig(t *testing.T, name string) *disconnectRevocation
 		Scopes:            []string{"read"},
 		IncludeRevocation: true,
 	})
-	oauthAuth := connector.Auth.InnerVal.(*cschema.AuthOAuth2)
+	oauthAuth := connector.Spec.Definition.Auth.InnerVal.(*cschema.AuthOAuth2)
 	supportedTokens := cschema.AuthOAuth2RevocationSupportedTypeRefreshToken
 	oauthAuth.Revocation.SupportedTokens = &supportedTokens
 	oauthAuth.Revocation.FormOverrides = map[string]string{

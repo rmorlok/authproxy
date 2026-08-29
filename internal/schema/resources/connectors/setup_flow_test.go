@@ -773,9 +773,10 @@ func TestSetupFlowYAMLRoundtrip(t *testing.T) {
 		data, err := os.ReadFile("test_data/valid-oauth-connector-with-setup-flow.yaml")
 		require.NoError(t, err)
 
-		var connector Connector
-		err = yaml.Unmarshal(data, &connector)
+		var resource Connector
+		err = yaml.Unmarshal(data, &resource)
 		require.NoError(t, err)
+		connector := resource.Spec.Definition
 
 		require.NotNil(t, connector.SetupFlow)
 

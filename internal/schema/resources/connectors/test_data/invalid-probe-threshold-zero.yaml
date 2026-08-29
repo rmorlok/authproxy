@@ -1,18 +1,24 @@
-labels:
-  type: asana
-displayName: Asana
-logo:
-  publicUrl: https://example.com/logo.png
-description: |
-  failure_threshold of 0 must be rejected — thresholds count consecutive events
-  and a zero would mean "flip immediately on first event", which is the same as
-  having no threshold at all and isn't a meaningful configuration.
-probes:
-  - id: ping
-    cron: "*/5 * * * *"
-    failureThreshold: 0
-    http:
-      method: GET
-      url: https://example.com/ping
-auth:
-  type: no-auth
+apiVersion: authproxy.net/v1alpha1
+kind: Connector
+metadata:
+  name: probe-threshold-zero
+  labels:
+    type: asana
+spec:
+  definition:
+    displayName: Asana
+    logo:
+      publicUrl: https://example.com/logo.png
+    description: |
+      failure_threshold of 0 must be rejected — thresholds count consecutive events
+      and a zero would mean "flip immediately on first event", which is the same as
+      having no threshold at all and isn't a meaningful configuration.
+    probes:
+    - id: ping
+      cron: "*/5 * * * *"
+      failureThreshold: 0
+      http:
+        method: GET
+        url: https://example.com/ping
+    auth:
+      type: no-auth

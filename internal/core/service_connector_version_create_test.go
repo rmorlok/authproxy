@@ -14,8 +14,25 @@ import (
 	"github.com/rmorlok/authproxy/internal/encfield"
 	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/stretchr/testify/require"
 )
+
+func connectorResourceForMock(id apid.ID, version uint64, state database.ConnectorDefinitionVersionState, labels map[string]string, definition cschema.ConnectorDefinition) *cschema.Connector {
+	return &cschema.Connector{
+		TypeMeta: meta.NewTypeMeta(cschema.ConnectorKind),
+		Metadata: meta.ObjectMeta{
+			ID:         id.String(),
+			Namespace:  "root",
+			Generation: version,
+			Labels:     labels,
+		},
+		Spec: cschema.ConnectorSpec{
+			Release:    cschema.ConnectorReleaseSpec{DesiredState: cschema.ConnectorReleaseState(state)},
+			Definition: definition,
+		},
+	}
+}
 
 func TestCreateConnectorVersion(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
@@ -25,7 +42,7 @@ func TestCreateConnectorVersion(t *testing.T) {
 		fixedId := apid.MustParse("cxr_testaaaaaaaaaaaa")
 		ctx := apctx.WithFixedIdGenerator(context.Background(), fixedId)
 
-		definition := &cschema.Connector{
+		definition := &cschema.ConnectorDefinition{
 			DisplayName: "New Connector",
 			Description: "A new connector",
 		}
@@ -42,14 +59,10 @@ func TestCreateConnectorVersion(t *testing.T) {
 			Return(nil)
 
 		// Re-fetch after upsert
-		mock.MockConnectorRetrival(ctx, db, e, &cschema.Connector{
-			Id:          fixedId,
-			Version:     1,
-			State:       string(database.ConnectorDefinitionVersionStateDraft),
+		mock.MockConnectorRetrival(ctx, db, e, connectorResourceForMock(fixedId, 1, database.ConnectorDefinitionVersionStateDraft, labels, cschema.ConnectorDefinition{
 			DisplayName: "New Connector",
 			Description: "A new connector",
-			Labels:      labels,
-		})
+		}))
 
 		result, err := s.CreateConnectorVersion(ctx, "root", "", definition, labels, nil)
 		require.NoError(t, err)
@@ -66,7 +79,7 @@ func TestCreateConnectorVersion(t *testing.T) {
 		fixedId := apid.MustParse("cxr_testbbbbbbbbbbbb")
 		ctx := apctx.WithFixedIdGenerator(context.Background(), fixedId)
 
-		definition := &cschema.Connector{
+		definition := &cschema.ConnectorDefinition{
 			DisplayName: "Test",
 		}
 
@@ -143,15 +156,11 @@ func TestCreateDraftConnectorVersion(t *testing.T) {
 
 		// Re-fetch
 		newLabels := map[string]string{"env": "staging"}
-		mock.MockConnectorRetrival(ctx, db, e, &cschema.Connector{
-			Id:          id,
-			Version:     2,
-			State:       string(database.ConnectorDefinitionVersionStateDraft),
+		mock.MockConnectorRetrival(ctx, db, e, connectorResourceForMock(id, 2, database.ConnectorDefinitionVersionStateDraft, newLabels, cschema.ConnectorDefinition{
 			DisplayName: "Updated Def",
-			Labels:      newLabels,
-		})
+		}))
 
-		definition := &cschema.Connector{
+		definition := &cschema.ConnectorDefinition{
 			DisplayName: "Updated Def",
 		}
 
@@ -175,11 +184,8 @@ func TestCreateDraftConnectorVersion(t *testing.T) {
 			GetConnectorDefinitionVersionForState(gomock.Any(), id, database.ConnectorDefinitionVersionStateDraft).
 			Return(nil, database.ErrNotFound)
 
-		latestDef := &cschema.Connector{
-			Id:          id,
-			Version:     3,
+		latestDef := &cschema.ConnectorDefinition{
 			DisplayName: "Latest Connector",
-			Labels:      map[string]string{"type": "original"},
 		}
 
 		// Latest version
@@ -211,13 +217,9 @@ func TestCreateDraftConnectorVersion(t *testing.T) {
 			Return(nil)
 
 		// Re-fetch
-		mock.MockConnectorRetrival(ctx, db, e, &cschema.Connector{
-			Id:          id,
-			Version:     4,
-			State:       string(database.ConnectorDefinitionVersionStateDraft),
+		mock.MockConnectorRetrival(ctx, db, e, connectorResourceForMock(id, 4, database.ConnectorDefinitionVersionStateDraft, map[string]string{"type": "original"}, cschema.ConnectorDefinition{
 			DisplayName: "Latest Connector",
-			Labels:      map[string]string{"type": "original"},
-		})
+		}))
 
 		result, err := s.CreateDraftConnectorVersion(ctx, id, nil, nil, nil)
 		require.NoError(t, err)
@@ -333,7 +335,7 @@ func TestCreateDraftConnectorVersion(t *testing.T) {
 			UpsertConnectorDefinitionVersion(gomock.Any(), gomock.Any()).
 			Return(errors.New("constraint violation"))
 
-		_, err := s.CreateDraftConnectorVersion(ctx, id, &cschema.Connector{DisplayName: "Test"}, nil, nil)
+		_, err := s.CreateDraftConnectorVersion(ctx, id, &cschema.ConnectorDefinition{DisplayName: "Test"}, nil, nil)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "failed to upsert connector version")
 	})

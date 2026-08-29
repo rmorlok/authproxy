@@ -67,10 +67,7 @@ func NewApiKeyConnector(connectorID apid.ID, displayName string, opts ApiKeyConn
 		placement.UsernameField = opts.UsernameField
 	}
 
-	c := sconfig.Connector{
-		Id:          connectorID,
-		Version:     1,
-		Labels:      map[string]string{"type": displayName},
+	c := NewConfiguredConnector(connectorID, displayName, connectors.ConnectorDefinition{
 		DisplayName: displayName,
 		Auth: &connectors.Auth{
 			InnerVal: &connectors.AuthApiKey{
@@ -78,7 +75,7 @@ func NewApiKeyConnector(connectorID apid.ID, displayName string, opts ApiKeyConn
 				Placement: placement,
 			},
 		},
-	}
+	})
 
 	if opts.ProbeURL != "" {
 		probe := connectors.Probe{
@@ -90,7 +87,7 @@ func NewApiKeyConnector(connectorID apid.ID, displayName string, opts ApiKeyConn
 			FailureThreshold:  opts.ProbeFailureThreshold,
 			RecoveryThreshold: opts.ProbeRecoveryThreshold,
 		}
-		c.Probes = []connectors.Probe{probe}
+		c.Spec.Definition.Probes = []connectors.Probe{probe}
 	}
 
 	// Normalize synthesizes the credentials setup-flow step on top of the

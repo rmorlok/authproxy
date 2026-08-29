@@ -40,10 +40,10 @@ func (c *Connectors) Validate(vc *common.ValidationContext) error {
 		// We use a blank validation context at the connector level to account for the future of splitting
 		// the connector definition to a separate file.
 		if err := connector.Validate(&common.ValidationContext{}); err != nil {
-			if connector.Id != apid.Nil {
-				err = multierror.Prefix(err, fmt.Sprintf("connector %s: ", connector.Id.String()))
-			} else if connector.Name != "" {
-				err = multierror.Prefix(err, fmt.Sprintf("connector %s: ", connector.Name))
+			if connector.HasId() {
+				err = multierror.Prefix(err, fmt.Sprintf("connector %s: ", connector.Metadata.ID))
+			} else if connector.HasName() {
+				err = multierror.Prefix(err, fmt.Sprintf("connector %s: ", connector.Metadata.Name))
 			} else {
 				err = multierror.Prefix(err, fmt.Sprintf("connector %d: ", i))
 			}
@@ -90,9 +90,10 @@ func (c *Connectors) ValidateIdentities(vc *common.ValidationContext) error {
 			continue
 		}
 
-		name := connector.Name
+		id := connector.GetId()
+		name := connector.Metadata.Name
 		if name == "" {
-			name = common.ResourceName(connector.Id.String())
+			name = common.ResourceName(id.String())
 		}
 		nk := nameKey{Namespace: connector.GetNamespace(), Name: name}
 		nameDetails := byName[nk]
@@ -101,12 +102,12 @@ func (c *Connectors) ValidateIdentities(vc *common.ValidationContext) error {
 			byName[nk] = nameDetails
 		}
 		if connector.HasId() {
-			nameDetails.ids[connector.Id] = struct{}{}
+			nameDetails.ids[id] = struct{}{}
 		} else {
 			nameDetails.hasNoId = true
 		}
 
-		lk := logicalKey{Id: connector.Id}
+		lk := logicalKey{Id: id}
 		if !connector.HasId() {
 			lk.Namespace = connector.GetNamespace()
 			lk.Name = name
@@ -117,9 +118,9 @@ func (c *Connectors) ValidateIdentities(vc *common.ValidationContext) error {
 			byLogical[lk] = logicalDetails
 		}
 		if connector.HasVersion() {
-			logicalDetails.versions[connector.Version]++
+			logicalDetails.versions[connector.Metadata.Generation]++
 		} else {
-			state := connector.State
+			state := string(connector.Spec.Release.DesiredState)
 			if state == "" {
 				state = "primary"
 			}
@@ -127,15 +128,15 @@ func (c *Connectors) ValidateIdentities(vc *common.ValidationContext) error {
 		}
 
 		if connector.HasId() {
-			if idNamespaces[connector.Id] == nil {
-				idNamespaces[connector.Id] = make(map[string]struct{})
+			if idNamespaces[id] == nil {
+				idNamespaces[id] = make(map[string]struct{})
 			}
-			idNamespaces[connector.Id][connector.GetNamespace()] = struct{}{}
+			idNamespaces[id][connector.GetNamespace()] = struct{}{}
 			if connector.HasName() {
-				if idNames[connector.Id] == nil {
-					idNames[connector.Id] = make(map[common.ResourceName]struct{})
+				if idNames[id] == nil {
+					idNames[id] = make(map[common.ResourceName]struct{})
 				}
-				idNames[connector.Id][connector.Name] = struct{}{}
+				idNames[id][connector.Metadata.Name] = struct{}{}
 			}
 		}
 	}

@@ -205,11 +205,11 @@ func apiKeyMigrationConnectorDefinition(
 	displayName string,
 	stub *helpers.ApiKeyStubUpstream,
 	setupFlow *connectors.SetupFlow,
-) sconfig.Connector {
+) sconfig.ConnectorDefinition {
 	conn := helpers.NewApiKeyConnector(apid.New(apid.PrefixConnectorVersion), displayName, helpers.ApiKeyConnectorOptions{
 		Placement: connectors.ApiKeyPlacementBearer,
 		ProbeURL:  stub.BaseURL + "/probe",
-	})
+	}).Spec.Definition
 	conn.SetupFlow = setupFlow
 	return conn
 }

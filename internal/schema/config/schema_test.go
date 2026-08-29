@@ -36,6 +36,7 @@ func Test_SchemaAgainstRealData(t *testing.T) {
 	c := jsonschemav5.NewCompiler()
 
 	_ = loadSchema(t, c, "../resources/namespace/schema.json")
+	_ = loadSchema(t, c, "../resources/meta/schema.json")
 	_ = loadSchema(t, c, "../auth/schema.json")
 	_ = loadSchema(t, c, "../common/schema.json")
 	_ = loadSchema(t, c, "../resources/connectors/schema-oauth.json")
@@ -99,6 +100,7 @@ func Test_SchemaAppMetricsShape(t *testing.T) {
 	c := jsonschemav5.NewCompiler()
 
 	_ = loadSchema(t, c, "../resources/namespace/schema.json")
+	_ = loadSchema(t, c, "../resources/meta/schema.json")
 	_ = loadSchema(t, c, "../auth/schema.json")
 	_ = loadSchema(t, c, "../common/schema.json")
 	_ = loadSchema(t, c, "../resources/connectors/schema-oauth.json")
@@ -164,6 +166,7 @@ func compileTestSchema(t *testing.T, schemaJSON string) *jsonschemav5.Schema {
 	c := jsonschemav5.NewCompiler()
 
 	_ = loadSchema(t, c, "../resources/namespace/schema.json")
+	_ = loadSchema(t, c, "../resources/meta/schema.json")
 	_ = loadSchema(t, c, "../auth/schema.json")
 	_ = loadSchema(t, c, "../common/schema.json")
 	_ = loadSchema(t, c, "../resources/connectors/schema-oauth.json")
@@ -1008,12 +1011,12 @@ func TestSchemaDefinitions(t *testing.T) {
 				{
 					Name:  "connector with name",
 					Valid: true,
-					Data:  `{"test":{"loadFromList":[{"name":"example","labels":{},"displayName":"Example","logo":{"publicUrl":"https://example.com/logo.svg"},"auth":{"type":"no-auth"}}]}}`,
+					Data:  `{"test":{"loadFromList":[{"apiVersion":"authproxy.net/v1alpha1","kind":"Connector","metadata":{"name":"example","labels":{}},"spec":{"definition":{"displayName":"Example","logo":{"publicUrl":"https://example.com/logo.svg"},"auth":{"type":"no-auth"}}}}]}}`,
 				},
 				{
 					Name:  "connector without id or name",
 					Valid: false,
-					Data:  `{"test":{"loadFromList":[{"labels":{},"displayName":"Example","logo":{"publicUrl":"https://example.com/logo.svg"},"auth":{"type":"no-auth"}}]}}`,
+					Data:  `{"test":{"loadFromList":[{"apiVersion":"authproxy.net/v1alpha1","kind":"Connector","metadata":{"labels":{}},"spec":{"definition":{"displayName":"Example","logo":{"publicUrl":"https://example.com/logo.svg"},"auth":{"type":"no-auth"}}}}]}}`,
 				},
 				{
 					Name:  "extra property",

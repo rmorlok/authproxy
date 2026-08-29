@@ -28,6 +28,33 @@ type ObjectMeta struct {
 	UpdatedAt   *time.Time          `json:"updatedAt,omitempty" yaml:"updatedAt,omitempty"`
 }
 
+// CloneObjectMeta returns a deep copy of metadata, including its mutable maps
+// and timestamp pointers.
+func CloneObjectMeta(value ObjectMeta) ObjectMeta {
+	clone := value
+	if value.Labels != nil {
+		clone.Labels = make(map[string]string, len(value.Labels))
+		for key, item := range value.Labels {
+			clone.Labels[key] = item
+		}
+	}
+	if value.Annotations != nil {
+		clone.Annotations = make(map[string]string, len(value.Annotations))
+		for key, item := range value.Annotations {
+			clone.Annotations[key] = item
+		}
+	}
+	if value.CreatedAt != nil {
+		createdAt := *value.CreatedAt
+		clone.CreatedAt = &createdAt
+	}
+	if value.UpdatedAt != nil {
+		updatedAt := *value.UpdatedAt
+		clone.UpdatedAt = &updatedAt
+	}
+	return clone
+}
+
 // ObjectMetaPatch represents a metadata merge patch. A nil field leaves the
 // current value unchanged. A non-nil pointer to an empty labels or annotations
 // map clears that map.

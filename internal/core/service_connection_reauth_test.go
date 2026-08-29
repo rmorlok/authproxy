@@ -156,7 +156,7 @@ func TestReauthConnection(t *testing.T) {
 		s, db, _, _, _, _ := FullMockService(t, ctrl)
 		s.encrypt = e
 
-		connector := cschema.Connector{
+		connector := cschema.ConnectorDefinition{
 			Auth: &cschema.Auth{InnerVal: &cschema.AuthOAuth2{Type: cschema.AuthTypeOAuth2}},
 			SetupFlow: &cschema.SetupFlow{
 				Preconnect: &cschema.SetupFlowPhase{
@@ -209,7 +209,7 @@ func TestReauthConnection(t *testing.T) {
 		s, db, _, _, _, _ := FullMockService(t, ctrl)
 		s.encrypt = e
 
-		connector := cschema.Connector{
+		connector := cschema.ConnectorDefinition{
 			Auth: &cschema.Auth{InnerVal: &cschema.AuthNoAuth{Type: cschema.AuthTypeNoAuth}},
 			SetupFlow: &cschema.SetupFlow{
 				Preconnect: &cschema.SetupFlowPhase{

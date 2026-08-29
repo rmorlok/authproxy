@@ -696,7 +696,7 @@ func (r *ConnectorsRoutes) updateConnector(gctx *gin.Context) {
 		return
 	}
 
-	var def *cschema.Connector
+	var def *cschema.ConnectorDefinition
 	if req.Definition != nil {
 		def = req.Definition
 	} else {
@@ -927,7 +927,7 @@ func (r *ConnectorsRoutes) updateVersion(gctx *gin.Context) {
 		return
 	}
 
-	var def *cschema.Connector
+	var def *cschema.ConnectorDefinition
 	if req.Definition != nil {
 		def = req.Definition
 	} else {

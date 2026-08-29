@@ -6,11 +6,13 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/schema/config"
+	"github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
 
 type connectorBuilder struct {
 	s              *service
 	c              *config.Connector
+	definition     *connectors.ConnectorDefinition
 	configSetters  []func(c *config.Connector)
 	versionSetters []func(v *Connector)
 }
@@ -23,16 +25,24 @@ func newConnectorBuilder(s *service) *connectorBuilder {
 
 func (b *connectorBuilder) WithConfig(c *config.Connector) *connectorBuilder {
 	b.c = c
+	b.definition = &c.Spec.Definition
 
 	b.versionSetters = append([]func(v *Connector){
 		func(v *Connector) {
-			v.Version = c.Version
-			v.Id = c.Id
+			v.Version = c.Metadata.Generation
+			v.Id = c.GetId()
 			v.Namespace = c.GetNamespace()
-			v.Labels = c.Labels
+			v.Name = c.Metadata.Name
+			v.Labels = c.Metadata.Labels
+			v.Annotations = c.Metadata.Annotations
 		},
 	}, b.versionSetters...)
 
+	return b
+}
+
+func (b *connectorBuilder) WithDefinition(definition *connectors.ConnectorDefinition) *connectorBuilder {
+	b.definition = definition
 	return b
 }
 
@@ -45,7 +55,7 @@ func (b *connectorBuilder) WithId(id apid.ID) *connectorBuilder {
 
 	b.configSetters = append(b.configSetters,
 		func(c *config.Connector) {
-			c.Id = id
+			c.SetId(id)
 		},
 	)
 	return b
@@ -60,7 +70,7 @@ func (b *connectorBuilder) WithState(state database.ConnectorDefinitionVersionSt
 
 	b.configSetters = append(b.configSetters,
 		func(c *config.Connector) {
-			c.State = string(state)
+			c.Spec.Release.DesiredState = connectors.ConnectorReleaseState(state)
 		},
 	)
 	return b
@@ -75,7 +85,7 @@ func (b *connectorBuilder) WithVersion(ver uint64) *connectorBuilder {
 
 	b.configSetters = append(b.configSetters,
 		func(c *config.Connector) {
-			c.Version = uint64(ver)
+			c.Metadata.Generation = ver
 		},
 	)
 	return b
@@ -84,7 +94,7 @@ func (b *connectorBuilder) WithVersion(ver uint64) *connectorBuilder {
 var errNilConnector = errors.New("nil connector")
 
 func (b *connectorBuilder) Build() (*Connector, error) {
-	if b.c == nil {
+	if b.definition == nil {
 		return nil, errNilConnector
 	}
 
@@ -92,15 +102,17 @@ func (b *connectorBuilder) Build() (*Connector, error) {
 		s: b.s,
 	}
 
-	for _, setter := range b.configSetters {
-		setter(b.c)
+	if b.c != nil {
+		for _, setter := range b.configSetters {
+			setter(b.c)
+		}
 	}
 
 	for _, setter := range b.versionSetters {
 		setter(&c)
 	}
 
-	if err := c.setDefinition(b.c); err != nil {
+	if err := c.setDefinition(b.definition); err != nil {
 		return nil, err
 	}
 

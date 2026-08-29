@@ -306,7 +306,7 @@ connectors:
 	require.NoError(t, cfg.Connectors[0].Definition.Validate(&common.ValidationContext{}))
 }
 
-func mustConnector(t *testing.T, displayName string) config.Connector {
+func mustConnector(t *testing.T, displayName string) config.ConnectorDefinition {
 	t.Helper()
 
 	data := []byte(`
@@ -317,7 +317,7 @@ labels:
 auth:
   type: no-auth
 `)
-	var connector config.Connector
+	var connector config.ConnectorDefinition
 	require.NoError(t, yaml.Unmarshal(data, &connector))
 	return connector
 }
@@ -334,12 +334,8 @@ func connectorSummary(seed ConnectorSeed, state api.ConnectorVersionState, versi
 	}
 }
 
-func connectorVersion(def config.Connector, labels map[string]string, state api.ConnectorVersionState, version uint64) api.ConnectorVersionJson {
+func connectorVersion(def config.ConnectorDefinition, labels map[string]string, state api.ConnectorVersionState, version uint64) api.ConnectorVersionJson {
 	namespace := defaultNamespace
-	def.Id = testConnectorID
-	def.Version = version
-	def.Namespace = &namespace
-	def.State = string(state)
 	return api.ConnectorVersionJson{
 		Id:         testConnectorID,
 		Version:    version,

@@ -16,7 +16,7 @@ import (
 )
 
 func newTestConnectionWithService(s *service) *connection {
-	c := NewTestConnector(cschema.Connector{})
+	c := NewTestConnector(cschema.ConnectorDefinition{})
 	connId := apid.New(apid.PrefixConnection)
 	return &connection{
 		Connection: database.Connection{
@@ -34,12 +34,12 @@ func newTestConnectionWithService(s *service) *connection {
 
 func TestConnectionGetSetupStep(t *testing.T) {
 	t.Run("returns nil when no setup step set", func(t *testing.T) {
-		conn := newTestConnection(cschema.Connector{})
+		conn := newTestConnection(cschema.ConnectorDefinition{})
 		assert.Nil(t, conn.GetSetupStep())
 	})
 
 	t.Run("returns the setup step value", func(t *testing.T) {
-		conn := newTestConnection(cschema.Connector{})
+		conn := newTestConnection(cschema.ConnectorDefinition{})
 		step := cschema.MustNewSetupStep("step_a")
 		conn.SetupStep = &step
 		result := conn.GetSetupStep()
@@ -100,14 +100,14 @@ func TestConnectionSetSetupStep(t *testing.T) {
 
 func TestConnectionGetConfiguration(t *testing.T) {
 	t.Run("returns nil when no configuration set", func(t *testing.T) {
-		conn := newTestConnection(cschema.Connector{})
+		conn := newTestConnection(cschema.ConnectorDefinition{})
 		result, err := conn.GetConfiguration(context.Background())
 		require.NoError(t, err)
 		assert.Nil(t, result)
 	})
 
 	t.Run("returns nil when encrypted configuration is zero value", func(t *testing.T) {
-		conn := newTestConnection(cschema.Connector{})
+		conn := newTestConnection(cschema.ConnectorDefinition{})
 		conn.EncryptedConfiguration = &encfield.EncryptedField{}
 		result, err := conn.GetConfiguration(context.Background())
 		require.NoError(t, err)
@@ -335,7 +335,7 @@ func TestConnectionGetMustacheContext(t *testing.T) {
 	})
 
 	t.Run("returns labels in context", func(t *testing.T) {
-		conn := newTestConnection(cschema.Connector{})
+		conn := newTestConnection(cschema.ConnectorDefinition{})
 		conn.Labels = map[string]string{"env": "production", "team": "platform"}
 
 		data, err := conn.GetMustacheContext(context.Background())
@@ -348,7 +348,7 @@ func TestConnectionGetMustacheContext(t *testing.T) {
 	})
 
 	t.Run("returns annotations in context", func(t *testing.T) {
-		conn := newTestConnection(cschema.Connector{})
+		conn := newTestConnection(cschema.ConnectorDefinition{})
 		conn.Annotations = map[string]string{"base_url": "custom.example.com"}
 
 		data, err := conn.GetMustacheContext(context.Background())
@@ -387,7 +387,7 @@ func TestConnectionGetMustacheContext(t *testing.T) {
 	})
 
 	t.Run("omits cfg when no configuration set", func(t *testing.T) {
-		conn := newTestConnection(cschema.Connector{})
+		conn := newTestConnection(cschema.ConnectorDefinition{})
 
 		data, err := conn.GetMustacheContext(context.Background())
 		require.NoError(t, err)
@@ -396,7 +396,7 @@ func TestConnectionGetMustacheContext(t *testing.T) {
 	})
 
 	t.Run("omits labels when empty", func(t *testing.T) {
-		conn := newTestConnection(cschema.Connector{})
+		conn := newTestConnection(cschema.ConnectorDefinition{})
 
 		data, err := conn.GetMustacheContext(context.Background())
 		require.NoError(t, err)
@@ -405,7 +405,7 @@ func TestConnectionGetMustacheContext(t *testing.T) {
 	})
 
 	t.Run("omits annotations when empty", func(t *testing.T) {
-		conn := newTestConnection(cschema.Connector{})
+		conn := newTestConnection(cschema.ConnectorDefinition{})
 
 		data, err := conn.GetMustacheContext(context.Background())
 		require.NoError(t, err)
@@ -446,7 +446,7 @@ func TestConnectionGetJavascriptContext(t *testing.T) {
 	})
 
 	t.Run("returns empty maps when values are absent", func(t *testing.T) {
-		conn := newTestConnection(cschema.Connector{})
+		conn := newTestConnection(cschema.ConnectorDefinition{})
 
 		jsctx, err := conn.GetJavascriptContext(context.Background())
 		require.NoError(t, err)
@@ -457,7 +457,7 @@ func TestConnectionGetJavascriptContext(t *testing.T) {
 	})
 
 	t.Run("includes connector javascript helpers", func(t *testing.T) {
-		conn := newTestConnection(cschema.Connector{
+		conn := newTestConnection(cschema.ConnectorDefinition{
 			Javascript: `
 				function isProdTenant() {
 					return cfg.tenant === "acme" &&
@@ -489,7 +489,7 @@ func TestConnectionGetJavascriptContext(t *testing.T) {
 	})
 
 	t.Run("returns error for invalid connector javascript", func(t *testing.T) {
-		conn := newTestConnection(cschema.Connector{Javascript: `function broken(`})
+		conn := newTestConnection(cschema.ConnectorDefinition{Javascript: `function broken(`})
 
 		_, err := conn.GetJavascriptContext(context.Background())
 		require.Error(t, err)

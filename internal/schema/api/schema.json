@@ -1201,7 +1201,7 @@
           "$ref": "#/$defs/ConnectorVersionState"
         },
         "definition": {
-          "$ref": "../resources/connectors/schema.json"
+          "$ref": "../resources/connectors/schema.json#/$defs/ConnectorDefinition"
         },
         "labels": {
           "$ref": "#/$defs/StringMap"
@@ -1254,7 +1254,7 @@
           "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath"
         },
         "definition": {
-          "$ref": "../resources/connectors/schema.json"
+          "$ref": "../resources/connectors/schema.json#/$defs/ConnectorDefinition"
         },
         "labels": {
           "$ref": "#/$defs/StringMap"
@@ -1273,7 +1273,7 @@
       "type": "object",
       "properties": {
         "definition": {
-          "$ref": "../resources/connectors/schema.json"
+          "$ref": "../resources/connectors/schema.json#/$defs/ConnectorDefinition"
         },
         "labels": {
           "$ref": "#/$defs/StringMap"
@@ -1288,7 +1288,7 @@
       "type": "object",
       "properties": {
         "definition": {
-          "$ref": "../resources/connectors/schema.json"
+          "$ref": "../resources/connectors/schema.json#/$defs/ConnectorDefinition"
         },
         "labels": {
           "$ref": "#/$defs/StringMap"

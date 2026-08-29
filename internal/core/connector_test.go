@@ -78,8 +78,7 @@ func TestConnector_GetDefinition(t *testing.T) {
 	c := wrapConnector(dbConnector, s)
 
 	// Create a connector definition
-	def := &cschema.Connector{
-		Labels:      map[string]string{"type": "test-connector"},
+	def := &cschema.ConnectorDefinition{
 		DisplayName: "Test Connector",
 		Description: "A test connector",
 	}
@@ -108,8 +107,7 @@ func TestConnector_GetHashDerivesFromEncryptedDefinition(t *testing.T) {
 
 	mockEncrypt := encryptmock.NewMockE(ctrl)
 	encryptedDefinition := encfield.EncryptedField{ID: "dek_test", Data: "encrypted-data"}
-	def := &cschema.Connector{
-		Labels:      map[string]string{"type": "test-connector"},
+	def := &cschema.ConnectorDefinition{
 		DisplayName: "Test Connector",
 	}
 	defJSON := util.Must(json.Marshal(def))
@@ -149,8 +147,7 @@ func TestConnector_SetDefinition(t *testing.T) {
 	c := wrapConnector(dbConnector, s)
 
 	// Create a connector definition
-	def := &cschema.Connector{
-		Labels:      map[string]string{"type": "test-connector"},
+	def := &cschema.ConnectorDefinition{
 		DisplayName: "Test Connector",
 		Description: "A test connector",
 	}
@@ -164,7 +161,7 @@ func TestConnector_SetDefinition(t *testing.T) {
 		EncryptStringForEntity(
 			gomock.Any(),
 			gomock.Any(),
-			gomock.Any()).
+			`{"auth":null,"description":"A test connector","displayName":"Test Connector","logo":null}`).
 		Return(newEncryptedDef, nil)
 
 	// Test
@@ -178,7 +175,7 @@ func TestConnector_SetDefinition(t *testing.T) {
 }
 
 func TestConnector_SetDefinitionResetsJavascriptLibrary(t *testing.T) {
-	c := NewTestConnector(cschema.Connector{
+	c := NewTestConnector(cschema.ConnectorDefinition{
 		Javascript: `function isUpdated() { return false; }`,
 	})
 
@@ -188,7 +185,7 @@ func TestConnector_SetDefinitionResetsJavascriptLibrary(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, ok)
 
-	err = c.setDefinition(&cschema.Connector{
+	err = c.setDefinition(&cschema.ConnectorDefinition{
 		Javascript: `function isUpdated() { return true; }`,
 	})
 	require.NoError(t, err)
@@ -201,20 +198,9 @@ func TestConnector_SetDefinitionResetsJavascriptLibrary(t *testing.T) {
 }
 
 // NewTestConnector creates a hydrated test connector using the provided definition.
-func NewTestConnector(c cschema.Connector) *Connector {
+func NewTestConnector(c cschema.ConnectorDefinition) *Connector {
 	e := encrypt.NewFakeEncryptService(false)
 	connectorId := apid.New(apid.PrefixActor)
-	if c.Id != apid.Nil {
-		connectorId = c.Id
-	}
-	version := uint64(1)
-	if c.Version != 0 {
-		version = c.Version
-	}
-	state := database.ConnectorDefinitionVersionStatePrimary
-	if c.State != "" {
-		state = database.ConnectorDefinitionVersionState(c.State)
-	}
 	encryptedDefinition, err := e.EncryptStringForEntity(context.Background(), &namespaceHolder{namespace: "root"}, string(util.Must(json.Marshal(c))))
 	if err != nil {
 		panic(err)
@@ -222,9 +208,9 @@ func NewTestConnector(c cschema.Connector) *Connector {
 
 	dbConnector := database.ConnectorWithDefinition{
 		Id:                  connectorId,
-		Version:             version,
+		Version:             1,
 		Labels:              map[string]string{"type": "test-connector"},
-		State:               state,
+		State:               database.ConnectorDefinitionVersionStatePrimary,
 		EncryptedDefinition: encryptedDefinition,
 	}
 

@@ -24,7 +24,7 @@ type Connector struct {
 	UpdatedAt   time.Time
 	Labels      map[string]string
 	Annotations map[string]string
-	Definition  *cschema.Connector
+	Definition  *cschema.ConnectorDefinition
 }
 
 func (m *Connector) GetId() apid.ID {
@@ -71,7 +71,7 @@ func (m *Connector) GetAnnotations() map[string]string {
 	return m.Annotations
 }
 
-func (m *Connector) GetDefinition() *cschema.Connector {
+func (m *Connector) GetDefinition() *cschema.ConnectorDefinition {
 	return m.Definition
 }
 

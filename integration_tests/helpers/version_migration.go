@@ -24,7 +24,7 @@ import (
 // same management API shape a host application would use.
 func (env *IntegrationTestEnv) CreateConnector(
 	t *testing.T,
-	definition sconfig.Connector,
+	definition sconfig.ConnectorDefinition,
 	labels map[string]string,
 	annotations map[string]string,
 	opts ...ActorOption,
@@ -52,7 +52,7 @@ func (env *IntegrationTestEnv) CreateConnector(
 func (env *IntegrationTestEnv) CreateDraftConnectorVersion(
 	t *testing.T,
 	connectorID apid.ID,
-	definition sconfig.Connector,
+	definition sconfig.ConnectorDefinition,
 	labels map[string]string,
 	annotations map[string]string,
 	opts ...ActorOption,
@@ -108,7 +108,7 @@ func (env *IntegrationTestEnv) ForceConnectorVersionState(
 func (env *IntegrationTestEnv) PublishConnectorVersion(
 	t *testing.T,
 	connectorID apid.ID,
-	definition sconfig.Connector,
+	definition sconfig.ConnectorDefinition,
 	labels map[string]string,
 	annotations map[string]string,
 	opts ...ActorOption,

@@ -5,9 +5,6 @@
     "description": "Updated Salesforce integration",
     "auth": {
       "type": "no-auth"
-    },
-    "labels": {
-      "service": "salesforce"
     }
   },
   "labels": {

@@ -7,6 +7,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/core/mock"
+	"github.com/rmorlok/authproxy/internal/database"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/stretchr/testify/require"
 )
@@ -18,13 +19,10 @@ func TestGetConnectorVersion(t *testing.T) {
 	id := apid.New(apid.PrefixActor)
 	version := uint64(1)
 
-	mock.MockConnectorRetrival(context.Background(), db, e, &cschema.Connector{
-		Id:          id,
-		Version:     version,
+	mock.MockConnectorRetrival(context.Background(), db, e, connectorResourceForMock(id, version, database.ConnectorDefinitionVersionStatePrimary, map[string]string{"type": "test"}, cschema.ConnectorDefinition{
 		DisplayName: "Test Connector",
-		Labels:      map[string]string{"type": "test"},
 		Auth:        cschema.NewNoAuth(),
-	})
+	}))
 
 	c, err := s.GetConnectorVersion(context.Background(), id, version)
 	require.NoError(t, err)

@@ -1,35 +1,41 @@
-labels:
-  type: google-drive
-displayName: Google Drive
-logo:
-  publicUrl: https://example.com/logo.png
-description: Conditional scope and probe example
-auth:
-  type: OAuth2
-  clientId:
-    envVar: GOOGLE_CLIENT_ID
-  clientSecret:
-    envVar: GOOGLE_CLIENT_SECRET
-  authorization:
-    endpoint: https://accounts.google.com/o/oauth2/v2/auth
-  token:
-    endpoint: https://oauth2.googleapis.com/token
-  scopes:
-    - id: https://www.googleapis.com/auth/drive.readonly
-      reason: We need to be able to view the files
-    - id: https://www.googleapis.com/auth/drive.file
+apiVersion: authproxy.net/v1alpha1
+kind: Connector
+metadata:
+  name: conditional-scopes-and-probes
+  labels:
+    type: google-drive
+spec:
+  definition:
+    displayName: Google Drive
+    logo:
+      publicUrl: https://example.com/logo.png
+    description: Conditional scope and probe example
+    auth:
+      type: OAuth2
+      clientId:
+        envVar: GOOGLE_CLIENT_ID
+      clientSecret:
+        envVar: GOOGLE_CLIENT_SECRET
+      authorization:
+        endpoint: https://accounts.google.com/o/oauth2/v2/auth
+      token:
+        endpoint: https://oauth2.googleapis.com/token
+      scopes:
+      - id: https://www.googleapis.com/auth/drive.readonly
+        reason: We need to be able to view the files
+      - id: https://www.googleapis.com/auth/drive.file
+        if:
+          javascript: cfg.push_files === true
+        reason: We need to be able to write files
+      - id: https://www.googleapis.com/auth/drive.activity.readonly
+        required:
+          javascript: cfg.sync_activity === true
+        reason: We need to be able to see activity
+    probes:
+    - id: drive-health
+      period: 1m
       if:
-        javascript: cfg.push_files === true
-      reason: We need to be able to write files
-    - id: https://www.googleapis.com/auth/drive.activity.readonly
-      required:
-        javascript: cfg.sync_activity === true
-      reason: We need to be able to see activity
-probes:
-  - id: drive-health
-    period: 1m
-    if:
-      javascript: cfg.has_drive === true
-    proxyHttp:
-      method: GET
-      url: https://www.googleapis.com/drive/v3/about
+        javascript: cfg.has_drive === true
+      proxyHttp:
+        method: GET
+        url: https://www.googleapis.com/drive/v3/about
