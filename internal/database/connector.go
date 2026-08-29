@@ -211,7 +211,11 @@ func (s *service) UpdateConnectorName(ctx context.Context, id apid.ID, name scom
 
 // UpdateConnectorLabels replaces all user-owned labels on a logical connector
 // while preserving its system-managed labels.
-func (s *service) UpdateConnectorLabels(ctx context.Context, id apid.ID, labels map[string]string) (*Connector, error) {
+func (s *service) UpdateConnectorLabels(
+	ctx context.Context,
+	id apid.ID,
+	labels map[string]string,
+) (*Connector, error) {
 	if id.IsNil() {
 		return nil, errors.New("connector id is required")
 	}
@@ -238,23 +242,36 @@ func (s *service) UpdateConnectorLabels(ctx context.Context, id apid.ID, labels 
 			return err
 		}
 
-		merged, now, err := s.replaceUserLabelsInTableTx(ctx, tx, ConnectorsTable, sq.Eq{"id": id, "deleted_at": nil}, Labels(labels))
+		merged, now, err := s.replaceUserLabelsInTableTx(
+			ctx,
+			tx,
+			ConnectorsTable,
+			sq.Eq{"id": id, "deleted_at": nil},
+			labels,
+		)
 		if err != nil {
 			return err
 		}
+
 		connector.Labels = merged
 		connector.UpdatedAt = now
 		result = &connector
+
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
+
 	return result, nil
 }
 
 // UpdateConnectorAnnotations replaces all annotations on a logical connector.
-func (s *service) UpdateConnectorAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*Connector, error) {
+func (s *service) UpdateConnectorAnnotations(
+	ctx context.Context,
+	id apid.ID,
+	annotations map[string]string,
+) (*Connector, error) {
 	if id.IsNil() {
 		return nil, errors.New("connector id is required")
 	}
@@ -281,17 +298,26 @@ func (s *service) UpdateConnectorAnnotations(ctx context.Context, id apid.ID, an
 			return err
 		}
 
-		now, err := s.updateAnnotationsInTableTx(ctx, tx, ConnectorsTable, sq.Eq{"id": id, "deleted_at": nil}, Annotations(annotations))
+		now, err := s.updateAnnotationsInTableTx(
+			ctx,
+			tx,
+			ConnectorsTable,
+			sq.Eq{"id": id, "deleted_at": nil},
+			annotations,
+		)
 		if err != nil {
 			return err
 		}
+
 		connector.Annotations = Annotations(annotations)
 		connector.UpdatedAt = now
 		result = &connector
+
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
+
 	return result, nil
 }
