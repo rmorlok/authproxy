@@ -106,9 +106,14 @@ func noAuthMigrationConnectorDefinition(
 	setupFlow *connectors.SetupFlow,
 	probes []connectors.Probe,
 ) sconfig.ConnectorDefinition {
-	connector := helpers.NewNoAuthConnector(apid.New(apid.PrefixConnectorVersion), displayName, nil).Spec.Definition
+	connector := helpers.NewNoAuthConnector(
+		apid.New(apid.PrefixConnectorVersion),
+		displayName,
+		nil, // rateLimiting
+	).Spec.Definition
 	connector.SetupFlow = setupFlow
 	connector.Probes = probes
+
 	return connector
 }
 
