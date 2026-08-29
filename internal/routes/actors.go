@@ -164,10 +164,10 @@ func (r *ActorsRoutes) list(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, ListActorsResponseJson{
-		Items:  util.Map(auth.FilterForValidatedResources(val, result.Results), DatabaseActorToJson),
-		Cursor: result.Cursor,
-	})
+	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewListActorsResponseJson(
+		util.Map(auth.FilterForValidatedResources(val, result.Results), DatabaseActorToJson),
+		result.Cursor,
+	))
 }
 
 // @Summary		Get actor by UUID
@@ -441,7 +441,7 @@ func (r *ActorsRoutes) create(gctx *gin.Context) {
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
 	var req CreateActorRequestJson
-	if err := bindJSONBody(gctx, &req); err != nil {
+	if err := apgin.BindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, r.logger, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
@@ -585,7 +585,7 @@ func (r *ActorsRoutes) update(gctx *gin.Context) {
 	}
 
 	var req UpdateActorRequestJson
-	if err := bindJSONBody(gctx, &req); err != nil {
+	if err := apgin.BindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, r.logger, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
@@ -708,7 +708,7 @@ func (r *ActorsRoutes) updateByExternalId(gctx *gin.Context) {
 	}
 
 	var req UpdateActorRequestJson
-	if err := bindJSONBody(gctx, &req); err != nil {
+	if err := apgin.BindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, r.logger, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return

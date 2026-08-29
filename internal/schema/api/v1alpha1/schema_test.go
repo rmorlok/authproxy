@@ -70,6 +70,21 @@ func TestSchemaDefinitions(t *testing.T) {
       "spec":{},
       "unexpected":true
 	}`))
+
+	actionRequestSchema := compileDefinition(t, "ActionRequest")
+	require.NoError(t, validateJSON(t, actionRequestSchema, `{
+      "apiVersion":"authproxy.net/v1alpha1",
+      "kind":"ConnectionDisconnect",
+      "metadata":{"target":{"apiVersion":"authproxy.net/v1alpha1","kind":"Connection","id":"cxn_123"}},
+      "spec":{"timeoutSeconds":30}
+    }`))
+	require.Error(t, validateJSON(t, actionRequestSchema, `{
+      "apiVersion":"authproxy.net/v1alpha1",
+      "kind":"ConnectionDisconnect",
+      "metadata":{"target":{"apiVersion":"authproxy.net/v1alpha1","kind":"Connection","id":"cxn_123"}},
+      "spec":{"timeoutSeconds":30},
+      "status":{"taskId":"task_1"}
+    }`))
 }
 
 func TestSchemaDefinitionsHaveDescriptions(t *testing.T) {
@@ -83,7 +98,7 @@ func TestSchemaDefinitionsHaveDescriptions(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(data, &schema))
 
-	for _, definition := range []string{"ListMeta", "ResourceList", "ActionMeta", "Action"} {
+	for _, definition := range []string{"ListMeta", "ResourceList", "ActionMeta", "Action", "ActionRequest", "ActionResponse"} {
 		require.NotEmpty(t, schema.Definitions[definition].Description, "%s should have a description", definition)
 	}
 }

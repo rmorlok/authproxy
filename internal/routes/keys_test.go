@@ -502,13 +502,13 @@ func TestKeys(t *testing.T) {
 			var resp ListKeysResponseJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			require.Len(t, resp.Items, 1)
-			require.NotEmpty(t, resp.Cursor)
+			require.NotEmpty(t, resp.Metadata.Continue)
 
 			// Fetch next page using cursor
 			w = httptest.NewRecorder()
 			req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
-				fmt.Sprintf("/keys?cursor=%s", url.QueryEscape(resp.Cursor)),
+				fmt.Sprintf("/keys?cursor=%s", url.QueryEscape(resp.Metadata.Continue)),
 				nil,
 				"root",
 				"some-actor",

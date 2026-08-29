@@ -3,6 +3,7 @@ package api
 import (
 	"time"
 
+	apiv1alpha1 "github.com/rmorlok/authproxy/internal/schema/api/v1alpha1"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 )
 
@@ -47,12 +48,11 @@ type UpdateNamespaceRequestJson struct {
 	Annotations map[string]string `json:"annotations" yaml:"annotations"`
 }
 
-// ListNamespacesResponseJson is a paginated namespace list response.
-//
-//	@Description	Paginated list of namespaces
-type ListNamespacesResponseJson struct {
-	Items  []NamespaceJson `json:"items" yaml:"items"`
-	Cursor string          `json:"cursor,omitempty" yaml:"cursor,omitempty"`
+// ListNamespacesResponseJson is the Kubernetes-style namespace list response.
+type ListNamespacesResponseJson = apiv1alpha1.ResourceList[NamespaceJson]
+
+func NewListNamespacesResponseJson(items []NamespaceJson, continueToken string) ListNamespacesResponseJson {
+	return apiv1alpha1.NewResourceList("Namespace", items, apiv1alpha1.ListMeta{Continue: continueToken})
 }
 
 // SetNamespaceKeyRequestJson sets the key used by a namespace.

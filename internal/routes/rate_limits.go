@@ -184,7 +184,7 @@ func (r *RateLimitsRoutes) create(gctx *gin.Context) {
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
 	var req CreateRateLimitRequestJson
-	if err := bindJSONBody(gctx, &req); err != nil {
+	if err := apgin.BindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
@@ -334,10 +334,10 @@ func (r *RateLimitsRoutes) list(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, ListRateLimitsResponseJson{
-		Items:  util.Map(auth.FilterForValidatedResources(val, result.Results), RateLimitToJson),
-		Cursor: result.Cursor,
-	})
+	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewListRateLimitsResponseJson(
+		util.Map(auth.FilterForValidatedResources(val, result.Results), RateLimitToJson),
+		result.Cursor,
+	))
 }
 
 // @Summary		Update rate limit
@@ -367,7 +367,7 @@ func (r *RateLimitsRoutes) update(gctx *gin.Context) {
 	}
 
 	var req UpdateRateLimitRequestJson
-	if err := bindJSONBody(gctx, &req); err != nil {
+	if err := apgin.BindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
@@ -550,7 +550,7 @@ func (r *RateLimitsRoutes) dryRun(gctx *gin.Context) {
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
 	var req DryRunRequestJson
-	if err := bindJSONBody(gctx, &req); err != nil {
+	if err := apgin.BindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return

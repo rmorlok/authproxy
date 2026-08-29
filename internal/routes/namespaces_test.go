@@ -546,11 +546,11 @@ func TestNamespaces(t *testing.T) {
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &first))
 			require.Len(t, first.Items, 1)
 			require.Equal(t, "old", string(first.Items[0].Name))
-			require.NotEmpty(t, first.Cursor)
+			require.NotEmpty(t, first.Metadata.Continue)
 
 			w = httptest.NewRecorder()
 			req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
-				http.MethodGet, "/namespaces?cursor="+url.QueryEscape(first.Cursor), nil,
+				http.MethodGet, "/namespaces?cursor="+url.QueryEscape(first.Metadata.Continue), nil,
 				"root", "some-actor", aschema.AllPermissions(),
 			)
 			require.NoError(t, err)

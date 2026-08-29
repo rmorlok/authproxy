@@ -434,22 +434,21 @@
       "additionalProperties": false
     },
     "ListConnectionResponse": {
-      "type": "object",
-      "properties": {
-        "items": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Connection"
+      "description": "A Kubernetes-style list of connections.",
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ResourceList" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "ConnectionList" },
+            "items": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/Connection" }
+            }
           }
-        },
-        "cursor": {
-          "type": "string"
         }
-      },
-      "required": [
-        "items"
-      ],
-      "additionalProperties": false
+      ]
     },
     "DisconnectConnectionRequest": {
       "type": "object",
@@ -720,22 +719,21 @@
       "additionalProperties": false
     },
     "ListNamespacesResponse": {
-      "type": "object",
-      "properties": {
-        "items": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Namespace"
+      "description": "A Kubernetes-style list of namespaces.",
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ResourceList" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "NamespaceList" },
+            "items": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/Namespace" }
+            }
           }
-        },
-        "cursor": {
-          "type": "string"
         }
-      },
-      "required": [
-        "items"
-      ],
-      "additionalProperties": false
+      ]
     },
     "SetNamespaceKeyRequest": {
       "type": "object",
@@ -832,22 +830,21 @@
       "additionalProperties": false
     },
     "ListActorsResponse": {
-      "type": "object",
-      "properties": {
-        "items": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Actor"
+      "description": "A Kubernetes-style list of actors.",
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ResourceList" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "ActorList" },
+            "items": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/Actor" }
+            }
           }
-        },
-        "cursor": {
-          "type": "string"
         }
-      },
-      "required": [
-        "items"
-      ],
-      "additionalProperties": false
+      ]
     },
     "MetricsRange": {
       "type": "object",
@@ -1167,22 +1164,21 @@
       "additionalProperties": false
     },
     "ListConnectorsResponse": {
-      "type": "object",
-      "properties": {
-        "items": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Connector"
+      "description": "A Kubernetes-style list of connectors.",
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ResourceList" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "ConnectorList" },
+            "items": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/Connector" }
+            }
           }
-        },
-        "cursor": {
-          "type": "string"
         }
-      },
-      "required": [
-        "items"
-      ],
-      "additionalProperties": false
+      ]
     },
     "ConnectorVersion": {
       "type": "object",
@@ -1230,22 +1226,21 @@
       "additionalProperties": false
     },
     "ListConnectorVersionsResponse": {
-      "type": "object",
-      "properties": {
-        "items": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/ConnectorVersion"
+      "description": "A Kubernetes-style list of connector generations.",
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ResourceList" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "ConnectorList" },
+            "items": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/ConnectorVersion" }
+            }
           }
-        },
-        "cursor": {
-          "type": "string"
         }
-      },
-      "required": [
-        "items"
-      ],
-      "additionalProperties": false
+      ]
     },
     "CreateConnectorRequest": {
       "type": "object",
@@ -1374,22 +1369,21 @@
       "additionalProperties": false
     },
     "ListRateLimitsResponse": {
-      "type": "object",
-      "properties": {
-        "items": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/RateLimit"
+      "description": "A Kubernetes-style list of rate limits.",
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ResourceList" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "RateLimitList" },
+            "items": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/RateLimit" }
+            }
           }
-        },
-        "cursor": {
-          "type": "string"
         }
-      },
-      "required": [
-        "items"
-      ],
-      "additionalProperties": false
+      ]
     },
     "CreateRateLimitRequest": {
       "type": "object",
@@ -1619,22 +1613,21 @@
       "additionalProperties": false
     },
     "ListKeysResponse": {
-      "type": "object",
-      "properties": {
-        "items": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Key"
+      "description": "A Kubernetes-style list of keys.",
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ResourceList" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "KeyList" },
+            "items": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/Key" }
+            }
           }
-        },
-        "cursor": {
-          "type": "string"
         }
-      },
-      "required": [
-        "items"
-      ],
-      "additionalProperties": false
+      ]
     },
     "CreateKeyRequest": {
       "type": "object",

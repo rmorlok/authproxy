@@ -104,7 +104,26 @@ func (m *ListMeta) Validate(vc *common.ValidationContext) error {
 
 // Validate verifies the action envelope for expectedKind.
 func (a *Action[TSpec, TStatus]) Validate(expectedKind meta.Kind) error {
+	return a.ValidateResponse(expectedKind)
+}
+
+// ValidateRequest verifies an action received from a client. Action status is
+// server-owned and therefore must not be present in request bodies.
+func (a *Action[TSpec, TStatus]) ValidateRequest(expectedKind meta.Kind) error {
+	return a.validateFor(expectedKind, meta.ValidationModeCreate)
+}
+
+// ValidateResponse verifies an action returned by the server. Response status
+// is allowed because it contains the observed result of the action.
+func (a *Action[TSpec, TStatus]) ValidateResponse(expectedKind meta.Kind) error {
+	return a.validateFor(expectedKind, meta.ValidationModeResponse)
+}
+
+func (a *Action[TSpec, TStatus]) validateFor(expectedKind meta.Kind, mode meta.ValidationMode) error {
 	vc := &common.ValidationContext{Path: "$"}
+	if a == nil {
+		return vc.NewError("action is required")
+	}
 	if strings.HasSuffix(string(expectedKind), "List") {
 		return vc.NewErrorfForField("kind", "action kind %q must not be a list kind", expectedKind)
 	}
@@ -114,6 +133,9 @@ func (a *Action[TSpec, TStatus]) Validate(expectedKind meta.Kind) error {
 		result = multierror.Append(result, err)
 	}
 	if err := a.Metadata.Validate(vc.PushField("metadata")); err != nil {
+		result = multierror.Append(result, err)
+	}
+	if err := meta.ValidateStatus(a.Status, mode, vc); err != nil {
 		result = multierror.Append(result, err)
 	}
 	return result.ErrorOrNil()

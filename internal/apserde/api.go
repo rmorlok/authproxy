@@ -176,6 +176,25 @@ func sanitizeStruct(fmtType format, v reflect.Value, report *Report) (map[string
 		if opts.Contains("omitempty") && isEmptyValue(fv) {
 			continue
 		}
+		if fieldIsInline(fmtType, field) {
+			sanitized, err := sanitizeValue(fmtType, fv, report)
+			if err != nil {
+				return nil, err
+			}
+			if sanitized == nil {
+				continue
+			}
+			embedded, ok := sanitized.(map[string]any)
+			if !ok {
+				return nil, fmt.Errorf("inline field %s must serialize to an object", field.Name)
+			}
+			for key, value := range embedded {
+				if _, exists := result[key]; !exists {
+					result[key] = value
+				}
+			}
+			continue
+		}
 
 		if isSecretField(field) {
 			redacted, didRedact, err := redactValue(fmtType, fv)
@@ -300,7 +319,10 @@ func collectRedactedPlaceholders(v reflect.Value, path string, paths *[]string) 
 			continue
 		}
 		fv := v.Field(i)
-		fieldPath := path + "." + name
+		fieldPath := path
+		if !fieldIsInline(formatJSON, field) {
+			fieldPath += "." + name
+		}
 		if isSecretField(field) {
 			plain, err := toPlain(formatJSON, fv.Interface())
 			if err != nil {
@@ -372,6 +394,28 @@ func fieldName(fmtType format, field reflect.StructField) (string, tagOptions, b
 		return name, nil, true
 	}
 	return name, strings.Split(opts, ","), true
+}
+
+func fieldIsInline(fmtType format, field reflect.StructField) bool {
+	tagName := "json"
+	if fmtType == formatYAML {
+		tagName = "yaml"
+	}
+
+	tag := field.Tag.Get(tagName)
+	name, options, _ := strings.Cut(tag, ",")
+	if slices.Contains(strings.Split(options, ","), "inline") {
+		return true
+	}
+	if fmtType != formatJSON || !field.Anonymous || name != "" {
+		return false
+	}
+
+	fieldType := field.Type
+	for fieldType.Kind() == reflect.Pointer {
+		fieldType = fieldType.Elem()
+	}
+	return fieldType.Kind() == reflect.Struct
 }
 
 func isSecretField(field reflect.StructField) bool {

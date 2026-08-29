@@ -65,8 +65,8 @@ func cmdListConnectors() *cobra.Command {
 			defer out.Done()
 			out.EmitAll(response.Items)
 
-			for response.Cursor != "" && !out.ShouldStop() {
-				cursor := response.Cursor
+			for response.Metadata.Continue != "" && !out.ShouldStop() {
+				cursor := response.Metadata.Continue
 				response = routes2.ListConnectorsResponseJson{}
 				req = signer.SignRestyRequest(client.R()).
 					SetResult(&response).

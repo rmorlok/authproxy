@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/apid"
+	apiv1alpha1 "github.com/rmorlok/authproxy/internal/schema/api/v1alpha1"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
@@ -39,9 +40,10 @@ type ConnectorJson struct {
 	UpdatedAt     time.Time             `json:"updatedAt" yaml:"updatedAt"`
 }
 
-type ListConnectorsResponseJson struct {
-	Items  []ConnectorJson `json:"items" yaml:"items"`
-	Cursor string          `json:"cursor,omitempty" yaml:"cursor,omitempty"`
+type ListConnectorsResponseJson = apiv1alpha1.ResourceList[ConnectorJson]
+
+func NewListConnectorsResponseJson(items []ConnectorJson, continueToken string) ListConnectorsResponseJson {
+	return apiv1alpha1.NewResourceList("Connector", items, apiv1alpha1.ListMeta{Continue: continueToken})
 }
 
 // ConnectorVersionJson represents a single connector version returned by the API.
@@ -60,9 +62,10 @@ type ConnectorVersionJson struct {
 	UpdatedAt   time.Time                   `json:"updatedAt" yaml:"updatedAt"`
 }
 
-type ListConnectorVersionsResponseJson struct {
-	Items  []ConnectorVersionJson `json:"items" yaml:"items"`
-	Cursor string                 `json:"cursor,omitempty" yaml:"cursor,omitempty"`
+type ListConnectorVersionsResponseJson = apiv1alpha1.ResourceList[ConnectorVersionJson]
+
+func NewListConnectorVersionsResponseJson(items []ConnectorVersionJson, continueToken string) ListConnectorVersionsResponseJson {
+	return apiv1alpha1.NewResourceList("Connector", items, apiv1alpha1.ListMeta{Continue: continueToken})
 }
 
 // CreateConnectorRequestJson is the request body for POST /connectors.

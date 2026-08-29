@@ -70,6 +70,8 @@ func TestActionConstructorsPutTargetInMetadata(t *testing.T) {
 	response := NewActionResponse("ConnectionDisconnect", target, disconnectSpec{TimeoutSeconds: 30}, disconnectStatus{TaskID: "task-1"})
 	require.Equal(t, "task-1", response.Status.TaskID)
 	require.NoError(t, response.Validate("ConnectionDisconnect"))
+	require.NoError(t, response.ValidateResponse("ConnectionDisconnect"))
+	require.ErrorContains(t, response.ValidateRequest("ConnectionDisconnect"), "$.status: is server-owned")
 }
 
 func TestListAndActionValidationIsFieldAddressable(t *testing.T) {

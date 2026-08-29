@@ -40,6 +40,7 @@ func compileRefSchema(t *testing.T, ref string) *jsonschemav5.Schema {
 	_ = loadSchema(t, c, "../resources/connectors/schema.json")
 	_ = loadSchema(t, c, "../resources/key/schema.json")
 	_ = loadSchema(t, c, "../resources/rate_limit/schema.json")
+	_ = loadSchema(t, c, "./v1alpha1/schema.json")
 	sid := loadSchema(t, c, "./schema.json")
 	require.Equal(t, SchemaIdAPI, sid)
 
@@ -141,6 +142,14 @@ func TestSchemaSamples(t *testing.T) {
 			require.NoError(t, schema.Validate(v))
 		})
 	}
+}
+
+func TestManagedListSchemasRejectLegacyTopLevelCursor(t *testing.T) {
+	schema := compileRefSchema(t, "./schema.json#/$defs/ListActorsResponse")
+	require.Error(t, schema.Validate(map[string]any{
+		"items":  []any{},
+		"cursor": "next-page",
+	}))
 }
 
 func TestInitiateConnectionRequestValidate(t *testing.T) {

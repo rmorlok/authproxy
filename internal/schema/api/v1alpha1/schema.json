@@ -83,6 +83,21 @@
         }
       ],
       "unevaluatedProperties": false
+    },
+    "ActionRequest": {
+      "description": "A typed action accepted from a client; server-owned status is forbidden.",
+      "allOf": [
+        { "$ref": "#/$defs/Action" },
+        {
+          "properties": {
+            "status": false
+          }
+        }
+      ]
+    },
+    "ActionResponse": {
+      "description": "A typed action returned by the server, optionally including observed status.",
+      "$ref": "#/$defs/Action"
     }
   }
 }

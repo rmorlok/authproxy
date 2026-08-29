@@ -5,36 +5,43 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/apid"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
+	apiv1alpha1 "github.com/rmorlok/authproxy/internal/schema/api/v1alpha1"
 )
+
+// ResourceListJson is the non-generic OpenAPI projection of the common list
+// transport. Concrete list adapters embed it and specialize Items because
+// swaggo cannot reliably document instantiated generic Go types.
+type ResourceListJson struct {
+	APIVersion string               `json:"apiVersion" binding:"required" enums:"authproxy.net/v1alpha1" example:"authproxy.net/v1alpha1"`
+	Kind       string               `json:"kind" binding:"required"`
+	Metadata   apiv1alpha1.ListMeta `json:"metadata" binding:"required"`
+}
 
 // ListActorsResponseJson documents the paginated actor list response.
 //
 //	@Description	Paginated list of actors
 type ListActorsResponseJson struct {
+	ResourceListJson
 	// List of actors.
-	Items []schemaapi.ActorJson `json:"items"`
-	// Pagination cursor for next page.
-	Cursor string `json:"cursor,omitempty"`
+	Items []schemaapi.ActorJson `json:"items" binding:"required"`
 }
 
 // ListNamespacesResponseJson documents the paginated namespace list response.
 //
 //	@Description	Paginated list of namespaces
 type ListNamespacesResponseJson struct {
+	ResourceListJson
 	// List of namespaces.
-	Items []schemaapi.NamespaceJson `json:"items"`
-	// Pagination cursor for next page.
-	Cursor string `json:"cursor,omitempty"`
+	Items []schemaapi.NamespaceJson `json:"items" binding:"required"`
 }
 
 // ListConnectorsResponseJson documents the paginated connector list response.
 //
 //	@Description	Paginated list of connectors
 type ListConnectorsResponseJson struct {
+	ResourceListJson
 	// List of connectors.
-	Items []schemaapi.ConnectorJson `json:"items"`
-	// Pagination cursor for next page.
-	Cursor string `json:"cursor,omitempty"`
+	Items []schemaapi.ConnectorJson `json:"items" binding:"required"`
 }
 
 // ConnectorVersionJson documents a connector version response.
@@ -57,10 +64,9 @@ type ConnectorVersionJson struct {
 //
 //	@Description	Paginated list of connector versions
 type ListConnectorVersionsResponseJson struct {
+	ResourceListJson
 	// List of connector versions.
-	Items []interface{} `json:"items"`
-	// Pagination cursor for next page.
-	Cursor string `json:"cursor,omitempty"`
+	Items []ConnectorVersionJson `json:"items" binding:"required"`
 }
 
 // ConnectionJson documents a connection response while keeping nested
@@ -86,8 +92,8 @@ type ConnectionJson struct {
 //
 //	@Description	Paginated list of connections
 type ListConnectionResponseJson struct {
-	Items  []interface{} `json:"items"`
-	Cursor string        `json:"cursor,omitempty"`
+	ResourceListJson
+	Items []ConnectionJson `json:"items" binding:"required"`
 }
 
 // DisconnectResponseJson documents the connection disconnect response.
@@ -237,8 +243,8 @@ type CreateKeyRequestJson struct {
 //
 //	@Description	Paginated list of keys
 type ListKeysResponseJson struct {
-	Items  []interface{} `json:"items"`
-	Cursor string        `json:"cursor,omitempty"`
+	ResourceListJson
+	Items []KeyJson `json:"items" binding:"required"`
 }
 
 // ListRequestEventsResponseJson documents the paginated request-events list response.
@@ -323,8 +329,8 @@ type RateLimitJson struct {
 //
 //	@Description	Paginated list of rate limits
 type ListRateLimitsResponseJson struct {
-	Items  []interface{} `json:"items"`
-	Cursor string        `json:"cursor,omitempty"`
+	ResourceListJson
+	Items []RateLimitJson `json:"items" binding:"required"`
 }
 
 // CreateRateLimitRequestJson documents the rate-limit creation body.

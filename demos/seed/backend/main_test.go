@@ -35,7 +35,7 @@ func TestUpsertConnectorCreatesAndPublishesMissingSeed(t *testing.T) {
 		case "GET /api/v1/connectors":
 			require.Equal(t, defaultNamespace, r.URL.Query().Get("namespace"))
 			require.Equal(t, seedLabelKey+"=demo-noauth", r.URL.Query().Get("labelSelector"))
-			writeJSON(t, w, api.ListConnectorsResponseJson{})
+			writeJSON(t, w, api.NewListConnectorsResponseJson(nil, ""))
 		case "POST /api/v1/connectors":
 			var req api.CreateConnectorRequestJson
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
@@ -71,9 +71,10 @@ func TestUpsertConnectorSkipsMatchingPrimarySeed(t *testing.T) {
 	client := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method + " " + r.URL.Path {
 		case "GET /api/v1/connectors":
-			writeJSON(t, w, api.ListConnectorsResponseJson{
-				Items: []api.ConnectorJson{connectorSummary(seed, api.ConnectorVersionStatePrimary, 1)},
-			})
+			writeJSON(t, w, api.NewListConnectorsResponseJson(
+				[]api.ConnectorJson{connectorSummary(seed, api.ConnectorVersionStatePrimary, 1)},
+				"",
+			))
 		case "GET /api/v1/connectors/cxr_testgmail0000001/versions/1":
 			writeJSON(t, w, connectorVersion(seed.Definition, connectorLabels(seed), api.ConnectorVersionStatePrimary, 1))
 		default:
@@ -98,9 +99,10 @@ func TestUpsertConnectorPublishesNewVersionWhenDefinitionChanges(t *testing.T) {
 	client := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method + " " + r.URL.Path {
 		case "GET /api/v1/connectors":
-			writeJSON(t, w, api.ListConnectorsResponseJson{
-				Items: []api.ConnectorJson{connectorSummary(seed, api.ConnectorVersionStatePrimary, 1)},
-			})
+			writeJSON(t, w, api.NewListConnectorsResponseJson(
+				[]api.ConnectorJson{connectorSummary(seed, api.ConnectorVersionStatePrimary, 1)},
+				"",
+			))
 		case "GET /api/v1/connectors/cxr_testgmail0000001/versions/1":
 			writeJSON(t, w, connectorVersion(oldDefinition, connectorLabels(seed), api.ConnectorVersionStatePrimary, 1))
 		case "POST /api/v1/connectors/cxr_testgmail0000001/versions":

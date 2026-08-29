@@ -130,6 +130,133 @@ definitions:
       updatedAt:
         type: string
     type: object
+  openapi.ConnectionJson:
+    description: Connection to an external service
+    properties:
+      annotations:
+        additionalProperties:
+          type: string
+        type: object
+      connector: {}
+      createdAt:
+        type: string
+      healthState:
+        example: healthy
+        type: string
+      id:
+        example: cxn_test550e8400abcde
+        type: string
+      labels:
+        additionalProperties:
+          type: string
+        type: object
+      name:
+        example: production-crm
+        type: string
+      namespace:
+        example: root.acme
+        type: string
+      setupError:
+        type: string
+      setupStepId:
+        example: tenant
+        type: string
+      state:
+        example: configured
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  openapi.ConnectorVersionJson:
+    description: Detailed connector version information
+    properties:
+      annotations:
+        additionalProperties:
+          type: string
+        type: object
+      createdAt:
+        type: string
+      definition: {}
+      id:
+        example: cxr_test550e8400abcde
+        type: string
+      labels:
+        additionalProperties:
+          type: string
+        type: object
+      name:
+        example: salesforce
+        type: string
+      namespace:
+        example: root.acme
+        type: string
+      state:
+        example: primary
+        type: string
+      updatedAt:
+        type: string
+      version:
+        example: 1
+        type: integer
+    type: object
+  openapi.KeyJson:
+    description: Key API response
+    properties:
+      annotations:
+        additionalProperties:
+          type: string
+        type: object
+      createdAt:
+        type: string
+      id:
+        example: key_test550e8400abcd
+        type: string
+      keyData:
+        type: object
+      labels:
+        additionalProperties:
+          type: string
+        type: object
+      name:
+        example: primary-encryption-key
+        type: string
+      namespace:
+        example: root.acme
+        type: string
+      state:
+        example: active
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  openapi.RateLimitJson:
+    description: Rate-limit API response
+    properties:
+      annotations:
+        additionalProperties:
+          type: string
+        type: object
+      createdAt:
+        type: string
+      definition:
+        additionalProperties: {}
+        type: object
+      id:
+        example: rl_test550e8400abcde
+        type: string
+      labels:
+        additionalProperties:
+          type: string
+        type: object
+      name:
+        example: public-api
+        type: string
+      namespace:
+        example: root.acme
+        type: string
+      updatedAt:
+        type: string
+    type: object
   routes.ActorJson:
     description: Actor identity within a namespace
     properties:
@@ -660,67 +787,138 @@ definitions:
   routes.OpenAPIListActorsResponseJson:
     description: Paginated list of actors
     properties:
-      cursor:
-        description: Pagination cursor for next page.
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
         type: string
       items:
         description: List of actors.
         items:
           $ref: '#/definitions/api.ActorJson'
         type: array
+      kind:
+        type: string
+      metadata:
+        $ref: '#/definitions/v1alpha1.ListMeta'
+    required:
+    - apiVersion
+    - items
+    - kind
+    - metadata
     type: object
   routes.OpenAPIListConnectionResponseJson:
     description: Paginated list of connections
     properties:
-      cursor:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
         type: string
       items:
-        items: {}
+        items:
+          $ref: '#/definitions/openapi.ConnectionJson'
         type: array
+      kind:
+        type: string
+      metadata:
+        $ref: '#/definitions/v1alpha1.ListMeta'
+    required:
+    - apiVersion
+    - items
+    - kind
+    - metadata
     type: object
   routes.OpenAPIListConnectorVersionsResponseJson:
     description: Paginated list of connector versions
     properties:
-      cursor:
-        description: Pagination cursor for next page.
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
         type: string
       items:
         description: List of connector versions.
-        items: {}
+        items:
+          $ref: '#/definitions/openapi.ConnectorVersionJson'
         type: array
+      kind:
+        type: string
+      metadata:
+        $ref: '#/definitions/v1alpha1.ListMeta'
+    required:
+    - apiVersion
+    - items
+    - kind
+    - metadata
     type: object
   routes.OpenAPIListConnectorsResponseJson:
     description: Paginated list of connectors
     properties:
-      cursor:
-        description: Pagination cursor for next page.
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
         type: string
       items:
         description: List of connectors.
         items:
           $ref: '#/definitions/api.ConnectorJson'
         type: array
+      kind:
+        type: string
+      metadata:
+        $ref: '#/definitions/v1alpha1.ListMeta'
+    required:
+    - apiVersion
+    - items
+    - kind
+    - metadata
     type: object
   routes.OpenAPIListKeysResponseJson:
     description: Paginated list of keys
     properties:
-      cursor:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
         type: string
       items:
-        items: {}
+        items:
+          $ref: '#/definitions/openapi.KeyJson'
         type: array
+      kind:
+        type: string
+      metadata:
+        $ref: '#/definitions/v1alpha1.ListMeta'
+    required:
+    - apiVersion
+    - items
+    - kind
+    - metadata
     type: object
   routes.OpenAPIListNamespacesResponseJson:
     description: Paginated list of namespaces
     properties:
-      cursor:
-        description: Pagination cursor for next page.
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
         type: string
       items:
         description: List of namespaces.
         items:
           $ref: '#/definitions/api.NamespaceJson'
         type: array
+      kind:
+        type: string
+      metadata:
+        $ref: '#/definitions/v1alpha1.ListMeta'
+    required:
+    - apiVersion
+    - items
+    - kind
+    - metadata
     type: object
   routes.OpenAPIListNotificationsResponseJson:
     description: Paginated list of actor-visible notifications
@@ -734,11 +932,24 @@ definitions:
   routes.OpenAPIListRateLimitsResponseJson:
     description: Paginated list of rate limits
     properties:
-      cursor:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
         type: string
       items:
-        items: {}
+        items:
+          $ref: '#/definitions/openapi.RateLimitJson'
         type: array
+      kind:
+        type: string
+      metadata:
+        $ref: '#/definitions/v1alpha1.ListMeta'
+    required:
+    - apiVersion
+    - items
+    - kind
+    - metadata
     type: object
   routes.OpenAPIListRequestEventsResponse:
     description: Paginated list of request events entries
@@ -1130,6 +1341,15 @@ definitions:
         additionalProperties:
           type: string
         type: object
+    type: object
+  v1alpha1.ListMeta:
+    properties:
+      continue:
+        type: string
+      remainingItemCount:
+        type: integer
+      resourceVersion:
+        type: string
     type: object
 host: localhost:8081
 info:

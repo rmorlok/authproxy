@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/apid"
+	apiv1alpha1 "github.com/rmorlok/authproxy/internal/schema/api/v1alpha1"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 )
@@ -22,9 +23,10 @@ type RateLimitJson struct {
 	UpdatedAt   time.Time           `json:"updatedAt" yaml:"updatedAt"`
 }
 
-type ListRateLimitsResponseJson struct {
-	Items  []RateLimitJson `json:"items" yaml:"items"`
-	Cursor string          `json:"cursor,omitempty" yaml:"cursor,omitempty"`
+type ListRateLimitsResponseJson = apiv1alpha1.ResourceList[RateLimitJson]
+
+func NewListRateLimitsResponseJson(items []RateLimitJson, continueToken string) ListRateLimitsResponseJson {
+	return apiv1alpha1.NewResourceList("RateLimit", items, apiv1alpha1.ListMeta{Continue: continueToken})
 }
 
 // CreateRateLimitRequestJson is the request body for POST /rate-limits.
