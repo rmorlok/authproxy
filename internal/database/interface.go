@@ -103,8 +103,16 @@ type DB interface {
 	UpsertConnectorDefinitionVersion(ctx context.Context, cv *ConnectorWithDefinition) error
 	SetConnectorDefinitionVersionState(ctx context.Context, id apid.ID, version uint64, state ConnectorDefinitionVersionState) error
 	UpdateConnectorName(ctx context.Context, id apid.ID, name scommon.ResourceName) error
-	UpdateConnectorLabels(ctx context.Context, id apid.ID, labels map[string]string) (*Connector, error)
-	UpdateConnectorAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*Connector, error)
+	UpdateConnectorLabels(
+		ctx context.Context,
+		id apid.ID,
+		labels map[string]string,
+	) (*Connector, error)
+	UpdateConnectorAnnotations(
+		ctx context.Context,
+		id apid.ID,
+		annotations map[string]string,
+	) (*Connector, error)
 	DeleteConnector(ctx context.Context, id apid.ID) error
 	ListConnectorDefinitionVersionsBuilder() ListConnectorDefinitionVersionsBuilder
 	ListConnectorDefinitionVersionsFromCursor(ctx context.Context, cursor string) (ListConnectorDefinitionVersionsExecutor, error)
