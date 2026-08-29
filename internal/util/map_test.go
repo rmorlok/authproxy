@@ -31,3 +31,10 @@ func TestFlatMap(t *testing.T) {
 	assert.Equal(t, []int{}, FlatMap([][]int{}, func(i []int) []int { return i }))
 	assert.Equal(t, []int{}, FlatMap(nil, func(i []int) []int { return i }))
 }
+
+func TestSortedStringMapKeys(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, []string{"a", "b", "c"}, SortedStringMapKeys(map[string]string{"a": "1", "b": "2", "c": "3"}))
+	assert.Equal(t, []string{}, SortedStringMapKeys(map[string]string{}))
+	assert.Equal(t, []string{}, SortedStringMapKeys[map[string]string](nil))
+}

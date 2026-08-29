@@ -4,18 +4,20 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
-	"sort"
 	"strings"
 
 	"github.com/hashicorp/go-multierror"
+	"github.com/rmorlok/authproxy/internal/util"
 )
 
 // Kubernetes-style label restrictions
 const (
-	// LabelKeyNameMaxLength is the maximum length for the name portion of a label key
+	// LabelKeyNameMaxLength is the maximum length for the name portion of a
+	// label key
 	LabelKeyNameMaxLength = 63
 
-	// LabelKeyPrefixMaxLength is the maximum length for the optional prefix portion of a label key
+	// LabelKeyPrefixMaxLength is the maximum length for the optional prefix
+	// portion of a label key
 	LabelKeyPrefixMaxLength = 253
 
 	// LabelValueMaxLength is the maximum length for a label value
@@ -28,7 +30,8 @@ const (
 	// LabelValueMaxLength via ValidateLabelValue.
 	SystemLabelValueMaxLength = 253
 
-	// AnnotationsTotalMaxSize is the maximum total size of all annotations (keys + values) in bytes.
+	// AnnotationsTotalMaxSize is the maximum total size of all annotations
+	// (keys + values) in bytes.
 	AnnotationsTotalMaxSize = 256 * 1024
 
 	// SystemLabelPrefix is the reserved label-key prefix for system-managed
@@ -146,7 +149,9 @@ func ValidateUserLabelKey(key string) error {
 	return ValidateLabelKey(key)
 }
 
-// ValidateLabelValue validates a single label value according to Kubernetes restrictions.
+// ValidateLabelValue validates a single label value according to Kubernetes
+// restrictions.
+//
 // - 0-63 characters (can be empty)
 // - if non-empty: must start and end with alphanumeric, may contain alphanumeric, '-', '_', '.'
 func ValidateLabelValue(value string) error {
@@ -159,10 +164,10 @@ func ValidateLabelValue(value string) error {
 	return nil
 }
 
-// ValidateSystemLabelValue validates a label value stored under an apxy/-prefixed
-// key. It allows up to SystemLabelValueMaxLength characters so namespace paths
-// (e.g. root.foo.bar.baz...) can fit, including the leading underscores and
-// trailing hyphens accepted in namespace path segments.
+// ValidateSystemLabelValue validates a label value stored under an apxy/-
+// prefixed key. It allows up to SystemLabelValueMaxLength characters so
+// namespace paths (e.g. root.foo.bar.baz...) can fit, including the leading
+// underscores and trailing hyphens accepted in namespace path segments.
 func ValidateSystemLabelValue(value string) error {
 	if len(value) > SystemLabelValueMaxLength {
 		return fmt.Errorf("system label value exceeds maximum length of %d characters", SystemLabelValueMaxLength)
@@ -173,7 +178,8 @@ func ValidateSystemLabelValue(value string) error {
 	return nil
 }
 
-// ValidateLabelValueForKey validates a label value using the user or system limit implied by its key.
+// ValidateLabelValueForKey validates a label value using the user or system
+// limit implied by its key.
 func ValidateLabelValueForKey(key, value string) error {
 	if strings.HasPrefix(key, SystemLabelPrefix) {
 		return ValidateSystemLabelValue(value)
@@ -187,7 +193,7 @@ func ValidateLabelValueForKey(key, value string) error {
 // SystemLabelValueMaxLength cap.
 func ValidateLabels(labels map[string]string) error {
 	var result *multierror.Error
-	for _, key := range sortedMapKeys(labels) {
+	for _, key := range util.SortedStringMapKeys(labels) {
 		value := labels[key]
 		if err := ValidateLabelKey(key); err != nil {
 			result = multierror.Append(result, fmt.Errorf("invalid label key %q: %w", key, err))
@@ -204,7 +210,7 @@ func ValidateLabels(labels map[string]string) error {
 // reserved apxy/ namespace.
 func ValidateUserLabels(labels map[string]string) error {
 	var result *multierror.Error
-	for _, key := range sortedMapKeys(labels) {
+	for _, key := range util.SortedStringMapKeys(labels) {
 		value := labels[key]
 		if err := ValidateUserLabelKey(key); err != nil {
 			result = multierror.Append(result, fmt.Errorf("invalid label key %q: %w", key, err))
@@ -235,14 +241,15 @@ func ValidateAnnotationKey(key string) error { return ValidateLabelKey(key) }
 
 // ValidateAnnotationValue validates a single annotation value.
 // Annotation values have no format restriction — any string is allowed.
-// Individual value size is not restricted; only the total annotations size is checked.
+// Individual value size is not restricted; only the total annotations size is
+// checked.
 func ValidateAnnotationValue(_ string) error { return nil }
 
 // ValidateAnnotations validates all annotations in a map.
 func ValidateAnnotations(annotations map[string]string) error {
 	var result *multierror.Error
 	totalSize := 0
-	for _, key := range sortedMapKeys(annotations) {
+	for _, key := range util.SortedStringMapKeys(annotations) {
 		value := annotations[key]
 		if err := ValidateAnnotationKey(key); err != nil {
 			result = multierror.Append(result, fmt.Errorf("invalid annotation key %q: %w", key, err))
@@ -253,13 +260,4 @@ func ValidateAnnotations(annotations map[string]string) error {
 		result = multierror.Append(result, fmt.Errorf("total annotations size %d exceeds maximum of %d bytes", totalSize, AnnotationsTotalMaxSize))
 	}
 	return result.ErrorOrNil()
-}
-
-func sortedMapKeys(values map[string]string) []string {
-	keys := make([]string, 0, len(values))
-	for key := range values {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	return keys
 }
