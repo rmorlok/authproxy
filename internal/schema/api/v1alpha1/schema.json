@@ -4,23 +4,46 @@
   "$defs": {
     "ListMeta": {
       "type": "object",
+      "description": "Pagination details returned with a list of resources.",
       "properties": {
-        "resourceVersion": { "type": "string" },
-        "continue": { "type": "string" },
-        "remainingItemCount": { "type": "integer", "minimum": 0 }
+        "resourceVersion": {
+          "type": "string",
+          "description": "Opaque version identifying the resource-list snapshot."
+        },
+        "continue": {
+          "type": "string",
+          "description": "Opaque token used to request the next page."
+        },
+        "remainingItemCount": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of resources remaining after the current page."
+        }
       },
       "additionalProperties": false
     },
     "ResourceList": {
+      "description": "A paginated API response containing resources of one kind.",
       "allOf": [
         { "$ref": "../../resources/meta/schema.json#/$defs/TypeMeta" },
         {
           "type": "object",
           "required": ["metadata", "items"],
           "properties": {
-            "kind": { "type": "string", "pattern": "^[A-Z][A-Za-z0-9]*List$" },
-            "metadata": { "$ref": "#/$defs/ListMeta" },
-            "items": { "type": "array", "items": { "type": "object" } }
+            "kind": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Za-z0-9]*List$",
+              "description": "Resource kind followed by List, such as ConnectionList."
+            },
+            "metadata": {
+              "$ref": "#/$defs/ListMeta",
+              "description": "Pagination details for this list."
+            },
+            "items": {
+              "type": "array",
+              "items": { "type": "object" },
+              "description": "Resources returned in the current page."
+            }
           }
         }
       ],
@@ -28,22 +51,34 @@
     },
     "ActionMeta": {
       "type": "object",
+      "description": "Identifies the resource on which an action operates.",
       "required": ["target"],
       "properties": {
-        "target": { "$ref": "../../resources/meta/schema.json#/$defs/ObjectReference" }
+        "target": {
+          "$ref": "../../resources/meta/schema.json#/$defs/ObjectReference",
+          "description": "Reference to the resource on which the action operates."
+        }
       },
       "additionalProperties": false
     },
     "Action": {
+      "description": "A request to perform an operation on a resource, optionally including its result.",
       "allOf": [
         { "$ref": "../../resources/meta/schema.json#/$defs/TypeMeta" },
         {
           "type": "object",
           "required": ["metadata", "spec"],
           "properties": {
-            "metadata": { "$ref": "#/$defs/ActionMeta" },
-            "spec": {},
-            "status": {}
+            "metadata": {
+              "$ref": "#/$defs/ActionMeta",
+              "description": "Identifies the resource targeted by the action."
+            },
+            "spec": {
+              "description": "Input parameters for the action."
+            },
+            "status": {
+              "description": "Result of the action when returned by the server."
+            }
           }
         }
       ],

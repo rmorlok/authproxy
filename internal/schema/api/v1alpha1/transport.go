@@ -1,9 +1,9 @@
 package v1alpha1
 
 import (
-	"fmt"
 	"strings"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 )
@@ -38,6 +38,7 @@ type Action[TSpec any, TStatus any] struct {
 	Status        *TStatus   `json:"status,omitempty" yaml:"status,omitempty"`
 }
 
+// ListKind returns the list kind corresponding to itemKind.
 func ListKind(itemKind meta.Kind) meta.Kind {
 	if strings.HasSuffix(string(itemKind), "List") {
 		return itemKind
@@ -45,6 +46,7 @@ func ListKind(itemKind meta.Kind) meta.Kind {
 	return meta.Kind(string(itemKind) + "List")
 }
 
+// NewResourceList creates a list response and normalizes nil items to an empty array.
 func NewResourceList[T any](itemKind meta.Kind, items []T, listMeta ListMeta) ResourceList[T] {
 	if items == nil {
 		items = make([]T, 0)
@@ -56,6 +58,7 @@ func NewResourceList[T any](itemKind meta.Kind, items []T, listMeta ListMeta) Re
 	}
 }
 
+// NewActionRequest creates an action request without response status.
 func NewActionRequest[TSpec any](kind meta.Kind, target meta.ObjectReference, spec TSpec) Action[TSpec, struct{}] {
 	return Action[TSpec, struct{}]{
 		TypeMeta: meta.NewTypeMeta(kind),
@@ -64,6 +67,7 @@ func NewActionRequest[TSpec any](kind meta.Kind, target meta.ObjectReference, sp
 	}
 }
 
+// NewActionResponse creates an action response containing its status.
 func NewActionResponse[TSpec any, TStatus any](kind meta.Kind, target meta.ObjectReference, spec TSpec, status TStatus) Action[TSpec, TStatus] {
 	return Action[TSpec, TStatus]{
 		TypeMeta: meta.NewTypeMeta(kind),
@@ -73,28 +77,52 @@ func NewActionResponse[TSpec any, TStatus any](kind meta.Kind, target meta.Objec
 	}
 }
 
-func ValidateResourceListType(typeMeta meta.TypeMeta, itemKind meta.Kind) error {
+// Validate verifies the list envelope for resources of itemKind.
+func (r *ResourceList[T]) Validate(itemKind meta.Kind) error {
+	vc := &common.ValidationContext{Path: "$"}
+	var result *multierror.Error
 	expectedKind := ListKind(itemKind)
-	if err := meta.ValidateTypeMeta(typeMeta, APIVersion, expectedKind, nil); err != nil {
-		return err
+	if err := meta.ValidateTypeMeta(r.TypeMeta, APIVersion, expectedKind, vc); err != nil {
+		result = multierror.Append(result, err)
+	}
+	if err := r.Metadata.Validate(vc.PushField("metadata")); err != nil {
+		result = multierror.Append(result, err)
+	}
+	return result.ErrorOrNil()
+}
+
+// Validate verifies list pagination metadata.
+func (m *ListMeta) Validate(vc *common.ValidationContext) error {
+	if vc == nil {
+		vc = &common.ValidationContext{Path: "$.metadata"}
+	}
+	if m.RemainingItemCount != nil && *m.RemainingItemCount < 0 {
+		return vc.NewErrorForField("remainingItemCount", "must not be negative")
 	}
 	return nil
 }
 
-func ValidateListMeta(value ListMeta) error {
-	if value.RemainingItemCount != nil && *value.RemainingItemCount < 0 {
-		return (&common.ValidationContext{Path: "$.metadata"}).NewErrorForField("remainingItemCount", "must not be negative")
-	}
-	return nil
-}
-
-func ValidateActionType(typeMeta meta.TypeMeta, expectedKind meta.Kind) error {
+// Validate verifies the action envelope for expectedKind.
+func (a *Action[TSpec, TStatus]) Validate(expectedKind meta.Kind) error {
+	vc := &common.ValidationContext{Path: "$"}
 	if strings.HasSuffix(string(expectedKind), "List") {
-		return fmt.Errorf("action kind %q must not be a list kind", expectedKind)
+		return vc.NewErrorfForField("kind", "action kind %q must not be a list kind", expectedKind)
 	}
-	return meta.ValidateTypeMeta(typeMeta, APIVersion, expectedKind, nil)
+
+	var result *multierror.Error
+	if err := meta.ValidateTypeMeta(a.TypeMeta, APIVersion, expectedKind, vc); err != nil {
+		result = multierror.Append(result, err)
+	}
+	if err := a.Metadata.Validate(vc.PushField("metadata")); err != nil {
+		result = multierror.Append(result, err)
+	}
+	return result.ErrorOrNil()
 }
 
-func ValidateActionMeta(value ActionMeta) error {
-	return meta.ValidateObjectReference(value.Target, &common.ValidationContext{Path: "$.metadata.target"})
+// Validate verifies action target metadata.
+func (m *ActionMeta) Validate(vc *common.ValidationContext) error {
+	if vc == nil {
+		vc = &common.ValidationContext{Path: "$.metadata"}
+	}
+	return meta.ValidateObjectReference(m.Target, vc.PushField("target"))
 }

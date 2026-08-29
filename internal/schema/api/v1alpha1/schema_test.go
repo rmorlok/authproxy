@@ -69,5 +69,21 @@ func TestSchemaDefinitions(t *testing.T) {
       "metadata":{},
       "spec":{},
       "unexpected":true
-    }`))
+	}`))
+}
+
+func TestSchemaDefinitionsHaveDescriptions(t *testing.T) {
+	data, err := os.ReadFile("schema.json")
+	require.NoError(t, err)
+
+	var schema struct {
+		Definitions map[string]struct {
+			Description string `json:"description"`
+		} `json:"$defs"`
+	}
+	require.NoError(t, json.Unmarshal(data, &schema))
+
+	for _, definition := range []string{"ListMeta", "ResourceList", "ActionMeta", "Action"} {
+		require.NotEmpty(t, schema.Definitions[definition].Description, "%s should have a description", definition)
+	}
 }

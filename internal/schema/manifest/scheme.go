@@ -16,7 +16,9 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// GVK is the lookup key for a registered manifest type.
+// GVK (Group-Version-Kind) identifies a manifest contract by its API version
+// and kind. APIVersion contains both the API group and version, for example
+// authproxy.net/v1alpha1.
 type GVK struct {
 	APIVersion meta.APIVersion
 	Kind       meta.Kind
