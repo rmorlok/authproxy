@@ -17,18 +17,29 @@ import (
 // pointing at the logical connector. Failures to enqueue are logged but do not
 // fail the originating request — the daily consistency checker (#198)
 // covers any drift if the task is dropped.
-func (s *service) enqueueConnectorLabelPropagation(ctx context.Context, id apid.ID) {
+func (s *service) enqueueConnectorLabelPropagation(
+	ctx context.Context,
+	id apid.ID,
+) {
 	task, err := dbtasks.NewPropagateConnectorLabelsTask(id)
 	if err != nil {
 		s.logger.Error("failed to build connector label propagation task", "id", id, "error", err)
 		return
 	}
+
 	if _, err := s.ac.EnqueueContext(ctx, task); err != nil {
 		s.logger.Error("failed to enqueue connector label propagation task", "id", id, "error", err)
 	}
 }
 
-func (s *service) UpdateDraftConnectorVersion(ctx context.Context, id apid.ID, version uint64, definition *cschema.ConnectorDefinition, labels map[string]string, annotations map[string]string) (iface.Connector, error) {
+func (s *service) UpdateDraftConnectorVersion(
+	ctx context.Context,
+	id apid.ID,
+	version uint64,
+	definition *cschema.ConnectorDefinition,
+	labels map[string]string,
+	annotations map[string]string,
+) (iface.Connector, error) {
 	existing, err := s.db.GetConnectorDefinitionVersion(ctx, id, version)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
@@ -65,7 +76,10 @@ func (s *service) UpdateDraftConnectorVersion(ctx context.Context, id apid.ID, v
 	c.ConnectorWithDefinition.Namespace = existing.Namespace
 	c.ConnectorWithDefinition.Name = existing.Name
 
-	if err := s.db.UpsertConnectorDefinitionVersion(ctx, &c.ConnectorWithDefinition); err != nil {
+	if err := s.db.UpsertConnectorDefinitionVersion(
+		ctx,
+		&c.ConnectorWithDefinition,
+	); err != nil {
 		return nil, fmt.Errorf("failed to upsert connector version: %w", err)
 	}
 
@@ -73,12 +87,20 @@ func (s *service) UpdateDraftConnectorVersion(ctx context.Context, id apid.ID, v
 	return s.getConnectorVersion(ctx, id, version)
 }
 
-func (s *service) GetOrCreateDraftConnectorVersion(ctx context.Context, id apid.ID) (iface.Connector, error) {
+func (s *service) GetOrCreateDraftConnectorVersion(
+	ctx context.Context,
+	id apid.ID,
+) (iface.Connector, error) {
 	// Try to find an existing draft
-	existingDraft, err := s.db.GetConnectorDefinitionVersionForState(ctx, id, database.ConnectorDefinitionVersionStateDraft)
+	existingDraft, err := s.db.GetConnectorDefinitionVersionForState(
+		ctx,
+		id,
+		database.ConnectorDefinitionVersionStateDraft,
+	)
 	if err != nil && !errors.Is(err, database.ErrNotFound) {
 		return nil, fmt.Errorf("failed to check for existing draft: %w", err)
 	}
+
 	if existingDraft != nil {
 		wrapped := wrapConnector(*existingDraft, s)
 		// Verify we can load the definition
