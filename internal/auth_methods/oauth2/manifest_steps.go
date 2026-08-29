@@ -55,7 +55,7 @@ func (f *factory) ManifestSetupSteps(
 					if err != nil {
 						return httperr.BadRequest(err.Error())
 					}
-					
+
 					if err := f.PersistClientCredentials(
 						ctx,
 						connection,
