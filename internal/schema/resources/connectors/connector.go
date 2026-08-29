@@ -76,7 +76,10 @@ func (c *Connector) Validate(vc *common.ValidationContext) error {
 	return c.ValidateFor(meta.ValidationModeConfig, vc)
 }
 
-func (c *Connector) ValidateFor(mode meta.ValidationMode, vc *common.ValidationContext) error {
+func (c *Connector) ValidateFor(
+	mode meta.ValidationMode,
+	vc *common.ValidationContext,
+) error {
 	if c == nil {
 		return fmt.Errorf("connector is required")
 	}
@@ -85,22 +88,26 @@ func (c *Connector) ValidateFor(mode meta.ValidationMode, vc *common.ValidationC
 	}
 
 	var result *multierror.Error
-	if err := meta.ValidateResource(c.TypeMeta, c.Metadata, meta.ValidationOptions{
-		Mode:               mode,
-		Path:               vc,
-		ExpectedAPIVersion: meta.APIVersionV1Alpha1,
-		ExpectedKind:       ConnectorKind,
-		IDValidator: func(value string) error {
-			id, err := apid.Parse(value)
-			if err != nil {
-				return err
-			}
-			if id.Prefix() != apid.PrefixConnector {
-				return fmt.Errorf("must be a connector id")
-			}
-			return nil
+	if err := meta.ValidateResource(
+		c.TypeMeta,
+		c.Metadata,
+		meta.ValidationOptions{
+			Mode:               mode,
+			Path:               vc,
+			ExpectedAPIVersion: meta.APIVersionV1Alpha1,
+			ExpectedKind:       ConnectorKind,
+			IDValidator: func(value string) error {
+				id, err := apid.Parse(value)
+				if err != nil {
+					return err
+				}
+				if id.Prefix() != apid.PrefixConnector {
+					return fmt.Errorf("must be a connector id")
+				}
+				return nil
+			},
 		},
-	}); err != nil {
+	); err != nil {
 		result = multierror.Append(result, err)
 	}
 
@@ -116,7 +123,10 @@ func (c *Connector) ValidateFor(mode meta.ValidationMode, vc *common.ValidationC
 		result = multierror.Append(result, vc.NewErrorfForField("spec.release.desiredState", "must be either %q or %q", ConnectorReleaseStateDraft, ConnectorReleaseStatePrimary))
 	}
 
-	if err := c.Spec.Definition.Validate(vc.PushField("spec").PushField("definition")); err != nil {
+	if err := c.Spec.Definition.Validate(vc.
+		PushField("spec").
+		PushField("definition"),
+	); err != nil {
 		result = multierror.Append(result, err)
 	}
 	if err := meta.ValidateStatus(c.Status, mode, vc); err != nil {
@@ -124,7 +134,10 @@ func (c *Connector) ValidateFor(mode meta.ValidationMode, vc *common.ValidationC
 	}
 	if c.Status != nil {
 		switch c.Status.Release.State {
-		case ConnectorReleaseStateDraft, ConnectorReleaseStatePrimary, ConnectorReleaseStateActive, ConnectorReleaseStateArchived:
+		case ConnectorReleaseStateDraft,
+			ConnectorReleaseStatePrimary,
+			ConnectorReleaseStateActive,
+			ConnectorReleaseStateArchived:
 		default:
 			result = multierror.Append(result, vc.NewErrorfForField("status.release.state", "is not a recognized connector release state"))
 		}
@@ -152,12 +165,22 @@ func (c *Connector) SetId(id apid.ID) {
 	}
 }
 
-func (c *Connector) HasName() bool    { return c != nil && c.Metadata.Name != "" }
-func (c *Connector) HasVersion() bool { return c != nil && c.Metadata.Generation > 0 }
+func (c *Connector) HasName() bool {
+	return c != nil && c.Metadata.Name != ""
+}
+
+func (c *Connector) HasVersion() bool {
+	return c != nil && c.Metadata.Generation > 0
+}
+
 func (c *Connector) HasState() bool {
 	return c != nil && c.Spec.Release.DesiredState != ""
 }
-func (c *Connector) HasNamespace() bool { return c != nil && c.Metadata.Namespace != "" }
+
+func (c *Connector) HasNamespace() bool {
+	return c != nil && c.Metadata.Namespace != ""
+}
+
 func (c *Connector) IsDraft() bool {
 	return c != nil && c.Spec.Release.DesiredState == ConnectorReleaseStateDraft
 }
