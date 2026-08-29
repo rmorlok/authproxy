@@ -10,13 +10,8 @@ import (
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
-	"github.com/hashicorp/go-multierror"
 	"github.com/rmorlok/authproxy/internal/apctx"
-)
-
-const (
-	// AnnotationsTotalMaxSize is the maximum total size of all annotations (keys + values) in bytes.
-	AnnotationsTotalMaxSize = 256 * 1024 // 256KB
+	smeta "github.com/rmorlok/authproxy/internal/schema/resources/meta"
 )
 
 // Annotations is a map of key-value pairs similar to Kubernetes annotations.
@@ -63,44 +58,13 @@ func (a *Annotations) Scan(value interface{}) error {
 	}
 }
 
-// ValidateAnnotationKey validates a single annotation key.
-// Annotation keys follow the same format as label keys.
-func ValidateAnnotationKey(key string) error {
-	return ValidateLabelKey(key)
-}
-
-// ValidateAnnotationValue validates a single annotation value.
-// Annotation values have no format restriction — any string is allowed.
-// Individual value size is not restricted; only the total annotations size is checked.
-func ValidateAnnotationValue(_ string) error {
-	return nil
-}
-
-// ValidateAnnotations validates all annotations in a map.
-func ValidateAnnotations(annotations map[string]string) error {
-	var result *multierror.Error
-	totalSize := 0
-	for key, value := range annotations {
-		if err := ValidateAnnotationKey(key); err != nil {
-			result = multierror.Append(result, fmt.Errorf("invalid annotation key %q: %w", key, err))
-		}
-		totalSize += len(key) + len(value)
-	}
-
-	if totalSize > AnnotationsTotalMaxSize {
-		result = multierror.Append(result, fmt.Errorf("total annotations size %d exceeds maximum of %d bytes", totalSize, AnnotationsTotalMaxSize))
-	}
-
-	return result.ErrorOrNil()
-}
-
 // Validate validates all annotations.
 func (a Annotations) Validate() error {
 	if a == nil {
 		return nil
 	}
 
-	return ValidateAnnotations(a)
+	return smeta.ValidateAnnotations(a)
 }
 
 // Get returns the value for an annotation key, and whether the key exists.

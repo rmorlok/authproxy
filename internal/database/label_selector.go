@@ -7,6 +7,7 @@ import (
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/rmorlok/authproxy/internal/schema/config"
+	smeta "github.com/rmorlok/authproxy/internal/schema/resources/meta"
 )
 
 type LabelOperator string
@@ -50,10 +51,10 @@ func ParseLabelSelector(selector string) (LabelSelector, error) {
 			opParts := strings.SplitN(part, "!=", 2)
 			key := strings.TrimSpace(opParts[0])
 			val := strings.TrimSpace(opParts[1])
-			if err := ValidateLabelKey(key); err != nil {
+			if err := smeta.ValidateLabelKey(key); err != nil {
 				return nil, fmt.Errorf("invalid label key in selector %q: %w", part, err)
 			}
-			if err := validateValueForKey(key, val); err != nil {
+			if err := smeta.ValidateLabelValueForKey(key, val); err != nil {
 				return nil, fmt.Errorf("invalid label value in selector %q: %w", part, err)
 			}
 			requirements = append(requirements, LabelRequirement{
@@ -65,10 +66,10 @@ func ParseLabelSelector(selector string) (LabelSelector, error) {
 			opParts := strings.SplitN(part, "==", 2)
 			key := strings.TrimSpace(opParts[0])
 			val := strings.TrimSpace(opParts[1])
-			if err := ValidateLabelKey(key); err != nil {
+			if err := smeta.ValidateLabelKey(key); err != nil {
 				return nil, fmt.Errorf("invalid label key in selector %q: %w", part, err)
 			}
-			if err := validateValueForKey(key, val); err != nil {
+			if err := smeta.ValidateLabelValueForKey(key, val); err != nil {
 				return nil, fmt.Errorf("invalid label value in selector %q: %w", part, err)
 			}
 			requirements = append(requirements, LabelRequirement{
@@ -80,10 +81,10 @@ func ParseLabelSelector(selector string) (LabelSelector, error) {
 			opParts := strings.SplitN(part, "=", 2)
 			key := strings.TrimSpace(opParts[0])
 			val := strings.TrimSpace(opParts[1])
-			if err := ValidateLabelKey(key); err != nil {
+			if err := smeta.ValidateLabelKey(key); err != nil {
 				return nil, fmt.Errorf("invalid label key in selector %q: %w", part, err)
 			}
-			if err := validateValueForKey(key, val); err != nil {
+			if err := smeta.ValidateLabelValueForKey(key, val); err != nil {
 				return nil, fmt.Errorf("invalid label value in selector %q: %w", part, err)
 			}
 			requirements = append(requirements, LabelRequirement{
@@ -93,7 +94,7 @@ func ParseLabelSelector(selector string) (LabelSelector, error) {
 			})
 		} else if strings.HasPrefix(part, "!") {
 			key := strings.TrimSpace(part[1:])
-			if err := ValidateLabelKey(key); err != nil {
+			if err := smeta.ValidateLabelKey(key); err != nil {
 				return nil, fmt.Errorf("invalid label key in selector %q: %w", part, err)
 			}
 			requirements = append(requirements, LabelRequirement{
@@ -102,7 +103,7 @@ func ParseLabelSelector(selector string) (LabelSelector, error) {
 			})
 		} else {
 			key := strings.TrimSpace(part)
-			if err := ValidateLabelKey(key); err != nil {
+			if err := smeta.ValidateLabelKey(key); err != nil {
 				return nil, fmt.Errorf("invalid label key in selector %q: %w", part, err)
 			}
 			requirements = append(requirements, LabelRequirement{

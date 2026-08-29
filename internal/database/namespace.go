@@ -14,6 +14,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/httperr"
 	scommon "github.com/rmorlok/authproxy/internal/schema/common"
+	smeta "github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -773,7 +774,7 @@ func (s *service) UpdateNamespaceLabels(ctx context.Context, path string, labels
 	}
 
 	if labels != nil {
-		if err := ValidateUserLabels(labels); err != nil {
+		if err := smeta.ValidateUserLabels(labels); err != nil {
 			return nil, fmt.Errorf("invalid labels: %w", err)
 		}
 	}
@@ -815,7 +816,7 @@ func (s *service) PutNamespaceLabels(ctx context.Context, path string, labels ma
 		return s.GetNamespace(ctx, path)
 	}
 
-	if err := ValidateUserLabels(labels); err != nil {
+	if err := smeta.ValidateUserLabels(labels); err != nil {
 		return nil, fmt.Errorf("invalid labels: %w", err)
 	}
 
@@ -856,7 +857,7 @@ func (s *service) DeleteNamespaceLabels(ctx context.Context, path string, keys [
 		return s.GetNamespace(ctx, path)
 	}
 
-	if err := ValidateUserLabelDeletionKeys(keys); err != nil {
+	if err := smeta.ValidateUserLabelDeletionKeys(keys); err != nil {
 		return nil, fmt.Errorf("invalid label keys: %w", err)
 	}
 
@@ -893,7 +894,7 @@ func (s *service) UpdateNamespaceAnnotations(ctx context.Context, path string, a
 	}
 
 	if annotations != nil {
-		if err := ValidateAnnotations(annotations); err != nil {
+		if err := smeta.ValidateAnnotations(annotations); err != nil {
 			return nil, fmt.Errorf("invalid annotations: %w", err)
 		}
 	}
@@ -934,7 +935,7 @@ func (s *service) PutNamespaceAnnotations(ctx context.Context, path string, anno
 		return s.GetNamespace(ctx, path)
 	}
 
-	if err := ValidateAnnotations(annotations); err != nil {
+	if err := smeta.ValidateAnnotations(annotations); err != nil {
 		return nil, fmt.Errorf("invalid annotations: %w", err)
 	}
 

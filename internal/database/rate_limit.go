@@ -14,6 +14,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	scommon "github.com/rmorlok/authproxy/internal/schema/common"
+	smeta "github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 	"github.com/rmorlok/authproxy/internal/util"
@@ -300,7 +301,7 @@ func (s *service) UpdateRateLimitLabels(ctx context.Context, id apid.ID, labels 
 	}
 
 	if labels != nil {
-		if err := ValidateUserLabels(labels); err != nil {
+		if err := smeta.ValidateUserLabels(labels); err != nil {
 			return nil, fmt.Errorf("invalid labels: %w", err)
 		}
 	}
@@ -347,7 +348,7 @@ func (s *service) PutRateLimitLabels(ctx context.Context, id apid.ID, labels map
 		return s.GetRateLimit(ctx, id)
 	}
 
-	if err := ValidateUserLabels(labels); err != nil {
+	if err := smeta.ValidateUserLabels(labels); err != nil {
 		return nil, fmt.Errorf("invalid labels: %w", err)
 	}
 
@@ -393,7 +394,7 @@ func (s *service) DeleteRateLimitLabels(ctx context.Context, id apid.ID, keys []
 		return s.GetRateLimit(ctx, id)
 	}
 
-	if err := ValidateUserLabelDeletionKeys(keys); err != nil {
+	if err := smeta.ValidateUserLabelDeletionKeys(keys); err != nil {
 		return nil, fmt.Errorf("invalid label keys: %w", err)
 	}
 
@@ -436,7 +437,7 @@ func (s *service) UpdateRateLimitAnnotations(ctx context.Context, id apid.ID, an
 	}
 
 	if annotations != nil {
-		if err := ValidateAnnotations(annotations); err != nil {
+		if err := smeta.ValidateAnnotations(annotations); err != nil {
 			return nil, fmt.Errorf("invalid annotations: %w", err)
 		}
 	}
@@ -483,7 +484,7 @@ func (s *service) PutRateLimitAnnotations(ctx context.Context, id apid.ID, annot
 		return s.GetRateLimit(ctx, id)
 	}
 
-	if err := ValidateAnnotations(annotations); err != nil {
+	if err := smeta.ValidateAnnotations(annotations); err != nil {
 		return nil, fmt.Errorf("invalid annotations: %w", err)
 	}
 

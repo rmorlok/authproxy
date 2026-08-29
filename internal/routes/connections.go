@@ -22,6 +22,7 @@ import (
 	schemaapiopenapi "github.com/rmorlok/authproxy/internal/schema/api/openapi"
 	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	smeta "github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 
@@ -1110,7 +1111,7 @@ func (r *ConnectionsRoutes) update(gctx *gin.Context) {
 	}
 
 	if req.Labels != nil {
-		if err := database.ValidateUserLabels(req.Labels); err != nil {
+		if err := smeta.ValidateUserLabels(req.Labels); err != nil {
 			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid labels: %s", err.Error()))
 			val.MarkErrorReturn()
 			return

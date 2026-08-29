@@ -19,6 +19,7 @@ import (
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	schemaapiopenapi "github.com/rmorlok/authproxy/internal/schema/api/openapi"
 	scommon "github.com/rmorlok/authproxy/internal/schema/common"
+	smeta "github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -215,7 +216,7 @@ func (r *RateLimitsRoutes) create(gctx *gin.Context) {
 	}
 
 	if req.Labels != nil {
-		if err := database.ValidateUserLabels(req.Labels); err != nil {
+		if err := smeta.ValidateUserLabels(req.Labels); err != nil {
 			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid labels: %s", err.Error()))
 			val.MarkErrorReturn()
 			return
@@ -381,7 +382,7 @@ func (r *RateLimitsRoutes) update(gctx *gin.Context) {
 	}
 
 	if req.Labels != nil {
-		if err := database.ValidateUserLabels(*req.Labels); err != nil {
+		if err := smeta.ValidateUserLabels(*req.Labels); err != nil {
 			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid labels: %s", err.Error()))
 			val.MarkErrorReturn()
 			return

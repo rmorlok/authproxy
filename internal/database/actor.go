@@ -17,6 +17,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/encfield"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	scommon "github.com/rmorlok/authproxy/internal/schema/common"
+	smeta "github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -889,7 +890,7 @@ func (s *service) PutActorLabels(ctx context.Context, id apid.ID, labels map[str
 		return s.GetActor(ctx, id)
 	}
 
-	if err := ValidateUserLabels(labels); err != nil {
+	if err := smeta.ValidateUserLabels(labels); err != nil {
 		return nil, fmt.Errorf("invalid labels: %w", err)
 	}
 
@@ -937,7 +938,7 @@ func (s *service) UpdateActorAnnotations(ctx context.Context, id apid.ID, annota
 	}
 
 	if annotations != nil {
-		if err := ValidateAnnotations(annotations); err != nil {
+		if err := smeta.ValidateAnnotations(annotations); err != nil {
 			return nil, fmt.Errorf("invalid annotations: %w", err)
 		}
 	}
@@ -989,7 +990,7 @@ func (s *service) PutActorAnnotations(ctx context.Context, id apid.ID, annotatio
 		return s.GetActor(ctx, id)
 	}
 
-	if err := ValidateAnnotations(annotations); err != nil {
+	if err := smeta.ValidateAnnotations(annotations); err != nil {
 		return nil, fmt.Errorf("invalid annotations: %w", err)
 	}
 
@@ -1087,7 +1088,7 @@ func (s *service) DeleteActorLabels(ctx context.Context, id apid.ID, keys []stri
 		return s.GetActor(ctx, id)
 	}
 
-	if err := ValidateUserLabelDeletionKeys(keys); err != nil {
+	if err := smeta.ValidateUserLabelDeletionKeys(keys); err != nil {
 		return nil, fmt.Errorf("invalid label keys: %w", err)
 	}
 

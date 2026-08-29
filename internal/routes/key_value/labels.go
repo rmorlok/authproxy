@@ -12,8 +12,8 @@
 package key_value
 
 import (
-	"github.com/rmorlok/authproxy/internal/database"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
+	smeta "github.com/rmorlok/authproxy/internal/schema/resources/meta"
 )
 
 // Resource is the minimal contract a fetched resource must satisfy so the
@@ -52,8 +52,8 @@ var Label = Kind{
 	PathSegment:   "labels",
 	ParamName:     "label",
 	Singular:      "label",
-	ValidateKey:   database.ValidateUserLabelKey,
-	ValidateValue: database.ValidateLabelValue,
+	ValidateKey:   smeta.ValidateUserLabelKey,
+	ValidateValue: smeta.ValidateLabelValue,
 	Get:           func(r Resource) map[string]string { return r.GetLabels() },
 }
 
@@ -62,8 +62,8 @@ var Annotation = Kind{
 	PathSegment:   "annotations",
 	ParamName:     "annotation",
 	Singular:      "annotation",
-	ValidateKey:   database.ValidateAnnotationKey,
-	ValidateValue: database.ValidateAnnotationValue,
+	ValidateKey:   smeta.ValidateAnnotationKey,
+	ValidateValue: smeta.ValidateAnnotationValue,
 	Get:           func(r Resource) map[string]string { return r.GetAnnotations() },
 }
 
