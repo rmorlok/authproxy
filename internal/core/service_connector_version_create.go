@@ -13,7 +13,14 @@ import (
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
 
-func (s *service) CreateConnectorVersion(ctx context.Context, namespace string, name scommon.ResourceName, definition *cschema.ConnectorDefinition, labels map[string]string, annotations map[string]string) (iface.Connector, error) {
+func (s *service) CreateConnectorVersion(
+	ctx context.Context,
+	namespace string,
+	name scommon.ResourceName,
+	definition *cschema.ConnectorDefinition,
+	labels map[string]string,
+	annotations map[string]string,
+) (iface.Connector, error) {
 	id := apctx.GetIdGenerator(ctx).New(apid.PrefixConnectorVersion)
 
 	c, err := newConnectorBuilder(s).
@@ -31,14 +38,21 @@ func (s *service) CreateConnectorVersion(ctx context.Context, namespace string, 
 	c.ConnectorWithDefinition.Name = name
 	c.ConnectorWithDefinition.Namespace = namespace
 
-	if err := s.db.UpsertConnectorDefinitionVersion(ctx, &c.ConnectorWithDefinition); err != nil {
+	if err := s.db.UpsertConnectorDefinitionVersion(
+		ctx,
+		&c.ConnectorWithDefinition,
+	); err != nil {
 		return nil, fmt.Errorf("failed to upsert connector version: %w", err)
 	}
 
 	return s.getConnectorVersion(ctx, id, 1)
 }
 
-func (s *service) UpdateConnectorName(ctx context.Context, id apid.ID, name scommon.ResourceName) error {
+func (s *service) UpdateConnectorName(
+	ctx context.Context,
+	id apid.ID,
+	name scommon.ResourceName,
+) error {
 	if err := s.db.UpdateConnectorName(ctx, id, name); err != nil {
 		if errors.Is(err, database.ErrNotFound) {
 			return ErrNotFound
@@ -49,9 +63,19 @@ func (s *service) UpdateConnectorName(ctx context.Context, id apid.ID, name scom
 	return nil
 }
 
-func (s *service) CreateDraftConnectorVersion(ctx context.Context, id apid.ID, definition *cschema.ConnectorDefinition, labels map[string]string, annotations map[string]string) (iface.Connector, error) {
+func (s *service) CreateDraftConnectorVersion(
+	ctx context.Context,
+	id apid.ID,
+	definition *cschema.ConnectorDefinition,
+	labels map[string]string,
+	annotations map[string]string,
+) (iface.Connector, error) {
 	// Check for existing draft
-	existingDraft, err := s.db.GetConnectorDefinitionVersionForState(ctx, id, database.ConnectorDefinitionVersionStateDraft)
+	existingDraft, err := s.db.GetConnectorDefinitionVersionForState(
+		ctx,
+		id,
+		database.ConnectorDefinitionVersionStateDraft,
+	)
 	if err != nil && !errors.Is(err, database.ErrNotFound) {
 		return nil, fmt.Errorf("failed to check for existing draft: %w", err)
 	}
@@ -107,7 +131,10 @@ func (s *service) CreateDraftConnectorVersion(ctx context.Context, id apid.ID, d
 	c.ConnectorWithDefinition.Namespace = latest.Namespace
 	c.ConnectorWithDefinition.Name = latest.Name
 
-	if err := s.db.UpsertConnectorDefinitionVersion(ctx, &c.ConnectorWithDefinition); err != nil {
+	if err := s.db.UpsertConnectorDefinitionVersion(
+		ctx,
+		&c.ConnectorWithDefinition,
+	); err != nil {
 		return nil, fmt.Errorf("failed to upsert connector version: %w", err)
 	}
 

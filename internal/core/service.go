@@ -58,7 +58,12 @@ type service struct {
 type Option func(*service)
 
 type workflowClient interface {
-	CreateWorkflowInstance(ctx context.Context, options client.WorkflowInstanceOptions, workflow wflib.Workflow, args ...any) (*wflib.Instance, error)
+	CreateWorkflowInstance(
+		ctx context.Context,
+		options client.WorkflowInstanceOptions,
+		workflow wflib.Workflow,
+		args ...any,
+	) (*wflib.Instance, error)
 }
 
 // WithRateLimitCache wires the in-memory rate-limit rule cache the
@@ -72,7 +77,10 @@ func WithRateLimitCache(c ratelimit.Cache) Option {
 // factories owned by the core service (e.g. the OAuth2 factory) can
 // instrument their lifecycle operations. nil providers / disabled signals
 // degrade to no-op.
-func WithTelemetry(providers *aptelemetry.Providers, cfg *sconfig.Telemetry) Option {
+func WithTelemetry(
+	providers *aptelemetry.Providers,
+	cfg *sconfig.Telemetry,
+) Option {
 	return func(s *service) {
 		s.telProviders = providers
 		s.telCfg = cfg
@@ -133,7 +141,9 @@ func (s *service) buildAuthMethodFactories() map[cschema.AuthType]auth_methods.F
 // auth type. Returns nil if no factory is registered (i.e. an auth type
 // the core service was not wired for); callers fall back to their own
 // not-implemented handling.
-func (s *service) getAuthMethodFactory(connector *cschema.ConnectorDefinition) auth_methods.Factory {
+func (s *service) getAuthMethodFactory(
+	connector *cschema.ConnectorDefinition,
+) auth_methods.Factory {
 	if connector == nil || connector.Auth == nil {
 		return nil
 	}
