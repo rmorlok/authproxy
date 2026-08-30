@@ -48,8 +48,15 @@ type ConnectionJson struct {
 
 type ListConnectionResponseJson = apiv1alpha1.ResourceList[ConnectionJson]
 
-func NewListConnectionResponseJson(items []ConnectionJson, continueToken string) ListConnectionResponseJson {
-	return apiv1alpha1.NewResourceList("Connection", items, apiv1alpha1.ListMeta{Continue: continueToken})
+func NewListConnectionResponseJson(
+	items []ConnectionJson,
+	continueToken string,
+) ListConnectionResponseJson {
+	return apiv1alpha1.NewResourceList(
+		"Connection",
+		items,
+		apiv1alpha1.ListMeta{Continue: continueToken},
+	)
 }
 
 type DisconnectResponseJson struct {

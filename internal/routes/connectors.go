@@ -441,7 +441,7 @@ func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
 					httperr.WithResponseMsg("failed to list connector versions from cursor"),
 				),
 			)
-			
+
 			val.MarkErrorReturn()
 
 			return
