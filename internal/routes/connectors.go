@@ -418,15 +418,32 @@ func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
 	if effectiveMatchers != nil && len(effectiveMatchers) == 0 {
 		// No access to any namespaces for this resource/verb
 		val.MarkValidated()
-		apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewListConnectorVersionsResponseJson(nil, ""))
+		apgin.APIJSON(
+			gctx,
+			http.StatusOK,
+			schemaapi.NewListConnectorVersionsResponseJson(
+				nil, // items
+				"",  // continueToken
+			),
+		)
+
 		return
 	}
 
 	if req.Cursor != nil {
 		ex, err = r.connectors.ListConnectorVersionsFromCursor(ctx, *req.Cursor)
 		if err != nil {
-			apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err), httperr.WithResponseMsg("failed to list connector versions from cursor")))
+			apgin.WriteError(
+				gctx,
+				nil, // logger
+				httperr.InternalServerError(
+					httperr.WithInternalErr(err),
+					httperr.WithResponseMsg("failed to list connector versions from cursor"),
+				),
+			)
+			
 			val.MarkErrorReturn()
+
 			return
 		}
 	} else {
