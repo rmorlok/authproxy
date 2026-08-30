@@ -29,8 +29,14 @@ func (s *service) GetKey(ctx context.Context, id apid.ID) (iface.Key, error) {
 	return wrapKey(*ek, s), nil
 }
 
-func (s *service) ResolveKeyReference(ctx context.Context, reference meta.ObjectReference) (iface.Key, error) {
-	if err := nschema.ValidateEncryptionKeyReference(&reference, nil); err != nil {
+func (s *service) ResolveKeyReference(
+	ctx context.Context,
+	reference meta.ObjectReference,
+) (iface.Key, error) {
+	if err := nschema.ValidateEncryptionKeyReference(
+		&reference,
+		nil, // validation context
+	); err != nil {
 		return nil, fmt.Errorf("invalid key reference: %w", err)
 	}
 
@@ -39,6 +45,7 @@ func (s *service) ResolveKeyReference(ctx context.Context, reference meta.Object
 		if err != nil {
 			return nil, fmt.Errorf("invalid key reference: %w", err)
 		}
+
 		return s.GetKey(ctx, id)
 	}
 
@@ -50,9 +57,11 @@ func (s *service) ResolveKeyReference(ctx context.Context, reference meta.Object
 	if result.Error != nil {
 		return nil, result.Error
 	}
+
 	if len(result.Results) == 0 {
 		return nil, ErrNotFound
 	}
+
 	if len(result.Results) > 1 {
 		return nil, fmt.Errorf("key reference %q/%q is ambiguous", reference.Namespace, reference.Name)
 	}
