@@ -41,6 +41,7 @@ func namespaceResourceFromDatabase(ns database.Namespace) *nschema.Namespace {
 	if err != nil {
 		return nil
 	}
+
 	result.Metadata.Labels = maps.Clone(map[string]string(ns.Labels))
 	result.Metadata.Annotations = maps.Clone(map[string]string(ns.Annotations))
 	result.Metadata.CreatedAt = &ns.CreatedAt
@@ -49,18 +50,23 @@ func namespaceResourceFromDatabase(ns database.Namespace) *nschema.Namespace {
 	result.Status = &nschema.NamespaceStatus{
 		State: nschema.NamespaceState(ns.State),
 	}
+
 	if ns.KeyId != nil {
 		result.Spec.EncryptionKeyRef = nschema.NewEncryptionKeyReference(*ns.KeyId)
 	}
+
 	return result
 }
 
 // databaseNamespaceFromResource converts desired resource data into the flat
 // database model used to create a namespace.
-func databaseNamespaceFromResource(resource *nschema.Namespace) (*database.Namespace, error) {
+func databaseNamespaceFromResource(
+	resource *nschema.Namespace,
+) (*database.Namespace, error) {
 	if resource == nil {
 		return nil, fmt.Errorf("namespace is required")
 	}
+
 	path, err := nschema.PathFromMetadata(resource.Metadata)
 	if err != nil {
 		return nil, err
@@ -72,6 +78,7 @@ func databaseNamespaceFromResource(resource *nschema.Namespace) (*database.Names
 		Labels:      database.Labels(maps.Clone(resource.Metadata.Labels)),
 		Annotations: database.Annotations(maps.Clone(resource.Metadata.Annotations)),
 	}
+
 	if ref := resource.Spec.EncryptionKeyRef; ref != nil {
 		id, err := nschema.EncryptionKeyID(ref)
 		if err != nil {
@@ -79,6 +86,7 @@ func databaseNamespaceFromResource(resource *nschema.Namespace) (*database.Names
 		}
 		result.KeyId = id
 	}
+
 	return result, nil
 }
 
