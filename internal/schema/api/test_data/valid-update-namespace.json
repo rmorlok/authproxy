@@ -1,8 +1,13 @@
 {
-  "labels": {
-    "team": "integrations"
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "Namespace",
+  "metadata": {
+    "labels": {
+      "team": "integrations"
+    },
+    "annotations": {
+      "owner": "api"
+    }
   },
-  "annotations": {
-    "owner": "api"
-  }
+  "spec": {}
 }

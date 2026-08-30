@@ -1,3 +1,14 @@
 {
-  "keyId": "key_test550e8400abcd"
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "Namespace",
+  "metadata": {
+    "id": "root.acme"
+  },
+  "spec": {
+    "encryptionKeyRef": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Key",
+      "id": "key_test550e8400abcd"
+    }
+  }
 }

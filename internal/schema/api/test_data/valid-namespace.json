@@ -1,13 +1,27 @@
 {
-  "path": "root.acme",
-  "state": "active",
-  "keyId": "key_test550e8400abcd",
-  "labels": {
-    "team": "platform"
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "Namespace",
+  "metadata": {
+    "id": "root.acme",
+    "name": "acme",
+    "namespace": "root",
+    "labels": {
+      "team": "platform"
+    },
+    "annotations": {
+      "owner": "integrations"
+    },
+    "createdAt": "2026-05-25T12:00:00Z",
+    "updatedAt": "2026-05-25T12:30:00Z"
   },
-  "annotations": {
-    "owner": "integrations"
+  "spec": {
+    "encryptionKeyRef": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Key",
+      "id": "key_test550e8400abcd"
+    }
   },
-  "createdAt": "2026-05-25T12:00:00Z",
-  "updatedAt": "2026-05-25T12:30:00Z"
+  "status": {
+    "state": "active"
+  }
 }

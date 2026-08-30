@@ -10,6 +10,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	dbtasks "github.com/rmorlok/authproxy/internal/database/tasks"
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -189,14 +190,17 @@ func (s *service) ClearNamespaceKey(ctx context.Context, path string) (iface.Nam
 	return wrapNamespace(*ns, s), nil
 }
 
-func (s *service) CreateNamespace(ctx context.Context, path string, labels map[string]string) (iface.Namespace, error) {
-	ns := &database.Namespace{
-		Path:   path,
-		State:  database.NamespaceStateActive,
-		Labels: database.Labels(labels),
+func (s *service) CreateNamespace(ctx context.Context, resource *namespace.Namespace) (iface.Namespace, error) {
+	if err := resource.ValidateFor(meta.ValidationModeCreate, nil); err != nil {
+		return nil, err
 	}
 
-	err := s.db.CreateNamespace(ctx, ns)
+	ns, err := databaseNamespaceFromResource(resource)
+	if err != nil {
+		return nil, err
+	}
+
+	err = s.db.CreateNamespace(ctx, ns)
 	if err != nil {
 		return nil, err
 	}
@@ -295,9 +299,9 @@ func (l *listNamespaceWrapper) ForName(name common.ResourceName) iface.ListNames
 	}
 }
 
-func (l *listNamespaceWrapper) ForState(s database.NamespaceState) iface.ListNamespacesBuilder {
+func (l *listNamespaceWrapper) ForState(s namespace.NamespaceState) iface.ListNamespacesBuilder {
 	return &listNamespaceWrapper{
-		l: l.l.ForState(s),
+		l: l.l.ForState(database.NamespaceState(s)),
 		s: l.s,
 	}
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
+	nschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -70,9 +71,13 @@ func TestCallbackRejection_CrossNamespace(t *testing.T) {
 	defer env.Cleanup()
 
 	ctx := context.Background()
-	_, err := env.Core.CreateNamespace(ctx, tenantA, nil)
+	namespaceA, err := nschema.NewNamespaceForPath(tenantA)
 	require.NoError(t, err)
-	_, err = env.Core.CreateNamespace(ctx, tenantB, nil)
+	_, err = env.Core.CreateNamespace(ctx, namespaceA)
+	require.NoError(t, err)
+	namespaceB, err := nschema.NewNamespaceForPath(tenantB)
+	require.NoError(t, err)
+	_, err = env.Core.CreateNamespace(ctx, namespaceB)
 	require.NoError(t, err)
 
 	callbackURL := env.PublicOAuthCallbackURL()

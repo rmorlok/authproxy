@@ -18,6 +18,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/ratelimit"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	cfgschema "github.com/rmorlok/authproxy/internal/schema/config"
+	nschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 	"github.com/stretchr/testify/require"
 )
@@ -167,9 +168,13 @@ func TestDryRunRateLimit_NamespaceCascade(t *testing.T) {
 	// Rule at root should apply to a request in root.child; a rule at
 	// root.other should not.
 	rootRule := installRule(t, svc, rlCache, "root", freshTokenBucket())
-	_, err := svc.CreateNamespace(context.Background(), "root.child", nil)
+	child, err := nschema.NewNamespaceForPath("root.child")
 	require.NoError(t, err)
-	_, err = svc.CreateNamespace(context.Background(), "root.other", nil)
+	_, err = svc.CreateNamespace(context.Background(), child)
+	require.NoError(t, err)
+	other, err := nschema.NewNamespaceForPath("root.other")
+	require.NoError(t, err)
+	_, err = svc.CreateNamespace(context.Background(), other)
 	require.NoError(t, err)
 	otherRule := installRule(t, svc, rlCache, "root.other", freshTokenBucket())
 

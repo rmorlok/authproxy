@@ -1,9 +1,15 @@
 {
-  "path": "root.acme",
-  "labels": {
-    "team": "platform"
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "Namespace",
+  "metadata": {
+    "name": "acme",
+    "namespace": "root",
+    "labels": {
+      "team": "platform"
+    },
+    "annotations": {
+      "owner": "integrations"
+    }
   },
-  "annotations": {
-    "owner": "integrations"
-  }
+  "spec": {}
 }

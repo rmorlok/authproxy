@@ -106,15 +106,10 @@ func (c *Connector) ValidateFor(
 				}
 				return nil
 			},
+			NamespaceValidator: nschema.ValidatePath,
 		},
 	); err != nil {
 		result = multierror.Append(result, err)
-	}
-
-	if c.Metadata.Namespace != "" {
-		if err := nschema.ValidatePath(c.Metadata.Namespace); err != nil {
-			result = multierror.Append(result, err)
-		}
 	}
 
 	switch c.Spec.Release.DesiredState {

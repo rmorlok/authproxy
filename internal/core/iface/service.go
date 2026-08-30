@@ -11,6 +11,7 @@ import (
 	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	cfgschema "github.com/rmorlok/authproxy/internal/schema/config"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	nschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 	"github.com/rmorlok/authproxy/internal/tasks"
 	apworkflows "github.com/rmorlok/authproxy/internal/workflows"
@@ -337,8 +338,7 @@ type C interface {
 	// CreateNamespace creates a new namespace.
 	CreateNamespace(
 		ctx context.Context,
-		path string,
-		labels map[string]string,
+		namespace *nschema.Namespace,
 	) (Namespace, error)
 
 	// UpdateNamespaceLabels replaces all labels on a namespace.

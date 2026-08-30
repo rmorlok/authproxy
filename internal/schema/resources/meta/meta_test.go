@@ -138,6 +138,54 @@ func TestValidationContexts(t *testing.T) {
 	})
 }
 
+func TestValidateObjectMetaPatch(t *testing.T) {
+	id := "wid_123"
+	name := common.ResourceName("example")
+	namespace := "root"
+	labels := map[string]string{}
+	annotations := map[string]string{"example.com/owner": "platform"}
+	require.NoError(t, ValidateObjectMetaPatch(ObjectMetaPatch{
+		ID:          &id,
+		Name:        &name,
+		Namespace:   &namespace,
+		Labels:      &labels,
+		Annotations: &annotations,
+	}, ValidationOptions{
+		Mode:               ValidationModeUpdate,
+		IDValidator:        func(value string) error { return nil },
+		NamespaceValidator: func(value string) error { return nil },
+	}))
+
+	empty := ""
+	emptyName := common.ResourceName("")
+	zero := uint64(0)
+	reservedLabels := map[string]string{"apxy/wid/-/id": "wid_123"}
+	now := time.Now()
+	err := ValidateObjectMetaPatch(ObjectMetaPatch{
+		ID:         &empty,
+		Name:       &emptyName,
+		Namespace:  &empty,
+		Generation: &zero,
+		Labels:     &reservedLabels,
+		CreatedAt:  &now,
+		UpdatedAt:  &now,
+	}, ValidationOptions{Mode: ValidationModeUpdate})
+	for _, path := range []string{
+		"$.metadata.id",
+		"$.metadata.name",
+		"$.metadata.namespace",
+		"$.metadata.generation",
+		"$.metadata.labels",
+		"$.metadata.createdAt",
+		"$.metadata.updatedAt",
+	} {
+		require.ErrorContains(t, err, path)
+	}
+
+	err = ValidateObjectMetaPatch(ObjectMetaPatch{}, ValidationOptions{Mode: ValidationModeCreate})
+	require.ErrorContains(t, err, "metadata patches require update validation mode")
+}
+
 func TestTypeMetaAndImmutableValidationUseFieldPaths(t *testing.T) {
 	err := ValidateTypeMeta(
 		TypeMeta{APIVersion: "authproxy.net/v1alpha2", Kind: "Gadget"},

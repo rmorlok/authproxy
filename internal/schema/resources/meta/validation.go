@@ -40,6 +40,7 @@ type ValidationOptions struct {
 	RequireName        bool
 	RequireNamespace   bool
 	IDValidator        func(string) error
+	NamespaceValidator func(string) error
 }
 
 // UpdateOptions selects the resource-specific metadata fields that are
@@ -198,6 +199,10 @@ func ValidateObjectMeta(value ObjectMeta, options ValidationOptions) error {
 
 	if options.RequireNamespace && value.Namespace == "" {
 		result = multierror.Append(result, vc.NewErrorForField("namespace", "is required"))
+	} else if value.Namespace != "" && options.NamespaceValidator != nil {
+		if err := options.NamespaceValidator(value.Namespace); err != nil {
+			result = multierror.Append(result, vc.NewErrorfForField("namespace", "%v", err))
+		}
 	}
 
 	switch options.Mode {
@@ -226,6 +231,69 @@ func ValidateObjectMeta(value ObjectMeta, options ValidationOptions) error {
 
 	if err := ValidateAnnotations(value.Annotations); err != nil {
 		result = multierror.Append(result, vc.NewErrorfForField("annotations", "%v", err))
+	}
+
+	return result.ErrorOrNil()
+}
+
+// ValidateObjectMetaPatch validates the fields that are present in a metadata
+// patch. Resource packages supply validators for their ID and namespace
+// formats, just as they do for complete ObjectMeta values.
+func ValidateObjectMetaPatch(value ObjectMetaPatch, options ValidationOptions) error {
+	vc := validationPath(options.Path).PushField("metadata")
+	var result *multierror.Error
+
+	if options.Mode != ValidationModeUpdate {
+		result = multierror.Append(result, validationPath(options.Path).
+			NewErrorf("metadata patches require update validation mode, got %q", options.Mode))
+	}
+
+	if value.ID != nil {
+		if *value.ID == "" {
+			result = multierror.Append(result, vc.NewErrorForField("id", "must not be empty when provided"))
+		} else if options.IDValidator != nil {
+			if err := options.IDValidator(*value.ID); err != nil {
+				result = multierror.Append(result, vc.NewErrorfForField("id", "%v", err))
+			}
+		}
+	}
+
+	if value.Name != nil {
+		if err := value.Name.Validate(); err != nil {
+			result = multierror.Append(result, vc.NewErrorfForField("name", "%v", err))
+		}
+	}
+
+	if value.Namespace != nil {
+		if *value.Namespace == "" {
+			result = multierror.Append(result, vc.NewErrorForField("namespace", "must not be empty when provided"))
+		} else if options.NamespaceValidator != nil {
+			if err := options.NamespaceValidator(*value.Namespace); err != nil {
+				result = multierror.Append(result, vc.NewErrorfForField("namespace", "%v", err))
+			}
+		}
+	}
+
+	if value.Generation != nil && *value.Generation == 0 {
+		result = multierror.Append(result, vc.NewErrorForField("generation", "must be greater than zero when provided"))
+	}
+
+	if value.Labels != nil {
+		if err := ValidateUserLabels(*value.Labels); err != nil {
+			result = multierror.Append(result, vc.NewErrorfForField("labels", "%v", err))
+		}
+	}
+	if value.Annotations != nil {
+		if err := ValidateAnnotations(*value.Annotations); err != nil {
+			result = multierror.Append(result, vc.NewErrorfForField("annotations", "%v", err))
+		}
+	}
+
+	if value.CreatedAt != nil {
+		result = multierror.Append(result, vc.NewErrorForField("createdAt", "is server-owned"))
+	}
+	if value.UpdatedAt != nil {
+		result = multierror.Append(result, vc.NewErrorForField("updatedAt", "is server-owned"))
 	}
 
 	return result.ErrorOrNil()

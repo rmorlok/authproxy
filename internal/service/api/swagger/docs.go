@@ -8311,7 +8311,35 @@ const docTemplateApi = `{
             }
         },
         "api.NamespaceJson": {
-            "description": "Namespace for organizing resources",
+            "type": "object",
+            "properties": {
+                "apiVersion": {
+                    "$ref": "#/definitions/meta.APIVersion"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/meta.ObjectMeta"
+                },
+                "spec": {
+                    "$ref": "#/definitions/namespace.NamespaceSpec"
+                },
+                "status": {
+                    "$ref": "#/definitions/namespace.NamespaceStatus"
+                }
+            }
+        },
+        "meta.APIVersion": {
+            "type": "string",
+            "enum": [
+                "authproxy.net/v1alpha1"
+            ],
+            "x-enum-varnames": [
+                "APIVersionV1Alpha1"
+            ]
+        },
+        "meta.ObjectMeta": {
             "type": "object",
             "properties": {
                 "annotations": {
@@ -8323,9 +8351,11 @@ const docTemplateApi = `{
                 "createdAt": {
                     "type": "string"
                 },
-                "keyId": {
-                    "type": "string",
-                    "example": "key_test550e8400abcd"
+                "generation": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
                 },
                 "labels": {
                     "type": "object",
@@ -8334,19 +8364,86 @@ const docTemplateApi = `{
                     }
                 },
                 "name": {
-                    "description": "Name is automatically set to the final segment of Path and cannot be changed.",
-                    "type": "string",
-                    "example": "acme"
+                    "type": "string"
                 },
-                "path": {
-                    "type": "string",
-                    "example": "root.acme"
-                },
-                "state": {
-                    "type": "string",
-                    "example": "active"
+                "namespace": {
+                    "type": "string"
                 },
                 "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "meta.ObjectMetaPatch": {
+            "type": "object",
+            "properties": {
+                "annotations": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "generation": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "labels": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "namespace": {
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "meta.ObjectReference": {
+            "type": "object",
+            "properties": {
+                "apiVersion": {
+                    "$ref": "#/definitions/meta.APIVersion"
+                },
+                "generation": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "namespace": {
+                    "type": "string"
+                }
+            }
+        },
+        "namespace.NamespaceSpec": {
+            "type": "object",
+            "properties": {
+                "encryptionKeyRef": {
+                    "$ref": "#/definitions/meta.ObjectReference"
+                }
+            }
+        },
+        "namespace.NamespaceStatus": {
+            "type": "object",
+            "properties": {
+                "state": {
                     "type": "string"
                 }
             }
@@ -8766,24 +8863,22 @@ const docTemplateApi = `{
             }
         },
         "routes.CreateNamespaceRequestJson": {
-            "description": "Namespace creation request",
             "type": "object",
             "properties": {
-                "annotations": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
+                "apiVersion": {
+                    "$ref": "#/definitions/meta.APIVersion"
                 },
-                "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
+                "kind": {
+                    "type": "string"
                 },
-                "path": {
-                    "type": "string",
-                    "example": "root.acme"
+                "metadata": {
+                    "$ref": "#/definitions/meta.ObjectMeta"
+                },
+                "spec": {
+                    "$ref": "#/definitions/namespace.NamespaceSpec"
+                },
+                "status": {
+                    "$ref": "#/definitions/namespace.NamespaceStatus"
                 }
             }
         },
@@ -8897,43 +8992,22 @@ const docTemplateApi = `{
             }
         },
         "routes.NamespaceJson": {
-            "description": "Namespace for organizing resources",
             "type": "object",
             "properties": {
-                "annotations": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
+                "apiVersion": {
+                    "$ref": "#/definitions/meta.APIVersion"
                 },
-                "createdAt": {
+                "kind": {
                     "type": "string"
                 },
-                "keyId": {
-                    "type": "string",
-                    "example": "key_test550e8400abcd"
+                "metadata": {
+                    "$ref": "#/definitions/meta.ObjectMeta"
                 },
-                "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
+                "spec": {
+                    "$ref": "#/definitions/namespace.NamespaceSpec"
                 },
-                "name": {
-                    "description": "Name is automatically set to the final segment of Path and cannot be changed.",
-                    "type": "string",
-                    "example": "acme"
-                },
-                "path": {
-                    "type": "string",
-                    "example": "root.acme"
-                },
-                "state": {
-                    "type": "string",
-                    "example": "active"
-                },
-                "updatedAt": {
-                    "type": "string"
+                "status": {
+                    "$ref": "#/definitions/namespace.NamespaceStatus"
                 }
             }
         },
@@ -10032,20 +10106,22 @@ const docTemplateApi = `{
             }
         },
         "routes.UpdateNamespaceRequestJson": {
-            "description": "Namespace update request",
             "type": "object",
             "properties": {
-                "annotations": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
+                "apiVersion": {
+                    "$ref": "#/definitions/meta.APIVersion"
                 },
-                "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
+                "kind": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/meta.ObjectMetaPatch"
+                },
+                "spec": {
+                    "$ref": "#/definitions/namespace.NamespaceSpec"
+                },
+                "status": {
+                    "$ref": "#/definitions/namespace.NamespaceStatus"
                 }
             }
         },

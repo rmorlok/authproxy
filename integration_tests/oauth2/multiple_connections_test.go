@@ -18,6 +18,7 @@ import (
 	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
+	nschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -76,9 +77,13 @@ func TestOAuth2MultipleConnections_DifferentTenantsSameProviderAccount(t *testin
 
 	tenantA := uniqueTenantNamespace("tenant-a")
 	tenantB := uniqueTenantNamespace("tenant-b")
-	_, err := rig.env.Core.CreateNamespace(context.Background(), tenantA, nil)
+	namespaceA, err := nschema.NewNamespaceForPath(tenantA)
 	require.NoError(t, err)
-	_, err = rig.env.Core.CreateNamespace(context.Background(), tenantB, nil)
+	_, err = rig.env.Core.CreateNamespace(context.Background(), namespaceA)
+	require.NoError(t, err)
+	namespaceB, err := nschema.NewNamespaceForPath(tenantB)
+	require.NoError(t, err)
+	_, err = rig.env.Core.CreateNamespace(context.Background(), namespaceB)
 	require.NoError(t, err)
 
 	connA := completeAuthFlowAsActor(t, rig, "tenant-a-actor", tenantA)

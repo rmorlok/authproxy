@@ -8,7 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/apgin"
-	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/core"
 	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
@@ -18,7 +17,7 @@ import (
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	schemaapiopenapi "github.com/rmorlok/authproxy/internal/schema/api/openapi"
 	scommon "github.com/rmorlok/authproxy/internal/schema/common"
-	smeta "github.com/rmorlok/authproxy/internal/schema/resources/meta"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -35,33 +34,18 @@ type NamespaceKeyJson = schemaapi.NamespaceKeyJson
 type OpenAPIListNamespacesResponseJson = schemaapiopenapi.ListNamespacesResponseJson
 
 func NamespaceToJson(ns coreIface.Namespace) NamespaceJson {
-	var ekId *string
-	if ns.GetKeyId() != nil {
-		s := string(*ns.GetKeyId())
-		ekId = &s
-	}
-
-	return NamespaceJson{
-		Path:        ns.GetPath(),
-		Name:        ns.GetName(),
-		State:       schemaapi.NamespaceState(ns.GetState()),
-		KeyId:       ekId,
-		Labels:      ns.GetLabels(),
-		Annotations: ns.GetAnnotations(),
-		CreatedAt:   ns.GetCreatedAt(),
-		UpdatedAt:   ns.GetUpdatedAt(),
-	}
+	return *ns.GetResource()
 }
 
 type ListNamespacesRequestQueryParams struct {
-	Cursor        *string                  `form:"cursor"`
-	LimitVal      *int32                   `form:"limit"`
-	StateVal      *database.NamespaceState `form:"state"`
-	ChildrenOf    *string                  `form:"childrenOf"`
-	NamespaceVal  *string                  `form:"namespace"`
-	NameVal       *string                  `form:"name"`
-	LabelSelector *string                  `form:"labelSelector"`
-	OrderByVal    *string                  `form:"orderBy"`
+	Cursor        *string                   `form:"cursor"`
+	LimitVal      *int32                    `form:"limit"`
+	StateVal      *namespace.NamespaceState `form:"state"`
+	ChildrenOf    *string                   `form:"childrenOf"`
+	NamespaceVal  *string                   `form:"namespace"`
+	NameVal       *string                   `form:"name"`
+	LabelSelector *string                   `form:"labelSelector"`
+	OrderByVal    *string                   `form:"orderBy"`
 }
 
 type NamespacesRoutes struct {
@@ -115,7 +99,11 @@ func (r *NamespacesRoutes) get(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, NamespaceToJson(ns))
+	resource := NamespaceToJson(ns)
+	if err := apgin.RenderResourceJSON(gctx, http.StatusOK, &resource); err != nil {
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+		val.MarkErrorReturn()
+	}
 }
 
 // @Summary		Create namespace
@@ -136,30 +124,23 @@ func (r *NamespacesRoutes) create(gctx *gin.Context) {
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
 	var req CreateNamespaceRequestJson
-	if err := apgin.BindJSONBody(gctx, &req); err != nil {
+	if err := apgin.BindResourceJSON(gctx, &req, meta.ValidationModeCreate); err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
+		val.MarkErrorReturn()
+		return
+	}
+
+	path, err := namespace.PathFromMetadata(req.Metadata)
+	if err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
 	}
 
-	if err := namespace.ValidatePath(req.Path); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid namespace path '%s': %s", req.Path, err.Error()))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if req.Labels != nil {
-		if err := smeta.ValidateUserLabels(req.Labels); err != nil {
-			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid labels: %s", err.Error()))
-			val.MarkErrorReturn()
-			return
-		}
-	}
-
-	ns, err := r.core.GetNamespace(ctx, req.Path)
+	ns, err := r.core.GetNamespace(ctx, path)
 	if err == nil {
 		// This means the namespace already exists
-		apgin.WriteError(gctx, nil, httperr.Conflictf("namespace '%s' already exists", req.Path))
+		apgin.WriteError(gctx, nil, httperr.Conflictf("namespace '%s' already exists", path))
 		val.MarkErrorReturn()
 		return
 	}
@@ -170,36 +151,24 @@ func (r *NamespacesRoutes) create(gctx *gin.Context) {
 		return
 	}
 
-	if err := val.ValidateNamespace(req.Path); err != nil {
+	if err := val.ValidateNamespace(path); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
-	ns, err = r.core.CreateNamespace(ctx, req.Path, req.Labels)
+	ns, err = r.core.CreateNamespace(ctx, &req)
 	if err != nil {
 		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
 
-	// Set annotations if provided
-	if req.Annotations != nil {
-		if err := database.Annotations(req.Annotations).Validate(); err != nil {
-			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid annotations: %s", err.Error()))
-			val.MarkErrorReturn()
-			return
-		}
-
-		ns, err = r.core.UpdateNamespaceAnnotations(ctx, req.Path, req.Annotations)
-		if err != nil {
-			apgin.WriteErr(gctx, nil, err)
-			val.MarkErrorReturn()
-			return
-		}
+	resource := NamespaceToJson(ns)
+	if err := apgin.RenderResourceJSON(gctx, http.StatusOK, &resource); err != nil {
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+		val.MarkErrorReturn()
 	}
-
-	apgin.APIJSON(gctx, http.StatusOK, NamespaceToJson(ns))
 }
 
 // @Summary		List namespaces
@@ -250,6 +219,11 @@ func (r *NamespacesRoutes) list(gctx *gin.Context) {
 		}
 
 		if req.StateVal != nil {
+			if !namespace.IsValidState(*req.StateVal) {
+				apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid namespace state %q", *req.StateVal))
+				val.MarkErrorReturn()
+				return
+			}
 			b = b.ForState(*req.StateVal)
 		}
 
@@ -315,10 +289,16 @@ func (r *NamespacesRoutes) list(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewListNamespacesResponseJson(
+	response := schemaapi.NewListNamespacesResponseJson(
 		util.Map(auth.FilterForValidatedResources(val, result.Results), NamespaceToJson),
 		result.Cursor,
-	))
+	)
+	if err := response.Validate(namespace.NamespaceKind); err != nil {
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+		val.MarkErrorReturn()
+		return
+	}
+	apgin.APIJSON(gctx, http.StatusOK, response)
 }
 
 // @Summary		Update namespace
@@ -348,28 +328,10 @@ func (r *NamespacesRoutes) update(gctx *gin.Context) {
 	}
 
 	var req UpdateNamespaceRequestJson
-	if err := apgin.BindJSONBody(gctx, &req); err != nil {
+	if err := apgin.BindResourceJSON(gctx, &req, meta.ValidationModeUpdate); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
-	}
-
-	// Validate labels if provided
-	if req.Labels != nil {
-		if err := smeta.ValidateUserLabels(req.Labels); err != nil {
-			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid labels: %s", err.Error()))
-			val.MarkErrorReturn()
-			return
-		}
-	}
-
-	// Validate annotations if provided
-	if req.Annotations != nil {
-		if err := database.Annotations(req.Annotations).Validate(); err != nil {
-			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid annotations: %s", err.Error()))
-			val.MarkErrorReturn()
-			return
-		}
 	}
 
 	// Get the existing namespace for authorization check
@@ -391,9 +353,17 @@ func (r *NamespacesRoutes) update(gctx *gin.Context) {
 		return
 	}
 
+	before := ns.GetResource()
+	_, err = req.ApplyTo(before, nil)
+	if err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		val.MarkErrorReturn()
+		return
+	}
+
 	// Only update labels if provided in the request
-	if req.Labels != nil {
-		ns, err = r.core.UpdateNamespaceLabels(ctx, path, req.Labels)
+	if req.Metadata.Labels != nil {
+		ns, err = r.core.UpdateNamespaceLabels(ctx, path, *req.Metadata.Labels)
 		if err != nil {
 			if errors.Is(err, core.ErrNotFound) {
 				apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("namespace '%s' not found", path), httperr.WithInternalErr(err)))
@@ -408,8 +378,8 @@ func (r *NamespacesRoutes) update(gctx *gin.Context) {
 	}
 
 	// Only update annotations if provided in the request
-	if req.Annotations != nil {
-		ns, err = r.core.UpdateNamespaceAnnotations(ctx, path, req.Annotations)
+	if req.Metadata.Annotations != nil {
+		ns, err = r.core.UpdateNamespaceAnnotations(ctx, path, *req.Metadata.Annotations)
 		if err != nil {
 			if errors.Is(err, core.ErrNotFound) {
 				apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("namespace '%s' not found", path), httperr.WithInternalErr(err)))
@@ -423,7 +393,26 @@ func (r *NamespacesRoutes) update(gctx *gin.Context) {
 		}
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, NamespaceToJson(ns))
+	if ref := req.Spec.EncryptionKeyRef; ref != nil {
+		keyID, err := namespace.EncryptionKeyID(ref)
+		if err != nil {
+			apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+			val.MarkErrorReturn()
+			return
+		}
+		ns, err = r.core.SetNamespaceKey(ctx, path, *keyID)
+		if err != nil {
+			apgin.WriteErr(gctx, nil, err)
+			val.MarkErrorReturn()
+			return
+		}
+	}
+
+	resource := NamespaceToJson(ns)
+	if err := apgin.RenderResourceJSON(gctx, http.StatusOK, &resource); err != nil {
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+		val.MarkErrorReturn()
+	}
 }
 
 // Label and annotation handlers for namespaces delegate to a shared
@@ -589,9 +578,11 @@ func (r *NamespacesRoutes) getKey(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, NamespaceKeyJson{
-		KeyId: string(*ekId),
-	})
+	resource := NamespaceToJson(ns)
+	if err := apgin.RenderResourceJSON(gctx, http.StatusOK, &resource); err != nil {
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+		val.MarkErrorReturn()
+	}
 }
 
 func (r *NamespacesRoutes) setKey(gctx *gin.Context) {
@@ -607,14 +598,14 @@ func (r *NamespacesRoutes) setKey(gctx *gin.Context) {
 	}
 
 	var req SetNamespaceKeyRequestJson
-	if err := apgin.BindJSONBody(gctx, &req); err != nil {
+	if err := apgin.BindResourceJSON(gctx, &req, meta.ValidationModeUpdate); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
-	if req.KeyId == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("keyId is required"))
+	if req.Spec.EncryptionKeyRef == nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequest("spec.encryptionKeyRef is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -637,11 +628,22 @@ func (r *NamespacesRoutes) setKey(gctx *gin.Context) {
 		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
+	if _, err := req.ApplyTo(ns.GetResource(), nil); err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		val.MarkErrorReturn()
+		return
+	}
 
-	ns, err = r.core.SetNamespaceKey(ctx, path, apid.ID(req.KeyId))
+	keyID, err := namespace.EncryptionKeyID(req.Spec.EncryptionKeyRef)
+	if err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		val.MarkErrorReturn()
+		return
+	}
+	ns, err = r.core.SetNamespaceKey(ctx, path, *keyID)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("key '%s' not found", req.KeyId), httperr.WithInternalErr(err)))
+			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("key '%s' not found", *keyID), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
@@ -658,7 +660,11 @@ func (r *NamespacesRoutes) setKey(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, NamespaceToJson(ns))
+	resource := NamespaceToJson(ns)
+	if err := apgin.RenderResourceJSON(gctx, http.StatusOK, &resource); err != nil {
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+		val.MarkErrorReturn()
+	}
 }
 
 func (r *NamespacesRoutes) clearKey(gctx *gin.Context) {

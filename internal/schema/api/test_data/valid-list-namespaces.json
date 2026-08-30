@@ -1,18 +1,27 @@
 {
-	"apiVersion": "authproxy.net/v1alpha1",
-	"kind": "NamespaceList",
-	"metadata": {
-		"continue": "next-page"
-	},
-	"items": [
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "NamespaceList",
+  "metadata": {
+    "continue": "next-page"
+  },
+  "items": [
     {
-      "path": "root.acme",
-      "state": "active",
-      "labels": {
-        "team": "platform"
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Namespace",
+      "metadata": {
+        "id": "root.acme",
+        "name": "acme",
+        "namespace": "root",
+        "labels": {
+          "team": "platform"
+        },
+        "createdAt": "2026-05-25T12:00:00Z",
+        "updatedAt": "2026-05-25T12:30:00Z"
       },
-      "createdAt": "2026-05-25T12:00:00Z",
-      "updatedAt": "2026-05-25T12:30:00Z"
+      "spec": {},
+      "status": {
+        "state": "active"
+      }
     }
-	]
+  ]
 }
