@@ -51,8 +51,15 @@ type UpdateNamespaceRequestJson struct {
 // ListNamespacesResponseJson is the Kubernetes-style namespace list response.
 type ListNamespacesResponseJson = apiv1alpha1.ResourceList[NamespaceJson]
 
-func NewListNamespacesResponseJson(items []NamespaceJson, continueToken string) ListNamespacesResponseJson {
-	return apiv1alpha1.NewResourceList("Namespace", items, apiv1alpha1.ListMeta{Continue: continueToken})
+func NewListNamespacesResponseJson(
+	items []NamespaceJson,
+	continueToken string,
+) ListNamespacesResponseJson {
+	return apiv1alpha1.NewResourceList(
+		"Namespace",
+		items,
+		apiv1alpha1.ListMeta{Continue: continueToken},
+	)
 }
 
 // SetNamespaceKeyRequestJson sets the key used by a namespace.

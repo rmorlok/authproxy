@@ -25,8 +25,15 @@ type RateLimitJson struct {
 
 type ListRateLimitsResponseJson = apiv1alpha1.ResourceList[RateLimitJson]
 
-func NewListRateLimitsResponseJson(items []RateLimitJson, continueToken string) ListRateLimitsResponseJson {
-	return apiv1alpha1.NewResourceList("RateLimit", items, apiv1alpha1.ListMeta{Continue: continueToken})
+func NewListRateLimitsResponseJson(
+	items []RateLimitJson,
+	continueToken string,
+) ListRateLimitsResponseJson {
+	return apiv1alpha1.NewResourceList(
+		"RateLimit",
+		items,
+		apiv1alpha1.ListMeta{Continue: continueToken},
+	)
 }
 
 // CreateRateLimitRequestJson is the request body for POST /rate-limits.
