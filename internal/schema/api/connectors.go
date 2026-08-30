@@ -42,8 +42,15 @@ type ConnectorJson struct {
 
 type ListConnectorsResponseJson = apiv1alpha1.ResourceList[ConnectorJson]
 
-func NewListConnectorsResponseJson(items []ConnectorJson, continueToken string) ListConnectorsResponseJson {
-	return apiv1alpha1.NewResourceList("Connector", items, apiv1alpha1.ListMeta{Continue: continueToken})
+func NewListConnectorsResponseJson(
+	items []ConnectorJson,
+	continueToken string,
+) ListConnectorsResponseJson {
+	return apiv1alpha1.NewResourceList(
+		"Connector",
+		items,
+		apiv1alpha1.ListMeta{Continue: continueToken},
+	)
 }
 
 // ConnectorVersionJson represents a single connector version returned by the API.

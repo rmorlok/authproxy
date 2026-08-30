@@ -72,8 +72,14 @@ func TestUpsertConnectorSkipsMatchingPrimarySeed(t *testing.T) {
 		switch r.Method + " " + r.URL.Path {
 		case "GET /api/v1/connectors":
 			writeJSON(t, w, api.NewListConnectorsResponseJson(
-				[]api.ConnectorJson{connectorSummary(seed, api.ConnectorVersionStatePrimary, 1)},
-				"",
+				[]api.ConnectorJson{
+					connectorSummary(
+						seed,
+						api.ConnectorVersionStatePrimary,
+						1, // version
+					),
+				},
+				"", // continueToken
 			))
 		case "GET /api/v1/connectors/cxr_testgmail0000001/versions/1":
 			writeJSON(t, w, connectorVersion(seed.Definition, connectorLabels(seed), api.ConnectorVersionStatePrimary, 1))
