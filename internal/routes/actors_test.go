@@ -139,7 +139,11 @@ func TestActorsRoutes(t *testing.T) {
 
 			var resp ListActorsResponseJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, "authproxy.net/v1alpha1", string(resp.APIVersion))
+			require.Equal(t, "ActorList", string(resp.Kind))
+			require.NotNil(t, resp.Items)
 			require.GreaterOrEqual(t, len(resp.Items), 1)
+			require.NotContains(t, w.Body.String(), `"cursor"`)
 		})
 
 		t.Run("with results and pagination", func(t *testing.T) {
@@ -162,11 +166,11 @@ func TestActorsRoutes(t *testing.T) {
 			var resp1 ListActorsResponseJson
 			require.NoError(t, json.Unmarshal(w1.Body.Bytes(), &resp1))
 			require.Len(t, resp1.Items, 2)
-			require.NotEmpty(t, resp1.Cursor)
+			require.NotEmpty(t, resp1.Metadata.Continue)
 
 			// page 2 using cursor
 			w2 := httptest.NewRecorder()
-			req2, err := http.NewRequest(http.MethodGet, "/actors?cursor="+url.QueryEscape(resp1.Cursor), nil)
+			req2, err := http.NewRequest(http.MethodGet, "/actors?cursor="+url.QueryEscape(resp1.Metadata.Continue), nil)
 			require.NoError(t, err)
 			req2 = authenticate(t, tu, req2)
 
@@ -175,7 +179,7 @@ func TestActorsRoutes(t *testing.T) {
 			var resp2 ListActorsResponseJson
 			require.NoError(t, json.Unmarshal(w2.Body.Bytes(), &resp2))
 			require.GreaterOrEqual(t, len(resp2.Items), 1)
-			require.Equal(t, "", resp2.Cursor)
+			require.Equal(t, "", resp2.Metadata.Continue)
 		})
 
 		t.Run("invalid order_by field", func(t *testing.T) {

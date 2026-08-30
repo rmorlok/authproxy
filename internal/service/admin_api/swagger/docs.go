@@ -8351,6 +8351,186 @@ const docTemplateadmin_api = `{
                 }
             }
         },
+        "openapi.ConnectionJson": {
+            "description": "Connection to an external service",
+            "type": "object",
+            "properties": {
+                "annotations": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "connector": {},
+                "createdAt": {
+                    "type": "string"
+                },
+                "healthState": {
+                    "type": "string",
+                    "example": "healthy"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "cxn_test550e8400abcde"
+                },
+                "labels": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "name": {
+                    "type": "string",
+                    "example": "production-crm"
+                },
+                "namespace": {
+                    "type": "string",
+                    "example": "root.acme"
+                },
+                "setupError": {
+                    "type": "string"
+                },
+                "setupStepId": {
+                    "type": "string",
+                    "example": "tenant"
+                },
+                "state": {
+                    "type": "string",
+                    "example": "configured"
+                },
+                "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "openapi.ConnectorVersionJson": {
+            "description": "Detailed connector version information",
+            "type": "object",
+            "properties": {
+                "annotations": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "definition": {},
+                "id": {
+                    "type": "string",
+                    "example": "cxr_test550e8400abcde"
+                },
+                "labels": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "name": {
+                    "type": "string",
+                    "example": "salesforce"
+                },
+                "namespace": {
+                    "type": "string",
+                    "example": "root.acme"
+                },
+                "state": {
+                    "type": "string",
+                    "example": "primary"
+                },
+                "updatedAt": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "integer",
+                    "example": 1
+                }
+            }
+        },
+        "openapi.KeyJson": {
+            "description": "Key API response",
+            "type": "object",
+            "properties": {
+                "annotations": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "key_test550e8400abcd"
+                },
+                "keyData": {
+                    "type": "object"
+                },
+                "labels": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "name": {
+                    "type": "string",
+                    "example": "primary-encryption-key"
+                },
+                "namespace": {
+                    "type": "string",
+                    "example": "root.acme"
+                },
+                "state": {
+                    "type": "string",
+                    "example": "active"
+                },
+                "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "openapi.RateLimitJson": {
+            "description": "Rate-limit API response",
+            "type": "object",
+            "properties": {
+                "annotations": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "definition": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "id": {
+                    "type": "string",
+                    "example": "rl_test550e8400abcde"
+                },
+                "labels": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "name": {
+                    "type": "string",
+                    "example": "public-api"
+                },
+                "namespace": {
+                    "type": "string",
+                    "example": "root.acme"
+                },
+                "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
         "routes.ActorJson": {
             "description": "Actor identity within a namespace",
             "type": "object",
@@ -9081,10 +9261,19 @@ const docTemplateadmin_api = `{
         "routes.OpenAPIListActorsResponseJson": {
             "description": "Paginated list of actors",
             "type": "object",
+            "required": [
+                "apiVersion",
+                "items",
+                "kind",
+                "metadata"
+            ],
             "properties": {
-                "cursor": {
-                    "description": "Pagination cursor for next page.",
-                    "type": "string"
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
                 },
                 "items": {
                     "description": "List of actors.",
@@ -9092,44 +9281,94 @@ const docTemplateadmin_api = `{
                     "items": {
                         "$ref": "#/definitions/api.ActorJson"
                     }
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/v1alpha1.ListMeta"
                 }
             }
         },
         "routes.OpenAPIListConnectionResponseJson": {
             "description": "Paginated list of connections",
             "type": "object",
+            "required": [
+                "apiVersion",
+                "items",
+                "kind",
+                "metadata"
+            ],
             "properties": {
-                "cursor": {
-                    "type": "string"
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
                 },
                 "items": {
                     "type": "array",
-                    "items": {}
+                    "items": {
+                        "$ref": "#/definitions/openapi.ConnectionJson"
+                    }
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/v1alpha1.ListMeta"
                 }
             }
         },
         "routes.OpenAPIListConnectorVersionsResponseJson": {
             "description": "Paginated list of connector versions",
             "type": "object",
+            "required": [
+                "apiVersion",
+                "items",
+                "kind",
+                "metadata"
+            ],
             "properties": {
-                "cursor": {
-                    "description": "Pagination cursor for next page.",
-                    "type": "string"
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
                 },
                 "items": {
                     "description": "List of connector versions.",
                     "type": "array",
-                    "items": {}
+                    "items": {
+                        "$ref": "#/definitions/openapi.ConnectorVersionJson"
+                    }
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/v1alpha1.ListMeta"
                 }
             }
         },
         "routes.OpenAPIListConnectorsResponseJson": {
             "description": "Paginated list of connectors",
             "type": "object",
+            "required": [
+                "apiVersion",
+                "items",
+                "kind",
+                "metadata"
+            ],
             "properties": {
-                "cursor": {
-                    "description": "Pagination cursor for next page.",
-                    "type": "string"
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
                 },
                 "items": {
                     "description": "List of connectors.",
@@ -9137,29 +9376,62 @@ const docTemplateadmin_api = `{
                     "items": {
                         "$ref": "#/definitions/api.ConnectorJson"
                     }
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/v1alpha1.ListMeta"
                 }
             }
         },
         "routes.OpenAPIListKeysResponseJson": {
             "description": "Paginated list of keys",
             "type": "object",
+            "required": [
+                "apiVersion",
+                "items",
+                "kind",
+                "metadata"
+            ],
             "properties": {
-                "cursor": {
-                    "type": "string"
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
                 },
                 "items": {
                     "type": "array",
-                    "items": {}
+                    "items": {
+                        "$ref": "#/definitions/openapi.KeyJson"
+                    }
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/v1alpha1.ListMeta"
                 }
             }
         },
         "routes.OpenAPIListNamespacesResponseJson": {
             "description": "Paginated list of namespaces",
             "type": "object",
+            "required": [
+                "apiVersion",
+                "items",
+                "kind",
+                "metadata"
+            ],
             "properties": {
-                "cursor": {
-                    "description": "Pagination cursor for next page.",
-                    "type": "string"
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
                 },
                 "items": {
                     "description": "List of namespaces.",
@@ -9167,6 +9439,12 @@ const docTemplateadmin_api = `{
                     "items": {
                         "$ref": "#/definitions/api.NamespaceJson"
                     }
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/v1alpha1.ListMeta"
                 }
             }
         },
@@ -9186,13 +9464,31 @@ const docTemplateadmin_api = `{
         "routes.OpenAPIListRateLimitsResponseJson": {
             "description": "Paginated list of rate limits",
             "type": "object",
+            "required": [
+                "apiVersion",
+                "items",
+                "kind",
+                "metadata"
+            ],
             "properties": {
-                "cursor": {
-                    "type": "string"
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
                 },
                 "items": {
                     "type": "array",
-                    "items": {}
+                    "items": {
+                        "$ref": "#/definitions/openapi.RateLimitJson"
+                    }
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/v1alpha1.ListMeta"
                 }
             }
         },
@@ -9750,6 +10046,20 @@ const docTemplateadmin_api = `{
                     "additionalProperties": {
                         "type": "string"
                     }
+                }
+            }
+        },
+        "v1alpha1.ListMeta": {
+            "type": "object",
+            "properties": {
+                "continue": {
+                    "type": "string"
+                },
+                "remainingItemCount": {
+                    "type": "integer"
+                },
+                "resourceVersion": {
+                    "type": "string"
                 }
             }
         }

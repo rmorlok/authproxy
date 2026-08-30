@@ -136,7 +136,7 @@ func (r *NamespacesRoutes) create(gctx *gin.Context) {
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
 	var req CreateNamespaceRequestJson
-	if err := bindJSONBody(gctx, &req); err != nil {
+	if err := apgin.BindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
@@ -315,10 +315,10 @@ func (r *NamespacesRoutes) list(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, ListNamespacesResponseJson{
-		Items:  util.Map(auth.FilterForValidatedResources(val, result.Results), NamespaceToJson),
-		Cursor: result.Cursor,
-	})
+	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewListNamespacesResponseJson(
+		util.Map(auth.FilterForValidatedResources(val, result.Results), NamespaceToJson),
+		result.Cursor,
+	))
 }
 
 // @Summary		Update namespace
@@ -348,7 +348,7 @@ func (r *NamespacesRoutes) update(gctx *gin.Context) {
 	}
 
 	var req UpdateNamespaceRequestJson
-	if err := bindJSONBody(gctx, &req); err != nil {
+	if err := apgin.BindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
@@ -607,7 +607,7 @@ func (r *NamespacesRoutes) setKey(gctx *gin.Context) {
 	}
 
 	var req SetNamespaceKeyRequestJson
-	if err := bindJSONBody(gctx, &req); err != nil {
+	if err := apgin.BindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return

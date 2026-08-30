@@ -88,7 +88,7 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
 	var req coreIface.InitiateConnectionRequest
-	if err := bindJSONBody(gctx, &req); err != nil {
+	if err := apgin.BindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
@@ -148,7 +148,7 @@ func (r *ConnectionsRoutes) submit(gctx *gin.Context) {
 	}
 
 	var req coreIface.SubmitConnectionRequest
-	if err := bindJSONBody(gctx, &req); err != nil {
+	if err := apgin.BindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
@@ -422,12 +422,12 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, ListConnectionResponseJson{
-		Items: util.Map(auth.FilterForValidatedResources(val, result.Results), func(c coreIface.Connection) ConnectionJson {
+	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewListConnectionResponseJson(
+		util.Map(auth.FilterForValidatedResources(val, result.Results), func(c coreIface.Connection) ConnectionJson {
 			return ConnectionToJson(c)
 		}),
-		Cursor: result.Cursor,
-	})
+		result.Cursor,
+	))
 }
 
 // @Summary		Get connection
@@ -570,7 +570,7 @@ func (r *ConnectionsRoutes) parseConnectionDisconnectRequest(gctx *gin.Context) 
 
 	req := DisconnectConnectionRequestJson{}
 	if gctx.Request.Body != http.NoBody && gctx.Request.ContentLength != 0 {
-		if err := bindJSONBody(gctx, &req); err != nil {
+		if err := apgin.BindJSONBody(gctx, &req); err != nil {
 			apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 			val.MarkErrorReturn()
 			return coreIface.ConnectionDisconnectOptions{}, false
@@ -666,7 +666,7 @@ func (r *ConnectionsRoutes) parseConnectionMigrationRequest(gctx *gin.Context) (
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
 	req := MigrateConnectionVersionRequestJson{}
-	if err := bindJSONBody(gctx, &req); err != nil {
+	if err := apgin.BindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return coreIface.ConnectionMigrationOptions{}, false
@@ -906,7 +906,7 @@ func (r *ConnectionsRoutes) retry(gctx *gin.Context) {
 
 	var req RetryConnectionRequest
 	// Body is optional — returnToUrl is only needed when the connector has no preconnect steps.
-	if err := bindOptionalJSONBody(gctx, &req); err != nil {
+	if err := apgin.BindOptionalJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
@@ -974,7 +974,7 @@ func (r *ConnectionsRoutes) reauth(gctx *gin.Context) {
 
 	var req ReauthConnectionRequest
 	// Body is optional — returnToUrl is only needed for OAuth2 connectors with no preconnect steps.
-	if err := bindOptionalJSONBody(gctx, &req); err != nil {
+	if err := apgin.BindOptionalJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
@@ -1023,7 +1023,7 @@ func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 	}
 
 	req := ForceStateRequestJson{}
-	err = bindJSONBody(gctx, &req)
+	err = apgin.BindJSONBody(gctx, &req)
 	if err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
@@ -1104,7 +1104,7 @@ func (r *ConnectionsRoutes) update(gctx *gin.Context) {
 	}
 
 	var req UpdateConnectionRequestJson
-	if err := bindJSONBody(gctx, &req); err != nil {
+	if err := apgin.BindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return

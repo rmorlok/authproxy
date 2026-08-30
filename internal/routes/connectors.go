@@ -308,10 +308,10 @@ func (r *ConnectorsRoutes) list(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, ListConnectorsResponseJson{
-		Items:  util.Map(auth.FilterForValidatedResources(val, result.Results), ConnectorToJson),
-		Cursor: result.Cursor,
-	})
+	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewListConnectorsResponseJson(
+		util.Map(auth.FilterForValidatedResources(val, result.Results), ConnectorToJson),
+		result.Cursor,
+	))
 }
 
 // @Summary		Get connector version
@@ -418,15 +418,32 @@ func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
 	if effectiveMatchers != nil && len(effectiveMatchers) == 0 {
 		// No access to any namespaces for this resource/verb
 		val.MarkValidated()
-		apgin.APIJSON(gctx, http.StatusOK, ListConnectorVersionsResponseJson{Items: []ConnectorVersionJson{}})
+		apgin.APIJSON(
+			gctx,
+			http.StatusOK,
+			schemaapi.NewListConnectorVersionsResponseJson(
+				nil, // items
+				"",  // continueToken
+			),
+		)
+
 		return
 	}
 
 	if req.Cursor != nil {
 		ex, err = r.connectors.ListConnectorVersionsFromCursor(ctx, *req.Cursor)
 		if err != nil {
-			apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err), httperr.WithResponseMsg("failed to list connector versions from cursor")))
+			apgin.WriteError(
+				gctx,
+				nil, // logger
+				httperr.InternalServerError(
+					httperr.WithInternalErr(err),
+					httperr.WithResponseMsg("failed to list connector versions from cursor"),
+				),
+			)
+
 			val.MarkErrorReturn()
+
 			return
 		}
 	} else {
@@ -491,10 +508,10 @@ func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, ListConnectorVersionsResponseJson{
-		Items:  util.Map(auth.FilterForValidatedResources(val, result.Results), ConnectorVersionToJson),
-		Cursor: result.Cursor,
-	})
+	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewListConnectorVersionsResponseJson(
+		util.Map(auth.FilterForValidatedResources(val, result.Results), ConnectorVersionToJson),
+		result.Cursor,
+	))
 }
 
 // @Summary		Create connector
@@ -516,7 +533,7 @@ func (r *ConnectorsRoutes) createConnector(gctx *gin.Context) {
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
 	var req CreateConnectorRequestJson
-	if err := bindJSONBody(gctx, &req); err != nil {
+	if err := apgin.BindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
@@ -606,7 +623,7 @@ func (r *ConnectorsRoutes) updateConnector(gctx *gin.Context) {
 	}
 
 	var req UpdateConnectorRequestJson
-	if err := bindJSONBody(gctx, &req); err != nil {
+	if err := apgin.BindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
@@ -780,7 +797,7 @@ func (r *ConnectorsRoutes) createVersion(gctx *gin.Context) {
 	var req CreateConnectorVersionRequestJson
 	// Support a blank post to create a new draft version of the connector
 	if gctx.Request.ContentLength > 0 {
-		if err := bindJSONBody(gctx, &req); err != nil {
+		if err := apgin.BindJSONBody(gctx, &req); err != nil {
 			apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
@@ -871,7 +888,7 @@ func (r *ConnectorsRoutes) updateVersion(gctx *gin.Context) {
 	version := connectorVersionId.Version
 
 	var req UpdateConnectorRequestJson
-	if err := bindJSONBody(gctx, &req); err != nil {
+	if err := apgin.BindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
@@ -1139,7 +1156,7 @@ func (r *ConnectorsRoutes) forceVersionState(gctx *gin.Context) {
 	version := connectorVersionId.Version
 
 	req := ForceConnectorVersionStateRequestJson{}
-	if err := bindJSONBody(gctx, &req); err != nil {
+	if err := apgin.BindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
@@ -1211,7 +1228,7 @@ func (r *ConnectorsRoutes) parseLifecycleRequest(gctx *gin.Context) (connIface.C
 
 	req := ConnectorLifecycleRequestJson{}
 	if gctx.Request.Body != http.NoBody && gctx.Request.ContentLength != 0 {
-		if err := bindJSONBody(gctx, &req); err != nil {
+		if err := apgin.BindJSONBody(gctx, &req); err != nil {
 			apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 			val.MarkErrorReturn()
 			return connIface.ConnectorLifecycleOptions{}, false

@@ -135,7 +135,7 @@ func (r *NotificationsRoutes) markViewedBatch(gctx *gin.Context) {
 	ra := auth.MustGetAuthFromGinContext(gctx)
 
 	var req MarkNotificationsViewedRequestJson
-	if err := bindJSONBody(gctx, &req); err != nil {
+	if err := apgin.BindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		return
 	}

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/apid"
+	apiv1alpha1 "github.com/rmorlok/authproxy/internal/schema/api/v1alpha1"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	keyschema "github.com/rmorlok/authproxy/internal/schema/resources/key"
 )
@@ -31,9 +32,17 @@ type KeyJson struct {
 	UpdatedAt   time.Time           `json:"updatedAt" yaml:"updatedAt"`
 }
 
-type ListKeysResponseJson struct {
-	Items  []KeyJson `json:"items" yaml:"items"`
-	Cursor string    `json:"cursor,omitempty" yaml:"cursor,omitempty"`
+type ListKeysResponseJson = apiv1alpha1.ResourceList[KeyJson]
+
+func NewListKeysResponseJson(
+	items []KeyJson,
+	continueToken string,
+) ListKeysResponseJson {
+	return apiv1alpha1.NewResourceList(
+		"Key",
+		items,
+		apiv1alpha1.ListMeta{Continue: continueToken},
+	)
 }
 
 // CreateKeyRequestJson is the request body for POST /keys.

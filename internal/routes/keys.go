@@ -162,7 +162,7 @@ func (r *KeysRoutes) create(gctx *gin.Context) {
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
 	var req CreateKeyRequestJson
-	if err := bindJSONBody(gctx, &req); err != nil {
+	if err := apgin.BindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
@@ -345,10 +345,7 @@ func (r *KeysRoutes) list(gctx *gin.Context) {
 		jsonKeys = append(jsonKeys, resp)
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, ListKeysResponseJson{
-		Items:  jsonKeys,
-		Cursor: result.Cursor,
-	})
+	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewListKeysResponseJson(jsonKeys, result.Cursor))
 }
 
 // @Summary		Update key
@@ -379,7 +376,7 @@ func (r *KeysRoutes) update(gctx *gin.Context) {
 	}
 
 	var req UpdateKeyRequestJson
-	if err := bindJSONBody(gctx, &req); err != nil {
+	if err := apgin.BindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return

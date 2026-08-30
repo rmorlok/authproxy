@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/apid"
+	apiv1alpha1 "github.com/rmorlok/authproxy/internal/schema/api/v1alpha1"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
@@ -45,9 +46,17 @@ type ConnectionJson struct {
 	UpdatedAt   time.Time             `json:"updatedAt" yaml:"updatedAt"`
 }
 
-type ListConnectionResponseJson struct {
-	Items  []ConnectionJson `json:"items" yaml:"items"`
-	Cursor string           `json:"cursor,omitempty" yaml:"cursor,omitempty"`
+type ListConnectionResponseJson = apiv1alpha1.ResourceList[ConnectionJson]
+
+func NewListConnectionResponseJson(
+	items []ConnectionJson,
+	continueToken string,
+) ListConnectionResponseJson {
+	return apiv1alpha1.NewResourceList(
+		"Connection",
+		items,
+		apiv1alpha1.ListMeta{Continue: continueToken},
+	)
 }
 
 type DisconnectResponseJson struct {

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -26,8 +27,11 @@ const (
 	formatYAML
 )
 
+// contextKey prevents this package's context values from colliding with keys
+// owned by callers or other packages.
 type contextKey string
 
+// format selects the field tags and plain-data encoder used while sanitizing.
 type format int
 
 // Report describes what happened during API sanitization.
@@ -35,12 +39,16 @@ type Report struct {
 	Redacted bool
 }
 
-// WithSecretReplay records whether the current request may replay secret values.
+// WithSecretReplay returns a child of ctx that records whether API serializers
+// may emit original secret values. Callers must authorize replay before
+// passing allowed=true.
 func WithSecretReplay(ctx context.Context, allowed bool) context.Context {
 	return context.WithValue(ctx, secretReplayKey, allowed)
 }
 
-// SecretReplayAllowed returns true when API serializers should emit original secret values.
+// SecretReplayAllowed reports whether ctx authorizes API serializers to emit
+// original secret values. A nil context and missing or non-boolean values are
+// treated as false.
 func SecretReplayAllowed(ctx context.Context) bool {
 	if ctx == nil {
 		return false
@@ -49,17 +57,20 @@ func SecretReplayAllowed(ctx context.Context) bool {
 	return allowed
 }
 
-// SanitizeJSONForAPI converts v into JSON-ready data with API redaction applied.
+// SanitizeJSONForAPI converts v into JSON-ready maps, slices, and scalar values.
+// Fields tagged apiredact:"secret" are masked unless ctx authorizes replay.
 func SanitizeJSONForAPI(ctx context.Context, v any) (any, Report, error) {
 	return sanitizeForAPI(ctx, v, formatJSON)
 }
 
-// SanitizeYAMLForAPI converts v into YAML-ready data with API redaction applied.
+// SanitizeYAMLForAPI converts v into YAML-ready maps, slices, and scalar values.
+// Fields tagged apiredact:"secret" are masked unless ctx authorizes replay.
 func SanitizeYAMLForAPI(ctx context.Context, v any) (any, Report, error) {
 	return sanitizeForAPI(ctx, v, formatYAML)
 }
 
-// MarshalJSONForAPI renders v as JSON with API redaction applied and HTML escaping disabled.
+// MarshalJSONForAPI renders v as JSON after applying the redaction policy from
+// ctx. HTML escaping is disabled to match the API renderer's wire behavior.
 func MarshalJSONForAPI(ctx context.Context, v any) ([]byte, Report, error) {
 	sanitized, report, err := SanitizeJSONForAPI(ctx, v)
 	if err != nil {
@@ -75,7 +86,8 @@ func MarshalJSONForAPI(ctx context.Context, v any) ([]byte, Report, error) {
 	return buf.Bytes(), report, nil
 }
 
-// MarshalYAMLForAPI renders v as YAML with API redaction applied.
+// MarshalYAMLForAPI renders v as YAML after applying the redaction policy from
+// ctx.
 func MarshalYAMLForAPI(ctx context.Context, v any) ([]byte, Report, error) {
 	sanitized, report, err := SanitizeYAMLForAPI(ctx, v)
 	if err != nil {
@@ -85,6 +97,9 @@ func MarshalYAMLForAPI(ctx context.Context, v any) ([]byte, Report, error) {
 	return out, report, err
 }
 
+// sanitizeForAPI converts v into plain data using fmtType. It uses the ordinary
+// encoder when no redaction tag is reachable or ctx authorizes secret replay;
+// otherwise it recursively masks secret fields and returns a redaction report.
 func sanitizeForAPI(ctx context.Context, v any, fmtType format) (any, Report, error) {
 	if SecretReplayAllowed(ctx) || !valueHasRedactionTag(reflect.ValueOf(v), map[visit]bool{}) {
 		plain, err := toPlain(fmtType, v)
@@ -96,6 +111,9 @@ func sanitizeForAPI(ctx context.Context, v any, fmtType format) (any, Report, er
 	return sanitized, report, err
 }
 
+// sanitizeValue recursively converts v using fmtType and updates report when a
+// descendant is masked. It preserves structs, sequences, maps, pointers, and
+// AuthProxy polymorphic wrappers as plain wire-format data.
 func sanitizeValue(fmtType format, v reflect.Value, report *Report) (any, error) {
 	if !v.IsValid() {
 		return nil, nil
@@ -157,6 +175,9 @@ func sanitizeValue(fmtType format, v reflect.Value, report *Report) (any, error)
 	}
 }
 
+// sanitizeStruct converts struct v into a map using fmtType's field tags. It
+// applies omitempty, flattens inline fields, masks secret fields, and updates
+// report when any field is redacted.
 func sanitizeStruct(fmtType format, v reflect.Value, report *Report) (map[string]any, error) {
 	result := map[string]any{}
 	t := v.Type()
@@ -174,6 +195,25 @@ func sanitizeStruct(fmtType format, v reflect.Value, report *Report) (map[string
 
 		fv := v.Field(i)
 		if opts.Contains("omitempty") && isEmptyValue(fv) {
+			continue
+		}
+		if fieldIsInline(fmtType, field) {
+			sanitized, err := sanitizeValue(fmtType, fv, report)
+			if err != nil {
+				return nil, err
+			}
+			if sanitized == nil {
+				continue
+			}
+			embedded, ok := sanitized.(map[string]any)
+			if !ok {
+				return nil, fmt.Errorf("inline field %s must serialize to an object", field.Name)
+			}
+			for key, value := range embedded {
+				if _, exists := result[key]; !exists {
+					result[key] = value
+				}
+			}
 			continue
 		}
 
@@ -199,6 +239,9 @@ func sanitizeStruct(fmtType format, v reflect.Value, report *Report) (map[string
 	return result, nil
 }
 
+// redactValue converts v with fmtType and recursively masks its plain
+// representation. The boolean result reports whether a non-empty value was
+// replaced.
 func redactValue(fmtType format, v reflect.Value) (any, bool, error) {
 	if !v.IsValid() || isNil(v) {
 		return nil, false, nil
@@ -211,6 +254,8 @@ func redactValue(fmtType format, v reflect.Value) (any, bool, error) {
 	return maskPlain(plain)
 }
 
+// maskPlain recursively replaces scalar values in the plain value v with `*`
+// runes. It returns a deep copy and whether at least one value was masked.
 func maskPlain(v any) (any, bool, error) {
 	switch typed := v.(type) {
 	case nil:
@@ -253,72 +298,129 @@ func maskPlain(v any) (any, bool, error) {
 	}
 }
 
-// ValidateNoRedactedPlaceholders rejects mask-only values supplied for annotated secret fields.
+// ValidateNoRedactedPlaceholders rejects mask-only values supplied on fields
+// tagged apiredact:"secret". The returned error lists JSON-style paths to all
+// offending fields reachable from v.
 func ValidateNoRedactedPlaceholders(v any) error {
 	paths := []string{}
-	if err := collectRedactedPlaceholders(reflect.ValueOf(v), "$", &paths); err != nil {
+	if err := collectRedactedPlaceholders(
+		reflect.ValueOf(v),
+		"$", // path
+		&paths,
+		map[visit]bool{},
+	); err != nil {
 		return err
 	}
+
 	if len(paths) > 0 {
 		return fmt.Errorf("redacted placeholder values are not accepted for secret fields: %s", strings.Join(paths, ", "))
 	}
+
 	return nil
 }
 
-func collectRedactedPlaceholders(v reflect.Value, path string, paths *[]string) error {
+// collectRedactedPlaceholders walks v and appends the JSON-style path of every
+// mask-only secret field to paths. seen contains pointers on the current walk
+// so cyclic request values terminate without hiding aliases at other paths.
+func collectRedactedPlaceholders(
+	v reflect.Value,
+	path string,
+	paths *[]string,
+	seen map[visit]bool,
+) error {
 	if !v.IsValid() || isNil(v) {
 		return nil
 	}
 
 	v = unwrapInterface(v)
+	entered := []visit{}
 	for v.IsValid() && v.Kind() == reflect.Pointer {
 		if v.IsNil() {
 			return nil
 		}
+		id := visit{typ: v.Type(), ptr: v.Pointer()}
+		if seen[id] {
+			return nil
+		}
+		seen[id] = true
+		entered = append(entered, id)
 		v = unwrapInterface(v.Elem())
 	}
+	defer func() {
+		for _, id := range entered {
+			delete(seen, id)
+		}
+	}()
 	if !v.IsValid() {
 		return nil
 	}
 
 	if inner, ok := innerValue(v); ok {
-		return collectRedactedPlaceholders(inner, path, paths)
+		return collectRedactedPlaceholders(inner, path, paths, seen)
 	}
 
-	if v.Kind() != reflect.Struct {
-		return nil
-	}
+	switch v.Kind() {
+	case reflect.Struct:
+		t := v.Type()
+		for i := 0; i < t.NumField(); i++ {
+			field := t.Field(i)
+			if field.PkgPath != "" && !field.Anonymous {
+				continue
+			}
 
-	t := v.Type()
-	for i := 0; i < t.NumField(); i++ {
-		field := t.Field(i)
-		if field.PkgPath != "" && !field.Anonymous {
-			continue
+			name, _, ok := fieldName(formatJSON, field)
+			if !ok {
+				continue
+			}
+
+			fv := v.Field(i)
+			fieldPath := path
+			if !fieldIsInline(formatJSON, field) {
+				fieldPath += "." + name
+			}
+
+			if isSecretField(field) {
+				plain, err := toPlain(formatJSON, fv.Interface())
+				if err != nil {
+					return err
+				}
+
+				if containsMaskOnlyString(plain) {
+					*paths = append(*paths, fieldPath)
+				}
+
+				continue
+			}
+			if err := collectRedactedPlaceholders(fv, fieldPath, paths, seen); err != nil {
+				return err
+			}
 		}
-		name, _, ok := fieldName(formatJSON, field)
-		if !ok {
-			continue
+	case reflect.Slice, reflect.Array:
+		for i := 0; i < v.Len(); i++ {
+			itemPath := path + "[" + strconv.Itoa(i) + "]"
+			if err := collectRedactedPlaceholders(v.Index(i), itemPath, paths, seen); err != nil {
+				return err
+			}
 		}
-		fv := v.Field(i)
-		fieldPath := path + "." + name
-		if isSecretField(field) {
-			plain, err := toPlain(formatJSON, fv.Interface())
+	case reflect.Map:
+		iter := v.MapRange()
+		for iter.Next() {
+			key, err := mapKeyToString(iter.Key())
 			if err != nil {
 				return err
 			}
-			if containsMaskOnlyString(plain) {
-				*paths = append(*paths, fieldPath)
+			itemPath := path + "[" + strconv.Quote(key) + "]"
+			if err := collectRedactedPlaceholders(iter.Value(), itemPath, paths, seen); err != nil {
+				return err
 			}
-			continue
-		}
-		if err := collectRedactedPlaceholders(fv, fieldPath, paths); err != nil {
-			return err
 		}
 	}
 
 	return nil
 }
 
+// containsMaskOnlyString reports whether v, or a value nested in its plain
+// map/slice representation, contains a non-empty string made only of `*`.
 func containsMaskOnlyString(v any) bool {
 	switch typed := v.(type) {
 	case string:
@@ -343,12 +445,17 @@ func containsMaskOnlyString(v any) bool {
 	return false
 }
 
+// tagOptions contains the comma-separated options from a JSON or YAML field
+// tag.
 type tagOptions []string
 
+// Contains reports whether option occurs in o.
 func (o tagOptions) Contains(option string) bool {
 	return slices.Contains(o, option)
 }
 
+// fieldName returns field's serialized name and options for fmtType. The final
+// result is false when the field is excluded with the `-` tag.
 func fieldName(fmtType format, field reflect.StructField) (string, tagOptions, bool) {
 	tagName := "json"
 	if fmtType == formatYAML {
@@ -374,6 +481,33 @@ func fieldName(fmtType format, field reflect.StructField) (string, tagOptions, b
 	return name, strings.Split(opts, ","), true
 }
 
+// fieldIsInline reports whether field should be flattened for fmtType. JSON
+// anonymously embeds struct fields by default; either format can also request
+// flattening with the `inline` tag option.
+func fieldIsInline(fmtType format, field reflect.StructField) bool {
+	tagName := "json"
+	if fmtType == formatYAML {
+		tagName = "yaml"
+	}
+
+	tag := field.Tag.Get(tagName)
+	name, options, _ := strings.Cut(tag, ",")
+	if slices.Contains(strings.Split(options, ","), "inline") {
+		return true
+	}
+	if fmtType != formatJSON || !field.Anonymous || name != "" {
+		return false
+	}
+
+	fieldType := field.Type
+	for fieldType.Kind() == reflect.Pointer {
+		fieldType = fieldType.Elem()
+	}
+	return fieldType.Kind() == reflect.Struct
+}
+
+// isSecretField reports whether field contains the `secret` option in its
+// apiredact tag.
 func isSecretField(field reflect.StructField) bool {
 	for _, tag := range strings.Split(field.Tag.Get(RedactTagName), ",") {
 		if strings.TrimSpace(tag) == RedactTagSecret {
@@ -383,6 +517,8 @@ func isSecretField(field reflect.StructField) bool {
 	return false
 }
 
+// toPlain round-trips v through fmtType's standard encoder into maps, slices,
+// and scalar values. JSON numbers retain their textual representation.
 func toPlain(fmtType format, v any) (any, error) {
 	if v == nil {
 		return nil, nil
@@ -415,6 +551,8 @@ func toPlain(fmtType format, v any) (any, error) {
 	return plain, nil
 }
 
+// normalizeYAML recursively converts YAML maps with arbitrary key types into
+// string-keyed maps suitable for the package's shared sanitization logic.
 func normalizeYAML(v any) any {
 	switch typed := v.(type) {
 	case map[string]any:
@@ -440,11 +578,14 @@ func normalizeYAML(v any) any {
 	}
 }
 
+// visit identifies a pointer encountered during a reflective tree walk.
 type visit struct {
 	typ reflect.Type
 	ptr uintptr
 }
 
+// valueHasRedactionTag reports whether v has a reachable exported field tagged
+// as secret. seen prevents cycles while following pointers.
 func valueHasRedactionTag(v reflect.Value, seen map[visit]bool) bool {
 	if !v.IsValid() {
 		return false
@@ -504,6 +645,8 @@ func valueHasRedactionTag(v reflect.Value, seen map[visit]bool) bool {
 	return false
 }
 
+// innerValue returns the non-nil InnerVal field used by AuthProxy's
+// polymorphic schema wrappers. Values without that wrapper shape return false.
 func innerValue(v reflect.Value) (reflect.Value, bool) {
 	if v.Kind() != reflect.Struct {
 		return reflect.Value{}, false
@@ -515,6 +658,8 @@ func innerValue(v reflect.Value) (reflect.Value, bool) {
 	return unwrapInterface(field), true
 }
 
+// unwrapInterface follows non-nil interface values until reaching their
+// concrete value. A nil interface produces an invalid reflect.Value.
 func unwrapInterface(v reflect.Value) reflect.Value {
 	for v.IsValid() && v.Kind() == reflect.Interface {
 		if v.IsNil() {
@@ -525,6 +670,7 @@ func unwrapInterface(v reflect.Value) reflect.Value {
 	return v
 }
 
+// isNil reports whether v has a nil-capable kind and currently holds nil.
 func isNil(v reflect.Value) bool {
 	if !canBeNil(v) {
 		return false
@@ -532,6 +678,7 @@ func isNil(v reflect.Value) bool {
 	return v.IsNil()
 }
 
+// canBeNil reports whether v's kind supports nil.
 func canBeNil(v reflect.Value) bool {
 	switch v.Kind() {
 	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
@@ -541,6 +688,9 @@ func canBeNil(v reflect.Value) bool {
 	}
 }
 
+// mapKeyToString returns the API object key for v. String keys are kept as-is,
+// encoding.TextMarshaler keys use their text representation, and other keys
+// fall back to fmt.Sprint.
 func mapKeyToString(v reflect.Value) (string, error) {
 	if v.Kind() == reflect.String {
 		return v.String(), nil
@@ -554,6 +704,8 @@ func mapKeyToString(v reflect.Value) (string, error) {
 	return fmt.Sprint(v.Interface()), nil
 }
 
+// isEmptyValue applies the emptiness rules used by JSON and YAML `omitempty`
+// handling to v.
 func isEmptyValue(v reflect.Value) bool {
 	if !v.IsValid() {
 		return true

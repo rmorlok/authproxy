@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/apid"
+	apiv1alpha1 "github.com/rmorlok/authproxy/internal/schema/api/v1alpha1"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 )
 
@@ -41,10 +42,9 @@ type UpdateActorRequestJson struct {
 	Annotations map[string]string    `json:"annotations" yaml:"annotations"`
 }
 
-// ListActorsResponseJson is a paginated actor list response.
-//
-//	@Description	Paginated list of actors
-type ListActorsResponseJson struct {
-	Items  []ActorJson `json:"items" yaml:"items"`
-	Cursor string      `json:"cursor,omitempty" yaml:"cursor,omitempty"`
+// ListActorsResponseJson is the Kubernetes-style actor list response.
+type ListActorsResponseJson = apiv1alpha1.ResourceList[ActorJson]
+
+func NewListActorsResponseJson(items []ActorJson, continueToken string) ListActorsResponseJson {
+	return apiv1alpha1.NewResourceList("Actor", items, apiv1alpha1.ListMeta{Continue: continueToken})
 }
