@@ -275,16 +275,26 @@ func maskPlain(v any) (any, bool, error) {
 // ValidateNoRedactedPlaceholders rejects mask-only values supplied for annotated secret fields.
 func ValidateNoRedactedPlaceholders(v any) error {
 	paths := []string{}
-	if err := collectRedactedPlaceholders(reflect.ValueOf(v), "$", &paths); err != nil {
+	if err := collectRedactedPlaceholders(
+		reflect.ValueOf(v),
+		"$", // path
+		&paths,
+	); err != nil {
 		return err
 	}
+
 	if len(paths) > 0 {
 		return fmt.Errorf("redacted placeholder values are not accepted for secret fields: %s", strings.Join(paths, ", "))
 	}
+
 	return nil
 }
 
-func collectRedactedPlaceholders(v reflect.Value, path string, paths *[]string) error {
+func collectRedactedPlaceholders(
+	v reflect.Value,
+	path string,
+	paths *[]string,
+) error {
 	if !v.IsValid() || isNil(v) {
 		return nil
 	}
@@ -314,23 +324,28 @@ func collectRedactedPlaceholders(v reflect.Value, path string, paths *[]string) 
 		if field.PkgPath != "" && !field.Anonymous {
 			continue
 		}
+
 		name, _, ok := fieldName(formatJSON, field)
 		if !ok {
 			continue
 		}
+
 		fv := v.Field(i)
 		fieldPath := path
 		if !fieldIsInline(formatJSON, field) {
 			fieldPath += "." + name
 		}
+
 		if isSecretField(field) {
 			plain, err := toPlain(formatJSON, fv.Interface())
 			if err != nil {
 				return err
 			}
+
 			if containsMaskOnlyString(plain) {
 				*paths = append(*paths, fieldPath)
 			}
+
 			continue
 		}
 		if err := collectRedactedPlaceholders(fv, fieldPath, paths); err != nil {

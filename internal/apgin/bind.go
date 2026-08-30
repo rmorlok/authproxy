@@ -42,7 +42,10 @@ func BindJSONBody(gctx *gin.Context, obj any) error {
 
 // BindOptionalJSONBody decodes a body when one is present.
 func BindOptionalJSONBody(gctx *gin.Context, obj any) error {
-	if gctx.Request == nil || gctx.Request.Body == nil || gctx.Request.Body == http.NoBody || gctx.Request.ContentLength == 0 {
+	if gctx.Request == nil ||
+		gctx.Request.Body == nil ||
+		gctx.Request.Body == http.NoBody ||
+		gctx.Request.ContentLength == 0 {
 		return nil
 	}
 
@@ -52,16 +55,23 @@ func BindOptionalJSONBody(gctx *gin.Context, obj any) error {
 // BindResourceJSON decodes and validates a resource create or update body.
 // Secret placeholders emitted by redacted API responses are never accepted as
 // write values.
-func BindResourceJSON(gctx *gin.Context, obj resourceLifecycleValidator, mode meta.ValidationMode) error {
+func BindResourceJSON(
+	gctx *gin.Context,
+	obj resourceLifecycleValidator,
+	mode meta.ValidationMode,
+) error {
 	if mode != meta.ValidationModeCreate && mode != meta.ValidationModeUpdate {
 		return fmt.Errorf("resource request validation mode must be create or update, got %q", mode)
 	}
+
 	if err := BindJSONBody(gctx, obj); err != nil {
 		return err
 	}
+
 	if err := apserde.ValidateNoRedactedPlaceholders(obj); err != nil {
 		return err
 	}
+
 	return obj.ValidateFor(mode, &common.ValidationContext{Path: "$"})
 }
 
