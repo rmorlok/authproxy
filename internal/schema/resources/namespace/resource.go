@@ -104,13 +104,16 @@ func EncryptionKeyID(ref *meta.ObjectReference) (*apid.ID, error) {
 	if ref == nil {
 		return nil, nil
 	}
+
 	id, err := apid.Parse(ref.ID)
 	if err != nil {
 		return nil, err
 	}
+
 	if id.Prefix() != apid.PrefixKey {
 		return nil, fmt.Errorf("must be a key id")
 	}
+
 	return &id, nil
 }
 

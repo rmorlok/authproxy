@@ -294,7 +294,7 @@ func (r *NamespacesRoutes) list(gctx *gin.Context) {
 		),
 		result.Cursor,
 	)
-	
+
 	if err := response.Validate(namespace.NamespaceKind); err != nil {
 		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
