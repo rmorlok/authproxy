@@ -33,10 +33,6 @@ type SetNamespaceKeyRequestJson = schemaapi.SetNamespaceKeyRequestJson
 type NamespaceKeyJson = schemaapi.NamespaceKeyJson
 type OpenAPIListNamespacesResponseJson = schemaapiopenapi.ListNamespacesResponseJson
 
-func NamespaceToJson(ns coreIface.Namespace) NamespaceJson {
-	return *ns.GetResource()
-}
-
 type ListNamespacesRequestQueryParams struct {
 	Cursor        *string                   `form:"cursor"`
 	LimitVal      *int32                    `form:"limit"`
@@ -99,8 +95,8 @@ func (r *NamespacesRoutes) get(gctx *gin.Context) {
 		return
 	}
 
-	resource := NamespaceToJson(ns)
-	if err := apgin.RenderResourceJSON(gctx, http.StatusOK, &resource); err != nil {
+	resource := ns.GetResource()
+	if err := apgin.RenderResourceJSON(gctx, http.StatusOK, resource); err != nil {
 		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 	}
@@ -164,8 +160,8 @@ func (r *NamespacesRoutes) create(gctx *gin.Context) {
 		return
 	}
 
-	resource := NamespaceToJson(ns)
-	if err := apgin.RenderResourceJSON(gctx, http.StatusOK, &resource); err != nil {
+	resource := ns.GetResource()
+	if err := apgin.RenderResourceJSON(gctx, http.StatusOK, resource); err != nil {
 		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 	}
@@ -290,9 +286,15 @@ func (r *NamespacesRoutes) list(gctx *gin.Context) {
 	}
 
 	response := schemaapi.NewListNamespacesResponseJson(
-		util.Map(auth.FilterForValidatedResources(val, result.Results), NamespaceToJson),
+		util.Map(
+			auth.FilterForValidatedResources(val, result.Results),
+			func(ns coreIface.Namespace) schemaapi.NamespaceJson {
+				return *ns.GetResource()
+			},
+		),
 		result.Cursor,
 	)
+	
 	if err := response.Validate(namespace.NamespaceKind); err != nil {
 		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
@@ -408,8 +410,8 @@ func (r *NamespacesRoutes) update(gctx *gin.Context) {
 		}
 	}
 
-	resource := NamespaceToJson(ns)
-	if err := apgin.RenderResourceJSON(gctx, http.StatusOK, &resource); err != nil {
+	resource := ns.GetResource()
+	if err := apgin.RenderResourceJSON(gctx, http.StatusOK, resource); err != nil {
 		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 	}
@@ -578,8 +580,8 @@ func (r *NamespacesRoutes) getKey(gctx *gin.Context) {
 		return
 	}
 
-	resource := NamespaceToJson(ns)
-	if err := apgin.RenderResourceJSON(gctx, http.StatusOK, &resource); err != nil {
+	resource := ns.GetResource()
+	if err := apgin.RenderResourceJSON(gctx, http.StatusOK, resource); err != nil {
 		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 	}
@@ -660,8 +662,8 @@ func (r *NamespacesRoutes) setKey(gctx *gin.Context) {
 		return
 	}
 
-	resource := NamespaceToJson(ns)
-	if err := apgin.RenderResourceJSON(gctx, http.StatusOK, &resource); err != nil {
+	resource := ns.GetResource()
+	if err := apgin.RenderResourceJSON(gctx, http.StatusOK, resource); err != nil {
 		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 	}
