@@ -77,32 +77,54 @@ func BindResourceJSON(
 
 // BindActionJSON decodes and validates a typed action request, including the
 // rule that status is server-owned.
-func BindActionJSON(gctx *gin.Context, obj actionRequestValidator, expectedKind meta.Kind) error {
+func BindActionJSON(
+	gctx *gin.Context,
+	obj actionRequestValidator,
+	expectedKind meta.Kind,
+) error {
 	if err := BindJSONBody(gctx, obj); err != nil {
 		return err
 	}
+
 	if err := apserde.ValidateNoRedactedPlaceholders(obj); err != nil {
 		return err
 	}
+
 	return obj.ValidateRequest(expectedKind)
 }
 
 // RenderResourceJSON validates a resource as a server response before using
 // the standard redacting API renderer.
-func RenderResourceJSON(gctx *gin.Context, code int, obj resourceLifecycleValidator) error {
-	if err := obj.ValidateFor(meta.ValidationModeResponse, &common.ValidationContext{Path: "$"}); err != nil {
+func RenderResourceJSON(
+	gctx *gin.Context,
+	code int,
+	obj resourceLifecycleValidator,
+) error {
+	if err := obj.ValidateFor(
+		meta.ValidationModeResponse,
+		&common.ValidationContext{Path: "$"},
+	); err != nil {
 		return fmt.Errorf("validate API resource response: %w", err)
 	}
+
 	APIJSON(gctx, code, obj)
+
 	return nil
 }
 
 // RenderActionJSON validates an action response before using the standard
 // redacting API renderer.
-func RenderActionJSON(gctx *gin.Context, code int, obj actionResponseValidator, expectedKind meta.Kind) error {
+func RenderActionJSON(
+	gctx *gin.Context,
+	code int,
+	obj actionResponseValidator,
+	expectedKind meta.Kind,
+) error {
 	if err := obj.ValidateResponse(expectedKind); err != nil {
 		return fmt.Errorf("validate API action response: %w", err)
 	}
+
 	APIJSON(gctx, code, obj)
+
 	return nil
 }
