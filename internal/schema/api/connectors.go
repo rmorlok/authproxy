@@ -71,8 +71,15 @@ type ConnectorVersionJson struct {
 
 type ListConnectorVersionsResponseJson = apiv1alpha1.ResourceList[ConnectorVersionJson]
 
-func NewListConnectorVersionsResponseJson(items []ConnectorVersionJson, continueToken string) ListConnectorVersionsResponseJson {
-	return apiv1alpha1.NewResourceList("Connector", items, apiv1alpha1.ListMeta{Continue: continueToken})
+func NewListConnectorVersionsResponseJson(
+	items []ConnectorVersionJson,
+	continueToken string,
+) ListConnectorVersionsResponseJson {
+	return apiv1alpha1.NewResourceList(
+		"Connector",
+		items,
+		apiv1alpha1.ListMeta{Continue: continueToken},
+	)
 }
 
 // CreateConnectorRequestJson is the request body for POST /connectors.

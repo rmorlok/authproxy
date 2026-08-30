@@ -34,8 +34,15 @@ type KeyJson struct {
 
 type ListKeysResponseJson = apiv1alpha1.ResourceList[KeyJson]
 
-func NewListKeysResponseJson(items []KeyJson, continueToken string) ListKeysResponseJson {
-	return apiv1alpha1.NewResourceList("Key", items, apiv1alpha1.ListMeta{Continue: continueToken})
+func NewListKeysResponseJson(
+	items []KeyJson,
+	continueToken string,
+) ListKeysResponseJson {
+	return apiv1alpha1.NewResourceList(
+		"Key",
+		items,
+		apiv1alpha1.ListMeta{Continue: continueToken},
+	)
 }
 
 // CreateKeyRequestJson is the request body for POST /keys.
