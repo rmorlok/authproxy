@@ -70,8 +70,9 @@ type ObjectMetaPatch struct {
 }
 
 // ObjectReference contains stable identity without copying another resource's
-// spec or status. ID, name, namespace, and generation are populated only when
-// they apply to the referenced kind.
+// spec or status. A reference identifies its target by ID or by the combination
+// of namespace and name. Generation is populated only when it applies to the
+// referenced kind.
 type ObjectReference struct {
 	APIVersion APIVersion          `json:"apiVersion" yaml:"apiVersion"`
 	Kind       Kind                `json:"kind" yaml:"kind"`
@@ -79,6 +80,17 @@ type ObjectReference struct {
 	Name       common.ResourceName `json:"name,omitempty" yaml:"name,omitempty"`
 	Namespace  string              `json:"namespace,omitempty" yaml:"namespace,omitempty"`
 	Generation uint64              `json:"generation,omitempty" yaml:"generation,omitempty"`
+}
+
+// HasID reports whether the reference identifies its target by immutable ID.
+func (r ObjectReference) HasID() bool {
+	return r.ID != ""
+}
+
+// HasNamespacedName reports whether the reference identifies its target by
+// namespace and name.
+func (r ObjectReference) HasNamespacedName() bool {
+	return r.Namespace != "" && r.Name != ""
 }
 
 // ConditionStatus is the tri-state status of a resource condition.

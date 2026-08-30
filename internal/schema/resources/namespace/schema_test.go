@@ -183,6 +183,25 @@ func TestNamespaceResourceSchema(t *testing.T) {
 	}
 	require.NoError(t, schema.Validate(valid))
 
+	valid["spec"] = map[string]any{
+		"encryptionKeyRef": map[string]any{
+			"apiVersion": "authproxy.net/v1alpha1",
+			"kind":       "Key",
+			"namespace":  "root",
+			"name":       "key_global",
+		},
+	}
+	require.NoError(t, schema.Validate(valid))
+
+	valid["spec"] = map[string]any{
+		"encryptionKeyRef": map[string]any{
+			"apiVersion": "authproxy.net/v1alpha1",
+			"kind":       "Key",
+			"name":       "key_global",
+		},
+	}
+	require.Error(t, schema.Validate(valid))
+
 	invalid := map[string]any{
 		"apiVersion": "authproxy.net/v1alpha1",
 		"kind":       "Namespace",

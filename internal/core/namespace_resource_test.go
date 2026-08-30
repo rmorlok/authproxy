@@ -72,4 +72,16 @@ func TestDatabaseNamespaceFromResource(t *testing.T) {
 	dbRoot, err := databaseNamespaceFromResource(root)
 	require.NoError(t, err)
 	require.Equal(t, nschema.Root, dbRoot.Path)
+
+	namedKey, err := nschema.NewNamespaceForPath("root.named-key")
+	require.NoError(t, err)
+	namedKey.Spec.EncryptionKeyRef = &meta.ObjectReference{
+		APIVersion: meta.APIVersionV1Alpha1,
+		Kind:       nschema.EncryptionKeyKind,
+		Namespace:  "root",
+		Name:       "key_global",
+	}
+	dbNamedKey, err := databaseNamespaceFromResource(namedKey)
+	require.NoError(t, err)
+	require.Nil(t, dbNamedKey.KeyId)
 }

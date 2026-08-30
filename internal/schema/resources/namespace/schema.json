@@ -32,9 +32,9 @@
               "properties": {
                 "apiVersion": { "const": "authproxy.net/v1alpha1" },
                 "kind": { "const": "Key" },
-                "id": { "type": "string", "pattern": "^key_" }
-              },
-              "required": ["id"]
+                "id": { "type": "string", "pattern": "^key_" },
+                "namespace": { "$ref": "#/$defs/NamespacePath" }
+              }
             }
           ]
         }

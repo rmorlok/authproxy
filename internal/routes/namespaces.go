@@ -155,6 +155,12 @@ func (r *NamespacesRoutes) create(gctx *gin.Context) {
 
 	ns, err = r.core.CreateNamespace(ctx, &req)
 	if err != nil {
+		if errors.Is(err, core.ErrNotFound) && req.Spec.EncryptionKeyRef != nil {
+			apgin.WriteError(gctx, nil, httperr.NotFound("key reference not found", httperr.WithInternalErr(err)))
+			val.MarkErrorReturn()
+			return
+		}
+
 		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
@@ -396,13 +402,19 @@ func (r *NamespacesRoutes) update(gctx *gin.Context) {
 	}
 
 	if ref := req.Spec.EncryptionKeyRef; ref != nil {
-		keyID, err := namespace.EncryptionKeyID(ref)
+		key, err := r.core.ResolveKeyReference(ctx, *ref)
 		if err != nil {
-			apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+			if errors.Is(err, core.ErrNotFound) {
+				apgin.WriteError(gctx, nil, httperr.NotFound("key reference not found", httperr.WithInternalErr(err)))
+				val.MarkErrorReturn()
+				return
+			}
+
+			apgin.WriteErr(gctx, nil, err)
 			val.MarkErrorReturn()
 			return
 		}
-		ns, err = r.core.SetNamespaceKey(ctx, path, *keyID)
+		ns, err = r.core.SetNamespaceKey(ctx, path, key.GetId())
 		if err != nil {
 			apgin.WriteErr(gctx, nil, err)
 			val.MarkErrorReturn()
@@ -636,16 +648,22 @@ func (r *NamespacesRoutes) setKey(gctx *gin.Context) {
 		return
 	}
 
-	keyID, err := namespace.EncryptionKeyID(req.Spec.EncryptionKeyRef)
+	key, err := r.core.ResolveKeyReference(ctx, *req.Spec.EncryptionKeyRef)
 	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		if errors.Is(err, core.ErrNotFound) {
+			apgin.WriteError(gctx, nil, httperr.NotFound("key reference not found", httperr.WithInternalErr(err)))
+			val.MarkErrorReturn()
+			return
+		}
+
+		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
-	ns, err = r.core.SetNamespaceKey(ctx, path, *keyID)
+	ns, err = r.core.SetNamespaceKey(ctx, path, key.GetId())
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("key '%s' not found", *keyID), httperr.WithInternalErr(err)))
+			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("key '%s' not found", key.GetId()), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}

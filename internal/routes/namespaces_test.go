@@ -345,6 +345,12 @@ func TestNamespaces(t *testing.T) {
 			body := namespaceCreateRequest("root.withlabels")
 			body.Metadata.Labels = map[string]string{"env": "test", "team": "dev"}
 			body.Metadata.Annotations = map[string]string{"example.com/owner": "platform"}
+			body.Spec.EncryptionKeyRef = &meta.ObjectReference{
+				APIVersion: meta.APIVersionV1Alpha1,
+				Kind:       nschema.EncryptionKeyKind,
+				Namespace:  "root",
+				Name:       "key_global",
+			}
 			jsonBody, _ := json.Marshal(body)
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPost,
@@ -366,6 +372,7 @@ func TestNamespaces(t *testing.T) {
 			require.Equal(t, "test", resp.Metadata.Labels["env"])
 			require.Equal(t, "dev", resp.Metadata.Labels["team"])
 			require.Equal(t, "platform", resp.Metadata.Annotations["example.com/owner"])
+			require.Equal(t, database.GlobalKeyID.String(), resp.Spec.EncryptionKeyRef.ID)
 		})
 
 		t.Run("rejects apxy/-prefixed labels in request body", func(t *testing.T) {
@@ -935,7 +942,8 @@ func TestNamespaces(t *testing.T) {
 		patch.Spec.EncryptionKeyRef = &meta.ObjectReference{
 			APIVersion: meta.APIVersionV1Alpha1,
 			Kind:       "Key",
-			ID:         database.GlobalKeyID.String(),
+			Namespace:  "root",
+			Name:       "key_global",
 		}
 		body, err := json.Marshal(patch)
 		require.NoError(t, err)

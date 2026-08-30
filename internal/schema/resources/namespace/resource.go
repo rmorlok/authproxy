@@ -98,10 +98,10 @@ func NewEncryptionKeyReference(id apid.ID) *meta.ObjectReference {
 	}
 }
 
-// EncryptionKeyID parses and type-checks a Namespace encryption-key
-// reference. A nil reference means no key was selected.
+// EncryptionKeyID parses and type-checks the ID in a Namespace encryption-key
+// reference. A nil reference or namespaced-name reference has no ID to return.
 func EncryptionKeyID(ref *meta.ObjectReference) (*apid.ID, error) {
-	if ref == nil {
+	if ref == nil || ref.ID == "" {
 		return nil, nil
 	}
 
@@ -233,7 +233,7 @@ func (n *Namespace) ValidateFor(mode meta.ValidationMode, vc *common.ValidationC
 		}
 	}
 
-	if err := validateEncryptionKeyReference(n.Spec.EncryptionKeyRef, vc); err != nil {
+	if err := ValidateEncryptionKeyReference(n.Spec.EncryptionKeyRef, vc); err != nil {
 		result = multierror.Append(result, err)
 	}
 
@@ -276,7 +276,7 @@ func (p *NamespacePatch) ValidateFor(mode meta.ValidationMode, vc *common.Valida
 			result = multierror.Append(result, vc.NewErrorfForField("metadata.name", "%v", err))
 		}
 	}
-	if err := validateEncryptionKeyReference(p.Spec.EncryptionKeyRef, vc); err != nil {
+	if err := ValidateEncryptionKeyReference(p.Spec.EncryptionKeyRef, vc); err != nil {
 		result = multierror.Append(result, err)
 	}
 	if err := meta.ValidateStatus(p.Status, mode, vc); err != nil {
@@ -308,7 +308,9 @@ func (p *NamespacePatch) ApplyTo(current *Namespace, vc *common.ValidationContex
 	return updated, nil
 }
 
-func validateEncryptionKeyReference(ref *meta.ObjectReference, vc *common.ValidationContext) error {
+// ValidateEncryptionKeyReference applies the common object-reference rules and
+// the Namespace-specific requirement that the target is a v1alpha1 Key.
+func ValidateEncryptionKeyReference(ref *meta.ObjectReference, vc *common.ValidationContext) error {
 	if ref == nil {
 		return nil
 	}
@@ -317,22 +319,15 @@ func validateEncryptionKeyReference(ref *meta.ObjectReference, vc *common.Valida
 	}
 
 	refPath := vc.PushField("spec").PushField("encryptionKeyRef")
-	var result *multierror.Error
-	if err := meta.ValidateObjectReference(*ref, refPath); err != nil {
-		result = multierror.Append(result, err)
-	}
-	if ref.APIVersion != meta.APIVersionV1Alpha1 {
-		result = multierror.Append(result, refPath.NewErrorfForField("apiVersion", "must be %q", meta.APIVersionV1Alpha1))
-	}
-	if ref.Kind != EncryptionKeyKind {
-		result = multierror.Append(result, refPath.NewErrorfForField("kind", "must be %q", EncryptionKeyKind))
-	}
-	if ref.ID == "" {
-		result = multierror.Append(result, refPath.NewErrorForField("id", "is required"))
-	} else if _, err := EncryptionKeyID(ref); err != nil {
-		result = multierror.Append(result, refPath.NewErrorfForField("id", "%v", err))
-	}
-	return result.ErrorOrNil()
+	return meta.ValidateObjectReferenceWithOptions(*ref, meta.ObjectReferenceValidationOptions{
+		ExpectedAPIVersion: meta.APIVersionV1Alpha1,
+		ExpectedKind:       EncryptionKeyKind,
+		IDValidator: func(value string) error {
+			_, err := EncryptionKeyID(&meta.ObjectReference{ID: value})
+			return err
+		},
+		NamespaceValidator: ValidatePath,
+	}, refPath)
 }
 
 // ValidateUpdate rejects changes to namespace identity after applying a full

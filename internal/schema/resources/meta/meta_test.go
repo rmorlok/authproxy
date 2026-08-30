@@ -2,6 +2,7 @@ package meta
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -222,8 +223,38 @@ func TestStatusReferenceAndConditionValidation(t *testing.T) {
 
 	reference := ObjectReference{APIVersion: APIVersionV1Alpha1, Kind: "Connector", ID: "cxr_123"}
 	require.NoError(t, ValidateObjectReference(reference, &common.ValidationContext{Path: "$.metadata.target"}))
+	require.True(t, reference.HasID())
+	require.False(t, reference.HasNamespacedName())
+
 	reference.ID = ""
-	require.ErrorContains(t, ValidateObjectReference(reference, &common.ValidationContext{Path: "$.metadata.target"}), "$.metadata.target: must contain id or name")
+	reference.Namespace = "root"
+	reference.Name = "greenhouse"
+	require.NoError(t, ValidateObjectReference(reference, &common.ValidationContext{Path: "$.metadata.target"}))
+	require.False(t, reference.HasID())
+	require.True(t, reference.HasNamespacedName())
+
+	reference.Namespace = ""
+	require.ErrorContains(t, ValidateObjectReference(reference, &common.ValidationContext{Path: "$.metadata.target"}), "$.metadata.target: must contain id or namespace and name")
+
+	err := ValidateObjectReferenceWithOptions(
+		ObjectReference{
+			APIVersion: APIVersionV1Alpha1,
+			Kind:       "Key",
+			ID:         "cxr_wrong",
+		},
+		ObjectReferenceValidationOptions{
+			ExpectedAPIVersion: APIVersionV1Alpha1,
+			ExpectedKind:       "Key",
+			IDValidator: func(value string) error {
+				if value != "key_expected" {
+					return fmt.Errorf("must be a key id")
+				}
+				return nil
+			},
+		},
+		&common.ValidationContext{Path: "$.metadata.target"},
+	)
+	require.ErrorContains(t, err, "$.metadata.target.id: must be a key id")
 
 	condition := NewCondition("Ready", ConditionTrue, 1, "Configured", "ready", time.Date(2026, 8, 28, 10, 0, 0, 0, time.UTC))
 	require.NoError(t, ValidateCondition(condition, &common.ValidationContext{Path: "$.status.conditions[0]"}))

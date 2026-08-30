@@ -8,7 +8,8 @@
     "encryptionKeyRef": {
       "apiVersion": "authproxy.net/v1alpha1",
       "kind": "Key",
-      "id": "key_test550e8400abcd"
+      "namespace": "root",
+      "name": "key_global"
     }
   }
 }

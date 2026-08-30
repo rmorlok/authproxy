@@ -12,6 +12,8 @@ import (
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	cfgschema "github.com/rmorlok/authproxy/internal/schema/config"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
+	nschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
@@ -25,6 +27,37 @@ func (s *service) GetKey(ctx context.Context, id apid.ID) (iface.Key, error) {
 	}
 
 	return wrapKey(*ek, s), nil
+}
+
+func (s *service) ResolveKeyReference(ctx context.Context, reference meta.ObjectReference) (iface.Key, error) {
+	if err := nschema.ValidateEncryptionKeyReference(&reference, nil); err != nil {
+		return nil, fmt.Errorf("invalid key reference: %w", err)
+	}
+
+	if reference.HasID() {
+		id, err := apid.Parse(reference.ID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid key reference: %w", err)
+		}
+		return s.GetKey(ctx, id)
+	}
+
+	result := s.ListKeysBuilder().
+		ForNamespaceMatcher(reference.Namespace).
+		ForName(reference.Name).
+		Limit(2).
+		FetchPage(ctx)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	if len(result.Results) == 0 {
+		return nil, ErrNotFound
+	}
+	if len(result.Results) > 1 {
+		return nil, fmt.Errorf("key reference %q/%q is ambiguous", reference.Namespace, reference.Name)
+	}
+
+	return result.Results[0], nil
 }
 
 func (s *service) CreateKey(ctx context.Context, namespace string, name common.ResourceName, keyData *cfgschema.KeyData, labels map[string]string) (iface.Key, error) {

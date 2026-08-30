@@ -99,7 +99,7 @@
           },
           "anyOf": [
             { "required": ["id"] },
-            { "required": ["name"] }
+            { "required": ["namespace", "name"] }
           ]
         }
       ],

@@ -199,6 +199,14 @@ func (s *service) CreateNamespace(ctx context.Context, resource *namespace.Names
 	if err != nil {
 		return nil, err
 	}
+	if resource.Spec.EncryptionKeyRef != nil {
+		key, err := s.ResolveKeyReference(ctx, *resource.Spec.EncryptionKeyRef)
+		if err != nil {
+			return nil, err
+		}
+		keyID := key.GetId()
+		ns.KeyId = &keyID
+	}
 
 	err = s.db.CreateNamespace(ctx, ns)
 	if err != nil {

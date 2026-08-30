@@ -145,6 +145,20 @@ func TestNamespaceValidationModes(t *testing.T) {
 	writeWithStatus.Metadata.Namespace = "root"
 	writeWithStatus.Status = &NamespaceStatus{State: NamespaceStateActive}
 	require.ErrorContains(t, writeWithStatus.ValidateFor(meta.ValidationModeUpdate, nil), "status: is server-owned")
+
+	namedKey := NewNamespace()
+	namedKey.Metadata.Name = "acme"
+	namedKey.Metadata.Namespace = "root"
+	namedKey.Spec.EncryptionKeyRef = &meta.ObjectReference{
+		APIVersion: meta.APIVersionV1Alpha1,
+		Kind:       EncryptionKeyKind,
+		Namespace:  "root",
+		Name:       "key_global",
+	}
+	require.NoError(t, namedKey.ValidateFor(meta.ValidationModeCreate, nil))
+
+	namedKey.Spec.EncryptionKeyRef.Namespace = ""
+	require.ErrorContains(t, namedKey.ValidateFor(meta.ValidationModeCreate, nil), "spec.encryptionKeyRef: must contain id or namespace and name")
 }
 
 func TestNamespaceValidateUpdate(t *testing.T) {

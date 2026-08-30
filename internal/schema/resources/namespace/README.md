@@ -20,7 +20,8 @@ The resource maps hierarchy and identity as follows:
 - `metadata.name` is the final path segment, such as `billing`.
 - `metadata.namespace` is the parent path, such as `root.prod`; it is omitted
   only for the `root` resource.
-- `spec.encryptionKeyRef` is the optional desired encryption-key selection.
+- `spec.encryptionKeyRef` is the optional desired encryption-key selection. It
+  accepts either the key's immutable `id` or its `namespace` and `name`.
 - `status.state` is the server-owned lifecycle observation.
 
 `PathFromMetadata` and `NewResourceMetadata` are the canonical conversion
