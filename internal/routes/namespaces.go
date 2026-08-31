@@ -52,6 +52,17 @@ type NamespacesRoutes struct {
 	annotsAdapter key_value.Adapter[string]
 }
 
+func writeNamespaceKeyReferenceError(gctx *gin.Context, err error) {
+	switch {
+	case errors.Is(err, core.ErrInvalidArgument):
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
+	case errors.Is(err, core.ErrNotFound):
+		apgin.WriteError(gctx, nil, httperr.NotFound("key reference not found", httperr.WithInternalErr(err)))
+	default:
+		apgin.WriteErr(gctx, nil, err)
+	}
+}
+
 // @Summary		Get namespace
 // @Description	Get a specific namespace by its path
 // @Tags			namespaces
@@ -155,13 +166,11 @@ func (r *NamespacesRoutes) create(gctx *gin.Context) {
 
 	ns, err = r.core.CreateNamespace(ctx, &req)
 	if err != nil {
-		if errors.Is(err, core.ErrNotFound) && req.Spec.EncryptionKeyRef != nil {
-			apgin.WriteError(gctx, nil, httperr.NotFound("key reference not found", httperr.WithInternalErr(err)))
-			val.MarkErrorReturn()
-			return
+		if req.Spec.EncryptionKeyRef != nil {
+			writeNamespaceKeyReferenceError(gctx, err)
+		} else {
+			apgin.WriteErr(gctx, nil, err)
 		}
-
-		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
@@ -404,13 +413,7 @@ func (r *NamespacesRoutes) update(gctx *gin.Context) {
 	if ref := req.Spec.EncryptionKeyRef; ref != nil {
 		key, err := r.core.ResolveKeyReference(ctx, *ref)
 		if err != nil {
-			if errors.Is(err, core.ErrNotFound) {
-				apgin.WriteError(gctx, nil, httperr.NotFound("key reference not found", httperr.WithInternalErr(err)))
-				val.MarkErrorReturn()
-				return
-			}
-
-			apgin.WriteErr(gctx, nil, err)
+			writeNamespaceKeyReferenceError(gctx, err)
 			val.MarkErrorReturn()
 			return
 		}
@@ -650,13 +653,7 @@ func (r *NamespacesRoutes) setKey(gctx *gin.Context) {
 
 	key, err := r.core.ResolveKeyReference(ctx, *req.Spec.EncryptionKeyRef)
 	if err != nil {
-		if errors.Is(err, core.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFound("key reference not found", httperr.WithInternalErr(err)))
-			val.MarkErrorReturn()
-			return
-		}
-
-		apgin.WriteErr(gctx, nil, err)
+		writeNamespaceKeyReferenceError(gctx, err)
 		val.MarkErrorReturn()
 		return
 	}

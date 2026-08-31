@@ -17,6 +17,7 @@ import (
 	asynqmock "github.com/rmorlok/authproxy/internal/apasynq/mock"
 	auth2 "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/apctx"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/apredis/mock"
@@ -985,6 +986,37 @@ func TestNamespaces(t *testing.T) {
 		var fetched NamespaceJson
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &fetched))
 		require.Equal(t, database.GlobalKeyID.String(), fetched.Spec.EncryptionKeyRef.ID)
+
+		otherKeyID := apid.New(apid.PrefixKey)
+		err = tu.Db.CreateKey(context.Background(), &database.Key{
+			Id:        otherKeyID,
+			Namespace: "root",
+			Name:      "other",
+		})
+		require.NoError(t, err)
+
+		patch.Spec.EncryptionKeyRef = &meta.ObjectReference{
+			APIVersion: meta.APIVersionV1Alpha1,
+			Kind:       nschema.EncryptionKeyKind,
+			ID:         database.GlobalKeyID.String(),
+			Namespace:  "root",
+			Name:       "other",
+		}
+		body, err = json.Marshal(patch)
+		require.NoError(t, err)
+		w = httptest.NewRecorder()
+		req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
+			http.MethodPut,
+			"/namespaces/root.key-resource/key",
+			bytes.NewReader(body),
+			"root",
+			"some-actor",
+			aschema.AllPermissions(),
+		)
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+		tu.Gin.ServeHTTP(w, req)
+		require.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
 	})
 
 	t.Run("get labels", func(t *testing.T) {

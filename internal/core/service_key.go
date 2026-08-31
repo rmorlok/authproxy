@@ -37,18 +37,53 @@ func (s *service) ResolveKeyReference(
 		&reference,
 		nil, // validation context
 	); err != nil {
-		return nil, fmt.Errorf("invalid key reference: %w", err)
+		return nil, fmt.Errorf("%w: invalid key reference: %v", ErrInvalidArgument, err)
 	}
 
+	var keyByID iface.Key
 	if reference.HasID() {
 		id, err := apid.Parse(reference.ID)
 		if err != nil {
-			return nil, fmt.Errorf("invalid key reference: %w", err)
+			return nil, fmt.Errorf("%w: invalid key reference: %v", ErrInvalidArgument, err)
 		}
 
-		return s.GetKey(ctx, id)
+		keyByID, err = s.GetKey(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+
+		if !reference.HasNamespacedName() {
+			return keyByID, nil
+		}
 	}
 
+	keyByName, err := s.resolveKeyByNamespacedName(ctx, reference)
+	if err != nil {
+		return nil, err
+	}
+
+	if keyByID != nil && keyByID.GetId() != keyByName.GetId() {
+		return nil, fmt.Errorf(
+			"%w: key reference id %q does not match key %q/%q with id %q",
+			ErrInvalidArgument,
+			reference.ID,
+			reference.Namespace,
+			reference.Name,
+			keyByName.GetId(),
+		)
+	}
+
+	if keyByID != nil {
+		return keyByID, nil
+	}
+
+	return keyByName, nil
+}
+
+func (s *service) resolveKeyByNamespacedName(
+	ctx context.Context,
+	reference meta.ObjectReference,
+) (iface.Key, error) {
 	result := s.ListKeysBuilder().
 		ForNamespaceMatcher(reference.Namespace).
 		ForName(reference.Name).
