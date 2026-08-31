@@ -25,6 +25,8 @@ import (
 	"net/http"
 )
 
+// Swagger annotations do not count as Go references, so retain this compile-
+// time reference to the documentation-only list projection used below.
 var _ = schemaapiopenapi.ListNamespacesResponseJson{}
 
 type ListNamespacesRequestQueryParams struct {
@@ -313,7 +315,7 @@ func (r *NamespacesRoutes) list(gctx *gin.Context) {
 }
 
 // @Summary		Update namespace
-// @Description	Update a namespace's labels and annotations. Its path and derived name cannot be changed.
+// @Description	Update a namespace's desired encryption key, labels, and annotations. Set spec.encryptionKeyRef to null to clear it. Namespace identity cannot be changed.
 // @Tags			namespaces
 // @Accept			json
 // @Produce		json
@@ -404,14 +406,18 @@ func (r *NamespacesRoutes) update(gctx *gin.Context) {
 		}
 	}
 
-	if ref := req.Spec.EncryptionKeyRef; ref != nil {
-		key, err := r.core.ResolveKeyReference(ctx, *ref)
-		if err != nil {
-			writeNamespaceKeyReferenceError(gctx, err)
-			val.MarkErrorReturn()
-			return
+	if req.Spec.HasEncryptionKeyRef() {
+		if ref := req.Spec.EncryptionKeyRef; ref != nil {
+			key, resolveErr := r.core.ResolveKeyReference(ctx, *ref)
+			if resolveErr != nil {
+				writeNamespaceKeyReferenceError(gctx, resolveErr)
+				val.MarkErrorReturn()
+				return
+			}
+			ns, err = r.core.SetNamespaceKey(ctx, path, key.GetId())
+		} else {
+			ns, err = r.core.ClearNamespaceKey(ctx, path)
 		}
-		ns, err = r.core.SetNamespaceKey(ctx, path, key.GetId())
 		if err != nil {
 			apgin.WriteErr(gctx, nil, err)
 			val.MarkErrorReturn()

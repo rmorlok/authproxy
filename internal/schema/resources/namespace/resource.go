@@ -53,6 +53,25 @@ type NamespaceSpec struct {
 // lose omitted-versus-zero patch semantics.
 type NamespaceSpecPatch struct {
 	EncryptionKeyRef *meta.ObjectReference `json:"encryptionKeyRef,omitempty" yaml:"encryptionKeyRef,omitempty"`
+
+	encryptionKeyRefPresent bool
+}
+
+// HasEncryptionKeyRef reports whether encryptionKeyRef was explicitly supplied.
+// A present nil reference means clear the namespace's key; an omitted reference
+// means leave the current key unchanged.
+func (p *NamespaceSpecPatch) HasEncryptionKeyRef() bool {
+	return p != nil && (p.encryptionKeyRefPresent || p.EncryptionKeyRef != nil)
+}
+
+// SetEncryptionKeyRef records an explicit encryption-key patch value. A nil
+// reference represents an explicit clear and is serialized as null.
+func (p *NamespaceSpecPatch) SetEncryptionKeyRef(ref *meta.ObjectReference) {
+	if p == nil {
+		return
+	}
+	p.EncryptionKeyRef = ref
+	p.encryptionKeyRefPresent = true
 }
 
 // NamespaceStatus contains server-observed namespace state.
@@ -317,9 +336,12 @@ func (p *NamespacePatch) ApplyTo(current *Namespace, vc *common.ValidationContex
 
 	updated := current.Clone()
 	updated.Metadata = meta.ApplyObjectMetaPatch(updated.Metadata, *p.Metadata)
-	if p.Spec.EncryptionKeyRef != nil {
-		keyRef := *p.Spec.EncryptionKeyRef
-		updated.Spec.EncryptionKeyRef = &keyRef
+	if p.Spec.HasEncryptionKeyRef() {
+		updated.Spec.EncryptionKeyRef = nil
+		if p.Spec.EncryptionKeyRef != nil {
+			keyRef := *p.Spec.EncryptionKeyRef
+			updated.Spec.EncryptionKeyRef = &keyRef
+		}
 	}
 	if err := ValidateUpdate(current, updated, vc); err != nil {
 		return nil, err

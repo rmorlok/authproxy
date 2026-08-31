@@ -206,6 +206,12 @@ func TestNamespacePatchApplyTo(t *testing.T) {
 	require.Equal(t, current.Metadata.ID, updated.Metadata.ID)
 	require.NotSame(t, current.Spec.EncryptionKeyRef, updated.Spec.EncryptionKeyRef)
 
+	clearKey := NewNamespacePatch()
+	clearKey.Spec.SetEncryptionKeyRef(nil)
+	updated, err = clearKey.ApplyTo(&current, nil)
+	require.NoError(t, err)
+	require.Nil(t, updated.Spec.EncryptionKeyRef)
+
 	otherID := "root.other"
 	patch.Metadata.ID = &otherID
 	_, err = patch.ApplyTo(&current, nil)
@@ -257,25 +263,66 @@ func TestNamespacePatchRequiresMetadataAndSpec(t *testing.T) {
 	}
 }
 
-func TestNamespaceSpecPatchRejectsExplicitNullKeyReference(t *testing.T) {
-	var jsonPatch NamespacePatch
-	err := json.Unmarshal([]byte(`{
-      "apiVersion":"authproxy.net/v1alpha1",
-      "kind":"Namespace",
-      "metadata":{},
-      "spec":{"encryptionKeyRef":null}
-    }`), &jsonPatch)
-	require.ErrorContains(t, err, "encryptionKeyRef must not be null")
+func TestNamespaceSpecPatchPreservesKeyReferencePresence(t *testing.T) {
+	t.Run("omitted", func(t *testing.T) {
+		patch := NewNamespacePatch()
+		require.False(t, patch.Spec.HasEncryptionKeyRef())
 
-	var yamlPatch NamespacePatch
-	err = yaml.Unmarshal([]byte(`
+		data, err := json.Marshal(patch)
+		require.NoError(t, err)
+		require.JSONEq(t, `{
+          "apiVersion":"authproxy.net/v1alpha1",
+          "kind":"Namespace",
+          "metadata":{},
+          "spec":{}
+        }`, string(data))
+	})
+
+	t.Run("explicit JSON null", func(t *testing.T) {
+		var patch NamespacePatch
+		err := json.Unmarshal([]byte(`{
+          "apiVersion":"authproxy.net/v1alpha1",
+          "kind":"Namespace",
+          "metadata":{},
+          "spec":{"encryptionKeyRef":null}
+        }`), &patch)
+		require.NoError(t, err)
+		require.True(t, patch.Spec.HasEncryptionKeyRef())
+		require.Nil(t, patch.Spec.EncryptionKeyRef)
+
+		data, err := json.Marshal(patch)
+		require.NoError(t, err)
+		require.JSONEq(t, `{
+          "apiVersion":"authproxy.net/v1alpha1",
+          "kind":"Namespace",
+          "metadata":{},
+          "spec":{"encryptionKeyRef":null}
+        }`, string(data))
+	})
+
+	t.Run("explicit YAML null", func(t *testing.T) {
+		var patch NamespacePatch
+		err := yaml.Unmarshal([]byte(`
 apiVersion: authproxy.net/v1alpha1
 kind: Namespace
 metadata: {}
 spec:
   encryptionKeyRef: null
-`), &yamlPatch)
-	require.ErrorContains(t, err, "encryptionKeyRef must not be null")
+`), &patch)
+		require.NoError(t, err)
+		require.True(t, patch.Spec.HasEncryptionKeyRef())
+		require.Nil(t, patch.Spec.EncryptionKeyRef)
+
+		data, err := yaml.Marshal(patch)
+		require.NoError(t, err)
+		require.Contains(t, string(data), "encryptionKeyRef: null")
+	})
+
+	t.Run("programmatic reference", func(t *testing.T) {
+		patch := NewNamespacePatch()
+		patch.Spec.EncryptionKeyRef = NewEncryptionKeyReference("key_test550e8400abcd")
+		require.True(t, patch.Spec.HasEncryptionKeyRef())
+	})
 }
 
 func TestNamespaceCloneDoesNotAliasMutableFields(t *testing.T) {

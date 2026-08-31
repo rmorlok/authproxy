@@ -21,23 +21,24 @@
       "type": "string",
       "enum": ["active", "destroying", "destroyed"]
     },
+    "EncryptionKeyReference": {
+      "allOf": [
+        { "$ref": "../meta/schema.json#/$defs/ObjectReference" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "Key" },
+            "id": { "type": "string", "pattern": "^key_" },
+            "namespace": { "$ref": "#/$defs/NamespacePath" }
+          }
+        }
+      ]
+    },
     "NamespaceSpec": {
       "type": "object",
       "properties": {
-        "encryptionKeyRef": {
-          "allOf": [
-            { "$ref": "../meta/schema.json#/$defs/ObjectReference" },
-            {
-              "type": "object",
-              "properties": {
-                "apiVersion": { "const": "authproxy.net/v1alpha1" },
-                "kind": { "const": "Key" },
-                "id": { "type": "string", "pattern": "^key_" },
-                "namespace": { "$ref": "#/$defs/NamespacePath" }
-              }
-            }
-          ]
-        }
+        "encryptionKeyRef": { "$ref": "#/$defs/EncryptionKeyReference" }
       },
       "additionalProperties": false
     },
@@ -50,7 +51,16 @@
       "additionalProperties": false
     },
     "NamespaceSpecPatch": {
-      "$ref": "#/$defs/NamespaceSpec"
+      "type": "object",
+      "properties": {
+        "encryptionKeyRef": {
+          "anyOf": [
+            { "$ref": "#/$defs/EncryptionKeyReference" },
+            { "type": "null" }
+          ]
+        }
+      },
+      "additionalProperties": false
     },
     "NamespacePatch": {
       "allOf": [

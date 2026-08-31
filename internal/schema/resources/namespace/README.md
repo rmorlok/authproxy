@@ -33,7 +33,9 @@ Updates use `NamespacePatch`, whose required pointer-based `metadata` and
 `ObjectMetaPatch` preserves the difference between an omitted map and an
 explicitly empty map. `NamespaceSpecPatch` is separate from `NamespaceSpec` so
 future scalar fields must define patch presence semantics deliberately.
-`spec.encryptionKeyRef: null` is rejected; omit it for no change and use the
-namespace key clear operation to remove the selection. Use
-`NamespacePatch.ApplyTo` to apply a patch and enforce immutable namespace
-identity; route code should not reproduce that merge logic.
+Omit `spec.encryptionKeyRef` to leave the current selection unchanged, set it
+to a reference to select a key, or set it to `null` to clear the selection and
+fall back to inherited key resolution. `NamespaceSpecPatch.HasEncryptionKeyRef`
+preserves that presence distinction. Use `NamespacePatch.ApplyTo` to apply a
+patch and enforce immutable namespace identity; route code should not reproduce
+that merge logic.

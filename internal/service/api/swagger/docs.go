@@ -6213,7 +6213,7 @@ const docTemplateApi = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Update a namespace's labels and annotations. Its path and derived name cannot be changed.",
+                "description": "Update a namespace's desired encryption key, labels, and annotations. Set spec.encryptionKeyRef to null to clear it. Namespace identity cannot be changed.",
                 "consumes": [
                     "application/json"
                 ],

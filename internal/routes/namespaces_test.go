@@ -780,10 +780,6 @@ func TestNamespaces(t *testing.T) {
 					name: "null sections",
 					body: `{"apiVersion":"authproxy.net/v1alpha1","kind":"Namespace","metadata":null,"spec":null}`,
 				},
-				{
-					name: "null encryption key reference",
-					body: `{"apiVersion":"authproxy.net/v1alpha1","kind":"Namespace","metadata":{},"spec":{"encryptionKeyRef":null}}`,
-				},
 			}
 
 			for _, test := range tests {
@@ -930,6 +926,50 @@ func TestNamespaces(t *testing.T) {
 			require.NoError(t, err)
 			nsUser, _ := database.SplitUserAndApxyLabels(ns.Labels)
 			require.Equal(t, database.Labels{"old": "value"}, nsUser)
+		})
+
+		t.Run("success - omitted key is unchanged and null clears it", func(t *testing.T) {
+			keyID := database.GlobalKeyID
+			_, err := tu.Db.SetNamespaceKeyId(context.Background(), "root.patchns", &keyID)
+			require.NoError(t, err)
+
+			requestPatch := func(body string) *httptest.ResponseRecorder {
+				w := httptest.NewRecorder()
+				req, requestErr := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodPatch,
+					"/namespaces/root.patchns",
+					bytes.NewBufferString(body),
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, requestErr)
+				req.Header.Set("Content-Type", "application/json")
+				tu.Gin.ServeHTTP(w, req)
+				return w
+			}
+
+			w := requestPatch(namespacePatchBody(nil, nil))
+			require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+			var unchanged nschema.Namespace
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &unchanged))
+			require.NotNil(t, unchanged.Spec.EncryptionKeyRef)
+			require.Equal(t, keyID.String(), unchanged.Spec.EncryptionKeyRef.ID)
+
+			w = requestPatch(`{
+              "apiVersion":"authproxy.net/v1alpha1",
+              "kind":"Namespace",
+              "metadata":{},
+              "spec":{"encryptionKeyRef":null}
+            }`)
+			require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+			var cleared nschema.Namespace
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &cleared))
+			require.Nil(t, cleared.Spec.EncryptionKeyRef)
+
+			stored, err := tu.Db.GetNamespace(context.Background(), "root.patchns")
+			require.NoError(t, err)
+			require.Nil(t, stored.KeyId)
 		})
 
 		t.Run("success - replaces labels entirely", func(t *testing.T) {

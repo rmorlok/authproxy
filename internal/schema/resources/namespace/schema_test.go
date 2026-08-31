@@ -239,7 +239,7 @@ func TestNamespacePatchSchema(t *testing.T) {
 		"metadata":   nil,
 		"spec":       nil,
 	}))
-	require.Error(t, schema.Validate(map[string]any{
+	require.NoError(t, schema.Validate(map[string]any{
 		"apiVersion": "authproxy.net/v1alpha1",
 		"kind":       "Namespace",
 		"metadata":   map[string]any{},
