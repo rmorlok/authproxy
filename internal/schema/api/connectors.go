@@ -40,17 +40,21 @@ type ConnectorJson struct {
 	UpdatedAt     time.Time             `json:"updatedAt" yaml:"updatedAt"`
 }
 
-type ListConnectorsResponseJson = apiv1alpha1.ResourceList[ConnectorJson]
+type ListConnectorsResponseJson struct {
+	apiv1alpha1.ResourceList[ConnectorJson] `json:",inline" yaml:",inline"`
+}
 
 func NewListConnectorsResponseJson(
 	items []ConnectorJson,
 	continueToken string,
 ) ListConnectorsResponseJson {
-	return apiv1alpha1.NewResourceList(
-		"Connector",
-		items,
-		apiv1alpha1.ListMeta{Continue: continueToken},
-	)
+	return ListConnectorsResponseJson{
+		ResourceList: apiv1alpha1.NewResourceList(
+			"Connector",
+			items,
+			apiv1alpha1.ListMeta{Continue: continueToken},
+		),
+	}
 }
 
 // ConnectorVersionJson represents a single connector version returned by the API.
@@ -69,17 +73,21 @@ type ConnectorVersionJson struct {
 	UpdatedAt   time.Time                   `json:"updatedAt" yaml:"updatedAt"`
 }
 
-type ListConnectorVersionsResponseJson = apiv1alpha1.ResourceList[ConnectorVersionJson]
+type ListConnectorVersionsResponseJson struct {
+	apiv1alpha1.ResourceList[ConnectorVersionJson] `json:",inline" yaml:",inline"`
+}
 
 func NewListConnectorVersionsResponseJson(
 	items []ConnectorVersionJson,
 	continueToken string,
 ) ListConnectorVersionsResponseJson {
-	return apiv1alpha1.NewResourceList(
-		"Connector",
-		items,
-		apiv1alpha1.ListMeta{Continue: continueToken},
-	)
+	return ListConnectorVersionsResponseJson{
+		ResourceList: apiv1alpha1.NewResourceList(
+			"Connector",
+			items,
+			apiv1alpha1.ListMeta{Continue: continueToken},
+		),
+	}
 }
 
 // CreateConnectorRequestJson is the request body for POST /connectors.

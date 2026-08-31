@@ -25,13 +25,7 @@ import (
 	"net/http"
 )
 
-type NamespaceJson = schemaapi.NamespaceJson
-type CreateNamespaceRequestJson = schemaapi.CreateNamespaceRequestJson
-type UpdateNamespaceRequestJson = schemaapi.UpdateNamespaceRequestJson
-type ListNamespacesResponseJson = schemaapi.ListNamespacesResponseJson
-type SetNamespaceKeyRequestJson = schemaapi.SetNamespaceKeyRequestJson
-type NamespaceKeyJson = schemaapi.NamespaceKeyJson
-type OpenAPIListNamespacesResponseJson = schemaapiopenapi.ListNamespacesResponseJson
+var _ = schemaapiopenapi.ListNamespacesResponseJson{}
 
 type ListNamespacesRequestQueryParams struct {
 	Cursor        *string                   `form:"cursor"`
@@ -69,7 +63,7 @@ func writeNamespaceKeyReferenceError(gctx *gin.Context, err error) {
 // @Accept			json
 // @Produce		json
 // @Param			path	path		string	true	"Namespace path"
-// @Success		200		{object}	NamespaceJson
+// @Success		200		{object}	namespace.Namespace
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		404		{object}	ErrorResponse
@@ -118,8 +112,8 @@ func (r *NamespacesRoutes) get(gctx *gin.Context) {
 // @Tags			namespaces
 // @Accept			json
 // @Produce		json
-// @Param			request	body		CreateNamespaceRequestJson	true	"Namespace creation request"
-// @Success		200		{object}	NamespaceJson
+// @Param			request	body		namespace.Namespace	true	"Namespace creation request"
+// @Success		200		{object}	namespace.Namespace
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		409		{object}	ErrorResponse
@@ -130,7 +124,7 @@ func (r *NamespacesRoutes) create(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
-	var req CreateNamespaceRequestJson
+	var req namespace.Namespace
 	if err := apgin.BindResourceJSON(gctx, &req, meta.ValidationModeCreate); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
@@ -195,7 +189,7 @@ func (r *NamespacesRoutes) create(gctx *gin.Context) {
 // @Param			name			query		string	false	"Filter by exact final path segment"
 // @Param			labelSelector	query		string	false	"Filter by label selector"
 // @Param			orderBy		query		string	false	"Order by field (e.g., 'path:asc')"
-// @Success		200				{object}	OpenAPIListNamespacesResponseJson
+// @Success		200				{object}	schemaapiopenapi.ListNamespacesResponseJson
 // @Failure		400				{object}	ErrorResponse
 // @Failure		401				{object}	ErrorResponse
 // @Failure		500				{object}	ErrorResponse
@@ -303,7 +297,7 @@ func (r *NamespacesRoutes) list(gctx *gin.Context) {
 	response := schemaapi.NewListNamespacesResponseJson(
 		util.Map(
 			auth.FilterForValidatedResources(val, result.Results),
-			func(ns coreIface.Namespace) schemaapi.NamespaceJson {
+			func(ns coreIface.Namespace) namespace.Namespace {
 				return *ns.GetResource()
 			},
 		),
@@ -324,8 +318,8 @@ func (r *NamespacesRoutes) list(gctx *gin.Context) {
 // @Accept			json
 // @Produce		json
 // @Param			path	path		string						true	"Namespace path"
-// @Param			request	body		UpdateNamespaceRequestJson	true	"Namespace update request"
-// @Success		200		{object}	NamespaceJson
+// @Param			request	body		namespace.NamespacePatch	true	"Namespace update request"
+// @Success		200		{object}	namespace.Namespace
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		404		{object}	ErrorResponse
@@ -344,7 +338,7 @@ func (r *NamespacesRoutes) update(gctx *gin.Context) {
 		return
 	}
 
-	var req UpdateNamespaceRequestJson
+	var req namespace.NamespacePatch
 	if err := apgin.BindResourceJSON(gctx, &req, meta.ValidationModeUpdate); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
@@ -614,7 +608,7 @@ func (r *NamespacesRoutes) setKey(gctx *gin.Context) {
 		return
 	}
 
-	var req SetNamespaceKeyRequestJson
+	var req namespace.NamespacePatch
 	if err := apgin.BindResourceJSON(gctx, &req, meta.ValidationModeUpdate); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()

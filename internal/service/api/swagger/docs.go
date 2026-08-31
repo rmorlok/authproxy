@@ -6062,7 +6062,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPIListNamespacesResponseJson"
+                            "$ref": "#/definitions/openapi.ListNamespacesResponseJson"
                         }
                     },
                     "400": {
@@ -6109,7 +6109,7 @@ const docTemplateApi = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.CreateNamespaceRequestJson"
+                            "$ref": "#/definitions/namespace.Namespace"
                         }
                     }
                 ],
@@ -6117,7 +6117,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.NamespaceJson"
+                            "$ref": "#/definitions/namespace.Namespace"
                         }
                     },
                     "400": {
@@ -6178,7 +6178,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.NamespaceJson"
+                            "$ref": "#/definitions/namespace.Namespace"
                         }
                     },
                     "400": {
@@ -6238,7 +6238,7 @@ const docTemplateApi = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.UpdateNamespaceRequestJson"
+                            "$ref": "#/definitions/namespace.NamespacePatch"
                         }
                     }
                 ],
@@ -6246,7 +6246,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.NamespaceJson"
+                            "$ref": "#/definitions/namespace.Namespace"
                         }
                     },
                     "400": {
@@ -8310,26 +8310,6 @@ const docTemplateApi = `{
                 }
             }
         },
-        "api.NamespaceJson": {
-            "type": "object",
-            "properties": {
-                "apiVersion": {
-                    "$ref": "#/definitions/meta.APIVersion"
-                },
-                "kind": {
-                    "type": "string"
-                },
-                "metadata": {
-                    "$ref": "#/definitions/meta.ObjectMeta"
-                },
-                "spec": {
-                    "$ref": "#/definitions/namespace.NamespaceSpec"
-                },
-                "status": {
-                    "$ref": "#/definitions/namespace.NamespaceStatus"
-                }
-            }
-        },
         "meta.APIVersion": {
             "type": "string",
             "enum": [
@@ -8429,6 +8409,46 @@ const docTemplateApi = `{
                 },
                 "namespace": {
                     "type": "string"
+                }
+            }
+        },
+        "namespace.Namespace": {
+            "type": "object",
+            "properties": {
+                "apiVersion": {
+                    "$ref": "#/definitions/meta.APIVersion"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/meta.ObjectMeta"
+                },
+                "spec": {
+                    "$ref": "#/definitions/namespace.NamespaceSpec"
+                },
+                "status": {
+                    "$ref": "#/definitions/namespace.NamespaceStatus"
+                }
+            }
+        },
+        "namespace.NamespacePatch": {
+            "type": "object",
+            "properties": {
+                "apiVersion": {
+                    "$ref": "#/definitions/meta.APIVersion"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/meta.ObjectMetaPatch"
+                },
+                "spec": {
+                    "$ref": "#/definitions/namespace.NamespaceSpecPatch"
+                },
+                "status": {
+                    "$ref": "#/definitions/namespace.NamespaceStatus"
                 }
             }
         },
@@ -8593,6 +8613,38 @@ const docTemplateApi = `{
                 },
                 "updatedAt": {
                     "type": "string"
+                }
+            }
+        },
+        "openapi.ListNamespacesResponseJson": {
+            "description": "Paginated list of namespaces",
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "items",
+                "kind",
+                "metadata"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "items": {
+                    "description": "List of namespaces.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/namespace.Namespace"
+                    }
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/v1alpha1.ListMeta"
                 }
             }
         },
@@ -8870,26 +8922,6 @@ const docTemplateApi = `{
                 }
             }
         },
-        "routes.CreateNamespaceRequestJson": {
-            "type": "object",
-            "properties": {
-                "apiVersion": {
-                    "$ref": "#/definitions/meta.APIVersion"
-                },
-                "kind": {
-                    "type": "string"
-                },
-                "metadata": {
-                    "$ref": "#/definitions/meta.ObjectMeta"
-                },
-                "spec": {
-                    "$ref": "#/definitions/namespace.NamespaceSpec"
-                },
-                "status": {
-                    "$ref": "#/definitions/namespace.NamespaceStatus"
-                }
-            }
-        },
         "routes.DataSourceOptionJson": {
             "description": "Data source option for form select fields",
             "type": "object",
@@ -8996,26 +9028,6 @@ const docTemplateApi = `{
                     "example": [
                         "ntf_test550e8400abcde"
                     ]
-                }
-            }
-        },
-        "routes.NamespaceJson": {
-            "type": "object",
-            "properties": {
-                "apiVersion": {
-                    "$ref": "#/definitions/meta.APIVersion"
-                },
-                "kind": {
-                    "type": "string"
-                },
-                "metadata": {
-                    "$ref": "#/definitions/meta.ObjectMeta"
-                },
-                "spec": {
-                    "$ref": "#/definitions/namespace.NamespaceSpec"
-                },
-                "status": {
-                    "$ref": "#/definitions/namespace.NamespaceStatus"
                 }
             }
         },
@@ -9488,38 +9500,6 @@ const docTemplateApi = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/openapi.KeyJson"
-                    }
-                },
-                "kind": {
-                    "type": "string"
-                },
-                "metadata": {
-                    "$ref": "#/definitions/v1alpha1.ListMeta"
-                }
-            }
-        },
-        "routes.OpenAPIListNamespacesResponseJson": {
-            "description": "Paginated list of namespaces",
-            "type": "object",
-            "required": [
-                "apiVersion",
-                "items",
-                "kind",
-                "metadata"
-            ],
-            "properties": {
-                "apiVersion": {
-                    "type": "string",
-                    "enum": [
-                        "authproxy.net/v1alpha1"
-                    ],
-                    "example": "authproxy.net/v1alpha1"
-                },
-                "items": {
-                    "description": "List of namespaces.",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/api.NamespaceJson"
                     }
                 },
                 "kind": {
@@ -10110,26 +10090,6 @@ const docTemplateApi = `{
                 "name": {
                     "type": "string",
                     "example": "production-crm"
-                }
-            }
-        },
-        "routes.UpdateNamespaceRequestJson": {
-            "type": "object",
-            "properties": {
-                "apiVersion": {
-                    "$ref": "#/definitions/meta.APIVersion"
-                },
-                "kind": {
-                    "type": "string"
-                },
-                "metadata": {
-                    "$ref": "#/definitions/meta.ObjectMetaPatch"
-                },
-                "spec": {
-                    "$ref": "#/definitions/namespace.NamespaceSpecPatch"
-                },
-                "status": {
-                    "$ref": "#/definitions/namespace.NamespaceStatus"
                 }
             }
         },

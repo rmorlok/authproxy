@@ -100,19 +100,6 @@ definitions:
         example: request_events
         type: string
     type: object
-  api.NamespaceJson:
-    properties:
-      apiVersion:
-        $ref: '#/definitions/meta.APIVersion'
-      kind:
-        type: string
-      metadata:
-        $ref: '#/definitions/meta.ObjectMeta'
-      spec:
-        $ref: '#/definitions/namespace.NamespaceSpec'
-      status:
-        $ref: '#/definitions/namespace.NamespaceStatus'
-    type: object
   meta.APIVersion:
     enum:
     - authproxy.net/v1alpha1
@@ -179,6 +166,32 @@ definitions:
         type: string
       namespace:
         type: string
+    type: object
+  namespace.Namespace:
+    properties:
+      apiVersion:
+        $ref: '#/definitions/meta.APIVersion'
+      kind:
+        type: string
+      metadata:
+        $ref: '#/definitions/meta.ObjectMeta'
+      spec:
+        $ref: '#/definitions/namespace.NamespaceSpec'
+      status:
+        $ref: '#/definitions/namespace.NamespaceStatus'
+    type: object
+  namespace.NamespacePatch:
+    properties:
+      apiVersion:
+        $ref: '#/definitions/meta.APIVersion'
+      kind:
+        type: string
+      metadata:
+        $ref: '#/definitions/meta.ObjectMetaPatch'
+      spec:
+        $ref: '#/definitions/namespace.NamespaceSpecPatch'
+      status:
+        $ref: '#/definitions/namespace.NamespaceStatus'
     type: object
   namespace.NamespaceSpec:
     properties:
@@ -293,6 +306,29 @@ definitions:
         type: string
       updatedAt:
         type: string
+    type: object
+  openapi.ListNamespacesResponseJson:
+    description: Paginated list of namespaces
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      items:
+        description: List of namespaces.
+        items:
+          $ref: '#/definitions/namespace.Namespace'
+        type: array
+      kind:
+        type: string
+      metadata:
+        $ref: '#/definitions/v1alpha1.ListMeta'
+    required:
+    - apiVersion
+    - items
+    - kind
+    - metadata
     type: object
   openapi.RateLimitJson:
     description: Rate-limit API response
@@ -494,19 +530,6 @@ definitions:
         example: root.acme
         type: string
     type: object
-  routes.CreateNamespaceRequestJson:
-    properties:
-      apiVersion:
-        $ref: '#/definitions/meta.APIVersion'
-      kind:
-        type: string
-      metadata:
-        $ref: '#/definitions/meta.ObjectMeta'
-      spec:
-        $ref: '#/definitions/namespace.NamespaceSpec'
-      status:
-        $ref: '#/definitions/namespace.NamespaceStatus'
-    type: object
   routes.DataSourceOptionJson:
     description: Data source option for form select fields
     properties:
@@ -589,19 +612,6 @@ definitions:
         items:
           type: string
         type: array
-    type: object
-  routes.NamespaceJson:
-    properties:
-      apiVersion:
-        $ref: '#/definitions/meta.APIVersion'
-      kind:
-        type: string
-      metadata:
-        $ref: '#/definitions/meta.ObjectMeta'
-      spec:
-        $ref: '#/definitions/namespace.NamespaceSpec'
-      status:
-        $ref: '#/definitions/namespace.NamespaceStatus'
     type: object
   routes.OpenAPIConnectionJson:
     description: Connection to an external service
@@ -932,29 +942,6 @@ definitions:
       items:
         items:
           $ref: '#/definitions/openapi.KeyJson'
-        type: array
-      kind:
-        type: string
-      metadata:
-        $ref: '#/definitions/v1alpha1.ListMeta'
-    required:
-    - apiVersion
-    - items
-    - kind
-    - metadata
-    type: object
-  routes.OpenAPIListNamespacesResponseJson:
-    description: Paginated list of namespaces
-    properties:
-      apiVersion:
-        enum:
-        - authproxy.net/v1alpha1
-        example: authproxy.net/v1alpha1
-        type: string
-      items:
-        description: List of namespaces.
-        items:
-          $ref: '#/definitions/api.NamespaceJson'
         type: array
       kind:
         type: string
@@ -1375,19 +1362,6 @@ definitions:
       name:
         example: production-crm
         type: string
-    type: object
-  routes.UpdateNamespaceRequestJson:
-    properties:
-      apiVersion:
-        $ref: '#/definitions/meta.APIVersion'
-      kind:
-        type: string
-      metadata:
-        $ref: '#/definitions/meta.ObjectMetaPatch'
-      spec:
-        $ref: '#/definitions/namespace.NamespaceSpecPatch'
-      status:
-        $ref: '#/definitions/namespace.NamespaceStatus'
     type: object
   v1alpha1.ListMeta:
     properties:
@@ -5344,7 +5318,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIListNamespacesResponseJson'
+            $ref: '#/definitions/openapi.ListNamespacesResponseJson'
         "400":
           description: Bad Request
           schema:
@@ -5372,14 +5346,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.CreateNamespaceRequestJson'
+          $ref: '#/definitions/namespace.Namespace'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.NamespaceJson'
+            $ref: '#/definitions/namespace.Namespace'
         "400":
           description: Bad Request
           schema:
@@ -5418,7 +5392,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.NamespaceJson'
+            $ref: '#/definitions/namespace.Namespace'
         "400":
           description: Bad Request
           schema:
@@ -5456,14 +5430,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.UpdateNamespaceRequestJson'
+          $ref: '#/definitions/namespace.NamespacePatch'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.NamespaceJson'
+            $ref: '#/definitions/namespace.Namespace'
         "400":
           description: Bad Request
           schema:

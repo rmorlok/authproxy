@@ -27,6 +27,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	httpf2 "github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/routes/key_value"
+	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
@@ -37,7 +38,7 @@ import (
 	clock "k8s.io/utils/clock/testing"
 )
 
-func namespaceCreateRequest(path string) CreateNamespaceRequestJson {
+func namespaceCreateRequest(path string) nschema.Namespace {
 	resource, err := nschema.NewNamespaceForPath(path)
 	if err != nil {
 		panic(err)
@@ -173,7 +174,7 @@ func TestNamespaces(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp NamespaceJson
+			var resp nschema.Namespace
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Equal(t, "root.dev", resp.Metadata.ID)
@@ -196,7 +197,7 @@ func TestNamespaces(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 
-			var resp NamespaceJson
+			var resp nschema.Namespace
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			require.Equal(t, nschema.Root, resp.Metadata.ID)
 			require.Equal(t, nschema.Root, string(resp.Metadata.Name))
@@ -218,7 +219,7 @@ func TestNamespaces(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp NamespaceJson
+			var resp nschema.Namespace
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Equal(t, "root.dev", resp.Metadata.ID)
@@ -255,7 +256,7 @@ func TestNamespaces(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp NamespaceJson
+			var resp nschema.Namespace
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Equal(t, "root.prod", resp.Metadata.ID)
@@ -331,7 +332,7 @@ func TestNamespaces(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp NamespaceJson
+			var resp nschema.Namespace
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Equal(t, "root.allowed", resp.Metadata.ID)
@@ -366,7 +367,7 @@ func TestNamespaces(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp NamespaceJson
+			var resp nschema.Namespace
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Equal(t, "root.withlabels", resp.Metadata.ID)
@@ -527,7 +528,7 @@ func TestNamespaces(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ListNamespacesResponseJson
+			var resp schemaapi.ListNamespacesResponseJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Len(t, resp.Items, 5)
@@ -580,7 +581,7 @@ func TestNamespaces(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ListNamespacesResponseJson
+			var resp schemaapi.ListNamespacesResponseJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Len(t, resp.Items, 2)
@@ -598,7 +599,7 @@ func TestNamespaces(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 
-			var first ListNamespacesResponseJson
+			var first schemaapi.ListNamespacesResponseJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &first))
 			require.Len(t, first.Items, 1)
 			require.Equal(t, "old", string(first.Items[0].Metadata.Name))
@@ -612,7 +613,7 @@ func TestNamespaces(t *testing.T) {
 			require.NoError(t, err)
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code, w.Body.String())
-			var second ListNamespacesResponseJson
+			var second schemaapi.ListNamespacesResponseJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &second))
 			require.Len(t, second.Items, 1)
 			require.Equal(t, "old", string(second.Items[0].Metadata.Name))
@@ -626,7 +627,7 @@ func TestNamespaces(t *testing.T) {
 			require.NoError(t, err)
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code, w.Body.String())
-			var authorized ListNamespacesResponseJson
+			var authorized schemaapi.ListNamespacesResponseJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &authorized))
 			require.Len(t, authorized.Items, 1)
 			require.Equal(t, "root.dev.old", authorized.Items[0].Metadata.ID)
@@ -640,7 +641,7 @@ func TestNamespaces(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ListNamespacesResponseJson
+			var resp schemaapi.ListNamespacesResponseJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Len(t, resp.Items, 1)
@@ -655,7 +656,7 @@ func TestNamespaces(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ListNamespacesResponseJson
+			var resp schemaapi.ListNamespacesResponseJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Len(t, resp.Items, 2)
@@ -678,7 +679,7 @@ func TestNamespaces(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ListNamespacesResponseJson
+			var resp schemaapi.ListNamespacesResponseJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Len(t, resp.Items, 1)
@@ -845,7 +846,7 @@ func TestNamespaces(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp NamespaceJson
+			var resp nschema.Namespace
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			require.Equal(t, "root.patchns", resp.Metadata.ID)
 			require.Equal(t, "patchns", string(resp.Metadata.Name))
@@ -883,7 +884,7 @@ func TestNamespaces(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp NamespaceJson
+			var resp nschema.Namespace
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			respUser, _ := database.SplitUserAndApxyLabels(database.Labels(resp.Metadata.Labels))
 			require.Empty(t, respUser)
@@ -919,7 +920,7 @@ func TestNamespaces(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp NamespaceJson
+			var resp nschema.Namespace
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			respUser, _ := database.SplitUserAndApxyLabels(database.Labels(resp.Metadata.Labels))
 			require.Equal(t, database.Labels{"old": "value"}, respUser)
@@ -955,7 +956,7 @@ func TestNamespaces(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp NamespaceJson
+			var resp nschema.Namespace
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			respUser, _ := database.SplitUserAndApxyLabels(database.Labels(resp.Metadata.Labels))
 			require.Len(t, respUser, 1)
@@ -1006,7 +1007,7 @@ func TestNamespaces(t *testing.T) {
 		tu.Gin.ServeHTTP(w, req)
 		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 
-		var updated NamespaceJson
+		var updated nschema.Namespace
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &updated))
 		require.Equal(t, meta.APIVersionV1Alpha1, updated.APIVersion)
 		require.Equal(t, nschema.NamespaceKind, updated.Kind)
@@ -1026,7 +1027,7 @@ func TestNamespaces(t *testing.T) {
 		tu.Gin.ServeHTTP(w, req)
 		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 
-		var fetched NamespaceJson
+		var fetched nschema.Namespace
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &fetched))
 		require.Equal(t, database.GlobalKeyID.String(), fetched.Spec.EncryptionKeyRef.ID)
 
@@ -1553,7 +1554,7 @@ func TestNamespaces(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp NamespaceJson
+			var resp nschema.Namespace
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			require.Equal(t, "root.patchannot", resp.Metadata.ID)
 			require.Equal(t, "my namespace", resp.Metadata.Annotations["description"])
@@ -1590,7 +1591,7 @@ func TestNamespaces(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp NamespaceJson
+			var resp nschema.Namespace
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			require.Equal(t, map[string]string{"old": "value"}, resp.Metadata.Annotations)
 
@@ -1624,7 +1625,7 @@ func TestNamespaces(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp NamespaceJson
+			var resp nschema.Namespace
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			require.Len(t, resp.Metadata.Annotations, 1)
 			require.Equal(t, "new-value", resp.Metadata.Annotations["new-key"])

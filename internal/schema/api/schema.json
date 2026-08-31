@@ -645,15 +645,6 @@
       ],
       "additionalProperties": false
     },
-    "Namespace": {
-      "$ref": "../resources/namespace/schema.json"
-    },
-    "CreateNamespaceRequest": {
-      "$ref": "../resources/namespace/schema.json"
-    },
-    "UpdateNamespaceRequest": {
-      "$ref": "../resources/namespace/schema.json#/$defs/NamespacePatch"
-    },
     "ListNamespacesResponse": {
       "description": "A Kubernetes-style list of namespaces.",
       "allOf": [
@@ -665,17 +656,11 @@
             "kind": { "const": "NamespaceList" },
             "items": {
               "type": "array",
-              "items": { "$ref": "#/$defs/Namespace" }
+              "items": { "$ref": "../resources/namespace/schema.json" }
             }
           }
         }
       ]
-    },
-    "SetNamespaceKeyRequest": {
-      "$ref": "../resources/namespace/schema.json#/$defs/NamespacePatch"
-    },
-    "NamespaceKey": {
-      "$ref": "../resources/namespace/schema.json"
     },
     "Actor": {
       "type": "object",

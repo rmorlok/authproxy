@@ -6,6 +6,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	apiv1alpha1 "github.com/rmorlok/authproxy/internal/schema/api/v1alpha1"
+	nschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 )
 
 // ResourceListJson is the non-generic OpenAPI projection of the common list
@@ -32,7 +33,7 @@ type ListActorsResponseJson struct {
 type ListNamespacesResponseJson struct {
 	ResourceListJson
 	// List of namespaces.
-	Items []schemaapi.NamespaceJson `json:"items" binding:"required"`
+	Items []nschema.Namespace `json:"items" binding:"required"`
 }
 
 // ListConnectorsResponseJson documents the paginated connector list response.
