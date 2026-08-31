@@ -8440,6 +8440,14 @@ const docTemplateadmin_api = `{
                 }
             }
         },
+        "namespace.NamespaceSpecPatch": {
+            "type": "object",
+            "properties": {
+                "encryptionKeyRef": {
+                    "$ref": "#/definitions/meta.ObjectReference"
+                }
+            }
+        },
         "namespace.NamespaceStatus": {
             "type": "object",
             "properties": {
@@ -10118,7 +10126,7 @@ const docTemplateadmin_api = `{
                     "$ref": "#/definitions/meta.ObjectMetaPatch"
                 },
                 "spec": {
-                    "$ref": "#/definitions/namespace.NamespaceSpec"
+                    "$ref": "#/definitions/namespace.NamespaceSpecPatch"
                 },
                 "status": {
                     "$ref": "#/definitions/namespace.NamespaceStatus"

@@ -33,18 +33,25 @@ type Namespace struct {
 	Status        *NamespaceStatus `json:"status,omitempty" yaml:"status,omitempty"`
 }
 
-// NamespacePatch is a partial Namespace resource used for updates. Pointer
-// fields in Metadata preserve the distinction between an omitted map and an
-// explicitly empty map that clears existing values.
+// NamespacePatch is a partial Namespace resource used for updates. Metadata
+// and Spec are pointers so validation can distinguish required empty objects
+// from missing or null top-level fields.
 type NamespacePatch struct {
 	meta.TypeMeta `json:",inline" yaml:",inline"`
-	Metadata      meta.ObjectMetaPatch `json:"metadata" yaml:"metadata"`
-	Spec          NamespaceSpec        `json:"spec" yaml:"spec"`
-	Status        *NamespaceStatus     `json:"status,omitempty" yaml:"status,omitempty"`
+	Metadata      *meta.ObjectMetaPatch `json:"metadata" yaml:"metadata"`
+	Spec          *NamespaceSpecPatch   `json:"spec" yaml:"spec"`
+	Status        *NamespaceStatus      `json:"status,omitempty" yaml:"status,omitempty"`
 }
 
 // NamespaceSpec contains desired namespace configuration.
 type NamespaceSpec struct {
+	EncryptionKeyRef *meta.ObjectReference `json:"encryptionKeyRef,omitempty" yaml:"encryptionKeyRef,omitempty"`
+}
+
+// NamespaceSpecPatch contains presence-aware desired-state updates. Keep this
+// separate from NamespaceSpec so future scalar spec fields cannot accidentally
+// lose omitted-versus-zero patch semantics.
+type NamespaceSpecPatch struct {
 	EncryptionKeyRef *meta.ObjectReference `json:"encryptionKeyRef,omitempty" yaml:"encryptionKeyRef,omitempty"`
 }
 
@@ -75,7 +82,11 @@ func NewNamespaceResourceForPath(path string) (*Namespace, error) {
 // NewNamespacePatch returns an empty Namespace update envelope with the
 // registered type metadata.
 func NewNamespacePatch() *NamespacePatch {
-	return &NamespacePatch{TypeMeta: meta.NewTypeMeta(NamespaceKind)}
+	return &NamespacePatch{
+		TypeMeta: meta.NewTypeMeta(NamespaceKind),
+		Metadata: &meta.ObjectMetaPatch{},
+		Spec:     &NamespaceSpecPatch{},
+	}
 }
 
 // NewNamespaceForPath returns a create-ready namespace resource derived from
@@ -263,21 +274,29 @@ func (p *NamespacePatch) ValidateFor(mode meta.ValidationMode, vc *common.Valida
 	if err := meta.ValidateTypeMeta(p.TypeMeta, meta.APIVersionV1Alpha1, NamespaceKind, vc); err != nil {
 		result = multierror.Append(result, err)
 	}
-	if err := meta.ValidateObjectMetaPatch(p.Metadata, meta.ValidationOptions{
-		Mode:               mode,
-		Path:               vc,
-		IDValidator:        ValidatePath,
-		NamespaceValidator: ValidatePath,
-	}); err != nil {
-		result = multierror.Append(result, err)
-	}
-	if p.Metadata.Name != nil {
-		if err := ValidateName(string(*p.Metadata.Name)); err != nil {
-			result = multierror.Append(result, vc.NewErrorfForField("metadata.name", "%v", err))
+	if p.Metadata == nil {
+		result = multierror.Append(result, vc.NewErrorForField("metadata", "is required and must not be null"))
+	} else {
+		if err := meta.ValidateObjectMetaPatch(*p.Metadata, meta.ValidationOptions{
+			Mode:               mode,
+			Path:               vc,
+			IDValidator:        ValidatePath,
+			NamespaceValidator: ValidatePath,
+		}); err != nil {
+			result = multierror.Append(result, err)
+		}
+		if p.Metadata.Name != nil {
+			if err := ValidateName(string(*p.Metadata.Name)); err != nil {
+				result = multierror.Append(result, vc.NewErrorfForField("metadata.name", "%v", err))
+			}
 		}
 	}
-	if err := ValidateEncryptionKeyReference(p.Spec.EncryptionKeyRef, vc); err != nil {
-		result = multierror.Append(result, err)
+	if p.Spec == nil {
+		result = multierror.Append(result, vc.NewErrorForField("spec", "is required and must not be null"))
+	} else {
+		if err := ValidateEncryptionKeyReference(p.Spec.EncryptionKeyRef, vc); err != nil {
+			result = multierror.Append(result, err)
+		}
 	}
 	if err := meta.ValidateStatus(p.Status, mode, vc); err != nil {
 		result = multierror.Append(result, err)
@@ -297,7 +316,7 @@ func (p *NamespacePatch) ApplyTo(current *Namespace, vc *common.ValidationContex
 	}
 
 	updated := current.Clone()
-	updated.Metadata = meta.ApplyObjectMetaPatch(updated.Metadata, p.Metadata)
+	updated.Metadata = meta.ApplyObjectMetaPatch(updated.Metadata, *p.Metadata)
 	if p.Spec.EncryptionKeyRef != nil {
 		keyRef := *p.Spec.EncryptionKeyRef
 		updated.Spec.EncryptionKeyRef = &keyRef

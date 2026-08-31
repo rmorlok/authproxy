@@ -185,6 +185,11 @@ definitions:
       encryptionKeyRef:
         $ref: '#/definitions/meta.ObjectReference'
     type: object
+  namespace.NamespaceSpecPatch:
+    properties:
+      encryptionKeyRef:
+        $ref: '#/definitions/meta.ObjectReference'
+    type: object
   namespace.NamespaceStatus:
     properties:
       state:
@@ -1380,7 +1385,7 @@ definitions:
       metadata:
         $ref: '#/definitions/meta.ObjectMetaPatch'
       spec:
-        $ref: '#/definitions/namespace.NamespaceSpec'
+        $ref: '#/definitions/namespace.NamespaceSpecPatch'
       status:
         $ref: '#/definitions/namespace.NamespaceStatus'
     type: object

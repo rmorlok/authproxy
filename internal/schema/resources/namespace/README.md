@@ -28,7 +28,12 @@ The resource maps hierarchy and identity as follows:
 helpers. Persistence remains flat and converts at the core boundary rather
 than leaking database rows into the public resource schema.
 
-Updates use `NamespacePatch`, whose pointer-based metadata fields preserve
-the difference between an omitted map and an explicitly empty map. Use
+Updates use `NamespacePatch`, whose required pointer-based `metadata` and
+`spec` envelopes distinguish empty objects from missing or null fields.
+`ObjectMetaPatch` preserves the difference between an omitted map and an
+explicitly empty map. `NamespaceSpecPatch` is separate from `NamespaceSpec` so
+future scalar fields must define patch presence semantics deliberately.
+`spec.encryptionKeyRef: null` is rejected; omit it for no change and use the
+namespace key clear operation to remove the selection. Use
 `NamespacePatch.ApplyTo` to apply a patch and enforce immutable namespace
 identity; route code should not reproduce that merge logic.

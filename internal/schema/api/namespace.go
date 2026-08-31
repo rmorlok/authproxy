@@ -13,7 +13,8 @@ type NamespaceJson = nschema.Namespace
 type CreateNamespaceRequestJson = nschema.Namespace
 
 // UpdateNamespaceRequestJson uses a partial Namespace resource envelope.
-// Metadata maps retain nil-versus-empty patch semantics.
+// Metadata and spec remain required top-level objects while their patch fields
+// retain omitted-versus-present semantics.
 type UpdateNamespaceRequestJson = nschema.NamespacePatch
 
 // ListNamespacesResponseJson is the Kubernetes-style namespace list response.

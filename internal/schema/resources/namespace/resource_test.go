@@ -182,6 +182,8 @@ func TestNamespacePatchApplyTo(t *testing.T) {
 	emptyLabels := map[string]string{}
 	annotations := map[string]string{"example.com/owner": "security"}
 	patch := NewNamespacePatch()
+	require.NotNil(t, patch.Metadata)
+	require.NotNil(t, patch.Spec)
 	patch.Metadata.Labels = &emptyLabels
 	patch.Metadata.Annotations = &annotations
 	data, err := json.Marshal(patch)
@@ -227,6 +229,53 @@ func TestNamespacePatchValidation(t *testing.T) {
 	require.ErrorContains(t, err, "spec.encryptionKeyRef.kind")
 	require.ErrorContains(t, err, "spec.encryptionKeyRef.id")
 	require.ErrorContains(t, err, "status: is server-owned")
+}
+
+func TestNamespacePatchRequiresMetadataAndSpec(t *testing.T) {
+	tests := []struct {
+		name string
+		data string
+	}{
+		{
+			name: "missing",
+			data: `{"apiVersion":"authproxy.net/v1alpha1","kind":"Namespace"}`,
+		},
+		{
+			name: "null",
+			data: `{"apiVersion":"authproxy.net/v1alpha1","kind":"Namespace","metadata":null,"spec":null}`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var patch NamespacePatch
+			require.NoError(t, json.Unmarshal([]byte(test.data), &patch))
+			err := patch.ValidateFor(meta.ValidationModeUpdate, nil)
+			require.ErrorContains(t, err, "$.metadata: is required and must not be null")
+			require.ErrorContains(t, err, "$.spec: is required and must not be null")
+		})
+	}
+}
+
+func TestNamespaceSpecPatchRejectsExplicitNullKeyReference(t *testing.T) {
+	var jsonPatch NamespacePatch
+	err := json.Unmarshal([]byte(`{
+      "apiVersion":"authproxy.net/v1alpha1",
+      "kind":"Namespace",
+      "metadata":{},
+      "spec":{"encryptionKeyRef":null}
+    }`), &jsonPatch)
+	require.ErrorContains(t, err, "encryptionKeyRef must not be null")
+
+	var yamlPatch NamespacePatch
+	err = yaml.Unmarshal([]byte(`
+apiVersion: authproxy.net/v1alpha1
+kind: Namespace
+metadata: {}
+spec:
+  encryptionKeyRef: null
+`), &yamlPatch)
+	require.ErrorContains(t, err, "encryptionKeyRef must not be null")
 }
 
 func TestNamespaceCloneDoesNotAliasMutableFields(t *testing.T) {

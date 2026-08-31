@@ -49,6 +49,9 @@
       "required": ["state"],
       "additionalProperties": false
     },
+    "NamespaceSpecPatch": {
+      "$ref": "#/$defs/NamespaceSpec"
+    },
     "NamespacePatch": {
       "allOf": [
         { "$ref": "../meta/schema.json#/$defs/Resource" },
@@ -70,7 +73,7 @@
                 }
               ]
             },
-            "spec": { "$ref": "#/$defs/NamespaceSpec" },
+            "spec": { "$ref": "#/$defs/NamespaceSpecPatch" },
             "status": { "$ref": "#/$defs/NamespaceStatus" }
           }
         }

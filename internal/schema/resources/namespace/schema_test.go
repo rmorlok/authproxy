@@ -232,6 +232,24 @@ func TestNamespacePatchSchema(t *testing.T) {
 	require.Error(t, schema.Validate(map[string]any{
 		"apiVersion": "authproxy.net/v1alpha1",
 		"kind":       "Namespace",
+	}))
+	require.Error(t, schema.Validate(map[string]any{
+		"apiVersion": "authproxy.net/v1alpha1",
+		"kind":       "Namespace",
+		"metadata":   nil,
+		"spec":       nil,
+	}))
+	require.Error(t, schema.Validate(map[string]any{
+		"apiVersion": "authproxy.net/v1alpha1",
+		"kind":       "Namespace",
+		"metadata":   map[string]any{},
+		"spec": map[string]any{
+			"encryptionKeyRef": nil,
+		},
+	}))
+	require.Error(t, schema.Validate(map[string]any{
+		"apiVersion": "authproxy.net/v1alpha1",
+		"kind":       "Namespace",
 		"metadata":   map[string]any{"id": "not-rooted"},
 		"spec":       map[string]any{},
 	}))

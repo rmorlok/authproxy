@@ -762,6 +762,49 @@ func TestNamespaces(t *testing.T) {
 			require.Equal(t, http.StatusBadRequest, w.Code)
 		})
 
+		t.Run("bad request - missing or null patch fields", func(t *testing.T) {
+			tests := []struct {
+				name string
+				body string
+			}{
+				{
+					name: "missing metadata",
+					body: `{"apiVersion":"authproxy.net/v1alpha1","kind":"Namespace","spec":{}}`,
+				},
+				{
+					name: "missing spec",
+					body: `{"apiVersion":"authproxy.net/v1alpha1","kind":"Namespace","metadata":{}}`,
+				},
+				{
+					name: "null sections",
+					body: `{"apiVersion":"authproxy.net/v1alpha1","kind":"Namespace","metadata":null,"spec":null}`,
+				},
+				{
+					name: "null encryption key reference",
+					body: `{"apiVersion":"authproxy.net/v1alpha1","kind":"Namespace","metadata":{},"spec":{"encryptionKeyRef":null}}`,
+				},
+			}
+
+			for _, test := range tests {
+				t.Run(test.name, func(t *testing.T) {
+					w := httptest.NewRecorder()
+					req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+						http.MethodPatch,
+						"/namespaces/root.patchns",
+						bytes.NewBufferString(test.body),
+						"root",
+						"some-actor",
+						aschema.AllPermissions(),
+					)
+					require.NoError(t, err)
+					req.Header.Set("Content-Type", "application/json")
+
+					tu.Gin.ServeHTTP(w, req)
+					require.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+				})
+			}
+		})
+
 		t.Run("bad request - immutable identity", func(t *testing.T) {
 			otherID := "root.other"
 			patch := nschema.NewNamespacePatch()
