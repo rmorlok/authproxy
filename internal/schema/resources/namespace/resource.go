@@ -281,7 +281,10 @@ func (n *Namespace) ValidateFor(mode meta.ValidationMode, vc *common.ValidationC
 }
 
 // ValidateFor validates a partial Namespace at the API update boundary.
-func (p *NamespacePatch) ValidateFor(mode meta.ValidationMode, vc *common.ValidationContext) error {
+func (p *NamespacePatch) ValidateFor(
+	mode meta.ValidationMode,
+	vc *common.ValidationContext,
+) error {
 	if p == nil {
 		return fmt.Errorf("namespace patch is required")
 	}
@@ -290,18 +293,26 @@ func (p *NamespacePatch) ValidateFor(mode meta.ValidationMode, vc *common.Valida
 	}
 
 	var result *multierror.Error
-	if err := meta.ValidateTypeMeta(p.TypeMeta, meta.APIVersionV1Alpha1, NamespaceKind, vc); err != nil {
+	if err := meta.ValidateTypeMeta(
+		p.TypeMeta,
+		meta.APIVersionV1Alpha1,
+		NamespaceKind,
+		vc,
+	); err != nil {
 		result = multierror.Append(result, err)
 	}
 	if p.Metadata == nil {
 		result = multierror.Append(result, vc.NewErrorForField("metadata", "is required and must not be null"))
 	} else {
-		if err := meta.ValidateObjectMetaPatch(*p.Metadata, meta.ValidationOptions{
-			Mode:               mode,
-			Path:               vc,
-			IDValidator:        ValidatePath,
-			NamespaceValidator: ValidatePath,
-		}); err != nil {
+		if err := meta.ValidateObjectMetaPatch(
+			*p.Metadata,
+			meta.ValidationOptions{
+				Mode:               mode,
+				Path:               vc,
+				IDValidator:        ValidatePath,
+				NamespaceValidator: ValidatePath,
+			},
+		); err != nil {
 			result = multierror.Append(result, err)
 		}
 		if p.Metadata.Name != nil {
@@ -326,7 +337,10 @@ func (p *NamespacePatch) ValidateFor(mode meta.ValidationMode, vc *common.Valida
 
 // ApplyTo applies p to a clone of current and verifies that immutable
 // namespace identity is unchanged.
-func (p *NamespacePatch) ApplyTo(current *Namespace, vc *common.ValidationContext) (*Namespace, error) {
+func (p *NamespacePatch) ApplyTo(
+	current *Namespace,
+	vc *common.ValidationContext,
+) (*Namespace, error) {
 	if current == nil {
 		return nil, fmt.Errorf("current namespace is required")
 	}
@@ -336,6 +350,7 @@ func (p *NamespacePatch) ApplyTo(current *Namespace, vc *common.ValidationContex
 
 	updated := current.Clone()
 	updated.Metadata = meta.ApplyObjectMetaPatch(updated.Metadata, *p.Metadata)
+
 	if p.Spec.HasEncryptionKeyRef() {
 		updated.Spec.EncryptionKeyRef = nil
 		if p.Spec.EncryptionKeyRef != nil {
@@ -343,15 +358,20 @@ func (p *NamespacePatch) ApplyTo(current *Namespace, vc *common.ValidationContex
 			updated.Spec.EncryptionKeyRef = &keyRef
 		}
 	}
+
 	if err := ValidateUpdate(current, updated, vc); err != nil {
 		return nil, err
 	}
+
 	return updated, nil
 }
 
 // ValidateEncryptionKeyReference applies the common object-reference rules and
 // the Namespace-specific requirement that the target is a v1alpha1 Key.
-func ValidateEncryptionKeyReference(ref *meta.ObjectReference, vc *common.ValidationContext) error {
+func ValidateEncryptionKeyReference(
+	ref *meta.ObjectReference,
+	vc *common.ValidationContext,
+) error {
 	if ref == nil {
 		return nil
 	}
@@ -360,20 +380,27 @@ func ValidateEncryptionKeyReference(ref *meta.ObjectReference, vc *common.Valida
 	}
 
 	refPath := vc.PushField("spec").PushField("encryptionKeyRef")
-	return meta.ValidateObjectReferenceWithOptions(*ref, meta.ObjectReferenceValidationOptions{
-		ExpectedAPIVersion: meta.APIVersionV1Alpha1,
-		ExpectedKind:       EncryptionKeyKind,
-		IDValidator: func(value string) error {
-			_, err := EncryptionKeyID(&meta.ObjectReference{ID: value})
-			return err
+	return meta.ValidateObjectReferenceWithOptions(
+		*ref,
+		meta.ObjectReferenceValidationOptions{
+			ExpectedAPIVersion: meta.APIVersionV1Alpha1,
+			ExpectedKind:       EncryptionKeyKind,
+			IDValidator: func(value string) error {
+				_, err := EncryptionKeyID(&meta.ObjectReference{ID: value})
+				return err
+			},
+			NamespaceValidator: ValidatePath,
 		},
-		NamespaceValidator: ValidatePath,
-	}, refPath)
+		refPath,
+	)
 }
 
 // ValidateUpdate rejects changes to namespace identity after applying a full
 // or partial update resource to an existing namespace.
-func ValidateUpdate(before, after *Namespace, vc *common.ValidationContext) error {
+func ValidateUpdate(
+	before, after *Namespace,
+	vc *common.ValidationContext,
+) error {
 	if before == nil || after == nil {
 		return fmt.Errorf("before and after namespaces are required")
 	}
@@ -382,15 +409,24 @@ func ValidateUpdate(before, after *Namespace, vc *common.ValidationContext) erro
 	}
 
 	var result *multierror.Error
-	if err := meta.ValidateTypeMetaUpdate(before.TypeMeta, after.TypeMeta, vc); err != nil {
+	if err := meta.ValidateTypeMetaUpdate(
+		before.TypeMeta,
+		after.TypeMeta,
+		vc,
+	); err != nil {
 		result = multierror.Append(result, err)
 	}
-	if err := meta.ValidateMetadataUpdate(before.Metadata, after.Metadata, meta.UpdateOptions{
-		ImmutableName:      true,
-		ImmutableNamespace: true,
-	}, vc); err != nil {
+	if err := meta.ValidateMetadataUpdate(
+		before.Metadata,
+		after.Metadata,
+		meta.UpdateOptions{
+			ImmutableName:      true,
+			ImmutableNamespace: true,
+		}, vc,
+	); err != nil {
 		result = multierror.Append(result, err)
 	}
+
 	return result.ErrorOrNil()
 }
 
@@ -398,7 +434,9 @@ func ValidateUpdate(before, after *Namespace, vc *common.ValidationContext) erro
 // value.
 func IsValidState(state NamespaceState) bool {
 	switch state {
-	case NamespaceStateActive, NamespaceStateDestroying, NamespaceStateDestroyed:
+	case NamespaceStateActive,
+		NamespaceStateDestroying,
+		NamespaceStateDestroyed:
 		return true
 	default:
 		return false
