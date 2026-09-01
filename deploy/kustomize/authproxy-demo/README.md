@@ -8,7 +8,8 @@ The base contains the shared AuthProxy, demo-shell, and go-oauth2-server
 workloads. Overlays choose backing services and public hostnames:
 
 - `overlays/demo` targets `demo.authproxy.net` and includes Postgres, Redis,
-  and MinIO backing workloads.
+  and MinIO backing workloads. Each stateful backing workload uses an encrypted
+  `gp3` persistent volume so data survives pod rescheduling and node replacement.
 - `overlays/dev` targets an example per-branch namespace and keeps the slim
   dev profile: SQLite, embedded miniredis, and filesystem blob storage. Its
   disposable pod-local database uses `serve --auto-migrate`; it removes the

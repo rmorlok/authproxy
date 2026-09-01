@@ -7,6 +7,8 @@ metadata:
     app.kubernetes.io/component: object-storage
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/name: minio
@@ -34,6 +36,13 @@ spec:
                   key: root-password
             - name: MINIO_DEFAULT_BUCKETS
               value: authproxy-request-logs
+          volumeMounts:
+            - name: data
+              mountPath: /bitnami/minio/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: minio-data
 ---
 apiVersion: v1
 kind: Service
@@ -51,3 +60,15 @@ spec:
     - name: api
       port: 9000
       targetPort: api
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: minio-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: gp3
+  resources:
+    requests:
+      storage: 10Gi
