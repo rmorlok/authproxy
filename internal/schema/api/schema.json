@@ -53,13 +53,6 @@
         "resolved"
       ]
     },
-    "KeyState": {
-      "type": "string",
-      "enum": [
-        "active",
-        "disabled"
-      ]
-    },
     "StringMap": {
       "type": "object",
       "additionalProperties": {
@@ -1480,40 +1473,7 @@
       "additionalProperties": false
     },
     "Key": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "namespace": {
-          "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath"
-        },
-        "state": {
-          "$ref": "#/$defs/KeyState"
-        },
-        "labels": {
-          "$ref": "#/$defs/StringMap"
-        },
-        "annotations": {
-          "$ref": "#/$defs/StringMap"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "id",
-        "namespace",
-        "state",
-        "createdAt",
-        "updatedAt"
-      ],
-      "additionalProperties": false
+      "$ref": "../resources/key/schema.json"
     },
     "ListKeysResponse": {
       "description": "A Kubernetes-style list of keys.",
@@ -1526,47 +1486,17 @@
             "kind": { "const": "KeyList" },
             "items": {
               "type": "array",
-              "items": { "$ref": "#/$defs/Key" }
+              "items": { "$ref": "../resources/key/schema.json" }
             }
           }
         }
       ]
     },
     "CreateKeyRequest": {
-      "type": "object",
-      "properties": {
-        "namespace": {
-          "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath"
-        },
-        "keyData": {
-          "$ref": "../resources/key/schema.json#/$defs/KeyData"
-        },
-        "labels": {
-          "$ref": "#/$defs/StringMap"
-        },
-        "annotations": {
-          "$ref": "#/$defs/StringMap"
-        }
-      },
-      "required": [
-        "namespace"
-      ],
-      "additionalProperties": false
+      "$ref": "../resources/key/schema.json"
     },
     "UpdateKeyRequest": {
-      "type": "object",
-      "properties": {
-        "state": {
-          "$ref": "#/$defs/KeyState"
-        },
-        "labels": {
-          "$ref": "#/$defs/StringMap"
-        },
-        "annotations": {
-          "$ref": "#/$defs/StringMap"
-        }
-      },
-      "additionalProperties": false
+      "$ref": "../resources/key/schema.json#/$defs/KeyPatch"
     },
     "SessionInitiateParams": {
       "type": "object",

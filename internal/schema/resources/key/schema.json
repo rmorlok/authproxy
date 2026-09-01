@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/schema/resources/key/schema.json",
   "$defs": {
-    "Key": {
+    "SigningKey": {
       "oneOf": [
         {
           "type": "object",
@@ -374,6 +374,105 @@
           "$ref": "#/$defs/KeyDataMockKMS"
         }
       ]
+    },
+    "KeyUsage": {
+      "type": "string",
+      "enum": ["data_encryption"]
+    },
+    "KeyMaterialType": {
+      "type": "string",
+      "enum": ["symmetric", "public", "private", "external"]
+    },
+    "KeyState": {
+      "type": "string",
+      "enum": ["active", "disabled"]
+    },
+    "KeySpec": {
+      "type": "object",
+      "properties": {
+        "usage": { "$ref": "#/$defs/KeyUsage" },
+        "materialType": { "$ref": "#/$defs/KeyMaterialType" },
+        "desiredState": { "$ref": "#/$defs/KeyState" },
+        "keyData": {
+          "$ref": "#/$defs/KeyData",
+          "writeOnly": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "KeyStatus": {
+      "type": "object",
+      "properties": {
+        "state": { "$ref": "#/$defs/KeyState" },
+        "keyDataConfigured": { "type": "boolean" }
+      },
+      "required": ["state", "keyDataConfigured"],
+      "additionalProperties": false
+    },
+    "KeySpecPatch": {
+      "type": "object",
+      "properties": {
+        "usage": { "$ref": "#/$defs/KeyUsage" },
+        "materialType": { "$ref": "#/$defs/KeyMaterialType" },
+        "desiredState": { "$ref": "#/$defs/KeyState" },
+        "keyData": {
+          "$ref": "#/$defs/KeyData",
+          "writeOnly": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "KeyPatch": {
+      "allOf": [
+        { "$ref": "../meta/schema.json#/$defs/Resource" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "Key" },
+            "metadata": {
+              "allOf": [
+                { "$ref": "../meta/schema.json#/$defs/ObjectMetaPatch" },
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "pattern": "^key_" },
+                    "namespace": { "$ref": "../namespace/schema.json#/$defs/NamespacePath" }
+                  }
+                }
+              ]
+            },
+            "spec": { "$ref": "#/$defs/KeySpecPatch" },
+            "status": { "$ref": "#/$defs/KeyStatus" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
     }
-  }
+  },
+  "allOf": [
+    { "$ref": "../meta/schema.json#/$defs/Resource" },
+    {
+      "type": "object",
+      "properties": {
+        "apiVersion": { "const": "authproxy.net/v1alpha1" },
+        "kind": { "const": "Key" },
+        "metadata": {
+          "allOf": [
+            { "$ref": "../meta/schema.json#/$defs/ObjectMeta" },
+            {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string", "pattern": "^key_" },
+                "namespace": { "$ref": "../namespace/schema.json#/$defs/NamespacePath" }
+              }
+            }
+          ]
+        },
+        "spec": { "$ref": "#/$defs/KeySpec" },
+        "status": { "$ref": "#/$defs/KeyStatus" }
+      }
+    }
+  ],
+  "unevaluatedProperties": false
 }

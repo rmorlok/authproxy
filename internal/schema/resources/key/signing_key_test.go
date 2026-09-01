@@ -7,7 +7,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestKey(t *testing.T) {
+func TestSigningKey(t *testing.T) {
 	assert := require.New(t)
 
 	t.Run("yaml parse", func(t *testing.T) {
@@ -16,10 +16,10 @@ func TestKey(t *testing.T) {
 sharedKey:
   value: some-key-value
 `
-			var key Key
+			var key SigningKey
 			err := yaml.Unmarshal([]byte(data), &key)
 			assert.NoError(err)
-			assert.Equal(Key{
+			assert.Equal(SigningKey{
 				InnerVal: &KeyShared{
 					SharedKey: &KeyData{
 						InnerVal: &KeyDataValue{
@@ -34,10 +34,10 @@ sharedKey:
 publicKey:
   value: some-key-value
 `
-			var key Key
+			var key SigningKey
 			err := yaml.Unmarshal([]byte(data), &key)
 			assert.NoError(err)
-			assert.Equal(Key{
+			assert.Equal(SigningKey{
 				InnerVal: &KeyPublicPrivate{
 					PublicKey: &KeyData{
 						InnerVal: &KeyDataValue{
@@ -52,10 +52,10 @@ publicKey:
 privateKey:
   value: some-key-value
 `
-			var key Key
+			var key SigningKey
 			err := yaml.Unmarshal([]byte(data), &key)
 			assert.NoError(err)
-			assert.Equal(Key{
+			assert.Equal(SigningKey{
 				InnerVal: &KeyPublicPrivate{
 					PrivateKey: &KeyData{
 						InnerVal: &KeyDataValue{
@@ -72,10 +72,10 @@ publicKey:
 privateKey:
   value: some-key-value-2
 `
-			var key Key
+			var key SigningKey
 			err := yaml.Unmarshal([]byte(data), &key)
 			assert.NoError(err)
-			assert.Equal(Key{
+			assert.Equal(SigningKey{
 				InnerVal: &KeyPublicPrivate{
 					PublicKey: &KeyData{
 						InnerVal: &KeyDataValue{

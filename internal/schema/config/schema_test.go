@@ -297,7 +297,7 @@ func TestSchemaDefinitions(t *testing.T) {
   "required": ["test"],
   "properties": {
 	"test": {
-		"$ref": "../resources/key/schema.json#/$defs/Key"
+		"$ref": "../resources/key/schema.json#/$defs/SigningKey"
     }
   }
 }`,

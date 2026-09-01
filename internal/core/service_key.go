@@ -12,6 +12,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	cfgschema "github.com/rmorlok/authproxy/internal/schema/config"
+	keyschema "github.com/rmorlok/authproxy/internal/schema/resources/key"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	nschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -104,25 +105,31 @@ func (s *service) resolveKeyByNamespacedName(
 	return result.Results[0], nil
 }
 
-func (s *service) CreateKey(ctx context.Context, namespace string, name common.ResourceName, keyData *cfgschema.KeyData, labels map[string]string) (iface.Key, error) {
-	ek := &database.Key{
-		Id:        apid.New(apid.PrefixKey),
-		Namespace: namespace,
-		Name:      name,
-		State:     database.KeyStateActive,
-		Labels:    database.Labels(labels),
+func (s *service) CreateKey(ctx context.Context, resource *keyschema.Key) (iface.Key, error) {
+	if resource == nil {
+		return nil, errors.New("key cannot be nil")
+	}
+	if err := resource.ValidateFor(meta.ValidationModeCreate, nil); err != nil {
+		return nil, err
 	}
 
-	if keyData == nil {
-		return nil, errors.New("key data cannot be nil")
+	id := apid.New(apid.PrefixKey)
+	normalized, err := resource.ApplyCreateDefaults(id)
+	if err != nil {
+		return nil, err
 	}
+	ek, err := databaseKeyFromResource(normalized, id)
+	if err != nil {
+		return nil, err
+	}
+	keyData := normalized.Spec.KeyData
 
 	keyDataBytes, err := json.Marshal(keyData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal key data to JSON: %w", err)
 	}
 
-	ef, err := s.encrypt.EncryptKeyForNamespace(ctx, namespace, keyDataBytes)
+	ef, err := s.encrypt.EncryptKeyForNamespace(ctx, normalized.Metadata.Namespace, keyDataBytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encrypt key data: %w", err)
 	}

@@ -4881,7 +4881,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPIListKeysResponseJson"
+                            "$ref": "#/definitions/openapi.ListKeysResponseJson"
                         }
                     },
                     "400": {
@@ -4928,7 +4928,7 @@ const docTemplateadmin_api = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPICreateKeyRequestJson"
+                            "$ref": "#/definitions/openapi.KeyJson"
                         }
                     }
                 ],
@@ -4936,7 +4936,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPIKeyJson"
+                            "$ref": "#/definitions/openapi.KeyJson"
                         }
                     },
                     "400": {
@@ -4997,7 +4997,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPIKeyJson"
+                            "$ref": "#/definitions/openapi.KeyJson"
                         }
                     },
                     "400": {
@@ -5082,7 +5082,7 @@ const docTemplateadmin_api = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Update a key's properties",
+                "description": "Update a key's desired state, provider configuration, name, labels, or annotations",
                 "consumes": [
                     "application/json"
                 ],
@@ -5107,7 +5107,7 @@ const docTemplateadmin_api = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPIUpdateKeyRequestJson"
+                            "$ref": "#/definitions/openapi.KeyPatchJson"
                         }
                     }
                 ],
@@ -5115,7 +5115,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPIKeyJson"
+                            "$ref": "#/definitions/openapi.KeyJson"
                         }
                     },
                     "400": {
@@ -8310,6 +8310,17 @@ const docTemplateadmin_api = `{
                 }
             }
         },
+        "key.KeyStatus": {
+            "type": "object",
+            "properties": {
+                "keyDataConfigured": {
+                    "type": "boolean"
+                },
+                "state": {
+                    "type": "string"
+                }
+            }
+        },
         "meta.APIVersion": {
             "type": "string",
             "enum": [
@@ -8574,45 +8585,163 @@ const docTemplateadmin_api = `{
             }
         },
         "openapi.KeyJson": {
-            "description": "Key API response",
+            "description": "Kubernetes-style managed Key resource. Secret keyData fields are always redacted in responses.",
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "kind",
+                "metadata",
+                "spec"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "Key"
+                    ],
+                    "example": "Key"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/meta.ObjectMeta"
+                },
+                "spec": {
+                    "$ref": "#/definitions/openapi.KeySpecJson"
+                },
+                "status": {
+                    "$ref": "#/definitions/key.KeyStatus"
+                }
+            }
+        },
+        "openapi.KeyPatchJson": {
+            "description": "Kubernetes-style managed Key patch. Status and server-owned metadata are rejected.",
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "kind",
+                "metadata",
+                "spec"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "Key"
+                    ],
+                    "example": "Key"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/meta.ObjectMetaPatch"
+                },
+                "spec": {
+                    "$ref": "#/definitions/openapi.KeySpecPatchJson"
+                },
+                "status": {
+                    "$ref": "#/definitions/key.KeyStatus"
+                }
+            }
+        },
+        "openapi.KeySpecJson": {
             "type": "object",
             "properties": {
-                "annotations": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "createdAt": {
-                    "type": "string"
-                },
-                "id": {
+                "desiredState": {
                     "type": "string",
-                    "example": "key_test550e8400abcd"
+                    "enum": [
+                        "active",
+                        "disabled"
+                    ]
                 },
                 "keyData": {
                     "type": "object"
                 },
-                "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
+                "materialType": {
+                    "type": "string",
+                    "enum": [
+                        "symmetric",
+                        "public",
+                        "private",
+                        "external"
+                    ]
+                },
+                "usage": {
+                    "type": "string",
+                    "enum": [
+                        "data_encryption"
+                    ]
+                }
+            }
+        },
+        "openapi.KeySpecPatchJson": {
+            "type": "object",
+            "properties": {
+                "desiredState": {
+                    "type": "string",
+                    "enum": [
+                        "active",
+                        "disabled"
+                    ]
+                },
+                "keyData": {
+                    "type": "object"
+                },
+                "materialType": {
+                    "type": "string",
+                    "enum": [
+                        "symmetric",
+                        "public",
+                        "private",
+                        "external"
+                    ]
+                },
+                "usage": {
+                    "type": "string",
+                    "enum": [
+                        "data_encryption"
+                    ]
+                }
+            }
+        },
+        "openapi.ListKeysResponseJson": {
+            "description": "Paginated list of keys",
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "items",
+                "kind",
+                "metadata"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/openapi.KeyJson"
                     }
                 },
-                "name": {
-                    "type": "string",
-                    "example": "primary-encryption-key"
-                },
-                "namespace": {
-                    "type": "string",
-                    "example": "root.acme"
-                },
-                "state": {
-                    "type": "string",
-                    "example": "active"
-                },
-                "updatedAt": {
+                "kind": {
                     "type": "string"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/v1alpha1.ListMeta"
                 }
             }
         },
@@ -9197,36 +9326,6 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "routes.OpenAPICreateKeyRequestJson": {
-            "description": "Request to create a key",
-            "type": "object",
-            "properties": {
-                "annotations": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "keyData": {
-                    "type": "object",
-                    "additionalProperties": true
-                },
-                "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "name": {
-                    "type": "string",
-                    "example": "primary-encryption-key"
-                },
-                "namespace": {
-                    "type": "string",
-                    "example": "root.acme"
-                }
-            }
-        },
         "routes.OpenAPICreateRateLimitRequestJson": {
             "description": "Request to create a rate limit",
             "type": "object",
@@ -9306,49 +9405,6 @@ const docTemplateadmin_api = `{
                     "additionalProperties": {
                         "type": "string"
                     }
-                }
-            }
-        },
-        "routes.OpenAPIKeyJson": {
-            "description": "Key API response",
-            "type": "object",
-            "properties": {
-                "annotations": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "createdAt": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string",
-                    "example": "key_test550e8400abcd"
-                },
-                "keyData": {
-                    "type": "object"
-                },
-                "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "name": {
-                    "type": "string",
-                    "example": "primary-encryption-key"
-                },
-                "namespace": {
-                    "type": "string",
-                    "example": "root.acme"
-                },
-                "state": {
-                    "type": "string",
-                    "example": "active"
-                },
-                "updatedAt": {
-                    "type": "string"
                 }
             }
         },
@@ -9469,37 +9525,6 @@ const docTemplateadmin_api = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/api.ConnectorJson"
-                    }
-                },
-                "kind": {
-                    "type": "string"
-                },
-                "metadata": {
-                    "$ref": "#/definitions/v1alpha1.ListMeta"
-                }
-            }
-        },
-        "routes.OpenAPIListKeysResponseJson": {
-            "description": "Paginated list of keys",
-            "type": "object",
-            "required": [
-                "apiVersion",
-                "items",
-                "kind",
-                "metadata"
-            ],
-            "properties": {
-                "apiVersion": {
-                    "type": "string",
-                    "enum": [
-                        "authproxy.net/v1alpha1"
-                    ],
-                    "example": "authproxy.net/v1alpha1"
-                },
-                "items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/openapi.KeyJson"
                     }
                 },
                 "kind": {
@@ -9888,36 +9913,6 @@ const docTemplateadmin_api = `{
                     "additionalProperties": {
                         "type": "string"
                     }
-                }
-            }
-        },
-        "routes.OpenAPIUpdateKeyRequestJson": {
-            "description": "Request to update a key",
-            "type": "object",
-            "properties": {
-                "annotations": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "keyData": {
-                    "type": "object",
-                    "additionalProperties": true
-                },
-                "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "name": {
-                    "type": "string",
-                    "example": "primary-encryption-key"
-                },
-                "state": {
-                    "type": "string",
-                    "example": "disabled"
                 }
             }
         },

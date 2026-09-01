@@ -13,4 +13,4 @@ func (kpp *KeyPublicPrivate) CanVerifySignature() bool {
 	return kpp.PublicKey != nil
 }
 
-var _ KeyType = (*KeyPublicPrivate)(nil)
+var _ SigningKeyType = (*KeyPublicPrivate)(nil)
