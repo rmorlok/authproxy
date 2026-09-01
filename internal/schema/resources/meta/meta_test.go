@@ -2,6 +2,7 @@ package meta
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -138,6 +139,54 @@ func TestValidationContexts(t *testing.T) {
 	})
 }
 
+func TestValidateObjectMetaPatch(t *testing.T) {
+	id := "wid_123"
+	name := common.ResourceName("example")
+	namespace := "root"
+	labels := map[string]string{}
+	annotations := map[string]string{"example.com/owner": "platform"}
+	require.NoError(t, ValidateObjectMetaPatch(ObjectMetaPatch{
+		ID:          &id,
+		Name:        &name,
+		Namespace:   &namespace,
+		Labels:      &labels,
+		Annotations: &annotations,
+	}, ValidationOptions{
+		Mode:               ValidationModeUpdate,
+		IDValidator:        func(value string) error { return nil },
+		NamespaceValidator: func(value string) error { return nil },
+	}))
+
+	empty := ""
+	emptyName := common.ResourceName("")
+	zero := uint64(0)
+	reservedLabels := map[string]string{"apxy/wid/-/id": "wid_123"}
+	now := time.Now()
+	err := ValidateObjectMetaPatch(ObjectMetaPatch{
+		ID:         &empty,
+		Name:       &emptyName,
+		Namespace:  &empty,
+		Generation: &zero,
+		Labels:     &reservedLabels,
+		CreatedAt:  &now,
+		UpdatedAt:  &now,
+	}, ValidationOptions{Mode: ValidationModeUpdate})
+	for _, path := range []string{
+		"$.metadata.id",
+		"$.metadata.name",
+		"$.metadata.namespace",
+		"$.metadata.generation",
+		"$.metadata.labels",
+		"$.metadata.createdAt",
+		"$.metadata.updatedAt",
+	} {
+		require.ErrorContains(t, err, path)
+	}
+
+	err = ValidateObjectMetaPatch(ObjectMetaPatch{}, ValidationOptions{Mode: ValidationModeCreate})
+	require.ErrorContains(t, err, "metadata patches require update validation mode")
+}
+
 func TestTypeMetaAndImmutableValidationUseFieldPaths(t *testing.T) {
 	err := ValidateTypeMeta(
 		TypeMeta{APIVersion: "authproxy.net/v1alpha2", Kind: "Gadget"},
@@ -174,8 +223,38 @@ func TestStatusReferenceAndConditionValidation(t *testing.T) {
 
 	reference := ObjectReference{APIVersion: APIVersionV1Alpha1, Kind: "Connector", ID: "cxr_123"}
 	require.NoError(t, ValidateObjectReference(reference, &common.ValidationContext{Path: "$.metadata.target"}))
+	require.True(t, reference.HasID())
+	require.False(t, reference.HasNamespacedName())
+
 	reference.ID = ""
-	require.ErrorContains(t, ValidateObjectReference(reference, &common.ValidationContext{Path: "$.metadata.target"}), "$.metadata.target: must contain id or name")
+	reference.Namespace = "root"
+	reference.Name = "greenhouse"
+	require.NoError(t, ValidateObjectReference(reference, &common.ValidationContext{Path: "$.metadata.target"}))
+	require.False(t, reference.HasID())
+	require.True(t, reference.HasNamespacedName())
+
+	reference.Namespace = ""
+	require.ErrorContains(t, ValidateObjectReference(reference, &common.ValidationContext{Path: "$.metadata.target"}), "$.metadata.target: must contain id or namespace and name")
+
+	err := ValidateObjectReferenceWithOptions(
+		ObjectReference{
+			APIVersion: APIVersionV1Alpha1,
+			Kind:       "Key",
+			ID:         "cxr_wrong",
+		},
+		ObjectReferenceValidationOptions{
+			ExpectedAPIVersion: APIVersionV1Alpha1,
+			ExpectedKind:       "Key",
+			IDValidator: func(value string) error {
+				if value != "key_expected" {
+					return fmt.Errorf("must be a key id")
+				}
+				return nil
+			},
+		},
+		&common.ValidationContext{Path: "$.metadata.target"},
+	)
+	require.ErrorContains(t, err, "$.metadata.target.id: must be a key id")
 
 	condition := NewCondition("Ready", ConditionTrue, 1, "Configured", "ready", time.Date(2026, 8, 28, 10, 0, 0, 0, time.UTC))
 	require.NoError(t, ValidateCondition(condition, &common.ValidationContext{Path: "$.status.conditions[0]"}))

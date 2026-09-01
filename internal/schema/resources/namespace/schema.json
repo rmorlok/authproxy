@@ -16,6 +16,106 @@
       "type": "string",
       "pattern": "^root(?:\\.[A-Za-z0-9_][A-Za-z0-9_-]*)*(?:\\.\\*\\*)?$",
       "description": "A matcher for a namespace. Supports wildcards like 'root.prod.**' or 'root.**'."
+    },
+    "NamespaceState": {
+      "type": "string",
+      "enum": ["active", "destroying", "destroyed"]
+    },
+    "EncryptionKeyReference": {
+      "allOf": [
+        { "$ref": "../meta/schema.json#/$defs/ObjectReference" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "Key" },
+            "id": { "type": "string", "pattern": "^key_" },
+            "namespace": { "$ref": "#/$defs/NamespacePath" }
+          }
+        }
+      ]
+    },
+    "NamespaceSpec": {
+      "type": "object",
+      "properties": {
+        "encryptionKeyRef": { "$ref": "#/$defs/EncryptionKeyReference" }
+      },
+      "additionalProperties": false
+    },
+    "NamespaceStatus": {
+      "type": "object",
+      "properties": {
+        "state": { "$ref": "#/$defs/NamespaceState" }
+      },
+      "required": ["state"],
+      "additionalProperties": false
+    },
+    "NamespaceSpecPatch": {
+      "type": "object",
+      "properties": {
+        "encryptionKeyRef": {
+          "anyOf": [
+            { "$ref": "#/$defs/EncryptionKeyReference" },
+            { "type": "null" }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "NamespacePatch": {
+      "allOf": [
+        { "$ref": "../meta/schema.json#/$defs/Resource" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "Namespace" },
+            "metadata": {
+              "allOf": [
+                { "$ref": "../meta/schema.json#/$defs/ObjectMetaPatch" },
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": { "$ref": "#/$defs/NamespacePath" },
+                    "name": { "$ref": "#/$defs/NamespaceName" },
+                    "namespace": { "$ref": "#/$defs/NamespacePath" }
+                  }
+                }
+              ]
+            },
+            "spec": { "$ref": "#/$defs/NamespaceSpecPatch" },
+            "status": { "$ref": "#/$defs/NamespaceStatus" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
     }
-  }
+  },
+  "allOf": [
+    { "$ref": "../meta/schema.json#/$defs/Resource" },
+    {
+      "type": "object",
+      "properties": {
+        "apiVersion": { "const": "authproxy.net/v1alpha1" },
+        "kind": { "const": "Namespace" },
+        "metadata": {
+          "allOf": [
+            { "$ref": "../meta/schema.json#/$defs/ObjectMeta" },
+            {
+              "type": "object",
+              "properties": {
+                "id": { "$ref": "#/$defs/NamespacePath" },
+                "name": { "$ref": "#/$defs/NamespaceName" },
+                "namespace": { "$ref": "#/$defs/NamespacePath" }
+              },
+              "required": ["name"]
+            }
+          ]
+        },
+        "spec": { "$ref": "#/$defs/NamespaceSpec" },
+        "status": { "$ref": "#/$defs/NamespaceStatus" }
+      }
+    }
+  ],
+  "unevaluatedProperties": false
 }

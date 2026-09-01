@@ -23,17 +23,21 @@ type RateLimitJson struct {
 	UpdatedAt   time.Time           `json:"updatedAt" yaml:"updatedAt"`
 }
 
-type ListRateLimitsResponseJson = apiv1alpha1.ResourceList[RateLimitJson]
+type ListRateLimitsResponseJson struct {
+	apiv1alpha1.ResourceList[RateLimitJson] `json:",inline" yaml:",inline"`
+}
 
 func NewListRateLimitsResponseJson(
 	items []RateLimitJson,
 	continueToken string,
 ) ListRateLimitsResponseJson {
-	return apiv1alpha1.NewResourceList(
-		"RateLimit",
-		items,
-		apiv1alpha1.ListMeta{Continue: continueToken},
-	)
+	return ListRateLimitsResponseJson{
+		ResourceList: apiv1alpha1.NewResourceList(
+			"RateLimit",
+			items,
+			apiv1alpha1.ListMeta{Continue: continueToken},
+		),
+	}
 }
 
 // CreateRateLimitRequestJson is the request body for POST /rate-limits.

@@ -94,9 +94,10 @@ func TestListAndActionValidationIsFieldAddressable(t *testing.T) {
 		APIVersion: meta.APIVersionV1Alpha1,
 		Kind:       "Widget",
 		Name:       "example",
+		Namespace:  "root",
 	}, struct{}{})
 	require.NoError(t, request.Validate("WidgetAction"))
 
-	request.Metadata.Target.Name = ""
-	require.ErrorContains(t, request.Validate("WidgetAction"), "$.metadata.target: must contain id or name")
+	request.Metadata.Target.Namespace = ""
+	require.ErrorContains(t, request.Validate("WidgetAction"), "$.metadata.target: must contain id or namespace and name")
 }

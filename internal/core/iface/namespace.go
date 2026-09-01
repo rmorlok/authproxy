@@ -7,18 +7,20 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	nschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
 type Namespace interface {
 	GetPath() string
 	GetName() common.ResourceName
-	GetState() database.NamespaceState
+	GetState() nschema.NamespaceState
 	GetKeyId() *apid.ID
 	GetCreatedAt() time.Time
 	GetUpdatedAt() time.Time
 	GetLabels() map[string]string
 	GetAnnotations() map[string]string
+	GetResource() *nschema.Namespace
 }
 
 /*
@@ -39,7 +41,7 @@ type ListNamespacesBuilder interface {
 	ForNamespaceMatcher(matcher string) ListNamespacesBuilder
 	ForNamespaceMatchers(matchers []string) ListNamespacesBuilder
 	ForName(name common.ResourceName) ListNamespacesBuilder
-	ForState(database.NamespaceState) ListNamespacesBuilder
+	ForState(nschema.NamespaceState) ListNamespacesBuilder
 	OrderBy(database.NamespaceOrderByField, pagination.OrderBy) ListNamespacesBuilder
 	IncludeDeleted() ListNamespacesBuilder
 	ForLabelSelector(selector string) ListNamespacesBuilder

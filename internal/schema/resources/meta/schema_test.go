@@ -62,6 +62,12 @@ func TestSchemaDefinitions(t *testing.T) {
 	}
 }
 
+func TestObjectReferenceSchemaSupportsNamespacedName(t *testing.T) {
+	schema := compileDefinition(t, "ObjectReference")
+	require.NoError(t, validateJSON(t, schema, "{\"apiVersion\":\"authproxy.net/v1alpha1\",\"kind\":\"Connector\",\"namespace\":\"root.prod\",\"name\":\"greenhouse\"}"))
+	require.Error(t, validateJSON(t, schema, "{\"apiVersion\":\"authproxy.net/v1alpha1\",\"kind\":\"Connector\",\"name\":\"greenhouse\"}"))
+}
+
 func TestResourceSchemaComposesWithoutRepeatingTypeMeta(t *testing.T) {
 	compiler := jsonschemav5.NewCompiler()
 	addSchema(t, compiler, "../../common/schema.json")

@@ -32,17 +32,21 @@ type KeyJson struct {
 	UpdatedAt   time.Time           `json:"updatedAt" yaml:"updatedAt"`
 }
 
-type ListKeysResponseJson = apiv1alpha1.ResourceList[KeyJson]
+type ListKeysResponseJson struct {
+	apiv1alpha1.ResourceList[KeyJson] `json:",inline" yaml:",inline"`
+}
 
 func NewListKeysResponseJson(
 	items []KeyJson,
 	continueToken string,
 ) ListKeysResponseJson {
-	return apiv1alpha1.NewResourceList(
-		"Key",
-		items,
-		apiv1alpha1.ListMeta{Continue: continueToken},
-	)
+	return ListKeysResponseJson{
+		ResourceList: apiv1alpha1.NewResourceList(
+			"Key",
+			items,
+			apiv1alpha1.ListMeta{Continue: continueToken},
+		),
+	}
 }
 
 // CreateKeyRequestJson is the request body for POST /keys.

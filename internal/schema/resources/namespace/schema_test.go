@@ -115,6 +115,8 @@ func TestSchema(t *testing.T) {
 	for _, entity := range entities {
 		t.Run(entity.name, func(t *testing.T) {
 			c := jsonschemav5.NewCompiler()
+			_ = loadSchema(t, c, "../../common/schema.json")
+			_ = loadSchema(t, c, "../meta/schema.json")
 			sid := loadSchema(t, c, "./schema.json")
 			require.Equal(t, SchemaId, sid, "schema ID should be the same as the one in the schema")
 
@@ -151,4 +153,104 @@ func TestSchema(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNamespaceResourceSchema(t *testing.T) {
+	c := jsonschemav5.NewCompiler()
+	_ = loadSchema(t, c, "../../common/schema.json")
+	_ = loadSchema(t, c, "../meta/schema.json")
+	sid := loadSchema(t, c, "./schema.json")
+
+	schema, err := c.Compile(sid)
+	require.NoError(t, err)
+
+	valid := map[string]any{
+		"apiVersion": "authproxy.net/v1alpha1",
+		"kind":       "Namespace",
+		"metadata": map[string]any{
+			"id":        "root.acme",
+			"name":      "acme",
+			"namespace": "root",
+		},
+		"spec": map[string]any{
+			"encryptionKeyRef": map[string]any{
+				"apiVersion": "authproxy.net/v1alpha1",
+				"kind":       "Key",
+				"id":         "key_test550e8400abcd",
+			},
+		},
+		"status": map[string]any{"state": "active"},
+	}
+	require.NoError(t, schema.Validate(valid))
+
+	valid["spec"] = map[string]any{
+		"encryptionKeyRef": map[string]any{
+			"apiVersion": "authproxy.net/v1alpha1",
+			"kind":       "Key",
+			"namespace":  "root",
+			"name":       "key_global",
+		},
+	}
+	require.NoError(t, schema.Validate(valid))
+
+	valid["spec"] = map[string]any{
+		"encryptionKeyRef": map[string]any{
+			"apiVersion": "authproxy.net/v1alpha1",
+			"kind":       "Key",
+			"name":       "key_global",
+		},
+	}
+	require.Error(t, schema.Validate(valid))
+
+	invalid := map[string]any{
+		"apiVersion": "authproxy.net/v1alpha1",
+		"kind":       "Namespace",
+		"metadata":   map[string]any{"name": "bad.name"},
+		"spec":       map[string]any{},
+		"unknown":    true,
+	}
+	require.Error(t, schema.Validate(invalid))
+}
+
+func TestNamespacePatchSchema(t *testing.T) {
+	c := jsonschemav5.NewCompiler()
+	_ = loadSchema(t, c, "../../common/schema.json")
+	_ = loadSchema(t, c, "../meta/schema.json")
+	sid := loadSchema(t, c, "./schema.json")
+
+	schema, err := c.Compile(sid + "#/$defs/NamespacePatch")
+	require.NoError(t, err)
+	require.NoError(t, schema.Validate(map[string]any{
+		"apiVersion": "authproxy.net/v1alpha1",
+		"kind":       "Namespace",
+		"metadata": map[string]any{
+			"labels":      map[string]any{},
+			"annotations": map[string]any{},
+		},
+		"spec": map[string]any{},
+	}))
+	require.Error(t, schema.Validate(map[string]any{
+		"apiVersion": "authproxy.net/v1alpha1",
+		"kind":       "Namespace",
+	}))
+	require.Error(t, schema.Validate(map[string]any{
+		"apiVersion": "authproxy.net/v1alpha1",
+		"kind":       "Namespace",
+		"metadata":   nil,
+		"spec":       nil,
+	}))
+	require.NoError(t, schema.Validate(map[string]any{
+		"apiVersion": "authproxy.net/v1alpha1",
+		"kind":       "Namespace",
+		"metadata":   map[string]any{},
+		"spec": map[string]any{
+			"encryptionKeyRef": nil,
+		},
+	}))
+	require.Error(t, schema.Validate(map[string]any{
+		"apiVersion": "authproxy.net/v1alpha1",
+		"kind":       "Namespace",
+		"metadata":   map[string]any{"id": "not-rooted"},
+		"spec":       map[string]any{},
+	}))
 }

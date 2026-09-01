@@ -43,8 +43,16 @@ type UpdateActorRequestJson struct {
 }
 
 // ListActorsResponseJson is the Kubernetes-style actor list response.
-type ListActorsResponseJson = apiv1alpha1.ResourceList[ActorJson]
+type ListActorsResponseJson struct {
+	apiv1alpha1.ResourceList[ActorJson] `json:",inline" yaml:",inline"`
+}
 
 func NewListActorsResponseJson(items []ActorJson, continueToken string) ListActorsResponseJson {
-	return apiv1alpha1.NewResourceList("Actor", items, apiv1alpha1.ListMeta{Continue: continueToken})
+	return ListActorsResponseJson{
+		ResourceList: apiv1alpha1.NewResourceList(
+			"Actor",
+			items,
+			apiv1alpha1.ListMeta{Continue: continueToken},
+		),
+	}
 }

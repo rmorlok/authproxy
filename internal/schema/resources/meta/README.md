@@ -17,3 +17,10 @@ The JSON Schema exposes an open `Resource` base for composition. A concrete
 resource schema adds its kind/spec/status definitions with `allOf`, then sets
 `unevaluatedProperties: false`; this reuses TypeMeta without repeating fields
 or allowing unknown properties at the concrete boundary.
+
+Object references use one shared identity convention: callers may specify an
+immutable `id`, or both `namespace` and `name`. A resource package specializes
+that shape with its expected `apiVersion` and `kind`, plus ID and namespace
+validators. Core services resolve namespaced names to immutable IDs before
+persisting relationships; responses may therefore return an ID-based reference
+even when the request used a namespaced name.

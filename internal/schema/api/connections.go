@@ -46,17 +46,21 @@ type ConnectionJson struct {
 	UpdatedAt   time.Time             `json:"updatedAt" yaml:"updatedAt"`
 }
 
-type ListConnectionResponseJson = apiv1alpha1.ResourceList[ConnectionJson]
+type ListConnectionResponseJson struct {
+	apiv1alpha1.ResourceList[ConnectionJson] `json:",inline" yaml:",inline"`
+}
 
 func NewListConnectionResponseJson(
 	items []ConnectionJson,
 	continueToken string,
 ) ListConnectionResponseJson {
-	return apiv1alpha1.NewResourceList(
-		"Connection",
-		items,
-		apiv1alpha1.ListMeta{Continue: continueToken},
-	)
+	return ListConnectionResponseJson{
+		ResourceList: apiv1alpha1.NewResourceList(
+			"Connection",
+			items,
+			apiv1alpha1.ListMeta{Continue: continueToken},
+		),
+	}
 }
 
 type DisconnectResponseJson struct {

@@ -28,6 +28,7 @@ import (
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
+	nschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 	"github.com/rmorlok/authproxy/internal/test_utils"
 	"github.com/rmorlok/authproxy/internal/util"
@@ -916,7 +917,9 @@ func TestRateLimits(t *testing.T) {
 			// Create a namespace + a rule in it that should not appear
 			// in the dry-run for a sibling namespace.
 			ctx := context.Background()
-			_, err := tu.Core.CreateNamespace(ctx, "root.sibling", nil)
+			ns, err := nschema.NewNamespaceForPath("root.sibling")
+			require.NoError(t, err)
+			_, err = tu.Core.CreateNamespace(ctx, ns)
 			require.NoError(t, err)
 			_ = installRules(t, tu, "root.sibling", tokenBucketRule())
 

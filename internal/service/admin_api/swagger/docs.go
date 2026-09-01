@@ -6062,7 +6062,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPIListNamespacesResponseJson"
+                            "$ref": "#/definitions/openapi.ListNamespacesResponseJson"
                         }
                     },
                     "400": {
@@ -6109,7 +6109,7 @@ const docTemplateadmin_api = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.CreateNamespaceRequestJson"
+                            "$ref": "#/definitions/namespace.Namespace"
                         }
                     }
                 ],
@@ -6117,7 +6117,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.NamespaceJson"
+                            "$ref": "#/definitions/namespace.Namespace"
                         }
                     },
                     "400": {
@@ -6178,7 +6178,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.NamespaceJson"
+                            "$ref": "#/definitions/namespace.Namespace"
                         }
                     },
                     "400": {
@@ -6213,7 +6213,7 @@ const docTemplateadmin_api = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Update a namespace's labels and annotations. Its path and derived name cannot be changed.",
+                "description": "Update a namespace's desired encryption key, labels, and annotations. Set spec.encryptionKeyRef to null to clear it. Namespace identity cannot be changed.",
                 "consumes": [
                     "application/json"
                 ],
@@ -6238,7 +6238,7 @@ const docTemplateadmin_api = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.UpdateNamespaceRequestJson"
+                            "$ref": "#/definitions/namespace.NamespacePatch"
                         }
                     }
                 ],
@@ -6246,7 +6246,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.NamespaceJson"
+                            "$ref": "#/definitions/namespace.Namespace"
                         }
                     },
                     "400": {
@@ -8310,8 +8310,16 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "api.NamespaceJson": {
-            "description": "Namespace for organizing resources",
+        "meta.APIVersion": {
+            "type": "string",
+            "enum": [
+                "authproxy.net/v1alpha1"
+            ],
+            "x-enum-varnames": [
+                "APIVersionV1Alpha1"
+            ]
+        },
+        "meta.ObjectMeta": {
             "type": "object",
             "properties": {
                 "annotations": {
@@ -8323,9 +8331,11 @@ const docTemplateadmin_api = `{
                 "createdAt": {
                     "type": "string"
                 },
-                "keyId": {
-                    "type": "string",
-                    "example": "key_test550e8400abcd"
+                "generation": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
                 },
                 "labels": {
                     "type": "object",
@@ -8334,19 +8344,134 @@ const docTemplateadmin_api = `{
                     }
                 },
                 "name": {
-                    "description": "Name is automatically set to the final segment of Path and cannot be changed.",
-                    "type": "string",
-                    "example": "acme"
+                    "type": "string"
                 },
-                "path": {
-                    "type": "string",
-                    "example": "root.acme"
-                },
-                "state": {
-                    "type": "string",
-                    "example": "active"
+                "namespace": {
+                    "type": "string"
                 },
                 "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "meta.ObjectMetaPatch": {
+            "type": "object",
+            "properties": {
+                "annotations": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "generation": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "labels": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "namespace": {
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "meta.ObjectReference": {
+            "type": "object",
+            "properties": {
+                "apiVersion": {
+                    "$ref": "#/definitions/meta.APIVersion"
+                },
+                "generation": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "namespace": {
+                    "type": "string"
+                }
+            }
+        },
+        "namespace.Namespace": {
+            "type": "object",
+            "properties": {
+                "apiVersion": {
+                    "$ref": "#/definitions/meta.APIVersion"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/meta.ObjectMeta"
+                },
+                "spec": {
+                    "$ref": "#/definitions/namespace.NamespaceSpec"
+                },
+                "status": {
+                    "$ref": "#/definitions/namespace.NamespaceStatus"
+                }
+            }
+        },
+        "namespace.NamespacePatch": {
+            "type": "object",
+            "properties": {
+                "apiVersion": {
+                    "$ref": "#/definitions/meta.APIVersion"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/meta.ObjectMetaPatch"
+                },
+                "spec": {
+                    "$ref": "#/definitions/namespace.NamespaceSpecPatch"
+                },
+                "status": {
+                    "$ref": "#/definitions/namespace.NamespaceStatus"
+                }
+            }
+        },
+        "namespace.NamespaceSpec": {
+            "type": "object",
+            "properties": {
+                "encryptionKeyRef": {
+                    "$ref": "#/definitions/meta.ObjectReference"
+                }
+            }
+        },
+        "namespace.NamespaceSpecPatch": {
+            "type": "object",
+            "properties": {
+                "encryptionKeyRef": {
+                    "$ref": "#/definitions/meta.ObjectReference"
+                }
+            }
+        },
+        "namespace.NamespaceStatus": {
+            "type": "object",
+            "properties": {
+                "state": {
                     "type": "string"
                 }
             }
@@ -8488,6 +8613,38 @@ const docTemplateadmin_api = `{
                 },
                 "updatedAt": {
                     "type": "string"
+                }
+            }
+        },
+        "openapi.ListNamespacesResponseJson": {
+            "description": "Paginated list of namespaces",
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "items",
+                "kind",
+                "metadata"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "items": {
+                    "description": "List of namespaces.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/namespace.Namespace"
+                    }
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/v1alpha1.ListMeta"
                 }
             }
         },
@@ -8765,28 +8922,6 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "routes.CreateNamespaceRequestJson": {
-            "description": "Namespace creation request",
-            "type": "object",
-            "properties": {
-                "annotations": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "path": {
-                    "type": "string",
-                    "example": "root.acme"
-                }
-            }
-        },
         "routes.DataSourceOptionJson": {
             "description": "Data source option for form select fields",
             "type": "object",
@@ -8893,47 +9028,6 @@ const docTemplateadmin_api = `{
                     "example": [
                         "ntf_test550e8400abcde"
                     ]
-                }
-            }
-        },
-        "routes.NamespaceJson": {
-            "description": "Namespace for organizing resources",
-            "type": "object",
-            "properties": {
-                "annotations": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "createdAt": {
-                    "type": "string"
-                },
-                "keyId": {
-                    "type": "string",
-                    "example": "key_test550e8400abcd"
-                },
-                "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "name": {
-                    "description": "Name is automatically set to the final segment of Path and cannot be changed.",
-                    "type": "string",
-                    "example": "acme"
-                },
-                "path": {
-                    "type": "string",
-                    "example": "root.acme"
-                },
-                "state": {
-                    "type": "string",
-                    "example": "active"
-                },
-                "updatedAt": {
-                    "type": "string"
                 }
             }
         },
@@ -9406,38 +9500,6 @@ const docTemplateadmin_api = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/openapi.KeyJson"
-                    }
-                },
-                "kind": {
-                    "type": "string"
-                },
-                "metadata": {
-                    "$ref": "#/definitions/v1alpha1.ListMeta"
-                }
-            }
-        },
-        "routes.OpenAPIListNamespacesResponseJson": {
-            "description": "Paginated list of namespaces",
-            "type": "object",
-            "required": [
-                "apiVersion",
-                "items",
-                "kind",
-                "metadata"
-            ],
-            "properties": {
-                "apiVersion": {
-                    "type": "string",
-                    "enum": [
-                        "authproxy.net/v1alpha1"
-                    ],
-                    "example": "authproxy.net/v1alpha1"
-                },
-                "items": {
-                    "description": "List of namespaces.",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/api.NamespaceJson"
                     }
                 },
                 "kind": {
@@ -10028,24 +10090,6 @@ const docTemplateadmin_api = `{
                 "name": {
                     "type": "string",
                     "example": "production-crm"
-                }
-            }
-        },
-        "routes.UpdateNamespaceRequestJson": {
-            "description": "Namespace update request",
-            "type": "object",
-            "properties": {
-                "annotations": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
                 }
             }
         },

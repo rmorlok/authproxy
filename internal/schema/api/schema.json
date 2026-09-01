@@ -12,14 +12,6 @@
         "error"
       ]
     },
-    "NamespaceState": {
-      "type": "string",
-      "enum": [
-        "active",
-        "destroying",
-        "destroyed"
-      ]
-    },
     "ConnectorVersionState": {
       "type": "string",
       "enum": [
@@ -653,71 +645,6 @@
       ],
       "additionalProperties": false
     },
-    "Namespace": {
-      "type": "object",
-      "properties": {
-        "path": {
-          "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath"
-        },
-        "state": {
-          "$ref": "#/$defs/NamespaceState"
-        },
-        "keyId": {
-          "type": "string"
-        },
-        "labels": {
-          "$ref": "#/$defs/StringMap"
-        },
-        "annotations": {
-          "$ref": "#/$defs/StringMap"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "path",
-        "state",
-        "createdAt",
-        "updatedAt"
-      ],
-      "additionalProperties": false
-    },
-    "CreateNamespaceRequest": {
-      "type": "object",
-      "properties": {
-        "path": {
-          "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath"
-        },
-        "labels": {
-          "$ref": "#/$defs/StringMap"
-        },
-        "annotations": {
-          "$ref": "#/$defs/StringMap"
-        }
-      },
-      "required": [
-        "path"
-      ],
-      "additionalProperties": false
-    },
-    "UpdateNamespaceRequest": {
-      "type": "object",
-      "properties": {
-        "labels": {
-          "$ref": "#/$defs/StringMap"
-        },
-        "annotations": {
-          "$ref": "#/$defs/StringMap"
-        }
-      },
-      "additionalProperties": false
-    },
     "ListNamespacesResponse": {
       "description": "A Kubernetes-style list of namespaces.",
       "allOf": [
@@ -729,35 +656,11 @@
             "kind": { "const": "NamespaceList" },
             "items": {
               "type": "array",
-              "items": { "$ref": "#/$defs/Namespace" }
+              "items": { "$ref": "../resources/namespace/schema.json" }
             }
           }
         }
       ]
-    },
-    "SetNamespaceKeyRequest": {
-      "type": "object",
-      "properties": {
-        "keyId": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "keyId"
-      ],
-      "additionalProperties": false
-    },
-    "NamespaceKey": {
-      "type": "object",
-      "properties": {
-        "keyId": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "keyId"
-      ],
-      "additionalProperties": false
     },
     "Actor": {
       "type": "object",
