@@ -110,8 +110,8 @@ const (
 
 // Re-export types from the key resource sub-package
 type (
-	Key                                = keyschema.Key
-	KeyType                            = keyschema.KeyType
+	Key                                = keyschema.SigningKey
+	KeyType                            = keyschema.SigningKeyType
 	KeyShared                          = keyschema.KeyShared
 	KeyPublicPrivate                   = keyschema.KeyPublicPrivate
 	KeyData                            = keyschema.KeyData

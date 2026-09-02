@@ -1,6 +1,10 @@
 {
-  "state": "disabled",
-  "annotations": {
-    "reason": "rotation complete"
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "Key",
+  "metadata": {
+    "annotations": {"reason": "rotation complete"}
+  },
+  "spec": {
+    "desiredState": "disabled"
   }
 }

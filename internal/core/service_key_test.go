@@ -15,6 +15,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
+	keyschema "github.com/rmorlok/authproxy/internal/schema/resources/key"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	nschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -227,11 +228,15 @@ func TestCreateKeyEnqueuesDEKGeneration(t *testing.T) {
 			Return(nil, nil),
 	)
 
-	created, err := s.CreateKey(ctx, "root.dev", "", keyData, map[string]string{"purpose": "test"})
+	resource := keyschema.NewKey()
+	resource.Metadata.Namespace = "root.dev"
+	resource.Metadata.Labels = map[string]string{"purpose": "test"}
+	resource.Spec.KeyData = keyData
+	created, err := s.CreateKey(ctx, resource)
 
 	require.NoError(t, err)
 	require.Equal(t, "root.dev", created.GetNamespace())
-	require.Equal(t, database.KeyStateActive, created.GetState())
+	require.Equal(t, keyschema.KeyStateActive, created.GetState())
 }
 
 func TestGetKeyDataDecryptsProviderConfig(t *testing.T) {

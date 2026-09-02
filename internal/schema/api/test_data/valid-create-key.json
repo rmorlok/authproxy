@@ -1,9 +1,12 @@
 {
-  "namespace": "root.acme",
-  "keyData": {
-    "numBytes": 32
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "Key",
+  "metadata": {
+    "name": "tenant-key",
+    "namespace": "root.acme",
+    "labels": {"scope": "tenant"}
   },
-  "labels": {
-    "scope": "tenant"
+  "spec": {
+    "keyData": {"numBytes": 32}
   }
 }

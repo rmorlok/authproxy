@@ -6,6 +6,8 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	apiv1alpha1 "github.com/rmorlok/authproxy/internal/schema/api/v1alpha1"
+	keyschema "github.com/rmorlok/authproxy/internal/schema/resources/key"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	nschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 )
 
@@ -214,30 +216,25 @@ type ConnectorLifecycleResponseJson struct {
 	ConnectorId apid.ID `json:"connectorId" swaggertype:"string" example:"cxr_test550e8400abcde"`
 }
 
-// KeyJson documents a managed key response.
-//
-//	@Description	Key API response
-type KeyJson struct {
-	Id          apid.ID                `json:"id" swaggertype:"string" example:"key_test550e8400abcd"`
-	Namespace   string                 `json:"namespace" example:"root.acme"`
-	Name        string                 `json:"name" example:"primary-encryption-key"`
-	State       string                 `json:"state" example:"active"`
-	KeyData     map[string]interface{} `json:"keyData,omitempty" swaggertype:"object"`
-	Labels      map[string]string      `json:"labels,omitempty"`
-	Annotations map[string]string      `json:"annotations,omitempty"`
-	CreatedAt   time.Time              `json:"createdAt"`
-	UpdatedAt   time.Time              `json:"updatedAt"`
+// KeySpecJson documents managed-key desired state while keeping polymorphic
+// provider configuration opaque to swaggo. No key-material examples belong in
+// this projection.
+type KeySpecJson struct {
+	Usage        keyschema.KeyUsage        `json:"usage,omitempty" enums:"data_encryption"`
+	MaterialType keyschema.KeyMaterialType `json:"materialType,omitempty" enums:"symmetric,public,private,external"`
+	DesiredState keyschema.KeyState        `json:"desiredState,omitempty" enums:"active,disabled"`
+	KeyData      map[string]interface{}    `json:"keyData,omitempty" swaggertype:"object"`
 }
 
-// CreateKeyRequestJson documents the key creation body.
+// KeyJson documents a managed key resource response.
 //
-//	@Description	Request to create a key
-type CreateKeyRequestJson struct {
-	Namespace   string                 `json:"namespace" example:"root.acme"`
-	Name        *string                `json:"name,omitempty" example:"primary-encryption-key"`
-	KeyData     map[string]interface{} `json:"keyData,omitempty"`
-	Labels      map[string]string      `json:"labels,omitempty"`
-	Annotations map[string]string      `json:"annotations,omitempty"`
+//	@Description	Kubernetes-style managed Key resource. Secret keyData fields are always redacted in responses.
+type KeyJson struct {
+	APIVersion string               `json:"apiVersion" binding:"required" enums:"authproxy.net/v1alpha1" example:"authproxy.net/v1alpha1"`
+	Kind       string               `json:"kind" binding:"required" enums:"Key" example:"Key"`
+	Metadata   meta.ObjectMeta      `json:"metadata" binding:"required"`
+	Spec       KeySpecJson          `json:"spec" binding:"required"`
+	Status     *keyschema.KeyStatus `json:"status,omitempty"`
 }
 
 // ListKeysResponseJson documents the paginated key list response.
@@ -300,15 +297,23 @@ type TaskInfoJson struct {
 	UpdatedAt string `json:"updatedAt,omitempty"`
 }
 
-// UpdateKeyRequestJson documents the key update body.
+// KeySpecPatchJson documents mutable desired key fields.
+type KeySpecPatchJson struct {
+	Usage        *keyschema.KeyUsage        `json:"usage,omitempty" enums:"data_encryption"`
+	MaterialType *keyschema.KeyMaterialType `json:"materialType,omitempty" enums:"symmetric,public,private,external"`
+	DesiredState *keyschema.KeyState        `json:"desiredState,omitempty" enums:"active,disabled"`
+	KeyData      map[string]interface{}     `json:"keyData,omitempty" swaggertype:"object"`
+}
+
+// KeyPatchJson documents the managed-key update body.
 //
-//	@Description	Request to update a key
-type UpdateKeyRequestJson struct {
-	Name        *string                 `json:"name,omitempty" example:"primary-encryption-key"`
-	State       *string                 `json:"state,omitempty" example:"disabled"`
-	KeyData     *map[string]interface{} `json:"keyData,omitempty"`
-	Labels      *map[string]string      `json:"labels,omitempty"`
-	Annotations *map[string]string      `json:"annotations,omitempty"`
+//	@Description	Kubernetes-style managed Key patch. Status and server-owned metadata are rejected.
+type KeyPatchJson struct {
+	APIVersion string                `json:"apiVersion" binding:"required" enums:"authproxy.net/v1alpha1" example:"authproxy.net/v1alpha1"`
+	Kind       string                `json:"kind" binding:"required" enums:"Key" example:"Key"`
+	Metadata   *meta.ObjectMetaPatch `json:"metadata" binding:"required"`
+	Spec       *KeySpecPatchJson     `json:"spec" binding:"required"`
+	Status     *keyschema.KeyStatus  `json:"status,omitempty"`
 }
 
 // RateLimitJson documents a rate-limit response while keeping the definition

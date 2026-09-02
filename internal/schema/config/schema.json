@@ -12,7 +12,7 @@
           "type": "string"
         },
         "key": {
-          "$ref": "../resources/key/schema.json#/$defs/Key"
+          "$ref": "../resources/key/schema.json#/$defs/SigningKey"
         },
         "permissions": {
           "type": "array",
@@ -974,7 +974,7 @@
     "SystemAuth": {
       "properties": {
         "jwtSigningKey": {
-          "$ref": "../resources/key/schema.json#/$defs/Key"
+          "$ref": "../resources/key/schema.json#/$defs/SigningKey"
         },
         "jwtIssuer": {
           "type": "string"
@@ -1076,7 +1076,7 @@
           "type": "string"
         },
         "key": {
-          "$ref": "../resources/key/schema.json#/$defs/Key"
+          "$ref": "../resources/key/schema.json#/$defs/SigningKey"
         },
         "permissions": {
           "type": "array",

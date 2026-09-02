@@ -12,4 +12,4 @@ func (ks *KeyShared) CanVerifySignature() bool {
 	return true
 }
 
-var _ KeyType = (*KeyShared)(nil)
+var _ SigningKeyType = (*KeyShared)(nil)

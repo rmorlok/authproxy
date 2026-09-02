@@ -7,7 +7,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/util"
 )
 
-func (k *Key) MarshalJSON() ([]byte, error) {
+func (k *SigningKey) MarshalJSON() ([]byte, error) {
 	if k == nil || k.InnerVal == nil {
 		return json.Marshal(nil)
 	}
@@ -17,14 +17,14 @@ func (k *Key) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON handles unmarshalling from JSON while allowing us to make decisions
 // about how the data is unmarshalled based on the concrete type being represented
-func (k *Key) UnmarshalJSON(data []byte) error {
+func (k *SigningKey) UnmarshalJSON(data []byte) error {
 	// If it's not a string, it should be an object
 	var valueMap map[string]interface{}
 	if err := json.Unmarshal(data, &valueMap); err != nil {
 		return fmt.Errorf("failed to unmarshal key value: %v", err)
 	}
 
-	var t KeyType
+	var t SigningKeyType
 
 	if _, ok := valueMap["publicKey"]; ok {
 		t = &KeyPublicPrivate{}

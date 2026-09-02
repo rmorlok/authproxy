@@ -11,6 +11,7 @@ import (
 	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	cfgschema "github.com/rmorlok/authproxy/internal/schema/config"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	keyschema "github.com/rmorlok/authproxy/internal/schema/resources/key"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	nschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
@@ -434,13 +435,10 @@ type C interface {
 		reference meta.ObjectReference,
 	) (Key, error)
 
-	// CreateKey creates a new key.
+	// CreateKey creates a new managed Key resource.
 	CreateKey(
 		ctx context.Context,
-		namespace string,
-		name scommon.ResourceName,
-		keyData *cfgschema.KeyData,
-		labels map[string]string,
+		resource *keyschema.Key,
 	) (Key, error)
 
 	// UpdateKeyName renames a key addressed by immutable ID.

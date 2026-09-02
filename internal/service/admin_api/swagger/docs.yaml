@@ -100,6 +100,13 @@ definitions:
         example: request_events
         type: string
     type: object
+  key.KeyStatus:
+    properties:
+      keyDataConfigured:
+        type: boolean
+      state:
+        type: string
+    type: object
   meta.APIVersion:
     enum:
     - authproxy.net/v1alpha1
@@ -278,34 +285,120 @@ definitions:
         type: integer
     type: object
   openapi.KeyJson:
-    description: Key API response
+    description: Kubernetes-style managed Key resource. Secret keyData fields are
+      always redacted in responses.
     properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      createdAt:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
         type: string
-      id:
-        example: key_test550e8400abcd
+      kind:
+        enum:
+        - Key
+        example: Key
+        type: string
+      metadata:
+        $ref: '#/definitions/meta.ObjectMeta'
+      spec:
+        $ref: '#/definitions/openapi.KeySpecJson'
+      status:
+        $ref: '#/definitions/key.KeyStatus'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
+  openapi.KeyPatchJson:
+    description: Kubernetes-style managed Key patch. Status and server-owned metadata
+      are rejected.
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - Key
+        example: Key
+        type: string
+      metadata:
+        $ref: '#/definitions/meta.ObjectMetaPatch'
+      spec:
+        $ref: '#/definitions/openapi.KeySpecPatchJson'
+      status:
+        $ref: '#/definitions/key.KeyStatus'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
+  openapi.KeySpecJson:
+    properties:
+      desiredState:
+        enum:
+        - active
+        - disabled
         type: string
       keyData:
         type: object
-      labels:
-        additionalProperties:
-          type: string
+      materialType:
+        enum:
+        - symmetric
+        - public
+        - private
+        - external
+        type: string
+      usage:
+        enum:
+        - data_encryption
+        type: string
+    type: object
+  openapi.KeySpecPatchJson:
+    properties:
+      desiredState:
+        enum:
+        - active
+        - disabled
+        type: string
+      keyData:
         type: object
-      name:
-        example: primary-encryption-key
+      materialType:
+        enum:
+        - symmetric
+        - public
+        - private
+        - external
         type: string
-      namespace:
-        example: root.acme
+      usage:
+        enum:
+        - data_encryption
         type: string
-      state:
-        example: active
+    type: object
+  openapi.ListKeysResponseJson:
+    description: Paginated list of keys
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
         type: string
-      updatedAt:
+      items:
+        items:
+          $ref: '#/definitions/openapi.KeyJson'
+        type: array
+      kind:
         type: string
+      metadata:
+        $ref: '#/definitions/v1alpha1.ListMeta'
+    required:
+    - apiVersion
+    - items
+    - kind
+    - metadata
     type: object
   openapi.ListNamespacesResponseJson:
     description: Paginated list of namespaces
@@ -730,27 +823,6 @@ definitions:
           type: string
         type: object
     type: object
-  routes.OpenAPICreateKeyRequestJson:
-    description: Request to create a key
-    properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      keyData:
-        additionalProperties: true
-        type: object
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-      name:
-        example: primary-encryption-key
-        type: string
-      namespace:
-        example: root.acme
-        type: string
-    type: object
   routes.OpenAPICreateRateLimitRequestJson:
     description: Request to create a rate limit
     properties:
@@ -809,36 +881,6 @@ definitions:
         additionalProperties:
           type: string
         type: object
-    type: object
-  routes.OpenAPIKeyJson:
-    description: Key API response
-    properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      createdAt:
-        type: string
-      id:
-        example: key_test550e8400abcd
-        type: string
-      keyData:
-        type: object
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-      name:
-        example: primary-encryption-key
-        type: string
-      namespace:
-        example: root.acme
-        type: string
-      state:
-        example: active
-        type: string
-      updatedAt:
-        type: string
     type: object
   routes.OpenAPIListActorsResponseJson:
     description: Paginated list of actors
@@ -920,28 +962,6 @@ definitions:
         description: List of connectors.
         items:
           $ref: '#/definitions/api.ConnectorJson'
-        type: array
-      kind:
-        type: string
-      metadata:
-        $ref: '#/definitions/v1alpha1.ListMeta'
-    required:
-    - apiVersion
-    - items
-    - kind
-    - metadata
-    type: object
-  routes.OpenAPIListKeysResponseJson:
-    description: Paginated list of keys
-    properties:
-      apiVersion:
-        enum:
-        - authproxy.net/v1alpha1
-        example: authproxy.net/v1alpha1
-        type: string
-      items:
-        items:
-          $ref: '#/definitions/openapi.KeyJson'
         type: array
       kind:
         type: string
@@ -1220,27 +1240,6 @@ definitions:
         additionalProperties:
           type: string
         type: object
-    type: object
-  routes.OpenAPIUpdateKeyRequestJson:
-    description: Request to update a key
-    properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      keyData:
-        additionalProperties: true
-        type: object
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-      name:
-        example: primary-encryption-key
-        type: string
-      state:
-        example: disabled
-        type: string
     type: object
   routes.OpenAPIUpdateRateLimitRequestJson:
     description: Request to update a rate limit
@@ -4555,7 +4554,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIListKeysResponseJson'
+            $ref: '#/definitions/openapi.ListKeysResponseJson'
         "400":
           description: Bad Request
           schema:
@@ -4583,14 +4582,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.OpenAPICreateKeyRequestJson'
+          $ref: '#/definitions/openapi.KeyJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIKeyJson'
+            $ref: '#/definitions/openapi.KeyJson'
         "400":
           description: Bad Request
           schema:
@@ -4661,7 +4660,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIKeyJson'
+            $ref: '#/definitions/openapi.KeyJson'
         "400":
           description: Bad Request
           schema:
@@ -4686,7 +4685,8 @@ paths:
     patch:
       consumes:
       - application/json
-      description: Update a key's properties
+      description: Update a key's desired state, provider configuration, name, labels,
+        or annotations
       parameters:
       - description: Key ID
         in: path
@@ -4698,14 +4698,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.OpenAPIUpdateKeyRequestJson'
+          $ref: '#/definitions/openapi.KeyPatchJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIKeyJson'
+            $ref: '#/definitions/openapi.KeyJson'
         "400":
           description: Bad Request
           schema:
