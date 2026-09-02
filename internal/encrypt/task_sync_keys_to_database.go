@@ -475,9 +475,15 @@ func (h *EncryptServiceTaskHandler) doSyncKeysToDatabase(ctx context.Context) er
 	)
 }
 
-// EnqueueForceSyncKeysToDatabase clears the sync sentinel and enqueues a sync task immediately.
-// The mutex inside the sync function prevents concurrent syncs.
-func EnqueueForceSyncKeysToDatabase(ctx context.Context, redis apredis.Client, ac apasynq.Client, logger *slog.Logger) {
+// EnqueueForceSyncKeysToDatabase clears the sync sentinel and enqueues a sync
+// task immediately. The mutex inside the sync function prevents concurrent
+// syncs.
+func EnqueueForceSyncKeysToDatabase(
+	ctx context.Context,
+	redis apredis.Client,
+	ac apasynq.Client,
+	logger *slog.Logger,
+) {
 	redis.Del(ctx, sentinelKey)
 	if _, err := ac.EnqueueContext(ctx, NewSyncKeysToDatabaseTask()); err != nil {
 		logger.Warn("failed to enqueue force key sync task", "error", err)

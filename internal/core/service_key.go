@@ -105,11 +105,17 @@ func (s *service) resolveKeyByNamespacedName(
 	return result.Results[0], nil
 }
 
-func (s *service) CreateKey(ctx context.Context, resource *keyschema.Key) (iface.Key, error) {
+func (s *service) CreateKey(
+	ctx context.Context,
+	resource *keyschema.Key,
+) (iface.Key, error) {
 	if resource == nil {
 		return nil, errors.New("key cannot be nil")
 	}
-	if err := resource.ValidateFor(meta.ValidationModeCreate, nil); err != nil {
+	if err := resource.ValidateFor(
+		meta.ValidationModeCreate,
+		nil, // validationContext
+	); err != nil {
 		return nil, err
 	}
 
@@ -118,10 +124,12 @@ func (s *service) CreateKey(ctx context.Context, resource *keyschema.Key) (iface
 	if err != nil {
 		return nil, err
 	}
+
 	ek, err := databaseKeyFromResource(normalized, id)
 	if err != nil {
 		return nil, err
 	}
+
 	keyData := normalized.Spec.KeyData
 
 	keyDataBytes, err := json.Marshal(keyData)
@@ -129,10 +137,15 @@ func (s *service) CreateKey(ctx context.Context, resource *keyschema.Key) (iface
 		return nil, fmt.Errorf("failed to marshal key data to JSON: %w", err)
 	}
 
-	ef, err := s.encrypt.EncryptKeyForNamespace(ctx, normalized.Metadata.Namespace, keyDataBytes)
+	ef, err := s.encrypt.EncryptKeyForNamespace(
+		ctx,
+		normalized.Metadata.Namespace,
+		keyDataBytes,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encrypt key data: %w", err)
 	}
+
 	ek.EncryptedKeyData = &ef
 
 	err = s.db.CreateKey(ctx, ek)
