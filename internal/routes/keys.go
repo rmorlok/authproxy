@@ -42,19 +42,33 @@ type ListKeysRequestQueryParams struct {
 	OrderByVal    *string             `form:"orderBy"`
 }
 
-func KeyToResource(ctx context.Context, c coreIface.C, ek coreIface.Key) (*keyschema.Key, error) {
+func KeyToResource(
+	ctx context.Context,
+	c coreIface.C,
+	ek coreIface.Key,
+) (*keyschema.Key, error) {
 	return keyToResource(ctx, c, ek, false)
 }
 
-func KeyToResourceOmitUnconfiguredData(ctx context.Context, c coreIface.C, ek coreIface.Key) (*keyschema.Key, error) {
+func KeyToResourceOmitUnconfiguredData(
+	ctx context.Context,
+	c coreIface.C,
+	ek coreIface.Key,
+) (*keyschema.Key, error) {
 	return keyToResource(ctx, c, ek, true)
 }
 
-func keyToResource(ctx context.Context, c coreIface.C, ek coreIface.Key, allowUnconfiguredKeyData bool) (*keyschema.Key, error) {
+func keyToResource(
+	ctx context.Context,
+	c coreIface.C,
+	ek coreIface.Key,
+	allowUnconfiguredKeyData bool,
+) (*keyschema.Key, error) {
 	resource := ek.GetResource()
 	keyData, err := c.GetKeyData(ctx, ek.GetId())
 	if err != nil {
-		if allowUnconfiguredKeyData && errors.Is(err, core.ErrKeyDataNotConfigured) {
+		if allowUnconfiguredKeyData &&
+			errors.Is(err, core.ErrKeyDataNotConfigured) {
 			return resource, nil
 		}
 		return nil, err
@@ -64,7 +78,9 @@ func keyToResource(ctx context.Context, c coreIface.C, ek coreIface.Key, allowUn
 	if err != nil {
 		return nil, err
 	}
+
 	resource.Spec.KeyData = redacted
+
 	return resource, nil
 }
 
@@ -104,12 +120,21 @@ func (r *KeysRoutes) get(gctx *gin.Context) {
 	ek, err := r.core.GetKey(ctx, id)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("key '%s' not found", id), httperr.WithInternalErr(err)))
+			apgin.WriteError(
+				gctx,
+				nil, // logger
+				httperr.NotFound(fmt.Sprintf("key '%s' not found", id),
+					httperr.WithInternalErr(err)),
+			)
 			val.MarkErrorReturn()
 			return
 		}
 
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+		apgin.WriteError(
+			gctx,
+			nil, // logger
+			httperr.InternalServerError(httperr.WithInternalErr(err)),
+		)
 		val.MarkErrorReturn()
 		return
 	}
@@ -121,13 +146,21 @@ func (r *KeysRoutes) get(gctx *gin.Context) {
 
 	resp, err := KeyToResourceOmitUnconfiguredData(ctx, r.core, ek)
 	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+		apgin.WriteError(
+			gctx,
+			nil, // logger
+			httperr.InternalServerError(httperr.WithInternalErr(err)),
+		)
 		val.MarkErrorReturn()
 		return
 	}
 
 	if err := apgin.RenderResourceJSON(gctx, http.StatusOK, resp); err != nil {
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+		apgin.WriteError(
+			gctx,
+			nil, // logger
+			httperr.InternalServerError(httperr.WithInternalErr(err)),
+		)
 		val.MarkErrorReturn()
 	}
 }
@@ -150,21 +183,38 @@ func (r *KeysRoutes) create(gctx *gin.Context) {
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
 	var req keyschema.Key
-	if err := apgin.BindResourceJSON(gctx, &req, meta.ValidationModeCreate); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
+	if err := apgin.BindResourceJSON(
+		gctx,
+		&req,
+		meta.ValidationModeCreate,
+	); err != nil {
+		apgin.WriteError(
+			gctx,
+			nil, // logger
+			httperr.BadRequestErr(err, httperr.WithPublicErr(err)),
+		)
 		val.MarkErrorReturn()
 		return
 	}
 
 	if err := val.ValidateNamespace(req.Metadata.Namespace); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
+		apgin.WriteError(
+			gctx,
+			nil, // logger
+			httperr.BadRequestErr(err, httperr.WithPublicErr(err)),
+		)
 		val.MarkErrorReturn()
 		return
 	}
 
 	ek, err := r.core.CreateKey(ctx, &req)
 	if err != nil {
-		if conflictErr := resourceNameConflictError(err, "key", req.Metadata.Name, req.Metadata.Namespace); conflictErr != nil {
+		if conflictErr := resourceNameConflictError(
+			err,
+			"key",
+			req.Metadata.Name,
+			req.Metadata.Namespace,
+		); conflictErr != nil {
 			apgin.WriteError(gctx, nil, conflictErr)
 			val.MarkErrorReturn()
 			return
@@ -176,13 +226,21 @@ func (r *KeysRoutes) create(gctx *gin.Context) {
 
 	resp, err := KeyToResource(ctx, r.core, ek)
 	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+		apgin.WriteError(
+			gctx,
+			nil, // logger
+			httperr.InternalServerError(httperr.WithInternalErr(err)),
+		)
 		val.MarkErrorReturn()
 		return
 	}
 
 	if err := apgin.RenderResourceJSON(gctx, http.StatusOK, resp); err != nil {
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+		apgin.WriteError(
+			gctx,
+			nil, // logger
+			httperr.InternalServerError(httperr.WithInternalErr(err)),
+		)
 		val.MarkErrorReturn()
 	}
 }
@@ -211,7 +269,11 @@ func (r *KeysRoutes) list(gctx *gin.Context) {
 
 	var req ListKeysRequestQueryParams
 	if err := gctx.ShouldBindQuery(&req); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
+		apgin.WriteError(
+			gctx,
+			nil, // logger
+			httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)),
+		)
 		val.MarkErrorReturn()
 		return
 	}
@@ -292,12 +354,20 @@ func (r *KeysRoutes) list(gctx *gin.Context) {
 	for _, ek := range validated {
 		resp, err := KeyToResourceOmitUnconfiguredData(ctx, r.core, ek)
 		if err != nil {
-			apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+			apgin.WriteError(
+				gctx,
+				nil, // logger
+				httperr.InternalServerError(httperr.WithInternalErr(err)),
+			)
 			val.MarkErrorReturn()
 			return
 		}
 		if err := resp.ValidateFor(meta.ValidationModeResponse, nil); err != nil {
-			apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+			apgin.WriteError(
+				gctx,
+				nil, // logger
+				httperr.InternalServerError(httperr.WithInternalErr(err)),
+			)
 			val.MarkErrorReturn()
 			return
 		}
@@ -306,7 +376,11 @@ func (r *KeysRoutes) list(gctx *gin.Context) {
 
 	response := schemaapi.NewListKeysResponseJson(resources, result.Cursor)
 	if err := response.Validate(keyschema.KeyKind); err != nil {
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+		apgin.WriteError(
+			gctx,
+			nil, // logger
+			httperr.InternalServerError(httperr.WithInternalErr(err)),
+		)
 		val.MarkErrorReturn()
 		return
 	}
@@ -335,14 +409,22 @@ func (r *KeysRoutes) update(gctx *gin.Context) {
 	id := apid.ID(gctx.Param("id"))
 
 	if id.IsNil() {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
+		apgin.WriteError(
+			gctx,
+			nil, // logger
+			httperr.BadRequest("id is required"),
+		)
 		val.MarkErrorReturn()
 		return
 	}
 
 	var req keyschema.KeyPatch
 	if err := apgin.BindResourceJSON(gctx, &req, meta.ValidationModeUpdate); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
+		apgin.WriteError(
+			gctx,
+			nil, // logger
+			httperr.BadRequestErr(err, httperr.WithPublicErr(err)),
+		)
 		val.MarkErrorReturn()
 		return
 	}
@@ -351,12 +433,20 @@ func (r *KeysRoutes) update(gctx *gin.Context) {
 	ek, err := r.core.GetKey(ctx, id)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("key '%s' not found", id), httperr.WithInternalErr(err)))
+			apgin.WriteError(
+				gctx,
+				nil, // logger
+				httperr.NotFound(fmt.Sprintf("key '%s' not found", id), httperr.WithInternalErr(err)),
+			)
 			val.MarkErrorReturn()
 			return
 		}
 
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+		apgin.WriteError(
+			gctx,
+			nil, // logger
+			httperr.InternalServerError(httperr.WithInternalErr(err)),
+		)
 		val.MarkErrorReturn()
 		return
 	}
@@ -368,12 +458,20 @@ func (r *KeysRoutes) update(gctx *gin.Context) {
 
 	before, err := KeyToResourceOmitUnconfiguredData(ctx, r.core, ek)
 	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+		apgin.WriteError(
+			gctx,
+			nil, // logger
+			httperr.InternalServerError(httperr.WithInternalErr(err)),
+		)
 		val.MarkErrorReturn()
 		return
 	}
 	if _, err := req.ApplyTo(before, nil); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
+		apgin.WriteError(
+			gctx,
+			nil, // logger
+			httperr.BadRequestErr(err, httperr.WithPublicErr(err)),
+		)
 		val.MarkErrorReturn()
 		return
 	}
@@ -383,27 +481,48 @@ func (r *KeysRoutes) update(gctx *gin.Context) {
 		originalNamespace := ek.GetNamespace()
 		ek, err = r.core.UpdateKeyName(ctx, id, name)
 		if err != nil {
-			if conflictErr := resourceNameConflictError(err, "key", name, originalNamespace); conflictErr != nil {
+			if conflictErr := resourceNameConflictError(
+				err,
+				"key",
+				name,
+				originalNamespace,
+			); conflictErr != nil {
 				apgin.WriteError(gctx, nil, conflictErr)
 				val.MarkErrorReturn()
 				return
 			}
-			apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+			apgin.WriteError(
+				gctx,
+				nil, // logger
+				httperr.InternalServerError(httperr.WithInternalErr(err)),
+			)
 			val.MarkErrorReturn()
 			return
 		}
 	}
 
 	if req.Spec.DesiredState != nil {
-		err = r.core.SetKeyState(ctx, id, database.KeyState(*req.Spec.DesiredState))
+		err = r.core.SetKeyState(
+			ctx,
+			id,
+			database.KeyState(*req.Spec.DesiredState),
+		)
 		if err != nil {
 			if errors.Is(err, core.ErrNotFound) {
-				apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("key '%s' not found", id), httperr.WithInternalErr(err)))
+				apgin.WriteError(
+					gctx,
+					nil, // logger
+					httperr.NotFound(fmt.Sprintf("key '%s' not found", id), httperr.WithInternalErr(err)),
+				)
 				val.MarkErrorReturn()
 				return
 			}
 
-			apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+			apgin.WriteError(
+				gctx,
+				nil, // logger
+				httperr.InternalServerError(httperr.WithInternalErr(err)),
+			)
 			val.MarkErrorReturn()
 			return
 		}
@@ -413,12 +532,20 @@ func (r *KeysRoutes) update(gctx *gin.Context) {
 		_, err = r.core.UpdateKeyLabels(ctx, id, *req.Metadata.Labels)
 		if err != nil {
 			if errors.Is(err, core.ErrNotFound) {
-				apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("key '%s' not found", id), httperr.WithInternalErr(err)))
+				apgin.WriteError(
+					gctx,
+					nil, // logger
+					httperr.NotFound(fmt.Sprintf("key '%s' not found", id), httperr.WithInternalErr(err)),
+				)
 				val.MarkErrorReturn()
 				return
 			}
 
-			apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+			apgin.WriteError(
+				gctx,
+				nil, // logger
+				httperr.InternalServerError(httperr.WithInternalErr(err)),
+			)
 			val.MarkErrorReturn()
 			return
 		}
@@ -428,12 +555,20 @@ func (r *KeysRoutes) update(gctx *gin.Context) {
 		_, err = r.core.UpdateKeyAnnotations(ctx, id, *req.Metadata.Annotations)
 		if err != nil {
 			if errors.Is(err, core.ErrNotFound) {
-				apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("key '%s' not found", id), httperr.WithInternalErr(err)))
+				apgin.WriteError(
+					gctx,
+					nil, // logger
+					httperr.NotFound(fmt.Sprintf("key '%s' not found", id), httperr.WithInternalErr(err)),
+				)
 				val.MarkErrorReturn()
 				return
 			}
 
-			apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+			apgin.WriteError(
+				gctx,
+				nil, // logger
+				httperr.InternalServerError(httperr.WithInternalErr(err)),
+			)
 			val.MarkErrorReturn()
 			return
 		}
@@ -443,12 +578,20 @@ func (r *KeysRoutes) update(gctx *gin.Context) {
 		_, err = r.core.UpdateKeyData(ctx, id, req.Spec.KeyData)
 		if err != nil {
 			if errors.Is(err, core.ErrNotFound) {
-				apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("key '%s' not found", id), httperr.WithInternalErr(err)))
+				apgin.WriteError(
+					gctx,
+					nil, // logger
+					httperr.NotFound(fmt.Sprintf("key '%s' not found", id), httperr.WithInternalErr(err)),
+				)
 				val.MarkErrorReturn()
 				return
 			}
 
-			apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+			apgin.WriteError(
+				gctx,
+				nil, // logger
+				httperr.InternalServerError(httperr.WithInternalErr(err)),
+			)
 			val.MarkErrorReturn()
 			return
 		}
@@ -457,25 +600,41 @@ func (r *KeysRoutes) update(gctx *gin.Context) {
 	ek, err = r.core.GetKey(ctx, id)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("key '%s' not found", id), httperr.WithInternalErr(err)))
+			apgin.WriteError(
+				gctx,
+				nil, // logger
+				httperr.NotFound(fmt.Sprintf("key '%s' not found", id), httperr.WithInternalErr(err)),
+			)
 			val.MarkErrorReturn()
 			return
 		}
 
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+		apgin.WriteError(
+			gctx,
+			nil, // logger
+			httperr.InternalServerError(httperr.WithInternalErr(err)),
+		)
 		val.MarkErrorReturn()
 		return
 	}
 
 	resp, err := KeyToResourceOmitUnconfiguredData(ctx, r.core, ek)
 	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+		apgin.WriteError(
+			gctx,
+			nil, // logger
+			httperr.InternalServerError(httperr.WithInternalErr(err)),
+		)
 		val.MarkErrorReturn()
 		return
 	}
 
 	if err := apgin.RenderResourceJSON(gctx, http.StatusOK, resp); err != nil {
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+		apgin.WriteError(
+			gctx,
+			nil, // logger
+			httperr.InternalServerError(httperr.WithInternalErr(err)),
+		)
 		val.MarkErrorReturn()
 	}
 }
@@ -505,7 +664,11 @@ func (r *KeysRoutes) delete(gctx *gin.Context) {
 	}
 
 	if id == database.GlobalKeyID {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("the global key cannot be deleted"))
+		apgin.WriteError(
+			gctx,
+			nil, // logger
+			httperr.BadRequest("the global key cannot be deleted"),
+		)
 		val.MarkErrorReturn()
 		return
 	}
@@ -519,7 +682,11 @@ func (r *KeysRoutes) delete(gctx *gin.Context) {
 			return
 		}
 
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+		apgin.WriteError(
+			gctx,
+			nil, // logger
+			httperr.InternalServerError(httperr.WithInternalErr(err)),
+		)
 		val.MarkErrorReturn()
 		return
 	}
@@ -536,7 +703,11 @@ func (r *KeysRoutes) delete(gctx *gin.Context) {
 			return
 		}
 
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+		apgin.WriteError(
+			gctx,
+			nil, // logger
+			httperr.InternalServerError(httperr.WithInternalErr(err)),
+		)
 		val.MarkErrorReturn()
 		return
 	}
@@ -560,7 +731,9 @@ func (r *KeysRoutes) delete(gctx *gin.Context) {
 // @Failure		500	{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/keys/{id}/labels [get]
-func (r *KeysRoutes) getLabels(gctx *gin.Context) { r.labelsAdapter.HandleList(gctx) }
+func (r *KeysRoutes) getLabels(gctx *gin.Context) {
+	r.labelsAdapter.HandleList(gctx)
+}
 
 // @Summary		Get a specific label for a key
 // @Description	Get a specific label value by key for a key
@@ -575,7 +748,9 @@ func (r *KeysRoutes) getLabels(gctx *gin.Context) { r.labelsAdapter.HandleList(g
 // @Failure		500		{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/keys/{id}/labels/{label} [get]
-func (r *KeysRoutes) getLabel(gctx *gin.Context) { r.labelsAdapter.HandleGet(gctx) }
+func (r *KeysRoutes) getLabel(gctx *gin.Context) {
+	r.labelsAdapter.HandleGet(gctx)
+}
 
 // @Summary		Set a label for a key
 // @Description	Set or update a specific label value by key for a key
@@ -593,7 +768,9 @@ func (r *KeysRoutes) getLabel(gctx *gin.Context) { r.labelsAdapter.HandleGet(gct
 // @Failure		500		{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/keys/{id}/labels/{label} [put]
-func (r *KeysRoutes) putLabel(gctx *gin.Context) { r.labelsAdapter.HandlePut(gctx) }
+func (r *KeysRoutes) putLabel(gctx *gin.Context) {
+	r.labelsAdapter.HandlePut(gctx)
+}
 
 // @Summary		Delete a label from a key
 // @Description	Delete a specific label by key from a key
@@ -607,7 +784,9 @@ func (r *KeysRoutes) putLabel(gctx *gin.Context) { r.labelsAdapter.HandlePut(gct
 // @Failure		500		{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/keys/{id}/labels/{label} [delete]
-func (r *KeysRoutes) deleteLabel(gctx *gin.Context) { r.labelsAdapter.HandleDelete(gctx) }
+func (r *KeysRoutes) deleteLabel(gctx *gin.Context) {
+	r.labelsAdapter.HandleDelete(gctx)
+}
 
 // @Summary		Get all annotations for a key
 // @Description	Get all annotations associated with a specific key
@@ -621,7 +800,9 @@ func (r *KeysRoutes) deleteLabel(gctx *gin.Context) { r.labelsAdapter.HandleDele
 // @Failure		500	{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/keys/{id}/annotations [get]
-func (r *KeysRoutes) getAnnotations(gctx *gin.Context) { r.annotsAdapter.HandleList(gctx) }
+func (r *KeysRoutes) getAnnotations(gctx *gin.Context) {
+	r.annotsAdapter.HandleList(gctx)
+}
 
 // @Summary		Get a specific annotation for a key
 // @Description	Get a specific annotation value by key for a key
@@ -636,7 +817,9 @@ func (r *KeysRoutes) getAnnotations(gctx *gin.Context) { r.annotsAdapter.HandleL
 // @Failure		500			{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/keys/{id}/annotations/{annotation} [get]
-func (r *KeysRoutes) getAnnotation(gctx *gin.Context) { r.annotsAdapter.HandleGet(gctx) }
+func (r *KeysRoutes) getAnnotation(gctx *gin.Context) {
+	r.annotsAdapter.HandleGet(gctx)
+}
 
 // @Summary		Set an annotation for a key
 // @Description	Set or update a specific annotation value by key for a key
@@ -654,7 +837,9 @@ func (r *KeysRoutes) getAnnotation(gctx *gin.Context) { r.annotsAdapter.HandleGe
 // @Failure		500			{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/keys/{id}/annotations/{annotation} [put]
-func (r *KeysRoutes) putAnnotation(gctx *gin.Context) { r.annotsAdapter.HandlePut(gctx) }
+func (r *KeysRoutes) putAnnotation(gctx *gin.Context) {
+	r.annotsAdapter.HandlePut(gctx)
+}
 
 // @Summary		Delete an annotation from a key
 // @Description	Delete a specific annotation by key from a key
@@ -673,11 +858,13 @@ func (r *KeysRoutes) deleteAnnotation(gctx *gin.Context) {
 }
 
 func (r *KeysRoutes) Register(g gin.IRouter) {
+	idExtractor := func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }
+
 	g.GET(
 		"/keys",
 		r.authService.NewRequiredBuilder().
 			ForResource("keys").
-			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }).
+			ForIdExtractor(idExtractor).
 			ForVerb("list").
 			Build(),
 		r.list,
@@ -686,7 +873,7 @@ func (r *KeysRoutes) Register(g gin.IRouter) {
 		"/keys",
 		r.authService.NewRequiredBuilder().
 			ForResource("keys").
-			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }).
+			ForIdExtractor(idExtractor).
 			ForVerb("create").
 			Build(),
 		r.create,
@@ -696,7 +883,7 @@ func (r *KeysRoutes) Register(g gin.IRouter) {
 		r.authService.NewRequiredBuilder().
 			ForResource("keys").
 			ForIdField("id").
-			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }).
+			ForIdExtractor(idExtractor).
 			ForVerb("get").
 			Build(),
 		r.get,
@@ -706,7 +893,7 @@ func (r *KeysRoutes) Register(g gin.IRouter) {
 		r.authService.NewRequiredBuilder().
 			ForResource("keys").
 			ForIdField("id").
-			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }).
+			ForIdExtractor(idExtractor).
 			ForVerb("update").
 			Build(),
 		r.update,
@@ -716,7 +903,7 @@ func (r *KeysRoutes) Register(g gin.IRouter) {
 		r.authService.NewRequiredBuilder().
 			ForResource("keys").
 			ForIdField("id").
-			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }).
+			ForIdExtractor(idExtractor).
 			ForVerb("delete").
 			Build(),
 		r.delete,
@@ -726,7 +913,7 @@ func (r *KeysRoutes) Register(g gin.IRouter) {
 		r.authService.NewRequiredBuilder().
 			ForResource("keys").
 			ForIdField("id").
-			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }).
+			ForIdExtractor(idExtractor).
 			ForVerb("get").
 			Build(),
 		r.getLabels,
@@ -736,7 +923,7 @@ func (r *KeysRoutes) Register(g gin.IRouter) {
 		r.authService.NewRequiredBuilder().
 			ForResource("keys").
 			ForIdField("id").
-			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }).
+			ForIdExtractor(idExtractor).
 			ForVerb("get").
 			Build(),
 		r.getLabel,
@@ -746,7 +933,7 @@ func (r *KeysRoutes) Register(g gin.IRouter) {
 		r.authService.NewRequiredBuilder().
 			ForResource("keys").
 			ForIdField("id").
-			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }).
+			ForIdExtractor(idExtractor).
 			ForVerb("update").
 			Build(),
 		r.putLabel,
@@ -756,7 +943,7 @@ func (r *KeysRoutes) Register(g gin.IRouter) {
 		r.authService.NewRequiredBuilder().
 			ForResource("keys").
 			ForIdField("id").
-			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }).
+			ForIdExtractor(idExtractor).
 			ForVerb("update").
 			Build(),
 		r.deleteLabel,
@@ -766,7 +953,7 @@ func (r *KeysRoutes) Register(g gin.IRouter) {
 		r.authService.NewRequiredBuilder().
 			ForResource("keys").
 			ForIdField("id").
-			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }).
+			ForIdExtractor(idExtractor).
 			ForVerb("get").
 			Build(),
 		r.getAnnotations,
@@ -776,7 +963,7 @@ func (r *KeysRoutes) Register(g gin.IRouter) {
 		r.authService.NewRequiredBuilder().
 			ForResource("keys").
 			ForIdField("id").
-			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }).
+			ForIdExtractor(idExtractor).
 			ForVerb("get").
 			Build(),
 		r.getAnnotation,
@@ -786,7 +973,7 @@ func (r *KeysRoutes) Register(g gin.IRouter) {
 		r.authService.NewRequiredBuilder().
 			ForResource("keys").
 			ForIdField("id").
-			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }).
+			ForIdExtractor(idExtractor).
 			ForVerb("update").
 			Build(),
 		r.putAnnotation,
@@ -796,7 +983,7 @@ func (r *KeysRoutes) Register(g gin.IRouter) {
 		r.authService.NewRequiredBuilder().
 			ForResource("keys").
 			ForIdField("id").
-			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }).
+			ForIdExtractor(idExtractor).
 			ForVerb("update").
 			Build(),
 		r.deleteAnnotation,
