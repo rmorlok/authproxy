@@ -165,6 +165,16 @@ jobs:
           grep -q "secretName: demo-jwt" "${demo_manifest}"
           grep -q "name: demo-authproxy-migrate" "${demo_manifest}"
           grep -q "suspend: true" "${demo_manifest}"
+          test "$(grep -c '^kind: PersistentVolumeClaim$' "${demo_manifest}")" -eq 3
+          test "$(grep -c '^  storageClassName: gp3$' "${demo_manifest}")" -eq 3
+          test "$(grep -c '^    type: Recreate$' "${demo_manifest}")" -eq 3
+          for claim in demo-postgresql-data demo-redis-data demo-minio-data; do
+            grep -q "name: ${claim}" "${demo_manifest}"
+            grep -q "claimName: ${claim}" "${demo_manifest}"
+          done
+          grep -q "mountPath: /bitnami/postgresql" "${demo_manifest}"
+          grep -q "mountPath: /bitnami/redis/data" "${demo_manifest}"
+          grep -q "mountPath: /bitnami/minio/data" "${demo_manifest}"
 
           grep -q "name: dev-authproxy" "${dev_manifest}"
           grep -q "provider: miniredis" "${dev_manifest}"
