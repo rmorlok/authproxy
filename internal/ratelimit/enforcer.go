@@ -9,6 +9,7 @@ import (
 	"math"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/apid"
@@ -196,6 +197,9 @@ func (rt *EnforcerRoundTripper) findMatches(rules []*database.RateLimit, reqCtx 
 	out := make([]matchedRule, 0, len(rules))
 	for _, rule := range rules {
 		if rule == nil {
+			continue
+		}
+		if rule.Namespace != reqCtx.Namespace && !strings.HasPrefix(reqCtx.Namespace, rule.Namespace+".") {
 			continue
 		}
 		ok, bucket, err := Match(rule.Definition, reqCtx)

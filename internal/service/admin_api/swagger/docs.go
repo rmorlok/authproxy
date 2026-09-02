@@ -7066,7 +7066,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPIListRateLimitsResponseJson"
+                            "$ref": "#/definitions/openapi.ListRateLimitsResponseJson"
                         }
                     },
                     "400": {
@@ -7113,7 +7113,7 @@ const docTemplateadmin_api = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPICreateRateLimitRequestJson"
+                            "$ref": "#/definitions/openapi.RateLimitJson"
                         }
                     }
                 ],
@@ -7121,7 +7121,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPIRateLimitJson"
+                            "$ref": "#/definitions/openapi.RateLimitJson"
                         }
                     },
                     "400": {
@@ -7176,7 +7176,7 @@ const docTemplateadmin_api = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPIDryRunRequestJson"
+                            "$ref": "#/definitions/openapi.DryRunRequestJson"
                         }
                     }
                 ],
@@ -7184,7 +7184,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPIDryRunResponseJson"
+                            "$ref": "#/definitions/openapi.DryRunResponseJson"
                         }
                     },
                     "400": {
@@ -7251,7 +7251,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPIRateLimitJson"
+                            "$ref": "#/definitions/openapi.RateLimitJson"
                         }
                     },
                     "400": {
@@ -7336,7 +7336,7 @@ const docTemplateadmin_api = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Update a rate limit's name, definition, labels, or annotations",
+                "description": "Update a rate limit's name, spec, labels, or annotations",
                 "consumes": [
                     "application/json"
                 ],
@@ -7361,7 +7361,7 @@ const docTemplateadmin_api = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPIUpdateRateLimitRequestJson"
+                            "$ref": "#/definitions/openapi.RateLimitPatchJson"
                         }
                     }
                 ],
@@ -7369,7 +7369,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPIRateLimitJson"
+                            "$ref": "#/definitions/openapi.RateLimitJson"
                         }
                     },
                     "400": {
@@ -8584,6 +8584,38 @@ const docTemplateadmin_api = `{
                 }
             }
         },
+        "openapi.DryRunRequestJson": {
+            "description": "Dry-run input: a proxy-shaped request + request type + the identity it runs under",
+            "type": "object",
+            "properties": {
+                "context": {},
+                "request": {},
+                "requestType": {
+                    "type": "string",
+                    "example": "proxy"
+                }
+            }
+        },
+        "openapi.DryRunResponseJson": {
+            "description": "Per-rule match + peek-driven would-allow result",
+            "type": "object",
+            "properties": {
+                "matched": {
+                    "type": "array",
+                    "items": {}
+                },
+                "notMatched": {
+                    "type": "array",
+                    "items": {}
+                },
+                "requestLabelSnapshot": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
         "openapi.KeyJson": {
             "description": "Kubernetes-style managed Key resource. Secret keyData fields are always redacted in responses.",
             "type": "object",
@@ -8777,43 +8809,297 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "openapi.RateLimitJson": {
-            "description": "Rate-limit API response",
+        "openapi.ListRateLimitsResponseJson": {
+            "description": "Paginated list of rate limits",
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "items",
+                "kind",
+                "metadata"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/openapi.RateLimitJson"
+                    }
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/v1alpha1.ListMeta"
+                }
+            }
+        },
+        "openapi.RateLimitAlgorithmJson": {
             "type": "object",
             "properties": {
-                "annotations": {
-                    "type": "object",
-                    "additionalProperties": {
+                "fixedWindow": {
+                    "$ref": "#/definitions/openapi.RateLimitFixedWindowJson"
+                },
+                "slidingWindow": {
+                    "$ref": "#/definitions/openapi.RateLimitSlidingWindowJson"
+                },
+                "tokenBucket": {
+                    "$ref": "#/definitions/openapi.RateLimitTokenBucketJson"
+                }
+            }
+        },
+        "openapi.RateLimitBucketJson": {
+            "type": "object",
+            "properties": {
+                "dimensions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "openapi.RateLimitFixedWindowJson": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer",
+                    "example": 100
+                },
+                "window": {
+                    "type": "string",
+                    "example": "1m"
+                }
+            }
+        },
+        "openapi.RateLimitJson": {
+            "description": "Kubernetes-style RateLimit resource",
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "kind",
+                "metadata",
+                "spec"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "RateLimit"
+                    ],
+                    "example": "RateLimit"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/meta.ObjectMeta"
+                },
+                "spec": {
+                    "$ref": "#/definitions/openapi.RateLimitSpecJson"
+                },
+                "status": {
+                    "$ref": "#/definitions/openapi.RateLimitStatusJson"
+                }
+            }
+        },
+        "openapi.RateLimitPatchJson": {
+            "description": "Kubernetes-style RateLimit patch. Status and server-owned metadata are rejected.",
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "kind",
+                "metadata",
+                "spec"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "RateLimit"
+                    ],
+                    "example": "RateLimit"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/meta.ObjectMetaPatch"
+                },
+                "spec": {
+                    "$ref": "#/definitions/openapi.RateLimitSpecPatchJson"
+                },
+                "status": {
+                    "$ref": "#/definitions/openapi.RateLimitStatusJson"
+                }
+            }
+        },
+        "openapi.RateLimitPathMatchJson": {
+            "type": "object",
+            "properties": {
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "prefix",
+                        "glob",
+                        "regex"
+                    ]
+                },
+                "value": {
+                    "type": "string"
+                }
+            }
+        },
+        "openapi.RateLimitScopeJson": {
+            "type": "object",
+            "properties": {
+                "connectionRef": {
+                    "$ref": "#/definitions/meta.ObjectReference"
+                },
+                "connectorRef": {
+                    "$ref": "#/definitions/meta.ObjectReference"
+                }
+            }
+        },
+        "openapi.RateLimitSelectorJson": {
+            "type": "object",
+            "properties": {
+                "labelSelector": {
+                    "type": "string"
+                },
+                "methods": {
+                    "type": "array",
+                    "items": {
                         "type": "string"
                     }
                 },
-                "createdAt": {
-                    "type": "string"
+                "pathMatch": {
+                    "$ref": "#/definitions/openapi.RateLimitPathMatchJson"
                 },
-                "definition": {
-                    "type": "object",
-                    "additionalProperties": {}
-                },
-                "id": {
-                    "type": "string",
-                    "example": "rl_test550e8400abcde"
-                },
-                "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
+                "requestTypes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "enum": [
+                            "global",
+                            "proxy",
+                            "oauth",
+                            "public",
+                            "probe"
+                        ]
                     }
+                }
+            }
+        },
+        "openapi.RateLimitSlidingWindowJson": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer",
+                    "example": 100
                 },
-                "name": {
+                "mode": {
                     "type": "string",
-                    "example": "public-api"
+                    "enum": [
+                        "log",
+                        "counter"
+                    ]
                 },
-                "namespace": {
+                "window": {
                     "type": "string",
-                    "example": "root.acme"
+                    "example": "1m"
+                }
+            }
+        },
+        "openapi.RateLimitSpecJson": {
+            "type": "object",
+            "required": [
+                "algorithm",
+                "bucket",
+                "selector"
+            ],
+            "properties": {
+                "algorithm": {
+                    "$ref": "#/definitions/openapi.RateLimitAlgorithmJson"
                 },
-                "updatedAt": {
-                    "type": "string"
+                "bucket": {
+                    "$ref": "#/definitions/openapi.RateLimitBucketJson"
+                },
+                "mode": {
+                    "type": "string",
+                    "enum": [
+                        "enforce",
+                        "observe"
+                    ]
+                },
+                "scope": {
+                    "$ref": "#/definitions/openapi.RateLimitScopeJson"
+                },
+                "selector": {
+                    "$ref": "#/definitions/openapi.RateLimitSelectorJson"
+                }
+            }
+        },
+        "openapi.RateLimitSpecPatchJson": {
+            "type": "object",
+            "properties": {
+                "algorithm": {
+                    "$ref": "#/definitions/openapi.RateLimitAlgorithmJson"
+                },
+                "bucket": {
+                    "$ref": "#/definitions/openapi.RateLimitBucketJson"
+                },
+                "mode": {
+                    "type": "string",
+                    "enum": [
+                        "enforce",
+                        "observe"
+                    ]
+                },
+                "scope": {
+                    "$ref": "#/definitions/openapi.RateLimitScopeJson"
+                },
+                "selector": {
+                    "$ref": "#/definitions/openapi.RateLimitSelectorJson"
+                }
+            }
+        },
+        "openapi.RateLimitStatusJson": {
+            "type": "object",
+            "properties": {
+                "effectiveMode": {
+                    "type": "string",
+                    "enum": [
+                        "enforce",
+                        "observe"
+                    ]
+                }
+            }
+        },
+        "openapi.RateLimitTokenBucketJson": {
+            "type": "object",
+            "properties": {
+                "capacity": {
+                    "type": "integer",
+                    "example": 60
+                },
+                "refillRate": {
+                    "type": "number",
+                    "example": 1
                 }
             }
         },
@@ -9326,36 +9612,6 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "routes.OpenAPICreateRateLimitRequestJson": {
-            "description": "Request to create a rate limit",
-            "type": "object",
-            "properties": {
-                "annotations": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "definition": {
-                    "type": "object",
-                    "additionalProperties": {}
-                },
-                "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "name": {
-                    "type": "string",
-                    "example": "public-api"
-                },
-                "namespace": {
-                    "type": "string",
-                    "example": "root.acme"
-                }
-            }
-        },
         "routes.OpenAPIDisconnectConnectionRequestJson": {
             "description": "Request body for connection disconnect operations",
             "type": "object",
@@ -9373,38 +9629,6 @@ const docTemplateadmin_api = `{
                 "connection": {},
                 "taskId": {
                     "type": "string"
-                }
-            }
-        },
-        "routes.OpenAPIDryRunRequestJson": {
-            "description": "Dry-run input: a proxy-shaped request + request type + the identity it runs under",
-            "type": "object",
-            "properties": {
-                "context": {},
-                "request": {},
-                "requestType": {
-                    "type": "string",
-                    "example": "proxy"
-                }
-            }
-        },
-        "routes.OpenAPIDryRunResponseJson": {
-            "description": "Per-rule match + peek-driven would-allow result",
-            "type": "object",
-            "properties": {
-                "matched": {
-                    "type": "array",
-                    "items": {}
-                },
-                "notMatched": {
-                    "type": "array",
-                    "items": {}
-                },
-                "requestLabelSnapshot": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
                 }
             }
         },
@@ -9548,37 +9772,6 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "routes.OpenAPIListRateLimitsResponseJson": {
-            "description": "Paginated list of rate limits",
-            "type": "object",
-            "required": [
-                "apiVersion",
-                "items",
-                "kind",
-                "metadata"
-            ],
-            "properties": {
-                "apiVersion": {
-                    "type": "string",
-                    "enum": [
-                        "authproxy.net/v1alpha1"
-                    ],
-                    "example": "authproxy.net/v1alpha1"
-                },
-                "items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/openapi.RateLimitJson"
-                    }
-                },
-                "kind": {
-                    "type": "string"
-                },
-                "metadata": {
-                    "$ref": "#/definitions/v1alpha1.ListMeta"
-                }
-            }
-        },
         "routes.OpenAPIListRequestEventsResponse": {
             "description": "Paginated list of request events entries",
             "type": "object",
@@ -9662,46 +9855,6 @@ const docTemplateadmin_api = `{
                 "statusCode": {
                     "type": "integer",
                     "example": 200
-                }
-            }
-        },
-        "routes.OpenAPIRateLimitJson": {
-            "description": "Rate-limit API response",
-            "type": "object",
-            "properties": {
-                "annotations": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "createdAt": {
-                    "type": "string"
-                },
-                "definition": {
-                    "type": "object",
-                    "additionalProperties": {}
-                },
-                "id": {
-                    "type": "string",
-                    "example": "rl_test550e8400abcde"
-                },
-                "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "name": {
-                    "type": "string",
-                    "example": "public-api"
-                },
-                "namespace": {
-                    "type": "string",
-                    "example": "root.acme"
-                },
-                "updatedAt": {
-                    "type": "string"
                 }
             }
         },
@@ -9913,32 +10066,6 @@ const docTemplateadmin_api = `{
                     "additionalProperties": {
                         "type": "string"
                     }
-                }
-            }
-        },
-        "routes.OpenAPIUpdateRateLimitRequestJson": {
-            "description": "Request to update a rate limit",
-            "type": "object",
-            "properties": {
-                "annotations": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "definition": {
-                    "type": "object",
-                    "additionalProperties": {}
-                },
-                "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "name": {
-                    "type": "string",
-                    "example": "public-api"
                 }
             }
         },

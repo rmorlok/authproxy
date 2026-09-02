@@ -24,6 +24,7 @@ import (
 	cfgschema "github.com/rmorlok/authproxy/internal/schema/config"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
+	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 	"github.com/rmorlok/authproxy/internal/test_utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -73,6 +74,24 @@ func appendConfiguredConnector(resources []cschema.Connector, value configuredCo
 	return append(resources, configuredConnectorResource(value))
 }
 
+func configuredRateLimit(id, name, namespace string) rlschema.RateLimit {
+	return rlschema.RateLimit{
+		TypeMeta: meta.NewTypeMeta(rlschema.RateLimitKind),
+		Metadata: meta.ObjectMeta{
+			ID:        id,
+			Name:      scommon.ResourceName(name),
+			Namespace: namespace,
+		},
+		Spec: rlschema.RateLimitSpec{
+			Selector: rlschema.Selector{},
+			Bucket:   rlschema.Bucket{},
+			Algorithm: rlschema.Algorithm{
+				TokenBucket: &rlschema.TokenBucket{Capacity: 10, RefillRate: 1},
+			},
+		},
+	}
+}
+
 func displayNameExpr(cfg config.C) string {
 	if cfg.GetRoot().Database.GetProvider() == cfgschema.DatabaseProviderPostgres {
 		return "(encrypted_definition ->> 'd')::jsonb ->> 'displayName'"
@@ -97,17 +116,13 @@ func TestMigration(t *testing.T) {
 	var service iface.C
 	var asynqClient apasynq.Client
 
-	setup := func(t *testing.T, connectors []configuredConnector) func() {
-		cfg = config.FromRoot(&cfgschema.Root{
-			DevSettings: &cfgschema.DevSettings{
-				Enabled:                  true,
-				FakeEncryption:           true,
-				FakeEncryptionSkipBase64: true,
-			},
-			Connectors: &cfgschema.Connectors{
-				LoadFromList: configuredConnectorResources(connectors),
-			},
-		})
+	setupRoot := func(t *testing.T, root *cfgschema.Root) func() {
+		root.DevSettings = &cfgschema.DevSettings{
+			Enabled:                  true,
+			FakeEncryption:           true,
+			FakeEncryptionSkipBase64: true,
+		}
+		cfg = config.FromRoot(root)
 
 		logger := slog.Default()
 		cfg, db, rawDb = database.MustApplyBlankTestDbConfigRaw(t, cfg)
@@ -130,6 +145,85 @@ func TestMigration(t *testing.T) {
 			assert.NoError(t, err)
 		}
 	}
+
+	setup := func(t *testing.T, connectors []configuredConnector) func() {
+		return setupRoot(t, &cfgschema.Root{
+			DevSettings: &cfgschema.DevSettings{
+				Enabled:                  true,
+				FakeEncryption:           true,
+				FakeEncryptionSkipBase64: true,
+			},
+			Connectors: &cfgschema.Connectors{
+				LoadFromList: configuredConnectorResources(connectors),
+			},
+		})
+	}
+
+	t.Run("rate limits", func(t *testing.T) {
+		ns := "root.acme"
+		first := configuredRateLimit("rl_test0000000000001", "tenant-default", ns)
+		second := configuredRateLimit("", "salesforce-v1", ns)
+		second.Spec.Scope = &rlschema.RateLimitScope{ConnectorRef: &meta.ObjectReference{
+			APIVersion: meta.APIVersionV1Alpha1,
+			Kind:       cschema.ConnectorKind,
+			Name:       "salesforce",
+			Namespace:  ns,
+			Generation: 1,
+		}}
+		root := &cfgschema.Root{
+			Connectors: &cfgschema.Connectors{LoadFromList: configuredConnectorResources([]configuredConnector{{
+				Name:        "salesforce",
+				Namespace:   &ns,
+				DisplayName: "Salesforce",
+			}})},
+			RateLimits: &cfgschema.RateLimits{LoadFromList: []rlschema.RateLimit{first, second}},
+		}
+		cleanup := setupRoot(t, root)
+		defer cleanup()
+
+		require.NoError(t, service.Migrate(context.Background()))
+
+		storedFirst, err := db.GetRateLimit(context.Background(), apid.MustParse("rl_test0000000000001"))
+		require.NoError(t, err)
+		require.Equal(t, scommon.ResourceName("tenant-default"), storedFirst.Name)
+		require.Equal(t, "config", storedFirst.Labels[rateLimitSourceLabelKey])
+
+		storedSecondPage := db.ListRateLimitsBuilder().ForNamespaceMatchers([]string{ns}).ForName("salesforce-v1").FetchPage(context.Background())
+		require.NoError(t, storedSecondPage.Error)
+		require.Len(t, storedSecondPage.Results, 1)
+		storedSecond := storedSecondPage.Results[0]
+		require.NotNil(t, storedSecond.Definition.Scope)
+		require.NotNil(t, storedSecond.Definition.Scope.ConnectorRef)
+		require.NotEmpty(t, storedSecond.Definition.Scope.ConnectorRef.ID)
+		require.Empty(t, storedSecond.Definition.Scope.ConnectorRef.Name)
+		require.Equal(t, uint64(1), storedSecond.Definition.Scope.ConnectorRef.Generation)
+
+		// Reconciliation updates the same explicit identity instead of creating
+		// another row, and a removed config-owned resource is cleaned up.
+		root.RateLimits.LoadFromList[0].Metadata.Name = "tenant-renamed"
+		root.RateLimits.LoadFromList[0].Metadata.Labels = map[string]string{"team": "platform"}
+		root.RateLimits.LoadFromList[0].Spec.Mode = rlschema.ModeObserve
+		root.RateLimits.LoadFromList = root.RateLimits.LoadFromList[:1]
+
+		apiID := apid.MustParse("rl_test0000000000099")
+		require.NoError(t, db.CreateRateLimit(context.Background(), &database.RateLimit{
+			Id:         apiID,
+			Namespace:  ns,
+			Name:       "api-owned",
+			Definition: configuredRateLimit("", "", ns).Spec,
+		}))
+		require.NoError(t, service.Migrate(context.Background()))
+
+		storedFirst, err = db.GetRateLimit(context.Background(), apid.MustParse("rl_test0000000000001"))
+		require.NoError(t, err)
+		require.Equal(t, scommon.ResourceName("tenant-renamed"), storedFirst.Name)
+		require.Equal(t, rlschema.ModeObserve, storedFirst.Definition.Mode)
+		require.Equal(t, "platform", storedFirst.Labels["team"])
+		_, err = db.GetRateLimit(context.Background(), storedSecond.Id)
+		require.ErrorIs(t, err, database.ErrNotFound)
+		_, err = db.GetRateLimit(context.Background(), apiID)
+		require.NoError(t, err, "API-owned rate limits must not be removed by config reconciliation")
+	})
 
 	t.Run("connectors", func(t *testing.T) {
 		t.Run("no connectors", func(t *testing.T) {

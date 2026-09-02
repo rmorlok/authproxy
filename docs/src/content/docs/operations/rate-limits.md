@@ -34,10 +34,15 @@ Content-Type: application/json
 Authorization: Bearer <admin token>
 
 {
-  "namespace": "root.acme",
-  "labels": { "team": "acme" },
-  "annotations": { "owner": "platform@example.com" },
-  "definition": {
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "RateLimit",
+  "metadata": {
+    "name": "salesforce-writes",
+    "namespace": "root.acme",
+    "labels": { "team": "acme" },
+    "annotations": { "owner": "platform@example.com" }
+  },
+  "spec": {
     "mode": "enforce",
     "selector": {
       "labelSelector": "apxy/cxr/type=salesforce",
@@ -57,11 +62,91 @@ Authorization: Bearer <admin token>
 }
 ```
 
-The response carries the server-assigned id (e.g., `rl_AbcXyz…`), the materialised label set (including the implicit `apxy/rl/-/id` / `apxy/rl/-/ns` and any carried-forward namespace labels — see [Labels](/concepts/labels-and-annotations/)), and timestamps.
+The response uses the same envelope. `metadata.id` contains the server-assigned id (e.g., `rl_AbcXyz…`), `metadata` carries the materialised label set and timestamps, and `status.effectiveMode` reports the resolved mode (`enforce` when `spec.mode` is omitted). The implicit `apxy/rl/-/id` / `apxy/rl/-/ns` labels and any carried-forward namespace labels are described under [Labels](/concepts/labels-and-annotations/).
 
-Update with `PATCH /api/v1/rate-limits/{id}` (the request body can carry any of `definition`, `labels`, `annotations`; omit fields you don't want to change). Delete with `DELETE /api/v1/rate-limits/{id}`. List with `GET /api/v1/rate-limits` (supports `namespace`, `labelSelector`, and pagination cursor params).
+Update with `PATCH /api/v1/rate-limits/{id}`. Send the resource type plus `metadata` and `spec` patch objects; omit fields inside those objects when they should remain unchanged:
+
+```json
+{
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "RateLimit",
+  "metadata": {},
+  "spec": {"mode": "observe"}
+}
+```
+
+Set `spec.scope` to `null` to restore namespace scope. Delete with `DELETE /api/v1/rate-limits/{id}`. List with `GET /api/v1/rate-limits` (supports `namespace`, `name`, `labelSelector`, and pagination cursor params).
 
 Labels and annotations also have sub-resource endpoints — see [Labels — API surface](/concepts/labels-and-annotations/#api-surface).
+
+### Via server configuration
+
+The `rateLimits.loadFromList` configuration accepts the same canonical YAML resource. Startup reconciliation preserves an explicit `metadata.id`, or matches by `metadata.namespace` and `metadata.name` when the ID is omitted:
+
+```yaml
+rateLimits:
+  loadFromList:
+    - apiVersion: authproxy.net/v1alpha1
+      kind: RateLimit
+      metadata:
+        name: salesforce-writes
+        namespace: root.acme
+        labels:
+          team: acme
+      spec:
+        scope:
+          connectorRef:
+            apiVersion: authproxy.net/v1alpha1
+            kind: Connector
+            namespace: root.acme
+            name: salesforce
+            generation: 3
+        mode: enforce
+        selector:
+          methods: [POST, PATCH, PUT]
+        bucket:
+          dimensions: [actor, labels/team]
+        algorithm:
+          tokenBucket:
+            capacity: 60
+            refillRate: 1.0
+```
+
+Connector references are resolved after configured connectors are reconciled. AuthProxy stores the stable connector ID and requested generation. The former flat rate-limit configuration is not accepted; update configuration before restarting on this breaking pre-production release.
+
+## Resource scope
+
+`metadata.namespace` always establishes the outer boundary: the rule can affect that namespace and its descendants, never a parent or sibling. An omitted `spec.scope` applies throughout that cascade. Add exactly one typed reference to narrow it:
+
+```yaml
+# Every generation of one connector
+scope:
+  connectorRef:
+    apiVersion: authproxy.net/v1alpha1
+    kind: Connector
+    id: cxr_01example
+```
+
+```yaml
+# One connector generation
+scope:
+  connectorRef:
+    apiVersion: authproxy.net/v1alpha1
+    kind: Connector
+    id: cxr_01example
+    generation: 3
+```
+
+```yaml
+# One connection
+scope:
+  connectionRef:
+    apiVersion: authproxy.net/v1alpha1
+    kind: Connection
+    id: cxn_01example
+```
+
+References may use `id`, or the pair `namespace` and `name`. Connector `generation` is optional and means all generations when omitted; it is not valid on a connection reference.
 
 ### Via Terraform
 
@@ -77,6 +162,13 @@ resource "authproxy_rate_limit" "salesforce_writes" {
   }
   annotations = {
     owner = "platform@example.com"
+  }
+
+  scope {
+    connector_ref {
+      id         = authproxy_connector.salesforce.id
+      generation = 3
+    }
   }
 
   selector {

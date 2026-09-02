@@ -61,19 +61,32 @@ const key = {
 };
 
 const rateLimit = {
-  id: 'rl_payments_public_api',
-  namespace: 'root.payments',
-  name: 'public-api',
-  definition: {
+  apiVersion: 'authproxy.net/v1alpha1',
+  kind: 'RateLimit',
+  metadata: {
+    id: 'rl_payments_public_api',
+    namespace: 'root.payments',
+    name: 'public-api',
+    labels: {scope: 'public-api', 'apxy/ns/team': 'payments'},
+    annotations: {owner: 'Payments Platform', runbook: 'go/payments/rate-limits'},
+    createdAt: '2026-08-05T15:30:00Z',
+    updatedAt: '2026-08-05T15:45:00Z',
+  },
+  spec: {
     mode: 'enforce',
+    scope: {
+      connectorRef: {
+        apiVersion: 'authproxy.net/v1alpha1',
+        kind: 'Connector',
+        id: 'cxr_payments_stripe',
+        generation: 3,
+      },
+    },
     selector: {methods: ['GET', 'POST'], requestTypes: ['proxy']},
     bucket: {dimensions: ['actor']},
     algorithm: {tokenBucket: {capacity: 100, refillRate: 20}},
   },
-  labels: {scope: 'public-api', 'apxy/ns/team': 'payments'},
-  annotations: {owner: 'Payments Platform', runbook: 'go/payments/rate-limits'},
-  createdAt: '2026-08-05T15:30:00Z',
-  updatedAt: '2026-08-05T15:45:00Z',
+  status: {effectiveMode: 'enforce'},
 };
 
 const connectorVersion = {
@@ -118,7 +131,7 @@ export const Key: Story = {
 };
 
 export const RateLimit: Story = {
-  render: () => <DetailCanvas><RateLimitDetail rateLimitId={rateLimit.id}/></DetailCanvas>,
+  render: () => <DetailCanvas><RateLimitDetail rateLimitId={rateLimit.metadata.id}/></DetailCanvas>,
 };
 
 function DetailCanvas({children}: {children: React.ReactNode}) {
@@ -131,6 +144,6 @@ function responseData(url: string) {
   if (url === `/api/v1/connectors/${connector.id}/versions`) return {items: [connectorVersion]};
   if (url === `/api/v1/connections/${connection.id}`) return connection;
   if (url === `/api/v1/keys/${key.id}`) return key;
-  if (url === `/api/v1/rate-limits/${rateLimit.id}`) return rateLimit;
+  if (url === `/api/v1/rate-limits/${rateLimit.metadata.id}`) return rateLimit;
   return {};
 }

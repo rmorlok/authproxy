@@ -6,14 +6,15 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 	"github.com/stretchr/testify/require"
 )
 
 // validRule returns a permissive rule that matches anything by default —
 // individual tests narrow it via the closure passed to mutate.
-func validRule(mutate func(*rlschema.RateLimit)) rlschema.RateLimit {
-	r := rlschema.RateLimit{
+func validRule(mutate func(*rlschema.RateLimitSpec)) rlschema.RateLimitSpec {
+	r := rlschema.RateLimitSpec{
 		Selector: rlschema.Selector{}, // no clauses = match anything (subject to default request types)
 		Bucket:   rlschema.Bucket{},
 		Algorithm: rlschema.Algorithm{
@@ -57,7 +58,7 @@ func TestMatch_RequestType_DefaultRejectsOAuth(t *testing.T) {
 }
 
 func TestMatch_RequestType_ExplicitOptIn(t *testing.T) {
-	rule := validRule(func(r *rlschema.RateLimit) {
+	rule := validRule(func(r *rlschema.RateLimitSpec) {
 		r.Selector.RequestTypes = []common.RequestType{common.RequestTypeOAuth}
 	})
 	// Default proxy traffic now fails to match.
@@ -71,10 +72,64 @@ func TestMatch_RequestType_ExplicitOptIn(t *testing.T) {
 	require.True(t, matched)
 }
 
+// --- Resource scope matching ---
+
+func TestMatch_ConnectionScope(t *testing.T) {
+	rule := validRule(func(r *rlschema.RateLimitSpec) {
+		r.Scope = &rlschema.RateLimitScope{ConnectionRef: &meta.ObjectReference{
+			APIVersion: meta.APIVersionV1Alpha1,
+			Kind:       rlschema.ConnectionKind,
+			ID:         "cxn_target",
+		}}
+	})
+
+	matched, _, err := Match(rule, proxyCtx(func(c *RequestContext) { c.ConnectionID = "cxn_target" }))
+	require.NoError(t, err)
+	require.True(t, matched)
+
+	matched, _, reason, err := MatchExplain(rule, proxyCtx(func(c *RequestContext) { c.ConnectionID = "cxn_other" }))
+	require.NoError(t, err)
+	require.False(t, matched)
+	require.Contains(t, reason, "scoped connection")
+}
+
+func TestMatch_ConnectorScope(t *testing.T) {
+	rule := validRule(func(r *rlschema.RateLimitSpec) {
+		r.Scope = &rlschema.RateLimitScope{ConnectorRef: &meta.ObjectReference{
+			APIVersion: meta.APIVersionV1Alpha1,
+			Kind:       "Connector",
+			ID:         "cxr_target",
+		}}
+	})
+
+	matched, _, err := Match(rule, proxyCtx(func(c *RequestContext) {
+		c.ConnectorID = "cxr_target"
+		c.ConnectorVersion = 7
+	}))
+	require.NoError(t, err)
+	require.True(t, matched, "an omitted generation applies to every connector generation")
+
+	rule.Scope.ConnectorRef.Generation = 7
+	matched, _, err = Match(rule, proxyCtx(func(c *RequestContext) {
+		c.ConnectorID = "cxr_target"
+		c.ConnectorVersion = 7
+	}))
+	require.NoError(t, err)
+	require.True(t, matched)
+
+	matched, _, reason, err := MatchExplain(rule, proxyCtx(func(c *RequestContext) {
+		c.ConnectorID = "cxr_target"
+		c.ConnectorVersion = 8
+	}))
+	require.NoError(t, err)
+	require.False(t, matched)
+	require.Contains(t, reason, "scoped generation 7")
+}
+
 // --- Method matching ---
 
 func TestMatch_Methods_EmptyMatchesAny(t *testing.T) {
-	rule := validRule(func(r *rlschema.RateLimit) { r.Selector.Methods = nil })
+	rule := validRule(func(r *rlschema.RateLimitSpec) { r.Selector.Methods = nil })
 	for _, m := range []string{"GET", "POST", "DELETE"} {
 		matched, _, err := Match(rule, proxyCtx(func(c *RequestContext) { c.Method = m }))
 		require.NoError(t, err)
@@ -83,7 +138,7 @@ func TestMatch_Methods_EmptyMatchesAny(t *testing.T) {
 }
 
 func TestMatch_Methods_FilterApplies(t *testing.T) {
-	rule := validRule(func(r *rlschema.RateLimit) {
+	rule := validRule(func(r *rlschema.RateLimitSpec) {
 		r.Selector.Methods = []string{"POST", "PATCH"}
 	})
 
@@ -99,7 +154,7 @@ func TestMatch_Methods_FilterApplies(t *testing.T) {
 // --- LabelSelector matching ---
 
 func TestMatch_LabelSelector_Matches(t *testing.T) {
-	rule := validRule(func(r *rlschema.RateLimit) {
+	rule := validRule(func(r *rlschema.RateLimitSpec) {
 		r.Selector.LabelSelector = "env=prod,team"
 	})
 
@@ -126,7 +181,7 @@ func TestMatch_LabelSelector_Matches(t *testing.T) {
 }
 
 func TestMatch_LabelSelector_NotEqualAndNotExists(t *testing.T) {
-	rule := validRule(func(r *rlschema.RateLimit) {
+	rule := validRule(func(r *rlschema.RateLimitSpec) {
 		r.Selector.LabelSelector = "env!=prod,!debug"
 	})
 
@@ -152,7 +207,7 @@ func TestMatch_LabelSelector_NotEqualAndNotExists(t *testing.T) {
 }
 
 func TestMatch_LabelSelector_BadSyntaxReturnsError(t *testing.T) {
-	rule := validRule(func(r *rlschema.RateLimit) {
+	rule := validRule(func(r *rlschema.RateLimitSpec) {
 		// Empty key after the bang isn't a valid label selector.
 		r.Selector.LabelSelector = "!="
 	})
@@ -171,7 +226,7 @@ func mustURL(t *testing.T, raw string) *url.URL {
 }
 
 func TestMatch_PathMatch_Prefix(t *testing.T) {
-	rule := validRule(func(r *rlschema.RateLimit) {
+	rule := validRule(func(r *rlschema.RateLimitSpec) {
 		r.Selector.PathMatch = &rlschema.PathMatch{
 			Kind: rlschema.PathMatchKindPrefix, Value: "/services/data/",
 		}
@@ -191,7 +246,7 @@ func TestMatch_PathMatch_Prefix(t *testing.T) {
 }
 
 func TestMatch_PathMatch_Glob(t *testing.T) {
-	rule := validRule(func(r *rlschema.RateLimit) {
+	rule := validRule(func(r *rlschema.RateLimitSpec) {
 		r.Selector.PathMatch = &rlschema.PathMatch{
 			Kind: rlschema.PathMatchKindGlob, Value: "/v1/users/*",
 		}
@@ -219,7 +274,7 @@ func TestMatch_PathMatch_Glob(t *testing.T) {
 }
 
 func TestMatch_PathMatch_Regex(t *testing.T) {
-	rule := validRule(func(r *rlschema.RateLimit) {
+	rule := validRule(func(r *rlschema.RateLimitSpec) {
 		r.Selector.PathMatch = &rlschema.PathMatch{
 			Kind: rlschema.PathMatchKindRegex, Value: `^/v1/users/[0-9]+$`,
 		}
@@ -239,7 +294,7 @@ func TestMatch_PathMatch_Regex(t *testing.T) {
 }
 
 func TestMatch_PathMatch_NilURLFails(t *testing.T) {
-	rule := validRule(func(r *rlschema.RateLimit) {
+	rule := validRule(func(r *rlschema.RateLimitSpec) {
 		r.Selector.PathMatch = &rlschema.PathMatch{
 			Kind: rlschema.PathMatchKindPrefix, Value: "/x",
 		}
@@ -250,7 +305,7 @@ func TestMatch_PathMatch_NilURLFails(t *testing.T) {
 }
 
 func TestMatch_PathMatch_BadRegexReturnsError(t *testing.T) {
-	rule := validRule(func(r *rlschema.RateLimit) {
+	rule := validRule(func(r *rlschema.RateLimitSpec) {
 		r.Selector.PathMatch = &rlschema.PathMatch{
 			Kind: rlschema.PathMatchKindRegex, Value: "[unterminated",
 		}
@@ -263,7 +318,7 @@ func TestMatch_PathMatch_BadRegexReturnsError(t *testing.T) {
 }
 
 func TestMatch_PathMatch_BadGlobReturnsError(t *testing.T) {
-	rule := validRule(func(r *rlschema.RateLimit) {
+	rule := validRule(func(r *rlschema.RateLimitSpec) {
 		r.Selector.PathMatch = &rlschema.PathMatch{
 			Kind: rlschema.PathMatchKindGlob, Value: "[unterminated",
 		}
@@ -276,7 +331,7 @@ func TestMatch_PathMatch_BadGlobReturnsError(t *testing.T) {
 }
 
 func TestMatch_PathMatch_UnknownKindReturnsError(t *testing.T) {
-	rule := validRule(func(r *rlschema.RateLimit) {
+	rule := validRule(func(r *rlschema.RateLimitSpec) {
 		r.Selector.PathMatch = &rlschema.PathMatch{
 			Kind: "exact", Value: "/x",
 		}
@@ -292,7 +347,7 @@ func TestMatch_PathMatch_UnknownKindReturnsError(t *testing.T) {
 
 func TestMatch_AllClausesANDed(t *testing.T) {
 	// All four clauses populated; one failure short-circuits the whole match.
-	rule := validRule(func(r *rlschema.RateLimit) {
+	rule := validRule(func(r *rlschema.RateLimitSpec) {
 		r.Selector = rlschema.Selector{
 			LabelSelector: "team=platform",
 			Methods:       []string{"POST"},
@@ -341,7 +396,7 @@ func TestMatch_AllClausesANDed(t *testing.T) {
 // --- BucketKey on match ---
 
 func TestMatch_ReturnsBucketKey(t *testing.T) {
-	rule := validRule(func(r *rlschema.RateLimit) {
+	rule := validRule(func(r *rlschema.RateLimitSpec) {
 		r.Bucket.Dimensions = []string{
 			rlschema.DimensionActor, "labels/team",
 		}
@@ -358,7 +413,7 @@ func TestMatch_ReturnsBucketKey(t *testing.T) {
 }
 
 func TestMatch_NonMatchReturnsZeroBucketKey(t *testing.T) {
-	rule := validRule(func(r *rlschema.RateLimit) {
+	rule := validRule(func(r *rlschema.RateLimitSpec) {
 		r.Selector.Methods = []string{"POST"}
 		r.Bucket.Dimensions = []string{rlschema.DimensionActor}
 	})

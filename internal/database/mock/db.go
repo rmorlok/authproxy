@@ -2173,7 +2173,7 @@ func (mr *MockDBMockRecorder) UpdateRateLimitAnnotations(ctx, id, annotations in
 }
 
 // UpdateRateLimitDefinition mocks base method.
-func (m *MockDB) UpdateRateLimitDefinition(ctx context.Context, id apid.ID, def rate_limit.RateLimit) (*database.RateLimit, error) {
+func (m *MockDB) UpdateRateLimitDefinition(ctx context.Context, id apid.ID, def rate_limit.RateLimitSpec) (*database.RateLimit, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateRateLimitDefinition", ctx, id, def)
 	ret0, _ := ret[0].(*database.RateLimit)

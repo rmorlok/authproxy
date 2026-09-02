@@ -16,11 +16,12 @@ type RateLimit interface {
 	GetId() apid.ID
 	GetNamespace() string
 	GetName() common.ResourceName
-	GetDefinition() rlschema.RateLimit
+	GetSpec() rlschema.RateLimitSpec
 	GetLabels() map[string]string
 	GetAnnotations() map[string]string
 	GetCreatedAt() time.Time
 	GetUpdatedAt() time.Time
+	GetResource() *rlschema.RateLimit
 }
 
 type ListRateLimitsExecutor interface {

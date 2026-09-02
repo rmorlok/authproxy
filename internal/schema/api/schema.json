@@ -1229,40 +1229,7 @@
       "additionalProperties": false
     },
     "RateLimit": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "namespace": {
-          "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath"
-        },
-        "definition": {
-          "$ref": "../resources/rate_limit/schema.json#/$defs/RateLimit"
-        },
-        "labels": {
-          "$ref": "#/$defs/StringMap"
-        },
-        "annotations": {
-          "$ref": "#/$defs/StringMap"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "id",
-        "namespace",
-        "definition",
-        "createdAt",
-        "updatedAt"
-      ],
-      "additionalProperties": false
+      "$ref": "../resources/rate_limit/schema.json"
     },
     "ListRateLimitsResponse": {
       "description": "A Kubernetes-style list of rate limits.",
@@ -1275,48 +1242,17 @@
             "kind": { "const": "RateLimitList" },
             "items": {
               "type": "array",
-              "items": { "$ref": "#/$defs/RateLimit" }
+              "items": { "$ref": "../resources/rate_limit/schema.json" }
             }
           }
         }
       ]
     },
     "CreateRateLimitRequest": {
-      "type": "object",
-      "properties": {
-        "namespace": {
-          "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath"
-        },
-        "definition": {
-          "$ref": "../resources/rate_limit/schema.json#/$defs/RateLimit"
-        },
-        "labels": {
-          "$ref": "#/$defs/StringMap"
-        },
-        "annotations": {
-          "$ref": "#/$defs/StringMap"
-        }
-      },
-      "required": [
-        "namespace",
-        "definition"
-      ],
-      "additionalProperties": false
+      "$ref": "../resources/rate_limit/schema.json"
     },
     "UpdateRateLimitRequest": {
-      "type": "object",
-      "properties": {
-        "definition": {
-          "$ref": "../resources/rate_limit/schema.json#/$defs/RateLimit"
-        },
-        "labels": {
-          "$ref": "#/$defs/StringMap"
-        },
-        "annotations": {
-          "$ref": "#/$defs/StringMap"
-        }
-      },
-      "additionalProperties": false
+      "$ref": "../resources/rate_limit/schema.json#/$defs/RateLimitPatch"
     },
     "ProxyRequest": {
       "type": "object",

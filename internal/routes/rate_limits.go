@@ -19,27 +19,19 @@ import (
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	schemaapiopenapi "github.com/rmorlok/authproxy/internal/schema/api/openapi"
 	scommon "github.com/rmorlok/authproxy/internal/schema/common"
-	smeta "github.com/rmorlok/authproxy/internal/schema/resources/meta"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
+	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
-type RateLimitJson = schemaapi.RateLimitJson
-type CreateRateLimitRequestJson = schemaapi.CreateRateLimitRequestJson
-type UpdateRateLimitRequestJson = schemaapi.UpdateRateLimitRequestJson
-type ListRateLimitsResponseJson = schemaapi.ListRateLimitsResponseJson
-type DryRunRequestJson = schemaapi.DryRunRequestJson
-type DryRunContextJson = schemaapi.DryRunContextJson
-type DryRunResponseJson = schemaapi.DryRunResponseJson
-type DryRunMatchJson = schemaapi.DryRunMatchJson
-type DryRunNotMatchedJson = schemaapi.DryRunNotMatchedJson
-
-type OpenAPIRateLimitJson = schemaapiopenapi.RateLimitJson
-type OpenAPIListRateLimitsResponseJson = schemaapiopenapi.ListRateLimitsResponseJson
-type OpenAPICreateRateLimitRequestJson = schemaapiopenapi.CreateRateLimitRequestJson
-type OpenAPIUpdateRateLimitRequestJson = schemaapiopenapi.UpdateRateLimitRequestJson
-type OpenAPIDryRunRequestJson = schemaapiopenapi.DryRunRequestJson
-type OpenAPIDryRunResponseJson = schemaapiopenapi.DryRunResponseJson
+var (
+	_ = schemaapiopenapi.RateLimitJson{}
+	_ = schemaapiopenapi.RateLimitPatchJson{}
+	_ = schemaapiopenapi.ListRateLimitsResponseJson{}
+	_ = schemaapiopenapi.DryRunRequestJson{}
+	_ = schemaapiopenapi.DryRunResponseJson{}
+)
 
 type ListRateLimitsRequestQueryParams struct {
 	Cursor        *string `form:"cursor"`
@@ -50,17 +42,8 @@ type ListRateLimitsRequestQueryParams struct {
 	OrderByVal    *string `form:"orderBy"`
 }
 
-func RateLimitToJson(r coreIface.RateLimit) RateLimitJson {
-	return RateLimitJson{
-		Id:          r.GetId(),
-		Namespace:   r.GetNamespace(),
-		Name:        r.GetName(),
-		Definition:  r.GetDefinition(),
-		Labels:      r.GetLabels(),
-		Annotations: r.GetAnnotations(),
-		CreatedAt:   r.GetCreatedAt(),
-		UpdatedAt:   r.GetUpdatedAt(),
-	}
+func RateLimitToResource(r coreIface.RateLimit) *rlschema.RateLimit {
+	return r.GetResource()
 }
 
 type RateLimitsRoutes struct {
@@ -73,7 +56,7 @@ type RateLimitsRoutes struct {
 
 // dryRunRequestToCore translates the wire request to the structured input the core
 // service consumes. Nothing here does business logic — it's just shape.
-func dryRunRequestToCore(r DryRunRequestJson) coreIface.DryRunRateLimitRequest {
+func dryRunRequestToCore(r schemaapi.DryRunRequestJson) coreIface.DryRunRateLimitRequest {
 	return coreIface.DryRunRateLimitRequest{
 		Request: coreIface.ProxyRequest{
 			URL:      r.Request.URL,
@@ -92,10 +75,10 @@ func dryRunRequestToCore(r DryRunRequestJson) coreIface.DryRunRateLimitRequest {
 	}
 }
 
-func dryRunResponseFromCore(res coreIface.DryRunRateLimitResult) DryRunResponseJson {
-	matched := make([]DryRunMatchJson, len(res.Matched))
+func dryRunResponseFromCore(res coreIface.DryRunRateLimitResult) schemaapi.DryRunResponseJson {
+	matched := make([]schemaapi.DryRunMatchJson, len(res.Matched))
 	for i, m := range res.Matched {
-		matched[i] = DryRunMatchJson{
+		matched[i] = schemaapi.DryRunMatchJson{
 			RateLimitId:      m.RateLimitId,
 			Namespace:        m.Namespace,
 			EffectiveMode:    m.EffectiveMode,
@@ -107,15 +90,15 @@ func dryRunResponseFromCore(res coreIface.DryRunRateLimitResult) DryRunResponseJ
 			PeekFailed:       m.PeekFailed,
 		}
 	}
-	notMatched := make([]DryRunNotMatchedJson, len(res.NotMatched))
+	notMatched := make([]schemaapi.DryRunNotMatchedJson, len(res.NotMatched))
 	for i, nm := range res.NotMatched {
-		notMatched[i] = DryRunNotMatchedJson{
+		notMatched[i] = schemaapi.DryRunNotMatchedJson{
 			RateLimitId: nm.RateLimitId,
 			Namespace:   nm.Namespace,
 			Reason:      nm.Reason,
 		}
 	}
-	return DryRunResponseJson{
+	return schemaapi.DryRunResponseJson{
 		RequestLabelSnapshot: res.RequestLabelSnapshot,
 		Matched:              matched,
 		NotMatched:           notMatched,
@@ -128,7 +111,7 @@ func dryRunResponseFromCore(res coreIface.DryRunRateLimitResult) DryRunResponseJ
 // @Accept			json
 // @Produce		json
 // @Param			id	path		string	true	"Rate limit ID"
-// @Success		200		{object}	OpenAPIRateLimitJson
+// @Success		200		{object}	schemaapiopenapi.RateLimitJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		404		{object}	ErrorResponse
@@ -163,7 +146,10 @@ func (r *RateLimitsRoutes) get(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, RateLimitToJson(rl))
+	if err := apgin.RenderResourceJSON(gctx, http.StatusOK, RateLimitToResource(rl)); err != nil {
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+		val.MarkErrorReturn()
+	}
 }
 
 // @Summary		Create rate limit
@@ -171,8 +157,8 @@ func (r *RateLimitsRoutes) get(gctx *gin.Context) {
 // @Tags			rate_limits
 // @Accept			json
 // @Produce		json
-// @Param			request	body		OpenAPICreateRateLimitRequestJson	true	"Rate limit creation request"
-// @Success		200		{object}	OpenAPIRateLimitJson
+// @Param			request	body		schemaapiopenapi.RateLimitJson	true	"Rate limit creation request"
+// @Success		200		{object}	schemaapiopenapi.RateLimitJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		409		{object}	ErrorResponse
@@ -183,58 +169,28 @@ func (r *RateLimitsRoutes) create(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
-	var req CreateRateLimitRequestJson
-	if err := apgin.BindJSONBody(gctx, &req); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if req.Namespace == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("namespace is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	name, httpErr := optionalResourceName(req.Name, "rate limit")
-	if httpErr != nil {
-		apgin.WriteError(gctx, nil, httpErr)
-		val.MarkErrorReturn()
-		return
-	}
-
-	if err := val.ValidateNamespace(req.Namespace); err != nil {
+	var req rlschema.RateLimit
+	if err := apgin.BindResourceJSON(gctx, &req, meta.ValidationModeCreate); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
-	if err := req.Definition.Validate(); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid definition: %s", err.Error()))
+	if err := val.ValidateNamespace(req.Metadata.Namespace); err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
-	if req.Labels != nil {
-		if err := smeta.ValidateUserLabels(req.Labels); err != nil {
-			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid labels: %s", err.Error()))
-			val.MarkErrorReturn()
-			return
-		}
-	}
-
-	if req.Annotations != nil {
-		if err := database.Annotations(req.Annotations).Validate(); err != nil {
-			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid annotations: %s", err.Error()))
-			val.MarkErrorReturn()
-			return
-		}
-	}
-
-	rl, err := r.core.CreateRateLimit(ctx, req.Namespace, name, req.Definition, req.Labels, req.Annotations)
+	rl, err := r.core.CreateRateLimit(ctx, &req)
 	if err != nil {
-		if conflictErr := resourceNameConflictError(err, "rate limit", name, req.Namespace); conflictErr != nil {
+		if conflictErr := resourceNameConflictError(err, "rate limit", req.Metadata.Name, req.Metadata.Namespace); conflictErr != nil {
 			apgin.WriteError(gctx, nil, conflictErr)
+			val.MarkErrorReturn()
+			return
+		}
+		if errors.Is(err, core.ErrInvalidArgument) || errors.Is(err, core.ErrNotFound) {
+			apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
@@ -243,7 +199,10 @@ func (r *RateLimitsRoutes) create(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, RateLimitToJson(rl))
+	if err := apgin.RenderResourceJSON(gctx, http.StatusOK, RateLimitToResource(rl)); err != nil {
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+		val.MarkErrorReturn()
+	}
 }
 
 // @Summary		List rate limits
@@ -257,7 +216,7 @@ func (r *RateLimitsRoutes) create(gctx *gin.Context) {
 // @Param			name			query		string	false	"Filter by exact name"
 // @Param			labelSelector	query		string	false	"Filter by label selector"
 // @Param			orderBy		query		string	false	"Order by field (e.g., 'created_at:desc')"
-// @Success		200				{object}	OpenAPIListRateLimitsResponseJson
+// @Success		200				{object}	schemaapiopenapi.ListRateLimitsResponseJson
 // @Failure		400				{object}	ErrorResponse
 // @Failure		401				{object}	ErrorResponse
 // @Failure		500				{object}	ErrorResponse
@@ -335,19 +294,21 @@ func (r *RateLimitsRoutes) list(gctx *gin.Context) {
 	}
 
 	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewListRateLimitsResponseJson(
-		util.Map(auth.FilterForValidatedResources(val, result.Results), RateLimitToJson),
+		util.Map(auth.FilterForValidatedResources(val, result.Results), func(value coreIface.RateLimit) rlschema.RateLimit {
+			return *RateLimitToResource(value)
+		}),
 		result.Cursor,
 	))
 }
 
 // @Summary		Update rate limit
-// @Description	Update a rate limit's name, definition, labels, or annotations
+// @Description	Update a rate limit's name, spec, labels, or annotations
 // @Tags			rate_limits
 // @Accept			json
 // @Produce		json
 // @Param			id		path		string							true	"Rate limit ID"
-// @Param			request	body		OpenAPIUpdateRateLimitRequestJson		true	"Update request"
-// @Success		200		{object}	OpenAPIRateLimitJson
+// @Param			request	body		schemaapiopenapi.RateLimitPatchJson	true	"Update request"
+// @Success		200		{object}	schemaapiopenapi.RateLimitJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		404		{object}	ErrorResponse
@@ -366,35 +327,11 @@ func (r *RateLimitsRoutes) update(gctx *gin.Context) {
 		return
 	}
 
-	var req UpdateRateLimitRequestJson
-	if err := apgin.BindJSONBody(gctx, &req); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
+	var req rlschema.RateLimitPatch
+	if err := apgin.BindResourceJSON(gctx, &req, meta.ValidationModeUpdate); err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
-	}
-
-	if req.Definition != nil {
-		if err := req.Definition.Validate(); err != nil {
-			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid definition: %s", err.Error()))
-			val.MarkErrorReturn()
-			return
-		}
-	}
-
-	if req.Labels != nil {
-		if err := smeta.ValidateUserLabels(*req.Labels); err != nil {
-			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid labels: %s", err.Error()))
-			val.MarkErrorReturn()
-			return
-		}
-	}
-
-	if req.Annotations != nil {
-		if err := database.Annotations(*req.Annotations).Validate(); err != nil {
-			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid annotations: %s", err.Error()))
-			val.MarkErrorReturn()
-			return
-		}
 	}
 
 	rl, err := r.core.GetRateLimit(ctx, id)
@@ -414,49 +351,30 @@ func (r *RateLimitsRoutes) update(gctx *gin.Context) {
 		return
 	}
 
-	if req.Name != nil {
-		name, httpErr := optionalResourceName(req.Name, "rate limit")
-		if httpErr != nil {
-			apgin.WriteError(gctx, nil, httpErr)
-			val.MarkErrorReturn()
-			return
-		}
-		if _, err := r.core.UpdateRateLimitName(ctx, id, name); err != nil {
-			if conflictErr := resourceNameConflictError(err, "rate limit", name, rl.GetNamespace()); conflictErr != nil {
+	updated, err := req.ApplyTo(rl.GetResource(), nil)
+	if err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
+		val.MarkErrorReturn()
+		return
+	}
+
+	originalNamespace := rl.GetNamespace()
+	rl, err = r.core.UpdateRateLimit(ctx, id, updated)
+	if err != nil {
+		if req.Metadata.Name != nil {
+			if conflictErr := resourceNameConflictError(err, "rate limit", *req.Metadata.Name, originalNamespace); conflictErr != nil {
 				apgin.WriteError(gctx, nil, conflictErr)
 				val.MarkErrorReturn()
 				return
 			}
-			r.handleMutateError(gctx, val, id, err)
-			return
 		}
-	}
-
-	if req.Definition != nil {
-		if _, err := r.core.UpdateRateLimitDefinition(ctx, id, *req.Definition); err != nil {
-			r.handleMutateError(gctx, val, id, err)
-			return
-		}
-	}
-
-	if req.Labels != nil {
-		if _, err := r.core.UpdateRateLimitLabels(ctx, id, *req.Labels); err != nil {
-			r.handleMutateError(gctx, val, id, err)
-			return
-		}
-	}
-
-	if req.Annotations != nil {
-		if _, err := r.core.UpdateRateLimitAnnotations(ctx, id, *req.Annotations); err != nil {
-			r.handleMutateError(gctx, val, id, err)
-			return
-		}
-	}
-
-	rl, err = r.core.GetRateLimit(ctx, id)
-	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
 			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("rate limit '%s' not found", id), httperr.WithInternalErr(err)))
+			val.MarkErrorReturn()
+			return
+		}
+		if errors.Is(err, core.ErrInvalidArgument) {
+			apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
@@ -465,17 +383,10 @@ func (r *RateLimitsRoutes) update(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, RateLimitToJson(rl))
-}
-
-func (r *RateLimitsRoutes) handleMutateError(gctx *gin.Context, val *auth.ResourcePermissionValidator, id apid.ID, err error) {
-	if errors.Is(err, core.ErrNotFound) {
-		apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("rate limit '%s' not found", id), httperr.WithInternalErr(err)))
+	if err := apgin.RenderResourceJSON(gctx, http.StatusOK, RateLimitToResource(rl)); err != nil {
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
-		return
 	}
-	apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
-	val.MarkErrorReturn()
 }
 
 // @Summary		Delete rate limit
@@ -536,8 +447,8 @@ func (r *RateLimitsRoutes) delete(gctx *gin.Context) {
 // @Tags			rate_limits
 // @Accept			json
 // @Produce		json
-// @Param			request	body		OpenAPIDryRunRequestJson	true	"Dry-run input"
-// @Success		200		{object}	OpenAPIDryRunResponseJson
+// @Param			request	body		schemaapiopenapi.DryRunRequestJson	true	"Dry-run input"
+// @Success		200		{object}	schemaapiopenapi.DryRunResponseJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		403		{object}	ErrorResponse
@@ -549,7 +460,7 @@ func (r *RateLimitsRoutes) dryRun(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
-	var req DryRunRequestJson
+	var req schemaapi.DryRunRequestJson
 	if err := apgin.BindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()

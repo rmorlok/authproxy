@@ -42,6 +42,7 @@ func Test_SchemaAgainstRealData(t *testing.T) {
 	_ = loadSchema(t, c, "../resources/connectors/schema-oauth.json")
 	_ = loadSchema(t, c, "../resources/connectors/schema.json")
 	_ = loadSchema(t, c, "../resources/key/schema.json")
+	_ = loadSchema(t, c, "../resources/rate_limit/schema.json")
 	schemaId := loadSchema(t, c, "./schema.json")
 
 	require.Equal(t, SchemaIdConfig, schemaId, "schema ID should be the same as the one in the schema")
@@ -106,6 +107,7 @@ func Test_SchemaAppMetricsShape(t *testing.T) {
 	_ = loadSchema(t, c, "../resources/connectors/schema-oauth.json")
 	_ = loadSchema(t, c, "../resources/connectors/schema.json")
 	_ = loadSchema(t, c, "../resources/key/schema.json")
+	_ = loadSchema(t, c, "../resources/rate_limit/schema.json")
 	schemaId := loadSchema(t, c, "./schema.json")
 
 	schema, err := c.Compile(schemaId)
@@ -172,6 +174,7 @@ func compileTestSchema(t *testing.T, schemaJSON string) *jsonschemav5.Schema {
 	_ = loadSchema(t, c, "../resources/connectors/schema-oauth.json")
 	_ = loadSchema(t, c, "../resources/connectors/schema.json")
 	_ = loadSchema(t, c, "../resources/key/schema.json")
+	_ = loadSchema(t, c, "../resources/rate_limit/schema.json")
 
 	sid := loadSchema(t, c, "./schema.json")
 	require.Equal(t, SchemaIdConfig, sid)
@@ -1017,6 +1020,49 @@ func TestSchemaDefinitions(t *testing.T) {
 					Name:  "connector without id or name",
 					Valid: false,
 					Data:  `{"test":{"loadFromList":[{"apiVersion":"authproxy.net/v1alpha1","kind":"Connector","metadata":{"labels":{}},"spec":{"definition":{"displayName":"Example","logo":{"publicUrl":"https://example.com/logo.svg"},"auth":{"type":"no-auth"}}}}]}}`,
+				},
+				{
+					Name:  "extra property",
+					Valid: false,
+					Data:  `{"test": {"extra": "field"}}`,
+				},
+			},
+		},
+		{
+			Name: "RateLimits",
+			Schema: `
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/schema/config/test.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["test"],
+  "properties": {
+	"test": {
+		"$ref": "./schema.json#/$defs/RateLimits"
+    }
+  }
+}`,
+			Tests: []test{
+				{
+					Name:  "minimal",
+					Valid: true,
+					Data:  `{"test": {}}`,
+				},
+				{
+					Name:  "canonical resource",
+					Valid: true,
+					Data:  `{"test":{"loadFromList":[{"apiVersion":"authproxy.net/v1alpha1","kind":"RateLimit","metadata":{"name":"tenant-default","namespace":"root.acme"},"spec":{"selector":{},"bucket":{},"algorithm":{"tokenBucket":{"capacity":10,"refillRate":1}}}}]}}`,
+				},
+				{
+					Name:  "resource without id or name",
+					Valid: false,
+					Data:  `{"test":{"loadFromList":[{"apiVersion":"authproxy.net/v1alpha1","kind":"RateLimit","metadata":{"namespace":"root.acme"},"spec":{"selector":{},"bucket":{},"algorithm":{"tokenBucket":{"capacity":10,"refillRate":1}}}}]}}`,
+				},
+				{
+					Name:  "legacy flat resource",
+					Valid: false,
+					Data:  `{"test":{"loadFromList":[{"name":"tenant-default","namespace":"root.acme","definition":{"selector":{},"bucket":{},"algorithm":{"tokenBucket":{"capacity":10,"refillRate":1}}}}]}}`,
 				},
 				{
 					Name:  "extra property",

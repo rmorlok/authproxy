@@ -23,13 +23,14 @@ import (
 
 const RateLimitsTable = "rate_limits"
 
-// RateLimit is the database envelope for a rate-limit resource. Definition
-// holds the JSON-serialised configuration (mode, selector, bucket, algorithm).
+// RateLimit is the flat persistence model for a canonical RateLimit resource.
+// Definition stores only RateLimitSpec in the existing JSON column; core owns
+// conversion to and from apiVersion/kind/metadata/spec/status.
 type RateLimit struct {
 	Id          apid.ID
 	Namespace   string
 	Name        scommon.ResourceName
-	Definition  rlschema.RateLimit
+	Definition  rlschema.RateLimitSpec
 	Labels      Labels
 	Annotations Annotations
 	CreatedAt   time.Time
@@ -89,12 +90,12 @@ func (rl *RateLimit) normalize() {
 	}
 }
 
-// rateLimitDefDB is a database-side wrapper around rlschema.RateLimit that
+// rateLimitDefDB is a database-side wrapper around rlschema.RateLimitSpec that
 // implements driver.Valuer and sql.Scanner for the definition column.
-type rateLimitDefDB rlschema.RateLimit
+type rateLimitDefDB rlschema.RateLimitSpec
 
 func (d rateLimitDefDB) Value() (driver.Value, error) {
-	return json.Marshal(rlschema.RateLimit(d))
+	return json.Marshal(rlschema.RateLimitSpec(d))
 }
 
 func (d *rateLimitDefDB) Scan(src interface{}) error {
@@ -109,7 +110,7 @@ func (d *rateLimitDefDB) Scan(src interface{}) error {
 	default:
 		return fmt.Errorf("rateLimitDefDB: cannot scan %T", src)
 	}
-	return json.Unmarshal(b, (*rlschema.RateLimit)(d))
+	return json.Unmarshal(b, (*rlschema.RateLimitSpec)(d))
 }
 
 func (rl *RateLimit) Validate() error {
@@ -216,7 +217,7 @@ func (s *service) CreateRateLimit(ctx context.Context, rl *RateLimit) error {
 // UpdateRateLimitDefinition replaces the definition column. The caller is
 // responsible for validation; this method runs Validate() on a candidate
 // RateLimit so misconfigured definitions never reach the database.
-func (s *service) UpdateRateLimitDefinition(ctx context.Context, id apid.ID, def rlschema.RateLimit) (*RateLimit, error) {
+func (s *service) UpdateRateLimitDefinition(ctx context.Context, id apid.ID, def rlschema.RateLimitSpec) (*RateLimit, error) {
 	if id.IsNil() {
 		return nil, errors.New("rate limit id is required")
 	}

@@ -215,7 +215,48 @@
       },
       "description": "Tagged union: exactly one of fixed_window, sliding_window, or token_bucket."
     },
-    "RateLimit": {
+    "ConnectorReference": {
+      "allOf": [
+        { "$ref": "../meta/schema.json#/$defs/ObjectReference" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "Connector" },
+            "id": { "type": "string", "pattern": "^cxr_" },
+            "namespace": { "$ref": "../namespace/schema.json#/$defs/NamespacePath" }
+          }
+        }
+      ]
+    },
+    "ConnectionReference": {
+      "allOf": [
+        { "$ref": "../meta/schema.json#/$defs/ObjectReference" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "Connection" },
+            "id": { "type": "string", "pattern": "^cxn_" },
+            "namespace": { "$ref": "../namespace/schema.json#/$defs/NamespacePath" },
+            "generation": { "const": 0 }
+          }
+        }
+      ]
+    },
+    "RateLimitScope": {
+      "type": "object",
+      "oneOf": [
+        { "required": ["connectorRef"] },
+        { "required": ["connectionRef"] }
+      ],
+      "properties": {
+        "connectorRef": { "$ref": "#/$defs/ConnectorReference" },
+        "connectionRef": { "$ref": "#/$defs/ConnectionReference" }
+      },
+      "additionalProperties": false
+    },
+    "RateLimitSpec": {
       "type": "object",
       "required": [
         "selector",
@@ -224,6 +265,9 @@
       ],
       "additionalProperties": false,
       "properties": {
+        "scope": {
+          "$ref": "#/$defs/RateLimitScope"
+        },
         "mode": {
           "$ref": "#/$defs/Mode"
         },
@@ -237,7 +281,84 @@
           "$ref": "#/$defs/Algorithm"
         }
       },
-      "description": "The JSON-serialised definition payload of a RateLimit resource. Envelope fields (id, namespace, labels, annotations, timestamps) are not part of the definition itself."
+      "description": "Desired matching, bucketing, and limiting policy for a RateLimit resource."
+    },
+    "RateLimitStatus": {
+      "type": "object",
+      "properties": {
+        "effectiveMode": { "$ref": "#/$defs/Mode" }
+      },
+      "required": ["effectiveMode"],
+      "additionalProperties": false
+    },
+    "RateLimitSpecPatch": {
+      "type": "object",
+      "properties": {
+        "scope": {
+          "anyOf": [
+            { "$ref": "#/$defs/RateLimitScope" },
+            { "type": "null" }
+          ]
+        },
+        "mode": { "$ref": "#/$defs/Mode" },
+        "selector": { "$ref": "#/$defs/Selector" },
+        "bucket": { "$ref": "#/$defs/Bucket" },
+        "algorithm": { "$ref": "#/$defs/Algorithm" }
+      },
+      "additionalProperties": false
+    },
+    "RateLimitPatch": {
+      "allOf": [
+        { "$ref": "../meta/schema.json#/$defs/Resource" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "RateLimit" },
+            "metadata": {
+              "allOf": [
+                { "$ref": "../meta/schema.json#/$defs/ObjectMetaPatch" },
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "pattern": "^rl_" },
+                    "namespace": { "$ref": "../namespace/schema.json#/$defs/NamespacePath" }
+                  }
+                }
+              ]
+            },
+            "spec": { "$ref": "#/$defs/RateLimitSpecPatch" },
+            "status": { "$ref": "#/$defs/RateLimitStatus" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
     }
-  }
+  },
+  "allOf": [
+    { "$ref": "../meta/schema.json#/$defs/Resource" },
+    {
+      "type": "object",
+      "properties": {
+        "apiVersion": { "const": "authproxy.net/v1alpha1" },
+        "kind": { "const": "RateLimit" },
+        "metadata": {
+          "allOf": [
+            { "$ref": "../meta/schema.json#/$defs/ObjectMeta" },
+            {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string", "pattern": "^rl_" },
+                "namespace": { "$ref": "../namespace/schema.json#/$defs/NamespacePath" }
+              },
+              "required": ["namespace"]
+            }
+          ]
+        },
+        "spec": { "$ref": "#/$defs/RateLimitSpec" },
+        "status": { "$ref": "#/$defs/RateLimitStatus" }
+      }
+    }
+  ],
+  "unevaluatedProperties": false
 }

@@ -316,19 +316,71 @@ type KeyPatchJson struct {
 	Status     *keyschema.KeyStatus  `json:"status,omitempty"`
 }
 
-// RateLimitJson documents a rate-limit response while keeping the definition
-// opaque for swaggo.
+type RateLimitPathMatchJson struct {
+	Kind  string `json:"kind" enums:"prefix,glob,regex"`
+	Value string `json:"value"`
+}
+
+type RateLimitSelectorJson struct {
+	LabelSelector string                  `json:"labelSelector,omitempty"`
+	Methods       []string                `json:"methods,omitempty"`
+	PathMatch     *RateLimitPathMatchJson `json:"pathMatch,omitempty"`
+	RequestTypes  []string                `json:"requestTypes,omitempty" enums:"global,proxy,oauth,public,probe"`
+}
+
+type RateLimitBucketJson struct {
+	Dimensions []string `json:"dimensions,omitempty"`
+}
+
+type RateLimitFixedWindowJson struct {
+	Window string `json:"window" example:"1m"`
+	Limit  int    `json:"limit" example:"100"`
+}
+
+type RateLimitSlidingWindowJson struct {
+	Window string `json:"window" example:"1m"`
+	Limit  int    `json:"limit" example:"100"`
+	Mode   string `json:"mode" enums:"log,counter"`
+}
+
+type RateLimitTokenBucketJson struct {
+	Capacity   int     `json:"capacity" example:"60"`
+	RefillRate float64 `json:"refillRate" example:"1"`
+}
+
+type RateLimitAlgorithmJson struct {
+	FixedWindow   *RateLimitFixedWindowJson   `json:"fixedWindow,omitempty"`
+	SlidingWindow *RateLimitSlidingWindowJson `json:"slidingWindow,omitempty"`
+	TokenBucket   *RateLimitTokenBucketJson   `json:"tokenBucket,omitempty"`
+}
+
+type RateLimitScopeJson struct {
+	ConnectorRef  *meta.ObjectReference `json:"connectorRef,omitempty"`
+	ConnectionRef *meta.ObjectReference `json:"connectionRef,omitempty"`
+}
+
+type RateLimitSpecJson struct {
+	Scope     *RateLimitScopeJson    `json:"scope,omitempty"`
+	Mode      string                 `json:"mode,omitempty" enums:"enforce,observe"`
+	Selector  RateLimitSelectorJson  `json:"selector" binding:"required"`
+	Bucket    RateLimitBucketJson    `json:"bucket" binding:"required"`
+	Algorithm RateLimitAlgorithmJson `json:"algorithm" binding:"required"`
+}
+
+type RateLimitStatusJson struct {
+	EffectiveMode string `json:"effectiveMode" enums:"enforce,observe"`
+}
+
+// RateLimitJson documents a canonical rate-limit resource without exposing
+// runtime-only schema implementations to swaggo's dependency walker.
 //
-//	@Description	Rate-limit API response
+//	@Description	Kubernetes-style RateLimit resource
 type RateLimitJson struct {
-	Id          apid.ID           `json:"id" swaggertype:"string" example:"rl_test550e8400abcde"`
-	Namespace   string            `json:"namespace" example:"root.acme"`
-	Name        string            `json:"name" example:"public-api"`
-	Definition  map[string]any    `json:"definition"`
-	Labels      map[string]string `json:"labels,omitempty"`
-	Annotations map[string]string `json:"annotations,omitempty"`
-	CreatedAt   time.Time         `json:"createdAt"`
-	UpdatedAt   time.Time         `json:"updatedAt"`
+	APIVersion string               `json:"apiVersion" binding:"required" enums:"authproxy.net/v1alpha1" example:"authproxy.net/v1alpha1"`
+	Kind       string               `json:"kind" binding:"required" enums:"RateLimit" example:"RateLimit"`
+	Metadata   meta.ObjectMeta      `json:"metadata" binding:"required"`
+	Spec       RateLimitSpecJson    `json:"spec" binding:"required"`
+	Status     *RateLimitStatusJson `json:"status,omitempty"`
 }
 
 // ListRateLimitsResponseJson documents the paginated rate-limit list response.
@@ -339,25 +391,24 @@ type ListRateLimitsResponseJson struct {
 	Items []RateLimitJson `json:"items" binding:"required"`
 }
 
-// CreateRateLimitRequestJson documents the rate-limit creation body.
-//
-//	@Description	Request to create a rate limit
-type CreateRateLimitRequestJson struct {
-	Namespace   string            `json:"namespace" example:"root.acme"`
-	Name        *string           `json:"name,omitempty" example:"public-api"`
-	Definition  map[string]any    `json:"definition"`
-	Labels      map[string]string `json:"labels,omitempty"`
-	Annotations map[string]string `json:"annotations,omitempty"`
+// RateLimitSpecPatchJson documents mutable desired rate-limit policy.
+type RateLimitSpecPatchJson struct {
+	Scope     *RateLimitScopeJson     `json:"scope,omitempty"`
+	Mode      *string                 `json:"mode,omitempty" enums:"enforce,observe"`
+	Selector  *RateLimitSelectorJson  `json:"selector,omitempty"`
+	Bucket    *RateLimitBucketJson    `json:"bucket,omitempty"`
+	Algorithm *RateLimitAlgorithmJson `json:"algorithm,omitempty"`
 }
 
-// UpdateRateLimitRequestJson documents the rate-limit update body.
+// RateLimitPatchJson documents a canonical rate-limit update.
 //
-//	@Description	Request to update a rate limit
-type UpdateRateLimitRequestJson struct {
-	Name        *string            `json:"name,omitempty" example:"public-api"`
-	Definition  map[string]any     `json:"definition,omitempty"`
-	Labels      *map[string]string `json:"labels,omitempty"`
-	Annotations *map[string]string `json:"annotations,omitempty"`
+//	@Description	Kubernetes-style RateLimit patch. Status and server-owned metadata are rejected.
+type RateLimitPatchJson struct {
+	APIVersion string                  `json:"apiVersion" binding:"required" enums:"authproxy.net/v1alpha1" example:"authproxy.net/v1alpha1"`
+	Kind       string                  `json:"kind" binding:"required" enums:"RateLimit" example:"RateLimit"`
+	Metadata   *meta.ObjectMetaPatch   `json:"metadata" binding:"required"`
+	Spec       *RateLimitSpecPatchJson `json:"spec" binding:"required"`
+	Status     *RateLimitStatusJson    `json:"status,omitempty"`
 }
 
 // ProxyRequestJson documents the proxy-shaped request used by dry-run.

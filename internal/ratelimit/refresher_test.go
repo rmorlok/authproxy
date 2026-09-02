@@ -15,8 +15,8 @@ import (
 	clock "k8s.io/utils/clock/testing"
 )
 
-func minimalRateLimitDef() rlschema.RateLimit {
-	return rlschema.RateLimit{
+func minimalRateLimitDef() rlschema.RateLimitSpec {
+	return rlschema.RateLimitSpec{
 		Selector: rlschema.Selector{},
 		Bucket:   rlschema.Bucket{},
 		Algorithm: rlschema.Algorithm{

@@ -13,6 +13,13 @@ resource "authproxy_rate_limit" "team_acme_salesforce_writes" {
     owner = "platform@example.com"
   }
 
+  # Omit generation to apply to every Salesforce connector version.
+  scope {
+    connector_ref {
+      id = authproxy_connector.salesforce.id
+    }
+  }
+
   selector {
     label_selector = "apxy/connector/-/id=salesforce"
     methods        = ["POST", "PATCH", "PUT"]

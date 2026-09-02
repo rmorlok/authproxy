@@ -252,8 +252,8 @@ VALUES
 	require.NoError(t, err)
 }
 
-func validSnapshotRateLimitDef() rlschema.RateLimit {
-	return rlschema.RateLimit{
+func validSnapshotRateLimitDef() rlschema.RateLimitSpec {
+	return rlschema.RateLimitSpec{
 		Mode: rlschema.ModeObserve,
 		Selector: rlschema.Selector{
 			Methods:      []string{"GET"},

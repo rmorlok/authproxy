@@ -21,7 +21,7 @@ import (
 //   - a non-nil error only for malformed rule data that escaped schema
 //     validation (e.g. an uncompilable regex). Callers should log + skip
 //     such rules — they shouldn't be able to reach the runtime.
-func Match(rule rlschema.RateLimit, ctx *RequestContext) (matched bool, key BucketKey, err error) {
+func Match(rule rlschema.RateLimitSpec, ctx *RequestContext) (matched bool, key BucketKey, err error) {
 	matched, key, _, err = MatchExplain(rule, ctx)
 	return
 }
@@ -34,9 +34,23 @@ func Match(rule rlschema.RateLimit, ctx *RequestContext) (matched bool, key Buck
 // verbatim. The same clause priority used by Match is preserved: the
 // first clause that fails wins (request_type → method → label_selector
 // → path_match).
-func MatchExplain(rule rlschema.RateLimit, ctx *RequestContext) (matched bool, key BucketKey, reason string, err error) {
+func MatchExplain(rule rlschema.RateLimitSpec, ctx *RequestContext) (matched bool, key BucketKey, reason string, err error) {
 	if ctx == nil {
 		return false, BucketKey{}, "request context not provided", nil
+	}
+
+	if rule.Scope != nil {
+		if ref := rule.Scope.ConnectionRef; ref != nil && ref.ID != ctx.ConnectionID.String() {
+			return false, BucketKey{}, fmt.Sprintf("connection %q does not match scoped connection %q", ctx.ConnectionID, ref.ID), nil
+		}
+		if ref := rule.Scope.ConnectorRef; ref != nil {
+			if ref.ID != ctx.ConnectorID.String() {
+				return false, BucketKey{}, fmt.Sprintf("connector %q does not match scoped connector %q", ctx.ConnectorID, ref.ID), nil
+			}
+			if ref.Generation != 0 && ref.Generation != ctx.ConnectorVersion {
+				return false, BucketKey{}, fmt.Sprintf("connector generation %d does not match scoped generation %d", ctx.ConnectorVersion, ref.Generation), nil
+			}
+		}
 	}
 
 	allowedTypes := rule.Selector.EffectiveRequestTypes()

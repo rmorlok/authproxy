@@ -4,7 +4,7 @@ This package contains endpoint-specific API request and response DTOs plus share
 
 Canonical resources and their resource-specific patches live in `internal/schema/resources/...`; routes use those types directly when the entire body is the resource or patch. Do not add aliases here merely to rename a resource for a particular endpoint. API models may compose shared primitives from `internal/schema/common` and resource models from `internal/schema/resources/...`. Resource packages must not import this package.
 
-Rate-limit API envelopes, pagination responses, and dry-run DTOs live here while the reusable rate-limit definition remains in `internal/schema/resources/rate_limit`. Encryption-key API DTOs live here too; key material syntax composes `internal/schema/resources/key.KeyData`, and the API exposes its own state enum rather than database storage types.
+Rate-limit resources and patches live in `internal/schema/resources/rate_limit`; this package owns only the rate-limit list transport and dry-run DTOs. Encryption-key API DTOs live here too; key material syntax composes `internal/schema/resources/key.KeyData`, and the API exposes its own state enum rather than database storage types.
 
 Auxiliary route DTOs also belong here: session initiation, request-events list envelopes, task status and monitoring responses, and shared label/annotation key-value bodies. Keep route packages focused on binding, validation, authorization, and conversion to/from service-layer types.
 

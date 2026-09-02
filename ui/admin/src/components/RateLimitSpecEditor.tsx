@@ -6,19 +6,19 @@ import { useTheme } from '@mui/material/styles';
 import CodeMirror from '@uiw/react-codemirror';
 import { json as jsonMode } from '@codemirror/lang-json';
 import { oneDark } from '@codemirror/theme-one-dark';
-import { RateLimitDefinition } from '@authproxy/api';
-import RateLimitDefinitionForm from './RateLimitDefinitionForm';
+import { RateLimitSpec } from '@authproxy/api';
+import RateLimitSpecForm from './RateLimitSpecForm';
 
 interface Props {
-    value: RateLimitDefinition;
-    onChange: (next: RateLimitDefinition) => void;
+    value: RateLimitSpec;
+    onChange: (next: RateLimitSpec) => void;
 }
 
 // Tabbed editor: structured form (default) + read-only JSON preview using
 // the same CodeMirror + one-dark setup that ConnectorVersionDetail uses.
 // Keeping the JSON view read-only sidesteps the round-trip headaches of
 // parsing arbitrary edits back into the structured form.
-export default function RateLimitDefinitionEditor({ value, onChange }: Props) {
+export default function RateLimitSpecEditor({ value, onChange }: Props) {
     const theme = useTheme();
     const [tab, setTab] = useState<'form' | 'json'>('form');
 
@@ -30,7 +30,7 @@ export default function RateLimitDefinitionEditor({ value, onChange }: Props) {
             </Tabs>
 
             {tab === 'form' && (
-                <RateLimitDefinitionForm value={value} onChange={onChange} />
+                <RateLimitSpecForm value={value} onChange={onChange} />
             )}
 
             {tab === 'json' && (

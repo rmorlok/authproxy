@@ -6,11 +6,13 @@ import (
 	"time"
 )
 
-// Wire models for the rate-limit resource. These mirror the server-side
-// `routes.RateLimitJson` and `rlschema.RateLimit` shapes, but are defined
-// locally so the TF provider binary doesn't pull in the full internal
-// schema package. Field names use the same `json:` tags the server emits.
+const (
+	RateLimitAPIVersion = "authproxy.net/v1alpha1"
+	RateLimitKind       = "RateLimit"
+)
 
+// These local wire models keep the Terraform provider independent from the
+// server's internal packages while mirroring its canonical resource contract.
 type RateLimitPathMatch struct {
 	Kind  string `json:"kind"`
 	Value string `json:"value"`
@@ -43,49 +45,85 @@ type RateLimitTokenBucket struct {
 	RefillRate float64 `json:"refillRate"`
 }
 
-// RateLimitAlgorithm is a tagged union: exactly one variant is set per
-// rule. The server's schema validator enforces this at write time; the
-// provider-side ConfigValidator on the resource enforces it at plan time
-// so authors see the error before \`terraform apply\`.
 type RateLimitAlgorithm struct {
 	FixedWindow   *RateLimitFixedWindow   `json:"fixedWindow,omitempty"`
 	SlidingWindow *RateLimitSlidingWindow `json:"slidingWindow,omitempty"`
 	TokenBucket   *RateLimitTokenBucket   `json:"tokenBucket,omitempty"`
 }
 
-// RateLimitDefinition is the JSON-serialised "definition" payload of a
-// RateLimit resource.
-type RateLimitDefinition struct {
+type ObjectReference struct {
+	APIVersion string `json:"apiVersion"`
+	Kind       string `json:"kind"`
+	ID         string `json:"id,omitempty"`
+	Name       string `json:"name,omitempty"`
+	Namespace  string `json:"namespace,omitempty"`
+	Generation uint64 `json:"generation,omitempty"`
+}
+
+type RateLimitScope struct {
+	ConnectorRef  *ObjectReference `json:"connectorRef,omitempty"`
+	ConnectionRef *ObjectReference `json:"connectionRef,omitempty"`
+}
+
+type RateLimitSpec struct {
+	Scope     *RateLimitScope    `json:"scope,omitempty"`
 	Mode      string             `json:"mode,omitempty"`
 	Selector  RateLimitSelector  `json:"selector"`
 	Bucket    RateLimitBucket    `json:"bucket"`
 	Algorithm RateLimitAlgorithm `json:"algorithm"`
 }
 
-// RateLimit is the server's RateLimitJson envelope.
+type RateLimitMetadata struct {
+	ID          string            `json:"id,omitempty"`
+	Name        string            `json:"name,omitempty"`
+	Namespace   string            `json:"namespace,omitempty"`
+	Labels      map[string]string `json:"labels,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
+	CreatedAt   *time.Time        `json:"createdAt,omitempty"`
+	UpdatedAt   *time.Time        `json:"updatedAt,omitempty"`
+}
+
+type RateLimitMetadataPatch struct {
+	Name        *string            `json:"name,omitempty"`
+	Labels      *map[string]string `json:"labels,omitempty"`
+	Annotations *map[string]string `json:"annotations,omitempty"`
+}
+
+type RateLimitStatus struct {
+	EffectiveMode string `json:"effectiveMode"`
+}
+
 type RateLimit struct {
-	Id          string              `json:"id"`
-	Namespace   string              `json:"namespace"`
-	Definition  RateLimitDefinition `json:"definition"`
-	Labels      map[string]string   `json:"labels,omitempty"`
-	Annotations map[string]string   `json:"annotations,omitempty"`
-	CreatedAt   time.Time           `json:"createdAt"`
-	UpdatedAt   time.Time           `json:"updatedAt"`
+	APIVersion string            `json:"apiVersion"`
+	Kind       string            `json:"kind"`
+	Metadata   RateLimitMetadata `json:"metadata"`
+	Spec       RateLimitSpec     `json:"spec"`
+	Status     *RateLimitStatus  `json:"status,omitempty"`
 }
 
 type CreateRateLimitRequest struct {
-	Namespace   string              `json:"namespace"`
-	Definition  RateLimitDefinition `json:"definition"`
-	Labels      map[string]string   `json:"labels,omitempty"`
-	Annotations map[string]string   `json:"annotations,omitempty"`
+	APIVersion string            `json:"apiVersion"`
+	Kind       string            `json:"kind"`
+	Metadata   RateLimitMetadata `json:"metadata"`
+	Spec       RateLimitSpec     `json:"spec"`
 }
 
-// UpdateRateLimitRequest uses pointers so the provider can send partial
-// updates (only changed fields land in the body). nil = "no change".
+type RateLimitSpecPatch struct {
+	// Scope is intentionally not omitted when nil. Provider updates send the
+	// complete desired spec, so a nil scope must be encoded as JSON null to
+	// clear a previously configured connector or connection scope.
+	Scope     *RateLimitScope     `json:"scope"`
+	Mode      *string             `json:"mode,omitempty"`
+	Selector  *RateLimitSelector  `json:"selector,omitempty"`
+	Bucket    *RateLimitBucket    `json:"bucket,omitempty"`
+	Algorithm *RateLimitAlgorithm `json:"algorithm,omitempty"`
+}
+
 type UpdateRateLimitRequest struct {
-	Definition  *RateLimitDefinition `json:"definition,omitempty"`
-	Labels      *map[string]string   `json:"labels,omitempty"`
-	Annotations *map[string]string   `json:"annotations,omitempty"`
+	APIVersion string                  `json:"apiVersion"`
+	Kind       string                  `json:"kind"`
+	Metadata   *RateLimitMetadataPatch `json:"metadata"`
+	Spec       *RateLimitSpecPatch     `json:"spec"`
 }
 
 func (c *Client) CreateRateLimit(ctx context.Context, req CreateRateLimitRequest) (*RateLimit, error) {

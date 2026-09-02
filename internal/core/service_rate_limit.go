@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"net/url"
+	"reflect"
 	"strings"
 
 	"github.com/rmorlok/authproxy/internal/apid"
@@ -12,6 +14,8 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/ratelimit"
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -27,14 +31,22 @@ func (s *service) GetRateLimit(ctx context.Context, id apid.ID) (iface.RateLimit
 	return wrapRateLimit(*rl, s), nil
 }
 
-func (s *service) CreateRateLimit(ctx context.Context, namespace string, name common.ResourceName, def rlschema.RateLimit, labels, annotations map[string]string) (iface.RateLimit, error) {
-	rl := &database.RateLimit{
-		Id:          apid.New(apid.PrefixRateLimit),
-		Namespace:   namespace,
-		Name:        name,
-		Definition:  def,
-		Labels:      database.Labels(labels),
-		Annotations: database.Annotations(annotations),
+func (s *service) CreateRateLimit(ctx context.Context, resource *rlschema.RateLimit) (iface.RateLimit, error) {
+	if resource == nil {
+		return nil, fmt.Errorf("rate limit cannot be nil")
+	}
+	if err := resource.ValidateFor(meta.ValidationModeCreate, nil); err != nil {
+		return nil, err
+	}
+
+	id := apid.New(apid.PrefixRateLimit)
+	normalized := resource.ApplyCreateDefaults(id)
+	if err := s.normalizeRateLimitScope(ctx, normalized); err != nil {
+		return nil, err
+	}
+	rl, err := databaseRateLimitFromResource(normalized, id)
+	if err != nil {
+		return nil, err
 	}
 
 	if err := s.db.CreateRateLimit(ctx, rl); err != nil {
@@ -43,26 +55,190 @@ func (s *service) CreateRateLimit(ctx context.Context, namespace string, name co
 	return wrapRateLimit(*rl, s), nil
 }
 
-func (s *service) UpdateRateLimitName(ctx context.Context, id apid.ID, name common.ResourceName) (iface.RateLimit, error) {
-	rl, err := s.db.UpdateRateLimitName(ctx, id, name)
+// UpdateRateLimit applies the desired resource envelope while keeping the
+// existing flat database model behind the core boundary.
+func (s *service) UpdateRateLimit(ctx context.Context, id apid.ID, resource *rlschema.RateLimit) (iface.RateLimit, error) {
+	if resource == nil {
+		return nil, fmt.Errorf("rate limit cannot be nil")
+	}
+	existing, err := s.GetRateLimit(ctx, id)
 	if err != nil {
-		if errors.Is(err, database.ErrNotFound) {
-			return nil, ErrNotFound
-		}
 		return nil, err
 	}
-	return wrapRateLimit(*rl, s), nil
+	before := existing.GetResource()
+	if err := rlschema.ValidateUpdate(before, resource, nil); err != nil {
+		return nil, err
+	}
+
+	normalized := resource.Clone()
+	if err := s.normalizeRateLimitScope(ctx, normalized); err != nil {
+		return nil, err
+	}
+	// Status is derived from spec, never accepted as desired state.
+	normalized.Status = &rlschema.RateLimitStatus{EffectiveMode: normalized.Spec.EffectiveMode()}
+	if err := normalized.ValidateFor(meta.ValidationModePersistence, nil); err != nil {
+		return nil, err
+	}
+
+	if before.Metadata.Name != normalized.Metadata.Name {
+		if _, err := s.db.UpdateRateLimitName(ctx, id, normalized.Metadata.Name); err != nil {
+			return nil, mapRateLimitDatabaseError(err)
+		}
+	}
+	if !rateLimitSpecsEqual(before.Spec, normalized.Spec) {
+		if _, err := s.db.UpdateRateLimitDefinition(ctx, id, normalized.Spec); err != nil {
+			return nil, mapRateLimitDatabaseError(err)
+		}
+	}
+	if !maps.Equal(before.Metadata.Labels, normalized.Metadata.Labels) {
+		if _, err := s.db.UpdateRateLimitLabels(ctx, id, normalized.Metadata.Labels); err != nil {
+			return nil, mapRateLimitDatabaseError(err)
+		}
+	}
+	if !maps.Equal(before.Metadata.Annotations, normalized.Metadata.Annotations) {
+		if _, err := s.db.UpdateRateLimitAnnotations(ctx, id, normalized.Metadata.Annotations); err != nil {
+			return nil, mapRateLimitDatabaseError(err)
+		}
+	}
+	return s.GetRateLimit(ctx, id)
 }
 
-func (s *service) UpdateRateLimitDefinition(ctx context.Context, id apid.ID, def rlschema.RateLimit) (iface.RateLimit, error) {
-	rl, err := s.db.UpdateRateLimitDefinition(ctx, id, def)
-	if err != nil {
-		if errors.Is(err, database.ErrNotFound) {
-			return nil, ErrNotFound
-		}
-		return nil, err
+func rateLimitSpecsEqual(left, right rlschema.RateLimitSpec) bool {
+	return reflect.DeepEqual(left, right)
+}
+
+func mapRateLimitDatabaseError(err error) error {
+	if errors.Is(err, database.ErrNotFound) {
+		return ErrNotFound
 	}
-	return wrapRateLimit(*rl, s), nil
+	return err
+}
+
+func (s *service) normalizeRateLimitScope(ctx context.Context, resource *rlschema.RateLimit) error {
+	if resource.Spec.Scope == nil {
+		return nil
+	}
+	if resource.Spec.Scope.ConnectorRef != nil {
+		connector, err := s.resolveRateLimitConnectorReference(ctx, *resource.Spec.Scope.ConnectorRef)
+		if err != nil {
+			return err
+		}
+		if !namespaceContains(resource.Metadata.Namespace, connector.GetNamespace()) {
+			return fmt.Errorf("%w: connector scope namespace %q is outside rate-limit namespace %q", ErrInvalidArgument, connector.GetNamespace(), resource.Metadata.Namespace)
+		}
+		resource.Spec.Scope.ConnectorRef = &meta.ObjectReference{
+			APIVersion: meta.APIVersionV1Alpha1,
+			Kind:       cschema.ConnectorKind,
+			ID:         connector.GetId().String(),
+			Generation: resource.Spec.Scope.ConnectorRef.Generation,
+		}
+	}
+	if resource.Spec.Scope.ConnectionRef != nil {
+		connection, err := s.resolveRateLimitConnectionReference(ctx, *resource.Spec.Scope.ConnectionRef)
+		if err != nil {
+			return err
+		}
+		if !namespaceContains(resource.Metadata.Namespace, connection.GetNamespace()) {
+			return fmt.Errorf("%w: connection scope namespace %q is outside rate-limit namespace %q", ErrInvalidArgument, connection.GetNamespace(), resource.Metadata.Namespace)
+		}
+		resource.Spec.Scope.ConnectionRef = &meta.ObjectReference{
+			APIVersion: meta.APIVersionV1Alpha1,
+			Kind:       rlschema.ConnectionKind,
+			ID:         connection.GetId().String(),
+		}
+	}
+	return nil
+}
+
+func (s *service) resolveRateLimitConnectorReference(ctx context.Context, ref meta.ObjectReference) (iface.Connector, error) {
+	var byID iface.Connector
+	if ref.HasID() {
+		id, err := apid.Parse(ref.ID)
+		if err != nil {
+			return nil, fmt.Errorf("%w: invalid connector reference: %v", ErrInvalidArgument, err)
+		}
+		if ref.Generation != 0 {
+			byID, err = s.GetConnectorVersion(ctx, id, ref.Generation)
+		} else {
+			page := s.ListConnectorsBuilder().ForId(id).Limit(1).FetchPage(ctx)
+			err = page.Error
+			if err == nil && len(page.Results) > 0 {
+				byID = page.Results[0]
+			}
+			if err == nil && byID == nil {
+				err = ErrNotFound
+			}
+		}
+		if err != nil {
+			return nil, err
+		}
+		if !ref.HasNamespacedName() {
+			return byID, nil
+		}
+	}
+
+	page := s.ListConnectorsBuilder().ForNamespaceMatcher(ref.Namespace).ForName(ref.Name).Limit(20).FetchPage(ctx)
+	if page.Error != nil {
+		return nil, page.Error
+	}
+	var byName iface.Connector
+	for _, candidate := range page.Results {
+		if byName == nil {
+			byName = candidate
+		} else if byName.GetId() != candidate.GetId() {
+			return nil, fmt.Errorf("%w: connector reference %q/%q is ambiguous", ErrInvalidArgument, ref.Namespace, ref.Name)
+		}
+	}
+	if byName == nil {
+		return nil, ErrNotFound
+	}
+	if ref.Generation != 0 {
+		versioned, err := s.GetConnectorVersion(ctx, byName.GetId(), ref.Generation)
+		if err != nil {
+			return nil, err
+		}
+		byName = versioned
+	}
+	if byID != nil && byID.GetId() != byName.GetId() {
+		return nil, fmt.Errorf("%w: connector reference id %q does not match %q/%q", ErrInvalidArgument, ref.ID, ref.Namespace, ref.Name)
+	}
+	return byName, nil
+}
+
+func (s *service) resolveRateLimitConnectionReference(ctx context.Context, ref meta.ObjectReference) (iface.Connection, error) {
+	var byID iface.Connection
+	if ref.HasID() {
+		id, err := apid.Parse(ref.ID)
+		if err != nil {
+			return nil, fmt.Errorf("%w: invalid connection reference: %v", ErrInvalidArgument, err)
+		}
+		byID, err = s.GetConnection(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		if !ref.HasNamespacedName() {
+			return byID, nil
+		}
+	}
+	page := s.ListConnectionsBuilder().ForNamespaceMatcher(ref.Namespace).ForName(ref.Name).Limit(2).FetchPage(ctx)
+	if page.Error != nil {
+		return nil, page.Error
+	}
+	if len(page.Results) == 0 {
+		return nil, ErrNotFound
+	}
+	if len(page.Results) > 1 {
+		return nil, fmt.Errorf("%w: connection reference %q/%q is ambiguous", ErrInvalidArgument, ref.Namespace, ref.Name)
+	}
+	byName := page.Results[0]
+	if byID != nil && byID.GetId() != byName.GetId() {
+		return nil, fmt.Errorf("%w: connection reference id %q does not match %q/%q", ErrInvalidArgument, ref.ID, ref.Namespace, ref.Name)
+	}
+	return byName, nil
+}
+
+func namespaceContains(parent, child string) bool {
+	return parent == child || strings.HasPrefix(child, parent+".")
 }
 
 func (s *service) DeleteRateLimit(ctx context.Context, id apid.ID) error {
@@ -398,7 +574,7 @@ func filterRulesInScope(rules []*database.RateLimit, requestNamespace string) []
 }
 
 // algorithmSummary renders the chosen algorithm for the dry-run output.
-func algorithmSummary(def rlschema.RateLimit) string {
+func algorithmSummary(def rlschema.RateLimitSpec) string {
 	a := def.Algorithm
 	switch {
 	case a.TokenBucket != nil:

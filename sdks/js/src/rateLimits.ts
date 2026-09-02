@@ -2,9 +2,10 @@ import { client } from './client';
 import { ListResponse } from './common';
 import { ProxyRequest } from './proxy';
 
-// Rate-limit models. Mirror the server's routes.RateLimitJson shape and
-// the internal rate_limit schema package — kept here verbatim so SDK
-// consumers can author definitions in TypeScript with full type safety.
+// Rate-limit models mirror the canonical authproxy.net/v1alpha1 resource.
+
+export const RATE_LIMIT_API_VERSION = 'authproxy.net/v1alpha1' as const;
+export const RATE_LIMIT_KIND = 'RateLimit' as const;
 
 export enum RateLimitMode {
     ENFORCE = 'enforce',
@@ -75,37 +76,86 @@ export interface RateLimitAlgorithm {
     tokenBucket?: RateLimitTokenBucket;
 }
 
-export interface RateLimitDefinition {
+export interface RateLimitConnectorReference {
+    apiVersion: typeof RATE_LIMIT_API_VERSION;
+    kind: 'Connector';
+    id?: string;
+    name?: string;
+    namespace?: string;
+    /** Omit to match every generation of the connector. */
+    generation?: number;
+}
+
+export interface RateLimitConnectionReference {
+    apiVersion: typeof RATE_LIMIT_API_VERSION;
+    kind: 'Connection';
+    id?: string;
+    name?: string;
+    namespace?: string;
+}
+
+export type RateLimitScope =
+    | {connectorRef: RateLimitConnectorReference; connectionRef?: never}
+    | {connectionRef: RateLimitConnectionReference; connectorRef?: never};
+
+export interface RateLimitSpec {
+    /** Omit to apply across metadata.namespace and all descendants. */
+    scope?: RateLimitScope;
     mode?: RateLimitMode;
     selector: RateLimitSelector;
     bucket: RateLimitBucket;
     algorithm: RateLimitAlgorithm;
 }
 
-export interface RateLimit {
+export interface RateLimitMetadata {
     id: string;
     name: string;
     namespace: string;
-    definition: RateLimitDefinition;
     labels?: Record<string, string>;
     annotations?: Record<string, string>;
     createdAt: string;
     updatedAt: string;
 }
 
+export interface RateLimitStatus {
+    effectiveMode: RateLimitMode;
+}
+
+export interface RateLimit {
+    apiVersion: typeof RATE_LIMIT_API_VERSION;
+    kind: typeof RATE_LIMIT_KIND;
+    metadata: RateLimitMetadata;
+    spec: RateLimitSpec;
+    status: RateLimitStatus;
+}
+
 export interface CreateRateLimitRequest {
-    namespace: string;
-    name?: string;
-    definition: RateLimitDefinition;
-    labels?: Record<string, string>;
-    annotations?: Record<string, string>;
+    apiVersion: typeof RATE_LIMIT_API_VERSION;
+    kind: typeof RATE_LIMIT_KIND;
+    metadata: {
+        namespace: string;
+        name?: string;
+        labels?: Record<string, string>;
+        annotations?: Record<string, string>;
+    };
+    spec: RateLimitSpec;
 }
 
 export interface UpdateRateLimitRequest {
-    name?: string;
-    definition?: RateLimitDefinition;
-    labels?: Record<string, string>;
-    annotations?: Record<string, string>;
+    apiVersion: typeof RATE_LIMIT_API_VERSION;
+    kind: typeof RATE_LIMIT_KIND;
+    metadata: {
+        name?: string;
+        labels?: Record<string, string>;
+        annotations?: Record<string, string>;
+    };
+    spec: {
+        scope?: RateLimitScope | null;
+        mode?: RateLimitMode;
+        selector?: RateLimitSelector;
+        bucket?: RateLimitBucket;
+        algorithm?: RateLimitAlgorithm;
+    };
 }
 
 export interface ListRateLimitsParams {
@@ -139,8 +189,8 @@ export const getRateLimit = (id: string) => {
 };
 
 /**
- * Update a rate limit's definition, labels, or annotations. Pass only the
- * fields you want to change; omitted fields are left untouched.
+ * Update a rate limit's spec or metadata. Fields omitted inside metadata and
+ * spec are left untouched; scope may be null to restore namespace scope.
  */
 export const updateRateLimit = (id: string, request: UpdateRateLimitRequest) => {
     return client.patch<RateLimit>(`/api/v1/rate-limits/${id}`, request);

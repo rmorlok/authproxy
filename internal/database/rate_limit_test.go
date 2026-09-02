@@ -13,8 +13,8 @@ import (
 )
 
 // validDef returns a known-good definition for use across CRUD tests.
-func validDef() rlschema.RateLimit {
-	return rlschema.RateLimit{
+func validDef() rlschema.RateLimitSpec {
+	return rlschema.RateLimitSpec{
 		Mode: rlschema.ModeEnforce,
 		Selector: rlschema.Selector{
 			Methods: []string{"GET"},
@@ -148,7 +148,7 @@ func TestRateLimit_Validation(t *testing.T) {
 	rl = &RateLimit{
 		Id:        apid.New(apid.PrefixRateLimit),
 		Namespace: "root",
-		Definition: rlschema.RateLimit{
+		Definition: rlschema.RateLimitSpec{
 			Selector: rlschema.Selector{Methods: []string{"GET"}},
 			Bucket:   rlschema.Bucket{},
 			// Algorithm intentionally empty.
@@ -318,11 +318,11 @@ func TestRateLimit_DefinitionRoundTripJSON(t *testing.T) {
 
 	cases := []struct {
 		name string
-		def  rlschema.RateLimit
+		def  rlschema.RateLimitSpec
 	}{
 		{
 			name: "fixed_window",
-			def: rlschema.RateLimit{
+			def: rlschema.RateLimitSpec{
 				Mode:     rlschema.ModeEnforce,
 				Selector: rlschema.Selector{Methods: []string{"GET"}, RequestTypes: []common.RequestType{common.RequestTypeProxy}},
 				Bucket:   rlschema.Bucket{Dimensions: []string{rlschema.DimensionActor}},
@@ -335,7 +335,7 @@ func TestRateLimit_DefinitionRoundTripJSON(t *testing.T) {
 		},
 		{
 			name: "sliding_window_log",
-			def: rlschema.RateLimit{
+			def: rlschema.RateLimitSpec{
 				Selector: rlschema.Selector{Methods: []string{"POST"}, RequestTypes: []common.RequestType{common.RequestTypeProxy}},
 				Bucket:   rlschema.Bucket{Dimensions: []string{rlschema.DimensionConnection}},
 				Algorithm: rlschema.Algorithm{
@@ -347,7 +347,7 @@ func TestRateLimit_DefinitionRoundTripJSON(t *testing.T) {
 		},
 		{
 			name: "token_bucket_observe",
-			def: rlschema.RateLimit{
+			def: rlschema.RateLimitSpec{
 				Mode:     rlschema.ModeObserve,
 				Selector: rlschema.Selector{},
 				Bucket:   rlschema.Bucket{},
