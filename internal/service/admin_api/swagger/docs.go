@@ -8972,6 +8972,10 @@ const docTemplateadmin_api = `{
                 },
                 "connectorRef": {
                     "$ref": "#/definitions/meta.ObjectReference"
+                },
+                "namespaceMatcher": {
+                    "type": "string",
+                    "example": "root.acme.payments.**"
                 }
             }
         },

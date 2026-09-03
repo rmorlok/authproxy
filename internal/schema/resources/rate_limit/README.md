@@ -3,10 +3,12 @@
 This package owns the canonical `authproxy.net/v1alpha1` `RateLimit` resource,
 its update patch, and the desired policy types used by runtime enforcement.
 
-`metadata.namespace` is the broad scope: a rule applies to that namespace and
-its descendants. `spec.scope` may narrow the rule to one typed `connectorRef`
-(optionally a specific connector generation) or one `connectionRef`. Core
-normalizes namespaced-name references to stable IDs before storing the spec.
+`metadata.namespace` is the hard outer boundary. With no `spec.scope`, a rule
+applies to that namespace and its descendants. Scope may narrow it to one
+`namespaceMatcher`, typed `connectorRef` (optionally a specific connector
+generation), or `connectionRef`. Matchers and resolved references must remain
+at or below the owning namespace. Core normalizes namespaced-name references
+to stable IDs before storing the spec.
 
 The database retains its flat columns and serializes only `RateLimitSpec` in
 the existing `definition` column. API and configuration boundaries use the

@@ -247,10 +247,12 @@
     "RateLimitScope": {
       "type": "object",
       "oneOf": [
+        { "required": ["namespaceMatcher"] },
         { "required": ["connectorRef"] },
         { "required": ["connectionRef"] }
       ],
       "properties": {
+        "namespaceMatcher": { "$ref": "../namespace/schema.json#/$defs/NamespaceMatcher" },
         "connectorRef": { "$ref": "#/$defs/ConnectorReference" },
         "connectionRef": { "$ref": "#/$defs/ConnectionReference" }
       },

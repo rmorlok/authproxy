@@ -1052,7 +1052,7 @@ func TestSchemaDefinitions(t *testing.T) {
 				{
 					Name:  "canonical resource",
 					Valid: true,
-					Data:  `{"test":{"loadFromList":[{"apiVersion":"authproxy.net/v1alpha1","kind":"RateLimit","metadata":{"name":"tenant-default","namespace":"root.acme"},"spec":{"selector":{},"bucket":{},"algorithm":{"tokenBucket":{"capacity":10,"refillRate":1}}}}]}}`,
+					Data:  `{"test":{"loadFromList":[{"apiVersion":"authproxy.net/v1alpha1","kind":"RateLimit","metadata":{"name":"tenant-default","namespace":"root.acme"},"spec":{"scope":{"namespaceMatcher":"root.acme.payments.**"},"selector":{},"bucket":{},"algorithm":{"tokenBucket":{"capacity":10,"refillRate":1}}}}]}}`,
 				},
 				{
 					Name:  "resource without id or name",

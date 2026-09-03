@@ -65,6 +65,9 @@ function algorithmDisplay(def: RateLimitSpec): { label: string; rows: Array<[str
 }
 
 function scopeDisplay(spec: RateLimitSpec): string {
+    if (spec.scope?.namespaceMatcher !== undefined) {
+        return `Namespaces matching ${spec.scope.namespaceMatcher}`;
+    }
     if (spec.scope?.connectorRef) {
         const ref = spec.scope.connectorRef;
         const target = ref.id || `${ref.namespace}/${ref.name}`;

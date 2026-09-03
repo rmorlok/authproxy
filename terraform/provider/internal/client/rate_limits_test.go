@@ -69,3 +69,27 @@ func TestUpdateRateLimitRequestEncodesNilScopeAsNull(t *testing.T) {
 		t.Fatalf("scope must be encoded as null to clear a prior scope: %s", data)
 	}
 }
+
+func TestRateLimitNamespaceMatcherScopeUsesCanonicalField(t *testing.T) {
+	data, err := json.Marshal(RateLimitSpec{
+		Scope:     &RateLimitScope{NamespaceMatcher: "root.platform.payments.**"},
+		Selector:  RateLimitSelector{},
+		Bucket:    RateLimitBucket{},
+		Algorithm: RateLimitAlgorithm{TokenBucket: &RateLimitTokenBucket{Capacity: 1, RefillRate: 1}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !json.Valid(data) || !containsJSONField(data, "namespaceMatcher", "root.platform.payments.**") {
+		t.Fatalf("namespace matcher scope missing from canonical payload: %s", data)
+	}
+}
+
+func containsJSONField(data []byte, field, want string) bool {
+	var value map[string]any
+	if err := json.Unmarshal(data, &value); err != nil {
+		return false
+	}
+	scope, ok := value["scope"].(map[string]any)
+	return ok && scope[field] == want
+}

@@ -41,8 +41,9 @@ type RateLimitResourceModel struct {
 }
 
 type rateLimitScopeModel struct {
-	ConnectorRef  *rateLimitConnectorRefModel  `tfsdk:"connector_ref"`
-	ConnectionRef *rateLimitConnectionRefModel `tfsdk:"connection_ref"`
+	NamespaceMatcher types.String                 `tfsdk:"namespace_matcher"`
+	ConnectorRef     *rateLimitConnectorRefModel  `tfsdk:"connector_ref"`
+	ConnectionRef    *rateLimitConnectionRefModel `tfsdk:"connection_ref"`
 }
 
 type rateLimitConnectorRefModel struct {
@@ -140,7 +141,13 @@ func (r *RateLimitResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 		},
 		Blocks: map[string]schema.Block{
 			"scope": schema.SingleNestedBlock{
-				Description: "Optionally narrow the namespace cascade to exactly one connector or connection.",
+				Description: "Optionally narrow the owning namespace cascade to one namespace matcher, connector, or connection.",
+				Attributes: map[string]schema.Attribute{
+					"namespace_matcher": schema.StringAttribute{
+						Description: "A namespace matcher at or below the rate limit namespace, such as root.acme.payments.**.",
+						Optional:    true,
+					},
+				},
 				Blocks: map[string]schema.Block{
 					"connector_ref": schema.SingleNestedBlock{
 						Description: "Target one connector. Omit generation to include every connector generation.",
@@ -260,9 +267,9 @@ func (r *RateLimitResource) Configure(_ context.Context, req resource.ConfigureR
 	r.client = req.ProviderData.(*client.Client)
 }
 
-// ConfigValidators registers a plan-time check that exactly one algorithm
-// variant is set. Catching this here is much friendlier than letting the
-// admin-API return a validation error on apply.
+// ConfigValidators registers plan-time checks for the scope and algorithm
+// tagged unions. Catching these here is much friendlier than letting the
+// admin API return a validation error on apply.
 func (r *RateLimitResource) ConfigValidators(_ context.Context) []resource.ConfigValidator {
 	return []resource.ConfigValidator{exactlyOneAlgorithmValidator{}}
 }
@@ -399,6 +406,7 @@ func buildRateLimitSpec(ctx context.Context, plan *RateLimitResourceModel) (clie
 	}
 	if plan.Scope != nil {
 		def.Scope = &client.RateLimitScope{}
+		def.Scope.NamespaceMatcher = plan.Scope.NamespaceMatcher.ValueString()
 		if plan.Scope.ConnectorRef != nil {
 			def.Scope.ConnectorRef = &client.ObjectReference{
 				APIVersion: client.RateLimitAPIVersion,
@@ -490,7 +498,10 @@ func setRateLimitState(model *RateLimitResourceModel, rl *client.RateLimit) {
 	}
 	model.Scope = nil
 	if rl.Spec.Scope != nil {
-		model.Scope = &rateLimitScopeModel{}
+		model.Scope = &rateLimitScopeModel{NamespaceMatcher: types.StringNull()}
+		if rl.Spec.Scope.NamespaceMatcher != "" {
+			model.Scope.NamespaceMatcher = types.StringValue(rl.Spec.Scope.NamespaceMatcher)
+		}
 		if rl.Spec.Scope.ConnectorRef != nil {
 			generation := types.Int64Null()
 			if rl.Spec.Scope.ConnectorRef.Generation != 0 {
@@ -604,6 +615,9 @@ func (v exactlyOneAlgorithmValidator) ValidateResource(ctx context.Context, req 
 	}
 	if model.Scope != nil {
 		set := 0
+		if !model.Scope.NamespaceMatcher.IsNull() && !model.Scope.NamespaceMatcher.IsUnknown() && model.Scope.NamespaceMatcher.ValueString() != "" {
+			set++
+		}
 		if model.Scope.ConnectorRef != nil {
 			set++
 		}
@@ -614,7 +628,7 @@ func (v exactlyOneAlgorithmValidator) ValidateResource(ctx context.Context, req 
 			resp.Diagnostics.AddAttributeError(
 				path.Root("scope"),
 				"Invalid rate-limit scope",
-				"Exactly one of connector_ref or connection_ref must be set when scope is configured.",
+				"Exactly one of namespace_matcher, connector_ref, or connection_ref must be set when scope is configured.",
 			)
 		}
 	}

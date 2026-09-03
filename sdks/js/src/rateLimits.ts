@@ -95,8 +95,9 @@ export interface RateLimitConnectionReference {
 }
 
 export type RateLimitScope =
-    | {connectorRef: RateLimitConnectorReference; connectionRef?: never}
-    | {connectionRef: RateLimitConnectionReference; connectorRef?: never};
+    | {namespaceMatcher: string; connectorRef?: never; connectionRef?: never}
+    | {connectorRef: RateLimitConnectorReference; connectionRef?: never; namespaceMatcher?: never}
+    | {connectionRef: RateLimitConnectionReference; connectorRef?: never; namespaceMatcher?: never};
 
 export interface RateLimitSpec {
     /** Omit to apply across metadata.namespace and all descendants. */

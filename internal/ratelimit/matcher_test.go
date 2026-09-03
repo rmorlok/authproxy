@@ -93,6 +93,22 @@ func TestMatch_ConnectionScope(t *testing.T) {
 	require.Contains(t, reason, "scoped connection")
 }
 
+func TestMatch_NamespaceMatcherScope(t *testing.T) {
+	matcher := "root.acme.payments.**"
+	rule := validRule(func(r *rlschema.RateLimitSpec) {
+		r.Scope = &rlschema.RateLimitScope{NamespaceMatcher: &matcher}
+	})
+
+	matched, _, err := Match(rule, proxyCtx(func(c *RequestContext) { c.Namespace = "root.acme.payments.us" }))
+	require.NoError(t, err)
+	require.True(t, matched)
+
+	matched, _, reason, err := MatchExplain(rule, proxyCtx(func(c *RequestContext) { c.Namespace = "root.acme.analytics" }))
+	require.NoError(t, err)
+	require.False(t, matched)
+	require.Contains(t, reason, "namespace matcher")
+}
+
 func TestMatch_ConnectorScope(t *testing.T) {
 	rule := validRule(func(r *rlschema.RateLimitSpec) {
 		r.Scope = &rlschema.RateLimitScope{ConnectorRef: &meta.ObjectReference{

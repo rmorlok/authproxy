@@ -61,8 +61,9 @@ type ObjectReference struct {
 }
 
 type RateLimitScope struct {
-	ConnectorRef  *ObjectReference `json:"connectorRef,omitempty"`
-	ConnectionRef *ObjectReference `json:"connectionRef,omitempty"`
+	NamespaceMatcher string           `json:"namespaceMatcher,omitempty"`
+	ConnectorRef     *ObjectReference `json:"connectorRef,omitempty"`
+	ConnectionRef    *ObjectReference `json:"connectionRef,omitempty"`
 }
 
 type RateLimitSpec struct {
@@ -111,7 +112,7 @@ type CreateRateLimitRequest struct {
 type RateLimitSpecPatch struct {
 	// Scope is intentionally not omitted when nil. Provider updates send the
 	// complete desired spec, so a nil scope must be encoded as JSON null to
-	// clear a previously configured connector or connection scope.
+	// clear a previously configured namespace matcher or resource reference.
 	Scope     *RateLimitScope     `json:"scope"`
 	Mode      *string             `json:"mode,omitempty"`
 	Selector  *RateLimitSelector  `json:"selector,omitempty"`

@@ -355,8 +355,9 @@ type RateLimitAlgorithmJson struct {
 }
 
 type RateLimitScopeJson struct {
-	ConnectorRef  *meta.ObjectReference `json:"connectorRef,omitempty"`
-	ConnectionRef *meta.ObjectReference `json:"connectionRef,omitempty"`
+	NamespaceMatcher *string               `json:"namespaceMatcher,omitempty" example:"root.acme.payments.**"`
+	ConnectorRef     *meta.ObjectReference `json:"connectorRef,omitempty"`
+	ConnectionRef    *meta.ObjectReference `json:"connectionRef,omitempty"`
 }
 
 type RateLimitSpecJson struct {

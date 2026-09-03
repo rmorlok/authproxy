@@ -8,6 +8,7 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	nschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 )
 
@@ -32,14 +33,17 @@ func Match(rule rlschema.RateLimitSpec, ctx *RequestContext) (matched bool, key 
 //
 // Reason strings stay narrow and human-readable; callers display them
 // verbatim. The same clause priority used by Match is preserved: the
-// first clause that fails wins (request_type → method → label_selector
-// → path_match).
+// first clause that fails wins (scope → request_type → method →
+// label_selector → path_match).
 func MatchExplain(rule rlschema.RateLimitSpec, ctx *RequestContext) (matched bool, key BucketKey, reason string, err error) {
 	if ctx == nil {
 		return false, BucketKey{}, "request context not provided", nil
 	}
 
 	if rule.Scope != nil {
+		if matcher := rule.Scope.NamespaceMatcher; matcher != nil && !nschema.Matches(*matcher, ctx.Namespace) {
+			return false, BucketKey{}, fmt.Sprintf("namespace %q does not match scoped namespace matcher %q", ctx.Namespace, *matcher), nil
+		}
 		if ref := rule.Scope.ConnectionRef; ref != nil && ref.ID != ctx.ConnectionID.String() {
 			return false, BucketKey{}, fmt.Sprintf("connection %q does not match scoped connection %q", ctx.ConnectionID, ref.ID), nil
 		}

@@ -130,7 +130,7 @@ func (rl *RateLimit) Validate() error {
 		result = multierror.Append(result, errors.New("namespace is required"))
 	}
 
-	if err := rl.Definition.Validate(); err != nil {
+	if err := rl.Definition.ValidateForNamespace(rl.Namespace); err != nil {
 		result = multierror.Append(result, fmt.Errorf("invalid definition: %w", err))
 	}
 
@@ -215,19 +215,18 @@ func (s *service) CreateRateLimit(ctx context.Context, rl *RateLimit) error {
 }
 
 // UpdateRateLimitDefinition replaces the definition column. The caller is
-// responsible for validation; this method runs Validate() on a candidate
-// RateLimit so misconfigured definitions never reach the database.
+// responsible for validation; this method also checks the definition against
+// the stored owning namespace so an invalid scope never reaches the database.
 func (s *service) UpdateRateLimitDefinition(ctx context.Context, id apid.ID, def rlschema.RateLimitSpec) (*RateLimit, error) {
 	if id.IsNil() {
 		return nil, errors.New("rate limit id is required")
 	}
 
-	candidate := &RateLimit{
-		Id:         id,
-		Namespace:  "validation-only",
-		Definition: def,
+	existing, err := s.GetRateLimit(ctx, id)
+	if err != nil {
+		return nil, err
 	}
-	if err := candidate.Definition.Validate(); err != nil {
+	if err := def.ValidateForNamespace(existing.Namespace); err != nil {
 		return nil, fmt.Errorf("invalid definition: %w", err)
 	}
 

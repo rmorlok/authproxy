@@ -328,6 +328,43 @@ func TestRateLimits(t *testing.T) {
 			require.Equal(t, http.StatusBadRequest, w.Code)
 		})
 
+		t.Run("namespace matcher must stay below owning namespace", func(t *testing.T) {
+			for _, matcher := range []string{"root.**", "root.other.**"} {
+				spec := validSpec()
+				spec["scope"] = map[string]interface{}{"namespaceMatcher": matcher}
+				body, _ := json.Marshal(resourceBody(map[string]interface{}{"namespace": "root.acme", "spec": spec}))
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodPost, "/rate-limits", bytes.NewReader(body),
+					"root", "some-actor", aschema.AllPermissions())
+				require.NoError(t, err)
+				req.Header.Set("Content-Type", "application/json")
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusBadRequest, w.Code, "matcher %s: %s", matcher, w.Body.String())
+				require.Contains(t, w.Body.String(), "must match only namespace")
+			}
+		})
+
+		t.Run("valid namespace matcher narrows owning namespace", func(t *testing.T) {
+			spec := validSpec()
+			spec["scope"] = map[string]interface{}{"namespaceMatcher": "root.payments.**"}
+			body, _ := json.Marshal(resourceBody(map[string]interface{}{"namespace": "root", "spec": spec}))
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost, "/rate-limits", bytes.NewReader(body),
+				"root", "some-actor", aschema.AllPermissions())
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+			var resp rlschema.RateLimit
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.NotNil(t, resp.Spec.Scope)
+			require.NotNil(t, resp.Spec.Scope.NamespaceMatcher)
+			require.Equal(t, "root.payments.**", *resp.Spec.Scope.NamespaceMatcher)
+		})
+
 		t.Run("invalid labels - reserved apxy/ prefix", func(t *testing.T) {
 			body, _ := json.Marshal(resourceBody(map[string]interface{}{
 				"namespace": "root",

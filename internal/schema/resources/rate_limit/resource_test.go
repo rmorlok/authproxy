@@ -43,6 +43,18 @@ func TestRateLimitResourceValidation(t *testing.T) {
 	require.ErrorContains(t, resource.ValidateFor(meta.ValidationModeResponse, nil), "must match")
 }
 
+func TestRateLimitResourceRejectsScopeOutsideOwningNamespace(t *testing.T) {
+	matcher := "root.other.**"
+	resource := &RateLimit{
+		TypeMeta: meta.NewTypeMeta(RateLimitKind),
+		Metadata: meta.ObjectMeta{Namespace: "root.acme"},
+		Spec:     validSpec(),
+	}
+	resource.Spec.Scope = &RateLimitScope{NamespaceMatcher: &matcher}
+
+	require.ErrorContains(t, resource.ValidateFor(meta.ValidationModeCreate, nil), "must match only namespace")
+}
+
 func TestRateLimitScopeValidation(t *testing.T) {
 	connectorID := apid.New(apid.PrefixConnector)
 	connectionID := apid.New(apid.PrefixConnection)
@@ -58,13 +70,57 @@ func TestRateLimitScopeValidation(t *testing.T) {
 		ID:         connectionID.String(),
 	}
 
+	namespaceMatcher := "root.acme.**"
+	require.NoError(t, ValidateScope(&RateLimitScope{NamespaceMatcher: &namespaceMatcher}, nil))
 	require.NoError(t, ValidateScope(&RateLimitScope{ConnectorRef: connectorRef}, nil))
 	require.NoError(t, ValidateScope(&RateLimitScope{ConnectionRef: connectionRef}, nil))
 	require.ErrorContains(t, ValidateScope(&RateLimitScope{}, nil), "exactly one")
+	require.ErrorContains(t, ValidateScope(&RateLimitScope{NamespaceMatcher: &namespaceMatcher, ConnectorRef: connectorRef}, nil), "exactly one")
 	require.ErrorContains(t, ValidateScope(&RateLimitScope{ConnectorRef: connectorRef, ConnectionRef: connectionRef}, nil), "exactly one")
+
+	invalidMatcher := "root.acme.*"
+	require.ErrorContains(t, ValidateScope(&RateLimitScope{NamespaceMatcher: &invalidMatcher}, nil), "scope.namespaceMatcher")
 
 	connectionRef.Generation = 1
 	require.ErrorContains(t, ValidateScope(&RateLimitScope{ConnectionRef: connectionRef}, nil), "does not apply")
+}
+
+func TestRateLimitScopeNamespaceBoundary(t *testing.T) {
+	matcher := "root.platform.payments.**"
+	require.NoError(t, ValidateScopeNamespaceBoundary(&RateLimitScope{NamespaceMatcher: &matcher}, "root.platform", nil))
+
+	matcher = "root.platform"
+	require.NoError(t, ValidateScopeNamespaceBoundary(&RateLimitScope{NamespaceMatcher: &matcher}, "root.platform", nil))
+
+	for _, outside := range []string{"root.**", "root.platforms.**", "root.other.**"} {
+		matcher = outside
+		require.ErrorContains(t,
+			ValidateScopeNamespaceBoundary(&RateLimitScope{NamespaceMatcher: &matcher}, "root.platform", nil),
+			"must match only namespace",
+		)
+	}
+
+	belowRef := &meta.ObjectReference{Namespace: "root.platform.payments"}
+	require.NoError(t, ValidateScopeNamespaceBoundary(&RateLimitScope{ConnectorRef: belowRef}, "root.platform", nil))
+
+	siblingRef := &meta.ObjectReference{Namespace: "root.other"}
+	require.ErrorContains(t,
+		ValidateScopeNamespaceBoundary(&RateLimitScope{ConnectionRef: siblingRef}, "root.platform", nil),
+		"must be namespace",
+	)
+}
+
+func TestRateLimitEffectiveNamespaceMatcher(t *testing.T) {
+	spec := validSpec()
+	require.Equal(t, "root.platform.**", spec.EffectiveNamespaceMatcher("root.platform"))
+	require.True(t, spec.MatchesNamespace("root.platform", "root.platform.payments"))
+	require.False(t, spec.MatchesNamespace("root.platform", "root.platforms"))
+
+	matcher := "root.platform.payments"
+	spec.Scope = &RateLimitScope{NamespaceMatcher: &matcher}
+	require.Equal(t, matcher, spec.EffectiveNamespaceMatcher("root.platform"))
+	require.True(t, spec.MatchesNamespace("root.platform", "root.platform.payments"))
+	require.False(t, spec.MatchesNamespace("root.platform", "root.platform.payments.child"))
 }
 
 func TestRateLimitPatchPresenceAndApply(t *testing.T) {
@@ -103,6 +159,17 @@ func TestRateLimitPatchPresenceAndApply(t *testing.T) {
 	encoded, err := json.Marshal(patch)
 	require.NoError(t, err)
 	require.Contains(t, string(encoded), `"scope":null`)
+
+	current.Metadata.Namespace = "root.acme"
+	var outsidePatch RateLimitPatch
+	require.NoError(t, json.Unmarshal([]byte(`{
+      "apiVersion":"authproxy.net/v1alpha1",
+      "kind":"RateLimit",
+      "metadata":{},
+      "spec":{"scope":{"namespaceMatcher":"root.other.**"}}
+    }`), &outsidePatch))
+	_, err = outsidePatch.ApplyTo(current, nil)
+	require.ErrorContains(t, err, "must match only namespace")
 
 	var yamlPatch RateLimitPatch
 	require.NoError(t, yaml.Unmarshal([]byte(`

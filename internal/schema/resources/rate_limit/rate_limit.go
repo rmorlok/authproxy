@@ -4,6 +4,7 @@ package rate_limit
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/rmorlok/authproxy/internal/apid"
@@ -41,8 +42,8 @@ func IsValidMode(m Mode) bool {
 
 // RateLimit is the Kubernetes-style representation of an AuthProxy rate-limit
 // rule. Metadata.Namespace establishes the namespace cascade; Spec.Scope may
-// narrow the rule to one connector (and optionally one generation) or one
-// connection.
+// narrow the rule to a namespace matcher, one connector (and optionally one
+// generation), or one connection.
 type RateLimit struct {
 	meta.TypeMeta `json:",inline" yaml:",inline"`
 	Metadata      meta.ObjectMeta  `json:"metadata" yaml:"metadata"`
@@ -60,12 +61,13 @@ type RateLimitSpec struct {
 	Algorithm Algorithm       `json:"algorithm" yaml:"algorithm"`
 }
 
-// RateLimitScope narrows the metadata namespace cascade to exactly one typed
-// resource reference. An omitted scope applies throughout the namespace and
-// its descendants.
+// RateLimitScope narrows the metadata namespace cascade to one namespace
+// matcher, connector, or connection. An omitted scope applies throughout the
+// resource namespace and its descendants.
 type RateLimitScope struct {
-	ConnectorRef  *meta.ObjectReference `json:"connectorRef,omitempty" yaml:"connectorRef,omitempty"`
-	ConnectionRef *meta.ObjectReference `json:"connectionRef,omitempty" yaml:"connectionRef,omitempty"`
+	NamespaceMatcher *string               `json:"namespaceMatcher,omitempty" yaml:"namespaceMatcher,omitempty"`
+	ConnectorRef     *meta.ObjectReference `json:"connectorRef,omitempty" yaml:"connectorRef,omitempty"`
+	ConnectionRef    *meta.ObjectReference `json:"connectionRef,omitempty" yaml:"connectionRef,omitempty"`
 }
 
 // RateLimitStatus contains server-observed policy state.
@@ -150,6 +152,10 @@ func (s RateLimitSpec) Clone() RateLimitSpec {
 	clone := s
 	if s.Scope != nil {
 		scope := *s.Scope
+		if s.Scope.NamespaceMatcher != nil {
+			matcher := *s.Scope.NamespaceMatcher
+			scope.NamespaceMatcher = &matcher
+		}
 		if s.Scope.ConnectorRef != nil {
 			ref := *s.Scope.ConnectorRef
 			scope.ConnectorRef = &ref
@@ -172,6 +178,22 @@ func (s *RateLimitSpec) EffectiveMode() Mode {
 		return DefaultMode
 	}
 	return s.Mode
+}
+
+// EffectiveNamespaceMatcher returns the explicit namespace scope, or the
+// resource namespace and all descendants when scope is omitted or targets a
+// connector or connection.
+func (s *RateLimitSpec) EffectiveNamespaceMatcher(resourceNamespace string) string {
+	if s != nil && s.Scope != nil && s.Scope.NamespaceMatcher != nil {
+		return *s.Scope.NamespaceMatcher
+	}
+	return resourceNamespace + nschema.WildcardSuffix
+}
+
+// MatchesNamespace reports whether a request namespace is within this rule's
+// effective namespace scope.
+func (s *RateLimitSpec) MatchesNamespace(resourceNamespace, requestNamespace string) bool {
+	return nschema.Matches(s.EffectiveNamespaceMatcher(resourceNamespace), requestNamespace)
 }
 
 func (r *RateLimit) Validate(vc *common.ValidationContext) error {
@@ -204,7 +226,7 @@ func (r *RateLimit) ValidateFor(mode meta.ValidationMode, vc *common.ValidationC
 	if r.Metadata.Generation != 0 {
 		result = multierror.Append(result, vc.NewErrorForField("metadata.generation", "does not apply to rate limits"))
 	}
-	if err := r.Spec.validate(vc.PushField("spec")); err != nil {
+	if err := r.Spec.validateForNamespace(r.Metadata.Namespace, vc.PushField("spec")); err != nil {
 		result = multierror.Append(result, err)
 	}
 	if err := meta.ValidateStatus(r.Status, mode, vc); err != nil {
@@ -230,6 +252,26 @@ func (s *RateLimitSpec) Validate() error {
 		return fmt.Errorf("rate-limit spec is required")
 	}
 	return s.validate(&common.ValidationContext{})
+}
+
+// ValidateForNamespace validates the policy and confirms that its scope cannot
+// escape the namespace that owns the RateLimit resource.
+func (s *RateLimitSpec) ValidateForNamespace(resourceNamespace string) error {
+	if s == nil {
+		return fmt.Errorf("rate-limit spec is required")
+	}
+	return s.validateForNamespace(resourceNamespace, &common.ValidationContext{})
+}
+
+func (s *RateLimitSpec) validateForNamespace(resourceNamespace string, vc *common.ValidationContext) error {
+	var result *multierror.Error
+	if err := s.validate(vc); err != nil {
+		result = multierror.Append(result, err)
+	}
+	if err := ValidateScopeNamespaceBoundary(s.Scope, resourceNamespace, vc); err != nil {
+		result = multierror.Append(result, err)
+	}
+	return result.ErrorOrNil()
 }
 
 func (s *RateLimitSpec) validate(vc *common.ValidationContext) error {
@@ -261,6 +303,12 @@ func ValidateScope(scope *RateLimitScope, vc *common.ValidationContext) error {
 	}
 	var result *multierror.Error
 	count := 0
+	if scope.NamespaceMatcher != nil {
+		count++
+		if err := nschema.ValidateMatcher(*scope.NamespaceMatcher); err != nil {
+			result = multierror.Append(result, vc.NewErrorfForField("scope.namespaceMatcher", "%v", err))
+		}
+	}
 	if scope.ConnectorRef != nil {
 		count++
 		if err := meta.ValidateObjectReferenceWithOptions(*scope.ConnectorRef, meta.ObjectReferenceValidationOptions{
@@ -287,7 +335,45 @@ func ValidateScope(scope *RateLimitScope, vc *common.ValidationContext) error {
 		}
 	}
 	if count != 1 {
-		result = multierror.Append(result, vc.NewErrorForField("scope", "must contain exactly one of connectorRef or connectionRef"))
+		result = multierror.Append(result, vc.NewErrorForField("scope", "must contain exactly one of namespaceMatcher, connectorRef, or connectionRef"))
+	}
+	return result.ErrorOrNil()
+}
+
+// ValidateScopeNamespaceBoundary ensures an explicit namespace matcher or a
+// namespaced reference stays at or below the namespace that owns the rule.
+// ID-only references are checked against their resolved target in core.
+func ValidateScopeNamespaceBoundary(scope *RateLimitScope, resourceNamespace string, vc *common.ValidationContext) error {
+	if scope == nil {
+		return nil
+	}
+	if vc == nil {
+		vc = &common.ValidationContext{}
+	}
+	var result *multierror.Error
+	if scope.NamespaceMatcher != nil {
+		base := strings.TrimSuffix(*scope.NamespaceMatcher, nschema.WildcardSuffix)
+		if !nschema.IsSameOrChild(resourceNamespace, base) {
+			result = multierror.Append(result, vc.NewErrorfForField(
+				"scope.namespaceMatcher",
+				"must match only namespace %q or its descendants",
+				resourceNamespace,
+			))
+		}
+	}
+	if ref := scope.ConnectorRef; ref != nil && ref.Namespace != "" && !nschema.IsSameOrChild(resourceNamespace, ref.Namespace) {
+		result = multierror.Append(result, vc.NewErrorfForField(
+			"scope.connectorRef.namespace",
+			"must be namespace %q or one of its descendants",
+			resourceNamespace,
+		))
+	}
+	if ref := scope.ConnectionRef; ref != nil && ref.Namespace != "" && !nschema.IsSameOrChild(resourceNamespace, ref.Namespace) {
+		result = multierror.Append(result, vc.NewErrorfForField(
+			"scope.connectionRef.namespace",
+			"must be namespace %q or one of its descendants",
+			resourceNamespace,
+		))
 	}
 	return result.ErrorOrNil()
 }
@@ -389,6 +475,9 @@ func (p *RateLimitPatch) ApplyTo(current *RateLimit, vc *common.ValidationContex
 	if current == nil {
 		return nil, fmt.Errorf("current rate limit is required")
 	}
+	if vc == nil {
+		vc = &common.ValidationContext{Path: "$"}
+	}
 	if err := p.ValidateFor(meta.ValidationModeUpdate, vc); err != nil {
 		return nil, err
 	}
@@ -412,6 +501,9 @@ func (p *RateLimitPatch) ApplyTo(current *RateLimit, vc *common.ValidationContex
 	}
 	if p.Spec.Algorithm != nil {
 		updated.Spec.Algorithm = *p.Spec.Algorithm
+	}
+	if err := updated.Spec.validateForNamespace(updated.Metadata.Namespace, vc.PushField("spec")); err != nil {
+		return nil, err
 	}
 	if err := ValidateUpdate(current, updated, vc); err != nil {
 		return nil, err

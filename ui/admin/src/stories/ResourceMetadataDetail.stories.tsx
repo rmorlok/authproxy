@@ -75,12 +75,7 @@ const rateLimit = {
   spec: {
     mode: 'enforce',
     scope: {
-      connectorRef: {
-        apiVersion: 'authproxy.net/v1alpha1',
-        kind: 'Connector',
-        id: 'cxr_payments_stripe',
-        generation: 3,
-      },
+      namespaceMatcher: 'root.payments.checkout.**',
     },
     selector: {methods: ['GET', 'POST'], requestTypes: ['proxy']},
     bucket: {dimensions: ['actor']},

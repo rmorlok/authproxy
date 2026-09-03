@@ -155,6 +155,23 @@ func TestBuildRateLimitSpec_ConnectorScope(t *testing.T) {
 	}
 }
 
+func TestBuildRateLimitSpec_NamespaceMatcherScope(t *testing.T) {
+	plan := &RateLimitResourceModel{
+		Scope:     &rateLimitScopeModel{NamespaceMatcher: types.StringValue("root.platform.payments.**")},
+		Selector:  &rateLimitSelectorModel{},
+		Bucket:    &rateLimitBucketModel{},
+		Algorithm: &rateLimitAlgorithmModel{TokenBucket: &rateLimitTokenBucketModel{Capacity: types.Int64Value(1), RefillRate: types.Float64Value(1)}},
+	}
+
+	spec, err := buildRateLimitSpec(context.Background(), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.Scope == nil || spec.Scope.NamespaceMatcher != "root.platform.payments.**" {
+		t.Fatalf("namespace matcher scope: %+v", spec.Scope)
+	}
+}
+
 func TestBuildRateLimitSpec_ConnectionScope(t *testing.T) {
 	plan := &RateLimitResourceModel{
 		Scope:     &rateLimitScopeModel{ConnectionRef: &rateLimitConnectionRefModel{ID: types.StringValue("cxn_customer")}},
@@ -246,6 +263,22 @@ func TestSetRateLimitState_PopulatesAllFields(t *testing.T) {
 		model.Algorithm.TokenBucket.Capacity.ValueInt64() != 60 ||
 		model.Algorithm.TokenBucket.RefillRate.ValueFloat64() != 0.5 {
 		t.Errorf("algorithm/token_bucket: %+v", model.Algorithm)
+	}
+}
+
+func TestSetRateLimitState_NamespaceMatcherScope(t *testing.T) {
+	rl := &client.RateLimit{
+		Metadata: client.RateLimitMetadata{ID: "rl_test123", Namespace: "root.acme"},
+		Spec: client.RateLimitSpec{
+			Scope:     &client.RateLimitScope{NamespaceMatcher: "root.acme.payments.**"},
+			Algorithm: client.RateLimitAlgorithm{TokenBucket: &client.RateLimitTokenBucket{Capacity: 1, RefillRate: 1}},
+		},
+	}
+
+	var model RateLimitResourceModel
+	setRateLimitState(&model, rl)
+	if model.Scope == nil || model.Scope.NamespaceMatcher.ValueString() != "root.acme.payments.**" {
+		t.Fatalf("namespace matcher scope: %+v", model.Scope)
 	}
 }
 

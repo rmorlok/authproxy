@@ -35,7 +35,7 @@ const REQUEST_TYPES = ['proxy', 'probe', 'oauth', 'public', 'global'];
 const RESERVED_DIMENSIONS = ['actor', 'connection', 'connector', 'connector_version', 'namespace', 'method'];
 
 type AlgorithmVariant = 'token_bucket' | 'fixed_window' | 'sliding_window';
-type ScopeKind = 'namespace' | 'connector' | 'connection';
+type ScopeKind = 'namespace-default' | 'namespace-matcher' | 'connector' | 'connection';
 
 function detectVariant(algo: RateLimitAlgorithm): AlgorithmVariant {
     if (algo.fixedWindow) return 'fixed_window';
@@ -136,10 +136,19 @@ export default function RateLimitSpecForm({ value, onChange }: Props) {
 }
 
 function ScopeSection({ value, onChange }: { value?: RateLimitScope; onChange: (scope?: RateLimitScope) => void }) {
-    const kind: ScopeKind = value?.connectorRef ? 'connector' : value?.connectionRef ? 'connection' : 'namespace';
+    const kind: ScopeKind = value?.namespaceMatcher !== undefined
+        ? 'namespace-matcher'
+        : value?.connectorRef
+            ? 'connector'
+            : value?.connectionRef
+                ? 'connection'
+                : 'namespace-default';
 
     const changeKind = (next: ScopeKind) => {
         switch (next) {
+            case 'namespace-matcher':
+                onChange({namespaceMatcher: ''});
+                break;
             case 'connector':
                 onChange({connectorRef: {apiVersion: RATE_LIMIT_API_VERSION, kind: 'Connector', id: ''}});
                 break;
@@ -152,7 +161,7 @@ function ScopeSection({ value, onChange }: { value?: RateLimitScope; onChange: (
     };
 
     return (
-        <Section title="Scope" hint="Namespace scope cascades to descendants; optionally narrow the rule to one connector or connection.">
+        <Section title="Scope" hint="The resource namespace cascades to descendants by default; optionally narrow it with a namespace matcher, connector, or connection.">
             <Stack spacing={2}>
                 <FormControl size="small" sx={{maxWidth: 280}}>
                     <InputLabel id="rate-limit-scope-label">Target</InputLabel>
@@ -162,11 +171,24 @@ function ScopeSection({ value, onChange }: { value?: RateLimitScope; onChange: (
                         value={kind}
                         onChange={(event) => changeKind(event.target.value as ScopeKind)}
                     >
-                        <MenuItem value="namespace">Namespace and descendants</MenuItem>
+                        <MenuItem value="namespace-default">Resource namespace and descendants</MenuItem>
+                        <MenuItem value="namespace-matcher">Namespace matcher</MenuItem>
                         <MenuItem value="connector">Connector</MenuItem>
                         <MenuItem value="connection">Connection</MenuItem>
                     </Select>
                 </FormControl>
+
+                {value?.namespaceMatcher !== undefined && (
+                    <TextField
+                        label="Namespace matcher"
+                        size="small"
+                        fullWidth
+                        value={value.namespaceMatcher}
+                        onChange={(event) => onChange({namespaceMatcher: event.target.value})}
+                        placeholder="root.acme.payments.**"
+                        helperText="Must select only the rate limit namespace or its descendants. Omit .** for an exact namespace."
+                    />
+                )}
 
                 {value?.connectorRef && (
                     <Stack direction={{xs: 'column', sm: 'row'}} spacing={2}>

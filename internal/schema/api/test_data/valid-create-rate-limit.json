@@ -7,6 +7,7 @@
     "labels": {"team": "analytics"}
   },
   "spec": {
+    "scope": {"namespaceMatcher": "root.acme.analytics.**"},
     "selector": {
       "methods": ["GET"],
       "pathMatch": {"kind": "glob", "value": "/reports/*"}

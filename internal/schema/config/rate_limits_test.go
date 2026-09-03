@@ -39,4 +39,9 @@ func TestRateLimitsValidate(t *testing.T) {
 
 	duplicateID := configuredRateLimitForValidation("rl_test0000000000001", "other", "root.acme")
 	require.ErrorContains(t, (&RateLimits{LoadFromList: []rlschema.RateLimit{duplicateName, duplicateID}}).Validate(nil), "duplicates item 0")
+
+	outsideMatcher := "root.other.**"
+	invalidScope := configuredRateLimitForValidation("", "tenant-scoped", "root.acme")
+	invalidScope.Spec.Scope = &rlschema.RateLimitScope{NamespaceMatcher: &outsideMatcher}
+	require.ErrorContains(t, (&RateLimits{LoadFromList: []rlschema.RateLimit{invalidScope}}).Validate(nil), "must match only namespace")
 }

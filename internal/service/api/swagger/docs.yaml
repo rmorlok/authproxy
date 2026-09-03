@@ -562,6 +562,9 @@ definitions:
         $ref: '#/definitions/meta.ObjectReference'
       connectorRef:
         $ref: '#/definitions/meta.ObjectReference'
+      namespaceMatcher:
+        example: root.acme.payments.**
+        type: string
     type: object
   openapi.RateLimitSelectorJson:
     properties:

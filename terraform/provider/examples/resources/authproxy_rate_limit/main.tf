@@ -50,6 +50,12 @@ resource "authproxy_rate_limit" "team_acme_reads_observed" {
   namespace = authproxy_namespace.acme.path
   mode      = "observe"
 
+  # Keep the policy centrally owned in root.acme while applying it only to
+  # the payments subtree.
+  scope {
+    namespace_matcher = "root.acme.payments.**"
+  }
+
   selector {
     methods       = ["GET"]
     request_types = ["proxy"]

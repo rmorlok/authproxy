@@ -116,7 +116,15 @@ Connector references are resolved after configured connectors are reconciled. Au
 
 ## Resource scope
 
-`metadata.namespace` always establishes the outer boundary: the rule can affect that namespace and its descendants, never a parent or sibling. An omitted `spec.scope` applies throughout that cascade. Add exactly one typed reference to narrow it:
+`metadata.namespace` always establishes the outer boundary: the rule can affect that namespace and its descendants, never a parent or sibling. An omitted `spec.scope` applies to `<metadata.namespace>.**`, including the owning namespace itself. Add exactly one namespace matcher or typed reference to narrow it:
+
+```yaml
+# Selected descendants of a centrally managed parent namespace
+scope:
+  namespaceMatcher: root.acme.payments.**
+```
+
+The matcher may be exact (`root.acme.payments`) or recursive (`root.acme.payments.**`). Its base namespace must be the RateLimit's `metadata.namespace` or a descendant. For example, a rule owned by `root.acme` cannot use `root.**` or `root.other.**`. This lets administrators keep a surgical rule in a parent namespace where child-namespace principals cannot remove it.
 
 ```yaml
 # Every generation of one connector
@@ -146,7 +154,7 @@ scope:
     id: cxn_01example
 ```
 
-References may use `id`, or the pair `namespace` and `name`. Connector `generation` is optional and means all generations when omitted; it is not valid on a connection reference.
+References may use `id`, or the pair `namespace` and `name`. Connector `generation` is optional and means all generations when omitted; it is not valid on a connection reference. AuthProxy resolves every reference and rejects it unless the target resource belongs to `metadata.namespace` or one of its descendants.
 
 ### Via Terraform
 
@@ -192,6 +200,8 @@ resource "authproxy_rate_limit" "salesforce_writes" {
   }
 }
 ```
+
+For namespace targeting, use `scope { namespace_matcher = "root.acme.payments.**" }`. The provider requires exactly one of `namespace_matcher`, `connector_ref`, or `connection_ref` whenever a scope block is present.
 
 Plan-time validation catches "exactly one of `fixed_window` / `sliding_window` / `token_bucket`" before `terraform apply`. The `namespace` is `ForceNew` — changing it replaces the resource. See [`authproxy_rate_limit` reference](https://github.com/rmorlok/authproxy/blob/main/terraform/provider/docs/resources/authproxy_rate_limit.md) for the full attribute reference, and [`examples/`](https://github.com/rmorlok/authproxy/tree/main/terraform/provider/examples/resources/authproxy_rate_limit/) for three end-to-end examples (token bucket, observe-mode rollout, sliding-window counter).
 
@@ -361,7 +371,7 @@ Composition is "all apply" — there is no priority field, no specificity scorin
 
 ## Namespace inheritance and permissions
 
-A rate limit defined in namespace `N` applies to requests against connections in `N` **and any descendant namespace**. Define a rule at `root` to cover the whole system; define it at `root.team-acme` to scope it to that team's traffic.
+A rate limit defined in namespace `N` applies to requests against connections in `N` **and any descendant namespace** by default. An explicit `namespaceMatcher`, `connectorRef`, or `connectionRef` narrows that inherited scope. Define a rule at `root` to cover the whole system, or keep it at `root` and use `namespaceMatcher: root.team-acme.**` when the rule must be managed centrally but enforced only for that team's traffic.
 
 The implicit `apxy/rl/-/ns` label records the rule's home namespace, and the rule's user labels are inherited from that namespace via [carry-forward](/concepts/labels-and-annotations/#carry-forward--how-labels-flow-through-the-hierarchy).
 

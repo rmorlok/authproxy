@@ -170,9 +170,17 @@ func TestDryRunRateLimit_NamespaceCascade(t *testing.T) {
 	svc, rlCache, done := newDryRunService(t)
 	defer done()
 
-	// Rule at root should apply to a request in root.child; a rule at
-	// root.other should not.
+	// A default rule at root and a root-owned rule narrowed to root.child
+	// should apply. A sibling-owned rule and an exact root matcher should not.
 	rootRule := installRule(t, svc, rlCache, "root", freshTokenBucket())
+	childMatcher := "root.child.**"
+	childScopedDef := freshTokenBucket()
+	childScopedDef.Scope = &rlschema.RateLimitScope{NamespaceMatcher: &childMatcher}
+	childScopedRule := installRule(t, svc, rlCache, "root", childScopedDef)
+	exactRootMatcher := "root"
+	exactRootDef := freshTokenBucket()
+	exactRootDef.Scope = &rlschema.RateLimitScope{NamespaceMatcher: &exactRootMatcher}
+	exactRootRule := installRule(t, svc, rlCache, "root", exactRootDef)
 	child, err := nschema.NewNamespaceForPath("root.child")
 	require.NoError(t, err)
 	_, err = svc.CreateNamespace(context.Background(), child)
@@ -189,9 +197,11 @@ func TestDryRunRateLimit_NamespaceCascade(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, "root.child", res.Namespace)
-	require.Len(t, res.Matched, 1, "ancestor rule applies, sibling does not")
+	require.Len(t, res.Matched, 2, "default ancestor and narrowed child rule apply")
 	require.Equal(t, rootRule.Id, res.Matched[0].RateLimitId)
-	require.Empty(t, res.NotMatched, "the sibling-namespace rule should be filtered out before the matcher runs")
+	require.Equal(t, childScopedRule.Id, res.Matched[1].RateLimitId)
+	require.Empty(t, res.NotMatched, "out-of-scope rules should be filtered before selector matching")
+	_ = exactRootRule
 	_ = otherRule
 }
 

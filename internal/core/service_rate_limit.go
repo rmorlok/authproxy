@@ -16,6 +16,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
+	nschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -161,6 +162,9 @@ func (s *service) normalizeRateLimitScope(
 	ctx context.Context,
 	resource *rlschema.RateLimit,
 ) error {
+	if err := rlschema.ValidateScopeNamespaceBoundary(resource.Spec.Scope, resource.Metadata.Namespace, nil); err != nil {
+		return fmt.Errorf("%w: %v", ErrInvalidArgument, err)
+	}
 	if resource.Spec.Scope == nil {
 		return nil
 	}
@@ -174,16 +178,8 @@ func (s *service) normalizeRateLimitScope(
 			return err
 		}
 
-		if !namespaceContains(
-			resource.Metadata.Namespace,
-			connector.GetNamespace(),
-		) {
-			return fmt.Errorf(
-				"%w: connector scope namespace %q is outside rate-limit namespace %q",
-				ErrInvalidArgument,
-				connector.GetNamespace(),
-				resource.Metadata.Namespace,
-			)
+		if err := validateRateLimitScopeTargetNamespace("connector", resource.Metadata.Namespace, connector.GetNamespace()); err != nil {
+			return err
 		}
 		resource.Spec.Scope.ConnectorRef = &meta.ObjectReference{
 			APIVersion: meta.APIVersionV1Alpha1,
@@ -201,16 +197,8 @@ func (s *service) normalizeRateLimitScope(
 			return err
 		}
 
-		if !namespaceContains(
-			resource.Metadata.Namespace,
-			connection.GetNamespace(),
-		) {
-			return fmt.Errorf(
-				"%w: connection scope namespace %q is outside rate-limit namespace %q",
-				ErrInvalidArgument,
-				connection.GetNamespace(),
-				resource.Metadata.Namespace,
-			)
+		if err := validateRateLimitScopeTargetNamespace("connection", resource.Metadata.Namespace, connection.GetNamespace()); err != nil {
+			return err
 		}
 		resource.Spec.Scope.ConnectionRef = &meta.ObjectReference{
 			APIVersion: meta.APIVersionV1Alpha1,
@@ -219,6 +207,19 @@ func (s *service) normalizeRateLimitScope(
 		}
 	}
 	return nil
+}
+
+func validateRateLimitScopeTargetNamespace(targetKind, resourceNamespace, targetNamespace string) error {
+	if nschema.IsSameOrChild(resourceNamespace, targetNamespace) {
+		return nil
+	}
+	return fmt.Errorf(
+		"%w: %s scope namespace %q is outside rate-limit namespace %q",
+		ErrInvalidArgument,
+		targetKind,
+		targetNamespace,
+		resourceNamespace,
+	)
 }
 
 func (s *service) resolveRateLimitConnectorReference(
@@ -309,10 +310,6 @@ func (s *service) resolveRateLimitConnectionReference(ctx context.Context, ref m
 		return nil, fmt.Errorf("%w: connection reference id %q does not match %q/%q", ErrInvalidArgument, ref.ID, ref.Namespace, ref.Name)
 	}
 	return byName, nil
-}
-
-func namespaceContains(parent, child string) bool {
-	return parent == child || strings.HasPrefix(child, parent+".")
 }
 
 func (s *service) DeleteRateLimit(ctx context.Context, id apid.ID) error {
@@ -484,9 +481,8 @@ var _ iface.ListRateLimitsBuilder = (*listRateLimitsWrapper)(nil)
 // connection (the way httpf.ForConnection populates them); otherwise
 // raw fields are used and manual Labels always merge on top.
 //
-// Rule cascade matches the enforcer: rules at the request's namespace
-// or any ancestor are evaluated; rules in unrelated branches are
-// filtered out.
+// Namespace scope matches the enforcer: each rule's explicit namespace
+// matcher is applied, or its owning namespace and descendants when omitted.
 func (s *service) DryRunRateLimit(ctx context.Context, req iface.DryRunRateLimitRequest) (iface.DryRunRateLimitResult, error) {
 	if req.Request.Method == "" {
 		return iface.DryRunRateLimitResult{}, fmt.Errorf("%w: request.method is required", ErrInvalidArgument)
@@ -631,16 +627,15 @@ func (s *service) hydrateDryRunContext(ctx context.Context, req iface.DryRunRate
 	return rc, nil
 }
 
-// filterRulesInScope keeps rules whose namespace is the request's
-// namespace or any ancestor — matching the runtime cascade where a rule
-// at root.foo applies to a request in root.foo.bar.
+// filterRulesInScope applies each rule's effective namespace matcher. An
+// omitted scope cascades from the rule's owning namespace to all descendants.
 func filterRulesInScope(rules []*database.RateLimit, requestNamespace string) []*database.RateLimit {
 	out := make([]*database.RateLimit, 0, len(rules))
 	for _, rule := range rules {
 		if rule == nil {
 			continue
 		}
-		if rule.Namespace == requestNamespace || strings.HasPrefix(requestNamespace, rule.Namespace+".") {
+		if rule.Definition.MatchesNamespace(rule.Namespace, requestNamespace) {
 			out = append(out, rule)
 		}
 	}
