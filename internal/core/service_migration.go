@@ -127,11 +127,15 @@ func (s *service) MigrateRateLimits(ctx context.Context) error {
 	if cfgRoot == nil {
 		return errors.New("invalid config")
 	}
+
 	if cfgRoot.RateLimits == nil {
 		s.logger.Info("no rate limits configured")
 		return nil
 	}
-	if err := cfgRoot.RateLimits.Validate(&scommon.ValidationContext{Path: "$.rateLimits"}); err != nil {
+
+	if err := cfgRoot.RateLimits.Validate(
+		&scommon.ValidationContext{Path: "$.rateLimits"},
+	); err != nil {
 		return fmt.Errorf("invalid rate-limit configuration: %w", err)
 	}
 
@@ -143,32 +147,44 @@ func (s *service) MigrateRateLimits(ctx context.Context) error {
 		}
 		seen[id] = struct{}{}
 	}
+
 	return s.cleanupOrphanedConfigRateLimits(ctx, seen)
 }
 
-func (s *service) migrateRateLimit(ctx context.Context, configured *rlschema.RateLimit) (apid.ID, error) {
+func (s *service) migrateRateLimit(
+	ctx context.Context,
+	configured *rlschema.RateLimit,
+) (apid.ID, error) {
 	desired := configured.Clone()
+
 	if err := s.normalizeRateLimitScope(ctx, desired); err != nil {
 		return apid.Nil, fmt.Errorf("failed to resolve configured rate-limit scope: %w", err)
 	}
 
 	var existing *database.RateLimit
 	var id apid.ID
+
 	if desired.Metadata.ID != "" {
 		parsed, err := apid.Parse(desired.Metadata.ID)
 		if err != nil {
 			return apid.Nil, err
 		}
+
 		id = parsed
 		existing, err = s.db.GetRateLimit(ctx, id)
 		if err != nil && !errors.Is(err, database.ErrNotFound) {
 			return apid.Nil, err
 		}
 	} else {
-		found, err := s.rateLimitForConfigName(ctx, desired.Metadata.Namespace, desired.Metadata.Name)
+		found, err := s.rateLimitForConfigName(
+			ctx,
+			desired.Metadata.Namespace,
+			desired.Metadata.Name,
+		)
 		if err != nil && !errors.Is(err, database.ErrNotFound) {
 			return apid.Nil, err
 		}
+
 		existing = found
 		if existing != nil {
 			id = existing.Id
@@ -181,58 +197,95 @@ func (s *service) migrateRateLimit(ctx context.Context, configured *rlschema.Rat
 		if desired.Metadata.Labels == nil {
 			desired.Metadata.Labels = map[string]string{}
 		}
+
 		desired.Metadata.Labels[rateLimitSourceLabelKey] = rateLimitSourceLabelValueConfig
 		desired = desired.ApplyCreateDefaults(id)
+
 		row, err := databaseRateLimitFromResource(desired, id)
 		if err != nil {
 			return apid.Nil, err
 		}
+
 		if err := s.db.CreateRateLimit(ctx, row); err != nil {
 			return apid.Nil, fmt.Errorf("failed to create configured rate limit %s: %w", id, err)
 		}
+
 		return id, nil
 	}
 
 	current := rateLimitResourceFromDatabase(*existing)
+
 	if desired.Metadata.Name != "" {
 		current.Metadata.Name = desired.Metadata.Name
 	}
+
 	current.Metadata.Labels = maps.Clone(desired.Metadata.Labels)
 	current.Metadata.Annotations = maps.Clone(desired.Metadata.Annotations)
 	current.Spec = desired.Spec.Clone()
+
 	if _, err := s.UpdateRateLimit(ctx, id, current); err != nil {
 		return apid.Nil, fmt.Errorf("failed to update configured rate limit %s: %w", id, err)
 	}
+
 	return id, nil
 }
 
-func (s *service) rateLimitForConfigName(ctx context.Context, namespace string, name scommon.ResourceName) (*database.RateLimit, error) {
-	page := s.db.ListRateLimitsBuilder().ForNamespaceMatchers([]string{namespace}).ForName(name).Limit(2).FetchPage(ctx)
+func (s *service) rateLimitForConfigName(
+	ctx context.Context,
+	namespace string,
+	name scommon.ResourceName,
+) (*database.RateLimit, error) {
+	page := s.db.
+		ListRateLimitsBuilder().
+		ForNamespaceMatchers([]string{namespace}).
+		ForName(name).
+		Limit(2).
+		FetchPage(ctx)
+
 	if page.Error != nil {
 		return nil, page.Error
 	}
+
 	if len(page.Results) == 0 {
 		return nil, database.ErrNotFound
 	}
+
 	if len(page.Results) > 1 {
 		return nil, fmt.Errorf("multiple rate limits named %q exist in namespace %q: %w", name, namespace, database.ErrViolation)
 	}
+
 	return &page.Results[0], nil
 }
 
-func (s *service) cleanupOrphanedConfigRateLimits(ctx context.Context, seen map[apid.ID]struct{}) error {
-	selector := fmt.Sprintf("%s=%s", rateLimitSourceLabelKey, rateLimitSourceLabelValueConfig)
-	return s.db.ListRateLimitsBuilder().ForLabelSelector(selector).Enumerate(ctx, func(page pagination.PageResult[database.RateLimit]) (pagination.KeepGoing, error) {
-		for i := range page.Results {
-			if _, ok := seen[page.Results[i].Id]; ok {
-				continue
+func (s *service) cleanupOrphanedConfigRateLimits(
+	ctx context.Context,
+	seen map[apid.ID]struct{},
+) error {
+	selector := fmt.Sprintf(
+		"%s=%s",
+		rateLimitSourceLabelKey,
+		rateLimitSourceLabelValueConfig,
+	)
+
+	return s.db.
+		ListRateLimitsBuilder().
+		ForLabelSelector(selector).
+		Enumerate(ctx, func(page pagination.PageResult[database.RateLimit]) (pagination.KeepGoing, error) {
+			for i := range page.Results {
+				if _, ok := seen[page.Results[i].Id]; ok {
+					continue
+				}
+
+				if err := s.db.DeleteRateLimit(
+					ctx,
+					page.Results[i].Id,
+				); err != nil && !errors.Is(err, database.ErrNotFound) {
+					return pagination.Stop, err
+				}
 			}
-			if err := s.db.DeleteRateLimit(ctx, page.Results[i].Id); err != nil && !errors.Is(err, database.ErrNotFound) {
-				return pagination.Stop, err
-			}
-		}
-		return pagination.Continue, nil
-	})
+
+			return pagination.Continue, nil
+		})
 }
 
 func (s *service) syncConfiguredConnectorEnvelope(
