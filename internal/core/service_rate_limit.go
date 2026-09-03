@@ -20,7 +20,10 @@ import (
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
-func (s *service) GetRateLimit(ctx context.Context, id apid.ID) (iface.RateLimit, error) {
+func (s *service) GetRateLimit(
+	ctx context.Context,
+	id apid.ID,
+) (iface.RateLimit, error) {
 	rl, err := s.db.GetRateLimit(ctx, id)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
@@ -28,22 +31,29 @@ func (s *service) GetRateLimit(ctx context.Context, id apid.ID) (iface.RateLimit
 		}
 		return nil, err
 	}
+
 	return wrapRateLimit(*rl, s), nil
 }
 
-func (s *service) CreateRateLimit(ctx context.Context, resource *rlschema.RateLimit) (iface.RateLimit, error) {
+func (s *service) CreateRateLimit(
+	ctx context.Context,
+	resource *rlschema.RateLimit,
+) (iface.RateLimit, error) {
 	if resource == nil {
 		return nil, fmt.Errorf("rate limit cannot be nil")
 	}
+
 	if err := resource.ValidateFor(meta.ValidationModeCreate, nil); err != nil {
 		return nil, err
 	}
 
 	id := apid.New(apid.PrefixRateLimit)
 	normalized := resource.ApplyCreateDefaults(id)
+
 	if err := s.normalizeRateLimitScope(ctx, normalized); err != nil {
 		return nil, err
 	}
+
 	rl, err := databaseRateLimitFromResource(normalized, id)
 	if err != nil {
 		return nil, err
@@ -52,19 +62,26 @@ func (s *service) CreateRateLimit(ctx context.Context, resource *rlschema.RateLi
 	if err := s.db.CreateRateLimit(ctx, rl); err != nil {
 		return nil, err
 	}
+
 	return wrapRateLimit(*rl, s), nil
 }
 
 // UpdateRateLimit applies the desired resource envelope while keeping the
 // existing flat database model behind the core boundary.
-func (s *service) UpdateRateLimit(ctx context.Context, id apid.ID, resource *rlschema.RateLimit) (iface.RateLimit, error) {
+func (s *service) UpdateRateLimit(
+	ctx context.Context,
+	id apid.ID,
+	resource *rlschema.RateLimit,
+) (iface.RateLimit, error) {
 	if resource == nil {
 		return nil, fmt.Errorf("rate limit cannot be nil")
 	}
+
 	existing, err := s.GetRateLimit(ctx, id)
 	if err != nil {
 		return nil, err
 	}
+
 	before := existing.GetResource()
 	if err := rlschema.ValidateUpdate(before, resource, nil); err != nil {
 		return nil, err
@@ -74,29 +91,55 @@ func (s *service) UpdateRateLimit(ctx context.Context, id apid.ID, resource *rls
 	if err := s.normalizeRateLimitScope(ctx, normalized); err != nil {
 		return nil, err
 	}
+
 	// Status is derived from spec, never accepted as desired state.
-	normalized.Status = &rlschema.RateLimitStatus{EffectiveMode: normalized.Spec.EffectiveMode()}
-	if err := normalized.ValidateFor(meta.ValidationModePersistence, nil); err != nil {
+	normalized.Status = &rlschema.RateLimitStatus{
+		EffectiveMode: normalized.Spec.EffectiveMode(),
+	}
+
+	if err := normalized.ValidateFor(
+		meta.ValidationModePersistence,
+		nil, // validation context
+	); err != nil {
 		return nil, err
 	}
 
 	if before.Metadata.Name != normalized.Metadata.Name {
-		if _, err := s.db.UpdateRateLimitName(ctx, id, normalized.Metadata.Name); err != nil {
+		if _, err := s.db.UpdateRateLimitName(
+			ctx,
+			id,
+			normalized.Metadata.Name,
+		); err != nil {
 			return nil, mapRateLimitDatabaseError(err)
 		}
 	}
 	if !rateLimitSpecsEqual(before.Spec, normalized.Spec) {
-		if _, err := s.db.UpdateRateLimitDefinition(ctx, id, normalized.Spec); err != nil {
+		if _, err := s.db.UpdateRateLimitDefinition(
+			ctx,
+			id,
+			normalized.Spec,
+		); err != nil {
 			return nil, mapRateLimitDatabaseError(err)
 		}
 	}
 	if !maps.Equal(before.Metadata.Labels, normalized.Metadata.Labels) {
-		if _, err := s.db.UpdateRateLimitLabels(ctx, id, normalized.Metadata.Labels); err != nil {
+		if _, err := s.db.UpdateRateLimitLabels(
+			ctx,
+			id,
+			normalized.Metadata.Labels,
+		); err != nil {
 			return nil, mapRateLimitDatabaseError(err)
 		}
 	}
-	if !maps.Equal(before.Metadata.Annotations, normalized.Metadata.Annotations) {
-		if _, err := s.db.UpdateRateLimitAnnotations(ctx, id, normalized.Metadata.Annotations); err != nil {
+	if !maps.Equal(
+		before.Metadata.Annotations,
+		normalized.Metadata.Annotations,
+	) {
+		if _, err := s.db.UpdateRateLimitAnnotations(
+			ctx,
+			id,
+			normalized.Metadata.Annotations,
+		); err != nil {
 			return nil, mapRateLimitDatabaseError(err)
 		}
 	}
@@ -114,17 +157,33 @@ func mapRateLimitDatabaseError(err error) error {
 	return err
 }
 
-func (s *service) normalizeRateLimitScope(ctx context.Context, resource *rlschema.RateLimit) error {
+func (s *service) normalizeRateLimitScope(
+	ctx context.Context,
+	resource *rlschema.RateLimit,
+) error {
 	if resource.Spec.Scope == nil {
 		return nil
 	}
+
 	if resource.Spec.Scope.ConnectorRef != nil {
-		connector, err := s.resolveRateLimitConnectorReference(ctx, *resource.Spec.Scope.ConnectorRef)
+		connector, err := s.resolveRateLimitConnectorReference(
+			ctx,
+			*resource.Spec.Scope.ConnectorRef,
+		)
 		if err != nil {
 			return err
 		}
-		if !namespaceContains(resource.Metadata.Namespace, connector.GetNamespace()) {
-			return fmt.Errorf("%w: connector scope namespace %q is outside rate-limit namespace %q", ErrInvalidArgument, connector.GetNamespace(), resource.Metadata.Namespace)
+
+		if !namespaceContains(
+			resource.Metadata.Namespace,
+			connector.GetNamespace(),
+		) {
+			return fmt.Errorf(
+				"%w: connector scope namespace %q is outside rate-limit namespace %q",
+				ErrInvalidArgument,
+				connector.GetNamespace(),
+				resource.Metadata.Namespace,
+			)
 		}
 		resource.Spec.Scope.ConnectorRef = &meta.ObjectReference{
 			APIVersion: meta.APIVersionV1Alpha1,
@@ -134,12 +193,24 @@ func (s *service) normalizeRateLimitScope(ctx context.Context, resource *rlschem
 		}
 	}
 	if resource.Spec.Scope.ConnectionRef != nil {
-		connection, err := s.resolveRateLimitConnectionReference(ctx, *resource.Spec.Scope.ConnectionRef)
+		connection, err := s.resolveRateLimitConnectionReference(
+			ctx,
+			*resource.Spec.Scope.ConnectionRef,
+		)
 		if err != nil {
 			return err
 		}
-		if !namespaceContains(resource.Metadata.Namespace, connection.GetNamespace()) {
-			return fmt.Errorf("%w: connection scope namespace %q is outside rate-limit namespace %q", ErrInvalidArgument, connection.GetNamespace(), resource.Metadata.Namespace)
+
+		if !namespaceContains(
+			resource.Metadata.Namespace,
+			connection.GetNamespace(),
+		) {
+			return fmt.Errorf(
+				"%w: connection scope namespace %q is outside rate-limit namespace %q",
+				ErrInvalidArgument,
+				connection.GetNamespace(),
+				resource.Metadata.Namespace,
+			)
 		}
 		resource.Spec.Scope.ConnectionRef = &meta.ObjectReference{
 			APIVersion: meta.APIVersionV1Alpha1,
@@ -150,7 +221,10 @@ func (s *service) normalizeRateLimitScope(ctx context.Context, resource *rlschem
 	return nil
 }
 
-func (s *service) resolveRateLimitConnectorReference(ctx context.Context, ref meta.ObjectReference) (iface.Connector, error) {
+func (s *service) resolveRateLimitConnectorReference(
+	ctx context.Context,
+	ref meta.ObjectReference,
+) (iface.Connector, error) {
 	var byID iface.Connector
 	if ref.HasID() {
 		id, err := apid.Parse(ref.ID)
