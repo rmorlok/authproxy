@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"maps"
 	"net/url"
-	"reflect"
 	"strings"
 
 	"github.com/rmorlok/authproxy/internal/apid"
@@ -114,7 +113,8 @@ func (s *service) UpdateRateLimit(
 			return nil, mapRateLimitDatabaseError(err)
 		}
 	}
-	if !rateLimitSpecsEqual(before.Spec, normalized.Spec) {
+
+	if !before.Spec.Equal(&normalized.Spec) {
 		if _, err := s.db.UpdateRateLimitDefinition(
 			ctx,
 			id,
@@ -123,6 +123,7 @@ func (s *service) UpdateRateLimit(
 			return nil, mapRateLimitDatabaseError(err)
 		}
 	}
+
 	if !maps.Equal(before.Metadata.Labels, normalized.Metadata.Labels) {
 		if _, err := s.db.UpdateRateLimitLabels(
 			ctx,
@@ -132,6 +133,7 @@ func (s *service) UpdateRateLimit(
 			return nil, mapRateLimitDatabaseError(err)
 		}
 	}
+
 	if !maps.Equal(
 		before.Metadata.Annotations,
 		normalized.Metadata.Annotations,
@@ -144,11 +146,8 @@ func (s *service) UpdateRateLimit(
 			return nil, mapRateLimitDatabaseError(err)
 		}
 	}
-	return s.GetRateLimit(ctx, id)
-}
 
-func rateLimitSpecsEqual(left, right rlschema.RateLimitSpec) bool {
-	return reflect.DeepEqual(left, right)
+	return s.GetRateLimit(ctx, id)
 }
 
 func mapRateLimitDatabaseError(err error) error {
@@ -162,9 +161,14 @@ func (s *service) normalizeRateLimitScope(
 	ctx context.Context,
 	resource *rlschema.RateLimit,
 ) error {
-	if err := rlschema.ValidateScopeNamespaceBoundary(resource.Spec.Scope, resource.Metadata.Namespace, nil); err != nil {
+	if err := rlschema.ValidateScopeNamespaceBoundary(
+		resource.Spec.Scope,
+		resource.Metadata.Namespace,
+		nil, // validation context
+	); err != nil {
 		return fmt.Errorf("%w: %v", ErrInvalidArgument, err)
 	}
+
 	if resource.Spec.Scope == nil {
 		return nil
 	}
@@ -178,15 +182,21 @@ func (s *service) normalizeRateLimitScope(
 			return err
 		}
 
-		if err := validateRateLimitScopeTargetNamespace("connector", resource.Metadata.Namespace, connector.GetNamespace()); err != nil {
+		if err := validateRateLimitScopeTargetNamespace(
+			"connector",
+			resource.Metadata.Namespace,
+			connector.GetNamespace(),
+		); err != nil {
 			return err
 		}
+
 		resource.Spec.Scope.ConnectorRef = &meta.ObjectReference{
 			APIVersion: meta.APIVersionV1Alpha1,
 			Kind:       cschema.ConnectorKind,
 			ID:         connector.GetId().String(),
 		}
 	}
+
 	if resource.Spec.Scope.ConnectionRef != nil {
 		connection, err := s.resolveRateLimitConnectionReference(
 			ctx,
@@ -196,7 +206,11 @@ func (s *service) normalizeRateLimitScope(
 			return err
 		}
 
-		if err := validateRateLimitScopeTargetNamespace("connection", resource.Metadata.Namespace, connection.GetNamespace()); err != nil {
+		if err := validateRateLimitScopeTargetNamespace(
+			"connection",
+			resource.Metadata.Namespace,
+			connection.GetNamespace(),
+		); err != nil {
 			return err
 		}
 		resource.Spec.Scope.ConnectionRef = &meta.ObjectReference{
@@ -205,6 +219,7 @@ func (s *service) normalizeRateLimitScope(
 			ID:         connection.GetId().String(),
 		}
 	}
+
 	return nil
 }
 

@@ -4,6 +4,7 @@ package rate_limit
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/hashicorp/go-multierror"
@@ -193,6 +194,18 @@ func (s *RateLimitSpec) EffectiveNamespaceMatcher(resourceNamespace string) stri
 // effective namespace scope.
 func (s *RateLimitSpec) MatchesNamespace(resourceNamespace, requestNamespace string) bool {
 	return nschema.Matches(s.EffectiveNamespaceMatcher(resourceNamespace), requestNamespace)
+}
+
+func (s *RateLimitSpec) Equal(other *RateLimitSpec) bool {
+	if s == nil && other == nil {
+		return true
+	}
+
+	if s == nil || other == nil {
+		return false
+	}
+
+	return reflect.DeepEqual(*s, *other)
 }
 
 func (r *RateLimit) Validate(vc *common.ValidationContext) error {
