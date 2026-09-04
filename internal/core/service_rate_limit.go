@@ -198,7 +198,7 @@ func (s *service) normalizeRateLimitScope(
 	}
 
 	if resource.Spec.Scope.ConnectionRef != nil {
-		connection, err := s.resolveRateLimitConnectionReference(
+		connection, err := s.resolveConnectionReference(
 			ctx,
 			*resource.Spec.Scope.ConnectionRef,
 		)
@@ -223,7 +223,9 @@ func (s *service) normalizeRateLimitScope(
 	return nil
 }
 
-func validateRateLimitScopeTargetNamespace(targetKind, resourceNamespace, targetNamespace string) error {
+func validateRateLimitScopeTargetNamespace(
+	targetKind, resourceNamespace, targetNamespace string,
+) error {
 	if nschema.IsSameOrChild(resourceNamespace, targetNamespace) {
 		return nil
 	}
@@ -244,8 +246,13 @@ func (s *service) resolveRateLimitConnectorReference(
 	if ref.HasID() {
 		id, err := apid.Parse(ref.ID)
 		if err != nil {
-			return nil, fmt.Errorf("%w: invalid connector reference: %v", ErrInvalidArgument, err)
+			return nil, fmt.Errorf(
+				"%w: invalid connector reference: %v",
+				ErrInvalidArgument,
+				err,
+			)
 		}
+
 		page := s.ListConnectorsBuilder().ForId(id).Limit(1).FetchPage(ctx)
 		err = page.Error
 		if err == nil && len(page.Results) > 0 {
@@ -262,56 +269,41 @@ func (s *service) resolveRateLimitConnectorReference(
 		}
 	}
 
-	page := s.ListConnectorsBuilder().ForNamespaceMatcher(ref.Namespace).ForName(ref.Name).Limit(20).FetchPage(ctx)
+	page := s.ListConnectorsBuilder().
+		ForNamespaceMatcher(ref.Namespace).
+		ForName(ref.Name).
+		Limit(20).
+		FetchPage(ctx)
 	if page.Error != nil {
 		return nil, page.Error
 	}
+
 	var byName iface.Connector
 	for _, candidate := range page.Results {
 		if byName == nil {
 			byName = candidate
 		} else if byName.GetId() != candidate.GetId() {
-			return nil, fmt.Errorf("%w: connector reference %q/%q is ambiguous", ErrInvalidArgument, ref.Namespace, ref.Name)
+			return nil, fmt.Errorf(
+				"%w: connector reference %q/%q is ambiguous",
+				ErrInvalidArgument,
+				ref.Namespace,
+				ref.Name,
+			)
 		}
 	}
 	if byName == nil {
 		return nil, ErrNotFound
 	}
 	if byID != nil && byID.GetId() != byName.GetId() {
-		return nil, fmt.Errorf("%w: connector reference id %q does not match %q/%q", ErrInvalidArgument, ref.ID, ref.Namespace, ref.Name)
+		return nil, fmt.Errorf(
+			"%w: connector reference id %q does not match %q/%q",
+			ErrInvalidArgument,
+			ref.ID,
+			ref.Namespace,
+			ref.Name,
+		)
 	}
-	return byName, nil
-}
 
-func (s *service) resolveRateLimitConnectionReference(ctx context.Context, ref meta.ObjectReference) (iface.Connection, error) {
-	var byID iface.Connection
-	if ref.HasID() {
-		id, err := apid.Parse(ref.ID)
-		if err != nil {
-			return nil, fmt.Errorf("%w: invalid connection reference: %v", ErrInvalidArgument, err)
-		}
-		byID, err = s.GetConnection(ctx, id)
-		if err != nil {
-			return nil, err
-		}
-		if !ref.HasNamespacedName() {
-			return byID, nil
-		}
-	}
-	page := s.ListConnectionsBuilder().ForNamespaceMatcher(ref.Namespace).ForName(ref.Name).Limit(2).FetchPage(ctx)
-	if page.Error != nil {
-		return nil, page.Error
-	}
-	if len(page.Results) == 0 {
-		return nil, ErrNotFound
-	}
-	if len(page.Results) > 1 {
-		return nil, fmt.Errorf("%w: connection reference %q/%q is ambiguous", ErrInvalidArgument, ref.Namespace, ref.Name)
-	}
-	byName := page.Results[0]
-	if byID != nil && byID.GetId() != byName.GetId() {
-		return nil, fmt.Errorf("%w: connection reference id %q does not match %q/%q", ErrInvalidArgument, ref.ID, ref.Namespace, ref.Name)
-	}
 	return byName, nil
 }
 
