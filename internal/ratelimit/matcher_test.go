@@ -123,23 +123,22 @@ func TestMatch_ConnectorScope(t *testing.T) {
 		c.ConnectorVersion = 7
 	}))
 	require.NoError(t, err)
-	require.True(t, matched, "an omitted generation applies to every connector generation")
-
-	rule.Scope.ConnectorRef.Generation = 7
-	matched, _, err = Match(rule, proxyCtx(func(c *RequestContext) {
-		c.ConnectorID = "cxr_target"
-		c.ConnectorVersion = 7
-	}))
-	require.NoError(t, err)
 	require.True(t, matched)
 
-	matched, _, reason, err := MatchExplain(rule, proxyCtx(func(c *RequestContext) {
+	matched, _, err = Match(rule, proxyCtx(func(c *RequestContext) {
 		c.ConnectorID = "cxr_target"
 		c.ConnectorVersion = 8
 	}))
 	require.NoError(t, err)
+	require.True(t, matched, "a connector scope applies across connector generations")
+
+	matched, _, reason, err := MatchExplain(rule, proxyCtx(func(c *RequestContext) {
+		c.ConnectorID = "cxr_other"
+		c.ConnectorVersion = 8
+	}))
+	require.NoError(t, err)
 	require.False(t, matched)
-	require.Contains(t, reason, "scoped generation 7")
+	require.Contains(t, reason, "scoped connector")
 }
 
 // --- Method matching ---

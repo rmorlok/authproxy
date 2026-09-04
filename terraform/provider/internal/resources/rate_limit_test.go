@@ -135,8 +135,7 @@ func TestBuildRateLimitSpec_EmptyOptionalFieldsOmitted(t *testing.T) {
 func TestBuildRateLimitSpec_ConnectorScope(t *testing.T) {
 	plan := &RateLimitResourceModel{
 		Scope: &rateLimitScopeModel{ConnectorRef: &rateLimitConnectorRefModel{
-			ID:         types.StringValue("cxr_salesforce"),
-			Generation: types.Int64Value(3),
+			ID: types.StringValue("cxr_salesforce"),
 		}},
 		Selector:  &rateLimitSelectorModel{},
 		Bucket:    &rateLimitBucketModel{},
@@ -150,7 +149,7 @@ func TestBuildRateLimitSpec_ConnectorScope(t *testing.T) {
 	if spec.Scope == nil || spec.Scope.ConnectorRef == nil {
 		t.Fatalf("connector scope: %+v", spec.Scope)
 	}
-	if got := spec.Scope.ConnectorRef; got.APIVersion != client.RateLimitAPIVersion || got.Kind != "Connector" || got.ID != "cxr_salesforce" || got.Generation != 3 {
+	if got := spec.Scope.ConnectorRef; got.APIVersion != client.RateLimitAPIVersion || got.Kind != "Connector" || got.ID != "cxr_salesforce" {
 		t.Errorf("connector ref: %+v", got)
 	}
 }
@@ -187,7 +186,7 @@ func TestBuildRateLimitSpec_ConnectionScope(t *testing.T) {
 	if spec.Scope == nil || spec.Scope.ConnectionRef == nil {
 		t.Fatalf("connection scope: %+v", spec.Scope)
 	}
-	if got := spec.Scope.ConnectionRef; got.APIVersion != client.RateLimitAPIVersion || got.Kind != "Connection" || got.ID != "cxn_customer" || got.Generation != 0 {
+	if got := spec.Scope.ConnectionRef; got.APIVersion != client.RateLimitAPIVersion || got.Kind != "Connection" || got.ID != "cxn_customer" {
 		t.Errorf("connection ref: %+v", got)
 	}
 }
@@ -212,7 +211,6 @@ func TestSetRateLimitState_PopulatesAllFields(t *testing.T) {
 				APIVersion: client.RateLimitAPIVersion,
 				Kind:       "Connector",
 				ID:         "cxr_salesforce",
-				Generation: 4,
 			}},
 			Mode: "observe",
 			Selector: client.RateLimitSelector{
@@ -240,7 +238,7 @@ func TestSetRateLimitState_PopulatesAllFields(t *testing.T) {
 	if model.Mode.ValueString() != "observe" {
 		t.Errorf("mode: %s", model.Mode.ValueString())
 	}
-	if model.Scope == nil || model.Scope.ConnectorRef == nil || model.Scope.ConnectorRef.ID.ValueString() != "cxr_salesforce" || model.Scope.ConnectorRef.Generation.ValueInt64() != 4 {
+	if model.Scope == nil || model.Scope.ConnectorRef == nil || model.Scope.ConnectorRef.ID.ValueString() != "cxr_salesforce" {
 		t.Errorf("scope/connector_ref: %+v", model.Scope)
 	}
 

@@ -52,9 +52,8 @@ resource "authproxy_rate_limit" "team_acme_writes" {
 - `annotations` - (Optional) Map of annotations.
 - `scope` - (Optional block) Narrows the owning namespace cascade. Omit the block to apply to the namespace and all descendants. When present, exactly one of `namespace_matcher`, `connector_ref`, or `connection_ref` is required.
   - `namespace_matcher` - (Optional, mutually exclusive with the reference blocks) An exact or recursive matcher at or below `namespace`, such as `root.acme.payments.**`.
-  - `connector_ref` - (Optional block, mutually exclusive with the other scope variants) A connector ID and optional generation. Omit `generation` to match every generation.
+  - `connector_ref` - (Optional block, mutually exclusive with the other scope variants) A connector ID. The rule applies across every generation of that connector.
     - `id` - Connector ID (`cxr_...`).
-    - `generation` - (Optional) Exact connector generation.
   - `connection_ref` - (Optional block, mutually exclusive with the other scope variants) One connection.
     - `id` - Connection ID (`cxn_...`).
 - `selector` - (Required block) Match criteria; all clauses ANDed.

@@ -57,7 +57,6 @@ type ObjectReference struct {
 	ID         string `json:"id,omitempty"`
 	Name       string `json:"name,omitempty"`
 	Namespace  string `json:"namespace,omitempty"`
-	Generation uint64 `json:"generation,omitempty"`
 }
 
 type RateLimitScope struct {

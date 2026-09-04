@@ -100,7 +100,6 @@ rateLimits:
             kind: Connector
             namespace: root.acme
             name: salesforce
-            generation: 3
         mode: enforce
         selector:
           methods: [POST, PATCH, PUT]
@@ -112,7 +111,7 @@ rateLimits:
             refillRate: 1.0
 ```
 
-Connector references are resolved after configured connectors are reconciled. AuthProxy stores the stable connector ID and requested generation. The former flat rate-limit configuration is not accepted; update configuration before restarting on this breaking pre-production release.
+Connector references are resolved after configured connectors are reconciled. AuthProxy stores the stable connector ID, and the rule applies across every generation of that connector. The former flat rate-limit configuration is not accepted; update configuration before restarting on this breaking pre-production release.
 
 ## Resource scope
 
@@ -127,22 +126,12 @@ scope:
 The matcher may be exact (`root.acme.payments`) or recursive (`root.acme.payments.**`). Its base namespace must be the RateLimit's `metadata.namespace` or a descendant. For example, a rule owned by `root.acme` cannot use `root.**` or `root.other.**`. This lets administrators keep a surgical rule in a parent namespace where child-namespace principals cannot remove it.
 
 ```yaml
-# Every generation of one connector
+# One connector, across every generation
 scope:
   connectorRef:
     apiVersion: authproxy.net/v1alpha1
     kind: Connector
     id: cxr_01example
-```
-
-```yaml
-# One connector generation
-scope:
-  connectorRef:
-    apiVersion: authproxy.net/v1alpha1
-    kind: Connector
-    id: cxr_01example
-    generation: 3
 ```
 
 ```yaml
@@ -154,7 +143,7 @@ scope:
     id: cxn_01example
 ```
 
-References may use `id`, or the pair `namespace` and `name`. Connector `generation` is optional and means all generations when omitted; it is not valid on a connection reference. AuthProxy resolves every reference and rejects it unless the target resource belongs to `metadata.namespace` or one of its descendants.
+References may use `id`, or the pair `namespace` and `name`. A connector reference intentionally has no `generation`: RateLimit and Connector resources have no version binding, so the rule covers current and future connector generations. AuthProxy resolves every reference and rejects it unless the target resource belongs to `metadata.namespace` or one of its descendants.
 
 ### Via Terraform
 
@@ -174,8 +163,7 @@ resource "authproxy_rate_limit" "salesforce_writes" {
 
   scope {
     connector_ref {
-      id         = authproxy_connector.salesforce.id
-      generation = 3
+      id = authproxy_connector.salesforce.id
     }
   }
 

@@ -18,7 +18,6 @@ func TestCreateRateLimitRequestUsesCanonicalResourceEnvelope(t *testing.T) {
 				APIVersion: RateLimitAPIVersion,
 				Kind:       "Connector",
 				ID:         "cxr_salesforce",
-				Generation: 3,
 			}},
 			Selector: RateLimitSelector{},
 			Bucket:   RateLimitBucket{},

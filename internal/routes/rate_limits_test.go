@@ -365,6 +365,28 @@ func TestRateLimits(t *testing.T) {
 			require.Equal(t, "root.payments.**", *resp.Spec.Scope.NamespaceMatcher)
 		})
 
+		t.Run("connector scope rejects generation binding", func(t *testing.T) {
+			spec := validSpec()
+			spec["scope"] = map[string]interface{}{
+				"connectorRef": map[string]interface{}{
+					"apiVersion": string(meta.APIVersionV1Alpha1),
+					"kind":       "Connector",
+					"id":         apid.New(apid.PrefixConnector).String(),
+					"generation": 2,
+				},
+			}
+			body, _ := json.Marshal(resourceBody(map[string]interface{}{"namespace": "root", "spec": spec}))
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost, "/rate-limits", bytes.NewReader(body),
+				"root", "some-actor", aschema.AllPermissions())
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+			require.Contains(t, w.Body.String(), "does not apply to rate-limit connector references")
+		})
+
 		t.Run("invalid labels - reserved apxy/ prefix", func(t *testing.T) {
 			body, _ := json.Marshal(resourceBody(map[string]interface{}{
 				"namespace": "root",

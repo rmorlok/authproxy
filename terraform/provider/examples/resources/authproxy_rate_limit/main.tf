@@ -13,7 +13,7 @@ resource "authproxy_rate_limit" "team_acme_salesforce_writes" {
     owner = "platform@example.com"
   }
 
-  # Omit generation to apply to every Salesforce connector version.
+  # Connector scopes always apply across every connector generation.
   scope {
     connector_ref {
       id = authproxy_connector.salesforce.id

@@ -224,7 +224,8 @@
             "apiVersion": { "const": "authproxy.net/v1alpha1" },
             "kind": { "const": "Connector" },
             "id": { "type": "string", "pattern": "^cxr_" },
-            "namespace": { "$ref": "../namespace/schema.json#/$defs/NamespacePath" }
+            "namespace": { "$ref": "../namespace/schema.json#/$defs/NamespacePath" },
+            "generation": { "const": 0 }
           }
         }
       ]

@@ -47,8 +47,7 @@ type rateLimitScopeModel struct {
 }
 
 type rateLimitConnectorRefModel struct {
-	ID         types.String `tfsdk:"id"`
-	Generation types.Int64  `tfsdk:"generation"`
+	ID types.String `tfsdk:"id"`
 }
 
 type rateLimitConnectionRefModel struct {
@@ -150,10 +149,9 @@ func (r *RateLimitResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				},
 				Blocks: map[string]schema.Block{
 					"connector_ref": schema.SingleNestedBlock{
-						Description: "Target one connector. Omit generation to include every connector generation.",
+						Description: "Target one connector across all of its generations.",
 						Attributes: map[string]schema.Attribute{
-							"id":         schema.StringAttribute{Required: true},
-							"generation": schema.Int64Attribute{Optional: true},
+							"id": schema.StringAttribute{Required: true},
 						},
 					},
 					"connection_ref": schema.SingleNestedBlock{
@@ -412,7 +410,6 @@ func buildRateLimitSpec(ctx context.Context, plan *RateLimitResourceModel) (clie
 				APIVersion: client.RateLimitAPIVersion,
 				Kind:       "Connector",
 				ID:         plan.Scope.ConnectorRef.ID.ValueString(),
-				Generation: uint64(plan.Scope.ConnectorRef.Generation.ValueInt64()),
 			}
 		}
 		if plan.Scope.ConnectionRef != nil {
@@ -503,13 +500,8 @@ func setRateLimitState(model *RateLimitResourceModel, rl *client.RateLimit) {
 			model.Scope.NamespaceMatcher = types.StringValue(rl.Spec.Scope.NamespaceMatcher)
 		}
 		if rl.Spec.Scope.ConnectorRef != nil {
-			generation := types.Int64Null()
-			if rl.Spec.Scope.ConnectorRef.Generation != 0 {
-				generation = types.Int64Value(int64(rl.Spec.Scope.ConnectorRef.Generation))
-			}
 			model.Scope.ConnectorRef = &rateLimitConnectorRefModel{
-				ID:         types.StringValue(rl.Spec.Scope.ConnectorRef.ID),
-				Generation: generation,
+				ID: types.StringValue(rl.Spec.Scope.ConnectorRef.ID),
 			}
 		}
 		if rl.Spec.Scope.ConnectionRef != nil {

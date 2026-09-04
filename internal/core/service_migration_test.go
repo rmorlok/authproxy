@@ -162,13 +162,12 @@ func TestMigration(t *testing.T) {
 	t.Run("rate limits", func(t *testing.T) {
 		ns := "root.acme"
 		first := configuredRateLimit("rl_test0000000000001", "tenant-default", ns)
-		second := configuredRateLimit("", "salesforce-v1", ns)
+		second := configuredRateLimit("", "salesforce", ns)
 		second.Spec.Scope = &rlschema.RateLimitScope{ConnectorRef: &meta.ObjectReference{
 			APIVersion: meta.APIVersionV1Alpha1,
 			Kind:       cschema.ConnectorKind,
 			Name:       "salesforce",
 			Namespace:  ns,
-			Generation: 1,
 		}}
 		root := &cfgschema.Root{
 			Connectors: &cfgschema.Connectors{LoadFromList: configuredConnectorResources([]configuredConnector{{
@@ -188,7 +187,7 @@ func TestMigration(t *testing.T) {
 		require.Equal(t, scommon.ResourceName("tenant-default"), storedFirst.Name)
 		require.Equal(t, "config", storedFirst.Labels[rateLimitSourceLabelKey])
 
-		storedSecondPage := db.ListRateLimitsBuilder().ForNamespaceMatchers([]string{ns}).ForName("salesforce-v1").FetchPage(context.Background())
+		storedSecondPage := db.ListRateLimitsBuilder().ForNamespaceMatchers([]string{ns}).ForName("salesforce").FetchPage(context.Background())
 		require.NoError(t, storedSecondPage.Error)
 		require.Len(t, storedSecondPage.Results, 1)
 		storedSecond := storedSecondPage.Results[0]
@@ -196,7 +195,7 @@ func TestMigration(t *testing.T) {
 		require.NotNil(t, storedSecond.Definition.Scope.ConnectorRef)
 		require.NotEmpty(t, storedSecond.Definition.Scope.ConnectorRef.ID)
 		require.Empty(t, storedSecond.Definition.Scope.ConnectorRef.Name)
-		require.Equal(t, uint64(1), storedSecond.Definition.Scope.ConnectorRef.Generation)
+		require.Zero(t, storedSecond.Definition.Scope.ConnectorRef.Generation)
 
 		// Reconciliation updates the same explicit identity instead of creating
 		// another row, and a removed config-owned resource is cleaned up.

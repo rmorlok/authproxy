@@ -51,9 +51,6 @@ func MatchExplain(rule rlschema.RateLimitSpec, ctx *RequestContext) (matched boo
 			if ref.ID != ctx.ConnectorID.String() {
 				return false, BucketKey{}, fmt.Sprintf("connector %q does not match scoped connector %q", ctx.ConnectorID, ref.ID), nil
 			}
-			if ref.Generation != 0 && ref.Generation != ctx.ConnectorVersion {
-				return false, BucketKey{}, fmt.Sprintf("connector generation %d does not match scoped generation %d", ctx.ConnectorVersion, ref.Generation), nil
-			}
 		}
 	}
 

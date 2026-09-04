@@ -62,7 +62,6 @@ func TestRateLimitScopeValidation(t *testing.T) {
 		APIVersion: meta.APIVersionV1Alpha1,
 		Kind:       "Connector",
 		ID:         connectorID.String(),
-		Generation: 2,
 	}
 	connectionRef := &meta.ObjectReference{
 		APIVersion: meta.APIVersionV1Alpha1,
@@ -80,6 +79,9 @@ func TestRateLimitScopeValidation(t *testing.T) {
 
 	invalidMatcher := "root.acme.*"
 	require.ErrorContains(t, ValidateScope(&RateLimitScope{NamespaceMatcher: &invalidMatcher}, nil), "scope.namespaceMatcher")
+
+	connectorRef.Generation = 1
+	require.ErrorContains(t, ValidateScope(&RateLimitScope{ConnectorRef: connectorRef}, nil), "does not apply")
 
 	connectionRef.Generation = 1
 	require.ErrorContains(t, ValidateScope(&RateLimitScope{ConnectionRef: connectionRef}, nil), "does not apply")

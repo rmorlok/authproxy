@@ -354,10 +354,28 @@ type RateLimitAlgorithmJson struct {
 	TokenBucket   *RateLimitTokenBucketJson   `json:"tokenBucket,omitempty"`
 }
 
+// RateLimitConnectorReferenceJson documents an unversioned reference to a
+// Connector. Rate limits bind to connector identity, not one generation.
+type RateLimitConnectorReferenceJson struct {
+	APIVersion string `json:"apiVersion" binding:"required" enums:"authproxy.net/v1alpha1" example:"authproxy.net/v1alpha1"`
+	Kind       string `json:"kind" binding:"required" enums:"Connector" example:"Connector"`
+	ID         string `json:"id,omitempty" example:"cxr_01example"`
+	Name       string `json:"name,omitempty" example:"salesforce"`
+	Namespace  string `json:"namespace,omitempty" example:"root.acme"`
+}
+
+type RateLimitConnectionReferenceJson struct {
+	APIVersion string `json:"apiVersion" binding:"required" enums:"authproxy.net/v1alpha1" example:"authproxy.net/v1alpha1"`
+	Kind       string `json:"kind" binding:"required" enums:"Connection" example:"Connection"`
+	ID         string `json:"id,omitempty" example:"cxn_01example"`
+	Name       string `json:"name,omitempty" example:"salesforce-production"`
+	Namespace  string `json:"namespace,omitempty" example:"root.acme"`
+}
+
 type RateLimitScopeJson struct {
-	NamespaceMatcher *string               `json:"namespaceMatcher,omitempty" example:"root.acme.payments.**"`
-	ConnectorRef     *meta.ObjectReference `json:"connectorRef,omitempty"`
-	ConnectionRef    *meta.ObjectReference `json:"connectionRef,omitempty"`
+	NamespaceMatcher *string                           `json:"namespaceMatcher,omitempty" example:"root.acme.payments.**"`
+	ConnectorRef     *RateLimitConnectorReferenceJson  `json:"connectorRef,omitempty"`
+	ConnectionRef    *RateLimitConnectionReferenceJson `json:"connectionRef,omitempty"`
 }
 
 type RateLimitSpecJson struct {

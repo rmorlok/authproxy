@@ -485,6 +485,56 @@ definitions:
           type: string
         type: array
     type: object
+  openapi.RateLimitConnectionReferenceJson:
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      id:
+        example: cxn_01example
+        type: string
+      kind:
+        enum:
+        - Connection
+        example: Connection
+        type: string
+      name:
+        example: salesforce-production
+        type: string
+      namespace:
+        example: root.acme
+        type: string
+    required:
+    - apiVersion
+    - kind
+    type: object
+  openapi.RateLimitConnectorReferenceJson:
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      id:
+        example: cxr_01example
+        type: string
+      kind:
+        enum:
+        - Connector
+        example: Connector
+        type: string
+      name:
+        example: salesforce
+        type: string
+      namespace:
+        example: root.acme
+        type: string
+    required:
+    - apiVersion
+    - kind
+    type: object
   openapi.RateLimitFixedWindowJson:
     properties:
       limit:
@@ -559,9 +609,9 @@ definitions:
   openapi.RateLimitScopeJson:
     properties:
       connectionRef:
-        $ref: '#/definitions/meta.ObjectReference'
+        $ref: '#/definitions/openapi.RateLimitConnectionReferenceJson'
       connectorRef:
-        $ref: '#/definitions/meta.ObjectReference'
+        $ref: '#/definitions/openapi.RateLimitConnectorReferenceJson'
       namespaceMatcher:
         example: root.acme.payments.**
         type: string

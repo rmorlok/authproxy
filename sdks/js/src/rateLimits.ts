@@ -82,8 +82,6 @@ export interface RateLimitConnectorReference {
     id?: string;
     name?: string;
     namespace?: string;
-    /** Omit to match every generation of the connector. */
-    generation?: number;
 }
 
 export interface RateLimitConnectionReference {

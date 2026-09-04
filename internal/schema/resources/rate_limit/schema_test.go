@@ -169,8 +169,8 @@ func TestSchema(t *testing.T) {
 			Tests: []testCase{
 				{"namespace exact", true, `{"test":{"namespaceMatcher":"root.acme"}}`},
 				{"namespace descendants", true, `{"test":{"namespaceMatcher":"root.acme.**"}}`},
-				{"connector all generations", true, `{"test":{"connectorRef":{"apiVersion":"authproxy.net/v1alpha1","kind":"Connector","id":"cxr_test0000000000001"}}}`},
-				{"connector generation", true, `{"test":{"connectorRef":{"apiVersion":"authproxy.net/v1alpha1","kind":"Connector","id":"cxr_test0000000000001","generation":2}}}`},
+				{"connector", true, `{"test":{"connectorRef":{"apiVersion":"authproxy.net/v1alpha1","kind":"Connector","id":"cxr_test0000000000001"}}}`},
+				{"connector generation rejected", false, `{"test":{"connectorRef":{"apiVersion":"authproxy.net/v1alpha1","kind":"Connector","id":"cxr_test0000000000001","generation":2}}}`},
 				{"connection", true, `{"test":{"connectionRef":{"apiVersion":"authproxy.net/v1alpha1","kind":"Connection","id":"cxn_test0000000000001"}}}`},
 				{"empty rejected", false, `{"test":{}}`},
 				{"invalid namespace matcher rejected", false, `{"test":{"namespaceMatcher":"root.acme.*"}}`},

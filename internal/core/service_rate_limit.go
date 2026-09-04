@@ -185,7 +185,6 @@ func (s *service) normalizeRateLimitScope(
 			APIVersion: meta.APIVersionV1Alpha1,
 			Kind:       cschema.ConnectorKind,
 			ID:         connector.GetId().String(),
-			Generation: resource.Spec.Scope.ConnectorRef.Generation,
 		}
 	}
 	if resource.Spec.Scope.ConnectionRef != nil {
@@ -232,17 +231,13 @@ func (s *service) resolveRateLimitConnectorReference(
 		if err != nil {
 			return nil, fmt.Errorf("%w: invalid connector reference: %v", ErrInvalidArgument, err)
 		}
-		if ref.Generation != 0 {
-			byID, err = s.GetConnectorVersion(ctx, id, ref.Generation)
-		} else {
-			page := s.ListConnectorsBuilder().ForId(id).Limit(1).FetchPage(ctx)
-			err = page.Error
-			if err == nil && len(page.Results) > 0 {
-				byID = page.Results[0]
-			}
-			if err == nil && byID == nil {
-				err = ErrNotFound
-			}
+		page := s.ListConnectorsBuilder().ForId(id).Limit(1).FetchPage(ctx)
+		err = page.Error
+		if err == nil && len(page.Results) > 0 {
+			byID = page.Results[0]
+		}
+		if err == nil && byID == nil {
+			err = ErrNotFound
 		}
 		if err != nil {
 			return nil, err
@@ -266,13 +261,6 @@ func (s *service) resolveRateLimitConnectorReference(
 	}
 	if byName == nil {
 		return nil, ErrNotFound
-	}
-	if ref.Generation != 0 {
-		versioned, err := s.GetConnectorVersion(ctx, byName.GetId(), ref.Generation)
-		if err != nil {
-			return nil, err
-		}
-		byName = versioned
 	}
 	if byID != nil && byID.GetId() != byName.GetId() {
 		return nil, fmt.Errorf("%w: connector reference id %q does not match %q/%q", ErrInvalidArgument, ref.ID, ref.Namespace, ref.Name)

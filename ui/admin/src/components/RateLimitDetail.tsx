@@ -71,7 +71,7 @@ function scopeDisplay(spec: RateLimitSpec): string {
     if (spec.scope?.connectorRef) {
         const ref = spec.scope.connectorRef;
         const target = ref.id || `${ref.namespace}/${ref.name}`;
-        return ref.generation ? `Connector ${target}, generation ${ref.generation}` : `Connector ${target}, all generations`;
+        return `Connector ${target}`;
     }
     if (spec.scope?.connectionRef) {
         const ref = spec.scope.connectionRef;

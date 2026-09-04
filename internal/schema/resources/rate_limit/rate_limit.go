@@ -42,8 +42,7 @@ func IsValidMode(m Mode) bool {
 
 // RateLimit is the Kubernetes-style representation of an AuthProxy rate-limit
 // rule. Metadata.Namespace establishes the namespace cascade; Spec.Scope may
-// narrow the rule to a namespace matcher, one connector (and optionally one
-// generation), or one connection.
+// narrow the rule to a namespace matcher, one connector, or one connection.
 type RateLimit struct {
 	meta.TypeMeta `json:",inline" yaml:",inline"`
 	Metadata      meta.ObjectMeta  `json:"metadata" yaml:"metadata"`
@@ -318,6 +317,9 @@ func ValidateScope(scope *RateLimitScope, vc *common.ValidationContext) error {
 			NamespaceValidator: nschema.ValidatePath,
 		}, vc.PushField("scope").PushField("connectorRef")); err != nil {
 			result = multierror.Append(result, err)
+		}
+		if scope.ConnectorRef.Generation != 0 {
+			result = multierror.Append(result, vc.NewErrorForField("scope.connectorRef.generation", "does not apply to rate-limit connector references"))
 		}
 	}
 	if scope.ConnectionRef != nil {

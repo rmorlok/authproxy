@@ -8865,6 +8865,76 @@ const docTemplateadmin_api = `{
                 }
             }
         },
+        "openapi.RateLimitConnectionReferenceJson": {
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "kind"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "cxn_01example"
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "Connection"
+                    ],
+                    "example": "Connection"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "salesforce-production"
+                },
+                "namespace": {
+                    "type": "string",
+                    "example": "root.acme"
+                }
+            }
+        },
+        "openapi.RateLimitConnectorReferenceJson": {
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "kind"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "cxr_01example"
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "Connector"
+                    ],
+                    "example": "Connector"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "salesforce"
+                },
+                "namespace": {
+                    "type": "string",
+                    "example": "root.acme"
+                }
+            }
+        },
         "openapi.RateLimitFixedWindowJson": {
             "type": "object",
             "properties": {
@@ -8968,10 +9038,10 @@ const docTemplateadmin_api = `{
             "type": "object",
             "properties": {
                 "connectionRef": {
-                    "$ref": "#/definitions/meta.ObjectReference"
+                    "$ref": "#/definitions/openapi.RateLimitConnectionReferenceJson"
                 },
                 "connectorRef": {
-                    "$ref": "#/definitions/meta.ObjectReference"
+                    "$ref": "#/definitions/openapi.RateLimitConnectorReferenceJson"
                 },
                 "namespaceMatcher": {
                     "type": "string",

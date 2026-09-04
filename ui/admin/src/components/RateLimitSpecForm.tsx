@@ -191,28 +191,15 @@ function ScopeSection({ value, onChange }: { value?: RateLimitScope; onChange: (
                 )}
 
                 {value?.connectorRef && (
-                    <Stack direction={{xs: 'column', sm: 'row'}} spacing={2}>
-                        <TextField
-                            label="Connector ID"
-                            size="small"
-                            fullWidth
-                            value={value.connectorRef.id || ''}
-                            onChange={(event) => onChange({connectorRef: {...value.connectorRef, id: event.target.value}})}
-                            placeholder="cxr_..."
-                        />
-                        <TextField
-                            label="Generation"
-                            size="small"
-                            type="number"
-                            value={value.connectorRef.generation ?? ''}
-                            onChange={(event) => onChange({connectorRef: {
-                                ...value.connectorRef,
-                                generation: event.target.value === '' ? undefined : Number(event.target.value),
-                            }})}
-                            helperText="Optional; empty means all generations"
-                            slotProps={{htmlInput: {min: 1, step: 1}}}
-                        />
-                    </Stack>
+                    <TextField
+                        label="Connector ID"
+                        size="small"
+                        fullWidth
+                        value={value.connectorRef.id || ''}
+                        onChange={(event) => onChange({connectorRef: {...value.connectorRef, id: event.target.value}})}
+                        placeholder="cxr_..."
+                        helperText="Applies to every generation of the connector"
+                    />
                 )}
 
                 {value?.connectionRef && (
