@@ -6,3 +6,9 @@ the system that will handle appropriate logging an event queuing for background 
 
 Generally speaking, other packages should not take dependencies on core directly, but rather take dependencies on its
 `iface` subpackage that exposes the core interfaces as well as some of the data model used by those interfaces.
+
+Kubernetes-style `ObjectReference` values are resolved through the typed
+`Resolve<Resource>Reference` methods. Database resolution establishes the
+logical resource identity; core is responsible for domain conversion and
+hydration, such as selecting a connector definition generation or loading the
+connector generation pinned by a connection.

@@ -14,7 +14,6 @@ import (
 	cfgschema "github.com/rmorlok/authproxy/internal/schema/config"
 	keyschema "github.com/rmorlok/authproxy/internal/schema/resources/key"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
-	nschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
@@ -28,81 +27,6 @@ func (s *service) GetKey(ctx context.Context, id apid.ID) (iface.Key, error) {
 	}
 
 	return wrapKey(*ek, s), nil
-}
-
-func (s *service) ResolveKeyReference(
-	ctx context.Context,
-	reference meta.ObjectReference,
-) (iface.Key, error) {
-	if err := nschema.ValidateEncryptionKeyReference(
-		&reference,
-		nil, // validation context
-	); err != nil {
-		return nil, fmt.Errorf("%w: invalid key reference: %v", ErrInvalidArgument, err)
-	}
-
-	var keyByID iface.Key
-	if reference.HasID() {
-		id, err := apid.Parse(reference.ID)
-		if err != nil {
-			return nil, fmt.Errorf("%w: invalid key reference: %v", ErrInvalidArgument, err)
-		}
-
-		keyByID, err = s.GetKey(ctx, id)
-		if err != nil {
-			return nil, err
-		}
-
-		if !reference.HasNamespacedName() {
-			return keyByID, nil
-		}
-	}
-
-	keyByName, err := s.resolveKeyByNamespacedName(ctx, reference)
-	if err != nil {
-		return nil, err
-	}
-
-	if keyByID != nil && keyByID.GetId() != keyByName.GetId() {
-		return nil, fmt.Errorf(
-			"%w: key reference id %q does not match key %q/%q with id %q",
-			ErrInvalidArgument,
-			reference.ID,
-			reference.Namespace,
-			reference.Name,
-			keyByName.GetId(),
-		)
-	}
-
-	if keyByID != nil {
-		return keyByID, nil
-	}
-
-	return keyByName, nil
-}
-
-func (s *service) resolveKeyByNamespacedName(
-	ctx context.Context,
-	reference meta.ObjectReference,
-) (iface.Key, error) {
-	result := s.ListKeysBuilder().
-		ForNamespaceMatcher(reference.Namespace).
-		ForName(reference.Name).
-		Limit(2).
-		FetchPage(ctx)
-	if result.Error != nil {
-		return nil, result.Error
-	}
-
-	if len(result.Results) == 0 {
-		return nil, ErrNotFound
-	}
-
-	if len(result.Results) > 1 {
-		return nil, fmt.Errorf("key reference %q/%q is ambiguous", reference.Namespace, reference.Name)
-	}
-
-	return result.Results[0], nil
 }
 
 func (s *service) CreateKey(

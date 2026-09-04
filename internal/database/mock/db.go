@@ -16,6 +16,7 @@ import (
 	auth "github.com/rmorlok/authproxy/internal/schema/auth"
 	common "github.com/rmorlok/authproxy/internal/schema/common"
 	connectors "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	meta "github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	rate_limit "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 	pagination "github.com/rmorlok/authproxy/internal/util/pagination"
 	rate "golang.org/x/time/rate"
@@ -1632,6 +1633,81 @@ func (mr *MockDBMockRecorder) RefreshNamespaceLabelsCarryForward(ctx, nsPath int
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RefreshNamespaceLabelsCarryForward", reflect.TypeOf((*MockDB)(nil).RefreshNamespaceLabelsCarryForward), ctx, nsPath)
 }
 
+// ResolveActorReference mocks base method.
+func (m *MockDB) ResolveActorReference(ctx context.Context, reference meta.ObjectReference) (*database.Actor, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ResolveActorReference", ctx, reference)
+	ret0, _ := ret[0].(*database.Actor)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ResolveActorReference indicates an expected call of ResolveActorReference.
+func (mr *MockDBMockRecorder) ResolveActorReference(ctx, reference interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResolveActorReference", reflect.TypeOf((*MockDB)(nil).ResolveActorReference), ctx, reference)
+}
+
+// ResolveConnectionReference mocks base method.
+func (m *MockDB) ResolveConnectionReference(ctx context.Context, reference meta.ObjectReference) (*database.Connection, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ResolveConnectionReference", ctx, reference)
+	ret0, _ := ret[0].(*database.Connection)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ResolveConnectionReference indicates an expected call of ResolveConnectionReference.
+func (mr *MockDBMockRecorder) ResolveConnectionReference(ctx, reference interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResolveConnectionReference", reflect.TypeOf((*MockDB)(nil).ResolveConnectionReference), ctx, reference)
+}
+
+// ResolveConnectorReference mocks base method.
+func (m *MockDB) ResolveConnectorReference(ctx context.Context, reference meta.ObjectReference) (*database.Connector, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ResolveConnectorReference", ctx, reference)
+	ret0, _ := ret[0].(*database.Connector)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ResolveConnectorReference indicates an expected call of ResolveConnectorReference.
+func (mr *MockDBMockRecorder) ResolveConnectorReference(ctx, reference interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResolveConnectorReference", reflect.TypeOf((*MockDB)(nil).ResolveConnectorReference), ctx, reference)
+}
+
+// ResolveKeyReference mocks base method.
+func (m *MockDB) ResolveKeyReference(ctx context.Context, reference meta.ObjectReference) (*database.Key, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ResolveKeyReference", ctx, reference)
+	ret0, _ := ret[0].(*database.Key)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ResolveKeyReference indicates an expected call of ResolveKeyReference.
+func (mr *MockDBMockRecorder) ResolveKeyReference(ctx, reference interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResolveKeyReference", reflect.TypeOf((*MockDB)(nil).ResolveKeyReference), ctx, reference)
+}
+
+// ResolveNamespaceReference mocks base method.
+func (m *MockDB) ResolveNamespaceReference(ctx context.Context, reference meta.ObjectReference) (*database.Namespace, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ResolveNamespaceReference", ctx, reference)
+	ret0, _ := ret[0].(*database.Namespace)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ResolveNamespaceReference indicates an expected call of ResolveNamespaceReference.
+func (mr *MockDBMockRecorder) ResolveNamespaceReference(ctx, reference interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResolveNamespaceReference", reflect.TypeOf((*MockDB)(nil).ResolveNamespaceReference), ctx, reference)
+}
+
 // ResolveNotificationsForResourceKeys mocks base method.
 func (m *MockDB) ResolveNotificationsForResourceKeys(ctx context.Context, resourceType string, resourceID apid.ID, keys []string) error {
 	m.ctrl.T.Helper()
@@ -1644,6 +1720,21 @@ func (m *MockDB) ResolveNotificationsForResourceKeys(ctx context.Context, resour
 func (mr *MockDBMockRecorder) ResolveNotificationsForResourceKeys(ctx, resourceType, resourceID, keys interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResolveNotificationsForResourceKeys", reflect.TypeOf((*MockDB)(nil).ResolveNotificationsForResourceKeys), ctx, resourceType, resourceID, keys)
+}
+
+// ResolveRateLimitReference mocks base method.
+func (m *MockDB) ResolveRateLimitReference(ctx context.Context, reference meta.ObjectReference) (*database.RateLimit, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ResolveRateLimitReference", ctx, reference)
+	ret0, _ := ret[0].(*database.RateLimit)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ResolveRateLimitReference indicates an expected call of ResolveRateLimitReference.
+func (mr *MockDBMockRecorder) ResolveRateLimitReference(ctx, reference interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResolveRateLimitReference", reflect.TypeOf((*MockDB)(nil).ResolveRateLimitReference), ctx, reference)
 }
 
 // SearchResources mocks base method.

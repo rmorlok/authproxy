@@ -24,3 +24,10 @@ that shape with its expected `apiVersion` and `kind`, plus ID and namespace
 validators. Core services resolve namespaced names to immutable IDs before
 persisting relationships; responses may therefore return an ID-based reference
 even when the request used a namespaced name.
+
+Persistence resolution is centralized in `internal/database`: a closed mapping
+of supported kinds selects a trusted table and row scanner, and one query path
+resolves only live rows by ID or exact namespace/name. Typed database methods
+perform the resource-specific cast. Core reference methods then wrap or hydrate
+the row as needed; in particular, connector generation is selected at this
+boundary and connections load their pinned connector generation.
