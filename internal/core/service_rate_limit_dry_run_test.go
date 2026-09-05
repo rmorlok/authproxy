@@ -29,7 +29,11 @@ import (
 // hydration, the namespace cascade, and the Peek-doesn't-mutate
 // invariant at the layer that actually owns the logic.
 
-func newDryRunService(t *testing.T) (iface.C, ratelimit.MutableCache, func()) {
+func newDryRunService(t *testing.T) (
+	iface.C,
+	ratelimit.MutableCache,
+	func(),
+) {
 	t.Helper()
 	cfg := config.FromRoot(&cfgschema.Root{
 		DevSettings: &cfgschema.DevSettings{
@@ -56,7 +60,13 @@ func newDryRunService(t *testing.T) (iface.C, ratelimit.MutableCache, func()) {
 	return svc, rlCache, ctrl.Finish
 }
 
-func installRule(t *testing.T, svc iface.C, rlCache ratelimit.MutableCache, namespace string, def rlschema.RateLimitSpec) *database.RateLimit {
+func installRule(
+	t *testing.T,
+	svc iface.C,
+	rlCache ratelimit.MutableCache,
+	namespace string,
+	def rlschema.RateLimitSpec,
+) *database.RateLimit {
 	t.Helper()
 	created, err := svc.CreateRateLimit(context.Background(), &rlschema.RateLimit{
 		TypeMeta: meta.NewTypeMeta(rlschema.RateLimitKind),
