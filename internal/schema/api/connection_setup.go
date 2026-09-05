@@ -42,39 +42,52 @@ type ConnectionInitiateAction struct {
 	apiv1alpha1.Action[ConnectionInitiateSpec, struct{}] `json:",inline" yaml:",inline"`
 }
 
-func (a *ConnectionInitiateAction) ValidateRequest(expectedKind meta.Kind) error {
+func (a *ConnectionInitiateAction) ValidateRequest(
+	expectedKind meta.Kind,
+) error {
 	if err := a.Action.ValidateRequest(expectedKind); err != nil {
 		return err
 	}
 	vc := &common.ValidationContext{Path: "$"}
 	var result *multierror.Error
-	if err := meta.ValidateObjectReferenceWithOptions(a.Metadata.Target, meta.ObjectReferenceValidationOptions{
-		ExpectedAPIVersion: meta.APIVersionV1Alpha1,
-		ExpectedKind:       connectorschema.ConnectorKind,
-		IDValidator:        connectorschema.ValidateID,
-		NamespaceValidator: namespaceschema.ValidatePath,
-	}, vc.PushField("metadata").PushField("target")); err != nil {
+	if err := meta.ValidateObjectReferenceWithOptions(
+		a.Metadata.Target,
+		meta.ObjectReferenceValidationOptions{
+			ExpectedAPIVersion: meta.APIVersionV1Alpha1,
+			ExpectedKind:       connectorschema.ConnectorKind,
+			IDValidator:        connectorschema.ValidateID,
+			NamespaceValidator: namespaceschema.ValidatePath,
+		},
+		vc.
+			PushField("metadata").
+			PushField("target"),
+	); err != nil {
 		result = multierror.Append(result, err)
 	}
+
 	if a.Spec.IntoNamespace != "" {
 		if err := namespaceschema.ValidatePath(a.Spec.IntoNamespace); err != nil {
 			result = multierror.Append(result, vc.NewErrorfForField("spec.intoNamespace", "%v", err))
 		}
 	}
+
 	if a.Spec.Name != nil {
 		if err := a.Spec.Name.Validate(); err != nil {
 			result = multierror.Append(result, vc.NewErrorfForField("spec.name", "%v", err))
 		}
 	}
+
 	if err := meta.ValidateUserLabels(a.Spec.Labels); err != nil {
 		result = multierror.Append(result, vc.NewErrorfForField("spec.labels", "%v", err))
 	}
 	if err := meta.ValidateAnnotations(a.Spec.Annotations); err != nil {
 		result = multierror.Append(result, vc.NewErrorfForField("spec.annotations", "%v", err))
 	}
+
 	if a.Spec.ReturnToURL == "" {
 		result = multierror.Append(result, vc.NewErrorForField("spec.returnToUrl", "is required"))
 	}
+
 	return result.ErrorOrNil()
 }
 
@@ -197,16 +210,21 @@ type ConnectionSetupSubmitAction struct {
 	apiv1alpha1.Action[ConnectionSetupSubmitSpec, struct{}] `json:",inline" yaml:",inline"`
 }
 
-func (a *ConnectionSetupSubmitAction) ValidateRequest(expectedKind meta.Kind) error {
+func (a *ConnectionSetupSubmitAction) ValidateRequest(
+	expectedKind meta.Kind,
+) error {
 	if err := a.Action.ValidateRequest(expectedKind); err != nil {
 		return err
 	}
+
 	if a.Spec.StepID == "" {
 		return fmt.Errorf("$.spec.stepId: is required")
 	}
+
 	if len(a.Spec.Data) == 0 || string(a.Spec.Data) == "null" {
 		return fmt.Errorf("$.spec.data: is required and must not be null")
 	}
+
 	return validateConnectionActionTarget(a.Metadata.Target)
 }
 
@@ -219,7 +237,9 @@ type ConnectionSetupControlAction struct {
 	apiv1alpha1.Action[ConnectionSetupControlSpec, struct{}] `json:",inline" yaml:",inline"`
 }
 
-func (a *ConnectionSetupControlAction) ValidateRequest(expectedKind meta.Kind) error {
+func (a *ConnectionSetupControlAction) ValidateRequest(
+	expectedKind meta.Kind,
+) error {
 	if err := a.Action.ValidateRequest(expectedKind); err != nil {
 		return err
 	}
