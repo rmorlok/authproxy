@@ -33,7 +33,7 @@
   },
   "permissions": [
     {
-      "namespace": "root.prod.payments",
+      "namespace": "root.prod.**",
       "resources": ["connections"],
       "verbs": ["list"]
     }
