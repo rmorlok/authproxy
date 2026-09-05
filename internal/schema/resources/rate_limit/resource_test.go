@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/apid"
+	connectionschema "github.com/rmorlok/authproxy/internal/schema/resources/connection"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
@@ -65,7 +66,7 @@ func TestRateLimitScopeValidation(t *testing.T) {
 	}
 	connectionRef := &meta.ObjectReference{
 		APIVersion: meta.APIVersionV1Alpha1,
-		Kind:       ConnectionKind,
+		Kind:       connectionschema.ConnectionKind,
 		ID:         connectionID.String(),
 	}
 
@@ -140,7 +141,7 @@ func TestRateLimitPatchPresenceAndApply(t *testing.T) {
 	}
 	current.Spec.Scope = &RateLimitScope{ConnectionRef: &meta.ObjectReference{
 		APIVersion: meta.APIVersionV1Alpha1,
-		Kind:       ConnectionKind,
+		Kind:       connectionschema.ConnectionKind,
 		ID:         apid.New(apid.PrefixConnection).String(),
 	}}
 

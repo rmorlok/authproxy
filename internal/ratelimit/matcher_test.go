@@ -6,6 +6,7 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	connectionschema "github.com/rmorlok/authproxy/internal/schema/resources/connection"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 	"github.com/stretchr/testify/require"
@@ -78,7 +79,7 @@ func TestMatch_ConnectionScope(t *testing.T) {
 	rule := validRule(func(r *rlschema.RateLimitSpec) {
 		r.Scope = &rlschema.RateLimitScope{ConnectionRef: &meta.ObjectReference{
 			APIVersion: meta.APIVersionV1Alpha1,
-			Kind:       rlschema.ConnectionKind,
+			Kind:       connectionschema.ConnectionKind,
 			ID:         "cxn_target",
 		}}
 	})

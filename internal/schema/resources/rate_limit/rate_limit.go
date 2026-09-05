@@ -10,15 +10,13 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	connectionschema "github.com/rmorlok/authproxy/internal/schema/resources/connection"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	nschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 )
 
-const (
-	RateLimitKind  meta.Kind = "RateLimit"
-	ConnectionKind meta.Kind = "Connection"
-)
+const RateLimitKind meta.Kind = "RateLimit"
 
 // Mode controls whether a matching rule rejects requests or only observes them.
 type Mode string
@@ -339,7 +337,7 @@ func ValidateScope(scope *RateLimitScope, vc *common.ValidationContext) error {
 		count++
 		if err := meta.ValidateObjectReferenceWithOptions(*scope.ConnectionRef, meta.ObjectReferenceValidationOptions{
 			ExpectedAPIVersion: meta.APIVersionV1Alpha1,
-			ExpectedKind:       ConnectionKind,
+			ExpectedKind:       connectionschema.ConnectionKind,
 			IDValidator:        validateConnectionID,
 			NamespaceValidator: nschema.ValidatePath,
 		}, vc.PushField("scope").PushField("connectionRef")); err != nil {

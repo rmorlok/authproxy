@@ -13,6 +13,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/ratelimit"
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	connectionschema "github.com/rmorlok/authproxy/internal/schema/resources/connection"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	nschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
@@ -174,7 +175,7 @@ func (s *service) normalizeRateLimitScope(
 	}
 
 	if resource.Spec.Scope.ConnectorRef != nil {
-		connector, err := s.resolveRateLimitConnectorReference(
+		connector, err := s.ResolveConnectorReference(
 			ctx,
 			*resource.Spec.Scope.ConnectorRef,
 		)
@@ -198,7 +199,7 @@ func (s *service) normalizeRateLimitScope(
 	}
 
 	if resource.Spec.Scope.ConnectionRef != nil {
-		connection, err := s.resolveConnectionReference(
+		connection, err := s.ResolveConnectionReference(
 			ctx,
 			*resource.Spec.Scope.ConnectionRef,
 		)
@@ -215,7 +216,7 @@ func (s *service) normalizeRateLimitScope(
 		}
 		resource.Spec.Scope.ConnectionRef = &meta.ObjectReference{
 			APIVersion: meta.APIVersionV1Alpha1,
-			Kind:       rlschema.ConnectionKind,
+			Kind:       connectionschema.ConnectionKind,
 			ID:         connection.GetId().String(),
 		}
 	}
@@ -236,75 +237,6 @@ func validateRateLimitScopeTargetNamespace(
 		targetNamespace,
 		resourceNamespace,
 	)
-}
-
-func (s *service) resolveRateLimitConnectorReference(
-	ctx context.Context,
-	ref meta.ObjectReference,
-) (iface.Connector, error) {
-	var byID iface.Connector
-	if ref.HasID() {
-		id, err := apid.Parse(ref.ID)
-		if err != nil {
-			return nil, fmt.Errorf(
-				"%w: invalid connector reference: %v",
-				ErrInvalidArgument,
-				err,
-			)
-		}
-
-		page := s.ListConnectorsBuilder().ForId(id).Limit(1).FetchPage(ctx)
-		err = page.Error
-		if err == nil && len(page.Results) > 0 {
-			byID = page.Results[0]
-		}
-		if err == nil && byID == nil {
-			err = ErrNotFound
-		}
-		if err != nil {
-			return nil, err
-		}
-		if !ref.HasNamespacedName() {
-			return byID, nil
-		}
-	}
-
-	page := s.ListConnectorsBuilder().
-		ForNamespaceMatcher(ref.Namespace).
-		ForName(ref.Name).
-		Limit(20).
-		FetchPage(ctx)
-	if page.Error != nil {
-		return nil, page.Error
-	}
-
-	var byName iface.Connector
-	for _, candidate := range page.Results {
-		if byName == nil {
-			byName = candidate
-		} else if byName.GetId() != candidate.GetId() {
-			return nil, fmt.Errorf(
-				"%w: connector reference %q/%q is ambiguous",
-				ErrInvalidArgument,
-				ref.Namespace,
-				ref.Name,
-			)
-		}
-	}
-	if byName == nil {
-		return nil, ErrNotFound
-	}
-	if byID != nil && byID.GetId() != byName.GetId() {
-		return nil, fmt.Errorf(
-			"%w: connector reference id %q does not match %q/%q",
-			ErrInvalidArgument,
-			ref.ID,
-			ref.Namespace,
-			ref.Name,
-		)
-	}
-
-	return byName, nil
 }
 
 func (s *service) DeleteRateLimit(ctx context.Context, id apid.ID) error {
