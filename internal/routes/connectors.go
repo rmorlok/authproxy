@@ -252,9 +252,12 @@ func (r *ConnectorsRoutes) list(gctx *gin.Context) {
 	}
 
 	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewListConnectorsResponseJson(
-		util.Map(auth.FilterForValidatedResources(val, result.Results), func(c connIface.Connector) cschema.Connector {
-			return *c.GetResource()
-		}),
+		util.Map(
+			auth.FilterForValidatedResources(val, result.Results),
+			func(c connIface.Connector) cschema.Connector {
+				return *c.GetResource()
+			},
+		),
 		result.Cursor,
 	))
 }
