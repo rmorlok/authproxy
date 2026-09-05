@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/rmorlok/authproxy/internal/apid"
@@ -13,6 +14,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	encryptmock "github.com/rmorlok/authproxy/internal/encrypt/mock"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -99,6 +101,52 @@ func TestConnector_GetDefinition(t *testing.T) {
 	// Test caching - should not call decrypt again
 	result2 := c.GetDefinition()
 	assert.Equal(t, result, result2)
+}
+
+func TestConnector_GetResource(t *testing.T) {
+	createdAt := time.Date(2026, time.September, 5, 14, 0, 0, 0, time.UTC)
+	updatedAt := createdAt.Add(time.Minute)
+	id := apid.MustParse("cxr_testresource00001")
+	definition := &cschema.ConnectorDefinition{
+		DisplayName: "Test Connector",
+		Description: "A test connector",
+	}
+	labels := database.Labels{"team": "platform"}
+	annotations := database.Annotations{"example.com/owner": "integrations"}
+	c := &Connector{
+		ConnectorWithDefinition: database.ConnectorWithDefinition{
+			Id:          id,
+			Name:        "test-connector",
+			Namespace:   "root.acme",
+			Version:     3,
+			State:       database.ConnectorDefinitionVersionStateArchived,
+			Labels:      labels,
+			Annotations: annotations,
+			CreatedAt:   createdAt,
+			UpdatedAt:   updatedAt,
+		},
+		def: definition,
+	}
+
+	resource := c.GetResource()
+	require.Equal(t, cschema.ConnectorKind, resource.Kind)
+	require.Equal(t, id.String(), resource.Metadata.ID)
+	require.Equal(t, "test-connector", string(resource.Metadata.Name))
+	require.Equal(t, "root.acme", resource.Metadata.Namespace)
+	require.Equal(t, uint64(3), resource.Metadata.Generation)
+	require.Equal(t, createdAt, *resource.Metadata.CreatedAt)
+	require.Equal(t, updatedAt, *resource.Metadata.UpdatedAt)
+	require.Equal(t, cschema.ConnectorReleaseStatePrimary, resource.Spec.Release.DesiredState)
+	require.Equal(t, cschema.ConnectorReleaseStateArchived, resource.Status.Release.State)
+	require.Equal(t, definition, &resource.Spec.Definition)
+	require.NoError(t, resource.ValidateFor(meta.ValidationModeResponse, nil))
+
+	resource.Metadata.Labels["team"] = "changed"
+	resource.Metadata.Annotations["example.com/owner"] = "changed"
+	resource.Spec.Definition.Description = "changed"
+	require.Equal(t, "platform", labels["team"])
+	require.Equal(t, "integrations", annotations["example.com/owner"])
+	require.Equal(t, "A test connector", definition.Description)
 }
 
 func TestConnector_GetHashDerivesFromEncryptedDefinition(t *testing.T) {

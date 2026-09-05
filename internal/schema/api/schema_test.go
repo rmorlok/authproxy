@@ -92,11 +92,12 @@ func TestSchemaSamples(t *testing.T) {
 		{name: "metrics schema", ref: "./schema.json#/$defs/MetricsSchemaResponse", file: "valid-metrics-schema.json"},
 		{name: "connector", ref: "./schema.json#/$defs/Connector", file: "valid-connector.json"},
 		{name: "list connectors", ref: "./schema.json#/$defs/ListConnectorsResponse", file: "valid-list-connectors.json"},
-		{name: "connector version", ref: "./schema.json#/$defs/ConnectorVersion", file: "valid-connector-version.json"},
+		{name: "connector generation", ref: "./schema.json#/$defs/Connector", file: "valid-connector-version.json"},
 		{name: "list connector versions", ref: "./schema.json#/$defs/ListConnectorVersionsResponse", file: "valid-list-connector-versions.json"},
 		{name: "create connector", ref: "./schema.json#/$defs/CreateConnectorRequest", file: "valid-create-connector.json"},
 		{name: "update connector", ref: "./schema.json#/$defs/UpdateConnectorRequest", file: "valid-update-connector.json"},
 		{name: "create connector version", ref: "./schema.json#/$defs/CreateConnectorVersionRequest", file: "valid-create-connector-version.json"},
+		{name: "update connector version", ref: "./schema.json#/$defs/UpdateConnectorVersionRequest", file: "valid-update-connector.json"},
 		{name: "connector lifecycle request", ref: "./schema.json#/$defs/ConnectorLifecycleRequest", file: "valid-connector-lifecycle-request.json"},
 		{name: "connector lifecycle response", ref: "./schema.json#/$defs/ConnectorLifecycleResponse", file: "valid-connector-lifecycle-response.json"},
 		{name: "force connector version state", ref: "./schema.json#/$defs/ForceConnectorVersionStateRequest", file: "valid-force-connector-version-state.json"},
@@ -145,6 +146,16 @@ func TestManagedListSchemasRejectLegacyTopLevelCursor(t *testing.T) {
 	require.Error(t, schema.Validate(map[string]any{
 		"items":  []any{},
 		"cursor": "next-page",
+	}))
+}
+
+func TestConnectorSchemasRejectLegacyFlatShape(t *testing.T) {
+	schema := compileRefSchema(t, "./schema.json#/$defs/CreateConnectorRequest")
+	require.Error(t, schema.Validate(map[string]any{
+		"namespace": "root",
+		"definition": map[string]any{
+			"displayName": "Legacy",
+		},
 	}))
 }
 

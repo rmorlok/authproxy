@@ -41,7 +41,7 @@ type ConnectionJson struct {
 	HealthState ConnectionHealthState `json:"healthState" yaml:"healthState" swaggertype:"string" example:"healthy"`
 	SetupStep   *cschema.SetupStep    `json:"setupStepId,omitempty" yaml:"setupStepId,omitempty" swaggertype:"string" example:"tenant"`
 	SetupError  *string               `json:"setupError,omitempty" yaml:"setupError,omitempty"`
-	Connector   ConnectorJson         `json:"connector" yaml:"connector"`
+	Connector   cschema.Connector     `json:"connector" yaml:"connector"`
 	CreatedAt   time.Time             `json:"createdAt" yaml:"createdAt"`
 	UpdatedAt   time.Time             `json:"updatedAt" yaml:"updatedAt"`
 }

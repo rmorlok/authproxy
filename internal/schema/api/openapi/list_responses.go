@@ -8,6 +8,7 @@ import (
 	apiv1alpha1 "github.com/rmorlok/authproxy/internal/schema/api/v1alpha1"
 	authschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	actorschema "github.com/rmorlok/authproxy/internal/schema/resources/actor"
+	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	keyschema "github.com/rmorlok/authproxy/internal/schema/resources/key"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	nschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
@@ -77,29 +78,53 @@ type ListNamespacesResponseJson struct {
 	Items []nschema.Namespace `json:"items" binding:"required"`
 }
 
+// ConnectorSpecJson documents connector desired state while keeping the
+// polymorphic provider definition opaque to swaggo.
+type ConnectorSpecJson struct {
+	Release    cschema.ConnectorReleaseSpec `json:"release,omitempty"`
+	Definition map[string]interface{}       `json:"definition" swaggertype:"object"`
+}
+
+// ConnectorJson documents one logical connector generation. Every connector
+// endpoint uses this same kind; metadata.generation selects the version.
+//
+//	@Description	Kubernetes-style Connector resource
+type ConnectorJson struct {
+	APIVersion string                   `json:"apiVersion" binding:"required" enums:"authproxy.net/v1alpha1" example:"authproxy.net/v1alpha1"`
+	Kind       string                   `json:"kind" binding:"required" enums:"Connector" example:"Connector"`
+	Metadata   meta.ObjectMeta          `json:"metadata" binding:"required"`
+	Spec       ConnectorSpecJson        `json:"spec" binding:"required"`
+	Status     *cschema.ConnectorStatus `json:"status,omitempty"`
+}
+
+// ConnectorReleaseSpecPatchJson documents desired release-state updates.
+type ConnectorReleaseSpecPatchJson struct {
+	DesiredState *cschema.ConnectorReleaseState `json:"desiredState,omitempty" enums:"draft,primary"`
+}
+
+// ConnectorSpecPatchJson documents mutable connector desired state.
+type ConnectorSpecPatchJson struct {
+	Release    *ConnectorReleaseSpecPatchJson `json:"release,omitempty"`
+	Definition map[string]interface{}         `json:"definition,omitempty" swaggertype:"object"`
+}
+
+// ConnectorPatchJson documents a canonical Connector update.
+//
+//	@Description	Kubernetes-style Connector patch
+type ConnectorPatchJson struct {
+	APIVersion string                   `json:"apiVersion" binding:"required" enums:"authproxy.net/v1alpha1" example:"authproxy.net/v1alpha1"`
+	Kind       string                   `json:"kind" binding:"required" enums:"Connector" example:"Connector"`
+	Metadata   *meta.ObjectMetaPatch    `json:"metadata" binding:"required"`
+	Spec       *ConnectorSpecPatchJson  `json:"spec" binding:"required"`
+	Status     *cschema.ConnectorStatus `json:"status,omitempty"`
+}
+
 // ListConnectorsResponseJson documents the paginated connector list response.
 //
 //	@Description	Paginated list of connectors
 type ListConnectorsResponseJson struct {
 	ResourceListJson
-	// List of connectors.
-	Items []schemaapi.ConnectorJson `json:"items" binding:"required"`
-}
-
-// ConnectorVersionJson documents a connector version response.
-//
-//	@Description	Detailed connector version information
-type ConnectorVersionJson struct {
-	Id          apid.ID                         `json:"id" swaggertype:"string" example:"cxr_test550e8400abcde"`
-	Version     uint64                          `json:"version" example:"1"`
-	Namespace   string                          `json:"namespace" example:"root.acme"`
-	Name        string                          `json:"name" example:"salesforce"`
-	State       schemaapi.ConnectorVersionState `json:"state" swaggertype:"string" example:"primary"`
-	Definition  interface{}                     `json:"definition"`
-	Labels      map[string]string               `json:"labels,omitempty"`
-	Annotations map[string]string               `json:"annotations,omitempty"`
-	CreatedAt   time.Time                       `json:"createdAt"`
-	UpdatedAt   time.Time                       `json:"updatedAt"`
+	Items []ConnectorJson `json:"items" binding:"required"`
 }
 
 // ListConnectorVersionsResponseJson documents the paginated connector version list response.
@@ -107,12 +132,12 @@ type ConnectorVersionJson struct {
 //	@Description	Paginated list of connector versions
 type ListConnectorVersionsResponseJson struct {
 	ResourceListJson
-	// List of connector versions.
-	Items []ConnectorVersionJson `json:"items" binding:"required"`
+	Items []ConnectorJson `json:"items" binding:"required"`
 }
 
-// ConnectionJson documents a connection response while keeping nested
-// connector/setup definitions opaque for swaggo.
+// ConnectionJson documents a connection response while keeping setup
+// definitions opaque for swaggo. The nested connector uses the same canonical
+// envelope as connector endpoints.
 //
 //	@Description	Connection to an external service
 type ConnectionJson struct {
@@ -125,7 +150,7 @@ type ConnectionJson struct {
 	HealthState string            `json:"healthState" example:"healthy"`
 	SetupStep   string            `json:"setupStepId,omitempty" example:"tenant"`
 	SetupError  string            `json:"setupError,omitempty"`
-	Connector   interface{}       `json:"connector"`
+	Connector   ConnectorJson     `json:"connector"`
 	CreatedAt   time.Time         `json:"createdAt"`
 	UpdatedAt   time.Time         `json:"updatedAt"`
 }
@@ -199,45 +224,6 @@ type NotificationJson struct {
 type ListNotificationsResponseJson struct {
 	Items  []interface{} `json:"items"`
 	Cursor string        `json:"cursor,omitempty"`
-}
-
-// CreateConnectorRequestJson documents the connector creation body.
-//
-//	@Description	Request to create a new connector
-type CreateConnectorRequestJson struct {
-	Namespace   string            `json:"namespace" example:"root.acme"`
-	Name        *string           `json:"name,omitempty" example:"salesforce"`
-	Definition  interface{}       `json:"definition"`
-	Labels      map[string]string `json:"labels,omitempty"`
-	Annotations map[string]string `json:"annotations,omitempty"`
-}
-
-// UpdateConnectorRequestJson documents the connector update body.
-//
-//	@Description	Request to update a logical connector
-type UpdateConnectorRequestJson struct {
-	Name        *string            `json:"name,omitempty" example:"salesforce"`
-	Definition  interface{}        `json:"definition,omitempty"`
-	Labels      *map[string]string `json:"labels,omitempty"`
-	Annotations *map[string]string `json:"annotations,omitempty"`
-}
-
-// UpdateConnectorVersionRequestJson documents connector definition-version updates.
-//
-//	@Description Request to update a connector definition version
-type UpdateConnectorVersionRequestJson struct {
-	Definition  interface{}        `json:"definition,omitempty"`
-	Labels      *map[string]string `json:"labels,omitempty"`
-	Annotations *map[string]string `json:"annotations,omitempty"`
-}
-
-// CreateConnectorVersionRequestJson documents the connector version creation body.
-//
-//	@Description	Request to create a new draft connector version
-type CreateConnectorVersionRequestJson struct {
-	Definition  interface{}        `json:"definition,omitempty"`
-	Labels      *map[string]string `json:"labels,omitempty"`
-	Annotations *map[string]string `json:"annotations,omitempty"`
 }
 
 // ConnectorLifecycleRequestJson documents connector lifecycle operation bodies.

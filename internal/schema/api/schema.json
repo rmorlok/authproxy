@@ -924,79 +924,7 @@
       "additionalProperties": false
     },
     "Connector": {
-      "description": "API summary projection of a connector version. This intentionally differs from the resource connector definition schema: fields such as logo are flattened for responses, while runtime fields such as state, has_configure, timestamps, version counts, and state summaries are added by the API. Request bodies and version detail responses reference the canonical resource schema under their definition fields.",
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "version": {
-          "type": "integer",
-          "minimum": 1
-        },
-        "namespace": {
-          "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath"
-        },
-        "state": {
-          "$ref": "#/$defs/ConnectorVersionState"
-        },
-        "displayName": {
-          "type": "string"
-        },
-        "highlight": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
-        },
-        "statusPageUrl": {
-          "type": "string",
-          "format": "uri"
-        },
-        "logo": {
-          "type": "string"
-        },
-        "hasConfigure": {
-          "type": "boolean"
-        },
-        "labels": {
-          "$ref": "#/$defs/StringMap"
-        },
-        "annotations": {
-          "$ref": "#/$defs/StringMap"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "versions": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "states": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/ConnectorVersionState"
-          }
-        }
-      },
-      "required": [
-        "id",
-        "version",
-        "namespace",
-        "state",
-        "displayName",
-        "description",
-        "logo",
-        "hasConfigure",
-        "createdAt",
-        "updatedAt"
-      ],
-      "additionalProperties": false
+      "$ref": "../resources/connectors/schema.json"
     },
     "ListConnectorsResponse": {
       "description": "A Kubernetes-style list of connectors.",
@@ -1015,51 +943,6 @@
         }
       ]
     },
-    "ConnectorVersion": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "version": {
-          "type": "integer",
-          "minimum": 1
-        },
-        "namespace": {
-          "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath"
-        },
-        "state": {
-          "$ref": "#/$defs/ConnectorVersionState"
-        },
-        "definition": {
-          "$ref": "../resources/connectors/schema.json#/$defs/ConnectorDefinition"
-        },
-        "labels": {
-          "$ref": "#/$defs/StringMap"
-        },
-        "annotations": {
-          "$ref": "#/$defs/StringMap"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "id",
-        "version",
-        "namespace",
-        "state",
-        "definition",
-        "createdAt",
-        "updatedAt"
-      ],
-      "additionalProperties": false
-    },
     "ListConnectorVersionsResponse": {
       "description": "A Kubernetes-style list of connector generations.",
       "allOf": [
@@ -1071,63 +954,23 @@
             "kind": { "const": "ConnectorList" },
             "items": {
               "type": "array",
-              "items": { "$ref": "#/$defs/ConnectorVersion" }
+              "items": { "$ref": "#/$defs/Connector" }
             }
           }
         }
       ]
     },
     "CreateConnectorRequest": {
-      "type": "object",
-      "properties": {
-        "namespace": {
-          "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath"
-        },
-        "definition": {
-          "$ref": "../resources/connectors/schema.json#/$defs/ConnectorDefinition"
-        },
-        "labels": {
-          "$ref": "#/$defs/StringMap"
-        },
-        "annotations": {
-          "$ref": "#/$defs/StringMap"
-        }
-      },
-      "required": [
-        "namespace",
-        "definition"
-      ],
-      "additionalProperties": false
+      "$ref": "../resources/connectors/schema.json#/$defs/ConnectorCreate"
     },
     "UpdateConnectorRequest": {
-      "type": "object",
-      "properties": {
-        "definition": {
-          "$ref": "../resources/connectors/schema.json#/$defs/ConnectorDefinition"
-        },
-        "labels": {
-          "$ref": "#/$defs/StringMap"
-        },
-        "annotations": {
-          "$ref": "#/$defs/StringMap"
-        }
-      },
-      "additionalProperties": false
+      "$ref": "../resources/connectors/schema.json#/$defs/ConnectorPatch"
     },
     "CreateConnectorVersionRequest": {
-      "type": "object",
-      "properties": {
-        "definition": {
-          "$ref": "../resources/connectors/schema.json#/$defs/ConnectorDefinition"
-        },
-        "labels": {
-          "$ref": "#/$defs/StringMap"
-        },
-        "annotations": {
-          "$ref": "#/$defs/StringMap"
-        }
-      },
-      "additionalProperties": false
+      "$ref": "../resources/connectors/schema.json#/$defs/ConnectorCreate"
+    },
+    "UpdateConnectorVersionRequest": {
+      "$ref": "../resources/connectors/schema.json#/$defs/ConnectorPatch"
     },
     "ConnectorLifecycleRequest": {
       "type": "object",

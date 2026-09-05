@@ -387,7 +387,7 @@ func TestConnections(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, resp.Items, 1)
 			require.Equal(t, oauthConnectionId, resp.Items[0].Id)
-			require.Equal(t, oauthConnectorId, resp.Items[0].Connector.Id)
+			require.Equal(t, oauthConnectorId, resp.Items[0].Connector.GetId())
 		})
 
 		t.Run("invalid connector id filter", func(t *testing.T) {

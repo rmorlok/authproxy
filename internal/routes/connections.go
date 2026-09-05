@@ -282,7 +282,7 @@ func (r *ConnectionsRoutes) getDataSource(gctx *gin.Context) {
 }
 
 func ConnectionToJson(conn coreIface.Connection) ConnectionJson {
-	connector := ConnectorVersionToConnectorJson(conn.GetConnector())
+	connector := *conn.GetConnector().GetResource()
 
 	return ConnectionJson{
 		Id:          conn.GetId(),

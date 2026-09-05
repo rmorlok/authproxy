@@ -143,15 +143,35 @@ type C interface {
 		cursor string,
 	) (ListConnectorVersionsExecutor, error)
 
-	// CreateConnectorVersion creates a new connector with version 1 in draft
-	// state.
+	// CreateConnector creates a logical connector and its first generation from
+	// the canonical resource envelope.
+	CreateConnector(
+		ctx context.Context,
+		resource *cschema.Connector,
+	) (Connector, error)
+
+	// UpdateConnector applies a resource patch at the logical connector
+	// boundary. Definition changes create or update the draft generation.
+	UpdateConnector(
+		ctx context.Context,
+		id apid.ID,
+		patch *cschema.ConnectorPatch,
+	) (Connector, error)
+
+	// CreateConnectorVersion creates the next sequential generation. A nil
+	// resource clones the newest generation as a draft.
 	CreateConnectorVersion(
 		ctx context.Context,
-		namespace string,
-		name scommon.ResourceName,
-		definition *cschema.ConnectorDefinition,
-		labels map[string]string,
-		annotations map[string]string,
+		id apid.ID,
+		resource *cschema.Connector,
+	) (Connector, error)
+
+	// UpdateConnectorVersion applies a resource patch to one draft generation.
+	UpdateConnectorVersion(
+		ctx context.Context,
+		id apid.ID,
+		version uint64,
+		patch *cschema.ConnectorPatch,
 	) (Connector, error)
 
 	// UpdateConnectorName renames a logical connector without changing its

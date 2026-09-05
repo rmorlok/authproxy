@@ -24,5 +24,6 @@ type Connector interface {
 	GetLabels() map[string]string
 	GetAnnotations() map[string]string
 	GetDefinition() *cschema.ConnectorDefinition
+	GetResource() *cschema.Connector
 	SetState(ctx context.Context, state database.ConnectorDefinitionVersionState) error
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"maps"
 	"sync"
 	"time"
 
@@ -49,6 +50,41 @@ func wrapConnector(c database.ConnectorWithDefinition, s *service) *Connector {
 	}
 }
 
+// connectorResourceFromDatabase converts a hydrated persistence row into the
+// canonical versioned Connector resource. The database state is observed
+// state; published generations retain primary desired state after they become
+// active or archived.
+func connectorResourceFromDatabase(
+	c database.ConnectorWithDefinition,
+	definition *cschema.ConnectorDefinition,
+) *cschema.Connector {
+	createdAt := c.CreatedAt
+	updatedAt := c.UpdatedAt
+	observed := cschema.ConnectorReleaseState(c.State)
+	return &cschema.Connector{
+		TypeMeta: meta.NewTypeMeta(cschema.ConnectorKind),
+		Metadata: meta.NormalizeObjectMeta(meta.ObjectMeta{
+			ID:          c.Id.String(),
+			Name:        c.Name,
+			Namespace:   c.Namespace,
+			Generation:  c.Version,
+			Labels:      maps.Clone(map[string]string(c.Labels)),
+			Annotations: maps.Clone(map[string]string(c.Annotations)),
+			CreatedAt:   &createdAt,
+			UpdatedAt:   &updatedAt,
+		}),
+		Spec: cschema.ConnectorSpec{
+			Release: cschema.ConnectorReleaseSpec{
+				DesiredState: cschema.DesiredReleaseStateForObserved(observed),
+			},
+			Definition: *definition.Clone(),
+		},
+		Status: &cschema.ConnectorStatus{
+			Release: cschema.ConnectorReleaseStatus{State: observed},
+		},
+	}
+}
+
 func (c *Connector) GetId() apid.ID {
 	return c.ConnectorWithDefinition.Id
 }
@@ -75,6 +111,13 @@ func (c *Connector) GetHash() string {
 
 func (c *Connector) GetDefinition() *cschema.ConnectorDefinition {
 	return util.Must(c.getDefinition())
+}
+
+func (c *Connector) GetResource() *cschema.Connector {
+	return connectorResourceFromDatabase(
+		c.ConnectorWithDefinition,
+		c.GetDefinition(),
+	)
 }
 
 func (c *Connector) GetCreatedAt() time.Time {

@@ -5,55 +5,6 @@ definitions:
       signingKeyConfigured:
         type: boolean
     type: object
-  api.ConnectorJson:
-    description: Connector API summary response
-    properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      createdAt:
-        type: string
-      description:
-        example: Salesforce CRM integration
-        type: string
-      displayName:
-        example: Salesforce
-        type: string
-      hasConfigure:
-        example: false
-        type: boolean
-      highlight:
-        example: CRM platform
-        type: string
-      id:
-        example: cxr_test550e8400abcde
-        type: string
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-      logo:
-        example: https://example.com/logo.png
-        type: string
-      name:
-        example: salesforce
-        type: string
-      namespace:
-        example: root.acme
-        type: string
-      state:
-        example: primary
-        type: string
-      statusPageUrl:
-        example: https://status.salesforce.com
-        type: string
-      updatedAt:
-        type: string
-      version:
-        example: 1
-        type: integer
-    type: object
   api.MetricsSchemaMetricJson:
     description: Supported metric definition
     properties:
@@ -93,6 +44,21 @@ definitions:
         items:
           type: string
         type: array
+    type: object
+  connectors.ConnectorReleaseSpec:
+    properties:
+      desiredState:
+        type: string
+    type: object
+  connectors.ConnectorReleaseStatus:
+    properties:
+      state:
+        type: string
+    type: object
+  connectors.ConnectorStatus:
+    properties:
+      release:
+        $ref: '#/definitions/connectors.ConnectorReleaseStatus'
     type: object
   key.KeyStatus:
     properties:
@@ -294,7 +260,8 @@ definitions:
         additionalProperties:
           type: string
         type: object
-      connector: {}
+      connector:
+        $ref: '#/definitions/openapi.ConnectorJson'
       createdAt:
         type: string
       healthState:
@@ -324,37 +291,52 @@ definitions:
       updatedAt:
         type: string
     type: object
-  openapi.ConnectorVersionJson:
-    description: Detailed connector version information
+  openapi.ConnectorJson:
+    description: Kubernetes-style Connector resource
     properties:
-      annotations:
-        additionalProperties:
-          type: string
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - Connector
+        example: Connector
+        type: string
+      metadata:
+        $ref: '#/definitions/meta.ObjectMeta'
+      spec:
+        $ref: '#/definitions/openapi.ConnectorSpecJson'
+      status:
+        $ref: '#/definitions/connectors.ConnectorStatus'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
+  openapi.ConnectorReleaseSpecPatchJson:
+    properties:
+      desiredState:
+        enum:
+        - draft
+        - primary
+        type: string
+    type: object
+  openapi.ConnectorSpecJson:
+    properties:
+      definition:
         type: object
-      createdAt:
-        type: string
-      definition: {}
-      id:
-        example: cxr_test550e8400abcde
-        type: string
-      labels:
-        additionalProperties:
-          type: string
+      release:
+        $ref: '#/definitions/connectors.ConnectorReleaseSpec'
+    type: object
+  openapi.ConnectorSpecPatchJson:
+    properties:
+      definition:
         type: object
-      name:
-        example: salesforce
-        type: string
-      namespace:
-        example: root.acme
-        type: string
-      state:
-        example: primary
-        type: string
-      updatedAt:
-        type: string
-      version:
-        example: 1
-        type: integer
+      release:
+        $ref: '#/definitions/openapi.ConnectorReleaseSpecPatchJson'
     type: object
   openapi.DryRunRequestJson:
     description: 'Dry-run input: a proxy-shaped request + request type + the identity
@@ -873,55 +855,6 @@ definitions:
         example: redirect
         type: string
     type: object
-  routes.ConnectorJson:
-    description: Connector API summary response
-    properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      createdAt:
-        type: string
-      description:
-        example: Salesforce CRM integration
-        type: string
-      displayName:
-        example: Salesforce
-        type: string
-      hasConfigure:
-        example: false
-        type: boolean
-      highlight:
-        example: CRM platform
-        type: string
-      id:
-        example: cxr_test550e8400abcde
-        type: string
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-      logo:
-        example: https://example.com/logo.png
-        type: string
-      name:
-        example: salesforce
-        type: string
-      namespace:
-        example: root.acme
-        type: string
-      state:
-        example: primary
-        type: string
-      statusPageUrl:
-        example: https://status.salesforce.com
-        type: string
-      updatedAt:
-        type: string
-      version:
-        example: 1
-        type: integer
-    type: object
   routes.DataSourceOptionJson:
     description: Data source option for form select fields
     properties:
@@ -1012,7 +945,8 @@ definitions:
         additionalProperties:
           type: string
         type: object
-      connector: {}
+      connector:
+        $ref: '#/definitions/openapi.ConnectorJson'
       createdAt:
         type: string
       healthState:
@@ -1042,6 +976,31 @@ definitions:
       updatedAt:
         type: string
     type: object
+  routes.OpenAPIConnectorJson:
+    description: Kubernetes-style Connector resource
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - Connector
+        example: Connector
+        type: string
+      metadata:
+        $ref: '#/definitions/meta.ObjectMeta'
+      spec:
+        $ref: '#/definitions/openapi.ConnectorSpecJson'
+      status:
+        $ref: '#/definitions/connectors.ConnectorStatus'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
   routes.OpenAPIConnectorLifecycleRequestJson:
     description: Request to run a connector lifecycle operation
     properties:
@@ -1058,69 +1017,30 @@ definitions:
       taskId:
         type: string
     type: object
-  routes.OpenAPIConnectorVersionJson:
-    description: Detailed connector version information
+  routes.OpenAPIConnectorPatchJson:
+    description: Kubernetes-style Connector patch
     properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      createdAt:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
         type: string
-      definition: {}
-      id:
-        example: cxr_test550e8400abcde
+      kind:
+        enum:
+        - Connector
+        example: Connector
         type: string
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-      name:
-        example: salesforce
-        type: string
-      namespace:
-        example: root.acme
-        type: string
-      state:
-        example: primary
-        type: string
-      updatedAt:
-        type: string
-      version:
-        example: 1
-        type: integer
-    type: object
-  routes.OpenAPICreateConnectorRequestJson:
-    description: Request to create a new connector
-    properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      definition: {}
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-      name:
-        example: salesforce
-        type: string
-      namespace:
-        example: root.acme
-        type: string
-    type: object
-  routes.OpenAPICreateConnectorVersionRequestJson:
-    description: Request to create a new draft connector version
-    properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      definition: {}
-      labels:
-        additionalProperties:
-          type: string
-        type: object
+      metadata:
+        $ref: '#/definitions/meta.ObjectMetaPatch'
+      spec:
+        $ref: '#/definitions/openapi.ConnectorSpecPatchJson'
+      status:
+        $ref: '#/definitions/connectors.ConnectorStatus'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
     type: object
   routes.OpenAPIDisconnectConnectionRequestJson:
     description: Request body for connection disconnect operations
@@ -1167,9 +1087,8 @@ definitions:
         example: authproxy.net/v1alpha1
         type: string
       items:
-        description: List of connector versions.
         items:
-          $ref: '#/definitions/openapi.ConnectorVersionJson'
+          $ref: '#/definitions/openapi.ConnectorJson'
         type: array
       kind:
         type: string
@@ -1190,9 +1109,8 @@ definitions:
         example: authproxy.net/v1alpha1
         type: string
       items:
-        description: List of connectors.
         items:
-          $ref: '#/definitions/api.ConnectorJson'
+          $ref: '#/definitions/openapi.ConnectorJson'
         type: array
       kind:
         type: string
@@ -1392,35 +1310,6 @@ definitions:
         type: string
       updatedAt:
         type: string
-    type: object
-  routes.OpenAPIUpdateConnectorRequestJson:
-    description: Request to update a logical connector
-    properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      definition: {}
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-      name:
-        example: salesforce
-        type: string
-    type: object
-  routes.OpenAPIUpdateConnectorVersionRequestJson:
-    description: Request to update a connector definition version
-    properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      definition: {}
-      labels:
-        additionalProperties:
-          type: string
-        type: object
     type: object
   routes.ProxyRequest:
     description: Request to proxy or simulate an HTTP request
@@ -3383,14 +3272,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.OpenAPICreateConnectorRequestJson'
+          $ref: '#/definitions/routes.OpenAPIConnectorJson'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/routes.OpenAPIConnectorVersionJson'
+            $ref: '#/definitions/routes.OpenAPIConnectorJson'
         "400":
           description: Bad Request
           schema:
@@ -3433,7 +3322,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.ConnectorJson'
+            $ref: '#/definitions/routes.OpenAPIConnectorJson'
         "400":
           description: Bad Request
           schema:
@@ -3470,14 +3359,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.OpenAPIUpdateConnectorRequestJson'
+          $ref: '#/definitions/routes.OpenAPIConnectorPatchJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIConnectorVersionJson'
+            $ref: '#/definitions/routes.OpenAPIConnectorJson'
         "400":
           description: Bad Request
           schema:
@@ -4048,18 +3937,19 @@ paths:
         name: id
         required: true
         type: string
-      - description: Version creation request
+      - description: Version creation request; an empty body clones the newest generation
+          as a draft
         in: body
         name: request
         schema:
-          $ref: '#/definitions/routes.OpenAPICreateConnectorVersionRequestJson'
+          $ref: '#/definitions/routes.OpenAPIConnectorJson'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/routes.OpenAPIConnectorVersionJson'
+            $ref: '#/definitions/routes.OpenAPIConnectorJson'
         "400":
           description: Bad Request
           schema:
@@ -4111,7 +4001,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIConnectorVersionJson'
+            $ref: '#/definitions/routes.OpenAPIConnectorJson'
         "400":
           description: Bad Request
           schema:
@@ -4153,14 +4043,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.OpenAPIUpdateConnectorVersionRequestJson'
+          $ref: '#/definitions/routes.OpenAPIConnectorPatchJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIConnectorVersionJson'
+            $ref: '#/definitions/routes.OpenAPIConnectorJson'
         "400":
           description: Bad Request
           schema:
@@ -4218,7 +4108,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIConnectorVersionJson'
+            $ref: '#/definitions/routes.OpenAPIConnectorJson'
         "400":
           description: Bad Request
           schema:

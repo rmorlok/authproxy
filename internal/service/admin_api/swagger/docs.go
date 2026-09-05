@@ -2870,7 +2870,7 @@ const docTemplateadmin_api = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPICreateConnectorRequestJson"
+                            "$ref": "#/definitions/routes.OpenAPIConnectorJson"
                         }
                     }
                 ],
@@ -2878,7 +2878,7 @@ const docTemplateadmin_api = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPIConnectorVersionJson"
+                            "$ref": "#/definitions/routes.OpenAPIConnectorJson"
                         }
                     },
                     "400": {
@@ -2945,7 +2945,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.ConnectorJson"
+                            "$ref": "#/definitions/routes.OpenAPIConnectorJson"
                         }
                     },
                     "400": {
@@ -3005,7 +3005,7 @@ const docTemplateadmin_api = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPIUpdateConnectorRequestJson"
+                            "$ref": "#/definitions/routes.OpenAPIConnectorPatchJson"
                         }
                     }
                 ],
@@ -3013,7 +3013,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPIConnectorVersionJson"
+                            "$ref": "#/definitions/routes.OpenAPIConnectorJson"
                         }
                     },
                     "400": {
@@ -3891,11 +3891,11 @@ const docTemplateadmin_api = `{
                         "required": true
                     },
                     {
-                        "description": "Version creation request",
+                        "description": "Version creation request; an empty body clones the newest generation as a draft",
                         "name": "request",
                         "in": "body",
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPICreateConnectorVersionRequestJson"
+                            "$ref": "#/definitions/routes.OpenAPIConnectorJson"
                         }
                     }
                 ],
@@ -3903,7 +3903,7 @@ const docTemplateadmin_api = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPIConnectorVersionJson"
+                            "$ref": "#/definitions/routes.OpenAPIConnectorJson"
                         }
                     },
                     "400": {
@@ -3983,7 +3983,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPIConnectorVersionJson"
+                            "$ref": "#/definitions/routes.OpenAPIConnectorJson"
                         }
                     },
                     "400": {
@@ -4050,7 +4050,7 @@ const docTemplateadmin_api = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPIUpdateConnectorVersionRequestJson"
+                            "$ref": "#/definitions/routes.OpenAPIConnectorPatchJson"
                         }
                     }
                 ],
@@ -4058,7 +4058,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPIConnectorVersionJson"
+                            "$ref": "#/definitions/routes.OpenAPIConnectorJson"
                         }
                     },
                     "400": {
@@ -4147,7 +4147,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPIConnectorVersionJson"
+                            "$ref": "#/definitions/routes.OpenAPIConnectorJson"
                         }
                     },
                     "400": {
@@ -8177,74 +8177,6 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "api.ConnectorJson": {
-            "description": "Connector API summary response",
-            "type": "object",
-            "properties": {
-                "annotations": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "createdAt": {
-                    "type": "string"
-                },
-                "description": {
-                    "type": "string",
-                    "example": "Salesforce CRM integration"
-                },
-                "displayName": {
-                    "type": "string",
-                    "example": "Salesforce"
-                },
-                "hasConfigure": {
-                    "type": "boolean",
-                    "example": false
-                },
-                "highlight": {
-                    "type": "string",
-                    "example": "CRM platform"
-                },
-                "id": {
-                    "type": "string",
-                    "example": "cxr_test550e8400abcde"
-                },
-                "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "logo": {
-                    "type": "string",
-                    "example": "https://example.com/logo.png"
-                },
-                "name": {
-                    "type": "string",
-                    "example": "salesforce"
-                },
-                "namespace": {
-                    "type": "string",
-                    "example": "root.acme"
-                },
-                "state": {
-                    "type": "string",
-                    "example": "primary"
-                },
-                "statusPageUrl": {
-                    "type": "string",
-                    "example": "https://status.salesforce.com"
-                },
-                "updatedAt": {
-                    "type": "string"
-                },
-                "version": {
-                    "type": "integer",
-                    "example": 1
-                }
-            }
-        },
         "api.MetricsSchemaMetricJson": {
             "description": "Supported metric definition",
             "type": "object",
@@ -8301,6 +8233,30 @@ const docTemplateadmin_api = `{
                     "items": {
                         "type": "string"
                     }
+                }
+            }
+        },
+        "connectors.ConnectorReleaseSpec": {
+            "type": "object",
+            "properties": {
+                "desiredState": {
+                    "type": "string"
+                }
+            }
+        },
+        "connectors.ConnectorReleaseStatus": {
+            "type": "object",
+            "properties": {
+                "state": {
+                    "type": "string"
+                }
+            }
+        },
+        "connectors.ConnectorStatus": {
+            "type": "object",
+            "properties": {
+                "release": {
+                    "$ref": "#/definitions/connectors.ConnectorReleaseStatus"
                 }
             }
         },
@@ -8600,7 +8556,9 @@ const docTemplateadmin_api = `{
                         "type": "string"
                     }
                 },
-                "connector": {},
+                "connector": {
+                    "$ref": "#/definitions/openapi.ConnectorJson"
+                },
                 "createdAt": {
                     "type": "string"
                 },
@@ -8642,48 +8600,72 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "openapi.ConnectorVersionJson": {
-            "description": "Detailed connector version information",
+        "openapi.ConnectorJson": {
+            "description": "Kubernetes-style Connector resource",
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "kind",
+                "metadata",
+                "spec"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "Connector"
+                    ],
+                    "example": "Connector"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/meta.ObjectMeta"
+                },
+                "spec": {
+                    "$ref": "#/definitions/openapi.ConnectorSpecJson"
+                },
+                "status": {
+                    "$ref": "#/definitions/connectors.ConnectorStatus"
+                }
+            }
+        },
+        "openapi.ConnectorReleaseSpecPatchJson": {
             "type": "object",
             "properties": {
-                "annotations": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "createdAt": {
-                    "type": "string"
-                },
-                "definition": {},
-                "id": {
+                "desiredState": {
                     "type": "string",
-                    "example": "cxr_test550e8400abcde"
+                    "enum": [
+                        "draft",
+                        "primary"
+                    ]
+                }
+            }
+        },
+        "openapi.ConnectorSpecJson": {
+            "type": "object",
+            "properties": {
+                "definition": {
+                    "type": "object"
                 },
-                "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
+                "release": {
+                    "$ref": "#/definitions/connectors.ConnectorReleaseSpec"
+                }
+            }
+        },
+        "openapi.ConnectorSpecPatchJson": {
+            "type": "object",
+            "properties": {
+                "definition": {
+                    "type": "object"
                 },
-                "name": {
-                    "type": "string",
-                    "example": "salesforce"
-                },
-                "namespace": {
-                    "type": "string",
-                    "example": "root.acme"
-                },
-                "state": {
-                    "type": "string",
-                    "example": "primary"
-                },
-                "updatedAt": {
-                    "type": "string"
-                },
-                "version": {
-                    "type": "integer",
-                    "example": 1
+                "release": {
+                    "$ref": "#/definitions/openapi.ConnectorReleaseSpecPatchJson"
                 }
             }
         },
@@ -9408,74 +9390,6 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "routes.ConnectorJson": {
-            "description": "Connector API summary response",
-            "type": "object",
-            "properties": {
-                "annotations": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "createdAt": {
-                    "type": "string"
-                },
-                "description": {
-                    "type": "string",
-                    "example": "Salesforce CRM integration"
-                },
-                "displayName": {
-                    "type": "string",
-                    "example": "Salesforce"
-                },
-                "hasConfigure": {
-                    "type": "boolean",
-                    "example": false
-                },
-                "highlight": {
-                    "type": "string",
-                    "example": "CRM platform"
-                },
-                "id": {
-                    "type": "string",
-                    "example": "cxr_test550e8400abcde"
-                },
-                "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "logo": {
-                    "type": "string",
-                    "example": "https://example.com/logo.png"
-                },
-                "name": {
-                    "type": "string",
-                    "example": "salesforce"
-                },
-                "namespace": {
-                    "type": "string",
-                    "example": "root.acme"
-                },
-                "state": {
-                    "type": "string",
-                    "example": "primary"
-                },
-                "statusPageUrl": {
-                    "type": "string",
-                    "example": "https://status.salesforce.com"
-                },
-                "updatedAt": {
-                    "type": "string"
-                },
-                "version": {
-                    "type": "integer",
-                    "example": 1
-                }
-            }
-        },
         "routes.DataSourceOptionJson": {
             "description": "Data source option for form select fields",
             "type": "object",
@@ -9595,7 +9509,9 @@ const docTemplateadmin_api = `{
                         "type": "string"
                     }
                 },
-                "connector": {},
+                "connector": {
+                    "$ref": "#/definitions/openapi.ConnectorJson"
+                },
                 "createdAt": {
                     "type": "string"
                 },
@@ -9637,6 +9553,41 @@ const docTemplateadmin_api = `{
                 }
             }
         },
+        "routes.OpenAPIConnectorJson": {
+            "description": "Kubernetes-style Connector resource",
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "kind",
+                "metadata",
+                "spec"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "Connector"
+                    ],
+                    "example": "Connector"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/meta.ObjectMeta"
+                },
+                "spec": {
+                    "$ref": "#/definitions/openapi.ConnectorSpecJson"
+                },
+                "status": {
+                    "$ref": "#/definitions/connectors.ConnectorStatus"
+                }
+            }
+        },
         "routes.OpenAPIConnectorLifecycleRequestJson": {
             "description": "Request to run a connector lifecycle operation",
             "type": "object",
@@ -9660,94 +9611,38 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "routes.OpenAPIConnectorVersionJson": {
-            "description": "Detailed connector version information",
+        "routes.OpenAPIConnectorPatchJson": {
+            "description": "Kubernetes-style Connector patch",
             "type": "object",
+            "required": [
+                "apiVersion",
+                "kind",
+                "metadata",
+                "spec"
+            ],
             "properties": {
-                "annotations": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "createdAt": {
-                    "type": "string"
-                },
-                "definition": {},
-                "id": {
+                "apiVersion": {
                     "type": "string",
-                    "example": "cxr_test550e8400abcde"
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
                 },
-                "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "name": {
+                "kind": {
                     "type": "string",
-                    "example": "salesforce"
+                    "enum": [
+                        "Connector"
+                    ],
+                    "example": "Connector"
                 },
-                "namespace": {
-                    "type": "string",
-                    "example": "root.acme"
+                "metadata": {
+                    "$ref": "#/definitions/meta.ObjectMetaPatch"
                 },
-                "state": {
-                    "type": "string",
-                    "example": "primary"
+                "spec": {
+                    "$ref": "#/definitions/openapi.ConnectorSpecPatchJson"
                 },
-                "updatedAt": {
-                    "type": "string"
-                },
-                "version": {
-                    "type": "integer",
-                    "example": 1
-                }
-            }
-        },
-        "routes.OpenAPICreateConnectorRequestJson": {
-            "description": "Request to create a new connector",
-            "type": "object",
-            "properties": {
-                "annotations": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "definition": {},
-                "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "name": {
-                    "type": "string",
-                    "example": "salesforce"
-                },
-                "namespace": {
-                    "type": "string",
-                    "example": "root.acme"
-                }
-            }
-        },
-        "routes.OpenAPICreateConnectorVersionRequestJson": {
-            "description": "Request to create a new draft connector version",
-            "type": "object",
-            "properties": {
-                "annotations": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "definition": {},
-                "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
+                "status": {
+                    "$ref": "#/definitions/connectors.ConnectorStatus"
                 }
             }
         },
@@ -9820,10 +9715,9 @@ const docTemplateadmin_api = `{
                     "example": "authproxy.net/v1alpha1"
                 },
                 "items": {
-                    "description": "List of connector versions.",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/openapi.ConnectorVersionJson"
+                        "$ref": "#/definitions/openapi.ConnectorJson"
                     }
                 },
                 "kind": {
@@ -9852,10 +9746,9 @@ const docTemplateadmin_api = `{
                     "example": "authproxy.net/v1alpha1"
                 },
                 "items": {
-                    "description": "List of connectors.",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/api.ConnectorJson"
+                        "$ref": "#/definitions/openapi.ConnectorJson"
                     }
                 },
                 "kind": {
@@ -10131,48 +10024,6 @@ const docTemplateadmin_api = `{
                 },
                 "updatedAt": {
                     "type": "string"
-                }
-            }
-        },
-        "routes.OpenAPIUpdateConnectorRequestJson": {
-            "description": "Request to update a logical connector",
-            "type": "object",
-            "properties": {
-                "annotations": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "definition": {},
-                "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "name": {
-                    "type": "string",
-                    "example": "salesforce"
-                }
-            }
-        },
-        "routes.OpenAPIUpdateConnectorVersionRequestJson": {
-            "description": "Request to update a connector definition version",
-            "type": "object",
-            "properties": {
-                "annotations": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "definition": {},
-                "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
                 }
             }
         },

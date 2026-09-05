@@ -34,7 +34,7 @@ func connectorResourceForMock(id apid.ID, version uint64, state database.Connect
 	}
 }
 
-func TestCreateConnectorVersion(t *testing.T) {
+func TestCreateConnector(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		s, db, _, _, _, e := FullMockService(t, ctrl)
@@ -64,7 +64,12 @@ func TestCreateConnectorVersion(t *testing.T) {
 			Description: "A new connector",
 		}))
 
-		result, err := s.CreateConnectorVersion(ctx, "root", "", definition, labels, nil)
+		resource := cschema.NewConnector()
+		resource.Metadata.Namespace = "root"
+		resource.Metadata.Labels = labels
+		resource.Spec.Definition = *definition
+
+		result, err := s.CreateConnector(ctx, resource)
 		require.NoError(t, err)
 		require.Equal(t, fixedId, result.GetId())
 		require.Equal(t, uint64(1), result.GetVersion())
@@ -91,7 +96,11 @@ func TestCreateConnectorVersion(t *testing.T) {
 			UpsertConnectorDefinitionVersion(gomock.Any(), gomock.Any()).
 			Return(errors.New("db write failed"))
 
-		_, err := s.CreateConnectorVersion(ctx, "root", "", definition, nil, nil)
+		resource := cschema.NewConnector()
+		resource.Metadata.Namespace = "root"
+		resource.Spec.Definition = *definition
+
+		_, err := s.CreateConnector(ctx, resource)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "failed to upsert connector version")
 	})

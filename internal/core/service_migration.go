@@ -565,7 +565,7 @@ func (s *service) precheckConnectorForMigration(
 			}
 		}
 
-		if configConnector.HasVersion() {
+		if configConnector.HasGeneration() {
 			existingVersion, err := s.db.GetConnectorDefinitionVersion(
 				ctx,
 				configConnector.GetId(),
@@ -646,7 +646,7 @@ func (s *service) precheckConnectorForMigration(
 			return fmt.Errorf("failed to check for existing connector by name during precheck: %w", err)
 		}
 
-		if configConnector.HasVersion() {
+		if configConnector.HasGeneration() {
 			var existingVersion *database.ConnectorWithDefinition
 			if existingConnector != nil {
 				existingVersion, err = s.db.GetConnectorDefinitionVersion(
@@ -743,7 +743,7 @@ func (s *service) migrateConnector(
 	}
 
 	version := uint64(1)
-	if configConnector.HasVersion() {
+	if configConnector.HasGeneration() {
 		version = configConnector.Metadata.Generation
 	}
 
@@ -776,7 +776,7 @@ func (s *service) migrateConnector(
 		return true, nil
 	}
 
-	if configConnector.HasId() && configConnector.HasVersion() {
+	if configConnector.HasId() && configConnector.HasGeneration() {
 		existingVersion, err = s.db.GetConnectorDefinitionVersion(
 			ctx,
 			configConnector.GetId(),
@@ -861,7 +861,7 @@ func (s *service) migrateConnector(
 
 			version = existingVersion.Version + 1
 		}
-	} else if configConnector.HasVersion() {
+	} else if configConnector.HasGeneration() {
 		// Pattern C: version and name, no ID - resolve the logical connector by
 		// exact name within its namespace, then address the version by its ID.
 		existingConnector, lookupErr := s.connectorForConfigName(

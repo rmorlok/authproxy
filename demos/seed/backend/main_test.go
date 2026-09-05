@@ -14,6 +14,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/api"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/schema/config"
+	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
 
 var testConnectorID = apid.MustParse("cxr_testgmail0000001")
@@ -37,16 +38,16 @@ func TestUpsertConnectorCreatesAndPublishesMissingSeed(t *testing.T) {
 			require.Equal(t, seedLabelKey+"=demo-noauth", r.URL.Query().Get("labelSelector"))
 			writeJSON(t, w, api.NewListConnectorsResponseJson(nil, ""))
 		case "POST /api/v1/connectors":
-			var req api.CreateConnectorRequestJson
+			var req cschema.Connector
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
-			require.Equal(t, defaultNamespace, req.Namespace)
-			require.Equal(t, "Demo NoAuth", req.Definition.DisplayName)
-			require.Equal(t, "demo-noauth", req.Labels[seedLabelKey])
-			require.Equal(t, "true", req.Labels["demo"])
-			writeJSON(t, w, connectorVersion(req.Definition, req.Labels, api.ConnectorVersionStateDraft, 1))
+			require.Equal(t, defaultNamespace, req.Metadata.Namespace)
+			require.Equal(t, "Demo NoAuth", req.Spec.Definition.DisplayName)
+			require.Equal(t, "demo-noauth", req.Metadata.Labels[seedLabelKey])
+			require.Equal(t, "true", req.Metadata.Labels["demo"])
+			writeJSON(t, w, connectorVersion(req.Spec.Definition, req.Metadata.Labels, cschema.ConnectorReleaseStateDraft, 1))
 		case "PUT /api/v1/connectors/cxr_testgmail0000001/versions/1/_forceState":
 			forcedPrimary = true
-			writeJSON(t, w, connectorVersion(seed.Definition, connectorLabels(seed), api.ConnectorVersionStatePrimary, 1))
+			writeJSON(t, w, connectorVersion(seed.Definition, connectorLabels(seed), cschema.ConnectorReleaseStatePrimary, 1))
 		default:
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
 		}
@@ -72,17 +73,17 @@ func TestUpsertConnectorSkipsMatchingPrimarySeed(t *testing.T) {
 		switch r.Method + " " + r.URL.Path {
 		case "GET /api/v1/connectors":
 			writeJSON(t, w, api.NewListConnectorsResponseJson(
-				[]api.ConnectorJson{
+				[]cschema.Connector{
 					connectorSummary(
 						seed,
-						api.ConnectorVersionStatePrimary,
+						cschema.ConnectorReleaseStatePrimary,
 						1, // version
 					),
 				},
 				"", // continueToken
 			))
 		case "GET /api/v1/connectors/cxr_testgmail0000001/versions/1":
-			writeJSON(t, w, connectorVersion(seed.Definition, connectorLabels(seed), api.ConnectorVersionStatePrimary, 1))
+			writeJSON(t, w, connectorVersion(seed.Definition, connectorLabels(seed), cschema.ConnectorReleaseStatePrimary, 1))
 		default:
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
 		}
@@ -106,22 +107,21 @@ func TestUpsertConnectorPublishesNewVersionWhenDefinitionChanges(t *testing.T) {
 		switch r.Method + " " + r.URL.Path {
 		case "GET /api/v1/connectors":
 			writeJSON(t, w, api.NewListConnectorsResponseJson(
-				[]api.ConnectorJson{connectorSummary(seed, api.ConnectorVersionStatePrimary, 1)},
+				[]cschema.Connector{connectorSummary(seed, cschema.ConnectorReleaseStatePrimary, 1)},
 				"",
 			))
 		case "GET /api/v1/connectors/cxr_testgmail0000001/versions/1":
-			writeJSON(t, w, connectorVersion(oldDefinition, connectorLabels(seed), api.ConnectorVersionStatePrimary, 1))
+			writeJSON(t, w, connectorVersion(oldDefinition, connectorLabels(seed), cschema.ConnectorReleaseStatePrimary, 1))
 		case "POST /api/v1/connectors/cxr_testgmail0000001/versions":
-			var req api.CreateConnectorVersionRequestJson
+			var req cschema.Connector
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
-			require.NotNil(t, req.Definition)
-			require.Equal(t, "New Demo NoAuth", req.Definition.DisplayName)
-			require.NotNil(t, req.Labels)
-			require.Equal(t, "demo-noauth", (*req.Labels)[seedLabelKey])
-			writeJSON(t, w, connectorVersion(*req.Definition, *req.Labels, api.ConnectorVersionStateDraft, 2))
+			require.Equal(t, "New Demo NoAuth", req.Spec.Definition.DisplayName)
+			require.NotNil(t, req.Metadata.Labels)
+			require.Equal(t, "demo-noauth", req.Metadata.Labels[seedLabelKey])
+			writeJSON(t, w, connectorVersion(req.Spec.Definition, req.Metadata.Labels, cschema.ConnectorReleaseStateDraft, 2))
 		case "PUT /api/v1/connectors/cxr_testgmail0000001/versions/2/_forceState":
 			forcedPrimary = true
-			writeJSON(t, w, connectorVersion(seed.Definition, connectorLabels(seed), api.ConnectorVersionStatePrimary, 2))
+			writeJSON(t, w, connectorVersion(seed.Definition, connectorLabels(seed), cschema.ConnectorReleaseStatePrimary, 2))
 		default:
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
 		}
@@ -330,28 +330,23 @@ auth:
 	return connector
 }
 
-func connectorSummary(seed ConnectorSeed, state api.ConnectorVersionState, version uint64) api.ConnectorJson {
-	return api.ConnectorJson{
-		Id:          testConnectorID,
-		Version:     version,
-		Namespace:   connectorNamespace(seed),
-		State:       state,
-		DisplayName: seed.Definition.DisplayName,
-		Description: seed.Definition.Description,
-		Labels:      connectorLabels(seed),
-	}
+func connectorSummary(seed ConnectorSeed, state cschema.ConnectorReleaseState, version uint64) cschema.Connector {
+	return connectorVersion(seed.Definition, connectorLabels(seed), state, version)
 }
 
-func connectorVersion(def config.ConnectorDefinition, labels map[string]string, state api.ConnectorVersionState, version uint64) api.ConnectorVersionJson {
-	namespace := defaultNamespace
-	return api.ConnectorVersionJson{
-		Id:         testConnectorID,
-		Version:    version,
-		Namespace:  namespace,
-		State:      state,
-		Definition: def,
-		Labels:     labels,
+func connectorVersion(def config.ConnectorDefinition, labels map[string]string, state cschema.ConnectorReleaseState, version uint64) cschema.Connector {
+	resource := cschema.NewConnector()
+	resource.Metadata.ID = testConnectorID.String()
+	resource.Metadata.Name = "demo-noauth"
+	resource.Metadata.Namespace = defaultNamespace
+	resource.Metadata.Generation = version
+	resource.Metadata.Labels = labels
+	resource.Spec.Release.DesiredState = cschema.DesiredReleaseStateForObserved(state)
+	resource.Spec.Definition = def
+	resource.Status = &cschema.ConnectorStatus{
+		Release: cschema.ConnectorReleaseStatus{State: state},
 	}
+	return *resource
 }
 
 func writeJSON(t *testing.T, w http.ResponseWriter, v any) {
