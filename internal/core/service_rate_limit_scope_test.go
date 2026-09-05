@@ -18,7 +18,7 @@ func TestValidateRateLimitScopeTargetNamespace(t *testing.T) {
 				"root.acme",
 				namespace,
 			)
-			require.ErrorIs(t, err, ErrInvalidArgument)
+			require.NoError(t, err)
 		}
 	})
 
@@ -35,6 +35,7 @@ func TestValidateRateLimitScopeTargetNamespace(t *testing.T) {
 				namespace,
 			)
 			require.ErrorIs(t, err, ErrInvalidArgument)
+			require.ErrorContains(t, err, "outside rate-limit namespace")
 		}
 	})
 }

@@ -158,11 +158,13 @@ func mapRateLimitDatabaseError(err error) error {
 	return err
 }
 
-// normalizeRateLimitScope checks references in the scope. It loads the target
-// resources, then validates that they live in a namespace that is valid to
-// reference from this rate limit. From there, it converts the references to
-// id references so that we are directly referring to a direct resource for
-// saving.
+// normalizeRateLimitScope enforces the scope's namespace boundary and converts
+// connector and connection references to stable ID references for storage.
+// Namespace matchers remain unchanged: their syntax is checked by resource
+// validation, and ValidateScopeNamespaceBoundary ensures that they cannot
+// escape the namespace that owns the rate limit. They are not resolved to a
+// Namespace resource because a matcher may intentionally cover descendants
+// created in the future.
 func (s *service) normalizeRateLimitScope(
 	ctx context.Context,
 	resource *rlschema.RateLimit,
