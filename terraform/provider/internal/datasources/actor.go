@@ -40,9 +40,9 @@ func (d *ActorDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, 
 			"id":          schema.StringAttribute{Required: true},
 			"namespace":   schema.StringAttribute{Computed: true},
 			"external_id": schema.StringAttribute{Computed: true},
-			"labels":       schema.MapAttribute{Computed: true, ElementType: types.StringType},
-			"annotations":  schema.MapAttribute{Computed: true, ElementType: types.StringType},
-			"created_at":   schema.StringAttribute{Computed: true},
+			"labels":      schema.MapAttribute{Computed: true, ElementType: types.StringType},
+			"annotations": schema.MapAttribute{Computed: true, ElementType: types.StringType},
+			"created_at":  schema.StringAttribute{Computed: true},
 			"updated_at":  schema.StringAttribute{Computed: true},
 		},
 	}
@@ -68,12 +68,12 @@ func (d *ActorDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 		return
 	}
 
-	config.Namespace = types.StringValue(a.Namespace)
-	config.ExternalId = types.StringValue(a.ExternalId)
-	config.Labels = labelsToMap(a.Labels)
-	config.Annotations = annotationsToMap(a.Annotations)
-	config.CreatedAt = types.StringValue(a.CreatedAt.Format("2006-01-02T15:04:05Z07:00"))
-	config.UpdatedAt = types.StringValue(a.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"))
+	config.Namespace = types.StringValue(a.Metadata.Namespace)
+	config.ExternalId = types.StringValue(a.Spec.ExternalID)
+	config.Labels = labelsToMap(a.Metadata.Labels)
+	config.Annotations = annotationsToMap(a.Metadata.Annotations)
+	config.CreatedAt = types.StringValue(a.Metadata.CreatedAt.Format("2006-01-02T15:04:05Z07:00"))
+	config.UpdatedAt = types.StringValue(a.Metadata.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &config)...)
 }

@@ -48,14 +48,20 @@ Add the public key as an admin actor in `dev_config/default.yaml`:
 ```yaml
 systemAuth:
   actors:
-    - externalId: demo-shell
-      key:
-        publicKey:
-          path: ./demos/shell/dev_keys/demo-shell.pub
-      permissions:
-        - namespace: "root.**"
-          resources: ["*"]
-          verbs: ["*"]
+    - apiVersion: authproxy.net/v1alpha1
+      kind: Actor
+      metadata:
+        namespace: root
+        name: demo-shell
+      spec:
+        externalId: demo-shell
+        signingKey:
+          publicKey:
+            path: ./demos/shell/dev_keys/demo-shell.pub
+        permissions:
+          - namespace: "root.**"
+            resources: ["*"]
+            verbs: ["*"]
 ```
 
 Restart the AuthProxy server so it picks up the new actor.

@@ -18,6 +18,8 @@ import (
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
+	actorschema "github.com/rmorlok/authproxy/internal/schema/resources/actor"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/stretchr/testify/require"
 )
 
@@ -98,14 +100,17 @@ func NewRemoteAuthProxy(t *testing.T, opts RemoteAuthProxyOptions) *RemoteAuthPr
 	}
 }
 
-func (h *RemoteAuthProxy) CreateActor(t *testing.T, externalID string, labels map[string]string) schemaapi.ActorJson {
+func (h *RemoteAuthProxy) CreateActor(t *testing.T, externalID string, labels map[string]string) actorschema.Actor {
 	t.Helper()
 
-	var actor schemaapi.ActorJson
-	h.doSigned(t, h.AdminActorExternalID, http.MethodPost, h.AdminURL+"/api/v1/actors", schemaapi.CreateActorRequestJson{
-		ExternalId: externalID,
-		Namespace:  h.Namespace,
-		Labels:     labels,
+	var actor actorschema.Actor
+	h.doSigned(t, h.AdminActorExternalID, http.MethodPost, h.AdminURL+"/api/v1/actors", actorschema.Actor{
+		TypeMeta: meta.NewTypeMeta(actorschema.ActorKind),
+		Metadata: meta.ObjectMeta{
+			Namespace: h.Namespace,
+			Labels:    labels,
+		},
+		Spec: actorschema.ActorSpec{ExternalId: externalID},
 	}, true, http.StatusCreated, &actor)
 	return actor
 }

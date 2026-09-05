@@ -8,6 +8,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/schema/config"
+	"github.com/rmorlok/authproxy/internal/schema/resources/actor"
 	"github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
@@ -21,6 +22,7 @@ var allSchemaIDs = []string{
 	auth.SchemaIdAuth,
 	common.SchemaIdCommon,
 	config.SchemaIdConfig,
+	actor.SchemaIdActor,
 	connectors.SchemaIdConnectors,
 	meta.SchemaID,
 	namespace.SchemaId,

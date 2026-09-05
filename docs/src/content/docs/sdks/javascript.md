@@ -80,6 +80,27 @@ if (connection.state === ConnectionState.CONFIGURED) {
 }
 ```
 
+Actor calls use the canonical resource envelope. The SDK exports constants so
+callers do not need to repeat string literals:
+
+```ts
+import {ACTOR_API_VERSION, ACTOR_KIND, actors} from '@authproxy/api';
+
+const {data: actor} = await actors.create({
+  apiVersion: ACTOR_API_VERSION,
+  kind: ACTOR_KIND,
+  metadata: {
+    namespace: 'root.acme',
+    name: 'billing-service',
+  },
+  spec: {
+    externalId: 'svc_billing',
+  },
+});
+
+console.log(actor.metadata.id, actor.spec.externalId);
+```
+
 ### Create, rename, and query by name
 
 Resource models expose both `name` and immutable `id`. Optional create names

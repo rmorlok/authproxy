@@ -19,6 +19,7 @@ export const columns: GridColDef<Actor>[] = [
         flex: 0.8,
         minWidth: 120,
         sortable: true,
+        valueGetter: (_, row) => row.metadata.name,
     },
     {
         field: 'id',
@@ -26,6 +27,7 @@ export const columns: GridColDef<Actor>[] = [
         flex: 0.8,
         minWidth: 110,
         sortable: true,
+        valueGetter: (_, row) => row.metadata.id,
     },
     {
         field: 'externalId',
@@ -33,6 +35,7 @@ export const columns: GridColDef<Actor>[] = [
         flex: 0.4,
         minWidth: 80,
         sortable: true,
+        valueGetter: (_, row) => row.spec.externalId,
     },
     {
         field: 'email',
@@ -61,8 +64,8 @@ export const columns: GridColDef<Actor>[] = [
         flex: 1,
         minWidth: 80,
         sortable: true,
-        valueGetter: (value, _) => {
-            return dayjs(value).format('MMM DD, YYYY, h:mm A');
+        valueGetter: (_, row) => {
+            return dayjs(row.metadata.createdAt).format('MMM DD, YYYY, h:mm A');
         }
 
     },
@@ -72,8 +75,8 @@ export const columns: GridColDef<Actor>[] = [
         flex: 1,
         minWidth: 100,
         sortable: true,
-        valueGetter: (value) => {
-            return dayjs(value).format('MMM DD, YYYY, h:mm A');
+        valueGetter: (_, row) => {
+            return dayjs(row.metadata.updatedAt).format('MMM DD, YYYY, h:mm A');
         }
 
     },
@@ -200,11 +203,11 @@ export default function Actors() {
                     autoHeight
                     rows={rows}
                     columns={columns}
-                    getRowId={(row) => row.id}
+                    getRowId={(row) => row.metadata.id}
                     getRowClassName={(params) =>
                         params.indexRelativeToCurrentPage % 2 === 0 ? 'even' : 'odd'
                     }
-                    onRowClick={(params) => navigate(`/actors/${params.row.id}`)}
+                    onRowClick={(params) => navigate(`/actors/${params.row.metadata.id}`)}
                     sx={{cursor: 'pointer'}}
                     loading={loading}
                     sortingMode="server"

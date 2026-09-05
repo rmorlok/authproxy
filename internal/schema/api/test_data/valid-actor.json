@@ -1,13 +1,24 @@
 {
-  "id": "act_test550e8400abcde",
-  "namespace": "root.acme",
-  "externalId": "user-123",
-  "labels": {
-    "team": "platform"
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "Actor",
+  "metadata": {
+    "id": "act_test550e8400abcde",
+    "name": "billing-service",
+    "namespace": "root.acme",
+    "labels": {
+      "team": "platform"
+    },
+    "annotations": {
+      "owner": "integrations"
+    },
+    "createdAt": "2026-05-25T12:00:00Z",
+    "updatedAt": "2026-05-25T12:30:00Z"
   },
-  "annotations": {
-    "owner": "integrations"
+  "spec": {
+    "externalId": "user-123",
+    "permissions": []
   },
-  "createdAt": "2026-05-25T12:00:00Z",
-  "updatedAt": "2026-05-25T12:30:00Z"
+  "status": {
+    "signingKeyConfigured": false
+  }
 }

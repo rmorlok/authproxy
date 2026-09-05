@@ -29,6 +29,8 @@ import (
 	"github.com/rmorlok/authproxy/internal/apauth/jwt"
 	"github.com/rmorlok/authproxy/internal/schema/api"
 	"github.com/rmorlok/authproxy/internal/schema/config"
+	actorschema "github.com/rmorlok/authproxy/internal/schema/resources/actor"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/rmorlok/authproxy/internal/util"
 )
 
@@ -192,11 +194,14 @@ func upsertActor(c *resty.Client, baseUrl string, a ActorSeed) (created bool, er
 		return false, fmt.Errorf("GET actor %q returned %d: %s", a.ExternalId, getResp.StatusCode(), getResp.String())
 	}
 
-	body := api.CreateActorRequestJson{
-		ExternalId:  a.ExternalId,
-		Namespace:   a.Namespace,
-		Labels:      a.Labels,
-		Annotations: a.Annotations,
+	body := actorschema.Actor{
+		TypeMeta: meta.NewTypeMeta(actorschema.ActorKind),
+		Metadata: meta.ObjectMeta{
+			Namespace:   a.Namespace,
+			Labels:      a.Labels,
+			Annotations: a.Annotations,
+		},
+		Spec: actorschema.ActorSpec{ExternalId: a.ExternalId},
 	}
 	postResp, err := c.R().
 		SetHeader("Content-Type", "application/json").

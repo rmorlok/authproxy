@@ -220,6 +220,8 @@ func requestEventsFrame(events []requestEvent) *data.Frame {
 
 func resourceValue(item namedResource) string {
 	switch {
+	case item.Metadata != nil && item.Metadata.ID != "":
+		return item.Metadata.ID
 	case item.ID != "":
 		return item.ID
 	case item.Path != "":
@@ -235,6 +237,10 @@ func resourceText(item namedResource) string {
 	switch {
 	case item.DisplayName != "":
 		return item.DisplayName
+	case item.Kind == "Actor" && item.Spec != nil && item.Spec.ExternalID != "":
+		return item.Spec.ExternalID
+	case item.Metadata != nil && item.Metadata.Name != "":
+		return item.Metadata.Name
 	case item.Name != "":
 		return item.Name
 	case item.Path != "":

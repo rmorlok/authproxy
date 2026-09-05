@@ -3,19 +3,20 @@ package config
 import (
 	"fmt"
 
+	actorschema "github.com/rmorlok/authproxy/internal/schema/resources/actor"
 	"github.com/rmorlok/authproxy/internal/util"
 	"gopkg.in/yaml.v3"
 )
 
-type ConfiguredActorsList []*ConfiguredActor
+type ConfiguredActorsList []*actorschema.Actor
 
-func (cal ConfiguredActorsList) All() []*ConfiguredActor {
+func (cal ConfiguredActorsList) All() []*actorschema.Actor {
 	return cal
 }
 
-func (cal ConfiguredActorsList) GetByExternalId(externalId string) (*ConfiguredActor, bool) {
+func (cal ConfiguredActorsList) GetByExternalId(externalId string) (*actorschema.Actor, bool) {
 	for _, actor := range cal {
-		if actor.ExternalId == externalId {
+		if actor.Spec.ExternalId == externalId {
 			return actor, true
 		}
 	}
@@ -23,7 +24,7 @@ func (cal ConfiguredActorsList) GetByExternalId(externalId string) (*ConfiguredA
 	return nil, false
 }
 
-func (cal ConfiguredActorsList) GetBySubject(subject string) (*ConfiguredActor, bool) {
+func (cal ConfiguredActorsList) GetBySubject(subject string) (*actorschema.Actor, bool) {
 	// Subject is the same as ExternalId (no admin/ prefix handling)
 	return cal.GetByExternalId(subject)
 }
@@ -50,9 +51,9 @@ func configuredActorsListUnmarshalYAML(value *yaml.Node) (ConfiguredActorsList, 
 		return nil, fmt.Errorf("actors list expected a sequence node, got %v", value.Kind)
 	}
 
-	var results []*ConfiguredActor
+	var results []*actorschema.Actor
 	for _, childNode := range value.Content {
-		var actor ConfiguredActor
+		var actor actorschema.Actor
 		if err := util.DecodeYAMLNodeStrict(childNode, &actor); err != nil {
 			return nil, err
 		}

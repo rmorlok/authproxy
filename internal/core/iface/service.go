@@ -10,6 +10,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	cfgschema "github.com/rmorlok/authproxy/internal/schema/config"
+	actorschema "github.com/rmorlok/authproxy/internal/schema/resources/actor"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	keyschema "github.com/rmorlok/authproxy/internal/schema/resources/key"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
@@ -72,7 +73,7 @@ type C interface {
 	 */
 
 	// ResolveActorReference resolves an Actor by immutable ID or namespace/name.
-	ResolveActorReference(ctx context.Context, reference meta.ObjectReference) (*authcore.Actor, error)
+	ResolveActorReference(ctx context.Context, reference meta.ObjectReference) (Actor, error)
 
 	// ResolveConnectionReference resolves and fully hydrates a Connection.
 	ResolveConnectionReference(ctx context.Context, reference meta.ObjectReference) (Connection, error)
@@ -353,6 +354,45 @@ type C interface {
 		ra *authcore.RequestAuth,
 		ids []apid.ID,
 	) error
+
+	/*
+	 *
+	 * Actors
+	 *
+	 */
+
+	// GetActor returns an actor by immutable ID.
+	GetActor(ctx context.Context, id apid.ID) (Actor, error)
+
+	// GetActorByExternalId returns an actor by external identity in a namespace.
+	GetActorByExternalId(ctx context.Context, namespace, externalID string) (Actor, error)
+
+	// CreateActor creates a canonical Actor resource.
+	CreateActor(ctx context.Context, resource *actorschema.Actor) (Actor, error)
+
+	// UpdateActor applies a presence-aware canonical Actor patch.
+	UpdateActor(ctx context.Context, id apid.ID, patch *actorschema.ActorPatch) (Actor, error)
+
+	// DeleteActor soft deletes an actor.
+	DeleteActor(ctx context.Context, id apid.ID) error
+
+	// PutActorLabels adds or updates actor labels.
+	PutActorLabels(ctx context.Context, id apid.ID, labels map[string]string) (Actor, error)
+
+	// DeleteActorLabels removes actor label keys.
+	DeleteActorLabels(ctx context.Context, id apid.ID, keys []string) (Actor, error)
+
+	// PutActorAnnotations adds or updates actor annotations.
+	PutActorAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (Actor, error)
+
+	// DeleteActorAnnotations removes actor annotation keys.
+	DeleteActorAnnotations(ctx context.Context, id apid.ID, keys []string) (Actor, error)
+
+	// ListActorsBuilder returns a builder for listing actors.
+	ListActorsBuilder() ListActorsBuilder
+
+	// ListActorsFromCursor continues listing actors from a cursor.
+	ListActorsFromCursor(ctx context.Context, cursor string) (ListActorsExecutor, error)
 
 	/*
 	 *

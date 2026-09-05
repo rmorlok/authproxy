@@ -1,32 +1,9 @@
 basePath: /api/v1
 definitions:
-  api.ActorJson:
-    description: Actor identity within a namespace
+  actor.ActorStatus:
     properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      createdAt:
-        type: string
-      externalId:
-        example: user-123
-        type: string
-      id:
-        example: act_test550e8400abcde
-        type: string
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-      name:
-        example: billing-service
-        type: string
-      namespace:
-        example: root.acme
-        type: string
-      updatedAt:
-        type: string
+      signingKeyConfigured:
+        type: boolean
     type: object
   api.ConnectorJson:
     description: Connector API summary response
@@ -99,6 +76,23 @@ definitions:
       metric:
         example: request_events
         type: string
+    type: object
+  auth.Permission:
+    properties:
+      namespace:
+        type: string
+      resourceIds:
+        items:
+          type: string
+        type: array
+      resources:
+        items:
+          type: string
+        type: array
+      verbs:
+        items:
+          type: string
+        type: array
     type: object
   key.KeyStatus:
     properties:
@@ -214,6 +208,84 @@ definitions:
     properties:
       state:
         type: string
+    type: object
+  openapi.ActorJson:
+    description: Kubernetes-style Actor resource. Signing key material is write-only
+      and never returned.
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - Actor
+        example: Actor
+        type: string
+      metadata:
+        $ref: '#/definitions/meta.ObjectMeta'
+      spec:
+        $ref: '#/definitions/openapi.ActorSpecJson'
+      status:
+        $ref: '#/definitions/actor.ActorStatus'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
+  openapi.ActorPatchJson:
+    description: Kubernetes-style Actor patch. External identity and namespace are
+      immutable; signingKey null removes actor-specific signing material.
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - Actor
+        example: Actor
+        type: string
+      metadata:
+        $ref: '#/definitions/meta.ObjectMetaPatch'
+      spec:
+        $ref: '#/definitions/openapi.ActorSpecPatchJson'
+      status:
+        $ref: '#/definitions/actor.ActorStatus'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
+  openapi.ActorSpecJson:
+    properties:
+      externalId:
+        example: user-123
+        type: string
+      permissions:
+        items:
+          $ref: '#/definitions/auth.Permission'
+        type: array
+      signingKey:
+        type: object
+    required:
+    - externalId
+    type: object
+  openapi.ActorSpecPatchJson:
+    properties:
+      externalId:
+        example: user-123
+        type: string
+      permissions:
+        items:
+          $ref: '#/definitions/auth.Permission'
+        type: array
+      signingKey:
+        type: object
     type: object
   openapi.ConnectionJson:
     description: Connection to an external service
@@ -401,6 +473,29 @@ definitions:
         enum:
         - data_encryption
         type: string
+    type: object
+  openapi.ListActorsResponseJson:
+    description: Paginated list of actors
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      items:
+        description: List of actors.
+        items:
+          $ref: '#/definitions/openapi.ActorJson'
+        type: array
+      kind:
+        type: string
+      metadata:
+        $ref: '#/definitions/v1alpha1.ListMeta'
+    required:
+    - apiVersion
+    - items
+    - kind
+    - metadata
     type: object
   openapi.ListKeysResponseJson:
     description: Paginated list of keys
@@ -704,34 +799,6 @@ definitions:
         example: 1
         type: number
     type: object
-  routes.ActorJson:
-    description: Actor identity within a namespace
-    properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      createdAt:
-        type: string
-      externalId:
-        example: user-123
-        type: string
-      id:
-        example: act_test550e8400abcde
-        type: string
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-      name:
-        example: billing-service
-        type: string
-      namespace:
-        example: root.acme
-        type: string
-      updatedAt:
-        type: string
-    type: object
   routes.ConnectionScopesJson:
     properties:
       granted:
@@ -854,27 +921,6 @@ definitions:
       version:
         example: 1
         type: integer
-    type: object
-  routes.CreateActorRequestJson:
-    description: Actor creation request
-    properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      externalId:
-        example: user-123
-        type: string
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-      name:
-        example: billing-service
-        type: string
-      namespace:
-        example: root.acme
-        type: string
     type: object
   routes.DataSourceOptionJson:
     description: Data source option for form select fields
@@ -1089,29 +1135,6 @@ definitions:
       connection: {}
       taskId:
         type: string
-    type: object
-  routes.OpenAPIListActorsResponseJson:
-    description: Paginated list of actors
-    properties:
-      apiVersion:
-        enum:
-        - authproxy.net/v1alpha1
-        example: authproxy.net/v1alpha1
-        type: string
-      items:
-        description: List of actors.
-        items:
-          $ref: '#/definitions/api.ActorJson'
-        type: array
-      kind:
-        type: string
-      metadata:
-        $ref: '#/definitions/v1alpha1.ListMeta'
-    required:
-    - apiVersion
-    - items
-    - kind
-    - metadata
     type: object
   routes.OpenAPIListConnectionResponseJson:
     description: Paginated list of connections
@@ -1472,21 +1495,6 @@ definitions:
         example: preconnect:0
         type: string
     type: object
-  routes.UpdateActorRequestJson:
-    description: Actor update request
-    properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-      name:
-        example: billing-service
-        type: string
-    type: object
   routes.UpdateConnectionRequestJson:
     description: Request to update a connection's labels and annotations
     properties:
@@ -1560,7 +1568,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIListActorsResponseJson'
+            $ref: '#/definitions/openapi.ListActorsResponseJson'
         "400":
           description: Bad Request
           schema:
@@ -1588,14 +1596,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.CreateActorRequestJson'
+          $ref: '#/definitions/openapi.ActorJson'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/routes.ActorJson'
+            $ref: '#/definitions/openapi.ActorJson'
         "400":
           description: Bad Request
           schema:
@@ -1674,7 +1682,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.ActorJson'
+            $ref: '#/definitions/openapi.ActorJson'
         "400":
           description: Bad Request
           schema:
@@ -1711,14 +1719,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.UpdateActorRequestJson'
+          $ref: '#/definitions/openapi.ActorPatchJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.ActorJson'
+            $ref: '#/definitions/openapi.ActorJson'
         "400":
           description: Bad Request
           schema:
@@ -2151,7 +2159,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.ActorJson'
+            $ref: '#/definitions/openapi.ActorJson'
         "400":
           description: Bad Request
           schema:
@@ -2192,14 +2200,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.UpdateActorRequestJson'
+          $ref: '#/definitions/openapi.ActorPatchJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.ActorJson'
+            $ref: '#/definitions/openapi.ActorJson'
         "400":
           description: Bad Request
           schema:

@@ -81,7 +81,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPIListActorsResponseJson"
+                            "$ref": "#/definitions/openapi.ListActorsResponseJson"
                         }
                     },
                     "400": {
@@ -128,7 +128,7 @@ const docTemplateApi = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.CreateActorRequestJson"
+                            "$ref": "#/definitions/openapi.ActorJson"
                         }
                     }
                 ],
@@ -136,7 +136,7 @@ const docTemplateApi = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/routes.ActorJson"
+                            "$ref": "#/definitions/openapi.ActorJson"
                         }
                     },
                     "400": {
@@ -209,7 +209,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.ActorJson"
+                            "$ref": "#/definitions/openapi.ActorJson"
                         }
                     },
                     "400": {
@@ -337,7 +337,7 @@ const docTemplateApi = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.UpdateActorRequestJson"
+                            "$ref": "#/definitions/openapi.ActorPatchJson"
                         }
                     }
                 ],
@@ -345,7 +345,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.ActorJson"
+                            "$ref": "#/definitions/openapi.ActorJson"
                         }
                     },
                     "400": {
@@ -412,7 +412,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.ActorJson"
+                            "$ref": "#/definitions/openapi.ActorJson"
                         }
                     },
                     "400": {
@@ -528,7 +528,7 @@ const docTemplateApi = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.UpdateActorRequestJson"
+                            "$ref": "#/definitions/openapi.ActorPatchJson"
                         }
                     }
                 ],
@@ -536,7 +536,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.ActorJson"
+                            "$ref": "#/definitions/openapi.ActorJson"
                         }
                     },
                     "400": {
@@ -8169,43 +8169,11 @@ const docTemplateApi = `{
         }
     },
     "definitions": {
-        "api.ActorJson": {
-            "description": "Actor identity within a namespace",
+        "actor.ActorStatus": {
             "type": "object",
             "properties": {
-                "annotations": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "createdAt": {
-                    "type": "string"
-                },
-                "externalId": {
-                    "type": "string",
-                    "example": "user-123"
-                },
-                "id": {
-                    "type": "string",
-                    "example": "act_test550e8400abcde"
-                },
-                "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "name": {
-                    "type": "string",
-                    "example": "billing-service"
-                },
-                "namespace": {
-                    "type": "string",
-                    "example": "root.acme"
-                },
-                "updatedAt": {
-                    "type": "string"
+                "signingKeyConfigured": {
+                    "type": "boolean"
                 }
             }
         },
@@ -8307,6 +8275,32 @@ const docTemplateApi = `{
                 "metric": {
                     "type": "string",
                     "example": "request_events"
+                }
+            }
+        },
+        "auth.Permission": {
+            "type": "object",
+            "properties": {
+                "namespace": {
+                    "type": "string"
+                },
+                "resourceIds": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "resources": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "verbs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -8484,6 +8478,115 @@ const docTemplateApi = `{
             "properties": {
                 "state": {
                     "type": "string"
+                }
+            }
+        },
+        "openapi.ActorJson": {
+            "description": "Kubernetes-style Actor resource. Signing key material is write-only and never returned.",
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "kind",
+                "metadata",
+                "spec"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "Actor"
+                    ],
+                    "example": "Actor"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/meta.ObjectMeta"
+                },
+                "spec": {
+                    "$ref": "#/definitions/openapi.ActorSpecJson"
+                },
+                "status": {
+                    "$ref": "#/definitions/actor.ActorStatus"
+                }
+            }
+        },
+        "openapi.ActorPatchJson": {
+            "description": "Kubernetes-style Actor patch. External identity and namespace are immutable; signingKey null removes actor-specific signing material.",
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "kind",
+                "metadata",
+                "spec"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "Actor"
+                    ],
+                    "example": "Actor"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/meta.ObjectMetaPatch"
+                },
+                "spec": {
+                    "$ref": "#/definitions/openapi.ActorSpecPatchJson"
+                },
+                "status": {
+                    "$ref": "#/definitions/actor.ActorStatus"
+                }
+            }
+        },
+        "openapi.ActorSpecJson": {
+            "type": "object",
+            "required": [
+                "externalId"
+            ],
+            "properties": {
+                "externalId": {
+                    "type": "string",
+                    "example": "user-123"
+                },
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/auth.Permission"
+                    }
+                },
+                "signingKey": {
+                    "type": "object"
+                }
+            }
+        },
+        "openapi.ActorSpecPatchJson": {
+            "type": "object",
+            "properties": {
+                "externalId": {
+                    "type": "string",
+                    "example": "user-123"
+                },
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/auth.Permission"
+                    }
+                },
+                "signingKey": {
+                    "type": "object"
                 }
             }
         },
@@ -8743,6 +8846,38 @@ const docTemplateApi = `{
                     "enum": [
                         "data_encryption"
                     ]
+                }
+            }
+        },
+        "openapi.ListActorsResponseJson": {
+            "description": "Paginated list of actors",
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "items",
+                "kind",
+                "metadata"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "items": {
+                    "description": "List of actors.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/openapi.ActorJson"
+                    }
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/v1alpha1.ListMeta"
                 }
             }
         },
@@ -9177,46 +9312,6 @@ const docTemplateApi = `{
                 }
             }
         },
-        "routes.ActorJson": {
-            "description": "Actor identity within a namespace",
-            "type": "object",
-            "properties": {
-                "annotations": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "createdAt": {
-                    "type": "string"
-                },
-                "externalId": {
-                    "type": "string",
-                    "example": "user-123"
-                },
-                "id": {
-                    "type": "string",
-                    "example": "act_test550e8400abcde"
-                },
-                "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "name": {
-                    "type": "string",
-                    "example": "billing-service"
-                },
-                "namespace": {
-                    "type": "string",
-                    "example": "root.acme"
-                },
-                "updatedAt": {
-                    "type": "string"
-                }
-            }
-        },
         "routes.ConnectionScopesJson": {
             "type": "object",
             "properties": {
@@ -9378,36 +9473,6 @@ const docTemplateApi = `{
                 "version": {
                     "type": "integer",
                     "example": 1
-                }
-            }
-        },
-        "routes.CreateActorRequestJson": {
-            "description": "Actor creation request",
-            "type": "object",
-            "properties": {
-                "annotations": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "externalId": {
-                    "type": "string",
-                    "example": "user-123"
-                },
-                "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "name": {
-                    "type": "string",
-                    "example": "billing-service"
-                },
-                "namespace": {
-                    "type": "string",
-                    "example": "root.acme"
                 }
             }
         },
@@ -9703,38 +9768,6 @@ const docTemplateApi = `{
                 "connection": {},
                 "taskId": {
                     "type": "string"
-                }
-            }
-        },
-        "routes.OpenAPIListActorsResponseJson": {
-            "description": "Paginated list of actors",
-            "type": "object",
-            "required": [
-                "apiVersion",
-                "items",
-                "kind",
-                "metadata"
-            ],
-            "properties": {
-                "apiVersion": {
-                    "type": "string",
-                    "enum": [
-                        "authproxy.net/v1alpha1"
-                    ],
-                    "example": "authproxy.net/v1alpha1"
-                },
-                "items": {
-                    "description": "List of actors.",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/api.ActorJson"
-                    }
-                },
-                "kind": {
-                    "type": "string"
-                },
-                "metadata": {
-                    "$ref": "#/definitions/v1alpha1.ListMeta"
                 }
             }
         },
@@ -10242,28 +10275,6 @@ const docTemplateApi = `{
                     "description": "StepId is the id of the step being submitted. Must match the current setup step's id.",
                     "type": "string",
                     "example": "preconnect:0"
-                }
-            }
-        },
-        "routes.UpdateActorRequestJson": {
-            "description": "Actor update request",
-            "type": "object",
-            "properties": {
-                "annotations": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "name": {
-                    "type": "string",
-                    "example": "billing-service"
                 }
             }
         },

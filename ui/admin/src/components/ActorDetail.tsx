@@ -9,7 +9,7 @@ import IconButton from '@mui/material/IconButton';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import dayjs from 'dayjs';
 import Tooltip from '@mui/material/Tooltip';
-import {Actor, actors} from '@authproxy/api';
+import {ACTOR_API_VERSION, ACTOR_KIND, Actor, actors} from '@authproxy/api';
 import AnnotationsEditor from "./AnnotationsEditor";
 import ResourceNameEditor from './ResourceNameEditor';
 
@@ -21,7 +21,7 @@ export default function ActorDetail({actorId}: { actorId: string }) {
   const [copied, setCopied] = useState(false);
   const handleCopyId = async () => {
     try {
-      await navigator.clipboard.writeText(actor?.id || '');
+      await navigator.clipboard.writeText(actor?.metadata.id || '');
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch (_e: any) {
@@ -70,10 +70,15 @@ export default function ActorDetail({actorId}: { actorId: string }) {
       <Typography variant="h5">Actor</Typography>
 
       <ResourceNameEditor
-        name={actor.name}
+        name={actor.metadata.name}
         resourceType="Actor"
         onRename={async (name) => {
-          const response = await actors.update(actor.id, {name});
+          const response = await actors.update(actor.metadata.id, {
+            apiVersion: ACTOR_API_VERSION,
+            kind: ACTOR_KIND,
+            metadata: {name},
+            spec: {},
+          });
           setActor(response.data);
         }}
       />
@@ -95,7 +100,7 @@ export default function ActorDetail({actorId}: { actorId: string }) {
               letterSpacing: '0.02em',
             }}
           >
-            {actor.id}
+            {actor.metadata.id}
           </Typography>
           <Tooltip title={copied ? 'Copied!' : 'Copy'} placement="top">
             <IconButton size="small" aria-label="Copy actor id" onClick={handleCopyId}>
@@ -108,30 +113,30 @@ export default function ActorDetail({actorId}: { actorId: string }) {
       <Stack direction={{xs: 'column', sm: 'row'}} spacing={4}>
         <Box>
           <Typography variant="subtitle2" color="text.secondary">External ID</Typography>
-          <Typography variant="body1">{actor.externalId}</Typography>
+          <Typography variant="body1">{actor.spec.externalId}</Typography>
         </Box>
         <Box>
           <Typography variant="subtitle2" color="text.secondary">Namespace</Typography>
-          <Typography variant="body1">{actor.namespace}</Typography>
+          <Typography variant="body1">{actor.metadata.namespace}</Typography>
         </Box>
       </Stack>
 
       <Stack direction={{xs: 'column', sm: 'row'}} spacing={4}>
         <Box>
           <Typography variant="subtitle2" color="text.secondary">Created</Typography>
-          <Typography variant="body1">{dayjs(actor.createdAt).format('MMM DD, YYYY, h:mm A')}</Typography>
+          <Typography variant="body1">{dayjs(actor.metadata.createdAt).format('MMM DD, YYYY, h:mm A')}</Typography>
         </Box>
         <Box>
           <Typography variant="subtitle2" color="text.secondary">Updated</Typography>
-          <Typography variant="body1">{dayjs(actor.updatedAt).format('MMM DD, YYYY, h:mm A')}</Typography>
+          <Typography variant="body1">{dayjs(actor.metadata.updatedAt).format('MMM DD, YYYY, h:mm A')}</Typography>
         </Box>
       </Stack>
 
       <Box>
         <Typography variant="subtitle2" color="text.secondary">Labels</Typography>
-        {actor.labels && Object.keys(actor.labels).length > 0 ? (
+        {actor.metadata.labels && Object.keys(actor.metadata.labels).length > 0 ? (
           <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{mt: 0.5}}>
-            {Object.entries(actor.labels).map(([key, value]) => (
+            {Object.entries(actor.metadata.labels).map(([key, value]) => (
               <Chip key={key} label={`${key}: ${value}`} size="small" variant="outlined"/>
             ))}
           </Stack>
@@ -141,13 +146,13 @@ export default function ActorDetail({actorId}: { actorId: string }) {
       </Box>
 
       <AnnotationsEditor
-        annotations={actor.annotations}
+        annotations={actor.metadata.annotations}
         onPut={async (key, value) => {
-          await actors.putAnnotation(actor.id, key, value);
+          await actors.putAnnotation(actor.metadata.id, key, value);
           fetchActor();
         }}
         onDelete={async (key) => {
-          await actors.deleteAnnotation(actor.id, key);
+          await actors.deleteAnnotation(actor.metadata.id, key);
           fetchActor();
         }}
       />
