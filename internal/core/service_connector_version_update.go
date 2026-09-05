@@ -119,17 +119,22 @@ func (s *service) UpdateConnector(
 	if patch == nil {
 		return nil, fmt.Errorf("connector patch cannot be nil")
 	}
+
 	if patch.Metadata != nil && patch.Metadata.Generation != nil {
 		return nil, fmt.Errorf("%w: metadata.generation can only be addressed through a connector version endpoint", ErrInvalidArgument)
 	}
 
-	page := s.ListConnectorsBuilder().ForId(id).Limit(1).FetchPage(ctx)
+	page := s.ListConnectorsBuilder().
+		ForId(id).
+		Limit(1).
+		FetchPage(ctx)
 	if page.Error != nil {
 		return nil, page.Error
 	}
 	if len(page.Results) == 0 {
 		return nil, ErrNotFound
 	}
+
 	current := page.Results[0]
 	desired, err := patch.ApplyTo(current.GetResource(), nil)
 	if err != nil {
@@ -137,30 +142,40 @@ func (s *service) UpdateConnector(
 	}
 
 	if current.GetName() != desired.Metadata.Name {
-		if err := s.UpdateConnectorName(ctx, id, desired.Metadata.Name); err != nil {
+		if err := s.UpdateConnectorName(
+			ctx,
+			id,
+			desired.Metadata.Name,
+		); err != nil {
 			return nil, err
 		}
 	}
+
 	if !maps.Equal(current.GetLabels(), desired.Metadata.Labels) {
 		if _, err := s.db.UpdateConnectorLabels(ctx, id, desired.Metadata.Labels); err != nil {
 			return nil, mapDatabaseError(err)
 		}
 		s.enqueueConnectorLabelPropagation(ctx, id)
 	}
+
 	if !maps.Equal(current.GetAnnotations(), desired.Metadata.Annotations) {
 		if _, err := s.db.UpdateConnectorAnnotations(ctx, id, desired.Metadata.Annotations); err != nil {
 			return nil, mapDatabaseError(err)
 		}
 	}
 
-	hasDefinition := patch.Spec != nil && patch.Spec.HasDefinition()
+	hasDefinition := patch.Spec != nil &&
+		patch.Spec.HasDefinition()
 	hasDesiredState := patch.Spec != nil &&
 		patch.Spec.Release != nil &&
 		patch.Spec.Release.HasDesiredState()
-	if !hasDefinition && !hasDesiredState {
+
+	if !hasDefinition &&
+		!hasDesiredState {
 		return s.getConnectorVersion(ctx, id, current.GetVersion())
 	}
-	if !hasDefinition && hasDesiredState &&
+	if !hasDefinition &&
+		hasDesiredState &&
 		desired.Spec.Release.DesiredState == cschema.ConnectorReleaseStatePrimary &&
 		current.GetState() == database.ConnectorDefinitionVersionStatePrimary {
 		return s.getConnectorVersion(ctx, id, current.GetVersion())
@@ -170,6 +185,7 @@ func (s *service) UpdateConnector(
 	if err != nil {
 		return nil, err
 	}
+
 	desiredDraft, err := patch.ApplyTo(draft.GetResource(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidArgument, err)
@@ -197,17 +213,21 @@ func (s *service) UpdateConnectorVersion(
 	if patch == nil {
 		return nil, fmt.Errorf("connector patch cannot be nil")
 	}
+
 	existing, err := s.GetConnectorVersion(ctx, id, version)
 	if err != nil {
 		return nil, err
 	}
+
 	if existing.GetState() != database.ConnectorDefinitionVersionStateDraft {
 		return nil, ErrNotDraft
 	}
+
 	desired, err := patch.ApplyTo(existing.GetResource(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidArgument, err)
 	}
+
 	if desired.Metadata.Name != existing.GetName() {
 		return nil, fmt.Errorf("%w: connector names can only be changed through the connector-level update endpoint", ErrInvalidArgument)
 	}
