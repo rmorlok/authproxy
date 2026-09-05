@@ -214,10 +214,13 @@ func (r *RateLimit) ValidateFor(mode meta.ValidationMode, vc *common.ValidationC
 	if r == nil {
 		return fmt.Errorf("rate limit is required")
 	}
+
 	if vc == nil {
 		vc = &common.ValidationContext{Path: "$"}
 	}
-	requireStoredIdentity := mode == meta.ValidationModePersistence || mode == meta.ValidationModeResponse
+
+	requireStoredIdentity := mode == meta.ValidationModePersistence ||
+		mode == meta.ValidationModeResponse
 
 	var result *multierror.Error
 	if err := meta.ValidateResource(r.TypeMeta, r.Metadata, meta.ValidationOptions{
@@ -233,25 +236,32 @@ func (r *RateLimit) ValidateFor(mode meta.ValidationMode, vc *common.ValidationC
 	}); err != nil {
 		result = multierror.Append(result, err)
 	}
+
 	if r.Metadata.Generation != 0 {
 		result = multierror.Append(result, vc.NewErrorForField("metadata.generation", "does not apply to rate limits"))
 	}
+
 	if err := r.Spec.validateForNamespace(r.Metadata.Namespace, vc.PushField("spec")); err != nil {
 		result = multierror.Append(result, err)
 	}
+
 	if err := meta.ValidateStatus(r.Status, mode, vc); err != nil {
 		result = multierror.Append(result, err)
 	}
+
 	if r.Status != nil && !IsValidMode(r.Status.EffectiveMode) {
 		result = multierror.Append(result, vc.NewErrorForField("status.effectiveMode", "is not a recognized rate-limit mode"))
 	}
+
 	if (mode == meta.ValidationModePersistence || mode == meta.ValidationModeResponse) &&
 		r.Status != nil && r.Status.EffectiveMode != r.Spec.EffectiveMode() {
 		result = multierror.Append(result, vc.NewErrorForField("status.effectiveMode", "must match the effective spec mode"))
 	}
+
 	if requireStoredIdentity && r.Status == nil {
 		result = multierror.Append(result, vc.NewErrorForField("status", "is required"))
 	}
+
 	return result.ErrorOrNil()
 }
 
@@ -273,14 +283,23 @@ func (s *RateLimitSpec) ValidateForNamespace(resourceNamespace string) error {
 	return s.validateForNamespace(resourceNamespace, &common.ValidationContext{})
 }
 
-func (s *RateLimitSpec) validateForNamespace(resourceNamespace string, vc *common.ValidationContext) error {
+func (s *RateLimitSpec) validateForNamespace(
+	resourceNamespace string,
+	vc *common.ValidationContext,
+) error {
 	var result *multierror.Error
 	if err := s.validate(vc); err != nil {
 		result = multierror.Append(result, err)
 	}
-	if err := ValidateScopeNamespaceBoundary(s.Scope, resourceNamespace, vc); err != nil {
+
+	if err := ValidateScopeNamespaceBoundary(
+		s.Scope,
+		resourceNamespace,
+		vc,
+	); err != nil {
 		result = multierror.Append(result, err)
 	}
+
 	return result.ErrorOrNil()
 }
 
@@ -313,12 +332,14 @@ func ValidateScope(scope *RateLimitScope, vc *common.ValidationContext) error {
 	}
 	var result *multierror.Error
 	count := 0
+
 	if scope.NamespaceMatcher != nil {
 		count++
 		if err := nschema.ValidateMatcher(*scope.NamespaceMatcher); err != nil {
 			result = multierror.Append(result, vc.NewErrorfForField("scope.namespaceMatcher", "%v", err))
 		}
 	}
+
 	if scope.ConnectorRef != nil {
 		count++
 		if err := meta.ValidateObjectReferenceWithOptions(*scope.ConnectorRef, meta.ObjectReferenceValidationOptions{
@@ -333,6 +354,7 @@ func ValidateScope(scope *RateLimitScope, vc *common.ValidationContext) error {
 			result = multierror.Append(result, vc.NewErrorForField("scope.connectorRef.generation", "does not apply to rate-limit connector references"))
 		}
 	}
+
 	if scope.ConnectionRef != nil {
 		count++
 		if err := meta.ValidateObjectReferenceWithOptions(*scope.ConnectionRef, meta.ObjectReferenceValidationOptions{
@@ -347,22 +369,30 @@ func ValidateScope(scope *RateLimitScope, vc *common.ValidationContext) error {
 			result = multierror.Append(result, vc.NewErrorForField("scope.connectionRef.generation", "does not apply to connections"))
 		}
 	}
+
 	if count != 1 {
 		result = multierror.Append(result, vc.NewErrorForField("scope", "must contain exactly one of namespaceMatcher, connectorRef, or connectionRef"))
 	}
+
 	return result.ErrorOrNil()
 }
 
 // ValidateScopeNamespaceBoundary ensures an explicit namespace matcher or a
 // namespaced reference stays at or below the namespace that owns the rule.
 // ID-only references are checked against their resolved target in core.
-func ValidateScopeNamespaceBoundary(scope *RateLimitScope, resourceNamespace string, vc *common.ValidationContext) error {
+func ValidateScopeNamespaceBoundary(
+	scope *RateLimitScope,
+	resourceNamespace string,
+	vc *common.ValidationContext,
+) error {
 	if scope == nil {
 		return nil
 	}
+
 	if vc == nil {
 		vc = &common.ValidationContext{}
 	}
+
 	var result *multierror.Error
 	if scope.NamespaceMatcher != nil {
 		base := strings.TrimSuffix(*scope.NamespaceMatcher, nschema.WildcardSuffix)
@@ -374,20 +404,27 @@ func ValidateScopeNamespaceBoundary(scope *RateLimitScope, resourceNamespace str
 			))
 		}
 	}
-	if ref := scope.ConnectorRef; ref != nil && ref.Namespace != "" && !nschema.IsSameOrChild(resourceNamespace, ref.Namespace) {
+
+	if ref := scope.ConnectorRef; ref != nil &&
+		ref.Namespace != "" &&
+		!nschema.IsSameOrChild(resourceNamespace, ref.Namespace) {
 		result = multierror.Append(result, vc.NewErrorfForField(
 			"scope.connectorRef.namespace",
 			"must be namespace %q or one of its descendants",
 			resourceNamespace,
 		))
 	}
-	if ref := scope.ConnectionRef; ref != nil && ref.Namespace != "" && !nschema.IsSameOrChild(resourceNamespace, ref.Namespace) {
+
+	if ref := scope.ConnectionRef; ref != nil &&
+		ref.Namespace != "" &&
+		!nschema.IsSameOrChild(resourceNamespace, ref.Namespace) {
 		result = multierror.Append(result, vc.NewErrorfForField(
 			"scope.connectionRef.namespace",
 			"must be namespace %q or one of its descendants",
 			resourceNamespace,
 		))
 	}
+
 	return result.ErrorOrNil()
 }
 
@@ -412,17 +449,28 @@ func validatePrefixedID(value string, prefix apid.Prefix, name string) error {
 	return nil
 }
 
-func (p *RateLimitPatch) ValidateFor(mode meta.ValidationMode, vc *common.ValidationContext) error {
+func (p *RateLimitPatch) ValidateFor(
+	mode meta.ValidationMode,
+	vc *common.ValidationContext,
+) error {
 	if p == nil {
 		return fmt.Errorf("rate-limit patch is required")
 	}
+
 	if vc == nil {
 		vc = &common.ValidationContext{Path: "$"}
 	}
+
 	var result *multierror.Error
-	if err := meta.ValidateTypeMeta(p.TypeMeta, meta.APIVersionV1Alpha1, RateLimitKind, vc); err != nil {
+	if err := meta.ValidateTypeMeta(
+		p.TypeMeta,
+		meta.APIVersionV1Alpha1,
+		RateLimitKind,
+		vc,
+	); err != nil {
 		result = multierror.Append(result, err)
 	}
+
 	if p.Metadata == nil {
 		result = multierror.Append(result, vc.NewErrorForField("metadata", "is required and must not be null"))
 	} else if err := meta.ValidateObjectMetaPatch(*p.Metadata, meta.ValidationOptions{
@@ -430,42 +478,51 @@ func (p *RateLimitPatch) ValidateFor(mode meta.ValidationMode, vc *common.Valida
 	}); err != nil {
 		result = multierror.Append(result, err)
 	}
+
 	if p.Spec == nil {
 		result = multierror.Append(result, vc.NewErrorForField("spec", "is required and must not be null"))
 	} else if err := p.Spec.validate(vc.PushField("spec")); err != nil {
 		result = multierror.Append(result, err)
 	}
+
 	if err := meta.ValidateStatus(p.Status, mode, vc); err != nil {
 		result = multierror.Append(result, err)
 	}
+
 	return result.ErrorOrNil()
 }
 
 func (p *RateLimitSpecPatch) validate(vc *common.ValidationContext) error {
 	var result *multierror.Error
+
 	if p.modePresent && p.Mode == nil {
 		result = multierror.Append(result, vc.NewErrorForField("mode", "must not be null"))
 	} else if p.Mode != nil && !IsValidMode(*p.Mode) {
 		result = multierror.Append(result, vc.NewErrorForField("mode", "is not a recognized rate-limit mode"))
 	}
+
 	if p.scopePresent && p.Scope != nil {
 		result = multierror.Append(result, ValidateScope(p.Scope, vc))
 	}
+
 	if p.selectorPresent && p.Selector == nil {
 		result = multierror.Append(result, vc.NewErrorForField("selector", "must not be null"))
 	} else if p.Selector != nil {
 		result = multierror.Append(result, p.Selector.Validate(vc.PushField("selector")))
 	}
+
 	if p.bucketPresent && p.Bucket == nil {
 		result = multierror.Append(result, vc.NewErrorForField("bucket", "must not be null"))
 	} else if p.Bucket != nil {
 		result = multierror.Append(result, p.Bucket.Validate(vc.PushField("bucket")))
 	}
+
 	if p.algorithmPresent && p.Algorithm == nil {
 		result = multierror.Append(result, vc.NewErrorForField("algorithm", "must not be null"))
 	} else if p.Algorithm != nil {
 		result = multierror.Append(result, p.Algorithm.Validate(vc.PushField("algorithm")))
 	}
+
 	return result.ErrorOrNil()
 }
 
@@ -488,12 +545,15 @@ func (p *RateLimitPatch) ApplyTo(current *RateLimit, vc *common.ValidationContex
 	if current == nil {
 		return nil, fmt.Errorf("current rate limit is required")
 	}
+
 	if vc == nil {
 		vc = &common.ValidationContext{Path: "$"}
 	}
+
 	if err := p.ValidateFor(meta.ValidationModeUpdate, vc); err != nil {
 		return nil, err
 	}
+
 	updated := current.Clone()
 	updated.Metadata = meta.ApplyObjectMetaPatch(updated.Metadata, *p.Metadata)
 	if p.Spec.HasScope() {
@@ -503,6 +563,7 @@ func (p *RateLimitPatch) ApplyTo(current *RateLimit, vc *common.ValidationContex
 			updated.Spec.Scope = &scope
 		}
 	}
+
 	if p.Spec.Mode != nil {
 		updated.Spec.Mode = *p.Spec.Mode
 	}
@@ -515,28 +576,38 @@ func (p *RateLimitPatch) ApplyTo(current *RateLimit, vc *common.ValidationContex
 	if p.Spec.Algorithm != nil {
 		updated.Spec.Algorithm = *p.Spec.Algorithm
 	}
+
 	if err := updated.Spec.validateForNamespace(updated.Metadata.Namespace, vc.PushField("spec")); err != nil {
 		return nil, err
 	}
+
 	if err := ValidateUpdate(current, updated, vc); err != nil {
 		return nil, err
 	}
+
 	return updated, nil
 }
 
-func ValidateUpdate(before, after *RateLimit, vc *common.ValidationContext) error {
+func ValidateUpdate(
+	before, after *RateLimit,
+	vc *common.ValidationContext,
+) error {
 	if before == nil || after == nil {
 		return fmt.Errorf("before and after rate limits are required")
 	}
+
 	if vc == nil {
 		vc = &common.ValidationContext{Path: "$"}
 	}
+
 	var result *multierror.Error
 	if err := meta.ValidateTypeMetaUpdate(before.TypeMeta, after.TypeMeta, vc); err != nil {
 		result = multierror.Append(result, err)
 	}
+
 	if err := meta.ValidateMetadataUpdate(before.Metadata, after.Metadata, meta.UpdateOptions{ImmutableNamespace: true}, vc); err != nil {
 		result = multierror.Append(result, err)
 	}
+
 	return result.ErrorOrNil()
 }

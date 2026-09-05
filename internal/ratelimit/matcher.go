@@ -119,7 +119,7 @@ func matchRequestType(
 			return true
 		}
 	}
-	
+
 	return false
 }
 
