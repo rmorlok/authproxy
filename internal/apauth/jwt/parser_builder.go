@@ -325,6 +325,14 @@ func (pb *parserBuilder) ParseCtx(ctx context.Context, token string) (*AuthProxy
 	if !ok {
 		return nil, errors.New("invalid token")
 	}
+	validator := jwt.NewValidator(
+		jwt.WithTimeFunc(func() time.Time {
+			return apctx.GetClock(ctx).Now()
+		}),
+	)
+	if err := claims.Validate(validator); err != nil {
+		return nil, fmt.Errorf("can't validate token claims: %w", err)
+	}
 
 	return claims, nil
 }

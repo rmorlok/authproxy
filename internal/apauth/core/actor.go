@@ -20,16 +20,13 @@ type IActorData interface {
 // Actor is the information that identifies who is making a request. This can be an actor in the calling
 // system, an admin from the calling system, a devops admin from the cli, etc.
 type Actor struct {
-	// This version of the actor is deserialized from the JWT directly. The JSON annotations apply to
-	// how the JWT is structured.
-
-	Id          apid.ID              `json:"-"` // This is the database ID of the actor. It cannot be set in the JWT directly.
-	Name        scommon.ResourceName `json:"name,omitempty"`
-	ExternalId  string               `json:"externalId"`
-	Namespace   string               `json:"namespace,omitempty"`
-	Labels      map[string]string    `json:"labels,omitempty"`
-	Annotations map[string]string    `json:"annotations,omitempty"`
-	Permissions []aschema.Permission `json:"permissions"`
+	Id          apid.ID
+	Name        scommon.ResourceName
+	ExternalId  string
+	Namespace   string
+	Labels      map[string]string
+	Annotations map[string]string
+	Permissions []aschema.Permission
 }
 
 func (a *Actor) GetId() apid.ID {
@@ -57,7 +54,7 @@ func (a *Actor) GetNamespace() string {
 
 func (a *Actor) GetLabels() map[string]string { return a.Labels }
 
-// GetAnnotations returns actor annotations from database state or JWT claims.
+// GetAnnotations returns actor annotations from the source actor data.
 func (a *Actor) GetAnnotations() map[string]string { return a.Annotations }
 
 func isValidValueForNamespaceTemplating(val string) bool {

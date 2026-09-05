@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/jwt/schema.json",
+  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/internal/apauth/jwt/schema.json",
   "title": "Auth Proxy JWT Payload Schema",
   "type": "object",
   "properties": {
@@ -10,7 +10,7 @@
     },
     "sub": {
       "type": "string",
-      "description": "Subject of the token. Required. This value is the id of the actor taking the action. If actor is specified in this JWT, this value must match the actor's id."
+      "description": "External ID of the actor taking the action. If actor is specified, this value must match actor.spec.externalId."
     },
     "aud": {
       "oneOf": [
@@ -38,10 +38,24 @@
       "type": "string",
       "description": "JWT ID. Optional. Not used by Auth Proxy."
     },
+    "namespace": {
+      "type": "string",
+      "description": "Namespace of the actor. Defaults to root. If actor is specified, this value must match actor.metadata.namespace."
+    },
     "actor": { "$ref": "schema-actor.json" },
     "permissions": {
       "type": "array",
-      "description": "Optional request-level permission restrictions. These are intersected with the authenticated actor's permissions and cannot grant additional access."
+      "items": { "$ref": "../../schema/auth/schema.json#/$defs/Permission" },
+      "description": "Optional request-level permission restrictions. Every action represented here must be a subset of the authenticated actor's base permissions."
+    },
+    "systemSigned": {
+      "type": "boolean"
+    },
+    "actorSigned": {
+      "type": "boolean"
+    },
+    "nonce": {
+      "type": "string"
     }
   },
   "additionalProperties": true

@@ -150,6 +150,7 @@ func TestResolveBuilderWithGrafanaPreset(t *testing.T) {
 
 	claims := parseTestToken(t, ctx, token, []byte("test-secret"))
 	require.Equal(t, "grafana", claims.Subject)
+	require.Nil(t, claims.Actor, "CLI tokens resolve existing actors instead of embedding actor resources")
 	require.Equal(t, []string{string(config.ServiceIdApi)}, []string(claims.Audience))
 	require.True(t, apctx.GetClock(ctx).Now().Add(grafanaDefaultExpiresIn).Equal(claims.ExpiresAt.Time))
 	require.Contains(t, claims.Permissions, aschema.Permission{

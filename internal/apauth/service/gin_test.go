@@ -34,10 +34,10 @@ func TestAuth_Gin(t *testing.T) {
 			},
 
 			Namespace: "root",
-			Actor: &core.Actor{
+			Actor: jwtActor(&core.Actor{
 				ExternalId: "id1",
 				Namespace:  "root",
-			},
+			}),
 		}
 	}
 
@@ -53,10 +53,10 @@ func TestAuth_Gin(t *testing.T) {
 				Subject:   "aid1",
 			},
 			Namespace: "root",
-			Actor: &core.Actor{
+			Actor: jwtActor(&core.Actor{
 				ExternalId: "aid1",
 				Namespace:  "root",
-			},
+			}),
 		}
 	}
 
@@ -100,7 +100,7 @@ func TestAuth_Gin(t *testing.T) {
 			SetJwtRequestHeader(req, tok)
 			ts.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
-			require.Equal(t, c.Actor.ExternalId, w.Body.String())
+			require.Equal(t, c.Actor.Spec.ExternalId, w.Body.String())
 		})
 
 		t.Run("valid with alt claims", func(t *testing.T) {
@@ -115,7 +115,7 @@ func TestAuth_Gin(t *testing.T) {
 			SetJwtRequestHeader(req, tok)
 			ts.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
-			require.Equal(t, c.Actor.ExternalId, w.Body.String())
+			require.Equal(t, c.Actor.Spec.ExternalId, w.Body.String())
 		})
 
 		t.Run("expired", func(t *testing.T) {
@@ -182,7 +182,7 @@ func TestAuth_Gin(t *testing.T) {
 			SetJwtRequestHeader(req, tok)
 			ts.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
-			require.Equal(t, c.Actor.ExternalId, w.Body.String())
+			require.Equal(t, c.Actor.Spec.ExternalId, w.Body.String())
 		})
 
 		t.Run("valid with alt claims", func(t *testing.T) {
@@ -197,7 +197,7 @@ func TestAuth_Gin(t *testing.T) {
 			SetJwtRequestHeader(req, tok)
 			ts.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
-			require.Equal(t, c.Actor.ExternalId, w.Body.String())
+			require.Equal(t, c.Actor.Spec.ExternalId, w.Body.String())
 		})
 
 		t.Run("valid without auth", func(t *testing.T) {

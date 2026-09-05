@@ -10,7 +10,7 @@ minimum metadata needed to authorize and operate third-party connections.
 
 | Host entity | AuthProxy representation | Guidance |
 |---|---|---|
-| User or service principal | Actor `externalId` | Use an immutable primary key, not email or display name. |
+| User or service principal | Actor `spec.externalId` | Use an immutable primary key, not email or display name. |
 | Tenant or organization | Namespace | Derive a stable, namespace-safe segment and never rename it when the tenant's display name changes. |
 | Team | Optional child namespace | Create it only when it is an authorization boundary. Otherwise use a label. |
 | Integration installation | Connection | Store the immutable `cxn_...` ID in the host. Supply a human-readable name for display and exact-name discovery. |
@@ -75,6 +75,35 @@ AuthProxy supports two provisioning patterns:
 Provision-first is easier to audit. Just-in-time provisioning reduces sync work
 but makes the token issuer part of the actor-provisioning control plane.
 
+An embedded actor uses the same `authproxy.net/v1alpha1` resource shape as the
+Actor API, with a deliberately restricted field set:
+
+```yaml
+sub: usr_7
+namespace: root.tenants.tnt_42
+actor:
+  apiVersion: authproxy.net/v1alpha1
+  kind: Actor
+  metadata:
+    name: user-7
+    namespace: root.tenants.tnt_42
+    labels:
+      app.example.com/role: member
+  spec:
+    externalId: usr_7
+    permissions:
+      - namespace: root.tenants.tnt_42.**
+        resources: [connections]
+        verbs: [create, get, list, proxy]
+```
+
+The JWT `sub` must equal `actor.spec.externalId`, and the top-level
+`namespace` must equal `actor.metadata.namespace`. Do not include
+`metadata.id`, `metadata.generation`, lifecycle timestamps, `status`, or
+`spec.signingKey` in a JWT actor. Those fields are database identity,
+server-observed state, or secret configuration—not identity assertions. The
+legacy flat actor claim is not accepted.
+
 Do not copy an entire host user profile. AuthProxy generally needs the stable
 id, home namespace, permissions, and carefully selected labels or annotations.
 
@@ -105,9 +134,10 @@ separate operator identity. If connectors live in a shared parent namespace,
 grant their `list` and `get` permissions there while keeping connection
 permissions restricted to the tenant or user namespace.
 
-Request JWTs may narrow these permissions. AuthProxy intersects token
-restrictions with the actor's permissions, so a token can reduce authority but
-cannot elevate it.
+Request JWTs may narrow these permissions. AuthProxy verifies that every
+top-level token permission is a subset of the actor's base permissions and
+then intersects the two sets during authorization. A broader token is rejected
+instead of being silently trimmed.
 
 ## Track host installations
 

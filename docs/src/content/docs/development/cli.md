@@ -73,6 +73,12 @@ Every signed token has an **actor** (who is making the call) and a **service-id 
 - Service allowlist defaults to `all`. Override with `--apis admin-api,api` to scope a token down. Valid IDs: `admin-api`, `api`, `public`, `worker`.
 - `--admin` flips the token's permissions to match the `systemAuth.actors.permissions` block on the server (full access in the dev config).
 
+The CLI emits a subject-only token: the selected actor ID is placed in `sub`,
+and the server resolves the existing actor in the selected namespace. It does
+not embed or provision an actor resource. Applications that do embed actors
+must use the restricted `authproxy.net/v1alpha1` Actor claim described in
+[Authentication and Authorization](/security/authentication-and-authorization/#authentication-paths).
+
 ## Commands
 
 ### `ap list connectors` / `ap list connections`
@@ -131,7 +137,10 @@ ap sign-jwt --actorId grafana --apis api,admin-api --grafana-preset logs
 ap sign-jwt --actorId grafana --apis api,admin-api --grafana-preset logs --no-expiry
 ```
 
-Grafana presets use top-level JWT permissions. Those permissions only restrict the token; the backing actor still needs matching normal permissions.
+Grafana presets use top-level JWT permissions. Those permissions only restrict
+the token; the backing actor still needs matching normal permissions. The
+server rejects a token whose top-level permissions are broader than the
+backing actor's grants.
 
 Permission namespaces in a permissions file support the same actor templates as normal actor permissions: `{{externalId}}`, `{{labels.<label>}}`, and `{{annotations.<annotation>}}`. These render against the backing actor, and missing label or annotation values make the permission fail to match.
 

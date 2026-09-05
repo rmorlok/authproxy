@@ -8,6 +8,9 @@ import (
 	"github.com/rmorlok/authproxy/internal/apctx"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/schema/config"
+	actorschema "github.com/rmorlok/authproxy/internal/schema/resources/actor"
+	keyschema "github.com/rmorlok/authproxy/internal/schema/resources/key"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/stretchr/testify/require"
 	clock "k8s.io/utils/clock/testing"
 )
@@ -78,8 +81,8 @@ func TestClaimsBuilder(t *testing.T) {
 		require.NotEmpty(t, claims.ID)
 		require.Equal(t, "me", claims.Issuer)
 		require.Equal(t, "public", claims.Audience[0])
-		require.Equal(t, "bob-dole", claims.Actor.ExternalId)
-		require.Equal(t, "root.child", claims.Actor.Namespace)
+		require.Equal(t, "bob-dole", claims.Actor.Spec.ExternalId)
+		require.Equal(t, "root.child", claims.Actor.Metadata.Namespace)
 		require.Equal(t, "bob-dole", claims.Subject)
 		require.Equal(t, "root.child", claims.Namespace)
 		require.Equal(t, apctx.GetClock(ctx).Now().Add(10*time.Minute), claims.ExpiresAt.Time)
@@ -111,11 +114,42 @@ func TestClaimsBuilder(t *testing.T) {
 		require.NotEmpty(t, claims.ID)
 		require.Equal(t, "me", claims.Issuer)
 		require.Equal(t, "public", claims.Audience[0])
-		require.Equal(t, "bob-dole", claims.Actor.ExternalId)
-		require.Equal(t, "root.child", claims.Actor.Namespace)
+		require.Equal(t, "bob-dole", claims.Actor.Spec.ExternalId)
+		require.Equal(t, "root.child", claims.Actor.Metadata.Namespace)
 		require.Equal(t, "bob-dole", claims.Subject)
 		require.Equal(t, "root.child", claims.Namespace)
 		require.Equal(t, apctx.GetClock(ctx).Now().Add(10*time.Minute), claims.ExpiresAt.Time)
+	})
+	t.Run("configured actor is restricted for JWT transport", func(t *testing.T) {
+		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+		source := &actorschema.Actor{
+			TypeMeta: meta.NewTypeMeta(actorschema.ActorKind),
+			Metadata: meta.ObjectMeta{
+				ID:         "act_database-id",
+				Name:       "deploy-bot",
+				Namespace:  "root.platform",
+				Generation: 7,
+				CreatedAt:  &now,
+				UpdatedAt:  &now,
+			},
+			Spec: actorschema.ActorSpec{
+				ExternalId: "deploy-bot",
+				SigningKey: &keyschema.SigningKey{},
+			},
+			Status: &actorschema.ActorStatus{SigningKeyConfigured: true},
+		}
+
+		claims, err := NewClaimsBuilder().WithActor(source).BuildCtx(ctx)
+		require.NoError(t, err)
+		require.NoError(t, claims.Actor.Validate())
+		require.Equal(t, source.Metadata.Name, claims.Actor.Metadata.Name)
+		require.Empty(t, claims.Actor.Metadata.ID)
+		require.Zero(t, claims.Actor.Metadata.Generation)
+		require.Nil(t, claims.Actor.Metadata.CreatedAt)
+		require.Nil(t, claims.Actor.Metadata.UpdatedAt)
+		require.Nil(t, claims.Actor.Spec.SigningKey)
+		require.Nil(t, claims.Actor.Status)
 	})
 	t.Run("valid with top-level permissions", func(t *testing.T) {
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
@@ -141,6 +175,26 @@ func TestClaimsBuilder(t *testing.T) {
 		require.Nil(t, claims.Actor)
 		require.Equal(t, "bob-dole", claims.Subject)
 		require.Equal(t, "root.child", claims.Namespace)
+	})
+	t.Run("rejects top-level permission escalation for embedded actor", func(t *testing.T) {
+		_, err := NewClaimsBuilder().
+			WithActor(&core.Actor{
+				ExternalId: "bob-dole",
+				Namespace:  "root.child",
+				Permissions: []aschema.Permission{{
+					Namespace: "root.child",
+					Resources: []string{"connections"},
+					Verbs:     []string{"get"},
+				}},
+			}).
+			WithPermissions([]aschema.Permission{{
+				Namespace: "root.**",
+				Resources: []string{"actors"},
+				Verbs:     []string{"delete"},
+			}}).
+			Build()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "request permissions exceed actor permissions")
 	})
 	t.Run("nonce", func(t *testing.T) {
 		t.Run("valid", func(t *testing.T) {
@@ -186,8 +240,8 @@ func TestClaimsBuilder(t *testing.T) {
 			require.NotEmpty(t, claims.ID)
 			require.Equal(t, "me", claims.Issuer)
 			require.Equal(t, "public", claims.Audience[0])
-			require.Equal(t, "bob-dole", claims.Actor.ExternalId)
-			require.Equal(t, "root.child", claims.Actor.Namespace)
+			require.Equal(t, "bob-dole", claims.Actor.Spec.ExternalId)
+			require.Equal(t, "root.child", claims.Actor.Metadata.Namespace)
 			require.Equal(t, "bob-dole", claims.Subject)
 			require.Equal(t, "root.child", claims.Namespace)
 			require.Equal(t, apctx.GetClock(ctx).Now().Add(10*time.Minute), claims.ExpiresAt.Time)
@@ -243,7 +297,7 @@ func TestClaimsBuilder(t *testing.T) {
 			require.NoError(t, err)
 
 			require.NotNil(t, claims.Actor)
-			require.Equal(t, map[string]string{"foo": "bar", "baz": "qux"}, claims.Actor.Labels)
+			require.Equal(t, map[string]string{"foo": "bar", "baz": "qux"}, claims.Actor.Metadata.Labels)
 		})
 		t.Run("with map of labels", func(t *testing.T) {
 			now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
@@ -261,7 +315,7 @@ func TestClaimsBuilder(t *testing.T) {
 			require.NoError(t, err)
 
 			require.NotNil(t, claims.Actor)
-			require.Equal(t, map[string]string{"foo": "bar", "baz": "qux"}, claims.Actor.Labels)
+			require.Equal(t, map[string]string{"foo": "bar", "baz": "qux"}, claims.Actor.Metadata.Labels)
 		})
 		t.Run("merge labels with actor", func(t *testing.T) {
 			now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
@@ -282,7 +336,7 @@ func TestClaimsBuilder(t *testing.T) {
 			require.NoError(t, err)
 
 			require.NotNil(t, claims.Actor)
-			require.Equal(t, map[string]string{"foo": "bar", "baz": "qux"}, claims.Actor.Labels)
+			require.Equal(t, map[string]string{"foo": "bar", "baz": "qux"}, claims.Actor.Metadata.Labels)
 		})
 	})
 	t.Run("annotations", func(t *testing.T) {
@@ -303,7 +357,7 @@ func TestClaimsBuilder(t *testing.T) {
 			require.NoError(t, err)
 
 			require.NotNil(t, claims.Actor)
-			require.Equal(t, map[string]string{"foo": "bar", "baz": "qux"}, claims.Actor.Annotations)
+			require.Equal(t, map[string]string{"foo": "bar", "baz": "qux"}, claims.Actor.Metadata.Annotations)
 		})
 		t.Run("with map of annotations", func(t *testing.T) {
 			now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
@@ -321,7 +375,7 @@ func TestClaimsBuilder(t *testing.T) {
 			require.NoError(t, err)
 
 			require.NotNil(t, claims.Actor)
-			require.Equal(t, map[string]string{"foo": "bar", "baz": "qux"}, claims.Actor.Annotations)
+			require.Equal(t, map[string]string{"foo": "bar", "baz": "qux"}, claims.Actor.Metadata.Annotations)
 		})
 		t.Run("merge annotations with actor", func(t *testing.T) {
 			now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
@@ -342,7 +396,7 @@ func TestClaimsBuilder(t *testing.T) {
 			require.NoError(t, err)
 
 			require.NotNil(t, claims.Actor)
-			require.Equal(t, map[string]string{"foo": "bar", "baz": "qux"}, claims.Actor.Annotations)
+			require.Equal(t, map[string]string{"foo": "bar", "baz": "qux"}, claims.Actor.Metadata.Annotations)
 		})
 	})
 }

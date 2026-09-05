@@ -1,12 +1,143 @@
 package core
 
 import (
+	"fmt"
 	"slices"
 
 	"github.com/rmorlok/authproxy/internal/aptmpl"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 )
+
+// ValidatePermissionRestrictions verifies that every action described by the
+// request-level restrictions is already granted by the actor's base
+// permissions. Runtime authorization still intersects the two sets; this
+// validation makes an accidentally or maliciously broader token fail instead
+// of silently trimming it.
+func ValidatePermissionRestrictions(
+	actor *Actor,
+	basePermissions []aschema.Permission,
+	restrictions []aschema.Permission,
+) error {
+	for restrictionIndex, restriction := range restrictions {
+		if err := restriction.Validate(); err != nil {
+			return fmt.Errorf("request permission %d is invalid: %w", restrictionIndex, err)
+		}
+
+		restrictionNamespace, ok := renderValidPermissionNamespace(actor, restriction.Namespace)
+		if !ok {
+			return fmt.Errorf("request permission %d has an invalid namespace matcher", restrictionIndex)
+		}
+
+		for _, resource := range restriction.Resources {
+			for _, verb := range restriction.Verbs {
+				if len(restriction.ResourceIds) == 0 {
+					if !basePermissionsCoverAction(
+						actor,
+						basePermissions,
+						restrictionNamespace,
+						resource,
+						verb,
+						"",   // resourceId
+						true, // requireAllResourceIds
+					) {
+						return fmt.Errorf(
+							"request permission %d grants namespace %q, resource %q, and verb %q beyond the actor's permissions",
+							restrictionIndex,
+							restrictionNamespace,
+							resource,
+							verb,
+						)
+					}
+					continue
+				}
+
+				// A resource-id-scoped permission also permits resource-level
+				// checks where no ID is available, matching authorization behavior.
+				if !basePermissionsCoverAction(
+					actor,
+					basePermissions,
+					restrictionNamespace,
+					resource,
+					verb,
+					"",
+					false,
+				) {
+					return fmt.Errorf(
+						"request permission %d grants namespace %q, resource %q, and verb %q beyond the actor's permissions",
+						restrictionIndex,
+						restrictionNamespace,
+						resource,
+						verb,
+					)
+				}
+
+				for _, resourceID := range restriction.ResourceIds {
+					if !basePermissionsCoverAction(
+						actor,
+						basePermissions,
+						restrictionNamespace,
+						resource,
+						verb,
+						resourceID,
+						false,
+					) {
+						return fmt.Errorf(
+							"request permission %d grants namespace %q, resource %q, verb %q, and resource ID %q beyond the actor's permissions",
+							restrictionIndex,
+							restrictionNamespace,
+							resource,
+							verb,
+							resourceID,
+						)
+					}
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func basePermissionsCoverAction(
+	actor *Actor,
+	basePermissions []aschema.Permission,
+	restrictionNamespace, resource, verb, resourceID string,
+	requireAllResourceIDs bool,
+) bool {
+	for _, base := range basePermissions {
+		baseNamespace, ok := renderValidPermissionNamespace(actor, base.Namespace)
+		if !ok || !namespaceMatcherContains(baseNamespace, restrictionNamespace) {
+			continue
+		}
+		if !permissionValueContains(base.Resources, resource) || !permissionValueContains(base.Verbs, verb) {
+			continue
+		}
+		if requireAllResourceIDs {
+			if len(base.ResourceIds) == 0 {
+				return true
+			}
+			continue
+		}
+		if resourceID == "" || len(base.ResourceIds) == 0 || slices.Contains(base.ResourceIds, resourceID) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func namespaceMatcherContains(container, contained string) bool {
+	constrained, ok := namespace.ConstrainMatcher(container, contained)
+	return ok && constrained == contained
+}
+
+func permissionValueContains(baseValues []string, restrictionValue string) bool {
+	if restrictionValue == aschema.PermissionWildcard {
+		return slices.Contains(baseValues, aschema.PermissionWildcard)
+	}
+	return slices.Contains(baseValues, aschema.PermissionWildcard) || slices.Contains(baseValues, restrictionValue)
+}
 
 // allowsForActor checks if this permission allows the specified action for the given actor.
 //
