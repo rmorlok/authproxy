@@ -57,7 +57,7 @@ func (r *InitiateConnectionRequest) Validate() error {
 	if err := meta.ValidateAnnotations(r.Annotations); err != nil {
 		result = multierror.Append(result, fmt.Errorf("invalid connection annotations: %w", err))
 	}
-	
+
 	return result.ErrorOrNil()
 }
 

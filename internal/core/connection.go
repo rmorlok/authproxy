@@ -39,7 +39,11 @@ type connection struct {
 	proxyImplErr  error
 }
 
-func wrapConnection(dbConnection *database.Connection, c *Connector, s *service) *connection {
+func wrapConnection(
+	dbConnection *database.Connection,
+	c *Connector,
+	s *service,
+) *connection {
 	return &connection{
 		Connection: *dbConnection,
 		s:          s,
@@ -112,14 +116,18 @@ func (c *connection) GetConnector() iface.Connector {
 	return c.connector
 }
 
-func (c *connection) GetResource(ctx context.Context) (*connectionschema.Connection, error) {
+func (c *connection) GetResource(
+	ctx context.Context,
+) (*connectionschema.Connection, error) {
 	createdAt := c.CreatedAt
 	updatedAt := c.UpdatedAt
 	healthState := c.GetHealthState()
+
 	configuration, err := c.GetConfiguration(ctx)
 	if err != nil {
 		return nil, err
 	}
+
 	configuration, err = connectionschema.RedactConfiguration(configuration)
 	if err != nil {
 		return nil, err
@@ -159,7 +167,10 @@ func (c *connection) GetResource(ctx context.Context) (*connectionschema.Connect
 	}
 
 	if c.SetupStep != nil || c.SetupError != nil {
-		resource.Status.Setup = &connectionschema.ConnectionSetupStatus{Error: c.GetSetupError()}
+		resource.Status.Setup = &connectionschema.ConnectionSetupStatus{
+			Error: c.GetSetupError(),
+		}
+
 		if c.SetupStep != nil {
 			resource.Status.Setup.StepID = c.SetupStep.String()
 		}
@@ -168,7 +179,9 @@ func (c *connection) GetResource(ctx context.Context) (*connectionschema.Connect
 	return resource, nil
 }
 
-func (c *connection) GetJavascriptContext(ctx context.Context) (apjs.Context, error) {
+func (c *connection) GetJavascriptContext(
+	ctx context.Context,
+) (apjs.Context, error) {
 	jsLib, err := c.connector.getJavascriptLibrary()
 	if err != nil {
 		return apjs.Context{}, err
@@ -206,7 +219,10 @@ func (c *connection) Logger() *slog.Logger {
 	return c.logger
 }
 
-func (c *connection) SetSetupStep(ctx context.Context, setupStep *cschema.SetupStep) error {
+func (c *connection) SetSetupStep(
+	ctx context.Context,
+	setupStep *cschema.SetupStep,
+) error {
 	if err := c.s.db.SetConnectionSetupStep(ctx, c.Id, setupStep); err != nil {
 		return err
 	}
@@ -218,7 +234,10 @@ func (c *connection) GetSetupError() *string {
 	return c.SetupError
 }
 
-func (c *connection) SetSetupError(ctx context.Context, setupError *string) error {
+func (c *connection) SetSetupError(
+	ctx context.Context,
+	setupError *string,
+) error {
 	if err := c.s.db.SetConnectionSetupError(ctx, c.Id, setupError); err != nil {
 		return err
 	}
@@ -226,7 +245,9 @@ func (c *connection) SetSetupError(ctx context.Context, setupError *string) erro
 	return nil
 }
 
-func (c *connection) GetConfiguration(ctx context.Context) (map[string]any, error) {
+func (c *connection) GetConfiguration(
+	ctx context.Context,
+) (map[string]any, error) {
 	c.configMu.Lock()
 	defer c.configMu.Unlock()
 
@@ -256,7 +277,10 @@ func (c *connection) GetConfiguration(ctx context.Context) (map[string]any, erro
 	return cloneConfiguration(c.configCache), nil
 }
 
-func (c *connection) SetConfiguration(ctx context.Context, data map[string]any) error {
+func (c *connection) SetConfiguration(
+	ctx context.Context,
+	data map[string]any,
+) error {
 	c.configMu.Lock()
 	defer c.configMu.Unlock()
 
@@ -312,7 +336,9 @@ func cloneConfigurationValue(value any) any {
 	}
 }
 
-func (c *connection) GetMustacheContext(ctx context.Context) (map[string]any, error) {
+func (c *connection) GetMustacheContext(
+	ctx context.Context,
+) (map[string]any, error) {
 	data := map[string]any{}
 
 	cfg, err := c.GetConfiguration(ctx)
