@@ -75,8 +75,7 @@ actor:
 `sub` must match `actor.spec.externalId`, and the top-level namespace must
 match `actor.metadata.namespace`. JWT actors cannot contain `metadata.id`,
 `metadata.generation`, `metadata.createdAt`, `metadata.updatedAt`, `status`, or
-`spec.signingKey`. AuthProxy also rejects unknown fields and the former flat
-actor claim shape.
+`spec.signingKey`. AuthProxy also rejects unknown fields.
 
 ## Browser Session Handoff
 
