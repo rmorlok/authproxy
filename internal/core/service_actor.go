@@ -17,7 +17,10 @@ import (
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
-func (s *service) GetActor(ctx context.Context, id apid.ID) (iface.Actor, error) {
+func (s *service) GetActor(
+	ctx context.Context,
+	id apid.ID,
+) (iface.Actor, error) {
 	actor, err := s.db.GetActor(ctx, id)
 	if err != nil {
 		return nil, mapDatabaseError(err)
@@ -53,7 +56,11 @@ func (s *service) encryptActorSigningKey(
 		return nil, fmt.Errorf("marshal actor signing key: %w", err)
 	}
 
-	encrypted, err := s.encrypt.EncryptStringForNamespace(ctx, namespace, string(data))
+	encrypted, err := s.encrypt.EncryptStringForNamespace(
+		ctx,
+		namespace,
+		string(data),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("encrypt actor signing key: %w", err)
 	}
@@ -68,13 +75,20 @@ func (s *service) CreateActor(
 	if resource == nil {
 		return nil, errors.New("actor cannot be nil")
 	}
-	if err := resource.ValidateFor(meta.ValidationModeCreate, nil); err != nil {
+	if err := resource.ValidateFor(
+		meta.ValidationModeCreate,
+		nil, // validation context
+	); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidArgument, err)
 	}
 
 	id := apid.New(apid.PrefixActor)
 	normalized := resource.ApplyCreateDefaults(id)
-	encryptedKey, err := s.encryptActorSigningKey(ctx, normalized.Metadata.Namespace, normalized.Spec.SigningKey)
+	encryptedKey, err := s.encryptActorSigningKey(
+		ctx,
+		normalized.Metadata.Namespace,
+		normalized.Spec.SigningKey,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -83,6 +97,7 @@ func (s *service) CreateActor(
 	if err != nil {
 		return nil, err
 	}
+
 	if err := s.db.CreateActor(ctx, actor); err != nil {
 		return nil, mapDatabaseError(err)
 	}
@@ -104,6 +119,7 @@ func (s *service) UpdateActor(
 	if err != nil {
 		return nil, mapDatabaseError(err)
 	}
+
 	before := actorResourceFromDatabase(*existing)
 	desired, err := patch.ApplyTo(before, nil)
 	if err != nil {
@@ -112,21 +128,36 @@ func (s *service) UpdateActor(
 
 	encryptedKey := existing.EncryptedKey
 	if patch.Spec.HasSigningKey() {
-		encryptedKey, err = s.encryptActorSigningKey(ctx, desired.Metadata.Namespace, patch.Spec.SigningKey)
+		encryptedKey, err = s.encryptActorSigningKey(
+			ctx,
+			desired.Metadata.Namespace,
+			patch.Spec.SigningKey,
+		)
 		if err != nil {
 			return nil, err
 		}
 	}
+
 	// Signing keys are write-only. Persistence validation and conversion see
 	// only safe desired state plus the separately encrypted value.
 	desired.Spec.SigningKey = nil
-	desired.Status = &actorschema.ActorStatus{SigningKeyConfigured: encryptedKey != nil && !encryptedKey.IsZero()}
-	if err := desired.ValidateFor(meta.ValidationModePersistence, nil); err != nil {
+	desired.Status = &actorschema.ActorStatus{
+		SigningKeyConfigured: encryptedKey != nil && !encryptedKey.IsZero(),
+	}
+
+	if err := desired.ValidateFor(
+		meta.ValidationModePersistence,
+		nil, // validation context
+	); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidArgument, err)
 	}
 
 	if before.Metadata.Name != desired.Metadata.Name {
-		if _, err := s.db.UpdateActorName(ctx, id, desired.Metadata.Name); err != nil {
+		if _, err := s.db.UpdateActorName(
+			ctx,
+			id,
+			desired.Metadata.Name,
+		); err != nil {
 			return nil, mapDatabaseError(err)
 		}
 	}
@@ -135,10 +166,12 @@ func (s *service) UpdateActor(
 	if err != nil {
 		return nil, err
 	}
+
 	updated, err := s.db.UpsertActor(ctx, actor)
 	if err != nil {
 		return nil, mapDatabaseError(err)
 	}
+
 	return wrapActor(*updated, s), nil
 }
 
@@ -155,6 +188,7 @@ func (s *service) PutActorLabels(
 	if err != nil {
 		return nil, mapDatabaseError(err)
 	}
+
 	return wrapActor(*actor, s), nil
 }
 
@@ -167,6 +201,7 @@ func (s *service) DeleteActorLabels(
 	if err != nil {
 		return nil, mapDatabaseError(err)
 	}
+
 	return wrapActor(*actor, s), nil
 }
 
@@ -179,6 +214,7 @@ func (s *service) PutActorAnnotations(
 	if err != nil {
 		return nil, mapDatabaseError(err)
 	}
+
 	return wrapActor(*actor, s), nil
 }
 
@@ -191,6 +227,7 @@ func (s *service) DeleteActorAnnotations(
 	if err != nil {
 		return nil, mapDatabaseError(err)
 	}
+
 	return wrapActor(*actor, s), nil
 }
 
@@ -206,10 +243,12 @@ func (l *listActorWrapper) convertPageResult(
 	if result.Error != nil {
 		return pagination.PageResult[iface.Actor]{Error: result.Error}
 	}
+
 	actors := make([]iface.Actor, 0, len(result.Results))
 	for _, actor := range result.Results {
 		actors = append(actors, wrapActor(*actor, l.s))
 	}
+
 	return pagination.PageResult[iface.Actor]{
 		Results: actors,
 		Error:   result.Error,
@@ -225,7 +264,9 @@ func (l *listActorWrapper) executor() database.ListActorsExecutor {
 	return l.l
 }
 
-func (l *listActorWrapper) FetchPage(ctx context.Context) pagination.PageResult[iface.Actor] {
+func (l *listActorWrapper) FetchPage(
+	ctx context.Context,
+) pagination.PageResult[iface.Actor] {
 	return l.convertPageResult(l.executor().FetchPage(ctx))
 }
 
@@ -233,24 +274,34 @@ func (l *listActorWrapper) Enumerate(
 	ctx context.Context,
 	callback pagination.EnumerateCallback[iface.Actor],
 ) error {
-	return l.executor().Enumerate(ctx, func(result pagination.PageResult[*database.Actor]) (pagination.KeepGoing, error) {
-		return callback(l.convertPageResult(result))
-	})
+	return l.
+		executor().
+		Enumerate(ctx, func(result pagination.PageResult[*database.Actor]) (pagination.KeepGoing, error) {
+			return callback(l.convertPageResult(result))
+		})
 }
 
-func (l *listActorWrapper) ForExternalId(externalID string) iface.ListActorsBuilder {
+func (l *listActorWrapper) ForExternalId(
+	externalID string,
+) iface.ListActorsBuilder {
 	return &listActorWrapper{l: l.l.ForExternalId(externalID), s: l.s}
 }
 
-func (l *listActorWrapper) ForName(name common.ResourceName) iface.ListActorsBuilder {
+func (l *listActorWrapper) ForName(
+	name common.ResourceName,
+) iface.ListActorsBuilder {
 	return &listActorWrapper{l: l.l.ForName(name), s: l.s}
 }
 
-func (l *listActorWrapper) ForNamespaceMatcher(matcher string) iface.ListActorsBuilder {
+func (l *listActorWrapper) ForNamespaceMatcher(
+	matcher string,
+) iface.ListActorsBuilder {
 	return &listActorWrapper{l: l.l.ForNamespaceMatcher(matcher), s: l.s}
 }
 
-func (l *listActorWrapper) ForNamespaceMatchers(matchers []string) iface.ListActorsBuilder {
+func (l *listActorWrapper) ForNamespaceMatchers(
+	matchers []string,
+) iface.ListActorsBuilder {
 	return &listActorWrapper{l: l.l.ForNamespaceMatchers(matchers), s: l.s}
 }
 
@@ -258,7 +309,10 @@ func (l *listActorWrapper) Limit(limit int32) iface.ListActorsBuilder {
 	return &listActorWrapper{l: l.l.Limit(limit), s: l.s}
 }
 
-func (l *listActorWrapper) OrderBy(field database.ActorOrderByField, order pagination.OrderBy) iface.ListActorsBuilder {
+func (l *listActorWrapper) OrderBy(
+	field database.ActorOrderByField,
+	order pagination.OrderBy,
+) iface.ListActorsBuilder {
 	return &listActorWrapper{l: l.l.OrderBy(field, order), s: l.s}
 }
 
@@ -266,7 +320,9 @@ func (l *listActorWrapper) IncludeDeleted() iface.ListActorsBuilder {
 	return &listActorWrapper{l: l.l.IncludeDeleted(), s: l.s}
 }
 
-func (l *listActorWrapper) ForLabelSelector(selector string) iface.ListActorsBuilder {
+func (l *listActorWrapper) ForLabelSelector(
+	selector string,
+) iface.ListActorsBuilder {
 	return &listActorWrapper{l: l.l.ForLabelSelector(selector), s: l.s}
 }
 
