@@ -103,7 +103,11 @@ func (s *service) UpdateConnection(
 	}
 
 	if updated.Metadata.Name != current.GetName() {
-		if _, err := s.db.UpdateConnectionName(ctx, id, updated.Metadata.Name); err != nil {
+		if _, err := s.db.UpdateConnectionName(
+			ctx,
+			id,
+			updated.Metadata.Name,
+		); err != nil {
 			if errors.Is(err, database.ErrNotFound) {
 				return nil, ErrNotFound
 			}
@@ -111,12 +115,20 @@ func (s *service) UpdateConnection(
 		}
 	}
 	if patch.Metadata.Labels != nil {
-		if _, err := s.db.UpdateConnectionLabels(ctx, id, updated.Metadata.Labels); err != nil {
+		if _, err := s.db.UpdateConnectionLabels(
+			ctx,
+			id,
+			updated.Metadata.Labels,
+		); err != nil {
 			return nil, err
 		}
 	}
 	if patch.Metadata.Annotations != nil {
-		if _, err := s.db.UpdateConnectionAnnotations(ctx, id, updated.Metadata.Annotations); err != nil {
+		if _, err := s.db.UpdateConnectionAnnotations(
+			ctx,
+			id,
+			updated.Metadata.Annotations,
+		); err != nil {
 			return nil, err
 		}
 	}
