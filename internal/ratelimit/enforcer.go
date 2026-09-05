@@ -36,7 +36,11 @@ type EnforcerFactory struct {
 // (#221). The factory is per-process, the round-trippers it produces are
 // per-request-info, and the Limiters those round-trippers build are
 // per-rule-per-Decide-call.
-func NewEnforcerFactory(cache Cache, redis apredis.Client, logger *slog.Logger) *EnforcerFactory {
+func NewEnforcerFactory(
+	cache Cache,
+	redis apredis.Client,
+	logger *slog.Logger,
+) *EnforcerFactory {
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -90,7 +94,9 @@ type EnforcerRoundTripper struct {
 	transport http.RoundTripper
 }
 
-func (rt *EnforcerRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+func (rt *EnforcerRoundTripper) RoundTrip(
+	req *http.Request,
+) (*http.Response, error) {
 	ctx := req.Context()
 
 	rules := rt.cache.All()
@@ -192,15 +198,20 @@ type matchedRule struct {
 
 // findMatches runs Match() over every cached rule and returns the
 // subset (rule + resolved bucket) that applies to this request.
-func (rt *EnforcerRoundTripper) findMatches(rules []*database.RateLimit, reqCtx *RequestContext) []matchedRule {
+func (rt *EnforcerRoundTripper) findMatches(
+	rules []*database.RateLimit,
+	reqCtx *RequestContext,
+) []matchedRule {
 	out := make([]matchedRule, 0, len(rules))
 	for _, rule := range rules {
 		if rule == nil {
 			continue
 		}
+
 		if !rule.Definition.MatchesNamespace(rule.Namespace, reqCtx.Namespace) {
 			continue
 		}
+
 		ok, bucket, err := Match(rule.Definition, reqCtx)
 		if err != nil {
 			rt.logger.WarnContext(reqCtx.contextOrBackground(), "rate-limit rule match failed; skipping",
@@ -212,12 +223,14 @@ func (rt *EnforcerRoundTripper) findMatches(rules []*database.RateLimit, reqCtx 
 		if !ok {
 			continue
 		}
+
 		out = append(out, matchedRule{
 			rule:          rule,
 			effectiveMode: rule.Definition.EffectiveMode(),
 			bucket:        bucket,
 		})
 	}
+
 	return out
 }
 
@@ -226,7 +239,9 @@ func (rt *EnforcerRoundTripper) findMatches(rules []*database.RateLimit, reqCtx 
 // label snapshot, where ForActor() installs apxy/act/-/id; using the
 // label keeps the in-flight RequestInfo struct narrow and avoids
 // circular plumbing through httpf.
-func (rt *EnforcerRoundTripper) buildRequestContext(req *http.Request) *RequestContext {
+func (rt *EnforcerRoundTripper) buildRequestContext(
+	req *http.Request,
+) *RequestContext {
 	rc := &RequestContext{
 		Type:             common.RequestType(rt.ri.Type),
 		Method:           req.Method,
@@ -254,7 +269,10 @@ const actorIDLabelKey = "apxy/act/-/id"
 // rule rejects. Modeled on the connector-level reactive limiter's synth
 // 429 so callers see a consistent shape; the body identifies the rule
 // id so consumers can correlate with the rate-limit list endpoint.
-func (rt *EnforcerRoundTripper) syntheticTooManyRequests(ruleID apid.ID, retryAfter time.Duration) *http.Response {
+func (rt *EnforcerRoundTripper) syntheticTooManyRequests(
+	ruleID apid.ID,
+	retryAfter time.Duration,
+) *http.Response {
 	retryAfterSeconds := int(math.Ceil(retryAfter.Seconds()))
 	if retryAfterSeconds < 1 {
 		retryAfterSeconds = 1
