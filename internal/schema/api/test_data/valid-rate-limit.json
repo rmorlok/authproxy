@@ -1,40 +1,25 @@
 {
-  "id": "rl_test550e8400abcde",
-  "namespace": "root.acme",
-  "definition": {
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "RateLimit",
+  "metadata": {
+    "id": "rl_test550e8400abcde",
+    "name": "payments-writes",
+    "namespace": "root.acme",
+    "labels": {"team": "payments"},
+    "annotations": {"note": "protect write traffic"},
+    "createdAt": "2026-01-02T03:04:05Z",
+    "updatedAt": "2026-01-02T03:05:06Z"
+  },
+  "spec": {
     "mode": "enforce",
     "selector": {
-      "methods": [
-        "POST"
-      ],
-      "requestTypes": [
-        "proxy"
-      ],
+      "methods": ["POST"],
+      "requestTypes": ["proxy"],
       "labelSelector": "team == payments",
-      "pathMatch": {
-        "kind": "prefix",
-        "value": "/v1/"
-      }
+      "pathMatch": {"kind": "prefix", "value": "/v1/"}
     },
-    "bucket": {
-      "dimensions": [
-        "actor",
-        "labels/team"
-      ]
-    },
-    "algorithm": {
-      "fixedWindow": {
-        "window": "1m",
-        "limit": 100
-      }
-    }
+    "bucket": {"dimensions": ["actor", "labels/team"]},
+    "algorithm": {"fixedWindow": {"window": "1m", "limit": 100}}
   },
-  "labels": {
-    "team": "payments"
-  },
-  "annotations": {
-    "note": "protect write traffic"
-  },
-  "createdAt": "2026-01-02T03:04:05Z",
-  "updatedAt": "2026-01-02T03:05:06Z"
+  "status": {"effectiveMode": "enforce"}
 }

@@ -73,6 +73,30 @@
       "additionalProperties": false,
       "type": "object"
     },
+    "RateLimits": {
+      "properties": {
+        "loadFromList": {
+          "items": {
+            "allOf": [
+              {"$ref": "../resources/rate_limit/schema.json"},
+              {
+                "properties": {
+                  "metadata": {
+                    "anyOf": [
+                      {"required": ["id"]},
+                      {"required": ["name"]}
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
     "Connections": {
       "properties": {
         "setupTtl": {
@@ -1167,6 +1191,9 @@
     },
     "connectors": {
       "$ref": "#/$defs/Connectors"
+    },
+    "rateLimits": {
+      "$ref": "#/$defs/RateLimits"
     },
     "appMetrics": {
       "$ref": "#/$defs/AppMetrics"

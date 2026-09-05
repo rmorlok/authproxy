@@ -14,8 +14,8 @@ import (
 // minimalRateLimitDef returns a small but valid rate-limit definition so
 // CreateRateLimit succeeds. The exact algorithm shape is not relevant to
 // label-propagation tests.
-func minimalRateLimitDef() rlschema.RateLimit {
-	return rlschema.RateLimit{
+func minimalRateLimitDef() rlschema.RateLimitSpec {
+	return rlschema.RateLimitSpec{
 		Selector: rlschema.Selector{},
 		Bucket:   rlschema.Bucket{},
 		Algorithm: rlschema.Algorithm{

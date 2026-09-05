@@ -543,28 +543,17 @@ type C interface {
 	// GetRateLimit returns a rate limit by ID.
 	GetRateLimit(ctx context.Context, id apid.ID) (RateLimit, error)
 
-	// CreateRateLimit creates a new rate-limit resource. Definition is
-	// validated before insert.
+	// CreateRateLimit creates a canonical rate-limit resource.
 	CreateRateLimit(
 		ctx context.Context,
-		namespace string,
-		name scommon.ResourceName,
-		def rlschema.RateLimit,
-		labels, annotations map[string]string,
+		resource *rlschema.RateLimit,
 	) (RateLimit, error)
 
-	// UpdateRateLimitName renames a rate limit addressed by immutable ID.
-	UpdateRateLimitName(
+	// UpdateRateLimit applies a validated canonical resource update.
+	UpdateRateLimit(
 		ctx context.Context,
 		id apid.ID,
-		name scommon.ResourceName,
-	) (RateLimit, error)
-
-	// UpdateRateLimitDefinition replaces a rate limit's definition payload.
-	UpdateRateLimitDefinition(
-		ctx context.Context,
-		id apid.ID,
-		def rlschema.RateLimit,
+		resource *rlschema.RateLimit,
 	) (RateLimit, error)
 
 	// DeleteRateLimit soft deletes a rate limit.

@@ -34,10 +34,15 @@ Content-Type: application/json
 Authorization: Bearer <admin token>
 
 {
-  "namespace": "root.acme",
-  "labels": { "team": "acme" },
-  "annotations": { "owner": "platform@example.com" },
-  "definition": {
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "RateLimit",
+  "metadata": {
+    "name": "salesforce-writes",
+    "namespace": "root.acme",
+    "labels": { "team": "acme" },
+    "annotations": { "owner": "platform@example.com" }
+  },
+  "spec": {
     "mode": "enforce",
     "selector": {
       "labelSelector": "apxy/cxr/type=salesforce",
@@ -57,11 +62,88 @@ Authorization: Bearer <admin token>
 }
 ```
 
-The response carries the server-assigned id (e.g., `rl_AbcXyz…`), the materialised label set (including the implicit `apxy/rl/-/id` / `apxy/rl/-/ns` and any carried-forward namespace labels — see [Labels](/concepts/labels-and-annotations/)), and timestamps.
+The response uses the same envelope. `metadata.id` contains the server-assigned id (e.g., `rl_AbcXyz…`), `metadata` carries the materialised label set and timestamps, and `status.effectiveMode` reports the resolved mode (`enforce` when `spec.mode` is omitted). The implicit `apxy/rl/-/id` / `apxy/rl/-/ns` labels and any carried-forward namespace labels are described under [Labels](/concepts/labels-and-annotations/).
 
-Update with `PATCH /api/v1/rate-limits/{id}` (the request body can carry any of `definition`, `labels`, `annotations`; omit fields you don't want to change). Delete with `DELETE /api/v1/rate-limits/{id}`. List with `GET /api/v1/rate-limits` (supports `namespace`, `labelSelector`, and pagination cursor params).
+Update with `PATCH /api/v1/rate-limits/{id}`. Send the resource type plus `metadata` and `spec` patch objects; omit fields inside those objects when they should remain unchanged:
+
+```json
+{
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "RateLimit",
+  "metadata": {},
+  "spec": {"mode": "observe"}
+}
+```
+
+Set `spec.scope` to `null` to restore namespace scope. Delete with `DELETE /api/v1/rate-limits/{id}`. List with `GET /api/v1/rate-limits` (supports `namespace`, `name`, `labelSelector`, and pagination cursor params).
 
 Labels and annotations also have sub-resource endpoints — see [Labels — API surface](/concepts/labels-and-annotations/#api-surface).
+
+### Via server configuration
+
+The `rateLimits.loadFromList` configuration accepts the same canonical YAML resource. Startup reconciliation preserves an explicit `metadata.id`, or matches by `metadata.namespace` and `metadata.name` when the ID is omitted:
+
+```yaml
+rateLimits:
+  loadFromList:
+    - apiVersion: authproxy.net/v1alpha1
+      kind: RateLimit
+      metadata:
+        name: salesforce-writes
+        namespace: root.acme
+        labels:
+          team: acme
+      spec:
+        scope:
+          connectorRef:
+            apiVersion: authproxy.net/v1alpha1
+            kind: Connector
+            namespace: root.acme
+            name: salesforce
+        mode: enforce
+        selector:
+          methods: [POST, PATCH, PUT]
+        bucket:
+          dimensions: [actor, labels/team]
+        algorithm:
+          tokenBucket:
+            capacity: 60
+            refillRate: 1.0
+```
+
+Connector references are resolved after configured connectors are reconciled. AuthProxy stores the stable connector ID, and the rule applies across every generation of that connector. The former flat rate-limit configuration is not accepted; update configuration before restarting on this breaking pre-production release.
+
+## Resource scope
+
+`metadata.namespace` always establishes the outer boundary: the rule can affect that namespace and its descendants, never a parent or sibling. An omitted `spec.scope` applies to `<metadata.namespace>.**`, including the owning namespace itself. Add exactly one namespace matcher or typed reference to narrow it:
+
+```yaml
+# Selected descendants of a centrally managed parent namespace
+scope:
+  namespaceMatcher: root.acme.payments.**
+```
+
+The matcher may be exact (`root.acme.payments`) or recursive (`root.acme.payments.**`). Its base namespace must be the RateLimit's `metadata.namespace` or a descendant. For example, a rule owned by `root.acme` cannot use `root.**` or `root.other.**`. This lets administrators keep a surgical rule in a parent namespace where child-namespace principals cannot remove it.
+
+```yaml
+# One connector, across every generation
+scope:
+  connectorRef:
+    apiVersion: authproxy.net/v1alpha1
+    kind: Connector
+    id: cxr_01example
+```
+
+```yaml
+# One connection
+scope:
+  connectionRef:
+    apiVersion: authproxy.net/v1alpha1
+    kind: Connection
+    id: cxn_01example
+```
+
+References may use `id`, or the pair `namespace` and `name`. A connector reference intentionally has no `generation`: RateLimit and Connector resources have no version binding, so the rule covers current and future connector generations. AuthProxy resolves every reference and rejects it unless the target resource belongs to `metadata.namespace` or one of its descendants.
 
 ### Via Terraform
 
@@ -77,6 +159,12 @@ resource "authproxy_rate_limit" "salesforce_writes" {
   }
   annotations = {
     owner = "platform@example.com"
+  }
+
+  scope {
+    connector_ref {
+      id = authproxy_connector.salesforce.id
+    }
   }
 
   selector {
@@ -100,6 +188,8 @@ resource "authproxy_rate_limit" "salesforce_writes" {
   }
 }
 ```
+
+For namespace targeting, use `scope { namespace_matcher = "root.acme.payments.**" }`. The provider requires exactly one of `namespace_matcher`, `connector_ref`, or `connection_ref` whenever a scope block is present.
 
 Plan-time validation catches "exactly one of `fixed_window` / `sliding_window` / `token_bucket`" before `terraform apply`. The `namespace` is `ForceNew` — changing it replaces the resource. See [`authproxy_rate_limit` reference](https://github.com/rmorlok/authproxy/blob/main/terraform/provider/docs/resources/authproxy_rate_limit.md) for the full attribute reference, and [`examples/`](https://github.com/rmorlok/authproxy/tree/main/terraform/provider/examples/resources/authproxy_rate_limit/) for three end-to-end examples (token bucket, observe-mode rollout, sliding-window counter).
 
@@ -269,7 +359,7 @@ Composition is "all apply" — there is no priority field, no specificity scorin
 
 ## Namespace inheritance and permissions
 
-A rate limit defined in namespace `N` applies to requests against connections in `N` **and any descendant namespace**. Define a rule at `root` to cover the whole system; define it at `root.team-acme` to scope it to that team's traffic.
+A rate limit defined in namespace `N` applies to requests against connections in `N` **and any descendant namespace** by default. An explicit `namespaceMatcher`, `connectorRef`, or `connectionRef` narrows that inherited scope. Define a rule at `root` to cover the whole system, or keep it at `root` and use `namespaceMatcher: root.team-acme.**` when the rule must be managed centrally but enforced only for that team's traffic.
 
 The implicit `apxy/rl/-/ns` label records the rule's home namespace, and the rule's user labels are inherited from that namespace via [carry-forward](/concepts/labels-and-annotations/#carry-forward--how-labels-flow-through-the-hierarchy).
 

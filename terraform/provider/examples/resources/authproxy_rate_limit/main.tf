@@ -13,6 +13,13 @@ resource "authproxy_rate_limit" "team_acme_salesforce_writes" {
     owner = "platform@example.com"
   }
 
+  # Connector scopes always apply across every connector generation.
+  scope {
+    connector_ref {
+      id = authproxy_connector.salesforce.id
+    }
+  }
+
   selector {
     label_selector = "apxy/connector/-/id=salesforce"
     methods        = ["POST", "PATCH", "PUT"]
@@ -42,6 +49,12 @@ resource "authproxy_rate_limit" "team_acme_salesforce_writes" {
 resource "authproxy_rate_limit" "team_acme_reads_observed" {
   namespace = authproxy_namespace.acme.path
   mode      = "observe"
+
+  # Keep the policy centrally owned in root.acme while applying it only to
+  # the payments subtree.
+  scope {
+    namespace_matcher = "root.acme.payments.**"
+  }
 
   selector {
     methods       = ["GET"]

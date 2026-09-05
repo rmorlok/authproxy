@@ -1,21 +1,8 @@
 {
-  "definition": {
-    "mode": "observe",
-    "selector": {
-      "requestTypes": [
-        "proxy",
-        "probe"
-      ]
-    },
-    "bucket": {},
-    "algorithm": {
-      "fixedWindow": {
-        "window": "10s",
-        "limit": 10
-      }
-    }
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "RateLimit",
+  "metadata": {
+    "annotations": {"reason": "temporary observe mode"}
   },
-  "annotations": {
-    "reason": "temporary observe mode"
-  }
+  "spec": {"mode": "observe"}
 }

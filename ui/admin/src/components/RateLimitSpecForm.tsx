@@ -18,9 +18,10 @@ import Autocomplete from '@mui/material/Autocomplete';
 import Chip from '@mui/material/Chip';
 import Divider from '@mui/material/Divider';
 import {
-    RateLimitDefinition, RateLimitMode, PathMatchKind, SlidingWindowMode,
+    RateLimitSpec, RateLimitMode, PathMatchKind, SlidingWindowMode,
     RateLimitSelector, RateLimitBucket, RateLimitAlgorithm,
     RateLimitFixedWindow, RateLimitSlidingWindow, RateLimitTokenBucket,
+    RateLimitScope, RATE_LIMIT_API_VERSION,
 } from '@authproxy/api';
 
 // Mirrors the server's validHTTPMethods set in internal/schema/rate_limit/selector.go.
@@ -34,6 +35,7 @@ const REQUEST_TYPES = ['proxy', 'probe', 'oauth', 'public', 'global'];
 const RESERVED_DIMENSIONS = ['actor', 'connection', 'connector', 'connector_version', 'namespace', 'method'];
 
 type AlgorithmVariant = 'token_bucket' | 'fixed_window' | 'sliding_window';
+type ScopeKind = 'namespace-default' | 'namespace-matcher' | 'connector' | 'connection';
 
 function detectVariant(algo: RateLimitAlgorithm): AlgorithmVariant {
     if (algo.fixedWindow) return 'fixed_window';
@@ -47,7 +49,7 @@ const DEFAULT_TOKEN_BUCKET: RateLimitTokenBucket = { capacity: 60, refillRate: 1
 const DEFAULT_FIXED_WINDOW: RateLimitFixedWindow = { window: '1m', limit: 100 };
 const DEFAULT_SLIDING_WINDOW: RateLimitSlidingWindow = { window: '1m', limit: 100, mode: SlidingWindowMode.COUNTER };
 
-export const EMPTY_DEFINITION: RateLimitDefinition = {
+export const EMPTY_SPEC: RateLimitSpec = {
     mode: RateLimitMode.ENFORCE,
     selector: {
         methods: ['POST', 'PATCH', 'PUT'],
@@ -62,14 +64,14 @@ export const EMPTY_DEFINITION: RateLimitDefinition = {
 };
 
 interface Props {
-    value: RateLimitDefinition;
-    onChange: (next: RateLimitDefinition) => void;
+    value: RateLimitSpec;
+    onChange: (next: RateLimitSpec) => void;
 }
 
-export default function RateLimitDefinitionForm({ value, onChange }: Props) {
+export default function RateLimitSpecForm({ value, onChange }: Props) {
     const variant = detectVariant(value.algorithm);
 
-    const update = (patch: Partial<RateLimitDefinition>) => onChange({ ...value, ...patch });
+    const update = (patch: Partial<RateLimitSpec>) => onChange({ ...value, ...patch });
     const updateSelector = (patch: Partial<RateLimitSelector>) =>
         update({ selector: { ...value.selector, ...patch } });
     const updateBucket = (patch: Partial<RateLimitBucket>) =>
@@ -111,6 +113,10 @@ export default function RateLimitDefinitionForm({ value, onChange }: Props) {
 
             <Divider />
 
+            <ScopeSection value={value.scope} onChange={(scope) => update({scope})} />
+
+            <Divider />
+
             <SelectorSection value={value.selector} onChange={updateSelector} />
 
             <Divider />
@@ -126,6 +132,88 @@ export default function RateLimitDefinitionForm({ value, onChange }: Props) {
                 onChange={(algo) => update({ algorithm: algo })}
             />
         </Stack>
+    );
+}
+
+function ScopeSection({ value, onChange }: { value?: RateLimitScope; onChange: (scope?: RateLimitScope) => void }) {
+    const kind: ScopeKind = value?.namespaceMatcher !== undefined
+        ? 'namespace-matcher'
+        : value?.connectorRef
+            ? 'connector'
+            : value?.connectionRef
+                ? 'connection'
+                : 'namespace-default';
+
+    const changeKind = (next: ScopeKind) => {
+        switch (next) {
+            case 'namespace-matcher':
+                onChange({namespaceMatcher: ''});
+                break;
+            case 'connector':
+                onChange({connectorRef: {apiVersion: RATE_LIMIT_API_VERSION, kind: 'Connector', id: ''}});
+                break;
+            case 'connection':
+                onChange({connectionRef: {apiVersion: RATE_LIMIT_API_VERSION, kind: 'Connection', id: ''}});
+                break;
+            default:
+                onChange(undefined);
+        }
+    };
+
+    return (
+        <Section title="Scope" hint="The resource namespace cascades to descendants by default; optionally narrow it with a namespace matcher, connector, or connection.">
+            <Stack spacing={2}>
+                <FormControl size="small" sx={{maxWidth: 280}}>
+                    <InputLabel id="rate-limit-scope-label">Target</InputLabel>
+                    <Select
+                        labelId="rate-limit-scope-label"
+                        label="Target"
+                        value={kind}
+                        onChange={(event) => changeKind(event.target.value as ScopeKind)}
+                    >
+                        <MenuItem value="namespace-default">Resource namespace and descendants</MenuItem>
+                        <MenuItem value="namespace-matcher">Namespace matcher</MenuItem>
+                        <MenuItem value="connector">Connector</MenuItem>
+                        <MenuItem value="connection">Connection</MenuItem>
+                    </Select>
+                </FormControl>
+
+                {value?.namespaceMatcher !== undefined && (
+                    <TextField
+                        label="Namespace matcher"
+                        size="small"
+                        fullWidth
+                        value={value.namespaceMatcher}
+                        onChange={(event) => onChange({namespaceMatcher: event.target.value})}
+                        placeholder="root.acme.payments.**"
+                        helperText="Must select only the rate limit namespace or its descendants. Omit .** for an exact namespace."
+                    />
+                )}
+
+                {value?.connectorRef && (
+                    <TextField
+                        label="Connector ID"
+                        size="small"
+                        fullWidth
+                        value={value.connectorRef.id || ''}
+                        onChange={(event) => onChange({connectorRef: {...value.connectorRef, id: event.target.value}})}
+                        placeholder="cxr_..."
+                        helperText="Applies to every generation of the connector"
+                    />
+                )}
+
+                {value?.connectionRef && (
+                    <TextField
+                        label="Connection ID"
+                        size="small"
+                        fullWidth
+                        value={value.connectionRef.id || ''}
+                        onChange={(event) => onChange({connectionRef: {...value.connectionRef, id: event.target.value}})}
+                        placeholder="cxn_..."
+                    />
+                )}
+            </Stack>
+        </Section>
     );
 }
 

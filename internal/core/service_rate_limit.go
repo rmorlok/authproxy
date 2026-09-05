@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"net/url"
 	"strings"
 
@@ -12,11 +13,18 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/ratelimit"
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	connectionschema "github.com/rmorlok/authproxy/internal/schema/resources/connection"
+	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
+	nschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
-func (s *service) GetRateLimit(ctx context.Context, id apid.ID) (iface.RateLimit, error) {
+func (s *service) GetRateLimit(
+	ctx context.Context,
+	id apid.ID,
+) (iface.RateLimit, error) {
 	rl, err := s.db.GetRateLimit(ctx, id)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
@@ -24,45 +32,218 @@ func (s *service) GetRateLimit(ctx context.Context, id apid.ID) (iface.RateLimit
 		}
 		return nil, err
 	}
+
 	return wrapRateLimit(*rl, s), nil
 }
 
-func (s *service) CreateRateLimit(ctx context.Context, namespace string, name common.ResourceName, def rlschema.RateLimit, labels, annotations map[string]string) (iface.RateLimit, error) {
-	rl := &database.RateLimit{
-		Id:          apid.New(apid.PrefixRateLimit),
-		Namespace:   namespace,
-		Name:        name,
-		Definition:  def,
-		Labels:      database.Labels(labels),
-		Annotations: database.Annotations(annotations),
+func (s *service) CreateRateLimit(
+	ctx context.Context,
+	resource *rlschema.RateLimit,
+) (iface.RateLimit, error) {
+	if resource == nil {
+		return nil, fmt.Errorf("rate limit cannot be nil")
+	}
+
+	if err := resource.ValidateFor(meta.ValidationModeCreate, nil); err != nil {
+		return nil, err
+	}
+
+	id := apid.New(apid.PrefixRateLimit)
+	normalized := resource.ApplyCreateDefaults(id)
+
+	if err := s.normalizeRateLimitScope(ctx, normalized); err != nil {
+		return nil, err
+	}
+
+	rl, err := databaseRateLimitFromResource(normalized, id)
+	if err != nil {
+		return nil, err
 	}
 
 	if err := s.db.CreateRateLimit(ctx, rl); err != nil {
 		return nil, err
 	}
+
 	return wrapRateLimit(*rl, s), nil
 }
 
-func (s *service) UpdateRateLimitName(ctx context.Context, id apid.ID, name common.ResourceName) (iface.RateLimit, error) {
-	rl, err := s.db.UpdateRateLimitName(ctx, id, name)
+// UpdateRateLimit applies the desired resource envelope while keeping the
+// existing flat database model behind the core boundary.
+func (s *service) UpdateRateLimit(
+	ctx context.Context,
+	id apid.ID,
+	resource *rlschema.RateLimit,
+) (iface.RateLimit, error) {
+	if resource == nil {
+		return nil, fmt.Errorf("rate limit cannot be nil")
+	}
+
+	existing, err := s.GetRateLimit(ctx, id)
 	if err != nil {
-		if errors.Is(err, database.ErrNotFound) {
-			return nil, ErrNotFound
-		}
 		return nil, err
 	}
-	return wrapRateLimit(*rl, s), nil
+
+	before := existing.GetResource()
+	if err := rlschema.ValidateUpdate(before, resource, nil); err != nil {
+		return nil, err
+	}
+
+	normalized := resource.Clone()
+	if err := s.normalizeRateLimitScope(ctx, normalized); err != nil {
+		return nil, err
+	}
+
+	// Status is derived from spec, never accepted as desired state.
+	normalized.Status = &rlschema.RateLimitStatus{
+		EffectiveMode: normalized.Spec.EffectiveMode(),
+	}
+
+	if err := normalized.ValidateFor(
+		meta.ValidationModePersistence,
+		nil, // validation context
+	); err != nil {
+		return nil, err
+	}
+
+	if before.Metadata.Name != normalized.Metadata.Name {
+		if _, err := s.db.UpdateRateLimitName(
+			ctx,
+			id,
+			normalized.Metadata.Name,
+		); err != nil {
+			return nil, mapRateLimitDatabaseError(err)
+		}
+	}
+
+	if !before.Spec.Equal(&normalized.Spec) {
+		if _, err := s.db.UpdateRateLimitDefinition(
+			ctx,
+			id,
+			normalized.Spec,
+		); err != nil {
+			return nil, mapRateLimitDatabaseError(err)
+		}
+	}
+
+	if !maps.Equal(before.Metadata.Labels, normalized.Metadata.Labels) {
+		if _, err := s.db.UpdateRateLimitLabels(
+			ctx,
+			id,
+			normalized.Metadata.Labels,
+		); err != nil {
+			return nil, mapRateLimitDatabaseError(err)
+		}
+	}
+
+	if !maps.Equal(
+		before.Metadata.Annotations,
+		normalized.Metadata.Annotations,
+	) {
+		if _, err := s.db.UpdateRateLimitAnnotations(
+			ctx,
+			id,
+			normalized.Metadata.Annotations,
+		); err != nil {
+			return nil, mapRateLimitDatabaseError(err)
+		}
+	}
+
+	return s.GetRateLimit(ctx, id)
 }
 
-func (s *service) UpdateRateLimitDefinition(ctx context.Context, id apid.ID, def rlschema.RateLimit) (iface.RateLimit, error) {
-	rl, err := s.db.UpdateRateLimitDefinition(ctx, id, def)
-	if err != nil {
-		if errors.Is(err, database.ErrNotFound) {
-			return nil, ErrNotFound
-		}
-		return nil, err
+func mapRateLimitDatabaseError(err error) error {
+	if errors.Is(err, database.ErrNotFound) {
+		return ErrNotFound
 	}
-	return wrapRateLimit(*rl, s), nil
+	return err
+}
+
+// normalizeRateLimitScope enforces the scope's namespace boundary and converts
+// connector and connection references to stable ID references for storage.
+// Namespace matchers remain unchanged: their syntax is checked by resource
+// validation, and ValidateScopeNamespaceBoundary ensures that they cannot
+// escape the namespace that owns the rate limit. They are not resolved to a
+// Namespace resource because a matcher may intentionally cover descendants
+// created in the future.
+func (s *service) normalizeRateLimitScope(
+	ctx context.Context,
+	resource *rlschema.RateLimit,
+) error {
+	if err := rlschema.ValidateScopeNamespaceBoundary(
+		resource.Spec.Scope,
+		resource.Metadata.Namespace,
+		nil, // validation context
+	); err != nil {
+		return fmt.Errorf("%w: %v", ErrInvalidArgument, err)
+	}
+
+	if resource.Spec.Scope == nil {
+		return nil
+	}
+
+	if resource.Spec.Scope.ConnectorRef != nil {
+		connector, err := s.ResolveConnectorReference(
+			ctx,
+			*resource.Spec.Scope.ConnectorRef,
+		)
+		if err != nil {
+			return err
+		}
+
+		if err := validateRateLimitScopeTargetNamespace(
+			"connector",
+			resource.Metadata.Namespace,
+			connector.GetNamespace(),
+		); err != nil {
+			return err
+		}
+
+		resource.Spec.Scope.ConnectorRef = &meta.ObjectReference{
+			APIVersion: meta.APIVersionV1Alpha1,
+			Kind:       cschema.ConnectorKind,
+			ID:         connector.GetId().String(),
+		}
+	}
+
+	if resource.Spec.Scope.ConnectionRef != nil {
+		connection, err := s.ResolveConnectionReference(
+			ctx,
+			*resource.Spec.Scope.ConnectionRef,
+		)
+		if err != nil {
+			return err
+		}
+
+		if err := validateRateLimitScopeTargetNamespace(
+			"connection",
+			resource.Metadata.Namespace,
+			connection.GetNamespace(),
+		); err != nil {
+			return err
+		}
+		resource.Spec.Scope.ConnectionRef = &meta.ObjectReference{
+			APIVersion: meta.APIVersionV1Alpha1,
+			Kind:       connectionschema.ConnectionKind,
+			ID:         connection.GetId().String(),
+		}
+	}
+
+	return nil
+}
+
+func validateRateLimitScopeTargetNamespace(
+	targetKind, resourceNamespace, targetNamespace string,
+) error {
+	if nschema.IsSameOrChild(resourceNamespace, targetNamespace) {
+		return nil
+	}
+	return fmt.Errorf(
+		"%w: %s scope namespace %q is outside rate-limit namespace %q",
+		ErrInvalidArgument,
+		targetKind,
+		targetNamespace,
+		resourceNamespace,
+	)
 }
 
 func (s *service) DeleteRateLimit(ctx context.Context, id apid.ID) error {
@@ -234,9 +415,8 @@ var _ iface.ListRateLimitsBuilder = (*listRateLimitsWrapper)(nil)
 // connection (the way httpf.ForConnection populates them); otherwise
 // raw fields are used and manual Labels always merge on top.
 //
-// Rule cascade matches the enforcer: rules at the request's namespace
-// or any ancestor are evaluated; rules in unrelated branches are
-// filtered out.
+// Namespace scope matches the enforcer: each rule's explicit namespace
+// matcher is applied, or its owning namespace and descendants when omitted.
 func (s *service) DryRunRateLimit(ctx context.Context, req iface.DryRunRateLimitRequest) (iface.DryRunRateLimitResult, error) {
 	if req.Request.Method == "" {
 		return iface.DryRunRateLimitResult{}, fmt.Errorf("%w: request.method is required", ErrInvalidArgument)
@@ -381,16 +561,15 @@ func (s *service) hydrateDryRunContext(ctx context.Context, req iface.DryRunRate
 	return rc, nil
 }
 
-// filterRulesInScope keeps rules whose namespace is the request's
-// namespace or any ancestor — matching the runtime cascade where a rule
-// at root.foo applies to a request in root.foo.bar.
+// filterRulesInScope applies each rule's effective namespace matcher. An
+// omitted scope cascades from the rule's owning namespace to all descendants.
 func filterRulesInScope(rules []*database.RateLimit, requestNamespace string) []*database.RateLimit {
 	out := make([]*database.RateLimit, 0, len(rules))
 	for _, rule := range rules {
 		if rule == nil {
 			continue
 		}
-		if rule.Namespace == requestNamespace || strings.HasPrefix(requestNamespace, rule.Namespace+".") {
+		if rule.Definition.MatchesNamespace(rule.Namespace, requestNamespace) {
 			out = append(out, rule)
 		}
 	}
@@ -398,7 +577,7 @@ func filterRulesInScope(rules []*database.RateLimit, requestNamespace string) []
 }
 
 // algorithmSummary renders the chosen algorithm for the dry-run output.
-func algorithmSummary(def rlschema.RateLimit) string {
+func algorithmSummary(def rlschema.RateLimitSpec) string {
 	a := def.Algorithm
 	switch {
 	case a.TokenBucket != nil:

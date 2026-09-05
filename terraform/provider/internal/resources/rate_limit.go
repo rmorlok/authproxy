@@ -27,23 +27,38 @@ type RateLimitResource struct {
 // authors get autocomplete and field-level plan diffs — no jsonencode
 // blobs.
 type RateLimitResourceModel struct {
-	Id          types.String                 `tfsdk:"id"`
-	Namespace   types.String                 `tfsdk:"namespace"`
-	Mode        types.String                 `tfsdk:"mode"`
-	Labels      types.Map                    `tfsdk:"labels"`
-	Annotations types.Map                    `tfsdk:"annotations"`
-	Selector    *rateLimitSelectorModel      `tfsdk:"selector"`
-	Bucket      *rateLimitBucketModel        `tfsdk:"bucket"`
-	Algorithm   *rateLimitAlgorithmModel     `tfsdk:"algorithm"`
-	CreatedAt   types.String                 `tfsdk:"created_at"`
-	UpdatedAt   types.String                 `tfsdk:"updated_at"`
+	Id          types.String             `tfsdk:"id"`
+	Namespace   types.String             `tfsdk:"namespace"`
+	Mode        types.String             `tfsdk:"mode"`
+	Labels      types.Map                `tfsdk:"labels"`
+	Annotations types.Map                `tfsdk:"annotations"`
+	Scope       *rateLimitScopeModel     `tfsdk:"scope"`
+	Selector    *rateLimitSelectorModel  `tfsdk:"selector"`
+	Bucket      *rateLimitBucketModel    `tfsdk:"bucket"`
+	Algorithm   *rateLimitAlgorithmModel `tfsdk:"algorithm"`
+	CreatedAt   types.String             `tfsdk:"created_at"`
+	UpdatedAt   types.String             `tfsdk:"updated_at"`
+}
+
+type rateLimitScopeModel struct {
+	NamespaceMatcher types.String                 `tfsdk:"namespace_matcher"`
+	ConnectorRef     *rateLimitConnectorRefModel  `tfsdk:"connector_ref"`
+	ConnectionRef    *rateLimitConnectionRefModel `tfsdk:"connection_ref"`
+}
+
+type rateLimitConnectorRefModel struct {
+	ID types.String `tfsdk:"id"`
+}
+
+type rateLimitConnectionRefModel struct {
+	ID types.String `tfsdk:"id"`
 }
 
 type rateLimitSelectorModel struct {
-	LabelSelector types.String              `tfsdk:"label_selector"`
-	Methods       types.List                `tfsdk:"methods"`
-	RequestTypes  types.List                `tfsdk:"request_types"`
-	PathMatch     *rateLimitPathMatchModel  `tfsdk:"path_match"`
+	LabelSelector types.String             `tfsdk:"label_selector"`
+	Methods       types.List               `tfsdk:"methods"`
+	RequestTypes  types.List               `tfsdk:"request_types"`
+	PathMatch     *rateLimitPathMatchModel `tfsdk:"path_match"`
 }
 
 type rateLimitPathMatchModel struct {
@@ -124,6 +139,29 @@ func (r *RateLimitResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 			"updated_at": schema.StringAttribute{Computed: true},
 		},
 		Blocks: map[string]schema.Block{
+			"scope": schema.SingleNestedBlock{
+				Description: "Optionally narrow the owning namespace cascade to one namespace matcher, connector, or connection.",
+				Attributes: map[string]schema.Attribute{
+					"namespace_matcher": schema.StringAttribute{
+						Description: "A namespace matcher at or below the rate limit namespace, such as root.acme.payments.**.",
+						Optional:    true,
+					},
+				},
+				Blocks: map[string]schema.Block{
+					"connector_ref": schema.SingleNestedBlock{
+						Description: "Target one connector across all of its generations.",
+						Attributes: map[string]schema.Attribute{
+							"id": schema.StringAttribute{Required: true},
+						},
+					},
+					"connection_ref": schema.SingleNestedBlock{
+						Description: "Target one connection.",
+						Attributes: map[string]schema.Attribute{
+							"id": schema.StringAttribute{Required: true},
+						},
+					},
+				},
+			},
 			"selector": schema.SingleNestedBlock{
 				Description: "Match criteria. All non-empty clauses are ANDed.",
 				Attributes: map[string]schema.Attribute{
@@ -227,9 +265,9 @@ func (r *RateLimitResource) Configure(_ context.Context, req resource.ConfigureR
 	r.client = req.ProviderData.(*client.Client)
 }
 
-// ConfigValidators registers a plan-time check that exactly one algorithm
-// variant is set. Catching this here is much friendlier than letting the
-// admin-API return a validation error on apply.
+// ConfigValidators registers plan-time checks for the scope and algorithm
+// tagged unions. Catching these here is much friendlier than letting the
+// admin API return a validation error on apply.
 func (r *RateLimitResource) ConfigValidators(_ context.Context) []resource.ConfigValidator {
 	return []resource.ConfigValidator{exactlyOneAlgorithmValidator{}}
 }
@@ -247,17 +285,21 @@ func (r *RateLimitResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	def, err := buildDefinition(ctx, &plan)
+	spec, err := buildRateLimitSpec(ctx, &plan)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to build rate-limit definition", err.Error())
+		resp.Diagnostics.AddError("Failed to build rate-limit spec", err.Error())
 		return
 	}
 
 	rl, err := r.client.CreateRateLimit(ctx, client.CreateRateLimitRequest{
-		Namespace:   plan.Namespace.ValueString(),
-		Definition:  def,
-		Labels:      labels,
-		Annotations: annotations,
+		APIVersion: client.RateLimitAPIVersion,
+		Kind:       client.RateLimitKind,
+		Metadata: client.RateLimitMetadata{
+			Namespace:   plan.Namespace.ValueString(),
+			Labels:      labels,
+			Annotations: annotations,
+		},
+		Spec: spec,
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create rate limit", err.Error())
@@ -302,18 +344,29 @@ func (r *RateLimitResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	def, err := buildDefinition(ctx, &plan)
+	spec, err := buildRateLimitSpec(ctx, &plan)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to build rate-limit definition", err.Error())
+		resp.Diagnostics.AddError("Failed to build rate-limit spec", err.Error())
 		return
 	}
 
-	updateReq := client.UpdateRateLimitRequest{Definition: &def}
+	updateReq := client.UpdateRateLimitRequest{
+		APIVersion: client.RateLimitAPIVersion,
+		Kind:       client.RateLimitKind,
+		Metadata:   &client.RateLimitMetadataPatch{},
+		Spec: &client.RateLimitSpecPatch{
+			Scope:     spec.Scope,
+			Mode:      &spec.Mode,
+			Selector:  &spec.Selector,
+			Bucket:    &spec.Bucket,
+			Algorithm: &spec.Algorithm,
+		},
+	}
 	if labels != nil {
-		updateReq.Labels = &labels
+		updateReq.Metadata.Labels = &labels
 	}
 	if annotations != nil {
-		updateReq.Annotations = &annotations
+		updateReq.Metadata.Annotations = &annotations
 	}
 
 	rl, err := r.client.UpdateRateLimit(ctx, plan.Id.ValueString(), updateReq)
@@ -343,11 +396,29 @@ func (r *RateLimitResource) ImportState(ctx context.Context, req resource.Import
 
 // --- helpers ---
 
-// buildDefinition projects the user's HCL model into the wire payload the
+// buildRateLimitSpec projects the user's HCL model into the wire payload the
 // admin API expects.
-func buildDefinition(ctx context.Context, plan *RateLimitResourceModel) (client.RateLimitDefinition, error) {
-	def := client.RateLimitDefinition{
+func buildRateLimitSpec(ctx context.Context, plan *RateLimitResourceModel) (client.RateLimitSpec, error) {
+	def := client.RateLimitSpec{
 		Mode: plan.Mode.ValueString(),
+	}
+	if plan.Scope != nil {
+		def.Scope = &client.RateLimitScope{}
+		def.Scope.NamespaceMatcher = plan.Scope.NamespaceMatcher.ValueString()
+		if plan.Scope.ConnectorRef != nil {
+			def.Scope.ConnectorRef = &client.ObjectReference{
+				APIVersion: client.RateLimitAPIVersion,
+				Kind:       "Connector",
+				ID:         plan.Scope.ConnectorRef.ID.ValueString(),
+			}
+		}
+		if plan.Scope.ConnectionRef != nil {
+			def.Scope.ConnectionRef = &client.ObjectReference{
+				APIVersion: client.RateLimitAPIVersion,
+				Kind:       "Connection",
+				ID:         plan.Scope.ConnectionRef.ID.ValueString(),
+			}
+		}
 	}
 
 	if plan.Selector != nil {
@@ -405,53 +476,74 @@ func buildDefinition(ctx context.Context, plan *RateLimitResourceModel) (client.
 // setRateLimitState populates a model from the API response, including
 // the nested blocks. Used by all of Create/Read/Update.
 func setRateLimitState(model *RateLimitResourceModel, rl *client.RateLimit) {
-	model.Id = types.StringValue(rl.Id)
-	model.Namespace = types.StringValue(rl.Namespace)
-	if rl.Definition.Mode != "" {
-		model.Mode = types.StringValue(rl.Definition.Mode)
+	model.Id = types.StringValue(rl.Metadata.ID)
+	model.Namespace = types.StringValue(rl.Metadata.Namespace)
+	if rl.Spec.Mode != "" {
+		model.Mode = types.StringValue(rl.Spec.Mode)
 	} else {
 		// The server returns mode = "" for the default ("enforce");
 		// surface that explicitly so plan/apply consistency holds.
 		model.Mode = types.StringValue("enforce")
 	}
-	model.Labels = labelsToMap(rl.Labels)
-	model.Annotations = annotationsToMap(rl.Annotations)
-	model.CreatedAt = types.StringValue(rl.CreatedAt.Format("2006-01-02T15:04:05Z07:00"))
-	model.UpdatedAt = types.StringValue(rl.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"))
+	model.Labels = labelsToMap(rl.Metadata.Labels)
+	model.Annotations = annotationsToMap(rl.Metadata.Annotations)
+	if rl.Metadata.CreatedAt != nil {
+		model.CreatedAt = types.StringValue(rl.Metadata.CreatedAt.Format("2006-01-02T15:04:05Z07:00"))
+	}
+	if rl.Metadata.UpdatedAt != nil {
+		model.UpdatedAt = types.StringValue(rl.Metadata.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"))
+	}
+	model.Scope = nil
+	if rl.Spec.Scope != nil {
+		model.Scope = &rateLimitScopeModel{NamespaceMatcher: types.StringNull()}
+		if rl.Spec.Scope.NamespaceMatcher != "" {
+			model.Scope.NamespaceMatcher = types.StringValue(rl.Spec.Scope.NamespaceMatcher)
+		}
+		if rl.Spec.Scope.ConnectorRef != nil {
+			model.Scope.ConnectorRef = &rateLimitConnectorRefModel{
+				ID: types.StringValue(rl.Spec.Scope.ConnectorRef.ID),
+			}
+		}
+		if rl.Spec.Scope.ConnectionRef != nil {
+			model.Scope.ConnectionRef = &rateLimitConnectionRefModel{
+				ID: types.StringValue(rl.Spec.Scope.ConnectionRef.ID),
+			}
+		}
+	}
 
 	model.Selector = &rateLimitSelectorModel{
-		LabelSelector: optionalString(rl.Definition.Selector.LabelSelector),
-		Methods:       stringsToList(rl.Definition.Selector.Methods),
-		RequestTypes:  stringsToList(rl.Definition.Selector.RequestTypes),
+		LabelSelector: optionalString(rl.Spec.Selector.LabelSelector),
+		Methods:       stringsToList(rl.Spec.Selector.Methods),
+		RequestTypes:  stringsToList(rl.Spec.Selector.RequestTypes),
 	}
-	if rl.Definition.Selector.PathMatch != nil {
+	if rl.Spec.Selector.PathMatch != nil {
 		model.Selector.PathMatch = &rateLimitPathMatchModel{
-			Kind:  types.StringValue(rl.Definition.Selector.PathMatch.Kind),
-			Value: types.StringValue(rl.Definition.Selector.PathMatch.Value),
+			Kind:  types.StringValue(rl.Spec.Selector.PathMatch.Kind),
+			Value: types.StringValue(rl.Spec.Selector.PathMatch.Value),
 		}
 	}
 
 	model.Bucket = &rateLimitBucketModel{
-		Dimensions: stringsToList(rl.Definition.Bucket.Dimensions),
+		Dimensions: stringsToList(rl.Spec.Bucket.Dimensions),
 	}
 
 	algoModel := &rateLimitAlgorithmModel{}
 	switch {
-	case rl.Definition.Algorithm.FixedWindow != nil:
+	case rl.Spec.Algorithm.FixedWindow != nil:
 		algoModel.FixedWindow = &rateLimitFixedWindowModel{
-			Window: types.StringValue(rl.Definition.Algorithm.FixedWindow.Window),
-			Limit:  types.Int64Value(int64(rl.Definition.Algorithm.FixedWindow.Limit)),
+			Window: types.StringValue(rl.Spec.Algorithm.FixedWindow.Window),
+			Limit:  types.Int64Value(int64(rl.Spec.Algorithm.FixedWindow.Limit)),
 		}
-	case rl.Definition.Algorithm.SlidingWindow != nil:
+	case rl.Spec.Algorithm.SlidingWindow != nil:
 		algoModel.SlidingWindow = &rateLimitSlidingWindowModel{
-			Window: types.StringValue(rl.Definition.Algorithm.SlidingWindow.Window),
-			Limit:  types.Int64Value(int64(rl.Definition.Algorithm.SlidingWindow.Limit)),
-			Mode:   types.StringValue(rl.Definition.Algorithm.SlidingWindow.Mode),
+			Window: types.StringValue(rl.Spec.Algorithm.SlidingWindow.Window),
+			Limit:  types.Int64Value(int64(rl.Spec.Algorithm.SlidingWindow.Limit)),
+			Mode:   types.StringValue(rl.Spec.Algorithm.SlidingWindow.Mode),
 		}
-	case rl.Definition.Algorithm.TokenBucket != nil:
+	case rl.Spec.Algorithm.TokenBucket != nil:
 		algoModel.TokenBucket = &rateLimitTokenBucketModel{
-			Capacity:   types.Int64Value(int64(rl.Definition.Algorithm.TokenBucket.Capacity)),
-			RefillRate: types.Float64Value(rl.Definition.Algorithm.TokenBucket.RefillRate),
+			Capacity:   types.Int64Value(int64(rl.Spec.Algorithm.TokenBucket.Capacity)),
+			RefillRate: types.Float64Value(rl.Spec.Algorithm.TokenBucket.RefillRate),
 		}
 	}
 	model.Algorithm = algoModel
@@ -512,6 +604,25 @@ func (v exactlyOneAlgorithmValidator) ValidateResource(ctx context.Context, req 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &model)...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+	if model.Scope != nil {
+		set := 0
+		if !model.Scope.NamespaceMatcher.IsNull() && !model.Scope.NamespaceMatcher.IsUnknown() && model.Scope.NamespaceMatcher.ValueString() != "" {
+			set++
+		}
+		if model.Scope.ConnectorRef != nil {
+			set++
+		}
+		if model.Scope.ConnectionRef != nil {
+			set++
+		}
+		if set != 1 {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("scope"),
+				"Invalid rate-limit scope",
+				"Exactly one of namespace_matcher, connector_ref, or connection_ref must be set when scope is configured.",
+			)
+		}
 	}
 
 	if model.Algorithm == nil {

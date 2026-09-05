@@ -1,64 +1,27 @@
 package api
 
 import (
-	"time"
-
 	"github.com/rmorlok/authproxy/internal/apid"
 	apiv1alpha1 "github.com/rmorlok/authproxy/internal/schema/api/v1alpha1"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 )
 
-// RateLimitJson is the API envelope around a rate-limit resource definition.
-//
-//	@Description	Rate-limit API response
-type RateLimitJson struct {
-	Id          apid.ID             `json:"id" yaml:"id" swaggertype:"string" example:"rl_test550e8400abcde"`
-	Namespace   string              `json:"namespace" yaml:"namespace" example:"root.acme"`
-	Name        common.ResourceName `json:"name" yaml:"name" swaggertype:"string" example:"public-api"`
-	Definition  rlschema.RateLimit  `json:"definition" yaml:"definition"`
-	Labels      map[string]string   `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Annotations map[string]string   `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	CreatedAt   time.Time           `json:"createdAt" yaml:"createdAt"`
-	UpdatedAt   time.Time           `json:"updatedAt" yaml:"updatedAt"`
-}
-
 type ListRateLimitsResponseJson struct {
-	apiv1alpha1.ResourceList[RateLimitJson] `json:",inline" yaml:",inline"`
+	apiv1alpha1.ResourceList[rlschema.RateLimit] `json:",inline" yaml:",inline"`
 }
 
 func NewListRateLimitsResponseJson(
-	items []RateLimitJson,
+	items []rlschema.RateLimit,
 	continueToken string,
 ) ListRateLimitsResponseJson {
 	return ListRateLimitsResponseJson{
 		ResourceList: apiv1alpha1.NewResourceList(
-			"RateLimit",
+			rlschema.RateLimitKind,
 			items,
 			apiv1alpha1.ListMeta{Continue: continueToken},
 		),
 	}
-}
-
-// CreateRateLimitRequestJson is the request body for POST /rate-limits.
-//
-//	@Description	Request to create a rate limit
-type CreateRateLimitRequestJson struct {
-	Namespace   string               `json:"namespace" yaml:"namespace" example:"root.acme"`
-	Name        *common.ResourceName `json:"name,omitempty" yaml:"name,omitempty" swaggertype:"string" example:"public-api"`
-	Definition  rlschema.RateLimit   `json:"definition" yaml:"definition"`
-	Labels      map[string]string    `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Annotations map[string]string    `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-}
-
-// UpdateRateLimitRequestJson is the request body for PATCH /rate-limits/:id.
-//
-//	@Description	Request to update a rate limit
-type UpdateRateLimitRequestJson struct {
-	Name        *common.ResourceName `json:"name,omitempty" yaml:"name,omitempty" swaggertype:"string" example:"public-api"`
-	Definition  *rlschema.RateLimit  `json:"definition,omitempty" yaml:"definition,omitempty"`
-	Labels      *map[string]string   `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Annotations *map[string]string   `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 }
 
 // ProxyRequestJson is the wire shape used by API endpoints that accept a

@@ -18,6 +18,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/ratelimit"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	cfgschema "github.com/rmorlok/authproxy/internal/schema/config"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	nschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 	"github.com/stretchr/testify/require"
@@ -28,7 +29,11 @@ import (
 // hydration, the namespace cascade, and the Peek-doesn't-mutate
 // invariant at the layer that actually owns the logic.
 
-func newDryRunService(t *testing.T) (iface.C, ratelimit.MutableCache, func()) {
+func newDryRunService(t *testing.T) (
+	iface.C,
+	ratelimit.MutableCache,
+	func(),
+) {
 	t.Helper()
 	cfg := config.FromRoot(&cfgschema.Root{
 		DevSettings: &cfgschema.DevSettings{
@@ -55,9 +60,19 @@ func newDryRunService(t *testing.T) (iface.C, ratelimit.MutableCache, func()) {
 	return svc, rlCache, ctrl.Finish
 }
 
-func installRule(t *testing.T, svc iface.C, rlCache ratelimit.MutableCache, namespace string, def rlschema.RateLimit) *database.RateLimit {
+func installRule(
+	t *testing.T,
+	svc iface.C,
+	rlCache ratelimit.MutableCache,
+	namespace string,
+	def rlschema.RateLimitSpec,
+) *database.RateLimit {
 	t.Helper()
-	created, err := svc.CreateRateLimit(context.Background(), namespace, "", def, nil, nil)
+	created, err := svc.CreateRateLimit(context.Background(), &rlschema.RateLimit{
+		TypeMeta: meta.NewTypeMeta(rlschema.RateLimitKind),
+		Metadata: meta.ObjectMeta{Namespace: namespace},
+		Spec:     def,
+	})
 	require.NoError(t, err)
 	// The cache the enforcer reads holds *database.RateLimit rows
 	// (loaded by the refresher). Read straight back from the iface
@@ -66,15 +81,15 @@ func installRule(t *testing.T, svc iface.C, rlCache ratelimit.MutableCache, name
 	row := &database.RateLimit{
 		Id:         created.GetId(),
 		Namespace:  created.GetNamespace(),
-		Definition: created.GetDefinition(),
+		Definition: created.GetSpec(),
 	}
 	existing := rlCache.All()
 	rlCache.Replace(append(existing, row), time.Now())
 	return row
 }
 
-func freshTokenBucket() rlschema.RateLimit {
-	return rlschema.RateLimit{
+func freshTokenBucket() rlschema.RateLimitSpec {
+	return rlschema.RateLimitSpec{
 		Selector: rlschema.Selector{
 			Methods:      []string{"POST"},
 			RequestTypes: []common.RequestType{common.RequestTypeProxy},
@@ -165,9 +180,17 @@ func TestDryRunRateLimit_NamespaceCascade(t *testing.T) {
 	svc, rlCache, done := newDryRunService(t)
 	defer done()
 
-	// Rule at root should apply to a request in root.child; a rule at
-	// root.other should not.
+	// A default rule at root and a root-owned rule narrowed to root.child
+	// should apply. A sibling-owned rule and an exact root matcher should not.
 	rootRule := installRule(t, svc, rlCache, "root", freshTokenBucket())
+	childMatcher := "root.child.**"
+	childScopedDef := freshTokenBucket()
+	childScopedDef.Scope = &rlschema.RateLimitScope{NamespaceMatcher: &childMatcher}
+	childScopedRule := installRule(t, svc, rlCache, "root", childScopedDef)
+	exactRootMatcher := "root"
+	exactRootDef := freshTokenBucket()
+	exactRootDef.Scope = &rlschema.RateLimitScope{NamespaceMatcher: &exactRootMatcher}
+	exactRootRule := installRule(t, svc, rlCache, "root", exactRootDef)
 	child, err := nschema.NewNamespaceForPath("root.child")
 	require.NoError(t, err)
 	_, err = svc.CreateNamespace(context.Background(), child)
@@ -184,9 +207,11 @@ func TestDryRunRateLimit_NamespaceCascade(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, "root.child", res.Namespace)
-	require.Len(t, res.Matched, 1, "ancestor rule applies, sibling does not")
+	require.Len(t, res.Matched, 2, "default ancestor and narrowed child rule apply")
 	require.Equal(t, rootRule.Id, res.Matched[0].RateLimitId)
-	require.Empty(t, res.NotMatched, "the sibling-namespace rule should be filtered out before the matcher runs")
+	require.Equal(t, childScopedRule.Id, res.Matched[1].RateLimitId)
+	require.Empty(t, res.NotMatched, "out-of-scope rules should be filtered before selector matching")
+	_ = exactRootRule
 	_ = otherRule
 }
 
@@ -194,7 +219,7 @@ func TestDryRunRateLimit_RequestLabelsOverride(t *testing.T) {
 	svc, rlCache, done := newDryRunService(t)
 	defer done()
 
-	installRule(t, svc, rlCache, "root", rlschema.RateLimit{
+	installRule(t, svc, rlCache, "root", rlschema.RateLimitSpec{
 		Selector: rlschema.Selector{
 			LabelSelector: "team=acme",
 			Methods:       []string{"POST"},
@@ -218,7 +243,7 @@ func TestDryRunRateLimit_MissReasonReported(t *testing.T) {
 	svc, rlCache, done := newDryRunService(t)
 	defer done()
 
-	rule := installRule(t, svc, rlCache, "root", rlschema.RateLimit{
+	rule := installRule(t, svc, rlCache, "root", rlschema.RateLimitSpec{
 		Selector: rlschema.Selector{
 			Methods:      []string{"DELETE"},
 			RequestTypes: []common.RequestType{common.RequestTypeProxy},

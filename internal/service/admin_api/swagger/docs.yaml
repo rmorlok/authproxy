@@ -284,6 +284,30 @@ definitions:
         example: 1
         type: integer
     type: object
+  openapi.DryRunRequestJson:
+    description: 'Dry-run input: a proxy-shaped request + request type + the identity
+      it runs under'
+    properties:
+      context: {}
+      request: {}
+      requestType:
+        example: proxy
+        type: string
+    type: object
+  openapi.DryRunResponseJson:
+    description: Per-rule match + peek-driven would-allow result
+    properties:
+      matched:
+        items: {}
+        type: array
+      notMatched:
+        items: {}
+        type: array
+      requestLabelSnapshot:
+        additionalProperties:
+          type: string
+        type: object
+    type: object
   openapi.KeyJson:
     description: Kubernetes-style managed Key resource. Secret keyData fields are
       always redacted in responses.
@@ -423,33 +447,262 @@ definitions:
     - kind
     - metadata
     type: object
-  openapi.RateLimitJson:
-    description: Rate-limit API response
+  openapi.ListRateLimitsResponseJson:
+    description: Paginated list of rate limits
     properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      createdAt:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
         type: string
-      definition:
-        additionalProperties: {}
-        type: object
+      items:
+        items:
+          $ref: '#/definitions/openapi.RateLimitJson'
+        type: array
+      kind:
+        type: string
+      metadata:
+        $ref: '#/definitions/v1alpha1.ListMeta'
+    required:
+    - apiVersion
+    - items
+    - kind
+    - metadata
+    type: object
+  openapi.RateLimitAlgorithmJson:
+    properties:
+      fixedWindow:
+        $ref: '#/definitions/openapi.RateLimitFixedWindowJson'
+      slidingWindow:
+        $ref: '#/definitions/openapi.RateLimitSlidingWindowJson'
+      tokenBucket:
+        $ref: '#/definitions/openapi.RateLimitTokenBucketJson'
+    type: object
+  openapi.RateLimitBucketJson:
+    properties:
+      dimensions:
+        items:
+          type: string
+        type: array
+    type: object
+  openapi.RateLimitConnectionReferenceJson:
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
       id:
-        example: rl_test550e8400abcde
+        example: cxn_01example
         type: string
-      labels:
-        additionalProperties:
-          type: string
-        type: object
+      kind:
+        enum:
+        - Connection
+        example: Connection
+        type: string
       name:
-        example: public-api
+        example: salesforce-production
         type: string
       namespace:
         example: root.acme
         type: string
-      updatedAt:
+    required:
+    - apiVersion
+    - kind
+    type: object
+  openapi.RateLimitConnectorReferenceJson:
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
         type: string
+      id:
+        example: cxr_01example
+        type: string
+      kind:
+        enum:
+        - Connector
+        example: Connector
+        type: string
+      name:
+        example: salesforce
+        type: string
+      namespace:
+        example: root.acme
+        type: string
+    required:
+    - apiVersion
+    - kind
+    type: object
+  openapi.RateLimitFixedWindowJson:
+    properties:
+      limit:
+        example: 100
+        type: integer
+      window:
+        example: 1m
+        type: string
+    type: object
+  openapi.RateLimitJson:
+    description: Kubernetes-style RateLimit resource
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - RateLimit
+        example: RateLimit
+        type: string
+      metadata:
+        $ref: '#/definitions/meta.ObjectMeta'
+      spec:
+        $ref: '#/definitions/openapi.RateLimitSpecJson'
+      status:
+        $ref: '#/definitions/openapi.RateLimitStatusJson'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
+  openapi.RateLimitPatchJson:
+    description: Kubernetes-style RateLimit patch. Status and server-owned metadata
+      are rejected.
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - RateLimit
+        example: RateLimit
+        type: string
+      metadata:
+        $ref: '#/definitions/meta.ObjectMetaPatch'
+      spec:
+        $ref: '#/definitions/openapi.RateLimitSpecPatchJson'
+      status:
+        $ref: '#/definitions/openapi.RateLimitStatusJson'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
+  openapi.RateLimitPathMatchJson:
+    properties:
+      kind:
+        enum:
+        - prefix
+        - glob
+        - regex
+        type: string
+      value:
+        type: string
+    type: object
+  openapi.RateLimitScopeJson:
+    properties:
+      connectionRef:
+        $ref: '#/definitions/openapi.RateLimitConnectionReferenceJson'
+      connectorRef:
+        $ref: '#/definitions/openapi.RateLimitConnectorReferenceJson'
+      namespaceMatcher:
+        example: root.acme.payments.**
+        type: string
+    type: object
+  openapi.RateLimitSelectorJson:
+    properties:
+      labelSelector:
+        type: string
+      methods:
+        items:
+          type: string
+        type: array
+      pathMatch:
+        $ref: '#/definitions/openapi.RateLimitPathMatchJson'
+      requestTypes:
+        items:
+          enum:
+          - global
+          - proxy
+          - oauth
+          - public
+          - probe
+          type: string
+        type: array
+    type: object
+  openapi.RateLimitSlidingWindowJson:
+    properties:
+      limit:
+        example: 100
+        type: integer
+      mode:
+        enum:
+        - log
+        - counter
+        type: string
+      window:
+        example: 1m
+        type: string
+    type: object
+  openapi.RateLimitSpecJson:
+    properties:
+      algorithm:
+        $ref: '#/definitions/openapi.RateLimitAlgorithmJson'
+      bucket:
+        $ref: '#/definitions/openapi.RateLimitBucketJson'
+      mode:
+        enum:
+        - enforce
+        - observe
+        type: string
+      scope:
+        $ref: '#/definitions/openapi.RateLimitScopeJson'
+      selector:
+        $ref: '#/definitions/openapi.RateLimitSelectorJson'
+    required:
+    - algorithm
+    - bucket
+    - selector
+    type: object
+  openapi.RateLimitSpecPatchJson:
+    properties:
+      algorithm:
+        $ref: '#/definitions/openapi.RateLimitAlgorithmJson'
+      bucket:
+        $ref: '#/definitions/openapi.RateLimitBucketJson'
+      mode:
+        enum:
+        - enforce
+        - observe
+        type: string
+      scope:
+        $ref: '#/definitions/openapi.RateLimitScopeJson'
+      selector:
+        $ref: '#/definitions/openapi.RateLimitSelectorJson'
+    type: object
+  openapi.RateLimitStatusJson:
+    properties:
+      effectiveMode:
+        enum:
+        - enforce
+        - observe
+        type: string
+    type: object
+  openapi.RateLimitTokenBucketJson:
+    properties:
+      capacity:
+        example: 60
+        type: integer
+      refillRate:
+        example: 1
+        type: number
     type: object
   routes.ActorJson:
     description: Actor identity within a namespace
@@ -823,27 +1076,6 @@ definitions:
           type: string
         type: object
     type: object
-  routes.OpenAPICreateRateLimitRequestJson:
-    description: Request to create a rate limit
-    properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      definition:
-        additionalProperties: {}
-        type: object
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-      name:
-        example: public-api
-        type: string
-      namespace:
-        example: root.acme
-        type: string
-    type: object
   routes.OpenAPIDisconnectConnectionRequestJson:
     description: Request body for connection disconnect operations
     properties:
@@ -857,30 +1089,6 @@ definitions:
       connection: {}
       taskId:
         type: string
-    type: object
-  routes.OpenAPIDryRunRequestJson:
-    description: 'Dry-run input: a proxy-shaped request + request type + the identity
-      it runs under'
-    properties:
-      context: {}
-      request: {}
-      requestType:
-        example: proxy
-        type: string
-    type: object
-  routes.OpenAPIDryRunResponseJson:
-    description: Per-rule match + peek-driven would-allow result
-    properties:
-      matched:
-        items: {}
-        type: array
-      notMatched:
-        items: {}
-        type: array
-      requestLabelSnapshot:
-        additionalProperties:
-          type: string
-        type: object
     type: object
   routes.OpenAPIListActorsResponseJson:
     description: Paginated list of actors
@@ -982,28 +1190,6 @@ definitions:
         items: {}
         type: array
     type: object
-  routes.OpenAPIListRateLimitsResponseJson:
-    description: Paginated list of rate limits
-    properties:
-      apiVersion:
-        enum:
-        - authproxy.net/v1alpha1
-        example: authproxy.net/v1alpha1
-        type: string
-      items:
-        items:
-          $ref: '#/definitions/openapi.RateLimitJson'
-        type: array
-      kind:
-        type: string
-      metadata:
-        $ref: '#/definitions/v1alpha1.ListMeta'
-    required:
-    - apiVersion
-    - items
-    - kind
-    - metadata
-    type: object
   routes.OpenAPIListRequestEventsResponse:
     description: Paginated list of request events entries
     properties:
@@ -1063,34 +1249,6 @@ definitions:
       statusCode:
         example: 200
         type: integer
-    type: object
-  routes.OpenAPIRateLimitJson:
-    description: Rate-limit API response
-    properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      createdAt:
-        type: string
-      definition:
-        additionalProperties: {}
-        type: object
-      id:
-        example: rl_test550e8400abcde
-        type: string
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-      name:
-        example: public-api
-        type: string
-      namespace:
-        example: root.acme
-        type: string
-      updatedAt:
-        type: string
     type: object
   routes.OpenAPIRequestEventsEntry:
     description: HTTP request events entry
@@ -1240,24 +1398,6 @@ definitions:
         additionalProperties:
           type: string
         type: object
-    type: object
-  routes.OpenAPIUpdateRateLimitRequestJson:
-    description: Request to update a rate limit
-    properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      definition:
-        additionalProperties: {}
-        type: object
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-      name:
-        example: public-api
-        type: string
     type: object
   routes.ProxyRequest:
     description: Request to proxy or simulate an HTTP request
@@ -5967,7 +6107,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIListRateLimitsResponseJson'
+            $ref: '#/definitions/openapi.ListRateLimitsResponseJson'
         "400":
           description: Bad Request
           schema:
@@ -5995,14 +6135,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.OpenAPICreateRateLimitRequestJson'
+          $ref: '#/definitions/openapi.RateLimitJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIRateLimitJson'
+            $ref: '#/definitions/openapi.RateLimitJson'
         "400":
           description: Bad Request
           schema:
@@ -6038,14 +6178,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.OpenAPIDryRunRequestJson'
+          $ref: '#/definitions/openapi.DryRunRequestJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIDryRunResponseJson'
+            $ref: '#/definitions/openapi.DryRunResponseJson'
         "400":
           description: Bad Request
           schema:
@@ -6120,7 +6260,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIRateLimitJson'
+            $ref: '#/definitions/openapi.RateLimitJson'
         "400":
           description: Bad Request
           schema:
@@ -6145,7 +6285,7 @@ paths:
     patch:
       consumes:
       - application/json
-      description: Update a rate limit's name, definition, labels, or annotations
+      description: Update a rate limit's name, spec, labels, or annotations
       parameters:
       - description: Rate limit ID
         in: path
@@ -6157,14 +6297,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.OpenAPIUpdateRateLimitRequestJson'
+          $ref: '#/definitions/openapi.RateLimitPatchJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIRateLimitJson'
+            $ref: '#/definitions/openapi.RateLimitJson'
         "400":
           description: Bad Request
           schema:

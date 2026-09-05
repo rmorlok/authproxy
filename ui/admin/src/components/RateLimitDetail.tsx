@@ -20,11 +20,12 @@ import Tooltip from '@mui/material/Tooltip';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import dayjs from 'dayjs';
 import {
-    RateLimit, rateLimits, RateLimitMode, RateLimitDefinition,
+    RateLimit, rateLimits, RateLimitMode, RateLimitSpec,
+    RATE_LIMIT_API_VERSION, RATE_LIMIT_KIND,
 } from '@authproxy/api';
 import { useNavigate } from 'react-router-dom';
-import RateLimitDefinitionEditor from './RateLimitDefinitionEditor';
-import { EMPTY_DEFINITION } from './RateLimitDefinitionForm';
+import RateLimitSpecEditor from './RateLimitSpecEditor';
+import { EMPTY_SPEC } from './RateLimitSpecForm';
 import ResourceIdentifier from './ResourceIdentifier';
 import ResourceMetadataMenuItems from './ResourceMetadataMenuItems';
 import AnnotationsEditor from './AnnotationsEditor';
@@ -38,7 +39,7 @@ function ModeChip({ mode }: { mode: RateLimitMode }) {
 // One-line summary of an algorithm variant, used in the read-only
 // algorithm card. Keeps the detail page scannable without rendering the
 // full nested JSON.
-function algorithmDisplay(def: RateLimitDefinition): { label: string; rows: Array<[string, string]> } {
+function algorithmDisplay(def: RateLimitSpec): { label: string; rows: Array<[string, string]> } {
     if (def.algorithm.fixedWindow) {
         const a = def.algorithm.fixedWindow;
         return {
@@ -63,6 +64,22 @@ function algorithmDisplay(def: RateLimitDefinition): { label: string; rows: Arra
     return { label: '—', rows: [] };
 }
 
+function scopeDisplay(spec: RateLimitSpec): string {
+    if (spec.scope?.namespaceMatcher !== undefined) {
+        return `Namespaces matching ${spec.scope.namespaceMatcher}`;
+    }
+    if (spec.scope?.connectorRef) {
+        const ref = spec.scope.connectorRef;
+        const target = ref.id || `${ref.namespace}/${ref.name}`;
+        return `Connector ${target}`;
+    }
+    if (spec.scope?.connectionRef) {
+        const ref = spec.scope.connectionRef;
+        return `Connection ${ref.id || `${ref.namespace}/${ref.name}`}`;
+    }
+    return 'Namespace and descendants';
+}
+
 export default function RateLimitDetail({ rateLimitId }: { rateLimitId: string }) {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
@@ -71,8 +88,8 @@ export default function RateLimitDetail({ rateLimitId }: { rateLimitId: string }
 
     // Action menu / dialog state.
     const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
-    const [editDefOpen, setEditDefOpen] = useState(false);
-    const [editDef, setEditDef] = useState<RateLimitDefinition>(EMPTY_DEFINITION);
+    const [editSpecOpen, setEditSpecOpen] = useState(false);
+    const [editSpec, setEditSpec] = useState<RateLimitSpec>(EMPTY_SPEC);
     const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
     const [actionError, setActionError] = useState<string | null>(null);
@@ -114,7 +131,7 @@ export default function RateLimitDetail({ rateLimitId }: { rateLimitId: string }
     const openMenu = (e: React.MouseEvent<HTMLButtonElement>) => setMenuAnchorEl(e.currentTarget);
     const closeMenu = () => setMenuAnchorEl(null);
 
-    const mode = (rl.definition.mode || RateLimitMode.ENFORCE) as RateLimitMode;
+    const mode = (rl.spec.mode || RateLimitMode.ENFORCE) as RateLimitMode;
     const isEnforce = mode === RateLimitMode.ENFORCE;
 
     // Inline mode toggle for the page header. Same semantics as the list
@@ -123,11 +140,16 @@ export default function RateLimitDetail({ rateLimitId }: { rateLimitId: string }
         if (modePending) return;
         setModePending(true);
         const nextMode = isEnforce ? RateLimitMode.OBSERVE : RateLimitMode.ENFORCE;
-        const nextDef: RateLimitDefinition = { ...rl.definition, mode: nextMode };
+        const nextSpec: RateLimitSpec = { ...rl.spec, mode: nextMode };
         const prev = rl;
-        setRl({ ...rl, definition: nextDef });
+        setRl({ ...rl, spec: nextSpec });
         try {
-            const resp = await rateLimits.update(rl.id, { definition: nextDef });
+            const resp = await rateLimits.update(rl.metadata.id, {
+                apiVersion: RATE_LIMIT_API_VERSION,
+                kind: RATE_LIMIT_KIND,
+                metadata: {},
+                spec: nextSpec,
+            });
             setRl(resp.data);
         } catch (err: any) {
             setRl(prev);
@@ -137,22 +159,29 @@ export default function RateLimitDetail({ rateLimitId }: { rateLimitId: string }
         }
     };
 
-    const onClickEditDefinition = () => {
+    const onClickEditSpec = () => {
         setActionError(null);
-        setEditDef(rl.definition);
+        setEditSpec(rl.spec);
         closeMenu();
-        setEditDefOpen(true);
+        setEditSpecOpen(true);
     };
 
-    const onSubmitEditDefinition = async () => {
+    const onSubmitEditSpec = async () => {
         setActionError(null);
         setActionLoading(true);
         try {
-            await rateLimits.update(rl.id, { definition: editDef });
-            setEditDefOpen(false);
+            await rateLimits.update(rl.metadata.id, {
+                apiVersion: RATE_LIMIT_API_VERSION,
+                kind: RATE_LIMIT_KIND,
+                metadata: {},
+                // PATCH distinguishes an omitted scope (leave unchanged)
+                // from null (restore namespace-and-descendants scope).
+                spec: {...editSpec, scope: editSpec.scope ?? null},
+            });
+            setEditSpecOpen(false);
             fetchRl();
         } catch (err: any) {
-            const msg = err?.response?.data?.error || err.message || 'Failed to update definition';
+            const msg = err?.response?.data?.error || err.message || 'Failed to update spec';
             setActionError(msg);
         } finally {
             setActionLoading(false);
@@ -169,7 +198,7 @@ export default function RateLimitDetail({ rateLimitId }: { rateLimitId: string }
         setActionError(null);
         setActionLoading(true);
         try {
-            await rateLimits.delete(rl.id);
+            await rateLimits.delete(rl.metadata.id);
             setConfirmDeleteOpen(false);
             navigate('/rate-limits');
         } catch (err: any) {
@@ -180,7 +209,7 @@ export default function RateLimitDetail({ rateLimitId }: { rateLimitId: string }
         }
     };
 
-    const algoDisplay = algorithmDisplay(rl.definition);
+    const algoDisplay = algorithmDisplay(rl.spec);
 
     return (
         <Stack spacing={2} sx={{ p: 2 }}>
@@ -211,23 +240,33 @@ export default function RateLimitDetail({ rateLimitId }: { rateLimitId: string }
                     <Menu anchorEl={menuAnchorEl} open={Boolean(menuAnchorEl)} onClose={closeMenu} keepMounted>
                         <ResourceMetadataMenuItems
                             resource="rate limit"
-                            name={rl.name}
-                            labels={rl.labels}
-                            annotations={rl.annotations}
+                            name={rl.metadata.name}
+                            labels={rl.metadata.labels}
+                            annotations={rl.metadata.annotations}
                             onCloseMenu={closeMenu}
                             includeRename={false}
                             onUpdateLabels={async (labels) => {
-                                const response = await rateLimits.update(rl.id, {labels});
+                                const response = await rateLimits.update(rl.metadata.id, {
+                                    apiVersion: RATE_LIMIT_API_VERSION,
+                                    kind: RATE_LIMIT_KIND,
+                                    metadata: {labels},
+                                    spec: {},
+                                });
                                 setRl(response.data);
                             }}
                             onUpdateAnnotations={async (annotations) => {
-                                const response = await rateLimits.update(rl.id, {annotations});
+                                const response = await rateLimits.update(rl.metadata.id, {
+                                    apiVersion: RATE_LIMIT_API_VERSION,
+                                    kind: RATE_LIMIT_KIND,
+                                    metadata: {annotations},
+                                    spec: {},
+                                });
                                 setRl(response.data);
                             }}
                             disabled={actionLoading || modePending}
                         />
                         <Divider />
-                        <MenuItem onClick={onClickEditDefinition}>Edit definition...</MenuItem>
+                        <MenuItem onClick={onClickEditSpec}>Edit spec...</MenuItem>
                         <Divider />
                         <MenuItem onClick={onClickDelete} sx={{ color: 'error.main' }}>Delete</MenuItem>
                     </Menu>
@@ -237,29 +276,39 @@ export default function RateLimitDetail({ rateLimitId }: { rateLimitId: string }
             {actionError && <Alert severity="error" onClose={() => setActionError(null)}>{actionError}</Alert>}
 
             <ResourceNameEditor
-                name={rl.name}
+                name={rl.metadata.name}
                 resourceType="Rate Limit"
                 onRename={async (name) => {
-                    const response = await rateLimits.update(rl.id, {name});
+                    const response = await rateLimits.update(rl.metadata.id, {
+                        apiVersion: RATE_LIMIT_API_VERSION,
+                        kind: RATE_LIMIT_KIND,
+                        metadata: {name},
+                        spec: {},
+                    });
                     setRl(response.data);
                 }}
             />
 
-            <ResourceIdentifier value={rl.id} copyLabel="Copy rate limit id" />
+            <ResourceIdentifier value={rl.metadata.id} copyLabel="Copy rate limit id" />
 
             <Box>
                 <Typography variant="subtitle2" color="text.secondary">Namespace</Typography>
-                <Typography variant="body1">{rl.namespace}</Typography>
+                <Typography variant="body1">{rl.metadata.namespace}</Typography>
+            </Box>
+
+            <Box>
+                <Typography variant="subtitle2" color="text.secondary">Scope</Typography>
+                <Typography variant="body1">{scopeDisplay(rl.spec)}</Typography>
             </Box>
 
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={4}>
                 <Box>
                     <Typography variant="subtitle2" color="text.secondary">Created</Typography>
-                    <Typography variant="body1">{dayjs(rl.createdAt).format('MMM DD, YYYY, h:mm A')}</Typography>
+                    <Typography variant="body1">{dayjs(rl.metadata.createdAt).format('MMM DD, YYYY, h:mm A')}</Typography>
                 </Box>
                 <Box>
                     <Typography variant="subtitle2" color="text.secondary">Updated</Typography>
-                    <Typography variant="body1">{dayjs(rl.updatedAt).format('MMM DD, YYYY, h:mm A')}</Typography>
+                    <Typography variant="body1">{dayjs(rl.metadata.updatedAt).format('MMM DD, YYYY, h:mm A')}</Typography>
                 </Box>
             </Stack>
 
@@ -278,28 +327,28 @@ export default function RateLimitDetail({ rateLimitId }: { rateLimitId: string }
             <Box>
                 <Typography variant="subtitle2" color="text.secondary">Selector</Typography>
                 <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{ mt: 0.5, rowGap: 0.5 }}>
-                    {rl.definition.selector.labelSelector && (
-                        <Chip label={`labels: ${rl.definition.selector.labelSelector}`} size="small" variant="outlined" />
+                    {rl.spec.selector.labelSelector && (
+                        <Chip label={`labels: ${rl.spec.selector.labelSelector}`} size="small" variant="outlined" />
                     )}
-                    {rl.definition.selector.methods && rl.definition.selector.methods.length > 0 && (
-                        <Chip label={`methods: ${rl.definition.selector.methods.join(', ')}`} size="small" variant="outlined" />
+                    {rl.spec.selector.methods && rl.spec.selector.methods.length > 0 && (
+                        <Chip label={`methods: ${rl.spec.selector.methods.join(', ')}`} size="small" variant="outlined" />
                     )}
-                    {rl.definition.selector.pathMatch && (
+                    {rl.spec.selector.pathMatch && (
                         <Chip
-                            label={`path ${rl.definition.selector.pathMatch.kind}: ${rl.definition.selector.pathMatch.value}`}
+                            label={`path ${rl.spec.selector.pathMatch.kind}: ${rl.spec.selector.pathMatch.value}`}
                             size="small" variant="outlined"
                         />
                     )}
-                    {rl.definition.selector.requestTypes && rl.definition.selector.requestTypes.length > 0 && (
+                    {rl.spec.selector.requestTypes && rl.spec.selector.requestTypes.length > 0 && (
                         <Chip
-                            label={`types: ${rl.definition.selector.requestTypes.join(', ')}`}
+                            label={`types: ${rl.spec.selector.requestTypes.join(', ')}`}
                             size="small" variant="outlined"
                         />
                     )}
-                    {!rl.definition.selector.labelSelector
-                        && (!rl.definition.selector.methods || rl.definition.selector.methods.length === 0)
-                        && !rl.definition.selector.pathMatch
-                        && (!rl.definition.selector.requestTypes || rl.definition.selector.requestTypes.length === 0) && (
+                    {!rl.spec.selector.labelSelector
+                        && (!rl.spec.selector.methods || rl.spec.selector.methods.length === 0)
+                        && !rl.spec.selector.pathMatch
+                        && (!rl.spec.selector.requestTypes || rl.spec.selector.requestTypes.length === 0) && (
                         <Typography variant="body2" color="text.secondary">No selector clauses (matches default proxy + probe traffic)</Typography>
                     )}
                 </Stack>
@@ -307,9 +356,9 @@ export default function RateLimitDetail({ rateLimitId }: { rateLimitId: string }
 
             <Box>
                 <Typography variant="subtitle2" color="text.secondary">Bucket</Typography>
-                {rl.definition.bucket.dimensions && rl.definition.bucket.dimensions.length > 0 ? (
+                {rl.spec.bucket.dimensions && rl.spec.bucket.dimensions.length > 0 ? (
                     <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{ mt: 0.5 }}>
-                        {rl.definition.bucket.dimensions.map((d) => (
+                        {rl.spec.bucket.dimensions.map((d) => (
                             <Chip key={d} label={d} size="small" variant="outlined" />
                         ))}
                     </Stack>
@@ -320,9 +369,9 @@ export default function RateLimitDetail({ rateLimitId }: { rateLimitId: string }
 
             <Box>
                 <Typography variant="subtitle2" color="text.secondary">Labels</Typography>
-                {rl.labels && Object.keys(rl.labels).length > 0 ? (
+                {rl.metadata.labels && Object.keys(rl.metadata.labels).length > 0 ? (
                     <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{ mt: 0.5, rowGap: 0.5 }}>
-                        {Object.entries(rl.labels).map(([key, value]) => (
+                        {Object.entries(rl.metadata.labels).map(([key, value]) => (
                             <Chip key={key} label={`${key}: ${value}`} size="small" variant="outlined" />
                         ))}
                     </Stack>
@@ -331,20 +380,20 @@ export default function RateLimitDetail({ rateLimitId }: { rateLimitId: string }
                 )}
             </Box>
 
-            <AnnotationsEditor annotations={rl.annotations} readOnly onPut={async () => {}} onDelete={async () => {}} />
+            <AnnotationsEditor annotations={rl.metadata.annotations} readOnly onPut={async () => {}} onDelete={async () => {}} />
 
-            {/* Edit-definition dialog */}
-            <Dialog open={editDefOpen} onClose={() => !actionLoading && setEditDefOpen(false)} fullWidth maxWidth="md">
-                <DialogTitle>Edit definition</DialogTitle>
+            {/* Edit-spec dialog */}
+            <Dialog open={editSpecOpen} onClose={() => !actionLoading && setEditSpecOpen(false)} fullWidth maxWidth="md">
+                <DialogTitle>Edit spec</DialogTitle>
                 <DialogContent>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                         The mode toggle in the header is the quick path for the most-common change. Use this dialog for selector / bucket / algorithm edits.
                     </Typography>
-                    <RateLimitDefinitionEditor value={editDef} onChange={setEditDef} />
+                    <RateLimitSpecEditor value={editSpec} onChange={setEditSpec} />
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setEditDefOpen(false)} disabled={actionLoading}>Cancel</Button>
-                    <Button onClick={onSubmitEditDefinition} variant="contained" disabled={actionLoading}>Save</Button>
+                    <Button onClick={() => setEditSpecOpen(false)} disabled={actionLoading}>Cancel</Button>
+                    <Button onClick={onSubmitEditSpec} variant="contained" disabled={actionLoading}>Save</Button>
                 </DialogActions>
             </Dialog>
 

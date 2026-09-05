@@ -13,7 +13,13 @@ import {initiateConnection, updateConnection} from './connections';
 import {updateConnector} from './connectors';
 import {createKey, listKeys, updateKey} from './keys';
 import {listNamespaces} from './namespaces';
-import {createRateLimit, RateLimitMode, updateRateLimit} from './rateLimits';
+import {
+    createRateLimit,
+    RATE_LIMIT_API_VERSION,
+    RATE_LIMIT_KIND,
+    RateLimitMode,
+    updateRateLimit,
+} from './rateLimits';
 
 describe('resource name contracts', () => {
     beforeEach(() => {
@@ -27,9 +33,10 @@ describe('resource name contracts', () => {
         initiateConnection('cxr_test', '/return', {env: 'prod'}, 'production-crm');
         createKey({namespace: 'root', name: 'primary-key'});
         createRateLimit({
-            namespace: 'root',
-            name: 'public-api',
-            definition: {
+            apiVersion: RATE_LIMIT_API_VERSION,
+            kind: RATE_LIMIT_KIND,
+            metadata: {namespace: 'root', name: 'public-api'},
+            spec: {
                 mode: RateLimitMode.ENFORCE,
                 selector: {},
                 bucket: {},
@@ -40,7 +47,11 @@ describe('resource name contracts', () => {
         expect(postMock).toHaveBeenCalledWith('/api/v1/actors', expect.objectContaining({name: 'customer'}));
         expect(postMock).toHaveBeenCalledWith('/api/v1/connections/_initiate', expect.objectContaining({name: 'production-crm'}));
         expect(postMock).toHaveBeenCalledWith('/api/v1/keys', expect.objectContaining({name: 'primary-key'}));
-        expect(postMock).toHaveBeenCalledWith('/api/v1/rate-limits', expect.objectContaining({name: 'public-api'}));
+        expect(postMock).toHaveBeenCalledWith('/api/v1/rate-limits', expect.objectContaining({
+            apiVersion: RATE_LIMIT_API_VERSION,
+            kind: RATE_LIMIT_KIND,
+            metadata: expect.objectContaining({name: 'public-api'}),
+        }));
     });
 
     it('renames resources by immutable id', () => {
@@ -48,13 +59,23 @@ describe('resource name contracts', () => {
         updateConnection('cxn_test', {name: 'connection-name'});
         updateConnector('cxr_test', {name: 'connector-name'});
         updateKey('key_test', {name: 'key-name'});
-        updateRateLimit('rl_test', {name: 'limit-name'});
+        updateRateLimit('rl_test', {
+            apiVersion: RATE_LIMIT_API_VERSION,
+            kind: RATE_LIMIT_KIND,
+            metadata: {name: 'limit-name'},
+            spec: {},
+        });
 
         expect(patchMock).toHaveBeenCalledWith('/api/v1/actors/act_test', {name: 'actor-name'});
         expect(patchMock).toHaveBeenCalledWith('/api/v1/connections/cxn_test', {name: 'connection-name'});
         expect(patchMock).toHaveBeenCalledWith('/api/v1/connectors/cxr_test', {name: 'connector-name'});
         expect(patchMock).toHaveBeenCalledWith('/api/v1/keys/key_test', {name: 'key-name'});
-        expect(patchMock).toHaveBeenCalledWith('/api/v1/rate-limits/rl_test', {name: 'limit-name'});
+        expect(patchMock).toHaveBeenCalledWith('/api/v1/rate-limits/rl_test', {
+            apiVersion: RATE_LIMIT_API_VERSION,
+            kind: RATE_LIMIT_KIND,
+            metadata: {name: 'limit-name'},
+            spec: {},
+        });
     });
 
     it('passes exact-name list filters without replacing ids', () => {

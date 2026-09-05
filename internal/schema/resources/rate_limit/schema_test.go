@@ -164,8 +164,24 @@ func TestSchema(t *testing.T) {
 			},
 		},
 		{
-			Name:   "RateLimit",
-			Schema: mkSchema("./schema.json#/$defs/RateLimit"),
+			Name:   "RateLimitScope",
+			Schema: mkSchema("./schema.json#/$defs/RateLimitScope"),
+			Tests: []testCase{
+				{"namespace exact", true, `{"test":{"namespaceMatcher":"root.acme"}}`},
+				{"namespace descendants", true, `{"test":{"namespaceMatcher":"root.acme.**"}}`},
+				{"connector", true, `{"test":{"connectorRef":{"apiVersion":"authproxy.net/v1alpha1","kind":"Connector","id":"cxr_test0000000000001"}}}`},
+				{"connector generation rejected", false, `{"test":{"connectorRef":{"apiVersion":"authproxy.net/v1alpha1","kind":"Connector","id":"cxr_test0000000000001","generation":2}}}`},
+				{"connection", true, `{"test":{"connectionRef":{"apiVersion":"authproxy.net/v1alpha1","kind":"Connection","id":"cxn_test0000000000001"}}}`},
+				{"empty rejected", false, `{"test":{}}`},
+				{"invalid namespace matcher rejected", false, `{"test":{"namespaceMatcher":"root.acme.*"}}`},
+				{"namespace and connector rejected", false, `{"test":{"namespaceMatcher":"root.acme.**","connectorRef":{"apiVersion":"authproxy.net/v1alpha1","kind":"Connector","id":"cxr_test0000000000001"}}}`},
+				{"both rejected", false, `{"test":{"connectorRef":{"apiVersion":"authproxy.net/v1alpha1","kind":"Connector","id":"cxr_test0000000000001"},"connectionRef":{"apiVersion":"authproxy.net/v1alpha1","kind":"Connection","id":"cxn_test0000000000001"}}}`},
+				{"connection generation rejected", false, `{"test":{"connectionRef":{"apiVersion":"authproxy.net/v1alpha1","kind":"Connection","id":"cxn_test0000000000001","generation":2}}}`},
+			},
+		},
+		{
+			Name:   "RateLimitSpec",
+			Schema: mkSchema("./schema.json#/$defs/RateLimitSpec"),
 			Tests: []testCase{
 				{
 					"valid token_bucket",
@@ -200,6 +216,8 @@ func TestSchema(t *testing.T) {
 		t.Run(e.Name, func(t *testing.T) {
 			c := jsonschemav5.NewCompiler()
 			_ = loadSchemaInto(t, c, "../../common/schema.json")
+			_ = loadSchemaInto(t, c, "../meta/schema.json")
+			_ = loadSchemaInto(t, c, "../namespace/schema.json")
 			_ = loadSchemaInto(t, c, "./schema.json")
 			require.NoError(t, c.AddResource(testSchemaId, strings.NewReader(e.Schema)))
 
@@ -220,4 +238,33 @@ func TestSchema(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestResourceSchema(t *testing.T) {
+	c := jsonschemav5.NewCompiler()
+	_ = loadSchemaInto(t, c, "../../common/schema.json")
+	_ = loadSchemaInto(t, c, "../meta/schema.json")
+	_ = loadSchemaInto(t, c, "../namespace/schema.json")
+	_ = loadSchemaInto(t, c, "./schema.json")
+	schema, err := c.Compile(SchemaIdRateLimit)
+	require.NoError(t, err)
+
+	valid := `{
+	  "apiVersion":"authproxy.net/v1alpha1",
+	  "kind":"RateLimit",
+	  "metadata":{"name":"tenant-default","namespace":"root.acme"},
+	  "spec":{"selector":{},"bucket":{},"algorithm":{"tokenBucket":{"capacity":10,"refillRate":1}}}
+	}`
+	var resource any
+	require.NoError(t, json.Unmarshal([]byte(valid), &resource))
+	require.NoError(t, schema.Validate(resource))
+
+	invalidFlat := `{
+	  "apiVersion":"authproxy.net/v1alpha1",
+	  "kind":"RateLimit",
+	  "metadata":{"namespace":"root.acme"},
+	  "selector":{},"bucket":{},"algorithm":{"tokenBucket":{"capacity":10,"refillRate":1}}
+	}`
+	require.NoError(t, json.Unmarshal([]byte(invalidFlat), &resource))
+	require.Error(t, schema.Validate(resource))
 }

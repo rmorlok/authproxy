@@ -271,7 +271,7 @@ type DB interface {
 	GetRateLimit(ctx context.Context, id apid.ID) (*RateLimit, error)
 	CreateRateLimit(ctx context.Context, rl *RateLimit) error
 	UpdateRateLimitName(ctx context.Context, id apid.ID, name scommon.ResourceName) (*RateLimit, error)
-	UpdateRateLimitDefinition(ctx context.Context, id apid.ID, def rlschema.RateLimit) (*RateLimit, error)
+	UpdateRateLimitDefinition(ctx context.Context, id apid.ID, def rlschema.RateLimitSpec) (*RateLimit, error)
 	DeleteRateLimit(ctx context.Context, id apid.ID) error
 	UpdateRateLimitLabels(ctx context.Context, id apid.ID, labels map[string]string) (*RateLimit, error)
 	PutRateLimitLabels(ctx context.Context, id apid.ID, labels map[string]string) (*RateLimit, error)

@@ -16,6 +16,10 @@ resource "authproxy_rate_limit" "team_acme_writes" {
     owner = "platform@example.com"
   }
 
+  scope {
+    namespace_matcher = "root.acme.payments.**"
+  }
+
   selector {
     label_selector = "apxy/connector/-/id=salesforce"
     methods        = ["POST", "PATCH", "PUT"]
@@ -46,6 +50,12 @@ resource "authproxy_rate_limit" "team_acme_writes" {
 - `mode` - (Optional) Either `enforce` (default) or `observe`. In `observe` mode the rule evaluates and records matches but never returns a 429 — useful for safe rollout.
 - `labels` - (Optional) Map of user labels.
 - `annotations` - (Optional) Map of annotations.
+- `scope` - (Optional block) Narrows the owning namespace cascade. Omit the block to apply to the namespace and all descendants. When present, exactly one of `namespace_matcher`, `connector_ref`, or `connection_ref` is required.
+  - `namespace_matcher` - (Optional, mutually exclusive with the reference blocks) An exact or recursive matcher at or below `namespace`, such as `root.acme.payments.**`.
+  - `connector_ref` - (Optional block, mutually exclusive with the other scope variants) A connector ID. The rule applies across every generation of that connector.
+    - `id` - Connector ID (`cxr_...`).
+  - `connection_ref` - (Optional block, mutually exclusive with the other scope variants) One connection.
+    - `id` - Connection ID (`cxn_...`).
 - `selector` - (Required block) Match criteria; all clauses ANDed.
   - `label_selector` - (Optional) Kubernetes-style selector evaluated against the per-request label snapshot.
   - `methods` - (Optional) List of HTTP verbs. Empty / omitted = any.
