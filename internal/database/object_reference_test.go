@@ -86,7 +86,11 @@ func newObjectReferenceFixture(t *testing.T) objectReferenceFixture {
 	}
 }
 
-func objectReference(kind meta.Kind, id, namespace string, name common.ResourceName) meta.ObjectReference {
+func objectReference(
+	kind meta.Kind,
+	id, namespace string,
+	name common.ResourceName,
+) meta.ObjectReference {
 	return meta.ObjectReference{
 		APIVersion: meta.APIVersionV1Alpha1,
 		Kind:       kind,
@@ -109,8 +113,11 @@ func TestResolveObjectReferencesBySupportedIdentity(t *testing.T) {
 		resolve    func(meta.ObjectReference) (string, error)
 	}{
 		{
-			name: "actor", kind: actorschema.ActorKind,
-			id: fixture.actor.Id.String(), namespace: fixture.actor.Namespace, objectName: fixture.actor.Name,
+			name:       "actor",
+			kind:       actorschema.ActorKind,
+			id:         fixture.actor.Id.String(),
+			namespace:  fixture.actor.Namespace,
+			objectName: fixture.actor.Name,
 			resolve: func(ref meta.ObjectReference) (string, error) {
 				value, err := fixture.db.ResolveActorReference(ctx, ref)
 				if err != nil {
@@ -120,8 +127,11 @@ func TestResolveObjectReferencesBySupportedIdentity(t *testing.T) {
 			},
 		},
 		{
-			name: "connection", kind: connectionschema.ConnectionKind,
-			id: fixture.connection.Id.String(), namespace: fixture.connection.Namespace, objectName: fixture.connection.Name,
+			name:       "connection",
+			kind:       connectionschema.ConnectionKind,
+			id:         fixture.connection.Id.String(),
+			namespace:  fixture.connection.Namespace,
+			objectName: fixture.connection.Name,
 			resolve: func(ref meta.ObjectReference) (string, error) {
 				value, err := fixture.db.ResolveConnectionReference(ctx, ref)
 				if err != nil {
@@ -131,8 +141,11 @@ func TestResolveObjectReferencesBySupportedIdentity(t *testing.T) {
 			},
 		},
 		{
-			name: "connector", kind: connectorschema.ConnectorKind,
-			id: fixture.connector.Id.String(), namespace: fixture.connector.Namespace, objectName: fixture.connector.Name,
+			name:       "connector",
+			kind:       connectorschema.ConnectorKind,
+			id:         fixture.connector.Id.String(),
+			namespace:  fixture.connector.Namespace,
+			objectName: fixture.connector.Name,
 			resolve: func(ref meta.ObjectReference) (string, error) {
 				value, err := fixture.db.ResolveConnectorReference(ctx, ref)
 				if err != nil {
@@ -142,8 +155,11 @@ func TestResolveObjectReferencesBySupportedIdentity(t *testing.T) {
 			},
 		},
 		{
-			name: "key", kind: keyschema.KeyKind,
-			id: fixture.key.Id.String(), namespace: fixture.key.Namespace, objectName: fixture.key.Name,
+			name:       "key",
+			kind:       keyschema.KeyKind,
+			id:         fixture.key.Id.String(),
+			namespace:  fixture.key.Namespace,
+			objectName: fixture.key.Name,
 			resolve: func(ref meta.ObjectReference) (string, error) {
 				value, err := fixture.db.ResolveKeyReference(ctx, ref)
 				if err != nil {
@@ -153,8 +169,11 @@ func TestResolveObjectReferencesBySupportedIdentity(t *testing.T) {
 			},
 		},
 		{
-			name: "namespace", kind: namespaceschema.NamespaceKind,
-			id: fixture.namespace.Path, namespace: "root", objectName: "team",
+			name:       "namespace",
+			kind:       namespaceschema.NamespaceKind,
+			id:         fixture.namespace.Path,
+			namespace:  "root",
+			objectName: "team",
 			resolve: func(ref meta.ObjectReference) (string, error) {
 				value, err := fixture.db.ResolveNamespaceReference(ctx, ref)
 				if err != nil {
@@ -164,8 +183,11 @@ func TestResolveObjectReferencesBySupportedIdentity(t *testing.T) {
 			},
 		},
 		{
-			name: "rate limit", kind: ratelimitschema.RateLimitKind,
-			id: fixture.rateLimit.Id.String(), namespace: fixture.rateLimit.Namespace, objectName: fixture.rateLimit.Name,
+			name:       "rate limit",
+			kind:       ratelimitschema.RateLimitKind,
+			id:         fixture.rateLimit.Id.String(),
+			namespace:  fixture.rateLimit.Namespace,
+			objectName: fixture.rateLimit.Name,
 			resolve: func(ref meta.ObjectReference) (string, error) {
 				value, err := fixture.db.ResolveRateLimitReference(ctx, ref)
 				if err != nil {
@@ -208,7 +230,15 @@ func TestResolveObjectReferenceValidation(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("unsupported kind", func(t *testing.T) {
-		_, err := fixture.db.(*service).resolveObjectReference(ctx, objectReference("Widget", "wid_123", "", ""))
+		_, err := fixture.db.(*service).resolveObjectReference(
+			ctx,
+			objectReference(
+				"Widget",  // kind
+				"wid_123", // id
+				"",        // namespace
+				"",        // name
+			),
+		)
 		require.ErrorIs(t, err, ErrInvalidReference)
 		require.ErrorContains(t, err, "unsupported kind")
 	})
