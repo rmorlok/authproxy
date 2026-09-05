@@ -71,6 +71,16 @@ func TestBindJSONBodyIsStrictAndPreservesBody(t *testing.T) {
 	require.Equal(t, []byte(body), stored)
 }
 
+func TestBindJSONBodyRejectsMissingBodyWithoutPanicking(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Request = &http.Request{}
+
+	var target map[string]any
+	require.ErrorIs(t, BindJSONBody(ctx, &target), io.EOF)
+	require.ErrorIs(t, BindJSONBody(nil, &target), io.EOF)
+}
+
 func TestBindResourceJSONAppliesWritePolicy(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()

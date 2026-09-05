@@ -1222,12 +1222,12 @@ const docTemplateadmin_api = `{
                 "summary": "Initiate connection",
                 "parameters": [
                     {
-                        "description": "Connection initiation request",
+                        "description": "Connection initiation action",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.InitiateConnectionRequest"
+                            "$ref": "#/definitions/routes.OpenAPIConnectionInitiateActionJson"
                         }
                     }
                 ],
@@ -1235,7 +1235,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.ConnectionSetupRedirect"
+                            "$ref": "#/definitions/routes.OpenAPIConnectionSetupActionJson"
                         }
                     },
                     "400": {
@@ -1356,7 +1356,7 @@ const docTemplateadmin_api = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.UpdateConnectionRequestJson"
+                            "$ref": "#/definitions/routes.OpenAPIConnectionPatchJson"
                         }
                     }
                 ],
@@ -1414,6 +1414,9 @@ const docTemplateadmin_api = `{
                     }
                 ],
                 "description": "Abort an in-progress connection setup, cleaning up credentials and deleting the connection",
+                "consumes": [
+                    "application/json"
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -1428,6 +1431,15 @@ const docTemplateadmin_api = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "description": "Abort action",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/routes.OpenAPIEmptyConnectionActionJson"
+                        }
                     }
                 ],
                 "responses": {
@@ -1463,6 +1475,9 @@ const docTemplateadmin_api = `{
                     }
                 ],
                 "description": "Abandon a reconfigure attempt on a ready connection by clearing setup_step and setup_error. The connection remains ready and its previously stored configuration continues to apply.",
+                "consumes": [
+                    "application/json"
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -1477,6 +1492,15 @@ const docTemplateadmin_api = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "description": "Cancel setup action",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/routes.OpenAPIEmptyConnectionActionJson"
+                        }
                     }
                 ],
                 "responses": {
@@ -1593,11 +1617,12 @@ const docTemplateadmin_api = `{
                         "required": true
                     },
                     {
-                        "description": "Disconnect options",
+                        "description": "Disconnect action",
                         "name": "request",
                         "in": "body",
+                        "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPIDisconnectConnectionRequestJson"
+                            "$ref": "#/definitions/routes.OpenAPIConnectionDisconnectActionJson"
                         }
                     }
                 ],
@@ -1605,7 +1630,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPIDisconnectResponseJson"
+                            "$ref": "#/definitions/routes.OpenAPIConnectionDisconnectActionJson"
                         }
                     },
                     "400": {
@@ -1662,12 +1687,12 @@ const docTemplateadmin_api = `{
                         "required": true
                     },
                     {
-                        "description": "New state",
+                        "description": "Force-state action",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.ForceStateRequestJson"
+                            "$ref": "#/definitions/routes.OpenAPIConnectionForceStateActionJson"
                         }
                     }
                 ],
@@ -1675,7 +1700,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPIConnectionJson"
+                            "$ref": "#/definitions/routes.OpenAPIConnectionForceStateActionJson"
                         }
                     },
                     "400": {
@@ -1738,12 +1763,12 @@ const docTemplateadmin_api = `{
                         "required": true
                     },
                     {
-                        "description": "Migration options",
+                        "description": "Migration action",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPIMigrateConnectionVersionRequestJson"
+                            "$ref": "#/definitions/routes.OpenAPIConnectionVersionMigrationActionJson"
                         }
                     }
                 ],
@@ -1751,7 +1776,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPIMigrateConnectionVersionResponseJson"
+                            "$ref": "#/definitions/routes.OpenAPIConnectionVersionMigrationActionJson"
                         }
                     },
                     "400": {
@@ -1890,12 +1915,12 @@ const docTemplateadmin_api = `{
                         "required": true
                     },
                     {
-                        "description": "Reauth request",
+                        "description": "Reauthentication action",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.ReauthConnectionRequest"
+                            "$ref": "#/definitions/routes.OpenAPIConnectionSetupControlActionJson"
                         }
                     }
                 ],
@@ -1903,7 +1928,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.ConnectionSetupForm"
+                            "$ref": "#/definitions/routes.OpenAPIConnectionSetupActionJson"
                         }
                     },
                     "400": {
@@ -1935,6 +1960,9 @@ const docTemplateadmin_api = `{
                     }
                 ],
                 "description": "Restart the configure phase for a completed connection, allowing re-entry of post-auth settings",
+                "consumes": [
+                    "application/json"
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -1949,13 +1977,22 @@ const docTemplateadmin_api = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "description": "Reconfigure action",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/routes.OpenAPIEmptyConnectionActionJson"
+                        }
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.ConnectionSetupForm"
+                            "$ref": "#/definitions/routes.OpenAPIConnectionSetupActionJson"
                         }
                     },
                     "400": {
@@ -2006,12 +2043,12 @@ const docTemplateadmin_api = `{
                         "required": true
                     },
                     {
-                        "description": "Retry request",
+                        "description": "Retry action",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.RetryConnectionRequest"
+                            "$ref": "#/definitions/routes.OpenAPIConnectionSetupControlActionJson"
                         }
                     }
                 ],
@@ -2019,7 +2056,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.ConnectionSetupForm"
+                            "$ref": "#/definitions/routes.OpenAPIConnectionSetupActionJson"
                         }
                     },
                     "400": {
@@ -2077,7 +2114,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.ConnectionSetupComplete"
+                            "$ref": "#/definitions/routes.OpenAPIConnectionSetupActionJson"
                         }
                     },
                     "400": {
@@ -2128,12 +2165,12 @@ const docTemplateadmin_api = `{
                         "required": true
                     },
                     {
-                        "description": "Form submission data",
+                        "description": "Form submission action",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.SubmitConnectionRequest"
+                            "$ref": "#/definitions/routes.OpenAPIConnectionSetupSubmitActionJson"
                         }
                     }
                 ],
@@ -2141,7 +2178,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.ConnectionSetupComplete"
+                            "$ref": "#/definitions/routes.OpenAPIConnectionSetupActionJson"
                         }
                     },
                     "400": {
@@ -8177,6 +8214,40 @@ const docTemplateadmin_api = `{
                 }
             }
         },
+        "api.ConnectionInitiateSpec": {
+            "type": "object",
+            "properties": {
+                "annotations": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "intoNamespace": {
+                    "type": "string"
+                },
+                "labels": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "returnToUrl": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.ConnectionSetupControlSpec": {
+            "type": "object",
+            "properties": {
+                "returnToUrl": {
+                    "type": "string"
+                }
+            }
+        },
         "api.MetricsSchemaMetricJson": {
             "description": "Supported metric definition",
             "type": "object",
@@ -8233,6 +8304,53 @@ const docTemplateadmin_api = `{
                     "items": {
                         "type": "string"
                     }
+                }
+            }
+        },
+        "connection.ConnectionHealthStatus": {
+            "type": "object",
+            "properties": {
+                "state": {
+                    "type": "string"
+                }
+            }
+        },
+        "connection.ConnectionLifecycleStatus": {
+            "type": "object",
+            "properties": {
+                "state": {
+                    "type": "string"
+                }
+            }
+        },
+        "connection.ConnectionSetupStatus": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                },
+                "stepId": {
+                    "type": "string"
+                }
+            }
+        },
+        "connection.ConnectionSpecPatch": {
+            "type": "object"
+        },
+        "connection.ConnectionStatus": {
+            "type": "object",
+            "properties": {
+                "configurationConfigured": {
+                    "type": "boolean"
+                },
+                "health": {
+                    "$ref": "#/definitions/connection.ConnectionHealthStatus"
+                },
+                "lifecycle": {
+                    "$ref": "#/definitions/connection.ConnectionLifecycleStatus"
+                },
+                "setup": {
+                    "$ref": "#/definitions/connection.ConnectionSetupStatus"
                 }
             }
         },
@@ -8546,56 +8664,201 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "openapi.ConnectionJson": {
-            "description": "Connection to an external service",
+        "openapi.ConnectionActionMetaJson": {
+            "type": "object",
+            "required": [
+                "target"
+            ],
+            "properties": {
+                "target": {
+                    "$ref": "#/definitions/meta.ObjectReference"
+                }
+            }
+        },
+        "openapi.ConnectionDisconnectSpecJson": {
             "type": "object",
             "properties": {
-                "annotations": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
+                "timeoutSeconds": {
+                    "type": "integer",
+                    "example": 600
+                }
+            }
+        },
+        "openapi.ConnectionDisconnectStatusJson": {
+            "type": "object",
+            "properties": {
+                "connection": {
+                    "$ref": "#/definitions/openapi.ConnectionJson"
                 },
-                "connector": {
-                    "$ref": "#/definitions/openapi.ConnectorJson"
-                },
-                "createdAt": {
+                "taskId": {
                     "type": "string"
-                },
-                "healthState": {
-                    "type": "string",
-                    "example": "healthy"
-                },
-                "id": {
-                    "type": "string",
-                    "example": "cxn_test550e8400abcde"
-                },
-                "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "name": {
-                    "type": "string",
-                    "example": "production-crm"
-                },
-                "namespace": {
-                    "type": "string",
-                    "example": "root.acme"
-                },
-                "setupError": {
-                    "type": "string"
-                },
-                "setupStepId": {
-                    "type": "string",
-                    "example": "tenant"
-                },
+                }
+            }
+        },
+        "openapi.ConnectionForceStateSpecJson": {
+            "type": "object",
+            "required": [
+                "state"
+            ],
+            "properties": {
                 "state": {
                     "type": "string",
-                    "example": "configured"
+                    "enum": [
+                        "setup",
+                        "configured",
+                        "disabled",
+                        "disconnecting",
+                        "disconnected"
+                    ]
+                }
+            }
+        },
+        "openapi.ConnectionForceStateStatusJson": {
+            "type": "object",
+            "properties": {
+                "connection": {
+                    "$ref": "#/definitions/openapi.ConnectionJson"
+                }
+            }
+        },
+        "openapi.ConnectionJson": {
+            "description": "Kubernetes-style Connection resource",
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "kind",
+                "metadata",
+                "spec"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
                 },
-                "updatedAt": {
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "Connection"
+                    ],
+                    "example": "Connection"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/meta.ObjectMeta"
+                },
+                "spec": {
+                    "$ref": "#/definitions/openapi.ConnectionSpecJson"
+                },
+                "status": {
+                    "$ref": "#/definitions/connection.ConnectionStatus"
+                }
+            }
+        },
+        "openapi.ConnectionSetupActionStatusJson": {
+            "type": "object",
+            "properties": {
+                "canRetry": {
+                    "type": "boolean"
+                },
+                "data": {
+                    "type": "object"
+                },
+                "error": {
+                    "type": "string"
+                },
+                "jsonSchema": {
+                    "type": "object"
+                },
+                "redirectUrl": {
+                    "type": "string"
+                },
+                "stepDescription": {
+                    "type": "string"
+                },
+                "stepId": {
+                    "type": "string"
+                },
+                "stepTitle": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "redirect",
+                        "form",
+                        "complete",
+                        "verifying",
+                        "error"
+                    ]
+                },
+                "uiSchema": {
+                    "type": "object"
+                }
+            }
+        },
+        "openapi.ConnectionSetupSubmitSpecJson": {
+            "type": "object",
+            "required": [
+                "data",
+                "stepId"
+            ],
+            "properties": {
+                "data": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "returnToUrl": {
+                    "type": "string"
+                },
+                "stepId": {
+                    "type": "string"
+                }
+            }
+        },
+        "openapi.ConnectionSpecJson": {
+            "type": "object",
+            "required": [
+                "connectorRef"
+            ],
+            "properties": {
+                "actorRef": {
+                    "$ref": "#/definitions/meta.ObjectReference"
+                },
+                "configuration": {
+                    "type": "object"
+                },
+                "connectorRef": {
+                    "$ref": "#/definitions/meta.ObjectReference"
+                }
+            }
+        },
+        "openapi.ConnectionVersionMigrationSpecJson": {
+            "type": "object",
+            "required": [
+                "connectorRef"
+            ],
+            "properties": {
+                "connectorRef": {
+                    "$ref": "#/definitions/meta.ObjectReference"
+                },
+                "timeoutSeconds": {
+                    "type": "integer",
+                    "example": 600
+                }
+            }
+        },
+        "openapi.ConnectionVersionMigrationStatusJson": {
+            "type": "object",
+            "properties": {
+                "sourceConnectorRef": {
+                    "$ref": "#/definitions/meta.ObjectReference"
+                },
+                "targetConnectorRef": {
+                    "$ref": "#/definitions/meta.ObjectReference"
+                },
+                "taskId": {
                     "type": "string"
                 }
             }
@@ -9311,96 +9574,14 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "routes.ConnectionSetupComplete": {
-            "description": "Completion response for connection setup",
-            "type": "object",
-            "properties": {
-                "id": {
-                    "description": "Connection UUID.",
-                    "type": "string",
-                    "example": "cxn_test550e8400abcde"
-                },
-                "type": {
-                    "description": "Response type.",
-                    "type": "string",
-                    "example": "complete"
-                }
-            }
-        },
-        "routes.ConnectionSetupForm": {
-            "description": "Form response for connection setup",
-            "type": "object",
-            "properties": {
-                "data": {
-                    "description": "Existing values for fields in this step. Present when reconfiguring a\nconfigured connection so clients can initialize the form without exposing\nconfiguration values owned by other setup steps.",
-                    "type": "object"
-                },
-                "id": {
-                    "description": "Connection UUID.",
-                    "type": "string",
-                    "example": "cxn_test550e8400abcde"
-                },
-                "jsonSchema": {
-                    "description": "JSON Schema defining the form fields.",
-                    "type": "object"
-                },
-                "stepDescription": {
-                    "description": "Step description.",
-                    "type": "string"
-                },
-                "stepId": {
-                    "description": "Step ID being submitted.",
-                    "type": "string",
-                    "example": "preconnect:0"
-                },
-                "stepTitle": {
-                    "description": "Step title.",
-                    "type": "string",
-                    "example": "Choose workspace"
-                },
-                "type": {
-                    "description": "Response type.",
-                    "type": "string",
-                    "example": "form"
-                },
-                "uiSchema": {
-                    "description": "UI Schema for JSON Forms rendering.",
-                    "type": "object"
-                }
-            }
-        },
-        "routes.ConnectionSetupRedirect": {
-            "description": "Redirect response for connection setup",
-            "type": "object",
-            "properties": {
-                "id": {
-                    "description": "Connection UUID.",
-                    "type": "string",
-                    "example": "cxn_test550e8400abcde"
-                },
-                "redirectUrl": {
-                    "description": "URL to redirect the user to.",
-                    "type": "string",
-                    "example": "https://oauth.provider.com/authorize?..."
-                },
-                "type": {
-                    "description": "Response type.",
-                    "type": "string",
-                    "example": "redirect"
-                }
-            }
-        },
         "routes.DataSourceOptionJson": {
-            "description": "Data source option for form select fields",
             "type": "object",
             "properties": {
                 "label": {
-                    "description": "Human-readable label.",
                     "type": "string",
                     "example": "My Workspace"
                 },
                 "value": {
-                    "description": "Option value.",
                     "type": "string",
                     "example": "ws-123"
                 }
@@ -9431,47 +9612,6 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "routes.ForceStateRequestJson": {
-            "description": "Request to force a connection state",
-            "type": "object",
-            "properties": {
-                "state": {
-                    "type": "string",
-                    "example": "configured"
-                }
-            }
-        },
-        "routes.InitiateConnectionRequest": {
-            "description": "Request to initiate a connection",
-            "type": "object",
-            "properties": {
-                "connectorId": {
-                    "description": "ID of the connector to initiate the connection for.",
-                    "type": "string",
-                    "example": "cxr_test550e8400abcde"
-                },
-                "connectorVersion": {
-                    "description": "Version of the connector to initiate connection for; if not specified defaults to the primary version.",
-                    "type": "integer",
-                    "example": 1
-                },
-                "intoNamespace": {
-                    "description": "The namespace to create the connection in. Must be the namespace of connector or a child namespace of that\nnamespace. Defaults to the connector namespace if not specified.",
-                    "type": "string",
-                    "example": "root.acme"
-                },
-                "name": {
-                    "description": "Optional mutable name for the connection. Defaults to the generated connection ID.",
-                    "type": "string",
-                    "example": "production-crm"
-                },
-                "returnToUrl": {
-                    "description": "The URL to return to after the connection is completed.",
-                    "type": "string",
-                    "example": "https://example.com/callback"
-                }
-            }
-        },
         "routes.KeyValueJson": {
             "type": "object",
             "properties": {
@@ -9499,57 +9639,302 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "routes.OpenAPIConnectionJson": {
-            "description": "Connection to an external service",
+        "routes.OpenAPIConnectionDisconnectActionJson": {
             "type": "object",
+            "required": [
+                "apiVersion",
+                "kind",
+                "metadata",
+                "spec"
+            ],
             "properties": {
-                "annotations": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "connector": {
-                    "$ref": "#/definitions/openapi.ConnectorJson"
-                },
-                "createdAt": {
-                    "type": "string"
-                },
-                "healthState": {
+                "apiVersion": {
                     "type": "string",
-                    "example": "healthy"
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
                 },
-                "id": {
+                "kind": {
                     "type": "string",
-                    "example": "cxn_test550e8400abcde"
+                    "enum": [
+                        "ConnectionDisconnect"
+                    ],
+                    "example": "ConnectionDisconnect"
                 },
-                "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
+                "metadata": {
+                    "$ref": "#/definitions/openapi.ConnectionActionMetaJson"
                 },
-                "name": {
+                "spec": {
+                    "$ref": "#/definitions/openapi.ConnectionDisconnectSpecJson"
+                },
+                "status": {
+                    "$ref": "#/definitions/openapi.ConnectionDisconnectStatusJson"
+                }
+            }
+        },
+        "routes.OpenAPIConnectionForceStateActionJson": {
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "kind",
+                "metadata",
+                "spec"
+            ],
+            "properties": {
+                "apiVersion": {
                     "type": "string",
-                    "example": "production-crm"
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
                 },
-                "namespace": {
+                "kind": {
                     "type": "string",
-                    "example": "root.acme"
+                    "enum": [
+                        "ConnectionForceState"
+                    ],
+                    "example": "ConnectionForceState"
                 },
-                "setupError": {
-                    "type": "string"
+                "metadata": {
+                    "$ref": "#/definitions/openapi.ConnectionActionMetaJson"
                 },
-                "setupStepId": {
+                "spec": {
+                    "$ref": "#/definitions/openapi.ConnectionForceStateSpecJson"
+                },
+                "status": {
+                    "$ref": "#/definitions/openapi.ConnectionForceStateStatusJson"
+                }
+            }
+        },
+        "routes.OpenAPIConnectionInitiateActionJson": {
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "kind",
+                "metadata",
+                "spec"
+            ],
+            "properties": {
+                "apiVersion": {
                     "type": "string",
-                    "example": "tenant"
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
                 },
-                "state": {
+                "kind": {
                     "type": "string",
-                    "example": "configured"
+                    "enum": [
+                        "ConnectionInitiate"
+                    ],
+                    "example": "ConnectionInitiate"
                 },
-                "updatedAt": {
-                    "type": "string"
+                "metadata": {
+                    "$ref": "#/definitions/openapi.ConnectionActionMetaJson"
+                },
+                "spec": {
+                    "$ref": "#/definitions/api.ConnectionInitiateSpec"
+                }
+            }
+        },
+        "routes.OpenAPIConnectionJson": {
+            "description": "Kubernetes-style Connection resource",
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "kind",
+                "metadata",
+                "spec"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "Connection"
+                    ],
+                    "example": "Connection"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/meta.ObjectMeta"
+                },
+                "spec": {
+                    "$ref": "#/definitions/openapi.ConnectionSpecJson"
+                },
+                "status": {
+                    "$ref": "#/definitions/connection.ConnectionStatus"
+                }
+            }
+        },
+        "routes.OpenAPIConnectionPatchJson": {
+            "description": "Kubernetes-style Connection patch. Connector and actor bindings are immutable.",
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "kind",
+                "metadata",
+                "spec"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "Connection"
+                    ],
+                    "example": "Connection"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/meta.ObjectMetaPatch"
+                },
+                "spec": {
+                    "$ref": "#/definitions/connection.ConnectionSpecPatch"
+                },
+                "status": {
+                    "$ref": "#/definitions/connection.ConnectionStatus"
+                }
+            }
+        },
+        "routes.OpenAPIConnectionSetupActionJson": {
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "kind",
+                "metadata",
+                "spec"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "ConnectionSetup"
+                    ],
+                    "example": "ConnectionSetup"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/openapi.ConnectionActionMetaJson"
+                },
+                "spec": {
+                    "type": "object"
+                },
+                "status": {
+                    "$ref": "#/definitions/openapi.ConnectionSetupActionStatusJson"
+                }
+            }
+        },
+        "routes.OpenAPIConnectionSetupControlActionJson": {
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "kind",
+                "metadata",
+                "spec"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "ConnectionSetupRetry",
+                        "ConnectionReauthenticate"
+                    ]
+                },
+                "metadata": {
+                    "$ref": "#/definitions/openapi.ConnectionActionMetaJson"
+                },
+                "spec": {
+                    "$ref": "#/definitions/api.ConnectionSetupControlSpec"
+                }
+            }
+        },
+        "routes.OpenAPIConnectionSetupSubmitActionJson": {
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "kind",
+                "metadata",
+                "spec"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "ConnectionSetupSubmit"
+                    ],
+                    "example": "ConnectionSetupSubmit"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/openapi.ConnectionActionMetaJson"
+                },
+                "spec": {
+                    "$ref": "#/definitions/openapi.ConnectionSetupSubmitSpecJson"
+                }
+            }
+        },
+        "routes.OpenAPIConnectionVersionMigrationActionJson": {
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "kind",
+                "metadata",
+                "spec"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "ConnectionVersionMigration"
+                    ],
+                    "example": "ConnectionVersionMigration"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/openapi.ConnectionActionMetaJson"
+                },
+                "spec": {
+                    "$ref": "#/definitions/openapi.ConnectionVersionMigrationSpecJson"
+                },
+                "status": {
+                    "$ref": "#/definitions/openapi.ConnectionVersionMigrationStatusJson"
                 }
             }
         },
@@ -9646,23 +10031,35 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "routes.OpenAPIDisconnectConnectionRequestJson": {
-            "description": "Request body for connection disconnect operations",
+        "routes.OpenAPIEmptyConnectionActionJson": {
             "type": "object",
+            "required": [
+                "apiVersion",
+                "kind",
+                "metadata",
+                "spec"
+            ],
             "properties": {
-                "timeoutSeconds": {
-                    "type": "integer",
-                    "example": 600
-                }
-            }
-        },
-        "routes.OpenAPIDisconnectResponseJson": {
-            "description": "Response for disconnect operation",
-            "type": "object",
-            "properties": {
-                "connection": {},
-                "taskId": {
-                    "type": "string"
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "ConnectionSetupAbort",
+                        "ConnectionReconfigure",
+                        "ConnectionSetupCancel"
+                    ]
+                },
+                "metadata": {
+                    "$ref": "#/definitions/openapi.ConnectionActionMetaJson"
+                },
+                "spec": {
+                    "type": "object"
                 }
             }
         },
@@ -9797,41 +10194,6 @@ const docTemplateadmin_api = `{
                     "items": {
                         "$ref": "#/definitions/api.MetricsSchemaMetricJson"
                     }
-                }
-            }
-        },
-        "routes.OpenAPIMigrateConnectionVersionRequestJson": {
-            "description": "Request body for connection connector-version migration operations",
-            "type": "object",
-            "properties": {
-                "targetVersion": {
-                    "type": "integer",
-                    "example": 3
-                },
-                "timeoutSeconds": {
-                    "type": "integer",
-                    "example": 600
-                }
-            }
-        },
-        "routes.OpenAPIMigrateConnectionVersionResponseJson": {
-            "description": "Response for connection connector-version migration operation",
-            "type": "object",
-            "properties": {
-                "connectionId": {
-                    "type": "string",
-                    "example": "cxn_test550e8400abcde"
-                },
-                "sourceVersion": {
-                    "type": "integer",
-                    "example": 1
-                },
-                "targetVersion": {
-                    "type": "integer",
-                    "example": 3
-                },
-                "taskId": {
-                    "type": "string"
                 }
             }
         },
@@ -10066,22 +10428,6 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "routes.ReauthConnectionRequest": {
-            "type": "object",
-            "properties": {
-                "returnToUrl": {
-                    "type": "string"
-                }
-            }
-        },
-        "routes.RetryConnectionRequest": {
-            "type": "object",
-            "properties": {
-                "returnToUrl": {
-                    "type": "string"
-                }
-            }
-        },
         "routes.SessionInitiateFailureResponse": {
             "type": "object",
             "properties": {
@@ -10106,48 +10452,6 @@ const docTemplateadmin_api = `{
                 "actorId": {
                     "type": "string",
                     "example": "act_test550e8400abcde"
-                }
-            }
-        },
-        "routes.SubmitConnectionRequest": {
-            "description": "Form submission data",
-            "type": "object",
-            "properties": {
-                "data": {
-                    "description": "Data is the form data submitted by the user for the current step.",
-                    "type": "object"
-                },
-                "returnToUrl": {
-                    "description": "ReturnToUrl is required when the next step after form submission is an auth redirect.\nThe client should provide this so the OAuth callback knows where to return.",
-                    "type": "string",
-                    "example": "https://example.com/callback"
-                },
-                "stepId": {
-                    "description": "StepId is the id of the step being submitted. Must match the current setup step's id.",
-                    "type": "string",
-                    "example": "preconnect:0"
-                }
-            }
-        },
-        "routes.UpdateConnectionRequestJson": {
-            "description": "Request to update a connection's labels and annotations",
-            "type": "object",
-            "properties": {
-                "annotations": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "name": {
-                    "type": "string",
-                    "example": "production-crm"
                 }
             }
         },

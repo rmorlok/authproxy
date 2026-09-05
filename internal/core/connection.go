@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"maps"
 	"sync"
 	"time"
 
@@ -15,8 +16,9 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	scommon "github.com/rmorlok/authproxy/internal/schema/common"
-	"github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	connectionschema "github.com/rmorlok/authproxy/internal/schema/resources/connection"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 )
 
 // Connection is a wrapper for the lower level database equivalent that handles wiring up logic specified in this
@@ -82,6 +84,14 @@ func (c *connection) GetConnectorVersion() uint64 {
 	return c.ConnectorVersion
 }
 
+func (c *connection) GetActorId() *apid.ID {
+	if c.ActorId == nil {
+		return nil
+	}
+	actorID := *c.ActorId
+	return &actorID
+}
+
 func (c *connection) GetCreatedAt() time.Time {
 	return c.CreatedAt
 }
@@ -108,6 +118,66 @@ func (c *connection) GetSetupStep() *cschema.SetupStep {
 
 func (c *connection) GetConnector() iface.Connector {
 	return c.connector
+}
+
+func (c *connection) GetResource(ctx context.Context) (*connectionschema.Connection, error) {
+	createdAt := c.CreatedAt
+	updatedAt := c.UpdatedAt
+	healthState := c.GetHealthState()
+	configuration, err := c.GetConfiguration(ctx)
+	if err != nil {
+		return nil, err
+	}
+	configuration, err = connectionschema.RedactConfiguration(configuration)
+	if err != nil {
+		return nil, err
+	}
+
+	resource := &connectionschema.Connection{
+		TypeMeta: meta.NewTypeMeta(connectionschema.ConnectionKind),
+		Metadata: meta.NormalizeObjectMeta(meta.ObjectMeta{
+			ID:          c.Id.String(),
+			Name:        c.Name,
+			Namespace:   c.Namespace,
+			Labels:      maps.Clone(map[string]string(c.Labels)),
+			Annotations: maps.Clone(map[string]string(c.Annotations)),
+			CreatedAt:   &createdAt,
+			UpdatedAt:   &updatedAt,
+		}),
+		Spec: connectionschema.ConnectionSpec{
+			ConnectorRef: meta.ObjectReference{
+				APIVersion: meta.APIVersionV1Alpha1,
+				Kind:       cschema.ConnectorKind,
+				ID:         c.connector.GetId().String(),
+				Name:       c.connector.GetName(),
+				Namespace:  c.connector.GetNamespace(),
+				Generation: c.connector.GetVersion(),
+			},
+			ActorRef:      connectionschema.NewActorReference(apid.Nil),
+			Configuration: configuration,
+		},
+		Status: &connectionschema.ConnectionStatus{
+			Lifecycle: connectionschema.ConnectionLifecycleStatus{
+				State: connectionschema.ConnectionState(c.State),
+			},
+			Health: connectionschema.ConnectionHealthStatus{
+				State: connectionschema.ConnectionHealthState(healthState),
+			},
+			ConfigurationConfigured: c.EncryptedConfiguration != nil && !c.EncryptedConfiguration.IsZero(),
+		},
+	}
+
+	if c.ActorId != nil {
+		resource.Spec.ActorRef = connectionschema.NewActorReference(*c.ActorId)
+	}
+	if c.SetupStep != nil || c.SetupError != nil {
+		resource.Status.Setup = &connectionschema.ConnectionSetupStatus{Error: c.GetSetupError()}
+		if c.SetupStep != nil {
+			resource.Status.Setup.StepID = c.SetupStep.String()
+		}
+	}
+
+	return resource, nil
 }
 
 func (c *connection) GetJavascriptContext(ctx context.Context) (apjs.Context, error) {
@@ -276,7 +346,7 @@ func (c *connection) GetMustacheContext(ctx context.Context) (map[string]any, er
 	return data, nil
 }
 
-func (c *connection) GetRateLimitConfig() *connectors.RateLimiting {
+func (c *connection) GetRateLimitConfig() *cschema.RateLimiting {
 	def := c.connector.GetDefinition()
 	if def == nil {
 		return nil

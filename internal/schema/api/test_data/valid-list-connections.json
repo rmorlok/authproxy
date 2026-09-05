@@ -1,41 +1,33 @@
 {
-	"apiVersion": "authproxy.net/v1alpha1",
-	"kind": "ConnectionList",
-	"metadata": {
-		"continue": "next"
-	},
-	"items": [
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "ConnectionList",
+  "metadata": { "continue": "next" },
+  "items": [
     {
-      "id": "cxn_test550e8400abcde",
-      "namespace": "root.acme",
-      "state": "configured",
-      "healthState": "healthy",
-      "connector": {
-        "apiVersion": "authproxy.net/v1alpha1",
-        "kind": "Connector",
-        "metadata": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connection",
+      "metadata": {
+        "id": "cxn_test550e8400abcde",
+        "name": "production-crm",
+        "namespace": "root.acme",
+        "createdAt": "2026-05-25T12:00:00Z",
+        "updatedAt": "2026-05-25T12:30:00Z"
+      },
+      "spec": {
+        "connectorRef": {
+          "apiVersion": "authproxy.net/v1alpha1",
+          "kind": "Connector",
           "id": "cxr_test550e8400abcde",
           "name": "salesforce",
           "namespace": "root.acme",
-          "generation": 1,
-          "createdAt": "2026-05-25T12:00:00Z",
-          "updatedAt": "2026-05-25T12:30:00Z"
-        },
-        "spec": {
-          "release": { "desiredState": "primary" },
-          "definition": {
-            "displayName": "Salesforce",
-            "logo": { "publicUrl": "https://example.com/logo.png" },
-            "description": "Salesforce CRM integration",
-            "auth": { "type": "no-auth" }
-          }
-        },
-        "status": {
-          "release": { "state": "primary" }
+          "generation": 1
         }
       },
-      "createdAt": "2026-05-25T12:00:00Z",
-      "updatedAt": "2026-05-25T12:30:00Z"
+      "status": {
+        "lifecycle": { "state": "configured" },
+        "health": { "state": "healthy" },
+        "configurationConfigured": true
+      }
     }
-	]
+  ]
 }

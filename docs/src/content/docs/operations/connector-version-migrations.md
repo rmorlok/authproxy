@@ -207,8 +207,24 @@ POST /api/v1/connections/{id}/_migrateVersion
 Content-Type: application/json
 
 {
-  "targetVersion": 3,
-  "timeoutSeconds": 600
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "ConnectionVersionMigration",
+  "metadata": {
+    "target": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connection",
+      "id": "cxn_..."
+    }
+  },
+  "spec": {
+    "connectorRef": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connector",
+      "id": "cxr_...",
+      "generation": 3
+    },
+    "timeoutSeconds": 600
+  }
 }
 ```
 
@@ -216,10 +232,39 @@ The response binds the workflow task to the caller:
 
 ```json
 {
-  "taskId": "tsk_...",
-  "connectionId": "cxn_...",
-  "sourceVersion": 1,
-  "targetVersion": 3
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "ConnectionVersionMigration",
+  "metadata": {
+    "target": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connection",
+      "id": "cxn_..."
+    }
+  },
+  "spec": {
+    "connectorRef": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connector",
+      "id": "cxr_...",
+      "generation": 3
+    },
+    "timeoutSeconds": 600
+  },
+  "status": {
+    "taskId": "tsk_...",
+    "sourceConnectorRef": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connector",
+      "id": "cxr_...",
+      "generation": 1
+    },
+    "targetConnectorRef": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connector",
+      "id": "cxr_...",
+      "generation": 3
+    }
+  }
 }
 ```
 
