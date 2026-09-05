@@ -366,7 +366,7 @@ func (s *service) establishAuthFromRequest(ctx context.Context, requireSessionXs
 		} else {
 			// The actor was specified in the JWT. This means that we can upsert an actor, either creating it or making
 			// it consistent with the request's definition.
-			actor, err = s.db.UpsertActor(ctx, claims.Actor)
+			actor, err = s.db.UpsertActor(ctx, claims.Actor.ToCoreActor())
 			if err != nil {
 				return core.NewUnauthenticatedRequestAuth(), httperr.InternalServerErrorMsg("database error", httperr.WithInternalErrorf("failed to upsert actor: %w", err))
 			}
@@ -374,6 +374,14 @@ func (s *service) establishAuthFromRequest(ctx context.Context, requireSessionXs
 		}
 
 		if len(claims.Permissions) > 0 {
+			if err := core.ValidatePermissionRestrictions(
+				core.CreateActor(actor),
+				actor.GetPermissions(),
+				claims.Permissions,
+			); err != nil {
+				claimsErr := fmt.Errorf("%w: token permissions exceed actor permissions: %w", jwt2.ErrInvalidClaims, err)
+				return core.NewUnauthenticatedRequestAuth(), httperr.Unauthorized(httperr.WithPublicErr(claimsErr))
+			}
 			ra = core.NewAuthenticatedRequestAuthWithPermissions(actor, claims.Permissions)
 		} else {
 			ra = core.NewAuthenticatedRequestAuth(actor)

@@ -8,17 +8,32 @@
   "exp": 1735689600,
   "nbf": 1735603200,
   "iat": 1735603200,
-  "jti": "550e8400-e29b-41d4-a716-446655440000",
+  "jti": "jwt_550e8400-e29b-41d4-a716-446655440000",
+  "namespace": "root.prod",
   "actor": {
-    "id": "user/12345",
-    "permissions": [
-      "root.prod.actor-1234#/connections/_initiate",
-      "root.prod.**#/connections/_list"
-    ]
+    "apiVersion": "authproxy.net/v1alpha1",
+    "kind": "Actor",
+    "metadata": {
+      "name": "user-12345",
+      "namespace": "root.prod",
+      "labels": {
+        "team": "payments"
+      }
+    },
+    "spec": {
+      "externalId": "user/12345",
+      "permissions": [
+        {
+          "namespace": "root.prod.**",
+          "resources": ["connections"],
+          "verbs": ["get", "list"]
+        }
+      ]
+    }
   },
   "permissions": [
     {
-      "namespace": "root.prod.**",
+      "namespace": "root.prod.payments",
       "resources": ["connections"],
       "verbs": ["list"]
     }

@@ -586,6 +586,143 @@ func TestPermission_AllowsForActor(t *testing.T) {
 	}
 }
 
+func TestValidatePermissionRestrictions(t *testing.T) {
+	actor := &Actor{
+		ExternalId: "deploy-bot",
+		Labels:     map[string]string{"team": "platform"},
+	}
+	base := []aschema.Permission{
+		{
+			Namespace: "root.{{labels.team}}.**",
+			Resources: []string{"connections"},
+			Verbs:     []string{"get", "list"},
+		},
+		{
+			Namespace:   "root.platform.secure",
+			Resources:   []string{"actors"},
+			ResourceIds: []string{"act_one", "act_two"},
+			Verbs:       []string{"get"},
+		},
+	}
+
+	tests := []struct {
+		name         string
+		restrictions []aschema.Permission
+		wantError    bool
+	}{
+		{
+			name: "empty restrictions",
+		},
+		{
+			name: "narrower namespace and verb",
+			restrictions: []aschema.Permission{{
+				Namespace: "root.platform.production.**",
+				Resources: []string{"connections"},
+				Verbs:     []string{"list"},
+			}},
+		},
+		{
+			name: "equivalent rendered namespace",
+			restrictions: []aschema.Permission{{
+				Namespace: "root.{{labels.team}}.**",
+				Resources: []string{"connections"},
+				Verbs:     []string{"get"},
+			}},
+		},
+		{
+			name: "resource id subset split across base permissions",
+			restrictions: []aschema.Permission{{
+				Namespace:   "root.platform.secure",
+				Resources:   []string{"actors"},
+				ResourceIds: []string{"act_one", "act_two"},
+				Verbs:       []string{"get"},
+			}},
+		},
+		{
+			name: "broader namespace",
+			restrictions: []aschema.Permission{{
+				Namespace: "root.**",
+				Resources: []string{"connections"},
+				Verbs:     []string{"list"},
+			}},
+			wantError: true,
+		},
+		{
+			name: "new resource",
+			restrictions: []aschema.Permission{{
+				Namespace: "root.platform",
+				Resources: []string{"connectors"},
+				Verbs:     []string{"get"},
+			}},
+			wantError: true,
+		},
+		{
+			name: "wildcard resource",
+			restrictions: []aschema.Permission{{
+				Namespace: "root.platform",
+				Resources: []string{"*"},
+				Verbs:     []string{"get"},
+			}},
+			wantError: true,
+		},
+		{
+			name: "new verb",
+			restrictions: []aschema.Permission{{
+				Namespace: "root.platform",
+				Resources: []string{"connections"},
+				Verbs:     []string{"delete"},
+			}},
+			wantError: true,
+		},
+		{
+			name: "all resource ids from scoped base",
+			restrictions: []aschema.Permission{{
+				Namespace: "root.platform.secure",
+				Resources: []string{"actors"},
+				Verbs:     []string{"get"},
+			}},
+			wantError: true,
+		},
+		{
+			name: "new resource id",
+			restrictions: []aschema.Permission{{
+				Namespace:   "root.platform.secure",
+				Resources:   []string{"actors"},
+				ResourceIds: []string{"act_three"},
+				Verbs:       []string{"get"},
+			}},
+			wantError: true,
+		},
+		{
+			name: "invalid restriction",
+			restrictions: []aschema.Permission{{
+				Namespace: "root.platform",
+			}},
+			wantError: true,
+		},
+		{
+			name: "unrenderable namespace",
+			restrictions: []aschema.Permission{{
+				Namespace: "root.{{labels.missing}}",
+				Resources: []string{"connections"},
+				Verbs:     []string{"get"},
+			}},
+			wantError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidatePermissionRestrictions(actor, base, tt.restrictions)
+			if tt.wantError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestPermissionsAllowForActor(t *testing.T) {
 	tests := []struct {
 		name        string

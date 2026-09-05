@@ -3,6 +3,7 @@ package jwt
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -49,7 +50,7 @@ type claimsBuilder struct {
 	expiration   *time.Time
 	externalId   *string
 	namespace    *string
-	actor        *core.Actor
+	actor        *ActorClaim
 	permissions  []aschema.Permission
 	labels       map[string]string
 	annotations  map[string]string
@@ -118,7 +119,7 @@ func (b *claimsBuilder) WithNamespace(namespace string) ClaimsBuilder {
 }
 
 func (b *claimsBuilder) WithActor(actor core.IActorData) ClaimsBuilder {
-	b.actor = core.CreateActor(actor)
+	b.actor = NewActorClaim(actor)
 	return b
 }
 
@@ -161,12 +162,12 @@ func (b *claimsBuilder) WithNonce() ClaimsBuilder {
 
 func (b *claimsBuilder) BuildCtx(ctx context.Context) (*AuthProxyClaims, error) {
 	if b.actor != nil {
-		if b.actor.GetExternalId() != "" {
-			b.externalId = util.ToPtr(b.actor.GetExternalId())
+		if b.actor.Spec.ExternalId != "" {
+			b.externalId = util.ToPtr(b.actor.Spec.ExternalId)
 		}
 
-		if b.actor.GetNamespace() != "" {
-			b.namespace = util.ToPtr(b.actor.GetNamespace())
+		if b.actor.Metadata.Namespace != "" {
+			b.namespace = util.ToPtr(b.actor.Metadata.Namespace)
 		}
 
 		if b.namespace == nil {
@@ -174,36 +175,42 @@ func (b *claimsBuilder) BuildCtx(ctx context.Context) (*AuthProxyClaims, error) 
 		}
 
 		if b.namespace != nil {
-			b.actor.Namespace = *b.namespace
+			b.actor.Metadata.Namespace = *b.namespace
 		}
 
 		if b.externalId != nil {
-			b.actor.ExternalId = *b.externalId
+			b.actor.Spec.ExternalId = *b.externalId
 		}
 
 		if len(b.labels) > 0 {
-			if b.actor.Labels == nil {
-				b.actor.Labels = make(map[string]string)
+			if b.actor.Metadata.Labels == nil {
+				b.actor.Metadata.Labels = make(map[string]string)
 			}
 			for k, v := range b.labels {
-				b.actor.Labels[k] = v
+				b.actor.Metadata.Labels[k] = v
 			}
 		}
 
 		if len(b.annotations) > 0 {
-			if b.actor.Annotations == nil {
-				b.actor.Annotations = make(map[string]string)
+			if b.actor.Metadata.Annotations == nil {
+				b.actor.Metadata.Annotations = make(map[string]string)
 			}
 			for k, v := range b.annotations {
-				b.actor.Annotations[k] = v
+				b.actor.Metadata.Annotations[k] = v
 			}
 		}
 	}
 
 	if b.actor == nil && (len(b.labels) > 0 || len(b.annotations) > 0) {
-		b.actor = &core.Actor{
-			Labels:      b.labels,
-			Annotations: b.annotations,
+		b.actor = NewActorClaim(&core.Actor{
+			Labels:      cloneStringMap(b.labels),
+			Annotations: cloneStringMap(b.annotations),
+		})
+		if b.namespace != nil {
+			b.actor.Metadata.Namespace = *b.namespace
+		}
+		if b.externalId != nil {
+			b.actor.Spec.ExternalId = *b.externalId
 		}
 	}
 
@@ -249,6 +256,24 @@ func (b *claimsBuilder) BuildCtx(ctx context.Context) (*AuthProxyClaims, error) 
 		}
 
 		c.Nonce = b.nonce
+	}
+
+	for i := range c.Permissions {
+		if err := c.Permissions[i].Validate(); err != nil {
+			return nil, fmt.Errorf("invalid request permission %d: %w", i, err)
+		}
+	}
+	if c.Actor != nil {
+		if err := c.Actor.Validate(); err != nil {
+			return nil, fmt.Errorf("invalid JWT actor resource: %w", err)
+		}
+		if err := core.ValidatePermissionRestrictions(
+			c.Actor.ToCoreActor(),
+			c.Actor.Spec.Permissions,
+			c.Permissions,
+		); err != nil {
+			return nil, fmt.Errorf("request permissions exceed actor permissions: %w", err)
+		}
 	}
 
 	return &c, nil
