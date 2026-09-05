@@ -27,19 +27,30 @@ func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConn
 		return nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err))
 	}
 
-	var err error
+	logicalConnector, err := s.db.ResolveConnectorReference(ctx, req.ConnectorRef)
+	if err != nil {
+		val.MarkErrorReturn()
+		if errors.Is(err, database.ErrNotFound) {
+			return nil, httperr.NotFound("connector not found")
+		}
+		if errors.Is(err, database.ErrInvalidReference) {
+			return nil, httperr.BadRequest("invalid connector reference", httperr.WithInternalErr(err))
+		}
+		return nil, httperr.InternalServerError(httperr.WithInternalErr(err))
+	}
+
 	var c iface.Connector
-	if req.HasVersion() {
-		c, err = s.GetConnectorVersion(ctx, req.ConnectorId, req.ConnectorVersion)
+	if req.ConnectorRef.Generation != 0 {
+		c, err = s.GetConnectorVersion(ctx, logicalConnector.Id, req.ConnectorRef.Generation)
 	} else {
-		c, err = s.GetConnectorVersionForState(ctx, req.ConnectorId, database.ConnectorDefinitionVersionStatePrimary)
+		c, err = s.GetConnectorVersionForState(ctx, logicalConnector.Id, database.ConnectorDefinitionVersionStatePrimary)
 	}
 
 	if err != nil {
 		val.MarkErrorReturn()
 
 		if errors.Is(err, ErrNotFound) {
-			return nil, httperr.NotFoundf("connector '%s' not found", req.ConnectorId)
+			return nil, httperr.NotFoundf("connector '%s' not found", logicalConnector.Id)
 		}
 
 		return nil, httperr.InternalServerError(httperr.WithInternalErr(err))
@@ -77,7 +88,7 @@ func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConn
 	if req.Name != nil {
 		name = *req.Name
 	}
-	connectionIface, err := s.CreateConnection(ctx, targetNamespace, name, c)
+	connectionIface, err := s.CreateConnection(ctx, targetNamespace, name, req.Labels, req.Annotations, c)
 	if err != nil {
 		val.MarkErrorReturn()
 		if errors.Is(err, database.ErrDuplicate) {

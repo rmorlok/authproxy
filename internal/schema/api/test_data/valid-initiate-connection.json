@@ -1,6 +1,18 @@
 {
-  "connectorId": "cxr_test0000000000001",
-  "connectorVersion": 1,
-  "intoNamespace": "root.acme",
-  "returnToUrl": "https://example.com/callback"
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "ConnectionInitiate",
+  "metadata": {
+    "target": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connector",
+      "id": "cxr_test0000000000001",
+      "generation": 1
+    }
+  },
+  "spec": {
+    "intoNamespace": "root.acme",
+    "name": "production-crm",
+    "labels": { "team": "platform" },
+    "returnToUrl": "https://example.com/callback"
+  }
 }

@@ -1,22 +1,33 @@
 {
-  "id": "cxn_test0000000000002",
-  "type": "form",
-  "stepId": "preconnect:0",
-  "stepTitle": "Choose workspace",
-  "jsonSchema": {
-    "type": "object",
-    "properties": {
-      "workspace": {
-        "type": "string"
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "ConnectionSetup",
+  "metadata": {
+    "target": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connection",
+      "id": "cxn_test0000000000002"
+    }
+  },
+  "spec": {},
+  "status": {
+    "type": "form",
+    "stepId": "preconnect:0",
+    "stepTitle": "Choose workspace",
+    "jsonSchema": {
+      "type": "object",
+      "properties": {
+        "workspace": {
+          "type": "string"
+        }
       }
+    },
+    "uiSchema": {
+      "workspace": {
+        "ui:widget": "select"
+      }
+    },
+    "data": {
+      "workspace": "existing-workspace"
     }
-  },
-  "uiSchema": {
-    "workspace": {
-      "ui:widget": "select"
-    }
-  },
-  "data": {
-    "workspace": "existing-workspace"
   }
 }

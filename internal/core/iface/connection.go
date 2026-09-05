@@ -10,6 +10,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	connectionschema "github.com/rmorlok/authproxy/internal/schema/resources/connection"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
 
@@ -25,6 +26,7 @@ type Connection interface {
 	GetHealthState() database.ConnectionHealthState
 	GetConnectorId() apid.ID
 	GetConnectorVersion() uint64
+	GetActorId() *apid.ID
 	GetCreatedAt() time.Time
 	GetUpdatedAt() time.Time
 	GetDeletedAt() *time.Time
@@ -32,6 +34,7 @@ type Connection interface {
 	GetAnnotations() map[string]string
 	GetSetupStep() *cschema.SetupStep
 	GetSetupError() *string
+	GetResource(ctx context.Context) (*connectionschema.Connection, error)
 	GetJavascriptContext(ctx context.Context) (apjs.Context, error)
 
 	/*

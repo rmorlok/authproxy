@@ -1,39 +1,35 @@
 {
-  "id": "cxn_test550e8400abcde",
-  "namespace": "root.acme",
-  "labels": {
-    "team": "platform"
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "Connection",
+  "metadata": {
+    "id": "cxn_test550e8400abcde",
+    "name": "production-crm",
+    "namespace": "root.acme",
+    "labels": { "team": "platform" },
+    "annotations": { "owner": "integrations" },
+    "createdAt": "2026-05-25T12:00:00Z",
+    "updatedAt": "2026-05-25T12:30:00Z"
   },
-  "annotations": {
-    "owner": "integrations"
-  },
-  "state": "configured",
-  "healthState": "healthy",
-  "setupStepId": "tenant",
-  "connector": {
-    "apiVersion": "authproxy.net/v1alpha1",
-    "kind": "Connector",
-    "metadata": {
+  "spec": {
+    "connectorRef": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connector",
       "id": "cxr_test550e8400abcde",
       "name": "salesforce",
       "namespace": "root.acme",
-      "generation": 1,
-      "createdAt": "2026-05-25T12:00:00Z",
-      "updatedAt": "2026-05-25T12:30:00Z"
+      "generation": 1
     },
-    "spec": {
-      "release": { "desiredState": "primary" },
-      "definition": {
-        "displayName": "Salesforce",
-        "logo": { "publicUrl": "https://example.com/logo.png" },
-        "description": "Salesforce CRM integration",
-        "auth": { "type": "no-auth" }
-      }
+    "actorRef": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Actor",
+      "id": "act_test550e8400abcde"
     },
-    "status": {
-      "release": { "state": "primary" }
-    }
+    "configuration": { "tenant": "********" }
   },
-  "createdAt": "2026-05-25T12:00:00Z",
-  "updatedAt": "2026-05-25T12:30:00Z"
+  "status": {
+    "lifecycle": { "state": "configured" },
+    "health": { "state": "healthy" },
+    "setup": { "stepId": "tenant" },
+    "configurationConfigured": true
+  }
 }

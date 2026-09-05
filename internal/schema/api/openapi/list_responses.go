@@ -1,6 +1,7 @@
 package openapi
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/apid"
@@ -8,6 +9,7 @@ import (
 	apiv1alpha1 "github.com/rmorlok/authproxy/internal/schema/api/v1alpha1"
 	authschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	actorschema "github.com/rmorlok/authproxy/internal/schema/resources/actor"
+	connectionschema "github.com/rmorlok/authproxy/internal/schema/resources/connection"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	keyschema "github.com/rmorlok/authproxy/internal/schema/resources/key"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
@@ -135,24 +137,33 @@ type ListConnectorVersionsResponseJson struct {
 	Items []ConnectorJson `json:"items" binding:"required"`
 }
 
-// ConnectionJson documents a connection response while keeping setup
-// definitions opaque for swaggo. The nested connector uses the same canonical
-// envelope as connector endpoints.
+// ConnectionSpecJson documents the durable references for a Connection.
+type ConnectionSpecJson struct {
+	ConnectorRef  meta.ObjectReference   `json:"connectorRef" binding:"required"`
+	ActorRef      *meta.ObjectReference  `json:"actorRef,omitempty"`
+	Configuration map[string]interface{} `json:"configuration,omitempty" swaggertype:"object"`
+}
+
+// ConnectionJson documents a canonical Connection resource.
 //
-//	@Description	Connection to an external service
+//	@Description	Kubernetes-style Connection resource
 type ConnectionJson struct {
-	Id          apid.ID           `json:"id" swaggertype:"string" example:"cxn_test550e8400abcde"`
-	Namespace   string            `json:"namespace" example:"root.acme"`
-	Name        string            `json:"name" example:"production-crm"`
-	Labels      map[string]string `json:"labels,omitempty"`
-	Annotations map[string]string `json:"annotations,omitempty"`
-	State       string            `json:"state" example:"configured"`
-	HealthState string            `json:"healthState" example:"healthy"`
-	SetupStep   string            `json:"setupStepId,omitempty" example:"tenant"`
-	SetupError  string            `json:"setupError,omitempty"`
-	Connector   ConnectorJson     `json:"connector"`
-	CreatedAt   time.Time         `json:"createdAt"`
-	UpdatedAt   time.Time         `json:"updatedAt"`
+	APIVersion string                             `json:"apiVersion" binding:"required" enums:"authproxy.net/v1alpha1" example:"authproxy.net/v1alpha1"`
+	Kind       string                             `json:"kind" binding:"required" enums:"Connection" example:"Connection"`
+	Metadata   meta.ObjectMeta                    `json:"metadata" binding:"required"`
+	Spec       ConnectionSpecJson                 `json:"spec" binding:"required"`
+	Status     *connectionschema.ConnectionStatus `json:"status,omitempty"`
+}
+
+// ConnectionPatchJson documents metadata-only Connection updates.
+//
+//	@Description	Kubernetes-style Connection patch. Connector and actor bindings are immutable.
+type ConnectionPatchJson struct {
+	APIVersion string                                `json:"apiVersion" binding:"required" enums:"authproxy.net/v1alpha1" example:"authproxy.net/v1alpha1"`
+	Kind       string                                `json:"kind" binding:"required" enums:"Connection" example:"Connection"`
+	Metadata   *meta.ObjectMetaPatch                 `json:"metadata" binding:"required"`
+	Spec       *connectionschema.ConnectionSpecPatch `json:"spec" binding:"required"`
+	Status     *connectionschema.ConnectionStatus    `json:"status,omitempty"`
 }
 
 // ListConnectionResponseJson documents the paginated connection list response.
@@ -163,37 +174,122 @@ type ListConnectionResponseJson struct {
 	Items []ConnectionJson `json:"items" binding:"required"`
 }
 
-// DisconnectResponseJson documents the connection disconnect response.
-//
-//	@Description	Response for disconnect operation
-type DisconnectResponseJson struct {
-	TaskId     string      `json:"taskId"`
-	Connection interface{} `json:"connection"`
+// ConnectionActionMetaJson identifies the resource targeted by an action.
+type ConnectionActionMetaJson struct {
+	Target meta.ObjectReference `json:"target" binding:"required"`
 }
 
-// DisconnectConnectionRequestJson documents connection disconnect operation bodies.
-//
-//	@Description	Request body for connection disconnect operations
-type DisconnectConnectionRequestJson struct {
+// ConnectionInitiateActionJson documents a request to create and begin setup
+// for a Connection. metadata.target identifies the Connector to use.
+type ConnectionInitiateActionJson struct {
+	APIVersion string                           `json:"apiVersion" binding:"required" enums:"authproxy.net/v1alpha1" example:"authproxy.net/v1alpha1"`
+	Kind       string                           `json:"kind" binding:"required" enums:"ConnectionInitiate" example:"ConnectionInitiate"`
+	Metadata   ConnectionActionMetaJson         `json:"metadata" binding:"required"`
+	Spec       schemaapi.ConnectionInitiateSpec `json:"spec" binding:"required"`
+}
+
+// ConnectionSetupActionJson documents the observed next setup step.
+type ConnectionSetupActionJson struct {
+	APIVersion string                           `json:"apiVersion" binding:"required" enums:"authproxy.net/v1alpha1" example:"authproxy.net/v1alpha1"`
+	Kind       string                           `json:"kind" binding:"required" enums:"ConnectionSetup" example:"ConnectionSetup"`
+	Metadata   ConnectionActionMetaJson         `json:"metadata" binding:"required"`
+	Spec       struct{}                         `json:"spec" binding:"required"`
+	Status     *ConnectionSetupActionStatusJson `json:"status,omitempty"`
+}
+
+type ConnectionSetupActionStatusJson struct {
+	Type            string          `json:"type" enums:"redirect,form,complete,verifying,error"`
+	RedirectURL     string          `json:"redirectUrl,omitempty"`
+	StepID          string          `json:"stepId,omitempty"`
+	StepTitle       string          `json:"stepTitle,omitempty"`
+	StepDescription string          `json:"stepDescription,omitempty"`
+	JSONSchema      json.RawMessage `json:"jsonSchema,omitempty" swaggertype:"object"`
+	UISchema        json.RawMessage `json:"uiSchema,omitempty" swaggertype:"object"`
+	Data            json.RawMessage `json:"data,omitempty" swaggertype:"object"`
+	Error           string          `json:"error,omitempty"`
+	CanRetry        bool            `json:"canRetry,omitempty"`
+}
+
+type ConnectionSetupSubmitSpecJson struct {
+	StepID      string                 `json:"stepId" binding:"required"`
+	Data        map[string]interface{} `json:"data" binding:"required"`
+	ReturnToURL string                 `json:"returnToUrl,omitempty"`
+}
+
+type ConnectionSetupSubmitActionJson struct {
+	APIVersion string                        `json:"apiVersion" binding:"required" enums:"authproxy.net/v1alpha1" example:"authproxy.net/v1alpha1"`
+	Kind       string                        `json:"kind" binding:"required" enums:"ConnectionSetupSubmit" example:"ConnectionSetupSubmit"`
+	Metadata   ConnectionActionMetaJson      `json:"metadata" binding:"required"`
+	Spec       ConnectionSetupSubmitSpecJson `json:"spec" binding:"required"`
+}
+
+// ConnectionSetupControlActionJson documents retry and reauthentication
+// request bodies, whose kinds distinguish the requested operation.
+type ConnectionSetupControlActionJson struct {
+	APIVersion string                               `json:"apiVersion" binding:"required" enums:"authproxy.net/v1alpha1" example:"authproxy.net/v1alpha1"`
+	Kind       string                               `json:"kind" binding:"required" enums:"ConnectionSetupRetry,ConnectionReauthenticate"`
+	Metadata   ConnectionActionMetaJson             `json:"metadata" binding:"required"`
+	Spec       schemaapi.ConnectionSetupControlSpec `json:"spec" binding:"required"`
+}
+
+// EmptyConnectionActionJson documents setup actions with no parameters.
+type EmptyConnectionActionJson struct {
+	APIVersion string                   `json:"apiVersion" binding:"required" enums:"authproxy.net/v1alpha1" example:"authproxy.net/v1alpha1"`
+	Kind       string                   `json:"kind" binding:"required" enums:"ConnectionSetupAbort,ConnectionReconfigure,ConnectionSetupCancel"`
+	Metadata   ConnectionActionMetaJson `json:"metadata" binding:"required"`
+	Spec       struct{}                 `json:"spec" binding:"required"`
+}
+
+type ConnectionDisconnectSpecJson struct {
 	TimeoutSeconds *int64 `json:"timeoutSeconds,omitempty" example:"600"`
 }
 
-// MigrateConnectionVersionRequestJson documents connection version migration operation bodies.
-//
-//	@Description	Request body for connection connector-version migration operations
-type MigrateConnectionVersionRequestJson struct {
-	TargetVersion  uint64 `json:"targetVersion" example:"3"`
-	TimeoutSeconds *int64 `json:"timeoutSeconds,omitempty" example:"600"`
+type ConnectionDisconnectStatusJson struct {
+	TaskID     string         `json:"taskId"`
+	Connection ConnectionJson `json:"connection"`
 }
 
-// MigrateConnectionVersionResponseJson documents the connection version migration response.
-//
-//	@Description	Response for connection connector-version migration operation
-type MigrateConnectionVersionResponseJson struct {
-	TaskId        string  `json:"taskId"`
-	ConnectionId  apid.ID `json:"connectionId" swaggertype:"string" example:"cxn_test550e8400abcde"`
-	SourceVersion uint64  `json:"sourceVersion" example:"1"`
-	TargetVersion uint64  `json:"targetVersion" example:"3"`
+type ConnectionDisconnectActionJson struct {
+	APIVersion string                          `json:"apiVersion" binding:"required" enums:"authproxy.net/v1alpha1" example:"authproxy.net/v1alpha1"`
+	Kind       string                          `json:"kind" binding:"required" enums:"ConnectionDisconnect" example:"ConnectionDisconnect"`
+	Metadata   ConnectionActionMetaJson        `json:"metadata" binding:"required"`
+	Spec       ConnectionDisconnectSpecJson    `json:"spec" binding:"required"`
+	Status     *ConnectionDisconnectStatusJson `json:"status,omitempty"`
+}
+
+type ConnectionVersionMigrationSpecJson struct {
+	ConnectorRef   meta.ObjectReference `json:"connectorRef" binding:"required"`
+	TimeoutSeconds *int64               `json:"timeoutSeconds,omitempty" example:"600"`
+}
+
+type ConnectionVersionMigrationStatusJson struct {
+	TaskID             string               `json:"taskId"`
+	SourceConnectorRef meta.ObjectReference `json:"sourceConnectorRef"`
+	TargetConnectorRef meta.ObjectReference `json:"targetConnectorRef"`
+}
+
+type ConnectionVersionMigrationActionJson struct {
+	APIVersion string                                `json:"apiVersion" binding:"required" enums:"authproxy.net/v1alpha1" example:"authproxy.net/v1alpha1"`
+	Kind       string                                `json:"kind" binding:"required" enums:"ConnectionVersionMigration" example:"ConnectionVersionMigration"`
+	Metadata   ConnectionActionMetaJson              `json:"metadata" binding:"required"`
+	Spec       ConnectionVersionMigrationSpecJson    `json:"spec" binding:"required"`
+	Status     *ConnectionVersionMigrationStatusJson `json:"status,omitempty"`
+}
+
+type ConnectionForceStateSpecJson struct {
+	State string `json:"state" binding:"required" enums:"setup,configured,disabled,disconnecting,disconnected"`
+}
+
+type ConnectionForceStateStatusJson struct {
+	Connection ConnectionJson `json:"connection"`
+}
+
+type ConnectionForceStateActionJson struct {
+	APIVersion string                          `json:"apiVersion" binding:"required" enums:"authproxy.net/v1alpha1" example:"authproxy.net/v1alpha1"`
+	Kind       string                          `json:"kind" binding:"required" enums:"ConnectionForceState" example:"ConnectionForceState"`
+	Metadata   ConnectionActionMetaJson        `json:"metadata" binding:"required"`
+	Spec       ConnectionForceStateSpecJson    `json:"spec" binding:"required"`
+	Status     *ConnectionForceStateStatusJson `json:"status,omitempty"`
 }
 
 // NotificationJson documents actor-visible notifications.

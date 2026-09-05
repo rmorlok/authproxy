@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/schema/resources/connection/schema.json",
+  "$defs": {
+    "ConnectionState": {
+      "type": "string",
+      "enum": ["setup", "configured", "disabled", "disconnecting", "disconnected"]
+    },
+    "ConnectionHealthState": {
+      "type": "string",
+      "enum": ["healthy", "unhealthy"]
+    },
+    "ConnectorReference": {
+      "allOf": [
+        { "$ref": "../meta/schema.json#/$defs/ObjectReference" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "Connector" },
+            "id": { "type": "string", "pattern": "^cxr_" },
+            "generation": { "type": "integer", "minimum": 1 }
+          }
+        }
+      ]
+    },
+    "ActorReference": {
+      "allOf": [
+        { "$ref": "../meta/schema.json#/$defs/ObjectReference" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "Actor" },
+            "id": { "type": "string", "pattern": "^act_" },
+            "generation": false
+          }
+        }
+      ]
+    },
+    "ConnectionReference": {
+      "allOf": [
+        { "$ref": "../meta/schema.json#/$defs/ObjectReference" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "Connection" },
+            "id": { "type": "string", "pattern": "^cxn_" },
+            "generation": false
+          }
+        }
+      ]
+    },
+    "ConnectionSpec": {
+      "type": "object",
+      "required": ["connectorRef"],
+      "properties": {
+        "connectorRef": { "$ref": "#/$defs/ConnectorReference" },
+        "actorRef": { "$ref": "#/$defs/ActorReference" },
+        "configuration": {
+          "type": "object",
+          "description": "Connector-defined desired setup configuration. Values are write-only and always redacted in API responses."
+        }
+      },
+      "additionalProperties": false
+    },
+    "ConnectionLifecycleStatus": {
+      "type": "object",
+      "required": ["state"],
+      "properties": {
+        "state": { "$ref": "#/$defs/ConnectionState" }
+      },
+      "additionalProperties": false
+    },
+    "ConnectionHealthStatus": {
+      "type": "object",
+      "required": ["state"],
+      "properties": {
+        "state": { "$ref": "#/$defs/ConnectionHealthState" }
+      },
+      "additionalProperties": false
+    },
+    "ConnectionSetupStatus": {
+      "type": "object",
+      "properties": {
+        "stepId": { "type": "string", "minLength": 1 },
+        "error": { "type": "string" }
+      },
+      "anyOf": [
+        { "required": ["stepId"] },
+        { "required": ["error"] }
+      ],
+      "additionalProperties": false
+    },
+    "ConnectionStatus": {
+      "type": "object",
+      "required": ["lifecycle", "health", "configurationConfigured"],
+      "properties": {
+        "lifecycle": { "$ref": "#/$defs/ConnectionLifecycleStatus" },
+        "health": { "$ref": "#/$defs/ConnectionHealthStatus" },
+        "setup": { "$ref": "#/$defs/ConnectionSetupStatus" },
+        "configurationConfigured": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "ConnectionSpecPatch": {
+      "type": "object",
+      "additionalProperties": false
+    },
+    "ConnectionPatch": {
+      "allOf": [
+        { "$ref": "../meta/schema.json#/$defs/Resource" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "Connection" },
+            "metadata": {
+              "allOf": [
+                { "$ref": "../meta/schema.json#/$defs/ObjectMetaPatch" },
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "pattern": "^cxn_" },
+                    "namespace": { "$ref": "../namespace/schema.json#/$defs/NamespacePath" },
+                    "generation": false
+                  }
+                }
+              ]
+            },
+            "spec": { "$ref": "#/$defs/ConnectionSpecPatch" },
+            "status": { "$ref": "#/$defs/ConnectionStatus" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    }
+  },
+  "allOf": [
+    { "$ref": "../meta/schema.json#/$defs/Resource" },
+    {
+      "type": "object",
+      "properties": {
+        "apiVersion": { "const": "authproxy.net/v1alpha1" },
+        "kind": { "const": "Connection" },
+        "metadata": {
+          "allOf": [
+            { "$ref": "../meta/schema.json#/$defs/ObjectMeta" },
+            {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string", "pattern": "^cxn_" },
+                "namespace": { "$ref": "../namespace/schema.json#/$defs/NamespacePath" },
+                "generation": false
+              }
+            }
+          ]
+        },
+        "spec": { "$ref": "#/$defs/ConnectionSpec" },
+        "status": { "$ref": "#/$defs/ConnectionStatus" }
+      }
+    }
+  ],
+  "unevaluatedProperties": false
+}
