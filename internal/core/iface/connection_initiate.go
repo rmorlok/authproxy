@@ -25,30 +25,39 @@ type InitiateConnectionRequest struct {
 
 func (r *InitiateConnectionRequest) Validate() error {
 	var result *multierror.Error
-	if err := meta.ValidateObjectReferenceWithOptions(r.ConnectorRef, meta.ObjectReferenceValidationOptions{
-		ExpectedAPIVersion: meta.APIVersionV1Alpha1,
-		ExpectedKind:       connectorschema.ConnectorKind,
-		IDValidator:        connectorschema.ValidateID,
-		NamespaceValidator: nschema.ValidatePath,
-	}, nil); err != nil {
+	if err := meta.ValidateObjectReferenceWithOptions(
+		r.ConnectorRef,
+		meta.ObjectReferenceValidationOptions{
+			ExpectedAPIVersion: meta.APIVersionV1Alpha1,
+			ExpectedKind:       connectorschema.ConnectorKind,
+			IDValidator:        connectorschema.ValidateID,
+			NamespaceValidator: nschema.ValidatePath,
+		},
+		nil, // path
+	); err != nil {
 		result = multierror.Append(result, fmt.Errorf("connector reference is invalid: %w", err))
 	}
+
 	if r.HasIntoNamespace() {
 		if err := nschema.ValidatePath(r.IntoNamespace); err != nil {
 			result = multierror.Append(result, err)
 		}
 	}
+
 	if r.Name != nil {
 		if err := r.Name.Validate(); err != nil {
 			result = multierror.Append(result, fmt.Errorf("invalid connection name: %w", err))
 		}
 	}
+
 	if err := meta.ValidateUserLabels(r.Labels); err != nil {
 		result = multierror.Append(result, fmt.Errorf("invalid connection labels: %w", err))
 	}
+
 	if err := meta.ValidateAnnotations(r.Annotations); err != nil {
 		result = multierror.Append(result, fmt.Errorf("invalid connection annotations: %w", err))
 	}
+	
 	return result.ErrorOrNil()
 }
 
