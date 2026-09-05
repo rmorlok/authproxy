@@ -1,117 +1,248 @@
 package api
 
 import (
-	"time"
+	"fmt"
 
-	"github.com/rmorlok/authproxy/internal/apid"
 	apiv1alpha1 "github.com/rmorlok/authproxy/internal/schema/api/v1alpha1"
 	"github.com/rmorlok/authproxy/internal/schema/common"
-	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	connectionschema "github.com/rmorlok/authproxy/internal/schema/resources/connection"
+	connectorschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
+	namespaceschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 )
-
-// ConnectionState is the API-visible lifecycle state of a connection.
-type ConnectionState string
 
 const (
-	ConnectionStateSetup         ConnectionState = "setup"
-	ConnectionStateConfigured    ConnectionState = "configured"
-	ConnectionStateDisabled      ConnectionState = "disabled"
-	ConnectionStateDisconnecting ConnectionState = "disconnecting"
-	ConnectionStateDisconnected  ConnectionState = "disconnected"
+	ConnectionDisconnectActionKind       meta.Kind = "ConnectionDisconnect"
+	ConnectionVersionMigrationActionKind meta.Kind = "ConnectionVersionMigration"
+	ConnectionForceStateActionKind       meta.Kind = "ConnectionForceState"
 )
-
-// ConnectionHealthState is the API-visible operational health signal for a connection.
-type ConnectionHealthState string
-
-const (
-	ConnectionHealthStateHealthy   ConnectionHealthState = "healthy"
-	ConnectionHealthStateUnhealthy ConnectionHealthState = "unhealthy"
-)
-
-// ConnectionJson is the API projection of a connection resource.
-//
-//	@Description	Connection to an external service
-type ConnectionJson struct {
-	Id          apid.ID               `json:"id" yaml:"id" swaggertype:"string" example:"cxn_test550e8400abcde"`
-	Namespace   string                `json:"namespace" yaml:"namespace" example:"root.acme"`
-	Name        common.ResourceName   `json:"name" yaml:"name" swaggertype:"string" example:"production-crm"`
-	Labels      map[string]string     `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Annotations map[string]string     `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	State       ConnectionState       `json:"state" yaml:"state" swaggertype:"string" example:"configured"`
-	HealthState ConnectionHealthState `json:"healthState" yaml:"healthState" swaggertype:"string" example:"healthy"`
-	SetupStep   *cschema.SetupStep    `json:"setupStepId,omitempty" yaml:"setupStepId,omitempty" swaggertype:"string" example:"tenant"`
-	SetupError  *string               `json:"setupError,omitempty" yaml:"setupError,omitempty"`
-	Connector   cschema.Connector     `json:"connector" yaml:"connector"`
-	CreatedAt   time.Time             `json:"createdAt" yaml:"createdAt"`
-	UpdatedAt   time.Time             `json:"updatedAt" yaml:"updatedAt"`
-}
 
 type ListConnectionResponseJson struct {
-	apiv1alpha1.ResourceList[ConnectionJson] `json:",inline" yaml:",inline"`
+	apiv1alpha1.ResourceList[connectionschema.Connection] `json:",inline" yaml:",inline"`
 }
 
 func NewListConnectionResponseJson(
-	items []ConnectionJson,
+	items []connectionschema.Connection,
 	continueToken string,
 ) ListConnectionResponseJson {
 	return ListConnectionResponseJson{
 		ResourceList: apiv1alpha1.NewResourceList(
-			"Connection",
+			connectionschema.ConnectionKind,
 			items,
 			apiv1alpha1.ListMeta{Continue: continueToken},
 		),
 	}
 }
 
-type DisconnectResponseJson struct {
-	TaskId     string         `json:"taskId" yaml:"taskId"`
-	Connection ConnectionJson `json:"connection" yaml:"connection"`
+type ConnectionDisconnectSpec struct {
+	TimeoutSeconds *int64 `json:"timeoutSeconds,omitempty" yaml:"timeoutSeconds,omitempty"`
 }
 
-// MigrateConnectionVersionRequestJson is the request body for POST /connections/:id/_migrate_version.
-//
-//	@Description	Request to migrate a connection to another connector version
-type MigrateConnectionVersionRequestJson struct {
-	TargetVersion  uint64 `json:"targetVersion" yaml:"targetVersion" example:"3"`
-	TimeoutSeconds *int64 `json:"timeoutSeconds,omitempty" yaml:"timeoutSeconds,omitempty" example:"600"`
+type ConnectionDisconnectStatus struct {
+	TaskID     string                      `json:"taskId" yaml:"taskId"`
+	Connection connectionschema.Connection `json:"connection" yaml:"connection"`
 }
 
-// MigrateConnectionVersionResponseJson is returned when a connection-version migration workflow starts.
-//
-//	@Description	Response returned after starting a connection connector-version migration workflow
-type MigrateConnectionVersionResponseJson struct {
-	TaskId        string  `json:"taskId" yaml:"taskId"`
-	ConnectionId  apid.ID `json:"connectionId" yaml:"connectionId" swaggertype:"string" example:"cxn_test550e8400abcde"`
-	SourceVersion uint64  `json:"sourceVersion" yaml:"sourceVersion" example:"1"`
-	TargetVersion uint64  `json:"targetVersion" yaml:"targetVersion" example:"3"`
+type ConnectionDisconnectAction struct {
+	apiv1alpha1.Action[ConnectionDisconnectSpec, ConnectionDisconnectStatus] `json:",inline" yaml:",inline"`
 }
 
-// DisconnectConnectionRequestJson is the optional request body for POST /connections/:id/_disconnect.
-//
-//	@Description	Request to disconnect a connection
-type DisconnectConnectionRequestJson struct {
-	TimeoutSeconds *int64 `json:"timeoutSeconds,omitempty" yaml:"timeoutSeconds,omitempty" example:"600"`
+func (a *ConnectionDisconnectAction) ValidateRequest(expectedKind meta.Kind) error {
+	if err := a.Action.ValidateRequest(expectedKind); err != nil {
+		return err
+	}
+	return a.validateFields(false)
 }
 
-// ForceConnectionStateRequestJson is the request body for PUT /connections/:id/_force_state.
-//
-//	@Description	Request to force a connection state
-type ForceConnectionStateRequestJson struct {
-	State string `json:"state" yaml:"state" example:"configured"`
+func (a *ConnectionDisconnectAction) ValidateResponse(expectedKind meta.Kind) error {
+	if err := a.Action.ValidateResponse(expectedKind); err != nil {
+		return err
+	}
+	return a.validateFields(true)
 }
 
-// UpdateConnectionRequestJson is the request body for PATCH /connections/:id.
-//
-//	@Description	Request to update a connection's labels and annotations
-type UpdateConnectionRequestJson struct {
-	Name        *common.ResourceName `json:"name,omitempty" yaml:"name,omitempty" swaggertype:"string" example:"production-crm"`
-	Labels      map[string]string    `json:"labels" yaml:"labels"`
-	Annotations map[string]string    `json:"annotations" yaml:"annotations"`
+func (a *ConnectionDisconnectAction) validateFields(requireStatus bool) error {
+	if err := validateConnectionActionTarget(a.Metadata.Target); err != nil {
+		return err
+	}
+	if a.Spec.TimeoutSeconds != nil && *a.Spec.TimeoutSeconds <= 0 {
+		return fmt.Errorf("$.spec.timeoutSeconds: must be greater than zero")
+	}
+	if !requireStatus {
+		return nil
+	}
+	if a.Status == nil {
+		return fmt.Errorf("$.status: is required")
+	}
+	if a.Status.TaskID == "" {
+		return fmt.Errorf("$.status.taskId: is required")
+	}
+	if err := a.Status.Connection.ValidateFor(meta.ValidationModeResponse, nil); err != nil {
+		return fmt.Errorf("$.status.connection: %w", err)
+	}
+	return nil
 }
 
-// ProxyResponseJson is the response from a proxied request.
-//
-//	@Description	Response from a proxied HTTP request
+func NewConnectionDisconnectResponse(
+	target meta.ObjectReference,
+	spec ConnectionDisconnectSpec,
+	status ConnectionDisconnectStatus,
+) ConnectionDisconnectAction {
+	return ConnectionDisconnectAction{Action: apiv1alpha1.NewActionResponse(
+		ConnectionDisconnectActionKind,
+		target,
+		spec,
+		status,
+	)}
+}
+
+// ConnectionVersionMigrationSpec identifies the exact target connector
+// generation. The action target remains the Connection being migrated.
+type ConnectionVersionMigrationSpec struct {
+	ConnectorRef   meta.ObjectReference `json:"connectorRef" yaml:"connectorRef"`
+	TimeoutSeconds *int64               `json:"timeoutSeconds,omitempty" yaml:"timeoutSeconds,omitempty"`
+}
+
+type ConnectionVersionMigrationStatus struct {
+	TaskID             string               `json:"taskId" yaml:"taskId"`
+	SourceConnectorRef meta.ObjectReference `json:"sourceConnectorRef" yaml:"sourceConnectorRef"`
+	TargetConnectorRef meta.ObjectReference `json:"targetConnectorRef" yaml:"targetConnectorRef"`
+}
+
+type ConnectionVersionMigrationAction struct {
+	apiv1alpha1.Action[ConnectionVersionMigrationSpec, ConnectionVersionMigrationStatus] `json:",inline" yaml:",inline"`
+}
+
+func (a *ConnectionVersionMigrationAction) ValidateRequest(expectedKind meta.Kind) error {
+	if err := a.Action.ValidateRequest(expectedKind); err != nil {
+		return err
+	}
+	return a.validateFields(false)
+}
+
+func (a *ConnectionVersionMigrationAction) ValidateResponse(expectedKind meta.Kind) error {
+	if err := a.Action.ValidateResponse(expectedKind); err != nil {
+		return err
+	}
+	return a.validateFields(true)
+}
+
+func (a *ConnectionVersionMigrationAction) validateFields(requireStatus bool) error {
+	if err := validateConnectionActionTarget(a.Metadata.Target); err != nil {
+		return err
+	}
+	if err := validateVersionedConnectorReference(a.Spec.ConnectorRef, "$.spec.connectorRef"); err != nil {
+		return err
+	}
+	if a.Spec.TimeoutSeconds != nil && *a.Spec.TimeoutSeconds <= 0 {
+		return fmt.Errorf("$.spec.timeoutSeconds: must be greater than zero")
+	}
+	if !requireStatus {
+		return nil
+	}
+	if a.Status == nil {
+		return fmt.Errorf("$.status: is required")
+	}
+	if a.Status.TaskID == "" {
+		return fmt.Errorf("$.status.taskId: is required")
+	}
+	if err := validateVersionedConnectorReference(a.Status.SourceConnectorRef, "$.status.sourceConnectorRef"); err != nil {
+		return err
+	}
+	if err := validateVersionedConnectorReference(a.Status.TargetConnectorRef, "$.status.targetConnectorRef"); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateVersionedConnectorReference(reference meta.ObjectReference, path string) error {
+	vc := &common.ValidationContext{Path: path}
+	if err := meta.ValidateObjectReferenceWithOptions(reference, meta.ObjectReferenceValidationOptions{
+		ExpectedAPIVersion: meta.APIVersionV1Alpha1,
+		ExpectedKind:       connectorschema.ConnectorKind,
+		IDValidator:        connectorschema.ValidateID,
+		NamespaceValidator: namespaceschema.ValidatePath,
+	}, vc); err != nil {
+		return err
+	}
+	if reference.Generation == 0 {
+		return vc.NewErrorForField("generation", "is required")
+	}
+	return nil
+}
+
+func NewConnectionVersionMigrationResponse(
+	target meta.ObjectReference,
+	spec ConnectionVersionMigrationSpec,
+	status ConnectionVersionMigrationStatus,
+) ConnectionVersionMigrationAction {
+	return ConnectionVersionMigrationAction{Action: apiv1alpha1.NewActionResponse(
+		ConnectionVersionMigrationActionKind,
+		target,
+		spec,
+		status,
+	)}
+}
+
+type ConnectionForceStateSpec struct {
+	State connectionschema.ConnectionState `json:"state" yaml:"state"`
+}
+
+type ConnectionForceStateStatus struct {
+	Connection connectionschema.Connection `json:"connection" yaml:"connection"`
+}
+
+type ConnectionForceStateAction struct {
+	apiv1alpha1.Action[ConnectionForceStateSpec, ConnectionForceStateStatus] `json:",inline" yaml:",inline"`
+}
+
+func (a *ConnectionForceStateAction) ValidateRequest(expectedKind meta.Kind) error {
+	if err := a.Action.ValidateRequest(expectedKind); err != nil {
+		return err
+	}
+	return a.validateFields(false)
+}
+
+func (a *ConnectionForceStateAction) ValidateResponse(expectedKind meta.Kind) error {
+	if err := a.Action.ValidateResponse(expectedKind); err != nil {
+		return err
+	}
+	return a.validateFields(true)
+}
+
+func (a *ConnectionForceStateAction) validateFields(requireStatus bool) error {
+	if err := validateConnectionActionTarget(a.Metadata.Target); err != nil {
+		return err
+	}
+	if !connectionschema.IsValidConnectionState(a.Spec.State) {
+		return fmt.Errorf("$.spec.state: is not a recognized connection lifecycle state")
+	}
+	if !requireStatus {
+		return nil
+	}
+	if a.Status == nil {
+		return fmt.Errorf("$.status: is required")
+	}
+	if err := a.Status.Connection.ValidateFor(meta.ValidationModeResponse, nil); err != nil {
+		return fmt.Errorf("$.status.connection: %w", err)
+	}
+	return nil
+}
+
+func NewConnectionForceStateResponse(
+	target meta.ObjectReference,
+	spec ConnectionForceStateSpec,
+	connection connectionschema.Connection,
+) ConnectionForceStateAction {
+	return ConnectionForceStateAction{Action: apiv1alpha1.NewActionResponse(
+		ConnectionForceStateActionKind,
+		target,
+		spec,
+		ConnectionForceStateStatus{Connection: connection},
+	)}
+}
+
+// ProxyResponseJson is the unwrapped response from a proxied request.
 type ProxyResponseJson struct {
 	StatusCode int               `json:"statusCode" yaml:"statusCode" example:"200"`
 	Headers    map[string]string `json:"headers,omitempty" yaml:"headers,omitempty"`

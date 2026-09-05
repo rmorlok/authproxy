@@ -29,6 +29,9 @@ type actionResponseValidator interface {
 // the bytes in both the request and Gin context so request logging and later
 // middleware observe exactly what the client sent.
 func BindJSONBody(gctx *gin.Context, obj any) error {
+	if gctx == nil || gctx.Request == nil || gctx.Request.Body == nil {
+		return io.EOF
+	}
 	data, err := io.ReadAll(gctx.Request.Body)
 	if err != nil {
 		return err

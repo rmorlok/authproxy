@@ -1,4 +1,20 @@
 {
-  "targetVersion": 3,
-  "timeoutSeconds": 600
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "ConnectionVersionMigration",
+  "metadata": {
+    "target": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connection",
+      "id": "cxn_test550e8400abcde"
+    }
+  },
+  "spec": {
+    "connectorRef": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connector",
+      "id": "cxr_test550e8400abcde",
+      "generation": 3
+    },
+    "timeoutSeconds": 600
+  }
 }

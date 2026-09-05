@@ -22,12 +22,12 @@ func TestMigrationStatusAndDirectionsSQLite(t *testing.T) {
 
 	missing := MigrationStatus(ctx, cfg)
 	require.Equal(t, migration.StateMissing, missing.State)
-	require.Equal(t, uint(16), missing.AvailableVersion)
+	require.Equal(t, uint(17), missing.AvailableVersion)
 
 	require.NoError(t, RunMigrations(ctx, cfg, logger, migration.DirectionUp, nil))
 	current := MigrationStatus(ctx, cfg)
 	require.True(t, current.Compatible())
-	require.Equal(t, uint(16), *current.CurrentVersion)
+	require.Equal(t, uint(17), *current.CurrentVersion)
 
 	target := uint(15)
 	require.NoError(t, RunMigrations(ctx, cfg, logger, migration.DirectionDown, &target))

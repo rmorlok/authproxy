@@ -2,16 +2,6 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/schema/api/schema.json",
   "$defs": {
-    "ConnectionSetupResponseType": {
-      "type": "string",
-      "enum": [
-        "redirect",
-        "form",
-        "complete",
-        "verifying",
-        "error"
-      ]
-    },
     "ConnectorVersionState": {
       "type": "string",
       "enum": [
@@ -19,23 +9,6 @@
         "primary",
         "active",
         "archived"
-      ]
-    },
-    "ConnectionState": {
-      "type": "string",
-      "enum": [
-        "setup",
-        "configured",
-        "disabled",
-        "disconnecting",
-        "disconnected"
-      ]
-    },
-    "ConnectionHealthState": {
-      "type": "string",
-      "enum": [
-        "healthy",
-        "unhealthy"
       ]
     },
     "NotificationLevel": {
@@ -196,161 +169,217 @@
       ],
       "additionalProperties": false
     },
-    "InitiateConnectionRequest": {
+    "Connection": {
+      "$ref": "../resources/connection/schema.json"
+    },
+    "ConnectionPatch": {
+      "$ref": "../resources/connection/schema.json#/$defs/ConnectionPatch"
+    },
+    "ConnectorActionTarget": {
       "type": "object",
+      "required": ["target"],
       "properties": {
-        "connectorId": {
-          "type": "string"
-        },
-        "connectorVersion": {
-          "type": "integer",
-          "minimum": 1
-        },
-        "intoNamespace": {
-          "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath"
-        },
-        "returnToUrl": {
-          "type": "string",
-          "format": "uri"
-        }
+        "target": { "$ref": "../resources/connection/schema.json#/$defs/ConnectorReference" }
       },
-      "required": [
-        "connectorId",
-        "returnToUrl"
-      ],
       "additionalProperties": false
     },
-    "ConnectionSetupRedirect": {
+    "ConnectionActionTarget": {
       "type": "object",
+      "required": ["target"],
       "properties": {
-        "id": {
-          "type": "string"
-        },
-        "type": {
-          "const": "redirect"
-        },
-        "redirectUrl": {
-          "type": "string",
-          "format": "uri"
-        }
+        "target": { "$ref": "../resources/connection/schema.json#/$defs/ConnectionReference" }
       },
-      "required": [
-        "id",
-        "type",
-        "redirectUrl"
-      ],
       "additionalProperties": false
     },
-    "ConnectionSetupForm": {
+    "ConnectionInitiateSpec": {
       "type": "object",
       "properties": {
-        "id": {
-          "type": "string"
-        },
-        "type": {
-          "const": "form"
-        },
-        "stepId": {
-          "type": "string"
-        },
-        "stepTitle": {
-          "type": "string"
-        },
-        "stepDescription": {
-          "type": "string"
-        },
-        "jsonSchema": {
-          "type": "object"
-        },
-        "uiSchema": {
-          "type": "object"
-        },
-        "data": {
-          "type": "object"
-        }
+        "intoNamespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
+        "name": { "$ref": "../common/schema.json#/$defs/ResourceName" },
+        "labels": { "$ref": "../resources/meta/schema.json#/$defs/Labels" },
+        "annotations": { "$ref": "../resources/meta/schema.json#/$defs/Annotations" },
+        "returnToUrl": { "type": "string", "format": "uri" }
       },
-      "required": [
-        "id",
-        "type",
-        "stepId",
-        "jsonSchema",
-        "uiSchema"
-      ],
+      "required": ["returnToUrl"],
       "additionalProperties": false
     },
-    "ConnectionSetupComplete": {
+    "ConnectionInitiateAction": {
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ActionRequest" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "ConnectionInitiate" },
+            "metadata": { "$ref": "#/$defs/ConnectorActionTarget" },
+            "spec": { "$ref": "#/$defs/ConnectionInitiateSpec" }
+          }
+        }
+      ]
+    },
+    "ConnectionSetupStatus": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["type", "redirectUrl"],
+          "properties": {
+            "type": { "const": "redirect" },
+            "redirectUrl": { "type": "string", "format": "uri" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["type", "stepId", "jsonSchema", "uiSchema"],
+          "properties": {
+            "type": { "const": "form" },
+            "stepId": { "type": "string", "minLength": 1 },
+            "stepTitle": { "type": "string" },
+            "stepDescription": { "type": "string" },
+            "jsonSchema": { "type": "object" },
+            "uiSchema": { "type": "object" },
+            "data": { "type": "object" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["type"],
+          "properties": { "type": { "enum": ["complete", "verifying"] } },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["type", "error", "canRetry"],
+          "properties": {
+            "type": { "const": "error" },
+            "error": { "type": "string" },
+            "canRetry": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "ConnectionSetupAction": {
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ActionResponse" },
+        {
+          "type": "object",
+          "required": ["status"],
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "ConnectionSetup" },
+            "metadata": { "$ref": "#/$defs/ConnectionActionTarget" },
+            "spec": { "type": "object", "additionalProperties": false },
+            "status": { "$ref": "#/$defs/ConnectionSetupStatus" }
+          }
+        }
+      ]
+    },
+    "ConnectionSetupSubmitSpec": {
       "type": "object",
       "properties": {
-        "id": {
-          "type": "string"
-        },
-        "type": {
-          "const": "complete"
-        }
+        "stepId": { "type": "string", "minLength": 1 },
+        "data": { "not": { "type": "null" } },
+        "returnToUrl": { "type": "string", "format": "uri" }
       },
-      "required": [
-        "id",
-        "type"
-      ],
+      "required": ["stepId", "data"],
       "additionalProperties": false
     },
-    "ConnectionSetupVerifying": {
+    "ConnectionSetupSubmitAction": {
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ActionRequest" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "ConnectionSetupSubmit" },
+            "metadata": { "$ref": "#/$defs/ConnectionActionTarget" },
+            "spec": { "$ref": "#/$defs/ConnectionSetupSubmitSpec" }
+          }
+        }
+      ]
+    },
+    "ConnectionSetupControlSpec": {
       "type": "object",
       "properties": {
-        "id": {
-          "type": "string"
-        },
-        "type": {
-          "const": "verifying"
-        }
+        "returnToUrl": { "type": "string", "format": "uri" }
       },
-      "required": [
-        "id",
-        "type"
-      ],
       "additionalProperties": false
     },
-    "ConnectionSetupError": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "type": {
-          "const": "error"
-        },
-        "error": {
-          "type": "string"
-        },
-        "canRetry": {
-          "type": "boolean"
+    "ConnectionSetupRetryAction": {
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ActionRequest" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "ConnectionSetupRetry" },
+            "metadata": { "$ref": "#/$defs/ConnectionActionTarget" },
+            "spec": { "$ref": "#/$defs/ConnectionSetupControlSpec" }
+          }
         }
-      },
-      "required": [
-        "id",
-        "type",
-        "error",
-        "canRetry"
-      ],
+      ]
+    },
+    "ConnectionReauthenticateAction": {
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ActionRequest" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "ConnectionReauthenticate" },
+            "metadata": { "$ref": "#/$defs/ConnectionActionTarget" },
+            "spec": { "$ref": "#/$defs/ConnectionSetupControlSpec" }
+          }
+        }
+      ]
+    },
+    "EmptyConnectionActionSpec": {
+      "type": "object",
       "additionalProperties": false
     },
-    "SubmitConnectionRequest": {
-      "type": "object",
-      "properties": {
-        "stepId": {
-          "type": "string"
-        },
-        "data": {},
-        "returnToUrl": {
-          "type": "string",
-          "format": "uri"
+    "ConnectionSetupAbortAction": {
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ActionRequest" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "ConnectionSetupAbort" },
+            "metadata": { "$ref": "#/$defs/ConnectionActionTarget" },
+            "spec": { "$ref": "#/$defs/EmptyConnectionActionSpec" }
+          }
         }
-      },
-      "required": [
-        "stepId",
-        "data"
-      ],
-      "additionalProperties": false
+      ]
+    },
+    "ConnectionReconfigureAction": {
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ActionRequest" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "ConnectionReconfigure" },
+            "metadata": { "$ref": "#/$defs/ConnectionActionTarget" },
+            "spec": { "$ref": "#/$defs/EmptyConnectionActionSpec" }
+          }
+        }
+      ]
+    },
+    "ConnectionSetupCancelAction": {
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ActionRequest" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "ConnectionSetupCancel" },
+            "metadata": { "$ref": "#/$defs/ConnectionActionTarget" },
+            "spec": { "$ref": "#/$defs/EmptyConnectionActionSpec" }
+          }
+        }
+      ]
     },
     "DataSourceOption": {
       "type": "object",
@@ -365,56 +394,6 @@
       "required": [
         "value",
         "label"
-      ],
-      "additionalProperties": false
-    },
-    "Connection": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "namespace": {
-          "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath"
-        },
-        "labels": {
-          "$ref": "#/$defs/StringMap"
-        },
-        "annotations": {
-          "$ref": "#/$defs/StringMap"
-        },
-        "state": {
-          "$ref": "#/$defs/ConnectionState"
-        },
-        "healthState": {
-          "$ref": "#/$defs/ConnectionHealthState"
-        },
-        "setupStepId": {
-          "type": "string"
-        },
-        "setupError": {
-          "type": "string"
-        },
-        "connector": {
-          "$ref": "#/$defs/Connector"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "id",
-        "namespace",
-        "state",
-        "healthState",
-        "connector",
-        "createdAt",
-        "updatedAt"
       ],
       "additionalProperties": false
     },
@@ -435,7 +414,7 @@
         }
       ]
     },
-    "DisconnectConnectionRequest": {
+    "ConnectionDisconnectSpec": {
       "type": "object",
       "properties": {
         "timeoutSeconds": {
@@ -445,7 +424,7 @@
       },
       "additionalProperties": false
     },
-    "DisconnectResponse": {
+    "ConnectionDisconnectStatus": {
       "type": "object",
       "properties": {
         "taskId": {
@@ -461,54 +440,101 @@
       ],
       "additionalProperties": false
     },
-    "MigrateConnectionVersionRequest": {
+    "ConnectionDisconnectActionRequest": {
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ActionRequest" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "ConnectionDisconnect" },
+            "metadata": { "$ref": "#/$defs/ConnectionActionTarget" },
+            "spec": { "$ref": "#/$defs/ConnectionDisconnectSpec" }
+          }
+        }
+      ]
+    },
+    "ConnectionDisconnectActionResponse": {
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ActionResponse" },
+        {
+          "type": "object",
+          "required": ["status"],
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "ConnectionDisconnect" },
+            "metadata": { "$ref": "#/$defs/ConnectionActionTarget" },
+            "spec": { "$ref": "#/$defs/ConnectionDisconnectSpec" },
+            "status": { "$ref": "#/$defs/ConnectionDisconnectStatus" }
+          }
+        }
+      ]
+    },
+    "ConnectionVersionMigrationSpec": {
       "type": "object",
       "properties": {
-        "targetVersion": {
-          "type": "integer",
-          "minimum": 1
-        },
+        "connectorRef": { "$ref": "../resources/connection/schema.json#/$defs/ConnectorReference" },
         "timeoutSeconds": {
           "type": "integer",
           "minimum": 1
         }
       },
       "required": [
-        "targetVersion"
+        "connectorRef"
       ],
       "additionalProperties": false
     },
-    "MigrateConnectionVersionResponse": {
+    "ConnectionVersionMigrationStatus": {
       "type": "object",
       "properties": {
         "taskId": {
           "type": "string"
         },
-        "connectionId": {
-          "type": "string"
-        },
-        "sourceVersion": {
-          "type": "integer",
-          "minimum": 1
-        },
-        "targetVersion": {
-          "type": "integer",
-          "minimum": 1
-        }
+        "sourceConnectorRef": { "$ref": "../resources/connection/schema.json#/$defs/ConnectorReference" },
+        "targetConnectorRef": { "$ref": "../resources/connection/schema.json#/$defs/ConnectorReference" }
       },
       "required": [
         "taskId",
-        "connectionId",
-        "sourceVersion",
-        "targetVersion"
+        "sourceConnectorRef",
+        "targetConnectorRef"
       ],
       "additionalProperties": false
     },
-    "ForceConnectionStateRequest": {
+    "ConnectionVersionMigrationActionRequest": {
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ActionRequest" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "ConnectionVersionMigration" },
+            "metadata": { "$ref": "#/$defs/ConnectionActionTarget" },
+            "spec": { "$ref": "#/$defs/ConnectionVersionMigrationSpec" }
+          }
+        }
+      ]
+    },
+    "ConnectionVersionMigrationActionResponse": {
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ActionResponse" },
+        {
+          "type": "object",
+          "required": ["status"],
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "ConnectionVersionMigration" },
+            "metadata": { "$ref": "#/$defs/ConnectionActionTarget" },
+            "spec": { "$ref": "#/$defs/ConnectionVersionMigrationSpec" },
+            "status": { "$ref": "#/$defs/ConnectionVersionMigrationStatus" }
+          }
+        }
+      ]
+    },
+    "ConnectionForceStateSpec": {
       "type": "object",
       "properties": {
         "state": {
-          "$ref": "#/$defs/ConnectionState"
+          "$ref": "../resources/connection/schema.json#/$defs/ConnectionState"
         }
       },
       "required": [
@@ -516,17 +542,43 @@
       ],
       "additionalProperties": false
     },
-    "UpdateConnectionRequest": {
+    "ConnectionForceStateStatus": {
       "type": "object",
+      "required": ["connection"],
       "properties": {
-        "labels": {
-          "$ref": "#/$defs/StringMap"
-        },
-        "annotations": {
-          "$ref": "#/$defs/StringMap"
-        }
+        "connection": { "$ref": "#/$defs/Connection" }
       },
       "additionalProperties": false
+    },
+    "ConnectionForceStateActionRequest": {
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ActionRequest" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "ConnectionForceState" },
+            "metadata": { "$ref": "#/$defs/ConnectionActionTarget" },
+            "spec": { "$ref": "#/$defs/ConnectionForceStateSpec" }
+          }
+        }
+      ]
+    },
+    "ConnectionForceStateActionResponse": {
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ActionResponse" },
+        {
+          "type": "object",
+          "required": ["status"],
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "ConnectionForceState" },
+            "metadata": { "$ref": "#/$defs/ConnectionActionTarget" },
+            "spec": { "$ref": "#/$defs/ConnectionForceStateSpec" },
+            "status": { "$ref": "#/$defs/ConnectionForceStateStatus" }
+          }
+        }
+      ]
     },
     "ProxyResponse": {
       "type": "object",

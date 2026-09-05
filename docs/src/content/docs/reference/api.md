@@ -39,10 +39,10 @@ required namespace, resource, resource-ID, and verb scope. See
 ## Resource identity and names
 
 Namespace, actor, connector, connection, key, and rate-limit responses expose a
-human-readable `name` alongside their direct identity (`id`, or `path` for a
-namespace). Keep using the immutable ID in URLs, permissions, foreign-key
-fields, and stored references. Names are for display and discovery; renaming a
-resource does not change its URL.
+human-readable `metadata.name` alongside their direct identity (`metadata.id`,
+or the canonical path for a namespace). Keep using the immutable ID in URLs,
+permissions, foreign-key fields, and stored references. Names are for display
+and discovery; renaming a resource does not change its URL.
 
 Create requests for actors, connectors, connections, keys, and rate limits may
 include `name`. If it is omitted, AuthProxy generates the ID first and uses that
@@ -53,12 +53,28 @@ POST /api/v1/connections/_initiate
 Content-Type: application/json
 
 {
-  "connectorId": "cxr_01example",
-  "intoNamespace": "root.acme",
-  "name": "production-crm",
-  "returnToUrl": "https://app.example.com/integrations/complete"
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "ConnectionInitiate",
+  "metadata": {
+    "target": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connector",
+      "id": "cxr_01example",
+      "generation": 3
+    }
+  },
+  "spec": {
+    "intoNamespace": "root.acme",
+    "name": "production-crm",
+    "returnToUrl": "https://app.example.com/integrations/complete"
+  }
 }
 ```
+
+Omit the connector generation to select its primary generation. The setup
+result is a `ConnectionSetup` action whose `metadata.target` identifies the new
+connection and whose `status.type` is `redirect`, `form`, `verifying`,
+`complete`, or `error`.
 
 Rename through the immutable ID. The response keeps the same `id` and returns
 the new `name`:
@@ -68,7 +84,12 @@ PATCH /api/v1/connections/cxn_01example
 Content-Type: application/json
 
 {
-  "name": "production-salesforce"
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "Connection",
+  "metadata": {
+    "name": "production-salesforce"
+  },
+  "spec": {}
 }
 ```
 
@@ -94,7 +115,51 @@ GET /api/v1/connections?name=production-salesforce&namespace=root.acme
 
 The namespace restriction is important when a query can span multiple
 namespaces, because those namespaces may contain the same name. Results still
-include both `name` and immutable `id`.
+include both `metadata.name` and immutable `metadata.id`.
+
+## Connection resource shape
+
+Connection reads and lists use the `authproxy.net/v1alpha1` resource envelope.
+The connector binding is generation-specific because stored configuration and
+credentials are interpreted by that exact connector definition. The optional
+actor reference records who initiated setup; namespace permissions remain the
+authorization boundary.
+
+```json
+{
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "Connection",
+  "metadata": {
+    "id": "cxn_01example",
+    "name": "production-salesforce",
+    "namespace": "root.acme"
+  },
+  "spec": {
+    "connectorRef": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connector",
+      "id": "cxr_01example",
+      "generation": 3
+    },
+    "actorRef": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Actor",
+      "id": "act_01example"
+    },
+    "configuration": {"tenant": "****"}
+  },
+  "status": {
+    "lifecycle": {"state": "configured"},
+    "health": {"state": "healthy"},
+    "configurationConfigured": true
+  }
+}
+```
+
+Setup values and credentials are never fields on the durable resource. Submit
+them through the typed setup actions; AuthProxy validates them against the
+connector's form definition, encrypts stored values, and redacts secret-bearing
+setup data in ordinary API responses.
 
 The Admin cross-resource endpoint searches names directly and also searches
 user-label values:

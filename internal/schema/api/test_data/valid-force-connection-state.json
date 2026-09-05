@@ -1,3 +1,12 @@
 {
-  "state": "configured"
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "ConnectionForceState",
+  "metadata": {
+    "target": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connection",
+      "id": "cxn_test550e8400abcde"
+    }
+  },
+  "spec": { "state": "configured" }
 }

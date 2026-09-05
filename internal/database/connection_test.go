@@ -37,17 +37,31 @@ func TestConnections(t *testing.T) {
 		}
 		assert.Error(t, c.Validate())
 	})
+	t.Run("validation rejects wrong prefix on actor id", func(t *testing.T) {
+		actorID := apid.New(apid.PrefixConnection)
+		c := &Connection{
+			Id:               apid.New(apid.PrefixConnection),
+			Namespace:        "root",
+			ConnectorId:      apid.New(apid.PrefixConnectorVersion),
+			ConnectorVersion: 1,
+			ActorId:          &actorID,
+			State:            ConnectionStateSetup,
+		}
+		assert.ErrorContains(t, c.Validate(), "actor id")
+	})
 	t.Run("round trip", func(t *testing.T) {
 		_, db := MustApplyBlankTestDbConfig(t, nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 		u := apid.New(apid.PrefixConnection)
+		actorID := apid.New(apid.PrefixActor)
 		err := db.CreateConnection(ctx, &Connection{
 			Id:               u,
 			Namespace:        "root.some-namespace",
 			ConnectorId:      apid.New(apid.PrefixConnectorVersion),
 			ConnectorVersion: 1,
+			ActorId:          &actorID,
 			State:            ConnectionStateSetup,
 		})
 		assert.NoError(t, err)
@@ -56,6 +70,8 @@ func TestConnections(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, c)
 		assert.Equal(t, c.Id, u)
+		require.NotNil(t, c.ActorId)
+		assert.Equal(t, actorID, *c.ActorId)
 		assert.Equal(t, c.State, ConnectionStateSetup)
 		assert.True(t, c.CreatedAt.Equal(now))
 		assert.True(t, c.UpdatedAt.Equal(now))

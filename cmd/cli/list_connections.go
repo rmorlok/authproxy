@@ -7,14 +7,15 @@ import (
 	"github.com/go-resty/resty/v2"
 	"github.com/rmorlok/authproxy/cmd/cli/config"
 	"github.com/rmorlok/authproxy/internal/httperr"
-	routes2 "github.com/rmorlok/authproxy/internal/routes"
+	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
+	connectionschema "github.com/rmorlok/authproxy/internal/schema/resources/connection"
 	"github.com/spf13/cobra"
 )
 
 func cmdListConnections() *cobra.Command {
 	var (
 		resolver *config.Resolver
-		out      Output[routes2.ConnectionJson]
+		out      Output[connectionschema.Connection]
 
 		name  string
 		state string
@@ -43,7 +44,7 @@ func cmdListConnections() *cobra.Command {
 
 			client := resty.New()
 
-			var response routes2.ListConnectionResponseJson
+			var response schemaapi.ListConnectionResponseJson
 			var apiErr httperr.ErrorResponse
 			var resp *resty.Response
 
@@ -66,7 +67,7 @@ func cmdListConnections() *cobra.Command {
 
 			for response.Metadata.Continue != "" && !out.ShouldStop() {
 				cursor := response.Metadata.Continue
-				response = routes2.ListConnectionResponseJson{}
+				response = schemaapi.ListConnectionResponseJson{}
 				req = signer.SignRestyRequest(client.R()).
 					SetResult(&response).
 					SetError(&apiErr)
@@ -85,7 +86,7 @@ func cmdListConnections() *cobra.Command {
 	}
 
 	resolver = config.WithConfigParams(cmd)
-	out = OutputMultiple[routes2.ConnectionJson](cmd)
+	out = OutputMultiple[connectionschema.Connection](cmd)
 
 	cmd.Flags().StringVar(&name, "name", "", "Only show connections with this exact name")
 	cmd.Flags().StringVar(&state, "state", "", "Only show connections in the specified state")

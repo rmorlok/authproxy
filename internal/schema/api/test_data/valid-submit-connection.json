@@ -1,7 +1,18 @@
 {
-  "stepId": "preconnect:0",
-  "data": {
-    "workspace": "ws-123"
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "ConnectionSetupSubmit",
+  "metadata": {
+    "target": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connection",
+      "id": "cxn_test0000000000002"
+    }
   },
-  "returnToUrl": "https://example.com/callback"
+  "spec": {
+    "stepId": "preconnect:0",
+    "data": {
+      "workspace": "ws-123"
+    },
+    "returnToUrl": "https://example.com/callback"
+  }
 }

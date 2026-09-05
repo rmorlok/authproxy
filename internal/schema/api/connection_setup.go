@@ -1,66 +1,84 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
 	"github.com/hashicorp/go-multierror"
-	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/apserde"
+	apiv1alpha1 "github.com/rmorlok/authproxy/internal/schema/api/v1alpha1"
 	"github.com/rmorlok/authproxy/internal/schema/common"
-	nschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
+	connectionschema "github.com/rmorlok/authproxy/internal/schema/resources/connection"
+	connectorschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
+	namespaceschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 )
 
-// InitiateConnectionRequest represents a request to initiate a connection to an external service.
-//
-//	@Description	Request to initiate a connection
-type InitiateConnectionRequest struct {
-	// ID of the connector to initiate the connection for.
-	ConnectorId apid.ID `json:"connectorId" yaml:"connectorId" swaggertype:"string" example:"cxr_test550e8400abcde"`
+const (
+	ConnectionInitiateActionKind    meta.Kind = "ConnectionInitiate"
+	ConnectionSetupActionKind       meta.Kind = "ConnectionSetup"
+	ConnectionSetupSubmitActionKind meta.Kind = "ConnectionSetupSubmit"
+	ConnectionSetupAbortActionKind  meta.Kind = "ConnectionSetupAbort"
+	ConnectionReconfigureActionKind meta.Kind = "ConnectionReconfigure"
+	ConnectionSetupCancelActionKind meta.Kind = "ConnectionSetupCancel"
+	ConnectionSetupRetryActionKind  meta.Kind = "ConnectionSetupRetry"
+	ConnectionReauthActionKind      meta.Kind = "ConnectionReauthenticate"
+)
 
-	// Version of the connector to initiate connection for; if not specified defaults to the primary version.
-	ConnectorVersion uint64 `json:"connectorVersion,omitempty" yaml:"connectorVersion,omitempty" example:"1"`
-
-	// The namespace to create the connection in. Must be the namespace of connector or a child namespace of that
-	// namespace. Defaults to the connector namespace if not specified.
-	IntoNamespace string `json:"intoNamespace,omitempty" yaml:"intoNamespace,omitempty" example:"root.acme"`
-
-	// Optional mutable name for the connection. Defaults to the generated connection ID.
-	Name *common.ResourceName `json:"name,omitempty" yaml:"name,omitempty" swaggertype:"string" example:"production-crm"`
-
-	// The URL to return to after the connection is completed.
-	ReturnToUrl string `json:"returnToUrl" yaml:"returnToUrl" example:"https://example.com/callback"`
+// ConnectionInitiateSpec contains the desired metadata and callback used to
+// create a connection. The action target is the Connector reference; an
+// omitted target generation selects its primary generation.
+type ConnectionInitiateSpec struct {
+	IntoNamespace string               `json:"intoNamespace,omitempty" yaml:"intoNamespace,omitempty"`
+	Name          *common.ResourceName `json:"name,omitempty" yaml:"name,omitempty"`
+	Labels        map[string]string    `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Annotations   map[string]string    `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	ReturnToURL   string               `json:"returnToUrl" yaml:"returnToUrl"`
 }
 
-func (icr *InitiateConnectionRequest) Validate() error {
-	result := &multierror.Error{}
+// ConnectionInitiateAction starts setup for a new Connection.
+type ConnectionInitiateAction struct {
+	apiv1alpha1.Action[ConnectionInitiateSpec, struct{}] `json:",inline" yaml:",inline"`
+}
 
-	if icr.ConnectorId == apid.Nil {
-		result = multierror.Append(result, fmt.Errorf("connector_id is required"))
+func (a *ConnectionInitiateAction) ValidateRequest(expectedKind meta.Kind) error {
+	if err := a.Action.ValidateRequest(expectedKind); err != nil {
+		return err
 	}
-
-	if icr.HasIntoNamespace() {
-		if err := nschema.ValidatePath(icr.IntoNamespace); err != nil {
-			result = multierror.Append(result, err)
+	vc := &common.ValidationContext{Path: "$"}
+	var result *multierror.Error
+	if err := meta.ValidateObjectReferenceWithOptions(a.Metadata.Target, meta.ObjectReferenceValidationOptions{
+		ExpectedAPIVersion: meta.APIVersionV1Alpha1,
+		ExpectedKind:       connectorschema.ConnectorKind,
+		IDValidator:        connectorschema.ValidateID,
+		NamespaceValidator: namespaceschema.ValidatePath,
+	}, vc.PushField("metadata").PushField("target")); err != nil {
+		result = multierror.Append(result, err)
+	}
+	if a.Spec.IntoNamespace != "" {
+		if err := namespaceschema.ValidatePath(a.Spec.IntoNamespace); err != nil {
+			result = multierror.Append(result, vc.NewErrorfForField("spec.intoNamespace", "%v", err))
 		}
 	}
-
-	if icr.Name != nil {
-		if err := icr.Name.Validate(); err != nil {
-			result = multierror.Append(result, fmt.Errorf("invalid connection name: %w", err))
+	if a.Spec.Name != nil {
+		if err := a.Spec.Name.Validate(); err != nil {
+			result = multierror.Append(result, vc.NewErrorfForField("spec.name", "%v", err))
 		}
 	}
-
+	if err := meta.ValidateUserLabels(a.Spec.Labels); err != nil {
+		result = multierror.Append(result, vc.NewErrorfForField("spec.labels", "%v", err))
+	}
+	if err := meta.ValidateAnnotations(a.Spec.Annotations); err != nil {
+		result = multierror.Append(result, vc.NewErrorfForField("spec.annotations", "%v", err))
+	}
+	if a.Spec.ReturnToURL == "" {
+		result = multierror.Append(result, vc.NewErrorForField("spec.returnToUrl", "is required"))
+	}
 	return result.ErrorOrNil()
 }
 
-func (icr *InitiateConnectionRequest) HasVersion() bool {
-	return icr.ConnectorVersion > 0
-}
-
-func (icr *InitiateConnectionRequest) HasIntoNamespace() bool {
-	return icr.IntoNamespace != ""
-}
-
+// ConnectionSetupResponseType identifies the next setup UI/protocol step.
 type ConnectionSetupResponseType string
 
 const (
@@ -71,145 +89,172 @@ const (
 	ConnectionSetupResponseTypeError     ConnectionSetupResponseType = "error"
 )
 
-type ConnectionSetupResponse interface {
-	GetId() apid.ID
-	GetType() ConnectionSetupResponseType
+// ConnectionSetupActionStatus is the observed result of a setup operation.
+// Data may contain previously submitted setup values and is therefore always
+// returned in irreversibly redacted form.
+type ConnectionSetupActionStatus struct {
+	Type            ConnectionSetupResponseType `json:"type" yaml:"type"`
+	RedirectURL     string                      `json:"redirectUrl,omitempty" yaml:"redirectUrl,omitempty"`
+	StepID          string                      `json:"stepId,omitempty" yaml:"stepId,omitempty"`
+	StepTitle       string                      `json:"stepTitle,omitempty" yaml:"stepTitle,omitempty"`
+	StepDescription string                      `json:"stepDescription,omitempty" yaml:"stepDescription,omitempty"`
+	JSONSchema      json.RawMessage             `json:"jsonSchema,omitempty" yaml:"jsonSchema,omitempty"`
+	UISchema        json.RawMessage             `json:"uiSchema,omitempty" yaml:"uiSchema,omitempty"`
+	Data            json.RawMessage             `json:"data,omitempty" yaml:"data,omitempty" apiredact:"secret"`
+	Error           string                      `json:"error,omitempty" yaml:"error,omitempty"`
+	CanRetry        bool                        `json:"canRetry,omitempty" yaml:"canRetry,omitempty"`
 }
 
-// ConnectionSetupRedirect represents the response when a connection requires a redirect for OAuth.
-//
-//	@Description	Redirect response for connection setup
-type ConnectionSetupRedirect struct {
-	// Connection UUID.
-	Id apid.ID `json:"id" yaml:"id" swaggertype:"string" example:"cxn_test550e8400abcde"`
-
-	// Response type.
-	Type ConnectionSetupResponseType `json:"type" yaml:"type" swaggertype:"string" example:"redirect"`
-
-	// URL to redirect the user to.
-	RedirectUrl string `json:"redirectUrl" yaml:"redirectUrl" example:"https://oauth.provider.com/authorize?..."`
+// ConnectionSetupAction returns the current or next setup observation. Its
+// target is always the Connection being configured.
+type ConnectionSetupAction struct {
+	apiv1alpha1.Action[struct{}, ConnectionSetupActionStatus] `json:",inline" yaml:",inline"`
 }
 
-func (icr *ConnectionSetupRedirect) GetId() apid.ID {
-	return icr.Id
+func (a *ConnectionSetupAction) ValidateResponse(expectedKind meta.Kind) error {
+	if err := a.Action.ValidateResponse(expectedKind); err != nil {
+		return err
+	}
+	if err := validateConnectionActionTarget(a.Metadata.Target); err != nil {
+		return err
+	}
+	if a.Status == nil {
+		return fmt.Errorf("$.status: is required")
+	}
+
+	switch a.Status.Type {
+	case ConnectionSetupResponseTypeRedirect:
+		if a.Status.RedirectURL == "" {
+			return fmt.Errorf("$.status.redirectUrl: is required for a redirect setup result")
+		}
+	case ConnectionSetupResponseTypeForm:
+		if a.Status.StepID == "" {
+			return fmt.Errorf("$.status.stepId: is required for a form setup result")
+		}
+		if len(a.Status.JSONSchema) == 0 {
+			return fmt.Errorf("$.status.jsonSchema: is required for a form setup result")
+		}
+		if len(a.Status.UISchema) == 0 {
+			return fmt.Errorf("$.status.uiSchema: is required for a form setup result")
+		}
+	case ConnectionSetupResponseTypeComplete, ConnectionSetupResponseTypeVerifying:
+	case ConnectionSetupResponseTypeError:
+		if a.Status.Error == "" {
+			return fmt.Errorf("$.status.error: is required for an error setup result")
+		}
+	default:
+		return fmt.Errorf("$.status.type: is not a recognized setup result type")
+	}
+	return nil
 }
 
-func (icr *ConnectionSetupRedirect) GetType() ConnectionSetupResponseType {
-	return icr.Type
+func NewConnectionSetupAction(
+	target meta.ObjectReference,
+	status ConnectionSetupActionStatus,
+) ConnectionSetupAction {
+	return ConnectionSetupAction{Action: apiv1alpha1.NewActionResponse(
+		ConnectionSetupActionKind,
+		target,
+		struct{}{},
+		status,
+	)}
 }
 
-// ConnectionSetupForm represents the response when a connection requires form input.
-//
-//	@Description	Form response for connection setup
-type ConnectionSetupForm struct {
-	// Connection UUID.
-	Id apid.ID `json:"id" yaml:"id" swaggertype:"string" example:"cxn_test550e8400abcde"`
+// RedactConnectionSetupData returns a deep-copied setup-data object with every
+// value masked. Setup submissions are write-only even for callers authorized
+// to replay secrets from other resource types.
+func RedactConnectionSetupData(data json.RawMessage) (json.RawMessage, error) {
+	if len(data) == 0 {
+		return nil, nil
+	}
 
-	// Response type.
-	Type ConnectionSetupResponseType `json:"type" yaml:"type" swaggertype:"string" example:"form"`
+	value := struct {
+		Data json.RawMessage `json:"data" apiredact:"secret"`
+	}{Data: data}
+	redacted, _, err := apserde.MarshalJSONForAPI(context.Background(), value)
+	if err != nil {
+		return nil, fmt.Errorf("redact connection setup data: %w", err)
+	}
 
-	// Step ID being submitted.
-	StepId string `json:"stepId" yaml:"stepId" example:"preconnect:0"`
-
-	// Step title.
-	StepTitle string `json:"stepTitle,omitempty" yaml:"stepTitle,omitempty" example:"Choose workspace"`
-
-	// Step description.
-	StepDescription string `json:"stepDescription,omitempty" yaml:"stepDescription,omitempty"`
-
-	// JSON Schema defining the form fields.
-	JsonSchema json.RawMessage `json:"jsonSchema" yaml:"jsonSchema" swaggertype:"object"`
-
-	// UI Schema for JSON Forms rendering.
-	UiSchema json.RawMessage `json:"uiSchema" yaml:"uiSchema" swaggertype:"object"`
-
-	// Existing values for fields in this step. Present when reconfiguring a
-	// configured connection so clients can initialize the form without exposing
-	// configuration values owned by other setup steps.
-	Data json.RawMessage `json:"data,omitempty" yaml:"data,omitempty" swaggertype:"object"`
+	var result struct {
+		Data json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(redacted, &result); err != nil {
+		return nil, fmt.Errorf("decode redacted connection setup data: %w", err)
+	}
+	return result.Data, nil
 }
 
-func (icf *ConnectionSetupForm) GetId() apid.ID {
-	return icf.Id
+// ConnectionSetupSubmitSpec contains one setup-form submission. Data is a
+// write-only secret-bearing object.
+type ConnectionSetupSubmitSpec struct {
+	StepID      string          `json:"stepId" yaml:"stepId"`
+	Data        json.RawMessage `json:"data" yaml:"data" apiredact:"secret"`
+	ReturnToURL string          `json:"returnToUrl,omitempty" yaml:"returnToUrl,omitempty"`
 }
 
-func (icf *ConnectionSetupForm) GetType() ConnectionSetupResponseType {
-	return icf.Type
+type ConnectionSetupSubmitAction struct {
+	apiv1alpha1.Action[ConnectionSetupSubmitSpec, struct{}] `json:",inline" yaml:",inline"`
 }
 
-// ConnectionSetupComplete represents the response when a connection setup is complete.
-//
-//	@Description	Completion response for connection setup
-type ConnectionSetupComplete struct {
-	// Connection UUID.
-	Id apid.ID `json:"id" yaml:"id" swaggertype:"string" example:"cxn_test550e8400abcde"`
-
-	// Response type.
-	Type ConnectionSetupResponseType `json:"type" yaml:"type" swaggertype:"string" example:"complete"`
+func (a *ConnectionSetupSubmitAction) ValidateRequest(expectedKind meta.Kind) error {
+	if err := a.Action.ValidateRequest(expectedKind); err != nil {
+		return err
+	}
+	if a.Spec.StepID == "" {
+		return fmt.Errorf("$.spec.stepId: is required")
+	}
+	if len(a.Spec.Data) == 0 || string(a.Spec.Data) == "null" {
+		return fmt.Errorf("$.spec.data: is required and must not be null")
+	}
+	return validateConnectionActionTarget(a.Metadata.Target)
 }
 
-func (icc *ConnectionSetupComplete) GetId() apid.ID {
-	return icc.Id
+// ConnectionSetupControlSpec is shared by retry and reauthentication actions.
+type ConnectionSetupControlSpec struct {
+	ReturnToURL string `json:"returnToUrl,omitempty" yaml:"returnToUrl,omitempty"`
 }
 
-func (icc *ConnectionSetupComplete) GetType() ConnectionSetupResponseType {
-	return icc.Type
+type ConnectionSetupControlAction struct {
+	apiv1alpha1.Action[ConnectionSetupControlSpec, struct{}] `json:",inline" yaml:",inline"`
 }
 
-// ConnectionSetupVerifying indicates that probes are running in the background to verify
-// the credentials obtained during auth. The UI should poll /_setup_step to observe the outcome.
-type ConnectionSetupVerifying struct {
-	Id   apid.ID                     `json:"id" yaml:"id" swaggertype:"string" example:"cxn_test550e8400abcde"`
-	Type ConnectionSetupResponseType `json:"type" yaml:"type" swaggertype:"string" example:"verifying"`
+func (a *ConnectionSetupControlAction) ValidateRequest(expectedKind meta.Kind) error {
+	if err := a.Action.ValidateRequest(expectedKind); err != nil {
+		return err
+	}
+	return validateConnectionActionTarget(a.Metadata.Target)
 }
 
-func (icv *ConnectionSetupVerifying) GetId() apid.ID {
-	return icv.Id
+type EmptyConnectionAction struct {
+	apiv1alpha1.Action[struct{}, struct{}] `json:",inline" yaml:",inline"`
 }
 
-func (icv *ConnectionSetupVerifying) GetType() ConnectionSetupResponseType {
-	return icv.Type
+func (a *EmptyConnectionAction) ValidateRequest(expectedKind meta.Kind) error {
+	if err := a.Action.ValidateRequest(expectedKind); err != nil {
+		return err
+	}
+	return validateConnectionActionTarget(a.Metadata.Target)
 }
 
-// ConnectionSetupError is a terminal error response during setup, e.g. when probe verification
-// fails. The UI should show the error and offer retry (POST /_retry) or cancel (POST /_abort).
-type ConnectionSetupError struct {
-	Id       apid.ID                     `json:"id" yaml:"id" swaggertype:"string" example:"cxn_test550e8400abcde"`
-	Type     ConnectionSetupResponseType `json:"type" yaml:"type" swaggertype:"string" example:"error"`
-	Error    string                      `json:"error" yaml:"error" example:"probe verification failed"`
-	CanRetry bool                        `json:"canRetry" yaml:"canRetry" example:"true"`
+func validateConnectionActionTarget(target meta.ObjectReference) error {
+	vc := &common.ValidationContext{Path: "$.metadata.target"}
+	if err := meta.ValidateObjectReferenceWithOptions(target, meta.ObjectReferenceValidationOptions{
+		ExpectedAPIVersion: meta.APIVersionV1Alpha1,
+		ExpectedKind:       connectionschema.ConnectionKind,
+		IDValidator:        connectionschema.ValidateID,
+		NamespaceValidator: namespaceschema.ValidatePath,
+	}, vc); err != nil {
+		return err
+	}
+	if target.Generation != 0 {
+		return vc.NewErrorForField("generation", "does not apply to connections")
+	}
+	return nil
 }
 
-func (ice *ConnectionSetupError) GetId() apid.ID {
-	return ice.Id
-}
-
-func (ice *ConnectionSetupError) GetType() ConnectionSetupResponseType {
-	return ice.Type
-}
-
-// SubmitConnectionRequest represents a form data submission for a connection setup step.
-//
-//	@Description	Form submission data
-type SubmitConnectionRequest struct {
-	// StepId is the id of the step being submitted. Must match the current setup step's id.
-	StepId string `json:"stepId" yaml:"stepId" example:"preconnect:0"`
-
-	// Data is the form data submitted by the user for the current step.
-	Data json.RawMessage `json:"data" yaml:"data" swaggertype:"object"`
-
-	// ReturnToUrl is required when the next step after form submission is an auth redirect.
-	// The client should provide this so the OAuth callback knows where to return.
-	ReturnToUrl string `json:"returnToUrl,omitempty" yaml:"returnToUrl,omitempty" example:"https://example.com/callback"`
-}
-
-// DataSourceOptionJson represents a single option from a data source for populating form dropdowns.
-//
-//	@Description	Data source option for form select fields
+// DataSourceOptionJson represents a single option from a setup data source.
 type DataSourceOptionJson struct {
-	// Option value.
 	Value string `json:"value" yaml:"value" example:"ws-123"`
-
-	// Human-readable label.
 	Label string `json:"label" yaml:"label" example:"My Workspace"`
 }

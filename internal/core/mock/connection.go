@@ -12,7 +12,9 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	connectionschema "github.com/rmorlok/authproxy/internal/schema/resources/connection"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 )
 
 type Connection struct {
@@ -23,6 +25,8 @@ type Connection struct {
 	HealthState       database.ConnectionHealthState
 	ConnectorId       apid.ID
 	ConnectorVersion  uint64
+	ActorId           *apid.ID
+	ConnectorValue    iface.Connector
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
 	DeletedAt         *time.Time
@@ -58,6 +62,14 @@ func (m *Connection) GetConnectorVersion() uint64 {
 	return m.ConnectorVersion
 }
 
+func (m *Connection) GetActorId() *apid.ID {
+	if m.ActorId == nil {
+		return nil
+	}
+	actorID := *m.ActorId
+	return &actorID
+}
+
 func (m *Connection) GetCreatedAt() time.Time {
 	return m.CreatedAt
 }
@@ -75,7 +87,54 @@ func (m *Connection) GetLabels() map[string]string {
 }
 
 func (m *Connection) GetConnector() iface.Connector {
-	return nil
+	return m.ConnectorValue
+}
+
+func (m *Connection) GetResource(ctx context.Context) (*connectionschema.Connection, error) {
+	resource := connectionschema.NewConnection()
+	createdAt := m.CreatedAt
+	updatedAt := m.UpdatedAt
+	resource.Metadata = meta.ObjectMeta{
+		ID:          m.Id.String(),
+		Name:        m.Name,
+		Namespace:   m.Namespace,
+		Labels:      m.Labels,
+		Annotations: m.Annotations,
+		CreatedAt:   &createdAt,
+		UpdatedAt:   &updatedAt,
+	}
+	resource.Spec.ActorRef = connectionschema.NewActorReference(apid.Nil)
+	resource.Spec.Configuration = cloneMap(m.Configuration)
+	if m.ActorId != nil {
+		resource.Spec.ActorRef = connectionschema.NewActorReference(*m.ActorId)
+	}
+	if m.ConnectorValue != nil {
+		connectorResource := m.ConnectorValue.GetResource()
+		resource.Spec.ConnectorRef = meta.NewObjectReference(connectorResource.TypeMeta, connectorResource.Metadata)
+	}
+	resource.Status = &connectionschema.ConnectionStatus{
+		Lifecycle:               connectionschema.ConnectionLifecycleStatus{State: connectionschema.ConnectionState(m.State)},
+		Health:                  connectionschema.ConnectionHealthStatus{State: connectionschema.ConnectionHealthState(m.GetHealthState())},
+		ConfigurationConfigured: len(m.Configuration) > 0,
+	}
+	if m.SetupStep != nil || m.SetupError != nil {
+		resource.Status.Setup = &connectionschema.ConnectionSetupStatus{Error: m.SetupError}
+		if m.SetupStep != nil {
+			resource.Status.Setup.StepID = m.SetupStep.String()
+		}
+	}
+	return resource, nil
+}
+
+func cloneMap(source map[string]any) map[string]any {
+	if source == nil {
+		return nil
+	}
+	result := make(map[string]any, len(source))
+	for key, value := range source {
+		result[key] = value
+	}
+	return result
 }
 
 func (m *Connection) SetState(ctx context.Context, state database.ConnectionState) error {

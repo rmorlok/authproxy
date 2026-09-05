@@ -5,6 +5,28 @@ definitions:
       signingKeyConfigured:
         type: boolean
     type: object
+  api.ConnectionInitiateSpec:
+    properties:
+      annotations:
+        additionalProperties:
+          type: string
+        type: object
+      intoNamespace:
+        type: string
+      labels:
+        additionalProperties:
+          type: string
+        type: object
+      name:
+        type: string
+      returnToUrl:
+        type: string
+    type: object
+  api.ConnectionSetupControlSpec:
+    properties:
+      returnToUrl:
+        type: string
+    type: object
   api.MetricsSchemaMetricJson:
     description: Supported metric definition
     properties:
@@ -44,6 +66,36 @@ definitions:
         items:
           type: string
         type: array
+    type: object
+  connection.ConnectionHealthStatus:
+    properties:
+      state:
+        type: string
+    type: object
+  connection.ConnectionLifecycleStatus:
+    properties:
+      state:
+        type: string
+    type: object
+  connection.ConnectionSetupStatus:
+    properties:
+      error:
+        type: string
+      stepId:
+        type: string
+    type: object
+  connection.ConnectionSpecPatch:
+    type: object
+  connection.ConnectionStatus:
+    properties:
+      configurationConfigured:
+        type: boolean
+      health:
+        $ref: '#/definitions/connection.ConnectionHealthStatus'
+      lifecycle:
+        $ref: '#/definitions/connection.ConnectionLifecycleStatus'
+      setup:
+        $ref: '#/definitions/connection.ConnectionSetupStatus'
     type: object
   connectors.ConnectorReleaseSpec:
     properties:
@@ -253,42 +305,139 @@ definitions:
       signingKey:
         type: object
     type: object
-  openapi.ConnectionJson:
-    description: Connection to an external service
+  openapi.ConnectionActionMetaJson:
     properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      connector:
-        $ref: '#/definitions/openapi.ConnectorJson'
-      createdAt:
+      target:
+        $ref: '#/definitions/meta.ObjectReference'
+    required:
+    - target
+    type: object
+  openapi.ConnectionDisconnectSpecJson:
+    properties:
+      timeoutSeconds:
+        example: 600
+        type: integer
+    type: object
+  openapi.ConnectionDisconnectStatusJson:
+    properties:
+      connection:
+        $ref: '#/definitions/openapi.ConnectionJson'
+      taskId:
         type: string
-      healthState:
-        example: healthy
-        type: string
-      id:
-        example: cxn_test550e8400abcde
-        type: string
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-      name:
-        example: production-crm
-        type: string
-      namespace:
-        example: root.acme
-        type: string
-      setupError:
-        type: string
-      setupStepId:
-        example: tenant
-        type: string
+    type: object
+  openapi.ConnectionForceStateSpecJson:
+    properties:
       state:
-        example: configured
+        enum:
+        - setup
+        - configured
+        - disabled
+        - disconnecting
+        - disconnected
         type: string
-      updatedAt:
+    required:
+    - state
+    type: object
+  openapi.ConnectionForceStateStatusJson:
+    properties:
+      connection:
+        $ref: '#/definitions/openapi.ConnectionJson'
+    type: object
+  openapi.ConnectionJson:
+    description: Kubernetes-style Connection resource
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - Connection
+        example: Connection
+        type: string
+      metadata:
+        $ref: '#/definitions/meta.ObjectMeta'
+      spec:
+        $ref: '#/definitions/openapi.ConnectionSpecJson'
+      status:
+        $ref: '#/definitions/connection.ConnectionStatus'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
+  openapi.ConnectionSetupActionStatusJson:
+    properties:
+      canRetry:
+        type: boolean
+      data:
+        type: object
+      error:
+        type: string
+      jsonSchema:
+        type: object
+      redirectUrl:
+        type: string
+      stepDescription:
+        type: string
+      stepId:
+        type: string
+      stepTitle:
+        type: string
+      type:
+        enum:
+        - redirect
+        - form
+        - complete
+        - verifying
+        - error
+        type: string
+      uiSchema:
+        type: object
+    type: object
+  openapi.ConnectionSetupSubmitSpecJson:
+    properties:
+      data:
+        additionalProperties: true
+        type: object
+      returnToUrl:
+        type: string
+      stepId:
+        type: string
+    required:
+    - data
+    - stepId
+    type: object
+  openapi.ConnectionSpecJson:
+    properties:
+      actorRef:
+        $ref: '#/definitions/meta.ObjectReference'
+      configuration:
+        type: object
+      connectorRef:
+        $ref: '#/definitions/meta.ObjectReference'
+    required:
+    - connectorRef
+    type: object
+  openapi.ConnectionVersionMigrationSpecJson:
+    properties:
+      connectorRef:
+        $ref: '#/definitions/meta.ObjectReference'
+      timeoutSeconds:
+        example: 600
+        type: integer
+    required:
+    - connectorRef
+    type: object
+  openapi.ConnectionVersionMigrationStatusJson:
+    properties:
+      sourceConnectorRef:
+        $ref: '#/definitions/meta.ObjectReference'
+      targetConnectorRef:
+        $ref: '#/definitions/meta.ObjectReference'
+      taskId:
         type: string
     type: object
   openapi.ConnectorJson:
@@ -792,78 +941,12 @@ definitions:
           type: string
         type: array
     type: object
-  routes.ConnectionSetupComplete:
-    description: Completion response for connection setup
-    properties:
-      id:
-        description: Connection UUID.
-        example: cxn_test550e8400abcde
-        type: string
-      type:
-        description: Response type.
-        example: complete
-        type: string
-    type: object
-  routes.ConnectionSetupForm:
-    description: Form response for connection setup
-    properties:
-      data:
-        description: |-
-          Existing values for fields in this step. Present when reconfiguring a
-          configured connection so clients can initialize the form without exposing
-          configuration values owned by other setup steps.
-        type: object
-      id:
-        description: Connection UUID.
-        example: cxn_test550e8400abcde
-        type: string
-      jsonSchema:
-        description: JSON Schema defining the form fields.
-        type: object
-      stepDescription:
-        description: Step description.
-        type: string
-      stepId:
-        description: Step ID being submitted.
-        example: preconnect:0
-        type: string
-      stepTitle:
-        description: Step title.
-        example: Choose workspace
-        type: string
-      type:
-        description: Response type.
-        example: form
-        type: string
-      uiSchema:
-        description: UI Schema for JSON Forms rendering.
-        type: object
-    type: object
-  routes.ConnectionSetupRedirect:
-    description: Redirect response for connection setup
-    properties:
-      id:
-        description: Connection UUID.
-        example: cxn_test550e8400abcde
-        type: string
-      redirectUrl:
-        description: URL to redirect the user to.
-        example: https://oauth.provider.com/authorize?...
-        type: string
-      type:
-        description: Response type.
-        example: redirect
-        type: string
-    type: object
   routes.DataSourceOptionJson:
-    description: Data source option for form select fields
     properties:
       label:
-        description: Human-readable label.
         example: My Workspace
         type: string
       value:
-        description: Option value.
         example: ws-123
         type: string
     type: object
@@ -885,41 +968,6 @@ definitions:
         example: primary
         type: string
     type: object
-  routes.ForceStateRequestJson:
-    description: Request to force a connection state
-    properties:
-      state:
-        example: configured
-        type: string
-    type: object
-  routes.InitiateConnectionRequest:
-    description: Request to initiate a connection
-    properties:
-      connectorId:
-        description: ID of the connector to initiate the connection for.
-        example: cxr_test550e8400abcde
-        type: string
-      connectorVersion:
-        description: Version of the connector to initiate connection for; if not specified
-          defaults to the primary version.
-        example: 1
-        type: integer
-      intoNamespace:
-        description: |-
-          The namespace to create the connection in. Must be the namespace of connector or a child namespace of that
-          namespace. Defaults to the connector namespace if not specified.
-        example: root.acme
-        type: string
-      name:
-        description: Optional mutable name for the connection. Defaults to the generated
-          connection ID.
-        example: production-crm
-        type: string
-      returnToUrl:
-        description: The URL to return to after the connection is completed.
-        example: https://example.com/callback
-        type: string
-    type: object
   routes.KeyValueJson:
     properties:
       key:
@@ -938,43 +986,218 @@ definitions:
           type: string
         type: array
     type: object
-  routes.OpenAPIConnectionJson:
-    description: Connection to an external service
+  routes.OpenAPIConnectionDisconnectActionJson:
     properties:
-      annotations:
-        additionalProperties:
-          type: string
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - ConnectionDisconnect
+        example: ConnectionDisconnect
+        type: string
+      metadata:
+        $ref: '#/definitions/openapi.ConnectionActionMetaJson'
+      spec:
+        $ref: '#/definitions/openapi.ConnectionDisconnectSpecJson'
+      status:
+        $ref: '#/definitions/openapi.ConnectionDisconnectStatusJson'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
+  routes.OpenAPIConnectionForceStateActionJson:
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - ConnectionForceState
+        example: ConnectionForceState
+        type: string
+      metadata:
+        $ref: '#/definitions/openapi.ConnectionActionMetaJson'
+      spec:
+        $ref: '#/definitions/openapi.ConnectionForceStateSpecJson'
+      status:
+        $ref: '#/definitions/openapi.ConnectionForceStateStatusJson'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
+  routes.OpenAPIConnectionInitiateActionJson:
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - ConnectionInitiate
+        example: ConnectionInitiate
+        type: string
+      metadata:
+        $ref: '#/definitions/openapi.ConnectionActionMetaJson'
+      spec:
+        $ref: '#/definitions/api.ConnectionInitiateSpec'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
+  routes.OpenAPIConnectionJson:
+    description: Kubernetes-style Connection resource
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - Connection
+        example: Connection
+        type: string
+      metadata:
+        $ref: '#/definitions/meta.ObjectMeta'
+      spec:
+        $ref: '#/definitions/openapi.ConnectionSpecJson'
+      status:
+        $ref: '#/definitions/connection.ConnectionStatus'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
+  routes.OpenAPIConnectionPatchJson:
+    description: Kubernetes-style Connection patch. Connector and actor bindings are
+      immutable.
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - Connection
+        example: Connection
+        type: string
+      metadata:
+        $ref: '#/definitions/meta.ObjectMetaPatch'
+      spec:
+        $ref: '#/definitions/connection.ConnectionSpecPatch'
+      status:
+        $ref: '#/definitions/connection.ConnectionStatus'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
+  routes.OpenAPIConnectionSetupActionJson:
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - ConnectionSetup
+        example: ConnectionSetup
+        type: string
+      metadata:
+        $ref: '#/definitions/openapi.ConnectionActionMetaJson'
+      spec:
         type: object
-      connector:
-        $ref: '#/definitions/openapi.ConnectorJson'
-      createdAt:
+      status:
+        $ref: '#/definitions/openapi.ConnectionSetupActionStatusJson'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
+  routes.OpenAPIConnectionSetupControlActionJson:
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
         type: string
-      healthState:
-        example: healthy
+      kind:
+        enum:
+        - ConnectionSetupRetry
+        - ConnectionReauthenticate
         type: string
-      id:
-        example: cxn_test550e8400abcde
+      metadata:
+        $ref: '#/definitions/openapi.ConnectionActionMetaJson'
+      spec:
+        $ref: '#/definitions/api.ConnectionSetupControlSpec'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
+  routes.OpenAPIConnectionSetupSubmitActionJson:
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
         type: string
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-      name:
-        example: production-crm
+      kind:
+        enum:
+        - ConnectionSetupSubmit
+        example: ConnectionSetupSubmit
         type: string
-      namespace:
-        example: root.acme
+      metadata:
+        $ref: '#/definitions/openapi.ConnectionActionMetaJson'
+      spec:
+        $ref: '#/definitions/openapi.ConnectionSetupSubmitSpecJson'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
+  routes.OpenAPIConnectionVersionMigrationActionJson:
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
         type: string
-      setupError:
+      kind:
+        enum:
+        - ConnectionVersionMigration
+        example: ConnectionVersionMigration
         type: string
-      setupStepId:
-        example: tenant
-        type: string
-      state:
-        example: configured
-        type: string
-      updatedAt:
-        type: string
+      metadata:
+        $ref: '#/definitions/openapi.ConnectionActionMetaJson'
+      spec:
+        $ref: '#/definitions/openapi.ConnectionVersionMigrationSpecJson'
+      status:
+        $ref: '#/definitions/openapi.ConnectionVersionMigrationStatusJson'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
     type: object
   routes.OpenAPIConnectorJson:
     description: Kubernetes-style Connector resource
@@ -1042,19 +1265,28 @@ definitions:
     - metadata
     - spec
     type: object
-  routes.OpenAPIDisconnectConnectionRequestJson:
-    description: Request body for connection disconnect operations
+  routes.OpenAPIEmptyConnectionActionJson:
     properties:
-      timeoutSeconds:
-        example: 600
-        type: integer
-    type: object
-  routes.OpenAPIDisconnectResponseJson:
-    description: Response for disconnect operation
-    properties:
-      connection: {}
-      taskId:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
         type: string
+      kind:
+        enum:
+        - ConnectionSetupAbort
+        - ConnectionReconfigure
+        - ConnectionSetupCancel
+        type: string
+      metadata:
+        $ref: '#/definitions/openapi.ConnectionActionMetaJson'
+      spec:
+        type: object
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
     type: object
   routes.OpenAPIListConnectionResponseJson:
     description: Paginated list of connections
@@ -1149,31 +1381,6 @@ definitions:
         items:
           $ref: '#/definitions/api.MetricsSchemaMetricJson'
         type: array
-    type: object
-  routes.OpenAPIMigrateConnectionVersionRequestJson:
-    description: Request body for connection connector-version migration operations
-    properties:
-      targetVersion:
-        example: 3
-        type: integer
-      timeoutSeconds:
-        example: 600
-        type: integer
-    type: object
-  routes.OpenAPIMigrateConnectionVersionResponseJson:
-    description: Response for connection connector-version migration operation
-    properties:
-      connectionId:
-        example: cxn_test550e8400abcde
-        type: string
-      sourceVersion:
-        example: 1
-        type: integer
-      targetVersion:
-        example: 3
-        type: integer
-      taskId:
-        type: string
     type: object
   routes.OpenAPIProxyResponseJson:
     description: Response from a proxied HTTP request
@@ -1338,16 +1545,6 @@ definitions:
         example: production
         type: string
     type: object
-  routes.ReauthConnectionRequest:
-    properties:
-      returnToUrl:
-        type: string
-    type: object
-  routes.RetryConnectionRequest:
-    properties:
-      returnToUrl:
-        type: string
-    type: object
   routes.SessionInitiateFailureResponse:
     properties:
       redirectUrl:
@@ -1364,39 +1561,6 @@ definitions:
     properties:
       actorId:
         example: act_test550e8400abcde
-        type: string
-    type: object
-  routes.SubmitConnectionRequest:
-    description: Form submission data
-    properties:
-      data:
-        description: Data is the form data submitted by the user for the current step.
-        type: object
-      returnToUrl:
-        description: |-
-          ReturnToUrl is required when the next step after form submission is an auth redirect.
-          The client should provide this so the OAuth callback knows where to return.
-        example: https://example.com/callback
-        type: string
-      stepId:
-        description: StepId is the id of the step being submitted. Must match the
-          current setup step's id.
-        example: preconnect:0
-        type: string
-    type: object
-  routes.UpdateConnectionRequestJson:
-    description: Request to update a connection's labels and annotations
-    properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-      name:
-        example: production-crm
         type: string
     type: object
   v1alpha1.ListMeta:
@@ -2190,19 +2354,19 @@ paths:
       - application/json
       description: Initiate a new connection to an external service through a connector
       parameters:
-      - description: Connection initiation request
+      - description: Connection initiation action
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.InitiateConnectionRequest'
+          $ref: '#/definitions/routes.OpenAPIConnectionInitiateActionJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.ConnectionSetupRedirect'
+            $ref: '#/definitions/routes.OpenAPIConnectionSetupActionJson'
         "400":
           description: Bad Request
           schema:
@@ -2278,7 +2442,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.UpdateConnectionRequestJson'
+          $ref: '#/definitions/routes.OpenAPIConnectionPatchJson'
       produces:
       - application/json
       responses:
@@ -2317,6 +2481,8 @@ paths:
       - connections
   /connections/{id}/_abort:
     post:
+      consumes:
+      - application/json
       description: Abort an in-progress connection setup, cleaning up credentials
         and deleting the connection
       parameters:
@@ -2325,6 +2491,12 @@ paths:
         name: id
         required: true
         type: string
+      - description: Abort action
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.OpenAPIEmptyConnectionActionJson'
       produces:
       - application/json
       responses:
@@ -2349,6 +2521,8 @@ paths:
       - connections
   /connections/{id}/_cancelSetup:
     post:
+      consumes:
+      - application/json
       description: Abandon a reconfigure attempt on a ready connection by clearing
         setup_step and setup_error. The connection remains ready and its previously
         stored configuration continues to apply.
@@ -2358,6 +2532,12 @@ paths:
         name: id
         required: true
         type: string
+      - description: Cancel setup action
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.OpenAPIEmptyConnectionActionJson'
       produces:
       - application/json
       responses:
@@ -2432,18 +2612,19 @@ paths:
         name: id
         required: true
         type: string
-      - description: Disconnect options
+      - description: Disconnect action
         in: body
         name: request
+        required: true
         schema:
-          $ref: '#/definitions/routes.OpenAPIDisconnectConnectionRequestJson'
+          $ref: '#/definitions/routes.OpenAPIConnectionDisconnectActionJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIDisconnectResponseJson'
+            $ref: '#/definitions/routes.OpenAPIConnectionDisconnectActionJson'
         "400":
           description: Bad Request
           schema:
@@ -2476,19 +2657,19 @@ paths:
         name: id
         required: true
         type: string
-      - description: New state
+      - description: Force-state action
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.ForceStateRequestJson'
+          $ref: '#/definitions/routes.OpenAPIConnectionForceStateActionJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIConnectionJson'
+            $ref: '#/definitions/routes.OpenAPIConnectionForceStateActionJson'
         "400":
           description: Bad Request
           schema:
@@ -2526,19 +2707,19 @@ paths:
         name: id
         required: true
         type: string
-      - description: Migration options
+      - description: Migration action
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.OpenAPIMigrateConnectionVersionRequestJson'
+          $ref: '#/definitions/routes.OpenAPIConnectionVersionMigrationActionJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIMigrateConnectionVersionResponseJson'
+            $ref: '#/definitions/routes.OpenAPIConnectionVersionMigrationActionJson'
         "400":
           description: Bad Request
           schema:
@@ -2631,19 +2812,19 @@ paths:
         name: id
         required: true
         type: string
-      - description: Reauth request
+      - description: Reauthentication action
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.ReauthConnectionRequest'
+          $ref: '#/definitions/routes.OpenAPIConnectionSetupControlActionJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.ConnectionSetupForm'
+            $ref: '#/definitions/routes.OpenAPIConnectionSetupActionJson'
         "400":
           description: Bad Request
           schema:
@@ -2663,6 +2844,8 @@ paths:
       - connections
   /connections/{id}/_reconfigure:
     post:
+      consumes:
+      - application/json
       description: Restart the configure phase for a completed connection, allowing
         re-entry of post-auth settings
       parameters:
@@ -2671,13 +2854,19 @@ paths:
         name: id
         required: true
         type: string
+      - description: Reconfigure action
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.OpenAPIEmptyConnectionActionJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.ConnectionSetupForm'
+            $ref: '#/definitions/routes.OpenAPIConnectionSetupActionJson'
         "400":
           description: Bad Request
           schema:
@@ -2711,19 +2900,19 @@ paths:
         name: id
         required: true
         type: string
-      - description: Retry request
+      - description: Retry action
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.RetryConnectionRequest'
+          $ref: '#/definitions/routes.OpenAPIConnectionSetupControlActionJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.ConnectionSetupForm'
+            $ref: '#/definitions/routes.OpenAPIConnectionSetupActionJson'
         "400":
           description: Bad Request
           schema:
@@ -2761,7 +2950,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.ConnectionSetupComplete'
+            $ref: '#/definitions/routes.OpenAPIConnectionSetupActionJson'
         "400":
           description: Bad Request
           schema:
@@ -2790,19 +2979,19 @@ paths:
         name: id
         required: true
         type: string
-      - description: Form submission data
+      - description: Form submission action
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.SubmitConnectionRequest'
+          $ref: '#/definitions/routes.OpenAPIConnectionSetupSubmitActionJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.ConnectionSetupComplete'
+            $ref: '#/definitions/routes.OpenAPIConnectionSetupActionJson'
         "400":
           description: Bad Request
           schema:

@@ -93,6 +93,7 @@ type Connection struct {
 	HealthState            ConnectionHealthState
 	ConnectorId            apid.ID
 	ConnectorVersion       uint64
+	ActorId                *apid.ID
 	Labels                 Labels
 	Annotations            Annotations
 	EncryptedConfiguration *encfield.EncryptedField
@@ -113,6 +114,7 @@ func (c *Connection) cols() []string {
 		"health_state",
 		"connector_id",
 		"connector_version",
+		"actor_id",
 		"labels",
 		"annotations",
 		"encrypted_configuration",
@@ -134,6 +136,7 @@ func (c *Connection) fields() []any {
 		&c.HealthState,
 		&c.ConnectorId,
 		&c.ConnectorVersion,
+		&c.ActorId,
 		&c.Labels,
 		&c.Annotations,
 		&c.EncryptedConfiguration,
@@ -155,6 +158,7 @@ func (c *Connection) values() []any {
 		c.healthStateForInsert(),
 		c.ConnectorId,
 		c.ConnectorVersion,
+		c.ActorId,
 		c.Labels,
 		c.Annotations,
 		c.EncryptedConfiguration,
@@ -245,6 +249,12 @@ func (c *Connection) Validate() error {
 
 	if c.ConnectorVersion == 0 {
 		result = multierror.Append(result, errors.New("connection connector version is required"))
+	}
+
+	if c.ActorId != nil {
+		if err := c.ActorId.ValidatePrefix(apid.PrefixActor); err != nil {
+			result = multierror.Append(result, fmt.Errorf("invalid connection actor id: %w", err))
+		}
 	}
 
 	if err := c.Labels.Validate(); err != nil {

@@ -11,6 +11,7 @@ import (
 	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	cfgschema "github.com/rmorlok/authproxy/internal/schema/config"
 	actorschema "github.com/rmorlok/authproxy/internal/schema/resources/actor"
+	connectionschema "github.com/rmorlok/authproxy/internal/schema/resources/connection"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	keyschema "github.com/rmorlok/authproxy/internal/schema/resources/key"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
@@ -263,6 +264,8 @@ type C interface {
 		ctx context.Context,
 		namespace string,
 		name scommon.ResourceName,
+		labels map[string]string,
+		annotations map[string]string,
 		c Connector,
 	) (Connection, error)
 
@@ -271,6 +274,14 @@ type C interface {
 		ctx context.Context,
 		id apid.ID,
 		name scommon.ResourceName,
+	) (Connection, error)
+
+	// UpdateConnection applies the canonical metadata-only Connection patch.
+	// Connector generation and setup state changes use their dedicated actions.
+	UpdateConnection(
+		ctx context.Context,
+		id apid.ID,
+		patch *connectionschema.ConnectionPatch,
 	) (Connection, error)
 
 	// ListConnectionsBuilder returns a builder to allow the caller to list
