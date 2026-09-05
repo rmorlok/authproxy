@@ -596,6 +596,46 @@ func TestConnections(t *testing.T) {
 		})
 	})
 
+	t.Run("migrate connection version", func(t *testing.T) {
+		tu, done := setup(t, nil)
+		defer done()
+		connectionID := apid.New(apid.PrefixConnection)
+		require.NoError(t, tu.Db.CreateConnection(context.Background(), &database.Connection{
+			Id:               connectionID,
+			Namespace:        sconfig.RootNamespace,
+			ConnectorId:      connectorId,
+			ConnectorVersion: connectorVersion,
+			State:            database.ConnectionStateConfigured,
+		}))
+
+		t.Run("rejects a different logical connector", func(t *testing.T) {
+			body := connectionActionBody(
+				schemaapi.ConnectionVersionMigrationActionKind,
+				connectionID,
+				schemaapi.ConnectionVersionMigrationSpec{ConnectorRef: smeta.ObjectReference{
+					APIVersion: smeta.APIVersionV1Alpha1,
+					Kind:       cschema.ConnectorKind,
+					ID:         oauthConnectorId.String(),
+					Generation: oauthConnectorVersion,
+				}},
+			)
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost,
+				"/connections/"+connectionID.String()+"/_migrateVersion",
+				util.JsonToReader(body),
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "connections", "update"),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+			require.Contains(t, w.Body.String(), "connectorRef must identify the connection's connector")
+		})
+	})
+
 	t.Run("initiate connection", func(t *testing.T) {
 		tu, done := setup(t, nil)
 		defer done()
