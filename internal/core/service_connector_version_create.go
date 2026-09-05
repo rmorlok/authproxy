@@ -21,6 +21,7 @@ func (s *service) CreateConnector(
 	if resource == nil {
 		return nil, fmt.Errorf("connector cannot be nil")
 	}
+
 	if err := resource.ValidateFor(meta.ValidationModeCreate, nil); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidArgument, err)
 	}
@@ -160,22 +161,29 @@ func (s *service) CreateConnectorVersion(
 	if resource == nil {
 		return s.CreateDraftConnectorVersion(ctx, id, nil, nil, nil)
 	}
+
 	if err := resource.ValidateFor(meta.ValidationModeCreate, nil); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidArgument, err)
 	}
 
-	currentPage := s.ListConnectorsBuilder().ForId(id).Limit(1).FetchPage(ctx)
+	currentPage := s.ListConnectorsBuilder().
+		ForId(id).
+		Limit(1).
+		FetchPage(ctx)
 	if currentPage.Error != nil {
 		return nil, currentPage.Error
 	}
 	if len(currentPage.Results) == 0 {
 		return nil, ErrNotFound
 	}
+
 	current := currentPage.Results[0]
 	if resource.Metadata.Namespace != current.GetNamespace() {
 		return nil, fmt.Errorf("%w: metadata.namespace must match the logical connector", ErrInvalidArgument)
 	}
-	if resource.Metadata.Name != "" && resource.Metadata.Name != current.GetName() {
+
+	if resource.Metadata.Name != "" &&
+		resource.Metadata.Name != current.GetName() {
 		return nil, fmt.Errorf("%w: metadata.name must match the logical connector", ErrInvalidArgument)
 	}
 
@@ -183,6 +191,7 @@ func (s *service) CreateConnectorVersion(
 	if desiredState == "" {
 		desiredState = cschema.ConnectorReleaseStateDraft
 	}
+
 	created, err := s.CreateDraftConnectorVersion(
 		ctx,
 		id,
@@ -193,11 +202,17 @@ func (s *service) CreateConnectorVersion(
 	if err != nil {
 		return nil, err
 	}
+
 	if desiredState == cschema.ConnectorReleaseStatePrimary {
-		if err := created.SetState(ctx, database.ConnectorDefinitionVersionStatePrimary); err != nil {
+		if err := created.SetState(
+			ctx,
+			database.ConnectorDefinitionVersionStatePrimary,
+		); err != nil {
 			return nil, err
 		}
+
 		return s.getConnectorVersion(ctx, id, created.GetVersion())
 	}
+
 	return created, nil
 }
