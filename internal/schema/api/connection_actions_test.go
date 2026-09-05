@@ -9,6 +9,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apserde"
 	apiv1alpha1 "github.com/rmorlok/authproxy/internal/schema/api/v1alpha1"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	connectionschema "github.com/rmorlok/authproxy/internal/schema/resources/connection"
 	connectorschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
@@ -36,11 +37,14 @@ func connectionActionTestResource(t *testing.T) connectionschema.Connection {
 			CreatedAt: &now,
 			UpdatedAt: &now,
 		},
-		Spec: connectionschema.ConnectionSpec{ConnectorRef: connectionActionTestReference(
-			connectorschema.ConnectorKind,
-			apid.New(apid.PrefixConnector),
-			2,
-		)},
+		Spec: connectionschema.ConnectionSpec{
+			ConnectorRef: connectionActionTestReference(
+				connectorschema.ConnectorKind,
+				apid.New(apid.PrefixConnector),
+				2,
+			),
+			ConfigurationSchema: common.RawJSON(`{"type":"object","properties":{},"additionalProperties":true}`),
+		},
 		Status: &connectionschema.ConnectionStatus{
 			Lifecycle:               connectionschema.ConnectionLifecycleStatus{State: connectionschema.ConnectionStateConfigured},
 			Health:                  connectionschema.ConnectionHealthStatus{State: connectionschema.ConnectionHealthStateHealthy},

@@ -414,9 +414,12 @@ definitions:
     properties:
       configuration:
         type: object
+      configurationSchema:
+        type: object
       connectorRef:
         $ref: '#/definitions/meta.ObjectReference'
     required:
+    - configurationSchema
     - connectorRef
     type: object
   openapi.ConnectionVersionMigrationSpecJson:

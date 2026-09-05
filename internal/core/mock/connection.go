@@ -95,10 +95,17 @@ func (m *Connection) GetResource(ctx context.Context) (*connectionschema.Connect
 		UpdatedAt:   &updatedAt,
 	}
 	resource.Spec.Configuration = cloneMap(m.Configuration)
+	connectorDefinition := &cschema.ConnectorDefinition{}
 	if m.ConnectorValue != nil {
 		connectorResource := m.ConnectorValue.GetResource()
 		resource.Spec.ConnectorRef = meta.NewObjectReference(connectorResource.TypeMeta, connectorResource.Metadata)
+		connectorDefinition = &connectorResource.Spec.Definition
 	}
+	configurationSchema, err := connectorDefinition.ConnectionConfigurationJSONSchema()
+	if err != nil {
+		return nil, err
+	}
+	resource.Spec.ConfigurationSchema = configurationSchema
 	resource.Status = &connectionschema.ConnectionStatus{
 		Lifecycle:               connectionschema.ConnectionLifecycleStatus{State: connectionschema.ConnectionState(m.State)},
 		Health:                  connectionschema.ConnectionHealthStatus{State: connectionschema.ConnectionHealthState(m.GetHealthState())},

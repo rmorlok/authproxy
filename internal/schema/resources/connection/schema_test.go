@@ -45,6 +45,13 @@ func TestConnectionSchema(t *testing.T) {
 				"id":         "cxr_test0000000000001",
 				"generation": 2,
 			},
+			"configuration": map[string]any{"tenant": "acme"},
+			"configurationSchema": map[string]any{
+				"$schema":              "https://json-schema.org/draft/2020-12/schema",
+				"type":                 "object",
+				"properties":           map[string]any{"tenant": map[string]any{"type": "string"}},
+				"additionalProperties": true,
+			},
 		},
 		"status": map[string]any{
 			"lifecycle":               map[string]any{"state": "configured"},

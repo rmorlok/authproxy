@@ -6,11 +6,24 @@ in `metadata`. `spec.connectorRef` pins the exact connector generation that
 interprets the connection.
 
 Connector-defined setup values appear under `spec.configuration`, flow through
-typed setup actions, and are encrypted at rest. API serialization recursively
-redacts their values. Connection configuration is write-only even when the
-caller may replay secrets from other resource types. Lifecycle, aggregate 
-credential/probe health, setup progress, and whether encrypted setup 
+typed setup actions, and are encrypted at rest. API reads return those values
+in cleartext along with an aggregate JSON Schema under
+`spec.configurationSchema`. The aggregate describes the top-level fields from
+connector-authored preconnect and configure forms, but omits step-level
+`required` constraints so incomplete setup and skipped conditional steps remain
+representable. Setup actions continue to validate submissions against each
+step's original schema. The aggregate allows additional properties because
+connector migration hooks may create configuration fields without a form
+schema; those fields remain untyped.
+
+Auth-method-emitted fields such as API keys, OAuth client credentials, access
+tokens, and refresh tokens are persisted in dedicated encrypted credential
+storage. They are not part of `spec.configuration` or its schema. Lifecycle,
+aggregate credential/probe health, setup progress, and whether encrypted setup
 configuration exists are server-owned observations under `status`.
+Connector authors should use auth methods for secret material rather than
+collecting it in custom setup fields, because connection read/list responses
+return connector-authored configuration in cleartext.
 
 CRUD updates use `ConnectionPatch`. Only mutable metadata may change through
 that contract; connector migrations and setup transitions use their dedicated

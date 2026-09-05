@@ -128,9 +128,9 @@ func (c *connection) GetResource(
 		return nil, err
 	}
 
-	configuration, err = connectionschema.RedactConfiguration(configuration)
+	configurationSchema, err := c.connector.GetDefinition().ConnectionConfigurationJSONSchema()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("build connection configuration schema: %w", err)
 	}
 
 	resource := &connectionschema.Connection{
@@ -153,7 +153,8 @@ func (c *connection) GetResource(
 				Namespace:  c.connector.GetNamespace(),
 				Generation: c.connector.GetVersion(),
 			},
-			Configuration: configuration,
+			Configuration:       configuration,
+			ConfigurationSchema: configurationSchema,
 		},
 		Status: &connectionschema.ConnectionStatus{
 			Lifecycle: connectionschema.ConnectionLifecycleStatus{

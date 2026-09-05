@@ -8,6 +8,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	connectionschema "github.com/rmorlok/authproxy/internal/schema/resources/connection"
 	connectorschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
@@ -24,7 +25,12 @@ func TestConnectionGetResourceBuildsCanonicalEnvelope(t *testing.T) {
 		Name:      "salesforce",
 		Namespace: "root.acme",
 		Version:   4,
-	}}
+	}, def: &connectorschema.ConnectorDefinition{SetupFlow: &connectorschema.SetupFlow{
+		Preconnect: &connectorschema.SetupFlowPhase{Steps: []connectorschema.SetupFlowStep{{
+			Id:         "tenant",
+			JsonSchema: common.RawJSON(`{"type":"object","required":["tenant"],"properties":{"tenant":{"type":"string"}}}`),
+		}}},
+	}}}
 	encryptService := encrypt.NewFakeEncryptService(false)
 	encryptedConfiguration, err := encryptService.EncryptStringForNamespace(t.Context(), "root.acme.team", `{"tenant":"acme"}`)
 	require.NoError(t, err)
@@ -54,7 +60,13 @@ func TestConnectionGetResourceBuildsCanonicalEnvelope(t *testing.T) {
 	require.Equal(t, "platform", resource.Metadata.Labels["team"])
 	require.Equal(t, connectorID.String(), resource.Spec.ConnectorRef.ID)
 	require.Equal(t, uint64(4), resource.Spec.ConnectorRef.Generation)
-	require.Equal(t, "****", resource.Spec.Configuration["tenant"])
+	require.Equal(t, "acme", resource.Spec.Configuration["tenant"])
+	require.JSONEq(t, `{
+		"$schema":"https://json-schema.org/draft/2020-12/schema",
+		"type":"object",
+		"properties":{"tenant":{"type":"string"}},
+		"additionalProperties":true
+	}`, string(resource.Spec.ConfigurationSchema))
 	require.Equal(t, connectionschema.ConnectionStateSetup, resource.Status.Lifecycle.State)
 	require.Equal(t, connectionschema.ConnectionHealthStateUnhealthy, resource.Status.Health.State)
 	require.Equal(t, connectorschema.SetupStepVerifyFailed.String(), resource.Status.Setup.StepID)
@@ -73,7 +85,7 @@ func TestConnectionGetResourceOmitsSetupAndDefaultsHealth(t *testing.T) {
 		Name:      "example",
 		Namespace: "root",
 		Version:   1,
-	}}
+	}, def: &connectorschema.ConnectorDefinition{}}
 	wrapped := wrapConnection(&database.Connection{
 		Id:               apid.New(apid.PrefixConnection),
 		Name:             "example",
@@ -89,6 +101,12 @@ func TestConnectionGetResourceOmitsSetupAndDefaultsHealth(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, resource.Status.Setup)
 	require.False(t, resource.Status.ConfigurationConfigured)
+	require.JSONEq(t, `{
+		"$schema":"https://json-schema.org/draft/2020-12/schema",
+		"type":"object",
+		"properties":{},
+		"additionalProperties":true
+	}`, string(resource.Spec.ConfigurationSchema))
 	require.Equal(t, connectionschema.ConnectionHealthStateHealthy, resource.Status.Health.State)
 	require.NoError(t, resource.ValidateFor(meta.ValidationModeResponse, nil))
 }

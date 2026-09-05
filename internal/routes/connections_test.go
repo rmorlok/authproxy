@@ -97,6 +97,7 @@ func TestConnections(t *testing.T) {
 	connectorVersion := uint64(1)
 	oauthConnectorId := apid.MustParse("cxr_test0000000000002")
 	oauthConnectorVersion := uint64(1)
+	configurationConnectorId := apid.MustParse("cxr_test0000000000003")
 
 	setup := func(t *testing.T, cfg config.C) (*TestSetup, func()) {
 		cfg = config.FromRoot(&sconfig.Root{
@@ -110,6 +111,22 @@ func TestConnections(t *testing.T) {
 						Auth: &sconfig.Auth{InnerVal: &sconfig.AuthOAuth2{
 							Type: sconfig.AuthTypeOAuth2,
 						}},
+					}),
+					configuredConnectorResource(configurationConnectorId, connectorVersion, "root", map[string]string{"type": "configuration-connector"}, cschema.ConnectorDefinition{
+						DisplayName: "Configuration Test Connector",
+						SetupFlow: &cschema.SetupFlow{
+							Preconnect: &cschema.SetupFlowPhase{Steps: []cschema.SetupFlowStep{{
+								Id: "connection-settings",
+								JsonSchema: scommon.RawJSON(`{
+									"type":"object",
+									"required":["tenant"],
+									"properties":{
+										"tenant":{"type":"string"},
+										"workspace":{"type":"string"}
+									}
+								}`),
+							}}},
+						},
 					}),
 				},
 			},
@@ -147,7 +164,7 @@ func TestConnections(t *testing.T) {
 		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
 			Id:               u,
 			Namespace:        sconfig.RootNamespace,
-			ConnectorId:      connectorId,
+			ConnectorId:      configurationConnectorId,
 			ConnectorVersion: connectorVersion,
 			State:            database.ConnectionStateSetup,
 		})
@@ -155,7 +172,7 @@ func TestConnections(t *testing.T) {
 		encryptedConfiguration, err := tu.Encrypt.EncryptStringForNamespace(
 			context.Background(),
 			sconfig.RootNamespace,
-			`{"apiKey":"secret-value","tenant":"acme"}`,
+			`{"tenant":"acme","workspace":"sales"}`,
 		)
 		require.NoError(t, err)
 		require.NoError(t, tu.Db.SetConnectionEncryptedConfiguration(context.Background(), u, &encryptedConfiguration))
@@ -207,11 +224,20 @@ func TestConnections(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, u.String(), resp.Metadata.ID)
 			require.Equal(t, connectionschema.ConnectionStateSetup, resp.Status.Lifecycle.State)
-			require.Equal(t, connectorId.String(), resp.Spec.ConnectorRef.ID)
+			require.Equal(t, configurationConnectorId.String(), resp.Spec.ConnectorRef.ID)
 			require.Equal(t, connectorVersion, resp.Spec.ConnectorRef.Generation)
-			require.Equal(t, "************", resp.Spec.Configuration["apiKey"])
-			require.Equal(t, "****", resp.Spec.Configuration["tenant"])
-			require.Empty(t, w.Header().Get("X-AuthProxy-Data-Redacted"), "configuration is redacted before replay-aware serialization")
+			require.Equal(t, "acme", resp.Spec.Configuration["tenant"])
+			require.Equal(t, "sales", resp.Spec.Configuration["workspace"])
+			require.JSONEq(t, `{
+				"$schema":"https://json-schema.org/draft/2020-12/schema",
+				"type":"object",
+				"properties":{
+					"tenant":{"type":"string"},
+					"workspace":{"type":"string"}
+				},
+				"additionalProperties":true
+			}`, string(resp.Spec.ConfigurationSchema))
+			require.Empty(t, w.Header().Get("X-AuthProxy-Data-Redacted"))
 		})
 
 		t.Run("allowed with matching resource id permission", func(t *testing.T) {

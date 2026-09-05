@@ -137,10 +137,12 @@ type ListConnectorVersionsResponseJson struct {
 	Items []ConnectorJson `json:"items" binding:"required"`
 }
 
-// ConnectionSpecJson documents the durable references for a Connection.
+// ConnectionSpecJson documents the durable references and connector-authored
+// configuration for a Connection.
 type ConnectionSpecJson struct {
-	ConnectorRef  meta.ObjectReference   `json:"connectorRef" binding:"required"`
-	Configuration map[string]interface{} `json:"configuration,omitempty" swaggertype:"object"`
+	ConnectorRef        meta.ObjectReference   `json:"connectorRef" binding:"required"`
+	Configuration       map[string]interface{} `json:"configuration,omitempty" swaggertype:"object"`
+	ConfigurationSchema map[string]interface{} `json:"configurationSchema" binding:"required" swaggertype:"object"`
 }
 
 // ConnectionJson documents a canonical Connection resource.

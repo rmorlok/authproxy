@@ -140,7 +140,15 @@ are namespace-scoped and are not bound to an individual actor.
       "id": "cxr_01example",
       "generation": 3
     },
-    "configuration": {"tenant": "****"}
+    "configuration": {"tenant": "acme"},
+    "configurationSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "tenant": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": true
+    }
   },
   "status": {
     "lifecycle": {"state": "configured"},
@@ -151,9 +159,23 @@ are namespace-scoped and are not bound to an individual actor.
 ```
 
 Submit setup values through the typed setup actions. AuthProxy validates them
-against the connector's form definition, encrypts stored values, and only
-returns masked values under `spec.configuration`; credentials and setup data
-are never replayed in cleartext.
+against the connector's form definition and encrypts stored values. Connection
+reads return decrypted connector-authored values under `spec.configuration`
+and an aggregate JSON Schema under `spec.configurationSchema`. The aggregate
+omits step-level `required` rules because setup can be incomplete and
+conditional steps can be skipped; setup submissions still use each step's
+original schema for validation.
+
+The aggregate permits additional properties because connector migration hooks
+can create configuration fields without a form schema. Those fields are
+returned in `spec.configuration`, but remain untyped in the aggregate schema.
+
+Auth-method credentials do not appear in either field. API keys, OAuth client
+credentials, access tokens, and refresh tokens remain in dedicated encrypted
+credential storage and are never returned through the Connection resource.
+Connector authors should use those auth methods for secret material rather
+than collecting it in custom setup fields. A caller authorized to get or list
+a Connection can read its connector-authored configuration.
 
 The Admin cross-resource endpoint searches names directly and also searches
 user-label values:

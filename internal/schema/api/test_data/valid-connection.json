@@ -19,7 +19,13 @@
       "namespace": "root.acme",
       "generation": 1
     },
-    "configuration": { "tenant": "********" }
+    "configuration": { "tenant": "acme" },
+    "configurationSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": { "tenant": { "type": "string" } },
+      "additionalProperties": true
+    }
   },
   "status": {
     "lifecycle": { "state": "configured" },

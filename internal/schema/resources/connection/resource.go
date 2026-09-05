@@ -1,13 +1,11 @@
 package connection
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/rmorlok/authproxy/internal/apid"
-	"github.com/rmorlok/authproxy/internal/apserde"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	connectorschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
@@ -48,10 +46,13 @@ type Connection struct {
 
 // ConnectionSpec contains the stable references and connector-defined desired
 // configuration for a connection. Clients change configuration through typed
-// setup actions; API responses always redact every configuration value.
+// setup actions. ConfigurationSchema describes the connector-authored fields
+// that may appear in Configuration; auth-method credentials are stored and
+// managed separately from this map.
 type ConnectionSpec struct {
-	ConnectorRef  meta.ObjectReference `json:"connectorRef" yaml:"connectorRef"`
-	Configuration map[string]any       `json:"configuration,omitempty" yaml:"configuration,omitempty" apiredact:"secret"`
+	ConnectorRef        meta.ObjectReference `json:"connectorRef" yaml:"connectorRef"`
+	Configuration       map[string]any       `json:"configuration,omitempty" yaml:"configuration,omitempty"`
+	ConfigurationSchema common.RawJSON       `json:"configurationSchema" yaml:"configurationSchema"`
 }
 
 // ConnectionStatus contains server-observed lifecycle, health, setup, and
@@ -116,32 +117,6 @@ func NewConnectionReference(id apid.ID) meta.ObjectReference {
 	}
 }
 
-// RedactConfiguration returns a deep-copied configuration with every value
-// masked. It deliberately ignores secret-replay authorization: connection
-// setup values and credentials are write-only, even for callers that may
-// replay secrets from other resource types.
-func RedactConfiguration(configuration map[string]any) (map[string]any, error) {
-	if configuration == nil {
-		return nil, nil
-	}
-
-	value := struct {
-		Configuration map[string]any `json:"configuration" apiredact:"secret"`
-	}{Configuration: configuration}
-	data, _, err := apserde.MarshalJSONForAPI(context.Background(), value)
-	if err != nil {
-		return nil, fmt.Errorf("redact connection configuration: %w", err)
-	}
-
-	var redacted struct {
-		Configuration map[string]any `json:"configuration"`
-	}
-	if err := json.Unmarshal(data, &redacted); err != nil {
-		return nil, fmt.Errorf("decode redacted connection configuration: %w", err)
-	}
-	return redacted.Configuration, nil
-}
-
 func ValidateID(value string) error {
 	id, err := apid.Parse(value)
 	if err != nil {
@@ -182,6 +157,7 @@ func (c *Connection) Clone() *Connection {
 	clone := *c
 	clone.Metadata = meta.CloneObjectMeta(c.Metadata)
 	clone.Spec.Configuration = cloneConfiguration(c.Spec.Configuration)
+	clone.Spec.ConfigurationSchema = append(common.RawJSON(nil), c.Spec.ConfigurationSchema...)
 	if c.Status != nil {
 		status := *c.Status
 		if c.Status.Setup != nil {
@@ -256,6 +232,16 @@ func (c *Connection) ValidateFor(mode meta.ValidationMode, vc *common.Validation
 
 	if err := validateConnectorReference(c.Spec.ConnectorRef, requireStoredIdentity, vc.PushField("spec").PushField("connectorRef")); err != nil {
 		result = multierror.Append(result, err)
+	}
+	if c.Spec.ConfigurationSchema.IsEmpty() {
+		if mode == meta.ValidationModeResponse {
+			result = multierror.Append(result, vc.NewErrorForField("spec.configurationSchema", "is required"))
+		}
+	} else {
+		var configurationSchema map[string]any
+		if err := json.Unmarshal(c.Spec.ConfigurationSchema, &configurationSchema); err != nil || configurationSchema == nil {
+			result = multierror.Append(result, vc.NewErrorForField("spec.configurationSchema", "must be a JSON object"))
+		}
 	}
 	if err := meta.ValidateStatus(c.Status, mode, vc); err != nil {
 		result = multierror.Append(result, err)

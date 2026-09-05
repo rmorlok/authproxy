@@ -8,9 +8,11 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apserde"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	connectorschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func storedConnectionResource() *Connection {
@@ -34,9 +36,18 @@ func storedConnectionResource() *Connection {
 				Generation: 2,
 			},
 			Configuration: map[string]any{
-				"tenant": "acme",
-				"nested": map[string]any{"apiKey": "secret"},
+				"tenant":  "acme",
+				"options": map[string]any{"region": "us"},
 			},
+			ConfigurationSchema: common.RawJSON(`{
+				"$schema":"https://json-schema.org/draft/2020-12/schema",
+				"type":"object",
+				"properties":{
+					"tenant":{"type":"string"},
+					"options":{"type":"object"}
+				},
+				"additionalProperties":true
+			}`),
 		},
 		Status: &ConnectionStatus{
 			Lifecycle:               ConnectionLifecycleStatus{State: ConnectionStateConfigured},
@@ -82,6 +93,14 @@ func TestConnectionResourceRejectsInvalidReferencesAndStatus(t *testing.T) {
 	resource = storedConnectionResource()
 	resource.Status.Setup = &ConnectionSetupStatus{}
 	require.ErrorContains(t, resource.ValidateFor(meta.ValidationModeResponse, nil), "stepId or error")
+
+	resource = storedConnectionResource()
+	resource.Spec.ConfigurationSchema = nil
+	require.ErrorContains(t, resource.ValidateFor(meta.ValidationModeResponse, nil), "configurationSchema")
+
+	resource = storedConnectionResource()
+	resource.Spec.ConfigurationSchema = common.RawJSON(`[]`)
+	require.ErrorContains(t, resource.ValidateFor(meta.ValidationModeResponse, nil), "JSON object")
 }
 
 func TestConnectionCloneAndReferences(t *testing.T) {
@@ -90,10 +109,12 @@ func TestConnectionCloneAndReferences(t *testing.T) {
 	resource.Status.Setup = &ConnectionSetupStatus{StepID: "apxy:verify_failed", Error: &setupError}
 	clone := resource.Clone()
 	clone.Metadata.Labels["team"] = "changed"
-	clone.Spec.Configuration["nested"].(map[string]any)["apiKey"] = "changed"
+	clone.Spec.Configuration["options"].(map[string]any)["region"] = "changed"
+	clone.Spec.ConfigurationSchema[0] = '['
 	*clone.Status.Setup.Error = "changed"
 	require.Equal(t, "platform", resource.Metadata.Labels["team"])
-	require.Equal(t, "secret", resource.Spec.Configuration["nested"].(map[string]any)["apiKey"])
+	require.Equal(t, "us", resource.Spec.Configuration["options"].(map[string]any)["region"])
+	require.Equal(t, byte('{'), resource.Spec.ConfigurationSchema[0])
 	require.Equal(t, "failed", *resource.Status.Setup.Error)
 
 	connectionID := apid.New(apid.PrefixConnection)
@@ -104,30 +125,32 @@ func TestConnectionCloneAndReferences(t *testing.T) {
 	require.False(t, IsValidConnectionHealthState("unknown"))
 }
 
-func TestConnectionConfigurationIsRedactedForAPI(t *testing.T) {
+func TestConnectionConfigurationIsReturnedForAPI(t *testing.T) {
 	resource := storedConnectionResource()
 	encoded, report, err := apserde.MarshalJSONForAPI(context.Background(), resource)
 	require.NoError(t, err)
-	require.True(t, report.Redacted)
-	require.NotContains(t, string(encoded), "secret")
+	require.False(t, report.Redacted)
+	require.Contains(t, string(encoded), "acme")
 
 	var value map[string]any
 	require.NoError(t, json.Unmarshal(encoded, &value))
-	configuration := value["spec"].(map[string]any)["configuration"].(map[string]any)
-	require.Equal(t, "****", configuration["tenant"])
-	require.Equal(t, "******", configuration["nested"].(map[string]any)["apiKey"])
+	spec := value["spec"].(map[string]any)
+	configuration := spec["configuration"].(map[string]any)
+	require.Equal(t, "acme", configuration["tenant"])
+	require.Equal(t, "us", configuration["options"].(map[string]any)["region"])
+	configurationSchema := spec["configurationSchema"].(map[string]any)
+	require.Equal(t, "object", configurationSchema["type"])
 }
 
-func TestConnectionConfigurationCannotBeReplayed(t *testing.T) {
+func TestConnectionConfigurationSchemaIsStructuredYAML(t *testing.T) {
 	resource := storedConnectionResource()
-	redacted, err := RedactConfiguration(resource.Spec.Configuration)
+	encoded, err := yaml.Marshal(resource)
 	require.NoError(t, err)
-	resource.Spec.Configuration = redacted
+	require.Contains(t, string(encoded), "configurationSchema:\n        $schema:")
+	require.Contains(t, string(encoded), "properties:\n            options:")
 
-	ctx := apserde.WithSecretReplay(context.Background(), true)
-	encoded, report, err := apserde.MarshalJSONForAPI(ctx, resource)
-	require.NoError(t, err)
-	require.False(t, report.Redacted, "the configuration is already irreversibly redacted")
-	require.NotContains(t, string(encoded), "secret")
-	require.Contains(t, string(encoded), "******")
+	var decoded Connection
+	require.NoError(t, yaml.Unmarshal(encoded, &decoded))
+	require.JSONEq(t, string(resource.Spec.ConfigurationSchema), string(decoded.Spec.ConfigurationSchema))
+	require.Equal(t, resource.Spec.Configuration, decoded.Spec.Configuration)
 }

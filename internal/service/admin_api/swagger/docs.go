@@ -8820,10 +8820,14 @@ const docTemplateadmin_api = `{
         "openapi.ConnectionSpecJson": {
             "type": "object",
             "required": [
+                "configurationSchema",
                 "connectorRef"
             ],
             "properties": {
                 "configuration": {
+                    "type": "object"
+                },
+                "configurationSchema": {
                     "type": "object"
                 },
                 "connectorRef": {

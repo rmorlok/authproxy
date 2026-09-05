@@ -40,12 +40,16 @@
     },
     "ConnectionSpec": {
       "type": "object",
-      "required": ["connectorRef"],
+      "required": ["connectorRef", "configurationSchema"],
       "properties": {
         "connectorRef": { "$ref": "#/$defs/ConnectorReference" },
         "configuration": {
           "type": "object",
-          "description": "Connector-defined desired setup configuration. Values are write-only and always redacted in API responses."
+          "description": "Decrypted connector-authored setup configuration. Auth-method credentials are stored separately and are not included."
+        },
+        "configurationSchema": {
+          "type": "object",
+          "description": "Aggregate JSON Schema for connector-authored configuration fields. Step-level required constraints are enforced by setup actions and omitted here so partial and conditional setup state remains representable."
         }
       },
       "additionalProperties": false

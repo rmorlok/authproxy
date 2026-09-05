@@ -21,6 +21,12 @@
           "name": "salesforce",
           "namespace": "root.acme",
           "generation": 1
+        },
+        "configurationSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {},
+          "additionalProperties": true
         }
       },
       "status": {
