@@ -136,7 +136,7 @@ func TestResolveConnectorReferenceHydratesDefinitionVersion(t *testing.T) {
 		require.Equal(t, "Billing", resolved.GetDefinition().DisplayName)
 	})
 
-	t.Run("omitted generation uses newest", func(t *testing.T) {
+	t.Run("omitted generation uses primary", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		s, db, _, _, _, encrypt := FullMockService(t, ctrl)
 		ref := coreReference(connectorschema.ConnectorKind, connectorID.String())
@@ -145,13 +145,17 @@ func TestResolveConnectorReferenceHydratesDefinitionVersion(t *testing.T) {
 		require.NoError(t, err)
 
 		db.EXPECT().ResolveConnectorReference(ctx, ref).Return(logicalConnector, nil)
-		db.EXPECT().NewestConnectorDefinitionVersionForId(ctx, connectorID).Return(
+		db.EXPECT().GetConnectorDefinitionVersionForState(
+			ctx,
+			connectorID,
+			database.ConnectorDefinitionVersionStatePrimary,
+		).Return(
 			&database.ConnectorWithDefinition{
 				Id:                  connectorID,
 				Namespace:           logicalConnector.Namespace,
 				Name:                logicalConnector.Name,
-				Version:             3,
-				State:               database.ConnectorDefinitionVersionStateDraft,
+				Version:             2,
+				State:               database.ConnectorDefinitionVersionStatePrimary,
 				EncryptedDefinition: encryptedDefinition,
 			},
 			nil,
@@ -160,7 +164,8 @@ func TestResolveConnectorReferenceHydratesDefinitionVersion(t *testing.T) {
 
 		resolved, err := s.ResolveConnectorReference(ctx, ref)
 		require.NoError(t, err)
-		require.Equal(t, uint64(3), resolved.GetVersion())
+		require.Equal(t, uint64(2), resolved.GetVersion())
+		require.Equal(t, database.ConnectorDefinitionVersionStatePrimary, resolved.GetState())
 		require.Equal(t, logicalConnector.Name, resolved.GetName())
 	})
 }
@@ -294,7 +299,11 @@ func TestResolveConnectorReferenceReturnsNotFoundWithoutDefinitionVersion(t *tes
 	connector := &database.Connector{Id: apid.New(apid.PrefixConnector)}
 	ref := coreReference(connectorschema.ConnectorKind, connector.Id.String())
 	db.EXPECT().ResolveConnectorReference(ctx, ref).Return(connector, nil)
-	db.EXPECT().NewestConnectorDefinitionVersionForId(ctx, connector.Id).Return(nil, database.ErrNotFound)
+	db.EXPECT().GetConnectorDefinitionVersionForState(
+		ctx,
+		connector.Id,
+		database.ConnectorDefinitionVersionStatePrimary,
+	).Return(nil, database.ErrNotFound)
 
 	resolved, err := s.ResolveConnectorReference(ctx, ref)
 	require.Nil(t, resolved)
