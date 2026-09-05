@@ -765,22 +765,32 @@ func (r *ConnectionsRoutes) migrateVersion(gctx *gin.Context) {
 		val.MarkErrorReturn()
 		return
 	}
-	if err := validateConnectionActionPathTarget(req.Metadata.Target, c); err != nil {
+
+	if err := validateConnectionActionPathTarget(
+		req.Metadata.Target,
+		c,
+	); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
 	}
-	targetConnector, err := r.core.ResolveConnectorReference(ctx, req.Spec.ConnectorRef)
+
+	targetConnector, err := r.core.ResolveConnectorReference(
+		ctx,
+		req.Spec.ConnectorRef,
+	)
 	if err != nil {
 		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
+
 	if targetConnector.GetId() != c.GetConnectorId() {
 		apgin.WriteError(gctx, nil, httperr.BadRequest("connectorRef must identify the connection's connector"))
 		val.MarkErrorReturn()
 		return
 	}
+
 	opts := connectionMigrationOptions(
 		targetConnector.GetVersion(),
 		req.Spec.TimeoutSeconds,
@@ -816,6 +826,7 @@ func (r *ConnectionsRoutes) migrateVersion(gctx *gin.Context) {
 	targetRef.Name = targetConnector.GetName()
 	targetRef.Namespace = targetConnector.GetNamespace()
 	targetRef.Generation = targetConnector.GetVersion()
+
 	response := schemaapi.NewConnectionVersionMigrationResponse(
 		req.Metadata.Target,
 		req.Spec,
@@ -825,6 +836,7 @@ func (r *ConnectionsRoutes) migrateVersion(gctx *gin.Context) {
 			TargetConnectorRef: targetRef,
 		},
 	)
+	
 	if err := apgin.RenderActionJSON(
 		gctx,
 		http.StatusOK,
