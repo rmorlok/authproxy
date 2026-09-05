@@ -38,8 +38,8 @@ func ValidatePermissionRestrictions(
 						restrictionNamespace,
 						resource,
 						verb,
-						"",
-						true,
+						"",   // resourceId
+						true, // requireAllResourceIds
 					) {
 						return fmt.Errorf(
 							"request permission %d grants namespace %q, resource %q, and verb %q beyond the actor's permissions",

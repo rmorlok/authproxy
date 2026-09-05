@@ -16,15 +16,18 @@ import (
 
 var ErrInvalidClaims = errors.New("invalid jwt claims")
 
-// AuthProxyClaims is the struct that defines a JWT for the auth service. It contains information about the actor
-// (user or system taking the action) as well as standard JWT information.
+// AuthProxyClaims is the struct that defines a JWT for the auth service. It
+// contains information about the actor (user or system taking the action) as
+// well as standard JWT information.
 type AuthProxyClaims struct {
 	jwt.RegisteredClaims
 
-	// Namespace is the namespace of the actor. This is used to identify valid signing keys for the request, as well
-	// as where to look up the actor in the database. The value of subject must be unique within a given namespace. If
-	// omitted, Namespace is assumed to be root. If Actor is provided, the value of namespace must be the same as
-	// the value of the actor's namespace.
+	// Namespace is the namespace of the actor. This is used to identify valid
+	// signing keys for the request, as well as where to look up the actor in
+	// the database. The value of subject must be unique within a given
+	// namespace. If omitted, Namespace is assumed to be root. If Actor is
+	// provided, the value of namespace must be the same as the value of the
+	// actor's namespace.
 	Namespace string `json:"namespace,omitempty"`
 
 	// Actor is the entity taking the action, represented as a restricted
@@ -34,20 +37,24 @@ type AuthProxyClaims struct {
 	Actor *ActorClaim `json:"actor,omitempty"`
 
 	// Permissions optionally restrict what this specific token can do. Every
-	// permission must be contained by the authenticated actor's permissions, and
-	// the two sets are intersected during authorization.
+	// permission must be contained by the authenticated actor's permissions,
+	// and the two sets are intersected during authorization.
 	Permissions []aschema.Permission `json:"permissions,omitempty"`
 
-	// SystemSigned indicates this token was signed by an AuthProxy service using the GlobalAESKey (HMAC).
-	// This is used for internal auth transfer between services, OAuth redirects, etc.
+	// SystemSigned indicates this token was signed by an AuthProxy service using
+	// the GlobalAESKey (HMAC). This is used for internal auth transfer between
+	// services, OAuth redirects, etc.
 	SystemSigned bool `json:"systemSigned,omitempty"`
 
-	// ActorSigned indicates this token was signed by an actor using their own private key (asymmetric).
-	// This is used by the CLI and other external callers that have actor credentials.
+	// ActorSigned indicates this token was signed by an actor using their own
+	// private key (asymmetric). This is used by the CLI and other external
+	// callers that have actor credentials.
 	ActorSigned bool `json:"actorSigned,omitempty"`
 
-	// Nonce is a one-time-use value. Adding a nonce to the JWT make it a one-time-use for auth purposes. If you use
-	// a nonce, the JWT must also have an expiry so that tracking of the nonce values do not need to be kept forever.
+	// Nonce is a one-time-use value. Adding a nonce to the JWT makes it a
+	// one-time-use for auth purposes. If you use a nonce, the JWT must also
+	// have an expiry so that tracking of the nonce values do not need to be
+	// kept forever.
 	Nonce *apid.ID `json:"nonce,omitempty"`
 }
 
