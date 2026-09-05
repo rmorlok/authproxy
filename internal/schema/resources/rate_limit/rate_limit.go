@@ -7,7 +7,10 @@ package rate_limit
 import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 )
+
+const RateLimitKind meta.Kind = "RateLimit"
 
 // Mode controls whether a matching rule rejects requests or only observes them.
 type Mode string

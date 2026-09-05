@@ -9,6 +9,7 @@ import (
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 	"golang.org/x/time/rate"
@@ -49,6 +50,17 @@ type DB interface {
 	SetCursorEncryptor(e pagination.CursorEncryptor)
 	Ping(ctx context.Context) bool
 	SearchResources(ctx context.Context, params SearchResourcesParams) (SearchResourcesResult, error)
+
+	/*
+	 * Object references
+	 */
+
+	ResolveActorReference(ctx context.Context, reference meta.ObjectReference) (*Actor, error)
+	ResolveConnectionReference(ctx context.Context, reference meta.ObjectReference) (*Connection, error)
+	ResolveConnectorReference(ctx context.Context, reference meta.ObjectReference) (*Connector, error)
+	ResolveKeyReference(ctx context.Context, reference meta.ObjectReference) (*Key, error)
+	ResolveNamespaceReference(ctx context.Context, reference meta.ObjectReference) (*Namespace, error)
+	ResolveRateLimitReference(ctx context.Context, reference meta.ObjectReference) (*RateLimit, error)
 
 	/*
 	 *  Namespaces

@@ -68,6 +68,32 @@ type C interface {
 	MigrateConnectors(ctx context.Context) error
 
 	/*
+	 * Object references
+	 */
+
+	// ResolveActorReference resolves an Actor by immutable ID or namespace/name.
+	ResolveActorReference(ctx context.Context, reference meta.ObjectReference) (*authcore.Actor, error)
+
+	// ResolveConnectionReference resolves and fully hydrates a Connection.
+	ResolveConnectionReference(ctx context.Context, reference meta.ObjectReference) (Connection, error)
+
+	// ResolveConnectorReference resolves and hydrates a Connector. An explicit
+	// generation selects that definition version; otherwise the newest version
+	// is returned.
+	ResolveConnectorReference(ctx context.Context, reference meta.ObjectReference) (Connector, error)
+
+	// ResolveKeyReference resolves a Key by immutable ID or namespace/name.
+	ResolveKeyReference(ctx context.Context, reference meta.ObjectReference) (Key, error)
+
+	// ResolveNamespaceReference resolves a Namespace by canonical path or by
+	// parent namespace and name.
+	ResolveNamespaceReference(ctx context.Context, reference meta.ObjectReference) (Namespace, error)
+
+	// ResolveRateLimitReference resolves a RateLimit by immutable ID or
+	// namespace/name.
+	ResolveRateLimitReference(ctx context.Context, reference meta.ObjectReference) (RateLimit, error)
+
+	/*
 	 *
 	 * Connectors
 	 *
@@ -427,13 +453,6 @@ type C interface {
 
 	// GetKey returns a key by ID.
 	GetKey(ctx context.Context, id apid.ID) (Key, error)
-
-	// ResolveKeyReference returns the key identified by an immutable ID or by
-	// namespace and name.
-	ResolveKeyReference(
-		ctx context.Context,
-		reference meta.ObjectReference,
-	) (Key, error)
 
 	// CreateKey creates a new managed Key resource.
 	CreateKey(
