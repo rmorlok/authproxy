@@ -255,26 +255,44 @@ func resolveObjectReferenceAs[T objectReferenceRow](
 	return result, nil
 }
 
-func (s *service) ResolveActorReference(ctx context.Context, reference meta.ObjectReference) (*Actor, error) {
+func (s *service) ResolveActorReference(
+	ctx context.Context,
+	reference meta.ObjectReference,
+) (*Actor, error) {
 	return resolveObjectReferenceAs[*Actor](ctx, s, reference, actorschema.ActorKind)
 }
 
-func (s *service) ResolveConnectionReference(ctx context.Context, reference meta.ObjectReference) (*Connection, error) {
+func (s *service) ResolveConnectionReference(
+	ctx context.Context,
+	reference meta.ObjectReference,
+) (*Connection, error) {
 	return resolveObjectReferenceAs[*Connection](ctx, s, reference, connectionschema.ConnectionKind)
 }
 
-func (s *service) ResolveConnectorReference(ctx context.Context, reference meta.ObjectReference) (*Connector, error) {
+func (s *service) ResolveConnectorReference(
+	ctx context.Context,
+	reference meta.ObjectReference,
+) (*Connector, error) {
 	return resolveObjectReferenceAs[*Connector](ctx, s, reference, connectorschema.ConnectorKind)
 }
 
-func (s *service) ResolveKeyReference(ctx context.Context, reference meta.ObjectReference) (*Key, error) {
+func (s *service) ResolveKeyReference(
+	ctx context.Context,
+	reference meta.ObjectReference,
+) (*Key, error) {
 	return resolveObjectReferenceAs[*Key](ctx, s, reference, keyschema.KeyKind)
 }
 
-func (s *service) ResolveNamespaceReference(ctx context.Context, reference meta.ObjectReference) (*Namespace, error) {
+func (s *service) ResolveNamespaceReference(
+	ctx context.Context,
+	reference meta.ObjectReference,
+) (*Namespace, error) {
 	return resolveObjectReferenceAs[*Namespace](ctx, s, reference, namespaceschema.NamespaceKind)
 }
 
-func (s *service) ResolveRateLimitReference(ctx context.Context, reference meta.ObjectReference) (*RateLimit, error) {
+func (s *service) ResolveRateLimitReference(
+	ctx context.Context,
+	reference meta.ObjectReference,
+) (*RateLimit, error) {
 	return resolveObjectReferenceAs[*RateLimit](ctx, s, reference, ratelimitschema.RateLimitKind)
 }
