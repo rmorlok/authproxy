@@ -111,7 +111,7 @@ func (s *service) UpdateRateLimit(
 			id,
 			normalized.Metadata.Name,
 		); err != nil {
-			return nil, mapRateLimitDatabaseError(err)
+			return nil, mapDatabaseError(err)
 		}
 	}
 
@@ -121,7 +121,7 @@ func (s *service) UpdateRateLimit(
 			id,
 			normalized.Spec,
 		); err != nil {
-			return nil, mapRateLimitDatabaseError(err)
+			return nil, mapDatabaseError(err)
 		}
 	}
 
@@ -131,7 +131,7 @@ func (s *service) UpdateRateLimit(
 			id,
 			normalized.Metadata.Labels,
 		); err != nil {
-			return nil, mapRateLimitDatabaseError(err)
+			return nil, mapDatabaseError(err)
 		}
 	}
 
@@ -144,18 +144,11 @@ func (s *service) UpdateRateLimit(
 			id,
 			normalized.Metadata.Annotations,
 		); err != nil {
-			return nil, mapRateLimitDatabaseError(err)
+			return nil, mapDatabaseError(err)
 		}
 	}
 
 	return s.GetRateLimit(ctx, id)
-}
-
-func mapRateLimitDatabaseError(err error) error {
-	if errors.Is(err, database.ErrNotFound) {
-		return ErrNotFound
-	}
-	return err
 }
 
 // normalizeRateLimitScope enforces the scope's namespace boundary and converts

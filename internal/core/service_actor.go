@@ -17,18 +17,12 @@ import (
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
-func mapActorDatabaseError(err error) error {
-	if errors.Is(err, database.ErrNotFound) {
-		return ErrNotFound
-	}
-	return err
-}
-
 func (s *service) GetActor(ctx context.Context, id apid.ID) (iface.Actor, error) {
 	actor, err := s.db.GetActor(ctx, id)
 	if err != nil {
-		return nil, mapActorDatabaseError(err)
+		return nil, mapDatabaseError(err)
 	}
+
 	return wrapActor(*actor, s), nil
 }
 
@@ -39,8 +33,9 @@ func (s *service) GetActorByExternalId(
 ) (iface.Actor, error) {
 	actor, err := s.db.GetActorByExternalId(ctx, namespace, externalID)
 	if err != nil {
-		return nil, mapActorDatabaseError(err)
+		return nil, mapDatabaseError(err)
 	}
+
 	return wrapActor(*actor, s), nil
 }
 
@@ -51,14 +46,17 @@ func (s *service) encryptActorSigningKey(
 	if key == nil {
 		return nil, nil
 	}
+
 	data, err := json.Marshal(key)
 	if err != nil {
 		return nil, fmt.Errorf("marshal actor signing key: %w", err)
 	}
+
 	encrypted, err := s.encrypt.EncryptStringGlobal(ctx, string(data))
 	if err != nil {
 		return nil, fmt.Errorf("encrypt actor signing key: %w", err)
 	}
+
 	return &encrypted, nil
 }
 
@@ -85,7 +83,7 @@ func (s *service) CreateActor(
 		return nil, err
 	}
 	if err := s.db.CreateActor(ctx, actor); err != nil {
-		return nil, mapActorDatabaseError(err)
+		return nil, mapDatabaseError(err)
 	}
 	return s.GetActor(ctx, id)
 }
@@ -103,7 +101,7 @@ func (s *service) UpdateActor(
 
 	existing, err := s.db.GetActor(ctx, id)
 	if err != nil {
-		return nil, mapActorDatabaseError(err)
+		return nil, mapDatabaseError(err)
 	}
 	before := actorResourceFromDatabase(*existing)
 	desired, err := patch.ApplyTo(before, nil)
@@ -128,7 +126,7 @@ func (s *service) UpdateActor(
 
 	if before.Metadata.Name != desired.Metadata.Name {
 		if _, err := s.db.UpdateActorName(ctx, id, desired.Metadata.Name); err != nil {
-			return nil, mapActorDatabaseError(err)
+			return nil, mapDatabaseError(err)
 		}
 	}
 
@@ -138,13 +136,13 @@ func (s *service) UpdateActor(
 	}
 	updated, err := s.db.UpsertActor(ctx, actor)
 	if err != nil {
-		return nil, mapActorDatabaseError(err)
+		return nil, mapDatabaseError(err)
 	}
 	return wrapActor(*updated, s), nil
 }
 
 func (s *service) DeleteActor(ctx context.Context, id apid.ID) error {
-	return mapActorDatabaseError(s.db.DeleteActor(ctx, id))
+	return mapDatabaseError(s.db.DeleteActor(ctx, id))
 }
 
 func (s *service) PutActorLabels(
@@ -154,7 +152,7 @@ func (s *service) PutActorLabels(
 ) (iface.Actor, error) {
 	actor, err := s.db.PutActorLabels(ctx, id, labels)
 	if err != nil {
-		return nil, mapActorDatabaseError(err)
+		return nil, mapDatabaseError(err)
 	}
 	return wrapActor(*actor, s), nil
 }
@@ -166,7 +164,7 @@ func (s *service) DeleteActorLabels(
 ) (iface.Actor, error) {
 	actor, err := s.db.DeleteActorLabels(ctx, id, keys)
 	if err != nil {
-		return nil, mapActorDatabaseError(err)
+		return nil, mapDatabaseError(err)
 	}
 	return wrapActor(*actor, s), nil
 }
@@ -178,7 +176,7 @@ func (s *service) PutActorAnnotations(
 ) (iface.Actor, error) {
 	actor, err := s.db.PutActorAnnotations(ctx, id, annotations)
 	if err != nil {
-		return nil, mapActorDatabaseError(err)
+		return nil, mapDatabaseError(err)
 	}
 	return wrapActor(*actor, s), nil
 }
@@ -190,7 +188,7 @@ func (s *service) DeleteActorAnnotations(
 ) (iface.Actor, error) {
 	actor, err := s.db.DeleteActorAnnotations(ctx, id, keys)
 	if err != nil {
-		return nil, mapActorDatabaseError(err)
+		return nil, mapDatabaseError(err)
 	}
 	return wrapActor(*actor, s), nil
 }
