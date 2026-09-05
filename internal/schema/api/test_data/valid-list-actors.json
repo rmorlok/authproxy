@@ -1,19 +1,30 @@
 {
-	"apiVersion": "authproxy.net/v1alpha1",
-	"kind": "ActorList",
-	"metadata": {
-		"continue": "next-page"
-	},
-	"items": [
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "ActorList",
+  "metadata": {
+    "continue": "next-page"
+  },
+  "items": [
     {
-      "id": "act_test550e8400abcde",
-      "namespace": "root.acme",
-      "externalId": "user-123",
-      "labels": {
-        "team": "platform"
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Actor",
+      "metadata": {
+        "id": "act_test550e8400abcde",
+        "name": "billing-service",
+        "namespace": "root.acme",
+        "labels": {
+          "team": "platform"
+        },
+        "createdAt": "2026-05-25T12:00:00Z",
+        "updatedAt": "2026-05-25T12:30:00Z"
       },
-      "createdAt": "2026-05-25T12:00:00Z",
-      "updatedAt": "2026-05-25T12:30:00Z"
+      "spec": {
+        "externalId": "user-123",
+        "permissions": []
+      },
+      "status": {
+        "signingKeyConfigured": false
+      }
     }
-	]
+  ]
 }

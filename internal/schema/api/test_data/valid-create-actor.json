@@ -1,10 +1,17 @@
 {
-  "externalId": "user-123",
-  "namespace": "root.acme",
-  "labels": {
-    "team": "platform"
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "Actor",
+  "metadata": {
+    "namespace": "root.acme",
+    "labels": {
+      "team": "platform"
+    },
+    "annotations": {
+      "owner": "integrations"
+    }
   },
-  "annotations": {
-    "owner": "integrations"
+  "spec": {
+    "externalId": "user-123",
+    "permissions": []
   }
 }

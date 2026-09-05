@@ -24,6 +24,8 @@ import (
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
+	actorschema "github.com/rmorlok/authproxy/internal/schema/resources/actor"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/rmorlok/authproxy/internal/test_utils"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/stretchr/testify/require"
@@ -33,6 +35,22 @@ import (
 
 func pathToTestData(path string) string {
 	return "../../../test_data/" + path
+}
+
+func testConfiguredActor(
+	externalID string,
+	key *sconfig.Key,
+	permissions []aschema.Permission,
+) *actorschema.Actor {
+	return &actorschema.Actor{
+		TypeMeta: meta.NewTypeMeta(actorschema.ActorKind),
+		Metadata: meta.ObjectMeta{Namespace: "root"},
+		Spec: actorschema.ActorSpec{
+			ExternalId:  externalID,
+			Permissions: permissions,
+			SigningKey:  key,
+		},
+	}
 }
 
 func TestAuth_Token(t *testing.T) {
@@ -352,10 +370,7 @@ func TestAuth_Parse(t *testing.T) {
 			SystemAuth: sconfig.SystemAuth{
 				Actors: &sconfig.ConfiguredActors{
 					InnerVal: sconfig.ConfiguredActorsList{
-						&sconfig.ConfiguredActor{
-							ExternalId: "bobdole",
-							Key:        bobdoleKey,
-						},
+						testConfiguredActor("bobdole", bobdoleKey, nil),
 					},
 				},
 				JwtTokenDurationVal: 12 * time.Hour,
@@ -760,10 +775,9 @@ func TestAuth_ActorPermissionsSync(t *testing.T) {
 			},
 			Actors: &sconfig.ConfiguredActors{
 				InnerVal: sconfig.ConfiguredActorsList{
-					&sconfig.ConfiguredActor{
-						ExternalId:  "aid1",
-						Permissions: configPerms,
-						Key: &sconfig.Key{
+					testConfiguredActor(
+						"aid1",
+						&sconfig.Key{
 							InnerVal: &sconfig.KeyPublicPrivate{
 								PublicKey: &sconfig.KeyData{
 									InnerVal: &sconfig.KeyDataFile{
@@ -777,7 +791,8 @@ func TestAuth_ActorPermissionsSync(t *testing.T) {
 								},
 							},
 						},
-					},
+						configPerms,
+					),
 				},
 			},
 			GlobalAESKey: &sconfig.KeyData{
@@ -1149,9 +1164,9 @@ var testConfigPublicPrivateKey = sconfig.Root{
 		},
 		Actors: &sconfig.ConfiguredActors{
 			InnerVal: sconfig.ConfiguredActorsList{
-				&sconfig.ConfiguredActor{
-					ExternalId: "aid1",
-					Key: &sconfig.Key{
+				testConfiguredActor(
+					"aid1",
+					&sconfig.Key{
 						InnerVal: &sconfig.KeyPublicPrivate{
 							PublicKey: &sconfig.KeyData{
 								InnerVal: &sconfig.KeyDataFile{
@@ -1165,7 +1180,8 @@ var testConfigPublicPrivateKey = sconfig.Root{
 							},
 						},
 					},
-				},
+					nil,
+				),
 			},
 		},
 		GlobalAESKey: &sconfig.KeyData{

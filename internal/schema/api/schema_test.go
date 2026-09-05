@@ -39,6 +39,7 @@ func compileRefSchema(t *testing.T, ref string) *jsonschemav5.Schema {
 	_ = loadSchema(t, c, "../resources/connectors/schema-oauth.json")
 	_ = loadSchema(t, c, "../resources/connectors/schema.json")
 	_ = loadSchema(t, c, "../resources/key/schema.json")
+	_ = loadSchema(t, c, "../resources/actor/schema.json")
 	_ = loadSchema(t, c, "../resources/rate_limit/schema.json")
 	_ = loadSchema(t, c, "./v1alpha1/schema.json")
 	sid := loadSchema(t, c, "./schema.json")

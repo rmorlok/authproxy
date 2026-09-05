@@ -1093,39 +1093,12 @@
         }
       ]
     },
-    "ConfiguredActor": {
-      "type": "object",
-      "properties": {
-        "externalId": {
-          "type": "string"
-        },
-        "key": {
-          "$ref": "../resources/key/schema.json#/$defs/SigningKey"
-        },
-        "permissions": {
-          "type": "array",
-          "items": {
-            "$ref": "../auth/schema.json#/$defs/Permission"
-          }
-        },
-        "labels": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          }
-        }
-      },
-      "required": [
-        "externalId",
-        "key"
-      ]
-    },
     "ConfiguredActors": {
       "oneOf": [
         {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/ConfiguredActor"
+            "$ref": "../resources/actor/schema.json"
           }
         },
         {

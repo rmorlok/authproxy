@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -12,6 +13,7 @@ import (
 	mockDb "github.com/rmorlok/authproxy/internal/database/mock"
 	mockE "github.com/rmorlok/authproxy/internal/encrypt/mock"
 	mockF "github.com/rmorlok/authproxy/internal/httpf/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/rmorlok/authproxy/internal/database"
 )
@@ -129,4 +131,10 @@ func compareResults(got, expected []iface.ConnectorVersionId) bool {
 		}
 	}
 	return true
+}
+
+func TestMapDatabaseError(t *testing.T) {
+	randomErr := errors.New("some error")
+	require.Equal(t, randomErr, mapDatabaseError(randomErr))
+	require.ErrorIs(t, mapDatabaseError(database.ErrNotFound), ErrNotFound)
 }

@@ -3,10 +3,12 @@ package config
 import (
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
+	actorschema "github.com/rmorlok/authproxy/internal/schema/resources/actor"
+	keyschema "github.com/rmorlok/authproxy/internal/schema/resources/key"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 )
 
 type ConfiguredActorsExternalSource struct {
@@ -15,13 +17,13 @@ type ConfiguredActorsExternalSource struct {
 	SyncCronSchedule string               `json:"syncCronSchedule,omitempty" yaml:"syncCronSchedule,omitempty"`
 }
 
-func (s *ConfiguredActorsExternalSource) All() []*ConfiguredActor {
+func (s *ConfiguredActorsExternalSource) All() []*actorschema.Actor {
 	entries, err := os.ReadDir(s.KeysPath)
 	if err != nil {
 		panic(err)
 	}
 
-	actors := make([]*ConfiguredActor, 0, len(entries))
+	actors := make([]*actorschema.Actor, 0, len(entries))
 	for _, entry := range entries {
 		if entry.IsDir() {
 			// Skip directories
@@ -31,18 +33,22 @@ func (s *ConfiguredActorsExternalSource) All() []*ConfiguredActor {
 		// Check if the file has the desired extension
 		if strings.HasSuffix(entry.Name(), ".pub") {
 			externalId := strings.TrimSuffix(entry.Name(), ".pub")
-			actors = append(actors, &ConfiguredActor{
-				ExternalId: externalId,
-				Key: &Key{
-					InnerVal: &KeyPublicPrivate{
-						PublicKey: &KeyData{
-							InnerVal: &KeyDataFile{
-								Path: filepath.Join(s.KeysPath, entry.Name()),
+			actors = append(actors, &actorschema.Actor{
+				TypeMeta: meta.NewTypeMeta(actorschema.ActorKind),
+				Metadata: meta.ObjectMeta{Namespace: "root"},
+				Spec: actorschema.ActorSpec{
+					ExternalId: externalId,
+					SigningKey: &keyschema.SigningKey{
+						InnerVal: &keyschema.KeyPublicPrivate{
+							PublicKey: &keyschema.KeyData{
+								InnerVal: &keyschema.KeyDataFile{
+									Path: filepath.Join(s.KeysPath, entry.Name()),
+								},
 							},
 						},
 					},
+					Permissions: actorschema.ClonePermissions(s.Permissions),
 				},
-				Permissions: slices.Clone(s.Permissions),
 			})
 		}
 	}
@@ -50,9 +56,9 @@ func (s *ConfiguredActorsExternalSource) All() []*ConfiguredActor {
 	return actors
 }
 
-func (s *ConfiguredActorsExternalSource) GetByExternalId(externalId string) (*ConfiguredActor, bool) {
+func (s *ConfiguredActorsExternalSource) GetByExternalId(externalId string) (*actorschema.Actor, bool) {
 	for _, actor := range s.All() {
-		if actor.ExternalId == externalId {
+		if actor.Spec.ExternalId == externalId {
 			return actor, true
 		}
 	}
@@ -60,7 +66,7 @@ func (s *ConfiguredActorsExternalSource) GetByExternalId(externalId string) (*Co
 	return nil, false
 }
 
-func (s *ConfiguredActorsExternalSource) GetBySubject(subject string) (*ConfiguredActor, bool) {
+func (s *ConfiguredActorsExternalSource) GetBySubject(subject string) (*actorschema.Actor, bool) {
 	// Subject is the same as ExternalId (no admin/ prefix handling)
 	return s.GetByExternalId(subject)
 }

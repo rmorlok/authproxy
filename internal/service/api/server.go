@@ -135,12 +135,8 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 		dm.GetAppMetricsService(),
 	)
 	routesActors := common_routes.NewActorsRoutes(
-		dm.GetConfig(),
 		authService,
-		dm.GetDatabase(),
-		dm.GetRedisClient(),
-		dm.GetHttpf(),
-		dm.GetEncryptService(),
+		dm.GetCoreService(),
 		logger,
 	)
 	routesRateLimits := common_routes.NewRateLimitsRoutes(

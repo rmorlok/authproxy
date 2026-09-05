@@ -104,10 +104,14 @@ func (r *ActorResource) Create(ctx context.Context, req resource.CreateRequest, 
 	}
 
 	a, err := r.client.CreateActor(ctx, client.CreateActorRequest{
-		ExternalId:  plan.ExternalId.ValueString(),
-		Namespace:   plan.Namespace.ValueString(),
-		Labels:      labels,
-		Annotations: annotations,
+		APIVersion: client.ActorAPIVersion,
+		Kind:       client.ActorKind,
+		Metadata: client.ActorMetadata{
+			Namespace:   plan.Namespace.ValueString(),
+			Labels:      labels,
+			Annotations: annotations,
+		},
+		Spec: client.ActorSpec{ExternalID: plan.ExternalId.ValueString()},
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create actor", err.Error())
@@ -157,8 +161,13 @@ func (r *ActorResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	}
 
 	a, err := r.client.UpdateActor(ctx, plan.Id.ValueString(), client.UpdateActorRequest{
-		Labels:      labels,
-		Annotations: annotations,
+		APIVersion: client.ActorAPIVersion,
+		Kind:       client.ActorKind,
+		Metadata: &client.ActorMetadataPatch{
+			Labels:      &labels,
+			Annotations: &annotations,
+		},
+		Spec: &client.ActorSpecPatch{},
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update actor", err.Error())
@@ -187,11 +196,11 @@ func (r *ActorResource) ImportState(ctx context.Context, req resource.ImportStat
 }
 
 func setActorState(model *ActorResourceModel, a *client.Actor) {
-	model.Id = types.StringValue(a.Id)
-	model.Namespace = types.StringValue(a.Namespace)
-	model.ExternalId = types.StringValue(a.ExternalId)
-	model.Labels = labelsToMap(a.Labels)
-	model.Annotations = annotationsToMap(a.Annotations)
-	model.CreatedAt = types.StringValue(a.CreatedAt.Format("2006-01-02T15:04:05Z07:00"))
-	model.UpdatedAt = types.StringValue(a.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"))
+	model.Id = types.StringValue(a.Metadata.ID)
+	model.Namespace = types.StringValue(a.Metadata.Namespace)
+	model.ExternalId = types.StringValue(a.Spec.ExternalID)
+	model.Labels = labelsToMap(a.Metadata.Labels)
+	model.Annotations = annotationsToMap(a.Metadata.Annotations)
+	model.CreatedAt = types.StringValue(a.Metadata.CreatedAt.Format("2006-01-02T15:04:05Z07:00"))
+	model.UpdatedAt = types.StringValue(a.Metadata.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"))
 }

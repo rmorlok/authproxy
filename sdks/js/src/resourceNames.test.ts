@@ -8,7 +8,7 @@ vi.mock('./client', () => ({
     client: {get: getMock, post: postMock, patch: patchMock},
 }));
 
-import {createActor, updateActor} from './actors';
+import {ACTOR_API_VERSION, ACTOR_KIND, createActor, updateActor} from './actors';
 import {initiateConnection, updateConnection} from './connections';
 import {updateConnector} from './connectors';
 import {createKey, listKeys, updateKey} from './keys';
@@ -29,7 +29,12 @@ describe('resource name contracts', () => {
     });
 
     it('sends optional names on create requests', () => {
-        createActor({namespace: 'root', externalId: 'customer-1', name: 'customer'});
+        createActor({
+            apiVersion: ACTOR_API_VERSION,
+            kind: ACTOR_KIND,
+            metadata: {namespace: 'root', name: 'customer'},
+            spec: {externalId: 'customer-1'},
+        });
         initiateConnection('cxr_test', '/return', {env: 'prod'}, 'production-crm');
         createKey({namespace: 'root', name: 'primary-key'});
         createRateLimit({
@@ -44,7 +49,11 @@ describe('resource name contracts', () => {
             },
         });
 
-        expect(postMock).toHaveBeenCalledWith('/api/v1/actors', expect.objectContaining({name: 'customer'}));
+        expect(postMock).toHaveBeenCalledWith('/api/v1/actors', expect.objectContaining({
+            apiVersion: ACTOR_API_VERSION,
+            kind: ACTOR_KIND,
+            metadata: expect.objectContaining({name: 'customer'}),
+        }));
         expect(postMock).toHaveBeenCalledWith('/api/v1/connections/_initiate', expect.objectContaining({name: 'production-crm'}));
         expect(postMock).toHaveBeenCalledWith('/api/v1/keys', expect.objectContaining({name: 'primary-key'}));
         expect(postMock).toHaveBeenCalledWith('/api/v1/rate-limits', expect.objectContaining({
@@ -55,7 +64,12 @@ describe('resource name contracts', () => {
     });
 
     it('renames resources by immutable id', () => {
-        updateActor('act_test', {name: 'actor-name'});
+        updateActor('act_test', {
+            apiVersion: ACTOR_API_VERSION,
+            kind: ACTOR_KIND,
+            metadata: {name: 'actor-name'},
+            spec: {},
+        });
         updateConnection('cxn_test', {name: 'connection-name'});
         updateConnector('cxr_test', {name: 'connector-name'});
         updateKey('key_test', {name: 'key-name'});
@@ -66,7 +80,12 @@ describe('resource name contracts', () => {
             spec: {},
         });
 
-        expect(patchMock).toHaveBeenCalledWith('/api/v1/actors/act_test', {name: 'actor-name'});
+        expect(patchMock).toHaveBeenCalledWith('/api/v1/actors/act_test', {
+            apiVersion: ACTOR_API_VERSION,
+            kind: ACTOR_KIND,
+            metadata: {name: 'actor-name'},
+            spec: {},
+        });
         expect(patchMock).toHaveBeenCalledWith('/api/v1/connections/cxn_test', {name: 'connection-name'});
         expect(patchMock).toHaveBeenCalledWith('/api/v1/connectors/cxr_test', {name: 'connector-name'});
         expect(patchMock).toHaveBeenCalledWith('/api/v1/keys/key_test', {name: 'key-name'});

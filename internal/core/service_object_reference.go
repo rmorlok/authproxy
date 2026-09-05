@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	authcore "github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
@@ -24,17 +23,16 @@ func coreObjectReferenceError(kind meta.Kind, err error) error {
 	return err
 }
 
-// ResolveActorReference resolves an actor and converts the persistence model
-// to the actor object used by authentication and authorization code.
+// ResolveActorReference resolves and wraps an Actor resource.
 func (s *service) ResolveActorReference(
 	ctx context.Context,
 	reference meta.ObjectReference,
-) (*authcore.Actor, error) {
+) (iface.Actor, error) {
 	actor, err := s.db.ResolveActorReference(ctx, reference)
 	if err != nil {
 		return nil, coreObjectReferenceError(reference.Kind, err)
 	}
-	return authcore.CreateActor(actor), nil
+	return wrapActor(*actor, s), nil
 }
 
 // ResolveConnectionReference resolves a connection and hydrates its pinned

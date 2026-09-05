@@ -656,74 +656,13 @@
       ]
     },
     "Actor": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "namespace": {
-          "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath"
-        },
-        "externalId": {
-          "type": "string"
-        },
-        "labels": {
-          "$ref": "#/$defs/StringMap"
-        },
-        "annotations": {
-          "$ref": "#/$defs/StringMap"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "id",
-        "namespace",
-        "externalId",
-        "createdAt",
-        "updatedAt"
-      ],
-      "additionalProperties": false
+      "$ref": "../resources/actor/schema.json"
     },
     "CreateActorRequest": {
-      "type": "object",
-      "properties": {
-        "externalId": {
-          "type": "string"
-        },
-        "namespace": {
-          "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath"
-        },
-        "labels": {
-          "$ref": "#/$defs/StringMap"
-        },
-        "annotations": {
-          "$ref": "#/$defs/StringMap"
-        }
-      },
-      "required": [
-        "externalId",
-        "namespace"
-      ],
-      "additionalProperties": false
+      "$ref": "../resources/actor/schema.json"
     },
     "UpdateActorRequest": {
-      "type": "object",
-      "properties": {
-        "labels": {
-          "$ref": "#/$defs/StringMap"
-        },
-        "annotations": {
-          "$ref": "#/$defs/StringMap"
-        }
-      },
-      "additionalProperties": false
+      "$ref": "../resources/actor/schema.json#/$defs/ActorPatch"
     },
     "ListActorsResponse": {
       "description": "A Kubernetes-style list of actors.",
@@ -736,7 +675,7 @@
             "kind": { "const": "ActorList" },
             "items": {
               "type": "array",
-              "items": { "$ref": "#/$defs/Actor" }
+              "items": { "$ref": "../resources/actor/schema.json" }
             }
           }
         }

@@ -8,7 +8,10 @@ import (
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encfield"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
+	actorschema "github.com/rmorlok/authproxy/internal/schema/resources/actor"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
@@ -71,33 +74,42 @@ func (s *service) SyncConfiguredActorsExternalSource(ctx context.Context) error 
 }
 
 // syncConfiguredActors performs the actual sync of configured actors to the database.
-func (s *service) syncConfiguredActors(ctx context.Context, actors []*sconfig.ConfiguredActor, sourceLabel string) error {
+func (s *service) syncConfiguredActors(ctx context.Context, actors []*actorschema.Actor, sourceLabel string) error {
 	// Build a set of expected external IDs
 	expectedExternalIds := make(map[string]bool)
 
 	// Upsert each configured actor
-	for _, actor := range actors {
-		externalId := actor.ExternalId
+	for i, actor := range actors {
+		if actor == nil {
+			return fmt.Errorf("configured actor %d is nil", i)
+		}
+		if err := actor.ValidateFor(
+			meta.ValidationModeConfig,
+			(&common.ValidationContext{Path: "$.systemAuth.actors"}).PushIndex(i),
+		); err != nil {
+			return fmt.Errorf("invalid configured actor: %w", err)
+		}
+		externalId := actor.Spec.ExternalId
 		expectedExternalIds[externalId] = true
 
 		// Serialize and encrypt the key
 		var encryptedKey *encfield.EncryptedField
-		if actor.Key != nil {
-			keyJson, err := json.Marshal(actor.Key)
+		if actor.Spec.SigningKey != nil {
+			keyJson, err := json.Marshal(actor.Spec.SigningKey)
 			if err != nil {
-				return fmt.Errorf("failed to marshal key for actor %s: %w", actor.ExternalId, err)
+				return fmt.Errorf("failed to marshal key for actor %s: %w", externalId, err)
 			}
 
-			encrypted, err := s.encrypt.EncryptStringGlobal(ctx, string(keyJson))
+			encrypted, err := s.encrypt.EncryptStringForNamespace(ctx, actor.Metadata.Namespace, string(keyJson))
 			if err != nil {
-				return fmt.Errorf("failed to encrypt key for actor %s: %w", actor.ExternalId, err)
+				return fmt.Errorf("failed to encrypt key for actor %s: %w", externalId, err)
 			}
 			encryptedKey = &encrypted
 		}
 
 		// Create labels, starting with actor's configured labels
 		labels := make(database.Labels)
-		for k, v := range actor.Labels {
+		for k, v := range actor.Metadata.Labels {
 			labels[k] = v
 		}
 		// Add the sync source label
@@ -105,17 +117,23 @@ func (s *service) syncConfiguredActors(ctx context.Context, actors []*sconfig.Co
 
 		// Create actor data with labels and encrypted key
 		actorData := &configuredActorData{
-			namespace:    "root",
+			namespace:    actor.Metadata.Namespace,
 			externalId:   externalId,
 			labels:       labels,
-			permissions:  actor.Permissions,
+			annotations:  database.Annotations(actor.Metadata.Annotations),
+			permissions:  actor.Spec.Permissions,
 			encryptedKey: encryptedKey,
 		}
 
 		// Upsert the actor
-		_, err := s.db.UpsertActor(ctx, actorData)
+		dbActor, err := s.db.UpsertActor(ctx, actorData)
 		if err != nil {
-			return fmt.Errorf("failed to upsert actor %s: %w", actor.ExternalId, err)
+			return fmt.Errorf("failed to upsert actor %s: %w", externalId, err)
+		}
+		if actor.Metadata.Name != "" && actor.Metadata.Name != dbActor.Name {
+			if _, err := s.db.UpdateActorName(ctx, dbActor.Id, actor.Metadata.Name); err != nil {
+				return fmt.Errorf("failed to update name for actor %s: %w", externalId, err)
+			}
 		}
 
 		s.logger.Debug("synced configured actor", "external_id", externalId)

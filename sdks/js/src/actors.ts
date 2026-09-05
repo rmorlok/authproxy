@@ -1,12 +1,76 @@
 import { client } from './client';
 import { ListResponse } from './common';
 
-// Actor models
+// Actor models mirror the canonical authproxy.net/v1alpha1 resource.
 
-export interface UpdateActorRequest {
+export const ACTOR_API_VERSION = 'authproxy.net/v1alpha1' as const;
+export const ACTOR_KIND = 'Actor' as const;
+
+export interface ActorPermission {
+  namespace: string;
+  resources: string[];
+  resourceIds?: string[];
+  verbs: string[];
+}
+
+export type ActorSigningKey = Record<string, unknown>;
+
+export interface ActorMetadata {
+  id: string;
+  name: string;
+  namespace: string;
+  labels?: Record<string, string>;
+  annotations?: Record<string, string>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ActorSpec {
+  externalId: string;
+  permissions?: ActorPermission[];
+}
+
+export interface ActorStatus {
+  signingKeyConfigured: boolean;
+}
+
+export interface Actor {
+  apiVersion: typeof ACTOR_API_VERSION;
+  kind: typeof ACTOR_KIND;
+  metadata: ActorMetadata;
+  spec: ActorSpec;
+  status: ActorStatus;
+}
+
+export interface CreateActorRequest {
+  apiVersion: typeof ACTOR_API_VERSION;
+  kind: typeof ACTOR_KIND;
+  metadata: {
+    namespace: string;
     name?: string;
     labels?: Record<string, string>;
     annotations?: Record<string, string>;
+  };
+  spec: {
+    externalId: string;
+    permissions?: ActorPermission[];
+    signingKey?: ActorSigningKey;
+  };
+}
+
+export interface UpdateActorRequest {
+  apiVersion: typeof ACTOR_API_VERSION;
+  kind: typeof ACTOR_KIND;
+  metadata: {
+    name?: string;
+    labels?: Record<string, string>;
+    annotations?: Record<string, string>;
+  };
+  spec: {
+    permissions?: ActorPermission[];
+    /** Explicit null removes actor-specific signing material. */
+    signingKey?: ActorSigningKey | null;
+  };
 }
 
 export interface PutActorLabelRequest {
@@ -25,25 +89,6 @@ export interface PutActorAnnotationRequest {
 export interface ActorAnnotation {
   key: string;
   value: string;
-}
-
-export interface Actor {
-  id: string;
-  name: string;
-  namespace: string;
-  labels?: Record<string, string>;
-  annotations?: Record<string, string>;
-  externalId: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CreateActorRequest {
-    namespace: string;
-    name?: string;
-    externalId: string;
-    labels?: Record<string, string>;
-    annotations?: Record<string, string>;
 }
 
 /**
@@ -72,7 +117,7 @@ export const listActors = (params: ListActorsParams) => {
  * @param request The actor to create
  */
 export const createActor = (request: CreateActorRequest) => {
-    return client.post<Actor>('/api/v1/actors', request);
+  return client.post<Actor>('/api/v1/actors', request);
 };
 
 /**

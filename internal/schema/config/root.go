@@ -74,6 +74,10 @@ func (r *Root) Validate() error {
 		result = multierror.Append(result, err)
 	}
 
+	if err := r.SystemAuth.Actors.Validate(vc.PushField("systemAuth").PushField("actors")); err != nil {
+		result = multierror.Append(result, err)
+	}
+
 	return result.ErrorOrNil()
 }
 

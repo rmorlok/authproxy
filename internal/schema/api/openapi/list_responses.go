@@ -6,6 +6,8 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	apiv1alpha1 "github.com/rmorlok/authproxy/internal/schema/api/v1alpha1"
+	authschema "github.com/rmorlok/authproxy/internal/schema/auth"
+	actorschema "github.com/rmorlok/authproxy/internal/schema/resources/actor"
 	keyschema "github.com/rmorlok/authproxy/internal/schema/resources/key"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	nschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
@@ -20,13 +22,50 @@ type ResourceListJson struct {
 	Metadata   apiv1alpha1.ListMeta `json:"metadata" binding:"required"`
 }
 
+// ActorSpecJson documents Actor desired state while keeping polymorphic
+// write-only signing-key configuration opaque to swaggo.
+type ActorSpecJson struct {
+	ExternalId  string                  `json:"externalId" binding:"required" example:"user-123"`
+	Permissions []authschema.Permission `json:"permissions,omitempty"`
+	SigningKey  map[string]interface{}  `json:"signingKey,omitempty" swaggertype:"object"`
+}
+
+// ActorJson documents a canonical Actor resource.
+//
+//	@Description	Kubernetes-style Actor resource. Signing key material is write-only and never returned.
+type ActorJson struct {
+	APIVersion string                   `json:"apiVersion" binding:"required" enums:"authproxy.net/v1alpha1" example:"authproxy.net/v1alpha1"`
+	Kind       string                   `json:"kind" binding:"required" enums:"Actor" example:"Actor"`
+	Metadata   meta.ObjectMeta          `json:"metadata" binding:"required"`
+	Spec       ActorSpecJson            `json:"spec" binding:"required"`
+	Status     *actorschema.ActorStatus `json:"status,omitempty"`
+}
+
+// ActorSpecPatchJson documents mutable Actor desired state.
+type ActorSpecPatchJson struct {
+	ExternalId  *string                  `json:"externalId,omitempty" example:"user-123"`
+	Permissions *[]authschema.Permission `json:"permissions,omitempty"`
+	SigningKey  map[string]interface{}   `json:"signingKey,omitempty" swaggertype:"object"`
+}
+
+// ActorPatchJson documents a canonical Actor update.
+//
+//	@Description	Kubernetes-style Actor patch. External identity and namespace are immutable; signingKey null removes actor-specific signing material.
+type ActorPatchJson struct {
+	APIVersion string                   `json:"apiVersion" binding:"required" enums:"authproxy.net/v1alpha1" example:"authproxy.net/v1alpha1"`
+	Kind       string                   `json:"kind" binding:"required" enums:"Actor" example:"Actor"`
+	Metadata   *meta.ObjectMetaPatch    `json:"metadata" binding:"required"`
+	Spec       *ActorSpecPatchJson      `json:"spec" binding:"required"`
+	Status     *actorschema.ActorStatus `json:"status,omitempty"`
+}
+
 // ListActorsResponseJson documents the paginated actor list response.
 //
 //	@Description	Paginated list of actors
 type ListActorsResponseJson struct {
 	ResourceListJson
 	// List of actors.
-	Items []schemaapi.ActorJson `json:"items" binding:"required"`
+	Items []ActorJson `json:"items" binding:"required"`
 }
 
 // ListNamespacesResponseJson documents the paginated namespace list response.

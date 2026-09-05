@@ -2,6 +2,7 @@ import * as React from 'react';
 import type {Meta, StoryObj} from '@storybook/react';
 import Box from '@mui/material/Box';
 import {configureClient} from '@authproxy/api';
+import ActorDetail from '../components/ActorDetail';
 import NamespaceDetail from '../components/NamespaceDetail';
 import ConnectorDetail from '../components/ConnectorDetail';
 import ConnectionDetail from '../components/ConnectionDetail';
@@ -84,6 +85,25 @@ const rateLimit = {
   status: {effectiveMode: 'enforce'},
 };
 
+const actor = {
+  apiVersion: 'authproxy.net/v1alpha1',
+  kind: 'Actor',
+  metadata: {
+    id: 'act_payments_billing',
+    namespace: 'root.payments',
+    name: 'billing-service',
+    labels: {team: 'payments', 'apxy/act/-/name': 'billing-service'},
+    annotations: {owner: 'Payments Platform', runbook: 'go/payments/billing'},
+    createdAt: '2026-08-05T15:30:00Z',
+    updatedAt: '2026-08-05T15:45:00Z',
+  },
+  spec: {
+    externalId: 'svc_billing',
+    permissions: [],
+  },
+  status: {signingKeyConfigured: true},
+};
+
 const connectorVersion = {
   ...connector,
   definition: {displayName: 'Stripe', setupFlow: {steps: []}},
@@ -129,6 +149,10 @@ export const RateLimit: Story = {
   render: () => <DetailCanvas><RateLimitDetail rateLimitId={rateLimit.metadata.id}/></DetailCanvas>,
 };
 
+export const Actor: Story = {
+  render: () => <DetailCanvas><ActorDetail actorId={actor.metadata.id}/></DetailCanvas>,
+};
+
 function DetailCanvas({children}: {children: React.ReactNode}) {
   return <Box sx={{maxWidth: 960, minHeight: '100vh', mx: 'auto', bgcolor: 'background.default'}}>{children}</Box>;
 }
@@ -140,5 +164,6 @@ function responseData(url: string) {
   if (url === `/api/v1/connections/${connection.id}`) return connection;
   if (url === `/api/v1/keys/${key.id}`) return key;
   if (url === `/api/v1/rate-limits/${rateLimit.metadata.id}`) return rateLimit;
+  if (url === `/api/v1/actors/${actor.metadata.id}`) return actor;
   return {};
 }

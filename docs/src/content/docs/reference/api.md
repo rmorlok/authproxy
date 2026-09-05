@@ -107,6 +107,53 @@ Exact name matches rank before name prefixes, which rank before name
 substrings and matching label values. Namespace and resource-ID permissions are
 applied before results are returned.
 
+## Actor resource shape
+
+Actor create, read, update, and list operations use the
+`authproxy.net/v1alpha1` resource envelope. Namespace and identity fields live
+in `metadata`; the host identity and permissions live in `spec`:
+
+```http
+POST /api/v1/actors
+Content-Type: application/json
+
+{
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "Actor",
+  "metadata": {
+    "namespace": "root.acme",
+    "name": "billing-service",
+    "labels": {"team": "payments"}
+  },
+  "spec": {
+    "externalId": "svc_billing",
+    "permissions": [
+      {
+        "namespace": "root.acme.**",
+        "resources": ["connections"],
+        "verbs": ["list", "get", "proxy"]
+      }
+    ]
+  }
+}
+```
+
+Updates use the same type metadata and require both `metadata` and `spec`,
+even when one section has no changes:
+
+```json
+{
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "Actor",
+  "metadata": {"labels": {"team": "platform"}},
+  "spec": {}
+}
+```
+
+`spec.signingKey` is write-only. AuthProxy encrypts supplied signing material
+and reports only `status.signingKeyConfigured` in returned resources. An
+explicit `"signingKey": null` in an update removes the actor-specific key.
+
 ## Regenerate specifications
 
 Swagger artifacts are generated from Go route annotations. Run:
