@@ -140,7 +140,6 @@ type ListConnectorVersionsResponseJson struct {
 // ConnectionSpecJson documents the durable references for a Connection.
 type ConnectionSpecJson struct {
 	ConnectorRef  meta.ObjectReference   `json:"connectorRef" binding:"required"`
-	ActorRef      *meta.ObjectReference  `json:"actorRef,omitempty"`
 	Configuration map[string]interface{} `json:"configuration,omitempty" swaggertype:"object"`
 }
 

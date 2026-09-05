@@ -412,8 +412,6 @@ definitions:
     type: object
   openapi.ConnectionSpecJson:
     properties:
-      actorRef:
-        $ref: '#/definitions/meta.ObjectReference'
       configuration:
         type: object
       connectorRef:

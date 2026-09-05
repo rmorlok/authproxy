@@ -84,14 +84,6 @@ func (c *connection) GetConnectorVersion() uint64 {
 	return c.ConnectorVersion
 }
 
-func (c *connection) GetActorId() *apid.ID {
-	if c.ActorId == nil {
-		return nil
-	}
-	actorID := *c.ActorId
-	return &actorID
-}
-
 func (c *connection) GetCreatedAt() time.Time {
 	return c.CreatedAt
 }
@@ -153,7 +145,6 @@ func (c *connection) GetResource(ctx context.Context) (*connectionschema.Connect
 				Namespace:  c.connector.GetNamespace(),
 				Generation: c.connector.GetVersion(),
 			},
-			ActorRef:      connectionschema.NewActorReference(apid.Nil),
 			Configuration: configuration,
 		},
 		Status: &connectionschema.ConnectionStatus{
@@ -167,9 +158,6 @@ func (c *connection) GetResource(ctx context.Context) (*connectionschema.Connect
 		},
 	}
 
-	if c.ActorId != nil {
-		resource.Spec.ActorRef = connectionschema.NewActorReference(*c.ActorId)
-	}
 	if c.SetupStep != nil || c.SetupError != nil {
 		resource.Status.Setup = &connectionschema.ConnectionSetupStatus{Error: c.GetSetupError()}
 		if c.SetupStep != nil {

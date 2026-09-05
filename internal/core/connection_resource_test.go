@@ -16,7 +16,6 @@ import (
 
 func TestConnectionGetResourceBuildsCanonicalEnvelope(t *testing.T) {
 	now := time.Now().UTC()
-	actorID := apid.New(apid.PrefixActor)
 	setupError := "authorization failed"
 	connectionID := apid.New(apid.PrefixConnection)
 	connectorID := apid.New(apid.PrefixConnector)
@@ -38,7 +37,6 @@ func TestConnectionGetResourceBuildsCanonicalEnvelope(t *testing.T) {
 		HealthState:            database.ConnectionHealthStateUnhealthy,
 		ConnectorId:            connectorID,
 		ConnectorVersion:       4,
-		ActorId:                &actorID,
 		Labels:                 database.Labels{"team": "platform"},
 		Annotations:            database.Annotations{"owner": "integrations"},
 		SetupStep:              &connectorschema.SetupStepVerifyFailed,
@@ -56,7 +54,6 @@ func TestConnectionGetResourceBuildsCanonicalEnvelope(t *testing.T) {
 	require.Equal(t, "platform", resource.Metadata.Labels["team"])
 	require.Equal(t, connectorID.String(), resource.Spec.ConnectorRef.ID)
 	require.Equal(t, uint64(4), resource.Spec.ConnectorRef.Generation)
-	require.Equal(t, actorID.String(), resource.Spec.ActorRef.ID)
 	require.Equal(t, "****", resource.Spec.Configuration["tenant"])
 	require.Equal(t, connectionschema.ConnectionStateSetup, resource.Status.Lifecycle.State)
 	require.Equal(t, connectionschema.ConnectionHealthStateUnhealthy, resource.Status.Health.State)
@@ -66,13 +63,10 @@ func TestConnectionGetResourceBuildsCanonicalEnvelope(t *testing.T) {
 	require.NoError(t, resource.ValidateFor(meta.ValidationModeResponse, nil))
 
 	resource.Metadata.Labels["team"] = "changed"
-	resource.Spec.ActorRef.ID = apid.New(apid.PrefixActor).String()
 	require.Equal(t, "platform", wrapped.Labels["team"])
-	require.Equal(t, actorID, *wrapped.ActorId)
-	require.Equal(t, actorID, *wrapped.GetActorId())
 }
 
-func TestConnectionGetResourceOmitsOptionalActorAndSetup(t *testing.T) {
+func TestConnectionGetResourceOmitsSetupAndDefaultsHealth(t *testing.T) {
 	now := time.Now().UTC()
 	connector := &Connector{ConnectorWithDefinition: database.ConnectorWithDefinition{
 		Id:        apid.New(apid.PrefixConnector),
@@ -93,7 +87,6 @@ func TestConnectionGetResourceOmitsOptionalActorAndSetup(t *testing.T) {
 
 	resource, err := wrapped.GetResource(t.Context())
 	require.NoError(t, err)
-	require.Nil(t, resource.Spec.ActorRef)
 	require.Nil(t, resource.Status.Setup)
 	require.False(t, resource.Status.ConfigurationConfigured)
 	require.Equal(t, connectionschema.ConnectionHealthStateHealthy, resource.Status.Health.State)

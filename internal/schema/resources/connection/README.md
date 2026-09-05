@@ -3,8 +3,8 @@
 This package owns the canonical `authproxy.net/v1alpha1` `Connection`
 resource. Common identity, namespace, labels, annotations, and timestamps live
 in `metadata`. `spec.connectorRef` pins the exact connector generation that
-interprets the connection, while optional `spec.actorRef` records the actor
-that initiated it without changing namespace-based authorization.
+interprets the connection. Connections are governed by namespace permissions
+and are not bound to individual actors.
 
 Connector-defined setup values appear under `spec.configuration`, flow through
 typed setup actions, and are encrypted at rest. API serialization recursively

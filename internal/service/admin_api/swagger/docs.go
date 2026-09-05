@@ -8823,9 +8823,6 @@ const docTemplateadmin_api = `{
                 "connectorRef"
             ],
             "properties": {
-                "actorRef": {
-                    "$ref": "#/definitions/meta.ObjectReference"
-                },
                 "configuration": {
                     "type": "object"
                 },

@@ -19,11 +19,6 @@
       "namespace": "root.acme",
       "generation": 1
     },
-    "actorRef": {
-      "apiVersion": "authproxy.net/v1alpha1",
-      "kind": "Actor",
-      "id": "act_test550e8400abcde"
-    },
     "configuration": { "tenant": "********" }
   },
   "status": {

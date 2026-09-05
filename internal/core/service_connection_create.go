@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	authcore "github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aplog"
@@ -51,11 +50,6 @@ func (s *service) CreateConnection(
 		UpdatedAt:        now,
 		State:            database.ConnectionStateSetup,
 	}
-	if actor := authcore.ActorFromContext(ctx); actor != nil && !actor.GetId().IsNil() {
-		actorID := actor.GetId()
-		dbConn.ActorId = &actorID
-	}
-
 	err = s.db.CreateConnection(ctx, &dbConn)
 	if err != nil {
 		logger.Error("failed to create connection", "namespace", namespace, "error", err)

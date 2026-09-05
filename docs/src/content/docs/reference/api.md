@@ -121,9 +121,8 @@ include both `metadata.name` and immutable `metadata.id`.
 
 Connection reads and lists use the `authproxy.net/v1alpha1` resource envelope.
 The connector binding is generation-specific because stored configuration and
-credentials are interpreted by that exact connector definition. The optional
-actor reference records who initiated setup; namespace permissions remain the
-authorization boundary.
+credentials are interpreted by that exact connector definition. Connections
+are namespace-scoped and are not bound to an individual actor.
 
 ```json
 {
@@ -141,11 +140,6 @@ authorization boundary.
       "id": "cxr_01example",
       "generation": 3
     },
-    "actorRef": {
-      "apiVersion": "authproxy.net/v1alpha1",
-      "kind": "Actor",
-      "id": "act_01example"
-    },
     "configuration": {"tenant": "****"}
   },
   "status": {
@@ -156,10 +150,10 @@ authorization boundary.
 }
 ```
 
-Setup values and credentials are never fields on the durable resource. Submit
-them through the typed setup actions; AuthProxy validates them against the
-connector's form definition, encrypts stored values, and redacts secret-bearing
-setup data in ordinary API responses.
+Submit setup values through the typed setup actions. AuthProxy validates them
+against the connector's form definition, encrypts stored values, and only
+returns masked values under `spec.configuration`; credentials and setup data
+are never replayed in cleartext.
 
 The Admin cross-resource endpoint searches names directly and also searches
 user-label values:

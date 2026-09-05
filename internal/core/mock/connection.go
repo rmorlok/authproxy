@@ -25,7 +25,6 @@ type Connection struct {
 	HealthState       database.ConnectionHealthState
 	ConnectorId       apid.ID
 	ConnectorVersion  uint64
-	ActorId           *apid.ID
 	ConnectorValue    iface.Connector
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
@@ -62,14 +61,6 @@ func (m *Connection) GetConnectorVersion() uint64 {
 	return m.ConnectorVersion
 }
 
-func (m *Connection) GetActorId() *apid.ID {
-	if m.ActorId == nil {
-		return nil
-	}
-	actorID := *m.ActorId
-	return &actorID
-}
-
 func (m *Connection) GetCreatedAt() time.Time {
 	return m.CreatedAt
 }
@@ -103,11 +94,7 @@ func (m *Connection) GetResource(ctx context.Context) (*connectionschema.Connect
 		CreatedAt:   &createdAt,
 		UpdatedAt:   &updatedAt,
 	}
-	resource.Spec.ActorRef = connectionschema.NewActorReference(apid.Nil)
 	resource.Spec.Configuration = cloneMap(m.Configuration)
-	if m.ActorId != nil {
-		resource.Spec.ActorRef = connectionschema.NewActorReference(*m.ActorId)
-	}
 	if m.ConnectorValue != nil {
 		connectorResource := m.ConnectorValue.GetResource()
 		resource.Spec.ConnectorRef = meta.NewObjectReference(connectorResource.TypeMeta, connectorResource.Metadata)

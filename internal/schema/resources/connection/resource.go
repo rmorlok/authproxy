@@ -9,7 +9,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apserde"
 	"github.com/rmorlok/authproxy/internal/schema/common"
-	actorschema "github.com/rmorlok/authproxy/internal/schema/resources/actor"
 	connectorschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	namespaceschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
@@ -39,8 +38,7 @@ const (
 // Connection is the canonical Kubernetes-style representation of one
 // configured connector instance. ConnectorRef is generation-specific because
 // credentials and setup configuration are interpreted by that exact connector
-// definition. ActorRef records the actor that initiated the connection; it is
-// informational and does not replace namespace-based authorization.
+// definition. Connections are namespace-scoped and are not bound to an actor.
 type Connection struct {
 	meta.TypeMeta `json:",inline" yaml:",inline"`
 	Metadata      meta.ObjectMeta   `json:"metadata" yaml:"metadata"`
@@ -52,9 +50,8 @@ type Connection struct {
 // configuration for a connection. Clients change configuration through typed
 // setup actions; API responses always redact every configuration value.
 type ConnectionSpec struct {
-	ConnectorRef  meta.ObjectReference  `json:"connectorRef" yaml:"connectorRef"`
-	ActorRef      *meta.ObjectReference `json:"actorRef,omitempty" yaml:"actorRef,omitempty"`
-	Configuration map[string]any        `json:"configuration,omitempty" yaml:"configuration,omitempty" apiredact:"secret"`
+	ConnectorRef  meta.ObjectReference `json:"connectorRef" yaml:"connectorRef"`
+	Configuration map[string]any       `json:"configuration,omitempty" yaml:"configuration,omitempty" apiredact:"secret"`
 }
 
 // ConnectionStatus contains server-observed lifecycle, health, setup, and
@@ -115,17 +112,6 @@ func NewConnectionReference(id apid.ID) meta.ObjectReference {
 	return meta.ObjectReference{
 		APIVersion: meta.APIVersionV1Alpha1,
 		Kind:       ConnectionKind,
-		ID:         id.String(),
-	}
-}
-
-func NewActorReference(id apid.ID) *meta.ObjectReference {
-	if id.IsNil() {
-		return nil
-	}
-	return &meta.ObjectReference{
-		APIVersion: meta.APIVersionV1Alpha1,
-		Kind:       actorschema.ActorKind,
 		ID:         id.String(),
 	}
 }
@@ -196,10 +182,6 @@ func (c *Connection) Clone() *Connection {
 	clone := *c
 	clone.Metadata = meta.CloneObjectMeta(c.Metadata)
 	clone.Spec.Configuration = cloneConfiguration(c.Spec.Configuration)
-	if c.Spec.ActorRef != nil {
-		actorRef := *c.Spec.ActorRef
-		clone.Spec.ActorRef = &actorRef
-	}
 	if c.Status != nil {
 		status := *c.Status
 		if c.Status.Setup != nil {
@@ -275,20 +257,6 @@ func (c *Connection) ValidateFor(mode meta.ValidationMode, vc *common.Validation
 	if err := validateConnectorReference(c.Spec.ConnectorRef, requireStoredIdentity, vc.PushField("spec").PushField("connectorRef")); err != nil {
 		result = multierror.Append(result, err)
 	}
-	if c.Spec.ActorRef != nil {
-		if err := meta.ValidateObjectReferenceWithOptions(*c.Spec.ActorRef, meta.ObjectReferenceValidationOptions{
-			ExpectedAPIVersion: meta.APIVersionV1Alpha1,
-			ExpectedKind:       actorschema.ActorKind,
-			IDValidator:        actorschema.ValidateID,
-			NamespaceValidator: namespaceschema.ValidatePath,
-		}, vc.PushField("spec").PushField("actorRef")); err != nil {
-			result = multierror.Append(result, err)
-		}
-		if c.Spec.ActorRef.Generation != 0 {
-			result = multierror.Append(result, vc.NewErrorForField("spec.actorRef.generation", "does not apply to actors"))
-		}
-	}
-
 	if err := meta.ValidateStatus(c.Status, mode, vc); err != nil {
 		result = multierror.Append(result, err)
 	}

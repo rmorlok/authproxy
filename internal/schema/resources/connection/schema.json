@@ -24,20 +24,6 @@
         }
       ]
     },
-    "ActorReference": {
-      "allOf": [
-        { "$ref": "../meta/schema.json#/$defs/ObjectReference" },
-        {
-          "type": "object",
-          "properties": {
-            "apiVersion": { "const": "authproxy.net/v1alpha1" },
-            "kind": { "const": "Actor" },
-            "id": { "type": "string", "pattern": "^act_" },
-            "generation": false
-          }
-        }
-      ]
-    },
     "ConnectionReference": {
       "allOf": [
         { "$ref": "../meta/schema.json#/$defs/ObjectReference" },
@@ -57,7 +43,6 @@
       "required": ["connectorRef"],
       "properties": {
         "connectorRef": { "$ref": "#/$defs/ConnectorReference" },
-        "actorRef": { "$ref": "#/$defs/ActorReference" },
         "configuration": {
           "type": "object",
           "description": "Connector-defined desired setup configuration. Values are write-only and always redacted in API responses."

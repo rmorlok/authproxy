@@ -45,11 +45,6 @@ func TestConnectionSchema(t *testing.T) {
 				"id":         "cxr_test0000000000001",
 				"generation": 2,
 			},
-			"actorRef": map[string]any{
-				"apiVersion": "authproxy.net/v1alpha1",
-				"kind":       "Actor",
-				"id":         "act_test0000000000001",
-			},
 		},
 		"status": map[string]any{
 			"lifecycle":               map[string]any{"state": "configured"},

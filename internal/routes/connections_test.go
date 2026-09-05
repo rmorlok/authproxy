@@ -675,7 +675,6 @@ func TestConnections(t *testing.T) {
 			require.Equal(t, connectorVersion, connection.ConnectorVersion)
 			require.Equal(t, "platform", connection.Labels["team"])
 			require.Equal(t, "integrations", connection.Annotations["owner"])
-			require.NotNil(t, connection.ActorId)
 		})
 	})
 
@@ -2362,8 +2361,6 @@ func TestConnections(t *testing.T) {
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &connection))
 			require.Equal(t, expectedName, string(connection.Metadata.Name))
 			require.Equal(t, expectedName, connection.Metadata.Labels["apxy/cxn/-/name"])
-			require.NotNil(t, connection.Spec.ActorRef)
-			require.Equal(t, smeta.Kind("Actor"), connection.Spec.ActorRef.Kind)
 		}
 
 		otherName := "other-connection"

@@ -8,7 +8,6 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apserde"
-	actorschema "github.com/rmorlok/authproxy/internal/schema/resources/actor"
 	connectorschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/stretchr/testify/require"
@@ -33,11 +32,6 @@ func storedConnectionResource() *Connection {
 				Kind:       connectorschema.ConnectorKind,
 				ID:         apid.New(apid.PrefixConnector).String(),
 				Generation: 2,
-			},
-			ActorRef: &meta.ObjectReference{
-				APIVersion: meta.APIVersionV1Alpha1,
-				Kind:       actorschema.ActorKind,
-				ID:         apid.New(apid.PrefixActor).String(),
 			},
 			Configuration: map[string]any{
 				"tenant": "acme",
@@ -82,10 +76,6 @@ func TestConnectionResourceRejectsInvalidReferencesAndStatus(t *testing.T) {
 	require.ErrorContains(t, resource.ValidateFor(meta.ValidationModeResponse, nil), "generation")
 
 	resource = storedConnectionResource()
-	resource.Spec.ActorRef.Kind = connectorschema.ConnectorKind
-	require.ErrorContains(t, resource.ValidateFor(meta.ValidationModeResponse, nil), "Actor")
-
-	resource = storedConnectionResource()
 	resource.Status.Health.State = "unknown"
 	require.ErrorContains(t, resource.ValidateFor(meta.ValidationModeResponse, nil), "health")
 
@@ -100,18 +90,14 @@ func TestConnectionCloneAndReferences(t *testing.T) {
 	resource.Status.Setup = &ConnectionSetupStatus{StepID: "apxy:verify_failed", Error: &setupError}
 	clone := resource.Clone()
 	clone.Metadata.Labels["team"] = "changed"
-	clone.Spec.ActorRef.ID = apid.New(apid.PrefixActor).String()
 	clone.Spec.Configuration["nested"].(map[string]any)["apiKey"] = "changed"
 	*clone.Status.Setup.Error = "changed"
 	require.Equal(t, "platform", resource.Metadata.Labels["team"])
-	require.NotEqual(t, clone.Spec.ActorRef.ID, resource.Spec.ActorRef.ID)
 	require.Equal(t, "secret", resource.Spec.Configuration["nested"].(map[string]any)["apiKey"])
 	require.Equal(t, "failed", *resource.Status.Setup.Error)
 
 	connectionID := apid.New(apid.PrefixConnection)
 	require.Equal(t, connectionID.String(), NewConnectionReference(connectionID).ID)
-	require.Nil(t, NewActorReference(apid.Nil))
-	require.Equal(t, actorschema.ActorKind, NewActorReference(apid.New(apid.PrefixActor)).Kind)
 	require.NoError(t, ValidateID(connectionID.String()))
 	require.Error(t, ValidateID(apid.New(apid.PrefixConnector).String()))
 	require.False(t, IsValidConnectionState("unknown"))
