@@ -54,7 +54,9 @@ func (a *ConnectionDisconnectAction) ValidateRequest(expectedKind meta.Kind) err
 	return a.validateFields(false)
 }
 
-func (a *ConnectionDisconnectAction) ValidateResponse(expectedKind meta.Kind) error {
+func (a *ConnectionDisconnectAction) ValidateResponse(
+	expectedKind meta.Kind,
+) error {
 	if err := a.Action.ValidateResponse(expectedKind); err != nil {
 		return err
 	}
@@ -65,21 +67,27 @@ func (a *ConnectionDisconnectAction) validateFields(requireStatus bool) error {
 	if err := validateConnectionActionTarget(a.Metadata.Target); err != nil {
 		return err
 	}
+
 	if a.Spec.TimeoutSeconds != nil && *a.Spec.TimeoutSeconds <= 0 {
 		return fmt.Errorf("$.spec.timeoutSeconds: must be greater than zero")
 	}
+
 	if !requireStatus {
 		return nil
 	}
+
 	if a.Status == nil {
 		return fmt.Errorf("$.status: is required")
 	}
+
 	if a.Status.TaskID == "" {
 		return fmt.Errorf("$.status.taskId: is required")
 	}
+
 	if err := a.Status.Connection.ValidateFor(meta.ValidationModeResponse, nil); err != nil {
 		return fmt.Errorf("$.status.connection: %w", err)
 	}
+
 	return nil
 }
 
@@ -113,25 +121,34 @@ type ConnectionVersionMigrationAction struct {
 	apiv1alpha1.Action[ConnectionVersionMigrationSpec, ConnectionVersionMigrationStatus] `json:",inline" yaml:",inline"`
 }
 
-func (a *ConnectionVersionMigrationAction) ValidateRequest(expectedKind meta.Kind) error {
+func (a *ConnectionVersionMigrationAction) ValidateRequest(
+	expectedKind meta.Kind,
+) error {
 	if err := a.Action.ValidateRequest(expectedKind); err != nil {
 		return err
 	}
 	return a.validateFields(false)
 }
 
-func (a *ConnectionVersionMigrationAction) ValidateResponse(expectedKind meta.Kind) error {
+func (a *ConnectionVersionMigrationAction) ValidateResponse(
+	expectedKind meta.Kind,
+) error {
 	if err := a.Action.ValidateResponse(expectedKind); err != nil {
 		return err
 	}
 	return a.validateFields(true)
 }
 
-func (a *ConnectionVersionMigrationAction) validateFields(requireStatus bool) error {
+func (a *ConnectionVersionMigrationAction) validateFields(
+	requireStatus bool,
+) error {
 	if err := validateConnectionActionTarget(a.Metadata.Target); err != nil {
 		return err
 	}
-	if err := validateVersionedConnectorReference(a.Spec.ConnectorRef, "$.spec.connectorRef"); err != nil {
+	if err := validateVersionedConnectorReference(
+		a.Spec.ConnectorRef,
+		"$.spec.connectorRef",
+	); err != nil {
 		return err
 	}
 	if a.Spec.TimeoutSeconds != nil && *a.Spec.TimeoutSeconds <= 0 {
@@ -146,28 +163,43 @@ func (a *ConnectionVersionMigrationAction) validateFields(requireStatus bool) er
 	if a.Status.TaskID == "" {
 		return fmt.Errorf("$.status.taskId: is required")
 	}
-	if err := validateVersionedConnectorReference(a.Status.SourceConnectorRef, "$.status.sourceConnectorRef"); err != nil {
+	if err := validateVersionedConnectorReference(
+		a.Status.SourceConnectorRef,
+		"$.status.sourceConnectorRef",
+	); err != nil {
 		return err
 	}
-	if err := validateVersionedConnectorReference(a.Status.TargetConnectorRef, "$.status.targetConnectorRef"); err != nil {
+	if err := validateVersionedConnectorReference(
+		a.Status.TargetConnectorRef,
+		"$.status.targetConnectorRef",
+	); err != nil {
 		return err
 	}
 	return nil
 }
 
-func validateVersionedConnectorReference(reference meta.ObjectReference, path string) error {
+func validateVersionedConnectorReference(
+	reference meta.ObjectReference,
+	path string,
+) error {
 	vc := &common.ValidationContext{Path: path}
-	if err := meta.ValidateObjectReferenceWithOptions(reference, meta.ObjectReferenceValidationOptions{
-		ExpectedAPIVersion: meta.APIVersionV1Alpha1,
-		ExpectedKind:       connectorschema.ConnectorKind,
-		IDValidator:        connectorschema.ValidateID,
-		NamespaceValidator: namespaceschema.ValidatePath,
-	}, vc); err != nil {
+	if err := meta.ValidateObjectReferenceWithOptions(
+		reference,
+		meta.ObjectReferenceValidationOptions{
+			ExpectedAPIVersion: meta.APIVersionV1Alpha1,
+			ExpectedKind:       connectorschema.ConnectorKind,
+			IDValidator:        connectorschema.ValidateID,
+			NamespaceValidator: namespaceschema.ValidatePath,
+		},
+		vc,
+	); err != nil {
 		return err
 	}
+
 	if reference.Generation == 0 {
 		return vc.NewErrorForField("generation", "is required")
 	}
+
 	return nil
 }
 
@@ -176,12 +208,14 @@ func NewConnectionVersionMigrationResponse(
 	spec ConnectionVersionMigrationSpec,
 	status ConnectionVersionMigrationStatus,
 ) ConnectionVersionMigrationAction {
-	return ConnectionVersionMigrationAction{Action: apiv1alpha1.NewActionResponse(
-		ConnectionVersionMigrationActionKind,
-		target,
-		spec,
-		status,
-	)}
+	return ConnectionVersionMigrationAction{
+		Action: apiv1alpha1.NewActionResponse(
+			ConnectionVersionMigrationActionKind,
+			target,
+			spec,
+			status,
+		),
+	}
 }
 
 type ConnectionForceStateSpec struct {
@@ -196,14 +230,18 @@ type ConnectionForceStateAction struct {
 	apiv1alpha1.Action[ConnectionForceStateSpec, ConnectionForceStateStatus] `json:",inline" yaml:",inline"`
 }
 
-func (a *ConnectionForceStateAction) ValidateRequest(expectedKind meta.Kind) error {
+func (a *ConnectionForceStateAction) ValidateRequest(
+	expectedKind meta.Kind,
+) error {
 	if err := a.Action.ValidateRequest(expectedKind); err != nil {
 		return err
 	}
 	return a.validateFields(false)
 }
 
-func (a *ConnectionForceStateAction) ValidateResponse(expectedKind meta.Kind) error {
+func (a *ConnectionForceStateAction) ValidateResponse(
+	expectedKind meta.Kind,
+) error {
 	if err := a.Action.ValidateResponse(expectedKind); err != nil {
 		return err
 	}
@@ -214,18 +252,23 @@ func (a *ConnectionForceStateAction) validateFields(requireStatus bool) error {
 	if err := validateConnectionActionTarget(a.Metadata.Target); err != nil {
 		return err
 	}
+
 	if !connectionschema.IsValidConnectionState(a.Spec.State) {
 		return fmt.Errorf("$.spec.state: is not a recognized connection lifecycle state")
 	}
+
 	if !requireStatus {
 		return nil
 	}
+
 	if a.Status == nil {
 		return fmt.Errorf("$.status: is required")
 	}
+
 	if err := a.Status.Connection.ValidateFor(meta.ValidationModeResponse, nil); err != nil {
 		return fmt.Errorf("$.status.connection: %w", err)
 	}
+	
 	return nil
 }
 
