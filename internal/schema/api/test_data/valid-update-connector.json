@@ -1,13 +1,21 @@
 {
-  "definition": {
-    "displayName": "Salesforce",
-    "logo": "https://example.com/logo.png",
-    "description": "Updated Salesforce integration",
-    "auth": {
-      "type": "no-auth"
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "Connector",
+  "metadata": {
+    "labels": {
+      "team": "integrations"
     }
   },
-  "labels": {
-    "team": "integrations"
+  "spec": {
+    "definition": {
+      "displayName": "Salesforce",
+      "logo": {
+        "publicUrl": "https://example.com/logo.png"
+      },
+      "description": "Updated Salesforce integration",
+      "auth": {
+        "type": "no-auth"
+      }
+    }
   }
 }

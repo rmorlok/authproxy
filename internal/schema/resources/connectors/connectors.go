@@ -117,7 +117,7 @@ func (c *Connectors) ValidateIdentities(vc *common.ValidationContext) error {
 			logicalDetails = &identityDetails{versions: make(map[uint64]int), unversioned: make(map[string]int)}
 			byLogical[lk] = logicalDetails
 		}
-		if connector.HasVersion() {
+		if connector.HasGeneration() {
 			logicalDetails.versions[connector.Metadata.Generation]++
 		} else {
 			state := string(connector.Spec.Release.DesiredState)

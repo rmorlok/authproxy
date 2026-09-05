@@ -3,6 +3,7 @@ package mock
 import (
 	"context"
 	"fmt"
+	"maps"
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/apid"
@@ -10,6 +11,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 )
 
 type Connector struct {
@@ -73,6 +75,34 @@ func (m *Connector) GetAnnotations() map[string]string {
 
 func (m *Connector) GetDefinition() *cschema.ConnectorDefinition {
 	return m.Definition
+}
+
+func (m *Connector) GetResource() *cschema.Connector {
+	observed := cschema.ConnectorReleaseState(m.State)
+	definition := cschema.ConnectorDefinition{}
+	if m.Definition != nil {
+		definition = *m.Definition.Clone()
+	}
+	return &cschema.Connector{
+		TypeMeta: cschema.NewConnector().TypeMeta,
+		Metadata: meta.ObjectMeta{
+			ID:          m.Id.String(),
+			Name:        m.Name,
+			Namespace:   m.Namespace,
+			Generation:  m.Version,
+			Labels:      maps.Clone(m.Labels),
+			Annotations: maps.Clone(m.Annotations),
+			CreatedAt:   &m.CreatedAt,
+			UpdatedAt:   &m.UpdatedAt,
+		},
+		Spec: cschema.ConnectorSpec{
+			Release:    cschema.ConnectorReleaseSpec{DesiredState: cschema.DesiredReleaseStateForObserved(observed)},
+			Definition: definition,
+		},
+		Status: &cschema.ConnectorStatus{
+			Release: cschema.ConnectorReleaseStatus{State: observed},
+		},
+	}
 }
 
 func (m *Connector) SetState(_ context.Context, state database.ConnectorDefinitionVersionState) error {

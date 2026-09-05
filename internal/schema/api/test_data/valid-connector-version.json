@@ -1,19 +1,32 @@
 {
-  "id": "cxr_test550e8400abcde",
-  "version": 1,
-  "namespace": "root.acme",
-  "state": "primary",
-  "definition": {
-    "displayName": "Salesforce",
-    "logo": "https://example.com/logo.png",
-    "description": "Salesforce CRM integration",
-    "auth": {
-      "type": "no-auth"
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "Connector",
+  "metadata": {
+    "id": "cxr_test550e8400abcde",
+    "name": "salesforce",
+    "namespace": "root.acme",
+    "generation": 2,
+    "createdAt": "2026-05-25T12:00:00Z",
+    "updatedAt": "2026-05-25T12:30:00Z"
+  },
+  "spec": {
+    "release": {
+      "desiredState": "draft"
+    },
+    "definition": {
+      "displayName": "Salesforce",
+      "logo": {
+        "publicUrl": "https://example.com/logo.png"
+      },
+      "description": "Salesforce CRM integration",
+      "auth": {
+        "type": "no-auth"
+      }
     }
   },
-  "labels": {
-    "team": "platform"
-  },
-  "createdAt": "2026-05-25T12:00:00Z",
-  "updatedAt": "2026-05-25T12:30:00Z"
+  "status": {
+    "release": {
+      "state": "draft"
+    }
+  }
 }

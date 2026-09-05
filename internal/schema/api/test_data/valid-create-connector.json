@@ -1,17 +1,25 @@
 {
-  "namespace": "root.acme",
-  "definition": {
-    "displayName": "Salesforce",
-    "logo": "https://example.com/logo.png",
-    "description": "Salesforce CRM integration",
-    "auth": {
-      "type": "no-auth"
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "Connector",
+  "metadata": {
+    "namespace": "root.acme",
+    "labels": {
+      "team": "platform"
+    },
+    "annotations": {
+      "owner": "integrations"
     }
   },
-  "labels": {
-    "team": "platform"
-  },
-  "annotations": {
-    "owner": "integrations"
+  "spec": {
+    "definition": {
+      "displayName": "Salesforce",
+      "logo": {
+        "publicUrl": "https://example.com/logo.png"
+      },
+      "description": "Salesforce CRM integration",
+      "auth": {
+        "type": "no-auth"
+      }
+    }
   }
 }

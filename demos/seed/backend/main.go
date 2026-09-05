@@ -30,6 +30,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/api"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 	actorschema "github.com/rmorlok/authproxy/internal/schema/resources/actor"
+	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/rmorlok/authproxy/internal/util"
 )
@@ -316,8 +317,24 @@ func connectorLabels(seed ConnectorSeed) map[string]string {
 	return labels
 }
 
-func connectorDefinitionsEqual(want config.ConnectorDefinition, got api.ConnectorVersionJson) bool {
-	return reflect.DeepEqual(normalizeForJSON(want), normalizeForJSON(got.Definition))
+func connectorDefinitionsEqual(want config.ConnectorDefinition, got cschema.Connector) bool {
+	return reflect.DeepEqual(normalizeForJSON(want), normalizeForJSON(got.Spec.Definition))
+}
+
+func connectorResourceForSeed(seed ConnectorSeed) cschema.Connector {
+	resource := cschema.NewConnector()
+	resource.Metadata.Namespace = connectorNamespace(seed)
+	resource.Metadata.Labels = connectorLabels(seed)
+	resource.Metadata.Annotations = seed.Annotations
+	resource.Spec.Definition = seed.Definition
+	return *resource
+}
+
+func connectorObservedState(connector cschema.Connector) cschema.ConnectorReleaseState {
+	if connector.Status == nil {
+		return ""
+	}
+	return connector.Status.Release.State
 }
 
 func stringMapsEqual(a, b map[string]string) bool {
@@ -346,7 +363,7 @@ func normalizeForJSON(v any) any {
 	return out
 }
 
-func listSeededConnector(c *resty.Client, baseUrl string, seed ConnectorSeed) (*api.ConnectorJson, error) {
+func listSeededConnector(c *resty.Client, baseUrl string, seed ConnectorSeed) (*cschema.Connector, error) {
 	var list api.ListConnectorsResponseJson
 	resp, err := c.R().
 		SetHeader("Accept", "application/json").
@@ -367,29 +384,24 @@ func listSeededConnector(c *resty.Client, baseUrl string, seed ConnectorSeed) (*
 	return &list.Items[0], nil
 }
 
-func getConnectorVersion(c *resty.Client, baseUrl string, connector api.ConnectorJson) (*api.ConnectorVersionJson, error) {
-	var version api.ConnectorVersionJson
+func getConnectorVersion(c *resty.Client, baseUrl string, connector cschema.Connector) (*cschema.Connector, error) {
+	var version cschema.Connector
 	resp, err := c.R().
 		SetHeader("Accept", "application/json").
 		SetResult(&version).
-		Get(fmt.Sprintf("%s/api/v1/connectors/%s/versions/%d", baseUrl, connector.Id, connector.Version))
+		Get(fmt.Sprintf("%s/api/v1/connectors/%s/versions/%d", baseUrl, connector.GetId(), connector.Metadata.Generation))
 	if err != nil {
-		return nil, fmt.Errorf("GET connector version %s:%d: %w", connector.Id, connector.Version, err)
+		return nil, fmt.Errorf("GET connector version %s:%d: %w", connector.GetId(), connector.Metadata.Generation, err)
 	}
 	if resp.StatusCode() >= 400 {
-		return nil, fmt.Errorf("GET connector version %s:%d returned %d: %s", connector.Id, connector.Version, resp.StatusCode(), resp.String())
+		return nil, fmt.Errorf("GET connector version %s:%d returned %d: %s", connector.GetId(), connector.Metadata.Generation, resp.StatusCode(), resp.String())
 	}
 	return &version, nil
 }
 
-func createConnector(c *resty.Client, baseUrl string, seed ConnectorSeed) (*api.ConnectorVersionJson, error) {
-	body := api.CreateConnectorRequestJson{
-		Namespace:   connectorNamespace(seed),
-		Definition:  seed.Definition,
-		Labels:      connectorLabels(seed),
-		Annotations: seed.Annotations,
-	}
-	var created api.ConnectorVersionJson
+func createConnector(c *resty.Client, baseUrl string, seed ConnectorSeed) (*cschema.Connector, error) {
+	body := connectorResourceForSeed(seed)
+	var created cschema.Connector
 	resp, err := c.R().
 		SetHeader("Content-Type", "application/json").
 		SetBody(body).
@@ -404,19 +416,15 @@ func createConnector(c *resty.Client, baseUrl string, seed ConnectorSeed) (*api.
 	return &created, nil
 }
 
-func createConnectorDraft(c *resty.Client, baseUrl string, connector api.ConnectorJson, seed ConnectorSeed) (*api.ConnectorVersionJson, error) {
-	labels := connectorLabels(seed)
-	body := api.CreateConnectorVersionRequestJson{
-		Definition:  &seed.Definition,
-		Labels:      &labels,
-		Annotations: &seed.Annotations,
-	}
-	var created api.ConnectorVersionJson
+func createConnectorDraft(c *resty.Client, baseUrl string, connector cschema.Connector, seed ConnectorSeed) (*cschema.Connector, error) {
+	body := connectorResourceForSeed(seed)
+	body.Metadata.Name = connector.Metadata.Name
+	var created cschema.Connector
 	resp, err := c.R().
 		SetHeader("Content-Type", "application/json").
 		SetBody(body).
 		SetResult(&created).
-		Post(fmt.Sprintf("%s/api/v1/connectors/%s/versions", baseUrl, connector.Id))
+		Post(fmt.Sprintf("%s/api/v1/connectors/%s/versions", baseUrl, connector.GetId()))
 	if err != nil {
 		return nil, fmt.Errorf("POST connector seed %q version: %w", seed.Key, err)
 	}
@@ -426,16 +434,16 @@ func createConnectorDraft(c *resty.Client, baseUrl string, connector api.Connect
 	return &created, nil
 }
 
-func forceConnectorPrimary(c *resty.Client, baseUrl string, version api.ConnectorVersionJson) error {
+func forceConnectorPrimary(c *resty.Client, baseUrl string, version cschema.Connector) error {
 	resp, err := c.R().
 		SetHeader("Content-Type", "application/json").
-		SetBody(api.ForceConnectorVersionStateRequestJson{State: string(api.ConnectorVersionStatePrimary)}).
-		Put(fmt.Sprintf("%s/api/v1/connectors/%s/versions/%d/_forceState", baseUrl, version.Id, version.Version))
+		SetBody(api.ForceConnectorVersionStateRequestJson{State: string(cschema.ConnectorReleaseStatePrimary)}).
+		Put(fmt.Sprintf("%s/api/v1/connectors/%s/versions/%d/_forceState", baseUrl, version.GetId(), version.Metadata.Generation))
 	if err != nil {
-		return fmt.Errorf("PUT connector seed %s:%d primary: %w", version.Id, version.Version, err)
+		return fmt.Errorf("PUT connector seed %s:%d primary: %w", version.GetId(), version.Metadata.Generation, err)
 	}
 	if resp.StatusCode() >= 400 {
-		return fmt.Errorf("PUT connector seed %s:%d primary returned %d: %s", version.Id, version.Version, resp.StatusCode(), resp.String())
+		return fmt.Errorf("PUT connector seed %s:%d primary returned %d: %s", version.GetId(), version.Metadata.Generation, resp.StatusCode(), resp.String())
 	}
 	return nil
 }
@@ -455,7 +463,7 @@ func upsertConnector(c *resty.Client, baseUrl string, seed ConnectorSeed) (conne
 		if err != nil {
 			return "", err
 		}
-		if created.State != api.ConnectorVersionStatePrimary {
+		if connectorObservedState(*created) != cschema.ConnectorReleaseStatePrimary {
 			if err := forceConnectorPrimary(c, baseUrl, *created); err != nil {
 				return "", err
 			}
@@ -469,9 +477,9 @@ func upsertConnector(c *resty.Client, baseUrl string, seed ConnectorSeed) (conne
 	}
 
 	if connectorDefinitionsEqual(seed.Definition, *version) &&
-		stringMapsEqual(connectorLabels(seed), version.Labels) &&
-		stringMapsEqual(seed.Annotations, version.Annotations) {
-		if version.State != api.ConnectorVersionStatePrimary {
+		stringMapsEqual(connectorLabels(seed), version.Metadata.Labels) &&
+		stringMapsEqual(seed.Annotations, version.Metadata.Annotations) {
+		if connectorObservedState(*version) != cschema.ConnectorReleaseStatePrimary {
 			if err := forceConnectorPrimary(c, baseUrl, *version); err != nil {
 				return "", err
 			}

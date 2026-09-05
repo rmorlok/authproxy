@@ -11,7 +11,6 @@ import (
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/apgin"
 	"github.com/rmorlok/authproxy/internal/apid"
-	"github.com/rmorlok/authproxy/internal/apserde"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/core"
 	connIface "github.com/rmorlok/authproxy/internal/core/iface"
@@ -24,63 +23,21 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	smeta "github.com/rmorlok/authproxy/internal/schema/resources/meta"
-	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/tasks"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
-type ConnectorJson = schemaapi.ConnectorJson
-type ConnectorVersionState = schemaapi.ConnectorVersionState
-type ListConnectorsResponseJson = schemaapi.ListConnectorsResponseJson
-type ConnectorVersionJson = schemaapi.ConnectorVersionJson
-type ListConnectorVersionsResponseJson = schemaapi.ListConnectorVersionsResponseJson
-type CreateConnectorRequestJson = schemaapi.CreateConnectorRequestJson
-type UpdateConnectorRequestJson = schemaapi.UpdateConnectorRequestJson
-type CreateConnectorVersionRequestJson = schemaapi.CreateConnectorVersionRequestJson
 type ConnectorLifecycleRequestJson = schemaapi.ConnectorLifecycleRequestJson
 type ConnectorLifecycleResponseJson = schemaapi.ConnectorLifecycleResponseJson
 type ForceConnectorVersionStateRequestJson = schemaapi.ForceConnectorVersionStateRequestJson
 
 type OpenAPIListConnectorsResponseJson = schemaapiopenapi.ListConnectorsResponseJson
-type OpenAPIConnectorVersionJson = schemaapiopenapi.ConnectorVersionJson
+type OpenAPIConnectorJson = schemaapiopenapi.ConnectorJson
+type OpenAPIConnectorPatchJson = schemaapiopenapi.ConnectorPatchJson
 type OpenAPIListConnectorVersionsResponseJson = schemaapiopenapi.ListConnectorVersionsResponseJson
-type OpenAPICreateConnectorRequestJson = schemaapiopenapi.CreateConnectorRequestJson
-type OpenAPIUpdateConnectorRequestJson = schemaapiopenapi.UpdateConnectorRequestJson
-type OpenAPIUpdateConnectorVersionRequestJson = schemaapiopenapi.UpdateConnectorVersionRequestJson
-type OpenAPICreateConnectorVersionRequestJson = schemaapiopenapi.CreateConnectorVersionRequestJson
 type OpenAPIConnectorLifecycleRequestJson = schemaapiopenapi.ConnectorLifecycleRequestJson
 type OpenAPIConnectorLifecycleResponseJson = schemaapiopenapi.ConnectorLifecycleResponseJson
-
-func ConnectorToJson(c connIface.Connector) ConnectorJson {
-	return ConnectorVersionToConnectorJson(c)
-}
-
-func ConnectorVersionToConnectorJson(c connIface.Connector) ConnectorJson {
-	def := c.GetDefinition()
-	logo := ""
-	if def.Logo != nil {
-		logo = def.Logo.GetUrl()
-	}
-
-	return ConnectorJson{
-		Id:            c.GetId(),
-		Version:       c.GetVersion(),
-		Namespace:     c.GetNamespace(),
-		Name:          c.GetName(),
-		State:         schemaapi.ConnectorVersionState(c.GetState()),
-		Highlight:     def.Highlight,
-		DisplayName:   def.DisplayName,
-		Description:   def.Description,
-		StatusPageUrl: def.StatusPageUrl,
-		Logo:          logo,
-		HasConfigure:  def.SetupFlow.HasConfigure(),
-		Labels:        c.GetLabels(),
-		Annotations:   c.GetAnnotations(),
-		CreatedAt:     c.GetCreatedAt(),
-		UpdatedAt:     c.GetUpdatedAt(),
-	}
-}
 
 type ListConnectorsRequestQueryParams struct {
 	Cursor        *string                                   `form:"cursor"`
@@ -90,23 +47,6 @@ type ListConnectorsRequestQueryParams struct {
 	NameVal       *string                                   `form:"name"`
 	LabelSelector *string                                   `form:"labelSelector"`
 	OrderByVal    *string                                   `form:"orderBy"`
-}
-
-func ConnectorVersionToJson(c connIface.Connector) ConnectorVersionJson {
-	def := c.GetDefinition()
-
-	return ConnectorVersionJson{
-		Id:          c.GetId(),
-		Version:     c.GetVersion(),
-		Namespace:   c.GetNamespace(),
-		Name:        c.GetName(),
-		State:       schemaapi.ConnectorVersionState(c.GetState()),
-		Definition:  *def,
-		Labels:      c.GetLabels(),
-		Annotations: c.GetAnnotations(),
-		CreatedAt:   c.GetCreatedAt(),
-		UpdatedAt:   c.GetUpdatedAt(),
-	}
 }
 
 type ListConnectorVersionsRequestQueryParams struct {
@@ -176,7 +116,7 @@ func parseConnectorVersionID(gctx *gin.Context) (connectorVersionID, *httperr.Er
 // @Accept			json
 // @Produce		json
 // @Param			id	path		string	true	"Connector UUID"
-// @Success		200	{object}	ConnectorJson
+// @Success		200	{object}	OpenAPIConnectorJson
 // @Failure		400	{object}	ErrorResponse
 // @Failure		401	{object}	ErrorResponse
 // @Failure		404	{object}	ErrorResponse
@@ -211,7 +151,10 @@ func (r *ConnectorsRoutes) get(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, ConnectorToJson(c))
+	if err := apgin.RenderResourceJSON(gctx, http.StatusOK, c.GetResource()); err != nil {
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+		val.MarkErrorReturn()
+	}
 }
 
 // @Summary		List connectors
@@ -309,7 +252,12 @@ func (r *ConnectorsRoutes) list(gctx *gin.Context) {
 	}
 
 	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewListConnectorsResponseJson(
-		util.Map(auth.FilterForValidatedResources(val, result.Results), ConnectorToJson),
+		util.Map(
+			auth.FilterForValidatedResources(val, result.Results),
+			func(c connIface.Connector) cschema.Connector {
+				return *c.GetResource()
+			},
+		),
 		result.Cursor,
 	))
 }
@@ -321,7 +269,7 @@ func (r *ConnectorsRoutes) list(gctx *gin.Context) {
 // @Produce		json
 // @Param			id		path		string	true	"Connector UUID"
 // @Param			version	path		integer	true	"Version number"
-// @Success		200		{object}	OpenAPIConnectorVersionJson
+// @Success		200		{object}	OpenAPIConnectorJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		404		{object}	ErrorResponse
@@ -370,7 +318,10 @@ func (r *ConnectorsRoutes) getVersion(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, ConnectorVersionToJson(c))
+	if err := apgin.RenderResourceJSON(gctx, http.StatusOK, c.GetResource()); err != nil {
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+		val.MarkErrorReturn()
+	}
 }
 
 // @Summary		List connector versions
@@ -509,7 +460,9 @@ func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
 	}
 
 	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewListConnectorVersionsResponseJson(
-		util.Map(auth.FilterForValidatedResources(val, result.Results), ConnectorVersionToJson),
+		util.Map(auth.FilterForValidatedResources(val, result.Results), func(c connIface.Connector) cschema.Connector {
+			return *c.GetResource()
+		}),
 		result.Cursor,
 	))
 }
@@ -519,8 +472,8 @@ func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
 // @Tags			connectors
 // @Accept			json
 // @Produce		json
-// @Param			request	body		OpenAPICreateConnectorRequestJson	true	"Connector creation request"
-// @Success		201		{object}	OpenAPIConnectorVersionJson
+// @Param			request	body		OpenAPIConnectorJson	true	"Connector creation request"
+// @Success		201		{object}	OpenAPIConnectorJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		403		{object}	ErrorResponse
@@ -532,58 +485,27 @@ func (r *ConnectorsRoutes) createConnector(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
-	var req CreateConnectorRequestJson
-	if err := apgin.BindJSONBody(gctx, &req); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-	if err := apserde.ValidateNoRedactedPlaceholders(req); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
+	var req cschema.Connector
+	if err := apgin.BindResourceJSON(gctx, &req, smeta.ValidationModeCreate); err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
-	if err := namespace.ValidatePath(req.Namespace); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid namespace '%s': %s", req.Namespace, err.Error()))
-		val.MarkErrorReturn()
-		return
-	}
-
-	name, httpErr := optionalResourceName(req.Name, "connector")
-	if httpErr != nil {
-		apgin.WriteError(gctx, nil, httpErr)
-		val.MarkErrorReturn()
-		return
-	}
-
-	if err := smeta.ValidateUserLabels(req.Labels); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid labels: %s", err.Error()))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if err := database.Annotations(req.Annotations).Validate(); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid annotations: %s", err.Error()))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if err := req.Definition.Validate(&common.ValidationContext{}); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid connector definition: %s", err.Error()))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if err := val.ValidateNamespace(req.Namespace); err != nil {
+	if err := val.ValidateNamespace(req.Metadata.Namespace); err != nil {
 		apgin.WriteError(gctx, nil, httperr.Forbidden("", httperr.WithPublicErr(err)))
 		return
 	}
 
-	result, err := r.connectors.CreateConnectorVersion(ctx, req.Namespace, name, &req.Definition, req.Labels, req.Annotations)
+	result, err := r.connectors.CreateConnector(ctx, &req)
 	if err != nil {
-		if conflictErr := resourceNameConflictError(err, "connector", name, req.Namespace); conflictErr != nil {
+		if conflictErr := resourceNameConflictError(err, "connector", req.Metadata.Name, req.Metadata.Namespace); conflictErr != nil && req.Metadata.Name != "" {
 			apgin.WriteError(gctx, nil, conflictErr)
+			val.MarkErrorReturn()
+			return
+		}
+		if errors.Is(err, core.ErrInvalidArgument) {
+			apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
@@ -592,7 +514,10 @@ func (r *ConnectorsRoutes) createConnector(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusCreated, ConnectorVersionToJson(result))
+	if err := apgin.RenderResourceJSON(gctx, http.StatusCreated, result.GetResource()); err != nil {
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+		val.MarkErrorReturn()
+	}
 }
 
 // @Summary		Update connector
@@ -601,8 +526,8 @@ func (r *ConnectorsRoutes) createConnector(gctx *gin.Context) {
 // @Accept			json
 // @Produce		json
 // @Param			id		path		string							true	"Connector UUID"
-// @Param			request	body		OpenAPIUpdateConnectorRequestJson	true	"Connector update request"
-// @Success		200		{object}	OpenAPIConnectorVersionJson
+// @Param			request	body		OpenAPIConnectorPatchJson	true	"Connector update request"
+// @Success		200		{object}	OpenAPIConnectorJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		403		{object}	ErrorResponse
@@ -622,32 +547,11 @@ func (r *ConnectorsRoutes) updateConnector(gctx *gin.Context) {
 		return
 	}
 
-	var req UpdateConnectorRequestJson
-	if err := apgin.BindJSONBody(gctx, &req); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
+	var req cschema.ConnectorPatch
+	if err := apgin.BindResourceJSON(gctx, &req, smeta.ValidationModeUpdate); err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
-	}
-	if err := apserde.ValidateNoRedactedPlaceholders(req); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if req.Labels != nil {
-		if err := smeta.ValidateUserLabels(*req.Labels); err != nil {
-			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid labels: %s", err.Error()))
-			val.MarkErrorReturn()
-			return
-		}
-	}
-
-	if req.Annotations != nil {
-		if err := database.Annotations(*req.Annotations).Validate(); err != nil {
-			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid annotations: %s", err.Error()))
-			val.MarkErrorReturn()
-			return
-		}
 	}
 
 	current, err := r.loadConnectorByID(ctx, connectorId)
@@ -666,40 +570,17 @@ func (r *ConnectorsRoutes) updateConnector(gctx *gin.Context) {
 		return
 	}
 
-	if req.Name != nil {
-		name, httpErr := optionalResourceName(req.Name, "connector")
-		if httpErr != nil {
-			apgin.WriteError(gctx, nil, httpErr)
-			val.MarkErrorReturn()
-			return
-		}
-		if err := r.connectors.UpdateConnectorName(ctx, connectorId, name); err != nil {
-			if conflictErr := resourceNameConflictError(err, "connector", name, current.GetNamespace()); conflictErr != nil {
+	result, err := r.connectors.UpdateConnector(ctx, connectorId, &req)
+	if err != nil {
+		if req.Metadata != nil && req.Metadata.Name != nil {
+			if conflictErr := resourceNameConflictError(err, "connector", *req.Metadata.Name, current.GetNamespace()); conflictErr != nil {
 				apgin.WriteError(gctx, nil, conflictErr)
 				val.MarkErrorReturn()
 				return
 			}
-			apgin.WriteErr(gctx, nil, err)
-			val.MarkErrorReturn()
-			return
 		}
-		current, err = r.connectors.GetConnectorVersion(ctx, connectorId, current.GetVersion())
-		if err != nil {
-			apgin.WriteErr(gctx, nil, err)
-			val.MarkErrorReturn()
-			return
-		}
-	}
-
-	if req.Definition == nil && req.Labels == nil && req.Annotations == nil {
-		apgin.APIJSON(gctx, http.StatusOK, ConnectorVersionToJson(current))
-		return
-	}
-
-	draft, err := r.connectors.GetOrCreateDraftConnectorVersion(ctx, connectorId)
-	if err != nil {
-		if errors.Is(err, core.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFoundf("connector '%s' not found", connectorId))
+		if errors.Is(err, core.ErrInvalidArgument) {
+			apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
@@ -708,46 +589,10 @@ func (r *ConnectorsRoutes) updateConnector(gctx *gin.Context) {
 		return
 	}
 
-	if httpErr := val.ValidateHttpStatusError(draft); httpErr != nil {
-		apgin.WriteError(gctx, nil, httpErr)
-		return
-	}
-
-	var def *cschema.ConnectorDefinition
-	if req.Definition != nil {
-		def = req.Definition
-	} else {
-		def = draft.GetDefinition()
-	}
-
-	if err := def.Validate(&common.ValidationContext{}); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid connector definition: %s", err.Error()))
+	if err := apgin.RenderResourceJSON(gctx, http.StatusOK, result.GetResource()); err != nil {
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
-		return
 	}
-
-	var labels map[string]string
-	if req.Labels != nil {
-		labels = *req.Labels
-	} else {
-		labels = draft.GetLabels()
-	}
-
-	var annotations map[string]string
-	if req.Annotations != nil {
-		annotations = *req.Annotations
-	} else {
-		annotations = draft.GetAnnotations()
-	}
-
-	result, err := r.connectors.UpdateDraftConnectorVersion(ctx, connectorId, draft.GetVersion(), def, labels, annotations)
-	if err != nil {
-		apgin.WriteErr(gctx, nil, err)
-		val.MarkErrorReturn()
-		return
-	}
-
-	apgin.APIJSON(gctx, http.StatusOK, ConnectorVersionToJson(result))
 }
 
 // @Summary		Create connector version
@@ -756,8 +601,8 @@ func (r *ConnectorsRoutes) updateConnector(gctx *gin.Context) {
 // @Accept			json
 // @Produce		json
 // @Param			id		path		string									true	"Connector UUID"
-// @Param			request	body		OpenAPICreateConnectorVersionRequestJson	false	"Version creation request"
-// @Success		201		{object}	OpenAPIConnectorVersionJson
+// @Param			request	body		OpenAPIConnectorJson	false	"Version creation request; an empty body clones the newest generation as a draft"
+// @Success		201		{object}	OpenAPIConnectorJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		403		{object}	ErrorResponse
@@ -794,50 +639,18 @@ func (r *ConnectorsRoutes) createVersion(gctx *gin.Context) {
 		return
 	}
 
-	var req CreateConnectorVersionRequestJson
+	var req *cschema.Connector
 	// Support a blank post to create a new draft version of the connector
 	if gctx.Request.ContentLength > 0 {
-		if err := apgin.BindJSONBody(gctx, &req); err != nil {
-			apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
-			val.MarkErrorReturn()
-			return
-		}
-		if err := apserde.ValidateNoRedactedPlaceholders(req); err != nil {
-			apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
+		req = cschema.NewConnector()
+		if err := apgin.BindResourceJSON(gctx, req, smeta.ValidationModeCreate); err != nil {
+			apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
 	}
 
-	if req.Definition != nil {
-		if err := req.Definition.Validate(&common.ValidationContext{}); err != nil {
-			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid connector definition: %s", err.Error()))
-			val.MarkErrorReturn()
-			return
-		}
-	}
-
-	var labels map[string]string
-	if req.Labels != nil {
-		labels = *req.Labels
-		if err := smeta.ValidateUserLabels(labels); err != nil {
-			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid labels: %s", err.Error()))
-			val.MarkErrorReturn()
-			return
-		}
-	}
-
-	var annotations map[string]string
-	if req.Annotations != nil {
-		annotations = *req.Annotations
-		if err := database.Annotations(annotations).Validate(); err != nil {
-			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid annotations: %s", err.Error()))
-			val.MarkErrorReturn()
-			return
-		}
-	}
-
-	result, err := r.connectors.CreateDraftConnectorVersion(ctx, connectorId, req.Definition, labels, annotations)
+	result, err := r.connectors.CreateConnectorVersion(ctx, connectorId, req)
 	if err != nil {
 		if errors.Is(err, core.ErrDraftAlreadyExists) {
 			apgin.WriteError(gctx, nil, httperr.Conflict("a draft version already exists for this connector"))
@@ -849,12 +662,20 @@ func (r *ConnectorsRoutes) createVersion(gctx *gin.Context) {
 			val.MarkErrorReturn()
 			return
 		}
+		if errors.Is(err, core.ErrInvalidArgument) {
+			apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
+			val.MarkErrorReturn()
+			return
+		}
 		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusCreated, ConnectorVersionToJson(result))
+	if err := apgin.RenderResourceJSON(gctx, http.StatusCreated, result.GetResource()); err != nil {
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+		val.MarkErrorReturn()
+	}
 }
 
 // @Summary		Update connector version
@@ -864,8 +685,8 @@ func (r *ConnectorsRoutes) createVersion(gctx *gin.Context) {
 // @Produce		json
 // @Param			id		path		string							true	"Connector UUID"
 // @Param			version	path		integer							true	"Version number"
-// @Param			request	body		OpenAPIUpdateConnectorVersionRequestJson	true	"Version update request"
-// @Success		200		{object}	OpenAPIConnectorVersionJson
+// @Param			request	body		OpenAPIConnectorPatchJson	true	"Version update request"
+// @Success		200		{object}	OpenAPIConnectorJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		403		{object}	ErrorResponse
@@ -887,38 +708,11 @@ func (r *ConnectorsRoutes) updateVersion(gctx *gin.Context) {
 	connectorId := connectorVersionId.ConnectorID
 	version := connectorVersionId.Version
 
-	var req UpdateConnectorRequestJson
-	if err := apgin.BindJSONBody(gctx, &req); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
+	var req cschema.ConnectorPatch
+	if err := apgin.BindResourceJSON(gctx, &req, smeta.ValidationModeUpdate); err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
-	}
-	if err := apserde.ValidateNoRedactedPlaceholders(req); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if req.Name != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("connector names can only be changed through the connector-level update endpoint"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if req.Labels != nil {
-		if err := smeta.ValidateUserLabels(*req.Labels); err != nil {
-			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid labels: %s", err.Error()))
-			val.MarkErrorReturn()
-			return
-		}
-	}
-
-	if req.Annotations != nil {
-		if err := database.Annotations(*req.Annotations).Validate(); err != nil {
-			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid annotations: %s", err.Error()))
-			val.MarkErrorReturn()
-			return
-		}
 	}
 
 	existing, err := r.connectors.GetConnectorVersion(ctx, connectorId, version)
@@ -944,37 +738,15 @@ func (r *ConnectorsRoutes) updateVersion(gctx *gin.Context) {
 		return
 	}
 
-	var def *cschema.ConnectorDefinition
-	if req.Definition != nil {
-		def = req.Definition
-	} else {
-		def = existing.GetDefinition()
-	}
-
-	if err := def.Validate(&common.ValidationContext{}); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid connector definition: %s", err.Error()))
-		val.MarkErrorReturn()
-		return
-	}
-
-	var labels map[string]string
-	if req.Labels != nil {
-		labels = *req.Labels
-	} else {
-		labels = existing.GetLabels()
-	}
-
-	var annotations map[string]string
-	if req.Annotations != nil {
-		annotations = *req.Annotations
-	} else {
-		annotations = existing.GetAnnotations()
-	}
-
-	result, err := r.connectors.UpdateDraftConnectorVersion(ctx, connectorId, version, def, labels, annotations)
+	result, err := r.connectors.UpdateConnectorVersion(ctx, connectorId, version, &req)
 	if err != nil {
 		if errors.Is(err, core.ErrNotDraft) {
 			apgin.WriteError(gctx, nil, httperr.Conflictf("connector version '%s:%d' is not a draft", connectorId, version))
+			val.MarkErrorReturn()
+			return
+		}
+		if errors.Is(err, core.ErrInvalidArgument) {
+			apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
@@ -983,7 +755,10 @@ func (r *ConnectorsRoutes) updateVersion(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, ConnectorVersionToJson(result))
+	if err := apgin.RenderResourceJSON(gctx, http.StatusOK, result.GetResource()); err != nil {
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+		val.MarkErrorReturn()
+	}
 }
 
 // @Summary		Get all labels for a connector
@@ -1134,7 +909,7 @@ func (r *ConnectorsRoutes) deleteVersionLabel(gctx *gin.Context) {
 // @Param			id		path		string								true	"Connector UUID"
 // @Param			version	path		integer								true	"Version number"
 // @Param			request	body		ForceConnectorVersionStateRequestJson	true	"New state"
-// @Success		200		{object}	OpenAPIConnectorVersionJson
+// @Success		200		{object}	OpenAPIConnectorJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		403		{object}	ErrorResponse
@@ -1194,7 +969,10 @@ func (r *ConnectorsRoutes) forceVersionState(gctx *gin.Context) {
 	}
 
 	if c.GetState() == state {
-		apgin.APIJSON(gctx, http.StatusOK, ConnectorVersionToJson(c))
+		if err := apgin.RenderResourceJSON(gctx, http.StatusOK, c.GetResource()); err != nil {
+			apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+			val.MarkErrorReturn()
+		}
 		return
 	}
 
@@ -1205,7 +983,10 @@ func (r *ConnectorsRoutes) forceVersionState(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, ConnectorVersionToJson(c))
+	if err := apgin.RenderResourceJSON(gctx, http.StatusOK, c.GetResource()); err != nil {
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+		val.MarkErrorReturn()
+	}
 }
 
 func (r *ConnectorsRoutes) loadConnectorByID(ctx context.Context, connectorId apid.ID) (connIface.Connector, error) {

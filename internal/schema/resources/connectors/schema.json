@@ -458,6 +458,79 @@
       },
       "required": ["release"],
       "additionalProperties": false
+    },
+    "ConnectorCreate": {
+      "allOf": [
+        { "$ref": "../meta/schema.json#/$defs/Resource" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "Connector" },
+            "metadata": {
+              "allOf": [
+                { "$ref": "../meta/schema.json#/$defs/ObjectMeta" },
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "pattern": "^cxr_" },
+                    "namespace": { "$ref": "../namespace/schema.json#/$defs/NamespacePath" }
+                  },
+                  "required": ["namespace"]
+                }
+              ]
+            },
+            "spec": { "$ref": "#/$defs/ConnectorSpec" },
+            "status": { "$ref": "#/$defs/ConnectorStatus" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "ConnectorReleaseSpecPatch": {
+      "type": "object",
+      "properties": {
+        "desiredState": {
+          "type": "string",
+          "enum": ["draft", "primary"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "ConnectorSpecPatch": {
+      "type": "object",
+      "properties": {
+        "release": { "$ref": "#/$defs/ConnectorReleaseSpecPatch" },
+        "definition": { "$ref": "#/$defs/ConnectorDefinition" }
+      },
+      "additionalProperties": false
+    },
+    "ConnectorPatch": {
+      "allOf": [
+        { "$ref": "../meta/schema.json#/$defs/Resource" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "Connector" },
+            "metadata": {
+              "allOf": [
+                { "$ref": "../meta/schema.json#/$defs/ObjectMetaPatch" },
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "pattern": "^cxr_" },
+                    "namespace": { "$ref": "../namespace/schema.json#/$defs/NamespacePath" }
+                  }
+                }
+              ]
+            },
+            "spec": { "$ref": "#/$defs/ConnectorSpecPatch" },
+            "status": { "$ref": "#/$defs/ConnectorStatus" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
     }
   },
   "allOf": [
