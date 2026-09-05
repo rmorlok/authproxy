@@ -14,13 +14,17 @@ import (
 )
 
 /*
- * This file contains the logic for initiating connections. This is in the core service because despite it being
- * heavily tied to the request/response structure, it also deeply depends on the connector configuration logic.
+ * This file contains the logic for initiating connections. This is in the core
+ * service because despite it being heavily tied to the request/response
+ * structure, it also deeply depends on the connector configuration logic.
  */
 
-// InitiateConnection starts the process of initiating the connection. This method provides auth validation as part of
-// the logic.
-func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConnectionRequest) (iface.ConnectionSetupResponse, error) {
+// InitiateConnection starts the process of initiating the connection. This
+// method provides auth validation as part of the logic.
+func (s *service) InitiateConnection(
+	ctx context.Context,
+	req iface.InitiateConnectionRequest,
+) (iface.ConnectionSetupResponse, error) {
 	val := auth.MustGetValidatorFromContext(ctx)
 	if err := req.Validate(); err != nil {
 		val.MarkErrorReturn()
@@ -54,9 +58,12 @@ func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConn
 		return nil, httperr.BadRequestf("target namespace '%s' is not a child of the connector's namespace '%s'", targetNamespace, c.GetNamespace())
 	}
 
-	// Primary validation for the request -- make sure the user can initiate connections in the target namespace with
-	// the specified connector id.
-	if err := val.ValidateNamespaceResourceId(targetNamespace, c.GetId().String()); err != nil {
+	// Primary validation for the request -- make sure the user can initiate
+	// connections in the target namespace with the specified connector id.
+	if err := val.ValidateNamespaceResourceId(
+		targetNamespace,
+		c.GetId().String(),
+	); err != nil {
 		val.MarkErrorReturn()
 		return nil, httperr.Forbidden(err.Error(), httperr.WithInternalErr(err))
 	}
@@ -71,7 +78,14 @@ func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConn
 	if req.Name != nil {
 		name = *req.Name
 	}
-	connectionIface, err := s.CreateConnection(ctx, targetNamespace, name, req.Labels, req.Annotations, c)
+	connectionIface, err := s.CreateConnection(
+		ctx,
+		targetNamespace,
+		name,
+		req.Labels,
+		req.Annotations,
+		c,
+	)
 	if err != nil {
 		val.MarkErrorReturn()
 		if errors.Is(err, database.ErrDuplicate) {
@@ -79,6 +93,7 @@ func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConn
 		}
 		return nil, httperr.InternalServerError(httperr.WithInternalErr(err))
 	}
+	
 	// CreateConnection returns the concrete *connection typed as iface; we
 	// need the concrete to invoke the dispatch helpers.
 	connection, ok := connectionIface.(*connection)
