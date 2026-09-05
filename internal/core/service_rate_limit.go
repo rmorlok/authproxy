@@ -175,7 +175,7 @@ func (s *service) normalizeRateLimitScope(
 	}
 
 	if resource.Spec.Scope.ConnectorRef != nil {
-		connector, err := s.ResolveConnectorReference(
+		connector, err := s.resolveLogicalConnectorReference(
 			ctx,
 			*resource.Spec.Scope.ConnectorRef,
 		)
@@ -186,7 +186,7 @@ func (s *service) normalizeRateLimitScope(
 		if err := validateRateLimitScopeTargetNamespace(
 			"connector",
 			resource.Metadata.Namespace,
-			connector.GetNamespace(),
+			connector.Namespace,
 		); err != nil {
 			return err
 		}
@@ -194,7 +194,7 @@ func (s *service) normalizeRateLimitScope(
 		resource.Spec.Scope.ConnectorRef = &meta.ObjectReference{
 			APIVersion: meta.APIVersionV1Alpha1,
 			Kind:       cschema.ConnectorKind,
-			ID:         connector.GetId().String(),
+			ID:         connector.Id.String(),
 		}
 	}
 

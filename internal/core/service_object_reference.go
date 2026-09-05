@@ -48,23 +48,41 @@ func (s *service) ResolveConnectionReference(
 	return s.getConnectionForDb(ctx, connection)
 }
 
+// resolveLogicalConnectorReference resolves a connector reference without
+// selecting or hydrating a definition version. Use this for relationships that
+// apply to the logical connector across all generations.
+func (s *service) resolveLogicalConnectorReference(
+	ctx context.Context,
+	reference meta.ObjectReference,
+) (*database.Connector, error) {
+	connector, err := s.db.ResolveConnectorReference(ctx, reference)
+	if err != nil {
+		return nil, coreObjectReferenceError(reference.Kind, err)
+	}
+	return connector, nil
+}
+
 // ResolveConnectorReference resolves the logical connector first, then uses
 // generation to choose the requested definition version. An omitted
-// generation selects the newest version.
+// generation selects the primary version.
 func (s *service) ResolveConnectorReference(
 	ctx context.Context,
 	reference meta.ObjectReference,
 ) (iface.Connector, error) {
-	connector, err := s.db.ResolveConnectorReference(ctx, reference)
+	connector, err := s.resolveLogicalConnectorReference(ctx, reference)
 	if err != nil {
-		return nil, coreObjectReferenceError(reference.Kind, err)
+		return nil, err
 	}
 
 	if reference.Generation != 0 {
 		return s.getConnectorVersion(ctx, connector.Id, reference.Generation)
 	}
 
-	version, err := s.db.NewestConnectorDefinitionVersionForId(ctx, connector.Id)
+	version, err := s.db.GetConnectorDefinitionVersionForState(
+		ctx,
+		connector.Id,
+		database.ConnectorDefinitionVersionStatePrimary,
+	)
 	if err != nil {
 		return nil, coreObjectReferenceError(reference.Kind, err)
 	}

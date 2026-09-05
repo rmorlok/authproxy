@@ -79,7 +79,7 @@ type C interface {
 	ResolveConnectionReference(ctx context.Context, reference meta.ObjectReference) (Connection, error)
 
 	// ResolveConnectorReference resolves and hydrates a Connector. An explicit
-	// generation selects that definition version; otherwise the newest version
+	// generation selects that definition version; otherwise the primary version
 	// is returned.
 	ResolveConnectorReference(ctx context.Context, reference meta.ObjectReference) (Connector, error)
 
