@@ -88,8 +88,8 @@ func TestCreateActorEncryptsWriteOnlySigningKey(t *testing.T) {
 	}}
 	encrypted := encfield.EncryptedField{ID: apid.New(apid.PrefixDataEncryptionKey), Data: "ciphertext"}
 
-	encryption.EXPECT().EncryptStringGlobal(ctx, gomock.Any()).DoAndReturn(
-		func(_ context.Context, data string) (encfield.EncryptedField, error) {
+	encryption.EXPECT().EncryptStringForNamespace(ctx, resource.Metadata.Namespace, gomock.Any()).DoAndReturn(
+		func(_ context.Context, _ string, data string) (encfield.EncryptedField, error) {
 			var decoded keyschema.SigningKey
 			require.NoError(t, json.Unmarshal([]byte(data), &decoded))
 			require.True(t, decoded.CanSign())
@@ -164,6 +164,32 @@ func TestUpdateActorSigningKeyPresence(t *testing.T) {
 		updated, err := service.UpdateActor(ctx, existing.Id, patch)
 		require.NoError(t, err)
 		require.False(t, updated.GetResource().Status.SigningKeyConfigured)
+	})
+
+	t.Run("replacement uses the actor namespace key", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		service, db, _, _, _, encryption := FullMockService(t, ctrl)
+		existing := actorServiceTestDatabaseActor()
+		existing.EncryptedKey = &encfield.EncryptedField{ID: apid.New(apid.PrefixDataEncryptionKey), Data: "old"}
+		patch := actorschema.NewActorPatch()
+		patch.Spec.SetSigningKey(&keyschema.SigningKey{InnerVal: &keyschema.KeyShared{
+			SharedKey: &keyschema.KeyData{InnerVal: &keyschema.KeyDataValue{Value: "replacement"}},
+		}})
+		replacement := encfield.EncryptedField{ID: apid.New(apid.PrefixDataEncryptionKey), Data: "new"}
+
+		db.EXPECT().GetActor(ctx, existing.Id).Return(existing, nil)
+		encryption.EXPECT().EncryptStringForNamespace(ctx, existing.Namespace, gomock.Any()).Return(replacement, nil)
+		db.EXPECT().UpsertActor(ctx, gomock.Any()).DoAndReturn(func(_ context.Context, data database.IActorData) (*database.Actor, error) {
+			updated := data.(*database.Actor)
+			require.Equal(t, &replacement, updated.EncryptedKey)
+			updated.CreatedAt = existing.CreatedAt
+			updated.UpdatedAt = existing.UpdatedAt.Add(time.Second)
+			return updated, nil
+		})
+
+		updated, err := service.UpdateActor(ctx, existing.Id, patch)
+		require.NoError(t, err)
+		require.True(t, updated.GetResource().Status.SigningKeyConfigured)
 	})
 }
 

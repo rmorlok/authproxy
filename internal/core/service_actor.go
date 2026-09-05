@@ -41,6 +41,7 @@ func (s *service) GetActorByExternalId(
 
 func (s *service) encryptActorSigningKey(
 	ctx context.Context,
+	namespace string,
 	key *keyschema.SigningKey,
 ) (*encfield.EncryptedField, error) {
 	if key == nil {
@@ -52,7 +53,7 @@ func (s *service) encryptActorSigningKey(
 		return nil, fmt.Errorf("marshal actor signing key: %w", err)
 	}
 
-	encrypted, err := s.encrypt.EncryptStringGlobal(ctx, string(data))
+	encrypted, err := s.encrypt.EncryptStringForNamespace(ctx, namespace, string(data))
 	if err != nil {
 		return nil, fmt.Errorf("encrypt actor signing key: %w", err)
 	}
@@ -73,7 +74,7 @@ func (s *service) CreateActor(
 
 	id := apid.New(apid.PrefixActor)
 	normalized := resource.ApplyCreateDefaults(id)
-	encryptedKey, err := s.encryptActorSigningKey(ctx, normalized.Spec.SigningKey)
+	encryptedKey, err := s.encryptActorSigningKey(ctx, normalized.Metadata.Namespace, normalized.Spec.SigningKey)
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +112,7 @@ func (s *service) UpdateActor(
 
 	encryptedKey := existing.EncryptedKey
 	if patch.Spec.HasSigningKey() {
-		encryptedKey, err = s.encryptActorSigningKey(ctx, patch.Spec.SigningKey)
+		encryptedKey, err = s.encryptActorSigningKey(ctx, desired.Metadata.Namespace, patch.Spec.SigningKey)
 		if err != nil {
 			return nil, err
 		}

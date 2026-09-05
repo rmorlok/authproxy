@@ -100,7 +100,7 @@ func (s *service) syncConfiguredActors(ctx context.Context, actors []*actorschem
 				return fmt.Errorf("failed to marshal key for actor %s: %w", externalId, err)
 			}
 
-			encrypted, err := s.encrypt.EncryptStringGlobal(ctx, string(keyJson))
+			encrypted, err := s.encrypt.EncryptStringForNamespace(ctx, actor.Metadata.Namespace, string(keyJson))
 			if err != nil {
 				return fmt.Errorf("failed to encrypt key for actor %s: %w", externalId, err)
 			}

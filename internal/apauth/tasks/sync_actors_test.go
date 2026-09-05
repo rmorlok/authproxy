@@ -6,11 +6,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	"github.com/rmorlok/authproxy/internal/apctx"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/encfield"
 	"github.com/rmorlok/authproxy/internal/encrypt"
+	encryptmock "github.com/rmorlok/authproxy/internal/encrypt/mock"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	actorschema "github.com/rmorlok/authproxy/internal/schema/resources/actor"
@@ -111,6 +115,42 @@ func TestSyncActorsList(t *testing.T) {
 		bob, err := db.GetActorByExternalId(ctx, "root", "bob")
 		require.NoError(t, err)
 		require.NotNil(t, bob.EncryptedKey)
+	})
+
+	t.Run("encrypts signing keys with the actor namespace key", func(t *testing.T) {
+		actor := testConfiguredActor(
+			"alice",
+			&sconfig.Key{
+				InnerVal: &sconfig.KeyShared{
+					SharedKey: &sconfig.KeyData{
+						InnerVal: &sconfig.KeyDataBase64Val{Base64: "dGVzdGtleTEyMw=="},
+					},
+				},
+			},
+			nil,
+			nil,
+		)
+		actor.Metadata.Namespace = "root.team"
+		actors := &sconfig.ConfiguredActors{
+			InnerVal: sconfig.ConfiguredActorsList{actor},
+		}
+
+		cfg := setup(t, actors)
+		require.NoError(t, db.CreateNamespace(ctx, &database.Namespace{Path: actor.Metadata.Namespace}))
+
+		ctrl := gomock.NewController(t)
+		mockEncrypt := encryptmock.NewMockE(ctrl)
+		encrypted := encfield.EncryptedField{ID: apid.New(apid.PrefixDataEncryptionKey), Data: "ciphertext"}
+		mockEncrypt.EXPECT().
+			EncryptStringForNamespace(ctx, actor.Metadata.Namespace, gomock.Any()).
+			Return(encrypted, nil)
+
+		svc := NewService(cfg, db, redis, mockEncrypt, cfg.GetRootLogger())
+		require.NoError(t, svc.SyncActorList(ctx))
+
+		stored, err := db.GetActorByExternalId(ctx, actor.Metadata.Namespace, actor.Spec.ExternalId)
+		require.NoError(t, err)
+		require.Equal(t, &encrypted, stored.EncryptedKey)
 	})
 
 	t.Run("deletes stale actors", func(t *testing.T) {
