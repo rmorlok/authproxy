@@ -93,7 +93,7 @@ func (s *service) InitiateConnection(
 		}
 		return nil, httperr.InternalServerError(httperr.WithInternalErr(err))
 	}
-	
+
 	// CreateConnection returns the concrete *connection typed as iface; we
 	// need the concrete to invoke the dispatch helpers.
 	connection, ok := connectionIface.(*connection)

@@ -60,8 +60,13 @@ type OpenAPIConnectionForceStateActionJson = schemaapiopenapi.ConnectionForceSta
 type ProxyRequest = schemaapiopenapi.ProxyRequestJson
 type OpenAPIProxyResponseJson = schemaapiopenapi.ProxyResponseJson
 
-func connectionSetupAction(resp coreIface.ConnectionSetupResponse) (schemaapi.ConnectionSetupAction, error) {
-	status := schemaapi.ConnectionSetupActionStatus{Type: schemaapi.ConnectionSetupResponseType(resp.GetType())}
+func connectionSetupAction(
+	resp coreIface.ConnectionSetupResponse,
+) (schemaapi.ConnectionSetupAction, error) {
+	status := schemaapi.ConnectionSetupActionStatus{
+		Type: schemaapi.ConnectionSetupResponseType(resp.GetType()),
+	}
+
 	switch typed := resp.(type) {
 	case *coreIface.ConnectionSetupRedirect:
 		status.RedirectURL = typed.RedirectUrl
@@ -90,14 +95,20 @@ func connectionSetupAction(resp coreIface.ConnectionSetupResponse) (schemaapi.Co
 	), nil
 }
 
-func validateConnectionActionPathTarget(target smeta.ObjectReference, connection coreIface.Connection) error {
+func validateConnectionActionPathTarget(
+	target smeta.ObjectReference,
+	connection coreIface.Connection,
+) error {
 	if target.ID != "" && target.ID != connection.GetId().String() {
 		return errors.New("metadata.target.id does not match the connection path")
 	}
+
 	if target.HasNamespacedName() &&
-		(target.Namespace != connection.GetNamespace() || target.Name != connection.GetName()) {
+		(target.Namespace != connection.GetNamespace() ||
+			target.Name != connection.GetName()) {
 		return errors.New("metadata.target namespace/name does not match the connection path")
 	}
+
 	return nil
 }
 
@@ -112,7 +123,12 @@ func renderConnectionSetupAction(
 		val.MarkErrorReturn()
 		return
 	}
-	if err := apgin.RenderActionJSON(gctx, http.StatusOK, &action, schemaapi.ConnectionSetupActionKind); err != nil {
+	if err := apgin.RenderActionJSON(
+		gctx,
+		http.StatusOK,
+		&action,
+		schemaapi.ConnectionSetupActionKind,
+	); err != nil {
 		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 	}
@@ -136,21 +152,28 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
 	var req schemaapi.ConnectionInitiateAction
-	if err := apgin.BindActionJSON(gctx, &req, schemaapi.ConnectionInitiateActionKind); err != nil {
+	if err := apgin.BindActionJSON(
+		gctx,
+		&req,
+		schemaapi.ConnectionInitiateActionKind,
+	); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
 	}
 
 	// InitiateConnection also performs request validation for security
-	resp, err := r.core.InitiateConnection(ctx, coreIface.InitiateConnectionRequest{
-		ConnectorRef:  req.Metadata.Target,
-		IntoNamespace: req.Spec.IntoNamespace,
-		Name:          req.Spec.Name,
-		Labels:        req.Spec.Labels,
-		Annotations:   req.Spec.Annotations,
-		ReturnToUrl:   req.Spec.ReturnToURL,
-	})
+	resp, err := r.core.InitiateConnection(
+		ctx,
+		coreIface.InitiateConnectionRequest{
+			ConnectorRef:  req.Metadata.Target,
+			IntoNamespace: req.Spec.IntoNamespace,
+			Name:          req.Spec.Name,
+			Labels:        req.Spec.Labels,
+			Annotations:   req.Spec.Annotations,
+			ReturnToUrl:   req.Spec.ReturnToURL,
+		},
+	)
 	if err != nil {
 		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
@@ -203,22 +226,32 @@ func (r *ConnectionsRoutes) submit(gctx *gin.Context) {
 	}
 
 	var req schemaapi.ConnectionSetupSubmitAction
-	if err := apgin.BindActionJSON(gctx, &req, schemaapi.ConnectionSetupSubmitActionKind); err != nil {
+	if err := apgin.BindActionJSON(
+		gctx,
+		&req,
+		schemaapi.ConnectionSetupSubmitActionKind,
+	); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
 	}
-	if err := validateConnectionActionPathTarget(req.Metadata.Target, c); err != nil {
+	if err := validateConnectionActionPathTarget(
+		req.Metadata.Target,
+		c,
+	); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
 	}
 
-	resp, err := c.SubmitForm(ctx, coreIface.SubmitConnectionRequest{
-		StepId:      req.Spec.StepID,
-		Data:        req.Spec.Data,
-		ReturnToUrl: req.Spec.ReturnToURL,
-	})
+	resp, err := c.SubmitForm(
+		ctx,
+		coreIface.SubmitConnectionRequest{
+			StepId:      req.Spec.StepID,
+			Data:        req.Spec.Data,
+			ReturnToUrl: req.Spec.ReturnToURL,
+		},
+	)
 	if err != nil {
 		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
@@ -423,7 +456,9 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 			b = b.ForConnectorId(connectorId)
 		}
 
-		b = b.ForNamespaceMatchers(val.GetEffectiveNamespaceMatchers(req.NamespaceVal))
+		b = b.ForNamespaceMatchers(
+			val.GetEffectiveNamespaceMatchers(req.NamespaceVal),
+		)
 
 		if req.NameVal != nil {
 			name := scommon.ResourceName(*req.NameVal)
@@ -476,7 +511,10 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 			val.MarkErrorReturn()
 			return
 		}
-		if err := resource.ValidateFor(smeta.ValidationModeResponse, nil); err != nil {
+		if err := resource.ValidateFor(
+			smeta.ValidationModeResponse,
+			nil, // validation context
+		); err != nil {
 			apgin.WriteErr(gctx, nil, err)
 			val.MarkErrorReturn()
 			return
@@ -546,7 +584,11 @@ func (r *ConnectionsRoutes) get(gctx *gin.Context) {
 		val.MarkErrorReturn()
 		return
 	}
-	if err := apgin.RenderResourceJSON(gctx, http.StatusOK, resource); err != nil {
+	if err := apgin.RenderResourceJSON(
+		gctx,
+		http.StatusOK,
+		resource,
+	); err != nil {
 		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 	}
@@ -596,12 +638,20 @@ func (r *ConnectionsRoutes) disconnect(gctx *gin.Context) {
 	}
 
 	var req schemaapi.ConnectionDisconnectAction
-	if err := apgin.BindActionJSON(gctx, &req, schemaapi.ConnectionDisconnectActionKind); err != nil {
+	if err := apgin.BindActionJSON(
+		gctx,
+		&req,
+		schemaapi.ConnectionDisconnectActionKind,
+	); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
 	}
-	if err := validateConnectionActionPathTarget(req.Metadata.Target, c); err != nil {
+
+	if err := validateConnectionActionPathTarget(
+		req.Metadata.Target,
+		c,
+	); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
@@ -642,13 +692,20 @@ func (r *ConnectionsRoutes) disconnect(gctx *gin.Context) {
 			Connection: *connectionResource,
 		},
 	)
-	if err := apgin.RenderActionJSON(gctx, http.StatusOK, &response, schemaapi.ConnectionDisconnectActionKind); err != nil {
+	if err := apgin.RenderActionJSON(
+		gctx,
+		http.StatusOK,
+		&response,
+		schemaapi.ConnectionDisconnectActionKind,
+	); err != nil {
 		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 	}
 }
 
-func connectionDisconnectOptions(spec schemaapi.ConnectionDisconnectSpec) coreIface.ConnectionDisconnectOptions {
+func connectionDisconnectOptions(
+	spec schemaapi.ConnectionDisconnectSpec,
+) coreIface.ConnectionDisconnectOptions {
 	timeout := defaultConnectorLifecycleTimeout
 	if spec.TimeoutSeconds != nil {
 		timeout = time.Duration(*spec.TimeoutSeconds) * time.Second
@@ -699,7 +756,11 @@ func (r *ConnectionsRoutes) migrateVersion(gctx *gin.Context) {
 	}
 
 	var req schemaapi.ConnectionVersionMigrationAction
-	if err := apgin.BindActionJSON(gctx, &req, schemaapi.ConnectionVersionMigrationActionKind); err != nil {
+	if err := apgin.BindActionJSON(
+		gctx,
+		&req,
+		schemaapi.ConnectionVersionMigrationActionKind,
+	); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
@@ -720,7 +781,10 @@ func (r *ConnectionsRoutes) migrateVersion(gctx *gin.Context) {
 		val.MarkErrorReturn()
 		return
 	}
-	opts := connectionMigrationOptions(targetConnector.GetVersion(), req.Spec.TimeoutSeconds)
+	opts := connectionMigrationOptions(
+		targetConnector.GetVersion(),
+		req.Spec.TimeoutSeconds,
+	)
 
 	task, err := r.core.MigrateConnectionVersion(ctx, id, opts)
 	if err != nil {
@@ -761,13 +825,21 @@ func (r *ConnectionsRoutes) migrateVersion(gctx *gin.Context) {
 			TargetConnectorRef: targetRef,
 		},
 	)
-	if err := apgin.RenderActionJSON(gctx, http.StatusOK, &response, schemaapi.ConnectionVersionMigrationActionKind); err != nil {
+	if err := apgin.RenderActionJSON(
+		gctx,
+		http.StatusOK,
+		&response,
+		schemaapi.ConnectionVersionMigrationActionKind,
+	); err != nil {
 		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 	}
 }
 
-func connectionMigrationOptions(targetVersion uint64, timeoutSeconds *int64) coreIface.ConnectionMigrationOptions {
+func connectionMigrationOptions(
+	targetVersion uint64,
+	timeoutSeconds *int64,
+) coreIface.ConnectionMigrationOptions {
 	timeout := defaultConnectorLifecycleTimeout
 	if timeoutSeconds != nil {
 		timeout = time.Duration(*timeoutSeconds) * time.Second
@@ -824,12 +896,19 @@ func (r *ConnectionsRoutes) abort(gctx *gin.Context) {
 		return
 	}
 	var req schemaapi.EmptyConnectionAction
-	if err := apgin.BindActionJSON(gctx, &req, schemaapi.ConnectionSetupAbortActionKind); err != nil {
+	if err := apgin.BindActionJSON(
+		gctx,
+		&req,
+		schemaapi.ConnectionSetupAbortActionKind,
+	); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
 	}
-	if err := validateConnectionActionPathTarget(req.Metadata.Target, c); err != nil {
+	if err := validateConnectionActionPathTarget(
+		req.Metadata.Target,
+		c,
+	); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
@@ -891,12 +970,19 @@ func (r *ConnectionsRoutes) reconfigure(gctx *gin.Context) {
 		return
 	}
 	var req schemaapi.EmptyConnectionAction
-	if err := apgin.BindActionJSON(gctx, &req, schemaapi.ConnectionReconfigureActionKind); err != nil {
+	if err := apgin.BindActionJSON(
+		gctx,
+		&req,
+		schemaapi.ConnectionReconfigureActionKind,
+	); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
 	}
-	if err := validateConnectionActionPathTarget(req.Metadata.Target, c); err != nil {
+	if err := validateConnectionActionPathTarget(
+		req.Metadata.Target,
+		c,
+	); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
@@ -958,12 +1044,19 @@ func (r *ConnectionsRoutes) cancelSetup(gctx *gin.Context) {
 		return
 	}
 	var req schemaapi.EmptyConnectionAction
-	if err := apgin.BindActionJSON(gctx, &req, schemaapi.ConnectionSetupCancelActionKind); err != nil {
+	if err := apgin.BindActionJSON(
+		gctx,
+		&req,
+		schemaapi.ConnectionSetupCancelActionKind,
+	); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
 	}
-	if err := validateConnectionActionPathTarget(req.Metadata.Target, c); err != nil {
+	if err := validateConnectionActionPathTarget(
+		req.Metadata.Target,
+		c,
+	); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
@@ -1025,12 +1118,19 @@ func (r *ConnectionsRoutes) retry(gctx *gin.Context) {
 	}
 
 	var req schemaapi.ConnectionSetupControlAction
-	if err := apgin.BindActionJSON(gctx, &req, schemaapi.ConnectionSetupRetryActionKind); err != nil {
+	if err := apgin.BindActionJSON(
+		gctx,
+		&req,
+		schemaapi.ConnectionSetupRetryActionKind,
+	); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
-	if err := validateConnectionActionPathTarget(req.Metadata.Target, c); err != nil {
+	if err := validateConnectionActionPathTarget(
+		req.Metadata.Target,
+		c,
+	); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
@@ -1093,12 +1193,19 @@ func (r *ConnectionsRoutes) reauth(gctx *gin.Context) {
 	}
 
 	var req schemaapi.ConnectionSetupControlAction
-	if err := apgin.BindActionJSON(gctx, &req, schemaapi.ConnectionReauthActionKind); err != nil {
+	if err := apgin.BindActionJSON(
+		gctx,
+		&req,
+		schemaapi.ConnectionReauthActionKind,
+	); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
-	if err := validateConnectionActionPathTarget(req.Metadata.Target, c); err != nil {
+	if err := validateConnectionActionPathTarget(
+		req.Metadata.Target,
+		c,
+	); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
@@ -1147,7 +1254,11 @@ func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 	}
 
 	var req schemaapi.ConnectionForceStateAction
-	if err := apgin.BindActionJSON(gctx, &req, schemaapi.ConnectionForceStateActionKind); err != nil {
+	if err := apgin.BindActionJSON(
+		gctx,
+		&req,
+		schemaapi.ConnectionForceStateActionKind,
+	); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
@@ -1170,7 +1281,10 @@ func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
-	if err := validateConnectionActionPathTarget(req.Metadata.Target, c); err != nil {
+	if err := validateConnectionActionPathTarget(
+		req.Metadata.Target,
+		c,
+	); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
@@ -1184,7 +1298,11 @@ func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 			val.MarkErrorReturn()
 			return
 		}
-		response := schemaapi.NewConnectionForceStateResponse(req.Metadata.Target, req.Spec, *resource)
+		response := schemaapi.NewConnectionForceStateResponse(
+			req.Metadata.Target,
+			req.Spec,
+			*resource,
+		)
 		if err := apgin.RenderActionJSON(gctx, http.StatusOK, &response, schemaapi.ConnectionForceStateActionKind); err != nil {
 			apgin.WriteErr(gctx, nil, err)
 			val.MarkErrorReturn()
@@ -1205,7 +1323,11 @@ func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 		val.MarkErrorReturn()
 		return
 	}
-	response := schemaapi.NewConnectionForceStateResponse(req.Metadata.Target, req.Spec, *resource)
+	response := schemaapi.NewConnectionForceStateResponse(
+		req.Metadata.Target,
+		req.Spec,
+		*resource,
+	)
 	if err := apgin.RenderActionJSON(gctx, http.StatusOK, &response, schemaapi.ConnectionForceStateActionKind); err != nil {
 		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
@@ -1246,7 +1368,11 @@ func (r *ConnectionsRoutes) update(gctx *gin.Context) {
 	}
 
 	var req connectionschema.ConnectionPatch
-	if err := apgin.BindResourceJSON(gctx, &req, smeta.ValidationModeUpdate); err != nil {
+	if err := apgin.BindResourceJSON(
+		gctx,
+		&req,
+		smeta.ValidationModeUpdate,
+	); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
@@ -1277,21 +1403,32 @@ func (r *ConnectionsRoutes) update(gctx *gin.Context) {
 		if req.Metadata != nil && req.Metadata.Name != nil {
 			name = *req.Metadata.Name
 		}
-		if conflictErr := resourceNameConflictError(err, "connection", name, originalNamespace); conflictErr != nil {
+		if conflictErr := resourceNameConflictError(
+			err,
+			"connection",
+			name,
+			originalNamespace,
+		); conflictErr != nil {
 			apgin.WriteError(gctx, nil, conflictErr)
 			val.MarkErrorReturn()
 			return
 		}
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+		apgin.WriteError(
+			gctx,
+			nil, // logger
+			httperr.InternalServerError(httperr.WithInternalErr(err)),
+		)
 		val.MarkErrorReturn()
 		return
 	}
+
 	resource, err := updated.GetResource(ctx)
 	if err != nil {
 		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
+
 	if err := apgin.RenderResourceJSON(gctx, http.StatusOK, resource); err != nil {
 		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
@@ -1480,12 +1617,20 @@ func (r *ConnectionsRoutes) getScopes(gctx *gin.Context) {
 
 	connector := c.GetConnector().GetDefinition()
 	if connector.Auth == nil {
-		apgin.WriteError(gctx, nil, httperr.New(http.StatusUnprocessableEntity, "scopes are only available for OAuth2 connections"))
+		apgin.WriteError(
+			gctx,
+			nil, // logger
+			httperr.New(http.StatusUnprocessableEntity, "scopes are only available for OAuth2 connections"),
+		)
 		val.MarkErrorReturn()
 		return
 	}
 	if _, ok := connector.Auth.Inner().(*cschema.AuthOAuth2); !ok {
-		apgin.WriteError(gctx, nil, httperr.New(http.StatusUnprocessableEntity, "scopes are only available for OAuth2 connections"))
+		apgin.WriteError(
+			gctx,
+			nil, // logger
+			httperr.New(http.StatusUnprocessableEntity, "scopes are only available for OAuth2 connections"),
+		)
 		val.MarkErrorReturn()
 		return
 	}
@@ -1493,7 +1638,11 @@ func (r *ConnectionsRoutes) getScopes(gctx *gin.Context) {
 	token, err := r.db.GetOAuth2Token(ctx, id)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFound("no oauth2 token exists for this connection"))
+			apgin.WriteError(
+				gctx,
+				nil, // logger
+				httperr.NotFound("no oauth2 token exists for this connection"),
+			)
 		} else {
 			apgin.WriteErr(gctx, nil, err)
 		}
