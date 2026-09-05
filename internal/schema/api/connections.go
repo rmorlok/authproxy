@@ -268,7 +268,7 @@ func (a *ConnectionForceStateAction) validateFields(requireStatus bool) error {
 	if err := a.Status.Connection.ValidateFor(meta.ValidationModeResponse, nil); err != nil {
 		return fmt.Errorf("$.status.connection: %w", err)
 	}
-	
+
 	return nil
 }
 
