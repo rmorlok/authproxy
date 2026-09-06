@@ -16,6 +16,17 @@ envelopes, task status and monitoring responses, and shared label/annotation
 key-value bodies. Keep route packages focused on binding, validation, 
 authorization, and conversion to/from service-layer types.
 
+OpenAPI-only generator adapters live under `internal/schema/api/openapi`. Keep
+those adapters thin: they may compose API DTOs and canonical resources for
+documentation, but no runtime contract or behavior may depend on them.
+
+Route handlers should import endpoint-specific DTOs from this package and
+canonical resources from their resource package, or convert those contracts to
+runtime/core/database models. Do not add new endpoint-specific `*RequestJson`
+or `*ResponseJson` structs under `internal/routes`; preflight rejects that so
+contract ownership stays clear.
+
+## Notifications
 Notifications and search make their non-resource semantics explicit here.
 `NotificationJson` is a read-only, resource-shaped projection of a durable
 notification row because its `status.viewed` and `status.action` values are
@@ -25,6 +36,7 @@ resource. Search items are heterogeneous summaries, not partial resources.
 truncation/incompleteness observations in projection metadata. Notification
 view mutations use typed action contracts.
 
+## Request Events
 Request events are immutable, resource-shaped observations rather than
 client-managed desired resources. `RequestEventJson` uses resource metadata for
 the event identity, namespace, label snapshot, and creation time. Its `spec`
@@ -33,6 +45,7 @@ optional captured protocol data. Capture fields remain explicitly tagged for
 the API secret-replay policy. `RequestEventList` uses list metadata for its
 opaque continuation token and exact result total.
 
+## Tasks/Workflows and Related Operations
 Tasks, queues, workflow instances, and their related operational records are
 read-only projections over Asynq and go-workflows, not AuthProxy-managed desired
 resources. They still use typed v1alpha1 objects so their identity, spec, and
@@ -80,13 +93,3 @@ payloads contain scalar IDs and parameters rather than embedded API resource
 objects, so this migration does not add a second payload version or conversion
 job. If a future private payload embeds a resource, its task/workflow name and
 payload type must be versioned before deployment.
-
-OpenAPI-only generator adapters live under `internal/schema/api/openapi`. Keep
-those adapters thin: they may compose API DTOs and canonical resources for 
-documentation, but no runtime contract or behavior may depend on them.
-
-Route handlers should import endpoint-specific DTOs from this package and 
-canonical resources from their resource package, or convert those contracts to 
-runtime/core/database models. Do not add new endpoint-specific `*RequestJson` 
-or `*ResponseJson` structs under `internal/routes`; preflight rejects that so 
-contract ownership stays clear.
