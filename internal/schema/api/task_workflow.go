@@ -60,7 +60,11 @@ type TaskStatusJson struct {
 	State TaskState `json:"state" yaml:"state"`
 }
 
-func NewTaskJson(id, taskType string, state TaskState, updatedAt *time.Time) TaskJson {
+func NewTaskJson(
+	id, taskType string,
+	state TaskState,
+	updatedAt *time.Time,
+) TaskJson {
 	return TaskJson{
 		TypeMeta: meta.NewTypeMeta(TaskKind),
 		Metadata: meta.ObjectMeta{
@@ -107,7 +111,9 @@ type ListTaskQueuesResponseJson struct {
 	apiv1alpha1.ResourceList[TaskQueueJson] `json:",inline" yaml:",inline"`
 }
 
-func NewListTaskQueuesResponseJson(items []TaskQueueJson) ListTaskQueuesResponseJson {
+func NewListTaskQueuesResponseJson(
+	items []TaskQueueJson,
+) ListTaskQueuesResponseJson {
 	return ListTaskQueuesResponseJson{ResourceList: apiv1alpha1.NewResourceList(
 		TaskQueueKind,
 		items,
@@ -211,7 +217,9 @@ type ListTaskServersResponseJson struct {
 	apiv1alpha1.ResourceList[TaskServerJson] `json:",inline" yaml:",inline"`
 }
 
-func NewListTaskServersResponseJson(items []TaskServerJson) ListTaskServersResponseJson {
+func NewListTaskServersResponseJson(
+	items []TaskServerJson,
+) ListTaskServersResponseJson {
 	return ListTaskServersResponseJson{ResourceList: apiv1alpha1.NewResourceList(
 		TaskServerKind,
 		items,
@@ -240,7 +248,9 @@ type ListTaskSchedulesResponseJson struct {
 	apiv1alpha1.ResourceList[TaskScheduleJson] `json:",inline" yaml:",inline"`
 }
 
-func NewListTaskSchedulesResponseJson(items []TaskScheduleJson) ListTaskSchedulesResponseJson {
+func NewListTaskSchedulesResponseJson(
+	items []TaskScheduleJson,
+) ListTaskSchedulesResponseJson {
 	return ListTaskSchedulesResponseJson{ResourceList: apiv1alpha1.NewResourceList(
 		TaskScheduleKind,
 		items,
@@ -286,11 +296,13 @@ func NewListWorkflowInstancesResponseJson(
 	items []WorkflowInstanceJson,
 	continueToken string,
 ) ListWorkflowInstancesResponseJson {
-	return ListWorkflowInstancesResponseJson{ResourceList: apiv1alpha1.NewResourceList(
-		WorkflowInstanceKind,
-		items,
-		apiv1alpha1.ListMeta{Continue: continueToken},
-	)}
+	return ListWorkflowInstancesResponseJson{
+		ResourceList: apiv1alpha1.NewResourceList(
+			WorkflowInstanceKind,
+			items,
+			apiv1alpha1.ListMeta{Continue: continueToken},
+		),
+	}
 }
 
 type WorkflowHistoryEventJson struct {
@@ -312,11 +324,13 @@ type ListWorkflowHistoryResponseJson struct {
 }
 
 func NewListWorkflowHistoryResponseJson(items []WorkflowHistoryEventJson) ListWorkflowHistoryResponseJson {
-	return ListWorkflowHistoryResponseJson{ResourceList: apiv1alpha1.NewResourceList(
-		WorkflowHistoryEventKind,
-		items,
-		apiv1alpha1.ListMeta{},
-	)}
+	return ListWorkflowHistoryResponseJson{
+		ResourceList: apiv1alpha1.NewResourceList(
+			WorkflowHistoryEventKind,
+			items,
+			apiv1alpha1.ListMeta{},
+		),
+	}
 }
 
 type TaskExecutionActionSpecJson struct {
@@ -349,28 +363,66 @@ type WorkflowInstanceActionJson struct {
 }
 
 func NewTaskExecutionActionResponse(kind meta.Kind, queue, taskID string) TaskExecutionActionJson {
-	return TaskExecutionActionJson{Action: apiv1alpha1.NewActionResponse(
-		kind,
-		meta.ObjectReference{APIVersion: meta.APIVersionV1Alpha1, Kind: TaskExecutionKind, ID: taskID},
-		TaskExecutionActionSpecJson{Queue: queue},
-		OperationActionStatusJson{Succeeded: true, AffectedCount: 1},
-	)}
+	return TaskExecutionActionJson{
+		Action: apiv1alpha1.NewActionResponse(
+			kind,
+			meta.ObjectReference{
+				APIVersion: meta.APIVersionV1Alpha1,
+				Kind:       TaskExecutionKind,
+				ID:         taskID,
+			},
+			TaskExecutionActionSpecJson{
+				Queue: queue,
+			},
+			OperationActionStatusJson{
+				Succeeded:     true,
+				AffectedCount: 1,
+			},
+		)}
 }
 
-func NewTaskQueueActionResponse(kind meta.Kind, queue, state string, affectedCount int) TaskQueueActionJson {
-	return TaskQueueActionJson{Action: apiv1alpha1.NewActionResponse(
-		kind,
-		meta.ObjectReference{APIVersion: meta.APIVersionV1Alpha1, Kind: TaskQueueKind, ID: queue},
-		TaskQueueActionSpecJson{State: state},
-		OperationActionStatusJson{Succeeded: true, AffectedCount: affectedCount},
-	)}
+func NewTaskQueueActionResponse(
+	kind meta.Kind,
+	queue, state string,
+	affectedCount int,
+) TaskQueueActionJson {
+	return TaskQueueActionJson{
+		Action: apiv1alpha1.NewActionResponse(
+			kind,
+			meta.ObjectReference{
+				APIVersion: meta.APIVersionV1Alpha1,
+				Kind:       TaskQueueKind,
+				ID:         queue,
+			},
+			TaskQueueActionSpecJson{
+				State: state,
+			},
+			OperationActionStatusJson{
+				Succeeded:     true,
+				AffectedCount: affectedCount,
+			},
+		)}
 }
 
-func NewWorkflowInstanceActionResponse(kind meta.Kind, instanceID, executionID string) WorkflowInstanceActionJson {
-	return WorkflowInstanceActionJson{Action: apiv1alpha1.NewActionResponse(
-		kind,
-		meta.ObjectReference{APIVersion: meta.APIVersionV1Alpha1, Kind: WorkflowInstanceKind, ID: executionID},
-		WorkflowInstanceActionSpecJson{InstanceID: instanceID},
-		OperationActionStatusJson{Succeeded: true, AffectedCount: 1},
-	)}
+func NewWorkflowInstanceActionResponse(
+	kind meta.Kind,
+	instanceID, executionID string,
+) WorkflowInstanceActionJson {
+	return WorkflowInstanceActionJson{
+		Action: apiv1alpha1.NewActionResponse(
+			kind,
+			meta.ObjectReference{
+				APIVersion: meta.APIVersionV1Alpha1,
+				Kind:       WorkflowInstanceKind,
+				ID:         executionID,
+			},
+			WorkflowInstanceActionSpecJson{
+				InstanceID: instanceID,
+			},
+			OperationActionStatusJson{
+				Succeeded:     true,
+				AffectedCount: 1,
+			},
+		),
+	}
 }
