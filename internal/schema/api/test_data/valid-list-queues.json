@@ -1,24 +1,34 @@
 {
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "TaskQueueList",
+  "metadata": {},
   "items": [
     {
-      "queue": "default",
-      "memoryUsage": 1024,
-      "latencySeconds": 0.25,
-      "size": 3,
-      "groups": 0,
-      "pending": 1,
-      "active": 1,
-      "scheduled": 0,
-      "retry": 0,
-      "archived": 0,
-      "completed": 1,
-      "aggregating": 0,
-      "processed": 10,
-      "failed": 1,
-      "processedTotal": 100,
-      "failedTotal": 5,
-      "paused": false,
-      "timestamp": "2026-01-02T03:04:05Z"
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "TaskQueue",
+      "metadata": {
+        "id": "default",
+        "updatedAt": "2026-01-02T03:04:05Z"
+      },
+      "spec": {},
+      "status": {
+        "memoryUsage": 1024,
+        "latencySeconds": 0.25,
+        "size": 3,
+        "groups": 0,
+        "pending": 1,
+        "active": 1,
+        "scheduled": 0,
+        "retry": 0,
+        "archived": 0,
+        "completed": 1,
+        "aggregating": 0,
+        "processed": 10,
+        "failed": 1,
+        "processedTotal": 100,
+        "failedTotal": 5,
+        "paused": false
+      }
     }
   ]
 }

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/hibiken/asynq"
@@ -15,6 +14,8 @@ import (
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/httperr"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
+	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
@@ -39,138 +40,120 @@ func NewTaskMonitoringRoutes(
 	}
 }
 
-// JSON response models
-
-type QueueInfoJson = schemaapi.QueueInfoJson
-
-func queueInfoToJson(qi *asynq.QueueInfo) *QueueInfoJson {
-	return &QueueInfoJson{
-		Queue:          qi.Queue,
-		MemoryUsage:    qi.MemoryUsage,
-		Latency:        qi.Latency.Seconds(),
-		Size:           qi.Size,
-		Groups:         qi.Groups,
-		Pending:        qi.Pending,
-		Active:         qi.Active,
-		Scheduled:      qi.Scheduled,
-		Retry:          qi.Retry,
-		Archived:       qi.Archived,
-		Completed:      qi.Completed,
-		Aggregating:    qi.Aggregating,
-		Processed:      qi.Processed,
-		Failed:         qi.Failed,
-		ProcessedTotal: qi.ProcessedTotal,
-		FailedTotal:    qi.FailedTotal,
-		Paused:         qi.Paused,
-		Timestamp:      qi.Timestamp.UTC().Format(time.RFC3339),
+func queueInfoToJson(qi *asynq.QueueInfo) *schemaapi.TaskQueueJson {
+	return &schemaapi.TaskQueueJson{
+		TypeMeta: meta.NewTypeMeta(schemaapi.TaskQueueKind),
+		Metadata: meta.ObjectMeta{
+			ID:        qi.Queue,
+			UpdatedAt: util.UtcTimePointer(util.ToPtrNonZero(qi.Timestamp)),
+		},
+		Spec: schemaapi.TaskQueueSpecJson{},
+		Status: schemaapi.TaskQueueStatusJson{
+			MemoryUsage:    qi.MemoryUsage,
+			LatencySeconds: qi.Latency.Seconds(),
+			Size:           qi.Size,
+			Groups:         qi.Groups,
+			Pending:        qi.Pending,
+			Active:         qi.Active,
+			Scheduled:      qi.Scheduled,
+			Retry:          qi.Retry,
+			Archived:       qi.Archived,
+			Completed:      qi.Completed,
+			Aggregating:    qi.Aggregating,
+			Processed:      qi.Processed,
+			Failed:         qi.Failed,
+			ProcessedTotal: qi.ProcessedTotal,
+			FailedTotal:    qi.FailedTotal,
+			Paused:         qi.Paused,
+		},
 	}
 }
 
-type MonitoringTaskInfoJson = schemaapi.MonitoringTaskInfoJson
-
-func taskInfoToJson(ti *asynq.TaskInfo) *MonitoringTaskInfoJson {
+func taskInfoToJson(ti *asynq.TaskInfo) *schemaapi.TaskExecutionJson {
 	payload := base64.StdEncoding.EncodeToString(ti.Payload)
 	if json.Valid(ti.Payload) {
 		payload = string(ti.Payload)
 	}
 
-	j := &MonitoringTaskInfoJson{
-		ID:       ti.ID,
-		Queue:    ti.Queue,
-		Type:     ti.Type,
-		Payload:  payload,
-		State:    ti.State.String(),
-		MaxRetry: ti.MaxRetry,
-		Retried:  ti.Retried,
-		LastErr:  ti.LastErr,
-		Group:    ti.Group,
+	return &schemaapi.TaskExecutionJson{
+		TypeMeta: meta.NewTypeMeta(schemaapi.TaskExecutionKind),
+		Metadata: meta.ObjectMeta{ID: ti.ID},
+		Spec: schemaapi.TaskExecutionSpecJson{
+			Queue:    ti.Queue,
+			Type:     ti.Type,
+			Payload:  payload,
+			MaxRetry: ti.MaxRetry,
+			Group:    ti.Group,
+		},
+		Status: schemaapi.TaskExecutionStatusJson{
+			State:         ti.State.String(),
+			Retried:       ti.Retried,
+			LastError:     ti.LastErr,
+			LastFailedAt:  util.UtcTimePointer(util.ToPtrNonZero(ti.LastFailedAt)),
+			NextProcessAt: util.UtcTimePointer(util.ToPtrNonZero(ti.NextProcessAt)),
+			CompletedAt:   util.UtcTimePointer(util.ToPtrNonZero(ti.CompletedAt)),
+			Orphaned:      ti.IsOrphaned,
+		},
 	}
-
-	if !ti.LastFailedAt.IsZero() {
-		j.LastFailedAt = ti.LastFailedAt.UTC().Format(time.RFC3339)
-	}
-	if !ti.NextProcessAt.IsZero() {
-		j.NextProcessAt = ti.NextProcessAt.UTC().Format(time.RFC3339)
-	}
-	if !ti.CompletedAt.IsZero() {
-		j.CompletedAt = ti.CompletedAt.UTC().Format(time.RFC3339)
-	}
-	if ti.IsOrphaned {
-		j.IsOrphaned = true
-	}
-
-	return j
 }
 
-type DailyStatsJson = schemaapi.DailyStatsJson
-
-func dailyStatsToJson(ds *asynq.DailyStats) *DailyStatsJson {
-	return &DailyStatsJson{
-		Queue:     ds.Queue,
+func dailyStatsToJson(ds *asynq.DailyStats) schemaapi.TaskQueueDailyStatsJson {
+	return schemaapi.TaskQueueDailyStatsJson{
+		Date:      ds.Date.UTC().Format("2006-01-02"),
 		Processed: ds.Processed,
 		Failed:    ds.Failed,
-		Date:      ds.Date.UTC().Format("2006-01-02"),
 	}
 }
 
-type WorkerInfoJson = schemaapi.WorkerInfoJson
-
-func workerInfoToJson(wi *asynq.WorkerInfo) *WorkerInfoJson {
-	return &WorkerInfoJson{
-		TaskID:   wi.TaskID,
-		TaskType: wi.TaskType,
-		Queue:    wi.Queue,
-		Started:  wi.Started.UTC().Format(time.RFC3339),
-		Deadline: wi.Deadline.UTC().Format(time.RFC3339),
+func workerInfoToJson(wi *asynq.WorkerInfo) schemaapi.TaskWorkerJson {
+	return schemaapi.TaskWorkerJson{
+		TaskID:    wi.TaskID,
+		TaskType:  wi.TaskType,
+		Queue:     wi.Queue,
+		StartedAt: wi.Started.UTC(),
+		Deadline:  wi.Deadline.UTC(),
 	}
 }
 
-type ServerInfoJson = schemaapi.ServerInfoJson
-
-func serverInfoToJson(si *asynq.ServerInfo) *ServerInfoJson {
-	workers := make([]*WorkerInfoJson, 0, len(si.ActiveWorkers))
+func serverInfoToJson(si *asynq.ServerInfo) *schemaapi.TaskServerJson {
+	workers := make([]schemaapi.TaskWorkerJson, 0, len(si.ActiveWorkers))
 	for _, w := range si.ActiveWorkers {
 		workers = append(workers, workerInfoToJson(w))
 	}
-	return &ServerInfoJson{
-		ID:             si.ID,
-		Host:           si.Host,
-		PID:            si.PID,
-		Concurrency:    si.Concurrency,
-		Queues:         si.Queues,
-		StrictPriority: si.StrictPriority,
-		Started:        si.Started.UTC().Format(time.RFC3339),
-		Status:         si.Status,
-		ActiveWorkers:  workers,
+	return &schemaapi.TaskServerJson{
+		TypeMeta: meta.NewTypeMeta(schemaapi.TaskServerKind),
+		Metadata: meta.ObjectMeta{
+			ID:        si.ID,
+			CreatedAt: util.UtcTimePointer(util.ToPtrNonZero(si.Started)),
+		},
+		Spec: schemaapi.TaskServerSpecJson{
+			Host:           si.Host,
+			PID:            si.PID,
+			Concurrency:    si.Concurrency,
+			Queues:         si.Queues,
+			StrictPriority: si.StrictPriority,
+		},
+		Status: schemaapi.TaskServerStatusJson{
+			State:         si.Status,
+			ActiveWorkers: workers,
+		},
 	}
 }
 
-type SchedulerEntryJson = schemaapi.SchedulerEntryJson
-
-func schedulerEntryToJson(se *asynq.SchedulerEntry) *SchedulerEntryJson {
-	j := &SchedulerEntryJson{
-		ID:       se.ID,
-		Spec:     se.Spec,
-		TaskType: se.Task.Type(),
-		Next:     se.Next.UTC().Format(time.RFC3339),
+func schedulerEntryToJson(se *asynq.SchedulerEntry) *schemaapi.TaskScheduleJson {
+	return &schemaapi.TaskScheduleJson{
+		TypeMeta: meta.NewTypeMeta(schemaapi.TaskScheduleKind),
+		Metadata: meta.ObjectMeta{ID: se.ID},
+		Spec: schemaapi.TaskScheduleSpecJson{
+			Schedule: se.Spec,
+			TaskType: se.Task.Type(),
+		},
+		Status: schemaapi.TaskScheduleStatusJson{
+			NextRunAt:     se.Next.UTC(),
+			PreviousRunAt: util.UtcTimePointer(util.ToPtrNonZero(se.Prev)),
+		},
 	}
-	if !se.Prev.IsZero() {
-		j.Prev = se.Prev.UTC().Format(time.RFC3339)
-	}
-	return j
 }
-
-type BulkActionResponseJson = schemaapi.BulkActionResponseJson
-
-type ListQueuesResponseJson = schemaapi.ListQueuesResponseJson
-
-type ListMonitoringTasksResponseJson = schemaapi.ListMonitoringTasksResponseJson
-
-type ListServersResponseJson = schemaapi.ListServersResponseJson
-
-type ListSchedulerEntriesResponseJson = schemaapi.ListSchedulerEntriesResponseJson
-
-type ListQueueHistoryResponseJson = schemaapi.ListQueueHistoryResponseJson
 
 type taskListCursor struct {
 	Page     int    `json:"page"`
@@ -211,17 +194,17 @@ func (r *TaskMonitoringRoutes) listQueues(gctx *gin.Context) {
 		return
 	}
 
-	items := make([]*QueueInfoJson, 0, len(queues))
+	items := make([]schemaapi.TaskQueueJson, 0, len(queues))
 	for _, q := range queues {
 		qi, err := r.inspector.GetQueueInfo(q)
 		if err != nil {
 			apgin.WriteError(gctx, nil, httperr.InternalServerErrorf("failed to get queue info for %s", q))
 			return
 		}
-		items = append(items, queueInfoToJson(qi))
+		items = append(items, *queueInfoToJson(qi))
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, ListQueuesResponseJson{Items: items})
+	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewListTaskQueuesResponseJson(items))
 }
 
 func (r *TaskMonitoringRoutes) getQueueInfo(gctx *gin.Context) {
@@ -269,12 +252,17 @@ func (r *TaskMonitoringRoutes) getQueueHistory(gctx *gin.Context) {
 		return
 	}
 
-	result := make([]*DailyStatsJson, 0, len(stats))
+	result := make([]schemaapi.TaskQueueDailyStatsJson, 0, len(stats))
 	for _, s := range stats {
 		result = append(result, dailyStatsToJson(s))
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, ListQueueHistoryResponseJson{Items: result})
+	apgin.APIJSON(gctx, http.StatusOK, schemaapi.TaskQueueHistoryJson{
+		TypeMeta: meta.NewTypeMeta(schemaapi.TaskQueueHistoryKind),
+		Metadata: meta.ObjectMeta{ID: queue},
+		Spec:     schemaapi.TaskQueueHistorySpecJson{Days: days},
+		Status:   schemaapi.TaskQueueHistoryStatusJson{Items: result},
+	})
 }
 
 func (r *TaskMonitoringRoutes) listTasksByState(gctx *gin.Context) {
@@ -345,9 +333,9 @@ func (r *TaskMonitoringRoutes) listTasksByState(gctx *gin.Context) {
 		return
 	}
 
-	items := make([]*MonitoringTaskInfoJson, 0, len(tasks))
+	items := make([]schemaapi.TaskExecutionJson, 0, len(tasks))
 	for _, t := range tasks {
-		items = append(items, taskInfoToJson(t))
+		items = append(items, *taskInfoToJson(t))
 	}
 
 	// Determine if there are more pages by checking total count from queue info
@@ -366,10 +354,7 @@ func (r *TaskMonitoringRoutes) listTasksByState(gctx *gin.Context) {
 		}
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, ListMonitoringTasksResponseJson{
-		Items:  items,
-		Cursor: cursor,
-	})
+	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewListTaskExecutionsResponseJson(items, cursor))
 }
 
 func (r *TaskMonitoringRoutes) getTask(gctx *gin.Context) {
@@ -403,12 +388,12 @@ func (r *TaskMonitoringRoutes) listServers(gctx *gin.Context) {
 		return
 	}
 
-	items := make([]*ServerInfoJson, 0, len(servers))
+	items := make([]schemaapi.TaskServerJson, 0, len(servers))
 	for _, s := range servers {
-		items = append(items, serverInfoToJson(s))
+		items = append(items, *serverInfoToJson(s))
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, ListServersResponseJson{Items: items})
+	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewListTaskServersResponseJson(items))
 }
 
 func (r *TaskMonitoringRoutes) listSchedulerEntries(gctx *gin.Context) {
@@ -421,12 +406,12 @@ func (r *TaskMonitoringRoutes) listSchedulerEntries(gctx *gin.Context) {
 		return
 	}
 
-	items := make([]*SchedulerEntryJson, 0, len(entries))
+	items := make([]schemaapi.TaskScheduleJson, 0, len(entries))
 	for _, e := range entries {
-		items = append(items, schedulerEntryToJson(e))
+		items = append(items, *schedulerEntryToJson(e))
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, ListSchedulerEntriesResponseJson{Items: items})
+	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewListTaskSchedulesResponseJson(items))
 }
 
 func (r *TaskMonitoringRoutes) runTask(gctx *gin.Context) {
@@ -441,7 +426,9 @@ func (r *TaskMonitoringRoutes) runTask(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, gin.H{"ok": true})
+	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewTaskExecutionActionResponse(
+		schemaapi.TaskExecutionRunActionKind, queue, taskId,
+	))
 }
 
 func (r *TaskMonitoringRoutes) archiveTask(gctx *gin.Context) {
@@ -456,7 +443,9 @@ func (r *TaskMonitoringRoutes) archiveTask(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, gin.H{"ok": true})
+	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewTaskExecutionActionResponse(
+		schemaapi.TaskExecutionArchiveActionKind, queue, taskId,
+	))
 }
 
 func (r *TaskMonitoringRoutes) cancelTask(gctx *gin.Context) {
@@ -470,7 +459,9 @@ func (r *TaskMonitoringRoutes) cancelTask(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, gin.H{"ok": true})
+	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewTaskExecutionActionResponse(
+		schemaapi.TaskExecutionCancelActionKind, gctx.Param("queue"), taskId,
+	))
 }
 
 func (r *TaskMonitoringRoutes) deleteTask(gctx *gin.Context) {
@@ -485,7 +476,9 @@ func (r *TaskMonitoringRoutes) deleteTask(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, gin.H{"ok": true})
+	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewTaskExecutionActionResponse(
+		schemaapi.TaskExecutionDeleteActionKind, queue, taskId,
+	))
 }
 
 func (r *TaskMonitoringRoutes) pauseQueue(gctx *gin.Context) {
@@ -499,7 +492,9 @@ func (r *TaskMonitoringRoutes) pauseQueue(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, gin.H{"ok": true})
+	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewTaskQueueActionResponse(
+		schemaapi.TaskQueuePauseActionKind, queue, "", 1,
+	))
 }
 
 func (r *TaskMonitoringRoutes) unpauseQueue(gctx *gin.Context) {
@@ -513,7 +508,9 @@ func (r *TaskMonitoringRoutes) unpauseQueue(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, gin.H{"ok": true})
+	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewTaskQueueActionResponse(
+		schemaapi.TaskQueueUnpauseActionKind, queue, "", 1,
+	))
 }
 
 func (r *TaskMonitoringRoutes) runAllArchivedTasks(gctx *gin.Context) {
@@ -528,7 +525,9 @@ func (r *TaskMonitoringRoutes) runAllArchivedTasks(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, &BulkActionResponseJson{AffectedCount: count})
+	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewTaskQueueActionResponse(
+		schemaapi.TaskQueueRunAllActionKind, queue, "archived", count,
+	))
 }
 
 func (r *TaskMonitoringRoutes) runAllRetryTasks(gctx *gin.Context) {
@@ -543,7 +542,9 @@ func (r *TaskMonitoringRoutes) runAllRetryTasks(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, &BulkActionResponseJson{AffectedCount: count})
+	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewTaskQueueActionResponse(
+		schemaapi.TaskQueueRunAllActionKind, queue, "retry", count,
+	))
 }
 
 func (r *TaskMonitoringRoutes) deleteAllArchivedTasks(gctx *gin.Context) {
@@ -558,7 +559,9 @@ func (r *TaskMonitoringRoutes) deleteAllArchivedTasks(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, &BulkActionResponseJson{AffectedCount: count})
+	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewTaskQueueActionResponse(
+		schemaapi.TaskQueueDeleteAllActionKind, queue, "archived", count,
+	))
 }
 
 func (r *TaskMonitoringRoutes) deleteAllCompletedTasks(gctx *gin.Context) {
@@ -573,7 +576,9 @@ func (r *TaskMonitoringRoutes) deleteAllCompletedTasks(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, &BulkActionResponseJson{AffectedCount: count})
+	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewTaskQueueActionResponse(
+		schemaapi.TaskQueueDeleteAllActionKind, queue, "completed", count,
+	))
 }
 
 // Register registers all task monitoring routes

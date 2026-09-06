@@ -1,6 +1,14 @@
 {
-  "id": "task-token",
-  "type": "sync",
-  "state": "completed",
-  "updatedAt": "2026-01-02T03:04:05Z"
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "Task",
+  "metadata": {
+    "id": "task-token",
+    "updatedAt": "2026-01-02T03:04:05Z"
+  },
+  "spec": {
+    "type": "sync"
+  },
+  "status": {
+    "state": "completed"
+  }
 }

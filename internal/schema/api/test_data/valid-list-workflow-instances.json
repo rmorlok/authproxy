@@ -1,25 +1,23 @@
 {
   "apiVersion": "authproxy.net/v1alpha1",
-  "kind": "TaskExecutionList",
+  "kind": "WorkflowInstanceList",
   "metadata": {
     "continue": "next"
   },
   "items": [
     {
       "apiVersion": "authproxy.net/v1alpha1",
-      "kind": "TaskExecution",
+      "kind": "WorkflowInstance",
       "metadata": {
-        "id": "task-1"
+        "id": "exec-a"
       },
       "spec": {
-        "queue": "default",
-        "type": "sync",
-        "payload": "{\"id\":\"1\"}",
-        "maxRetry": 5
+        "instanceId": "workflow-a",
+        "queue": "default"
       },
       "status": {
-        "state": "pending",
-        "retried": 1
+        "state": "finished",
+        "completedAt": "2026-01-02T03:04:05Z"
       }
     }
   ]

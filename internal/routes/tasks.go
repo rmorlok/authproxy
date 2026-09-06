@@ -32,40 +32,30 @@ type TaskRoutes struct {
 	workflowClient apworkflows.Client
 }
 
-type TaskState = schemaapi.TaskState
-type TaskInfoJson = schemaapi.TaskInfoJson
-type OpenAPITaskInfoJson = schemaapiopenapi.TaskInfoJson
+// Keep the OpenAPI adapter visible to the compiler; swaggo resolves it from
+// the response annotation below.
+var _ = schemaapiopenapi.TaskJson{}
 
-const (
-	TaskStateUnknown   = schemaapi.TaskStateUnknown
-	TaskStateActive    = schemaapi.TaskStateActive
-	TaskStatePending   = schemaapi.TaskStatePending
-	TaskStateScheduled = schemaapi.TaskStateScheduled
-	TaskStateRetry     = schemaapi.TaskStateRetry
-	TaskStateFailed    = schemaapi.TaskStateFailed
-	TaskStateCompleted = schemaapi.TaskStateCompleted
-)
-
-func TaskInfoToJson(encryptedId string, ti *asynq.TaskInfo) *TaskInfoJson {
-	ts := TaskStateUnknown
+func TaskInfoToJson(encryptedID string, ti *asynq.TaskInfo) *schemaapi.TaskJson {
+	ts := schemaapi.TaskStateUnknown
 	switch ti.State {
 	case asynq.TaskStateActive:
-		ts = TaskStateActive
+		ts = schemaapi.TaskStateActive
 	case asynq.TaskStatePending:
-		ts = TaskStatePending
+		ts = schemaapi.TaskStatePending
 	case asynq.TaskStateScheduled:
-		ts = TaskStateScheduled
+		ts = schemaapi.TaskStateScheduled
 	case asynq.TaskStateRetry:
-		ts = TaskStateRetry
+		ts = schemaapi.TaskStateRetry
 	case asynq.TaskStateArchived:
 		// Archived implies that retries were exhausted. See documentation:
 		// https://github.com/hibiken/asynq/wiki/Life-of-a-Task
-		ts = TaskStateFailed
+		ts = schemaapi.TaskStateFailed
 	case asynq.TaskStateCompleted:
-		ts = TaskStateCompleted
+		ts = schemaapi.TaskStateCompleted
 	case asynq.TaskStateAggregating:
 		// This isn't something we need to expose to clients. Just flag the task as pending work.
-		ts = TaskStatePending
+		ts = schemaapi.TaskStatePending
 	}
 
 	updatedAt := time.Time{}
@@ -81,36 +71,29 @@ func TaskInfoToJson(encryptedId string, ti *asynq.TaskInfo) *TaskInfoJson {
 		updatedAtPtr = &updatedAt
 	}
 
-	return &TaskInfoJson{
-		Id:        encryptedId,
-		Type:      ti.Type,
-		State:     ts,
-		UpdatedAt: updatedAtPtr,
-	}
+	result := schemaapi.NewTaskJson(encryptedID, ti.Type, ts, updatedAtPtr)
+	return &result
 }
 
-func WorkflowTaskInfoToJson(encryptedId string, ti *tasks.TaskInfo, state wfcore.WorkflowInstanceState) *TaskInfoJson {
-	ts := TaskStateUnknown
+func WorkflowTaskInfoToJson(encryptedID string, ti *tasks.TaskInfo, state wfcore.WorkflowInstanceState) *schemaapi.TaskJson {
+	ts := schemaapi.TaskStateUnknown
 	switch state {
 	case wfcore.WorkflowInstanceStateActive:
-		ts = TaskStateActive
+		ts = schemaapi.TaskStateActive
 	case wfcore.WorkflowInstanceStateContinuedAsNew, wfcore.WorkflowInstanceStateFinished:
-		ts = TaskStateCompleted
+		ts = schemaapi.TaskStateCompleted
 	}
 
-	return &TaskInfoJson{
-		Id:    encryptedId,
-		Type:  ti.WorkflowName,
-		State: ts,
-	}
+	result := schemaapi.NewTaskJson(encryptedID, ti.WorkflowName, ts, nil)
+	return &result
 }
 
-func WorkflowTaskInfoStateFromHistory(state wfcore.WorkflowInstanceState, historyEvents []*wfhistory.Event) TaskState {
+func WorkflowTaskInfoStateFromHistory(state wfcore.WorkflowInstanceState, historyEvents []*wfhistory.Event) schemaapi.TaskState {
 	switch state {
 	case wfcore.WorkflowInstanceStateActive:
-		return TaskStateActive
+		return schemaapi.TaskStateActive
 	case wfcore.WorkflowInstanceStateContinuedAsNew:
-		return TaskStateCompleted
+		return schemaapi.TaskStateCompleted
 	case wfcore.WorkflowInstanceStateFinished:
 		for i := len(historyEvents) - 1; i >= 0; i-- {
 			event := historyEvents[i]
@@ -119,17 +102,17 @@ func WorkflowTaskInfoStateFromHistory(state wfcore.WorkflowInstanceState, histor
 			}
 			switch event.Type {
 			case wfhistory.EventType_WorkflowExecutionCanceled, wfhistory.EventType_WorkflowExecutionTerminated:
-				return TaskStateFailed
+				return schemaapi.TaskStateFailed
 			case wfhistory.EventType_WorkflowExecutionFinished:
 				if workflowCompletionHasError(event.Attributes) {
-					return TaskStateFailed
+					return schemaapi.TaskStateFailed
 				}
-				return TaskStateCompleted
+				return schemaapi.TaskStateCompleted
 			}
 		}
-		return TaskStateCompleted
+		return schemaapi.TaskStateCompleted
 	default:
-		return TaskStateUnknown
+		return schemaapi.TaskStateUnknown
 	}
 }
 
@@ -158,7 +141,7 @@ func workflowCompletionHasError(attrs any) bool {
 // @Accept			json
 // @Produce		json
 // @Param			encryptedTaskInfo	path		string	true	"Encrypted task info token"
-// @Success		200					{object}	OpenAPITaskInfoJson
+// @Success		200					{object}	schemaapiopenapi.TaskJson
 // @Failure		400					{object}	ErrorResponse
 // @Failure		401					{object}	ErrorResponse
 // @Failure		403					{object}	ErrorResponse
@@ -234,7 +217,7 @@ func (r *TaskRoutes) get(gctx *gin.Context) {
 		}
 
 		resp := WorkflowTaskInfoToJson(encryptedTaskInfo, ti, state)
-		resp.State = WorkflowTaskInfoStateFromHistory(state, historyEvents)
+		resp.Status.State = WorkflowTaskInfoStateFromHistory(state, historyEvents)
 		apgin.APIJSON(gctx, http.StatusOK, resp)
 		return
 	}

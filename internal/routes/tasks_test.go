@@ -25,6 +25,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
+	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/tasks"
@@ -291,13 +292,13 @@ func TestTasks(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp TaskInfoJson
+			var resp schemaapi.TaskJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
-			require.Equal(t, encryptedTaskInfo, resp.Id)
-			require.Equal(t, "test-type", resp.Type)
-			require.Equal(t, string(TaskStateCompleted), string(resp.State))
-			require.Equal(t, now.UTC().Format(time.RFC3339), resp.UpdatedAt.UTC().Format(time.RFC3339))
+			require.Equal(t, encryptedTaskInfo, resp.Metadata.ID)
+			require.Equal(t, "test-type", resp.Spec.Type)
+			require.Equal(t, schemaapi.TaskStateCompleted, resp.Status.State)
+			require.Equal(t, now.UTC().Format(time.RFC3339), resp.Metadata.UpdatedAt.UTC().Format(time.RFC3339))
 		})
 
 		t.Run("success with retry state", func(t *testing.T) {
@@ -337,13 +338,13 @@ func TestTasks(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp TaskInfoJson
+			var resp schemaapi.TaskJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
-			require.Equal(t, encryptedTaskInfo, resp.Id)
-			require.Equal(t, "test-type", resp.Type)
-			require.Equal(t, string(TaskStateRetry), string(resp.State))
-			require.Equal(t, now.UTC().Format(time.RFC3339), resp.UpdatedAt.UTC().Format(time.RFC3339))
+			require.Equal(t, encryptedTaskInfo, resp.Metadata.ID)
+			require.Equal(t, "test-type", resp.Spec.Type)
+			require.Equal(t, schemaapi.TaskStateRetry, resp.Status.State)
+			require.Equal(t, now.UTC().Format(time.RFC3339), resp.Metadata.UpdatedAt.UTC().Format(time.RFC3339))
 		})
 
 		t.Run("workflow success", func(t *testing.T) {
@@ -351,17 +352,17 @@ func TestTasks(t *testing.T) {
 				name      string
 				state     wfcore.WorkflowInstanceState
 				history   []*history.Event
-				wantState TaskState
+				wantState schemaapi.TaskState
 			}{
 				{
 					name:      "active",
 					state:     wfcore.WorkflowInstanceStateActive,
-					wantState: TaskStateActive,
+					wantState: schemaapi.TaskStateActive,
 				},
 				{
 					name:      "continued as new",
 					state:     wfcore.WorkflowInstanceStateContinuedAsNew,
-					wantState: TaskStateCompleted,
+					wantState: schemaapi.TaskStateCompleted,
 				},
 				{
 					name:  "finished",
@@ -372,7 +373,7 @@ func TestTasks(t *testing.T) {
 							Attributes: &history.ExecutionCompletedAttributes{},
 						},
 					},
-					wantState: TaskStateCompleted,
+					wantState: schemaapi.TaskStateCompleted,
 				},
 				{
 					name:  "finished with error",
@@ -385,7 +386,7 @@ func TestTasks(t *testing.T) {
 							}{Error: "workflow failed"},
 						},
 					},
-					wantState: TaskStateFailed,
+					wantState: schemaapi.TaskStateFailed,
 				},
 				{
 					name:  "canceled",
@@ -395,12 +396,12 @@ func TestTasks(t *testing.T) {
 							Type: history.EventType_WorkflowExecutionCanceled,
 						},
 					},
-					wantState: TaskStateFailed,
+					wantState: schemaapi.TaskStateFailed,
 				},
 				{
 					name:      "unknown workflow state",
 					state:     wfcore.WorkflowInstanceState(99),
-					wantState: TaskStateUnknown,
+					wantState: schemaapi.TaskStateUnknown,
 				},
 			}
 
@@ -418,12 +419,12 @@ func TestTasks(t *testing.T) {
 					tu.Gin.ServeHTTP(w, req)
 					require.Equal(t, http.StatusOK, w.Code)
 
-					var resp TaskInfoJson
+					var resp schemaapi.TaskJson
 					err = json.Unmarshal(w.Body.Bytes(), &resp)
 					require.NoError(t, err)
-					require.Equal(t, encryptedTaskInfo, resp.Id)
-					require.Equal(t, "core.connection.disconnect.v1", resp.Type)
-					require.Equal(t, string(tc.wantState), string(resp.State))
+					require.Equal(t, encryptedTaskInfo, resp.Metadata.ID)
+					require.Equal(t, "core.connection.disconnect.v1", resp.Spec.Type)
+					require.Equal(t, tc.wantState, resp.Status.State)
 					require.Equal(t, "workflow-instance-id", tu.WorkflowClient.requestedInstance.InstanceID)
 					require.Equal(t, "workflow-execution-id", tu.WorkflowClient.requestedInstance.ExecutionID)
 				})

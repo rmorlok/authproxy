@@ -1700,400 +1700,523 @@
     },
     "TaskState": {
       "type": "string",
-      "enum": [
-        "unknown",
-        "active",
-        "pending",
-        "scheduled",
-        "retry",
-        "failed",
-        "completed"
+      "enum": ["unknown", "active", "pending", "scheduled", "retry", "failed", "completed"]
+    },
+    "TaskSpec": {
+      "type": "object",
+      "required": ["type"],
+      "properties": { "type": { "type": "string", "minLength": 1 } },
+      "additionalProperties": false
+    },
+    "TaskStatus": {
+      "type": "object",
+      "required": ["state"],
+      "properties": { "state": { "$ref": "#/$defs/TaskState" } },
+      "additionalProperties": false
+    },
+    "Task": {
+      "description": "A safe task-status projection addressed by an opaque tracking token.",
+      "allOf": [
+        { "$ref": "../resources/meta/schema.json#/$defs/Resource" },
+        {
+          "type": "object",
+          "required": ["status"],
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "Task" },
+            "metadata": {
+              "allOf": [
+                { "$ref": "../resources/meta/schema.json#/$defs/ObjectMeta" },
+                { "type": "object", "required": ["id"] }
+              ]
+            },
+            "spec": { "$ref": "#/$defs/TaskSpec" },
+            "status": { "$ref": "#/$defs/TaskStatus" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "TaskQueueSpec": {
+      "type": "object",
+      "additionalProperties": false
+    },
+    "TaskQueueStatus": {
+      "type": "object",
+      "required": ["memoryUsage", "latencySeconds", "size", "groups", "pending", "active", "scheduled", "retry", "archived", "completed", "aggregating", "processed", "failed", "processedTotal", "failedTotal", "paused"],
+      "properties": {
+        "memoryUsage": { "type": "integer", "minimum": 0 },
+        "latencySeconds": { "type": "number", "minimum": 0 },
+        "size": { "type": "integer", "minimum": 0 },
+        "groups": { "type": "integer", "minimum": 0 },
+        "pending": { "type": "integer", "minimum": 0 },
+        "active": { "type": "integer", "minimum": 0 },
+        "scheduled": { "type": "integer", "minimum": 0 },
+        "retry": { "type": "integer", "minimum": 0 },
+        "archived": { "type": "integer", "minimum": 0 },
+        "completed": { "type": "integer", "minimum": 0 },
+        "aggregating": { "type": "integer", "minimum": 0 },
+        "processed": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 },
+        "processedTotal": { "type": "integer", "minimum": 0 },
+        "failedTotal": { "type": "integer", "minimum": 0 },
+        "paused": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "TaskQueue": {
+      "description": "A read-only projection of an Asynq queue.",
+      "allOf": [
+        { "$ref": "../resources/meta/schema.json#/$defs/Resource" },
+        {
+          "type": "object",
+          "required": ["status"],
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "TaskQueue" },
+            "metadata": {
+              "allOf": [
+                { "$ref": "../resources/meta/schema.json#/$defs/ObjectMeta" },
+                { "type": "object", "required": ["id"] }
+              ]
+            },
+            "spec": { "$ref": "#/$defs/TaskQueueSpec" },
+            "status": { "$ref": "#/$defs/TaskQueueStatus" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "ListTaskQueuesResponse": {
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ResourceList" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "TaskQueueList" },
+            "items": { "type": "array", "items": { "$ref": "#/$defs/TaskQueue" } }
+          }
+        }
       ]
     },
-    "TaskInfo": {
+    "TaskExecutionSpec": {
       "type": "object",
+      "required": ["queue", "type", "payload", "maxRetry"],
       "properties": {
-        "id": {
-          "type": "string"
-        },
-        "type": {
-          "type": "string"
-        },
-        "state": {
-          "$ref": "#/$defs/TaskState"
-        },
-        "updatedAt": {
-          "type": "string",
-          "format": "date-time"
-        }
+        "queue": { "type": "string", "minLength": 1 },
+        "type": { "type": "string", "minLength": 1 },
+        "payload": { "type": "string" },
+        "maxRetry": { "type": "integer", "minimum": 0 },
+        "group": { "type": "string" }
       },
-      "required": [
-        "id",
-        "type",
-        "state"
-      ],
       "additionalProperties": false
     },
-    "QueueInfo": {
+    "TaskExecutionStatus": {
       "type": "object",
+      "required": ["state", "retried"],
       "properties": {
-        "queue": {
-          "type": "string"
-        },
-        "memoryUsage": {
-          "type": "integer"
-        },
-        "latencySeconds": {
-          "type": "number"
-        },
-        "size": {
-          "type": "integer"
-        },
-        "groups": {
-          "type": "integer"
-        },
-        "pending": {
-          "type": "integer"
-        },
-        "active": {
-          "type": "integer"
-        },
-        "scheduled": {
-          "type": "integer"
-        },
-        "retry": {
-          "type": "integer"
-        },
-        "archived": {
-          "type": "integer"
-        },
-        "completed": {
-          "type": "integer"
-        },
-        "aggregating": {
-          "type": "integer"
-        },
-        "processed": {
-          "type": "integer"
-        },
-        "failed": {
-          "type": "integer"
-        },
-        "processedTotal": {
-          "type": "integer"
-        },
-        "failedTotal": {
-          "type": "integer"
-        },
-        "paused": {
-          "type": "boolean"
-        },
-        "timestamp": {
-          "type": "string",
-          "format": "date-time"
-        }
+        "state": { "type": "string", "minLength": 1 },
+        "retried": { "type": "integer", "minimum": 0 },
+        "lastError": { "type": "string" },
+        "lastFailedAt": { "type": "string", "format": "date-time" },
+        "nextProcessAt": { "type": "string", "format": "date-time" },
+        "completedAt": { "type": "string", "format": "date-time" },
+        "orphaned": { "type": "boolean" }
       },
-      "required": [
-        "queue",
-        "memoryUsage",
-        "latencySeconds",
-        "size",
-        "groups",
-        "pending",
-        "active",
-        "scheduled",
-        "retry",
-        "archived",
-        "completed",
-        "aggregating",
-        "processed",
-        "failed",
-        "processedTotal",
-        "failedTotal",
-        "paused",
-        "timestamp"
-      ],
       "additionalProperties": false
     },
-    "MonitoringTaskInfo": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "queue": {
-          "type": "string"
-        },
-        "type": {
-          "type": "string"
-        },
-        "payload": {
-          "type": "string"
-        },
-        "state": {
-          "type": "string"
-        },
-        "maxRetry": {
-          "type": "integer"
-        },
-        "retried": {
-          "type": "integer"
-        },
-        "lastErr": {
-          "type": "string"
-        },
-        "lastFailedAt": {
-          "type": "string"
-        },
-        "nextProcessAt": {
-          "type": "string"
-        },
-        "completedAt": {
-          "type": "string"
-        },
-        "isOrphaned": {
-          "type": "boolean"
-        },
-        "group": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "id",
-        "queue",
-        "type",
-        "payload",
-        "state",
-        "maxRetry",
-        "retried"
-      ],
-      "additionalProperties": false
-    },
-    "DailyStats": {
-      "type": "object",
-      "properties": {
-        "queue": {
-          "type": "string"
-        },
-        "processed": {
-          "type": "integer"
-        },
-        "failed": {
-          "type": "integer"
-        },
-        "date": {
-          "type": "string",
-          "format": "date"
-        }
-      },
-      "required": [
-        "queue",
-        "processed",
-        "failed",
-        "date"
-      ],
-      "additionalProperties": false
-    },
-    "WorkerInfo": {
-      "type": "object",
-      "properties": {
-        "taskId": {
-          "type": "string"
-        },
-        "taskType": {
-          "type": "string"
-        },
-        "queue": {
-          "type": "string"
-        },
-        "started": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "deadline": {
-          "type": "string",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "taskId",
-        "taskType",
-        "queue",
-        "started",
-        "deadline"
-      ],
-      "additionalProperties": false
-    },
-    "ServerInfo": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "host": {
-          "type": "string"
-        },
-        "pid": {
-          "type": "integer"
-        },
-        "concurrency": {
-          "type": "integer"
-        },
-        "queues": {
+    "TaskExecution": {
+      "description": "An administrative projection of one Asynq task.",
+      "allOf": [
+        { "$ref": "../resources/meta/schema.json#/$defs/Resource" },
+        {
           "type": "object",
-          "additionalProperties": {
-            "type": "integer"
-          }
-        },
-        "strictPriority": {
-          "type": "boolean"
-        },
-        "started": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "status": {
-          "type": "string"
-        },
-        "activeWorkers": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/WorkerInfo"
+          "required": ["status"],
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "TaskExecution" },
+            "metadata": {
+              "allOf": [
+                { "$ref": "../resources/meta/schema.json#/$defs/ObjectMeta" },
+                { "type": "object", "required": ["id"] }
+              ]
+            },
+            "spec": { "$ref": "#/$defs/TaskExecutionSpec" },
+            "status": { "$ref": "#/$defs/TaskExecutionStatus" }
           }
         }
-      },
-      "required": [
-        "id",
-        "host",
-        "pid",
-        "concurrency",
-        "queues",
-        "strictPriority",
-        "started",
-        "status",
-        "activeWorkers"
       ],
-      "additionalProperties": false
+      "unevaluatedProperties": false
     },
-    "SchedulerEntry": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "spec": {
-          "type": "string"
-        },
-        "taskType": {
-          "type": "string"
-        },
-        "next": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "prev": {
-          "type": "string",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "id",
-        "spec",
-        "taskType",
-        "next"
-      ],
-      "additionalProperties": false
-    },
-    "BulkActionResponse": {
-      "type": "object",
-      "properties": {
-        "affectedCount": {
-          "type": "integer",
-          "minimum": 0
-        }
-      },
-      "required": [
-        "affectedCount"
-      ],
-      "additionalProperties": false
-    },
-    "ListQueuesResponse": {
-      "type": "object",
-      "properties": {
-        "items": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/QueueInfo"
+    "ListTaskExecutionsResponse": {
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ResourceList" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "TaskExecutionList" },
+            "items": { "type": "array", "items": { "$ref": "#/$defs/TaskExecution" } }
           }
         }
+      ]
+    },
+    "TaskQueueDailyStats": {
+      "type": "object",
+      "required": ["date", "processed", "failed"],
+      "properties": {
+        "date": { "type": "string", "format": "date" },
+        "processed": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 }
       },
-      "required": [
-        "items"
-      ],
       "additionalProperties": false
     },
-    "ListMonitoringTasksResponse": {
+    "TaskQueueHistorySpec": {
       "type": "object",
+      "required": ["days"],
+      "properties": { "days": { "type": "integer", "minimum": 1 } },
+      "additionalProperties": false
+    },
+    "TaskQueueHistoryStatus": {
+      "type": "object",
+      "required": ["items"],
       "properties": {
-        "items": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/MonitoringTaskInfo"
+        "items": { "type": "array", "items": { "$ref": "#/$defs/TaskQueueDailyStats" } }
+      },
+      "additionalProperties": false
+    },
+    "TaskQueueHistory": {
+      "description": "A requested time window and the observed daily queue samples.",
+      "allOf": [
+        { "$ref": "../resources/meta/schema.json#/$defs/Resource" },
+        {
+          "type": "object",
+          "required": ["status"],
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "TaskQueueHistory" },
+            "metadata": {
+              "allOf": [
+                { "$ref": "../resources/meta/schema.json#/$defs/ObjectMeta" },
+                { "type": "object", "required": ["id"] }
+              ]
+            },
+            "spec": { "$ref": "#/$defs/TaskQueueHistorySpec" },
+            "status": { "$ref": "#/$defs/TaskQueueHistoryStatus" }
           }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "TaskWorker": {
+      "type": "object",
+      "required": ["taskId", "taskType", "queue", "startedAt", "deadline"],
+      "properties": {
+        "taskId": { "type": "string" },
+        "taskType": { "type": "string" },
+        "queue": { "type": "string" },
+        "startedAt": { "type": "string", "format": "date-time" },
+        "deadline": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    },
+    "TaskServerSpec": {
+      "type": "object",
+      "required": ["host", "pid", "concurrency", "queues", "strictPriority"],
+      "properties": {
+        "host": { "type": "string" },
+        "pid": { "type": "integer" },
+        "concurrency": { "type": "integer", "minimum": 0 },
+        "queues": { "type": "object", "additionalProperties": { "type": "integer" } },
+        "strictPriority": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "TaskServerStatus": {
+      "type": "object",
+      "required": ["state", "activeWorkers"],
+      "properties": {
+        "state": { "type": "string" },
+        "activeWorkers": { "type": "array", "items": { "$ref": "#/$defs/TaskWorker" } }
+      },
+      "additionalProperties": false
+    },
+    "TaskServer": {
+      "allOf": [
+        { "$ref": "../resources/meta/schema.json#/$defs/Resource" },
+        {
+          "type": "object",
+          "required": ["status"],
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "TaskServer" },
+            "metadata": {
+              "allOf": [
+                { "$ref": "../resources/meta/schema.json#/$defs/ObjectMeta" },
+                { "type": "object", "required": ["id"] }
+              ]
+            },
+            "spec": { "$ref": "#/$defs/TaskServerSpec" },
+            "status": { "$ref": "#/$defs/TaskServerStatus" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "ListTaskServersResponse": {
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ResourceList" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "TaskServerList" },
+            "items": { "type": "array", "items": { "$ref": "#/$defs/TaskServer" } }
+          }
+        }
+      ]
+    },
+    "TaskScheduleSpec": {
+      "type": "object",
+      "required": ["schedule", "taskType"],
+      "properties": {
+        "schedule": { "type": "string" },
+        "taskType": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "TaskScheduleStatus": {
+      "type": "object",
+      "required": ["nextRunAt"],
+      "properties": {
+        "nextRunAt": { "type": "string", "format": "date-time" },
+        "previousRunAt": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    },
+    "TaskSchedule": {
+      "allOf": [
+        { "$ref": "../resources/meta/schema.json#/$defs/Resource" },
+        {
+          "type": "object",
+          "required": ["status"],
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "TaskSchedule" },
+            "metadata": {
+              "allOf": [
+                { "$ref": "../resources/meta/schema.json#/$defs/ObjectMeta" },
+                { "type": "object", "required": ["id"] }
+              ]
+            },
+            "spec": { "$ref": "#/$defs/TaskScheduleSpec" },
+            "status": { "$ref": "#/$defs/TaskScheduleStatus" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "ListTaskSchedulesResponse": {
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ResourceList" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "TaskScheduleList" },
+            "items": { "type": "array", "items": { "$ref": "#/$defs/TaskSchedule" } }
+          }
+        }
+      ]
+    },
+    "WorkflowInstanceReference": {
+      "type": "object",
+      "required": ["target", "instanceId"],
+      "properties": {
+        "target": {
+          "allOf": [
+            { "$ref": "../resources/meta/schema.json#/$defs/ObjectReference" },
+            {
+              "type": "object",
+              "properties": {
+                "apiVersion": { "const": "authproxy.net/v1alpha1" },
+                "kind": { "const": "WorkflowInstance" }
+              }
+            }
+          ]
         },
-        "cursor": {
-          "type": "string"
-        }
+        "instanceId": { "type": "string", "minLength": 1 }
       },
-      "required": [
-        "items"
-      ],
       "additionalProperties": false
     },
-    "ListServersResponse": {
+    "WorkflowInstanceSpec": {
       "type": "object",
+      "required": ["instanceId", "queue"],
       "properties": {
-        "items": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/ServerInfo"
-          }
-        }
+        "instanceId": { "type": "string", "minLength": 1 },
+        "queue": { "type": "string" },
+        "parentRef": { "$ref": "#/$defs/WorkflowInstanceReference" },
+        "workflowName": { "type": "string" }
       },
-      "required": [
-        "items"
-      ],
       "additionalProperties": false
     },
-    "ListSchedulerEntriesResponse": {
+    "WorkflowHistoryEventSpec": {
       "type": "object",
       "properties": {
-        "items": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/SchedulerEntry"
-          }
-        }
+        "sequenceId": { "type": "integer", "minimum": 0 },
+        "type": { "type": "string" },
+        "scheduleEventId": { "type": "integer", "minimum": 0 },
+        "attributes": {},
+        "visibleAt": { "type": "string", "format": "date-time" }
       },
-      "required": [
-        "items"
-      ],
       "additionalProperties": false
     },
-    "ListQueueHistoryResponse": {
-      "type": "object",
-      "properties": {
-        "items": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/DailyStats"
+    "WorkflowHistoryEvent": {
+      "allOf": [
+        { "$ref": "../resources/meta/schema.json#/$defs/Resource" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "WorkflowHistoryEvent" },
+            "spec": { "$ref": "#/$defs/WorkflowHistoryEventSpec" }
           }
         }
-      },
-      "required": [
-        "items"
       ],
+      "unevaluatedProperties": false
+    },
+    "WorkflowInstanceStatus": {
+      "type": "object",
+      "required": ["state"],
+      "properties": {
+        "state": { "type": "string", "enum": ["unknown", "active", "continued_as_new", "finished"] },
+        "completedAt": { "type": "string", "format": "date-time" },
+        "error": { "type": "boolean" },
+        "history": { "type": "array", "items": { "$ref": "#/$defs/WorkflowHistoryEvent" } },
+        "children": { "type": "array", "items": { "$ref": "#/$defs/WorkflowInstance" } }
+      },
       "additionalProperties": false
+    },
+    "WorkflowInstance": {
+      "description": "A read-only workflow execution projection; metadata.id is the execution ID.",
+      "allOf": [
+        { "$ref": "../resources/meta/schema.json#/$defs/Resource" },
+        {
+          "type": "object",
+          "required": ["status"],
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "WorkflowInstance" },
+            "metadata": {
+              "allOf": [
+                { "$ref": "../resources/meta/schema.json#/$defs/ObjectMeta" },
+                { "type": "object", "required": ["id"] }
+              ]
+            },
+            "spec": { "$ref": "#/$defs/WorkflowInstanceSpec" },
+            "status": { "$ref": "#/$defs/WorkflowInstanceStatus" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "ListWorkflowInstancesResponse": {
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ResourceList" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "WorkflowInstanceList" },
+            "items": { "type": "array", "items": { "$ref": "#/$defs/WorkflowInstance" } }
+          }
+        }
+      ]
+    },
+    "ListWorkflowHistoryResponse": {
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ResourceList" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "WorkflowHistoryEventList" },
+            "items": { "type": "array", "items": { "$ref": "#/$defs/WorkflowHistoryEvent" } }
+          }
+        }
+      ]
+    },
+    "OperationActionStatus": {
+      "type": "object",
+      "required": ["succeeded", "affectedCount"],
+      "properties": {
+        "succeeded": { "type": "boolean", "const": true },
+        "affectedCount": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "TaskExecutionActionSpec": {
+      "type": "object",
+      "required": ["queue"],
+      "properties": { "queue": { "type": "string", "minLength": 1 } },
+      "additionalProperties": false
+    },
+    "TaskExecutionAction": {
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ActionResponse" },
+        {
+          "type": "object",
+          "required": ["status"],
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "enum": ["TaskExecutionRun", "TaskExecutionArchive", "TaskExecutionCancel", "TaskExecutionDelete"] },
+            "spec": { "$ref": "#/$defs/TaskExecutionActionSpec" },
+            "status": { "$ref": "#/$defs/OperationActionStatus" }
+          }
+        }
+      ]
+    },
+    "TaskQueueActionSpec": {
+      "type": "object",
+      "properties": { "state": { "type": "string", "enum": ["archived", "retry", "completed"] } },
+      "additionalProperties": false
+    },
+    "TaskQueueAction": {
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ActionResponse" },
+        {
+          "type": "object",
+          "required": ["status"],
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "enum": ["TaskQueuePause", "TaskQueueUnpause", "TaskQueueRunAll", "TaskQueueDeleteAll"] },
+            "spec": { "$ref": "#/$defs/TaskQueueActionSpec" },
+            "status": { "$ref": "#/$defs/OperationActionStatus" }
+          }
+        }
+      ]
+    },
+    "WorkflowInstanceActionSpec": {
+      "type": "object",
+      "required": ["instanceId"],
+      "properties": { "instanceId": { "type": "string", "minLength": 1 } },
+      "additionalProperties": false
+    },
+    "WorkflowInstanceAction": {
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ActionResponse" },
+        {
+          "type": "object",
+          "required": ["status"],
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "enum": ["WorkflowInstanceCancel", "WorkflowInstanceDelete"] },
+            "spec": { "$ref": "#/$defs/WorkflowInstanceActionSpec" },
+            "status": { "$ref": "#/$defs/OperationActionStatus" }
+          }
+        }
+      ]
     }
   }
 }

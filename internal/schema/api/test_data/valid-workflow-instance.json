@@ -1,0 +1,23 @@
+{
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "WorkflowInstance",
+  "metadata": {
+    "id": "exec-child",
+    "createdAt": "2026-01-02T03:04:05Z"
+  },
+  "spec": {
+    "instanceId": "workflow-child",
+    "queue": "default",
+    "parentRef": {
+      "target": {
+        "apiVersion": "authproxy.net/v1alpha1",
+        "kind": "WorkflowInstance",
+        "id": "exec-parent"
+      },
+      "instanceId": "workflow-parent"
+    }
+  },
+  "status": {
+    "state": "active"
+  }
+}

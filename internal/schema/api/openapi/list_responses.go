@@ -412,14 +412,23 @@ type MetricsSchemaResponseJson struct {
 	Metrics []schemaapi.MetricsSchemaMetricJson `json:"metrics"`
 }
 
-// TaskInfoJson documents public background task status.
+// TaskJson documents public background task status.
 //
 //	@Description	Background task status
-type TaskInfoJson struct {
-	Id        string `json:"id"`
-	Type      string `json:"type"`
-	State     string `json:"state" example:"completed"`
-	UpdatedAt string `json:"updatedAt,omitempty"`
+type TaskJson struct {
+	APIVersion string          `json:"apiVersion" binding:"required" enums:"authproxy.net/v1alpha1" example:"authproxy.net/v1alpha1"`
+	Kind       string          `json:"kind" binding:"required" enums:"Task" example:"Task"`
+	Metadata   meta.ObjectMeta `json:"metadata" binding:"required"`
+	Spec       TaskSpecJson    `json:"spec" binding:"required"`
+	Status     TaskStatusJson  `json:"status" binding:"required"`
+}
+
+type TaskSpecJson struct {
+	Type string `json:"type"`
+}
+
+type TaskStatusJson struct {
+	State string `json:"state" example:"completed" enums:"unknown,active,pending,scheduled,retry,failed,completed"`
 }
 
 // KeySpecPatchJson documents mutable desired key fields.
