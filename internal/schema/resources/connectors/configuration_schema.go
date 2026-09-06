@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	jsonschemav5 "github.com/santhosh-tekuri/jsonschema/v5"
 )
 
 // ConnectionConfigurationJSONSchema returns a JSON Schema describing the
@@ -13,18 +14,21 @@ import (
 // spec.configuration. Auth-method-emitted credential fields are not part of
 // SetupFlow and therefore are intentionally excluded.
 //
-// Step-level required constraints are intentionally omitted. A Connection may
-// be returned while setup is incomplete, and conditional setup steps may never
-// run. Additional properties remain allowed because connector migration hooks
-// can add configuration fields that have no form schema. Each setup submission
+// Required constraints from unconditional steps are retained. Requirements
+// from conditionally eligible steps are omitted because their JavaScript
+// predicates cannot be represented faithfully by this aggregate JSON Schema.
+// Additional properties remain allowed because connector migration hooks can
+// add configuration fields that have no form schema. Each setup submission
 // remains subject to its original step schema.
 func (c *ConnectorDefinition) ConnectionConfigurationJSONSchema() (common.RawJSON, error) {
 	properties := make(map[string]json.RawMessage)
+	required := make([]string, 0)
+	requiredSet := make(map[string]struct{})
 	if c != nil && c.SetupFlow != nil {
-		if err := mergeSetupFlowConfigurationProperties(properties, c.SetupFlow.Preconnect); err != nil {
+		if err := mergeSetupFlowConfigurationSchema(properties, &required, requiredSet, c.SetupFlow.Preconnect); err != nil {
 			return nil, fmt.Errorf("preconnect configuration schema: %w", err)
 		}
-		if err := mergeSetupFlowConfigurationProperties(properties, c.SetupFlow.Configure); err != nil {
+		if err := mergeSetupFlowConfigurationSchema(properties, &required, requiredSet, c.SetupFlow.Configure); err != nil {
 			return nil, fmt.Errorf("configure configuration schema: %w", err)
 		}
 	}
@@ -35,6 +39,9 @@ func (c *ConnectorDefinition) ConnectionConfigurationJSONSchema() (common.RawJSO
 		"properties":           properties,
 		"additionalProperties": true,
 	}
+	if len(required) > 0 {
+		aggregate["required"] = required
+	}
 
 	encoded, err := json.Marshal(aggregate)
 	if err != nil {
@@ -43,8 +50,29 @@ func (c *ConnectorDefinition) ConnectionConfigurationJSONSchema() (common.RawJSO
 	return common.RawJSON(encoded), nil
 }
 
-func mergeSetupFlowConfigurationProperties(
+// ConnectionConfigurationMatchesJSONSchema reports whether configuration is
+// sufficient for the aggregate schema returned by
+// ConnectionConfigurationJSONSchema. A missing configuration is treated as an
+// empty object so connectors without required configuration fields are
+// considered configured.
+func ConnectionConfigurationMatchesJSONSchema(
+	schema common.RawJSON,
+	configuration map[string]any,
+) (bool, error) {
+	compiled, err := jsonschemav5.CompileString("connection-configuration.json", string(schema))
+	if err != nil {
+		return false, fmt.Errorf("compile connection configuration schema: %w", err)
+	}
+	if configuration == nil {
+		configuration = map[string]any{}
+	}
+	return compiled.Validate(configuration) == nil, nil
+}
+
+func mergeSetupFlowConfigurationSchema(
 	destination map[string]json.RawMessage,
+	required *[]string,
+	requiredSet map[string]struct{},
 	phase *SetupFlowPhase,
 ) error {
 	if phase == nil {
@@ -59,6 +87,7 @@ func mergeSetupFlowConfigurationProperties(
 
 		var parsed struct {
 			Properties map[string]json.RawMessage `json:"properties"`
+			Required   []string                   `json:"required"`
 		}
 		if err := json.Unmarshal(step.JsonSchema, &parsed); err != nil {
 			return fmt.Errorf("step %q: %w", step.Id, err)
@@ -78,6 +107,16 @@ func mergeSetupFlowConfigurationProperties(
 				return fmt.Errorf("step %q property %q: %w", step.Id, name, err)
 			}
 			destination[name] = combined
+		}
+
+		if step.If == nil {
+			for _, name := range parsed.Required {
+				if _, found := requiredSet[name]; found {
+					continue
+				}
+				requiredSet[name] = struct{}{}
+				*required = append(*required, name)
+			}
 		}
 	}
 

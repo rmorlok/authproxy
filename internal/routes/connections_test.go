@@ -232,6 +232,7 @@ func TestConnections(t *testing.T) {
 			require.JSONEq(t, `{
 				"$schema":"https://json-schema.org/draft/2020-12/schema",
 				"type":"object",
+				"required":["tenant"],
 				"properties":{
 					"tenant":{"type":"string"},
 					"workspace":{"type":"string"}

@@ -105,11 +105,18 @@ func (m *Connection) GetResource(ctx context.Context) (*connectionschema.Connect
 	if err != nil {
 		return nil, err
 	}
+	configurationConfigured, err := cschema.ConnectionConfigurationMatchesJSONSchema(
+		configurationSchema,
+		m.Configuration,
+	)
+	if err != nil {
+		return nil, err
+	}
 	resource.Status = &connectionschema.ConnectionStatus{
 		Lifecycle: connectionschema.ConnectionLifecycleStatus{State: connectionschema.ConnectionState(m.State)},
 		Health:    connectionschema.ConnectionHealthStatus{State: connectionschema.ConnectionHealthState(m.GetHealthState())},
 		Configuration: connectionschema.ConnectionConfigurationStatus{
-			Configured: len(m.Configuration) > 0,
+			Configured: configurationConfigured,
 			Schema:     configurationSchema,
 		},
 	}

@@ -150,6 +150,7 @@ are namespace-scoped and are not bound to an individual actor.
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
+        "required": ["tenant"],
         "properties": {
           "tenant": {"type": "string", "minLength": 1}
         },
@@ -163,12 +164,13 @@ are namespace-scoped and are not bound to an individual actor.
 Submit setup values through the typed setup actions. AuthProxy validates them
 against the connector's form definition and encrypts stored values. Connection
 reads return decrypted connector-authored values under `spec.configuration`
-and report whether configuration has been persisted under
+and report whether that configuration satisfies its aggregate schema under
 `status.configuration.configured`. The server-derived aggregate JSON Schema is
 under `status.configuration.schema`; clients cannot set it on a Connection.
-The aggregate omits step-level `required` rules because setup can be incomplete
-and conditional steps can be skipped; setup submissions still use each step's
-original schema for validation.
+The aggregate retains `required` rules from unconditional setup steps. It omits
+requirements from conditionally eligible steps because their JavaScript
+predicates cannot be represented faithfully by the aggregate JSON Schema;
+setup submissions still use each step's original schema for validation.
 
 The aggregate permits additional properties because connector migration hooks
 can create configuration fields without a form schema. Those fields are

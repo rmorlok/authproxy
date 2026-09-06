@@ -62,9 +62,9 @@ type ConnectionStatus struct {
 	Configuration ConnectionConfigurationStatus `json:"configuration" yaml:"configuration"`
 }
 
-// ConnectionConfigurationStatus describes the server-observed persisted
-// configuration state. Schema is derived from the referenced Connector
-// generation and is not settable on a Connection.
+// ConnectionConfigurationStatus describes whether spec.configuration
+// satisfies the server-derived Schema. Schema is derived from the referenced
+// Connector generation and is not settable on a Connection.
 type ConnectionConfigurationStatus struct {
 	Configured bool           `json:"configured" yaml:"configured"`
 	Schema     common.RawJSON `json:"schema" yaml:"schema" swaggertype:"object"`

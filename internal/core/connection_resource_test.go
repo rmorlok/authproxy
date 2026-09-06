@@ -81,6 +81,7 @@ func TestConnectionGetResourceBuildsCanonicalEnvelope(t *testing.T) {
 	require.JSONEq(t, `{
 		"$schema":"https://json-schema.org/draft/2020-12/schema",
 		"type":"object",
+		"required":["tenant"],
 		"properties":{"tenant":{"type":"string"}},
 		"additionalProperties":true
 	}`, string(resource.Status.Configuration.Schema))
@@ -124,7 +125,7 @@ func TestConnectionGetResourceOmitsSetupAndDefaultsHealth(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Nil(t, resource.Status.Setup)
-	require.False(t, resource.Status.Configuration.Configured)
+	require.True(t, resource.Status.Configuration.Configured)
 	require.JSONEq(t, `{
 		"$schema":"https://json-schema.org/draft/2020-12/schema",
 		"type":"object",
@@ -133,4 +134,41 @@ func TestConnectionGetResourceOmitsSetupAndDefaultsHealth(t *testing.T) {
 	}`, string(resource.Status.Configuration.Schema))
 	require.Equal(t, connectionschema.ConnectionHealthStateHealthy, resource.Status.Health.State)
 	require.NoError(t, resource.ValidateFor(meta.ValidationModeResponse, nil))
+}
+
+func TestConnectionGetResourceReportsIncompleteRequiredConfiguration(t *testing.T) {
+	now := time.Now().UTC()
+	connector := &Connector{
+		ConnectorWithDefinition: database.ConnectorWithDefinition{
+			Id:        apid.New(apid.PrefixConnector),
+			Name:      "example",
+			Namespace: "root",
+			Version:   1,
+		},
+		def: &connectorschema.ConnectorDefinition{SetupFlow: &connectorschema.SetupFlow{
+			Configure: &connectorschema.SetupFlowPhase{Steps: []connectorschema.SetupFlowStep{{
+				Id:         "workspace",
+				JsonSchema: common.RawJSON(`{"type":"object","required":["workspace"],"properties":{"workspace":{"type":"string"}}}`),
+			}}},
+		}},
+	}
+
+	wrapped := wrapConnection(
+		&database.Connection{
+			Id:               apid.New(apid.PrefixConnection),
+			Name:             "example",
+			Namespace:        "root",
+			State:            database.ConnectionStateSetup,
+			ConnectorId:      connector.Id,
+			ConnectorVersion: connector.Version,
+			CreatedAt:        now,
+			UpdatedAt:        now,
+		},
+		connector,
+		&service{logger: aplog.NewNoopLogger()},
+	)
+
+	resource, err := wrapped.GetResource(t.Context())
+	require.NoError(t, err)
+	require.False(t, resource.Status.Configuration.Configured)
 }

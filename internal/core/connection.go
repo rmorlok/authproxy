@@ -134,6 +134,13 @@ func (c *connection) GetResource(
 	if err != nil {
 		return nil, fmt.Errorf("build connection configuration schema: %w", err)
 	}
+	configurationConfigured, err := cschema.ConnectionConfigurationMatchesJSONSchema(
+		configurationSchema,
+		configuration,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("validate connection configuration: %w", err)
+	}
 
 	resource := &connectionschema.Connection{
 		TypeMeta: meta.NewTypeMeta(connectionschema.ConnectionKind),
@@ -165,9 +172,8 @@ func (c *connection) GetResource(
 				State: connectionschema.ConnectionHealthState(healthState),
 			},
 			Configuration: connectionschema.ConnectionConfigurationStatus{
-				Configured: c.EncryptedConfiguration != nil &&
-					!c.EncryptedConfiguration.IsZero(),
-				Schema: configurationSchema,
+				Configured: configurationConfigured,
+				Schema:     configurationSchema,
 			},
 		},
 	}
