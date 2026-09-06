@@ -1,6 +1,35 @@
 {
-  "taskId": "task_encrypted",
-  "connectionId": "cxn_test550e8400abcde",
-  "sourceVersion": 1,
-  "targetVersion": 3
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "ConnectionVersionMigration",
+  "metadata": {
+    "target": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connection",
+      "id": "cxn_test550e8400abcde"
+    }
+  },
+  "spec": {
+    "connectorRef": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connector",
+      "id": "cxr_test550e8400abcde",
+      "generation": 3
+    },
+    "timeoutSeconds": 600
+  },
+  "status": {
+    "taskId": "task_encrypted",
+    "sourceConnectorRef": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connector",
+      "id": "cxr_test550e8400abcde",
+      "generation": 1
+    },
+    "targetConnectorRef": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connector",
+      "id": "cxr_test550e8400abcde",
+      "generation": 3
+    }
+  }
 }

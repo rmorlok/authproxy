@@ -1,4 +1,13 @@
 {
-  "id": "cxn_test0000000000002",
-  "type": "complete"
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "ConnectionSetup",
+  "metadata": {
+    "target": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connection",
+      "id": "cxn_test0000000000002"
+    }
+  },
+  "spec": {},
+  "status": { "type": "complete" }
 }

@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	"github.com/go-resty/resty/v2"
-	"github.com/rmorlok/authproxy/internal/apid"
-	routes2 "github.com/rmorlok/authproxy/internal/routes"
 	scommon "github.com/rmorlok/authproxy/internal/schema/common"
+	connectionschema "github.com/rmorlok/authproxy/internal/schema/resources/connection"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/stretchr/testify/require"
 )
 
@@ -31,15 +31,19 @@ func TestResourceListCommandsExposeExactNameFilter(t *testing.T) {
 }
 
 func TestResourceListJSONKeepsNameAndImmutableID(t *testing.T) {
-	resource := routes2.ConnectionJson{
-		Id:   apid.MustParse("cxn_test1234567890ab"),
-		Name: scommon.ResourceName("production-crm"),
+	resource := connectionschema.Connection{
+		TypeMeta: meta.NewTypeMeta(connectionschema.ConnectionKind),
+		Metadata: meta.ObjectMeta{
+			ID:   "cxn_test1234567890ab",
+			Name: scommon.ResourceName("production-crm"),
+		},
 	}
 
 	encoded, err := json.Marshal(resource)
 	require.NoError(t, err)
 	var projected map[string]any
 	require.NoError(t, json.Unmarshal(encoded, &projected))
-	require.Equal(t, "cxn_test1234567890ab", projected["id"])
-	require.Equal(t, "production-crm", projected["name"])
+	metadata := projected["metadata"].(map[string]any)
+	require.Equal(t, "cxn_test1234567890ab", metadata["id"])
+	require.Equal(t, "production-crm", metadata["name"])
 }

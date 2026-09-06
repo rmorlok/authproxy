@@ -8,6 +8,9 @@ import (
 	"strings"
 	"testing"
 
+	apiv1alpha1 "github.com/rmorlok/authproxy/internal/schema/api/v1alpha1"
+	connectorschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	jsonschemav5 "github.com/santhosh-tekuri/jsonschema/v5"
 	"github.com/stretchr/testify/require"
 )
@@ -40,6 +43,7 @@ func compileRefSchema(t *testing.T, ref string) *jsonschemav5.Schema {
 	_ = loadSchema(t, c, "../resources/connectors/schema.json")
 	_ = loadSchema(t, c, "../resources/key/schema.json")
 	_ = loadSchema(t, c, "../resources/actor/schema.json")
+	_ = loadSchema(t, c, "../resources/connection/schema.json")
 	_ = loadSchema(t, c, "../resources/rate_limit/schema.json")
 	_ = loadSchema(t, c, "./v1alpha1/schema.json")
 	sid := loadSchema(t, c, "./schema.json")
@@ -64,22 +68,22 @@ func TestSchemaSamples(t *testing.T) {
 		file string
 	}{
 		{name: "error response", ref: "./schema.json#/$defs/ErrorResponse", file: "valid-error-response.json"},
-		{name: "initiate connection", ref: "./schema.json#/$defs/InitiateConnectionRequest", file: "valid-initiate-connection.json"},
-		{name: "setup redirect", ref: "./schema.json#/$defs/ConnectionSetupRedirect", file: "valid-connection-setup-redirect.json"},
-		{name: "setup form", ref: "./schema.json#/$defs/ConnectionSetupForm", file: "valid-connection-setup-form.json"},
-		{name: "setup complete", ref: "./schema.json#/$defs/ConnectionSetupComplete", file: "valid-connection-setup-complete.json"},
-		{name: "setup verifying", ref: "./schema.json#/$defs/ConnectionSetupVerifying", file: "valid-connection-setup-verifying.json"},
-		{name: "setup error", ref: "./schema.json#/$defs/ConnectionSetupError", file: "valid-connection-setup-error.json"},
-		{name: "submit connection", ref: "./schema.json#/$defs/SubmitConnectionRequest", file: "valid-submit-connection.json"},
+		{name: "initiate connection", ref: "./schema.json#/$defs/ConnectionInitiateAction", file: "valid-initiate-connection.json"},
+		{name: "setup redirect", ref: "./schema.json#/$defs/ConnectionSetupAction", file: "valid-connection-setup-redirect.json"},
+		{name: "setup form", ref: "./schema.json#/$defs/ConnectionSetupAction", file: "valid-connection-setup-form.json"},
+		{name: "setup complete", ref: "./schema.json#/$defs/ConnectionSetupAction", file: "valid-connection-setup-complete.json"},
+		{name: "setup verifying", ref: "./schema.json#/$defs/ConnectionSetupAction", file: "valid-connection-setup-verifying.json"},
+		{name: "setup error", ref: "./schema.json#/$defs/ConnectionSetupAction", file: "valid-connection-setup-error.json"},
+		{name: "submit connection", ref: "./schema.json#/$defs/ConnectionSetupSubmitAction", file: "valid-submit-connection.json"},
 		{name: "data source option", ref: "./schema.json#/$defs/DataSourceOption", file: "valid-data-source-option.json"},
 		{name: "connection", ref: "./schema.json#/$defs/Connection", file: "valid-connection.json"},
 		{name: "list connections", ref: "./schema.json#/$defs/ListConnectionResponse", file: "valid-list-connections.json"},
-		{name: "disconnect connection request", ref: "./schema.json#/$defs/DisconnectConnectionRequest", file: "valid-disconnect-connection-request.json"},
-		{name: "disconnect response", ref: "./schema.json#/$defs/DisconnectResponse", file: "valid-disconnect-response.json"},
-		{name: "migrate connection version request", ref: "./schema.json#/$defs/MigrateConnectionVersionRequest", file: "valid-migrate-connection-version-request.json"},
-		{name: "migrate connection version response", ref: "./schema.json#/$defs/MigrateConnectionVersionResponse", file: "valid-migrate-connection-version-response.json"},
-		{name: "force connection state", ref: "./schema.json#/$defs/ForceConnectionStateRequest", file: "valid-force-connection-state.json"},
-		{name: "update connection", ref: "./schema.json#/$defs/UpdateConnectionRequest", file: "valid-update-connection.json"},
+		{name: "disconnect connection request", ref: "./schema.json#/$defs/ConnectionDisconnectActionRequest", file: "valid-disconnect-connection-request.json"},
+		{name: "disconnect response", ref: "./schema.json#/$defs/ConnectionDisconnectActionResponse", file: "valid-disconnect-response.json"},
+		{name: "migrate connection version request", ref: "./schema.json#/$defs/ConnectionVersionMigrationActionRequest", file: "valid-migrate-connection-version-request.json"},
+		{name: "migrate connection version response", ref: "./schema.json#/$defs/ConnectionVersionMigrationActionResponse", file: "valid-migrate-connection-version-response.json"},
+		{name: "force connection state", ref: "./schema.json#/$defs/ConnectionForceStateActionRequest", file: "valid-force-connection-state.json"},
+		{name: "update connection", ref: "./schema.json#/$defs/ConnectionPatch", file: "valid-update-connection.json"},
 		{name: "proxy response", ref: "./schema.json#/$defs/ProxyResponse", file: "valid-proxy-response.json"},
 		{name: "list notifications", ref: "./schema.json#/$defs/ListNotificationsResponse", file: "valid-list-notifications.json"},
 		{name: "search resources", ref: "./schema.json#/$defs/SearchResourcesResponse", file: "valid-search-resources.json"},
@@ -159,29 +163,85 @@ func TestConnectorSchemasRejectLegacyFlatShape(t *testing.T) {
 	}))
 }
 
-func TestInitiateConnectionRequestValidate(t *testing.T) {
-	t.Run("valid", func(t *testing.T) {
-		req := InitiateConnectionRequest{
-			ConnectorId:   "cxr_test0000000000001",
-			IntoNamespace: "root.acme",
-			ReturnToUrl:   "https://example.com/callback",
-		}
-		require.NoError(t, req.Validate())
-		require.True(t, req.HasIntoNamespace())
-		require.False(t, req.HasVersion())
+func TestConnectionSchemasRejectLegacyFlatShapes(t *testing.T) {
+	t.Run("resource", func(t *testing.T) {
+		schema := compileRefSchema(t, "./schema.json#/$defs/Connection")
+		require.Error(t, schema.Validate(map[string]any{
+			"id":          "cxn_test0000000000001",
+			"namespace":   "root",
+			"state":       "configured",
+			"healthState": "healthy",
+		}))
 	})
 
-	t.Run("requires connector id", func(t *testing.T) {
-		req := InitiateConnectionRequest{ReturnToUrl: "https://example.com/callback"}
-		require.ErrorContains(t, req.Validate(), "connector_id is required")
+	t.Run("initiate action", func(t *testing.T) {
+		schema := compileRefSchema(t, "./schema.json#/$defs/ConnectionInitiateAction")
+		require.Error(t, schema.Validate(map[string]any{
+			"connectorId": "cxr_test0000000000001",
+			"returnToUrl": "https://example.com/callback",
+		}))
+	})
+
+	t.Run("patch", func(t *testing.T) {
+		schema := compileRefSchema(t, "./schema.json#/$defs/ConnectionPatch")
+		require.Error(t, schema.Validate(map[string]any{
+			"name": "legacy-name",
+		}))
+	})
+}
+
+func TestInitiateConnectionRequestValidate(t *testing.T) {
+	t.Run("valid", func(t *testing.T) {
+		req := ConnectionInitiateAction{Action: apiv1alpha1.NewActionRequest(
+			ConnectionInitiateActionKind,
+			meta.ObjectReference{
+				APIVersion: meta.APIVersionV1Alpha1,
+				Kind:       connectorschema.ConnectorKind,
+				ID:         "cxr_test0000000000001",
+			},
+			ConnectionInitiateSpec{
+				IntoNamespace: "root.acme",
+				ReturnToURL:   "https://example.com/callback",
+			},
+		)}
+		require.NoError(t, req.ValidateRequest(ConnectionInitiateActionKind))
+	})
+
+	t.Run("requires connector target", func(t *testing.T) {
+		req := ConnectionInitiateAction{Action: apiv1alpha1.NewActionRequest(
+			ConnectionInitiateActionKind,
+			meta.ObjectReference{},
+			ConnectionInitiateSpec{ReturnToURL: "https://example.com/callback"},
+		)}
+		require.ErrorContains(t, req.ValidateRequest(ConnectionInitiateActionKind), "apiVersion")
 	})
 
 	t.Run("validates namespace", func(t *testing.T) {
-		req := InitiateConnectionRequest{
-			ConnectorId:   "cxr_test0000000000001",
-			IntoNamespace: "not-rooted",
-			ReturnToUrl:   "https://example.com/callback",
-		}
-		require.Error(t, req.Validate())
+		req := ConnectionInitiateAction{Action: apiv1alpha1.NewActionRequest(
+			ConnectionInitiateActionKind,
+			meta.ObjectReference{
+				APIVersion: meta.APIVersionV1Alpha1,
+				Kind:       connectorschema.ConnectorKind,
+				ID:         "cxr_test0000000000001",
+			},
+			ConnectionInitiateSpec{
+				IntoNamespace: "not-rooted",
+				ReturnToURL:   "https://example.com/callback",
+			},
+		)}
+		require.Error(t, req.ValidateRequest(ConnectionInitiateActionKind))
+	})
+
+	t.Run("rejects connector generation zero only by omission semantics", func(t *testing.T) {
+		req := ConnectionInitiateAction{Action: apiv1alpha1.NewActionRequest(
+			ConnectionInitiateActionKind,
+			meta.ObjectReference{
+				APIVersion: meta.APIVersionV1Alpha1,
+				Kind:       connectorschema.ConnectorKind,
+				ID:         "cxr_test0000000000001",
+			},
+			ConnectionInitiateSpec{ReturnToURL: "https://example.com/callback"},
+		)}
+		require.NoError(t, req.ValidateRequest(ConnectionInitiateActionKind))
 	})
 }

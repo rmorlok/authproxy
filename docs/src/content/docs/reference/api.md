@@ -39,10 +39,10 @@ required namespace, resource, resource-ID, and verb scope. See
 ## Resource identity and names
 
 Namespace, actor, connector, connection, key, and rate-limit responses expose a
-human-readable `name` alongside their direct identity (`id`, or `path` for a
-namespace). Keep using the immutable ID in URLs, permissions, foreign-key
-fields, and stored references. Names are for display and discovery; renaming a
-resource does not change its URL.
+human-readable `metadata.name` alongside their direct identity (`metadata.id`,
+or the canonical path for a namespace). Keep using the immutable ID in URLs,
+permissions, foreign-key fields, and stored references. Names are for display
+and discovery; renaming a resource does not change its URL.
 
 Create requests for actors, connectors, connections, keys, and rate limits may
 include `name`. If it is omitted, AuthProxy generates the ID first and uses that
@@ -53,12 +53,28 @@ POST /api/v1/connections/_initiate
 Content-Type: application/json
 
 {
-  "connectorId": "cxr_01example",
-  "intoNamespace": "root.acme",
-  "name": "production-crm",
-  "returnToUrl": "https://app.example.com/integrations/complete"
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "ConnectionInitiate",
+  "metadata": {
+    "target": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connector",
+      "id": "cxr_01example",
+      "generation": 3
+    }
+  },
+  "spec": {
+    "intoNamespace": "root.acme",
+    "name": "production-crm",
+    "returnToUrl": "https://app.example.com/integrations/complete"
+  }
 }
 ```
+
+Omit the connector generation to select its primary generation. The setup
+result is a `ConnectionSetup` action whose `metadata.target` identifies the new
+connection and whose `status.type` is `redirect`, `form`, `verifying`,
+`complete`, or `error`.
 
 Rename through the immutable ID. The response keeps the same `id` and returns
 the new `name`:
@@ -68,7 +84,12 @@ PATCH /api/v1/connections/cxn_01example
 Content-Type: application/json
 
 {
-  "name": "production-salesforce"
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "Connection",
+  "metadata": {
+    "name": "production-salesforce"
+  },
+  "spec": {}
 }
 ```
 
@@ -94,7 +115,73 @@ GET /api/v1/connections?name=production-salesforce&namespace=root.acme
 
 The namespace restriction is important when a query can span multiple
 namespaces, because those namespaces may contain the same name. Results still
-include both `name` and immutable `id`.
+include both `metadata.name` and immutable `metadata.id`.
+
+## Connection resource shape
+
+Connection reads and lists use the `authproxy.net/v1alpha1` resource envelope.
+The connector binding is generation-specific because stored configuration and
+credentials are interpreted by that exact connector definition. Connections
+are namespace-scoped and are not bound to an individual actor.
+
+```json
+{
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "Connection",
+  "metadata": {
+    "id": "cxn_01example",
+    "name": "production-salesforce",
+    "namespace": "root.acme"
+  },
+  "spec": {
+    "connectorRef": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connector",
+      "id": "cxr_01example",
+      "generation": 3
+    },
+    "configuration": {"tenant": "acme"}
+  },
+  "status": {
+    "lifecycle": {"state": "configured"},
+    "health": {"state": "healthy"},
+    "configuration": {
+      "configured": true,
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "required": ["tenant"],
+        "properties": {
+          "tenant": {"type": "string", "minLength": 1}
+        },
+        "additionalProperties": true
+      }
+    }
+  }
+}
+```
+
+Submit setup values through the typed setup actions. AuthProxy validates them
+against the connector's form definition and encrypts stored values. Connection
+reads return decrypted connector-authored values under `spec.configuration`
+and report whether that configuration satisfies its aggregate schema under
+`status.configuration.configured`. The server-derived aggregate JSON Schema is
+under `status.configuration.schema`; clients cannot set it on a Connection.
+The aggregate retains `required` rules from unconditional setup steps. It omits
+requirements from conditionally eligible steps because their JavaScript
+predicates cannot be represented faithfully by the aggregate JSON Schema;
+setup submissions still use each step's original schema for validation.
+
+The aggregate permits additional properties because connector migration hooks
+can create configuration fields without a form schema. Those fields are
+returned in `spec.configuration`, but remain untyped in the aggregate schema.
+
+Auth-method credentials do not appear in either field. API keys, OAuth client
+credentials, access tokens, and refresh tokens remain in dedicated encrypted
+credential storage and are never returned through the Connection resource.
+Connector authors should use those auth methods for secret material rather
+than collecting it in custom setup fields. A caller authorized to get or list
+a Connection can read its connector-authored configuration.
 
 The Admin cross-resource endpoint searches names directly and also searches
 user-label values:

@@ -27,9 +27,13 @@ import (
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	httpf2 "github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/routes/key_value"
+	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
+	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
+	connectionschema "github.com/rmorlok/authproxy/internal/schema/resources/connection"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	smeta "github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/rmorlok/authproxy/internal/test_utils"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/stretchr/testify/assert"
@@ -37,18 +41,63 @@ import (
 	clock "k8s.io/utils/clock/testing"
 )
 
+func connectionActionBody(kind smeta.Kind, id apid.ID, spec any) map[string]any {
+	return map[string]any{
+		"apiVersion": smeta.APIVersionV1Alpha1,
+		"kind":       kind,
+		"metadata": map[string]any{
+			"target": connectionschema.NewConnectionReference(id),
+		},
+		"spec": spec,
+	}
+}
+
+func connectorActionBody(kind smeta.Kind, id apid.ID, generation uint64, spec any) map[string]any {
+	return map[string]any{
+		"apiVersion": smeta.APIVersionV1Alpha1,
+		"kind":       kind,
+		"metadata": map[string]any{
+			"target": smeta.ObjectReference{
+				APIVersion: smeta.APIVersionV1Alpha1,
+				Kind:       cschema.ConnectorKind,
+				ID:         id.String(),
+				Generation: generation,
+			},
+		},
+		"spec": spec,
+	}
+}
+
+func connectionPatchBody(metadata map[string]any) map[string]any {
+	return map[string]any{
+		"apiVersion": smeta.APIVersionV1Alpha1,
+		"kind":       connectionschema.ConnectionKind,
+		"metadata":   metadata,
+		"spec":       map[string]any{},
+	}
+}
+
+func connectionSubmitActionBody(id apid.ID) map[string]any {
+	return connectionActionBody(schemaapi.ConnectionSetupSubmitActionKind, id, map[string]any{
+		"stepId": "setup-step",
+		"data":   map[string]any{"key": "value"},
+	})
+}
+
 func TestConnections(t *testing.T) {
 	type TestSetup struct {
 		Gin      *gin.Engine
 		Cfg      config.C
 		AuthUtil *auth2.AuthTestUtil
 		Db       database.DB
+		Encrypt  encrypt.E
 	}
 
 	connectorId := apid.MustParse("cxr_test0000000000001")
 	connectorVersion := uint64(1)
 	oauthConnectorId := apid.MustParse("cxr_test0000000000002")
 	oauthConnectorVersion := uint64(1)
+	configurationConnectorId := apid.MustParse("cxr_test0000000000003")
 
 	setup := func(t *testing.T, cfg config.C) (*TestSetup, func()) {
 		cfg = config.FromRoot(&sconfig.Root{
@@ -62,6 +111,22 @@ func TestConnections(t *testing.T) {
 						Auth: &sconfig.Auth{InnerVal: &sconfig.AuthOAuth2{
 							Type: sconfig.AuthTypeOAuth2,
 						}},
+					}),
+					configuredConnectorResource(configurationConnectorId, connectorVersion, "root", map[string]string{"type": "configuration-connector"}, cschema.ConnectorDefinition{
+						DisplayName: "Configuration Test Connector",
+						SetupFlow: &cschema.SetupFlow{
+							Preconnect: &cschema.SetupFlowPhase{Steps: []cschema.SetupFlowStep{{
+								Id: "connection-settings",
+								JsonSchema: scommon.RawJSON(`{
+									"type":"object",
+									"required":["tenant"],
+									"properties":{
+										"tenant":{"type":"string"},
+										"workspace":{"type":"string"}
+									}
+								}`),
+							}}},
+						},
 					}),
 				},
 			},
@@ -86,6 +151,7 @@ func TestConnections(t *testing.T) {
 				Cfg:      cfg,
 				AuthUtil: authUtil,
 				Db:       db,
+				Encrypt:  e,
 			}, func() {
 				ctrl.Finish()
 			}
@@ -98,11 +164,18 @@ func TestConnections(t *testing.T) {
 		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
 			Id:               u,
 			Namespace:        sconfig.RootNamespace,
-			ConnectorId:      connectorId,
+			ConnectorId:      configurationConnectorId,
 			ConnectorVersion: connectorVersion,
 			State:            database.ConnectionStateSetup,
 		})
 		require.NoError(t, err)
+		encryptedConfiguration, err := tu.Encrypt.EncryptStringForNamespace(
+			context.Background(),
+			sconfig.RootNamespace,
+			`{"tenant":"acme","workspace":"sales"}`,
+		)
+		require.NoError(t, err)
+		require.NoError(t, tu.Db.SetConnectionEncryptedConfiguration(context.Background(), u, &encryptedConfiguration))
 
 		t.Run("unauthorized", func(t *testing.T) {
 			w := httptest.NewRecorder()
@@ -146,11 +219,27 @@ func TestConnections(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ConnectionJson
+			var resp connectionschema.Connection
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
-			require.Equal(t, u, resp.Id)
-			require.Equal(t, ConnectionState(database.ConnectionStateSetup), resp.State)
+			require.Equal(t, u.String(), resp.Metadata.ID)
+			require.Equal(t, connectionschema.ConnectionStateSetup, resp.Status.Lifecycle.State)
+			require.Equal(t, configurationConnectorId.String(), resp.Spec.ConnectorRef.ID)
+			require.Equal(t, connectorVersion, resp.Spec.ConnectorRef.Generation)
+			require.Equal(t, "acme", resp.Spec.Configuration["tenant"])
+			require.Equal(t, "sales", resp.Spec.Configuration["workspace"])
+			require.True(t, resp.Status.Configuration.Configured)
+			require.JSONEq(t, `{
+				"$schema":"https://json-schema.org/draft/2020-12/schema",
+				"type":"object",
+				"required":["tenant"],
+				"properties":{
+					"tenant":{"type":"string"},
+					"workspace":{"type":"string"}
+				},
+				"additionalProperties":true
+			}`, string(resp.Status.Configuration.Schema))
+			require.Empty(t, w.Header().Get("X-AuthProxy-Data-Redacted"))
 		})
 
 		t.Run("allowed with matching resource id permission", func(t *testing.T) {
@@ -168,10 +257,10 @@ func TestConnections(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ConnectionJson
+			var resp connectionschema.Connection
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
-			require.Equal(t, u, resp.Id)
+			require.Equal(t, u.String(), resp.Metadata.ID)
 		})
 
 		t.Run("forbidden with non-matching resource id permission", func(t *testing.T) {
@@ -207,10 +296,10 @@ func TestConnections(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ConnectionJson
+			var resp connectionschema.Connection
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
-			require.Equal(t, u, resp.Id)
+			require.Equal(t, u.String(), resp.Metadata.ID)
 		})
 	})
 
@@ -305,7 +394,7 @@ func TestConnections(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ListConnectionResponseJson
+			var resp schemaapi.ListConnectionResponseJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Len(t, resp.Items, 4)
@@ -319,11 +408,11 @@ func TestConnections(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ListConnectionResponseJson
+			var resp schemaapi.ListConnectionResponseJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Len(t, resp.Items, 1)
-			require.Equal(t, resp.Items[0].Id, u)
+			require.Equal(t, u.String(), resp.Items[0].Metadata.ID)
 		})
 
 		t.Run("filter to namespace matcher", func(t *testing.T) {
@@ -334,7 +423,7 @@ func TestConnections(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ListConnectionResponseJson
+			var resp schemaapi.ListConnectionResponseJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Len(t, resp.Items, 3)
@@ -355,12 +444,12 @@ func TestConnections(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ListConnectionResponseJson
+			var resp schemaapi.ListConnectionResponseJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Len(t, resp.Items, 3)
 			for _, item := range resp.Items {
-				require.Contains(t, item.Namespace, "root.child")
+				require.Contains(t, item.Metadata.Namespace, "root.child")
 			}
 		})
 
@@ -382,12 +471,12 @@ func TestConnections(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ListConnectionResponseJson
+			var resp schemaapi.ListConnectionResponseJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Len(t, resp.Items, 1)
-			require.Equal(t, oauthConnectionId, resp.Items[0].Id)
-			require.Equal(t, oauthConnectorId, resp.Items[0].Connector.GetId())
+			require.Equal(t, oauthConnectionId.String(), resp.Items[0].Metadata.ID)
+			require.Equal(t, oauthConnectorId.String(), resp.Items[0].Spec.ConnectorRef.ID)
 		})
 
 		t.Run("invalid connector id filter", func(t *testing.T) {
@@ -418,12 +507,12 @@ func TestConnections(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ListConnectionResponseJson
+			var resp schemaapi.ListConnectionResponseJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Len(t, resp.Items, 1)
-			require.Equal(t, connId, resp.Items[0].Id)
-			require.Equal(t, "test-label-conn", resp.Items[0].Labels["env"])
+			require.Equal(t, connId.String(), resp.Items[0].Metadata.ID)
+			require.Equal(t, "test-label-conn", resp.Items[0].Metadata.Labels["env"])
 		})
 	})
 
@@ -487,7 +576,27 @@ func TestConnections(t *testing.T) {
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPost,
 				"/connections/"+u.String()+"/_disconnect",
-				util.JsonToReader(DisconnectConnectionRequestJson{TimeoutSeconds: util.ToPtr(int64(0))}),
+				util.JsonToReader(connectionActionBody(schemaapi.ConnectionDisconnectActionKind, u, schemaapi.ConnectionDisconnectSpec{TimeoutSeconds: util.ToPtr(int64(0))})),
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "connections", "disconnect"),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code)
+		})
+
+		t.Run("rejects action target that does not match path", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost,
+				"/connections/"+u.String()+"/_disconnect",
+				util.JsonToReader(connectionActionBody(
+					schemaapi.ConnectionDisconnectActionKind,
+					apid.New(apid.PrefixConnection),
+					schemaapi.ConnectionDisconnectSpec{},
+				)),
 				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.**", "connections", "disconnect"),
@@ -512,6 +621,46 @@ func TestConnections(t *testing.T) {
 
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusBadRequest, w.Code)
+		})
+	})
+
+	t.Run("migrate connection version", func(t *testing.T) {
+		tu, done := setup(t, nil)
+		defer done()
+		connectionID := apid.New(apid.PrefixConnection)
+		require.NoError(t, tu.Db.CreateConnection(context.Background(), &database.Connection{
+			Id:               connectionID,
+			Namespace:        sconfig.RootNamespace,
+			ConnectorId:      connectorId,
+			ConnectorVersion: connectorVersion,
+			State:            database.ConnectionStateConfigured,
+		}))
+
+		t.Run("rejects a different logical connector", func(t *testing.T) {
+			body := connectionActionBody(
+				schemaapi.ConnectionVersionMigrationActionKind,
+				connectionID,
+				schemaapi.ConnectionVersionMigrationSpec{ConnectorRef: smeta.ObjectReference{
+					APIVersion: smeta.APIVersionV1Alpha1,
+					Kind:       cschema.ConnectorKind,
+					ID:         oauthConnectorId.String(),
+					Generation: oauthConnectorVersion,
+				}},
+			)
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost,
+				"/connections/"+connectionID.String()+"/_migrateVersion",
+				util.JsonToReader(body),
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "connections", "update"),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+			require.Contains(t, w.Body.String(), "connectorRef must identify the connection's connector")
 		})
 	})
 
@@ -550,6 +699,51 @@ func TestConnections(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusForbidden, w.Code)
 		})
+
+		t.Run("namespace and name connector reference selects primary generation", func(t *testing.T) {
+			body := map[string]any{
+				"apiVersion": smeta.APIVersionV1Alpha1,
+				"kind":       schemaapi.ConnectionInitiateActionKind,
+				"metadata": map[string]any{
+					"target": smeta.ObjectReference{
+						APIVersion: smeta.APIVersionV1Alpha1,
+						Kind:       cschema.ConnectorKind,
+						Name:       scommon.ResourceName(connectorId.String()),
+						Namespace:  sconfig.RootNamespace,
+					},
+				},
+				"spec": map[string]any{
+					"intoNamespace": sconfig.RootNamespace,
+					"name":          "reference-created",
+					"labels":        map[string]string{"team": "platform"},
+					"annotations":   map[string]string{"owner": "integrations"},
+					"returnToUrl":   "https://example.com/callback",
+				},
+			}
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost,
+				"/connections/_initiate",
+				util.JsonToReader(body),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+			var setupAction schemaapi.ConnectionSetupAction
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &setupAction))
+			connectionID := apid.MustParse(setupAction.Metadata.Target.ID)
+			connection, err := tu.Db.GetConnection(t.Context(), connectionID)
+			require.NoError(t, err)
+			require.Equal(t, connectorId, connection.ConnectorId)
+			require.Equal(t, connectorVersion, connection.ConnectorVersion)
+			require.Equal(t, "platform", connection.Labels["team"])
+			require.Equal(t, "integrations", connection.Annotations["owner"])
+		})
 	})
 
 	t.Run("update connection (PATCH)", func(t *testing.T) {
@@ -568,9 +762,9 @@ func TestConnections(t *testing.T) {
 
 		t.Run("unauthorized", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodPatch, "/connections/"+u.String(), util.JsonToReader(map[string]interface{}{
+			req, err := http.NewRequest(http.MethodPatch, "/connections/"+u.String(), util.JsonToReader(connectionPatchBody(map[string]any{
 				"labels": map[string]string{"env": "prod"},
-			}))
+			})))
 			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/json")
 
@@ -583,9 +777,9 @@ func TestConnections(t *testing.T) {
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPatch,
 				"/connections/"+u.String(),
-				util.JsonToReader(map[string]interface{}{
+				util.JsonToReader(connectionPatchBody(map[string]any{
 					"labels": map[string]string{"env": "prod"},
-				}),
+				})),
 				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.**", "connections", "get"), // Wrong verb
@@ -602,9 +796,9 @@ func TestConnections(t *testing.T) {
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPatch,
 				"/connections/not-a-uuid",
-				util.JsonToReader(map[string]interface{}{
+				util.JsonToReader(connectionPatchBody(map[string]any{
 					"labels": map[string]string{"env": "prod"},
-				}),
+				})),
 				"root",
 				"some-actor",
 				aschema.AllPermissions(),
@@ -621,9 +815,9 @@ func TestConnections(t *testing.T) {
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPatch,
 				"/connections/"+apid.New(apid.PrefixConnection).String(),
-				util.JsonToReader(map[string]interface{}{
+				util.JsonToReader(connectionPatchBody(map[string]any{
 					"labels": map[string]string{"env": "prod"},
-				}),
+				})),
 				"root",
 				"some-actor",
 				aschema.AllPermissions(),
@@ -640,9 +834,9 @@ func TestConnections(t *testing.T) {
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPatch,
 				"/connections/"+u.String(),
-				util.JsonToReader(map[string]interface{}{
+				util.JsonToReader(connectionPatchBody(map[string]any{
 					"labels": map[string]string{"apxy/cxr/source": "config"},
-				}),
+				})),
 				"root",
 				"some-actor",
 				aschema.AllPermissions(),
@@ -677,9 +871,9 @@ func TestConnections(t *testing.T) {
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPatch,
 				"/connections/"+u.String(),
-				util.JsonToReader(map[string]interface{}{
+				util.JsonToReader(connectionPatchBody(map[string]any{
 					"labels": map[string]string{"env": "production", "team": "backend"},
-				}),
+				})),
 				"root",
 				"some-actor",
 				aschema.AllPermissions(),
@@ -690,14 +884,14 @@ func TestConnections(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ConnectionJson
+			var resp connectionschema.Connection
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
-			require.Equal(t, u, resp.Id)
-			require.Equal(t, "production", resp.Labels["env"])
-			require.Equal(t, "backend", resp.Labels["team"])
+			require.Equal(t, u.String(), resp.Metadata.ID)
+			require.Equal(t, "production", resp.Metadata.Labels["env"])
+			require.Equal(t, "backend", resp.Metadata.Labels["team"])
 			// "existing" label should be gone since this is a full replacement
-			_, exists := resp.Labels["existing"]
+			_, exists := resp.Metadata.Labels["existing"]
 			require.False(t, exists)
 		})
 
@@ -706,9 +900,9 @@ func TestConnections(t *testing.T) {
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPatch,
 				"/connections/"+u.String(),
-				util.JsonToReader(map[string]interface{}{
+				util.JsonToReader(connectionPatchBody(map[string]any{
 					"labels": map[string]string{"new": "label"},
-				}),
+				})),
 				"root",
 				"some-actor",
 				aschema.AllPermissions(),
@@ -719,11 +913,11 @@ func TestConnections(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ConnectionJson
+			var resp connectionschema.Connection
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
-			require.Equal(t, u, resp.Id)
-			require.Equal(t, ConnectionState(database.ConnectionStateSetup), resp.State)
+			require.Equal(t, u.String(), resp.Metadata.ID)
+			require.Equal(t, connectionschema.ConnectionStateSetup, resp.Status.Lifecycle.State)
 		})
 
 		t.Run("success with annotations", func(t *testing.T) {
@@ -731,9 +925,9 @@ func TestConnections(t *testing.T) {
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPatch,
 				"/connections/"+u.String(),
-				util.JsonToReader(map[string]interface{}{
+				util.JsonToReader(connectionPatchBody(map[string]any{
 					"annotations": map[string]string{"owner": "platform"},
-				}),
+				})),
 				"root",
 				"some-actor",
 				aschema.AllPermissions(),
@@ -744,10 +938,10 @@ func TestConnections(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ConnectionJson
+			var resp connectionschema.Connection
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
-			require.Equal(t, "platform", resp.Annotations["owner"])
+			require.Equal(t, "platform", resp.Metadata.Annotations["owner"])
 		})
 	})
 
@@ -1302,7 +1496,11 @@ func TestConnections(t *testing.T) {
 
 		t.Run("unauthorized", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodPut, "/connections/"+u.String()+"/_forceState", util.JsonToReader(ForceStateRequestJson{State: string(database.ConnectionStateDisconnected)}))
+			req, err := http.NewRequest(http.MethodPut, "/connections/"+u.String()+"/_forceState", util.JsonToReader(connectionActionBody(
+				schemaapi.ConnectionForceStateActionKind,
+				u,
+				schemaapi.ConnectionForceStateSpec{State: connectionschema.ConnectionStateDisconnected},
+			)))
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -1314,7 +1512,7 @@ func TestConnections(t *testing.T) {
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
 				"/connections/"+apid.New(apid.PrefixConnection).String()+"/_forceState",
-				util.JsonToReader(ForceStateRequestJson{State: string(database.ConnectionStateDisconnected)}),
+				util.JsonToReader(connectionActionBody(schemaapi.ConnectionForceStateActionKind, u, schemaapi.ConnectionForceStateSpec{State: connectionschema.ConnectionStateDisconnected})),
 				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.**", "connections", "get"), // Wrong verb
@@ -1330,7 +1528,7 @@ func TestConnections(t *testing.T) {
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
 				"/connections/"+apid.New(apid.PrefixConnection).String()+"/_forceState",
-				util.JsonToReader(ForceStateRequestJson{State: string(database.ConnectionStateDisconnected)}),
+				util.JsonToReader(connectionActionBody(schemaapi.ConnectionForceStateActionKind, u, schemaapi.ConnectionForceStateSpec{State: connectionschema.ConnectionStateDisconnected})),
 				"root",
 				"some-actor",
 				aschema.AllPermissions(),
@@ -1346,7 +1544,7 @@ func TestConnections(t *testing.T) {
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
 				"/connections/"+u.String()+"/_forceState",
-				util.JsonToReader(ForceStateRequestJson{State: string(database.ConnectionStateDisconnected)}),
+				util.JsonToReader(connectionActionBody(schemaapi.ConnectionForceStateActionKind, u, schemaapi.ConnectionForceStateSpec{State: connectionschema.ConnectionStateDisconnected})),
 				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.**", "connections", "force_state"),
@@ -1356,11 +1554,11 @@ func TestConnections(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ConnectionJson
+			var resp schemaapi.ConnectionForceStateAction
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
-			require.Equal(t, u, resp.Id)
-			require.Equal(t, ConnectionState(database.ConnectionStateDisconnected), resp.State)
+			require.Equal(t, u.String(), resp.Metadata.Target.ID)
+			require.Equal(t, connectionschema.ConnectionStateDisconnected, resp.Status.Connection.Status.Lifecycle.State)
 		})
 
 		t.Run("allowed with matching resource id permission", func(t *testing.T) {
@@ -1372,7 +1570,7 @@ func TestConnections(t *testing.T) {
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
 				"/connections/"+u.String()+"/_forceState",
-				util.JsonToReader(ForceStateRequestJson{State: string(database.ConnectionStateDisconnected)}),
+				util.JsonToReader(connectionActionBody(schemaapi.ConnectionForceStateActionKind, u, schemaapi.ConnectionForceStateSpec{State: connectionschema.ConnectionStateDisconnected})),
 				"root",
 				"some-actor",
 				aschema.PermissionsSingleWithResourceIds("root.**", "connections", "force_state", u.String()),
@@ -1382,11 +1580,11 @@ func TestConnections(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ConnectionJson
+			var resp schemaapi.ConnectionForceStateAction
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
-			require.Equal(t, u, resp.Id)
-			require.Equal(t, ConnectionState(database.ConnectionStateDisconnected), resp.State)
+			require.Equal(t, u.String(), resp.Metadata.Target.ID)
+			require.Equal(t, connectionschema.ConnectionStateDisconnected, resp.Status.Connection.Status.Lifecycle.State)
 		})
 
 		t.Run("forbidden with non-matching resource id permission", func(t *testing.T) {
@@ -1395,7 +1593,7 @@ func TestConnections(t *testing.T) {
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
 				"/connections/"+u.String()+"/_forceState",
-				util.JsonToReader(ForceStateRequestJson{State: string(database.ConnectionStateConfigured)}),
+				util.JsonToReader(connectionActionBody(schemaapi.ConnectionForceStateActionKind, u, schemaapi.ConnectionForceStateSpec{State: connectionschema.ConnectionStateConfigured})),
 				"root",
 				"some-actor",
 				aschema.PermissionsSingleWithResourceIds("root.**", "connections", "force_state", otherResourceId.String()),
@@ -1817,9 +2015,7 @@ func TestConnections(t *testing.T) {
 
 		t.Run("unauthorized", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodPost, "/connections/"+connId.String()+"/_submit", util.JsonToReader(map[string]interface{}{
-				"data": map[string]interface{}{"key": "value"},
-			}))
+			req, err := http.NewRequest(http.MethodPost, "/connections/"+connId.String()+"/_submit", util.JsonToReader(connectionSubmitActionBody(connId)))
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -1831,9 +2027,7 @@ func TestConnections(t *testing.T) {
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPost,
 				"/connections/not-a-valid-id/_submit",
-				util.JsonToReader(map[string]interface{}{
-					"data": map[string]interface{}{"key": "value"},
-				}),
+				util.JsonToReader(connectionSubmitActionBody(connId)),
 				"root",
 				"some-actor",
 				aschema.AllPermissions(),
@@ -1849,9 +2043,7 @@ func TestConnections(t *testing.T) {
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPost,
 				"/connections/"+connId.String()+"/_submit",
-				util.JsonToReader(map[string]interface{}{
-					"data": map[string]interface{}{"key": "value"},
-				}),
+				util.JsonToReader(connectionSubmitActionBody(connId)),
 				"root",
 				"some-actor",
 				aschema.AllPermissions(),
@@ -1869,9 +2061,7 @@ func TestConnections(t *testing.T) {
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPost,
 				"/connections/"+connId.String()+"/_submit",
-				util.JsonToReader(map[string]interface{}{
-					"data": map[string]interface{}{"key": "value"},
-				}),
+				util.JsonToReader(connectionSubmitActionBody(connId)),
 				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.**", "connections", "list"),
@@ -1887,9 +2077,7 @@ func TestConnections(t *testing.T) {
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPost,
 				"/connections/"+connId.String()+"/_submit",
-				util.JsonToReader(map[string]interface{}{
-					"data": map[string]interface{}{"key": "value"},
-				}),
+				util.JsonToReader(connectionSubmitActionBody(connId)),
 				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.**", "connections", "create"),
@@ -1906,9 +2094,7 @@ func TestConnections(t *testing.T) {
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPost,
 				"/connections/"+connId.String()+"/_submit",
-				util.JsonToReader(map[string]interface{}{
-					"data": map[string]interface{}{"key": "value"},
-				}),
+				util.JsonToReader(connectionSubmitActionBody(connId)),
 				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.**", "connections", "update"),
@@ -2047,7 +2233,7 @@ func TestConnections(t *testing.T) {
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 					http.MethodPost,
 					"/connections/"+connId.String()+"/_retry",
-					nil,
+					util.JsonToReader(connectionActionBody(schemaapi.ConnectionSetupRetryActionKind, connId, schemaapi.ConnectionSetupControlSpec{})),
 					"root",
 					"some-actor",
 					aschema.PermissionsSingle("root.**", "connections", verb),
@@ -2200,13 +2386,13 @@ func TestConnections(t *testing.T) {
 		defer done()
 
 		initiate := func(name *string, expectedStatus int) apid.ID {
-			body := map[string]interface{}{
-				"connectorId": connectorId.String(),
+			spec := map[string]any{
 				"returnToUrl": "https://example.com/callback",
 			}
 			if name != nil {
-				body["name"] = *name
+				spec["name"] = *name
 			}
+			body := connectorActionBody(schemaapi.ConnectionInitiateActionKind, connectorId, connectorVersion, spec)
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPost, "/connections/_initiate", util.JsonToReader(body),
@@ -2220,11 +2406,9 @@ func TestConnections(t *testing.T) {
 				require.NotContains(t, w.Body.String(), "UNIQUE")
 				return apid.Nil
 			}
-			var resp struct {
-				Id apid.ID `json:"id"`
-			}
+			var resp schemaapi.ConnectionSetupAction
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-			return resp.Id
+			return apid.MustParse(resp.Metadata.Target.ID)
 		}
 
 		customName := "production-crm"
@@ -2241,31 +2425,31 @@ func TestConnections(t *testing.T) {
 			require.NoError(t, err)
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code, w.Body.String())
-			var connection ConnectionJson
+			var connection connectionschema.Connection
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &connection))
-			require.Equal(t, expectedName, string(connection.Name))
-			require.Equal(t, expectedName, connection.Labels["apxy/cxn/-/name"])
+			require.Equal(t, expectedName, string(connection.Metadata.Name))
+			require.Equal(t, expectedName, connection.Metadata.Labels["apxy/cxn/-/name"])
 		}
 
 		otherName := "other-connection"
 		_ = initiate(&otherName, http.StatusOK)
 		w := httptest.NewRecorder()
 		req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-			http.MethodPatch, "/connections/"+customID.String(), util.JsonToReader(map[string]string{"name": "renamed-connection"}),
+			http.MethodPatch, "/connections/"+customID.String(), util.JsonToReader(connectionPatchBody(map[string]any{"name": "renamed-connection"})),
 			"root", "some-actor", aschema.AllPermissions(),
 		)
 		require.NoError(t, err)
 		req.Header.Set("Content-Type", "application/json")
 		tu.Gin.ServeHTTP(w, req)
 		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
-		var renamed ConnectionJson
+		var renamed connectionschema.Connection
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &renamed))
-		require.Equal(t, "renamed-connection", string(renamed.Name))
-		require.Equal(t, "renamed-connection", renamed.Labels["apxy/cxn/-/name"])
+		require.Equal(t, "renamed-connection", string(renamed.Metadata.Name))
+		require.Equal(t, "renamed-connection", renamed.Metadata.Labels["apxy/cxn/-/name"])
 
 		w = httptest.NewRecorder()
 		req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
-			http.MethodPatch, "/connections/"+customID.String(), util.JsonToReader(map[string]string{"name": otherName}),
+			http.MethodPatch, "/connections/"+customID.String(), util.JsonToReader(connectionPatchBody(map[string]any{"name": otherName})),
 			"root", "some-actor", aschema.AllPermissions(),
 		)
 		require.NoError(t, err)
@@ -2281,9 +2465,9 @@ func TestConnections(t *testing.T) {
 		require.NoError(t, err)
 		tu.Gin.ServeHTTP(w, req)
 		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
-		var listed ListConnectionResponseJson
+		var listed schemaapi.ListConnectionResponseJson
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &listed))
 		require.Len(t, listed.Items, 1)
-		require.Equal(t, customID, listed.Items[0].Id)
+		require.Equal(t, customID.String(), listed.Items[0].Metadata.ID)
 	})
 }

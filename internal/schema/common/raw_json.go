@@ -2,6 +2,7 @@ package common
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"gopkg.in/yaml.v3"
 )
@@ -38,6 +39,21 @@ func (r *RawJSON) UnmarshalYAML(value *yaml.Node) error {
 	}
 	*r = RawJSON(jsonBytes)
 	return nil
+}
+
+// MarshalYAML decodes the JSON representation before handing it to the YAML
+// encoder so objects and arrays remain structured YAML values rather than
+// being emitted as an encoded byte slice.
+func (r RawJSON) MarshalYAML() (interface{}, error) {
+	if r == nil {
+		return nil, nil
+	}
+
+	var value interface{}
+	if err := json.Unmarshal(r, &value); err != nil {
+		return nil, fmt.Errorf("invalid raw JSON: %w", err)
+	}
+	return value, nil
 }
 
 // IsEmpty returns true if the raw JSON is nil or empty.
