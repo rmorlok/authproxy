@@ -25,10 +25,21 @@ func (c *ConnectorDefinition) ConnectionConfigurationJSONSchema() (common.RawJSO
 	required := make([]string, 0)
 	requiredSet := make(map[string]struct{})
 	if c != nil && c.SetupFlow != nil {
-		if err := mergeSetupFlowConfigurationSchema(properties, &required, requiredSet, c.SetupFlow.Preconnect); err != nil {
+		if err := mergeSetupFlowConfigurationSchema(
+			properties,
+			&required,
+			requiredSet,
+			c.SetupFlow.Preconnect,
+		); err != nil {
 			return nil, fmt.Errorf("preconnect configuration schema: %w", err)
 		}
-		if err := mergeSetupFlowConfigurationSchema(properties, &required, requiredSet, c.SetupFlow.Configure); err != nil {
+
+		if err := mergeSetupFlowConfigurationSchema(
+			properties,
+			&required,
+			requiredSet,
+			c.SetupFlow.Configure,
+		); err != nil {
 			return nil, fmt.Errorf("configure configuration schema: %w", err)
 		}
 	}
@@ -47,6 +58,7 @@ func (c *ConnectorDefinition) ConnectionConfigurationJSONSchema() (common.RawJSO
 	if err != nil {
 		return nil, fmt.Errorf("marshal aggregate configuration schema: %w", err)
 	}
+
 	return common.RawJSON(encoded), nil
 }
 
@@ -59,13 +71,18 @@ func ConnectionConfigurationMatchesJSONSchema(
 	schema common.RawJSON,
 	configuration map[string]any,
 ) (bool, error) {
-	compiled, err := jsonschemav5.CompileString("connection-configuration.json", string(schema))
+	compiled, err := jsonschemav5.CompileString(
+		"connection-configuration.json",
+		string(schema),
+	)
 	if err != nil {
 		return false, fmt.Errorf("compile connection configuration schema: %w", err)
 	}
+
 	if configuration == nil {
 		configuration = map[string]any{}
 	}
+
 	return compiled.Validate(configuration) == nil, nil
 }
 
@@ -81,7 +98,8 @@ func mergeSetupFlowConfigurationSchema(
 
 	for i := range phase.Steps {
 		step := &phase.Steps[i]
-		if step.Type.Normalized() != SetupFlowStepTypeForm || step.JsonSchema.IsEmpty() {
+		if step.Type.Normalized() != SetupFlowStepTypeForm ||
+			step.JsonSchema.IsEmpty() {
 			continue
 		}
 
@@ -106,6 +124,7 @@ func mergeSetupFlowConfigurationSchema(
 			if err != nil {
 				return fmt.Errorf("step %q property %q: %w", step.Id, name, err)
 			}
+
 			destination[name] = combined
 		}
 
@@ -114,6 +133,7 @@ func mergeSetupFlowConfigurationSchema(
 				if _, found := requiredSet[name]; found {
 					continue
 				}
+
 				requiredSet[name] = struct{}{}
 				*required = append(*required, name)
 			}
@@ -126,8 +146,11 @@ func mergeSetupFlowConfigurationSchema(
 func jsonSchemaEqual(left, right json.RawMessage) bool {
 	var leftCompact bytes.Buffer
 	var rightCompact bytes.Buffer
-	if json.Compact(&leftCompact, left) != nil || json.Compact(&rightCompact, right) != nil {
+
+	if json.Compact(&leftCompact, left) != nil ||
+		json.Compact(&rightCompact, right) != nil {
 		return bytes.Equal(left, right)
 	}
+
 	return bytes.Equal(leftCompact.Bytes(), rightCompact.Bytes())
 }
