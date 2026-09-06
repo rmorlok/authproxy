@@ -144,7 +144,11 @@ func (r *NotificationsRoutes) markViewedBatch(gctx *gin.Context) {
 	ra := auth.MustGetAuthFromGinContext(gctx)
 
 	var req schemaapi.NotificationBatchViewAction
-	if err := apgin.BindActionJSON(gctx, &req, schemaapi.NotificationBatchViewActionKind); err != nil {
+	if err := apgin.BindActionJSON(
+		gctx,
+		&req,
+		schemaapi.NotificationBatchViewActionKind,
+	); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		return
 	}
@@ -163,7 +167,12 @@ func (r *NotificationsRoutes) markViewedBatch(gctx *gin.Context) {
 		return
 	}
 	response := schemaapi.NewNotificationBatchViewResponse(req.Metadata.Targets)
-	if err := apgin.RenderActionJSON(gctx, http.StatusOK, &response, schemaapi.NotificationBatchViewActionKind); err != nil {
+	if err := apgin.RenderActionJSON(
+		gctx,
+		http.StatusOK,
+		&response,
+		schemaapi.NotificationBatchViewActionKind,
+	); err != nil {
 		apgin.WriteErr(gctx, nil, err)
 	}
 }
