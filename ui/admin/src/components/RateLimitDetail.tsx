@@ -21,7 +21,7 @@ import MoreVertIcon from '@mui/icons-material/MoreVert';
 import dayjs from 'dayjs';
 import {
     RateLimit, rateLimits, RateLimitMode, RateLimitSpec,
-    RATE_LIMIT_API_VERSION, RATE_LIMIT_KIND,
+    API_VERSION, RATE_LIMIT_KIND,
 } from '@authproxy/api';
 import { useNavigate } from 'react-router-dom';
 import RateLimitSpecEditor from './RateLimitSpecEditor';
@@ -145,7 +145,7 @@ export default function RateLimitDetail({ rateLimitId }: { rateLimitId: string }
         setRl({ ...rl, spec: nextSpec });
         try {
             const resp = await rateLimits.update(rl.metadata.id, {
-                apiVersion: RATE_LIMIT_API_VERSION,
+                apiVersion: API_VERSION,
                 kind: RATE_LIMIT_KIND,
                 metadata: {},
                 spec: nextSpec,
@@ -171,7 +171,7 @@ export default function RateLimitDetail({ rateLimitId }: { rateLimitId: string }
         setActionLoading(true);
         try {
             await rateLimits.update(rl.metadata.id, {
-                apiVersion: RATE_LIMIT_API_VERSION,
+                apiVersion: API_VERSION,
                 kind: RATE_LIMIT_KIND,
                 metadata: {},
                 // PATCH distinguishes an omitted scope (leave unchanged)
@@ -247,7 +247,7 @@ export default function RateLimitDetail({ rateLimitId }: { rateLimitId: string }
                             includeRename={false}
                             onUpdateLabels={async (labels) => {
                                 const response = await rateLimits.update(rl.metadata.id, {
-                                    apiVersion: RATE_LIMIT_API_VERSION,
+                                    apiVersion: API_VERSION,
                                     kind: RATE_LIMIT_KIND,
                                     metadata: {labels},
                                     spec: {},
@@ -256,7 +256,7 @@ export default function RateLimitDetail({ rateLimitId }: { rateLimitId: string }
                             }}
                             onUpdateAnnotations={async (annotations) => {
                                 const response = await rateLimits.update(rl.metadata.id, {
-                                    apiVersion: RATE_LIMIT_API_VERSION,
+                                    apiVersion: API_VERSION,
                                     kind: RATE_LIMIT_KIND,
                                     metadata: {annotations},
                                     spec: {},
@@ -280,7 +280,7 @@ export default function RateLimitDetail({ rateLimitId }: { rateLimitId: string }
                 resourceType="Rate Limit"
                 onRename={async (name) => {
                     const response = await rateLimits.update(rl.metadata.id, {
-                        apiVersion: RATE_LIMIT_API_VERSION,
+                        apiVersion: API_VERSION,
                         kind: RATE_LIMIT_KIND,
                         metadata: {name},
                         spec: {},

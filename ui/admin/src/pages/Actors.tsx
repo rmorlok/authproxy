@@ -5,7 +5,7 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import {DataGrid, GridColDef, GridSortModel} from '@mui/x-data-grid';
 import {
-    listActors, Actor, ListResponse, ListActorsParams
+    listActors, Actor, ActorList, ListActorsParams
 } from '@authproxy/api';
 import dayjs from 'dayjs';
 import {useQueryState, parseAsInteger, parseAsString} from 'nuqs'
@@ -98,7 +98,7 @@ export default function Actors() {
     const [hasNextPage, setHasNextPage] = useState<boolean>(false);
 
     // Simple cache to allow going back without re-fetching
-    const responsesCacheRef = useRef<ListResponse<Actor>[]>([]);
+    const responsesCacheRef = useRef<ActorList[]>([]);
     const pageRequestCacheRef = useRef<Set<number>>(new Set());
 
     const handleSortModelChange = React.useCallback((sortModel: GridSortModel) => {
@@ -131,14 +131,14 @@ export default function Actors() {
             if (cached) {
                 setRows(cached.items);
                 setLoading(false);
-                setHasNextPage(!!cached.cursor);
+                setHasNextPage(!!cached.metadata.continue);
                 return;
             }
 
             // If we don't know the cursor for this page yet, advance sequentially from the last known
             while (responsesCacheRef.current.length <= targetPageZeroBased && (
                     responsesCacheRef.current.length === 0 ||
-                    !!responsesCacheRef.current[responsesCacheRef.current.length - 1].cursor
+                    !!responsesCacheRef.current[responsesCacheRef.current.length - 1].metadata.continue
                 )
                 ) {
                 // Avoid multiple calls for the same page
@@ -150,7 +150,7 @@ export default function Actors() {
                 const thisPage = responsesCacheRef.current.length;
                 const prevResp = responsesCacheRef.current[responsesCacheRef.current.length - 1];
 
-                const params: ListActorsParams = prevResp?.cursor ? {cursor: prevResp.cursor} : {
+                const params: ListActorsParams = prevResp?.metadata.continue ? {cursor: prevResp.metadata.continue} : {
                     orderBy: sort || undefined,
                     limit: pageSize,
                 };
@@ -168,7 +168,7 @@ export default function Actors() {
             const data = responsesCacheRef.current[targetPageZeroBased];
             setRows(data?.items || []);
 
-            const hnp = !!data?.cursor;
+            const hnp = !!data?.metadata.continue;
             setHasNextPage(hnp);
 
             if(!hnp) {

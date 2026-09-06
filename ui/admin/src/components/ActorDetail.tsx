@@ -9,7 +9,7 @@ import IconButton from '@mui/material/IconButton';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import dayjs from 'dayjs';
 import Tooltip from '@mui/material/Tooltip';
-import {ACTOR_API_VERSION, ACTOR_KIND, Actor, actors} from '@authproxy/api';
+import {API_VERSION, ACTOR_KIND, Actor, actors} from '@authproxy/api';
 import AnnotationsEditor from "./AnnotationsEditor";
 import ResourceNameEditor from './ResourceNameEditor';
 
@@ -74,7 +74,7 @@ export default function ActorDetail({actorId}: { actorId: string }) {
         resourceType="Actor"
         onRename={async (name) => {
           const response = await actors.update(actor.metadata.id, {
-            apiVersion: ACTOR_API_VERSION,
+            apiVersion: API_VERSION,
             kind: ACTOR_KIND,
             metadata: {name},
             spec: {},

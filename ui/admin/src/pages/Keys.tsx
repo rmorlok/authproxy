@@ -19,7 +19,7 @@ import Alert from '@mui/material/Alert';
 import TextField from '@mui/material/TextField';
 import AddIcon from '@mui/icons-material/Add';
 import {
-    listKeys, KeyState, Key, ListResponse,
+    API_VERSION, KEY_KIND, listKeys, KeyState, Key, KeyList,
     ListKeysParams, namespaceAndChildren, createKey, CreateKeyRequest
 } from '@authproxy/api';
 import dayjs from 'dayjs';
@@ -58,6 +58,7 @@ export const columns: GridColDef<Key>[] = [
         flex: 0.7,
         minWidth: 120,
         sortable: true,
+        valueGetter: (_, row) => row.metadata.name,
     },
     {
         field: 'id',
@@ -65,6 +66,7 @@ export const columns: GridColDef<Key>[] = [
         flex: 0.8,
         minWidth: 130,
         sortable: false,
+        valueGetter: (_, row) => row.metadata.id,
     },
     {
         field: 'namespace',
@@ -72,6 +74,7 @@ export const columns: GridColDef<Key>[] = [
         flex: 0.5,
         minWidth: 90,
         sortable: false,
+        valueGetter: (_, row) => row.metadata.namespace,
     },
     {
         field: 'state',
@@ -79,6 +82,7 @@ export const columns: GridColDef<Key>[] = [
         flex: 0.3,
         minWidth: 80,
         sortable: true,
+        valueGetter: (_, row) => row.status.state,
         renderCell: (params) => renderState(params.value as KeyState),
     },
     {
@@ -87,6 +91,7 @@ export const columns: GridColDef<Key>[] = [
         flex: 0.7,
         minWidth: 120,
         sortable: false,
+        valueGetter: (_, row) => row.metadata.labels,
         renderCell: (params) => {
             const labels = params.value as Record<string, string> | undefined;
             if (!labels || Object.keys(labels).length === 0) return null;
@@ -105,8 +110,8 @@ export const columns: GridColDef<Key>[] = [
         flex: 1,
         minWidth: 80,
         sortable: true,
-        valueGetter: (value, _) => {
-            return dayjs(value).format('MMM DD, YYYY, h:mm A');
+        valueGetter: (_, row) => {
+            return dayjs(row.metadata.createdAt).format('MMM DD, YYYY, h:mm A');
         }
     },
     {
@@ -115,8 +120,8 @@ export const columns: GridColDef<Key>[] = [
         flex: 1,
         minWidth: 100,
         sortable: true,
-        valueGetter: (value) => {
-            return dayjs(value).format('MMM DD, YYYY, h:mm A');
+        valueGetter: (_, row) => {
+            return dayjs(row.metadata.updatedAt).format('MMM DD, YYYY, h:mm A');
         }
     },
 ];
@@ -153,7 +158,7 @@ export default function Keys() {
     const [createLabelRows, setCreateLabelRows] = useState<KeyValueRow[]>([]);
     const [createAnnotationRows, setCreateAnnotationRows] = useState<KeyValueRow[]>([]);
 
-    const responsesCacheRef = useRef<ListResponse<Key>[]>([]);
+    const responsesCacheRef = useRef<KeyList[]>([]);
     const pageRequestCacheRef = useRef<Set<number>>(new Set());
 
     const handleRowClick: GridEventListener<'rowClick'> = (params, event) => {
@@ -194,13 +199,13 @@ export default function Keys() {
             if (cached) {
                 setRows(cached.items);
                 setLoading(false);
-                setHasNextPage(!!cached.cursor);
+                setHasNextPage(!!cached.metadata.continue);
                 return;
             }
 
             while (responsesCacheRef.current.length <= targetPageZeroBased && (
                     responsesCacheRef.current.length === 0 ||
-                    !!responsesCacheRef.current[responsesCacheRef.current.length - 1].cursor
+                    !!responsesCacheRef.current[responsesCacheRef.current.length - 1].metadata.continue
                 )
             ) {
                 if (pageRequestCacheRef.current.has(targetPageZeroBased)) {
@@ -211,7 +216,7 @@ export default function Keys() {
                 const thisPage = responsesCacheRef.current.length;
                 const prevResp = responsesCacheRef.current[responsesCacheRef.current.length - 1];
 
-                const params: ListKeysParams = prevResp?.cursor ? {cursor: prevResp.cursor} : {
+                const params: ListKeysParams = prevResp?.metadata.continue ? {cursor: prevResp.metadata.continue} : {
                     state: (stateFilter as KeyState) || undefined,
                     namespace: namespaceAndChildren(ns),
                     orderBy: sort || undefined,
@@ -231,7 +236,7 @@ export default function Keys() {
             const data = responsesCacheRef.current[targetPageZeroBased];
             setRows(data?.items || []);
 
-            const hnp = !!data?.cursor;
+            const hnp = !!data?.metadata.continue;
             setHasNextPage(hnp);
 
             if(!hnp) {
@@ -280,11 +285,15 @@ export default function Keys() {
         setCreateError(null);
         try {
             const request: CreateKeyRequest = {
-                namespace: ns,
-                name: createName.trim() || undefined,
-                keyData: buildKeyDataPayload(createKeyData),
-                labels: rowsToMap(createLabelRows),
-                annotations: rowsToMap(createAnnotationRows),
+                apiVersion: API_VERSION,
+                kind: KEY_KIND,
+                metadata: {
+                    namespace: ns,
+                    name: createName.trim() || undefined,
+                    labels: rowsToMap(createLabelRows),
+                    annotations: rowsToMap(createAnnotationRows),
+                },
+                spec: {keyData: buildKeyDataPayload(createKeyData) || {}},
             };
             await createKey(request);
             setCreateOpen(false);
@@ -355,7 +364,7 @@ export default function Keys() {
                     autoHeight
                     rows={rows}
                     columns={columns}
-                    getRowId={(row) => row.id}
+                    getRowId={(row) => row.metadata.id}
                     getRowClassName={(params) =>
                         params.indexRelativeToCurrentPage % 2 === 0 ? 'clickable-row even' : 'clickable-row odd'
                     }

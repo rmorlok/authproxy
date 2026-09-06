@@ -15,6 +15,8 @@ vi.mock('@authproxy/api', () => {
     };
 
     return {
+        API_VERSION: 'authproxy.net/v1alpha1',
+        NAMESPACE_KIND: 'Namespace',
         NAMESPACE_PATH_SEPARATOR: '.',
         ROOT_NAMESPACE_PATH: 'root',
         NamespaceState: {
@@ -27,11 +29,16 @@ vi.mock('@authproxy/api', () => {
 });
 
 const rootNamespace = {
-    path: ROOT_NAMESPACE_PATH,
-    name: ROOT_NAMESPACE_PATH,
-    state: NamespaceState.ACTIVE,
-    createdAt: '2026-06-20T00:00:00.000Z',
-    updatedAt: '2026-06-20T00:00:00.000Z',
+    apiVersion: 'authproxy.net/v1alpha1' as const,
+    kind: 'Namespace' as const,
+    metadata: {
+        id: ROOT_NAMESPACE_PATH,
+        name: ROOT_NAMESPACE_PATH,
+        createdAt: '2026-06-20T00:00:00.000Z',
+        updatedAt: '2026-06-20T00:00:00.000Z',
+    },
+    spec: {},
+    status: {state: NamespaceState.ACTIVE},
 };
 
 function createStore() {
@@ -81,10 +88,10 @@ describe('namespacesSlice namespace path handling', () => {
 
     it('loads only the first 100-row child page and records that more results exist', async () => {
         const store = createStore();
-        const child = {...rootNamespace, path: 'root.team-a'};
+        const child = {...rootNamespace, metadata: {...rootNamespace.metadata, id: 'root.team-a'}};
         vi.mocked(namespaces.list).mockResolvedValue({
             status: 200,
-            data: {items: [child], cursor: 'next-page'},
+            data: {metadata: {continue: 'next-page'}, items: [child]},
         } as any);
 
         await store.dispatch(loadCurrentChildren(ROOT_NAMESPACE_PATH) as any);

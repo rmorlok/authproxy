@@ -9,7 +9,7 @@ import InputAdornment from '@mui/material/InputAdornment';
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import {alpha, styled} from '@mui/material/styles';
 import Typography from '@mui/material/Typography';
-import type {SearchResourceSummary, SearchResourceType} from '@authproxy/api';
+import type {SearchResourceType, SearchResult} from '@authproxy/api';
 import {namespaceAndChildren, searchResources} from '@authproxy/api';
 import {useDispatch, useSelector} from 'react-redux';
 import {useNavigate} from 'react-router-dom';
@@ -20,6 +20,11 @@ import {
     mergeSearchResults,
     SEARCH_RESULT_LIMIT,
     SearchResourceCache,
+    searchResourceTypeFromKind,
+    searchResultId,
+    searchResultName,
+    searchResultNamespace,
+    searchResultType,
 } from './cache';
 import {matchingNavigationItems} from './navigation';
 import {labelSelectorUsesSystemLabels, parseSearchQuery} from './query';
@@ -52,7 +57,7 @@ export function useCommandPalette(): CommandPaletteContextValue {
 
 interface RemoteState {
     queryKey: string;
-    items: SearchResourceSummary[];
+    items: SearchResult[];
     truncatedTypes: SearchResourceType[];
     incompleteTypes: SearchResourceType[];
     loading: boolean;
@@ -186,8 +191,8 @@ export function CommandPaletteProvider({
             if (controller.signal.aborted) return;
             cache.put(seedScopeKey, response.data.items);
             cache.markSeeded(seedScopeKey, uniqueTypes([
-                ...response.data.truncatedTypes,
-                ...response.data.incompleteTypes,
+                ...response.data.metadata.truncatedKinds.map(searchResourceTypeFromKind),
+                ...response.data.metadata.incompleteKinds.map(searchResourceTypeFromKind),
             ]));
             setCacheVersion((value) => value + 1);
             setSeedError(false);
@@ -230,8 +235,8 @@ export function CommandPaletteProvider({
                 setRemote({
                     queryKey,
                     items: response.data.items,
-                    truncatedTypes: response.data.truncatedTypes,
-                    incompleteTypes: response.data.incompleteTypes,
+                    truncatedTypes: response.data.metadata.truncatedKinds.map(searchResourceTypeFromKind),
+                    incompleteTypes: response.data.metadata.incompleteKinds.map(searchResourceTypeFromKind),
                     loading: false,
                     error: false,
                     completed: true,
@@ -286,10 +291,10 @@ export function CommandPaletteProvider({
         }
     }, [navigate]);
 
-    const selectResource = React.useCallback((item: SearchResourceSummary) => {
+    const selectResource = React.useCallback((item: SearchResult) => {
         setIsOpen(false);
-        if (item.resourceType === 'namespace') {
-            dispatch(setCurrentNamespace(item.resourceId));
+        if (searchResultType(item) === 'namespace') {
+            dispatch(setCurrentNamespace(searchResultId(item)));
             navigate('/namespace');
             return;
         }
@@ -383,18 +388,20 @@ export function CommandPaletteProvider({
                             <Command.Group heading="Resources">
                                 {visibleResources.map((item) => (
                                     <Command.Item
-                                        key={`${item.resourceType}:${item.resourceId}`}
-                                        value={`${item.resourceType}:${item.resourceId}`}
+                                        key={`${searchResultType(item)}:${searchResultId(item)}`}
+                                        value={`${searchResultType(item)}:${searchResultId(item)}`}
                                         onSelect={() => selectResource(item)}
                                     >
-                                        <ResourceTypeBadge type={item.resourceType} />
+                                        <ResourceTypeBadge type={searchResultType(item)} />
                                         <Box sx={{minWidth: 0, flex: 1}}>
                                             <Typography variant="body2" fontWeight={600} noWrap>
-                                                {item.name}
+                                                {searchResultName(item)}
                                             </Typography>
                                             <Typography variant="caption" color="text.secondary" noWrap component="div">
-                                                {item.resourceId}
-                                                {item.namespace && item.resourceType !== 'namespace' ? ` · ${item.namespace}` : ''}
+                                                {searchResultId(item)}
+                                                {searchResultNamespace(item) && searchResultType(item) !== 'namespace'
+                                                    ? ` · ${searchResultNamespace(item)}`
+                                                    : ''}
                                             </Typography>
                                         </Box>
                                     </Command.Item>
@@ -497,8 +504,9 @@ function StatusRow({children, color = 'text.secondary'}: React.PropsWithChildren
     );
 }
 
-function resourcePath(item: SearchResourceSummary): string {
-    if (item.resourceType === 'namespace') return '/namespace';
+function resourcePath(item: SearchResult): string {
+    const resourceType = searchResultType(item);
+    if (resourceType === 'namespace') return '/namespace';
     const routes: Record<Exclude<SearchResourceType, 'namespace'>, string> = {
         actor: '/actors/',
         connection: '/connections/',
@@ -506,7 +514,7 @@ function resourcePath(item: SearchResourceSummary): string {
         key: '/keys/',
 		'rate_limit': '/rate-limits/',
     };
-    return routes[item.resourceType] + encodeURIComponent(item.resourceId);
+    return routes[resourceType] + encodeURIComponent(searchResultId(item));
 }
 
 function uniqueTypes(types: SearchResourceType[]): SearchResourceType[] {

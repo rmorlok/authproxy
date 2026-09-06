@@ -1,11 +1,13 @@
 import {describe, expect, it} from 'vitest';
-import type {SearchResourceSummary, SearchResourceType} from '@authproxy/api';
+import {API_VERSION} from '@authproxy/api';
+import type {ManagedResourceKind, SearchResourceType, SearchResult} from '@authproxy/api';
 import {
     filterCachedResources,
     mergeSearchResults,
     SEARCH_CACHE_MAX_ENTRIES,
     SEARCH_CACHE_TTL_MS,
     SearchResourceCache,
+    searchResultId,
 } from './cache';
 import {parseSearchQuery} from './query';
 
@@ -13,12 +15,23 @@ function resource(
     id: string,
     type: SearchResourceType = 'connection',
     labels: Record<string, string> = {},
-): SearchResourceSummary {
+): SearchResult {
+    const kinds: Record<SearchResourceType, ManagedResourceKind> = {
+        actor: 'Actor',
+        connection: 'Connection',
+        connector: 'Connector',
+        namespace: 'Namespace',
+        key: 'Key',
+        rate_limit: 'RateLimit',
+    };
     return {
-        resourceType: type,
-        resourceId: id,
-        name: labels.name ?? id,
-        namespace: 'root.team',
+        resourceRef: {
+            apiVersion: API_VERSION,
+            kind: kinds[type],
+            id,
+            name: labels.name ?? id,
+            namespace: 'root.team',
+        },
         labels,
         matchedLabels: [],
         updatedAt: '2026-07-12T12:00:00Z',
@@ -42,7 +55,7 @@ describe('SearchResourceCache', () => {
             cache.put('all', [resource('cxn_' + i)], 100 + i);
         }
         expect(cache.size).toBe(SEARCH_CACHE_MAX_ENTRIES);
-        expect(cache.list('all', 1000).some((item) => item.resourceId === 'cxn_0')).toBe(false);
+        expect(cache.list('all', 1000).some((item) => searchResultId(item) === 'cxn_0')).toBe(false);
     });
 
     it('refreshes entries when their scope is read', () => {
@@ -55,7 +68,7 @@ describe('SearchResourceCache', () => {
         expect(cache.list('keep', 1000)).toHaveLength(1);
         cache.put('other', [resource('cxn_new')], 1000);
 
-        expect(cache.list('keep', 1000).map((item) => item.resourceId)).toEqual(['cxn_keep']);
+        expect(cache.list('keep', 1000).map(searchResultId)).toEqual(['cxn_keep']);
     });
 
     it('invalidates seed completeness when LRU eviction removes scope entries', () => {
@@ -80,25 +93,25 @@ describe('local search', () => {
             resource('act_other', 'actor', {name: 'payments', env: 'prod'}),
         ];
         const parsed = parseSearchQuery('type:connection label:env=prod payments');
-        expect(filterCachedResources(items, parsed).map((item) => item.resourceId))
+        expect(filterCachedResources(items, parsed).map(searchResultId))
             .toEqual(['cxn_exact', 'cxn_prefix']);
     });
 
     it('ranks first-class names ahead of label-only matches', () => {
         const items = [
-            {...resource('cxn_label', 'connection', {alias: 'payments'}), name: 'billing'},
-            {...resource('cxn_prefix'), name: 'payments-api'},
-            {...resource('cxn_exact'), name: 'payments'},
+            resource('cxn_label', 'connection', {name: 'billing', alias: 'payments'}),
+            resource('cxn_prefix', 'connection', {name: 'payments-api'}),
+            resource('cxn_exact', 'connection', {name: 'payments'}),
         ];
 
-        expect(filterCachedResources(items, parseSearchQuery('payments')).map((item) => item.resourceId))
+        expect(filterCachedResources(items, parseSearchQuery('payments')).map(searchResultId))
             .toEqual(['cxn_exact', 'cxn_prefix', 'cxn_label']);
     });
 
     it('deduplicates local and remote results', () => {
         const local = [resource('cxn_one'), resource('cxn_two')];
         const remote = [resource('cxn_two'), resource('cxn_three')];
-        expect(mergeSearchResults(local, remote).map((item) => item.resourceId))
+        expect(mergeSearchResults(local, remote).map(searchResultId))
             .toEqual(['cxn_two', 'cxn_three', 'cxn_one']);
     });
 
@@ -106,9 +119,9 @@ describe('local search', () => {
         const local = [resource('cxn_stale'), resource('act_partial', 'actor')];
         const remote = [resource('cxn_current')];
 
-        expect(mergeSearchResults(local, remote, []).map((item) => item.resourceId))
+        expect(mergeSearchResults(local, remote, []).map(searchResultId))
             .toEqual(['cxn_current']);
-        expect(mergeSearchResults(local, remote, ['actor']).map((item) => item.resourceId))
+        expect(mergeSearchResults(local, remote, ['actor']).map(searchResultId))
             .toEqual(['cxn_current', 'act_partial']);
     });
 
