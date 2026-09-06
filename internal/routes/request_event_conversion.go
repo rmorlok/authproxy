@@ -18,7 +18,10 @@ import (
 	ratelimitschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 )
 
-func requestEventToJSON(record *app_metrics.LogRecord, full *app_metrics.FullLog) *schemaapi.RequestEventJson {
+func requestEventToJSON(
+	record *app_metrics.LogRecord,
+	full *app_metrics.FullLog,
+) *schemaapi.RequestEventJson {
 	if record == nil {
 		return nil
 	}
@@ -130,6 +133,10 @@ func requestEventActorReference(labels database.Labels) *meta.ObjectReference {
 	return requestEventResourceReference(actorschema.ActorKind, id, 0, labels, "")
 }
 
+// requestEventResourceReference creates an object reference for the specified
+// id. The reference will always contain the id, and it will use best-effort
+// to extract the name/namespace from the labels of the request. For namespace
+// it will use the fallbackNamespace if no namespace is found.
 func requestEventResourceReference(
 	kind meta.Kind,
 	id apid.ID,
@@ -156,7 +163,11 @@ func requestEventResourceReference(
 	}
 }
 
-func requestEventRateLimit(id apid.ID, mode string, bucket map[string]string) *schemaapi.RequestEventRateLimitJson {
+func requestEventRateLimit(
+	id apid.ID,
+	mode string,
+	bucket map[string]string,
+) *schemaapi.RequestEventRateLimitJson {
 	return &schemaapi.RequestEventRateLimitJson{
 		RateLimitRef: meta.ObjectReference{
 			APIVersion: meta.APIVersionV1Alpha1,
