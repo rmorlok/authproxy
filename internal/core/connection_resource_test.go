@@ -20,40 +20,57 @@ func TestConnectionGetResourceBuildsCanonicalEnvelope(t *testing.T) {
 	setupError := "authorization failed"
 	connectionID := apid.New(apid.PrefixConnection)
 	connectorID := apid.New(apid.PrefixConnector)
-	connector := &Connector{ConnectorWithDefinition: database.ConnectorWithDefinition{
-		Id:        connectorID,
-		Name:      "salesforce",
-		Namespace: "root.acme",
-		Version:   4,
-	}, def: &connectorschema.ConnectorDefinition{SetupFlow: &connectorschema.SetupFlow{
-		Preconnect: &connectorschema.SetupFlowPhase{Steps: []connectorschema.SetupFlowStep{{
-			Id:         "tenant",
-			JsonSchema: common.RawJSON(`{"type":"object","required":["tenant"],"properties":{"tenant":{"type":"string"}}}`),
-		}}},
-	}}}
+	connector := &Connector{
+		ConnectorWithDefinition: database.ConnectorWithDefinition{
+			Id:        connectorID,
+			Name:      "salesforce",
+			Namespace: "root.acme",
+			Version:   4,
+		}, def: &connectorschema.ConnectorDefinition{
+			SetupFlow: &connectorschema.SetupFlow{
+				Preconnect: &connectorschema.SetupFlowPhase{
+					Steps: []connectorschema.SetupFlowStep{
+						{
+							Id:         "tenant",
+							JsonSchema: common.RawJSON(`{"type":"object","required":["tenant"],"properties":{"tenant":{"type":"string"}}}`),
+						},
+					}},
+			}}}
+
 	encryptService := encrypt.NewFakeEncryptService(false)
-	encryptedConfiguration, err := encryptService.EncryptStringForNamespace(t.Context(), "root.acme.team", `{"tenant":"acme"}`)
+	encryptedConfiguration, err := encryptService.EncryptStringForNamespace(
+		t.Context(),
+		"root.acme.team",
+		`{"tenant":"acme"}`,
+	)
 	require.NoError(t, err)
+
 	service := &service{encrypt: encryptService, logger: aplog.NewNoopLogger()}
-	wrapped := wrapConnection(&database.Connection{
-		Id:                     connectionID,
-		Name:                   "production",
-		Namespace:              "root.acme.team",
-		State:                  database.ConnectionStateSetup,
-		HealthState:            database.ConnectionHealthStateUnhealthy,
-		ConnectorId:            connectorID,
-		ConnectorVersion:       4,
-		Labels:                 database.Labels{"team": "platform"},
-		Annotations:            database.Annotations{"owner": "integrations"},
-		SetupStep:              &connectorschema.SetupStepVerifyFailed,
-		SetupError:             &setupError,
-		EncryptedConfiguration: &encryptedConfiguration,
-		CreatedAt:              now,
-		UpdatedAt:              now,
-	}, connector, service)
+
+	wrapped := wrapConnection(
+		&database.Connection{
+			Id:                     connectionID,
+			Name:                   "production",
+			Namespace:              "root.acme.team",
+			State:                  database.ConnectionStateSetup,
+			HealthState:            database.ConnectionHealthStateUnhealthy,
+			ConnectorId:            connectorID,
+			ConnectorVersion:       4,
+			Labels:                 database.Labels{"team": "platform"},
+			Annotations:            database.Annotations{"owner": "integrations"},
+			SetupStep:              &connectorschema.SetupStepVerifyFailed,
+			SetupError:             &setupError,
+			EncryptedConfiguration: &encryptedConfiguration,
+			CreatedAt:              now,
+			UpdatedAt:              now,
+		},
+		connector,
+		service,
+	)
 
 	resource, err := wrapped.GetResource(t.Context())
 	require.NoError(t, err)
+
 	require.Equal(t, meta.APIVersionV1Alpha1, resource.APIVersion)
 	require.Equal(t, connectionschema.ConnectionKind, resource.Kind)
 	require.Equal(t, connectionID.String(), resource.Metadata.ID)
@@ -80,12 +97,15 @@ func TestConnectionGetResourceBuildsCanonicalEnvelope(t *testing.T) {
 
 func TestConnectionGetResourceOmitsSetupAndDefaultsHealth(t *testing.T) {
 	now := time.Now().UTC()
-	connector := &Connector{ConnectorWithDefinition: database.ConnectorWithDefinition{
-		Id:        apid.New(apid.PrefixConnector),
-		Name:      "example",
-		Namespace: "root",
-		Version:   1,
-	}, def: &connectorschema.ConnectorDefinition{}}
+	connector := &Connector{
+		ConnectorWithDefinition: database.ConnectorWithDefinition{
+			Id:        apid.New(apid.PrefixConnector),
+			Name:      "example",
+			Namespace: "root",
+			Version:   1,
+		},
+		def: &connectorschema.ConnectorDefinition{},
+	}
 	wrapped := wrapConnection(&database.Connection{
 		Id:               apid.New(apid.PrefixConnection),
 		Name:             "example",
@@ -95,10 +115,14 @@ func TestConnectionGetResourceOmitsSetupAndDefaultsHealth(t *testing.T) {
 		ConnectorVersion: connector.Version,
 		CreatedAt:        now,
 		UpdatedAt:        now,
-	}, connector, &service{logger: aplog.NewNoopLogger()})
+	},
+		connector,
+		&service{logger: aplog.NewNoopLogger()},
+	)
 
 	resource, err := wrapped.GetResource(t.Context())
 	require.NoError(t, err)
+	
 	require.Nil(t, resource.Status.Setup)
 	require.False(t, resource.Status.Configuration.Configured)
 	require.JSONEq(t, `{
