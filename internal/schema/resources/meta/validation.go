@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/go-multierror"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/util"
 )
@@ -131,7 +132,11 @@ func ValidateObjectReference(
 	value ObjectReference,
 	path *common.ValidationContext,
 ) error {
-	return ValidateObjectReferenceWithOptions(value, ObjectReferenceValidationOptions{}, path)
+	return ValidateObjectReferenceWithOptions(
+		value,
+		ObjectReferenceValidationOptions{},
+		path,
+	)
 }
 
 // ValidateObjectReferenceWithOptions validates the common object-reference
@@ -271,7 +276,10 @@ func ValidateObjectMeta(value ObjectMeta, options ValidationOptions) error {
 // ValidateObjectMetaPatch validates the fields that are present in a metadata
 // patch. Resource packages supply validators for their ID and namespace
 // formats, just as they do for complete ObjectMeta values.
-func ValidateObjectMetaPatch(value ObjectMetaPatch, options ValidationOptions) error {
+func ValidateObjectMetaPatch(
+	value ObjectMetaPatch,
+	options ValidationOptions,
+) error {
 	vc := validationPath(options.Path).PushField("metadata")
 	var result *multierror.Error
 
@@ -410,4 +418,17 @@ func ValidateTypeMetaUpdate(
 		result = multierror.Append(result, vc.NewErrorForField("kind", "is immutable"))
 	}
 	return result.ErrorOrNil()
+}
+
+// IdValidatorForPrefix returns a validator that checks that the given ID is
+// valid for the given prefix. It is intened to be used with the
+// `ValidationOptions.IDValidator` option.
+func IdValidatorForPrefix(prefix apid.Prefix) func(string) error {
+	return func(value string) error {
+		id, err := apid.Parse(value)
+		if err != nil {
+			return err
+		}
+		return id.ValidatePrefix(prefix)
+	}
 }

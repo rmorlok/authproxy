@@ -42,21 +42,21 @@ var objectReferenceTargets = map[meta.Kind]objectReferenceTarget{
 		idColumn:    "id",
 		newRow:      func() objectReferenceRow { return &Actor{} },
 		rowID:       func(row objectReferenceRow) string { return row.(*Actor).Id.String() },
-		idValidator: idValidatorForPrefix(apid.PrefixActor),
+		idValidator: meta.IdValidatorForPrefix(apid.PrefixActor),
 	},
 	connectionschema.ConnectionKind: {
 		table:       ConnectionsTable,
 		idColumn:    "id",
 		newRow:      func() objectReferenceRow { return &Connection{} },
 		rowID:       func(row objectReferenceRow) string { return row.(*Connection).Id.String() },
-		idValidator: idValidatorForPrefix(apid.PrefixConnection),
+		idValidator: meta.IdValidatorForPrefix(apid.PrefixConnection),
 	},
 	connectorschema.ConnectorKind: {
 		table:           ConnectorsTable,
 		idColumn:        "id",
 		newRow:          func() objectReferenceRow { return &Connector{} },
 		rowID:           func(row objectReferenceRow) string { return row.(*Connector).Id.String() },
-		idValidator:     idValidatorForPrefix(apid.PrefixConnector),
+		idValidator:     meta.IdValidatorForPrefix(apid.PrefixConnector),
 		allowGeneration: true,
 	},
 	keyschema.KeyKind: {
@@ -64,7 +64,7 @@ var objectReferenceTargets = map[meta.Kind]objectReferenceTarget{
 		idColumn:    "id",
 		newRow:      func() objectReferenceRow { return &Key{} },
 		rowID:       func(row objectReferenceRow) string { return row.(*Key).Id.String() },
-		idValidator: idValidatorForPrefix(apid.PrefixKey),
+		idValidator: meta.IdValidatorForPrefix(apid.PrefixKey),
 	},
 	namespaceschema.NamespaceKind: {
 		table:                   NamespacesTable,
@@ -79,18 +79,8 @@ var objectReferenceTargets = map[meta.Kind]objectReferenceTarget{
 		idColumn:    "id",
 		newRow:      func() objectReferenceRow { return &RateLimit{} },
 		rowID:       func(row objectReferenceRow) string { return row.(*RateLimit).Id.String() },
-		idValidator: idValidatorForPrefix(apid.PrefixRateLimit),
+		idValidator: meta.IdValidatorForPrefix(apid.PrefixRateLimit),
 	},
-}
-
-func idValidatorForPrefix(prefix apid.Prefix) func(string) error {
-	return func(value string) error {
-		id, err := apid.Parse(value)
-		if err != nil {
-			return err
-		}
-		return id.ValidatePrefix(prefix)
-	}
 }
 
 func namespaceNamespacedNameCondition(reference meta.ObjectReference) (sq.Sqlizer, error) {

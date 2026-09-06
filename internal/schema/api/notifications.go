@@ -80,11 +80,13 @@ func NewListNotificationsResponseJson(
 	items []NotificationJson,
 	continueToken string,
 ) ListNotificationsResponseJson {
-	return ListNotificationsResponseJson{ResourceList: apiv1alpha1.NewResourceList(
-		NotificationKind,
-		items,
-		apiv1alpha1.ListMeta{Continue: continueToken},
-	)}
+	return ListNotificationsResponseJson{
+		ResourceList: apiv1alpha1.NewResourceList(
+			NotificationKind,
+			items,
+			apiv1alpha1.ListMeta{Continue: continueToken},
+		),
+	}
 }
 
 type NotificationViewSpec struct{}
@@ -98,25 +100,37 @@ type NotificationViewAction struct {
 }
 
 func NewNotificationViewRequest(target meta.ObjectReference) NotificationViewAction {
-	return NotificationViewAction{Action: apiv1alpha1.Action[NotificationViewSpec, NotificationViewStatus]{
-		TypeMeta: meta.NewTypeMeta(NotificationViewActionKind),
-		Metadata: apiv1alpha1.ActionMeta{Target: target},
-		Spec:     NotificationViewSpec{},
-	}}
+	return NotificationViewAction{
+		Action: apiv1alpha1.Action[NotificationViewSpec, NotificationViewStatus]{
+			TypeMeta: meta.NewTypeMeta(NotificationViewActionKind),
+			Metadata: apiv1alpha1.ActionMeta{Target: target},
+			Spec:     NotificationViewSpec{},
+		},
+	}
 }
 
 func (a *NotificationViewAction) ValidateRequest(expectedKind meta.Kind) error {
 	if err := a.Action.ValidateRequest(expectedKind); err != nil {
 		return err
 	}
-	return validateNotificationReference(a.Metadata.Target, &common.ValidationContext{Path: "$.metadata.target"})
+	return validateNotificationReference(
+		a.Metadata.Target,
+		&common.ValidationContext{
+			Path: "$.metadata.target",
+		},
+	)
 }
 
 func (a *NotificationViewAction) ValidateResponse(expectedKind meta.Kind) error {
 	if err := a.Action.ValidateResponse(expectedKind); err != nil {
 		return err
 	}
-	if err := validateNotificationReference(a.Metadata.Target, &common.ValidationContext{Path: "$.metadata.target"}); err != nil {
+	if err := validateNotificationReference(
+		a.Metadata.Target,
+		&common.ValidationContext{
+			Path: "$.metadata.target",
+		},
+	); err != nil {
 		return err
 	}
 	if a.Status == nil {
@@ -224,29 +238,35 @@ func NewNotificationReference(id apid.ID) meta.ObjectReference {
 	}
 }
 
-func validateNotificationReference(ref meta.ObjectReference, vc *common.ValidationContext) error {
+func validateNotificationReference(
+	ref meta.ObjectReference,
+	vc *common.ValidationContext,
+) error {
 	var result *multierror.Error
-	if err := meta.ValidateObjectReferenceWithOptions(ref, meta.ObjectReferenceValidationOptions{
-		ExpectedAPIVersion: meta.APIVersionV1Alpha1,
-		ExpectedKind:       NotificationKind,
-		IDValidator: func(value string) error {
-			id, err := apid.Parse(value)
-			if err != nil {
-				return err
-			}
-			return id.ValidatePrefix(apid.PrefixNotification)
+
+	if err := meta.ValidateObjectReferenceWithOptions(
+		ref,
+		meta.ObjectReferenceValidationOptions{
+			ExpectedAPIVersion: meta.APIVersionV1Alpha1,
+			ExpectedKind:       NotificationKind,
+			IDValidator:        meta.IdValidatorForPrefix(apid.PrefixNotification),
 		},
-	}, vc); err != nil {
+		vc,
+	); err != nil {
 		result = multierror.Append(result, err)
 	}
+
 	if ref.ID == "" {
 		result = multierror.Append(result, vc.NewErrorForField("id", "is required for Notification references"))
 	}
+
 	if ref.Name != "" || ref.Namespace != "" {
 		result = multierror.Append(result, vc.NewError("Notification references support id only"))
 	}
+
 	if ref.Generation != 0 {
 		result = multierror.Append(result, vc.NewErrorForField("generation", "does not apply to Notification references"))
 	}
+
 	return result.ErrorOrNil()
 }
