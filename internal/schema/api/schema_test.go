@@ -86,6 +86,8 @@ func TestSchemaSamples(t *testing.T) {
 		{name: "update connection", ref: "./schema.json#/$defs/ConnectionPatch", file: "valid-update-connection.json"},
 		{name: "proxy response", ref: "./schema.json#/$defs/ProxyResponse", file: "valid-proxy-response.json"},
 		{name: "list notifications", ref: "./schema.json#/$defs/ListNotificationsResponse", file: "valid-list-notifications.json"},
+		{name: "view notification", ref: "./schema.json#/$defs/NotificationViewAction", file: "valid-view-notification.json"},
+		{name: "batch view notifications", ref: "./schema.json#/$defs/NotificationBatchViewAction", file: "valid-batch-view-notifications.json"},
 		{name: "search resources", ref: "./schema.json#/$defs/SearchResourcesResponse", file: "valid-search-resources.json"},
 		{name: "list namespaces", ref: "./schema.json#/$defs/ListNamespacesResponse", file: "valid-list-namespaces.json"},
 		{name: "actor", ref: "./schema.json#/$defs/Actor", file: "valid-actor.json"},
@@ -150,6 +152,27 @@ func TestManagedListSchemasRejectLegacyTopLevelCursor(t *testing.T) {
 	require.Error(t, schema.Validate(map[string]any{
 		"items":  []any{},
 		"cursor": "next-page",
+	}))
+}
+
+func TestNotificationAndSearchSchemasRejectLegacyFlatIdentity(t *testing.T) {
+	notifications := compileRefSchema(t, "./schema.json#/$defs/ListNotificationsResponse")
+	require.Error(t, notifications.Validate(map[string]any{
+		"items": []any{map[string]any{
+			"id":           "ntf_test550e8400abcde",
+			"resourceType": "connection",
+			"resourceId":   "cxn_test550e8400abcde",
+		}},
+	}))
+
+	search := compileRefSchema(t, "./schema.json#/$defs/SearchResourcesResponse")
+	require.Error(t, search.Validate(map[string]any{
+		"items": []any{map[string]any{
+			"resourceType": "connection",
+			"resourceId":   "cxn_test550e8400abcde",
+			"name":         "production",
+			"namespace":    "root.acme",
+		}},
 	}))
 }
 

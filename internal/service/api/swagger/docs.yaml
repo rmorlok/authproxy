@@ -700,6 +700,103 @@ definitions:
     - kind
     - metadata
     type: object
+  openapi.NotificationActionStatusJson:
+    properties:
+      url:
+        type: string
+    required:
+    - url
+    type: object
+  openapi.NotificationBatchViewMetadataJson:
+    properties:
+      targets:
+        items:
+          $ref: '#/definitions/meta.ObjectReference'
+        type: array
+    required:
+    - targets
+    type: object
+  openapi.NotificationBatchViewStatusJson:
+    properties:
+      viewedCount:
+        type: integer
+    type: object
+  openapi.NotificationJson:
+    description: Actor-visible, resource-shaped notification projection
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - Notification
+        example: Notification
+        type: string
+      metadata:
+        $ref: '#/definitions/meta.ObjectMeta'
+      spec:
+        $ref: '#/definitions/openapi.NotificationSpecJson'
+      status:
+        $ref: '#/definitions/openapi.NotificationStatusJson'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    - status
+    type: object
+  openapi.NotificationSpecJson:
+    properties:
+      context:
+        type: object
+      key:
+        type: string
+      level:
+        enum:
+        - info
+        - warning
+        - error
+        example: warning
+        type: string
+      message:
+        type: string
+      resourceRef:
+        $ref: '#/definitions/meta.ObjectReference'
+      title:
+        type: string
+    required:
+    - key
+    - level
+    - message
+    - resourceRef
+    - title
+    type: object
+  openapi.NotificationStatusJson:
+    properties:
+      action:
+        $ref: '#/definitions/openapi.NotificationActionStatusJson'
+      resolvedAt:
+        type: string
+      state:
+        enum:
+        - active
+        - resolved
+        example: active
+        type: string
+      viewed:
+        type: boolean
+    required:
+    - state
+    type: object
+  openapi.NotificationViewSpecJson:
+    type: object
+  openapi.NotificationViewStatusJson:
+    properties:
+      viewed:
+        type: boolean
+    type: object
   openapi.RateLimitAlgorithmJson:
     properties:
       fixedWindow:
@@ -935,6 +1032,17 @@ definitions:
         example: 1
         type: number
     type: object
+  openapi.SearchResultListMetaJson:
+    properties:
+      incompleteKinds:
+        items:
+          type: string
+        type: array
+      truncatedKinds:
+        items:
+          type: string
+        type: array
+    type: object
   routes.ConnectionScopesJson:
     properties:
       granted:
@@ -981,15 +1089,6 @@ definitions:
       value:
         example: production
         type: string
-    type: object
-  routes.MarkNotificationsViewedRequestJson:
-    properties:
-      ids:
-        example:
-        - ntf_test550e8400abcde
-        items:
-          type: string
-        type: array
     type: object
   routes.OpenAPIConnectionDisconnectActionJson:
     properties:
@@ -1362,11 +1461,24 @@ definitions:
   routes.OpenAPIListNotificationsResponseJson:
     description: Paginated list of actor-visible notifications
     properties:
-      cursor:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
         type: string
       items:
-        items: {}
+        items:
+          $ref: '#/definitions/openapi.NotificationJson'
         type: array
+      kind:
+        type: string
+      metadata:
+        $ref: '#/definitions/v1alpha1.ListMeta'
+    required:
+    - apiVersion
+    - items
+    - kind
+    - metadata
     type: object
   routes.OpenAPIListRequestEventsResponse:
     description: Paginated list of request events entries
@@ -1386,6 +1498,54 @@ definitions:
         items:
           $ref: '#/definitions/api.MetricsSchemaMetricJson'
         type: array
+    type: object
+  routes.OpenAPINotificationBatchViewActionJson:
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - NotificationBatchView
+        example: NotificationBatchView
+        type: string
+      metadata:
+        $ref: '#/definitions/openapi.NotificationBatchViewMetadataJson'
+      spec:
+        $ref: '#/definitions/openapi.NotificationViewSpecJson'
+      status:
+        $ref: '#/definitions/openapi.NotificationBatchViewStatusJson'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
+  routes.OpenAPINotificationViewActionJson:
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - NotificationView
+        example: NotificationView
+        type: string
+      metadata:
+        $ref: '#/definitions/v1alpha1.ActionMeta'
+      spec:
+        $ref: '#/definitions/openapi.NotificationViewSpecJson'
+      status:
+        $ref: '#/definitions/openapi.NotificationViewStatusJson'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
     type: object
   routes.OpenAPIProxyResponseJson:
     description: Response from a proxied HTTP request
@@ -1464,14 +1624,12 @@ definitions:
     type: object
   routes.OpenAPISearchResourcesResponseJson:
     properties:
-      incompleteTypes:
-        items:
-          type: string
-        type: array
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
       items:
-        description: |-
-          This anonymous shape mirrors schemaapi.SearchResourceSummaryJson while
-          avoiding swaggo's inability to resolve same-package nested named types.
         items:
           properties:
             labels:
@@ -1482,33 +1640,33 @@ definitions:
               items:
                 properties:
                   key:
-                    example: name
+                    example: team
                     type: string
                   value:
-                    example: payments-production
+                    example: payments
                     type: string
                 type: object
               type: array
-            name:
-              example: production-crm
-              type: string
-            namespace:
-              example: root.acme
-              type: string
-            resourceId:
-              example: cxn_test550e8400abcde
-              type: string
-            resourceType:
-              example: connection
-              type: string
+            resourceRef:
+              $ref: '#/definitions/meta.ObjectReference'
             updatedAt:
               type: string
+          required:
+          - resourceRef
           type: object
         type: array
-      truncatedTypes:
-        items:
-          type: string
-        type: array
+      kind:
+        enum:
+        - SearchResultList
+        example: SearchResultList
+        type: string
+      metadata:
+        $ref: '#/definitions/openapi.SearchResultListMetaJson'
+    required:
+    - apiVersion
+    - items
+    - kind
+    - metadata
     type: object
   routes.OpenAPITaskInfoJson:
     description: Background task status
@@ -1567,6 +1725,11 @@ definitions:
       actorId:
         example: act_test550e8400abcde
         type: string
+    type: object
+  v1alpha1.ActionMeta:
+    properties:
+      target:
+        $ref: '#/definitions/meta.ObjectReference'
     type: object
   v1alpha1.ListMeta:
     properties:
@@ -6088,17 +6251,19 @@ paths:
       - application/json
       description: Mark multiple notifications viewed for the authenticated actor
       parameters:
-      - description: Notification IDs
+      - description: Notification batch view action
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.MarkNotificationsViewedRequestJson'
+          $ref: '#/definitions/routes.OpenAPINotificationBatchViewActionJson'
       produces:
       - application/json
       responses:
-        "204":
-          description: No Content
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.OpenAPINotificationBatchViewActionJson'
         "400":
           description: Bad Request
           schema:
@@ -6126,6 +6291,8 @@ paths:
       - notifications
   /notifications/{id}/_viewed:
     post:
+      consumes:
+      - application/json
       description: Mark a notification viewed for the authenticated actor
       parameters:
       - description: Notification ID
@@ -6133,11 +6300,19 @@ paths:
         name: id
         required: true
         type: string
+      - description: Notification view action
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.OpenAPINotificationViewActionJson'
       produces:
       - application/json
       responses:
-        "204":
-          description: No Content
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.OpenAPINotificationViewActionJson'
         "400":
           description: Bad Request
           schema:
@@ -6774,11 +6949,11 @@ paths:
         name: mode
         type: string
       - collectionFormat: multi
-        description: Resource types; may be repeated
+        description: Resource kinds; may be repeated
         in: query
         items:
           type: string
-        name: resourceType
+        name: kind
         type: array
       - description: Case-insensitive literal resource-name or label-value substring
           (minimum 3 characters)

@@ -6936,18 +6936,21 @@ const docTemplateApi = `{
                 "summary": "Mark notifications viewed",
                 "parameters": [
                     {
-                        "description": "Notification IDs",
+                        "description": "Notification batch view action",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.MarkNotificationsViewedRequestJson"
+                            "$ref": "#/definitions/routes.OpenAPINotificationBatchViewActionJson"
                         }
                     }
                 ],
                 "responses": {
-                    "204": {
-                        "description": "No Content"
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/routes.OpenAPINotificationBatchViewActionJson"
+                        }
                     },
                     "400": {
                         "description": "Bad Request",
@@ -6990,6 +6993,9 @@ const docTemplateApi = `{
                     }
                 ],
                 "description": "Mark a notification viewed for the authenticated actor",
+                "consumes": [
+                    "application/json"
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -7004,11 +7010,23 @@ const docTemplateApi = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "description": "Notification view action",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/routes.OpenAPINotificationViewActionJson"
+                        }
                     }
                 ],
                 "responses": {
-                    "204": {
-                        "description": "No Content"
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/routes.OpenAPINotificationViewActionJson"
+                        }
                     },
                     "400": {
                         "description": "Bad Request",
@@ -7998,8 +8016,8 @@ const docTemplateApi = `{
                             "type": "string"
                         },
                         "collectionFormat": "multi",
-                        "description": "Resource types; may be repeated",
-                        "name": "resourceType",
+                        "description": "Resource kinds; may be repeated",
+                        "name": "kind",
                         "in": "query"
                     },
                     {
@@ -9228,6 +9246,147 @@ const docTemplateApi = `{
                 }
             }
         },
+        "openapi.NotificationActionStatusJson": {
+            "type": "object",
+            "required": [
+                "url"
+            ],
+            "properties": {
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "openapi.NotificationBatchViewMetadataJson": {
+            "type": "object",
+            "required": [
+                "targets"
+            ],
+            "properties": {
+                "targets": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/meta.ObjectReference"
+                    }
+                }
+            }
+        },
+        "openapi.NotificationBatchViewStatusJson": {
+            "type": "object",
+            "properties": {
+                "viewedCount": {
+                    "type": "integer"
+                }
+            }
+        },
+        "openapi.NotificationJson": {
+            "description": "Actor-visible, resource-shaped notification projection",
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "kind",
+                "metadata",
+                "spec",
+                "status"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "Notification"
+                    ],
+                    "example": "Notification"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/meta.ObjectMeta"
+                },
+                "spec": {
+                    "$ref": "#/definitions/openapi.NotificationSpecJson"
+                },
+                "status": {
+                    "$ref": "#/definitions/openapi.NotificationStatusJson"
+                }
+            }
+        },
+        "openapi.NotificationSpecJson": {
+            "type": "object",
+            "required": [
+                "key",
+                "level",
+                "message",
+                "resourceRef",
+                "title"
+            ],
+            "properties": {
+                "context": {
+                    "type": "object"
+                },
+                "key": {
+                    "type": "string"
+                },
+                "level": {
+                    "type": "string",
+                    "enum": [
+                        "info",
+                        "warning",
+                        "error"
+                    ],
+                    "example": "warning"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "resourceRef": {
+                    "$ref": "#/definitions/meta.ObjectReference"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "openapi.NotificationStatusJson": {
+            "type": "object",
+            "required": [
+                "state"
+            ],
+            "properties": {
+                "action": {
+                    "$ref": "#/definitions/openapi.NotificationActionStatusJson"
+                },
+                "resolvedAt": {
+                    "type": "string"
+                },
+                "state": {
+                    "type": "string",
+                    "enum": [
+                        "active",
+                        "resolved"
+                    ],
+                    "example": "active"
+                },
+                "viewed": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "openapi.NotificationViewSpecJson": {
+            "type": "object"
+        },
+        "openapi.NotificationViewStatusJson": {
+            "type": "object",
+            "properties": {
+                "viewed": {
+                    "type": "boolean"
+                }
+            }
+        },
         "openapi.RateLimitAlgorithmJson": {
             "type": "object",
             "properties": {
@@ -9565,6 +9724,23 @@ const docTemplateApi = `{
                 }
             }
         },
+        "openapi.SearchResultListMetaJson": {
+            "type": "object",
+            "properties": {
+                "incompleteKinds": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "truncatedKinds": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
         "routes.ConnectionScopesJson": {
             "type": "object",
             "properties": {
@@ -9630,20 +9806,6 @@ const docTemplateApi = `{
                 "value": {
                     "type": "string",
                     "example": "production"
-                }
-            }
-        },
-        "routes.MarkNotificationsViewedRequestJson": {
-            "type": "object",
-            "properties": {
-                "ids": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "example": [
-                        "ntf_test550e8400abcde"
-                    ]
                 }
             }
         },
@@ -10167,13 +10329,31 @@ const docTemplateApi = `{
         "routes.OpenAPIListNotificationsResponseJson": {
             "description": "Paginated list of actor-visible notifications",
             "type": "object",
+            "required": [
+                "apiVersion",
+                "items",
+                "kind",
+                "metadata"
+            ],
             "properties": {
-                "cursor": {
-                    "type": "string"
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
                 },
                 "items": {
                     "type": "array",
-                    "items": {}
+                    "items": {
+                        "$ref": "#/definitions/openapi.NotificationJson"
+                    }
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/v1alpha1.ListMeta"
                 }
             }
         },
@@ -10202,6 +10382,74 @@ const docTemplateApi = `{
                     "items": {
                         "$ref": "#/definitions/api.MetricsSchemaMetricJson"
                     }
+                }
+            }
+        },
+        "routes.OpenAPINotificationBatchViewActionJson": {
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "kind",
+                "metadata",
+                "spec"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "NotificationBatchView"
+                    ],
+                    "example": "NotificationBatchView"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/openapi.NotificationBatchViewMetadataJson"
+                },
+                "spec": {
+                    "$ref": "#/definitions/openapi.NotificationViewSpecJson"
+                },
+                "status": {
+                    "$ref": "#/definitions/openapi.NotificationBatchViewStatusJson"
+                }
+            }
+        },
+        "routes.OpenAPINotificationViewActionJson": {
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "kind",
+                "metadata",
+                "spec"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "NotificationView"
+                    ],
+                    "example": "NotificationView"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/v1alpha1.ActionMeta"
+                },
+                "spec": {
+                    "$ref": "#/definitions/openapi.NotificationViewSpecJson"
+                },
+                "status": {
+                    "$ref": "#/definitions/openapi.NotificationViewStatusJson"
                 }
             }
         },
@@ -10313,18 +10561,27 @@ const docTemplateApi = `{
         },
         "routes.OpenAPISearchResourcesResponseJson": {
             "type": "object",
+            "required": [
+                "apiVersion",
+                "items",
+                "kind",
+                "metadata"
+            ],
             "properties": {
-                "incompleteTypes": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
                 },
                 "items": {
-                    "description": "This anonymous shape mirrors schemaapi.SearchResourceSummaryJson while\navoiding swaggo's inability to resolve same-package nested named types.",
                     "type": "array",
                     "items": {
                         "type": "object",
+                        "required": [
+                            "resourceRef"
+                        ],
                         "properties": {
                             "labels": {
                                 "type": "object",
@@ -10339,30 +10596,17 @@ const docTemplateApi = `{
                                     "properties": {
                                         "key": {
                                             "type": "string",
-                                            "example": "name"
+                                            "example": "team"
                                         },
                                         "value": {
                                             "type": "string",
-                                            "example": "payments-production"
+                                            "example": "payments"
                                         }
                                     }
                                 }
                             },
-                            "name": {
-                                "type": "string",
-                                "example": "production-crm"
-                            },
-                            "namespace": {
-                                "type": "string",
-                                "example": "root.acme"
-                            },
-                            "resourceId": {
-                                "type": "string",
-                                "example": "cxn_test550e8400abcde"
-                            },
-                            "resourceType": {
-                                "type": "string",
-                                "example": "connection"
+                            "resourceRef": {
+                                "$ref": "#/definitions/meta.ObjectReference"
                             },
                             "updatedAt": {
                                 "type": "string"
@@ -10370,11 +10614,15 @@ const docTemplateApi = `{
                         }
                     }
                 },
-                "truncatedTypes": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "SearchResultList"
+                    ],
+                    "example": "SearchResultList"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/openapi.SearchResultListMetaJson"
                 }
             }
         },
@@ -10460,6 +10708,14 @@ const docTemplateApi = `{
                 "actorId": {
                     "type": "string",
                     "example": "act_test550e8400abcde"
+                }
+            }
+        },
+        "v1alpha1.ActionMeta": {
+            "type": "object",
+            "properties": {
+                "target": {
+                    "$ref": "#/definitions/meta.ObjectReference"
                 }
             }
         },

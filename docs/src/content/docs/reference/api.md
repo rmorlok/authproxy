@@ -187,12 +187,45 @@ The Admin cross-resource endpoint searches names directly and also searches
 user-label values:
 
 ```http
-GET /api/v1/search/resources?q=production&resourceType=connection
+GET /api/v1/search/resources?q=production&kind=Connection
 ```
 
 Exact name matches rank before name prefixes, which rank before name
 substrings and matching label values. Namespace and resource-ID permissions are
-applied before results are returned.
+applied before results are returned. Search results are heterogeneous
+projections, not partial resource objects. Each item carries one typed
+`resourceRef`; partial-result observations live in the list metadata:
+
+```json
+{
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "SearchResultList",
+  "metadata": {
+    "truncatedKinds": ["Connection"],
+    "incompleteKinds": []
+  },
+  "items": [
+    {
+      "resourceRef": {
+        "apiVersion": "authproxy.net/v1alpha1",
+        "kind": "Connection",
+        "id": "cxn_01example",
+        "name": "production-salesforce",
+        "namespace": "root.acme"
+      },
+      "labels": {"team": "payments"},
+      "matchedLabels": [],
+      "updatedAt": "2026-08-16T12:00:00Z"
+    }
+  ]
+}
+```
+
+Namespace results use the immutable namespace path as an ID-only reference;
+clients can derive the display segment from that path. Search never returns
+request events, task history, or other operational projections as if they were
+durable resources. See [connector migration notifications](/operations/connector-version-migrations/#notifications)
+for the separate actor-specific notification projection and its view actions.
 
 ## Actor resource shape
 
