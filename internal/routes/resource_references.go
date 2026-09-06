@@ -39,7 +39,9 @@ func resourceKindForStoredType(resourceType string) (meta.Kind, error) {
 	return kind, nil
 }
 
-func searchResourceReference(resource database.SearchResource) (meta.ObjectReference, error) {
+func searchResourceReference(
+	resource database.SearchResource,
+) (meta.ObjectReference, error) {
 	kind, err := resourceKindForStoredType(string(resource.ResourceType))
 	if err != nil {
 		return meta.ObjectReference{}, err
@@ -50,6 +52,7 @@ func searchResourceReference(resource database.SearchResource) (meta.ObjectRefer
 		Name:      common.ResourceName(resource.Name),
 		Namespace: resource.Namespace,
 	}
+	
 	if kind == namespaceschema.NamespaceKind {
 		if err := namespaceschema.ValidatePath(resource.ResourceID); err != nil {
 			return meta.ObjectReference{}, fmt.Errorf("build namespace reference: %w", err)
