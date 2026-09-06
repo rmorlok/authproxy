@@ -128,7 +128,9 @@ func (c *connection) GetResource(
 		return nil, err
 	}
 
-	configurationSchema, err := c.connector.GetDefinition().ConnectionConfigurationJSONSchema()
+	configurationSchema, err := c.connector.
+		GetDefinition().
+		ConnectionConfigurationJSONSchema()
 	if err != nil {
 		return nil, fmt.Errorf("build connection configuration schema: %w", err)
 	}
@@ -163,8 +165,9 @@ func (c *connection) GetResource(
 				State: connectionschema.ConnectionHealthState(healthState),
 			},
 			Configuration: connectionschema.ConnectionConfigurationStatus{
-				Configured: c.EncryptedConfiguration != nil && !c.EncryptedConfiguration.IsZero(),
-				Schema:     configurationSchema,
+				Configured: c.EncryptedConfiguration != nil &&
+					!c.EncryptedConfiguration.IsZero(),
+				Schema: configurationSchema,
 			},
 		},
 	}
