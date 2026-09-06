@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"fmt"
+	"maps"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -12,6 +14,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/httperr"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	schemaapiopenapi "github.com/rmorlok/authproxy/internal/schema/api/openapi"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 )
 
@@ -22,8 +25,9 @@ type NotificationsRoutes struct {
 
 type NotificationJson = schemaapi.NotificationJson
 type ListNotificationsResponseJson = schemaapi.ListNotificationsResponseJson
-type MarkNotificationsViewedRequestJson = schemaapi.MarkNotificationsViewedRequestJson
 type OpenAPIListNotificationsResponseJson = schemaapiopenapi.ListNotificationsResponseJson
+type OpenAPINotificationViewActionJson = schemaapiopenapi.NotificationViewActionJson
+type OpenAPINotificationBatchViewActionJson = schemaapiopenapi.NotificationBatchViewActionJson
 
 type ListNotificationsRequestQuery struct {
 	LimitVal      *uint64 `form:"limit"`
@@ -110,10 +114,15 @@ func (r *NotificationsRoutes) list(gctx *gin.Context) {
 
 	items := make([]NotificationJson, 0, len(notifications))
 	for _, n := range notifications {
-		items = append(items, notificationToJSON(n))
+		item, err := notificationToJSON(n)
+		if err != nil {
+			apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+			return
+		}
+		items = append(items, item)
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, ListNotificationsResponseJson{Items: items})
+	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewListNotificationsResponseJson(items, ""))
 }
 
 // @Summary		Mark notifications viewed
@@ -121,8 +130,8 @@ func (r *NotificationsRoutes) list(gctx *gin.Context) {
 // @Tags			notifications
 // @Accept			json
 // @Produce		json
-// @Param			request	body	MarkNotificationsViewedRequestJson	true	"Notification IDs"
-// @Success		204
+// @Param			request	body	OpenAPINotificationBatchViewActionJson	true	"Notification batch view action"
+// @Success		200	{object}	OpenAPINotificationBatchViewActionJson
 // @Failure		400	{object}	ErrorResponse
 // @Failure		401	{object}	ErrorResponse
 // @Failure		403	{object}	ErrorResponse
@@ -134,25 +143,48 @@ func (r *NotificationsRoutes) markViewedBatch(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	ra := auth.MustGetAuthFromGinContext(gctx)
 
-	var req MarkNotificationsViewedRequestJson
-	if err := apgin.BindJSONBody(gctx, &req); err != nil {
+	var req schemaapi.NotificationBatchViewAction
+	if err := apgin.BindActionJSON(
+		gctx,
+		&req,
+		schemaapi.NotificationBatchViewActionKind,
+	); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		return
 	}
 
-	if err := r.core.MarkActorNotificationsViewed(ctx, ra, req.Ids); err != nil {
+	ids := make([]apid.ID, 0, len(req.Metadata.Targets))
+	for _, target := range req.Metadata.Targets {
+		id, err := apid.Parse(target.ID)
+		if err != nil {
+			apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+			return
+		}
+		ids = append(ids, id)
+	}
+	if err := r.core.MarkActorNotificationsViewed(ctx, ra, ids); err != nil {
 		apgin.WriteErr(gctx, nil, err)
 		return
 	}
-	gctx.Status(http.StatusNoContent)
+	response := schemaapi.NewNotificationBatchViewResponse(req.Metadata.Targets)
+	if err := apgin.RenderActionJSON(
+		gctx,
+		http.StatusOK,
+		&response,
+		schemaapi.NotificationBatchViewActionKind,
+	); err != nil {
+		apgin.WriteErr(gctx, nil, err)
+	}
 }
 
 // @Summary		Mark notification viewed
 // @Description	Mark a notification viewed for the authenticated actor
 // @Tags			notifications
+// @Accept		json
 // @Produce		json
 // @Param			id	path	string	true	"Notification ID"
-// @Success		204
+// @Param			request	body	OpenAPINotificationViewActionJson	true	"Notification view action"
+// @Success		200	{object}	OpenAPINotificationViewActionJson
 // @Failure		400	{object}	ErrorResponse
 // @Failure		401	{object}	ErrorResponse
 // @Failure		403	{object}	ErrorResponse
@@ -177,42 +209,70 @@ func (r *NotificationsRoutes) markViewed(gctx *gin.Context) {
 		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid notification id", httperr.WithInternalErr(err)))
 		return
 	}
+	var req schemaapi.NotificationViewAction
+	if err := apgin.BindActionJSON(gctx, &req, schemaapi.NotificationViewActionKind); err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		return
+	}
+	if req.Metadata.Target.ID != id.String() {
+		apgin.WriteError(gctx, nil, httperr.BadRequest("metadata.target.id does not match the notification path"))
+		return
+	}
 
 	if err := r.core.MarkActorNotificationViewed(ctx, ra, id); err != nil {
 		apgin.WriteErr(gctx, nil, err)
 		return
 	}
-	gctx.Status(http.StatusNoContent)
+	response := schemaapi.NewNotificationViewResponse(req.Metadata.Target)
+	if err := apgin.RenderActionJSON(gctx, http.StatusOK, &response, schemaapi.NotificationViewActionKind); err != nil {
+		apgin.WriteErr(gctx, nil, err)
+	}
 }
 
-func notificationToJSON(actorNotification coreIface.ActorNotification) NotificationJson {
+func notificationToJSON(actorNotification coreIface.ActorNotification) (NotificationJson, error) {
 	n := actorNotification.Notification
-	actionURL := ""
+	resourceKind, err := resourceKindForStoredType(n.ResourceType)
+	if err != nil {
+		return NotificationJson{}, fmt.Errorf("build notification resource reference: %w", err)
+	}
+	var action *schemaapi.NotificationActionStatusJson
 	if actorNotification.CanAction && n.ActionUrl != nil {
-		actionURL = *n.ActionUrl
+		action = &schemaapi.NotificationActionStatusJson{URL: *n.ActionUrl}
 	}
-	metadata := map[string]any(n.Metadata)
-	if len(metadata) == 0 {
-		metadata = nil
+	contextData := map[string]any(n.Metadata)
+	if len(contextData) == 0 {
+		contextData = nil
 	}
+	createdAt := n.CreatedAt
+	updatedAt := n.UpdatedAt
 	return NotificationJson{
-		Id:           n.Id,
-		Key:          n.Key,
-		Level:        schemaapi.NotificationLevel(n.Level),
-		State:        schemaapi.NotificationState(n.State),
-		ResourceType: n.ResourceType,
-		ResourceId:   n.ResourceId,
-		Namespace:    n.Namespace,
-		Title:        n.Title,
-		Message:      n.Message,
-		ActionUrl:    actionURL,
-		CanAction:    actorNotification.CanAction,
-		Viewed:       actorNotification.Viewed,
-		Metadata:     metadata,
-		CreatedAt:    n.CreatedAt,
-		UpdatedAt:    n.UpdatedAt,
-		ResolvedAt:   n.ResolvedAt,
-	}
+		TypeMeta: meta.NewTypeMeta(schemaapi.NotificationKind),
+		Metadata: meta.NormalizeObjectMeta(meta.ObjectMeta{
+			ID:        n.Id.String(),
+			Namespace: n.Namespace,
+			Labels:    maps.Clone(map[string]string(n.Labels)),
+			CreatedAt: &createdAt,
+			UpdatedAt: &updatedAt,
+		}),
+		Spec: schemaapi.NotificationSpecJson{
+			Key:   n.Key,
+			Level: schemaapi.NotificationLevel(n.Level),
+			ResourceRef: meta.ObjectReference{
+				APIVersion: meta.APIVersionV1Alpha1,
+				Kind:       resourceKind,
+				ID:         n.ResourceId.String(),
+			},
+			Title:   n.Title,
+			Message: n.Message,
+			Context: contextData,
+		},
+		Status: schemaapi.NotificationStatusJson{
+			State:      schemaapi.NotificationState(n.State),
+			Viewed:     actorNotification.Viewed,
+			Action:     action,
+			ResolvedAt: n.ResolvedAt,
+		},
+	}, nil
 }
 
 func (r *NotificationsRoutes) Register(g gin.IRouter) {

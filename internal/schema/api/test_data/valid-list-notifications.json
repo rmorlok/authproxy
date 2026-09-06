@@ -1,23 +1,38 @@
 {
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "NotificationList",
+  "metadata": {},
   "items": [
     {
-      "id": "ntf_test550e8400abcde",
-      "key": "connector_migration:cxn_test550e8400abcde:reauth",
-      "level": "warning",
-      "state": "active",
-      "resourceType": "connection",
-      "resourceId": "cxn_test550e8400abcde",
-      "namespace": "root.acme",
-      "title": "Connection requires re-authentication",
-      "message": "The target connector version requires the user to re-authenticate.",
-      "actionUrl": "/connections/cxn_test550e8400abcde?action=reauth",
-      "canAction": true,
-      "viewed": false,
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Notification",
       "metadata": {
-        "targetVersion": 3
+        "id": "ntf_test550e8400abcde",
+        "namespace": "root.acme",
+        "createdAt": "2026-07-03T12:00:00Z",
+        "updatedAt": "2026-07-03T12:00:00Z"
       },
-      "createdAt": "2026-07-03T12:00:00Z",
-      "updatedAt": "2026-07-03T12:00:00Z"
+      "spec": {
+        "key": "connector_migration:cxn_test550e8400abcde:reauth",
+        "level": "warning",
+        "resourceRef": {
+          "apiVersion": "authproxy.net/v1alpha1",
+          "kind": "Connection",
+          "id": "cxn_test550e8400abcde"
+        },
+        "title": "Connection requires re-authentication",
+        "message": "The target connector version requires the user to re-authenticate.",
+        "context": {
+          "targetVersion": 3
+        }
+      },
+      "status": {
+        "state": "active",
+        "viewed": false,
+        "action": {
+          "url": "/connections/cxn_test550e8400abcde?action=reauth"
+        }
+      }
     }
   ]
 }

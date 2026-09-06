@@ -32,15 +32,15 @@
         "type": "string"
       }
     },
-    "SearchResourceType": {
+    "SearchResourceKind": {
       "type": "string",
       "enum": [
-        "actor",
-        "connection",
-        "connector",
-        "namespace",
-        "key",
-        "rate_limit"
+        "Actor",
+        "Connection",
+        "Connector",
+        "Namespace",
+        "Key",
+        "RateLimit"
       ]
     },
     "SearchLabelMatch": {
@@ -62,24 +62,18 @@
     "SearchResourceSummary": {
       "type": "object",
       "properties": {
-        "resourceType": {
-          "$ref": "#/$defs/SearchResourceType"
-        },
-        "resourceId": {
-          "type": "string"
-        },
-        "name": {
-          "anyOf": [
+        "resourceRef": {
+          "allOf": [
+            { "$ref": "../resources/meta/schema.json#/$defs/ObjectReference" },
             {
-              "$ref": "../common/schema.json#/$defs/ResourceName"
-            },
-            {
-              "$ref": "../resources/namespace/schema.json#/$defs/NamespaceName"
+              "type": "object",
+              "properties": {
+                "apiVersion": { "const": "authproxy.net/v1alpha1" },
+                "kind": { "$ref": "#/$defs/SearchResourceKind" },
+                "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" }
+              }
             }
           ]
-        },
-        "namespace": {
-          "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath"
         },
         "labels": {
           "$ref": "#/$defs/StringMap"
@@ -96,44 +90,54 @@
         }
       },
       "required": [
-        "resourceType",
-        "resourceId",
-        "name",
-        "namespace",
+        "resourceRef",
         "labels",
         "matchedLabels",
         "updatedAt"
       ],
       "additionalProperties": false
     },
-    "SearchResourcesResponse": {
+    "SearchResultListMeta": {
       "type": "object",
       "properties": {
-        "items": {
+        "truncatedKinds": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/SearchResourceSummary"
+            "$ref": "#/$defs/SearchResourceKind"
           }
         },
-        "truncatedTypes": {
+        "incompleteKinds": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/SearchResourceType"
-          }
-        },
-        "incompleteTypes": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/SearchResourceType"
+            "$ref": "#/$defs/SearchResourceKind"
           }
         }
       },
       "required": [
-        "items",
-        "truncatedTypes",
-        "incompleteTypes"
+        "truncatedKinds",
+        "incompleteKinds"
       ],
       "additionalProperties": false
+    },
+    "SearchResourcesResponse": {
+      "description": "A heterogeneous search projection whose items identify resources through typed references.",
+      "allOf": [
+        { "$ref": "../resources/meta/schema.json#/$defs/TypeMeta" },
+        {
+          "type": "object",
+          "required": ["metadata", "items"],
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "SearchResultList" },
+            "metadata": { "$ref": "#/$defs/SearchResultListMeta" },
+            "items": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/SearchResourceSummary" }
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
     },
     "HeadersVal": {
       "oneOf": [
@@ -600,95 +604,208 @@
       ],
       "additionalProperties": false
     },
-    "Notification": {
+    "NotificationResourceReference": {
+      "allOf": [
+        { "$ref": "../resources/meta/schema.json#/$defs/ObjectReference" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "$ref": "#/$defs/SearchResourceKind" }
+          }
+        }
+      ]
+    },
+    "NotificationSpec": {
       "type": "object",
       "properties": {
-        "id": {
-          "type": "string"
-        },
         "key": {
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         },
         "level": {
           "$ref": "#/$defs/NotificationLevel"
         },
-        "state": {
-          "$ref": "#/$defs/NotificationState"
-        },
-        "resourceType": {
-          "type": "string"
-        },
-        "resourceId": {
-          "type": "string"
-        },
-        "namespace": {
-          "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath"
+        "resourceRef": {
+          "$ref": "#/$defs/NotificationResourceReference"
         },
         "title": {
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         },
         "message": {
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         },
-        "actionUrl": {
-          "type": "string"
-        },
-        "canAction": {
-          "type": "boolean"
-        },
-        "viewed": {
-          "type": "boolean"
-        },
-        "metadata": {
+        "context": {
           "type": "object"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "format": "date-time"
-        },
+        }
+      },
+      "required": ["key", "level", "resourceRef", "title", "message"],
+      "additionalProperties": false
+    },
+    "NotificationActionStatus": {
+      "type": "object",
+      "properties": {
+        "url": { "type": "string", "minLength": 1 }
+      },
+      "required": ["url"],
+      "additionalProperties": false
+    },
+    "NotificationStatus": {
+      "type": "object",
+      "properties": {
+        "state": { "$ref": "#/$defs/NotificationState" },
+        "viewed": { "type": "boolean" },
+        "action": { "$ref": "#/$defs/NotificationActionStatus" },
         "resolvedAt": {
           "type": "string",
           "format": "date-time"
         }
       },
-      "required": [
-        "id",
-        "key",
-        "level",
-        "state",
-        "resourceType",
-        "resourceId",
-        "namespace",
-        "title",
-        "message",
-        "canAction",
-        "viewed",
-        "createdAt",
-        "updatedAt"
-      ],
+      "required": ["state", "viewed"],
       "additionalProperties": false
     },
-    "ListNotificationsResponse": {
-      "type": "object",
-      "properties": {
-        "items": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Notification"
+    "Notification": {
+      "description": "A read-only actor-specific projection of a durable notification record.",
+      "allOf": [
+        { "$ref": "../resources/meta/schema.json#/$defs/Resource" },
+        {
+          "type": "object",
+          "required": ["status"],
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "Notification" },
+            "metadata": {
+              "allOf": [
+                { "$ref": "../resources/meta/schema.json#/$defs/ObjectMeta" },
+                {
+                  "type": "object",
+                  "required": ["id", "namespace", "createdAt", "updatedAt"],
+                  "properties": {
+                    "id": { "type": "string", "pattern": "^ntf_" },
+                    "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" }
+                  }
+                }
+              ]
+            },
+            "spec": { "$ref": "#/$defs/NotificationSpec" },
+            "status": { "$ref": "#/$defs/NotificationStatus" }
           }
-        },
-        "cursor": {
-          "type": "string"
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "ListNotificationsResponse": {
+      "description": "A Kubernetes-style list of actor-visible Notification projections.",
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ResourceList" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "NotificationList" },
+            "items": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/Notification" }
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "NotificationReference": {
+      "allOf": [
+        { "$ref": "../resources/meta/schema.json#/$defs/ObjectReference" },
+        {
+          "type": "object",
+          "required": ["id"],
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "Notification" },
+            "id": { "type": "string", "pattern": "^ntf_" }
+          },
+          "not": {
+            "anyOf": [
+              { "required": ["name"] },
+              { "required": ["namespace"] },
+              { "required": ["generation"] }
+            ]
+          }
+        }
+      ]
+    },
+    "NotificationViewSpec": {
+      "type": "object",
+      "additionalProperties": false
+    },
+    "NotificationViewStatus": {
+      "type": "object",
+      "required": ["viewed"],
+      "properties": {
+        "viewed": { "const": true }
+      },
+      "additionalProperties": false
+    },
+    "NotificationViewAction": {
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/Action" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "NotificationView" },
+            "metadata": {
+              "type": "object",
+              "required": ["target"],
+              "properties": {
+                "target": { "$ref": "#/$defs/NotificationReference" }
+              },
+              "additionalProperties": false
+            },
+            "spec": { "$ref": "#/$defs/NotificationViewSpec" },
+            "status": { "$ref": "#/$defs/NotificationViewStatus" }
+          }
+        }
+      ]
+    },
+    "NotificationBatchViewMetadata": {
+      "type": "object",
+      "required": ["targets"],
+      "properties": {
+        "targets": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/NotificationReference" }
         }
       },
-      "required": [
-        "items"
-      ],
       "additionalProperties": false
+    },
+    "NotificationBatchViewStatus": {
+      "type": "object",
+      "required": ["viewedCount"],
+      "properties": {
+        "viewedCount": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "NotificationBatchViewAction": {
+      "allOf": [
+        { "$ref": "../resources/meta/schema.json#/$defs/TypeMeta" },
+        {
+          "type": "object",
+          "required": ["metadata", "spec"],
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "NotificationBatchView" },
+            "metadata": { "$ref": "#/$defs/NotificationBatchViewMetadata" },
+            "spec": { "$ref": "#/$defs/NotificationViewSpec" },
+            "status": { "$ref": "#/$defs/NotificationBatchViewStatus" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
     },
     "ListNamespacesResponse": {
       "description": "A Kubernetes-style list of namespaces.",

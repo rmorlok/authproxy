@@ -292,34 +292,73 @@ type ConnectionForceStateActionJson struct {
 	Status     *ConnectionForceStateStatusJson `json:"status,omitempty"`
 }
 
-// NotificationJson documents actor-visible notifications.
+type NotificationSpecJson struct {
+	Key         string                 `json:"key" binding:"required"`
+	Level       string                 `json:"level" binding:"required" enums:"info,warning,error" example:"warning"`
+	ResourceRef meta.ObjectReference   `json:"resourceRef" binding:"required"`
+	Title       string                 `json:"title" binding:"required"`
+	Message     string                 `json:"message" binding:"required"`
+	Context     map[string]interface{} `json:"context,omitempty" swaggertype:"object"`
+}
+
+type NotificationActionStatusJson struct {
+	URL string `json:"url" binding:"required"`
+}
+
+type NotificationStatusJson struct {
+	State      string                        `json:"state" binding:"required" enums:"active,resolved" example:"active"`
+	Viewed     bool                          `json:"viewed"`
+	Action     *NotificationActionStatusJson `json:"action,omitempty"`
+	ResolvedAt *time.Time                    `json:"resolvedAt,omitempty"`
+}
+
+// NotificationJson documents an actor-visible resource-shaped projection.
 //
-//	@Description	Actor-visible notification
+//	@Description	Actor-visible, resource-shaped notification projection
 type NotificationJson struct {
-	Id           apid.ID                `json:"id" swaggertype:"string" example:"ntf_test550e8400abcde"`
-	Key          string                 `json:"key"`
-	Level        string                 `json:"level" example:"warning"`
-	State        string                 `json:"state" example:"active"`
-	ResourceType string                 `json:"resourceType" example:"connection"`
-	ResourceId   apid.ID                `json:"resourceId" swaggertype:"string" example:"cxn_test550e8400abcde"`
-	Namespace    string                 `json:"namespace" example:"root.acme"`
-	Title        string                 `json:"title"`
-	Message      string                 `json:"message"`
-	ActionUrl    string                 `json:"actionUrl,omitempty"`
-	CanAction    bool                   `json:"canAction"`
-	Viewed       bool                   `json:"viewed"`
-	Metadata     map[string]interface{} `json:"metadata,omitempty"`
-	CreatedAt    time.Time              `json:"createdAt"`
-	UpdatedAt    time.Time              `json:"updatedAt"`
-	ResolvedAt   *time.Time             `json:"resolvedAt,omitempty"`
+	APIVersion string                 `json:"apiVersion" binding:"required" enums:"authproxy.net/v1alpha1" example:"authproxy.net/v1alpha1"`
+	Kind       string                 `json:"kind" binding:"required" enums:"Notification" example:"Notification"`
+	Metadata   meta.ObjectMeta        `json:"metadata" binding:"required"`
+	Spec       NotificationSpecJson   `json:"spec" binding:"required"`
+	Status     NotificationStatusJson `json:"status" binding:"required"`
 }
 
 // ListNotificationsResponseJson documents the paginated notification list response.
 //
 //	@Description	Paginated list of actor-visible notifications
 type ListNotificationsResponseJson struct {
-	Items  []interface{} `json:"items"`
-	Cursor string        `json:"cursor,omitempty"`
+	ResourceListJson
+	Items []NotificationJson `json:"items" binding:"required"`
+}
+
+type NotificationViewSpecJson struct{}
+
+type NotificationViewStatusJson struct {
+	Viewed bool `json:"viewed"`
+}
+
+type NotificationViewActionJson struct {
+	APIVersion string                      `json:"apiVersion" binding:"required" enums:"authproxy.net/v1alpha1" example:"authproxy.net/v1alpha1"`
+	Kind       string                      `json:"kind" binding:"required" enums:"NotificationView" example:"NotificationView"`
+	Metadata   apiv1alpha1.ActionMeta      `json:"metadata" binding:"required"`
+	Spec       NotificationViewSpecJson    `json:"spec" binding:"required"`
+	Status     *NotificationViewStatusJson `json:"status,omitempty"`
+}
+
+type NotificationBatchViewMetadataJson struct {
+	Targets []meta.ObjectReference `json:"targets" binding:"required"`
+}
+
+type NotificationBatchViewStatusJson struct {
+	ViewedCount int `json:"viewedCount"`
+}
+
+type NotificationBatchViewActionJson struct {
+	APIVersion string                            `json:"apiVersion" binding:"required" enums:"authproxy.net/v1alpha1" example:"authproxy.net/v1alpha1"`
+	Kind       string                            `json:"kind" binding:"required" enums:"NotificationBatchView" example:"NotificationBatchView"`
+	Metadata   NotificationBatchViewMetadataJson `json:"metadata" binding:"required"`
+	Spec       NotificationViewSpecJson          `json:"spec" binding:"required"`
+	Status     *NotificationBatchViewStatusJson  `json:"status,omitempty"`
 }
 
 // ConnectorLifecycleRequestJson documents connector lifecycle operation bodies.

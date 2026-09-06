@@ -17,6 +17,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/httperr"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	schemaapiopenapi "github.com/rmorlok/authproxy/internal/schema/api/openapi"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 )
 
@@ -40,7 +41,7 @@ type ResourceSearchRoutes struct {
 
 type SearchResourcesRequestQuery struct {
 	Mode          string   `form:"mode"`
-	ResourceTypes []string `form:"resourceType"`
+	Kinds         []string `form:"kind"`
 	Query         string   `form:"q"`
 	LabelSelector string   `form:"labelSelector"`
 	Namespace     string   `form:"namespace"`
@@ -69,7 +70,7 @@ var searchPermissionResources = map[database.SearchResourceType]string{
 // @Tags         search
 // @Produce      json
 // @Param        mode            query string false "Search mode: query or seed"
-// @Param        resourceType   query []string false "Resource types; may be repeated" collectionFormat(multi)
+// @Param        kind           query []string false "Resource kinds; may be repeated" collectionFormat(multi)
 // @Param        q               query string false "Case-insensitive literal resource-name or label-value substring (minimum 3 characters)"
 // @Param        labelSelector  query string false "Exact Kubernetes-style label selector"
 // @Param        namespace       query string false "Namespace matcher"
@@ -88,6 +89,10 @@ func (r *ResourceSearchRoutes) search(gctx *gin.Context) {
 	var req SearchResourcesRequestQuery
 	if err := gctx.ShouldBindQuery(&req); err != nil {
 		apgin.WriteError(gctx, r.logger, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
+		return
+	}
+	if _, legacyResourceTypePresent := gctx.GetQuery("resourceType"); legacyResourceTypePresent {
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("resourceType is no longer supported; use kind"))
 		return
 	}
 
@@ -131,7 +136,7 @@ func (r *ResourceSearchRoutes) search(gctx *gin.Context) {
 		}
 	}
 
-	resourceTypes, explicitTypes, err := parseSearchResourceTypes(req.ResourceTypes)
+	resourceTypes, explicitTypes, err := parseSearchResourceKinds(req.Kinds)
 	if err != nil {
 		apgin.WriteError(gctx, r.logger, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
 		return
@@ -276,12 +281,13 @@ collectionComplete:
 		resources = resources[:limit]
 	}
 
-	response := schemaapi.SearchResourcesResponseJson{
-		Items:           make([]schemaapi.SearchResourceSummaryJson, 0, len(resources)),
-		TruncatedTypes:  schemaSearchTypes(truncated),
-		IncompleteTypes: schemaSearchTypes(incomplete),
-	}
+	items := make([]schemaapi.SearchResourceSummaryJson, 0, len(resources))
 	for _, resource := range resources {
+		resourceRef, err := searchResourceReference(resource)
+		if err != nil {
+			apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErr(err)))
+			return
+		}
 		labels := map[string]string{}
 		for key, value := range resource.Labels {
 			labels[key] = value
@@ -290,38 +296,41 @@ collectionComplete:
 		for _, match := range resource.MatchedLabels {
 			matches = append(matches, schemaapi.SearchLabelMatchJson{Key: match.Key, Value: match.Value})
 		}
-		response.Items = append(response.Items, schemaapi.SearchResourceSummaryJson{
-			ResourceType:  schemaapi.SearchResourceType(resource.ResourceType),
-			ResourceId:    resource.ResourceID,
-			Name:          resource.Name,
-			Namespace:     resource.Namespace,
+		items = append(items, schemaapi.SearchResourceSummaryJson{
+			ResourceRef:   resourceRef,
 			Labels:        labels,
 			MatchedLabels: matches,
 			UpdatedAt:     resource.UpdatedAt,
 		})
 	}
+	response := schemaapi.NewSearchResourcesResponseJson(
+		items,
+		schemaSearchKinds(truncated),
+		schemaSearchKinds(incomplete),
+	)
 
 	r.logger.Info("admin resource search completed",
 		"mode", mode,
-		"resource_type_count", len(resourceTypes),
+		"resource_kind_count", len(resourceTypes),
 		"result_count", len(response.Items),
-		"truncated_type_count", len(response.TruncatedTypes),
-		"incomplete_type_count", len(response.IncompleteTypes),
+		"truncated_kind_count", len(response.Metadata.TruncatedKinds),
+		"incomplete_kind_count", len(response.Metadata.IncompleteKinds),
 		"duration", time.Since(startedAt),
 	)
 	apgin.APIJSON(gctx, http.StatusOK, response)
 }
 
-func parseSearchResourceTypes(rawTypes []string) ([]database.SearchResourceType, bool, error) {
-	if len(rawTypes) == 0 {
+func parseSearchResourceKinds(rawKinds []string) ([]database.SearchResourceType, bool, error) {
+	if len(rawKinds) == 0 {
 		return database.SearchResourceTypes(), false, nil
 	}
-	seen := make(map[database.SearchResourceType]struct{}, len(rawTypes))
-	result := make([]database.SearchResourceType, 0, len(rawTypes))
-	for _, rawType := range rawTypes {
-		resourceType := database.SearchResourceType(strings.TrimSpace(rawType))
-		if !database.IsValidSearchResourceType(resourceType) {
-			return nil, true, httperr.BadRequestf("invalid resource_type %q", rawType)
+	seen := make(map[database.SearchResourceType]struct{}, len(rawKinds))
+	result := make([]database.SearchResourceType, 0, len(rawKinds))
+	for _, rawKind := range rawKinds {
+		kind := meta.Kind(strings.TrimSpace(rawKind))
+		resourceType, ok := searchResourceTypeByKind[kind]
+		if !ok {
+			return nil, true, httperr.BadRequestf("invalid kind %q", rawKind)
 		}
 		if _, ok := seen[resourceType]; ok {
 			continue
@@ -363,10 +372,10 @@ func intersectNamespaceMatchers(left, right []string) []string {
 	return result
 }
 
-func schemaSearchTypes(values map[database.SearchResourceType]struct{}) []schemaapi.SearchResourceType {
-	result := make([]schemaapi.SearchResourceType, 0, len(values))
+func schemaSearchKinds(values map[database.SearchResourceType]struct{}) []meta.Kind {
+	result := make([]meta.Kind, 0, len(values))
 	for resourceType := range values {
-		result = append(result, schemaapi.SearchResourceType(resourceType))
+		result = append(result, searchResourceKindByType[resourceType])
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i] < result[j] })
 	return result
