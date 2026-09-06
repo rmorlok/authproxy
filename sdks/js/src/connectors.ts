@@ -1,238 +1,287 @@
-import {client} from './client';
-import {ListResponse} from './common';
+import { client } from './client';
+import {
+  MutableResourceMetadata,
+  NamespacedCreateMetadata,
+  ObjectMetadata,
+  ResourceList,
+  TypeMeta,
+} from './common';
 
-// Connector models
-export interface ConnectorVersion {
-    id: string;
-    name: string;
-    version: number;
-    namespace: string;
-    state: ConnectorVersionState;
-    definition: Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
-    labels?: Record<string, string>;
-    annotations?: Record<string, string>;
-    createdAt: string;
-    updatedAt: string;
+export const CONNECTOR_KIND = 'Connector' as const;
+
+export enum ConnectorReleaseState {
+  DRAFT = 'draft',
+  PRIMARY = 'primary',
+  ACTIVE = 'active',
+  ARCHIVED = 'archived',
 }
 
-export interface Connector {
-    id: string;
-    name: string;
-    version: number;
-    namespace: string;
-    state: ConnectorVersionState;
-    displayName: string;
-    description: string;
-    highlight?: string;
-    statusPageUrl?: string;
-    logo: string;
-    hasConfigure: boolean;
-    labels?: Record<string, string>;
-    annotations?: Record<string, string>;
-    createdAt: string;
-    updatedAt: string;
+/**
+ * Connector definitions are open, connector-authored documents validated by
+ * the server's connector schema. The SDK preserves every definition field.
+ */
+export type ConnectorDefinition = Record<string, unknown>;
+
+export interface ConnectorMetadata extends ObjectMetadata {
+  id: string;
+  name: string;
+  namespace: string;
+  generation: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
-export interface PutConnectorAnnotationRequest {
-    value: string;
+export interface ConnectorReleaseSpec {
+  desiredState?: ConnectorReleaseState.DRAFT | ConnectorReleaseState.PRIMARY;
 }
 
-export interface ConnectorAnnotation {
-    key: string;
-    value: string;
+export interface ConnectorSpec {
+  release?: ConnectorReleaseSpec;
+  definition: ConnectorDefinition;
 }
 
-export enum ConnectorVersionState {
-    DRAFT = 'draft',
-    PRIMARY = 'primary',
-    ACTIVE = 'active',
-    ARCHIVED = 'archived',
+export interface ConnectorStatus {
+  release: {
+    state: ConnectorReleaseState;
+  };
 }
 
-export interface ListConnectorsParams {
-    name?: string;
-    state?: ConnectorVersionState;
-    namespace?: string;
-    labelSelector?: string;
-    cursor?: string;
-    limit?: number;
-    orderBy?: string;
+/**
+ * Every connector generation is a Connector resource. The logical connector
+ * is metadata.id; metadata.generation selects a specific version.
+ */
+export interface Connector extends TypeMeta<typeof CONNECTOR_KIND> {
+  metadata: ConnectorMetadata;
+  spec: ConnectorSpec;
+  status: ConnectorStatus;
 }
 
-export interface ListConnectorVersionsParams {
-    state?: ConnectorVersionState;
-    namespace?: string;
-    labelSelector?: string;
-    cursor?: string;
-    limit?: number;
-    orderBy?: string;
+export interface CreateConnectorRequest extends TypeMeta<typeof CONNECTOR_KIND> {
+  metadata: NamespacedCreateMetadata;
+  spec: ConnectorSpec;
 }
+
+export interface UpdateConnectorRequest extends TypeMeta<typeof CONNECTOR_KIND> {
+  metadata: MutableResourceMetadata;
+  spec: {
+    release?: {
+      desiredState?: ConnectorReleaseState.DRAFT | ConnectorReleaseState.PRIMARY;
+    };
+    definition?: ConnectorDefinition;
+  };
+}
+
+export type ConnectorList = ResourceList<Connector>;
 
 export interface ConnectorLifecycleRequest {
-    timeoutSeconds?: number;
+  timeoutSeconds?: number;
 }
 
 export interface ConnectorLifecycleResponse {
-    taskId: string;
-    connectorId: string;
+  taskId: string;
+  connectorId: string;
 }
 
-export interface UpdateConnectorRequest {
-    name?: string;
-    definition?: Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
-    labels?: Record<string, string>;
-    annotations?: Record<string, string>;
+export interface ForceConnectorGenerationStateRequest {
+  state: ConnectorReleaseState;
 }
 
-/**
- * Get a list of all available connectors
- */
-export const listConnectors = (params: ListConnectorsParams) => {
-    return client.get<ListResponse<Connector>>('/api/v1/connectors', {params});
-};
+export interface ListConnectorsParams {
+  name?: string;
+  state?: ConnectorReleaseState;
+  namespace?: string;
+  labelSelector?: string;
+  cursor?: string;
+  limit?: number;
+  orderBy?: string;
+}
 
-/**
- * Get a specific connector by ID
- */
-export const getConnector = (id: string) => {
-    return client.get<Connector>(`/api/v1/connectors/${id}`);
-};
+export interface ListConnectorGenerationsParams {
+  state?: ConnectorReleaseState;
+  namespace?: string;
+  labelSelector?: string;
+  cursor?: string;
+  limit?: number;
+  orderBy?: string;
+}
 
-/**
- * Update a connector name and/or its draft-version metadata.
- */
-export const updateConnector = (id: string, request: UpdateConnectorRequest) => {
-    return client.patch<ConnectorVersion>(`/api/v1/connectors/${id}`, request);
-};
+export interface ConnectorLabel {
+  key: string;
+  value: string;
+}
 
-/**
- * Get versions for a specific connector by ID
- */
-export const listConnectorVersions = (
-    id: string,
-    params: ListConnectorVersionsParams
+export interface ConnectorAnnotation {
+  key: string;
+  value: string;
+}
+
+export const listConnectors = (params?: ListConnectorsParams) =>
+  client.get<ConnectorList>('/api/v1/connectors', { params });
+
+export const createConnector = (request: CreateConnectorRequest) =>
+  client.post<Connector>('/api/v1/connectors', request);
+
+export const getConnector = (id: string) =>
+  client.get<Connector>(`/api/v1/connectors/${id}`);
+
+/** Updates connector-level metadata and the current draft generation. */
+export const updateConnector = (id: string, request: UpdateConnectorRequest) =>
+  client.patch<Connector>(`/api/v1/connectors/${id}`, request);
+
+export const listConnectorGenerations = (
+  id: string,
+  params?: ListConnectorGenerationsParams,
+) =>
+  client.get<ConnectorList>(`/api/v1/connectors/${id}/versions`, { params });
+
+export const createConnectorGeneration = (
+  id: string,
+  request?: CreateConnectorRequest,
+) => client.post<Connector>(`/api/v1/connectors/${id}/versions`, request);
+
+export const getConnectorGeneration = (id: string, generation: number) =>
+  client.get<Connector>(`/api/v1/connectors/${id}/versions/${generation}`);
+
+export const updateConnectorGeneration = (
+  id: string,
+  generation: number,
+  request: UpdateConnectorRequest,
+) => client.patch<Connector>(`/api/v1/connectors/${id}/versions/${generation}`, request);
+
+export const forceConnectorGenerationState = (
+  id: string,
+  generation: number,
+  state: ConnectorReleaseState,
 ) => {
-    return client.get<ListResponse<ConnectorVersion>>(
-        `/api/v1/connectors/${id}/versions`,
-        {params}
-    );
+  const request: ForceConnectorGenerationStateRequest = { state };
+  return client.put<Connector>(
+    `/api/v1/connectors/${id}/versions/${generation}/_forceState`,
+    request,
+  );
 };
 
-/**
- * Get a specific connector version by ID and version number
- */
-export const getConnectorVersion = (id: string, version: number) => {
-    return client.get<ConnectorVersion>(`/api/v1/connectors/${id}/versions/${version}`);
-};
+export const disconnectAllConnectorConnections = (
+  id: string,
+  request?: ConnectorLifecycleRequest,
+) => client.post<ConnectorLifecycleResponse>(`/api/v1/connectors/${id}/_disconnectAll`, request);
 
-export interface ForceConnectorVersionStateRequest {
-    state: ConnectorVersionState;
-}
+export const archiveConnector = (id: string, request?: ConnectorLifecycleRequest) =>
+  client.post<ConnectorLifecycleResponse>(`/api/v1/connectors/${id}/_archive`, request);
 
-export type ForceConnectorVersionStateResponse = ConnectorVersion;
+export const getConnectorLabels = (id: string) =>
+  client.get<Record<string, string>>(`/api/v1/connectors/${id}/labels`);
 
-/**
- * Force a connector version into a specific state (admin operation)
- */
-export const forceConnectorVersionState = (id: string, version: number, state: ConnectorVersionState) => {
-    const request: ForceConnectorVersionStateRequest = { state };
-    return client.put<ForceConnectorVersionStateResponse>(
-        `/api/v1/connectors/${id}/versions/${version}/_forceState`,
-        request
-    );
-};
+export const getConnectorLabel = (id: string, labelKey: string) =>
+  client.get<ConnectorLabel>(`/api/v1/connectors/${id}/labels/${labelKey}`);
 
-/**
- * Disconnect all connections for a connector.
- */
-export const disconnectAllConnectorConnections = (id: string, request?: ConnectorLifecycleRequest) => {
-    return client.post<ConnectorLifecycleResponse>(
-        `/api/v1/connectors/${id}/_disconnectAll`,
-        request
-    );
-};
+export const putConnectorLabel = (id: string, labelKey: string, value: string) =>
+  client.put<ConnectorLabel>(`/api/v1/connectors/${id}/labels/${labelKey}`, { value });
 
-/**
- * Archive a connector after disconnecting its connections.
- */
-export const archiveConnector = (id: string, request?: ConnectorLifecycleRequest) => {
-    return client.post<ConnectorLifecycleResponse>(
-        `/api/v1/connectors/${id}/_archive`,
-        request
-    );
-};
+export const deleteConnectorLabel = (id: string, labelKey: string) =>
+  client.delete(`/api/v1/connectors/${id}/labels/${labelKey}`);
 
-/**
- * Get all annotations for a specific connector
- */
-export const getConnectorAnnotations = (id: string) => {
-    return client.get<Record<string, string>>(`/api/v1/connectors/${id}/annotations`);
-};
+export const getConnectorAnnotations = (id: string) =>
+  client.get<Record<string, string>>(`/api/v1/connectors/${id}/annotations`);
 
-/**
- * Get a specific annotation for a connector
- */
-export const getConnectorAnnotation = (id: string, annotationKey: string) => {
-    return client.get<ConnectorAnnotation>(`/api/v1/connectors/${id}/annotations/${annotationKey}`);
-};
+export const getConnectorAnnotation = (id: string, annotationKey: string) =>
+  client.get<ConnectorAnnotation>(`/api/v1/connectors/${id}/annotations/${annotationKey}`);
 
-/**
- * Set a specific annotation for a connector
- */
-export const putConnectorAnnotation = (id: string, annotationKey: string, value: string) => {
-    return client.put<ConnectorAnnotation>(`/api/v1/connectors/${id}/annotations/${annotationKey}`, { value });
-};
+export const putConnectorAnnotation = (id: string, annotationKey: string, value: string) =>
+  client.put<ConnectorAnnotation>(`/api/v1/connectors/${id}/annotations/${annotationKey}`, {
+    value,
+  });
 
-/**
- * Delete a specific annotation from a connector
- */
-export const deleteConnectorAnnotation = (id: string, annotationKey: string) => {
-    return client.delete(`/api/v1/connectors/${id}/annotations/${annotationKey}`);
-};
+export const deleteConnectorAnnotation = (id: string, annotationKey: string) =>
+  client.delete(`/api/v1/connectors/${id}/annotations/${annotationKey}`);
 
-/**
- * Get all annotations for a specific connector version
- */
-export const getConnectorVersionAnnotations = (id: string, version: number) => {
-    return client.get<Record<string, string>>(`/api/v1/connectors/${id}/versions/${version}/annotations`);
-};
+export const getConnectorGenerationLabels = (id: string, generation: number) =>
+  client.get<Record<string, string>>(
+    `/api/v1/connectors/${id}/versions/${generation}/labels`,
+  );
 
-/**
- * Get a specific annotation for a connector version
- */
-export const getConnectorVersionAnnotation = (id: string, version: number, annotationKey: string) => {
-    return client.get<ConnectorAnnotation>(`/api/v1/connectors/${id}/versions/${version}/annotations/${annotationKey}`);
-};
+export const getConnectorGenerationLabel = (
+  id: string,
+  generation: number,
+  labelKey: string,
+) =>
+  client.get<ConnectorLabel>(
+    `/api/v1/connectors/${id}/versions/${generation}/labels/${labelKey}`,
+  );
 
-/**
- * Set a specific annotation for a connector version
- */
-export const putConnectorVersionAnnotation = (id: string, version: number, annotationKey: string, value: string) => {
-    return client.put<ConnectorAnnotation>(`/api/v1/connectors/${id}/versions/${version}/annotations/${annotationKey}`, { value });
-};
+export const putConnectorGenerationLabel = (
+  id: string,
+  generation: number,
+  labelKey: string,
+  value: string,
+) =>
+  client.put<ConnectorLabel>(
+    `/api/v1/connectors/${id}/versions/${generation}/labels/${labelKey}`,
+    { value },
+  );
 
-/**
- * Delete a specific annotation from a connector version
- */
-export const deleteConnectorVersionAnnotation = (id: string, version: number, annotationKey: string) => {
-    return client.delete(`/api/v1/connectors/${id}/versions/${version}/annotations/${annotationKey}`);
-};
+export const deleteConnectorGenerationLabel = (
+  id: string,
+  generation: number,
+  labelKey: string,
+) => client.delete(`/api/v1/connectors/${id}/versions/${generation}/labels/${labelKey}`);
+
+export const getConnectorGenerationAnnotations = (id: string, generation: number) =>
+  client.get<Record<string, string>>(
+    `/api/v1/connectors/${id}/versions/${generation}/annotations`,
+  );
+
+export const getConnectorGenerationAnnotation = (
+  id: string,
+  generation: number,
+  annotationKey: string,
+) =>
+  client.get<ConnectorAnnotation>(
+    `/api/v1/connectors/${id}/versions/${generation}/annotations/${annotationKey}`,
+  );
+
+export const putConnectorGenerationAnnotation = (
+  id: string,
+  generation: number,
+  annotationKey: string,
+  value: string,
+) =>
+  client.put<ConnectorAnnotation>(
+    `/api/v1/connectors/${id}/versions/${generation}/annotations/${annotationKey}`,
+    { value },
+  );
+
+export const deleteConnectorGenerationAnnotation = (
+  id: string,
+  generation: number,
+  annotationKey: string,
+) => client.delete(`/api/v1/connectors/${id}/versions/${generation}/annotations/${annotationKey}`);
 
 export const connectors = {
-    list: listConnectors,
-    get: getConnector,
-    update: updateConnector,
-    listVersions: listConnectorVersions,
-    getVersion: getConnectorVersion,
-    forceVersionState: forceConnectorVersionState,
-    disconnectAll: disconnectAllConnectorConnections,
-    archive: archiveConnector,
-    getAnnotations: getConnectorAnnotations,
-    getAnnotation: getConnectorAnnotation,
-    putAnnotation: putConnectorAnnotation,
-    deleteAnnotation: deleteConnectorAnnotation,
-    getVersionAnnotations: getConnectorVersionAnnotations,
-    getVersionAnnotation: getConnectorVersionAnnotation,
-    putVersionAnnotation: putConnectorVersionAnnotation,
-    deleteVersionAnnotation: deleteConnectorVersionAnnotation,
+  list: listConnectors,
+  create: createConnector,
+  get: getConnector,
+  update: updateConnector,
+  listGenerations: listConnectorGenerations,
+  createGeneration: createConnectorGeneration,
+  getGeneration: getConnectorGeneration,
+  updateGeneration: updateConnectorGeneration,
+  forceGenerationState: forceConnectorGenerationState,
+  disconnectAll: disconnectAllConnectorConnections,
+  archive: archiveConnector,
+  getLabels: getConnectorLabels,
+  getLabel: getConnectorLabel,
+  putLabel: putConnectorLabel,
+  deleteLabel: deleteConnectorLabel,
+  getAnnotations: getConnectorAnnotations,
+  getAnnotation: getConnectorAnnotation,
+  putAnnotation: putConnectorAnnotation,
+  deleteAnnotation: deleteConnectorAnnotation,
+  getGenerationLabels: getConnectorGenerationLabels,
+  getGenerationLabel: getConnectorGenerationLabel,
+  putGenerationLabel: putConnectorGenerationLabel,
+  deleteGenerationLabel: deleteConnectorGenerationLabel,
+  getGenerationAnnotations: getConnectorGenerationAnnotations,
+  getGenerationAnnotation: getConnectorGenerationAnnotation,
+  putGenerationAnnotation: putConnectorGenerationAnnotation,
+  deleteGenerationAnnotation: deleteConnectorGenerationAnnotation,
 };

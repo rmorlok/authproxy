@@ -1,50 +1,69 @@
 import { AxiosRequestConfig } from 'axios';
 import { client } from './client';
+import {
+  ActionResponse,
+  ObjectMetadata,
+  ObjectReference,
+  ResourceList,
+  TypeMeta,
+} from './common';
+import { OperationActionStatus } from './taskMonitoring';
 
-export interface WorkflowInstance {
+export const WORKFLOW_INSTANCE_KIND = 'WorkflowInstance' as const;
+export const WORKFLOW_HISTORY_EVENT_KIND = 'WorkflowHistoryEvent' as const;
+export const WORKFLOW_INSTANCE_CANCEL_KIND = 'WorkflowInstanceCancel' as const;
+export const WORKFLOW_INSTANCE_DELETE_KIND = 'WorkflowInstanceDelete' as const;
+
+export interface WorkflowInstanceReference {
+  target: ObjectReference<typeof WORKFLOW_INSTANCE_KIND>;
   instanceId: string;
-  executionId: string;
-  parent?: WorkflowInstance;
 }
 
 export type WorkflowInstanceState = 'active' | 'continued_as_new' | 'finished' | string;
 
-export interface WorkflowInstanceRef {
-  instance?: WorkflowInstance;
-  createdAt?: string;
-  completedAt?: string;
-  state: WorkflowInstanceState;
-  queue: string;
+export interface WorkflowInstance extends TypeMeta<typeof WORKFLOW_INSTANCE_KIND> {
+  /** metadata.id is the unique execution ID. */
+  metadata: ObjectMetadata & { id: string };
+  spec: {
+    /** Logical workflow instance ID, required together with metadata.id for addressing. */
+    instanceId: string;
+    queue: string;
+    parentRef?: WorkflowInstanceReference;
+    workflowName?: string;
+  };
+  status: {
+    state: WorkflowInstanceState;
+    completedAt?: string;
+    error?: boolean;
+    history?: WorkflowHistoryEvent[];
+    children?: WorkflowInstance[];
+  };
 }
 
-export interface WorkflowHistoryEvent {
-  id?: string;
-  sequenceId?: number;
-  type?: string;
-  timestamp?: string;
-  scheduleEventId?: number;
-  attributes?: unknown;
-  visibleAt?: string;
+export interface WorkflowHistoryEvent extends TypeMeta<typeof WORKFLOW_HISTORY_EVENT_KIND> {
+  metadata: ObjectMetadata;
+  spec: {
+    sequenceId?: number;
+    type?: string;
+    scheduleEventId?: number;
+    attributes?: unknown;
+    visibleAt?: string;
+  };
 }
 
-export interface WorkflowInstanceInfo extends WorkflowInstanceRef {
-  history?: WorkflowHistoryEvent[];
-}
+export type WorkflowInstanceList = ResourceList<WorkflowInstance>;
+export type WorkflowHistoryEventList = ResourceList<WorkflowHistoryEvent>;
 
-export interface WorkflowInstanceTree extends WorkflowInstanceRef {
-  workflowName?: string;
-  error?: boolean;
-  children?: WorkflowInstanceTree[];
-}
+export type WorkflowInstanceActionKind =
+  | typeof WORKFLOW_INSTANCE_CANCEL_KIND
+  | typeof WORKFLOW_INSTANCE_DELETE_KIND;
 
-export interface ListWorkflowInstancesResponse {
-  items: WorkflowInstanceRef[];
-  cursor?: string;
-}
-
-export interface ListWorkflowHistoryResponse {
-  items: WorkflowHistoryEvent[];
-}
+export type WorkflowInstanceAction<K extends WorkflowInstanceActionKind> = ActionResponse<
+  K,
+  typeof WORKFLOW_INSTANCE_KIND,
+  { instanceId: string },
+  OperationActionStatus
+>;
 
 export interface ListWorkflowInstancesParams {
   cursor?: string;
@@ -56,33 +75,31 @@ const instancePath = (instanceId: string, executionId: string) =>
 
 export const listWorkflowInstances = (
   params?: ListWorkflowInstancesParams,
-  config?: AxiosRequestConfig
-) => {
-  return client.get<ListWorkflowInstancesResponse>('/api/v1/workflow-monitoring/instances', {
+  config?: AxiosRequestConfig,
+) =>
+  client.get<WorkflowInstanceList>('/api/v1/workflow-monitoring/instances', {
     ...config,
     params,
   });
-};
 
-export const getWorkflowInstance = (instanceId: string, executionId: string) => {
-  return client.get<WorkflowInstanceInfo>(instancePath(instanceId, executionId));
-};
+export const getWorkflowInstance = (instanceId: string, executionId: string) =>
+  client.get<WorkflowInstance>(instancePath(instanceId, executionId));
 
-export const listWorkflowHistory = (instanceId: string, executionId: string) => {
-  return client.get<ListWorkflowHistoryResponse>(`${instancePath(instanceId, executionId)}/history`);
-};
+export const listWorkflowHistory = (instanceId: string, executionId: string) =>
+  client.get<WorkflowHistoryEventList>(`${instancePath(instanceId, executionId)}/history`);
 
-export const getWorkflowTree = (instanceId: string, executionId: string) => {
-  return client.get<WorkflowInstanceTree>(`${instancePath(instanceId, executionId)}/tree`);
-};
+export const getWorkflowTree = (instanceId: string, executionId: string) =>
+  client.get<WorkflowInstance>(`${instancePath(instanceId, executionId)}/tree`);
 
-export const cancelWorkflowInstance = (instanceId: string, executionId: string) => {
-  return client.post<{ ok: boolean }>(`${instancePath(instanceId, executionId)}/_cancel`);
-};
+export const cancelWorkflowInstance = (instanceId: string, executionId: string) =>
+  client.post<WorkflowInstanceAction<typeof WORKFLOW_INSTANCE_CANCEL_KIND>>(
+    `${instancePath(instanceId, executionId)}/_cancel`,
+  );
 
-export const removeWorkflowInstance = (instanceId: string, executionId: string) => {
-  return client.delete<{ ok: boolean }>(instancePath(instanceId, executionId));
-};
+export const removeWorkflowInstance = (instanceId: string, executionId: string) =>
+  client.delete<WorkflowInstanceAction<typeof WORKFLOW_INSTANCE_DELETE_KIND>>(
+    instancePath(instanceId, executionId),
+  );
 
 export const workflowMonitoring = {
   listWorkflowInstances,

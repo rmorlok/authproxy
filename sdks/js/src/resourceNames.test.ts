@@ -8,14 +8,14 @@ vi.mock('./client', () => ({
     client: {get: getMock, post: postMock, patch: patchMock},
 }));
 
-import {ACTOR_API_VERSION, ACTOR_KIND, createActor, updateActor} from './actors';
+import {ACTOR_KIND, createActor, updateActor} from './actors';
+import {API_VERSION, objectReference} from './common';
 import {initiateConnection, updateConnection} from './connections';
-import {updateConnector} from './connectors';
-import {createKey, listKeys, updateKey} from './keys';
+import {CONNECTOR_KIND, updateConnector} from './connectors';
+import {createKey, KeyState, listKeys, updateKey} from './keys';
 import {listNamespaces} from './namespaces';
 import {
     createRateLimit,
-    RATE_LIMIT_API_VERSION,
     RATE_LIMIT_KIND,
     RateLimitMode,
     updateRateLimit,
@@ -30,15 +30,24 @@ describe('resource name contracts', () => {
 
     it('sends optional names on create requests', () => {
         createActor({
-            apiVersion: ACTOR_API_VERSION,
+            apiVersion: API_VERSION,
             kind: ACTOR_KIND,
             metadata: {namespace: 'root', name: 'customer'},
             spec: {externalId: 'customer-1'},
         });
-        initiateConnection('cxr_test', '/return', {env: 'prod'}, 'production-crm');
-        createKey({namespace: 'root', name: 'primary-key'});
+        initiateConnection(objectReference(CONNECTOR_KIND, {id: 'cxr_test'}), {
+            returnToUrl: '/return',
+            labels: {env: 'prod'},
+            name: 'production-crm',
+        });
+        createKey({
+            apiVersion: API_VERSION,
+            kind: 'Key',
+            metadata: {namespace: 'root', name: 'primary-key'},
+            spec: {keyData: {numBytes: 32}},
+        });
         createRateLimit({
-            apiVersion: RATE_LIMIT_API_VERSION,
+            apiVersion: API_VERSION,
             kind: RATE_LIMIT_KIND,
             metadata: {namespace: 'root', name: 'public-api'},
             spec: {
@@ -50,14 +59,20 @@ describe('resource name contracts', () => {
         });
 
         expect(postMock).toHaveBeenCalledWith('/api/v1/actors', expect.objectContaining({
-            apiVersion: ACTOR_API_VERSION,
+            apiVersion: API_VERSION,
             kind: ACTOR_KIND,
             metadata: expect.objectContaining({name: 'customer'}),
         }));
-        expect(postMock).toHaveBeenCalledWith('/api/v1/connections/_initiate', expect.objectContaining({name: 'production-crm'}));
-        expect(postMock).toHaveBeenCalledWith('/api/v1/keys', expect.objectContaining({name: 'primary-key'}));
+        expect(postMock).toHaveBeenCalledWith('/api/v1/connections/_initiate', expect.objectContaining({
+            apiVersion: API_VERSION,
+            kind: 'ConnectionInitiate',
+            spec: expect.objectContaining({name: 'production-crm'}),
+        }));
+        expect(postMock).toHaveBeenCalledWith('/api/v1/keys', expect.objectContaining({
+            metadata: expect.objectContaining({name: 'primary-key'}),
+        }));
         expect(postMock).toHaveBeenCalledWith('/api/v1/rate-limits', expect.objectContaining({
-            apiVersion: RATE_LIMIT_API_VERSION,
+            apiVersion: API_VERSION,
             kind: RATE_LIMIT_KIND,
             metadata: expect.objectContaining({name: 'public-api'}),
         }));
@@ -65,32 +80,61 @@ describe('resource name contracts', () => {
 
     it('renames resources by immutable id', () => {
         updateActor('act_test', {
-            apiVersion: ACTOR_API_VERSION,
+            apiVersion: API_VERSION,
             kind: ACTOR_KIND,
             metadata: {name: 'actor-name'},
             spec: {},
         });
-        updateConnection('cxn_test', {name: 'connection-name'});
-        updateConnector('cxr_test', {name: 'connector-name'});
-        updateKey('key_test', {name: 'key-name'});
+        updateConnection('cxn_test', {
+            apiVersion: API_VERSION,
+            kind: 'Connection',
+            metadata: {name: 'connection-name'},
+            spec: {},
+        });
+        updateConnector('cxr_test', {
+            apiVersion: API_VERSION,
+            kind: CONNECTOR_KIND,
+            metadata: {name: 'connector-name'},
+            spec: {},
+        });
+        updateKey('key_test', {
+            apiVersion: API_VERSION,
+            kind: 'Key',
+            metadata: {name: 'key-name'},
+            spec: {desiredState: KeyState.ACTIVE},
+        });
         updateRateLimit('rl_test', {
-            apiVersion: RATE_LIMIT_API_VERSION,
+            apiVersion: API_VERSION,
             kind: RATE_LIMIT_KIND,
             metadata: {name: 'limit-name'},
             spec: {},
         });
 
         expect(patchMock).toHaveBeenCalledWith('/api/v1/actors/act_test', {
-            apiVersion: ACTOR_API_VERSION,
+            apiVersion: API_VERSION,
             kind: ACTOR_KIND,
             metadata: {name: 'actor-name'},
             spec: {},
         });
-        expect(patchMock).toHaveBeenCalledWith('/api/v1/connections/cxn_test', {name: 'connection-name'});
-        expect(patchMock).toHaveBeenCalledWith('/api/v1/connectors/cxr_test', {name: 'connector-name'});
-        expect(patchMock).toHaveBeenCalledWith('/api/v1/keys/key_test', {name: 'key-name'});
+        expect(patchMock).toHaveBeenCalledWith('/api/v1/connections/cxn_test', expect.objectContaining({
+            apiVersion: API_VERSION,
+            kind: 'Connection',
+            metadata: {name: 'connection-name'},
+            spec: {},
+        }));
+        expect(patchMock).toHaveBeenCalledWith('/api/v1/connectors/cxr_test', expect.objectContaining({
+            apiVersion: API_VERSION,
+            kind: CONNECTOR_KIND,
+            metadata: {name: 'connector-name'},
+            spec: {},
+        }));
+        expect(patchMock).toHaveBeenCalledWith('/api/v1/keys/key_test', expect.objectContaining({
+            apiVersion: API_VERSION,
+            kind: 'Key',
+            metadata: {name: 'key-name'},
+        }));
         expect(patchMock).toHaveBeenCalledWith('/api/v1/rate-limits/rl_test', {
-            apiVersion: RATE_LIMIT_API_VERSION,
+            apiVersion: API_VERSION,
             kind: RATE_LIMIT_KIND,
             metadata: {name: 'limit-name'},
             spec: {},

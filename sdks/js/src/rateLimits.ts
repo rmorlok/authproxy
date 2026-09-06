@@ -1,10 +1,16 @@
 import { client } from './client';
-import { ListResponse } from './common';
+import {
+    GenerationlessObjectReference,
+    MutableResourceMetadata,
+    NamespacedCreateMetadata,
+    ObjectMetadata,
+    ResourceList,
+    TypeMeta,
+} from './common';
 import { ProxyRequest } from './proxy';
 
 // Rate-limit models mirror the canonical authproxy.net/v1alpha1 resource.
 
-export const RATE_LIMIT_API_VERSION = 'authproxy.net/v1alpha1' as const;
 export const RATE_LIMIT_KIND = 'RateLimit' as const;
 
 export enum RateLimitMode {
@@ -70,27 +76,14 @@ export interface RateLimitTokenBucket {
  * Tagged union — exactly one variant must be set. The server (and the
  * Terraform provider) validate this at write time.
  */
-export interface RateLimitAlgorithm {
-    fixedWindow?: RateLimitFixedWindow;
-    slidingWindow?: RateLimitSlidingWindow;
-    tokenBucket?: RateLimitTokenBucket;
-}
+export type RateLimitAlgorithm =
+    | {fixedWindow: RateLimitFixedWindow; slidingWindow?: never; tokenBucket?: never}
+    | {slidingWindow: RateLimitSlidingWindow; fixedWindow?: never; tokenBucket?: never}
+    | {tokenBucket: RateLimitTokenBucket; fixedWindow?: never; slidingWindow?: never};
 
-export interface RateLimitConnectorReference {
-    apiVersion: typeof RATE_LIMIT_API_VERSION;
-    kind: 'Connector';
-    id?: string;
-    name?: string;
-    namespace?: string;
-}
+export type RateLimitConnectorReference = GenerationlessObjectReference<'Connector'>;
 
-export interface RateLimitConnectionReference {
-    apiVersion: typeof RATE_LIMIT_API_VERSION;
-    kind: 'Connection';
-    id?: string;
-    name?: string;
-    namespace?: string;
-}
+export type RateLimitConnectionReference = GenerationlessObjectReference<'Connection'>;
 
 export type RateLimitScope =
     | {namespaceMatcher: string; connectorRef?: never; connectionRef?: never}
@@ -106,12 +99,10 @@ export interface RateLimitSpec {
     algorithm: RateLimitAlgorithm;
 }
 
-export interface RateLimitMetadata {
+export interface RateLimitMetadata extends ObjectMetadata {
     id: string;
     name: string;
     namespace: string;
-    labels?: Record<string, string>;
-    annotations?: Record<string, string>;
     createdAt: string;
     updatedAt: string;
 }
@@ -120,34 +111,19 @@ export interface RateLimitStatus {
     effectiveMode: RateLimitMode;
 }
 
-export interface RateLimit {
-    apiVersion: typeof RATE_LIMIT_API_VERSION;
-    kind: typeof RATE_LIMIT_KIND;
+export interface RateLimit extends TypeMeta<typeof RATE_LIMIT_KIND> {
     metadata: RateLimitMetadata;
     spec: RateLimitSpec;
     status: RateLimitStatus;
 }
 
-export interface CreateRateLimitRequest {
-    apiVersion: typeof RATE_LIMIT_API_VERSION;
-    kind: typeof RATE_LIMIT_KIND;
-    metadata: {
-        namespace: string;
-        name?: string;
-        labels?: Record<string, string>;
-        annotations?: Record<string, string>;
-    };
+export interface CreateRateLimitRequest extends TypeMeta<typeof RATE_LIMIT_KIND> {
+    metadata: NamespacedCreateMetadata;
     spec: RateLimitSpec;
 }
 
-export interface UpdateRateLimitRequest {
-    apiVersion: typeof RATE_LIMIT_API_VERSION;
-    kind: typeof RATE_LIMIT_KIND;
-    metadata: {
-        name?: string;
-        labels?: Record<string, string>;
-        annotations?: Record<string, string>;
-    };
+export interface UpdateRateLimitRequest extends TypeMeta<typeof RATE_LIMIT_KIND> {
+    metadata: MutableResourceMetadata;
     spec: {
         scope?: RateLimitScope | null;
         mode?: RateLimitMode;
@@ -156,6 +132,8 @@ export interface UpdateRateLimitRequest {
         algorithm?: RateLimitAlgorithm;
     };
 }
+
+export type RateLimitList = ResourceList<RateLimit>;
 
 export interface ListRateLimitsParams {
     name?: string;
@@ -169,8 +147,8 @@ export interface ListRateLimitsParams {
 /**
  * List rate limits with optional filtering and pagination.
  */
-export const listRateLimits = (params: ListRateLimitsParams) => {
-    return client.get<ListResponse<RateLimit>>('/api/v1/rate-limits', { params });
+export const listRateLimits = (params?: ListRateLimitsParams) => {
+    return client.get<RateLimitList>('/api/v1/rate-limits', { params });
 };
 
 /**
