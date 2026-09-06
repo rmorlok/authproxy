@@ -1032,6 +1032,327 @@ definitions:
         example: 1
         type: number
     type: object
+  openapi.RequestEventActorReferenceJson:
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      id:
+        example: act_01example
+        type: string
+      kind:
+        enum:
+        - Actor
+        example: Actor
+        type: string
+      name:
+        example: billing-service
+        type: string
+      namespace:
+        example: root.acme
+        type: string
+    required:
+    - apiVersion
+    - id
+    - kind
+    type: object
+  openapi.RequestEventCaptureJson:
+    properties:
+      request:
+        $ref: '#/definitions/openapi.RequestEventCapturedRequestJson'
+      response:
+        $ref: '#/definitions/openapi.RequestEventCapturedResponseJson'
+    required:
+    - request
+    - response
+    type: object
+  openapi.RequestEventCapturedRequestJson:
+    properties:
+      body:
+        format: byte
+        type: string
+      headers:
+        additionalProperties:
+          items:
+            type: string
+          type: array
+        type: object
+      url:
+        example: https://api.example.com/v1/users
+        type: string
+    required:
+    - headers
+    - url
+    type: object
+  openapi.RequestEventCapturedResponseJson:
+    properties:
+      body:
+        format: byte
+        type: string
+      headers:
+        additionalProperties:
+          items:
+            type: string
+          type: array
+        type: object
+    required:
+    - headers
+    type: object
+  openapi.RequestEventConnectionReferenceJson:
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      id:
+        example: cxn_01example
+        type: string
+      kind:
+        enum:
+        - Connection
+        example: Connection
+        type: string
+      name:
+        example: production
+        type: string
+      namespace:
+        example: root.acme
+        type: string
+    required:
+    - apiVersion
+    - id
+    - kind
+    type: object
+  openapi.RequestEventConnectorReferenceJson:
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      generation:
+        example: 3
+        type: integer
+      id:
+        example: cxr_01example
+        type: string
+      kind:
+        enum:
+        - Connector
+        example: Connector
+        type: string
+      name:
+        example: provider
+        type: string
+      namespace:
+        example: root.integrations
+        type: string
+    required:
+    - apiVersion
+    - id
+    - kind
+    type: object
+  openapi.RequestEventJson:
+    description: Immutable, resource-shaped HTTP request event projection
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - RequestEvent
+        example: RequestEvent
+        type: string
+      metadata:
+        $ref: '#/definitions/meta.ObjectMeta'
+      spec:
+        $ref: '#/definitions/openapi.RequestEventSpecJson'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
+  openapi.RequestEventListMetaJson:
+    properties:
+      continue:
+        type: string
+      total:
+        type: integer
+    type: object
+  openapi.RequestEventNamespaceReferenceJson:
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      id:
+        example: root.acme
+        type: string
+      kind:
+        enum:
+        - Namespace
+        example: Namespace
+        type: string
+    required:
+    - apiVersion
+    - id
+    - kind
+    type: object
+  openapi.RequestEventRateLimitJson:
+    properties:
+      bucket:
+        additionalProperties:
+          type: string
+        type: object
+      mode:
+        enum:
+        - enforce
+        - observe
+        example: enforce
+        type: string
+      rateLimitRef:
+        $ref: '#/definitions/openapi.RequestEventRateLimitReferenceJson'
+    required:
+    - mode
+    - rateLimitRef
+    type: object
+  openapi.RequestEventRateLimitReferenceJson:
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      id:
+        example: rl_01example
+        type: string
+      kind:
+        enum:
+        - RateLimit
+        example: RateLimit
+        type: string
+    required:
+    - apiVersion
+    - id
+    - kind
+    type: object
+  openapi.RequestEventRequestJson:
+    properties:
+      bodySkipped:
+        enum:
+        - streaming
+        - too_large
+        type: string
+      host:
+        example: api.example.com
+        type: string
+      httpVersion:
+        example: HTTP/2.0
+        type: string
+      method:
+        example: GET
+        type: string
+      mimeType:
+        example: application/json
+        type: string
+      path:
+        example: /v1/users
+        type: string
+      scheme:
+        example: https
+        type: string
+      sizeBytes:
+        type: integer
+    required:
+    - host
+    - method
+    - path
+    - scheme
+    type: object
+  openapi.RequestEventResponseJson:
+    properties:
+      bodySkipped:
+        enum:
+        - streaming
+        - too_large
+        type: string
+      error:
+        type: string
+      httpVersion:
+        example: HTTP/2.0
+        type: string
+      mimeType:
+        example: application/json
+        type: string
+      sizeBytes:
+        type: integer
+      source:
+        enum:
+        - upstream
+        - connector_rate_limiter
+        - rate_limit
+        example: upstream
+        type: string
+      statusCode:
+        example: 200
+        type: integer
+    type: object
+  openapi.RequestEventSpecJson:
+    properties:
+      actorRef:
+        $ref: '#/definitions/openapi.RequestEventActorReferenceJson'
+      capture:
+        $ref: '#/definitions/openapi.RequestEventCaptureJson'
+      captureAvailable:
+        type: boolean
+      connectionRef:
+        $ref: '#/definitions/openapi.RequestEventConnectionReferenceJson'
+      connectorRef:
+        $ref: '#/definitions/openapi.RequestEventConnectorReferenceJson'
+      correlationId:
+        type: string
+      durationMilliseconds:
+        example: 150
+        type: integer
+      internalTimeout:
+        type: boolean
+      namespaceRef:
+        $ref: '#/definitions/openapi.RequestEventNamespaceReferenceJson'
+      rateLimit:
+        $ref: '#/definitions/openapi.RequestEventRateLimitJson'
+      rateLimitsMatched:
+        items:
+          $ref: '#/definitions/openapi.RequestEventRateLimitJson'
+        type: array
+      request:
+        $ref: '#/definitions/openapi.RequestEventRequestJson'
+      requestCancelled:
+        type: boolean
+      requestType:
+        enum:
+        - global
+        - proxy
+        - oauth
+        - public
+        - probe
+        example: proxy
+        type: string
+      response:
+        $ref: '#/definitions/openapi.RequestEventResponseJson'
+    required:
+    - durationMilliseconds
+    - namespaceRef
+    - request
+    - requestType
+    - response
+    type: object
   openapi.SearchResultListMetaJson:
     properties:
       incompleteKinds:
@@ -1481,15 +1802,29 @@ definitions:
     - metadata
     type: object
   routes.OpenAPIListRequestEventsResponse:
-    description: Paginated list of request events entries
+    description: Paginated list of immutable request-event projections
     properties:
-      cursor:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
         type: string
       items:
-        items: {}
+        items:
+          $ref: '#/definitions/openapi.RequestEventJson'
         type: array
-      total:
-        type: integer
+      kind:
+        enum:
+        - RequestEventList
+        example: RequestEventList
+        type: string
+      metadata:
+        $ref: '#/definitions/openapi.RequestEventListMetaJson'
+    required:
+    - apiVersion
+    - items
+    - kind
+    - metadata
     type: object
   routes.OpenAPIMetricsSchemaResponse:
     description: Application metrics schema response
@@ -1564,63 +1899,27 @@ definitions:
         type: integer
     type: object
   routes.OpenAPIRequestEventsEntry:
-    description: HTTP request events entry
+    description: Immutable, resource-shaped HTTP request event projection
     properties:
-      connectionId:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
         type: string
-      connectorId:
+      kind:
+        enum:
+        - RequestEvent
+        example: RequestEvent
         type: string
-      connectorVersion:
-        type: integer
-      correlationId:
-        type: string
-      duration:
-        example: 150
-        type: integer
-      host:
-        example: api.example.com
-        type: string
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-      method:
-        example: GET
-        type: string
-      namespace:
-        example: root.acme
-        type: string
-      path:
-        example: /v1/users
-        type: string
-      rateLimitBucket:
-        additionalProperties:
-          type: string
-        type: object
-      rateLimitId:
-        type: string
-      rateLimitMatched:
-        items: {}
-        type: array
-      rateLimitMode:
-        type: string
-      requestId:
-        example: req_test550e8400abcde
-        type: string
-      responseSource:
-        example: upstream
-        type: string
-      responseStatusCode:
-        example: 200
-        type: integer
-      scheme:
-        example: https
-        type: string
-      timestamp:
-        type: string
-      type:
-        example: proxy
-        type: string
+      metadata:
+        $ref: '#/definitions/meta.ObjectMeta'
+      spec:
+        $ref: '#/definitions/openapi.RequestEventSpecJson'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
     type: object
   routes.OpenAPISearchResourcesResponseJson:
     properties:
@@ -5512,7 +5811,8 @@ paths:
     get:
       consumes:
       - application/json
-      description: List request events entries with optional filtering and pagination
+      description: List immutable request-event projections with optional filtering
+        and pagination
       parameters:
       - description: Pagination cursor
         in: query
@@ -5610,7 +5910,7 @@ paths:
     get:
       consumes:
       - application/json
-      description: Get a specific request events entry by its UUID
+      description: Get a specific immutable request event by its ID
       parameters:
       - description: Request events entry UUID
         in: path

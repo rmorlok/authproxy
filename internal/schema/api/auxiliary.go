@@ -43,54 +43,6 @@ type PutKeyValueRequestJson struct {
 	Value string `json:"value" yaml:"value" example:"production"`
 }
 
-// RequestEventJson documents the public request-event record projection.
-type RequestEventJson struct {
-	Namespace           string                  `json:"namespace" yaml:"namespace" example:"root.acme"`
-	Type                string                  `json:"type" yaml:"type" example:"proxy"`
-	RequestId           apid.ID                 `json:"requestId" yaml:"requestId" swaggertype:"string" example:"req_test550e8400abcde"`
-	CorrelationId       string                  `json:"correlationId,omitempty" yaml:"correlationId,omitempty"`
-	Timestamp           time.Time               `json:"timestamp" yaml:"timestamp"`
-	MillisecondDuration int64                   `json:"duration" yaml:"duration" example:"150"`
-	ConnectionId        apid.ID                 `json:"connectionId,omitempty" yaml:"connectionId,omitempty" swaggertype:"string"`
-	ConnectorId         apid.ID                 `json:"connectorId,omitempty" yaml:"connectorId,omitempty" swaggertype:"string"`
-	ConnectorVersion    uint64                  `json:"connectorVersion,omitempty" yaml:"connectorVersion,omitempty"`
-	Method              string                  `json:"method" yaml:"method" example:"GET"`
-	Host                string                  `json:"host" yaml:"host" example:"api.example.com"`
-	Scheme              string                  `json:"scheme" yaml:"scheme" example:"https"`
-	Path                string                  `json:"path" yaml:"path" example:"/v1/users"`
-	RequestHttpVersion  string                  `json:"requestHttpVersion,omitempty" yaml:"requestHttpVersion,omitempty"`
-	RequestSizeBytes    int64                   `json:"requestSizeBytes,omitempty" yaml:"requestSizeBytes,omitempty"`
-	RequestMimeType     string                  `json:"requestMimeType,omitempty" yaml:"requestMimeType,omitempty"`
-	RequestBodySkipped  string                  `json:"requestBodySkipped,omitempty" yaml:"requestBodySkipped,omitempty"`
-	ResponseStatusCode  int                     `json:"responseStatusCode,omitempty" yaml:"responseStatusCode,omitempty" example:"200"`
-	ResponseError       string                  `json:"responseError,omitempty" yaml:"responseError,omitempty"`
-	ResponseHttpVersion string                  `json:"responseHttpVersion,omitempty" yaml:"responseHttpVersion,omitempty"`
-	ResponseSizeBytes   int64                   `json:"responseSizeBytes,omitempty" yaml:"responseSizeBytes,omitempty"`
-	ResponseMimeType    string                  `json:"responseMimeType,omitempty" yaml:"responseMimeType,omitempty"`
-	ResponseBodySkipped string                  `json:"responseBodySkipped,omitempty" yaml:"responseBodySkipped,omitempty"`
-	InternalTimeout     bool                    `json:"internalTimeout,omitempty" yaml:"internalTimeout,omitempty"`
-	RequestCancelled    bool                    `json:"requestCancelled,omitempty" yaml:"requestCancelled,omitempty"`
-	FullRequestRecorded bool                    `json:"fullRequestRecorded,omitempty" yaml:"fullRequestRecorded,omitempty"`
-	Labels              map[string]string       `json:"labels,omitempty" yaml:"labels,omitempty"`
-	ResponseSource      string                  `json:"responseSource,omitempty" yaml:"responseSource,omitempty" example:"upstream"`
-	RateLimitId         apid.ID                 `json:"rateLimitId,omitempty" yaml:"rateLimitId,omitempty" swaggertype:"string"`
-	RateLimitMode       string                  `json:"rateLimitMode,omitempty" yaml:"rateLimitMode,omitempty"`
-	RateLimitBucket     map[string]string       `json:"rateLimitBucket,omitempty" yaml:"rateLimitBucket,omitempty"`
-	RateLimitMatched    []RequestEventRateLimit `json:"rateLimitMatched,omitempty" yaml:"rateLimitMatched,omitempty"`
-}
-
-type RequestEventRateLimit struct {
-	Id     apid.ID           `json:"id" yaml:"id" swaggertype:"string" example:"rl_test550e8400abcde"`
-	Mode   string            `json:"mode" yaml:"mode" example:"enforce"`
-	Bucket map[string]string `json:"bucket,omitempty" yaml:"bucket,omitempty"`
-}
-
-type ListRequestEventsResponseJson struct {
-	Items  []*RequestEventJson `json:"items" yaml:"items"`
-	Cursor string              `json:"cursor,omitempty" yaml:"cursor,omitempty"`
-	Total  *int64              `json:"total,omitempty" yaml:"total,omitempty"`
-}
-
 type TaskState string
 
 const (

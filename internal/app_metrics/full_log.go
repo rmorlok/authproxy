@@ -104,6 +104,11 @@ type FullLog struct {
 	RequestCancelled    bool                `json:"rc,omitempty"`
 	Request             FullLogRequest      `json:"req"`
 	Response            FullLogResponse     `json:"res"`
+
+	// Record is attached by StorageService after loading the searchable row.
+	// It is not persisted in the encrypted blob. API conversion uses it to
+	// preserve typed resource attribution alongside captured protocol data.
+	Record *LogRecord `json:"-"`
 }
 
 func (e *FullLog) GetId() apid.ID {

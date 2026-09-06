@@ -25,6 +25,14 @@ resource. Search items are heterogeneous summaries, not partial resources.
 truncation/incompleteness observations in projection metadata. Notification
 view mutations use typed action contracts.
 
+Request events are immutable, resource-shaped observations rather than
+client-managed desired resources. `RequestEventJson` uses resource metadata for
+the event identity, namespace, label snapshot, and creation time. Its `spec`
+contains the observed exchange, typed references to attributed resources, and
+optional captured protocol data. Capture fields remain explicitly tagged for
+the API secret-replay policy. `RequestEventList` uses list metadata for its
+opaque continuation token and exact result total.
+
 OpenAPI-only generator adapters live under `internal/schema/api/openapi`. Keep
 those adapters thin: they may compose API DTOs and canonical resources for 
 documentation, but no runtime contract or behavior may depend on them.

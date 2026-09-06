@@ -1,17 +1,36 @@
 {
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "RequestEventList",
+  "metadata": {
+    "continue": "next",
+    "total": 1
+  },
   "items": [
     {
-      "namespace": "root.acme",
-      "type": "proxy",
-      "requestId": "req_test550e8400abcde",
-      "timestamp": "2026-01-02T03:04:05Z",
-      "duration": 150,
-      "method": "GET",
-      "host": "api.example.com",
-      "scheme": "https",
-      "path": "/v1/users"
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "RequestEvent",
+      "metadata": {
+        "id": "req_test550e8400abcde",
+        "namespace": "root.acme",
+        "createdAt": "2026-01-02T03:04:05Z"
+      },
+      "spec": {
+        "requestType": "proxy",
+        "durationMilliseconds": 150,
+        "namespaceRef": {
+          "apiVersion": "authproxy.net/v1alpha1",
+          "kind": "Namespace",
+          "id": "root.acme"
+        },
+        "request": {
+          "method": "GET",
+          "host": "api.example.com",
+          "scheme": "https",
+          "path": "/v1/users"
+        },
+        "response": {},
+        "captureAvailable": false
+      }
     }
-  ],
-  "cursor": "next",
-  "total": 1
+  ]
 }

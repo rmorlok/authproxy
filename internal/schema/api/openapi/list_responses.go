@@ -405,46 +405,11 @@ type ListKeysResponseJson struct {
 	Items []KeyJson `json:"items" binding:"required"`
 }
 
-// ListRequestEventsResponseJson documents the paginated request-events list response.
-//
-//	@Description	Paginated list of request events entries
-type ListRequestEventsResponseJson struct {
-	Items  []interface{} `json:"items"`
-	Cursor string        `json:"cursor,omitempty"`
-	Total  *int64        `json:"total,omitempty"`
-}
-
 // MetricsSchemaResponseJson documents the metrics schema response.
 //
 //	@Description	Application metrics schema response
 type MetricsSchemaResponseJson struct {
 	Metrics []schemaapi.MetricsSchemaMetricJson `json:"metrics"`
-}
-
-// RequestEventJson documents the public request-event record projection.
-//
-//	@Description	HTTP request events entry
-type RequestEventJson struct {
-	Namespace           string            `json:"namespace" example:"root.acme"`
-	Type                string            `json:"type" example:"proxy"`
-	RequestId           string            `json:"requestId" swaggertype:"string" example:"req_test550e8400abcde"`
-	CorrelationId       string            `json:"correlationId,omitempty"`
-	Timestamp           time.Time         `json:"timestamp"`
-	MillisecondDuration int64             `json:"duration" example:"150"`
-	ConnectionId        string            `json:"connectionId,omitempty" swaggertype:"string"`
-	ConnectorId         string            `json:"connectorId,omitempty" swaggertype:"string"`
-	ConnectorVersion    uint64            `json:"connectorVersion,omitempty"`
-	Method              string            `json:"method" example:"GET"`
-	Host                string            `json:"host" example:"api.example.com"`
-	Scheme              string            `json:"scheme" example:"https"`
-	Path                string            `json:"path" example:"/v1/users"`
-	ResponseStatusCode  int               `json:"responseStatusCode,omitempty" example:"200"`
-	Labels              map[string]string `json:"labels,omitempty"`
-	ResponseSource      string            `json:"responseSource,omitempty" example:"upstream"`
-	RateLimitId         string            `json:"rateLimitId,omitempty" swaggertype:"string"`
-	RateLimitMode       string            `json:"rateLimitMode,omitempty"`
-	RateLimitBucket     map[string]string `json:"rateLimitBucket,omitempty"`
-	RateLimitMatched    []interface{}     `json:"rateLimitMatched,omitempty"`
 }
 
 // TaskInfoJson documents public background task status.

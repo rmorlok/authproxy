@@ -347,6 +347,15 @@ func TestGetFullLog_BlobStore(t *testing.T) {
 	require.Equal(t, original.Request.URL, result.Request.URL)
 	require.Equal(t, original.Request.Method, result.Request.Method)
 	require.Equal(t, original.Response.StatusCode, result.Response.StatusCode)
+	require.Nil(t, result.Record, "the encrypted blob does not duplicate the searchable record")
+
+	record := original.ToRecord()
+	serviceResult, err := (&StorageService{
+		retriever: &recordRetrieverStub{record: record},
+		fullStore: fullStore,
+	}).GetFullLog(context.Background(), testId)
+	require.NoError(t, err)
+	require.Same(t, record, serviceResult.Record)
 }
 
 func TestBlobStoreStore_ReturnsEncryptError(t *testing.T) {

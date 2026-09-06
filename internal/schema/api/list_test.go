@@ -8,7 +8,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestManagedListConstructorsUseV1Alpha1Envelope(t *testing.T) {
+func TestListConstructorsUseV1Alpha1Envelope(t *testing.T) {
 	tests := []struct {
 		name         string
 		expectedKind string
@@ -22,6 +22,7 @@ func TestManagedListConstructorsUseV1Alpha1Envelope(t *testing.T) {
 		{name: "keys", expectedKind: "KeyList", value: NewListKeysResponseJson(nil, "next")},
 		{name: "rate limits", expectedKind: "RateLimitList", value: NewListRateLimitsResponseJson(nil, "next")},
 		{name: "notifications", expectedKind: "NotificationList", value: NewListNotificationsResponseJson(nil, "next")},
+		{name: "request events", expectedKind: "RequestEventList", value: NewListRequestEventsResponseJson(nil, "next", nil)},
 	}
 
 	for _, tt := range tests {
