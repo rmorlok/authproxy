@@ -149,7 +149,8 @@ func IsValidConnectionState(state ConnectionState) bool {
 
 func IsValidConnectionHealthState(state ConnectionHealthState) bool {
 	switch state {
-	case ConnectionHealthStateHealthy, ConnectionHealthStateUnhealthy:
+	case ConnectionHealthStateHealthy,
+		ConnectionHealthStateUnhealthy:
 		return true
 	default:
 		return false
@@ -217,21 +218,27 @@ func (c *Connection) ValidateFor(mode meta.ValidationMode, vc *common.Validation
 		vc = &common.ValidationContext{Path: "$"}
 	}
 
-	requireStoredIdentity := mode == meta.ValidationModePersistence || mode == meta.ValidationModeResponse
+	requireStoredIdentity := mode == meta.ValidationModePersistence ||
+		mode == meta.ValidationModeResponse
 	var result *multierror.Error
-	if err := meta.ValidateResource(c.TypeMeta, c.Metadata, meta.ValidationOptions{
-		Mode:               mode,
-		Path:               vc,
-		ExpectedAPIVersion: meta.APIVersionV1Alpha1,
-		ExpectedKind:       ConnectionKind,
-		RequireID:          requireStoredIdentity,
-		RequireName:        requireStoredIdentity,
-		RequireNamespace:   true,
-		IDValidator:        ValidateID,
-		NamespaceValidator: namespaceschema.ValidatePath,
-	}); err != nil {
+	if err := meta.ValidateResource(
+		c.TypeMeta,
+		c.Metadata,
+		meta.ValidationOptions{
+			Mode:               mode,
+			Path:               vc,
+			ExpectedAPIVersion: meta.APIVersionV1Alpha1,
+			ExpectedKind:       ConnectionKind,
+			RequireID:          requireStoredIdentity,
+			RequireName:        requireStoredIdentity,
+			RequireNamespace:   true,
+			IDValidator:        ValidateID,
+			NamespaceValidator: namespaceschema.ValidatePath,
+		},
+	); err != nil {
 		result = multierror.Append(result, err)
 	}
+
 	if c.Metadata.Generation != 0 {
 		result = multierror.Append(result, vc.NewErrorForField("metadata.generation", "does not apply to connections"))
 	}
@@ -239,12 +246,15 @@ func (c *Connection) ValidateFor(mode meta.ValidationMode, vc *common.Validation
 	if err := validateConnectorReference(c.Spec.ConnectorRef, requireStoredIdentity, vc.PushField("spec").PushField("connectorRef")); err != nil {
 		result = multierror.Append(result, err)
 	}
+
 	if err := meta.ValidateStatus(c.Status, mode, vc); err != nil {
 		result = multierror.Append(result, err)
 	}
+
 	if requireStoredIdentity && c.Status == nil {
 		result = multierror.Append(result, vc.NewErrorForField("status", "is required"))
 	}
+
 	if c.Status != nil {
 		if c.Status.Configuration.Schema.IsEmpty() {
 			if mode == meta.ValidationModeResponse {
@@ -270,26 +280,41 @@ func (c *Connection) ValidateFor(mode meta.ValidationMode, vc *common.Validation
 	return result.ErrorOrNil()
 }
 
-func validateConnectorReference(ref meta.ObjectReference, requireGeneration bool, vc *common.ValidationContext) error {
+func validateConnectorReference(
+	ref meta.ObjectReference,
+	requireGeneration bool,
+	vc *common.ValidationContext,
+) error {
 	var result *multierror.Error
-	if err := meta.ValidateObjectReferenceWithOptions(ref, meta.ObjectReferenceValidationOptions{
-		ExpectedAPIVersion: meta.APIVersionV1Alpha1,
-		ExpectedKind:       connectorschema.ConnectorKind,
-		IDValidator:        connectorschema.ValidateID,
-		NamespaceValidator: namespaceschema.ValidatePath,
-	}, vc); err != nil {
+
+	if err := meta.ValidateObjectReferenceWithOptions(
+		ref,
+		meta.ObjectReferenceValidationOptions{
+			ExpectedAPIVersion: meta.APIVersionV1Alpha1,
+			ExpectedKind:       connectorschema.ConnectorKind,
+			IDValidator:        connectorschema.ValidateID,
+			NamespaceValidator: namespaceschema.ValidatePath,
+		},
+		vc,
+	); err != nil {
 		result = multierror.Append(result, err)
 	}
+
 	if requireGeneration && ref.Generation == 0 {
 		result = multierror.Append(result, vc.NewErrorForField("generation", "is required for a stored connection binding"))
 	}
+
 	return result.ErrorOrNil()
 }
 
-func (p *ConnectionPatch) ValidateFor(mode meta.ValidationMode, vc *common.ValidationContext) error {
+func (p *ConnectionPatch) ValidateFor(
+	mode meta.ValidationMode,
+	vc *common.ValidationContext,
+) error {
 	if p == nil {
 		return fmt.Errorf("connection patch is required")
 	}
+
 	if vc == nil {
 		vc = &common.ValidationContext{Path: "$"}
 	}
@@ -298,6 +323,7 @@ func (p *ConnectionPatch) ValidateFor(mode meta.ValidationMode, vc *common.Valid
 	if err := meta.ValidateTypeMeta(p.TypeMeta, meta.APIVersionV1Alpha1, ConnectionKind, vc); err != nil {
 		result = multierror.Append(result, err)
 	}
+
 	if p.Metadata == nil {
 		result = multierror.Append(result, vc.NewErrorForField("metadata", "is required and must not be null"))
 	} else {
@@ -313,12 +339,15 @@ func (p *ConnectionPatch) ValidateFor(mode meta.ValidationMode, vc *common.Valid
 			result = multierror.Append(result, vc.NewErrorForField("metadata.generation", "does not apply to connections"))
 		}
 	}
+
 	if p.Spec == nil {
 		result = multierror.Append(result, vc.NewErrorForField("spec", "is required and must not be null"))
 	}
+
 	if err := meta.ValidateStatus(p.Status, mode, vc); err != nil {
 		result = multierror.Append(result, err)
 	}
+
 	return result.ErrorOrNil()
 }
 
@@ -328,11 +357,23 @@ func (c *Connection) ApplyUpdate(patch *ConnectionPatch) (*Connection, error) {
 	}
 	result := c.Clone()
 	result.Metadata = meta.ApplyObjectMetaPatch(result.Metadata, *patch.Metadata)
-	if err := meta.ValidateTypeMetaUpdate(c.TypeMeta, result.TypeMeta, nil); err != nil {
+
+	if err := meta.ValidateTypeMetaUpdate(
+		c.TypeMeta,
+		result.TypeMeta,
+		nil, // path
+	); err != nil {
 		return nil, err
 	}
-	if err := meta.ValidateMetadataUpdate(c.Metadata, result.Metadata, meta.UpdateOptions{ImmutableNamespace: true}, nil); err != nil {
+
+	if err := meta.ValidateMetadataUpdate(
+		c.Metadata,
+		result.Metadata,
+		meta.UpdateOptions{ImmutableNamespace: true},
+		nil, // path
+	); err != nil {
 		return nil, err
 	}
+
 	return result, result.ValidateFor(meta.ValidationModeResponse, nil)
 }
