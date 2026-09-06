@@ -1,448 +1,499 @@
-import {client} from './client';
-import {Connector} from './connectors';
-import {ListResponse} from './common';
+import { client } from './client';
+import {
+  ActionRequest,
+  ActionResponse,
+  MutableResourceMetadata,
+  ObjectMetadata,
+  ObjectReference,
+  ResourceList,
+  TypeMeta,
+  VersionedConnectorReference,
+  actionRequest,
+  objectReference,
+} from './common';
 
-// Connection models
-//
-// SETUP: connection is persisted and one or more setup steps are in progress.
-// CONFIGURED: setup is complete. The connection may or may not be currently
-// usable; the orthogonal ConnectionHealthState axis carries that signal.
+export const CONNECTION_KIND = 'Connection' as const;
+
 export enum ConnectionState {
-    SETUP = 'setup',
-    CONFIGURED = 'configured',
-    DISABLED = 'disabled',
-    DISCONNECTING = 'disconnecting',
-    DISCONNECTED = 'disconnected',
+  SETUP = 'setup',
+  CONFIGURED = 'configured',
+  DISABLED = 'disabled',
+  DISCONNECTING = 'disconnecting',
+  DISCONNECTED = 'disconnected',
 }
 
-// Operational health signal for a connection. Distinct from ConnectionState:
-// a Configured connection whose credentials have stopped working flips to
-// UNHEALTHY without leaving the Configured lifecycle state. UIs surface this
-// to drive the unified re-authentication action.
 export enum ConnectionHealthState {
-    HEALTHY = 'healthy',
-    UNHEALTHY = 'unhealthy',
+  HEALTHY = 'healthy',
+  UNHEALTHY = 'unhealthy',
 }
 
-export interface UpdateConnectionRequest {
-    name?: string;
-    labels?: Record<string, string>;
-    annotations?: Record<string, string>;
+export interface ConnectionMetadata extends ObjectMetadata {
+  id: string;
+  name: string;
+  namespace: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
-export interface PutConnectionLabelRequest {
-    value: string;
+export interface ConnectionSpec {
+  connectorRef: VersionedConnectorReference;
+  /** Connector-defined desired configuration. Auth credentials are stored separately. */
+  configuration?: Record<string, unknown>;
 }
 
-export interface ConnectionLabel {
-    key: string;
-    value: string;
-}
-
-export interface PutConnectionAnnotationRequest {
-    value: string;
-}
-
-export interface ConnectionAnnotation {
-    key: string;
-    value: string;
-}
-
-export interface Connection {
-    id: string;
-    name: string;
-    namespace: string;
-    connector: Connector;
+export interface ConnectionStatus {
+  lifecycle: {
     state: ConnectionState;
-    healthState: ConnectionHealthState;
-    setupStepId?: string;
-    setupError?: string;
-    labels?: Record<string, string>;
-    annotations?: Record<string, string>;
-    createdAt: string;
-    updatedAt: string;
+  };
+  health: {
+    state: ConnectionHealthState;
+  };
+  setup?: {
+    stepId?: string;
+    error?: string;
+  };
+  configuration: {
+    configured: boolean;
+    /** JSON Schema derived from the exact connector generation. */
+    schema: Record<string, unknown>;
+  };
 }
+
+export interface Connection extends TypeMeta<typeof CONNECTION_KIND> {
+  metadata: ConnectionMetadata;
+  spec: ConnectionSpec;
+  status: ConnectionStatus;
+}
+
+export interface UpdateConnectionRequest extends TypeMeta<typeof CONNECTION_KIND> {
+  metadata: MutableResourceMetadata;
+  /** Connection bindings/configuration are changed through typed actions. */
+  spec: Record<string, never>;
+}
+
+export type ConnectionList = ResourceList<Connection>;
 
 export function canBeDisconnected(connection: Connection): boolean {
-    return (
-        connection.state !== ConnectionState.DISCONNECTING &&
-        connection.state !== ConnectionState.DISCONNECTED
-    );
+  return (
+    connection.status.lifecycle.state !== ConnectionState.DISCONNECTING &&
+    connection.status.lifecycle.state !== ConnectionState.DISCONNECTED
+  );
 }
 
-// Request models
-export interface InitiateConnectionRequest {
-    connectorId: string;
-    name?: string;
-    returnToUrl: string;
-    labels?: Record<string, string>;
+export const CONNECTION_INITIATE_KIND = 'ConnectionInitiate' as const;
+export const CONNECTION_SETUP_KIND = 'ConnectionSetup' as const;
+export const CONNECTION_SETUP_SUBMIT_KIND = 'ConnectionSetupSubmit' as const;
+export const CONNECTION_SETUP_ABORT_KIND = 'ConnectionSetupAbort' as const;
+export const CONNECTION_RECONFIGURE_KIND = 'ConnectionReconfigure' as const;
+export const CONNECTION_SETUP_CANCEL_KIND = 'ConnectionSetupCancel' as const;
+export const CONNECTION_SETUP_RETRY_KIND = 'ConnectionSetupRetry' as const;
+export const CONNECTION_REAUTHENTICATE_KIND = 'ConnectionReauthenticate' as const;
+export const CONNECTION_DISCONNECT_KIND = 'ConnectionDisconnect' as const;
+export const CONNECTION_VERSION_MIGRATION_KIND = 'ConnectionVersionMigration' as const;
+export const CONNECTION_FORCE_STATE_KIND = 'ConnectionForceState' as const;
+
+export interface ConnectionInitiateSpec {
+  intoNamespace?: string;
+  name?: string;
+  labels?: Record<string, string>;
+  annotations?: Record<string, string>;
+  returnToUrl: string;
 }
+
+export type ConnectionInitiateRequest = ActionRequest<
+  typeof CONNECTION_INITIATE_KIND,
+  'Connector',
+  ConnectionInitiateSpec
+>;
 
 export enum ConnectionSetupResponseType {
-    REDIRECT = 'redirect',
-    FORM = 'form',
-    COMPLETE = 'complete',
-    VERIFYING = 'verifying',
-    ERROR = 'error',
+  REDIRECT = 'redirect',
+  FORM = 'form',
+  COMPLETE = 'complete',
+  VERIFYING = 'verifying',
+  ERROR = 'error',
 }
 
-export interface ConnectionSetupResponse {
-    id: string;
-    type: ConnectionSetupResponseType;
+export interface ConnectionSetupRedirectStatus {
+  type: ConnectionSetupResponseType.REDIRECT;
+  redirectUrl: string;
 }
 
-export interface ConnectionSetupRedirectResponse extends ConnectionSetupResponse {
-    type: ConnectionSetupResponseType.REDIRECT;
-    redirectUrl: string;
+export interface ConnectionSetupFormStatus {
+  type: ConnectionSetupResponseType.FORM;
+  stepId: string;
+  stepTitle?: string;
+  stepDescription?: string;
+  jsonSchema: Record<string, unknown>;
+  uiSchema: Record<string, unknown>;
+  /** Previously submitted values are always returned irreversibly redacted. */
+  data?: Record<string, unknown>;
 }
 
-export interface ConnectionSetupFormResponse extends ConnectionSetupResponse {
-    type: ConnectionSetupResponseType.FORM;
-    stepId: string;
-    stepTitle?: string;
-    stepDescription?: string;
-    jsonSchema: Record<string, unknown>;
-    uiSchema: Record<string, unknown>;
-    data?: Record<string, unknown>;
+export interface ConnectionSetupCompleteStatus {
+  type: ConnectionSetupResponseType.COMPLETE;
 }
 
-export interface ConnectionSetupCompleteResponse extends ConnectionSetupResponse {
-    type: ConnectionSetupResponseType.COMPLETE;
+export interface ConnectionSetupVerifyingStatus {
+  type: ConnectionSetupResponseType.VERIFYING;
 }
 
-export interface ConnectionSetupVerifyingResponse extends ConnectionSetupResponse {
-    type: ConnectionSetupResponseType.VERIFYING;
+export interface ConnectionSetupErrorStatus {
+  type: ConnectionSetupResponseType.ERROR;
+  error: string;
+  canRetry?: boolean;
 }
 
-export interface ConnectionSetupErrorResponse extends ConnectionSetupResponse {
-    type: ConnectionSetupResponseType.ERROR;
-    error: string;
-    canRetry: boolean;
+export type ConnectionSetupStatus =
+  | ConnectionSetupRedirectStatus
+  | ConnectionSetupFormStatus
+  | ConnectionSetupCompleteStatus
+  | ConnectionSetupVerifyingStatus
+  | ConnectionSetupErrorStatus;
+
+export type ConnectionSetupResponse = ActionResponse<
+  typeof CONNECTION_SETUP_KIND,
+  typeof CONNECTION_KIND,
+  Record<string, never>,
+  ConnectionSetupStatus
+>;
+
+export type ConnectionSetupRedirectResponse = ConnectionSetupResponse & {
+  status: ConnectionSetupRedirectStatus;
+};
+export type ConnectionSetupFormResponse = ConnectionSetupResponse & {
+  status: ConnectionSetupFormStatus;
+};
+export type ConnectionSetupCompleteResponse = ConnectionSetupResponse & {
+  status: ConnectionSetupCompleteStatus;
+};
+export type ConnectionSetupVerifyingResponse = ConnectionSetupResponse & {
+  status: ConnectionSetupVerifyingStatus;
+};
+export type ConnectionSetupErrorResponse = ConnectionSetupResponse & {
+  status: ConnectionSetupErrorStatus;
+};
+
+export function isRedirectResponse(
+  response: ConnectionSetupResponse,
+): response is ConnectionSetupRedirectResponse {
+  return response.status.type === ConnectionSetupResponseType.REDIRECT;
 }
 
-export function isRedirectResponse(response: ConnectionSetupResponse): response is ConnectionSetupRedirectResponse {
-    return response.type === ConnectionSetupResponseType.REDIRECT;
+export function isFormResponse(
+  response: ConnectionSetupResponse,
+): response is ConnectionSetupFormResponse {
+  return response.status.type === ConnectionSetupResponseType.FORM;
 }
 
-export function isFormResponse(response: ConnectionSetupResponse): response is ConnectionSetupFormResponse {
-    return response.type === ConnectionSetupResponseType.FORM;
+export function isCompleteResponse(
+  response: ConnectionSetupResponse,
+): response is ConnectionSetupCompleteResponse {
+  return response.status.type === ConnectionSetupResponseType.COMPLETE;
 }
 
-export function isCompleteResponse(response: ConnectionSetupResponse): response is ConnectionSetupCompleteResponse {
-    return response.type === ConnectionSetupResponseType.COMPLETE;
+export function isVerifyingResponse(
+  response: ConnectionSetupResponse,
+): response is ConnectionSetupVerifyingResponse {
+  return response.status.type === ConnectionSetupResponseType.VERIFYING;
 }
 
-export function isVerifyingResponse(response: ConnectionSetupResponse): response is ConnectionSetupVerifyingResponse {
-    return response.type === ConnectionSetupResponseType.VERIFYING;
+export function isErrorResponse(
+  response: ConnectionSetupResponse,
+): response is ConnectionSetupErrorResponse {
+  return response.status.type === ConnectionSetupResponseType.ERROR;
 }
 
-export function isErrorResponse(response: ConnectionSetupResponse): response is ConnectionSetupErrorResponse {
-    return response.type === ConnectionSetupResponseType.ERROR;
+export interface ConnectionSetupSubmitSpec {
+  stepId: string;
+  data: unknown;
+  returnToUrl?: string;
 }
 
-export interface SubmitConnectionRequest {
-    stepId: string;
-    data: unknown;
-    returnToUrl?: string;
+export type ConnectionSetupSubmitRequest = ActionRequest<
+  typeof CONNECTION_SETUP_SUBMIT_KIND,
+  typeof CONNECTION_KIND,
+  ConnectionSetupSubmitSpec
+>;
+
+export interface ConnectionSetupControlSpec {
+  returnToUrl?: string;
 }
 
-export interface RetryConnectionRequest {
-    returnToUrl?: string;
+export type ConnectionSetupRetryRequest = ActionRequest<
+  typeof CONNECTION_SETUP_RETRY_KIND,
+  typeof CONNECTION_KIND,
+  ConnectionSetupControlSpec
+>;
+
+export type ConnectionReauthenticateRequest = ActionRequest<
+  typeof CONNECTION_REAUTHENTICATE_KIND,
+  typeof CONNECTION_KIND,
+  ConnectionSetupControlSpec
+>;
+
+export type EmptyConnectionActionKind =
+  | typeof CONNECTION_SETUP_ABORT_KIND
+  | typeof CONNECTION_RECONFIGURE_KIND
+  | typeof CONNECTION_SETUP_CANCEL_KIND;
+
+export type EmptyConnectionActionRequest<K extends EmptyConnectionActionKind> = ActionRequest<
+  K,
+  typeof CONNECTION_KIND,
+  Record<string, never>
+>;
+
+export interface ConnectionDisconnectSpec {
+  timeoutSeconds?: number;
 }
 
-export interface ReauthConnectionRequest {
-    returnToUrl?: string;
+export interface ConnectionDisconnectStatus {
+  taskId: string;
+  connection: Connection;
 }
+
+export type ConnectionDisconnectRequest = ActionRequest<
+  typeof CONNECTION_DISCONNECT_KIND,
+  typeof CONNECTION_KIND,
+  ConnectionDisconnectSpec
+>;
+export type ConnectionDisconnectResponse = ActionResponse<
+  typeof CONNECTION_DISCONNECT_KIND,
+  typeof CONNECTION_KIND,
+  ConnectionDisconnectSpec,
+  ConnectionDisconnectStatus
+>;
+
+export interface ConnectionVersionMigrationSpec {
+  connectorRef: VersionedConnectorReference;
+  timeoutSeconds?: number;
+}
+
+export interface ConnectionVersionMigrationStatus {
+  taskId: string;
+  sourceConnectorRef: VersionedConnectorReference;
+  targetConnectorRef: VersionedConnectorReference;
+}
+
+export type ConnectionVersionMigrationRequest = ActionRequest<
+  typeof CONNECTION_VERSION_MIGRATION_KIND,
+  typeof CONNECTION_KIND,
+  ConnectionVersionMigrationSpec
+>;
+export type ConnectionVersionMigrationResponse = ActionResponse<
+  typeof CONNECTION_VERSION_MIGRATION_KIND,
+  typeof CONNECTION_KIND,
+  ConnectionVersionMigrationSpec,
+  ConnectionVersionMigrationStatus
+>;
+
+export interface ConnectionForceStateSpec {
+  state: ConnectionState;
+}
+
+export type ConnectionForceStateRequest = ActionRequest<
+  typeof CONNECTION_FORCE_STATE_KIND,
+  typeof CONNECTION_KIND,
+  ConnectionForceStateSpec
+>;
+export type ConnectionForceStateResponse = ActionResponse<
+  typeof CONNECTION_FORCE_STATE_KIND,
+  typeof CONNECTION_KIND,
+  ConnectionForceStateSpec,
+  { connection: Connection }
+>;
 
 export interface DataSourceOption {
-    value: string;
-    label: string;
+  value: string;
+  label: string;
 }
 
-// Disconnect models
-export interface DisconnectConnectionRequest {
-    timeoutSeconds?: number;
-}
-
-export interface DisconnectResponseJson {
-    taskId: string;
-    connection: Connection;
-}
-
-export interface MigrateConnectionVersionRequest {
-    targetVersion: number;
-    timeoutSeconds?: number;
-}
-
-export interface MigrateConnectionVersionResponseJson {
-    taskId: string;
-    connectionId: string;
-    sourceVersion: number;
-    targetVersion: number;
-}
-
-export interface ForceConnectionStateRequest {
-    state: ConnectionState;
-}
-
-export type ForceConnectionStateResponse = Connection;
-
-/**
- * Parameters used for listing connections.
- */
 export interface ListConnectionsParams {
-    name?: string;
-    state?: ConnectionState;
-    namespace?: string;
-    labelSelector?: string;
-    cursor?: string;
-    limit?: number;
-    orderBy?: string;
+  name?: string;
+  state?: ConnectionState;
+  namespace?: string;
+  labelSelector?: string;
+  cursor?: string;
+  limit?: number;
+  orderBy?: string;
 }
 
-/**
- * Get a list of all connections
- */
-export const listConnections = (params: ListConnectionsParams) => {
-    return client.get<ListResponse<Connection>>('/api/v1/connections', {params});
-};
+const connectionTarget = (id: string): ObjectReference<typeof CONNECTION_KIND> =>
+  objectReference(CONNECTION_KIND, { id });
 
-/**
- * Get a specific connection by ID
- */
-export const getConnection = (id: string) => {
-    return client.get<Connection>(`/api/v1/connections/${id}`);
-};
+export const listConnections = (params?: ListConnectionsParams) =>
+  client.get<ConnectionList>('/api/v1/connections', { params });
 
-/**
- * Initiate a new connection
- */
+export const getConnection = (id: string) =>
+  client.get<Connection>(`/api/v1/connections/${id}`);
+
 export const initiateConnection = (
-    connectorId: string,
-    returnToUrl: string,
-    labels?: Record<string, string>,
-    name?: string,
+  connectorRef: ObjectReference<'Connector'>,
+  spec: ConnectionInitiateSpec,
 ) => {
-    const request: InitiateConnectionRequest = {
-        connectorId: connectorId,
-        name,
-        returnToUrl: returnToUrl,
-        labels,
-    };
-
-    return client.post<ConnectionSetupResponse>(
-        '/api/v1/connections/_initiate',
-        request
-    );
+  const request: ConnectionInitiateRequest = actionRequest(
+    CONNECTION_INITIATE_KIND,
+    connectorRef,
+    spec,
+  );
+  return client.post<ConnectionSetupResponse>('/api/v1/connections/_initiate', request);
 };
 
-/**
- * Submit form data for a connection setup step
- */
-export const submitConnection = (
-    connectionId: string,
-    stepId: string,
-    data: unknown,
-    returnToUrl?: string
-) => {
-    const request: SubmitConnectionRequest = {
-        stepId: stepId,
-        data,
-        returnToUrl: returnToUrl,
-    };
-
-    return client.post<ConnectionSetupResponse>(
-        `/api/v1/connections/${connectionId}/_submit`,
-        request
-    );
+export const submitConnection = (connectionId: string, spec: ConnectionSetupSubmitSpec) => {
+  const request: ConnectionSetupSubmitRequest = actionRequest(
+    CONNECTION_SETUP_SUBMIT_KIND,
+    connectionTarget(connectionId),
+    spec,
+  );
+  return client.post<ConnectionSetupResponse>(
+    `/api/v1/connections/${connectionId}/_submit`,
+    request,
+  );
 };
 
-/**
- * Disconnect a connection
- */
-export const disconnectConnection = (id: string, request?: DisconnectConnectionRequest) => {
-    return client.post<DisconnectResponseJson>(
-        `/api/v1/connections/${id}/_disconnect`,
-        request
-    );
+export const disconnectConnection = (id: string, spec: ConnectionDisconnectSpec = {}) => {
+  const request: ConnectionDisconnectRequest = actionRequest(
+    CONNECTION_DISCONNECT_KIND,
+    connectionTarget(id),
+    spec,
+  );
+  return client.post<ConnectionDisconnectResponse>(
+    `/api/v1/connections/${id}/_disconnect`,
+    request,
+  );
 };
 
-/**
- * Migrate a connection to another version of the same connector.
- */
-export const migrateConnectionVersion = (id: string, request: MigrateConnectionVersionRequest) => {
-    return client.post<MigrateConnectionVersionResponseJson>(
-        `/api/v1/connections/${id}/_migrateVersion`,
-        request
-    );
+export const migrateConnectionVersion = (id: string, spec: ConnectionVersionMigrationSpec) => {
+  const request: ConnectionVersionMigrationRequest = actionRequest(
+    CONNECTION_VERSION_MIGRATION_KIND,
+    connectionTarget(id),
+    spec,
+  );
+  return client.post<ConnectionVersionMigrationResponse>(
+    `/api/v1/connections/${id}/_migrateVersion`,
+    request,
+  );
 };
 
-/**
- * Force the state of a connection. Requires admin permissions.
- */
 export const forceConnectionState = (id: string, state: ConnectionState) => {
-    const request: ForceConnectionStateRequest = {
-        state: state,
-    };
-    return client.put<ForceConnectionStateResponse>(
-        `/api/v1/connections/${id}/_forceState`,
-        request
-    );
+  const request: ConnectionForceStateRequest = actionRequest(
+    CONNECTION_FORCE_STATE_KIND,
+    connectionTarget(id),
+    { state },
+  );
+  return client.put<ConnectionForceStateResponse>(
+    `/api/v1/connections/${id}/_forceState`,
+    request,
+  );
 };
 
-/**
- * Update a connection's labels
- */
-export const updateConnection = (id: string, request: UpdateConnectionRequest) => {
-    return client.patch<Connection>(`/api/v1/connections/${id}`, request);
+export const updateConnection = (id: string, request: UpdateConnectionRequest) =>
+  client.patch<Connection>(`/api/v1/connections/${id}`, request);
+
+export const getConnectionLabels = (id: string) =>
+  client.get<Record<string, string>>(`/api/v1/connections/${id}/labels`);
+
+export const getConnectionLabel = (id: string, labelKey: string) =>
+  client.get<{ key: string; value: string }>(`/api/v1/connections/${id}/labels/${labelKey}`);
+
+export const putConnectionLabel = (id: string, labelKey: string, value: string) =>
+  client.put<{ key: string; value: string }>(
+    `/api/v1/connections/${id}/labels/${labelKey}`,
+    { value },
+  );
+
+export const deleteConnectionLabel = (id: string, labelKey: string) =>
+  client.delete(`/api/v1/connections/${id}/labels/${labelKey}`);
+
+export const getConnectionAnnotations = (id: string) =>
+  client.get<Record<string, string>>(`/api/v1/connections/${id}/annotations`);
+
+export const getConnectionAnnotation = (id: string, annotationKey: string) =>
+  client.get<{ key: string; value: string }>(
+    `/api/v1/connections/${id}/annotations/${annotationKey}`,
+  );
+
+export const putConnectionAnnotation = (id: string, annotationKey: string, value: string) =>
+  client.put<{ key: string; value: string }>(
+    `/api/v1/connections/${id}/annotations/${annotationKey}`,
+    { value },
+  );
+
+export const deleteConnectionAnnotation = (id: string, annotationKey: string) =>
+  client.delete(`/api/v1/connections/${id}/annotations/${annotationKey}`);
+
+const emptyConnectionAction = <K extends EmptyConnectionActionKind>(id: string, kind: K) =>
+  actionRequest(kind, connectionTarget(id), {});
+
+export const abortConnection = (id: string) =>
+  client.post<void>(
+    `/api/v1/connections/${id}/_abort`,
+    emptyConnectionAction(id, CONNECTION_SETUP_ABORT_KIND),
+  );
+
+export const getSetupStep = (connectionId: string, returnToUrl?: string) =>
+  client.get<ConnectionSetupResponse>(
+    `/api/v1/connections/${connectionId}/_setupStep`,
+    returnToUrl ? { params: { returnToUrl } } : undefined,
+  );
+
+export const getDataSource = (connectionId: string, sourceId: string) =>
+  client.get<DataSourceOption[]>(
+    `/api/v1/connections/${connectionId}/_dataSource/${sourceId}`,
+  );
+
+export const reconfigureConnection = (id: string) =>
+  client.post<ConnectionSetupResponse>(
+    `/api/v1/connections/${id}/_reconfigure`,
+    emptyConnectionAction(id, CONNECTION_RECONFIGURE_KIND),
+  );
+
+export const cancelSetupConnection = (id: string) =>
+  client.post<void>(
+    `/api/v1/connections/${id}/_cancelSetup`,
+    emptyConnectionAction(id, CONNECTION_SETUP_CANCEL_KIND),
+  );
+
+export const retryConnection = (id: string, spec: ConnectionSetupControlSpec = {}) => {
+  const request: ConnectionSetupRetryRequest = actionRequest(
+    CONNECTION_SETUP_RETRY_KIND,
+    connectionTarget(id),
+    spec,
+  );
+  return client.post<ConnectionSetupResponse>(`/api/v1/connections/${id}/_retry`, request);
 };
 
-/**
- * Get all labels for a specific connection by ID (uuid)
- */
-export const getConnectionLabels = (id: string) => {
-    return client.get<Record<string, string>>(`/api/v1/connections/${id}/labels`);
-};
-
-/**
- * Get a specific label for a connection by ID (uuid) and label key
- */
-export const getConnectionLabel = (id: string, labelKey: string) => {
-    return client.get<ConnectionLabel>(`/api/v1/connections/${id}/labels/${labelKey}`);
-};
-
-/**
- * Set a specific label for a connection by ID (uuid) and label key
- */
-export const putConnectionLabel = (id: string, labelKey: string, value: string) => {
-    return client.put<ConnectionLabel>(`/api/v1/connections/${id}/labels/${labelKey}`, { value });
-};
-
-/**
- * Delete a specific label for a connection by ID (uuid) and label key
- */
-export const deleteConnectionLabel = (id: string, labelKey: string) => {
-    return client.delete(`/api/v1/connections/${id}/labels/${labelKey}`);
-};
-
-/**
- * Get all annotations for a specific connection by ID (uuid)
- */
-export const getConnectionAnnotations = (id: string) => {
-    return client.get<Record<string, string>>(`/api/v1/connections/${id}/annotations`);
-};
-
-/**
- * Get a specific annotation for a connection by ID (uuid) and annotation key
- */
-export const getConnectionAnnotation = (id: string, annotationKey: string) => {
-    return client.get<ConnectionAnnotation>(`/api/v1/connections/${id}/annotations/${annotationKey}`);
-};
-
-/**
- * Set a specific annotation for a connection by ID (uuid) and annotation key
- */
-export const putConnectionAnnotation = (id: string, annotationKey: string, value: string) => {
-    return client.put<ConnectionAnnotation>(`/api/v1/connections/${id}/annotations/${annotationKey}`, { value });
-};
-
-/**
- * Delete a specific annotation for a connection by ID (uuid) and annotation key
- */
-export const deleteConnectionAnnotation = (id: string, annotationKey: string) => {
-    return client.delete(`/api/v1/connections/${id}/annotations/${annotationKey}`);
-};
-
-/**
- * Abort a connection that is still in setup
- */
-export const abortConnection = (id: string) => {
-    return client.post<void>(`/api/v1/connections/${id}/_abort`);
-};
-
-/**
- * Get the current setup step for a connection
- */
-export const getSetupStep = (connectionId: string, returnToUrl?: string) => {
-    return client.get<ConnectionSetupResponse>(
-        `/api/v1/connections/${connectionId}/_setupStep`,
-        returnToUrl ? {params: {returnToUrl: returnToUrl}} : undefined
-    );
-};
-
-/**
- * Get data source options for a connection setup step
- */
-export const getDataSource = (connectionId: string, sourceId: string) => {
-    return client.get<DataSourceOption[]>(`/api/v1/connections/${connectionId}/_dataSource/${sourceId}`);
-};
-
-/**
- * Reconfigure a completed connection by restarting its configure phase
- */
-export const reconfigureConnection = (id: string) => {
-    return client.post<ConnectionSetupResponse>(`/api/v1/connections/${id}/_reconfigure`);
-};
-
-/**
- * Cancel an in-flight reconfigure on a ready connection by clearing setup_step_id and setup_error.
- * The connection remains ready and its previously stored configuration continues to apply.
- */
-export const cancelSetupConnection = (id: string) => {
-    return client.post<void>(`/api/v1/connections/${id}/_cancelSetup`);
-};
-
-/**
- * Retry a connection that failed during setup, including auth-phase failures and probe
- * verification failures. For connectors with preconnect steps, returns to preconnect:0 so the
- * user can correct inputs. For connectors without preconnect steps, re-initiates OAuth
- * (returnToUrl is required in that case).
- */
-export const retryConnection = (id: string, returnToUrl?: string) => {
-    const request: RetryConnectionRequest = { returnToUrl: returnToUrl };
-    return client.post<ConnectionSetupResponse>(
-        `/api/v1/connections/${id}/_retry`,
-        request
-    );
-};
-
-/**
- * Re-authenticate a Ready connection. Used both for user-driven credential rotation and as the
- * recovery action when a connection has flipped to unhealthy. For api-key connectors, returns the
- * credentials form (no prior values pre-filled); on submit the existing credential is rotated
- * atomically. For OAuth2 connectors, restarts at preconnect:0 if defined, otherwise re-initiates
- * the OAuth redirect (returnToUrl is required in that case).
- */
-export const reauthConnection = (id: string, returnToUrl?: string) => {
-    const request: ReauthConnectionRequest = { returnToUrl: returnToUrl };
-    return client.post<ConnectionSetupResponse>(
-        `/api/v1/connections/${id}/_reauth`,
-        request
-    );
+export const reauthConnection = (id: string, spec: ConnectionSetupControlSpec = {}) => {
+  const request: ConnectionReauthenticateRequest = actionRequest(
+    CONNECTION_REAUTHENTICATE_KIND,
+    connectionTarget(id),
+    spec,
+  );
+  return client.post<ConnectionSetupResponse>(`/api/v1/connections/${id}/_reauth`, request);
 };
 
 export const connections = {
-    list: listConnections,
-    get: getConnection,
-    initiate: initiateConnection,
-    submit: submitConnection,
-    disconnect: disconnectConnection,
-    migrateVersion: migrateConnectionVersion,
-    abort: abortConnection,
-    forceState: forceConnectionState,
-    update: updateConnection,
-    getSetupStep: getSetupStep,
-    getDataSource: getDataSource,
-    reconfigure: reconfigureConnection,
-    cancelSetup: cancelSetupConnection,
-    retry: retryConnection,
-    reauth: reauthConnection,
-    getLabels: getConnectionLabels,
-    getLabel: getConnectionLabel,
-    putLabel: putConnectionLabel,
-    deleteLabel: deleteConnectionLabel,
-    getAnnotations: getConnectionAnnotations,
-    getAnnotation: getConnectionAnnotation,
-    putAnnotation: putConnectionAnnotation,
-    deleteAnnotation: deleteConnectionAnnotation,
+  list: listConnections,
+  get: getConnection,
+  initiate: initiateConnection,
+  submit: submitConnection,
+  disconnect: disconnectConnection,
+  migrateVersion: migrateConnectionVersion,
+  abort: abortConnection,
+  forceState: forceConnectionState,
+  update: updateConnection,
+  getSetupStep,
+  getDataSource,
+  reconfigure: reconfigureConnection,
+  cancelSetup: cancelSetupConnection,
+  retry: retryConnection,
+  reauth: reauthConnection,
+  getLabels: getConnectionLabels,
+  getLabel: getConnectionLabel,
+  putLabel: putConnectionLabel,
+  deleteLabel: deleteConnectionLabel,
+  getAnnotations: getConnectionAnnotations,
+  getAnnotation: getConnectionAnnotation,
+  putAnnotation: putConnectionAnnotation,
+  deleteAnnotation: deleteConnectionAnnotation,
 };

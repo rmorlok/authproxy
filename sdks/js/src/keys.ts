@@ -1,42 +1,81 @@
 import { client } from './client';
-import { ListResponse } from './common';
+import {
+  MutableResourceMetadata,
+  NamespacedCreateMetadata,
+  ObjectMetadata,
+  ResourceList,
+  TypeMeta,
+} from './common';
 
-// Key models
+export const KEY_KIND = 'Key' as const;
 
-export enum KeyState {
-    ACTIVE = 'active',
-    DISABLED = 'disabled',
+export enum KeyUsage {
+  DATA_ENCRYPTION = 'data_encryption',
 }
 
-export interface Key {
-  id: string;
-  name: string;
-  namespace: string;
-  state: KeyState;
-  keyData?: KeyData;
-  labels?: Record<string, string>;
-  annotations?: Record<string, string>;
-  createdAt: string;
-  updatedAt: string;
+export enum KeyMaterialType {
+  SYMMETRIC = 'symmetric',
+  PUBLIC = 'public',
+  PRIVATE = 'private',
+  EXTERNAL = 'external',
+}
+
+export enum KeyState {
+  ACTIVE = 'active',
+  DISABLED = 'disabled',
 }
 
 export type KeyData = Record<string, unknown>;
 
-export interface CreateKeyRequest {
-    namespace: string;
-    name?: string;
-    keyData?: KeyData;
-    labels?: Record<string, string>;
-    annotations?: Record<string, string>;
+export interface KeyMetadata extends ObjectMetadata {
+  id: string;
+  name: string;
+  namespace: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
-export interface UpdateKeyRequest {
-    name?: string;
-    state?: KeyState;
-    keyData?: KeyData;
-    labels?: Record<string, string>;
-    annotations?: Record<string, string>;
+export interface KeySpec {
+  usage: KeyUsage;
+  materialType: KeyMaterialType;
+  desiredState: KeyState;
+  /** Provider configuration is always returned with secret fields redacted. */
+  keyData?: KeyData;
 }
+
+export interface KeyStatus {
+  state: KeyState;
+  keyDataConfigured: boolean;
+}
+
+export interface Key extends TypeMeta<typeof KEY_KIND> {
+  metadata: KeyMetadata;
+  spec: KeySpec;
+  status: KeyStatus;
+}
+
+export interface CreateKeyRequest extends TypeMeta<typeof KEY_KIND> {
+  metadata: NamespacedCreateMetadata;
+  spec: {
+    usage?: KeyUsage;
+    materialType?: KeyMaterialType;
+    desiredState?: KeyState;
+    /** Write-only provider configuration; responses contain only redacted values. */
+    keyData: KeyData;
+  };
+}
+
+export interface UpdateKeyRequest extends TypeMeta<typeof KEY_KIND> {
+  metadata: MutableResourceMetadata;
+  spec: {
+    usage?: KeyUsage;
+    materialType?: KeyMaterialType;
+    desiredState?: KeyState;
+    keyData?: KeyData;
+  };
+}
+
+export type KeyList = ResourceList<Key>;
 
 export interface ListKeysParams {
   name?: string;
@@ -53,109 +92,47 @@ export interface KeyLabel {
   value: string;
 }
 
-export interface PutKeyLabelRequest {
-  value: string;
-}
-
-export interface PutKeyAnnotationRequest {
-  value: string;
-}
-
 export interface KeyAnnotation {
   key: string;
   value: string;
 }
 
-/**
- * List keys with optional filtering and pagination
- */
-export const listKeys = (params: ListKeysParams) => {
-  return client.get<ListResponse<Key>>('/api/v1/keys', { params });
-};
+export const listKeys = (params?: ListKeysParams) =>
+  client.get<KeyList>('/api/v1/keys', { params });
 
-/**
- * Create a new key
- */
-export const createKey = (request: CreateKeyRequest) => {
-    return client.post<Key>('/api/v1/keys', request);
-};
+export const createKey = (request: CreateKeyRequest) =>
+  client.post<Key>('/api/v1/keys', request);
 
-/**
- * Get a specific key by ID
- */
-export const getKey = (id: string) => {
-  return client.get<Key>(`/api/v1/keys/${id}`);
-};
+export const getKey = (id: string) => client.get<Key>(`/api/v1/keys/${id}`);
 
-/**
- * Update a key's state and/or labels
- */
-export const updateKey = (id: string, request: UpdateKeyRequest) => {
-  return client.patch<Key>(`/api/v1/keys/${id}`, request);
-};
+export const updateKey = (id: string, request: UpdateKeyRequest) =>
+  client.patch<Key>(`/api/v1/keys/${id}`, request);
 
-/**
- * Delete a key (soft delete)
- */
-export const deleteKey = (id: string) => {
-  return client.delete(`/api/v1/keys/${id}`);
-};
+export const deleteKey = (id: string) => client.delete(`/api/v1/keys/${id}`);
 
-/**
- * Get all labels for a specific key
- */
-export const getKeyLabels = (id: string) => {
-  return client.get<Record<string, string>>(`/api/v1/keys/${id}/labels`);
-};
+export const getKeyLabels = (id: string) =>
+  client.get<Record<string, string>>(`/api/v1/keys/${id}/labels`);
 
-/**
- * Get a specific label for a key
- */
-export const getKeyLabel = (id: string, labelKey: string) => {
-  return client.get<KeyLabel>(`/api/v1/keys/${id}/labels/${labelKey}`);
-};
+export const getKeyLabel = (id: string, labelKey: string) =>
+  client.get<KeyLabel>(`/api/v1/keys/${id}/labels/${labelKey}`);
 
-/**
- * Set a specific label for a key
- */
-export const putKeyLabel = (id: string, labelKey: string, value: string) => {
-  return client.put<KeyLabel>(`/api/v1/keys/${id}/labels/${labelKey}`, { value });
-};
+export const putKeyLabel = (id: string, labelKey: string, value: string) =>
+  client.put<KeyLabel>(`/api/v1/keys/${id}/labels/${labelKey}`, { value });
 
-/**
- * Delete a specific label from a key
- */
-export const deleteKeyLabel = (id: string, labelKey: string) => {
-  return client.delete(`/api/v1/keys/${id}/labels/${labelKey}`);
-};
+export const deleteKeyLabel = (id: string, labelKey: string) =>
+  client.delete(`/api/v1/keys/${id}/labels/${labelKey}`);
 
-/**
- * Get all annotations for a specific key
- */
-export const getKeyAnnotations = (id: string) => {
-  return client.get<Record<string, string>>(`/api/v1/keys/${id}/annotations`);
-};
+export const getKeyAnnotations = (id: string) =>
+  client.get<Record<string, string>>(`/api/v1/keys/${id}/annotations`);
 
-/**
- * Get a specific annotation for a key
- */
-export const getKeyAnnotation = (id: string, annotationKey: string) => {
-  return client.get<KeyAnnotation>(`/api/v1/keys/${id}/annotations/${annotationKey}`);
-};
+export const getKeyAnnotation = (id: string, annotationKey: string) =>
+  client.get<KeyAnnotation>(`/api/v1/keys/${id}/annotations/${annotationKey}`);
 
-/**
- * Set a specific annotation for a key
- */
-export const putKeyAnnotation = (id: string, annotationKey: string, value: string) => {
-  return client.put<KeyAnnotation>(`/api/v1/keys/${id}/annotations/${annotationKey}`, { value });
-};
+export const putKeyAnnotation = (id: string, annotationKey: string, value: string) =>
+  client.put<KeyAnnotation>(`/api/v1/keys/${id}/annotations/${annotationKey}`, { value });
 
-/**
- * Delete a specific annotation from a key
- */
-export const deleteKeyAnnotation = (id: string, annotationKey: string) => {
-  return client.delete(`/api/v1/keys/${id}/annotations/${annotationKey}`);
-};
+export const deleteKeyAnnotation = (id: string, annotationKey: string) =>
+  client.delete(`/api/v1/keys/${id}/annotations/${annotationKey}`);
 
 export const keys = {
   list: listKeys,

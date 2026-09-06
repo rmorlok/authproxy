@@ -1,69 +1,70 @@
 import { client } from './client';
-import { ListResponse } from './common';
+import {
+  API_VERSION,
+  GenerationlessObjectReference,
+  ObjectMetadata,
+  ResourceList,
+  TypeMeta,
+} from './common';
 
-// Namespace models
-
-// The predefined root namespace path
+export const NAMESPACE_KIND = 'Namespace' as const;
 export const ROOT_NAMESPACE_PATH = 'root';
 export const NAMESPACE_PATH_SEPARATOR = '.';
 
 export enum NamespaceState {
-    ACTIVE = 'active',
-    DISCONNECTING = 'disconnecting',
-    DISCONNECTED = 'disconnected',
+  ACTIVE = 'active',
+  DESTROYING = 'destroying',
+  DESTROYED = 'destroyed',
 }
 
-export interface UpdateNamespaceRequest {
-    labels?: Record<string, string>;
-    annotations?: Record<string, string>;
-}
-
-export interface PutNamespaceLabelRequest {
-    value: string;
-}
-
-export interface NamespaceLabel {
-    key: string;
-    value: string;
-}
-
-export interface PutNamespaceAnnotationRequest {
-    value: string;
-}
-
-export interface NamespaceAnnotation {
-    key: string;
-    value: string;
-}
-
-export interface Namespace {
-  path: string;
+export interface NamespaceMetadata extends ObjectMetadata {
+  /** Immutable canonical namespace path. */
+  id: string;
+  /** Final path segment. */
   name: string;
-  state: NamespaceState;
-  keyId?: string;
-  labels?: Record<string, string>;
-  annotations?: Record<string, string>;
+  /** Parent path; omitted only for root. */
+  namespace?: string;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface NamespaceKeyResponse {
-  keyId: string;
+export interface NamespaceSpec {
+  encryptionKeyRef?: GenerationlessObjectReference<'Key'>;
 }
 
-export interface SetNamespaceKeyRequest {
-  keyId: string;
+export interface NamespaceStatus {
+  state: NamespaceState;
 }
 
-export interface CreateNamespaceRequest {
-    path: string;
+export interface Namespace extends TypeMeta<typeof NAMESPACE_KIND> {
+  metadata: NamespaceMetadata;
+  spec: NamespaceSpec;
+  status: NamespaceStatus;
+}
+
+export interface CreateNamespaceRequest extends TypeMeta<typeof NAMESPACE_KIND> {
+  metadata: {
+    name: string;
+    namespace?: string;
     labels?: Record<string, string>;
     annotations?: Record<string, string>;
+  };
+  spec: NamespaceSpec;
 }
 
-/**
- * Parameters used for listing namespaces.
- */
+export interface UpdateNamespaceRequest extends TypeMeta<typeof NAMESPACE_KIND> {
+  metadata: {
+    labels?: Record<string, string>;
+    annotations?: Record<string, string>;
+  };
+  spec: {
+    /** Null clears the key; omission leaves the current value unchanged. */
+    encryptionKeyRef?: GenerationlessObjectReference<'Key'> | null;
+  };
+}
+
+export type NamespaceList = ResourceList<Namespace>;
+
 export interface ListNamespaceParams {
   name?: string;
   state?: NamespaceState;
@@ -75,129 +76,76 @@ export interface ListNamespaceParams {
   childrenOf?: string;
 }
 
-/**
- * Returns a matcher that will match for the specified namespace path and all its children. This value can be used
- * in the namespace filter param for listing resources. If no path is specified, the matcher will match for all namespaces.
- */
-export const namespaceAndChildren = (path: string | null | undefined): string => {
-    if( !path ) {
-        return ROOT_NAMESPACE_PATH + NAMESPACE_PATH_SEPARATOR +  "**";
-    }
-
-    if (path.endsWith("**")) {
-        return path;
-    } else {
-        return path + NAMESPACE_PATH_SEPARATOR + "**";
-    }
-}
-
-/**
- * Get a list of all namespaces
- * @param params The parameters for filtering and pagination
- */
-export const listNamespaces = (params: ListNamespaceParams) => {
-  return client.get<ListResponse<Namespace>>('/api/v1/namespaces', { params });
+/** Matches a namespace path and every descendant in list filters. */
+export const namespaceAndChildren = (path?: string | null): string => {
+  if (!path) {
+    return `${ROOT_NAMESPACE_PATH}${NAMESPACE_PATH_SEPARATOR}**`;
+  }
+  return path.endsWith('**') ? path : `${path}${NAMESPACE_PATH_SEPARATOR}**`;
 };
 
-/**
- * Create a new namespace
- * @param request The namespace to create
- */
-export const createNamespace = (request: CreateNamespaceRequest) => {
-    return client.post<Namespace>('/api/v1/namespaces', request);
-};
+export const listNamespaces = (params?: ListNamespaceParams) =>
+  client.get<NamespaceList>('/api/v1/namespaces', { params });
 
-/**
- * Get a specific namespace by path
- */
-export const getNamespaceByPath = (path: string) => {
-  return client.get<Namespace>(`/api/v1/namespaces/${path}`);
-};
+export const createNamespace = (request: CreateNamespaceRequest) =>
+  client.post<Namespace>('/api/v1/namespaces', request);
 
-/**
- * Update a namespace's labels
- */
-export const updateNamespace = (path: string, request: UpdateNamespaceRequest) => {
-  return client.patch<Namespace>(`/api/v1/namespaces/${path}`, request);
-};
+export const getNamespaceByPath = (path: string) =>
+  client.get<Namespace>(`/api/v1/namespaces/${path}`);
 
-/**
- * Get all labels for a specific namespace by path
- */
-export const getNamespaceLabels = (path: string) => {
-  return client.get<Record<string, string>>(`/api/v1/namespaces/${path}/labels`);
-};
+export const updateNamespace = (path: string, request: UpdateNamespaceRequest) =>
+  client.patch<Namespace>(`/api/v1/namespaces/${path}`, request);
 
-/**
- * Get a specific label for a namespace by path and label key
- */
-export const getNamespaceLabel = (path: string, labelKey: string) => {
-  return client.get<NamespaceLabel>(`/api/v1/namespaces/${path}/labels/${labelKey}`);
-};
+export const getNamespaceLabels = (path: string) =>
+  client.get<Record<string, string>>(`/api/v1/namespaces/${path}/labels`);
 
-/**
- * Set a specific label for a namespace by path and label key
- */
-export const putNamespaceLabel = (path: string, labelKey: string, value: string) => {
-  return client.put<NamespaceLabel>(`/api/v1/namespaces/${path}/labels/${labelKey}`, { value });
-};
+export const getNamespaceLabel = (path: string, labelKey: string) =>
+  client.get<{ key: string; value: string }>(`/api/v1/namespaces/${path}/labels/${labelKey}`);
 
-/**
- * Delete a specific label for a namespace by path and label key
- */
-export const deleteNamespaceLabel = (path: string, labelKey: string) => {
-  return client.delete(`/api/v1/namespaces/${path}/labels/${labelKey}`);
-};
+export const putNamespaceLabel = (path: string, labelKey: string, value: string) =>
+  client.put<{ key: string; value: string }>(`/api/v1/namespaces/${path}/labels/${labelKey}`, {
+    value,
+  });
 
-/**
- * Get the key assigned to a namespace
- */
-export const getNamespaceKey = (path: string) => {
-  return client.get<NamespaceKeyResponse>(`/api/v1/namespaces/${path}/key`);
-};
+export const deleteNamespaceLabel = (path: string, labelKey: string) =>
+  client.delete(`/api/v1/namespaces/${path}/labels/${labelKey}`);
 
-/**
- * Set the key for a namespace
- */
-export const setNamespaceKey = (path: string, keyId: string) => {
-  const request: SetNamespaceKeyRequest = { keyId: keyId };
+/** Returns the Namespace resource whose spec contains the assigned key. */
+export const getNamespaceKey = (path: string) =>
+  client.get<Namespace>(`/api/v1/namespaces/${path}/key`);
+
+export const setNamespaceKey = (
+  path: string,
+  encryptionKeyRef: GenerationlessObjectReference<'Key'>,
+) => {
+  const request: UpdateNamespaceRequest = {
+    apiVersion: API_VERSION,
+    kind: NAMESPACE_KIND,
+    metadata: {},
+    spec: { encryptionKeyRef },
+  };
   return client.put<Namespace>(`/api/v1/namespaces/${path}/key`, request);
 };
 
-/**
- * Clear the key for a namespace (falls back to parent)
- */
-export const clearNamespaceKey = (path: string) => {
-  return client.delete(`/api/v1/namespaces/${path}/key`);
-};
+export const clearNamespaceKey = (path: string) =>
+  client.delete(`/api/v1/namespaces/${path}/key`);
 
-/**
- * Get all annotations for a specific namespace by path
- */
-export const getNamespaceAnnotations = (path: string) => {
-  return client.get<Record<string, string>>(`/api/v1/namespaces/${path}/annotations`);
-};
+export const getNamespaceAnnotations = (path: string) =>
+  client.get<Record<string, string>>(`/api/v1/namespaces/${path}/annotations`);
 
-/**
- * Get a specific annotation for a namespace by path and annotation key
- */
-export const getNamespaceAnnotation = (path: string, annotationKey: string) => {
-  return client.get<NamespaceAnnotation>(`/api/v1/namespaces/${path}/annotations/${annotationKey}`);
-};
+export const getNamespaceAnnotation = (path: string, annotationKey: string) =>
+  client.get<{ key: string; value: string }>(
+    `/api/v1/namespaces/${path}/annotations/${annotationKey}`,
+  );
 
-/**
- * Set a specific annotation for a namespace by path and annotation key
- */
-export const putNamespaceAnnotation = (path: string, annotationKey: string, value: string) => {
-  return client.put<NamespaceAnnotation>(`/api/v1/namespaces/${path}/annotations/${annotationKey}`, { value });
-};
+export const putNamespaceAnnotation = (path: string, annotationKey: string, value: string) =>
+  client.put<{ key: string; value: string }>(
+    `/api/v1/namespaces/${path}/annotations/${annotationKey}`,
+    { value },
+  );
 
-/**
- * Delete a specific annotation for a namespace by path and annotation key
- */
-export const deleteNamespaceAnnotation = (path: string, annotationKey: string) => {
-  return client.delete(`/api/v1/namespaces/${path}/annotations/${annotationKey}`);
-};
+export const deleteNamespaceAnnotation = (path: string, annotationKey: string) =>
+  client.delete(`/api/v1/namespaces/${path}/annotations/${annotationKey}`);
 
 export const namespaces = {
   list: listNamespaces,
