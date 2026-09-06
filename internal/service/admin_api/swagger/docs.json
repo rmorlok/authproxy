@@ -5780,7 +5780,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "List request events entries with optional filtering and pagination",
+                "description": "List immutable request-event projections with optional filtering and pagination",
                 "consumes": [
                     "application/json"
                 ],
@@ -5930,7 +5930,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Get a specific request events entry by its UUID",
+                "description": "Get a specific immutable request event by its ID",
                 "consumes": [
                     "application/json"
                 ],
@@ -9718,6 +9718,458 @@
                 }
             }
         },
+        "openapi.RequestEventActorReferenceJson": {
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "id",
+                "kind"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "act_01example"
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "Actor"
+                    ],
+                    "example": "Actor"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "billing-service"
+                },
+                "namespace": {
+                    "type": "string",
+                    "example": "root.acme"
+                }
+            }
+        },
+        "openapi.RequestEventCaptureJson": {
+            "type": "object",
+            "required": [
+                "request",
+                "response"
+            ],
+            "properties": {
+                "request": {
+                    "$ref": "#/definitions/openapi.RequestEventCapturedRequestJson"
+                },
+                "response": {
+                    "$ref": "#/definitions/openapi.RequestEventCapturedResponseJson"
+                }
+            }
+        },
+        "openapi.RequestEventCapturedRequestJson": {
+            "type": "object",
+            "required": [
+                "headers",
+                "url"
+            ],
+            "properties": {
+                "body": {
+                    "type": "string",
+                    "format": "byte"
+                },
+                "headers": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "url": {
+                    "type": "string",
+                    "example": "https://api.example.com/v1/users"
+                }
+            }
+        },
+        "openapi.RequestEventCapturedResponseJson": {
+            "type": "object",
+            "required": [
+                "headers"
+            ],
+            "properties": {
+                "body": {
+                    "type": "string",
+                    "format": "byte"
+                },
+                "headers": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "openapi.RequestEventConnectionReferenceJson": {
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "id",
+                "kind"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "cxn_01example"
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "Connection"
+                    ],
+                    "example": "Connection"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "production"
+                },
+                "namespace": {
+                    "type": "string",
+                    "example": "root.acme"
+                }
+            }
+        },
+        "openapi.RequestEventConnectorReferenceJson": {
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "id",
+                "kind"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "generation": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "id": {
+                    "type": "string",
+                    "example": "cxr_01example"
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "Connector"
+                    ],
+                    "example": "Connector"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "provider"
+                },
+                "namespace": {
+                    "type": "string",
+                    "example": "root.integrations"
+                }
+            }
+        },
+        "openapi.RequestEventJson": {
+            "description": "Immutable, resource-shaped HTTP request event projection",
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "kind",
+                "metadata",
+                "spec"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "RequestEvent"
+                    ],
+                    "example": "RequestEvent"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/meta.ObjectMeta"
+                },
+                "spec": {
+                    "$ref": "#/definitions/openapi.RequestEventSpecJson"
+                }
+            }
+        },
+        "openapi.RequestEventListMetaJson": {
+            "type": "object",
+            "properties": {
+                "continue": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "openapi.RequestEventNamespaceReferenceJson": {
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "id",
+                "kind"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "root.acme"
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "Namespace"
+                    ],
+                    "example": "Namespace"
+                }
+            }
+        },
+        "openapi.RequestEventRateLimitJson": {
+            "type": "object",
+            "required": [
+                "mode",
+                "rateLimitRef"
+            ],
+            "properties": {
+                "bucket": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "mode": {
+                    "type": "string",
+                    "enum": [
+                        "enforce",
+                        "observe"
+                    ],
+                    "example": "enforce"
+                },
+                "rateLimitRef": {
+                    "$ref": "#/definitions/openapi.RequestEventRateLimitReferenceJson"
+                }
+            }
+        },
+        "openapi.RequestEventRateLimitReferenceJson": {
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "id",
+                "kind"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "rl_01example"
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "RateLimit"
+                    ],
+                    "example": "RateLimit"
+                }
+            }
+        },
+        "openapi.RequestEventRequestJson": {
+            "type": "object",
+            "required": [
+                "host",
+                "method",
+                "path",
+                "scheme"
+            ],
+            "properties": {
+                "bodySkipped": {
+                    "type": "string",
+                    "enum": [
+                        "streaming",
+                        "too_large"
+                    ]
+                },
+                "host": {
+                    "type": "string",
+                    "example": "api.example.com"
+                },
+                "httpVersion": {
+                    "type": "string",
+                    "example": "HTTP/2.0"
+                },
+                "method": {
+                    "type": "string",
+                    "example": "GET"
+                },
+                "mimeType": {
+                    "type": "string",
+                    "example": "application/json"
+                },
+                "path": {
+                    "type": "string",
+                    "example": "/v1/users"
+                },
+                "scheme": {
+                    "type": "string",
+                    "example": "https"
+                },
+                "sizeBytes": {
+                    "type": "integer"
+                }
+            }
+        },
+        "openapi.RequestEventResponseJson": {
+            "type": "object",
+            "properties": {
+                "bodySkipped": {
+                    "type": "string",
+                    "enum": [
+                        "streaming",
+                        "too_large"
+                    ]
+                },
+                "error": {
+                    "type": "string"
+                },
+                "httpVersion": {
+                    "type": "string",
+                    "example": "HTTP/2.0"
+                },
+                "mimeType": {
+                    "type": "string",
+                    "example": "application/json"
+                },
+                "sizeBytes": {
+                    "type": "integer"
+                },
+                "source": {
+                    "type": "string",
+                    "enum": [
+                        "upstream",
+                        "connector_rate_limiter",
+                        "rate_limit"
+                    ],
+                    "example": "upstream"
+                },
+                "statusCode": {
+                    "type": "integer",
+                    "example": 200
+                }
+            }
+        },
+        "openapi.RequestEventSpecJson": {
+            "type": "object",
+            "required": [
+                "durationMilliseconds",
+                "namespaceRef",
+                "request",
+                "requestType",
+                "response"
+            ],
+            "properties": {
+                "actorRef": {
+                    "$ref": "#/definitions/openapi.RequestEventActorReferenceJson"
+                },
+                "capture": {
+                    "$ref": "#/definitions/openapi.RequestEventCaptureJson"
+                },
+                "captureAvailable": {
+                    "type": "boolean"
+                },
+                "connectionRef": {
+                    "$ref": "#/definitions/openapi.RequestEventConnectionReferenceJson"
+                },
+                "connectorRef": {
+                    "$ref": "#/definitions/openapi.RequestEventConnectorReferenceJson"
+                },
+                "correlationId": {
+                    "type": "string"
+                },
+                "durationMilliseconds": {
+                    "type": "integer",
+                    "example": 150
+                },
+                "internalTimeout": {
+                    "type": "boolean"
+                },
+                "namespaceRef": {
+                    "$ref": "#/definitions/openapi.RequestEventNamespaceReferenceJson"
+                },
+                "rateLimit": {
+                    "$ref": "#/definitions/openapi.RequestEventRateLimitJson"
+                },
+                "rateLimitsMatched": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/openapi.RequestEventRateLimitJson"
+                    }
+                },
+                "request": {
+                    "$ref": "#/definitions/openapi.RequestEventRequestJson"
+                },
+                "requestCancelled": {
+                    "type": "boolean"
+                },
+                "requestType": {
+                    "type": "string",
+                    "enum": [
+                        "global",
+                        "proxy",
+                        "oauth",
+                        "public",
+                        "probe"
+                    ],
+                    "example": "proxy"
+                },
+                "response": {
+                    "$ref": "#/definitions/openapi.RequestEventResponseJson"
+                }
+            }
+        },
         "openapi.SearchResultListMetaJson": {
             "type": "object",
             "properties": {
@@ -10352,18 +10804,37 @@
             }
         },
         "routes.OpenAPIListRequestEventsResponse": {
-            "description": "Paginated list of request events entries",
+            "description": "Paginated list of immutable request-event projections",
             "type": "object",
+            "required": [
+                "apiVersion",
+                "items",
+                "kind",
+                "metadata"
+            ],
             "properties": {
-                "cursor": {
-                    "type": "string"
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
                 },
                 "items": {
                     "type": "array",
-                    "items": {}
+                    "items": {
+                        "$ref": "#/definitions/openapi.RequestEventJson"
+                    }
                 },
-                "total": {
-                    "type": "integer"
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "RequestEventList"
+                    ],
+                    "example": "RequestEventList"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/openapi.RequestEventListMetaJson"
                 }
             }
         },
@@ -10471,85 +10942,34 @@
             }
         },
         "routes.OpenAPIRequestEventsEntry": {
-            "description": "HTTP request events entry",
+            "description": "Immutable, resource-shaped HTTP request event projection",
             "type": "object",
+            "required": [
+                "apiVersion",
+                "kind",
+                "metadata",
+                "spec"
+            ],
             "properties": {
-                "connectionId": {
-                    "type": "string"
-                },
-                "connectorId": {
-                    "type": "string"
-                },
-                "connectorVersion": {
-                    "type": "integer"
-                },
-                "correlationId": {
-                    "type": "string"
-                },
-                "duration": {
-                    "type": "integer",
-                    "example": 150
-                },
-                "host": {
+                "apiVersion": {
                     "type": "string",
-                    "example": "api.example.com"
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
                 },
-                "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "method": {
+                "kind": {
                     "type": "string",
-                    "example": "GET"
+                    "enum": [
+                        "RequestEvent"
+                    ],
+                    "example": "RequestEvent"
                 },
-                "namespace": {
-                    "type": "string",
-                    "example": "root.acme"
+                "metadata": {
+                    "$ref": "#/definitions/meta.ObjectMeta"
                 },
-                "path": {
-                    "type": "string",
-                    "example": "/v1/users"
-                },
-                "rateLimitBucket": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "rateLimitId": {
-                    "type": "string"
-                },
-                "rateLimitMatched": {
-                    "type": "array",
-                    "items": {}
-                },
-                "rateLimitMode": {
-                    "type": "string"
-                },
-                "requestId": {
-                    "type": "string",
-                    "example": "req_test550e8400abcde"
-                },
-                "responseSource": {
-                    "type": "string",
-                    "example": "upstream"
-                },
-                "responseStatusCode": {
-                    "type": "integer",
-                    "example": 200
-                },
-                "scheme": {
-                    "type": "string",
-                    "example": "https"
-                },
-                "timestamp": {
-                    "type": "string"
-                },
-                "type": {
-                    "type": "string",
-                    "example": "proxy"
+                "spec": {
+                    "$ref": "#/definitions/openapi.RequestEventSpecJson"
                 }
             }
         },

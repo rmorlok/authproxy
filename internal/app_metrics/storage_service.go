@@ -121,6 +121,7 @@ func (ss *StorageService) GetFullLog(ctx context.Context, id apid.ID) (*FullLog,
 		}
 		return nil, err
 	}
+	fullLog.Record = log
 
 	return fullLog, nil
 }

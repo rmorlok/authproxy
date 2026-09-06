@@ -1451,182 +1451,252 @@
       ],
       "additionalProperties": false
     },
+    "RequestEventNamespaceReference": {
+      "allOf": [
+        { "$ref": "../resources/meta/schema.json#/$defs/ObjectReference" },
+        {
+          "type": "object",
+          "required": ["id"],
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "Namespace" },
+            "id": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" }
+          },
+          "not": {
+            "anyOf": [
+              { "required": ["name"] },
+              { "required": ["namespace"] },
+              { "required": ["generation"] }
+            ]
+          }
+        }
+      ]
+    },
+    "RequestEventActorReference": {
+      "allOf": [
+        { "$ref": "../resources/meta/schema.json#/$defs/ObjectReference" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "Actor" },
+            "id": { "type": "string", "pattern": "^act_" },
+            "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" }
+          }
+        }
+      ]
+    },
+    "RequestEventConnectionReference": {
+      "allOf": [
+        { "$ref": "../resources/meta/schema.json#/$defs/ObjectReference" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "Connection" },
+            "id": { "type": "string", "pattern": "^cxn_" },
+            "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" }
+          },
+          "not": { "required": ["generation"] }
+        }
+      ]
+    },
+    "RequestEventConnectorReference": {
+      "allOf": [
+        { "$ref": "../resources/meta/schema.json#/$defs/ObjectReference" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "Connector" },
+            "id": { "type": "string", "pattern": "^cxr_" },
+            "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" }
+          }
+        }
+      ]
+    },
+    "RequestEventRateLimitReference": {
+      "allOf": [
+        { "$ref": "../resources/meta/schema.json#/$defs/ObjectReference" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "RateLimit" },
+            "id": { "type": "string", "pattern": "^rl_" }
+          },
+          "not": { "required": ["generation"] }
+        }
+      ]
+    },
+    "RequestEventRequest": {
+      "type": "object",
+      "properties": {
+        "method": { "$ref": "../resources/rate_limit/schema.json#/$defs/HttpMethod" },
+        "host": { "type": "string" },
+        "scheme": { "type": "string" },
+        "path": { "type": "string" },
+        "httpVersion": { "type": "string" },
+        "sizeBytes": { "type": "integer", "minimum": 0 },
+        "mimeType": { "type": "string" },
+        "bodySkipped": { "type": "string", "enum": ["streaming", "too_large"] }
+      },
+      "required": ["method", "host", "scheme", "path"],
+      "additionalProperties": false
+    },
+    "RequestEventResponse": {
+      "type": "object",
+      "properties": {
+        "statusCode": { "type": "integer", "minimum": 100, "maximum": 599 },
+        "error": { "type": "string" },
+        "httpVersion": { "type": "string" },
+        "sizeBytes": { "type": "integer", "minimum": 0 },
+        "mimeType": { "type": "string" },
+        "bodySkipped": { "type": "string", "enum": ["streaming", "too_large"] },
+        "source": {
+          "type": "string",
+          "enum": ["upstream", "connector_rate_limiter", "rate_limit"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "RequestEventCapturedRequest": {
+      "type": "object",
+      "properties": {
+        "url": { "type": "string" },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "body": { "type": "string", "contentEncoding": "base64" }
+      },
+      "required": ["url", "headers"],
+      "additionalProperties": false
+    },
+    "RequestEventCapturedResponse": {
+      "type": "object",
+      "properties": {
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "body": { "type": "string", "contentEncoding": "base64" }
+      },
+      "required": ["headers"],
+      "additionalProperties": false
+    },
+    "RequestEventCapture": {
+      "type": "object",
+      "properties": {
+        "request": { "$ref": "#/$defs/RequestEventCapturedRequest" },
+        "response": { "$ref": "#/$defs/RequestEventCapturedResponse" }
+      },
+      "required": ["request", "response"],
+      "additionalProperties": false
+    },
     "RequestEventRateLimit": {
       "type": "object",
       "properties": {
-        "id": {
-          "type": "string"
+        "rateLimitRef": { "$ref": "#/$defs/RequestEventRateLimitReference" },
+        "mode": { "$ref": "../resources/rate_limit/schema.json#/$defs/Mode" },
+        "bucket": { "$ref": "#/$defs/StringMap" }
+      },
+      "required": ["rateLimitRef", "mode"],
+      "additionalProperties": false
+    },
+    "RequestEventSpec": {
+      "type": "object",
+      "properties": {
+        "requestType": { "$ref": "../common/schema.json#/$defs/RequestType" },
+        "correlationId": { "type": "string" },
+        "durationMilliseconds": { "type": "integer", "minimum": 0 },
+        "namespaceRef": { "$ref": "#/$defs/RequestEventNamespaceReference" },
+        "actorRef": { "$ref": "#/$defs/RequestEventActorReference" },
+        "connectionRef": { "$ref": "#/$defs/RequestEventConnectionReference" },
+        "connectorRef": { "$ref": "#/$defs/RequestEventConnectorReference" },
+        "request": { "$ref": "#/$defs/RequestEventRequest" },
+        "response": { "$ref": "#/$defs/RequestEventResponse" },
+        "captureAvailable": { "type": "boolean" },
+        "capture": { "$ref": "#/$defs/RequestEventCapture" },
+        "rateLimit": { "$ref": "#/$defs/RequestEventRateLimit" },
+        "rateLimitsMatched": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/RequestEventRateLimit" }
         },
-        "mode": {
-          "$ref": "../resources/rate_limit/schema.json#/$defs/Mode"
-        },
-        "bucket": {
-          "$ref": "#/$defs/StringMap"
-        }
+        "internalTimeout": { "type": "boolean" },
+        "requestCancelled": { "type": "boolean" }
       },
       "required": [
-        "id",
-        "mode"
+        "requestType",
+        "durationMilliseconds",
+        "namespaceRef",
+        "request",
+        "response",
+        "captureAvailable"
       ],
       "additionalProperties": false
     },
     "RequestEvent": {
-      "type": "object",
-      "properties": {
-        "namespace": {
-          "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath"
-        },
-        "type": {
-          "$ref": "../common/schema.json#/$defs/RequestType"
-        },
-        "requestId": {
-          "type": "string"
-        },
-        "correlationId": {
-          "type": "string"
-        },
-        "timestamp": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "duration": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "connectionId": {
-          "type": "string"
-        },
-        "connectorId": {
-          "type": "string"
-        },
-        "connectorVersion": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "method": {
-          "$ref": "../resources/rate_limit/schema.json#/$defs/HttpMethod"
-        },
-        "host": {
-          "type": "string"
-        },
-        "scheme": {
-          "type": "string"
-        },
-        "path": {
-          "type": "string"
-        },
-        "requestHttpVersion": {
-          "type": "string"
-        },
-        "requestSizeBytes": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "requestMimeType": {
-          "type": "string"
-        },
-        "requestBodySkipped": {
-          "type": "string",
-          "enum": [
-            "streaming",
-            "too_large"
-          ]
-        },
-        "responseStatusCode": {
-          "type": "integer",
-          "minimum": 100,
-          "maximum": 599
-        },
-        "responseError": {
-          "type": "string"
-        },
-        "responseHttpVersion": {
-          "type": "string"
-        },
-        "responseSizeBytes": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "responseMimeType": {
-          "type": "string"
-        },
-        "responseBodySkipped": {
-          "type": "string",
-          "enum": [
-            "streaming",
-            "too_large"
-          ]
-        },
-        "internalTimeout": {
-          "type": "boolean"
-        },
-        "requestCancelled": {
-          "type": "boolean"
-        },
-        "fullRequestRecorded": {
-          "type": "boolean"
-        },
-        "labels": {
-          "$ref": "#/$defs/StringMap"
-        },
-        "responseSource": {
-          "type": "string",
-          "enum": [
-            "upstream",
-            "connector_rate_limiter",
-            "rate_limit"
-          ]
-        },
-        "rateLimitId": {
-          "type": "string"
-        },
-        "rateLimitMode": {
-          "$ref": "../resources/rate_limit/schema.json#/$defs/Mode"
-        },
-        "rateLimitBucket": {
-          "$ref": "#/$defs/StringMap"
-        },
-        "rateLimitMatched": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/RequestEventRateLimit"
+      "description": "An immutable, resource-shaped HTTP event projection; it is not a client-managed desired resource.",
+      "allOf": [
+        { "$ref": "../resources/meta/schema.json#/$defs/Resource" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "RequestEvent" },
+            "metadata": {
+              "allOf": [
+                { "$ref": "../resources/meta/schema.json#/$defs/ObjectMeta" },
+                {
+                  "type": "object",
+                  "required": ["id", "namespace", "createdAt"],
+                  "properties": {
+                    "id": { "type": "string", "pattern": "^req_" },
+                    "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" }
+                  }
+                }
+              ]
+            },
+            "spec": { "$ref": "#/$defs/RequestEventSpec" }
           }
         }
-      },
-      "required": [
-        "namespace",
-        "type",
-        "requestId",
-        "timestamp",
-        "duration",
-        "method",
-        "host",
-        "scheme",
-        "path"
       ],
+      "unevaluatedProperties": false
+    },
+    "RequestEventListMeta": {
+      "type": "object",
+      "properties": {
+        "continue": { "type": "string" },
+        "total": { "type": "integer", "minimum": 0 }
+      },
       "additionalProperties": false
     },
     "ListRequestEventsResponse": {
-      "type": "object",
-      "properties": {
-        "items": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/RequestEvent"
+      "description": "A paginated list of immutable RequestEvent projections.",
+      "allOf": [
+        { "$ref": "../resources/meta/schema.json#/$defs/TypeMeta" },
+        {
+          "type": "object",
+          "required": ["metadata", "items"],
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "RequestEventList" },
+            "metadata": { "$ref": "#/$defs/RequestEventListMeta" },
+            "items": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/RequestEvent" }
+            }
           }
-        },
-        "cursor": {
-          "type": "string"
-        },
-        "total": {
-          "type": "integer",
-          "minimum": 0
         }
-      },
-      "required": [
-        "items"
       ],
-      "additionalProperties": false
+      "unevaluatedProperties": false
     },
     "TaskState": {
       "type": "string",

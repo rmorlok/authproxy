@@ -15,6 +15,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/app_metrics"
 	"github.com/rmorlok/authproxy/internal/app_metrics/mock"
+	"github.com/rmorlok/authproxy/internal/apserde"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"
@@ -101,7 +102,7 @@ func TestRequestEventsRoutes(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ListRequestEventsResponseJson
+			var resp sapi.ListRequestEventsResponseJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Len(t, resp.Items, 0)
@@ -189,11 +190,11 @@ func TestRequestEventsRoutes(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ListRequestEventsResponseJson
+			var resp sapi.ListRequestEventsResponseJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Len(t, resp.Items, 1)
-			require.Equal(t, resp.Items[0].RequestId, id)
+			require.Equal(t, id.String(), resp.Items[0].Metadata.ID)
 		})
 
 		t.Run("multiple pages of results", func(t *testing.T) {
@@ -232,11 +233,11 @@ func TestRequestEventsRoutes(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ListRequestEventsResponseJson
+			var resp sapi.ListRequestEventsResponseJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Len(t, resp.Items, 1)
-			require.Equal(t, resp.Cursor, "next-cursor")
+			require.Equal(t, "next-cursor", resp.Metadata.Continue)
 		})
 
 		t.Run("from cursor", func(t *testing.T) {
@@ -274,7 +275,7 @@ func TestRequestEventsRoutes(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ListRequestEventsResponseJson
+			var resp sapi.ListRequestEventsResponseJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Len(t, resp.Items, 1)
@@ -414,6 +415,16 @@ func TestRequestEventsRoutes(t *testing.T) {
 				Id:        testId,
 				Namespace: "root",
 				Timestamp: time.Now().UTC(),
+				Full:      true,
+				Request: app_metrics.FullLogRequest{
+					URL:     "https://api.example.com/items?api_key=secret",
+					Headers: map[string][]string{"Authorization": {"Bearer secret"}},
+					Body:    []byte("secret request body"),
+				},
+				Response: app_metrics.FullLogResponse{
+					Headers: map[string][]string{"Set-Cookie": {"session=secret"}},
+					Body:    []byte("secret response body"),
+				},
 			}
 
 			tu.MockRetriever.EXPECT().
@@ -422,6 +433,51 @@ func TestRequestEventsRoutes(t *testing.T) {
 
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
+			require.Equal(t, "true", w.Header().Get(apserde.RedactedHeader))
+			require.NotContains(t, w.Body.String(), "Bearer secret")
+
+			var response sapi.RequestEventJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+			require.Equal(t, testId.String(), response.Metadata.ID)
+			require.NotNil(t, response.Spec.Capture)
+		})
+
+		t.Run("valid with secret replay", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			permissions := append(
+				aschema.PermissionsSingle("root.**", "request-events", "get"),
+				aschema.PermissionsSingle("root.**", apserde.SecretResource, apserde.SecretReplayVerb)...,
+			)
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/metrics/request-events/"+testId.String(),
+				nil,
+				"root",
+				"some-actor",
+				permissions,
+			)
+			require.NoError(t, err)
+
+			entry := &app_metrics.FullLog{
+				Id:        testId,
+				Namespace: "root",
+				Timestamp: time.Now().UTC(),
+				Full:      true,
+				Request: app_metrics.FullLogRequest{
+					URL:     "https://api.example.com/items?api_key=secret",
+					Headers: map[string][]string{"Authorization": {"Bearer secret"}},
+				},
+			}
+
+			tu.MockRetriever.EXPECT().
+				GetFullLog(gomock.Any(), testId).
+				Return(entry, nil)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+			require.Empty(t, w.Header().Get(apserde.RedactedHeader))
+			require.Contains(t, w.Body.String(), "Bearer secret")
+			require.Contains(t, w.Body.String(), "api_key=secret")
 		})
 	})
 
@@ -464,11 +520,11 @@ func TestRequestEventsRoutes(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ListRequestEventsResponseJson
+			var resp sapi.ListRequestEventsResponseJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Len(t, resp.Items, 1)
-			require.Equal(t, id, resp.Items[0].RequestId)
+			require.Equal(t, id.String(), resp.Items[0].Metadata.ID)
 
 			// Verify the label_selector was passed to the builder
 			require.NotNil(t, b.LabelSelector)
@@ -520,7 +576,8 @@ func TestRequestEventsRoutes(t *testing.T) {
 			require.Len(t, items, 1)
 
 			item := items[0].(map[string]interface{})
-			labels := item["labels"].(map[string]interface{})
+			metadata := item["metadata"].(map[string]interface{})
+			labels := metadata["labels"].(map[string]interface{})
 			require.Equal(t, "prod", labels["env"])
 			require.Equal(t, "us-east", labels["region"])
 		})
@@ -569,7 +626,8 @@ func TestRequestEventsRoutes(t *testing.T) {
 			require.Len(t, items, 1)
 
 			item := items[0].(map[string]interface{})
-			_, hasLabels := item["labels"]
+			metadata := item["metadata"].(map[string]interface{})
+			_, hasLabels := metadata["labels"]
 			require.False(t, hasLabels, "labels should be omitted from JSON when nil")
 		})
 	})

@@ -155,6 +155,26 @@ func TestManagedListSchemasRejectLegacyTopLevelCursor(t *testing.T) {
 	}))
 }
 
+func TestRequestEventSchemasRejectLegacyFlatShape(t *testing.T) {
+	event := compileRefSchema(t, "./schema.json#/$defs/RequestEvent")
+	require.Error(t, event.Validate(map[string]any{
+		"namespace": "root.acme",
+		"requestId": "req_test550e8400abcde",
+		"timestamp": "2026-01-02T03:04:05Z",
+		"method":    "GET",
+		"host":      "api.example.com",
+		"scheme":    "https",
+		"path":      "/v1/users",
+	}))
+
+	list := compileRefSchema(t, "./schema.json#/$defs/ListRequestEventsResponse")
+	require.Error(t, list.Validate(map[string]any{
+		"items":  []any{},
+		"cursor": "next-page",
+		"total":  1,
+	}))
+}
+
 func TestNotificationAndSearchSchemasRejectLegacyFlatIdentity(t *testing.T) {
 	notifications := compileRefSchema(t, "./schema.json#/$defs/ListNotificationsResponse")
 	require.Error(t, notifications.Validate(map[string]any{

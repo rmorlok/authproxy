@@ -47,10 +47,77 @@ include namespace, connector, connection, method, status range, path, response
 source, rate-limit id, label selector, and timestamp range. Fetch one event at
 `GET /api/v1/metrics/request-events/{id}`.
 
+Request events use the `authproxy.net/v1alpha1` envelope, but they are immutable
+observations rather than resources with client-managed desired state. Event
+identity, namespace, the frozen label snapshot, and timestamp are in
+`metadata`; observed request and response facts are in `spec`. Resource
+attribution uses typed references. In particular, `connectorRef.generation`
+records the connector generation used for the request.
+
+```yaml
+apiVersion: authproxy.net/v1alpha1
+kind: RequestEvent
+metadata:
+  id: req_01example
+  namespace: root.acme
+  labels:
+    team: payments
+  createdAt: 2026-09-06T17:30:00Z
+spec:
+  requestType: proxy
+  correlationId: corr-123
+  durationMilliseconds: 150
+  namespaceRef:
+    apiVersion: authproxy.net/v1alpha1
+    kind: Namespace
+    id: root.acme
+  actorRef:
+    apiVersion: authproxy.net/v1alpha1
+    kind: Actor
+    id: act_01example
+    name: billing-service
+    namespace: root.acme
+  connectionRef:
+    apiVersion: authproxy.net/v1alpha1
+    kind: Connection
+    id: cxn_01example
+    name: production
+    namespace: root.acme
+  connectorRef:
+    apiVersion: authproxy.net/v1alpha1
+    kind: Connector
+    id: cxr_01example
+    name: provider
+    namespace: root.integrations
+    generation: 3
+  request:
+    method: GET
+    host: api.example.com
+    scheme: https
+    path: /v1/items
+  response:
+    statusCode: 200
+    source: upstream
+  captureAvailable: false
+```
+
+List responses use `kind: RequestEventList`; pagination is returned in
+`metadata.continue`, and the exact match count (when available) is returned in
+`metadata.total`. Existing request-event filters retain their current query
+parameter names, including `connectorVersion` for generation-specific queries.
+
 Full request and response payloads are separate encrypted blobs and exist only
 when `fullRequestRecording` is `always`. Keep recording at `never` unless the
 debugging or audit requirement justifies the additional sensitive data,
 storage, access control, and retention burden.
+
+When capture is present, `spec.capture` contains the original URL, headers, and
+request/response bodies; body values use base64 on the wire. These fields are
+not metadata and are redacted by default. AuthProxy returns unredacted capture
+only when the authenticated actor has `secrets:replay`; otherwise the response
+includes `X-AuthProxy-Data-Redacted: true` when capture fields were masked.
+Treat replayed data as sensitive even when a particular request appears
+harmless.
 
 ## Query API
 
