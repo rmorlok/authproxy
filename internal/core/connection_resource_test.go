@@ -122,7 +122,7 @@ func TestConnectionGetResourceOmitsSetupAndDefaultsHealth(t *testing.T) {
 
 	resource, err := wrapped.GetResource(t.Context())
 	require.NoError(t, err)
-	
+
 	require.Nil(t, resource.Status.Setup)
 	require.False(t, resource.Status.Configuration.Configured)
 	require.JSONEq(t, `{

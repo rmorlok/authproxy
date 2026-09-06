@@ -37,14 +37,20 @@ func connectionActionTestResource(t *testing.T) connectionschema.Connection {
 			CreatedAt: &now,
 			UpdatedAt: &now,
 		},
-		Spec: connectionschema.ConnectionSpec{ConnectorRef: connectionActionTestReference(
-			connectorschema.ConnectorKind,
-			apid.New(apid.PrefixConnector),
-			2,
-		)},
+		Spec: connectionschema.ConnectionSpec{
+			ConnectorRef: connectionActionTestReference(
+				connectorschema.ConnectorKind,
+				apid.New(apid.PrefixConnector),
+				2,
+			),
+		},
 		Status: &connectionschema.ConnectionStatus{
-			Lifecycle: connectionschema.ConnectionLifecycleStatus{State: connectionschema.ConnectionStateConfigured},
-			Health:    connectionschema.ConnectionHealthStatus{State: connectionschema.ConnectionHealthStateHealthy},
+			Lifecycle: connectionschema.ConnectionLifecycleStatus{
+				State: connectionschema.ConnectionStateConfigured,
+			},
+			Health: connectionschema.ConnectionHealthStatus{
+				State: connectionschema.ConnectionHealthStateHealthy,
+			},
 			Configuration: connectionschema.ConnectionConfigurationStatus{
 				Configured: true,
 				Schema:     common.RawJSON(`{"type":"object","properties":{},"additionalProperties":true}`),
@@ -54,7 +60,11 @@ func connectionActionTestResource(t *testing.T) connectionschema.Connection {
 }
 
 func TestConnectionInitiateActionValidation(t *testing.T) {
-	target := connectionActionTestReference(connectorschema.ConnectorKind, apid.New(apid.PrefixConnector), 0)
+	target := connectionActionTestReference(
+		connectorschema.ConnectorKind,
+		apid.New(apid.PrefixConnector),
+		0, // generation
+	)
 	action := ConnectionInitiateAction{Action: apiv1alpha1.NewActionRequest(
 		ConnectionInitiateActionKind,
 		target,
@@ -63,21 +73,28 @@ func TestConnectionInitiateActionValidation(t *testing.T) {
 	require.NoError(t, action.ValidateRequest(ConnectionInitiateActionKind))
 
 	action.Spec.ReturnToURL = ""
-	require.ErrorContains(t, action.ValidateRequest(ConnectionInitiateActionKind), "returnToUrl")
+	require.ErrorContains(t,
+		action.ValidateRequest(ConnectionInitiateActionKind),
+		"returnToUrl")
 	action.Spec.ReturnToURL = "https://app.example.com/complete"
 	action.Metadata.Target.Kind = connectionschema.ConnectionKind
-	require.ErrorContains(t, action.ValidateRequest(ConnectionInitiateActionKind), "Connector")
+	require.ErrorContains(t,
+		action.ValidateRequest(ConnectionInitiateActionKind),
+		"Connector")
 }
 
 func TestConnectionSetupActionValidationAndRedaction(t *testing.T) {
 	target := connectionschema.NewConnectionReference(apid.New(apid.PrefixConnection))
-	action := NewConnectionSetupAction(target, ConnectionSetupActionStatus{
-		Type:       ConnectionSetupResponseTypeForm,
-		StepID:     "credentials",
-		JSONSchema: json.RawMessage(`{"type":"object"}`),
-		UISchema:   json.RawMessage(`{}`),
-		Data:       json.RawMessage(`{"apiKey":"secret-value"}`),
-	})
+	action := NewConnectionSetupAction(
+		target,
+		ConnectionSetupActionStatus{
+			Type:       ConnectionSetupResponseTypeForm,
+			StepID:     "credentials",
+			JSONSchema: json.RawMessage(`{"type":"object"}`),
+			UISchema:   json.RawMessage(`{}`),
+			Data:       json.RawMessage(`{"apiKey":"secret-value"}`),
+		},
+	)
 	require.NoError(t, action.ValidateResponse(ConnectionSetupActionKind))
 
 	encoded, report, err := apserde.MarshalJSONForAPI(context.Background(), action)
@@ -107,28 +124,50 @@ func TestConnectionLifecycleActionResponseValidation(t *testing.T) {
 	target := connectionschema.NewConnectionReference(apid.MustParse(connection.Metadata.ID))
 	timeout := int64(60)
 
-	disconnect := NewConnectionDisconnectResponse(target, ConnectionDisconnectSpec{TimeoutSeconds: &timeout}, ConnectionDisconnectStatus{
-		TaskID:     "task-token",
-		Connection: connection,
-	})
+	disconnect := NewConnectionDisconnectResponse(
+		target,
+		ConnectionDisconnectSpec{
+			TimeoutSeconds: &timeout,
+		},
+		ConnectionDisconnectStatus{
+			TaskID:     "task-token",
+			Connection: connection,
+		},
+	)
 	require.NoError(t, disconnect.ValidateResponse(ConnectionDisconnectActionKind))
 	disconnect.Status.TaskID = ""
-	require.ErrorContains(t, disconnect.ValidateResponse(ConnectionDisconnectActionKind), "taskId")
+	require.ErrorContains(t,
+		disconnect.ValidateResponse(ConnectionDisconnectActionKind),
+		"taskId")
 
 	connectorRef := connection.Spec.ConnectorRef
-	migration := NewConnectionVersionMigrationResponse(target, ConnectionVersionMigrationSpec{ConnectorRef: connectorRef}, ConnectionVersionMigrationStatus{
-		TaskID:             "task-token",
-		SourceConnectorRef: connectorRef,
-		TargetConnectorRef: connectorRef,
-	})
+	migration := NewConnectionVersionMigrationResponse(
+		target,
+		ConnectionVersionMigrationSpec{
+			ConnectorRef: connectorRef,
+		},
+		ConnectionVersionMigrationStatus{
+			TaskID:             "task-token",
+			SourceConnectorRef: connectorRef,
+			TargetConnectorRef: connectorRef,
+		},
+	)
 	require.NoError(t, migration.ValidateResponse(ConnectionVersionMigrationActionKind))
 	migration.Status.TargetConnectorRef.Generation = 0
-	require.ErrorContains(t, migration.ValidateResponse(ConnectionVersionMigrationActionKind), "generation")
+	require.ErrorContains(t,
+		migration.ValidateResponse(ConnectionVersionMigrationActionKind),
+		"generation")
 
-	forceState := NewConnectionForceStateResponse(target, ConnectionForceStateSpec{
-		State: connectionschema.ConnectionStateConfigured,
-	}, connection)
+	forceState := NewConnectionForceStateResponse(
+		target,
+		ConnectionForceStateSpec{
+			State: connectionschema.ConnectionStateConfigured,
+		},
+		connection,
+	)
 	require.NoError(t, forceState.ValidateResponse(ConnectionForceStateActionKind))
 	forceState.Status.Connection.Status = nil
-	require.ErrorContains(t, forceState.ValidateResponse(ConnectionForceStateActionKind), "status")
+	require.ErrorContains(t,
+		forceState.ValidateResponse(ConnectionForceStateActionKind),
+		"status")
 }
