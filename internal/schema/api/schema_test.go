@@ -124,13 +124,18 @@ func TestSchemaSamples(t *testing.T) {
 		{name: "put key value", ref: "./schema.json#/$defs/PutKeyValueRequest", file: "valid-put-key-value.json"},
 		{name: "request event", ref: "./schema.json#/$defs/RequestEvent", file: "valid-request-event.json"},
 		{name: "list request events", ref: "./schema.json#/$defs/ListRequestEventsResponse", file: "valid-list-request-events.json"},
-		{name: "task info", ref: "./schema.json#/$defs/TaskInfo", file: "valid-task-info.json"},
-		{name: "list queues", ref: "./schema.json#/$defs/ListQueuesResponse", file: "valid-list-queues.json"},
-		{name: "list monitoring tasks", ref: "./schema.json#/$defs/ListMonitoringTasksResponse", file: "valid-list-monitoring-tasks.json"},
-		{name: "list servers", ref: "./schema.json#/$defs/ListServersResponse", file: "valid-list-servers.json"},
-		{name: "list scheduler entries", ref: "./schema.json#/$defs/ListSchedulerEntriesResponse", file: "valid-list-scheduler-entries.json"},
-		{name: "list queue history", ref: "./schema.json#/$defs/ListQueueHistoryResponse", file: "valid-list-queue-history.json"},
-		{name: "bulk action", ref: "./schema.json#/$defs/BulkActionResponse", file: "valid-bulk-action-response.json"},
+		{name: "task", ref: "./schema.json#/$defs/Task", file: "valid-task-info.json"},
+		{name: "list task queues", ref: "./schema.json#/$defs/ListTaskQueuesResponse", file: "valid-list-queues.json"},
+		{name: "list task executions", ref: "./schema.json#/$defs/ListTaskExecutionsResponse", file: "valid-list-monitoring-tasks.json"},
+		{name: "list task servers", ref: "./schema.json#/$defs/ListTaskServersResponse", file: "valid-list-servers.json"},
+		{name: "list task schedules", ref: "./schema.json#/$defs/ListTaskSchedulesResponse", file: "valid-list-scheduler-entries.json"},
+		{name: "task queue history", ref: "./schema.json#/$defs/TaskQueueHistory", file: "valid-list-queue-history.json"},
+		{name: "task execution action", ref: "./schema.json#/$defs/TaskExecutionAction", file: "valid-task-execution-action-response.json"},
+		{name: "task queue action", ref: "./schema.json#/$defs/TaskQueueAction", file: "valid-bulk-action-response.json"},
+		{name: "workflow instance", ref: "./schema.json#/$defs/WorkflowInstance", file: "valid-workflow-instance.json"},
+		{name: "list workflow instances", ref: "./schema.json#/$defs/ListWorkflowInstancesResponse", file: "valid-list-workflow-instances.json"},
+		{name: "list workflow history", ref: "./schema.json#/$defs/ListWorkflowHistoryResponse", file: "valid-list-workflow-history.json"},
+		{name: "workflow action", ref: "./schema.json#/$defs/WorkflowInstanceAction", file: "valid-workflow-action-response.json"},
 	}
 
 	for _, tt := range tests {
@@ -172,6 +177,29 @@ func TestRequestEventSchemasRejectLegacyFlatShape(t *testing.T) {
 		"items":  []any{},
 		"cursor": "next-page",
 		"total":  1,
+	}))
+}
+
+func TestTaskAndWorkflowSchemasRejectLegacyFlatShapes(t *testing.T) {
+	task := compileRefSchema(t, "./schema.json#/$defs/Task")
+	require.Error(t, task.Validate(map[string]any{
+		"id":    "task-token",
+		"type":  "sync",
+		"state": "completed",
+	}))
+
+	workflow := compileRefSchema(t, "./schema.json#/$defs/WorkflowInstance")
+	require.Error(t, workflow.Validate(map[string]any{
+		"instanceId":  "workflow-a",
+		"executionId": "exec-a",
+		"state":       "active",
+		"queue":       "default",
+	}))
+
+	list := compileRefSchema(t, "./schema.json#/$defs/ListTaskExecutionsResponse")
+	require.Error(t, list.Validate(map[string]any{
+		"items":  []any{},
+		"cursor": "next-page",
 	}))
 }
 

@@ -1364,6 +1364,51 @@ definitions:
           type: string
         type: array
     type: object
+  openapi.TaskJson:
+    description: Background task status
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - Task
+        example: Task
+        type: string
+      metadata:
+        $ref: '#/definitions/meta.ObjectMeta'
+      spec:
+        $ref: '#/definitions/openapi.TaskSpecJson'
+      status:
+        $ref: '#/definitions/openapi.TaskStatusJson'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    - status
+    type: object
+  openapi.TaskSpecJson:
+    properties:
+      type:
+        type: string
+    type: object
+  openapi.TaskStatusJson:
+    properties:
+      state:
+        enum:
+        - unknown
+        - active
+        - pending
+        - scheduled
+        - retry
+        - failed
+        - completed
+        example: completed
+        type: string
+    type: object
   routes.ConnectionScopesJson:
     properties:
       granted:
@@ -1966,19 +2011,6 @@ definitions:
     - items
     - kind
     - metadata
-    type: object
-  routes.OpenAPITaskInfoJson:
-    description: Background task status
-    properties:
-      id:
-        type: string
-      state:
-        example: completed
-        type: string
-      type:
-        type: string
-      updatedAt:
-        type: string
     type: object
   routes.ProxyRequest:
     description: Request to proxy or simulate an HTTP request
@@ -7369,7 +7401,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPITaskInfoJson'
+            $ref: '#/definitions/openapi.TaskJson'
         "400":
           description: Bad Request
           schema:

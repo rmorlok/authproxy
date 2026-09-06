@@ -4,7 +4,6 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
-	"time"
 
 	wfbackend "github.com/cschleiden/go-workflows/backend"
 	"github.com/cschleiden/go-workflows/backend/history"
@@ -12,9 +11,12 @@ import (
 	"github.com/cschleiden/go-workflows/diag"
 	"github.com/gin-gonic/gin"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
+	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apgin"
 	"github.com/rmorlok/authproxy/internal/httperr"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
+	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
@@ -42,13 +44,6 @@ type workflowListCursor struct {
 	Count            int    `json:"count"`
 }
 
-type WorkflowInstanceRefJson = schemaapi.WorkflowInstanceRefJson
-type WorkflowHistoryEventJson = schemaapi.WorkflowHistoryEventJson
-type WorkflowInstanceInfoJson = schemaapi.WorkflowInstanceInfoJson
-type WorkflowInstanceTreeJson = schemaapi.WorkflowInstanceTreeJson
-type ListWorkflowInstancesResponseJson = schemaapi.ListWorkflowInstancesResponseJson
-type ListWorkflowHistoryResponseJson = schemaapi.ListWorkflowHistoryResponseJson
-
 func workflowInstanceFromParams(gctx *gin.Context) (*wfcore.WorkflowInstance, bool) {
 	instanceID := gctx.Param("instanceId")
 	executionID := gctx.Param("executionId")
@@ -60,15 +55,18 @@ func workflowInstanceFromParams(gctx *gin.Context) (*wfcore.WorkflowInstance, bo
 	return wfcore.NewWorkflowInstance(instanceID, executionID), true
 }
 
-func workflowInstanceToJson(instance *wfcore.WorkflowInstance) *schemaapi.WorkflowInstanceJson {
+func workflowInstanceReferenceToJson(instance *wfcore.WorkflowInstance) *schemaapi.WorkflowInstanceReferenceJson {
 	if instance == nil {
 		return nil
 	}
 
-	return &schemaapi.WorkflowInstanceJson{
-		InstanceID:  instance.InstanceID,
-		ExecutionID: instance.ExecutionID,
-		Parent:      workflowInstanceToJson(instance.Parent),
+	return &schemaapi.WorkflowInstanceReferenceJson{
+		Target: meta.ObjectReference{
+			APIVersion: meta.APIVersionV1Alpha1,
+			Kind:       schemaapi.WorkflowInstanceKind,
+			ID:         instance.ExecutionID,
+		},
+		InstanceID: instance.InstanceID,
 	}
 }
 
@@ -85,61 +83,84 @@ func workflowInstanceStateToJson(state wfcore.WorkflowInstanceState) string {
 	}
 }
 
-func workflowInstanceRefToJson(ref *diag.WorkflowInstanceRef) *WorkflowInstanceRefJson {
-	if ref == nil {
+func workflowInstanceRefToJson(ref *diag.WorkflowInstanceRef) *schemaapi.WorkflowInstanceJson {
+	if ref == nil || ref.Instance == nil {
 		return nil
 	}
 
-	return &WorkflowInstanceRefJson{
-		Instance:    workflowInstanceToJson(ref.Instance),
-		CreatedAt:   ref.CreatedAt,
-		CompletedAt: ref.CompletedAt,
-		State:       workflowInstanceStateToJson(ref.State),
-		Queue:       ref.Queue,
+	return &schemaapi.WorkflowInstanceJson{
+		TypeMeta: meta.NewTypeMeta(schemaapi.WorkflowInstanceKind),
+		Metadata: meta.ObjectMeta{
+			ID:        ref.Instance.ExecutionID,
+			CreatedAt: util.UtcTimePointer(util.ToPtrNonZero(ref.CreatedAt)),
+		},
+		Spec: schemaapi.WorkflowInstanceSpecJson{
+			InstanceID: ref.Instance.InstanceID,
+			Queue:      ref.Queue,
+			ParentRef:  workflowInstanceReferenceToJson(ref.Instance.Parent),
+		},
+		Status: schemaapi.WorkflowInstanceStatusJson{
+			State:       workflowInstanceStateToJson(ref.State),
+			CompletedAt: util.UtcTimePointer(ref.CompletedAt),
+		},
 	}
 }
 
-func workflowInstanceRefsToJson(refs []*diag.WorkflowInstanceRef) []*WorkflowInstanceRefJson {
-	result := make([]*WorkflowInstanceRefJson, 0, len(refs))
+func workflowInstanceRefsToJson(refs []*diag.WorkflowInstanceRef) []schemaapi.WorkflowInstanceJson {
+	result := make([]schemaapi.WorkflowInstanceJson, 0, len(refs))
 	for _, ref := range refs {
-		result = append(result, workflowInstanceRefToJson(ref))
+		if item := workflowInstanceRefToJson(ref); item != nil {
+			result = append(result, *item)
+		}
 	}
 	return result
 }
 
-func workflowHistoryEventsToJson(events []*history.Event) []*WorkflowHistoryEventJson {
-	result := make([]*WorkflowHistoryEventJson, 0, len(events))
+func workflowHistoryEventsToJson(events []*history.Event) []schemaapi.WorkflowHistoryEventJson {
+	result := make([]schemaapi.WorkflowHistoryEventJson, 0, len(events))
 	for _, event := range events {
-		result = append(result, &WorkflowHistoryEventJson{
-			ID:              event.ID,
-			SequenceID:      event.SequenceID,
-			Type:            event.Type.String(),
-			Timestamp:       event.Timestamp,
-			ScheduleEventID: event.ScheduleEventID,
-			Attributes:      event.Attributes,
-			VisibleAt:       event.VisibleAt,
+		if event == nil {
+			continue
+		}
+		result = append(result, schemaapi.WorkflowHistoryEventJson{
+			TypeMeta: meta.NewTypeMeta(schemaapi.WorkflowHistoryEventKind),
+			Metadata: meta.ObjectMeta{
+				ID:        event.ID,
+				CreatedAt: util.UtcTimePointer(util.ToPtrNonZero(event.Timestamp)),
+			},
+			Spec: schemaapi.WorkflowHistoryEventSpecJson{
+				SequenceID:      event.SequenceID,
+				Type:            event.Type.String(),
+				ScheduleEventID: event.ScheduleEventID,
+				Attributes:      event.Attributes,
+				VisibleAt:       util.UtcTimePointer(event.VisibleAt),
+			},
 		})
 	}
 
 	return result
 }
 
-func workflowInstanceTreeToJson(tree *diag.WorkflowInstanceTree) *WorkflowInstanceTreeJson {
+func workflowInstanceTreeToJson(tree *diag.WorkflowInstanceTree) *schemaapi.WorkflowInstanceJson {
 	if tree == nil {
 		return nil
 	}
 
-	children := make([]*WorkflowInstanceTreeJson, 0, len(tree.Children))
+	children := make([]schemaapi.WorkflowInstanceJson, 0, len(tree.Children))
 	for _, child := range tree.Children {
-		children = append(children, workflowInstanceTreeToJson(child))
+		if item := workflowInstanceTreeToJson(child); item != nil {
+			children = append(children, *item)
+		}
 	}
 
-	return &WorkflowInstanceTreeJson{
-		WorkflowInstanceRefJson: workflowInstanceRefToJson(tree.WorkflowInstanceRef),
-		WorkflowName:            tree.WorkflowName,
-		Error:                   tree.Error,
-		Children:                children,
+	result := workflowInstanceRefToJson(tree.WorkflowInstanceRef)
+	if result == nil {
+		return nil
 	}
+	result.Spec.WorkflowName = tree.WorkflowName
+	result.Status.Error = tree.Error
+	result.Status.Children = children
+	return result
 }
 
 func writeWorkflowBackendError(gctx *gin.Context, publicMessage string, err error) {
@@ -203,10 +224,9 @@ func (r *WorkflowMonitoringRoutes) listInstances(gctx *gin.Context) {
 		}
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, ListWorkflowInstancesResponseJson{
-		Items:  workflowInstanceRefsToJson(items),
-		Cursor: cursor,
-	})
+	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewListWorkflowInstancesResponseJson(
+		workflowInstanceRefsToJson(items), cursor,
+	))
 }
 
 func (r *WorkflowMonitoringRoutes) getInstance(gctx *gin.Context) {
@@ -235,10 +255,9 @@ func (r *WorkflowMonitoringRoutes) getInstance(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, &WorkflowInstanceInfoJson{
-		WorkflowInstanceRefJson: workflowInstanceRefToJson(instanceRef),
-		History:                 workflowHistoryEventsToJson(historyEvents),
-	})
+	response := workflowInstanceRefToJson(instanceRef)
+	response.Status.History = workflowHistoryEventsToJson(historyEvents)
+	apgin.APIJSON(gctx, http.StatusOK, response)
 }
 
 func (r *WorkflowMonitoringRoutes) getHistory(gctx *gin.Context) {
@@ -267,7 +286,9 @@ func (r *WorkflowMonitoringRoutes) getHistory(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, ListWorkflowHistoryResponseJson{Items: workflowHistoryEventsToJson(historyEvents)})
+	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewListWorkflowHistoryResponseJson(
+		workflowHistoryEventsToJson(historyEvents),
+	))
 }
 
 func (r *WorkflowMonitoringRoutes) getTree(gctx *gin.Context) {
@@ -303,12 +324,14 @@ func (r *WorkflowMonitoringRoutes) cancelInstance(gctx *gin.Context) {
 		return
 	}
 
-	if err := r.backend.CancelWorkflowInstance(ctx, instance, history.NewWorkflowCancellationEvent(time.Now())); err != nil {
+	if err := r.backend.CancelWorkflowInstance(ctx, instance, history.NewWorkflowCancellationEvent(apctx.GetClock(ctx).Now())); err != nil {
 		writeWorkflowBackendError(gctx, "failed to cancel workflow instance", err)
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, gin.H{"ok": true})
+	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewWorkflowInstanceActionResponse(
+		schemaapi.WorkflowCancelActionKind, instance.InstanceID, instance.ExecutionID,
+	))
 }
 
 func (r *WorkflowMonitoringRoutes) removeInstance(gctx *gin.Context) {
@@ -326,7 +349,9 @@ func (r *WorkflowMonitoringRoutes) removeInstance(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, gin.H{"ok": true})
+	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewWorkflowInstanceActionResponse(
+		schemaapi.WorkflowDeleteActionKind, instance.InstanceID, instance.ExecutionID,
+	))
 }
 
 func (r *WorkflowMonitoringRoutes) Register(g gin.IRouter) {

@@ -131,11 +131,11 @@ func assertWorkflowTaskPolls(
 	tu.Gin.ServeHTTP(w, req)
 	require.Equal(t, http.StatusOK, w.Code)
 
-	var resp TaskInfoJson
+	var resp schemaapi.TaskJson
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-	require.Equal(t, taskID, resp.Id)
-	require.Equal(t, workflowName, resp.Type)
-	require.Equal(t, TaskStateActive, resp.State)
+	require.Equal(t, taskID, resp.Metadata.ID)
+	require.Equal(t, workflowName, resp.Spec.Type)
+	require.Equal(t, schemaapi.TaskStateActive, resp.Status.State)
 	require.NotNil(t, tu.Workflow.requestedInstance)
 	require.Equal(t, workflowInstanceID, tu.Workflow.requestedInstance.InstanceID)
 	require.Equal(t, workflowExecutionID, tu.Workflow.requestedInstance.ExecutionID)

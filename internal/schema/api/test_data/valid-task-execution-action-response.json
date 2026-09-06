@@ -1,18 +1,18 @@
 {
   "apiVersion": "authproxy.net/v1alpha1",
-  "kind": "TaskQueueRunAll",
+  "kind": "TaskExecutionRun",
   "metadata": {
     "target": {
       "apiVersion": "authproxy.net/v1alpha1",
-      "kind": "TaskQueue",
-      "id": "default"
+      "kind": "TaskExecution",
+      "id": "task-a"
     }
   },
   "spec": {
-    "state": "retry"
+    "queue": "default"
   },
   "status": {
     "succeeded": true,
-    "affectedCount": 3
+    "affectedCount": 1
   }
 }

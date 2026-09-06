@@ -1,10 +1,21 @@
 {
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "TaskScheduleList",
+  "metadata": {},
   "items": [
     {
-      "id": "entry-1",
-      "spec": "@every 1m",
-      "taskType": "sync",
-      "next": "2026-01-02T03:04:05Z"
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "TaskSchedule",
+      "metadata": {
+        "id": "entry-1"
+      },
+      "spec": {
+        "schedule": "@every 1m",
+        "taskType": "sync"
+      },
+      "status": {
+        "nextRunAt": "2026-01-02T03:04:05Z"
+      }
     }
   ]
 }

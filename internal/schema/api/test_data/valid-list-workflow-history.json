@@ -1,0 +1,19 @@
+{
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "WorkflowHistoryEventList",
+  "metadata": {},
+  "items": [
+    {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "WorkflowHistoryEvent",
+      "metadata": {
+        "id": "event-a",
+        "createdAt": "2026-01-02T03:04:05Z"
+      },
+      "spec": {
+        "sequenceId": 1,
+        "type": "WorkflowExecutionStarted"
+      }
+    }
+  ]
+}

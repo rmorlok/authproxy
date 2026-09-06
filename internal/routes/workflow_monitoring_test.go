@@ -20,6 +20,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apgin"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
+	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -113,11 +114,12 @@ func TestWorkflowMonitoringRoutes(t *testing.T) {
 			require.Equal(t, http.StatusOK, w.Code)
 			require.Equal(t, 2, tu.Backend.listCount)
 
-			var resp ListWorkflowInstancesResponseJson
+			var resp schemaapi.ListWorkflowInstancesResponseJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			require.Len(t, resp.Items, 1)
-			require.Equal(t, "wf-a", resp.Items[0].Instance.InstanceID)
-			require.NotEmpty(t, resp.Cursor)
+			require.Equal(t, "wf-a", resp.Items[0].Spec.InstanceID)
+			require.Equal(t, "exec-a", resp.Items[0].Metadata.ID)
+			require.NotEmpty(t, resp.Metadata.Continue)
 		})
 	})
 
@@ -147,15 +149,56 @@ func TestWorkflowMonitoringRoutes(t *testing.T) {
 		tu.Gin.ServeHTTP(w, req)
 		require.Equal(t, http.StatusOK, w.Code)
 
-		var resp WorkflowInstanceInfoJson
+		var resp schemaapi.WorkflowInstanceJson
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-		require.Equal(t, "wf-a", resp.Instance.InstanceID)
-		require.Len(t, resp.History, 1)
-		require.Equal(t, "WorkflowExecutionStarted", resp.History[0].Type)
+		require.Equal(t, "wf-a", resp.Spec.InstanceID)
+		require.Equal(t, "exec-a", resp.Metadata.ID)
+		require.Len(t, resp.Status.History, 1)
+		require.Equal(t, "WorkflowExecutionStarted", resp.Status.History[0].Spec.Type)
+	})
+
+	t.Run("history success", func(t *testing.T) {
+		tu := setup(t, nil)
+		timestamp := time.Now().UTC()
+		tu.Backend.instance = &diag.WorkflowInstanceRef{
+			Instance: wfcore.NewWorkflowInstance("wf-a", "exec-a"),
+			State:    wfcore.WorkflowInstanceStateActive,
+			Queue:    "default",
+		}
+		tu.Backend.history = []*history.Event{{
+			ID:         "event-a",
+			SequenceID: 1,
+			Type:       history.EventType_WorkflowExecutionStarted,
+			Timestamp:  timestamp,
+		}}
+
+		w := httptest.NewRecorder()
+		req, err := tu.Auth.NewSignedRequestForActorExternalId(
+			http.MethodGet,
+			"/workflow-monitoring/instances/wf-a/exec-a/history",
+			nil,
+			"root",
+			"some-actor",
+			aschema.PermissionsSingle("root.**", "workflow_monitoring", "get"),
+		)
+		require.NoError(t, err)
+
+		tu.Gin.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code)
+
+		var resp schemaapi.ListWorkflowHistoryResponseJson
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		require.Equal(t, schemaapi.WorkflowHistoryEventKind, resp.Items[0].Kind)
+		require.Equal(t, "event-a", resp.Items[0].Metadata.ID)
+		require.Equal(t, int64(1), resp.Items[0].Spec.SequenceID)
 	})
 
 	t.Run("history not found", func(t *testing.T) {
 		tu := setup(t, nil)
+		tu.Backend.instance = &diag.WorkflowInstanceRef{
+			Instance: wfcore.NewWorkflowInstance("missing", "exec"),
+			State:    wfcore.WorkflowInstanceStateActive,
+		}
 		tu.Backend.historyErr = wfbackend.ErrInstanceNotFound
 
 		w := httptest.NewRecorder()
@@ -197,9 +240,9 @@ func TestWorkflowMonitoringRoutes(t *testing.T) {
 		tu.Gin.ServeHTTP(w, req)
 		require.Equal(t, http.StatusOK, w.Code)
 
-		var resp WorkflowInstanceTreeJson
+		var resp schemaapi.WorkflowInstanceJson
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-		require.Equal(t, "core.connection.disconnect.v1", resp.WorkflowName)
+		require.Equal(t, "core.connection.disconnect.v1", resp.Spec.WorkflowName)
 	})
 
 	t.Run("cancel requires manage", func(t *testing.T) {
@@ -239,6 +282,13 @@ func TestWorkflowMonitoringRoutes(t *testing.T) {
 		require.Equal(t, http.StatusOK, w.Code)
 		require.True(t, tu.Backend.cancelCalled)
 		require.Equal(t, "wf-a", tu.Backend.cancelInstance.InstanceID)
+
+		var resp schemaapi.WorkflowInstanceActionJson
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		require.Equal(t, schemaapi.WorkflowCancelActionKind, resp.Kind)
+		require.Equal(t, "exec-a", resp.Metadata.Target.ID)
+		require.Equal(t, "wf-a", resp.Spec.InstanceID)
+		require.True(t, resp.Status.Succeeded)
 	})
 
 	t.Run("remove unfinished maps to conflict", func(t *testing.T) {
@@ -258,6 +308,33 @@ func TestWorkflowMonitoringRoutes(t *testing.T) {
 
 		tu.Gin.ServeHTTP(w, req)
 		require.Equal(t, http.StatusConflict, w.Code)
+	})
+
+	t.Run("remove success", func(t *testing.T) {
+		tu := setup(t, nil)
+
+		w := httptest.NewRecorder()
+		req, err := tu.Auth.NewSignedRequestForActorExternalId(
+			http.MethodDelete,
+			"/workflow-monitoring/instances/wf-a/exec-a",
+			nil,
+			"root",
+			"some-actor",
+			aschema.PermissionsSingle("root.**", "workflow_monitoring", "manage"),
+		)
+		require.NoError(t, err)
+
+		tu.Gin.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code)
+		require.True(t, tu.Backend.removeCalled)
+		require.Equal(t, "wf-a", tu.Backend.removeInstance.InstanceID)
+
+		var resp schemaapi.WorkflowInstanceActionJson
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		require.Equal(t, schemaapi.WorkflowDeleteActionKind, resp.Kind)
+		require.Equal(t, "exec-a", resp.Metadata.Target.ID)
+		require.Equal(t, "wf-a", resp.Spec.InstanceID)
+		require.True(t, resp.Status.Succeeded)
 	})
 }
 

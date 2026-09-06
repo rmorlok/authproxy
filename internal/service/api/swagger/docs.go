@@ -8186,7 +8186,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPITaskInfoJson"
+                            "$ref": "#/definitions/openapi.TaskJson"
                         }
                     },
                     "400": {
@@ -10193,6 +10193,68 @@ const docTemplateApi = `{
                 }
             }
         },
+        "openapi.TaskJson": {
+            "description": "Background task status",
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "kind",
+                "metadata",
+                "spec",
+                "status"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "Task"
+                    ],
+                    "example": "Task"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/meta.ObjectMeta"
+                },
+                "spec": {
+                    "$ref": "#/definitions/openapi.TaskSpecJson"
+                },
+                "status": {
+                    "$ref": "#/definitions/openapi.TaskStatusJson"
+                }
+            }
+        },
+        "openapi.TaskSpecJson": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "openapi.TaskStatusJson": {
+            "type": "object",
+            "properties": {
+                "state": {
+                    "type": "string",
+                    "enum": [
+                        "unknown",
+                        "active",
+                        "pending",
+                        "scheduled",
+                        "retry",
+                        "failed",
+                        "completed"
+                    ],
+                    "example": "completed"
+                }
+            }
+        },
         "routes.ConnectionScopesJson": {
             "type": "object",
             "properties": {
@@ -11043,25 +11105,6 @@ const docTemplateApi = `{
                 },
                 "metadata": {
                     "$ref": "#/definitions/openapi.SearchResultListMetaJson"
-                }
-            }
-        },
-        "routes.OpenAPITaskInfoJson": {
-            "description": "Background task status",
-            "type": "object",
-            "properties": {
-                "id": {
-                    "type": "string"
-                },
-                "state": {
-                    "type": "string",
-                    "example": "completed"
-                },
-                "type": {
-                    "type": "string"
-                },
-                "updatedAt": {
-                    "type": "string"
                 }
             }
         },

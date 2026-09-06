@@ -1,18 +1,18 @@
 {
   "apiVersion": "authproxy.net/v1alpha1",
-  "kind": "TaskQueueRunAll",
+  "kind": "WorkflowInstanceCancel",
   "metadata": {
     "target": {
       "apiVersion": "authproxy.net/v1alpha1",
-      "kind": "TaskQueue",
-      "id": "default"
+      "kind": "WorkflowInstance",
+      "id": "exec-a"
     }
   },
   "spec": {
-    "state": "retry"
+    "instanceId": "workflow-a"
   },
   "status": {
     "succeeded": true,
-    "affectedCount": 3
+    "affectedCount": 1
   }
 }
