@@ -7,14 +7,15 @@ interprets the connection.
 
 Connector-defined setup values appear under `spec.configuration`, flow through
 typed setup actions, and are encrypted at rest. API reads return those values
-in cleartext along with an aggregate JSON Schema under
-`spec.configurationSchema`. The aggregate describes the top-level fields from
-connector-authored preconnect and configure forms, but omits step-level
-`required` constraints so incomplete setup and skipped conditional steps remain
-representable. Setup actions continue to validate submissions against each
-step's original schema. The aggregate allows additional properties because
-connector migration hooks may create configuration fields without a form
-schema; those fields remain untyped.
+in cleartext. Server-derived configuration state lives under
+`status.configuration`: `configured` reports whether encrypted configuration
+has been persisted, and `schema` contains an aggregate JSON Schema for the
+top-level fields from connector-authored preconnect and configure forms. The
+schema omits step-level `required` constraints so incomplete setup and skipped
+conditional steps remain representable. Setup actions continue to validate
+submissions against each step's original schema. The aggregate allows
+additional properties because connector migration hooks may create
+configuration fields without a form schema; those fields remain untyped.
 
 Auth-method-emitted fields such as API keys, OAuth client credentials, access
 tokens, and refresh tokens are persisted in dedicated encrypted credential

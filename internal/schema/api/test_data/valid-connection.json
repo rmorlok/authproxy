@@ -19,18 +19,20 @@
       "namespace": "root.acme",
       "generation": 1
     },
-    "configuration": { "tenant": "acme" },
-    "configurationSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": { "tenant": { "type": "string" } },
-      "additionalProperties": true
-    }
+    "configuration": { "tenant": "acme" }
   },
   "status": {
     "lifecycle": { "state": "configured" },
     "health": { "state": "healthy" },
     "setup": { "stepId": "tenant" },
-    "configurationConfigured": true
+    "configuration": {
+      "configured": true,
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": { "tenant": { "type": "string" } },
+        "additionalProperties": true
+      }
+    }
   }
 }

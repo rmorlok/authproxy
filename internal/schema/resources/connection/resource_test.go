@@ -39,20 +39,22 @@ func storedConnectionResource() *Connection {
 				"tenant":  "acme",
 				"options": map[string]any{"region": "us"},
 			},
-			ConfigurationSchema: common.RawJSON(`{
-				"$schema":"https://json-schema.org/draft/2020-12/schema",
-				"type":"object",
-				"properties":{
-					"tenant":{"type":"string"},
-					"options":{"type":"object"}
-				},
-				"additionalProperties":true
-			}`),
 		},
 		Status: &ConnectionStatus{
-			Lifecycle:               ConnectionLifecycleStatus{State: ConnectionStateConfigured},
-			Health:                  ConnectionHealthStatus{State: ConnectionHealthStateHealthy},
-			ConfigurationConfigured: true,
+			Lifecycle: ConnectionLifecycleStatus{State: ConnectionStateConfigured},
+			Health:    ConnectionHealthStatus{State: ConnectionHealthStateHealthy},
+			Configuration: ConnectionConfigurationStatus{
+				Configured: true,
+				Schema: common.RawJSON(`{
+					"$schema":"https://json-schema.org/draft/2020-12/schema",
+					"type":"object",
+					"properties":{
+						"tenant":{"type":"string"},
+						"options":{"type":"object"}
+					},
+					"additionalProperties":true
+				}`),
+			},
 		},
 	}
 }
@@ -95,11 +97,11 @@ func TestConnectionResourceRejectsInvalidReferencesAndStatus(t *testing.T) {
 	require.ErrorContains(t, resource.ValidateFor(meta.ValidationModeResponse, nil), "stepId or error")
 
 	resource = storedConnectionResource()
-	resource.Spec.ConfigurationSchema = nil
-	require.ErrorContains(t, resource.ValidateFor(meta.ValidationModeResponse, nil), "configurationSchema")
+	resource.Status.Configuration.Schema = nil
+	require.ErrorContains(t, resource.ValidateFor(meta.ValidationModeResponse, nil), "configuration.schema")
 
 	resource = storedConnectionResource()
-	resource.Spec.ConfigurationSchema = common.RawJSON(`[]`)
+	resource.Status.Configuration.Schema = common.RawJSON(`[]`)
 	require.ErrorContains(t, resource.ValidateFor(meta.ValidationModeResponse, nil), "JSON object")
 }
 
@@ -110,11 +112,11 @@ func TestConnectionCloneAndReferences(t *testing.T) {
 	clone := resource.Clone()
 	clone.Metadata.Labels["team"] = "changed"
 	clone.Spec.Configuration["options"].(map[string]any)["region"] = "changed"
-	clone.Spec.ConfigurationSchema[0] = '['
+	clone.Status.Configuration.Schema[0] = '['
 	*clone.Status.Setup.Error = "changed"
 	require.Equal(t, "platform", resource.Metadata.Labels["team"])
 	require.Equal(t, "us", resource.Spec.Configuration["options"].(map[string]any)["region"])
-	require.Equal(t, byte('{'), resource.Spec.ConfigurationSchema[0])
+	require.Equal(t, byte('{'), resource.Status.Configuration.Schema[0])
 	require.Equal(t, "failed", *resource.Status.Setup.Error)
 
 	connectionID := apid.New(apid.PrefixConnection)
@@ -138,19 +140,24 @@ func TestConnectionConfigurationIsReturnedForAPI(t *testing.T) {
 	configuration := spec["configuration"].(map[string]any)
 	require.Equal(t, "acme", configuration["tenant"])
 	require.Equal(t, "us", configuration["options"].(map[string]any)["region"])
-	configurationSchema := spec["configurationSchema"].(map[string]any)
+	require.NotContains(t, spec, "configurationSchema")
+	status := value["status"].(map[string]any)
+	configurationStatus := status["configuration"].(map[string]any)
+	require.Equal(t, true, configurationStatus["configured"])
+	configurationSchema := configurationStatus["schema"].(map[string]any)
 	require.Equal(t, "object", configurationSchema["type"])
+	require.NotContains(t, status, "configurationConfigured")
 }
 
 func TestConnectionConfigurationSchemaIsStructuredYAML(t *testing.T) {
 	resource := storedConnectionResource()
 	encoded, err := yaml.Marshal(resource)
 	require.NoError(t, err)
-	require.Contains(t, string(encoded), "configurationSchema:\n        $schema:")
-	require.Contains(t, string(encoded), "properties:\n            options:")
+	require.Contains(t, string(encoded), "schema:\n            $schema:")
+	require.Contains(t, string(encoded), "properties:\n                options:")
 
 	var decoded Connection
 	require.NoError(t, yaml.Unmarshal(encoded, &decoded))
-	require.JSONEq(t, string(resource.Spec.ConfigurationSchema), string(decoded.Spec.ConfigurationSchema))
+	require.JSONEq(t, string(resource.Status.Configuration.Schema), string(decoded.Status.Configuration.Schema))
 	require.Equal(t, resource.Spec.Configuration, decoded.Spec.Configuration)
 }

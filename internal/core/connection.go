@@ -153,8 +153,7 @@ func (c *connection) GetResource(
 				Namespace:  c.connector.GetNamespace(),
 				Generation: c.connector.GetVersion(),
 			},
-			Configuration:       configuration,
-			ConfigurationSchema: configurationSchema,
+			Configuration: configuration,
 		},
 		Status: &connectionschema.ConnectionStatus{
 			Lifecycle: connectionschema.ConnectionLifecycleStatus{
@@ -163,7 +162,10 @@ func (c *connection) GetResource(
 			Health: connectionschema.ConnectionHealthStatus{
 				State: connectionschema.ConnectionHealthState(healthState),
 			},
-			ConfigurationConfigured: c.EncryptedConfiguration != nil && !c.EncryptedConfiguration.IsZero(),
+			Configuration: connectionschema.ConnectionConfigurationStatus{
+				Configured: c.EncryptedConfiguration != nil && !c.EncryptedConfiguration.IsZero(),
+				Schema:     configurationSchema,
+			},
 		},
 	}
 

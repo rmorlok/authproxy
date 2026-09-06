@@ -37,18 +37,18 @@ func connectionActionTestResource(t *testing.T) connectionschema.Connection {
 			CreatedAt: &now,
 			UpdatedAt: &now,
 		},
-		Spec: connectionschema.ConnectionSpec{
-			ConnectorRef: connectionActionTestReference(
-				connectorschema.ConnectorKind,
-				apid.New(apid.PrefixConnector),
-				2,
-			),
-			ConfigurationSchema: common.RawJSON(`{"type":"object","properties":{},"additionalProperties":true}`),
-		},
+		Spec: connectionschema.ConnectionSpec{ConnectorRef: connectionActionTestReference(
+			connectorschema.ConnectorKind,
+			apid.New(apid.PrefixConnector),
+			2,
+		)},
 		Status: &connectionschema.ConnectionStatus{
-			Lifecycle:               connectionschema.ConnectionLifecycleStatus{State: connectionschema.ConnectionStateConfigured},
-			Health:                  connectionschema.ConnectionHealthStatus{State: connectionschema.ConnectionHealthStateHealthy},
-			ConfigurationConfigured: true,
+			Lifecycle: connectionschema.ConnectionLifecycleStatus{State: connectionschema.ConnectionStateConfigured},
+			Health:    connectionschema.ConnectionHealthStatus{State: connectionschema.ConnectionHealthStateHealthy},
+			Configuration: connectionschema.ConnectionConfigurationStatus{
+				Configured: true,
+				Schema:     common.RawJSON(`{"type":"object","properties":{},"additionalProperties":true}`),
+			},
 		},
 	}
 }

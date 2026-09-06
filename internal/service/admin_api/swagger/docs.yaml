@@ -67,6 +67,13 @@ definitions:
           type: string
         type: array
     type: object
+  connection.ConnectionConfigurationStatus:
+    properties:
+      configured:
+        type: boolean
+      schema:
+        type: object
+    type: object
   connection.ConnectionHealthStatus:
     properties:
       state:
@@ -88,8 +95,8 @@ definitions:
     type: object
   connection.ConnectionStatus:
     properties:
-      configurationConfigured:
-        type: boolean
+      configuration:
+        $ref: '#/definitions/connection.ConnectionConfigurationStatus'
       health:
         $ref: '#/definitions/connection.ConnectionHealthStatus'
       lifecycle:
@@ -414,12 +421,9 @@ definitions:
     properties:
       configuration:
         type: object
-      configurationSchema:
-        type: object
       connectorRef:
         $ref: '#/definitions/meta.ObjectReference'
     required:
-    - configurationSchema
     - connectorRef
     type: object
   openapi.ConnectionVersionMigrationSpecJson:

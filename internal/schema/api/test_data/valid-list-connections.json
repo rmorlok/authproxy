@@ -21,18 +21,20 @@
           "name": "salesforce",
           "namespace": "root.acme",
           "generation": 1
-        },
-        "configurationSchema": {
-          "$schema": "https://json-schema.org/draft/2020-12/schema",
-          "type": "object",
-          "properties": {},
-          "additionalProperties": true
         }
       },
       "status": {
         "lifecycle": { "state": "configured" },
         "health": { "state": "healthy" },
-        "configurationConfigured": true
+        "configuration": {
+          "configured": true,
+          "schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true
+          }
+        }
       }
     }
   ]

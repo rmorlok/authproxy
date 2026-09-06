@@ -46,22 +46,28 @@ type Connection struct {
 
 // ConnectionSpec contains the stable references and connector-defined desired
 // configuration for a connection. Clients change configuration through typed
-// setup actions. ConfigurationSchema describes the connector-authored fields
-// that may appear in Configuration; auth-method credentials are stored and
-// managed separately from this map.
+// setup actions; auth-method credentials are stored and managed separately
+// from this map.
 type ConnectionSpec struct {
-	ConnectorRef        meta.ObjectReference `json:"connectorRef" yaml:"connectorRef"`
-	Configuration       map[string]any       `json:"configuration,omitempty" yaml:"configuration,omitempty"`
-	ConfigurationSchema common.RawJSON       `json:"configurationSchema" yaml:"configurationSchema"`
+	ConnectorRef  meta.ObjectReference `json:"connectorRef" yaml:"connectorRef"`
+	Configuration map[string]any       `json:"configuration,omitempty" yaml:"configuration,omitempty"`
 }
 
 // ConnectionStatus contains server-observed lifecycle, health, setup, and
-// encrypted-configuration state.
+// configuration state.
 type ConnectionStatus struct {
-	Lifecycle               ConnectionLifecycleStatus `json:"lifecycle" yaml:"lifecycle"`
-	Health                  ConnectionHealthStatus    `json:"health" yaml:"health"`
-	Setup                   *ConnectionSetupStatus    `json:"setup,omitempty" yaml:"setup,omitempty"`
-	ConfigurationConfigured bool                      `json:"configurationConfigured" yaml:"configurationConfigured"`
+	Lifecycle     ConnectionLifecycleStatus     `json:"lifecycle" yaml:"lifecycle"`
+	Health        ConnectionHealthStatus        `json:"health" yaml:"health"`
+	Setup         *ConnectionSetupStatus        `json:"setup,omitempty" yaml:"setup,omitempty"`
+	Configuration ConnectionConfigurationStatus `json:"configuration" yaml:"configuration"`
+}
+
+// ConnectionConfigurationStatus describes the server-observed persisted
+// configuration state. Schema is derived from the referenced Connector
+// generation and is not settable on a Connection.
+type ConnectionConfigurationStatus struct {
+	Configured bool           `json:"configured" yaml:"configured"`
+	Schema     common.RawJSON `json:"schema" yaml:"schema" swaggertype:"object"`
 }
 
 type ConnectionLifecycleStatus struct {
@@ -157,9 +163,9 @@ func (c *Connection) Clone() *Connection {
 	clone := *c
 	clone.Metadata = meta.CloneObjectMeta(c.Metadata)
 	clone.Spec.Configuration = cloneConfiguration(c.Spec.Configuration)
-	clone.Spec.ConfigurationSchema = append(common.RawJSON(nil), c.Spec.ConfigurationSchema...)
 	if c.Status != nil {
 		status := *c.Status
+		status.Configuration.Schema = append(common.RawJSON(nil), c.Status.Configuration.Schema...)
 		if c.Status.Setup != nil {
 			setup := *c.Status.Setup
 			if setup.Error != nil {
@@ -233,16 +239,6 @@ func (c *Connection) ValidateFor(mode meta.ValidationMode, vc *common.Validation
 	if err := validateConnectorReference(c.Spec.ConnectorRef, requireStoredIdentity, vc.PushField("spec").PushField("connectorRef")); err != nil {
 		result = multierror.Append(result, err)
 	}
-	if c.Spec.ConfigurationSchema.IsEmpty() {
-		if mode == meta.ValidationModeResponse {
-			result = multierror.Append(result, vc.NewErrorForField("spec.configurationSchema", "is required"))
-		}
-	} else {
-		var configurationSchema map[string]any
-		if err := json.Unmarshal(c.Spec.ConfigurationSchema, &configurationSchema); err != nil || configurationSchema == nil {
-			result = multierror.Append(result, vc.NewErrorForField("spec.configurationSchema", "must be a JSON object"))
-		}
-	}
 	if err := meta.ValidateStatus(c.Status, mode, vc); err != nil {
 		result = multierror.Append(result, err)
 	}
@@ -250,6 +246,16 @@ func (c *Connection) ValidateFor(mode meta.ValidationMode, vc *common.Validation
 		result = multierror.Append(result, vc.NewErrorForField("status", "is required"))
 	}
 	if c.Status != nil {
+		if c.Status.Configuration.Schema.IsEmpty() {
+			if mode == meta.ValidationModeResponse {
+				result = multierror.Append(result, vc.NewErrorForField("status.configuration.schema", "is required"))
+			}
+		} else {
+			var configurationSchema map[string]any
+			if err := json.Unmarshal(c.Status.Configuration.Schema, &configurationSchema); err != nil || configurationSchema == nil {
+				result = multierror.Append(result, vc.NewErrorForField("status.configuration.schema", "must be a JSON object"))
+			}
+		}
 		if !IsValidConnectionState(c.Status.Lifecycle.State) {
 			result = multierror.Append(result, vc.NewErrorForField("status.lifecycle.state", "is not a recognized connection lifecycle state"))
 		}

@@ -228,6 +228,7 @@ func TestConnections(t *testing.T) {
 			require.Equal(t, connectorVersion, resp.Spec.ConnectorRef.Generation)
 			require.Equal(t, "acme", resp.Spec.Configuration["tenant"])
 			require.Equal(t, "sales", resp.Spec.Configuration["workspace"])
+			require.True(t, resp.Status.Configuration.Configured)
 			require.JSONEq(t, `{
 				"$schema":"https://json-schema.org/draft/2020-12/schema",
 				"type":"object",
@@ -236,7 +237,7 @@ func TestConnections(t *testing.T) {
 					"workspace":{"type":"string"}
 				},
 				"additionalProperties":true
-			}`, string(resp.Spec.ConfigurationSchema))
+			}`, string(resp.Status.Configuration.Schema))
 			require.Empty(t, w.Header().Get("X-AuthProxy-Data-Redacted"))
 		})
 

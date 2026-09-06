@@ -105,11 +105,13 @@ func (m *Connection) GetResource(ctx context.Context) (*connectionschema.Connect
 	if err != nil {
 		return nil, err
 	}
-	resource.Spec.ConfigurationSchema = configurationSchema
 	resource.Status = &connectionschema.ConnectionStatus{
-		Lifecycle:               connectionschema.ConnectionLifecycleStatus{State: connectionschema.ConnectionState(m.State)},
-		Health:                  connectionschema.ConnectionHealthStatus{State: connectionschema.ConnectionHealthState(m.GetHealthState())},
-		ConfigurationConfigured: len(m.Configuration) > 0,
+		Lifecycle: connectionschema.ConnectionLifecycleStatus{State: connectionschema.ConnectionState(m.State)},
+		Health:    connectionschema.ConnectionHealthStatus{State: connectionschema.ConnectionHealthState(m.GetHealthState())},
+		Configuration: connectionschema.ConnectionConfigurationStatus{
+			Configured: len(m.Configuration) > 0,
+			Schema:     configurationSchema,
+		},
 	}
 	if m.SetupStep != nil || m.SetupError != nil {
 		resource.Status.Setup = &connectionschema.ConnectionSetupStatus{Error: m.SetupError}

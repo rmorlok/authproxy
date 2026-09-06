@@ -66,12 +66,12 @@ func TestConnectionGetResourceBuildsCanonicalEnvelope(t *testing.T) {
 		"type":"object",
 		"properties":{"tenant":{"type":"string"}},
 		"additionalProperties":true
-	}`, string(resource.Spec.ConfigurationSchema))
+	}`, string(resource.Status.Configuration.Schema))
 	require.Equal(t, connectionschema.ConnectionStateSetup, resource.Status.Lifecycle.State)
 	require.Equal(t, connectionschema.ConnectionHealthStateUnhealthy, resource.Status.Health.State)
 	require.Equal(t, connectorschema.SetupStepVerifyFailed.String(), resource.Status.Setup.StepID)
 	require.Equal(t, setupError, *resource.Status.Setup.Error)
-	require.True(t, resource.Status.ConfigurationConfigured)
+	require.True(t, resource.Status.Configuration.Configured)
 	require.NoError(t, resource.ValidateFor(meta.ValidationModeResponse, nil))
 
 	resource.Metadata.Labels["team"] = "changed"
@@ -100,13 +100,13 @@ func TestConnectionGetResourceOmitsSetupAndDefaultsHealth(t *testing.T) {
 	resource, err := wrapped.GetResource(t.Context())
 	require.NoError(t, err)
 	require.Nil(t, resource.Status.Setup)
-	require.False(t, resource.Status.ConfigurationConfigured)
+	require.False(t, resource.Status.Configuration.Configured)
 	require.JSONEq(t, `{
 		"$schema":"https://json-schema.org/draft/2020-12/schema",
 		"type":"object",
 		"properties":{},
 		"additionalProperties":true
-	}`, string(resource.Spec.ConfigurationSchema))
+	}`, string(resource.Status.Configuration.Schema))
 	require.Equal(t, connectionschema.ConnectionHealthStateHealthy, resource.Status.Health.State)
 	require.NoError(t, resource.ValidateFor(meta.ValidationModeResponse, nil))
 }

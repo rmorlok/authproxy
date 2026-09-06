@@ -8307,6 +8307,17 @@ const docTemplateApi = `{
                 }
             }
         },
+        "connection.ConnectionConfigurationStatus": {
+            "type": "object",
+            "properties": {
+                "configured": {
+                    "type": "boolean"
+                },
+                "schema": {
+                    "type": "object"
+                }
+            }
+        },
         "connection.ConnectionHealthStatus": {
             "type": "object",
             "properties": {
@@ -8340,8 +8351,8 @@ const docTemplateApi = `{
         "connection.ConnectionStatus": {
             "type": "object",
             "properties": {
-                "configurationConfigured": {
-                    "type": "boolean"
+                "configuration": {
+                    "$ref": "#/definitions/connection.ConnectionConfigurationStatus"
                 },
                 "health": {
                     "$ref": "#/definitions/connection.ConnectionHealthStatus"
@@ -8820,14 +8831,10 @@ const docTemplateApi = `{
         "openapi.ConnectionSpecJson": {
             "type": "object",
             "required": [
-                "configurationSchema",
                 "connectorRef"
             ],
             "properties": {
                 "configuration": {
-                    "type": "object"
-                },
-                "configurationSchema": {
                     "type": "object"
                 },
                 "connectorRef": {
