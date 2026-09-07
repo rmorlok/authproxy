@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/apid"
-	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encfield"
+	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
@@ -205,11 +205,7 @@ func (env *IntegrationTestEnv) InitiateOAuth2Connection(t *testing.T, connectorI
 	// namespace (root), which doesn't reflect how a real multi-tenant
 	// deployment isolates tenants — and breaks state-vs-connection
 	// namespace checks the security tests rely on.
-	body, err := jsonMarshal(coreIface.InitiateConnectionRequest{
-		ConnectorId:   connectorID,
-		ReturnToUrl:   returnToUrl,
-		IntoNamespace: cfg.actorNamespace,
-	})
+	body, err := jsonMarshal(connectionInitiateAction(connectorID, cfg.actorNamespace, returnToUrl))
 	require.NoError(t, err)
 
 	const path = "/api/v1/connections/_initiate"
@@ -242,12 +238,12 @@ func (env *IntegrationTestEnv) InitiateOAuth2Connection(t *testing.T, connectorI
 	}
 	require.Equalf(t, http.StatusOK, w.Code, "initiate failed: %s", w.Body.String())
 
-	var resp coreIface.ConnectionSetupRedirect
-	require.NoError(t, jsonUnmarshal(w.Body.Bytes(), &resp))
-	require.Equal(t, coreIface.ConnectionSetupResponseTypeRedirect, resp.Type, "expected OAuth2 connector to return redirect")
-	require.NotEmpty(t, resp.RedirectUrl)
+	resp := decodeConnectionSetupAction(t, w.Body.Bytes())
+	require.Equal(t, schemaapi.ConnectionSetupResponseTypeRedirect, resp.Status.Type, "expected OAuth2 connector to return redirect")
+	require.NotEmpty(t, resp.Status.RedirectURL)
+	require.NotEmpty(t, resp.Metadata.Target.ID)
 
-	return resp.Id.String(), resp.RedirectUrl
+	return resp.Metadata.Target.ID, resp.Status.RedirectURL
 }
 
 // ReauthOAuth2Connection starts an OAuth2 reauthorization flow for an
@@ -257,11 +253,11 @@ func (env *IntegrationTestEnv) InitiateOAuth2Connection(t *testing.T, connectorI
 func (env *IntegrationTestEnv) ReauthOAuth2Connection(t *testing.T, connectionID, returnToUrl string, opts ...ActorOption) string {
 	t.Helper()
 
-	body, err := jsonMarshal(struct {
-		ReturnToUrl string `json:"returnToUrl,omitempty"`
-	}{
-		ReturnToUrl: returnToUrl,
-	})
+	body, err := jsonMarshal(connectionSetupControlAction(
+		schemaapi.ConnectionReauthActionKind,
+		connectionID,
+		returnToUrl,
+	))
 	require.NoError(t, err)
 
 	w := env.doSignedRequest(
@@ -273,11 +269,10 @@ func (env *IntegrationTestEnv) ReauthOAuth2Connection(t *testing.T, connectionID
 	)
 	require.Equalf(t, http.StatusOK, w.Code, "reauth failed: %s", w.Body.String())
 
-	var resp coreIface.ConnectionSetupRedirect
-	require.NoErrorf(t, jsonUnmarshal(w.Body.Bytes(), &resp), "decode reauth response: %s", w.Body.String())
-	require.Equal(t, coreIface.ConnectionSetupResponseTypeRedirect, resp.Type)
-	require.NotEmpty(t, resp.RedirectUrl)
-	return resp.RedirectUrl
+	resp := decodeConnectionSetupAction(t, w.Body.Bytes())
+	require.Equal(t, schemaapi.ConnectionSetupResponseTypeRedirect, resp.Status.Type)
+	require.NotEmpty(t, resp.Status.RedirectURL)
+	return resp.Status.RedirectURL
 }
 
 // FollowOAuth2Redirect issues an in-process GET to the public service's

@@ -117,7 +117,7 @@ func TestPKCE_HappyPath_S256(t *testing.T) {
 	userPassword := "p4ssw0rd-" + suffix
 	userEmail := "alice-pkce-" + suffix + "@example.com"
 
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 	connector := helpers.NewOAuth2Connector(connectorID, "pkce-happy-test", provider, helpers.OAuth2ConnectorOptions{
 		ClientID:     clientKey,
 		ClientSecret: clientSecret,
@@ -296,7 +296,7 @@ func TestPKCE_TokenExchangeRejected(t *testing.T) {
 			clientSecret := "pkce-rej-secret-" + suffix
 			userEmail := "alice-pkce-rej-" + suffix + "@example.com"
 
-			connectorID := apid.New(apid.PrefixConnectorVersion)
+			connectorID := apid.New(apid.PrefixConnector)
 			connector := helpers.NewOAuth2Connector(connectorID, "pkce-rejected", provider, helpers.OAuth2ConnectorOptions{
 				ClientID:     clientKey,
 				ClientSecret: clientSecret,

@@ -49,7 +49,7 @@ func newAuthMethodCompatibilityRig(
 	clientSecret := name + "-secret-" + suffix
 	userEmail := name + "-" + suffix + "@example.com"
 
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 	opts := helpers.OAuth2ConnectorOptions{
 		ClientID:                clientKey,
 		ClientSecret:            clientSecret,

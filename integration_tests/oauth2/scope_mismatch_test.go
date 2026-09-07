@@ -58,7 +58,7 @@ func newScopeMismatchSetup(t *testing.T, name string, required, optional []strin
 	scopes := append([]string{}, required...)
 	scopes = append(scopes, optional...)
 
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 	connector := helpers.NewOAuth2Connector(connectorID, name, provider, helpers.OAuth2ConnectorOptions{
 		ClientID:       clientKey,
 		ClientSecret:   clientSecret,

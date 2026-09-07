@@ -31,7 +31,7 @@ func TestApiKeyManualRotation(t *testing.T) {
 		AcceptedKey: oldKey,
 	})
 
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 	conn := helpers.NewApiKeyConnector(connectorID, "api-key-rotation", helpers.ApiKeyConnectorOptions{
 		Placement: connectors.ApiKeyPlacementBearer,
 		ProbeURL:  stub.BaseURL + "/probe",
@@ -45,7 +45,7 @@ func TestApiKeyManualRotation(t *testing.T) {
 
 	// 1. Drive to Ready with the old key.
 	connectionID, form := env.InitiateApiKeyConnection(t, connectorID)
-	w := env.SubmitApiKeyCredentials(t, connectionID, form.StepId, map[string]any{
+	w := env.SubmitApiKeyCredentials(t, connectionID, form.StepID, map[string]any{
 		"api_key": oldKey,
 	})
 	require.Equalf(t, http.StatusOK, w.Code, "submit failed: %s", w.Body.String())

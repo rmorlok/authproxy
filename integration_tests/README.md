@@ -36,6 +36,18 @@ go test -tags integration -v -run TestRateLimiting429 ./proxy/...
 
 Integration tests use the `integration` build tag so they are excluded from `go test ./...`.
 
+The main database portion of the suite runs against either a fresh SQLite file
+or the PostgreSQL service above:
+
+```bash
+AUTH_PROXY_TEST_DATABASE_PROVIDER=sqlite go test -tags integration ./...
+AUTH_PROXY_TEST_DATABASE_PROVIDER=postgres go test -tags integration ./...
+```
+
+Fixtures exercise only the current `authproxy.net/v1alpha1` resource and action
+envelopes. They intentionally do not load or upgrade connector data written by
+the former flat API format.
+
 ## AWS Secrets Manager Integration Test
 
 This test hits real AWS Secrets Manager and is gated behind the `aws` build tag and an env flag.

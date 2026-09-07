@@ -55,6 +55,23 @@ go run ./cmd/server routes --config=./dev_config/default.yaml
 
 Verify the API at `http://localhost:8081/ping`.
 
+### Recreate data after breaking resource changes
+
+AuthProxy's `v1` API is still pre-production and may make breaking resource
+schema changes. There is no compatibility job that rewrites legacy connector
+definitions into the `authproxy.net/v1alpha1` envelope. If a checkout contains
+data created by the former flat resource format, recreate the local environment
+before starting the updated server:
+
+```bash
+./scripts/teardown-docker.sh
+docker compose up -d
+go run ./cmd/server serve --auto-migrate --config=./dev_config/default.yaml all
+```
+
+This intentionally deletes the local Docker volumes. Preserve anything you
+need before running the teardown.
+
 ## Sign into the local UIs
 
 AuthProxy expects the host application to initiate UI sessions. During local

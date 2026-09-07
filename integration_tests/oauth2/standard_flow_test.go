@@ -12,9 +12,9 @@ import (
 
 	"github.com/chromedp/chromedp"
 	"github.com/rmorlok/authproxy/integration_tests/helpers"
-	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -39,7 +39,7 @@ func TestStandardAuthorizationCodeFlow(t *testing.T) {
 	userPassword := "p4ssw0rd-" + suffix
 	userEmail := "alice-" + suffix + "@example.com"
 
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 	connector := helpers.NewOAuth2Connector(connectorID, "standard-flow-test", provider, helpers.OAuth2ConnectorOptions{
 		ClientID:     clientKey,
 		ClientSecret: clientSecret,

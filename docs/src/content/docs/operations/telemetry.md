@@ -148,12 +148,17 @@ Per-connector overrides for trace context propagation live on the connector defi
 ```yaml
 connectors:
   loadFromList:
-    - name: google-drive
-      labels:
-        type: google-drive
-      auth: { type: OAuth2, ... }
-      telemetry:
-        propagateTraceContext: true   # overrides telemetry.propagation.injectOutboundDefault for this connector
+    - apiVersion: authproxy.net/v1alpha1
+      kind: Connector
+      metadata:
+        name: google-drive
+        labels:
+          type: google-drive
+      spec:
+        definition:
+          auth: { type: OAuth2, ... }
+          telemetry:
+            propagateTraceContext: true # overrides telemetry.propagation.injectOutboundDefault for this connector
 ```
 
 ## Standard `OTEL_*` env vars

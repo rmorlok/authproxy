@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/go-resty/resty/v2"
@@ -15,6 +17,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	"github.com/rmorlok/authproxy/internal/util"
 )
 
 var testConnectorID = apid.MustParse("cxr_testgmail0000001")
@@ -22,32 +25,26 @@ var testConnectorID = apid.MustParse("cxr_testgmail0000001")
 const testBaseURL = "http://seed.test"
 
 func TestUpsertConnectorCreatesAndPublishesMissingSeed(t *testing.T) {
-	seed := ConnectorSeed{
-		Key:        "demo-noauth",
-		Definition: mustConnector(t, "Demo NoAuth"),
-		Labels: map[string]string{
-			"demo": "true",
-		},
-	}
+	seed := seedConnector(t, "demo-noauth", "Demo NoAuth")
 
 	forcedPrimary := false
 	client := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method + " " + r.URL.Path {
 		case "GET /api/v1/connectors":
-			require.Equal(t, defaultNamespace, r.URL.Query().Get("namespace"))
-			require.Equal(t, seedLabelKey+"=demo-noauth", r.URL.Query().Get("labelSelector"))
+			require.Equal(t, "root", r.URL.Query().Get("namespace"))
+			require.Equal(t, "demo-noauth", r.URL.Query().Get("name"))
 			writeJSON(t, w, api.NewListConnectorsResponseJson(nil, ""))
 		case "POST /api/v1/connectors":
 			var req cschema.Connector
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
-			require.Equal(t, defaultNamespace, req.Metadata.Namespace)
+			require.Equal(t, "root", req.Metadata.Namespace)
+			require.Equal(t, "demo-noauth", string(req.Metadata.Name))
 			require.Equal(t, "Demo NoAuth", req.Spec.Definition.DisplayName)
-			require.Equal(t, "demo-noauth", req.Metadata.Labels[seedLabelKey])
 			require.Equal(t, "true", req.Metadata.Labels["demo"])
 			writeJSON(t, w, connectorVersion(req.Spec.Definition, req.Metadata.Labels, cschema.ConnectorReleaseStateDraft, 1))
 		case "PUT /api/v1/connectors/cxr_testgmail0000001/versions/1/_forceState":
 			forcedPrimary = true
-			writeJSON(t, w, connectorVersion(seed.Definition, connectorLabels(seed), cschema.ConnectorReleaseStatePrimary, 1))
+			writeJSON(t, w, connectorVersion(seed.Spec.Definition, seed.Metadata.Labels, cschema.ConnectorReleaseStatePrimary, 1))
 		default:
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
 		}
@@ -60,14 +57,7 @@ func TestUpsertConnectorCreatesAndPublishesMissingSeed(t *testing.T) {
 }
 
 func TestUpsertConnectorSkipsMatchingPrimarySeed(t *testing.T) {
-	seed := ConnectorSeed{
-		Key:        "demo-noauth",
-		Namespace:  "root",
-		Definition: mustConnector(t, "Demo NoAuth"),
-		Labels: map[string]string{
-			"demo": "true",
-		},
-	}
+	seed := seedConnector(t, "demo-noauth", "Demo NoAuth")
 
 	client := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method + " " + r.URL.Path {
@@ -83,7 +73,7 @@ func TestUpsertConnectorSkipsMatchingPrimarySeed(t *testing.T) {
 				"", // continueToken
 			))
 		case "GET /api/v1/connectors/cxr_testgmail0000001/versions/1":
-			writeJSON(t, w, connectorVersion(seed.Definition, connectorLabels(seed), cschema.ConnectorReleaseStatePrimary, 1))
+			writeJSON(t, w, connectorVersion(seed.Spec.Definition, seed.Metadata.Labels, cschema.ConnectorReleaseStatePrimary, 1))
 		default:
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
 		}
@@ -95,11 +85,7 @@ func TestUpsertConnectorSkipsMatchingPrimarySeed(t *testing.T) {
 }
 
 func TestUpsertConnectorPublishesNewVersionWhenDefinitionChanges(t *testing.T) {
-	seed := ConnectorSeed{
-		Key:        "demo-noauth",
-		Namespace:  "root",
-		Definition: mustConnector(t, "New Demo NoAuth"),
-	}
+	seed := seedConnector(t, "demo-noauth", "New Demo NoAuth")
 	oldDefinition := mustConnector(t, "Old Demo NoAuth")
 	forcedPrimary := false
 
@@ -111,17 +97,16 @@ func TestUpsertConnectorPublishesNewVersionWhenDefinitionChanges(t *testing.T) {
 				"",
 			))
 		case "GET /api/v1/connectors/cxr_testgmail0000001/versions/1":
-			writeJSON(t, w, connectorVersion(oldDefinition, connectorLabels(seed), cschema.ConnectorReleaseStatePrimary, 1))
+			writeJSON(t, w, connectorVersion(oldDefinition, seed.Metadata.Labels, cschema.ConnectorReleaseStatePrimary, 1))
 		case "POST /api/v1/connectors/cxr_testgmail0000001/versions":
 			var req cschema.Connector
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
 			require.Equal(t, "New Demo NoAuth", req.Spec.Definition.DisplayName)
 			require.NotNil(t, req.Metadata.Labels)
-			require.Equal(t, "demo-noauth", req.Metadata.Labels[seedLabelKey])
 			writeJSON(t, w, connectorVersion(req.Spec.Definition, req.Metadata.Labels, cschema.ConnectorReleaseStateDraft, 2))
 		case "PUT /api/v1/connectors/cxr_testgmail0000001/versions/2/_forceState":
 			forcedPrimary = true
-			writeJSON(t, w, connectorVersion(seed.Definition, connectorLabels(seed), cschema.ConnectorReleaseStatePrimary, 2))
+			writeJSON(t, w, connectorVersion(seed.Spec.Definition, seed.Metadata.Labels, cschema.ConnectorReleaseStatePrimary, 2))
 		default:
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
 		}
@@ -219,6 +204,63 @@ func TestPostOAuth2TestProviderTreatsDuplicateAsAlreadyPresent(t *testing.T) {
 	}
 }
 
+func TestDeploymentSeedConfigsContainCanonicalResources(t *testing.T) {
+	for _, overlay := range []string{"demo", "dev"} {
+		t.Run(overlay, func(t *testing.T) {
+			manifestData, err := os.ReadFile(filepath.Join(
+				"..", "..", "..", "deploy", "kustomize", "authproxy-demo", "overlays", overlay, "seed", "seed-config.yaml",
+			))
+			require.NoError(t, err)
+
+			var manifest struct {
+				APIVersion string `yaml:"apiVersion"`
+				Kind       string `yaml:"kind"`
+				Metadata   struct {
+					Name string `yaml:"name"`
+				} `yaml:"metadata"`
+				Data map[string]string `yaml:"data"`
+			}
+			require.NoError(t, util.DecodeYAMLStrict(manifestData, &manifest))
+			require.Equal(t, "v1", manifest.APIVersion)
+			require.Equal(t, "ConfigMap", manifest.Kind)
+
+			seedPath := filepath.Join(t.TempDir(), "seed.yaml")
+			require.NoError(t, os.WriteFile(seedPath, []byte(manifest.Data["seed.yaml"]), 0o600))
+			cfg, err := loadConfig(seedPath)
+			require.NoError(t, err)
+			require.NotEmpty(t, cfg.Actors)
+			require.NotEmpty(t, cfg.Connectors)
+			for _, actor := range cfg.Actors {
+				require.Equal(t, "authproxy.net/v1alpha1", string(actor.APIVersion))
+				require.Equal(t, "Actor", string(actor.Kind))
+			}
+			for _, connector := range cfg.Connectors {
+				require.Equal(t, "authproxy.net/v1alpha1", string(connector.APIVersion))
+				require.Equal(t, "Connector", string(connector.Kind))
+			}
+		})
+	}
+}
+
+func TestLoadConfigRejectsLegacyFlatResources(t *testing.T) {
+	seedPath := filepath.Join(t.TempDir(), "seed.yaml")
+	require.NoError(t, os.WriteFile(seedPath, []byte(`
+actors:
+  - externalId: demo-admin
+    namespace: root
+connectors:
+  - key: demo-noauth
+    namespace: root
+    definition:
+      displayName: Demo NoAuth
+      auth:
+        type: no-auth
+`), 0o600))
+
+	_, err := loadConfig(seedPath)
+	require.ErrorContains(t, err, "parse seed config")
+}
+
 func TestSeedConfigParsesOAuthConnectorSetupVariants(t *testing.T) {
 	data := []byte(`
 oauth2TestProvider:
@@ -233,51 +275,57 @@ oauth2TestProvider:
     - username: demo-oauth-user@example.test
       password: demo-password
 connectors:
-  - key: demo-oauth-tenant
-    namespace: root
-    definition:
-      displayName: Demo OAuth Tenant
-      description: Demo OAuth connector with pre-connect config
+  - apiVersion: authproxy.net/v1alpha1
+    kind: Connector
+    metadata:
+      name: demo-oauth-tenant
+      namespace: root
       labels:
         type: demo-oauth-tenant
-      auth:
-        type: OAuth2
-        clientId: demo-oauth-tenant
-        clientSecret: demo-oauth-tenant-secret
-        authorization:
-          endpoint: https://example.test/oauth2/web/authorize
-          queryOverrides:
-            tenant: "{{cfg.tenant}}"
-        token:
-          endpoint: http://go-oauth2-server/v1/oauth/tokens
-        scopes:
-          - id: read
-            reason: Read demo data
-      setupFlow:
-        preconnect:
-          steps:
-            - id: tenant
-              title: Choose tenant
-              jsonSchema:
-                type: object
-                required:
-                  - tenant
-                properties:
-                  tenant:
-                    type: string
-              uiSchema:
-                type: VerticalLayout
-                elements:
-                  - type: Control
-                    scope: "#/properties/tenant"
+    spec:
+      release:
+        desiredState: primary
+      definition:
+        displayName: Demo OAuth Tenant
+        description: Demo OAuth connector with pre-connect config
+        auth:
+          type: OAuth2
+          clientId: demo-oauth-tenant
+          clientSecret: demo-oauth-tenant-secret
+          authorization:
+            endpoint: https://example.test/oauth2/web/authorize
+            queryOverrides:
+              tenant: "{{cfg.tenant}}"
+          token:
+            endpoint: http://go-oauth2-server/v1/oauth/tokens
+          scopes:
+            - id: read
+              reason: Read demo data
+        setupFlow:
+          preconnect:
+            steps:
+              - id: tenant
+                title: Choose tenant
+                jsonSchema:
+                  type: object
+                  required:
+                    - tenant
+                  properties:
+                    tenant:
+                      type: string
+                uiSchema:
+                  type: VerticalLayout
+                  elements:
+                    - type: Control
+                      scope: "#/properties/tenant"
 `)
 	var cfg SeedConfig
 	require.NoError(t, yaml.Unmarshal(data, &cfg))
 	require.NotNil(t, cfg.OAuth2TestProvider)
 	require.Len(t, cfg.OAuth2TestProvider.Clients, 1)
 	require.Len(t, cfg.Connectors, 1)
-	require.NoError(t, cfg.Connectors[0].Definition.Validate(&common.ValidationContext{}))
-	require.True(t, cfg.Connectors[0].Definition.SetupFlow.HasPreconnect())
+	require.NoError(t, cfg.Connectors[0].Spec.Definition.Validate(&common.ValidationContext{}))
+	require.True(t, cfg.Connectors[0].Spec.Definition.SetupFlow.HasPreconnect())
 }
 
 func TestSeedConfigParsesAPIKeyConnector(t *testing.T) {
@@ -289,29 +337,35 @@ oauth2TestProvider:
       key: demo-api-key
       placement: bearer
 connectors:
-  - key: demo-api-key
-    namespace: root
-    definition:
-      displayName: Demo API Key
-      description: Demo API key connector
+  - apiVersion: authproxy.net/v1alpha1
+    kind: Connector
+    metadata:
+      name: demo-api-key
+      namespace: root
       labels:
         type: demo-api-key
-      auth:
-        type: api-key
-        placement:
-          type: bearer
-      probes:
-        - id: verify-api-key
-          proxyHttp:
-            method: GET
-            url: http://go-oauth2-server/test/api-key-resource/demo-api-key
+    spec:
+      release:
+        desiredState: primary
+      definition:
+        displayName: Demo API Key
+        description: Demo API key connector
+        auth:
+          type: api-key
+          placement:
+            type: bearer
+        probes:
+          - id: verify-api-key
+            proxyHttp:
+              method: GET
+              url: http://go-oauth2-server/test/api-key-resource/demo-api-key
 `)
 	var cfg SeedConfig
 	require.NoError(t, yaml.Unmarshal(data, &cfg))
 	require.NotNil(t, cfg.OAuth2TestProvider)
 	require.Len(t, cfg.OAuth2TestProvider.APIKeyResourcePolicies, 1)
 	require.Len(t, cfg.Connectors, 1)
-	require.NoError(t, cfg.Connectors[0].Definition.Validate(&common.ValidationContext{}))
+	require.NoError(t, cfg.Connectors[0].Spec.Definition.Validate(&common.ValidationContext{}))
 }
 
 func mustConnector(t *testing.T, displayName string) config.ConnectorDefinition {
@@ -330,15 +384,26 @@ auth:
 	return connector
 }
 
-func connectorSummary(seed ConnectorSeed, state cschema.ConnectorReleaseState, version uint64) cschema.Connector {
-	return connectorVersion(seed.Definition, connectorLabels(seed), state, version)
+func seedConnector(t *testing.T, name, displayName string) cschema.Connector {
+	t.Helper()
+	resource := cschema.NewConnector()
+	resource.Metadata.Name = common.ResourceName(name)
+	resource.Metadata.Namespace = "root"
+	resource.Metadata.Labels = map[string]string{"demo": "true"}
+	resource.Spec.Release.DesiredState = cschema.ConnectorReleaseStatePrimary
+	resource.Spec.Definition = mustConnector(t, displayName)
+	return *resource
+}
+
+func connectorSummary(seed cschema.Connector, state cschema.ConnectorReleaseState, version uint64) cschema.Connector {
+	return connectorVersion(seed.Spec.Definition, seed.Metadata.Labels, state, version)
 }
 
 func connectorVersion(def config.ConnectorDefinition, labels map[string]string, state cschema.ConnectorReleaseState, version uint64) cschema.Connector {
 	resource := cschema.NewConnector()
 	resource.Metadata.ID = testConnectorID.String()
 	resource.Metadata.Name = "demo-noauth"
-	resource.Metadata.Namespace = defaultNamespace
+	resource.Metadata.Namespace = "root"
 	resource.Metadata.Generation = version
 	resource.Metadata.Labels = labels
 	resource.Spec.Release.DesiredState = cschema.DesiredReleaseStateForObserved(state)

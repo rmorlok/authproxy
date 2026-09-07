@@ -12,7 +12,6 @@ import (
 	"github.com/rmorlok/authproxy/integration_tests/helpers"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
-	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/schema/resources/connectors"
@@ -53,11 +52,12 @@ func TestNoAuthVersionMigrationAppliesDefaultsAndRunsAllTargetProbes(t *testing.
 		nil,
 		nil,
 	)
-	require.Equal(t, uint64(1), created.Version)
-	primary := env.ForceConnectorVersionState(t, created.Id, created.Version, schemaapi.ConnectorVersionStatePrimary)
-	require.Equal(t, schemaapi.ConnectorVersionStatePrimary, primary.State)
+	require.Equal(t, uint64(1), created.Metadata.Generation)
+	primary := env.ForceConnectorVersionState(t, created.GetId(), created.Metadata.Generation, connectors.ConnectorReleaseStatePrimary)
+	require.NotNil(t, primary.Status)
+	require.Equal(t, connectors.ConnectorReleaseStatePrimary, primary.Status.Release.State)
 
-	connectionID := env.InitiateNoAuthConnection(t, created.Id)
+	connectionID := env.InitiateNoAuthConnection(t, created.GetId())
 	initial := env.GetConnection(t, connectionID)
 	require.Equal(t, uint64(1), initial.ConnectorVersion)
 	require.Equal(t, database.ConnectionStateConfigured, initial.State)
@@ -69,7 +69,7 @@ func TestNoAuthVersionMigrationAppliesDefaultsAndRunsAllTargetProbes(t *testing.
 
 	published := env.PublishConnectorVersion(
 		t,
-		created.Id,
+		created.GetId(),
 		noAuthMigrationConnectorDefinition(
 			"no-auth-migration-v2",
 			defaultedConfigureFlow("region", "us-east-1"),
@@ -81,11 +81,12 @@ func TestNoAuthVersionMigrationAppliesDefaultsAndRunsAllTargetProbes(t *testing.
 		nil,
 		nil,
 	)
-	require.Equal(t, uint64(2), published.Version)
+	require.Equal(t, uint64(2), published.Metadata.Generation)
 
 	migration := env.MigrateConnectionVersionAndWait(t, connectionID, 2, noAuthMigrationTimeout)
-	require.Equal(t, uint64(1), migration.SourceVersion)
-	require.Equal(t, uint64(2), migration.TargetVersion)
+	require.NotNil(t, migration.Status)
+	require.Equal(t, uint64(1), migration.Status.SourceConnectorRef.Generation)
+	require.Equal(t, uint64(2), migration.Status.TargetConnectorRef.Generation)
 
 	migrated := env.GetConnection(t, connectionID)
 	require.Equal(t, uint64(2), migrated.ConnectorVersion)
@@ -107,7 +108,7 @@ func noAuthMigrationConnectorDefinition(
 	probes []connectors.Probe,
 ) sconfig.ConnectorDefinition {
 	connector := helpers.NewNoAuthConnector(
-		apid.New(apid.PrefixConnectorVersion),
+		apid.New(apid.PrefixConnector),
 		displayName,
 		nil, // rateLimiting
 	).Spec.Definition

@@ -42,7 +42,7 @@ func TestCallbackRejection_NamespaceMismatchActor(t *testing.T) {
 	clientKey := "ns-mismatch-actor-client-" + suffix
 	clientSecret := "ns-mismatch-actor-secret-" + suffix
 
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 	connector := helpers.NewOAuth2Connector(connectorID, "ns-mismatch-actor-test", provider, helpers.OAuth2ConnectorOptions{
 		ClientID:     clientKey,
 		ClientSecret: clientSecret,
@@ -153,7 +153,7 @@ func TestCallbackRejection_NamespaceMismatchConnection(t *testing.T) {
 	clientKey := "ns-mismatch-conn-client-" + suffix
 	clientSecret := "ns-mismatch-conn-secret-" + suffix
 
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 	connector := helpers.NewOAuth2Connector(connectorID, "ns-mismatch-conn-test", provider, helpers.OAuth2ConnectorOptions{
 		ClientID:     clientKey,
 		ClientSecret: clientSecret,

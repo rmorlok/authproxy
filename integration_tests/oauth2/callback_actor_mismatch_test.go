@@ -42,7 +42,7 @@ func TestCallbackRejection_ActorMismatch(t *testing.T) {
 	providerUserPassword := "p4ssw0rd-" + suffix
 	providerUserEmail := "alice-" + suffix + "@example.com"
 
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 	connector := helpers.NewOAuth2Connector(connectorID, "actor-mismatch-test", provider, helpers.OAuth2ConnectorOptions{
 		ClientID:     clientKey,
 		ClientSecret: clientSecret,

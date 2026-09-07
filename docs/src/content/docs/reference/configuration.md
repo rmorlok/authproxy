@@ -32,16 +32,23 @@ immutable `id`:
 ```yaml
 connectors:
   loadFromList:
-    - name: google-drive
-      namespace: root.integrations
-      labels:
-        type: google-drive
-      displayName: Google Drive
-      logo:
-        publicUrl: https://example.com/google-drive.svg
-      description: Connect to Google Drive.
-      auth:
-        type: no-auth
+    - apiVersion: authproxy.net/v1alpha1
+      kind: Connector
+      metadata:
+        name: google-drive
+        namespace: root.integrations
+        labels:
+          type: google-drive
+      spec:
+        release:
+          desiredState: primary
+        definition:
+          displayName: Google Drive
+          logo:
+            publicUrl: https://example.com/google-drive.svg
+          description: Connect to Google Drive.
+          auth:
+            type: no-auth
 ```
 
 With the development-only `serve --auto-migrate` option, AuthProxy reconciles
@@ -56,9 +63,11 @@ its ID fixed and change `name`. Changing the name of an ID-less entry describes
 a new connector, so the old config-managed connector enters the normal orphan
 cleanup flow.
 
-The former `connectors.identifyingLabels` setting has been removed. Delete it
-from existing configuration and add a stable `name` to every connector entry
-that does not already specify `id`.
+The former flat connector form and `connectors.identifyingLabels` setting have
+been removed. Every entry must be an `authproxy.net/v1alpha1` `Connector`
+resource. Delete `identifyingLabels` from existing configuration and add a
+stable `metadata.name` to every connector entry that does not already specify
+`metadata.id`.
 
 ## Kubernetes values
 

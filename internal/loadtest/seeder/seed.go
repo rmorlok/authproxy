@@ -146,7 +146,7 @@ func Seed(ctx context.Context, opts Options) (*Result, error) {
 
 	slug := slugForID(opts.Profile.Name)
 	baseNamespace := nschema.PathFromRoot("loadtest", slugForNamespace(opts.Profile.Name))
-	connectorID := apid.ID(fmt.Sprintf("%slt_%s_oauth2", apid.PrefixConnectorVersion, slug))
+	connectorID := apid.ID(fmt.Sprintf("%slt_%s_oauth2", apid.PrefixConnector, slug))
 	connectorVersion := uint64(1)
 	tenantCount := opts.Profile.TenantNamespaceCount()
 	connectionCount := opts.Profile.Objects.Connections

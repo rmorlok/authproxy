@@ -127,5 +127,5 @@ The dockerized OAuth provider persists registered clients and users
 across runs of `go test`. The test suffixes the client key, secret, and
 user email with `time.Now().UnixNano()` so reruns don't 400 on
 "Client ID taken" or "Username taken". The connector ID is generated
-fresh via `apid.New(apid.PrefixConnectorVersion)` per run, and each test
+fresh via `apid.New(apid.PrefixConnector)` per run, and each test
 gets an isolated database via `pgtestdb`.
