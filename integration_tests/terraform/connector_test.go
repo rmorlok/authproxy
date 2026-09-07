@@ -25,8 +25,9 @@ const updatedConnectorDefinition = `{
   }
 }`
 
-// TestAccConnector_publishTrue tests: create with publish=true -> version 1 is primary,
-// then update definition -> version 2 is primary.
+// TestAccConnector_publishTrue tests: create with publish=true -> generation 1 is primary,
+// then update definition -> generation 2 is primary. The provider retains its
+// established `version` HCL name while mapping it to API metadata.generation.
 func TestAccConnector_publishTrue(t *testing.T) {
 	env := testSetup(t)
 	providerCfg := testProviderConfig(env)
@@ -89,7 +90,7 @@ resource "authproxy_connector" "test" {
 	})
 }
 
-// TestAccConnector_publishFalse tests: create with publish=false -> version stays draft.
+// TestAccConnector_publishFalse tests creation and in-place updates of a draft generation.
 func TestAccConnector_publishFalse(t *testing.T) {
 	env := testSetup(t)
 	providerCfg := testProviderConfig(env)
@@ -97,7 +98,6 @@ func TestAccConnector_publishFalse(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories(),
 		Steps: []resource.TestStep{
-			// Create connector with publish=false -> stays draft
 			{
 				Config: providerCfg + `
 resource "authproxy_namespace" "test" {
@@ -121,6 +121,30 @@ resource "authproxy_connector" "test" {
 					resource.TestCheckResourceAttr("authproxy_connector.test", "version", "1"),
 					resource.TestCheckResourceAttr("authproxy_connector.test", "state", "draft"),
 					resource.TestCheckResourceAttr("authproxy_connector.test", "publish", "false"),
+				),
+			},
+			{
+				Config: providerCfg + `
+resource "authproxy_namespace" "test" {
+  path = "root.tf-test-connector-draft"
+}
+
+resource "authproxy_connector" "test" {
+  namespace  = authproxy_namespace.test.path
+  publish    = false
+  definition = jsonencode({
+    displayName = "Draft Connector Updated"
+    description = "An updated draft connector"
+    auth = {
+      type = "no-auth"
+    }
+  })
+}
+`,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("authproxy_connector.test", "version", "1"),
+					resource.TestCheckResourceAttr("authproxy_connector.test", "state", "draft"),
+					resource.TestCheckResourceAttr("authproxy_connector.test", "display_name", "Draft Connector Updated"),
 				),
 			},
 		},
@@ -245,7 +269,8 @@ resource "authproxy_connector" "test" {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("authproxy_connector.test", "labels.env", "production"),
 					resource.TestCheckResourceAttr("authproxy_connector.test", "labels.team", "platform"),
-					// The API creates a new version for any update on a published connector
+					// Resource metadata changes do not manufacture a new generation.
+					resource.TestCheckResourceAttr("authproxy_connector.test", "version", "1"),
 					resource.TestCheckResourceAttr("authproxy_connector.test", "state", "primary"),
 				),
 			},
@@ -380,8 +405,8 @@ resource "authproxy_connector" "test" {
 			},
 			{
 				ResourceName:      "authproxy_connector.test",
-				ImportState:        true,
-				ImportStateVerify:  true,
+				ImportState:       true,
+				ImportStateVerify: true,
 			},
 		},
 	})

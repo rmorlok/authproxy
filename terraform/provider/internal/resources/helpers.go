@@ -3,6 +3,7 @@ package resources
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -77,6 +78,13 @@ func annotationsToMap(annotations map[string]string) types.Map {
 	}
 	m, _ := types.MapValueFrom(context.Background(), types.StringType, elements)
 	return m
+}
+
+func timestampToString(value *time.Time) types.String {
+	if value == nil {
+		return types.StringNull()
+	}
+	return types.StringValue(value.Format(time.RFC3339))
 }
 
 // pathAttr returns a path.Path for the given attribute name.

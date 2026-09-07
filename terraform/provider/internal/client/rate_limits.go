@@ -3,13 +3,9 @@ package client
 import (
 	"context"
 	"fmt"
-	"time"
 )
 
-const (
-	RateLimitAPIVersion = "authproxy.net/v1alpha1"
-	RateLimitKind       = "RateLimit"
-)
+const RateLimitKind = "RateLimit"
 
 // These local wire models keep the Terraform provider independent from the
 // server's internal packages while mirroring its canonical resource contract.
@@ -51,14 +47,6 @@ type RateLimitAlgorithm struct {
 	TokenBucket   *RateLimitTokenBucket   `json:"tokenBucket,omitempty"`
 }
 
-type ObjectReference struct {
-	APIVersion string `json:"apiVersion"`
-	Kind       string `json:"kind"`
-	ID         string `json:"id,omitempty"`
-	Name       string `json:"name,omitempty"`
-	Namespace  string `json:"namespace,omitempty"`
-}
-
 type RateLimitScope struct {
 	NamespaceMatcher string           `json:"namespaceMatcher,omitempty"`
 	ConnectorRef     *ObjectReference `json:"connectorRef,omitempty"`
@@ -73,39 +61,21 @@ type RateLimitSpec struct {
 	Algorithm RateLimitAlgorithm `json:"algorithm"`
 }
 
-type RateLimitMetadata struct {
-	ID          string            `json:"id,omitempty"`
-	Name        string            `json:"name,omitempty"`
-	Namespace   string            `json:"namespace,omitempty"`
-	Labels      map[string]string `json:"labels,omitempty"`
-	Annotations map[string]string `json:"annotations,omitempty"`
-	CreatedAt   *time.Time        `json:"createdAt,omitempty"`
-	UpdatedAt   *time.Time        `json:"updatedAt,omitempty"`
-}
-
-type RateLimitMetadataPatch struct {
-	Name        *string            `json:"name,omitempty"`
-	Labels      *map[string]string `json:"labels,omitempty"`
-	Annotations *map[string]string `json:"annotations,omitempty"`
-}
-
 type RateLimitStatus struct {
 	EffectiveMode string `json:"effectiveMode"`
 }
 
 type RateLimit struct {
-	APIVersion string            `json:"apiVersion"`
-	Kind       string            `json:"kind"`
-	Metadata   RateLimitMetadata `json:"metadata"`
-	Spec       RateLimitSpec     `json:"spec"`
-	Status     *RateLimitStatus  `json:"status,omitempty"`
+	TypeMeta
+	Metadata ObjectMetadata   `json:"metadata"`
+	Spec     RateLimitSpec    `json:"spec"`
+	Status   *RateLimitStatus `json:"status,omitempty"`
 }
 
 type CreateRateLimitRequest struct {
-	APIVersion string            `json:"apiVersion"`
-	Kind       string            `json:"kind"`
-	Metadata   RateLimitMetadata `json:"metadata"`
-	Spec       RateLimitSpec     `json:"spec"`
+	TypeMeta
+	Metadata ObjectMetadata `json:"metadata"`
+	Spec     RateLimitSpec  `json:"spec"`
 }
 
 type RateLimitSpecPatch struct {
@@ -120,10 +90,9 @@ type RateLimitSpecPatch struct {
 }
 
 type UpdateRateLimitRequest struct {
-	APIVersion string                  `json:"apiVersion"`
-	Kind       string                  `json:"kind"`
-	Metadata   *RateLimitMetadataPatch `json:"metadata"`
-	Spec       *RateLimitSpecPatch     `json:"spec"`
+	TypeMeta
+	Metadata *ObjectMetadataPatch `json:"metadata"`
+	Spec     *RateLimitSpecPatch  `json:"spec"`
 }
 
 func (c *Client) CreateRateLimit(ctx context.Context, req CreateRateLimitRequest) (*RateLimit, error) {

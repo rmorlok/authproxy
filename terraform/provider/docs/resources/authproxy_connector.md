@@ -1,6 +1,6 @@
 # authproxy_connector
 
-Manages an AuthProxy connector with automatic version lifecycle. When the definition changes, a new version is created and optionally promoted to primary.
+Manages an AuthProxy connector with automatic generation lifecycle. The established Terraform attribute is named `version`, but its value comes from API `metadata.generation`.
 
 ## Example Usage
 
@@ -9,15 +9,22 @@ resource "authproxy_connector" "gmail" {
   namespace = "root.production"
 
   definition = jsonencode({
-    display_name = "Gmail"
+    displayName = "Gmail"
     description  = "Google Gmail integration"
     auth = {
-      type          = "oauth2"
-      client_id     = "your-client-id"
-      client_secret = "your-client-secret"
-      auth_url      = "https://accounts.google.com/o/oauth2/v2/auth"
-      token_url     = "https://oauth2.googleapis.com/token"
-      scopes        = ["https://www.googleapis.com/auth/gmail.readonly"]
+      type         = "OAuth2"
+      clientId     = "your-client-id"
+      clientSecret = "your-client-secret"
+      authorization = {
+        endpoint = "https://accounts.google.com/o/oauth2/v2/auth"
+      }
+      token = {
+        endpoint = "https://oauth2.googleapis.com/token"
+      }
+      scopes = [{
+        id     = "https://www.googleapis.com/auth/gmail.readonly"
+        reason = "Read Gmail messages"
+      }]
     }
   })
 
@@ -36,10 +43,10 @@ resource "authproxy_connector" "gmail_staging" {
   publish   = false
 
   definition = jsonencode({
-    display_name = "Gmail (Staging)"
+    displayName = "Gmail (Staging)"
     description  = "Gmail connector under review"
     auth = {
-      type = "no_auth"
+      type = "no-auth"
     }
   })
 }
@@ -48,14 +55,15 @@ resource "authproxy_connector" "gmail_staging" {
 ## Argument Reference
 
 - `namespace` - (Required, ForceNew) The namespace this connector belongs to.
-- `definition` - (Required) The connector definition as JSON. Use `jsonencode()` for readable HCL. Includes auth configuration, probes, rate limiting, etc.
+- `definition` - (Required, Sensitive) The connector provider definition as JSON. Use `jsonencode()` for readable HCL. This maps exclusively to API `spec.definition`; resource metadata and release state are separate. Because definitions can contain credentials, secure access to Terraform state.
 - `labels` - (Optional) A map of labels.
-- `publish` - (Optional, default `true`) Whether to promote new versions to primary state. When `false`, versions remain in draft state.
+- `annotations` - (Optional) A map of annotations.
+- `publish` - (Optional, default `true`) Whether to publish newly created or currently managed draft generations. Changing it from true to false does not demote an already published generation; it controls what happens when the next definition change creates a generation.
 
 ## Attribute Reference
 
 - `id` - The stable connector ID (persists across version changes).
-- `version` - The current version number.
+- `version` - The selected connector generation (`metadata.generation`).
 - `state` - The current version state (`draft`, `primary`, `active`, `archived`).
 - `display_name` - Display name extracted from the definition.
 - `created_at` - Timestamp of creation.
@@ -65,11 +73,14 @@ resource "authproxy_connector" "gmail_staging" {
 
 The connector resource abstracts version management:
 
-- **Create**: Creates version 1. If `publish = true`, promotes to `primary`.
-- **Update (definition changed)**: Creates a new version. If `publish = true`, promotes to `primary` (previous primary becomes `active`).
-- **Update (labels only)**: Updates labels on the current version without creating a new one.
-- **Update (publish false -> true)**: Promotes the current draft version to `primary`.
-- **Destroy**: Archives all non-archived versions.
+- **Create**: Creates generation 1 with desired release state `primary` when `publish = true`, or `draft` when false.
+- **Update a published definition**: Creates a new generation. With `publish = true`, the new generation becomes primary and the previous primary becomes active.
+- **Update a draft definition**: Updates that draft generation in place.
+- **Update labels or annotations**: Updates resource metadata without changing a published generation.
+- **Update `publish` from false to true**: Promotes the managed draft generation to primary.
+- **Destroy**: Archives all non-archived generations.
+
+The API redacts connector credentials unless the caller can replay secrets. On a redacted read, the provider preserves prior values only at masked fields so credentials remain stable while non-secret drift is still detected.
 
 ## Import
 

@@ -2,15 +2,22 @@ resource "authproxy_connector" "gmail" {
   namespace = "root.production"
 
   definition = jsonencode({
-    display_name = "Gmail"
-    description  = "Google Gmail integration"
+    displayName = "Gmail"
+    description = "Google Gmail integration"
     auth = {
-      type          = "oauth2"
-      client_id     = var.gmail_client_id
-      client_secret = var.gmail_client_secret
-      auth_url      = "https://accounts.google.com/o/oauth2/v2/auth"
-      token_url     = "https://oauth2.googleapis.com/token"
-      scopes        = ["https://www.googleapis.com/auth/gmail.readonly"]
+      type         = "OAuth2"
+      clientId     = var.gmail_client_id
+      clientSecret = var.gmail_client_secret
+      authorization = {
+        endpoint = "https://accounts.google.com/o/oauth2/v2/auth"
+      }
+      token = {
+        endpoint = "https://oauth2.googleapis.com/token"
+      }
+      scopes = [{
+        id     = "https://www.googleapis.com/auth/gmail.readonly"
+        reason = "Read Gmail messages"
+      }]
     }
   })
 
@@ -26,10 +33,10 @@ resource "authproxy_connector" "gmail_staging" {
   publish   = false
 
   definition = jsonencode({
-    display_name = "Gmail (Staging)"
-    description  = "Gmail connector under review"
+    displayName = "Gmail (Staging)"
+    description = "Gmail connector under review"
     auth = {
-      type = "no_auth"
+      type = "no-auth"
     }
   })
 }

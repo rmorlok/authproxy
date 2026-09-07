@@ -149,7 +149,7 @@ func TestBuildRateLimitSpec_ConnectorScope(t *testing.T) {
 	if spec.Scope == nil || spec.Scope.ConnectorRef == nil {
 		t.Fatalf("connector scope: %+v", spec.Scope)
 	}
-	if got := spec.Scope.ConnectorRef; got.APIVersion != client.RateLimitAPIVersion || got.Kind != "Connector" || got.ID != "cxr_salesforce" {
+	if got := spec.Scope.ConnectorRef; got.APIVersion != client.APIVersion || got.Kind != "Connector" || got.ID != "cxr_salesforce" {
 		t.Errorf("connector ref: %+v", got)
 	}
 }
@@ -186,7 +186,7 @@ func TestBuildRateLimitSpec_ConnectionScope(t *testing.T) {
 	if spec.Scope == nil || spec.Scope.ConnectionRef == nil {
 		t.Fatalf("connection scope: %+v", spec.Scope)
 	}
-	if got := spec.Scope.ConnectionRef; got.APIVersion != client.RateLimitAPIVersion || got.Kind != "Connection" || got.ID != "cxn_customer" {
+	if got := spec.Scope.ConnectionRef; got.APIVersion != client.APIVersion || got.Kind != "Connection" || got.ID != "cxn_customer" {
 		t.Errorf("connection ref: %+v", got)
 	}
 }
@@ -196,9 +196,8 @@ func TestBuildRateLimitSpec_ConnectionScope(t *testing.T) {
 func TestSetRateLimitState_PopulatesAllFields(t *testing.T) {
 	now := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
 	rl := &client.RateLimit{
-		APIVersion: client.RateLimitAPIVersion,
-		Kind:       client.RateLimitKind,
-		Metadata: client.RateLimitMetadata{
+		TypeMeta: client.NewTypeMeta(client.RateLimitKind),
+		Metadata: client.ObjectMetadata{
 			ID:          "rl_test123",
 			Namespace:   "root.acme",
 			Labels:      map[string]string{"team": "acme", "apxy/rl/-/id": "rl_test123"},
@@ -208,7 +207,7 @@ func TestSetRateLimitState_PopulatesAllFields(t *testing.T) {
 		},
 		Spec: client.RateLimitSpec{
 			Scope: &client.RateLimitScope{ConnectorRef: &client.ObjectReference{
-				APIVersion: client.RateLimitAPIVersion,
+				APIVersion: client.APIVersion,
 				Kind:       "Connector",
 				ID:         "cxr_salesforce",
 			}},
@@ -266,7 +265,7 @@ func TestSetRateLimitState_PopulatesAllFields(t *testing.T) {
 
 func TestSetRateLimitState_NamespaceMatcherScope(t *testing.T) {
 	rl := &client.RateLimit{
-		Metadata: client.RateLimitMetadata{ID: "rl_test123", Namespace: "root.acme"},
+		Metadata: client.ObjectMetadata{ID: "rl_test123", Namespace: "root.acme"},
 		Spec: client.RateLimitSpec{
 			Scope:     &client.RateLimitScope{NamespaceMatcher: "root.acme.payments.**"},
 			Algorithm: client.RateLimitAlgorithm{TokenBucket: &client.RateLimitTokenBucket{Capacity: 1, RefillRate: 1}},
@@ -284,10 +283,9 @@ func TestSetRateLimitState_EmptyModeDefaultsToEnforce(t *testing.T) {
 	// The server stores Mode="" for the default ("enforce"); the
 	// provider surfaces it explicitly so plan/apply consistency holds.
 	rl := &client.RateLimit{
-		APIVersion: client.RateLimitAPIVersion,
-		Kind:       client.RateLimitKind,
-		Metadata:   client.RateLimitMetadata{ID: "rl_x", Namespace: "root"},
-		Spec:       client.RateLimitSpec{Algorithm: client.RateLimitAlgorithm{TokenBucket: &client.RateLimitTokenBucket{Capacity: 1, RefillRate: 1}}},
+		TypeMeta: client.NewTypeMeta(client.RateLimitKind),
+		Metadata: client.ObjectMetadata{ID: "rl_x", Namespace: "root"},
+		Spec:     client.RateLimitSpec{Algorithm: client.RateLimitAlgorithm{TokenBucket: &client.RateLimitTokenBucket{Capacity: 1, RefillRate: 1}}},
 	}
 	var m RateLimitResourceModel
 	setRateLimitState(&m, rl)

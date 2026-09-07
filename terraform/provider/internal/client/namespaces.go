@@ -3,28 +3,48 @@ package client
 import (
 	"context"
 	"fmt"
-	"time"
+	"strings"
 )
 
+const NamespaceKind = "Namespace"
+
+type NamespaceSpec struct {
+	EncryptionKeyRef *ObjectReference `json:"encryptionKeyRef,omitempty"`
+}
+
+type NamespaceStatus struct {
+	State string `json:"state"`
+}
+
 type Namespace struct {
-	Path        string            `json:"path"`
-	State       string            `json:"state"`
-	KeyId       *string           `json:"keyId,omitempty"`
-	Labels      map[string]string `json:"labels,omitempty"`
-	Annotations map[string]string `json:"annotations,omitempty"`
-	CreatedAt   time.Time         `json:"createdAt"`
-	UpdatedAt   time.Time         `json:"updatedAt"`
+	TypeMeta
+	Metadata ObjectMetadata   `json:"metadata"`
+	Spec     NamespaceSpec    `json:"spec"`
+	Status   *NamespaceStatus `json:"status,omitempty"`
 }
 
 type CreateNamespaceRequest struct {
-	Path        string            `json:"path"`
-	Labels      map[string]string `json:"labels,omitempty"`
-	Annotations map[string]string `json:"annotations,omitempty"`
+	TypeMeta
+	Metadata ObjectMetadata `json:"metadata"`
+	Spec     NamespaceSpec  `json:"spec"`
 }
 
+type NamespaceSpecPatch struct{}
+
 type UpdateNamespaceRequest struct {
-	Labels      map[string]string `json:"labels,omitempty"`
-	Annotations map[string]string `json:"annotations,omitempty"`
+	TypeMeta
+	Metadata *ObjectMetadataPatch `json:"metadata"`
+	Spec     *NamespaceSpecPatch  `json:"spec"`
+}
+
+// NamespaceMetadataForPath maps Terraform's stable path attribute onto the
+// API's Kubernetes-style name and parent namespace identity.
+func NamespaceMetadataForPath(path string) ObjectMetadata {
+	index := strings.LastIndex(path, ".")
+	if index < 0 {
+		return ObjectMetadata{Name: path}
+	}
+	return ObjectMetadata{Name: path[index+1:], Namespace: path[:index]}
 }
 
 func (c *Client) CreateNamespace(ctx context.Context, req CreateNamespaceRequest) (*Namespace, error) {

@@ -292,9 +292,8 @@ func (r *RateLimitResource) Create(ctx context.Context, req resource.CreateReque
 	}
 
 	rl, err := r.client.CreateRateLimit(ctx, client.CreateRateLimitRequest{
-		APIVersion: client.RateLimitAPIVersion,
-		Kind:       client.RateLimitKind,
-		Metadata: client.RateLimitMetadata{
+		TypeMeta: client.NewTypeMeta(client.RateLimitKind),
+		Metadata: client.ObjectMetadata{
 			Namespace:   plan.Namespace.ValueString(),
 			Labels:      labels,
 			Annotations: annotations,
@@ -351,9 +350,8 @@ func (r *RateLimitResource) Update(ctx context.Context, req resource.UpdateReque
 	}
 
 	updateReq := client.UpdateRateLimitRequest{
-		APIVersion: client.RateLimitAPIVersion,
-		Kind:       client.RateLimitKind,
-		Metadata:   &client.RateLimitMetadataPatch{},
+		TypeMeta: client.NewTypeMeta(client.RateLimitKind),
+		Metadata: &client.ObjectMetadataPatch{},
 		Spec: &client.RateLimitSpecPatch{
 			Scope:     spec.Scope,
 			Mode:      &spec.Mode,
@@ -406,18 +404,10 @@ func buildRateLimitSpec(ctx context.Context, plan *RateLimitResourceModel) (clie
 		def.Scope = &client.RateLimitScope{}
 		def.Scope.NamespaceMatcher = plan.Scope.NamespaceMatcher.ValueString()
 		if plan.Scope.ConnectorRef != nil {
-			def.Scope.ConnectorRef = &client.ObjectReference{
-				APIVersion: client.RateLimitAPIVersion,
-				Kind:       "Connector",
-				ID:         plan.Scope.ConnectorRef.ID.ValueString(),
-			}
+			def.Scope.ConnectorRef = client.NewIDReference(client.ConnectorKind, plan.Scope.ConnectorRef.ID.ValueString())
 		}
 		if plan.Scope.ConnectionRef != nil {
-			def.Scope.ConnectionRef = &client.ObjectReference{
-				APIVersion: client.RateLimitAPIVersion,
-				Kind:       "Connection",
-				ID:         plan.Scope.ConnectionRef.ID.ValueString(),
-			}
+			def.Scope.ConnectionRef = client.NewIDReference("Connection", plan.Scope.ConnectionRef.ID.ValueString())
 		}
 	}
 
@@ -487,12 +477,8 @@ func setRateLimitState(model *RateLimitResourceModel, rl *client.RateLimit) {
 	}
 	model.Labels = labelsToMap(rl.Metadata.Labels)
 	model.Annotations = annotationsToMap(rl.Metadata.Annotations)
-	if rl.Metadata.CreatedAt != nil {
-		model.CreatedAt = types.StringValue(rl.Metadata.CreatedAt.Format("2006-01-02T15:04:05Z07:00"))
-	}
-	if rl.Metadata.UpdatedAt != nil {
-		model.UpdatedAt = types.StringValue(rl.Metadata.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"))
-	}
+	model.CreatedAt = timestampToString(rl.Metadata.CreatedAt)
+	model.UpdatedAt = timestampToString(rl.Metadata.UpdatedAt)
 	model.Scope = nil
 	if rl.Spec.Scope != nil {
 		model.Scope = &rateLimitScopeModel{NamespaceMatcher: types.StringNull()}
