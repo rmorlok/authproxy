@@ -19,6 +19,11 @@ spec:
         app.kubernetes.io/name: postgresql
         app.kubernetes.io/component: database
     spec:
+      # Bitnami runs as UID/GID 1001. EBS volumes are initially root-owned,
+      # so kubelet must make the mounted data directory group-writable.
+      securityContext:
+        fsGroup: 1001
+        fsGroupChangePolicy: OnRootMismatch
       containers:
         - name: postgresql
           image: docker.io/bitnamilegacy/postgresql:17.2.0-debian-12-r6

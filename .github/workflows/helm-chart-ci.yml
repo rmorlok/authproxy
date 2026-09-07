@@ -168,6 +168,8 @@ jobs:
           test "$(grep -c '^kind: PersistentVolumeClaim$' "${demo_manifest}")" -eq 3
           test "$(grep -c '^  storageClassName: gp3$' "${demo_manifest}")" -eq 3
           test "$(grep -c '^    type: Recreate$' "${demo_manifest}")" -eq 3
+          test "$(grep -c '^        fsGroup: 1001$' "${demo_manifest}")" -eq 3
+          test "$(grep -c '^        fsGroupChangePolicy: OnRootMismatch$' "${demo_manifest}")" -eq 3
           for claim in demo-postgresql-data demo-redis-data demo-minio-data; do
             grep -q "name: ${claim}" "${demo_manifest}"
             grep -q "claimName: ${claim}" "${demo_manifest}"

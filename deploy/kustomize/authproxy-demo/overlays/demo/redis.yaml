@@ -19,6 +19,11 @@ spec:
         app.kubernetes.io/name: redis
         app.kubernetes.io/component: redis
     spec:
+      # Bitnami runs as UID/GID 1001. EBS volumes are initially root-owned,
+      # so kubelet must make the mounted data directory group-writable.
+      securityContext:
+        fsGroup: 1001
+        fsGroupChangePolicy: OnRootMismatch
       containers:
         - name: redis
           image: docker.io/bitnamilegacy/redis:7.4.1-debian-12-r2

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/rmorlok/authproxy/integration_tests/helpers"
+	apauthcore "github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/schema/api"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
@@ -67,7 +68,7 @@ func smokeAdminPermissions(adminExternalID, userExternalID, connectionNamespace 
 			Verbs:     []string{"get", "create"},
 		},
 		{
-			Namespace:   smokeConnectorNamespace,
+			Namespace:   config.RootNamespace,
 			Resources:   []string{"actors"},
 			ResourceIds: []string{userExternalID},
 			Verbs:       []string{"get", "delete"},
@@ -100,12 +101,50 @@ func smokeUserPermissions(connectionNamespace string) []aschema.Permission {
 	}
 }
 
-func newRemoteSmokeRig(t *testing.T) *helpers.RemoteAuthProxy {
+func TestSmokePermissionsRespectActorHierarchy(t *testing.T) {
+	connectionNamespace := smokeConnectorNamespace + ".smoke-user"
+	tests := []struct {
+		name        string
+		actor       *apauthcore.Actor
+		permissions []aschema.Permission
+	}{
+		{
+			name:        "admin",
+			actor:       &apauthcore.Actor{Namespace: config.RootNamespace},
+			permissions: smokeAdminPermissions("smoke-admin", "smoke-user", connectionNamespace),
+		},
+		{
+			name:        "user with smoke connector",
+			actor:       &apauthcore.Actor{Namespace: config.RootNamespace},
+			permissions: smokeUserPermissions(connectionNamespace),
+		},
+		{
+			name:        "user with demo connector",
+			actor:       &apauthcore.Actor{Namespace: config.RootNamespace},
+			permissions: smokeUserPermissions(demoConnectorNamespace + ".smoke-user"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for i, permission := range tt.permissions {
+				require.NoErrorf(
+					t,
+					apauthcore.ValidatePermissionForActor(tt.actor, permission),
+					"permission %d",
+					i,
+				)
+			}
+		})
+	}
+}
+
+func newRemoteSmokeRig(t *testing.T, connectionParentNamespace string) *helpers.RemoteAuthProxy {
 	t.Helper()
 
 	adminExternalID := newSmokeActorExternalID(t, "smoke-admin")
 	userExternalID := newSmokeActorExternalID(t, "smoke-user")
-	connectionNamespace := smokeConnectorNamespace + "." + userExternalID
+	connectionNamespace := connectionParentNamespace + "." + userExternalID
 	adminPermissions := smokeAdminPermissions(adminExternalID, userExternalID, connectionNamespace)
 	userPermissions := smokeUserPermissions(connectionNamespace)
 	rig := helpers.NewRemoteAuthProxy(t, helpers.RemoteAuthProxyOptions{
@@ -115,7 +154,7 @@ func newRemoteSmokeRig(t *testing.T) *helpers.RemoteAuthProxy {
 		AdminActorNamespace:   config.RootNamespace,
 		AdminActorPermissions: adminPermissions,
 		UserActorExternalID:   userExternalID,
-		UserActorNamespace:    smokeConnectorNamespace,
+		UserActorNamespace:    config.RootNamespace,
 		UserActorPermissions:  userPermissions,
 		ConnectorNamespace:    smokeConnectorNamespace,
 		ConnectionNamespace:   connectionNamespace,
@@ -132,12 +171,12 @@ func newRemoteSmokeRig(t *testing.T) *helpers.RemoteAuthProxy {
 	rig.EnsureNamespace(t, connectionNamespace)
 	rig.ProvisionUserFromJWT(t)
 
-	actor := rig.GetActorByExternalID(t, smokeConnectorNamespace, userExternalID)
-	require.Equal(t, smokeConnectorNamespace, actor.Metadata.Namespace)
+	actor := rig.GetActorByExternalID(t, config.RootNamespace, userExternalID)
+	require.Equal(t, config.RootNamespace, actor.Metadata.Namespace)
 	require.Equal(t, userExternalID, actor.Spec.ExternalId)
 	require.Equal(t, userPermissions, actor.Spec.Permissions)
 	t.Cleanup(func() {
-		rig.DeleteActorByExternalIDAsAdmin(t, smokeConnectorNamespace, userExternalID)
+		rig.DeleteActorByExternalIDAsAdmin(t, config.RootNamespace, userExternalID)
 	})
 	return rig
 }
@@ -195,7 +234,7 @@ func TestRemoteOAuth2ProxySmoke(t *testing.T) {
 		t.Skip("set SMOKE_GLOBAL_KEY or pass -global-key")
 	}
 
-	rig := newRemoteSmokeRig(t)
+	rig := newRemoteSmokeRig(t, smokeConnectorNamespace)
 	provider := helpers.NewOAuth2TestProviderAt(t, rig.ProviderURL)
 
 	startedAt := time.Now().Add(-1 * time.Second)
@@ -288,7 +327,7 @@ func TestRemoteSeededOAuthConnectorSmoke(t *testing.T) {
 		t.Skip("set SMOKE_GLOBAL_KEY or pass -global-key")
 	}
 
-	rig := newRemoteSmokeRig(t)
+	rig := newRemoteSmokeRig(t, demoConnectorNamespace)
 	provider := helpers.NewOAuth2TestProviderAt(t, rig.ProviderURL)
 	connector := rig.FindConnectorBySeedKey(t, "demo-oauth-simple")
 
@@ -335,7 +374,7 @@ func TestRemoteSeededConnectorsSmoke(t *testing.T) {
 		t.Skip("set SMOKE_GLOBAL_KEY or pass -global-key")
 	}
 
-	rig := newRemoteSmokeRig(t)
+	rig := newRemoteSmokeRig(t, smokeConnectorNamespace)
 	provider := helpers.NewOAuth2TestProviderAt(t, rig.ProviderURL)
 	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
 	oauthClientID := "seeded-smoke-client-" + suffix

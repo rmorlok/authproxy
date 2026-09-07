@@ -45,11 +45,10 @@ const (
 )
 
 var (
-	labelKeyNamePattern      = regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9._-]{0,61}[a-zA-Z0-9])?$|^[a-zA-Z0-9]$`)
-	labelKeyPrefixPattern    = regexp.MustCompile(`^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)*[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$`)
-	labelValuePattern        = regexp.MustCompile(`^([a-zA-Z0-9]([a-zA-Z0-9._-]{0,61}[a-zA-Z0-9])?)?$|^[a-zA-Z0-9]?$`)
-	systemPathSegmentPattern = regexp.MustCompile(`^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?|-)$`)
-	systemLabelValuePattern  = regexp.MustCompile(`^[a-zA-Z0-9._-]{0,253}$`)
+	labelKeyNamePattern     = regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9._-]{0,61}[a-zA-Z0-9])?$|^[a-zA-Z0-9]$`)
+	labelKeyPrefixPattern   = regexp.MustCompile(`^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)*[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$`)
+	labelValuePattern       = regexp.MustCompile(`^([a-zA-Z0-9]([a-zA-Z0-9._-]{0,61}[a-zA-Z0-9])?)?$|^[a-zA-Z0-9]?$`)
+	systemLabelValuePattern = regexp.MustCompile(`^[a-zA-Z0-9._-]{0,253}$`)
 )
 
 // ValidateLabelKey validates a single label key.
@@ -62,7 +61,9 @@ var (
 //     may contain '-', '_', '.'
 //
 //  2. Reserved apxy/ multi-segment key: apxy/<seg>(/<seg>)*/<name>
-//     - each <seg> is a DNS-label-like token or the literal "-" sentinel
+//     - each <seg> is a DNS subdomain or the literal "-" sentinel; accepting
+//     DNS subdomains preserves qualified user-label keys when they are carried
+//     forward as apxy/<parent_rt>/<original_key>
 //     - <name> follows the standard name rule above
 //     - total prefix portion (everything before the final '/') still capped
 //     at LabelKeyPrefixMaxLength characters
@@ -131,8 +132,8 @@ func validateSystemLabelKey(key string) error {
 		if segment == "" {
 			return fmt.Errorf("%s label key has empty path segment", SystemLabelPrefix)
 		}
-		if !systemPathSegmentPattern.MatchString(segment) {
-			return fmt.Errorf("%s label key segment %q must be a DNS label or the %q sentinel", SystemLabelPrefix, segment, SystemLabelSentinel)
+		if segment != SystemLabelSentinel && !labelKeyPrefixPattern.MatchString(segment) {
+			return fmt.Errorf("%s label key segment %q must be a DNS subdomain or the %q sentinel", SystemLabelPrefix, segment, SystemLabelSentinel)
 		}
 	}
 	return validateLabelKeyName(name)
