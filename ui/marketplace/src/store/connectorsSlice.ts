@@ -24,8 +24,8 @@ export const fetchConnectorsAsync = createAsyncThunk(
           allItems = allItems.concat(response.data.items);
       }
 
-      while(response.data.cursor && response.data.cursor !== "") {
-          response = await connectors.list({cursor: response.data.cursor});
+      while(response.data.metadata.continue) {
+          response = await connectors.list({cursor: response.data.metadata.continue});
           if(response.status === 200) {
               allItems = allItems.concat(response.data.items);
           } else {

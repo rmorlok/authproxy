@@ -6,18 +6,14 @@ import {Provider} from 'react-redux';
 import {combineReducers, configureStore} from '@reduxjs/toolkit';
 import {MemoryRouter, Route, Routes, useLocation} from 'react-router-dom';
 import {beforeEach, describe, expect, test, vi} from 'vitest';
-import {
-    Notification,
-    NotificationLevel,
-    NotificationState,
-    notifications,
-} from '@authproxy/api';
+import {Notification, notifications} from '@authproxy/api';
 import Layout from '../components/Layout';
 import authReducer from '../store/sessionSlice';
 import connectorsReducer from '../store/connectorsSlice';
 import connectionsReducer from '../store/connectionsSlice';
 import notificationsReducer from '../store/notificationsSlice';
 import toastsReducer from '../store/toastsSlice';
+import {notificationFixture} from '../testing/resources';
 
 vi.mock('@authproxy/api', async () => {
     const actual = await vi.importActual<typeof import('@authproxy/api')>('@authproxy/api');
@@ -31,22 +27,9 @@ vi.mock('@authproxy/api', async () => {
     };
 });
 
-const notification: Notification = {
-    id: 'ntf_1',
-    key: 'connection:cxn1:auth_required',
-    level: NotificationLevel.WARNING,
-    state: NotificationState.ACTIVE,
-    resourceType: 'connection',
-    resourceId: 'cxn_1',
-    namespace: 'root',
-    title: 'Connection requires re-authentication',
-    message: 'Reconnect this connection to continue using it.',
+const notification: Notification = notificationFixture({
     actionUrl: '/connections/cxn_1?action=reauth',
-    canAction: true,
-    viewed: false,
-    createdAt: '2026-07-12T12:00:00Z',
-    updatedAt: '2026-07-12T12:00:00Z',
-};
+});
 
 function LocationProbe() {
     const location = useLocation();
@@ -113,7 +96,7 @@ describe('Layout notifications', () => {
         vi.mocked(notifications.list).mockReset();
         vi.mocked(notifications.markBatchViewed).mockReset();
         vi.mocked(notifications.list).mockResolvedValue({
-            data: {items: [notification], cursor: ''},
+            data: {apiVersion: notification.apiVersion, kind: 'NotificationList', metadata: {}, items: [notification]},
         } as any);
         vi.mocked(notifications.markBatchViewed).mockResolvedValue({} as any);
     });
@@ -136,7 +119,7 @@ describe('Layout notifications', () => {
         expect(notifications.markBatchViewed).toHaveBeenCalledWith(['ntf_1']);
 
         await waitFor(() => {
-            expect(store.getState().notifications.items[0].viewed).toBe(true);
+            expect(store.getState().notifications.items[0].status.viewed).toBe(true);
         });
 
         await user.click(screen.getByRole('button', {name: 'Open'}));

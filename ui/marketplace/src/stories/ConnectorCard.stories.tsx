@@ -1,7 +1,8 @@
 import * as React from 'react';
 import { Meta, StoryObj } from '@storybook/react';
 import ConnectorCard, { ConnectorCardSkeleton } from '../components/ConnectorCard';
-import { Connector, ConnectorVersionState } from '@authproxy/api';
+import { Connector } from '@authproxy/api';
+import { connectorFixture } from '../testing/resources';
 
 const logoDataUri = (label: string, background: string) => {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="280" height="140" viewBox="0 0 280 140" role="img" aria-label="${label} logo"><rect width="280" height="140" rx="8" fill="${background}"/><text x="50%" y="54%" text-anchor="middle" dominant-baseline="middle" fill="#fff" font-family="Inter, Arial, sans-serif" font-size="42" font-weight="700">GC</text></svg>`;
@@ -25,21 +26,17 @@ const meta: Meta<typeof ConnectorCard> = {
 export default meta;
 type Story = StoryObj<typeof ConnectorCard>;
 
-const mockConnector: Connector = {
-  id: 'google-calendar',
-  version: 1,
-  state: ConnectorVersionState.ACTIVE,
-  type: 'oauth',
+const mockConnector: Connector = connectorFixture({
   displayName: 'Google Calendar',
   description: 'Connect to your Google Calendar to manage events and appointments.',
   highlight: 'Manage events and appointments from Google Calendar.',
-  logo: logoDataUri('Google Calendar', '#1a73e8'),
-};
+  logo: {publicUrl: logoDataUri('Google Calendar', '#1a73e8')},
+});
 
 export const Default: Story = {
   args: {
     connector: mockConnector,
-    onConnect: (id) => console.log(`Connect clicked for ${id}`),
+    onConnect: (connector) => console.log(`Connect clicked for ${connector.metadata.id}`),
     onDetails: (id) => console.log(`Details clicked for ${id}`),
     isConnecting: false,
   },
@@ -49,9 +46,15 @@ export const WithHighlight: Story = {
   args: {
     connector: {
       ...mockConnector,
-      highlight: '**Sync your calendar** with Google Calendar to manage events, appointments, and meetings. Features include:\n\n• Event creation and management\n• Meeting scheduling\n• Reminder notifications\n• Calendar sharing',
+      spec: {
+        ...mockConnector.spec,
+        definition: {
+          ...mockConnector.spec.definition,
+          highlight: '**Sync your calendar** with Google Calendar to manage events, appointments, and meetings. Features include:\n\n• Event creation and management\n• Meeting scheduling\n• Reminder notifications\n• Calendar sharing',
+        },
+      },
     },
-    onConnect: (id) => console.log(`Connect clicked for ${id}`),
+    onConnect: (connector) => console.log(`Connect clicked for ${connector.metadata.id}`),
     onDetails: (id) => console.log(`Details clicked for ${id}`),
     isConnecting: false,
   },
@@ -60,7 +63,7 @@ export const WithHighlight: Story = {
 export const Connecting: Story = {
   args: {
     connector: mockConnector,
-    onConnect: (id) => console.log(`Connect clicked for ${id}`),
+    onConnect: (connector) => console.log(`Connect clicked for ${connector.metadata.id}`),
     onDetails: (id) => console.log(`Details clicked for ${id}`),
     isConnecting: true,
   },
@@ -68,12 +71,12 @@ export const Connecting: Story = {
 
 export const LongDescription: Story = {
   args: {
-    connector: {
-      ...mockConnector,
+    connector: connectorFixture({
       description: 'This is a very long description that should wrap to multiple lines. Connect to your Google Calendar to manage events and appointments, schedule meetings, and get reminders about upcoming events.',
       highlight: 'Short marketplace highlight stays on the card while the long description belongs on the overview page.',
-    },
-    onConnect: (id) => console.log(`Connect clicked for ${id}`),
+      logo: {publicUrl: logoDataUri('Google Calendar', '#1a73e8')},
+    }),
+    onConnect: (connector) => console.log(`Connect clicked for ${connector.metadata.id}`),
     onDetails: (id) => console.log(`Details clicked for ${id}`),
     isConnecting: false,
   },
@@ -81,12 +84,11 @@ export const LongDescription: Story = {
 
 export const DescriptionFallback: Story = {
   args: {
-    connector: {
-      ...mockConnector,
-      highlight: undefined,
+    connector: connectorFixture({
       description: 'Allow the agent to manage your calendar on your behalf. It is like having your own personal assistant.',
-    },
-    onConnect: (id) => console.log(`Connect clicked for ${id}`),
+      logo: {publicUrl: logoDataUri('Google Calendar', '#1a73e8')},
+    }),
+    onConnect: (connector) => console.log(`Connect clicked for ${connector.metadata.id}`),
     onDetails: (id) => console.log(`Details clicked for ${id}`),
     isConnecting: false,
   },
@@ -94,13 +96,13 @@ export const DescriptionFallback: Story = {
 
 export const WideLogo: Story = {
   args: {
-    connector: {
-      ...mockConnector,
+    connector: connectorFixture({
+      id: 'wide-format-systems',
       displayName: 'Wide Format Systems',
       highlight: 'A wide logo should scale down inside the card without being cut off.',
-      logo: wideLogoDataUri('Wide Format Systems'),
-    },
-    onConnect: (id) => console.log(`Connect clicked for ${id}`),
+      logo: {publicUrl: wideLogoDataUri('Wide Format Systems')},
+    }),
+    onConnect: (connector) => console.log(`Connect clicked for ${connector.metadata.id}`),
     onDetails: (id) => console.log(`Details clicked for ${id}`),
     isConnecting: false,
   },

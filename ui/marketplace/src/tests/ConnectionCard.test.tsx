@@ -11,7 +11,7 @@ import {
     ConnectionState,
     ConnectionHealthState,
     Connector,
-    ConnectorVersionState,
+    API_VERSION,
     connections,
     tasks,
     PollForTaskResult,
@@ -21,6 +21,7 @@ import connectorsReducer from '../store/connectorsSlice';
 import connectionsReducer from '../store/connectionsSlice';
 import toastsReducer from '../store/toastsSlice';
 import {beforeEach, describe, expect, test, vi} from 'vitest';
+import {completeSetupResponseFixture, connectionFixture, connectorFixture} from '../testing/resources';
 
 vi.mock('@authproxy/api', async () => {
     const actual = await vi.importActual<typeof import('@authproxy/api')>('@authproxy/api');
@@ -69,7 +70,11 @@ const rootInitialState = () => ({
     toasts: {items: []},
 });
 
-const renderConnectionCard = (connection: Connection, store = createMockStore(rootInitialState())) => {
+const renderConnectionCard = (
+    connection: Connection,
+    store = createMockStore(rootInitialState()),
+    connector?: Connector,
+) => {
     const LocationProbe = () => {
         const location = useLocation();
         return <span data-testid="location">{location.pathname}{location.search}</span>;
@@ -79,7 +84,7 @@ const renderConnectionCard = (connection: Connection, store = createMockStore(ro
         <MemoryRouter initialEntries={['/connections']}>
             <Provider store={store}>
                 <Routes>
-                    <Route path="/connections" element={<ConnectionCard connection={connection}/>} />
+                    <Route path="/connections" element={<ConnectionCard connection={connection} connector={connector}/>} />
                     <Route path="/connections/:connectionId" element={<LocationProbe/>} />
                 </Routes>
             </Provider>
@@ -90,31 +95,20 @@ const renderConnectionCard = (connection: Connection, store = createMockStore(ro
 };
 
 describe('ConnectionCard', () => {
-    const mockConnector: Connector = {
-        id: 'google-calendar',
-        name: 'google-calendar',
-        namespace: 'root',
-        version: 1,
-        state: ConnectorVersionState.ACTIVE,
+    const mockConnector: Connector = connectorFixture({
         displayName: 'Google Calendar',
         description: 'Connect to your Google Calendar to manage events and appointments.',
-        highlight: undefined,
-        logo: 'https://example.com/google-calendar-logo.png',
+        logo: {publicUrl: 'https://example.com/google-calendar-logo.png'},
         hasConfigure: false,
-        createdAt: '2023-04-01T12:00:00Z',
-        updatedAt: '2023-04-01T12:00:00Z',
-    };
+    });
 
-    const baseConnection: Connection = {
+    const baseConnection: Connection = connectionFixture({
         id: '123e4567-e89b-12d3-a456-426614174000',
         name: 'primary-calendar',
-        namespace: 'root',
         connector: mockConnector,
         state: ConnectionState.CONFIGURED,
         healthState: ConnectionHealthState.HEALTHY,
-        createdAt: '2023-04-01T12:00:00Z',
-        updatedAt: '2023-04-01T12:00:00Z',
-    };
+    });
 
     beforeEach(() => {
         vi.mocked(connections.disconnect).mockReset();
@@ -124,19 +118,22 @@ describe('ConnectionCard', () => {
         vi.mocked(tasks.pollForTaskFinalized).mockReset();
         vi.mocked(connections.disconnect).mockResolvedValue({
             data: {
-                taskId: 'task-123',
-                connection: {
+                apiVersion: API_VERSION,
+                kind: 'ConnectionDisconnect',
+                metadata: {target: {apiVersion: API_VERSION, kind: 'Connection', id: baseConnection.metadata.id}},
+                spec: {},
+                status: {taskId: 'task-123', connection: {
                     ...baseConnection,
-                    state: ConnectionState.DISCONNECTING,
-                },
+                    status: {...baseConnection.status, lifecycle: {state: ConnectionState.DISCONNECTING}},
+                }},
             },
         } as any);
         vi.mocked(connections.list).mockResolvedValue({
             status: 200,
-            data: {items: [], cursor: ''},
+            data: {apiVersion: API_VERSION, kind: 'ConnectionList', metadata: {}, items: []},
         } as any);
-        vi.mocked(connections.getSetupStep).mockResolvedValue({data: {id: baseConnection.id, type: 'complete'}} as any);
-        vi.mocked(connections.reauth).mockResolvedValue({data: {type: 'complete'}} as any);
+        vi.mocked(connections.getSetupStep).mockResolvedValue({data: completeSetupResponseFixture(baseConnection.metadata.id)} as any);
+        vi.mocked(connections.reauth).mockResolvedValue({data: completeSetupResponseFixture(baseConnection.metadata.id)} as any);
         vi.mocked(tasks.pollForTaskFinalized).mockResolvedValue({
             result: PollForTaskResult.FINALIZED,
         } as any);
@@ -145,7 +142,7 @@ describe('ConnectionCard', () => {
     test('renders connection information correctly with connector details', () => {
         const store = createMockStore(rootInitialState());
 
-        renderConnectionCard(baseConnection, store);
+        renderConnectionCard(baseConnection, store, mockConnector);
 
         // Check if the connector name is displayed
         expect(screen.getByText('Google Calendar')).toBeInTheDocument();
@@ -158,9 +155,7 @@ describe('ConnectionCard', () => {
 
     test('renders with unknown connector fallback when connector missing', () => {
         const store = createMockStore(rootInitialState());
-        const connWithoutConnector = {...baseConnection, connector: undefined as unknown as any};
-
-        renderConnectionCard(connWithoutConnector, store);
+        renderConnectionCard(baseConnection, store);
 
         // Check if the unknown connector text is displayed
         expect(screen.getByText('Unknown Connector')).toBeInTheDocument();
@@ -176,12 +171,15 @@ describe('ConnectionCard', () => {
 
         states.forEach(({state, label}) => {
             const store = createMockStore(rootInitialState());
-            const connection = {...baseConnection, state};
+            const connection = {
+                ...baseConnection,
+                status: {...baseConnection.status, lifecycle: {state}},
+            };
 
             const {unmount} = render(
                 <MemoryRouter>
                     <Provider store={store}>
-                        <ConnectionCard connection={connection}/>
+                        <ConnectionCard connection={connection} connector={mockConnector}/>
                     </Provider>
                 </MemoryRouter>
             );
@@ -195,34 +193,40 @@ describe('ConnectionCard', () => {
     test('resumes setup connections from their current step', async () => {
         const store = createMockStore(rootInitialState());
         const user = userEvent.setup();
-        const setupConnection: Connection = {
-            ...baseConnection,
+        const setupConnection = connectionFixture({
+            id: baseConnection.metadata.id,
+            connector: mockConnector,
             state: ConnectionState.SETUP,
-        };
+        });
         vi.mocked(connections.getSetupStep).mockResolvedValue({
             data: {
-                id: setupConnection.id,
-                type: 'form',
-                stepId: 'calendar',
-                stepTitle: 'Select a Calendar',
-                stepDescription: 'Choose which calendar should be managed.',
-                jsonSchema: {type: 'object'},
-                uiSchema: {type: 'VerticalLayout'},
+                apiVersion: API_VERSION,
+                kind: 'ConnectionSetup',
+                metadata: {target: {apiVersion: API_VERSION, kind: 'Connection', id: setupConnection.metadata.id}},
+                spec: {},
+                status: {
+                    type: 'form',
+                    stepId: 'calendar',
+                    stepTitle: 'Select a Calendar',
+                    stepDescription: 'Choose which calendar should be managed.',
+                    jsonSchema: {type: 'object'},
+                    uiSchema: {type: 'VerticalLayout'},
+                },
             },
         } as any);
 
-        renderConnectionCard(setupConnection, store);
+        renderConnectionCard(setupConnection, store, mockConnector);
 
         await user.click(screen.getByRole('button', {name: /Resume setup/i}));
 
         await waitFor(() => {
             expect(connections.getSetupStep).toHaveBeenCalledWith(
-                setupConnection.id,
+                setupConnection.metadata.id,
                 window.location.href,
             );
         });
         expect(store.getState().connections.currentFormStep).toMatchObject({
-            connectionId: setupConnection.id,
+            connectionId: setupConnection.metadata.id,
             stepId: 'calendar',
             stepTitle: 'Select a Calendar',
         });
@@ -231,16 +235,19 @@ describe('ConnectionCard', () => {
     test('promotes reauthentication for unhealthy configured connections', async () => {
         const store = createMockStore(rootInitialState());
         const user = userEvent.setup();
-        const unhealthyConnection: Connection = {
-            ...baseConnection,
-            connector: {
-                ...mockConnector,
-                hasConfigure: true,
-            },
+        const configurableConnector = connectorFixture({
+            displayName: 'Google Calendar',
+            description: 'Connect to your Google Calendar to manage events and appointments.',
+            logo: {publicUrl: 'https://example.com/google-calendar-logo.png'},
+            hasConfigure: true,
+        });
+        const unhealthyConnection = connectionFixture({
+            id: baseConnection.metadata.id,
+            connector: configurableConnector,
             healthState: ConnectionHealthState.UNHEALTHY,
-        };
+        });
 
-        renderConnectionCard(unhealthyConnection, store);
+        renderConnectionCard(unhealthyConnection, store, configurableConnector);
 
         expect(screen.getByText('Requires reconnection')).toBeInTheDocument();
         expect(screen.getByText('Reconnection required')).toBeInTheDocument();
@@ -252,8 +259,8 @@ describe('ConnectionCard', () => {
 
         await waitFor(() => {
             expect(connections.reauth).toHaveBeenCalledWith(
-                unhealthyConnection.id,
-                window.location.href,
+                unhealthyConnection.metadata.id,
+                {returnToUrl: window.location.href},
             );
         });
     });
@@ -261,15 +268,18 @@ describe('ConnectionCard', () => {
     test('keeps healthy connection secondary actions in the menu', async () => {
         const store = createMockStore(rootInitialState());
         const user = userEvent.setup();
-        const healthyConnection: Connection = {
-            ...baseConnection,
-            connector: {
-                ...mockConnector,
-                hasConfigure: true,
-            },
-        };
+        const configurableConnector = connectorFixture({
+            displayName: 'Google Calendar',
+            description: 'Connect to your Google Calendar to manage events and appointments.',
+            logo: {publicUrl: 'https://example.com/google-calendar-logo.png'},
+            hasConfigure: true,
+        });
+        const healthyConnection = connectionFixture({
+            id: baseConnection.metadata.id,
+            connector: configurableConnector,
+        });
 
-        renderConnectionCard(healthyConnection, store);
+        renderConnectionCard(healthyConnection, store, configurableConnector);
 
         expect(screen.getByRole('button', {name: /Reconfigure/i})).toBeInTheDocument();
         expect(screen.queryByRole('button', {name: /Re-authenticate/i})).not.toBeInTheDocument();
@@ -285,8 +295,8 @@ describe('ConnectionCard', () => {
 
         await waitFor(() => {
             expect(connections.reauth).toHaveBeenCalledWith(
-                healthyConnection.id,
-                window.location.href,
+                healthyConnection.metadata.id,
+                {returnToUrl: window.location.href},
             );
         });
     });
@@ -295,19 +305,19 @@ describe('ConnectionCard', () => {
         const store = createMockStore(rootInitialState());
         const user = userEvent.setup();
 
-        renderConnectionCard(baseConnection, store);
+        renderConnectionCard(baseConnection, store, mockConnector);
 
         await user.click(screen.getByRole('button', {name: /Connection actions/i}));
         await user.click(screen.getByRole('menuitem', {name: /View details/i}));
 
-        expect(screen.getByTestId('location')).toHaveTextContent(`/connections/${baseConnection.id}`);
+        expect(screen.getByTestId('location')).toHaveTextContent(`/connections/${baseConnection.metadata.id}`);
     });
 
     test('opens disconnect confirmation from healthy connection action menu', async () => {
         const store = createMockStore(rootInitialState());
         const user = userEvent.setup();
 
-        renderConnectionCard(baseConnection, store);
+        renderConnectionCard(baseConnection, store, mockConnector);
 
         await user.click(screen.getByRole('button', {name: /Connection actions/i}));
         await user.click(screen.getByRole('menuitem', {name: /^Disconnect$/i}));
@@ -316,7 +326,7 @@ describe('ConnectionCard', () => {
         await user.click(screen.getByRole('button', {name: /^Disconnect$/i}));
 
         await waitFor(() => {
-            expect(connections.disconnect).toHaveBeenCalledWith(baseConnection.id);
+            expect(connections.disconnect).toHaveBeenCalledWith(baseConnection.metadata.id);
         });
     });
 

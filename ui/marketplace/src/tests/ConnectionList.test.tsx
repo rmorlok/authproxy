@@ -10,8 +10,9 @@ import authReducer from '../store/sessionSlice';
 import connectorsReducer from '../store/connectorsSlice';
 import connectionsReducer from '../store/connectionsSlice';
 import toastsReducer from '../store/toastsSlice';
-import {Connection, ConnectionState, ConnectionHealthState, Connector, ConnectorVersionState, connections} from '@authproxy/api';
+import {API_VERSION, Connection, Connector, CONNECTOR_KIND, connections, objectReference} from '@authproxy/api';
 import {beforeEach, describe, expect, test, vi} from 'vitest';
+import {completeSetupResponseFixture, connectionFixture, connectorFixture} from '../testing/resources';
 
 vi.mock('@authproxy/api', async () => {
     const actual = await vi.importActual<typeof import('@authproxy/api')>('@authproxy/api');
@@ -39,32 +40,14 @@ function createStore(preloadedState?: any) {
     });
 }
 
-const connector: Connector = {
-    id: 'google-calendar',
-    name: 'google-calendar',
-    namespace: 'root',
-    version: 1,
-    state: ConnectorVersionState.ACTIVE,
+const connector: Connector = connectorFixture({
     displayName: 'Google Calendar',
     description: 'Calendar app',
-    highlight: undefined,
-    logo: 'https://example.com/logo.png',
+    logo: {publicUrl: 'https://example.com/logo.png'},
     hasConfigure: false,
-    createdAt: '2023-04-01T12:00:00Z',
-    updatedAt: '2023-04-01T12:00:00Z',
-};
-
-const makeConnection = (overrides: Partial<Connection> = {}): Connection => ({
-    id: 'c-1',
-    name: 'primary-calendar',
-    namespace: 'root',
-    connector: connector,
-    state: ConnectionState.CONFIGURED,
-    healthState: ConnectionHealthState.HEALTHY,
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-01T00:00:00Z',
-    ...overrides,
 });
+
+const makeConnection = (id = 'c-1'): Connection => connectionFixture({id, connector});
 
 describe('ConnectionList', () => {
     const baseConnectionsState = {
@@ -87,12 +70,12 @@ describe('ConnectionList', () => {
         vi.mocked(connections.list).mockReset();
         vi.mocked(connections.retry).mockReset();
         vi.mocked(connections.abort).mockResolvedValue({} as any);
-        vi.mocked(connections.initiate).mockResolvedValue({data: {id: 'c-new', type: 'complete'}} as any);
+        vi.mocked(connections.initiate).mockResolvedValue({data: completeSetupResponseFixture('c-new')} as any);
         vi.mocked(connections.list).mockResolvedValue({
             status: 200,
-            data: {items: [], cursor: ''},
+            data: {apiVersion: API_VERSION, kind: 'ConnectionList', metadata: {}, items: []},
         } as any);
-        vi.mocked(connections.retry).mockResolvedValue({data: {type: 'complete'}} as any);
+        vi.mocked(connections.retry).mockResolvedValue({data: completeSetupResponseFixture('c-1')} as any);
     });
 
     test('renders skeletons when loading', () => {
@@ -171,7 +154,7 @@ describe('ConnectionList', () => {
         const user = userEvent.setup();
         vi.mocked(connections.list).mockResolvedValue({
             status: 200,
-            data: {items: [makeConnection({id: 'c-new'})], cursor: ''},
+            data: {apiVersion: API_VERSION, kind: 'ConnectionList', metadata: {}, items: [makeConnection('c-new')]},
         } as any);
         const store = createStore({
             connectors: {items: [connector], status: 'succeeded', error: null},
@@ -198,13 +181,13 @@ describe('ConnectionList', () => {
         expect(newCard).toHaveAttribute('data-highlight-new', 'true');
         expect(screen.getByRole('link', {name: /Connect More/i})).toBeInTheDocument();
         expect(connections.initiate).toHaveBeenCalledWith(
-            'google-calendar',
-            `${window.location.origin}/connections`,
+            objectReference(CONNECTOR_KIND, {id: 'google-calendar', generation: 1}),
+            {returnToUrl: `${window.location.origin}/connections`},
         );
     });
 
     test('renders list of connections when present', () => {
-        const items = [makeConnection({id: 'c-1'}), makeConnection({id: 'c-2'})];
+        const items = [makeConnection('c-1'), makeConnection('c-2')];
         const store = createStore({
             connectors: {items: [connector], status: 'succeeded', error: null},
             connections: {
@@ -336,7 +319,7 @@ describe('ConnectionList', () => {
 
         await user.click(screen.getByRole('button', {name: /Retry setup/i}));
 
-        expect(connections.retry).toHaveBeenCalledWith('c-1', window.location.href);
+        expect(connections.retry).toHaveBeenCalledWith('c-1', {returnToUrl: window.location.href});
     });
 
     test('cancels verification failure and hides retry when retry is unavailable', async () => {

@@ -78,7 +78,7 @@ const ConnectorList: React.FC = () => {
     content = (
       <Grid container spacing={marketplaceTokens.spacing.gridGap}>
         {connectors.map((connector) => (
-          <Grid key={connector.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
+          <Grid key={`${connector.metadata.id}:${connector.metadata.generation}`} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
             <ConnectorCard
               connector={connector}
               onConnect={handleConnect}
