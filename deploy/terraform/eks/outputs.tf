@@ -62,3 +62,8 @@ output "oidc_provider_arn" {
   description = "ARN of the cluster's OIDC provider. Future IRSA roles bind their trust policy to this."
   value       = module.eks.oidc_provider_arn
 }
+
+output "ebs_csi_role_arn" {
+  description = "ARN of the IRSA role used by the Amazon EBS CSI controller."
+  value       = aws_iam_role.ebs_csi.arn
+}

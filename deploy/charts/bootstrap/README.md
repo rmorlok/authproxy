@@ -9,11 +9,12 @@ in-cluster components every downstream workload depends on:
 | cert-manager    | Automatic TLS issuance (Let's Encrypt prod, HTTP-01 or DNS-01) |
 | external-dns    | Reconciles Ingress hosts → Route53 A records                |
 | metrics-server  | Resource metrics for HPA + `kubectl top`                    |
+| EBS StorageClass | Default encrypted `gp3` storage via the EBS CSI driver     |
 | ClusterIssuer   | Let's Encrypt prod issuer named `letsencrypt-prod`          |
 
 This is a **helm-of-helms** chart: each component above is an upstream
-chart pinned as a `dependencies` entry in `Chart.yaml`. The only
-template owned by this chart directly is `templates/cluster_issuer.yaml`.
+chart pinned as a `dependencies` entry in `Chart.yaml`. This chart directly
+owns the `ClusterIssuer` and EBS CSI `StorageClass` templates.
 
 ## Pre-requisites
 
@@ -106,6 +107,12 @@ kubectl get pods -n kube-system \
 ```
 
 All four `app.kubernetes.io/name` selectors should report Running pods.
+
+```bash
+kubectl get storageclass gp3
+```
+
+The class should use `ebs.csi.aws.com` and be marked as the default.
 
 ```bash
 kubectl get clusterissuer letsencrypt-prod -o wide

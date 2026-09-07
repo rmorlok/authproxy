@@ -275,6 +275,14 @@ func TestActorsRoutes(t *testing.T) {
 		defer done()
 
 		a := createActor(t, tu.Db, "user/10", "root")
+		permissions := aschema.PermissionsSingleWithResourceIds("root.apps.**", "connections", "proxy", "cxn_example")
+		_, err := tu.Db.UpsertActor(context.Background(), &database.Actor{
+			Id:          a.Id,
+			Namespace:   a.Namespace,
+			ExternalId:  a.ExternalId,
+			Permissions: database.Permissions(permissions),
+		})
+		require.NoError(t, err)
 		otherId := apid.New(apid.PrefixActor)
 
 		t.Run("unauthorized", func(t *testing.T) {
@@ -335,6 +343,7 @@ func TestActorsRoutes(t *testing.T) {
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			require.Equal(t, a.Id.String(), resp.Metadata.ID)
 			require.Equal(t, a.ExternalId, resp.Spec.ExternalId)
+			require.Equal(t, permissions, resp.Spec.Permissions)
 		})
 	})
 
@@ -761,6 +770,7 @@ func TestActorsRoutes(t *testing.T) {
 			require.Equal(t, "root", resp.Metadata.Namespace)
 			require.NotNil(t, resp.Metadata.CreatedAt)
 			require.NotNil(t, resp.Metadata.UpdatedAt)
+			require.Empty(t, resp.Spec.Permissions)
 
 			// Verify the actor exists in the database
 			actor, err := tu.Db.GetActorByExternalId(context.Background(), "root", "created-actor")
@@ -974,6 +984,66 @@ func TestActorsRoutes(t *testing.T) {
 			require.Equal(t, string(updatedActor.Name), updatedActor.Labels["apxy/act/-/name"])
 		})
 
+		t.Run("success - update and clear permissions", func(t *testing.T) {
+			actor := createActor(t, tu.Db, "actor-permissions-update", "root")
+			permissions := []aschema.Permission{
+				{
+					Namespace: "root.tenant.**",
+					Resources: []string{"connectors", "connections"},
+					Verbs:     []string{"get", "list"},
+				},
+			}
+
+			patch := actorschema.NewActorPatch()
+			patch.Spec.Permissions = &permissions
+			body := util.MustPrettyJSON(patch)
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodPatch, "/actors/"+actor.Id.String(), bytes.NewBufferString(body))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp actorschema.Actor
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, permissions, resp.Spec.Permissions)
+
+			emptyPermissions := []aschema.Permission{}
+			patch = actorschema.NewActorPatch()
+			patch.Spec.Permissions = &emptyPermissions
+			body = util.MustPrettyJSON(patch)
+			w = httptest.NewRecorder()
+			req, err = http.NewRequest(http.MethodPatch, "/actors/"+actor.Id.String(), bytes.NewBufferString(body))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			updatedActor, err := tu.Db.GetActor(context.Background(), actor.Id)
+			require.NoError(t, err)
+			require.Empty(t, updatedActor.Permissions)
+		})
+
+		t.Run("bad request - invalid permission", func(t *testing.T) {
+			permissions := []aschema.Permission{{Namespace: "root", Resources: []string{"connections"}, Verbs: []string{}}}
+			patch := actorschema.NewActorPatch()
+			patch.Spec.Permissions = &permissions
+			body := util.MustPrettyJSON(patch)
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodPatch, "/actors/"+a.Id.String(), bytes.NewBufferString(body))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code)
+			require.Contains(t, w.Body.String(), "at least one permissions verb is required")
+		})
+
 		t.Run("success - labels unchanged", func(t *testing.T) {
 			// First add some labels
 			actorWithLabels := createActor(t, tu.Db, "actor-to-leave-labels", "root")
@@ -1080,6 +1150,32 @@ func TestActorsRoutes(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, "staging", updatedActor.Labels["env"])
 			require.Equal(t, "v2", updatedActor.Labels["version"])
+		})
+
+		t.Run("success - update permissions", func(t *testing.T) {
+			actor := createActor(t, tu.Db, "update-ext-actor-permissions", "root")
+			permissions := []aschema.Permission{
+				{
+					Namespace: "root.tenant.**",
+					Resources: []string{"connections"},
+					Verbs:     []string{"proxy"},
+				},
+			}
+			patch := actorschema.NewActorPatch()
+			patch.Spec.Permissions = &permissions
+			body := util.MustPrettyJSON(patch)
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodPatch, "/actors/external-id/"+actor.ExternalId, bytes.NewBufferString(body))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp actorschema.Actor
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, permissions, resp.Spec.Permissions)
 		})
 
 		t.Run("success - update in different namespace", func(t *testing.T) {

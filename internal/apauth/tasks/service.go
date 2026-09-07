@@ -37,8 +37,9 @@ type Service interface {
 	// This is typically called at startup when ConfiguredActorsList is configured.
 	SyncActorList(ctx context.Context) error
 
-	// SyncConfiguredActorsExternalSource synchronizes actors from ConfiguredActorsExternalSource configuration to the database.
-	// This is typically called periodically via cron when ConfiguredActorsExternalSource is configured.
+	// SyncConfiguredActorsExternalSource synchronizes actors from namespaced
+	// external-source configuration to the database. This is
+	// typically called periodically via cron.
 	SyncConfiguredActorsExternalSource(ctx context.Context) error
 }
 

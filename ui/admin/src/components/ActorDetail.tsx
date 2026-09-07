@@ -4,42 +4,23 @@ import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
 import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
-import Chip from '@mui/material/Chip';
 import IconButton from '@mui/material/IconButton';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import Menu from '@mui/material/Menu';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
 import dayjs from 'dayjs';
-import Tooltip from '@mui/material/Tooltip';
 import {API_VERSION, ACTOR_KIND, Actor, actors} from '@authproxy/api';
 import AnnotationsEditor from "./AnnotationsEditor";
+import ActorPermissionsEditor from './ActorPermissionsEditor';
 import ResourceNameEditor from './ResourceNameEditor';
+import ResourceIdentifier from './ResourceIdentifier';
+import ResourceMetadataMenuItems from './ResourceMetadataMenuItems';
+import {ResourceLabels, ResourceNamespace} from './ResourceMetadataFields';
 
 export default function ActorDetail({actorId}: { actorId: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actor, setActor] = useState<Actor | null>(null);
-
-  const [copied, setCopied] = useState(false);
-  const handleCopyId = async () => {
-    try {
-      await navigator.clipboard.writeText(actor?.metadata.id || '');
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch (_e: any) {
-      // ignore
-    }
-  };
-
-  const fetchActor = () => {
-    setLoading(true);
-    setError(null);
-    actors.getById(actorId)
-      .then(res => setActor(res.data))
-      .catch(err => {
-        const msg = err?.response?.data?.error || err.message || 'Failed to load actor';
-        setError(msg);
-      })
-      .finally(() => setLoading(false));
-  };
+  const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -65,9 +46,44 @@ export default function ActorDetail({actorId}: { actorId: string }) {
   if (error) return (<Alert severity="error">{error}</Alert>);
   if (!actor) return null;
 
+  const closeMenu = () => setMenuAnchorEl(null);
+
   return (
     <Stack spacing={2} sx={{p: 2}}>
-      <Typography variant="h5">Actor</Typography>
+      <Stack direction="row" justifyContent="space-between" alignItems="center">
+        <Typography variant="h5">Actor</Typography>
+        <IconButton aria-label="actions" onClick={(event) => setMenuAnchorEl(event.currentTarget)} size="small">
+          <MoreVertIcon/>
+        </IconButton>
+        <Menu anchorEl={menuAnchorEl} open={Boolean(menuAnchorEl)} onClose={closeMenu} keepMounted>
+          <ResourceMetadataMenuItems
+            resource="actor"
+            name={actor.metadata.name}
+            labels={actor.metadata.labels}
+            annotations={actor.metadata.annotations}
+            onCloseMenu={closeMenu}
+            includeRename={false}
+            onUpdateLabels={async (labels) => {
+              const response = await actors.update(actor.metadata.id, {
+                apiVersion: API_VERSION,
+                kind: ACTOR_KIND,
+                metadata: {labels},
+                spec: {},
+              });
+              setActor(response.data);
+            }}
+            onUpdateAnnotations={async (annotations) => {
+              const response = await actors.update(actor.metadata.id, {
+                apiVersion: API_VERSION,
+                kind: ACTOR_KIND,
+                metadata: {annotations},
+                spec: {},
+              });
+              setActor(response.data);
+            }}
+          />
+        </Menu>
+      </Stack>
 
       <ResourceNameEditor
         name={actor.metadata.name}
@@ -83,43 +99,28 @@ export default function ActorDetail({actorId}: { actorId: string }) {
         }}
       />
 
-      <Box>
-        <Typography variant="subtitle2" color="text.secondary">ID</Typography>
-        <Stack direction="row" spacing={1} alignItems="center" sx={{mt: 0.5}}>
-          <Typography
-            variant="body1"
-            component="code"
-            sx={{
-              wordBreak: 'break-all',
-              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Roboto Mono", monospace',
-              bgcolor: 'action.hover',
-              px: 1,
-              py: 0.5,
-              borderRadius: 0.5,
-              fontSize: '0.9rem',
-              letterSpacing: '0.02em',
-            }}
-          >
-            {actor.metadata.id}
-          </Typography>
-          <Tooltip title={copied ? 'Copied!' : 'Copy'} placement="top">
-            <IconButton size="small" aria-label="Copy actor id" onClick={handleCopyId}>
-              <ContentCopyIcon fontSize="inherit" />
-            </IconButton>
-          </Tooltip>
-        </Stack>
-      </Box>
+      <ResourceIdentifier value={actor.metadata.id} copyLabel="Copy actor id"/>
 
       <Stack direction={{xs: 'column', sm: 'row'}} spacing={4}>
         <Box>
           <Typography variant="subtitle2" color="text.secondary">External ID</Typography>
           <Typography variant="body1">{actor.spec.externalId}</Typography>
         </Box>
-        <Box>
-          <Typography variant="subtitle2" color="text.secondary">Namespace</Typography>
-          <Typography variant="body1">{actor.metadata.namespace}</Typography>
-        </Box>
+        <ResourceNamespace namespace={actor.metadata.namespace}/>
       </Stack>
+
+      <ActorPermissionsEditor
+        permissions={actor.spec.permissions}
+        onSave={async (permissions) => {
+          const response = await actors.update(actor.metadata.id, {
+            apiVersion: API_VERSION,
+            kind: ACTOR_KIND,
+            metadata: {},
+            spec: {permissions},
+          });
+          setActor(response.data);
+        }}
+      />
 
       <Stack direction={{xs: 'column', sm: 'row'}} spacing={4}>
         <Box>
@@ -132,43 +133,13 @@ export default function ActorDetail({actorId}: { actorId: string }) {
         </Box>
       </Stack>
 
-      <Box>
-        <Typography variant="subtitle2" color="text.secondary">Labels</Typography>
-        {actor.metadata.labels && Object.keys(actor.metadata.labels).length > 0 ? (
-          <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{mt: 0.5}}>
-            {Object.entries(actor.metadata.labels).map(([key, value]) => (
-              <Chip key={key} label={`${key}: ${value}`} size="small" variant="outlined"/>
-            ))}
-          </Stack>
-        ) : (
-          <Typography variant="body2" color="text.secondary">No labels</Typography>
-        )}
-      </Box>
+      <ResourceLabels labels={actor.metadata.labels}/>
 
       <AnnotationsEditor
         annotations={actor.metadata.annotations}
-        onPut={async (key, value) => {
-          await actors.update(actor.metadata.id, {
-            apiVersion: API_VERSION,
-            kind: ACTOR_KIND,
-            metadata: {
-              annotations: {...actor.metadata.annotations, [key]: value},
-            },
-            spec: {},
-          });
-          fetchActor();
-        }}
-        onDelete={async (key) => {
-          const annotations = {...actor.metadata.annotations};
-          delete annotations[key];
-          await actors.update(actor.metadata.id, {
-            apiVersion: API_VERSION,
-            kind: ACTOR_KIND,
-            metadata: {annotations},
-            spec: {},
-          });
-          fetchActor();
-        }}
+        readOnly
+        onPut={async () => {}}
+        onDelete={async () => {}}
       />
     </Stack>
   );

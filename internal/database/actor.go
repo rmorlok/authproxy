@@ -12,6 +12,7 @@ import (
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/hashicorp/go-multierror"
+	apauthcore "github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/encfield"
@@ -292,9 +293,9 @@ func (a *Actor) validate() error {
 		result = multierror.Append(result, errors.New("actor external id is empty"))
 	}
 
+	permissionActor := apauthcore.CreateActor(a)
 	for i, p := range a.Permissions {
-		err := p.Validate()
-		if err != nil {
+		if err := apauthcore.ValidatePermissionForActor(permissionActor, p); err != nil {
 			result = multierror.Append(result, fmt.Errorf("actor permission %d is invalid: %w", i, err))
 		}
 	}
@@ -547,7 +548,8 @@ func (s *service) UpsertActor(ctx context.Context, d IActorData) (*Actor, error)
 			return err
 		}
 
-		if !existingActor.sameAsData(d) {
+		needsUpdate := !existingActor.sameAsData(d)
+		if needsUpdate {
 			// Preserve apxy/ system labels — setFromData replaces Labels
 			// wholesale with the data's labels. Snapshot the existing labels
 			// first so MergeUpsertLabels can carry forward stored apxy/ values
@@ -558,11 +560,14 @@ func (s *service) UpsertActor(ctx context.Context, d IActorData) (*Actor, error)
 			existingActor.setFromData(d)
 			existingActor.normalize()
 			existingActor.Labels = MergeUpsertLabels(existingActor.Labels, existingLabelsSnapshot)
-			validationErr := existingActor.validate()
-			if validationErr != nil {
-				return validationErr
-			}
+		}
 
+		validationErr := existingActor.validate()
+		if validationErr != nil {
+			return validationErr
+		}
+
+		if needsUpdate {
 			existingActor.UpdatedAt = apctx.GetClock(ctx).Now()
 
 			dbResult, err := s.sq.

@@ -33,12 +33,12 @@ What can go wrong, ordered by validation:
    Two AuthProxy instances share Redis and happen to allocate the
    same actor id in different namespaces, or a state envelope is
    constructed via a process that picks an actor id colliding with
-   the caller. The actor-id check passes, but `s.Namespace !=
+   the caller. The actor-id check passes, but `s.ActorNamespace !=
    actor.GetNamespace()` fires `namespace_mismatch_actor`. This is a
    guard against the actor-id-uniqueness assumption breaking.
 
 3. **State pointing at a connection in the wrong tenant (case 7).**
-   A state envelope claims namespace X (matching the caller's), but
+   A state envelope claims actor namespace X (matching the caller's), but
    `state.ConnectionId` points at a connection that lives in
    namespace Y. The actor-id and actor-namespace checks both pass,
    but the connection-namespace check fires
@@ -48,13 +48,13 @@ What can go wrong, ordered by validation:
 
 ## Validation order in production
 
-`internal/auth_methods/oauth2/state.go:191–242` runs these checks in
+`getOAuth2State` in `internal/auth_methods/oauth2/state.go` runs these checks in
 sequence, returning on the first failure:
 
 1. `s.ActorId != actor.GetId()` → `actor_mismatch`
-2. `s.Namespace != actor.GetNamespace()` → `namespace_mismatch_actor`
+2. `s.ActorNamespace != actor.GetNamespace()` → `namespace_mismatch_actor`
 3. Load connection from DB
-4. `s.Namespace != connection.GetNamespace()` → `namespace_mismatch_connection`
+4. `s.ConnectionNamespace != connection.GetNamespace()` → `namespace_mismatch_connection`
 
 The earliest-failing check is the one that fires. Test 1 below
 exercises check 1 in a multi-tenant context; tests 2 and 3 exercise
@@ -75,26 +75,24 @@ For every test:
 - **Provider observed zero `/token` calls.** The token exchange
   path was short-circuited by state validation.
 
-## Test 1 — `TestCallbackRejection_CrossNamespace` (chromedp)
+## Test 1 — `TestCallbackRejection_CrossNamespace` (session cookie)
 
 Bug-bounty shape, multi-tenant flavor. Drives the victim leg through
-chromedp + the marketplace SPA bootstrap so the test mirrors the
-attacker-sends-link-to-victim delivery vector.
+the public session endpoint with a cookie jar so the callback is delivered
+with the same `SESSION-ID` cookie a browser would carry.
 
 | Step | Action |
 | ---- | ------ |
 | Setup | Create namespaces `root.tenant-a-<suffix>`, `root.tenant-b-<suffix>`. |
-| Attacker | Alice (externalId = `user-123-<suffix>`) initiates in tenant-a. State has `Namespace=tenant-a`, `ActorId=act_alice`. |
+| Attacker | Alice (externalId = `user-123-<suffix>`) initiates in tenant-a. State has `ActorNamespace=tenant-a`, `ConnectionNamespace=tenant-a`, `ActorId=act_alice`. |
 | Provider | `/test/authorize` issues a code under alice's stateId. |
-| Victim | Bob (externalId = `user-123-<suffix>`, same as alice) bootstraps via `/connectors?authToken=<bob>` in tenant-b. Browser holds `SESSION-ID` cookie scoped to bob. |
-| Forge | Browser navigates to the cross-tenant callback URL. |
+| Victim | Bob (externalId = `user-123-<suffix>`, same as alice) exchanges his tenant-b bearer token at `/session/_initiate`. The cookie jar holds the resulting `SESSION-ID` cookie scoped to bob. |
+| Forge | The cookie-aware client requests the cross-tenant callback URL. |
 | Reject | Public service identifies bob (act_bob in tenant-b); `s.ActorId (act_alice) != act_bob` → `actor_mismatch`. |
 
-**Why chromedp:** the saved feedback (cross-actor / cross-tenant
-tests prefer chromedp) applies — this is the realistic delivery
-vector for the bug-bounty submission shape. Direct-HTTP would
-exercise the same `state.ActorId` check but wouldn't mirror how the
-attack actually shows up.
+**Why a cookie jar:** the test still exercises the production session exchange
+and callback cookie path, without assuming a tenant-b actor can list the
+root-scoped connector in the marketplace UI.
 
 ## Test 2 — `TestCallbackRejection_NamespaceMismatchActor` (synthetic state, direct HTTP)
 
@@ -108,9 +106,9 @@ assumption breaks.
 | Setup | Create namespace `root.tenant-a-<suffix>`. |
 | Real initiate | Alice initiates in tenant-a so a real connection row exists. |
 | Lookup | Read alice's actor id via `env.Db.GetActorByExternalId(ctx, tenant-a, alice)`. |
-| Inject | `env.WriteOAuth2StateForTest` at a fresh `forgedStateID` with `ActorId=alice.Id`, `ConnectionId=conn.Id`, but `Namespace="root.tenant-b-<suffix>"` (lie). |
+| Inject | `env.WriteOAuth2StateForTest` at a fresh `forgedStateID` with `ActorId=alice.Id`, `ConnectionId=conn.Id`, valid `ConnectionNamespace=tenant-a`, but `ActorNamespace="root.tenant-b-<suffix>"` (lie). |
 | Deliver | `env.DeliverOAuth2Callback(callback, helpers.WithActor(alice, tenant-a))`. |
-| Reject | `s.ActorId == caller.Id` ✓, `s.Namespace ("tenant-b") != caller.Namespace ("tenant-a")` → `namespace_mismatch_actor`. |
+| Reject | `s.ActorId == caller.Id` ✓, `s.ActorNamespace ("tenant-b") != caller.Namespace ("tenant-a")` → `namespace_mismatch_actor`. |
 
 **Why direct HTTP:** the scenario hinges on programmatic state
 injection — there is no realistic browser-driven path to land a
@@ -129,9 +127,9 @@ different tenant.
 | Setup | Create namespaces `root.tenant-a-<suffix>`, `root.tenant-b-<suffix>`. |
 | Bob's connection | Bob initiates in tenant-b so a real connection row exists in tenant-b. |
 | Materialize alice | Alice initiates a throwaway connection in tenant-a so her actor row exists; we discard the connection id. |
-| Inject | Synthetic state: `Namespace=tenant-a`, `ActorId=alice.Id`, `ConnectionId=bob.Conn.Id` (in tenant-b). |
+| Inject | Synthetic state: `ActorNamespace=tenant-a`, `ConnectionNamespace=tenant-a`, `ActorId=alice.Id`, `ConnectionId=bob.Conn.Id` (in tenant-b). |
 | Deliver | `env.DeliverOAuth2Callback(callback, helpers.WithActor(alice, tenant-a))`. |
-| Reject | `s.ActorId == caller.Id` ✓, `s.Namespace == caller.Namespace` ✓, connection lookup returns bob's connection in tenant-b, `s.Namespace ("tenant-a") != connection.Namespace ("tenant-b")` → `namespace_mismatch_connection`. |
+| Reject | `s.ActorId == caller.Id` ✓, `s.ActorNamespace == caller.Namespace` ✓, connection lookup returns bob's connection in tenant-b, `s.ConnectionNamespace ("tenant-a") != connection.Namespace ("tenant-b")` → `namespace_mismatch_connection`. |
 
 **Why bob's connection isn't modified:** the rejection happens
 before any token exchange, so neither alice nor bob accumulates a
@@ -145,19 +143,19 @@ data even when the forgery names the victim's connection id.
 | -------------------------------------------------------- | ---------------- |
 | `env.Core.CreateNamespace(ctx, "root.tenant-x-…", nil)`  | Pre-creates child namespaces for multi-tenant tests. |
 | `env.InitiateOAuth2Connection(t, …, helpers.WithActor(ext, ns))` | Initiates as a named actor in a named namespace; sets `IntoNamespace` so the connection lives in the actor's tenant. |
-| `env.PublicAuthUtil.GenerateBearerToken(ctx, ext, ns, perms)` | Mints a JWT for any namespace; used to bootstrap the chromedp marketplace session. |
+| `env.PublicAuthUtil.GenerateBearerToken(ctx, ext, ns, perms)` | Mints a JWT for any namespace; used to establish the victim's public session. |
 | `env.WriteOAuth2StateForTest(t, OAuth2StateForTest{…}, ttl)` | Encrypts a synthetic state envelope via `env.DM.GetEncryptService().EncryptGlobal` and writes it to Redis at `oauth2:state:<id>`. The shape of `OAuth2StateForTest` mirrors the unexported production `state` struct. |
 | `env.DeliverOAuth2Callback(t, url, helpers.WithActor(ext, ns))` | Delivers the callback signed as a specific actor in a specific namespace; mirrors the JWT a real browser session would carry. |
 | `logCapture.RecordsWithMessage(t, rejectionEventMessage)` | Surfaces the structured rejection event for category assertions. |
 
-## Sequence — Test 1 (chromedp)
+## Sequence — Test 1 (session cookie)
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant T as Test
     participant ATK as Alice (tenant-a)
-    participant VIC as Bob's browser<br/>(chromedp, tenant-b)
+    participant VIC as Bob's cookie-aware client<br/>(tenant-b)
     participant PUB as Public service
     participant API as API service
     participant DB as Postgres
@@ -165,16 +163,17 @@ sequenceDiagram
     participant P as OAuth provider
 
     T->>API: POST /api/v1/connections/_initiate (signed alice@tenant-a, IntoNamespace=tenant-a)
-    API->>R: write encrypted state<br/>(ActorId=act_alice, Namespace=tenant-a)
+    API->>R: write encrypted state<br/>(ActorId=act_alice, ActorNamespace=tenant-a,<br/>ConnectionNamespace=tenant-a)
     API->>DB: insert connection in tenant-a
 
     T->>P: POST /test/authorize (decision=approve)
     P-->>T: redirect URL with code + state_id
 
-    T->>VIC: navigate /connectors?authToken=<bob@tenant-b>
-    VIC->>PUB: SPA bootstrap → SESSION-ID cookie for bob@tenant-b
+    T->>VIC: configure bearer token for bob@tenant-b
+    VIC->>PUB: POST /session/_initiate
+    PUB-->>VIC: SESSION-ID cookie for bob@tenant-b
 
-    T->>VIC: navigate /oauth2/callback?state=…&code=…
+    T->>VIC: request /oauth2/callback?state=…&code=…
     VIC->>PUB: GET /oauth2/callback (carries bob's cookie)
     PUB->>R: GET state envelope
     PUB->>PUB: s.ActorId(act_alice) ≠ caller(act_bob)

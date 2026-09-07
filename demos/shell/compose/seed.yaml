@@ -1,0 +1,56 @@
+namespaces:
+  - apiVersion: authproxy.net/v1alpha1
+    kind: Namespace
+    metadata:
+      name: demo
+      namespace: root
+      labels:
+        demo: "true"
+    spec: {}
+actors:
+  - apiVersion: authproxy.net/v1alpha1
+    kind: Actor
+    metadata:
+      name: demo-user
+      namespace: root.demo
+      labels:
+        demo: "true"
+        role: user
+    spec:
+      externalId: demo-user
+      permissions:
+        - namespace: root.demo
+          resources:
+            - connectors
+          verbs:
+            - list
+        - namespace: root.demo.{{external_id}}
+          resources:
+            - connections
+          verbs:
+            - create
+            - list
+            - get
+            - update
+            - disconnect
+connectors:
+  - apiVersion: authproxy.net/v1alpha1
+    kind: Connector
+    metadata:
+      name: demo-compose-noauth
+      namespace: root.demo
+      labels:
+        demo.authproxy.net/seed-key: demo-compose-noauth
+        auth_method: no_auth
+        demo: "true"
+        showcase: local-compose
+        type: demo-compose-noauth
+    spec:
+      release:
+        desiredState: primary
+      definition:
+        displayName: Demo Compose NoAuth
+        description: A local no-auth connector for exercising the demo Marketplace.
+        highlight: Connect without third-party credentials.
+        auth:
+          type: no-auth

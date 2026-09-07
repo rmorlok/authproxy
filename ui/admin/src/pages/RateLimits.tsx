@@ -21,7 +21,7 @@ import Alert from '@mui/material/Alert';
 import TextField from '@mui/material/TextField';
 import {
     listRateLimits, RateLimit, RateLimitMode, RateLimitSpec,
-    RateLimitList, ListRateLimitsParams, namespaceAndChildren,
+    RateLimitList, ListRateLimitsParams,
     createRateLimit, updateRateLimit, CreateRateLimitRequest,
     API_VERSION, RATE_LIMIT_KIND,
 } from '@authproxy/api';
@@ -31,8 +31,9 @@ import dayjs from 'dayjs';
 import {useQueryState, parseAsInteger, parseAsStringLiteral, parseAsString} from 'nuqs'
 import {useNavigate} from "react-router-dom";
 import {useSelector} from "react-redux";
-import {selectCurrentNamespacePath} from "../store/namespacesSlice";
+import {selectCurrentNamespaceMatcher, selectCurrentNamespacePath} from "../store/namespacesSlice";
 import {toSnakeCase} from '../util';
+import {ResourceLabelChips} from '../components/ResourceMetadataFields';
 
 // Summarise the algorithm variant in one short string. Keeps the column
 // scannable instead of showing the full JSON.
@@ -86,6 +87,7 @@ export default function RateLimits() {
     const navigate = useNavigate();
     const modeVals = useMemo(() => modeOptions.map(opt => opt.value), [modeOptions]);
     const ns = useSelector(selectCurrentNamespacePath);
+    const namespaceMatcher = useSelector(selectCurrentNamespaceMatcher);
 
     const [rows, setRows] = useState<RateLimit[]>([]);
     const [rowCount, setRowCount] = useState<number>(-1);
@@ -169,7 +171,7 @@ export default function RateLimits() {
                 const prevResp = responsesCacheRef.current[responsesCacheRef.current.length - 1];
 
                 const params: ListRateLimitsParams = prevResp?.metadata.continue ? {cursor: prevResp.metadata.continue} : {
-                    namespace: namespaceAndChildren(ns),
+                    namespace: namespaceMatcher,
                     orderBy: sort || undefined,
                     limit: pageSize,
                 };
@@ -211,7 +213,7 @@ export default function RateLimits() {
     useEffect(() => {
         resetPagination();
         fetchPage(1);
-    }, [ns, pageSize, sort, modeFilter]);
+    }, [namespaceMatcher, pageSize, sort, modeFilter]);
 
     useEffect(() => {
         fetchPage(page);
@@ -373,6 +375,15 @@ export default function RateLimits() {
             minWidth: 110,
             sortable: false,
             valueGetter: (_value, row) => row.metadata.namespace,
+        },
+        {
+            field: 'labels',
+            headerName: 'Labels',
+            flex: 0.7,
+            minWidth: 140,
+            sortable: false,
+            valueGetter: (_value, row) => row.metadata.labels,
+            renderCell: (params) => <ResourceLabelChips labels={params.value as Record<string, string> | undefined}/>,
         },
         {
             field: 'createdAt',

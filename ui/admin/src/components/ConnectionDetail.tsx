@@ -43,6 +43,7 @@ import ResourceIdentifier from './ResourceIdentifier';
 import ResourceMetadataMenuItems from './ResourceMetadataMenuItems';
 import AnnotationsEditor from "./AnnotationsEditor";
 import ResourceNameEditor from './ResourceNameEditor';
+import {ResourceLabels, ResourceNamespace} from './ResourceMetadataFields';
 
 const CONNECTION_MIGRATION_TIMEOUT_SECONDS = 600;
 
@@ -453,6 +454,7 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
       <ResourceIdentifier value={conn.metadata.id} copyLabel="Copy connection id"/>
 
       <Stack direction={{xs: 'column', sm: 'row'}} spacing={4}>
+        <ResourceNamespace namespace={conn.metadata.namespace}/>
         <Box>
           <Typography variant="subtitle2" color="text.secondary">Created</Typography>
           <Typography variant="body1">{dayjs(conn.metadata.createdAt).format('MMM DD, YYYY, h:mm A')}</Typography>
@@ -482,18 +484,7 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
               </Link>
             </Typography>
           </Box>
-          <Box>
-            <Typography variant="subtitle2" color="text.secondary">Labels</Typography>
-            {connector?.metadata.labels && Object.keys(connector.metadata.labels).length > 0 ? (
-              <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{ mt: 0.5 }}>
-                {Object.entries(connector.metadata.labels).map(([key, value]) => (
-                  <Chip key={key} label={`${key}: ${value}`} size="small" variant="outlined" />
-                ))}
-              </Stack>
-            ) : (
-              <Typography variant="body2" color="text.secondary">No labels</Typography>
-            )}
-          </Box>
+          <ResourceLabels labels={connector?.metadata.labels}/>
           <Box>
             <Typography variant="subtitle2" color="text.secondary">Version</Typography>
             <Typography variant="body1">
@@ -505,18 +496,7 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
         </Stack>
       </Box>
 
-      <Box>
-        <Typography variant="subtitle2" color="text.secondary">Labels</Typography>
-        {conn.metadata.labels && Object.keys(conn.metadata.labels).length > 0 ? (
-          <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{mt: 0.5}}>
-            {Object.entries(conn.metadata.labels).map(([key, value]) => (
-              <Chip key={key} label={`${key}: ${value}`} size="small" variant="outlined"/>
-            ))}
-          </Stack>
-        ) : (
-          <Typography variant="body2" color="text.secondary">No labels</Typography>
-        )}
-      </Box>
+      <ResourceLabels labels={conn.metadata.labels}/>
 
       <AnnotationsEditor annotations={conn.metadata.annotations} readOnly onPut={async () => {}} onDelete={async () => {}}/>
 

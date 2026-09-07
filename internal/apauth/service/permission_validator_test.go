@@ -206,6 +206,7 @@ func TestResourcePermissionValidator_Validate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			validator := &ResourcePermissionValidator{
 				ra: core.NewAuthenticatedRequestAuth(&core.Actor{
+					Namespace:   "root",
 					Permissions: tt.permissions,
 				}),
 				pvb: &PermissionValidatorBuilder{
@@ -407,6 +408,7 @@ func TestGetEffectiveNamespaceMatchers(t *testing.T) {
 			var ra *core.RequestAuth
 			if tt.authenticated {
 				ra = core.NewAuthenticatedRequestAuth(&core.Actor{
+					Namespace:   "root",
 					Permissions: tt.permissions,
 				})
 			} else {
@@ -488,6 +490,7 @@ func TestGetEffectiveNamespaceMatchers_MultiVerb(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ra := core.NewAuthenticatedRequestAuth(&core.Actor{
+				Namespace:   "root",
 				Permissions: tt.permissions,
 			})
 
@@ -577,6 +580,7 @@ func TestFilterForValidatedResources(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ra := core.NewAuthenticatedRequestAuth(&core.Actor{
+				Namespace:   "root",
 				Permissions: tt.permissions,
 			})
 

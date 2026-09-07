@@ -11,7 +11,8 @@ import {
   ConnectionState,
   Connector,
 } from '@authproxy/api';
-import theme from '../theme';
+import { createMarketplaceTheme } from '../theme';
+import { MarketplaceColorMode } from '../marketplaceConfig';
 import Layout from '../components/Layout';
 import ConnectorDetail from '../components/ConnectorDetail';
 import ConnectorList from '../components/ConnectorList';
@@ -171,15 +172,18 @@ const baseNotificationsState = {
 
 function MarketplaceStory({
   route,
+  colorMode = 'light',
   connectorsState = { items: connectors, status: 'succeeded', error: null },
   connectionsState = baseConnectionsState,
   notificationsState = baseNotificationsState,
 }: {
   route: '/connectors' | '/connector-detail' | '/connections';
+  colorMode?: Exclude<MarketplaceColorMode, 'system'>;
   connectorsState?: Record<string, unknown>;
   connectionsState?: Record<string, unknown>;
   notificationsState?: Record<string, unknown>;
 }) {
+  const theme = React.useMemo(() => createMarketplaceTheme(colorMode), [colorMode]);
   const store = configureStore({
     reducer: combineReducers({
       auth: authReducer,
@@ -200,7 +204,7 @@ function MarketplaceStory({
   return (
     <Provider store={store}>
       <ThemeProvider theme={theme}>
-        <CssBaseline />
+        <CssBaseline enableColorScheme />
         <Routes>
           <Route element={<Layout />}>
             <Route
@@ -249,6 +253,13 @@ export const AvailableConnectors: Story = {
   },
 };
 
+export const AvailableConnectorsDark: Story = {
+  args: {
+    route: '/connectors',
+    colorMode: 'dark',
+  },
+};
+
 export const ConnectorOverview: Story = {
   args: {
     route: '/connector-detail',
@@ -272,6 +283,13 @@ export const AvailableConnectorsLoading: Story = {
 export const ConnectionsPopulated: Story = {
   args: {
     route: '/connections',
+  },
+};
+
+export const ConnectionsPopulatedDark: Story = {
+  args: {
+    route: '/connections',
+    colorMode: 'dark',
   },
 };
 

@@ -293,7 +293,7 @@ func (pb *parserBuilder) getVerifyingKeyData(ctx context.Context, unverified *Au
 func (pb *parserBuilder) ParseCtx(ctx context.Context, token string) (*AuthProxyClaims, error) {
 	if pb.secretKeyPath == nil && pb.secretKeyData == nil &&
 		pb.publicKeyData == nil && pb.publicKeyPath == nil &&
-		pb.keySelector == nil {
+		pb.keySelector == nil && pb.key == nil {
 		return nil, errors.New("key material must be specified in some form")
 	}
 

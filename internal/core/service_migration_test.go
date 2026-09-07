@@ -22,6 +22,7 @@ import (
 	hmock "github.com/rmorlok/authproxy/internal/httpf/mock"
 	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	cfgschema "github.com/rmorlok/authproxy/internal/schema/config"
+	actorschema "github.com/rmorlok/authproxy/internal/schema/resources/actor"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
@@ -244,6 +245,36 @@ func TestMigration(t *testing.T) {
 		})
 
 		t.Run("names reconcile connector identity", func(t *testing.T) {
+			t.Run("annotation changes preserve the generated connector id", func(t *testing.T) {
+				cleanup := setup(t, []configuredConnector{{
+					Name:        "configured",
+					Labels:      map[string]string{"type": "test"},
+					Annotations: map[string]string{"example.com/owner": "before@example.com"},
+					DisplayName: "Configured connector",
+				}})
+				defer cleanup()
+
+				require.NoError(t, service.MigrateConnectors(context.Background()))
+				first := db.ListConnectorsBuilder().ForName("configured").FetchPage(context.Background())
+				require.NoError(t, first.Error)
+				require.Len(t, first.Results, 1)
+				generatedID := first.Results[0].Id
+				require.Equal(t, "before@example.com", first.Results[0].Annotations["example.com/owner"])
+
+				cfg.GetRoot().Connectors.LoadFromList[0].Metadata.Annotations["example.com/owner"] = "after@example.com"
+				require.NoError(t, service.MigrateConnectors(context.Background()))
+
+				result := db.ListConnectorsBuilder().ForName("configured").FetchPage(context.Background())
+				require.NoError(t, result.Error)
+				require.Len(t, result.Results, 1)
+				require.Equal(t, generatedID, result.Results[0].Id)
+				require.Equal(t, "after@example.com", result.Results[0].Annotations["example.com/owner"])
+
+				versions := db.ListConnectorDefinitionVersionsBuilder().ForId(generatedID).FetchPage(context.Background())
+				require.NoError(t, versions.Error)
+				require.Len(t, versions.Results, 1, "metadata-only changes must not create a connector generation")
+			})
+
 			t.Run("label changes preserve the generated connector id", func(t *testing.T) {
 				cleanup := setup(t, []configuredConnector{{
 					Name:        "configured",
@@ -2031,6 +2062,31 @@ func TestMigration(t *testing.T) {
 					{Id: "cxr_test0000000000099", Version: 1, State: "primary"},
 				})
 			})
+		})
+	})
+
+	t.Run("namespaces", func(t *testing.T) {
+		t.Run("includes configured actor namespaces", func(t *testing.T) {
+			cleanup := setup(t, []configuredConnector{})
+			defer cleanup()
+
+			actor := actorschema.NewActor()
+			actor.Metadata.Namespace = "root.smoke"
+			actor.Spec.ExternalId = "smoke-user"
+			actor.Spec.SigningKey = &cfgschema.Key{
+				InnerVal: &cfgschema.KeyShared{
+					SharedKey: &cfgschema.KeyData{
+						InnerVal: &cfgschema.KeyDataBase64Val{Base64: "dGVzdA=="},
+					},
+				},
+			}
+			cfg.GetRoot().SystemAuth.Actors = &cfgschema.ConfiguredActors{
+				InnerVal: cfgschema.ConfiguredActorsList{actor},
+			}
+
+			require.NoError(t, service.Migrate(context.Background()))
+			_, err := db.GetNamespace(context.Background(), "root.smoke")
+			require.NoError(t, err)
 		})
 	})
 }

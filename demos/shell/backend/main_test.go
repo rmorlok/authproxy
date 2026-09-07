@@ -4,10 +4,114 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/google/uuid"
+	authjwt "github.com/rmorlok/authproxy/internal/apauth/jwt"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/stretchr/testify/require"
 )
+
+func TestActorExternalID(t *testing.T) {
+	t.Run("keeps well-known actor external IDs stable", func(t *testing.T) {
+		require.Equal(t, "demo-admin", actorExternalID("demo-admin"))
+		require.Equal(t, "demo-user", actorExternalID("demo-user"))
+	})
+
+	t.Run("generates a new external ID for every fresh user", func(t *testing.T) {
+		first := actorExternalID(freshUserSelection)
+		second := actorExternalID(freshUserSelection)
+
+		require.NotEqual(t, first, second)
+		for _, externalID := range []string{first, second} {
+			suffix, found := strings.CutPrefix(externalID, freshUserSelection+"-")
+			require.True(t, found)
+			require.NoError(t, uuid.Validate(suffix))
+		}
+	})
+}
+
+func testKeyPaths() (privateKeyPath, publicKeyPath string) {
+	keyDir := filepath.Join("..", "..", "..", "test_data", "admin_user_keys")
+	return filepath.Join(keyDir, "bobdole"), filepath.Join(keyDir, "bobdole.pub")
+}
+
+func parseTestToken(t *testing.T, token string) *authjwt.AuthProxyClaims {
+	t.Helper()
+	_, publicKeyPath := testKeyPaths()
+	claims, err := authjwt.NewJwtTokenParserBuilder().
+		WithPublicKeyPath(publicKeyPath).
+		Parse(token)
+	require.NoError(t, err)
+	return claims
+}
+
+func TestSignAdminTokenUsesSelfSigningIdentity(t *testing.T) {
+	privateKeyPath, _ := testKeyPaths()
+	token, err := signAdminToken(settings{
+		adminUsername:       "demo-admin",
+		adminPrivateKeyPath: privateKeyPath,
+		tokenTtl:            time.Minute,
+	})
+	require.NoError(t, err)
+
+	claims := parseTestToken(t, token)
+	require.Equal(t, "demo-admin", claims.Subject)
+	require.Equal(t, "root", claims.GetNamespace())
+	require.True(t, claims.ActorSigned)
+	require.Nil(t, claims.Actor)
+	require.Empty(t, claims.Permissions)
+}
+
+func TestSignTokenForDemoUserUsesSubjectOnlySystemKeyJWT(t *testing.T) {
+	privateKeyPath, _ := testKeyPaths()
+	token, err := signTokenForDemoUser(settings{
+		jwtPrivateKeyPath: privateKeyPath,
+		tokenTtl:          time.Minute,
+	})
+	require.NoError(t, err)
+
+	claims := parseTestToken(t, token)
+	require.Equal(t, "demo-user", claims.Subject)
+	require.Equal(t, demoNamespace, claims.GetNamespace())
+	require.False(t, claims.ActorSigned)
+	require.False(t, claims.SystemSigned)
+	require.Nil(t, claims.Actor)
+	require.Empty(t, claims.Permissions)
+}
+
+func TestSignTokenForFreshUserIncludesLeastPrivilegeActor(t *testing.T) {
+	externalID := actorExternalID(freshUserSelection)
+	privateKeyPath, _ := testKeyPaths()
+	token, err := signTokenForFreshUser(settings{
+		jwtPrivateKeyPath: privateKeyPath,
+		tokenTtl:          time.Minute,
+	}, externalID)
+	require.NoError(t, err)
+
+	claims := parseTestToken(t, token)
+	require.Equal(t, externalID, claims.Subject)
+	require.False(t, claims.ActorSigned)
+	require.NotNil(t, claims.Actor)
+	require.Equal(t, externalID, claims.Actor.Spec.ExternalId)
+	require.Equal(t, demoNamespace, claims.Actor.Metadata.Namespace)
+	require.Equal(t, map[string]string{"demo": "true", "role": "user"}, claims.Actor.Metadata.Labels)
+	require.Equal(t, []aschema.Permission{
+		{
+			Namespace: demoNamespace,
+			Resources: []string{"connectors"},
+			Verbs:     []string{"list"},
+		},
+		{
+			Namespace: demoNamespace + ".{{external_id}}",
+			Resources: []string{"connections"},
+			Verbs:     []string{"create", "list", "get", "update", "disconnect"},
+		},
+	}, claims.Actor.Spec.Permissions)
+}
 
 func TestLoadTelemetryLinksFromGrafanaBaseURL(t *testing.T) {
 	t.Setenv("AUTHPROXY_GRAFANA_URL", "https://demo.example.test/grafana/")

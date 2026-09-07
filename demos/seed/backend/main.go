@@ -2,14 +2,14 @@
 // against a running AuthProxy admin API. Run as a Helm post-install /
 // post-upgrade hook from the authproxy-demo umbrella chart.
 //
-// Idempotency model: for each desired actor, first GET it by
-// external_id; if AuthProxy returns 404, POST it. For each desired
-// connector, list by its namespace/name identity, create it when absent,
-// or publish a new version when the definition changes. Re-running the
-// seed job is a no-op once the state matches.
+// Idempotency model: namespaces and actors are created when absent and
+// reconciled to the desired state when present. For each desired connector,
+// list by its namespace/name identity, create it when absent, or publish a new
+// generation when the definition changes. Re-running the seed job is a no-op
+// once the state matches.
 //
-// Auth: signs requests as the demo-shell admin actor using the same
-// keypair the demo-shell itself uses. AuthProxy already trusts that
+// Auth: signs requests as the demo-admin actor using the same keypair the
+// demo-shell uses for that actor. AuthProxy already trusts that
 // actor to create/list other actors via the admin-api access scope.
 package main
 
@@ -32,11 +32,13 @@ import (
 	actorschema "github.com/rmorlok/authproxy/internal/schema/resources/actor"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
+	nschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/util"
 )
 
 // SeedConfig is the YAML shape the binary consumes.
 type SeedConfig struct {
+	Namespaces         []nschema.Namespace     `yaml:"namespaces"`
 	Actors             []actorschema.Actor     `yaml:"actors"`
 	OAuth2TestProvider *OAuth2TestProviderSeed `yaml:"oauth2TestProvider"`
 	Connectors         []cschema.Connector     `yaml:"connectors"`
@@ -50,12 +52,14 @@ type OAuth2TestProviderSeed struct {
 	APIKeyResourcePolicies []APIKeyResourcePolicy     `yaml:"apiKeyResourcePolicies,omitempty"`
 }
 
+// The provider control-plane API uses snake_case JSON. The seed file remains
+// camelCase YAML to match the rest of the demo configuration surface.
 type OAuth2TestProviderClient struct {
 	Key                     string `json:"key" yaml:"key"`
 	Secret                  string `json:"secret,omitempty" yaml:"secret,omitempty"`
-	RedirectURI             string `json:"redirectUri,omitempty" yaml:"redirectUri,omitempty"`
-	TokenEndpointAuthMethod string `json:"tokenEndpointAuthMethod,omitempty" yaml:"tokenEndpointAuthMethod,omitempty"`
-	RequirePKCE             bool   `json:"requirePkce,omitempty" yaml:"requirePkce,omitempty"`
+	RedirectURI             string `json:"redirect_uri,omitempty" yaml:"redirectUri,omitempty"`
+	TokenEndpointAuthMethod string `json:"token_endpoint_auth_method,omitempty" yaml:"tokenEndpointAuthMethod,omitempty"`
+	RequirePKCE             bool   `json:"require_pkce,omitempty" yaml:"requirePkce,omitempty"`
 	Scope                   string `json:"scope,omitempty" yaml:"scope,omitempty"`
 }
 
@@ -64,20 +68,20 @@ type OAuth2TestProviderUser struct {
 	Password    string `json:"password,omitempty" yaml:"password,omitempty"`
 	Role        string `json:"role,omitempty" yaml:"role,omitempty"`
 	Email       string `json:"email,omitempty" yaml:"email,omitempty"`
-	DisplayName string `json:"displayName,omitempty" yaml:"displayName,omitempty"`
+	DisplayName string `json:"display_name,omitempty" yaml:"displayName,omitempty"`
 	Sub         string `json:"sub,omitempty" yaml:"sub,omitempty"`
 }
 
 type OAuth2ResourcePolicy struct {
 	Path          string `json:"path" yaml:"path"`
-	RequiredScope string `json:"requiredScope" yaml:"requiredScope"`
+	RequiredScope string `json:"required_scope" yaml:"requiredScope"`
 }
 
 type APIKeyResourcePolicy struct {
 	Path       string `json:"path" yaml:"path"`
 	Key        string `json:"key" yaml:"key"`
 	Placement  string `json:"placement,omitempty" yaml:"placement,omitempty"`
-	HeaderName string `json:"headerName,omitempty" yaml:"headerName,omitempty"`
+	HeaderName string `json:"header_name,omitempty" yaml:"headerName,omitempty"`
 	Prefix     string `json:"prefix,omitempty" yaml:"prefix,omitempty"`
 }
 
@@ -98,6 +102,7 @@ type seedAction string
 const (
 	seedCreated        seedAction = "created"
 	seedAlreadyPresent seedAction = "already-present"
+	seedUpdated        seedAction = "updated"
 )
 
 func mustGetenv(key string) string {
@@ -126,6 +131,11 @@ func loadConfig(path string) (*SeedConfig, error) {
 	var c SeedConfig
 	if err := util.DecodeYAMLStrict(data, &c); err != nil {
 		return nil, fmt.Errorf("parse seed config %q: %w", path, err)
+	}
+	for i := range c.Namespaces {
+		if err := c.Namespaces[i].ValidateFor(meta.ValidationModeCreate, nil); err != nil {
+			return nil, fmt.Errorf("validate seed namespace %d: %w", i, err)
+		}
 	}
 	for i := range c.Actors {
 		if err := c.Actors[i].ValidateFor(meta.ValidationModeCreate, nil); err != nil {
@@ -165,40 +175,152 @@ func newSignedClient(s settings) (*resty.Client, error) {
 	return c, nil
 }
 
-// upsertActor creates the actor if it doesn't already exist by
-// external_id. Returns true when a create was performed, false on
-// no-op.
-func upsertActor(c *resty.Client, baseUrl string, a actorschema.Actor) (created bool, err error) {
-	// GET by external_id (with optional namespace).
-	getReq := c.R().SetHeader("Accept", "application/json")
-	if a.Metadata.Namespace != "" {
-		getReq.SetQueryParam("namespace", a.Metadata.Namespace)
-	}
-	getResp, err := getReq.Get(fmt.Sprintf("%s/api/v1/actors/external-id/%s", baseUrl, a.Spec.ExternalId))
+func upsertNamespace(c *resty.Client, baseURL string, ns nschema.Namespace) (seedAction, error) {
+	path, err := nschema.PathFromMetadata(ns.Metadata)
 	if err != nil {
-		return false, fmt.Errorf("GET actor %q: %w", a.Spec.ExternalId, err)
+		return "", fmt.Errorf("derive namespace path: %w", err)
+	}
+
+	var existing nschema.Namespace
+	getResp, err := c.R().
+		SetHeader("Accept", "application/json").
+		SetResult(&existing).
+		Get(fmt.Sprintf("%s/api/v1/namespaces/%s", baseURL, path))
+	if err != nil {
+		return "", fmt.Errorf("GET namespace %q: %w", path, err)
 	}
 
 	switch getResp.StatusCode() {
 	case http.StatusOK:
-		return false, nil
+		if stringMapsEqual(ns.Metadata.Labels, userLabels(existing.Metadata.Labels)) &&
+			stringMapsEqual(ns.Metadata.Annotations, existing.Metadata.Annotations) {
+			return seedAlreadyPresent, nil
+		}
+		if err := updateNamespace(c, baseURL, ns); err != nil {
+			return "", err
+		}
+		return seedUpdated, nil
 	case http.StatusNotFound:
-		// fall through to create
+		// Create below.
 	default:
-		return false, fmt.Errorf("GET actor %q returned %d: %s", a.Spec.ExternalId, getResp.StatusCode(), getResp.String())
+		return "", fmt.Errorf("GET namespace %q returned %d: %s", path, getResp.StatusCode(), getResp.String())
 	}
 
 	postResp, err := c.R().
 		SetHeader("Content-Type", "application/json").
-		SetBody(a).
-		Post(fmt.Sprintf("%s/api/v1/actors", baseUrl))
+		SetBody(ns).
+		Post(fmt.Sprintf("%s/api/v1/namespaces", baseURL))
 	if err != nil {
-		return false, fmt.Errorf("POST actor %q: %w", a.Spec.ExternalId, err)
+		return "", fmt.Errorf("POST namespace %q: %w", path, err)
 	}
 	if postResp.StatusCode() >= 400 {
-		return false, fmt.Errorf("POST actor %q returned %d: %s", a.Spec.ExternalId, postResp.StatusCode(), postResp.String())
+		return "", fmt.Errorf("POST namespace %q returned %d: %s", path, postResp.StatusCode(), postResp.String())
 	}
-	return true, nil
+	return seedCreated, nil
+}
+
+func updateNamespace(c *resty.Client, baseURL string, ns nschema.Namespace) error {
+	path, err := nschema.PathFromMetadata(ns.Metadata)
+	if err != nil {
+		return fmt.Errorf("derive namespace path: %w", err)
+	}
+	labels := ns.Metadata.Labels
+	if labels == nil {
+		labels = map[string]string{}
+	}
+	annotations := ns.Metadata.Annotations
+	if annotations == nil {
+		annotations = map[string]string{}
+	}
+	patch := nschema.NewNamespacePatch()
+	patch.Metadata.Labels = &labels
+	patch.Metadata.Annotations = &annotations
+
+	patchResp, err := c.R().
+		SetHeader("Content-Type", "application/json").
+		SetBody(patch).
+		Patch(fmt.Sprintf("%s/api/v1/namespaces/%s", baseURL, path))
+	if err != nil {
+		return fmt.Errorf("PATCH namespace %q: %w", path, err)
+	}
+	if patchResp.StatusCode() >= 400 {
+		return fmt.Errorf("PATCH namespace %q returned %d: %s", path, patchResp.StatusCode(), patchResp.String())
+	}
+	return nil
+}
+
+// upsertActor creates the actor if absent and reconciles its mutable state.
+func upsertActor(c *resty.Client, baseURL string, actor actorschema.Actor) (seedAction, error) {
+	var existing actorschema.Actor
+	getReq := c.R().SetHeader("Accept", "application/json").SetResult(&existing)
+	getReq.SetQueryParam("namespace", actor.Metadata.Namespace)
+	getResp, err := getReq.Get(fmt.Sprintf("%s/api/v1/actors/external-id/%s", baseURL, actor.Spec.ExternalId))
+	if err != nil {
+		return "", fmt.Errorf("GET actor %q: %w", actor.Spec.ExternalId, err)
+	}
+
+	switch getResp.StatusCode() {
+	case http.StatusOK:
+		if existing.Metadata.Namespace != actor.Metadata.Namespace || existing.Spec.ExternalId != actor.Spec.ExternalId {
+			return "", fmt.Errorf("actor %q exists in namespace %q but does not match the configured state", actor.Spec.ExternalId, actor.Metadata.Namespace)
+		}
+		if existing.Metadata.Name != actor.Metadata.Name ||
+			!reflect.DeepEqual(existing.Spec.Permissions, actor.Spec.Permissions) ||
+			!stringMapsEqual(userLabels(existing.Metadata.Labels), actor.Metadata.Labels) ||
+			!stringMapsEqual(existing.Metadata.Annotations, actor.Metadata.Annotations) {
+			actor.Metadata.ID = existing.Metadata.ID
+			if err := updateActor(c, baseURL, actor); err != nil {
+				return "", err
+			}
+			return seedUpdated, nil
+		}
+		return seedAlreadyPresent, nil
+	case http.StatusNotFound:
+		// Create below.
+	default:
+		return "", fmt.Errorf("GET actor %q returned %d: %s", actor.Spec.ExternalId, getResp.StatusCode(), getResp.String())
+	}
+
+	postResp, err := c.R().
+		SetHeader("Content-Type", "application/json").
+		SetBody(actor).
+		Post(fmt.Sprintf("%s/api/v1/actors", baseURL))
+	if err != nil {
+		return "", fmt.Errorf("POST actor %q: %w", actor.Spec.ExternalId, err)
+	}
+	if postResp.StatusCode() >= 400 {
+		return "", fmt.Errorf("POST actor %q returned %d: %s", actor.Spec.ExternalId, postResp.StatusCode(), postResp.String())
+	}
+	return seedCreated, nil
+}
+
+func updateActor(c *resty.Client, baseURL string, actor actorschema.Actor) error {
+	labels := actor.Metadata.Labels
+	if labels == nil {
+		labels = map[string]string{}
+	}
+	annotations := actor.Metadata.Annotations
+	if annotations == nil {
+		annotations = map[string]string{}
+	}
+	permissions := actorschema.ClonePermissions(actor.Spec.Permissions)
+	patch := actorschema.NewActorPatch()
+	patch.Metadata.Name = &actor.Metadata.Name
+	patch.Metadata.Labels = &labels
+	patch.Metadata.Annotations = &annotations
+	patch.Spec.Permissions = &permissions
+
+	patchResp, err := c.R().
+		SetHeader("Content-Type", "application/json").
+		SetBody(patch).
+		Patch(fmt.Sprintf("%s/api/v1/actors/%s", baseURL, actor.Metadata.ID))
+	if err != nil {
+		return fmt.Errorf("PATCH actor %q: %w", actor.Spec.ExternalId, err)
+	}
+	if patchResp.StatusCode() >= 400 {
+		return fmt.Errorf("PATCH actor %q returned %d: %s", actor.Spec.ExternalId, patchResp.StatusCode(), patchResp.String())
+	}
+	return nil
 }
 
 func seedOAuth2TestProvider(c *resty.Client, seed OAuth2TestProviderSeed) error {
@@ -316,6 +438,18 @@ func stringMapsEqual(a, b map[string]string) bool {
 		}
 	}
 	return true
+}
+
+func userLabels(labels map[string]string) map[string]string {
+	// AuthProxy materializes reserved identity and inherited labels in API
+	// responses. Seed configuration owns only labels that callers can set.
+	result := make(map[string]string)
+	for key, value := range labels {
+		if !strings.HasPrefix(key, "apxy/") {
+			result[key] = value
+		}
+	}
+	return result
 }
 
 func normalizeForJSON(v any) any {
@@ -452,7 +586,7 @@ func upsertConnector(c *resty.Client, baseUrl string, seed cschema.Connector) (c
 	}
 
 	if connectorDefinitionsEqual(seed.Spec.Definition, *version) &&
-		stringMapsEqual(seed.Metadata.Labels, version.Metadata.Labels) &&
+		stringMapsEqual(seed.Metadata.Labels, userLabels(version.Metadata.Labels)) &&
 		stringMapsEqual(seed.Metadata.Annotations, version.Metadata.Annotations) {
 		if connectorObservedState(*version) != cschema.ConnectorReleaseStatePrimary {
 			if err := forceConnectorPrimary(c, baseUrl, *version); err != nil {
@@ -485,11 +619,32 @@ func run(logger *slog.Logger) error {
 	}
 	providerClient := resty.New().SetTimeout(30 * time.Second)
 
+	for _, ns := range cfg.Namespaces {
+		path, pathErr := nschema.PathFromMetadata(ns.Metadata)
+		if pathErr != nil {
+			return fmt.Errorf("derive seed namespace path: %w", pathErr)
+		}
+		deadline := time.Now().Add(seedRetryTimeout)
+		var action seedAction
+		for attempt := 1; ; attempt++ {
+			action, err = upsertNamespace(client, s.adminApiUrl, ns)
+			if err == nil {
+				break
+			}
+			if time.Now().After(deadline) {
+				return fmt.Errorf("upsert namespace %q after %s: %w", path, seedRetryTimeout, err)
+			}
+			logger.Warn("namespace seed attempt failed; retrying", "path", path, "attempt", attempt, "err", err)
+			time.Sleep(seedRetryInterval)
+		}
+		logger.Info("namespace seed complete", "path", path, "action", action)
+	}
+
 	for _, a := range cfg.Actors {
 		deadline := time.Now().Add(seedRetryTimeout)
-		var created bool
+		var action seedAction
 		for attempt := 1; ; attempt++ {
-			created, err = upsertActor(client, s.adminApiUrl, a)
+			action, err = upsertActor(client, s.adminApiUrl, a)
 			if err == nil {
 				break
 			}
@@ -504,9 +659,12 @@ func run(logger *slog.Logger) error {
 			)
 			time.Sleep(seedRetryInterval)
 		}
-		if created {
+		switch action {
+		case seedCreated:
 			logger.Info("actor created", "external_id", a.Spec.ExternalId, "namespace", a.Metadata.Namespace)
-		} else {
+		case seedUpdated:
+			logger.Info("actor updated", "external_id", a.Spec.ExternalId, "namespace", a.Metadata.Namespace)
+		case seedAlreadyPresent:
 			logger.Info("actor already present", "external_id", a.Spec.ExternalId, "namespace", a.Metadata.Namespace)
 		}
 	}

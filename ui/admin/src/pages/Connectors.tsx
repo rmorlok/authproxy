@@ -11,14 +11,15 @@ import InputLabel from '@mui/material/InputLabel';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import {
-    listConnectors, ConnectorReleaseState, Connector, ConnectorList, ListConnectorsParams, namespaceAndChildren
+    listConnectors, ConnectorReleaseState, Connector, ConnectorList, ListConnectorsParams
 } from '@authproxy/api';
 import dayjs from 'dayjs';
 import {useQueryState, parseAsInteger, parseAsStringLiteral, parseAsString} from 'nuqs'
 import {useNavigate} from "react-router-dom";
 import {useSelector} from "react-redux";
-import {selectCurrentNamespacePath} from "../store/namespacesSlice";
+import {selectCurrentNamespaceMatcher} from "../store/namespacesSlice";
 import {toSnakeCase} from '../util';
+import {ResourceLabelChips} from '../components/ResourceMetadataFields';
 
 function renderState(state: ConnectorReleaseState) {
     const colors: Record<ConnectorReleaseState, "default" | "success" | "error" | "info" | "warning" | "primary" | "secondary"> = {
@@ -80,17 +81,7 @@ export const columns: GridColDef<Connector>[] = [
         minWidth: 120,
         sortable: false,
         valueGetter: (_, row) => row.metadata.labels,
-        renderCell: (params) => {
-            const labels = params.value as Record<string, string> | undefined;
-            if (!labels || Object.keys(labels).length === 0) return null;
-            return (
-                <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{ py: 0.5 }}>
-                    {Object.entries(labels).map(([key, value]) => (
-                        <Chip key={key} label={`${key}: ${value}`} size="small" variant="outlined" />
-                    ))}
-                </Stack>
-            );
-        },
+        renderCell: (params) => <ResourceLabelChips labels={params.value as Record<string, string> | undefined}/>,
     },
     {
         field: 'displayName',
@@ -143,7 +134,7 @@ export default function Connectors() {
     ], []);
     const navigate = useNavigate();
     const stateVals = useMemo(() => stateOptions.map(opt => opt.value), [stateOptions]);
-    const ns = useSelector(selectCurrentNamespacePath);
+    const namespaceMatcher = useSelector(selectCurrentNamespaceMatcher);
 
     const [rows, setRows] = useState<Connector[]>([]);
     const [rowCount, setRowCount] = useState<number>(-1);
@@ -229,7 +220,7 @@ export default function Connectors() {
 
                 const params: ListConnectorsParams = prevResp?.metadata.continue ? {cursor: prevResp.metadata.continue} : {
                     state: (stateFilter as ConnectorReleaseState) || undefined,
-                    namespace: namespaceAndChildren(ns),
+                    namespace: namespaceMatcher,
                     orderBy: sort || undefined,
                     limit: pageSize,
                 };
@@ -265,7 +256,7 @@ export default function Connectors() {
         // Reset cursors/cache and immediately fetch first page to ensure initial load
         resetPagination();
         fetchPage(1);
-    }, [ns, pageSize, sort, stateFilter]);
+    }, [namespaceMatcher, pageSize, sort, stateFilter]);
 
     useEffect(() => {
         fetchPage(page);

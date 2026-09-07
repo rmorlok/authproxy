@@ -22,6 +22,7 @@ import ErrorIcon from '@mui/icons-material/Error';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import FolderIcon from '@mui/icons-material/Folder';
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
+import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
 import {useDispatch, useSelector} from "react-redux";
 import {
     selectCurrentNamespace,
@@ -41,6 +42,8 @@ import {
     ROOT_NAMESPACE_PATH,
 } from "@authproxy/api";
 import {useCommandPalette} from '../search/CommandPalette';
+import {useNavigate} from 'react-router-dom';
+import {namespaceDetailPath} from '../util';
 
 const ACTION_ADD = "...action.add";
 const ACTION_CHILDREN = "...action.children";
@@ -49,6 +52,7 @@ const ACTION_NAVIGATE_PARENT = "...action.navigate-parent";
 const ACTION_NAVIGATE_ROOT = "...action.navigate-root";
 const ACTION_REFRESH = "...action.refresh";
 const ACTION_SEARCH_CHILDREN = "...action.search-children";
+const ACTION_VIEW_CURRENT = "...action.view-current";
 const ACTION_PREFIX = "...action.";
 const NAMESPACE_LEAF_REGEX = /^[A-Za-z0-9_][A-Za-z0-9_-]*$/;
 
@@ -128,6 +132,7 @@ export default function NamespaceSelector() {
     const children = useSelector(selectCurrentNamespaceChildren);
     const childrenHasMore = useSelector(selectCurrentNamespaceChildrenHasMore);
     const commandPalette = useCommandPalette();
+    const navigate = useNavigate();
     const [val, setVal] = React.useState("");
     const [createOpen, setCreateOpen] = React.useState(false);
     const [createName, setCreateName] = React.useState("");
@@ -172,6 +177,11 @@ export default function NamespaceSelector() {
 
         if (path === ACTION_SEARCH_CHILDREN) {
             commandPalette.open('type:namespace scope:current ');
+            return;
+        }
+
+        if (path === ACTION_VIEW_CURRENT) {
+            navigate(namespaceDetailPath(ns?.metadata.id || ROOT_NAMESPACE_PATH));
             return;
         }
 
@@ -366,18 +376,21 @@ export default function NamespaceSelector() {
                     ]) : []
                 }
 
-                {depth(ns?.metadata.id) > 1 ?
-                    (
-                        <MenuItem value={ACTION_NAVIGATE_ROOT}>
-                            <ListItemIcon>
-                                <AccountTreeIcon sx={{fontSize: '1rem'}}/>
-                            </ListItemIcon>
-                            <ListItemText primary={`Go to ${ROOT_NAMESPACE_PATH}`} />
-                        </MenuItem>
-                    ) : null
-                }
-
                 <ListSubheader sx={{pt: 0}}>Actions</ListSubheader>
+                <MenuItem value={ACTION_VIEW_CURRENT}>
+                    <ListItemIcon>
+                        <VisibilityRoundedIcon />
+                    </ListItemIcon>
+                    <ListItemText primary="View Current" secondary="Open namespace details" />
+                </MenuItem>
+                {depth(ns?.metadata.id) > 0 ? (
+                    <MenuItem value={ACTION_NAVIGATE_ROOT}>
+                        <ListItemIcon>
+                            <AccountTreeIcon sx={{fontSize: '1rem'}}/>
+                        </ListItemIcon>
+                        <ListItemText primary="Go to root" secondary="Select the root namespace" />
+                    </MenuItem>
+                ) : null}
                 <MenuItem value={ACTION_REFRESH}>
                     <ListItemIcon>
                         <RefreshIcon />

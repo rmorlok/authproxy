@@ -78,6 +78,12 @@ result is a `ConnectionSetup` action whose `metadata.target` identifies the new
 connection and whose `status.type` is `redirect`, `form`, `verifying`,
 `complete`, or `error`.
 
+`intoNamespace` is optional. AuthProxy first tries the connector's namespace.
+If the actor cannot create connections there but has `connections:create` in
+exactly one permitted child namespace, AuthProxy uses that unambiguous child.
+It never infers from wildcard permissions or from multiple candidate
+namespaces; pass `intoNamespace` explicitly in those cases.
+
 Rename through the immutable ID. The response keeps the same `id` and returns
 the new `name`:
 

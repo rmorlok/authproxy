@@ -17,12 +17,33 @@ an AuthProxy browser session.
 | Mode | Configuration | Use when |
 |---|---|---|
 | Same origin | Set `public.static: {}` to serve the compiled Marketplace from the Public service. | You want the simplest cookie and CORS behavior. |
-| Separate SPA origin | Set `marketplace.base_url` to the Marketplace origin and point its `VITE_PUBLIC_BASE_URL` at the Public service. | You deploy or brand the frontend independently. |
+| Separate SPA origin | Set `marketplace.baseUrl` to the Marketplace origin and point its `VITE_PUBLIC_BASE_URL` at the Public service. | You deploy or brand the frontend independently. |
 
 For a separate origin, AuthProxy derives a credentialed CORS policy from
-`marketplace.base_url`. Deploy both origins over HTTPS and configure cookie
+`marketplace.baseUrl`. Deploy both origins over HTTPS and configure cookie
 attributes for the browser context. Same-origin hosting is the safer default
 when a separate frontend deployment is not required.
+
+## Color mode
+
+The Marketplace supports light and dark palettes. Choose a palette for either
+deployment mode under `marketplace.colorMode`:
+
+```yaml
+marketplace:
+  baseUrl: https://integrations.example.com
+  colorMode: system
+```
+
+Set `colorMode` to `light` to keep the Marketplace light, `dark` to keep it
+dark, or `system` to follow the browser's `prefers-color-scheme` setting. The
+default is `system`; the Marketplace updates immediately if the operating
+system preference changes while it is open.
+
+The Public service exposes this non-secret setting to the SPA at
+`GET /api/v1/marketplace/config`, so the same compiled frontend can be used for
+all three modes. A separately hosted Marketplace must be able to reach that
+Public service URL through `VITE_PUBLIC_BASE_URL`.
 
 ## SSO handoff
 

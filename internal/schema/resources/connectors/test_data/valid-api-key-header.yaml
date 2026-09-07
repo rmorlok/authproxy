@@ -4,6 +4,8 @@ metadata:
   name: api-key-header
   labels:
     type: openweathermap
+  annotations:
+    example.com/owner: integrations@example.com
 spec:
   definition:
     displayName: OpenWeatherMap

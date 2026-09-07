@@ -97,6 +97,9 @@ func TestConnections(t *testing.T) {
 	oauthConnectorId := apid.MustParse("cxr_test0000000000002")
 	oauthConnectorVersion := uint64(1)
 	configurationConnectorId := apid.MustParse("cxr_test0000000000003")
+	demoConnectorId := apid.MustParse("cxr_test0000000000004")
+	demoConnectorVersion := uint64(1)
+	demoConnectorNamespace := "root.demo"
 
 	setup := func(t *testing.T, cfg config.C) (*TestSetup, func()) {
 		cfg = config.FromRoot(&sconfig.Root{
@@ -126,6 +129,9 @@ func TestConnections(t *testing.T) {
 								}`),
 							}}},
 						},
+					}),
+					configuredConnectorResource(demoConnectorId, demoConnectorVersion, demoConnectorNamespace, map[string]string{"type": "demo-connector"}, cschema.ConnectorDefinition{
+						DisplayName: "Demo Connector",
 					}),
 				},
 			},
@@ -742,6 +748,44 @@ func TestConnections(t *testing.T) {
 			require.Equal(t, connectorVersion, connection.ConnectorVersion)
 			require.Equal(t, "platform", connection.Labels["team"])
 			require.Equal(t, "integrations", connection.Annotations["owner"])
+		})
+
+		t.Run("infers an exact permitted child namespace when omitted", func(t *testing.T) {
+			connectionNamespace := "root.demo.some-actor"
+			body := map[string]any{
+				"apiVersion": smeta.APIVersionV1Alpha1,
+				"kind":       schemaapi.ConnectionInitiateActionKind,
+				"metadata": map[string]any{
+					"target": smeta.ObjectReference{
+						APIVersion: smeta.APIVersionV1Alpha1,
+						Kind:       cschema.ConnectorKind,
+						ID:         demoConnectorId.String(),
+					},
+				},
+				"spec": map[string]any{
+					"returnToUrl": "https://example.com/callback",
+				},
+			}
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost,
+				"/connections/_initiate",
+				util.JsonToReader(body),
+				demoConnectorNamespace,
+				"some-actor",
+				aschema.PermissionsSingle(connectionNamespace, "connections", "create"),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+			var setupAction schemaapi.ConnectionSetupAction
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &setupAction))
+			connectionID := apid.MustParse(setupAction.Metadata.Target.ID)
+			created, err := tu.Db.GetConnection(context.Background(), connectionID)
+			require.NoError(t, err)
+			require.Equal(t, connectionNamespace, created.Namespace)
 		})
 	})
 

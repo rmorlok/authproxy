@@ -5,7 +5,7 @@ Provisions the EKS cluster the deployment pipeline runs against.
 | Resource                | Notes                                                         |
 |-------------------------|---------------------------------------------------------------|
 | VPC                     | 3 AZs, public + private subnets, single NAT (~$32/mo)         |
-| EKS                     | 1.34, managed node group (t3.medium x 2, scale 1-4)           |
+| EKS                     | 1.36, managed node group (t3.medium x 2, scale 1-4)           |
 | Cluster addons          | coredns, kube-proxy, vpc-cni, ebs-csi-driver                  |
 | IAM OIDC provider       | Federates GH Actions from `rmorlok/authproxy`                 |
 | GH Actions role         | Tag pushes (`v*`, `chart-v*`) + dispatches with `gha-eks` env |

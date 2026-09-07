@@ -175,6 +175,28 @@ func (atu *AuthTestUtil) GenerateBearerToken(ctx context.Context, externalId, na
 	return atu.s.Token(ctx, claims)
 }
 
+// GenerateScopedBearerToken creates a token whose actor permissions and
+// request-level permission restrictions can be controlled independently.
+func (atu *AuthTestUtil) GenerateScopedBearerToken(
+	ctx context.Context,
+	externalId string,
+	namespace string,
+	actorPermissions []aschema.Permission,
+	tokenPermissions []aschema.Permission,
+) (string, error) {
+	claims := atu.claimsForActor(ctx, core.Actor{
+		ExternalId:  externalId,
+		Namespace:   namespace,
+		Permissions: actorPermissions,
+	})
+	if claims == nil {
+		return "", errors.New("failed to create claims for actor")
+	}
+
+	claims.Permissions = tokenPermissions
+	return atu.s.Token(ctx, claims)
+}
+
 func (atu *AuthTestUtil) SignRequestQueryAs(ctx context.Context, req *http.Request, a core.Actor) (*http.Request, error) {
 	claims := atu.claimsForActor(ctx, a)
 	claims.Nonce = util.ToPtr(apid.New(apid.PrefixNonce))

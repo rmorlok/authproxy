@@ -20,7 +20,8 @@ import TasksPage from "./pages/Tasks";
 import TaskQueueDetailPage from "./pages/TaskQueueDetail";
 import WorkflowsPage from "./pages/Workflows";
 import WorkflowDetailPage from "./pages/WorkflowDetail";
-import NamespaceDetailPage from "./pages/NamespaceDetail";
+import NamespaceDetailPage, {CurrentNamespaceDetailRedirect} from "./pages/NamespaceDetail";
+import NamespacesPage from "./pages/Namespaces";
 import AboutPage from "./pages/About";
 import * as React from "react";
 
@@ -161,9 +162,27 @@ export const router = createBrowserRouter([
                 ],
             },
             {
-                path: 'namespace',
+                path: 'namespaces',
+                element: (<ListParent><NamespacesPage /></ListParent>),
+                handle: {title: 'Namespaces'},
+            },
+            {
+                path: 'namespaces/:path',
                 element: <NamespaceDetailPage />,
-                handle: { title: 'Namespace' }
+                handle: [
+                    {
+                        title: 'Namespaces',
+                        path: (_params: Params<string>) => '/namespaces',
+                    },
+                    {
+                        attr: 'path',
+                        path: (params: Params<string>) => `/namespaces/${encodeURIComponent(params.path || '')}`,
+                    },
+                ],
+            },
+            {
+                path: 'namespace',
+                element: <CurrentNamespaceDetailRedirect />,
             },
             {
                 path: 'actors',
@@ -185,44 +204,44 @@ export const router = createBrowserRouter([
                 ],
             },
             {
-                path: 'tasks',
+                path: 'internal-tasks',
                 element: <TasksPage />,
-                handle: { title: 'Tasks' }
+                handle: { title: 'Internal Tasks' }
             },
             {
-                path: 'tasks/queues/:queue',
+                path: 'internal-tasks/queues/:queue',
                 element: <TaskQueueDetailPage />,
                 handle: [
                     {
-                        title: 'Tasks',
-                        path: (_params: Params<string>) => `/tasks`,
+                        title: 'Internal Tasks',
+                        path: (_params: Params<string>) => `/internal-tasks`,
                     },
                     {
                         title: 'Queues',
-                        path: (_params: Params<string>) => `/tasks`,
+                        path: (_params: Params<string>) => `/internal-tasks`,
                     },
                     {
                         attr: 'queue',
-                        path: (params: Params<string>) => `/tasks/queues/${params.queue}`,
+                        path: (params: Params<string>) => `/internal-tasks/queues/${params.queue}`,
                     },
                 ],
             },
             {
-                path: 'workflows',
+                path: 'internal-workflows',
                 element: <WorkflowsPage />,
-                handle: { title: 'Workflows' }
+                handle: { title: 'Internal Workflows' }
             },
             {
-                path: 'workflows/:instanceId/:executionId',
+                path: 'internal-workflows/:instanceId/:executionId',
                 element: <WorkflowDetailPage />,
                 handle: [
                     {
-                        title: 'Workflows',
-                        path: (_params: Params<string>) => `/workflows`,
+                        title: 'Internal Workflows',
+                        path: (_params: Params<string>) => `/internal-workflows`,
                     },
                     {
                         attr: 'instanceId',
-                        path: (params: Params<string>) => `/workflows/${params.instanceId}/${params.executionId}`,
+                        path: (params: Params<string>) => `/internal-workflows/${params.instanceId}/${params.executionId}`,
                     },
                 ],
             },

@@ -42,6 +42,7 @@ import KeyValueRowsEditor, {
   rowsToMap,
   SYSTEM_LABEL_PREFIX,
 } from './KeyValueRowsEditor';
+import {ResourceLabels, ResourceNamespace} from './ResourceMetadataFields';
 
 function StateChip({state}: { state: KeyState }) {
   const colors: Record<KeyState, "default" | "success" | "error" | "info" | "warning" | "primary" | "secondary"> = {
@@ -252,10 +253,7 @@ export default function KeyDetail({keyId}: { keyId: string }) {
 
       <ResourceIdentifier value={ek.metadata.id} copyLabel="Copy key id"/>
 
-      <Box>
-        <Typography variant="subtitle2" color="text.secondary">Namespace</Typography>
-        <Typography variant="body1">{ek.metadata.namespace}</Typography>
-      </Box>
+      <ResourceNamespace namespace={ek.metadata.namespace}/>
 
       <Box>
         <Typography variant="subtitle2" color="text.secondary">Key Data</Typography>
@@ -284,18 +282,7 @@ export default function KeyDetail({keyId}: { keyId: string }) {
         </Box>
       </Stack>
 
-      <Box>
-        <Typography variant="subtitle2" color="text.secondary">Labels</Typography>
-        {ek.metadata.labels && Object.keys(ek.metadata.labels).length > 0 ? (
-          <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{ mt: 0.5 }}>
-            {Object.entries(ek.metadata.labels).map(([key, value]) => (
-              <Chip key={key} label={`${key}: ${value}`} size="small" variant="outlined" />
-            ))}
-          </Stack>
-        ) : (
-          <Typography variant="body2" color="text.secondary">No labels</Typography>
-        )}
-      </Box>
+      <ResourceLabels labels={ek.metadata.labels}/>
 
       <AnnotationsEditor annotations={ek.metadata.annotations} readOnly onPut={async () => {}} onDelete={async () => {}}/>
 

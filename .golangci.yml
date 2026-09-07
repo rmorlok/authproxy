@@ -1,12 +1,15 @@
+version: "2"
+
 linters:
-  disable-all: true
+  default: none
   enable:
     - depguard
-
-linters-settings:
-  depguard:
-    rules:
-      pkg-errors:
-        deny:
-          - pkg: "github.com/pkg/errors"
-            desc: "Use fmt.Errorf(\"...: %w\", err) or standard errors package instead"
+  settings:
+    depguard:
+      rules:
+        pkg-errors:
+          deny:
+            - pkg: "github.com/pkg/errors"
+              desc: "Use fmt.Errorf(\"...: %w\", err) or standard errors package instead"
+  exclusions:
+    generated: lax

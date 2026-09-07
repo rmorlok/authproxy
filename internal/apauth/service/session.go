@@ -16,6 +16,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/encfield"
 	"github.com/rmorlok/authproxy/internal/httperr"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 )
 
@@ -31,10 +32,11 @@ type Encrypt interface {
 
 // session is the object stored in redis to track the session
 type session struct {
-	Id              apid.ID   `json:"id"`
-	ActorId         apid.ID   `json:"actorId"`
-	ValidXsrfValues []string  `json:"-"` // Serialized separately in a different key
-	ExpiresAt       time.Time `json:"expiresAt"`
+	Id                     apid.ID              `json:"id"`
+	ActorId                apid.ID              `json:"actorId"`
+	PermissionRestrictions []aschema.Permission `json:"permissionRestrictions,omitempty"`
+	ValidXsrfValues        []string             `json:"-"` // Serialized separately in a different key
+	ExpiresAt              time.Time            `json:"expiresAt"`
 }
 
 func (s *session) MarshalBinary() ([]byte, error) {
@@ -226,7 +228,11 @@ func (s *service) establishAuthFromSession(
 		return core.NewUnauthenticatedRequestAuth(), fmt.Errorf("failed to extend session: %w", err)
 	}
 
-	return core.NewAuthenticatedRequestAuthWithSession(actor, &sess.Id), nil
+	return core.NewAuthenticatedRequestAuthWithSessionAndPermissions(
+		actor,
+		&sess.Id,
+		sess.PermissionRestrictions,
+	), nil
 }
 
 // EstablishSession is used to start a new session explicitly from a service that is using auth. Generally this
@@ -275,6 +281,12 @@ func (s *service) EstablishSession(ctx context.Context, w http.ResponseWriter, r
 			ExpiresAt: apctx.GetClock(ctx).Now().Add(sessionService.SessionTimeout()),
 		}
 	}
+
+	// A browser session must retain any request-level restrictions from the JWT
+	// that established or refreshed it. The actor is still loaded from the
+	// database on each session-authenticated request, so these restrictions are
+	// always intersected with the actor's current permissions.
+	sess.PermissionRestrictions = append([]aschema.Permission(nil), ra.GetPermissions()...)
 
 	err = s.extendSession(ctx, sess, w)
 	if err != nil {

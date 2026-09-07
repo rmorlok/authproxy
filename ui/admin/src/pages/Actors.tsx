@@ -10,7 +10,10 @@ import {
 import dayjs from 'dayjs';
 import {useQueryState, parseAsInteger, parseAsString} from 'nuqs'
 import {useNavigate} from 'react-router-dom';
+import {useSelector} from 'react-redux';
+import {selectCurrentNamespaceMatcher} from '../store/namespacesSlice';
 import {toSnakeCase} from '../util';
+import {ResourceLabelChips} from '../components/ResourceMetadataFields';
 
 export const columns: GridColDef<Actor>[] = [
     {
@@ -38,25 +41,21 @@ export const columns: GridColDef<Actor>[] = [
         valueGetter: (_, row) => row.spec.externalId,
     },
     {
-        field: 'email',
-        headerName: 'Email',
-        flex: 0.3,
-        minWidth: 60,
+        field: 'namespace',
+        headerName: 'Namespace',
+        flex: 0.5,
+        minWidth: 90,
         sortable: true,
+        valueGetter: (_, row) => row.metadata.namespace,
     },
     {
-        field: 'admin',
-        headerName: 'Admin',
-        flex: 0.5,
-        minWidth: 80,
-        sortable: true,
-    },
-    {
-        field: 'superAdmin',
-        headerName: 'Super Admin',
-        flex: 0.5,
-        minWidth: 80,
-        sortable: true,
+        field: 'labels',
+        headerName: 'Labels',
+        flex: 0.7,
+        minWidth: 120,
+        sortable: false,
+        valueGetter: (_, row) => row.metadata.labels,
+        renderCell: (params) => <ResourceLabelChips labels={params.value as Record<string, string> | undefined}/>,
     },
     {
         field: 'createdAt',
@@ -84,6 +83,7 @@ export const columns: GridColDef<Actor>[] = [
 
 export default function Actors() {
     const navigate = useNavigate();
+    const namespaceMatcher = useSelector(selectCurrentNamespaceMatcher);
     const defaultPageSize = 20;
 
     const [rows, setRows] = useState<Actor[]>([]);
@@ -151,6 +151,7 @@ export default function Actors() {
                 const prevResp = responsesCacheRef.current[responsesCacheRef.current.length - 1];
 
                 const params: ListActorsParams = prevResp?.metadata.continue ? {cursor: prevResp.metadata.continue} : {
+                    namespace: namespaceMatcher,
                     orderBy: sort || undefined,
                     limit: pageSize,
                 };
@@ -186,11 +187,11 @@ export default function Actors() {
         // Reset cursors/cache and immediately fetch first page to ensure initial load
         resetPagination();
         fetchPage(1);
-    }, [pageSize, sort]);
+    }, [namespaceMatcher, pageSize, sort]);
 
     useEffect(() => {
         fetchPage(page);
-    }, [page, pageSize, sort]); // TODO: only page?
+    }, [page]);
 
     return (
         <Box sx={{width: '100%', maxWidth: {sm: '100%', md: '1700px'}}}>

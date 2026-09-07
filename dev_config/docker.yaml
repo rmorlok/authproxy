@@ -38,6 +38,7 @@ hostApplication:
 
 marketplace:
   baseUrl: http://localhost:5173
+  colorMode: system
 
 systemAuth:
   jwtSigningKey:
@@ -46,13 +47,14 @@ systemAuth:
     privateKey:
       path: /app/dev_config/keys/system
   actors:
-    keysPath: /app/dev_config/keys/admin
-    permissions:
-      - namespace: root.**
-        resources:
-          - "*"
-        verbs:
-          - "*"
+    root:
+      keysPath: /app/dev_config/keys/admin
+      permissions:
+        - namespace: root.**
+          resources:
+            - "*"
+          verbs:
+            - "*"
   globalAesKey:
     path: /app/dev_config/keys/global_aes.key
 

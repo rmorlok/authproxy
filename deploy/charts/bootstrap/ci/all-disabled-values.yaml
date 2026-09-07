@@ -1,6 +1,6 @@
 # chart-testing values for the helm-chart-ci workflow.
 #
-# Disables every subchart + the ClusterIssuer template so `ct install`
+# Disables every subchart plus the StorageClass and ClusterIssuer templates so `ct install`
 # can render and "install" the chart against a kind cluster without
 # needing real AWS resources (NLB, Route53, Let's Encrypt). The install
 # becomes an effectively-empty Helm release — what we're verifying is
@@ -20,6 +20,9 @@ external-dns:
   enabled: false
 
 metrics-server:
+  enabled: false
+
+storageClass:
   enabled: false
 
 clusterIssuer:

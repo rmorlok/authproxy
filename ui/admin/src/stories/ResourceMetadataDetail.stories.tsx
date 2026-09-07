@@ -1,11 +1,13 @@
 import * as React from 'react';
 import type {Meta, StoryObj} from '@storybook/react';
 import Box from '@mui/material/Box';
-import {API_VERSION, configureClient} from '@authproxy/api';
-import ActorDetail from '../components/ActorDetail';
+import {API_VERSION, configureClient, ConnectorReleaseState} from '@authproxy/api';
+import type {Connector as ConnectorResource} from '@authproxy/api';
 import NamespaceDetail from '../components/NamespaceDetail';
 import ConnectorDetail from '../components/ConnectorDetail';
+import ConnectorVersionDetail from '../components/ConnectorVersionDetail';
 import ConnectionDetail from '../components/ConnectionDetail';
+import ActorDetail from '../components/ActorDetail';
 import KeyDetail from '../components/KeyDetail';
 import RateLimitDetail from '../components/RateLimitDetail';
 
@@ -142,6 +144,14 @@ const actor = {
   status: {signingKeyConfigured: true},
 };
 
+const draftConnectorVersion: ConnectorResource = {
+  ...connector,
+  kind: 'Connector',
+  metadata: {...connector.metadata, generation: 4},
+  spec: {...connector.spec, release: {desiredState: ConnectorReleaseState.DRAFT}},
+  status: {release: {state: ConnectorReleaseState.DRAFT}},
+};
+
 configureClient({
   axiosConfigOverride: {
     adapter: async (config) => ({
@@ -168,6 +178,10 @@ export const Namespace: Story = {
 
 export const Connector: Story = {
   render: () => <DetailCanvas><ConnectorDetail connectorId={connector.metadata.id}/></DetailCanvas>,
+};
+
+export const ConnectorVersion: Story = {
+  render: () => <DetailCanvas><ConnectorVersionDetail connectorVersion={draftConnectorVersion}/></DetailCanvas>,
 };
 
 export const Connection: Story = {

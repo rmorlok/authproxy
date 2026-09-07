@@ -295,6 +295,44 @@ func TestSetupFlowValidation(t *testing.T) {
 		assert.NoError(t, sf.Validate(vc))
 	})
 
+	t.Run("data source reference must match a defined source", func(t *testing.T) {
+		sf := &SetupFlow{
+			Configure: &SetupFlowPhase{
+				Steps: []SetupFlowStep{
+					{
+						Id:         "step1",
+						JsonSchema: common.RawJSON(`{"type":"object","properties":{"item_id":{"type":"string","x-data-source":"missing_items"}}}`),
+						DataSources: map[string]DataSourceDef{
+							"items": {
+								ProxyRequest: &DataSourceProxyRequest{Method: "GET", Url: "https://api.example.com"},
+								Transform:    "data",
+							},
+						},
+					},
+				},
+			},
+		}
+		err := sf.Validate(vc)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), `x-data-source "missing_items" is not defined in data_sources`)
+	})
+
+	t.Run("data source reference must be a non-empty string", func(t *testing.T) {
+		sf := &SetupFlow{
+			Configure: &SetupFlowPhase{
+				Steps: []SetupFlowStep{
+					{
+						Id:         "step1",
+						JsonSchema: common.RawJSON(`{"type":"object","properties":{"item_id":{"type":"string","x-data-source":true}}}`),
+					},
+				},
+			},
+		}
+		err := sf.Validate(vc)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "x-data-source must be a non-empty string")
+	})
+
 	t.Run("data source missing proxy_request", func(t *testing.T) {
 		sf := &SetupFlow{
 			Configure: &SetupFlowPhase{

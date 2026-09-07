@@ -169,10 +169,11 @@ template syntax.
 {{-     $_ := set $sysAuth "globalAesKey" (dict "path" (printf "%s/%s" .Values.encryptionKeys.mountPath .Values.encryptionKeys.globalAesKeyFile)) -}}
 {{-   end -}}
 {{-   if .Values.actors.existingSecret -}}
-{{-     $actors := dict "keysPath" .Values.actors.mountPath -}}
+{{-     $actorSource := dict "keysPath" .Values.actors.mountPath -}}
 {{-     if .Values.actors.permissions -}}
-{{-       $_ := set $actors "permissions" .Values.actors.permissions -}}
+{{-       $_ := set $actorSource "permissions" .Values.actors.permissions -}}
 {{-     end -}}
+{{-     $actors := dict "root" $actorSource -}}
 {{-     $_ := set $sysAuth "actors" $actors -}}
 {{-   end -}}
 {{-   $_ := set $cfg "systemAuth" $sysAuth -}}

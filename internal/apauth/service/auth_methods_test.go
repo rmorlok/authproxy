@@ -445,6 +445,31 @@ func TestAuth_Parse(t *testing.T) {
 			require.Equal(t, "bobdole", claims.Subject)
 		})
 
+		for _, tt := range []struct {
+			name        string
+			actorSigned bool
+		}{
+			{name: "actor-signed claim", actorSigned: true},
+			{name: "legacy token without signing claim"},
+		} {
+			t.Run("JWT signing key fallback/"+tt.name, func(t *testing.T) {
+				builder := jwt2.NewJwtTokenBuilder().
+					WithActorExternalId("bobdole").
+					WithPrivateKeyPath(pathToTestData("system_keys/other-system")).
+					WithAudience(string(sconfig.ServiceIdAdminApi))
+				if tt.actorSigned {
+					builder = builder.WithActorSigned()
+				}
+
+				token, err := builder.TokenCtx(testContext)
+				require.NoError(t, err)
+
+				claims, err := actorSrv.Parse(testContext, token)
+				require.NoError(t, err)
+				require.Equal(t, "bobdole", claims.Subject)
+			})
+		}
+
 		t.Run("system-signed for actor with asymmetric key", func(t *testing.T) {
 			// This covers the scenario where a service mints a system-signed token
 			// (using GlobalAESKey) for an actor that also has an asymmetric key stored
@@ -999,8 +1024,6 @@ func TestAuth_TopLevelPermissionsRestrictRequest(t *testing.T) {
 }
 
 func TestAuth_TopLevelPermissionsCannotEscalateDatabaseActor(t *testing.T) {
-	t.Parallel()
-
 	cfg := config.FromRoot(&testConfigPublicPrivateKey)
 	cfg, db := database.MustApplyBlankTestDbConfig(t, cfg)
 	authService := NewService(

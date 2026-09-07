@@ -319,3 +319,14 @@ func TestPermission_Validate(t *testing.T) {
 		})
 	}
 }
+
+func TestAllPermissionsForNamespace(t *testing.T) {
+	require.Equal(t, []Permission{
+		{
+			Namespace: "root.tenant.**",
+			Resources: []string{PermissionWildcard},
+			Verbs:     []string{PermissionWildcard},
+		},
+	}, AllPermissionsForNamespace("root.tenant"))
+	require.Equal(t, AllPermissions(), AllPermissionsForNamespace("root"))
+}

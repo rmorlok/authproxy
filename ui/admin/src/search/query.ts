@@ -1,4 +1,5 @@
 import type {SearchResourceType} from '@authproxy/api';
+import {namespaceDetailPath} from '../util';
 
 export type SearchScope = 'current' | 'all';
 
@@ -55,7 +56,7 @@ export function directSearchDestination(raw: string): DirectSearchDestination | 
         return null;
     }
     if (namespacePathPattern.test(value)) {
-        return {kind: 'namespace', path: '/namespace', namespace: value};
+        return {kind: 'namespace', path: namespaceDetailPath(value), namespace: value};
     }
     for (const [prefix, route] of directResourceRoutes) {
         if (value.startsWith(prefix) && value.length > prefix.length) {

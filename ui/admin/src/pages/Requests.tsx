@@ -23,7 +23,8 @@ import {HttpStatusChip, Duration, toSnakeCase} from '../util';
 import {useQueryState, parseAsInteger, parseAsStringLiteral, parseAsString} from 'nuqs'
 import RequestDetail from "../components/RequestDetail";
 import {useSelector} from "react-redux";
-import {selectCurrentNamespacePath} from "../store/namespacesSlice";
+import {selectCurrentNamespaceMatcher} from "../store/namespacesSlice";
+import {ResourceLabelChips} from '../components/ResourceMetadataFields';
 
 export const columns: (GridColDef<RequestEvent> & {hideInitial?: boolean})[] = [
     {
@@ -151,17 +152,7 @@ export const columns: (GridColDef<RequestEvent> & {hideInitial?: boolean})[] = [
         minWidth: 200,
         hideInitial: true,
         valueGetter: (_, row) => row.metadata.labels,
-        renderCell: (params) => {
-            const labels = params.value as Record<string, string> | undefined;
-            if (!labels || Object.keys(labels).length === 0) return null;
-            return (
-                <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', gap: 0.5 }}>
-                    {Object.entries(labels).map(([k, v]) => (
-                        <Chip key={k} label={`${k}=${v}`} size="small" variant="outlined" />
-                    ))}
-                </Stack>
-            );
-        },
+        renderCell: (params) => <ResourceLabelChips labels={params.value as Record<string, string> | undefined}/>,
     },
     {
         field: 'host',
@@ -279,7 +270,7 @@ export default function Requests() {
         { label: 'Public', value: RequestType.PUBLIC },
     ], []);
     const stateVals = useMemo(() => stateOptions.map(opt => opt.value), [stateOptions]);
-    const ns = useSelector(selectCurrentNamespacePath);
+    const namespaceMatcher = useSelector(selectCurrentNamespaceMatcher);
 
     const [rows, setRows] = useState<RequestEvent[]>([]);
     const [rowCount, setRowCount] = useState<number>(-1);
@@ -367,7 +358,7 @@ export default function Requests() {
                 const prevResp = responsesCacheRef.current[responsesCacheRef.current.length - 1];
 
                 const params: ListRequestEventsParams = prevResp?.metadata.continue ? {cursor: prevResp.metadata.continue} : {
-                    namespace: ns + ".**",
+                    namespace: namespaceMatcher,
                     requestType: (typeFilter as RequestType) || undefined,
                     labelSelector: labelSelector || undefined,
                     orderBy: sort || undefined,
@@ -405,7 +396,7 @@ export default function Requests() {
         // Reset cursors/cache and immediately fetch first page to ensure initial load
         resetPagination();
         fetchPage(1);
-    }, [ns, pageSize, sort, typeFilter, labelSelector]);
+    }, [namespaceMatcher, pageSize, sort, typeFilter, labelSelector]);
 
     useEffect(() => {
         fetchPage(page);

@@ -75,7 +75,7 @@ export default function Tasks() {
     }, [autoRefresh, fetchQueues]);
 
     const handleQueueClick: GridEventListener<'rowClick'> = (params) => {
-        navigate(`/tasks/queues/${params.row.metadata.id}`);
+        navigate(`/internal-tasks/queues/${params.row.metadata.id}`);
     };
 
     const queueColumns: GridColDef<TaskQueue>[] = [

@@ -48,14 +48,14 @@ jobs:
       PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version-file: integration_tests/go.mod
 
       - name: Resolve environment names
         id: env
@@ -176,7 +176,7 @@ jobs:
           done
 
       - name: Assume GH Actions role via OIDC
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
@@ -230,16 +230,24 @@ jobs:
             echo "Reusing ${RELEASE_NAME}-demo-shell-key"
           fi
 
-          if ! kubectl -n "${RELEASE_NS}" get secret "${RELEASE_NAME}-actors" >/dev/null 2>&1; then
-            kubectl -n "${RELEASE_NS}" create secret generic "${RELEASE_NAME}-actors" \
-              --from-file=demo-shell.pub="${workdir}/demo-shell.pub" \
-              --from-file=demo-admin.pub="${workdir}/demo-shell.pub" \
-              --from-file=demo-user.pub="${workdir}/demo-shell.pub" \
-              --from-file=fresh-user.pub="${workdir}/demo-shell.pub" \
-              --from-file=grafana.pub="${workdir}/demo-shell.pub"
-          else
-            echo "Reusing ${RELEASE_NAME}-actors"
-          fi
+          kubectl -n "${RELEASE_NS}" create secret generic "${RELEASE_NAME}-actors" \
+            --from-file=demo-admin.pub="${workdir}/demo-shell.pub" \
+            --from-file=grafana.pub="${workdir}/demo-shell.pub" \
+            --dry-run=client -o yaml \
+            | kubectl apply -f -
+
+          for stale_actor in demo-shell demo-user fresh-user smoke-user; do
+            stale_public="$(kubectl -n "${RELEASE_NS}" get secret "${RELEASE_NAME}-actors" \
+              -o "jsonpath={.data.${stale_actor}\\.pub}")"
+            if [ -n "${stale_public}" ]; then
+              kubectl -n "${RELEASE_NS}" patch secret "${RELEASE_NAME}-actors" \
+                --type json \
+                --patch="[{\"op\":\"remove\",\"path\":\"/data/${stale_actor}.pub\"}]"
+            fi
+          done
+
+          kubectl -n "${RELEASE_NS}" delete secret "${RELEASE_NAME}-smoke-actors" \
+            --ignore-not-found
 
       - name: Clear stale seed job
         env:
@@ -392,23 +400,23 @@ jobs:
           workdir="$(mktemp -d)"
           trap 'rm -rf "${workdir}"' EXIT
 
-          kubectl -n "${RELEASE_NS}" get secret "${RELEASE_NAME}-demo-shell-key" \
-            -o jsonpath='{.data.private}' \
-            | base64 -d > "${workdir}/demo-shell.private"
-          chmod 600 "${workdir}/demo-shell.private"
+          kubectl -n "${RELEASE_NS}" get secret "${RELEASE_NAME}-encryption" \
+            -o jsonpath='{.data.global_aes\.key}' \
+            | base64 -d > "${workdir}/global_aes.key"
+          chmod 600 "${workdir}/global_aes.key"
 
           log_path="${RUNNER_TEMP}/authproxy-smoke.log"
           echo "log_path=${log_path}" >> "$GITHUB_OUTPUT"
           {
             echo "Smoke-testing ${SMOKE_BASE_URL}"
             cd integration_tests
-            SMOKE_ADMIN_KEY="${workdir}/demo-shell.private" \
+            SMOKE_GLOBAL_KEY="${workdir}/global_aes.key" \
               go test -tags smoke ./smoke -run TestRemote -count=1 -v
           } 2>&1 | tee "${log_path}"
 
       - name: Post smoke failure comment
         if: failure() && steps.smoke.outcome == 'failure'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           SMOKE_LOG_PATH: ${{ steps.smoke.outputs.log_path }}
           DEV_URL: https://${{ steps.env.outputs.hostname }}/
@@ -469,7 +477,7 @@ jobs:
             }
 
       - name: Post dev environment comment
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           DEV_URL: https://${{ steps.env.outputs.hostname }}/
           RELEASE_NS: ${{ steps.env.outputs.namespace }}
@@ -610,7 +618,7 @@ jobs:
           echo "Hostname:  https://${hostname}/"
 
       - name: Assume GH Actions role via OIDC
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}

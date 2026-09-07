@@ -13,14 +13,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apauth/jwt"
 	"github.com/rmorlok/authproxy/internal/apid"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	actorschema "github.com/rmorlok/authproxy/internal/schema/resources/actor"
+	connectionschema "github.com/rmorlok/authproxy/internal/schema/resources/connection"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
+	nschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/stretchr/testify/require"
 )
 
@@ -32,10 +35,15 @@ type RemoteAuthProxyOptions struct {
 	ProviderURL string
 
 	AdminActorExternalID string
+	AdminActorNamespace  string
 	UserActorExternalID  string
-	Namespace            string
+	UserActorNamespace   string
+	ConnectorNamespace   string
+	ConnectionNamespace  string
 
-	AdminPrivateKey string
+	GlobalKey             string
+	AdminActorPermissions []aschema.Permission
+	UserActorPermissions  []aschema.Permission
 }
 
 type RemoteAuthProxy struct {
@@ -44,11 +52,16 @@ type RemoteAuthProxy struct {
 	ProviderURL string
 
 	AdminActorExternalID string
+	AdminActorNamespace  string
 	UserActorExternalID  string
-	Namespace            string
+	UserActorNamespace   string
+	ConnectorNamespace   string
+	ConnectionNamespace  string
 
-	privateKey string
-	client     *http.Client
+	globalKey             string
+	adminActorPermissions []aschema.Permission
+	userActorPermissions  []aschema.Permission
+	client                *http.Client
 }
 
 type remoteResponse struct {
@@ -61,7 +74,15 @@ func NewRemoteAuthProxy(t *testing.T, opts RemoteAuthProxyOptions) *RemoteAuthPr
 	t.Helper()
 
 	require.NotEmpty(t, opts.BaseURL, "base URL is required")
-	require.NotEmpty(t, opts.AdminPrivateKey, "admin private key is required")
+	require.NotEmpty(t, opts.GlobalKey, "global key is required")
+	require.NotEmpty(t, opts.AdminActorPermissions, "admin actor permissions are required")
+	for i, permission := range opts.AdminActorPermissions {
+		require.NoErrorf(t, permission.Validate(), "admin actor permission %d is invalid", i)
+	}
+	require.NotEmpty(t, opts.UserActorPermissions, "user actor permissions are required")
+	for i, permission := range opts.UserActorPermissions {
+		require.NoErrorf(t, permission.Validate(), "user actor permission %d is invalid", i)
+	}
 
 	adminURL := opts.AdminURL
 	if adminURL == "" {
@@ -80,54 +101,117 @@ func NewRemoteAuthProxy(t *testing.T, opts RemoteAuthProxyOptions) *RemoteAuthPr
 	if adminActor == "" {
 		adminActor = "demo-shell"
 	}
+	adminActorNamespace := opts.AdminActorNamespace
+	if adminActorNamespace == "" {
+		adminActorNamespace = sconfig.RootNamespace
+	}
 	userActor := opts.UserActorExternalID
 	if userActor == "" {
 		userActor = "fresh-user"
 	}
-	namespace := opts.Namespace
-	if namespace == "" {
-		namespace = sconfig.RootNamespace
+	userActorNamespace := opts.UserActorNamespace
+	if userActorNamespace == "" {
+		userActorNamespace = sconfig.RootNamespace
+	}
+	connectorNamespace := opts.ConnectorNamespace
+	if connectorNamespace == "" {
+		connectorNamespace = sconfig.RootNamespace
+	}
+	connectionNamespace := opts.ConnectionNamespace
+	if connectionNamespace == "" {
+		connectionNamespace = userActorNamespace
 	}
 
 	return &RemoteAuthProxy{
-		AdminURL:             strings.TrimRight(adminURL, "/"),
-		PublicURL:            strings.TrimRight(publicURL, "/"),
-		ProviderURL:          strings.TrimRight(providerURL, "/"),
-		AdminActorExternalID: adminActor,
-		UserActorExternalID:  userActor,
-		Namespace:            namespace,
-		privateKey:           opts.AdminPrivateKey,
-		client:               &http.Client{Timeout: 30 * time.Second},
+		AdminURL:              strings.TrimRight(adminURL, "/"),
+		PublicURL:             strings.TrimRight(publicURL, "/"),
+		ProviderURL:           strings.TrimRight(providerURL, "/"),
+		AdminActorExternalID:  adminActor,
+		AdminActorNamespace:   adminActorNamespace,
+		UserActorExternalID:   userActor,
+		UserActorNamespace:    userActorNamespace,
+		ConnectorNamespace:    connectorNamespace,
+		ConnectionNamespace:   connectionNamespace,
+		globalKey:             opts.GlobalKey,
+		adminActorPermissions: opts.AdminActorPermissions,
+		userActorPermissions:  opts.UserActorPermissions,
+		client:                &http.Client{Timeout: 30 * time.Second},
 	}
+}
+
+func (h *RemoteAuthProxy) EnsureNamespace(t *testing.T, namespace string) {
+	t.Helper()
+
+	endpoint := h.AdminURL + "/api/v1/namespaces/" + url.PathEscape(namespace)
+	resp := h.doSignedAllowing(t, h.AdminActorExternalID, h.AdminActorNamespace, http.MethodGet, endpoint, nil, true, []int{http.StatusOK, http.StatusNotFound}, nil)
+	if resp.StatusCode == http.StatusOK {
+		return
+	}
+
+	resource, err := nschema.NewNamespaceForPath(namespace)
+	require.NoError(t, err)
+	h.doSignedAllowing(t, h.AdminActorExternalID, h.AdminActorNamespace, http.MethodPost, h.AdminURL+"/api/v1/namespaces", resource, true, []int{http.StatusOK, http.StatusConflict}, nil)
+}
+
+func (h *RemoteAuthProxy) GetActorByExternalID(t *testing.T, namespace, externalID string) actorschema.Actor {
+	t.Helper()
+
+	endpoint := h.AdminURL + "/api/v1/actors/external-id/" + url.PathEscape(externalID) + "?namespace=" + url.QueryEscape(namespace)
+	var actor actorschema.Actor
+	h.doSigned(t, h.AdminActorExternalID, h.AdminActorNamespace, http.MethodGet, endpoint, nil, true, http.StatusOK, &actor)
+	return actor
+}
+
+func (h *RemoteAuthProxy) ProvisionUserFromJWT(t *testing.T) {
+	t.Helper()
+
+	h.doSigned(t, h.UserActorExternalID, h.UserActorNamespace, http.MethodGet, h.PublicURL+"/api/v1/connectors?limit=1", nil, true, http.StatusOK, nil)
+}
+
+func (h *RemoteAuthProxy) DeleteActorByExternalIDAsAdmin(t *testing.T, namespace, externalID string) {
+	t.Helper()
+
+	endpoint := h.AdminURL + "/api/v1/actors/external-id/" + url.PathEscape(externalID) + "?namespace=" + url.QueryEscape(namespace)
+	h.doSigned(t, h.AdminActorExternalID, h.AdminActorNamespace, http.MethodDelete, endpoint, nil, true, http.StatusNoContent, nil)
 }
 
 func (h *RemoteAuthProxy) CreateActor(t *testing.T, externalID string, labels map[string]string) actorschema.Actor {
 	t.Helper()
 
+	resource := actorschema.NewActor()
+	resource.Metadata.Namespace = h.UserActorNamespace
+	resource.Metadata.Labels = labels
+	resource.Spec.ExternalId = externalID
 	var actor actorschema.Actor
-	h.doSigned(t, h.AdminActorExternalID, http.MethodPost, h.AdminURL+"/api/v1/actors", actorschema.Actor{
-		TypeMeta: meta.NewTypeMeta(actorschema.ActorKind),
-		Metadata: meta.ObjectMeta{
-			Namespace: h.Namespace,
-			Labels:    labels,
-		},
-		Spec: actorschema.ActorSpec{ExternalId: externalID},
-	}, true, http.StatusCreated, &actor)
+	h.doSigned(t, h.AdminActorExternalID, h.AdminActorNamespace, http.MethodPost, h.AdminURL+"/api/v1/actors", resource, true, http.StatusCreated, &actor)
 	return actor
 }
 
 func (h *RemoteAuthProxy) CreateConnector(t *testing.T, connector sconfig.Connector) cschema.Connector {
 	t.Helper()
+	return h.CreateConnectorWithLabels(t, connector, map[string]string{"smoke": "true"})
+}
+
+func (h *RemoteAuthProxy) CreateConnectorWithLabels(t *testing.T, connector sconfig.Connector, labels map[string]string) cschema.Connector {
+	t.Helper()
 
 	resource := connector.Clone()
-	resource.Metadata.Namespace = h.Namespace
+	resource.Metadata.ID = ""
+	resource.Metadata.Generation = 0
+	resource.Metadata.CreatedAt = nil
+	resource.Metadata.UpdatedAt = nil
+	resource.Metadata.Namespace = h.ConnectorNamespace
+	resource.Status = nil
 	if resource.Metadata.Labels == nil {
 		resource.Metadata.Labels = map[string]string{}
 	}
-	resource.Metadata.Labels["smoke"] = "true"
+	for key, value := range labels {
+		resource.Metadata.Labels[key] = value
+	}
 
 	var created cschema.Connector
-	h.doSigned(t, h.AdminActorExternalID, http.MethodPost, h.AdminURL+"/api/v1/connectors", resource, true, http.StatusCreated, &created)
+	h.doSigned(t, h.AdminActorExternalID, h.AdminActorNamespace, http.MethodPost, h.AdminURL+"/api/v1/connectors", resource, true, http.StatusCreated, &created)
+	require.Equal(t, h.ConnectorNamespace, created.Metadata.Namespace)
 	return created
 }
 
@@ -140,8 +224,40 @@ func (h *RemoteAuthProxy) ListConnectors(t *testing.T, labelSelector string) []c
 	}
 
 	var list schemaapi.ListConnectorsResponseJson
-	h.doSigned(t, h.UserActorExternalID, http.MethodGet, endpoint, nil, true, http.StatusOK, &list)
+	h.doSigned(t, h.UserActorExternalID, h.UserActorNamespace, http.MethodGet, endpoint, nil, true, http.StatusOK, &list)
 	return list.Items
+}
+
+func (h *RemoteAuthProxy) ListConnectorsAsAdmin(t *testing.T, namespace, labelSelector string) []cschema.Connector {
+	t.Helper()
+
+	query := url.Values{"limit": []string{"100"}, "namespace": []string{namespace}}
+	if labelSelector != "" {
+		query.Set("labelSelector", labelSelector)
+	}
+	endpoint := h.AdminURL + "/api/v1/connectors?" + query.Encode()
+
+	var list schemaapi.ListConnectorsResponseJson
+	h.doSigned(t, h.AdminActorExternalID, h.AdminActorNamespace, http.MethodGet, endpoint, nil, true, http.StatusOK, &list)
+	return list.Items
+}
+
+func (h *RemoteAuthProxy) GetConnectorVersionAsAdmin(t *testing.T, connectorID apid.ID, generation uint64) cschema.Connector {
+	t.Helper()
+
+	var connector cschema.Connector
+	h.doSigned(
+		t,
+		h.AdminActorExternalID,
+		h.AdminActorNamespace,
+		http.MethodGet,
+		fmt.Sprintf("%s/api/v1/connectors/%s/generations/%d", h.AdminURL, connectorID, generation),
+		nil,
+		true,
+		http.StatusOK,
+		&connector,
+	)
+	return connector
 }
 
 func (h *RemoteAuthProxy) FindConnectorByName(t *testing.T, name string) cschema.Connector {
@@ -149,9 +265,17 @@ func (h *RemoteAuthProxy) FindConnectorByName(t *testing.T, name string) cschema
 
 	endpoint := h.PublicURL + "/api/v1/connectors?limit=100&name=" + url.QueryEscape(name)
 	var list schemaapi.ListConnectorsResponseJson
-	h.doSigned(t, h.UserActorExternalID, http.MethodGet, endpoint, nil, true, http.StatusOK, &list)
+	h.doSigned(t, h.UserActorExternalID, h.UserActorNamespace, http.MethodGet, endpoint, nil, true, http.StatusOK, &list)
 	require.Lenf(t, list.Items, 1, "expected exactly one connector named %q; got %d", name, len(list.Items))
 	return list.Items[0]
+}
+
+func (h *RemoteAuthProxy) FindConnectorBySeedKey(t *testing.T, seedKey string) cschema.Connector {
+	t.Helper()
+
+	connectors := h.ListConnectors(t, "demo.authproxy.net/seed-key="+seedKey)
+	require.Lenf(t, connectors, 1, "expected exactly one seeded connector with key %q; got %d", seedKey, len(connectors))
+	return connectors[0]
 }
 
 func (h *RemoteAuthProxy) ForceConnectorVersionState(t *testing.T, connectorID apid.ID, version uint64, state cschema.ConnectorReleaseState) cschema.Connector {
@@ -161,6 +285,7 @@ func (h *RemoteAuthProxy) ForceConnectorVersionState(t *testing.T, connectorID a
 	h.doSigned(
 		t,
 		h.AdminActorExternalID,
+		h.AdminActorNamespace,
 		http.MethodPut,
 		fmt.Sprintf("%s/api/v1/connectors/%s/generations/%d/_forceState", h.AdminURL, connectorID, version),
 		schemaapi.NewConnectorForceStateRequest(
@@ -183,15 +308,16 @@ func (h *RemoteAuthProxy) InitiateOAuth2Connection(t *testing.T, connectorID api
 	t.Helper()
 
 	var action schemaapi.ConnectionSetupAction
-	h.doSigned(t, h.UserActorExternalID, http.MethodPost, h.PublicURL+"/api/v1/connections/_initiate", connectionInitiateAction(
+	h.doSigned(t, h.UserActorExternalID, h.UserActorNamespace, http.MethodPost, h.PublicURL+"/api/v1/connections/_initiate", connectionInitiateAction(
 		connectorID,
-		h.Namespace,
+		h.ConnectionNamespace,
 		returnToURL,
 	), true, http.StatusOK, &action)
 	require.NotNil(t, action.Status)
 	require.Equal(t, schemaapi.ConnectionSetupResponseTypeRedirect, action.Status.Type)
 	require.NotEmpty(t, action.Status.RedirectURL)
 	require.NotEmpty(t, action.Metadata.Target.ID)
+	require.Equal(t, h.ConnectionNamespace, h.GetConnection(t, action.Metadata.Target.ID).Metadata.Namespace)
 	return action.Metadata.Target.ID, action.Status.RedirectURL
 }
 
@@ -199,16 +325,25 @@ func (h *RemoteAuthProxy) InitiateAPIKeyConnection(t *testing.T, connectorID api
 	t.Helper()
 
 	var action schemaapi.ConnectionSetupAction
-	h.doSigned(t, h.UserActorExternalID, http.MethodPost, h.PublicURL+"/api/v1/connections/_initiate", connectionInitiateAction(
+	h.doSigned(t, h.UserActorExternalID, h.UserActorNamespace, http.MethodPost, h.PublicURL+"/api/v1/connections/_initiate", connectionInitiateAction(
 		connectorID,
-		h.Namespace,
+		h.ConnectionNamespace,
 		"",
 	), true, http.StatusOK, &action)
 	require.NotNil(t, action.Status)
 	require.Equal(t, schemaapi.ConnectionSetupResponseTypeForm, action.Status.Type)
 	require.NotEmpty(t, action.Status.StepID)
 	require.NotEmpty(t, action.Metadata.Target.ID)
+	require.Equal(t, h.ConnectionNamespace, h.GetConnection(t, action.Metadata.Target.ID).Metadata.Namespace)
 	return action.Metadata.Target.ID, action.Status.StepID
+}
+
+func (h *RemoteAuthProxy) GetConnection(t *testing.T, connectionID string) connectionschema.Connection {
+	t.Helper()
+
+	var connection connectionschema.Connection
+	h.doSigned(t, h.UserActorExternalID, h.UserActorNamespace, http.MethodGet, h.PublicURL+"/api/v1/connections/"+connectionID, nil, true, http.StatusOK, &connection)
+	return connection
 }
 
 func (h *RemoteAuthProxy) SubmitAPIKeyCredentials(t *testing.T, connectionID, stepID, apiKey string) schemaapi.ConnectionSetupResponseType {
@@ -218,7 +353,7 @@ func (h *RemoteAuthProxy) SubmitAPIKeyCredentials(t *testing.T, connectionID, st
 	require.NoError(t, err)
 
 	var action schemaapi.ConnectionSetupAction
-	h.doSigned(t, h.UserActorExternalID, http.MethodPost, h.PublicURL+"/api/v1/connections/"+connectionID+"/_submit", connectionSetupSubmitAction(
+	h.doSigned(t, h.UserActorExternalID, h.UserActorNamespace, http.MethodPost, h.PublicURL+"/api/v1/connections/"+connectionID+"/_submit", connectionSetupSubmitAction(
 		connectionID,
 		stepID,
 		rawData,
@@ -236,16 +371,16 @@ func (h *RemoteAuthProxy) WaitForSetupComplete(t *testing.T, connectionID string
 	var lastError string
 	for time.Now().Before(deadline) {
 		var action schemaapi.ConnectionSetupAction
-		h.doSigned(t, h.UserActorExternalID, http.MethodGet, h.PublicURL+"/api/v1/connections/"+connectionID+"/_setupStep", nil, true, http.StatusOK, &action)
+		h.doSigned(t, h.UserActorExternalID, h.UserActorNamespace, http.MethodGet, h.PublicURL+"/api/v1/connections/"+connectionID+"/_setupStep", nil, true, http.StatusOK, &action)
 		require.NotNil(t, action.Status)
 		lastType = action.Status.Type
 		lastError = action.Status.Error
 
-		switch action.Status.Type {
+		switch lastType {
 		case schemaapi.ConnectionSetupResponseTypeComplete:
 			return
 		case schemaapi.ConnectionSetupResponseTypeError:
-			require.FailNowf(t, "connection setup failed", "connection %s setup error: %s", connectionID, action.Status.Error)
+			require.FailNowf(t, "connection setup failed", "connection %s setup error: %s", connectionID, lastError)
 		}
 		time.Sleep(1 * time.Second)
 	}
@@ -256,7 +391,7 @@ func (h *RemoteAuthProxy) WaitForSetupComplete(t *testing.T, connectionID string
 func (h *RemoteAuthProxy) FollowOAuth2Redirect(t *testing.T, redirectURL string) string {
 	t.Helper()
 
-	resp := h.doSigned(t, h.UserActorExternalID, http.MethodGet, redirectURL, nil, false, http.StatusFound, nil)
+	resp := h.doSigned(t, h.UserActorExternalID, h.UserActorNamespace, http.MethodGet, redirectURL, nil, false, http.StatusFound, nil)
 	loc := resp.Header.Get("Location")
 	require.NotEmpty(t, loc, "OAuth2 redirect response should include Location")
 	return loc
@@ -265,7 +400,7 @@ func (h *RemoteAuthProxy) FollowOAuth2Redirect(t *testing.T, redirectURL string)
 func (h *RemoteAuthProxy) DeliverOAuth2Callback(t *testing.T, callbackURL string) string {
 	t.Helper()
 
-	resp := h.doSigned(t, h.UserActorExternalID, http.MethodGet, callbackURL, nil, false, http.StatusFound, nil)
+	resp := h.doSigned(t, h.UserActorExternalID, h.UserActorNamespace, http.MethodGet, callbackURL, nil, false, http.StatusFound, nil)
 	loc := resp.Header.Get("Location")
 	require.NotEmpty(t, loc, "OAuth2 callback response should include Location")
 	return loc
@@ -275,14 +410,19 @@ func (h *RemoteAuthProxy) DoProxyRequest(t *testing.T, connectionID, targetURL, 
 	t.Helper()
 
 	var proxyResp schemaapi.ProxyResponseJson
-	h.doSigned(t, h.UserActorExternalID, http.MethodPost, h.PublicURL+"/api/v1/connections/"+connectionID+"/_proxy", schemaapi.ProxyRequestJson{
+	h.doSigned(t, h.UserActorExternalID, h.UserActorNamespace, http.MethodPost, h.PublicURL+"/api/v1/connections/"+connectionID+"/_proxy", schemaapi.ProxyRequestJson{
 		URL:    targetURL,
 		Method: method,
 	}, true, http.StatusOK, &proxyResp)
 	return proxyResp
 }
 
-func (h *RemoteAuthProxy) doSigned(t *testing.T, actorExternalID, method, rawURL string, body any, followRedirects bool, wantStatus int, out any) remoteResponse {
+func (h *RemoteAuthProxy) doSigned(t *testing.T, actorExternalID, actorNamespace, method, rawURL string, body any, followRedirects bool, wantStatus int, out any) remoteResponse {
+	t.Helper()
+	return h.doSignedAllowing(t, actorExternalID, actorNamespace, method, rawURL, body, followRedirects, []int{wantStatus}, out)
+}
+
+func (h *RemoteAuthProxy) doSignedAllowing(t *testing.T, actorExternalID, actorNamespace, method, rawURL string, body any, followRedirects bool, wantStatuses []int, out any) remoteResponse {
 	t.Helper()
 
 	var bodyReader io.Reader
@@ -299,7 +439,7 @@ func (h *RemoteAuthProxy) doSigned(t *testing.T, actorExternalID, method, rawURL
 		req.Header.Set("Content-Type", "application/json")
 	}
 
-	signer, err := h.signer(actorExternalID)
+	signer, err := h.signer(actorExternalID, actorNamespace)
 	require.NoError(t, err, "build JWT signer for %s", actorExternalID)
 	signer.SignAuthHeader(req)
 
@@ -319,7 +459,7 @@ func (h *RemoteAuthProxy) doSigned(t *testing.T, actorExternalID, method, rawURL
 
 	respBody, err := io.ReadAll(resp.Body)
 	require.NoError(t, err, "read response body")
-	require.Equalf(t, wantStatus, resp.StatusCode, "%s %s returned %d: %s", method, rawURL, resp.StatusCode, string(respBody))
+	require.Containsf(t, wantStatuses, resp.StatusCode, "%s %s returned %d: %s", method, rawURL, resp.StatusCode, string(respBody))
 
 	if out != nil {
 		require.NoError(t, json.Unmarshal(respBody, out), "decode response from %s %s: %s", method, rawURL, string(respBody))
@@ -332,19 +472,33 @@ func (h *RemoteAuthProxy) doSigned(t *testing.T, actorExternalID, method, rawURL
 	}
 }
 
-func (h *RemoteAuthProxy) signer(actorExternalID string) (jwt.Signer, error) {
+func (h *RemoteAuthProxy) signer(actorExternalID, actorNamespace string) (jwt.Signer, error) {
 	builder := jwt.NewJwtTokenBuilder().
-		WithActorExternalId(actorExternalID).
-		WithNamespace(h.Namespace).
-		WithActorSigned().
+		WithSystemSigned().
 		WithServiceIds(sconfig.AllServiceIds()).
-		WithPermissions(aschema.AllPermissions()).
 		WithExpiresIn(15 * time.Minute)
 
-	if looksLikePath(h.privateKey) {
-		builder = builder.WithPrivateKeyPath(h.privateKey)
+	var permissions []aschema.Permission
+	switch {
+	case actorExternalID == h.AdminActorExternalID && actorNamespace == h.AdminActorNamespace:
+		permissions = h.adminActorPermissions
+	case actorExternalID == h.UserActorExternalID && actorNamespace == h.UserActorNamespace:
+		permissions = h.userActorPermissions
+	default:
+		return nil, fmt.Errorf("no permissions configured for actor %q in namespace %q", actorExternalID, actorNamespace)
+	}
+	builder = builder.
+		WithActor(&core.Actor{
+			ExternalId:  actorExternalID,
+			Namespace:   actorNamespace,
+			Permissions: permissions,
+		}).
+		WithPermissions(permissions)
+
+	if looksLikePath(h.globalKey) {
+		builder = builder.WithSecretKeyPath(h.globalKey)
 	} else {
-		builder = builder.WithPrivateKeyString(h.privateKey)
+		builder = builder.WithSecretKeyString(h.globalKey)
 	}
 
 	return builder.Signer()

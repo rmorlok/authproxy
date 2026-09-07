@@ -23,6 +23,20 @@ import (
 
 var lowerCamelCase = regexp.MustCompile(`^[a-z][A-Za-z0-9]*$`)
 
+// These tags belong to an external provider API rather than AuthProxy's wire
+// contract. Keep the exception exact so other seed-service fields remain
+// covered by the lowerCamelCase guard.
+var externalJSONTags = map[string]map[string]struct{}{
+	"demos/seed/backend/main.go": {
+		"display_name":               {},
+		"header_name":                {},
+		"redirect_uri":               {},
+		"require_pkce":               {},
+		"required_scope":             {},
+		"token_endpoint_auth_method": {},
+	},
+}
+
 var goContractDirs = []string{
 	"cmd/cli", "cmd/loadtest", "demos/seed/backend", "demos/shell/backend",
 	"internal/apauth", "internal/app_metrics", "internal/apredis", "internal/config",
@@ -86,7 +100,8 @@ func checkGoTags() []string {
 				tag := reflect.StructTag(tagText)
 				for _, kind := range []string{"json", "yaml", "form"} {
 					name := strings.Split(tag.Get(kind), ",")[0]
-					if name != "" && name != "-" && name != "$id" && !lowerCamelCase.MatchString(name) {
+					if name != "" && name != "-" && name != "$id" && !lowerCamelCase.MatchString(name) &&
+						!(kind == "json" && isExternalJSONTag(path, name)) {
 						violations = append(violations, fmt.Sprintf("%s: %s tag %q must be lowerCamelCase", path, kind, name))
 					}
 				}
@@ -96,6 +111,15 @@ func checkGoTags() []string {
 		})
 	}
 	return violations
+}
+
+func isExternalJSONTag(path, name string) bool {
+	allowed, ok := externalJSONTags[filepath.ToSlash(path)]
+	if !ok {
+		return false
+	}
+	_, ok = allowed[name]
+	return ok
 }
 
 func checkSchemas() []string {

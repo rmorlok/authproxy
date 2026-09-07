@@ -49,22 +49,21 @@ func (th *taskHandler) RegisterTasks(mux *asynq.ServeMux) {
 }
 
 // GetCronTasks returns the cron task configurations for actor sync.
-// Only returns tasks if ConfiguredActorsExternalSource is configured.
+// Only returns tasks if an external actor source is configured.
 func (th *taskHandler) GetCronTasks() []*asynq.PeriodicTaskConfig {
 	actors := th.cfg.GetRoot().SystemAuth.Actors
 	if actors == nil {
 		return nil
 	}
 
-	// Only create cron task for external source configuration
-	caes, ok := actors.InnerVal.(*sconfig.ConfiguredActorsExternalSource)
+	sources, ok := actors.InnerVal.(*sconfig.ConfiguredActorsExternalSources)
 	if !ok {
 		return nil
 	}
 
 	return []*asynq.PeriodicTaskConfig{
 		{
-			Cronspec: caes.GetSyncCronScheduleOrDefault(),
+			Cronspec: sources.GetSyncCronScheduleOrDefault(),
 			Task:     NewSyncActorsExternalSourceTask(),
 		},
 		{

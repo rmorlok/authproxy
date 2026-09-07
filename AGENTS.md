@@ -15,6 +15,12 @@ the hosted demos, and the shortest developer quick start. Put conceptual,
 integration, SDK, deployment, operations, security, reference, and detailed
 development material in the Starlight site under `docs/src/content/docs/`.
 
+`docs/src/content/docs/security/permission-resources-and-verbs.md` is the
+canonical list of permission resource types and verbs. Whenever a permission
+check is added, changed, or removed—including route `ForResource` /
+`ForVerb(s)` checks and direct checks such as secret replay—update that table in
+the same change.
+
 ## Workflow
 
 ### Preflight (required before commit)

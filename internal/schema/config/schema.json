@@ -519,6 +519,14 @@
       "properties": {
         "baseUrl": {
           "$ref": "../common/schema.json#/$defs/StringValue"
+        },
+        "colorMode": {
+          "enum": [
+            "light",
+            "dark",
+            "system"
+          ],
+          "type": "string"
         }
       },
       "additionalProperties": false,
@@ -1104,25 +1112,43 @@
         {
           "type": "object",
           "properties": {
-            "keysPath": {
-              "type": "string"
-            },
-            "permissions": {
-              "type": "array",
-              "items": {
-                "$ref": "../auth/schema.json#/$defs/Permission"
-              }
-            },
             "syncCronSchedule": {
               "type": "string"
             }
           },
-          "required": [
-            "keysPath"
-          ],
-          "additionalProperties": false
+          "patternProperties": {
+            "^root(?:\\.[a-zA-Z0-9_]+[a-zA-Z0-9_\\-]*)*$": {
+              "$ref": "#/$defs/ConfiguredActorsExternalSource"
+            }
+          },
+          "additionalProperties": false,
+          "minProperties": 1,
+          "not": {
+            "required": [
+              "syncCronSchedule"
+            ],
+            "maxProperties": 1
+          }
         }
       ]
+    },
+    "ConfiguredActorsExternalSource": {
+      "type": "object",
+      "properties": {
+        "keysPath": {
+          "type": "string"
+        },
+        "permissions": {
+          "type": "array",
+          "items": {
+            "$ref": "../auth/schema.json#/$defs/Permission"
+          }
+        }
+      },
+      "required": [
+        "keysPath"
+      ],
+      "additionalProperties": false
     }
   },
   "properties": {

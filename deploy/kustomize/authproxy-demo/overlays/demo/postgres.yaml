@@ -7,6 +7,8 @@ metadata:
     app.kubernetes.io/component: database
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/name: postgresql
@@ -34,6 +36,13 @@ spec:
                 secretKeyRef:
                   name: demo-db
                   key: AUTHPROXY_DB_PASSWORD
+          volumeMounts:
+            - name: data
+              mountPath: /bitnami/postgresql
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: postgresql-data
 ---
 apiVersion: v1
 kind: Service
@@ -51,3 +60,15 @@ spec:
     - name: postgresql
       port: 5432
       targetPort: postgresql
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgresql-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: gp3
+  resources:
+    requests:
+      storage: 10Gi

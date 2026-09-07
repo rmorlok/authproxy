@@ -39,6 +39,8 @@ connectors:
         namespace: root.integrations
         labels:
           type: google-drive
+        annotations:
+          example.com/owner: integrations@example.com
       spec:
         release:
           desiredState: primary
@@ -53,9 +55,10 @@ connectors:
 
 With the development-only `serve --auto-migrate` option, AuthProxy reconciles
 this entry to the live connector whose exact
-name is `google-drive` in `root.integrations`. Labels are ordinary selectable
-metadata and do not participate in identity. Multiple configured versions use
-the same name and namespace.
+name is `google-drive` in `root.integrations`. Labels are selectable metadata;
+annotations are non-selectable metadata for values such as ownership details,
+descriptions, and links. Neither participates in connector identity. Multiple
+configured versions use the same name and namespace.
 
 An entry with an explicit `id` may omit `name`; a newly created connector then
 defaults its name to the ID. To rename an existing configured connector, keep
@@ -68,6 +71,43 @@ been removed. Every entry must be an `authproxy.net/v1alpha1` `Connector`
 resource. Delete `identifyingLabels` from existing configuration and add a
 stable `metadata.name` to every connector entry that does not already specify
 `metadata.id`.
+
+## Configured actor namespaces
+
+Inline configured actors are complete `authproxy.net/v1alpha1` `Actor`
+resources and set their namespace in `metadata.namespace`. For actors
+discovered from public-key directories, key each source by the namespace that
+owns its actors:
+
+```yaml
+systemAuth:
+  actors:
+    root:
+      keysPath: /etc/authproxy/keys/actors/root
+      permissions:
+        - namespace: root.**
+          resources: ["*"]
+          verbs: ["*"]
+    root.smoke:
+      keysPath: /etc/authproxy/keys/actors/smoke
+      permissions:
+        - namespace: root.smoke
+          resources: [connectors]
+          verbs: [list]
+        - namespace: root.smoke.{{external_id}}
+          resources: [connections]
+          verbs: [create, get, proxy]
+    syncCronSchedule: "* * * * *"
+```
+
+Every `.pub` file in a source directory creates an actor in that source's
+namespace. For example,
+`/etc/authproxy/keys/actors/smoke/smoke-user.pub` creates `smoke-user` in
+`root.smoke`. Permissions are source-specific, and permission namespaces can
+use actor templates such as `{{external_id}}`. Development migration creates
+each configured actor namespace and its missing parents before synchronization.
+Directory sources must always be keyed by namespace; the former
+single-directory actor source shape is not supported.
 
 ## Kubernetes values
 

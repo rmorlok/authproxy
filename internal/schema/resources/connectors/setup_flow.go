@@ -463,6 +463,8 @@ func (s *SetupFlowStep) validate(vc *common.ValidationContext, seenIds map[strin
 			result = multierror.Append(result, vc.NewErrorfForField("json_schema", "json_schema is required for form steps"))
 		} else if !json.Valid(s.JsonSchema) {
 			result = multierror.Append(result, vc.NewErrorfForField("json_schema", "json_schema is not valid JSON"))
+		} else if err := s.validateDataSourceReferences(vc.PushField("json_schema")); err != nil {
+			result = multierror.Append(result, err)
 		}
 		if !s.UiSchema.IsEmpty() && !json.Valid(s.UiSchema) {
 			result = multierror.Append(result, vc.NewErrorfForField("ui_schema", "ui_schema is not valid JSON"))
@@ -492,6 +494,48 @@ func (s *SetupFlowStep) validate(vc *common.ValidationContext, seenIds map[strin
 			if err := s.Redirect.Validate(vc.PushField("redirect")); err != nil {
 				result = multierror.Append(result, err)
 			}
+		}
+	}
+
+	return result.ErrorOrNil()
+}
+
+// validateDataSourceReferences ensures fields backed by dynamic options name a
+// data source defined on the same step. The Marketplace only resolves
+// x-data-source annotations on top-level properties, so validate the same
+// surface here and reject connector definitions that would render an empty
+// input instead of a select control.
+func (s *SetupFlowStep) validateDataSourceReferences(vc *common.ValidationContext) error {
+	var schema map[string]json.RawMessage
+	if err := json.Unmarshal(s.JsonSchema, &schema); err != nil {
+		return nil
+	}
+
+	var properties map[string]json.RawMessage
+	if err := json.Unmarshal(schema["properties"], &properties); err != nil {
+		return nil
+	}
+
+	result := &multierror.Error{}
+	for propertyName, rawProperty := range properties {
+		var property map[string]json.RawMessage
+		if err := json.Unmarshal(rawProperty, &property); err != nil {
+			continue
+		}
+
+		rawSourceID, ok := property["x-data-source"]
+		if !ok {
+			continue
+		}
+
+		propertyVc := vc.PushField("properties").PushField(propertyName)
+		var sourceID string
+		if err := json.Unmarshal(rawSourceID, &sourceID); err != nil || sourceID == "" {
+			result = multierror.Append(result, propertyVc.NewErrorfForField("x-data-source", "x-data-source must be a non-empty string"))
+			continue
+		}
+		if _, ok := s.DataSources[sourceID]; !ok {
+			result = multierror.Append(result, propertyVc.NewErrorfForField("x-data-source", "x-data-source %q is not defined in data_sources", sourceID))
 		}
 	}
 

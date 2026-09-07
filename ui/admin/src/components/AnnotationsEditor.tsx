@@ -30,7 +30,9 @@ export default function AnnotationsEditor({annotations, onPut, onDelete, readOnl
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const entries = annotations ? Object.entries(annotations) : [];
+  const entries = annotations
+    ? Object.entries(annotations).sort(([left], [right]) => left.localeCompare(right))
+    : [];
 
   const handleSaveNew = async () => {
     if (!newKey.trim()) return;

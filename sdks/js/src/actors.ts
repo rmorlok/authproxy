@@ -12,12 +12,14 @@ import {
 
 export const ACTOR_KIND = 'Actor' as const;
 
-export interface ActorPermission {
+export interface Permission {
   namespace: string;
   resources: string[];
   resourceIds?: string[];
   verbs: string[];
 }
+
+export type ActorPermission = Permission;
 
 export type ActorSigningKey = Record<string, unknown>;
 

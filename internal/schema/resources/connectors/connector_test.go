@@ -258,3 +258,12 @@ func mustJSON(t *testing.T, value any) string {
 	require.NoError(t, err)
 	return string(data)
 }
+
+func TestConnectorCloneCopiesAnnotations(t *testing.T) {
+	original := &Connector{Metadata: meta.ObjectMeta{Annotations: map[string]string{"example.com/owner": "before"}}}
+	clone := original.Clone()
+
+	clone.Metadata.Annotations["example.com/owner"] = "after"
+
+	require.Equal(t, "before", original.Metadata.Annotations["example.com/owner"])
+}

@@ -12,12 +12,11 @@ import (
 )
 
 type ConfiguredActorsExternalSource struct {
-	KeysPath         string               `json:"keysPath" yaml:"keysPath"`
-	Permissions      []aschema.Permission `json:"permissions,omitempty" yaml:"permissions,omitempty"`
-	SyncCronSchedule string               `json:"syncCronSchedule,omitempty" yaml:"syncCronSchedule,omitempty"`
+	KeysPath    string               `json:"keysPath" yaml:"keysPath"`
+	Permissions []aschema.Permission `json:"permissions,omitempty" yaml:"permissions,omitempty"`
 }
 
-func (s *ConfiguredActorsExternalSource) All() []*actorschema.Actor {
+func (s *ConfiguredActorsExternalSource) AllInNamespace(namespace string) []*actorschema.Actor {
 	entries, err := os.ReadDir(s.KeysPath)
 	if err != nil {
 		panic(err)
@@ -35,7 +34,7 @@ func (s *ConfiguredActorsExternalSource) All() []*actorschema.Actor {
 			externalId := strings.TrimSuffix(entry.Name(), ".pub")
 			actors = append(actors, &actorschema.Actor{
 				TypeMeta: meta.NewTypeMeta(actorschema.ActorKind),
-				Metadata: meta.ObjectMeta{Namespace: "root"},
+				Metadata: meta.ObjectMeta{Namespace: namespace},
 				Spec: actorschema.ActorSpec{
 					ExternalId: externalId,
 					SigningKey: &keyschema.SigningKey{
@@ -55,29 +54,3 @@ func (s *ConfiguredActorsExternalSource) All() []*actorschema.Actor {
 
 	return actors
 }
-
-func (s *ConfiguredActorsExternalSource) GetByExternalId(externalId string) (*actorschema.Actor, bool) {
-	for _, actor := range s.All() {
-		if actor.Spec.ExternalId == externalId {
-			return actor, true
-		}
-	}
-
-	return nil, false
-}
-
-func (s *ConfiguredActorsExternalSource) GetBySubject(subject string) (*actorschema.Actor, bool) {
-	// Subject is the same as ExternalId (no admin/ prefix handling)
-	return s.GetByExternalId(subject)
-}
-
-// GetSyncCronScheduleOrDefault returns the cron schedule for actors sync,
-// or a default of every 5 minutes if not configured.
-func (s *ConfiguredActorsExternalSource) GetSyncCronScheduleOrDefault() string {
-	if s == nil || s.SyncCronSchedule == "" {
-		return "*/5 * * * *" // Every 5 minutes
-	}
-	return s.SyncCronSchedule
-}
-
-var _ ConfiguredActorsType = (*ConfiguredActorsExternalSource)(nil)

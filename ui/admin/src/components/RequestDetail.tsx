@@ -27,6 +27,7 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import {Duration, HttpStatusChip} from '../util'
 import {getRequestEvent, RequestEvent} from '@authproxy/api';
 import Chip from "@mui/material/Chip";
+import {ResourceLabelChips} from './ResourceMetadataFields';
 
 function useRequest(id: string | undefined, fallbackRecord?: RequestEvent) {
     const [data, setData] = useState<RequestEvent | null>(null);
@@ -448,6 +449,9 @@ export default function RequestDetail({requestId, record, onClose, showOpenFullP
                                 <Table size="small">
                                     <TableBody>
                                         <TableRow><TableCell>ID</TableCell><TableCell>{data.metadata.id}</TableCell></TableRow>
+                                        {data.metadata.namespace && (
+                                            <TableRow><TableCell>Namespace</TableCell><TableCell>{data.metadata.namespace}</TableCell></TableRow>
+                                        )}
                                         {data.spec.correlationId && (
                                             <TableRow><TableCell>Correlation
                                                 ID</TableCell><TableCell>{data.spec.correlationId}</TableCell></TableRow>
@@ -474,11 +478,7 @@ export default function RequestDetail({requestId, record, onClose, showOpenFullP
                                             <TableRow>
                                                 <TableCell>Labels</TableCell>
                                                 <TableCell>
-                                                    <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', gap: 0.5 }}>
-                                                        {Object.entries(data.metadata.labels).map(([k, v]) => (
-                                                            <Chip key={k} label={`${k}=${v}`} size="small" variant="outlined" />
-                                                        ))}
-                                                    </Stack>
+                                                    <ResourceLabelChips labels={data.metadata.labels}/>
                                                 </TableCell>
                                             </TableRow>
                                         )}

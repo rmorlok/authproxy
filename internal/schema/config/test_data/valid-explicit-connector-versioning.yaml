@@ -9,6 +9,8 @@ connectors:
       generation: 1
       labels:
         type: asana
+      annotations:
+        example.com/owner: integrations@example.com
     spec:
       definition:
         displayName: Asana

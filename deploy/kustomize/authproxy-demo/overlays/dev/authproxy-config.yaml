@@ -41,10 +41,12 @@ systemAuth:
   globalAesKey:
     path: /etc/authproxy/keys/encryption/global_aes.key
   actors:
-    keysPath: /etc/authproxy/keys/actors
-    permissions:
-      - namespace: root.**
-        resources:
-          - "*"
-        verbs:
-          - "*"
+    root:
+      keysPath: /etc/authproxy/keys/actors/root
+      permissions:
+        - namespace: root.**
+          resources:
+            - "*"
+          verbs:
+            - "*"
+    syncCronSchedule: "* * * * *"

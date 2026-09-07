@@ -16,14 +16,14 @@ import {
     listConnections,
     ListConnectionsParams,
     ConnectionList,
-    namespaceAndChildren
 } from '@authproxy/api';
 import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
 import {useQueryState, parseAsInteger, parseAsStringLiteral, parseAsString} from 'nuqs'
 import {useSelector} from "react-redux";
-import {selectCurrentNamespacePath} from "../store/namespacesSlice";
+import {selectCurrentNamespaceMatcher} from "../store/namespacesSlice";
 import {toSnakeCase} from '../util';
+import {ResourceLabelChips} from '../components/ResourceMetadataFields';
 
 function renderState(state: ConnectionState) {
     const colors: Record<ConnectionState, "default" | "success" | "error" | "info" | "warning" | "primary" | "secondary"> = {
@@ -70,21 +70,12 @@ export const columns: GridColDef<Connection>[] = [
     },
     {
         field: 'labels',
-        headerName: 'Connection Labels',
+        headerName: 'Labels',
         flex: 0.7,
         minWidth: 120,
         sortable: false,
-        renderCell: (params) => {
-            const labels = params.row.metadata.labels;
-            if (!labels || Object.keys(labels).length === 0) return null;
-            return (
-                <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{ py: 0.5 }}>
-                    {Object.entries(labels).map(([key, value]) => (
-                        <Chip key={key} label={`${key}: ${value}`} size="small" variant="outlined" />
-                    ))}
-                </Stack>
-            );
-        },
+        valueGetter: (_, row) => row.metadata.labels,
+        renderCell: (params) => <ResourceLabelChips labels={params.value as Record<string, string> | undefined}/>,
     },
     {
         field: 'connector.name',
@@ -150,7 +141,7 @@ export default function Connections() {
     ], []);
     const stateVals = useMemo(() => stateOptions.map(opt => opt.value), [stateOptions]);
     const navigate = useNavigate();
-    const ns = useSelector(selectCurrentNamespacePath);
+    const namespaceMatcher = useSelector(selectCurrentNamespaceMatcher);
 
     const [rows, setRows] = useState<Connection[]>([]);
     const [rowCount, setRowCount] = useState<number>(-1);
@@ -236,7 +227,7 @@ export default function Connections() {
 
                 const params: ListConnectionsParams = prevResp?.metadata.continue ? {cursor: prevResp.metadata.continue} : {
                     state: (stateFilter as ConnectionState) || undefined,
-                    namespace: namespaceAndChildren(ns),
+                    namespace: namespaceMatcher,
                     orderBy: sort || undefined,
                     limit: pageSize,
                 };
@@ -272,7 +263,7 @@ export default function Connections() {
         // Reset cursors/cache and immediately fetch first page to ensure initial load
         resetPagination();
         fetchPage(1);
-    }, [ns, pageSize, sort, stateFilter]);
+    }, [namespaceMatcher, pageSize, sort, stateFilter]);
 
     useEffect(() => {
         fetchPage(page);

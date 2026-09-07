@@ -13,6 +13,21 @@
         "domain":       { "type": "string" }
       }
     },
+    "storageClass": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled":              { "type": "boolean" },
+        "name":                 { "type": "string", "minLength": 1 },
+        "default":              { "type": "boolean" },
+        "type":                 { "type": "string", "enum": ["gp2", "gp3", "io1", "io2", "sc1", "st1"] },
+        "encrypted":            { "type": "boolean" },
+        "fsType":               { "type": "string", "enum": ["ext2", "ext3", "ext4", "xfs"] },
+        "reclaimPolicy":        { "type": "string", "enum": ["Delete", "Retain"] },
+        "volumeBindingMode":    { "type": "string", "enum": ["Immediate", "WaitForFirstConsumer"] },
+        "allowVolumeExpansion": { "type": "boolean" }
+      }
+    },
     "clusterIssuer": {
       "type": "object",
       "additionalProperties": false,

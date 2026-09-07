@@ -7,6 +7,8 @@ metadata:
     app.kubernetes.io/component: redis
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/name: redis
@@ -32,6 +34,13 @@ spec:
                 secretKeyRef:
                   name: demo-redis-creds
                   key: AUTHPROXY_REDIS_PASSWORD
+          volumeMounts:
+            - name: data
+              mountPath: /bitnami/redis/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: redis-data
 ---
 apiVersion: v1
 kind: Service
@@ -49,3 +58,15 @@ spec:
     - name: redis
       port: 6379
       targetPort: redis
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: gp3
+  resources:
+    requests:
+      storage: 2Gi

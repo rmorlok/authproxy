@@ -8,7 +8,8 @@ The base contains the shared AuthProxy, demo-shell, and go-oauth2-server
 workloads. Overlays choose backing services and public hostnames:
 
 - `overlays/demo` targets `demo.authproxy.net` and includes Postgres, Redis,
-  and MinIO backing workloads.
+  and MinIO backing workloads. Each stateful backing workload uses an encrypted
+  `gp3` persistent volume so data survives pod rescheduling and node replacement.
 - `overlays/dev` targets an example per-branch namespace and keeps the slim
   dev profile: SQLite, embedded miniredis, and filesystem blob storage. Its
   disposable pod-local database uses `serve --auto-migrate`; it removes the
@@ -22,8 +23,8 @@ kubectl kustomize deploy/kustomize/authproxy-demo/overlays/dev
 ```
 
 `Deploy Demo` renders `overlays/demo`, rewrites the checked-out overlay with
-the selected image tag and configured hostname, and applies the resulting
-manifest with `kubectl apply`. The demo overlay includes Grafana at
+the selected image tag and configured hostname, applies the resulting
+manifest with `kubectl apply`, and then runs the seed job. The demo overlay includes Grafana at
 `https://<hostname>/grafana` with the bundled AuthProxy datasource plugin,
 Prometheus, Tempo, and Loki datasources, and sample app metrics dashboard
 provisioned from Kustomize ConfigMaps. Prometheus, Tempo, Loki, and the OTel
@@ -61,19 +62,13 @@ Set the `DEMO_GRAFANA_ADMIN_USER` repo variable and
 password is unset, the first deploy generates a random password and stores it
 in the cluster Secret.
 
-Seeding is intentionally not part of the Kustomize deployment apply. Run the
-`Seed Demo` GitHub Actions workflow to reseed the persistent demo environment
-on demand; it renders `overlays/demo/seed` and applies the resulting Job.
-Dev seeding will be run by the per-branch deploy workflow after the environment
-is applied.
+Both demo and dev deployment workflows run their seed job after the environment
+is ready. The `Seed Demo` GitHub Actions workflow remains available to rerun
+the demo seed job on demand.
 
-The seed ConfigMaps contain complete `authproxy.net/v1alpha1` `Actor` and
-`Connector` resources. Connector seed identity is its exact
+The job idempotently provisions `root.demo`, verifies or creates the
+least-privilege `demo-user`, and publishes demo connectors in `root.demo`.
+The seed ConfigMaps contain complete `authproxy.net/v1alpha1` `Namespace`,
+`Actor`, and `Connector` resources. Connector seed identity is its exact
 `metadata.namespace` and `metadata.name`; labels are ordinary resource
-metadata. The seed binary rejects the former flat actor and connector forms.
-
-There is deliberately no conversion job for environments populated with the
-former connector-definition format. At this pre-production API boundary,
-delete the disposable demo/dev environment and its data, redeploy it, and then
-run the seed workflow. Do not run the new seed job against legacy persisted
-data.
+metadata. The seed binary rejects the former flat resource forms.
