@@ -66,3 +66,14 @@ Seeding is intentionally not part of the Kustomize deployment apply. Run the
 on demand; it renders `overlays/demo/seed` and applies the resulting Job.
 Dev seeding will be run by the per-branch deploy workflow after the environment
 is applied.
+
+The seed ConfigMaps contain complete `authproxy.net/v1alpha1` `Actor` and
+`Connector` resources. Connector seed identity is its exact
+`metadata.namespace` and `metadata.name`; labels are ordinary resource
+metadata. The seed binary rejects the former flat actor and connector forms.
+
+There is deliberately no conversion job for environments populated with the
+former connector-definition format. At this pre-production API boundary,
+delete the disposable demo/dev environment and its data, redeploy it, and then
+run the seed workflow. Do not run the new seed job against legacy persisted
+data.

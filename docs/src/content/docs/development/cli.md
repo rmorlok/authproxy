@@ -89,19 +89,22 @@ the name to recognize a resource, but pass the ID to commands and URLs that
 address it directly.
 
 ```bash
-ap list connectors --name salesforce --state active --output table
+ap list connectors --name salesforce --state active
 ap list connections --name production-crm --order "created_at DESC"
 ```
 
 `--name` is an exact, case-sensitive filter. If the caller can list several
 namespaces, the same name can produce more than one result; compare namespace
 and ID before acting. Other useful flags are `--state`, `--type` (connectors
-only), `--order "<field> ASC|DESC"`, plus the global output flags from the
-`Output` helper (`--output json|jsonl|table`, `--limit`, …).
+only), and `--order "<field> ASC|DESC"`. Pagination is automatic and the
+complete result is printed as a JSON array.
 
-JSON and JSONL output retain the existing `id` field and add `name`; scripts
-that need durable identity should continue reading `id`. The CLI does not yet
-have dedicated create or rename commands, so use the API for those operations.
+JSON output contains complete `authproxy.net/v1alpha1` resources, including
+`apiVersion`, `kind`, `metadata`, `spec`, and (when available) `status`.
+Scripts that need durable identity should read `metadata.id`; the display name
+is `metadata.name`, and connector generations use `metadata.generation`. The
+CLI does not yet have dedicated create or rename commands, so use the API for
+those operations.
 See [Resource identity and names](/reference/api/#resource-identity-and-names)
 for create, rename-by-ID, conflict, and query examples.
 

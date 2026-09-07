@@ -47,7 +47,7 @@ func TestApiKeyVersionMigrationConfigureChangeRequiresSetup(t *testing.T) {
 		},
 	})
 	published := env.PublishConnectorVersion(t, connectorID, v2, nil, nil)
-	require.Equal(t, uint64(2), published.Version)
+	require.Equal(t, uint64(2), published.Metadata.Generation)
 
 	env.MigrateConnectionVersionAndWait(t, connectionID, 2, apiKeyMigrationTimeout)
 
@@ -64,8 +64,8 @@ func TestApiKeyVersionMigrationConfigureChangeRequiresSetup(t *testing.T) {
 		helpers.NotificationKeySuffixSetupRequired,
 	)
 	assertNoAuthProxyCopy(t, notification)
-	assert.True(t, notification.CanAction)
-	assert.Contains(t, notification.ActionUrl, "action=configure")
+	require.NotNil(t, notification.Status.Action)
+	assert.Contains(t, notification.Status.Action.URL, "action=configure")
 
 	w := env.SubmitSetupForm(t, connectionID, configureWorkspaceStepID, map[string]any{
 		"workspace": "north",
@@ -107,7 +107,7 @@ func TestApiKeyVersionMigrationPreconnectChangeRequiresReauth(t *testing.T) {
 		},
 	})
 	published := env.PublishConnectorVersion(t, connectorID, v2, nil, nil)
-	require.Equal(t, uint64(2), published.Version)
+	require.Equal(t, uint64(2), published.Metadata.Generation)
 
 	env.MigrateConnectionVersionAndWait(t, connectionID, 2, apiKeyMigrationTimeout)
 
@@ -123,20 +123,20 @@ func TestApiKeyVersionMigrationPreconnectChangeRequiresReauth(t *testing.T) {
 		helpers.NotificationKeySuffixAuthRequired,
 	)
 	assertNoAuthProxyCopy(t, notification)
-	assert.True(t, notification.CanAction)
-	assert.Contains(t, notification.ActionUrl, "action=reauth")
+	require.NotNil(t, notification.Status.Action)
+	assert.Contains(t, notification.Status.Action.URL, "action=reauth")
 
 	stub.RotateAcceptedKey(rotatedKey)
 
 	w := env.ReauthConnection(t, connectionID)
 	form := requireConnectionSetupForm(t, w)
-	require.Equal(t, preconnectRegionStepID, form.StepId)
+	require.Equal(t, preconnectRegionStepID, form.StepID)
 
 	w = env.SubmitSetupForm(t, connectionID, preconnectRegionStepID, map[string]any{
 		"region": "us-east-1",
 	})
 	form = requireConnectionSetupForm(t, w)
-	require.Equal(t, helpers.ApiKeySubmitFormStepId(), form.StepId)
+	require.Equal(t, helpers.ApiKeySubmitFormStepId(), form.StepID)
 
 	w = env.SubmitApiKeyCredentials(t, connectionID, helpers.ApiKeySubmitFormStepId(), map[string]any{
 		"api_key": rotatedKey,
@@ -169,12 +169,14 @@ func createPrimaryAPIKeyConnector(
 	t.Helper()
 
 	created := env.CreateConnector(t, apiKeyMigrationConnectorDefinition(displayName, stub, setupFlow), nil, nil)
-	require.Equal(t, uint64(1), created.Version)
-	require.Equal(t, schemaapi.ConnectorVersionStateDraft, created.State)
+	require.Equal(t, uint64(1), created.Metadata.Generation)
+	require.NotNil(t, created.Status)
+	require.Equal(t, connectors.ConnectorReleaseStateDraft, created.Status.Release.State)
 
-	primary := env.ForceConnectorVersionState(t, created.Id, created.Version, schemaapi.ConnectorVersionStatePrimary)
-	require.Equal(t, schemaapi.ConnectorVersionStatePrimary, primary.State)
-	return created.Id
+	primary := env.ForceConnectorVersionState(t, created.GetId(), created.Metadata.Generation, connectors.ConnectorReleaseStatePrimary)
+	require.NotNil(t, primary.Status)
+	require.Equal(t, connectors.ConnectorReleaseStatePrimary, primary.Status.Release.State)
+	return created.GetId()
 }
 
 func createHealthyAPIKeyConnection(
@@ -186,9 +188,9 @@ func createHealthyAPIKeyConnection(
 	t.Helper()
 
 	connectionID, form := env.InitiateApiKeyConnection(t, connectorID)
-	require.Equal(t, helpers.ApiKeySubmitFormStepId(), form.StepId)
+	require.Equal(t, helpers.ApiKeySubmitFormStepId(), form.StepID)
 
-	w := env.SubmitApiKeyCredentials(t, connectionID, form.StepId, map[string]any{"api_key": apiKey})
+	w := env.SubmitApiKeyCredentials(t, connectionID, form.StepID, map[string]any{"api_key": apiKey})
 	requireConnectionSetupVerifying(t, w)
 	require.NoError(t, env.RunVerifyConnection(t, connectionID))
 
@@ -206,7 +208,7 @@ func apiKeyMigrationConnectorDefinition(
 	stub *helpers.ApiKeyStubUpstream,
 	setupFlow *connectors.SetupFlow,
 ) sconfig.ConnectorDefinition {
-	conn := helpers.NewApiKeyConnector(apid.New(apid.PrefixConnectorVersion), displayName, helpers.ApiKeyConnectorOptions{
+	conn := helpers.NewApiKeyConnector(apid.New(apid.PrefixConnector), displayName, helpers.ApiKeyConnectorOptions{
 		Placement: connectors.ApiKeyPlacementBearer,
 		ProbeURL:  stub.BaseURL + "/probe",
 	}).Spec.Definition
@@ -229,17 +231,25 @@ func requiredStringStep(stepID, title, fieldName string) connectors.SetupFlowSte
 			"required": ["` + fieldName + `"],
 			"additionalProperties": false
 		}`),
+		UiSchema: common.RawJSON(`{
+			"type": "VerticalLayout",
+			"elements": [{
+				"type": "Control",
+				"scope": "#/properties/` + fieldName + `"
+			}]
+		}`),
 	}
 }
 
-func requireConnectionSetupForm(t *testing.T, w *httptest.ResponseRecorder) schemaapi.ConnectionSetupForm {
+func requireConnectionSetupForm(t *testing.T, w *httptest.ResponseRecorder) *schemaapi.ConnectionSetupActionStatus {
 	t.Helper()
 	require.Equalf(t, http.StatusOK, w.Code, "setup request failed: %s", w.Body.String())
 	requireConnectionSetupResponseType(t, w, schemaapi.ConnectionSetupResponseTypeForm)
 
-	var form schemaapi.ConnectionSetupForm
-	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &form))
-	return form
+	var action schemaapi.ConnectionSetupAction
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &action))
+	require.NotNil(t, action.Status)
+	return action.Status
 }
 
 func requireConnectionSetupVerifying(t *testing.T, w *httptest.ResponseRecorder) {
@@ -261,15 +271,14 @@ func requireConnectionSetupResponseType(
 ) {
 	t.Helper()
 
-	var generic struct {
-		Type schemaapi.ConnectionSetupResponseType `json:"type"`
-	}
-	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &generic))
-	require.Equalf(t, expected, generic.Type, "unexpected setup response: %s", w.Body.String())
+	var action schemaapi.ConnectionSetupAction
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &action))
+	require.NotNil(t, action.Status)
+	require.Equalf(t, expected, action.Status.Type, "unexpected setup response: %s", w.Body.String())
 }
 
 func assertNoAuthProxyCopy(t *testing.T, notification schemaapi.NotificationJson) {
 	t.Helper()
-	assert.NotContains(t, strings.ToLower(notification.Title), "authproxy")
-	assert.NotContains(t, strings.ToLower(notification.Message), "authproxy")
+	assert.NotContains(t, strings.ToLower(notification.Spec.Title), "authproxy")
+	assert.NotContains(t, strings.ToLower(notification.Spec.Message), "authproxy")
 }

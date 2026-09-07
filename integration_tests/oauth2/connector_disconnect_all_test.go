@@ -51,7 +51,7 @@ func newConnectorDisconnectAllRig(t *testing.T, name string, connectorCount int)
 	for i := 0; i < connectorCount; i++ {
 		clientKey := fmt.Sprintf("%s-client-%d-%s", name, i, suffix)
 		clientSecret := fmt.Sprintf("%s-secret-%d-%s", name, i, suffix)
-		connectorID := apid.New(apid.PrefixConnectorVersion)
+		connectorID := apid.New(apid.PrefixConnector)
 		connector := helpers.NewOAuth2Connector(connectorID, fmt.Sprintf("%s-%d", name, i), provider, helpers.OAuth2ConnectorOptions{
 			ClientID:          clientKey,
 			ClientSecret:      clientSecret,

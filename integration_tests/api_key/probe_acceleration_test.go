@@ -40,7 +40,7 @@ func TestApiKeyProbeAcceleration_401EnqueuesProbeNow(t *testing.T) {
 		AcceptedKey: goodKey,
 	})
 
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 	conn := helpers.NewApiKeyConnector(connectorID, "api-key-accel", helpers.ApiKeyConnectorOptions{
 		Placement: connectors.ApiKeyPlacementBearer,
 		ProbeURL:  stub.BaseURL + "/probe",
@@ -55,7 +55,7 @@ func TestApiKeyProbeAcceleration_401EnqueuesProbeNow(t *testing.T) {
 	// Drive to Ready with the good key. Subsequent proxy traffic uses
 	// this credential.
 	connectionID, form := env.InitiateApiKeyConnection(t, connectorID)
-	w := env.SubmitApiKeyCredentials(t, connectionID, form.StepId, map[string]any{"api_key": goodKey})
+	w := env.SubmitApiKeyCredentials(t, connectionID, form.StepID, map[string]any{"api_key": goodKey})
 	require.Equalf(t, http.StatusOK, w.Code, "submit failed: %s", w.Body.String())
 	require.NoError(t, env.RunVerifyConnection(t, connectionID))
 
@@ -116,7 +116,7 @@ func TestApiKeyProbeAcceleration_2xxDoesNotEnqueue(t *testing.T) {
 		AcceptedKey: goodKey,
 	})
 
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 	conn := helpers.NewApiKeyConnector(connectorID, "api-key-accel-2xx", helpers.ApiKeyConnectorOptions{
 		Placement: connectors.ApiKeyPlacementBearer,
 		ProbeURL:  stub.BaseURL + "/probe",
@@ -129,7 +129,7 @@ func TestApiKeyProbeAcceleration_2xxDoesNotEnqueue(t *testing.T) {
 	defer env.Cleanup()
 
 	connectionID, form := env.InitiateApiKeyConnection(t, connectorID)
-	w := env.SubmitApiKeyCredentials(t, connectionID, form.StepId, map[string]any{"api_key": goodKey})
+	w := env.SubmitApiKeyCredentials(t, connectionID, form.StepID, map[string]any{"api_key": goodKey})
 	require.Equalf(t, http.StatusOK, w.Code, "submit failed: %s", w.Body.String())
 	require.NoError(t, env.RunVerifyConnection(t, connectionID))
 

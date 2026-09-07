@@ -19,6 +19,7 @@ import (
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	actorschema "github.com/rmorlok/authproxy/internal/schema/resources/actor"
+	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/stretchr/testify/require"
 )
@@ -115,21 +116,22 @@ func (h *RemoteAuthProxy) CreateActor(t *testing.T, externalID string, labels ma
 	return actor
 }
 
-func (h *RemoteAuthProxy) CreateConnector(t *testing.T, connector sconfig.Connector) schemaapi.ConnectorVersionJson {
+func (h *RemoteAuthProxy) CreateConnector(t *testing.T, connector sconfig.Connector) cschema.Connector {
 	t.Helper()
 
-	var created schemaapi.ConnectorVersionJson
-	h.doSigned(t, h.AdminActorExternalID, http.MethodPost, h.AdminURL+"/api/v1/connectors", schemaapi.CreateConnectorRequestJson{
-		Namespace:  h.Namespace,
-		Definition: connector.Spec.Definition,
-		Labels: map[string]string{
-			"smoke": "true",
-		},
-	}, true, http.StatusCreated, &created)
+	resource := connector.Clone()
+	resource.Metadata.Namespace = h.Namespace
+	if resource.Metadata.Labels == nil {
+		resource.Metadata.Labels = map[string]string{}
+	}
+	resource.Metadata.Labels["smoke"] = "true"
+
+	var created cschema.Connector
+	h.doSigned(t, h.AdminActorExternalID, http.MethodPost, h.AdminURL+"/api/v1/connectors", resource, true, http.StatusCreated, &created)
 	return created
 }
 
-func (h *RemoteAuthProxy) ListConnectors(t *testing.T, labelSelector string) []schemaapi.ConnectorJson {
+func (h *RemoteAuthProxy) ListConnectors(t *testing.T, labelSelector string) []cschema.Connector {
 	t.Helper()
 
 	endpoint := h.PublicURL + "/api/v1/connectors?limit=100"
@@ -142,24 +144,26 @@ func (h *RemoteAuthProxy) ListConnectors(t *testing.T, labelSelector string) []s
 	return list.Items
 }
 
-func (h *RemoteAuthProxy) FindConnectorBySeedKey(t *testing.T, seedKey string) schemaapi.ConnectorJson {
+func (h *RemoteAuthProxy) FindConnectorByName(t *testing.T, name string) cschema.Connector {
 	t.Helper()
 
-	connectors := h.ListConnectors(t, "demo.authproxy.net/seed-key="+seedKey)
-	require.Lenf(t, connectors, 1, "expected exactly one seeded connector with key %q; got %d", seedKey, len(connectors))
-	return connectors[0]
+	endpoint := h.PublicURL + "/api/v1/connectors?limit=100&name=" + url.QueryEscape(name)
+	var list schemaapi.ListConnectorsResponseJson
+	h.doSigned(t, h.UserActorExternalID, http.MethodGet, endpoint, nil, true, http.StatusOK, &list)
+	require.Lenf(t, list.Items, 1, "expected exactly one connector named %q; got %d", name, len(list.Items))
+	return list.Items[0]
 }
 
-func (h *RemoteAuthProxy) ForceConnectorVersionState(t *testing.T, connectorID apid.ID, version uint64, state string) schemaapi.ConnectorVersionJson {
+func (h *RemoteAuthProxy) ForceConnectorVersionState(t *testing.T, connectorID apid.ID, version uint64, state cschema.ConnectorReleaseState) cschema.Connector {
 	t.Helper()
 
-	var updated schemaapi.ConnectorVersionJson
+	var updated cschema.Connector
 	h.doSigned(
 		t,
 		h.AdminActorExternalID,
 		http.MethodPut,
 		fmt.Sprintf("%s/api/v1/connectors/%s/versions/%d/_forceState", h.AdminURL, connectorID, version),
-		schemaapi.ForceConnectorVersionStateRequestJson{State: state},
+		schemaapi.ForceConnectorVersionStateRequestJson{State: string(state)},
 		true,
 		http.StatusOK,
 		&updated,
@@ -170,28 +174,33 @@ func (h *RemoteAuthProxy) ForceConnectorVersionState(t *testing.T, connectorID a
 func (h *RemoteAuthProxy) InitiateOAuth2Connection(t *testing.T, connectorID apid.ID, returnToURL string) (connectionID, redirectURL string) {
 	t.Helper()
 
-	var redirect schemaapi.ConnectionSetupRedirect
-	h.doSigned(t, h.UserActorExternalID, http.MethodPost, h.PublicURL+"/api/v1/connections/_initiate", schemaapi.InitiateConnectionRequest{
-		ConnectorId:   connectorID,
-		IntoNamespace: h.Namespace,
-		ReturnToUrl:   returnToURL,
-	}, true, http.StatusOK, &redirect)
-	require.Equal(t, schemaapi.ConnectionSetupResponseTypeRedirect, redirect.Type)
-	require.NotEmpty(t, redirect.RedirectUrl)
-	return redirect.Id.String(), redirect.RedirectUrl
+	var action schemaapi.ConnectionSetupAction
+	h.doSigned(t, h.UserActorExternalID, http.MethodPost, h.PublicURL+"/api/v1/connections/_initiate", connectionInitiateAction(
+		connectorID,
+		h.Namespace,
+		returnToURL,
+	), true, http.StatusOK, &action)
+	require.NotNil(t, action.Status)
+	require.Equal(t, schemaapi.ConnectionSetupResponseTypeRedirect, action.Status.Type)
+	require.NotEmpty(t, action.Status.RedirectURL)
+	require.NotEmpty(t, action.Metadata.Target.ID)
+	return action.Metadata.Target.ID, action.Status.RedirectURL
 }
 
 func (h *RemoteAuthProxy) InitiateAPIKeyConnection(t *testing.T, connectorID apid.ID) (connectionID, stepID string) {
 	t.Helper()
 
-	var form schemaapi.ConnectionSetupForm
-	h.doSigned(t, h.UserActorExternalID, http.MethodPost, h.PublicURL+"/api/v1/connections/_initiate", schemaapi.InitiateConnectionRequest{
-		ConnectorId:   connectorID,
-		IntoNamespace: h.Namespace,
-	}, true, http.StatusOK, &form)
-	require.Equal(t, schemaapi.ConnectionSetupResponseTypeForm, form.Type)
-	require.NotEmpty(t, form.StepId)
-	return form.Id.String(), form.StepId
+	var action schemaapi.ConnectionSetupAction
+	h.doSigned(t, h.UserActorExternalID, http.MethodPost, h.PublicURL+"/api/v1/connections/_initiate", connectionInitiateAction(
+		connectorID,
+		h.Namespace,
+		"",
+	), true, http.StatusOK, &action)
+	require.NotNil(t, action.Status)
+	require.Equal(t, schemaapi.ConnectionSetupResponseTypeForm, action.Status.Type)
+	require.NotEmpty(t, action.Status.StepID)
+	require.NotEmpty(t, action.Metadata.Target.ID)
+	return action.Metadata.Target.ID, action.Status.StepID
 }
 
 func (h *RemoteAuthProxy) SubmitAPIKeyCredentials(t *testing.T, connectionID, stepID, apiKey string) schemaapi.ConnectionSetupResponseType {
@@ -200,15 +209,15 @@ func (h *RemoteAuthProxy) SubmitAPIKeyCredentials(t *testing.T, connectionID, st
 	rawData, err := json.Marshal(map[string]string{"api_key": apiKey})
 	require.NoError(t, err)
 
-	var generic struct {
-		Type schemaapi.ConnectionSetupResponseType `json:"type"`
-	}
-	h.doSigned(t, h.UserActorExternalID, http.MethodPost, h.PublicURL+"/api/v1/connections/"+connectionID+"/_submit", schemaapi.SubmitConnectionRequest{
-		StepId: stepID,
-		Data:   rawData,
-	}, true, http.StatusOK, &generic)
-	require.NotEmpty(t, generic.Type)
-	return generic.Type
+	var action schemaapi.ConnectionSetupAction
+	h.doSigned(t, h.UserActorExternalID, http.MethodPost, h.PublicURL+"/api/v1/connections/"+connectionID+"/_submit", connectionSetupSubmitAction(
+		connectionID,
+		stepID,
+		rawData,
+	), true, http.StatusOK, &action)
+	require.NotNil(t, action.Status)
+	require.NotEmpty(t, action.Status.Type)
+	return action.Status.Type
 }
 
 func (h *RemoteAuthProxy) WaitForSetupComplete(t *testing.T, connectionID string, timeout time.Duration) {
@@ -218,19 +227,17 @@ func (h *RemoteAuthProxy) WaitForSetupComplete(t *testing.T, connectionID string
 	var lastType schemaapi.ConnectionSetupResponseType
 	var lastError string
 	for time.Now().Before(deadline) {
-		var generic struct {
-			Type  schemaapi.ConnectionSetupResponseType `json:"type"`
-			Error string                                `json:"error,omitempty"`
-		}
-		h.doSigned(t, h.UserActorExternalID, http.MethodGet, h.PublicURL+"/api/v1/connections/"+connectionID+"/_setupStep", nil, true, http.StatusOK, &generic)
-		lastType = generic.Type
-		lastError = generic.Error
+		var action schemaapi.ConnectionSetupAction
+		h.doSigned(t, h.UserActorExternalID, http.MethodGet, h.PublicURL+"/api/v1/connections/"+connectionID+"/_setupStep", nil, true, http.StatusOK, &action)
+		require.NotNil(t, action.Status)
+		lastType = action.Status.Type
+		lastError = action.Status.Error
 
-		switch generic.Type {
+		switch action.Status.Type {
 		case schemaapi.ConnectionSetupResponseTypeComplete:
 			return
 		case schemaapi.ConnectionSetupResponseTypeError:
-			require.FailNowf(t, "connection setup failed", "connection %s setup error: %s", connectionID, generic.Error)
+			require.FailNowf(t, "connection setup failed", "connection %s setup error: %s", connectionID, action.Status.Error)
 		}
 		time.Sleep(1 * time.Second)
 	}

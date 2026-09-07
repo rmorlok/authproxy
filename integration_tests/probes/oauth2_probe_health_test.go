@@ -41,7 +41,7 @@ func TestOAuth2ProbeHealth_FailureAndRecovery(t *testing.T) {
 	userEmail := "probe-health-" + suffix + "@example.com"
 	userPassword := "p4ssw0rd-" + suffix
 
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 
 	one := 1
 	probeURL := provider.ResourceURL("/probe-" + suffix)

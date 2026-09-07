@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 
 	"github.com/go-resty/resty/v2"
 	"github.com/spf13/cobra"
@@ -20,6 +21,7 @@ type Output[T any] interface {
 type output[T any] struct {
 	isSingle    bool
 	hasPrevious bool
+	writer      io.Writer
 }
 
 func (o *output[T]) EmitAll(vs []T) {
@@ -33,14 +35,14 @@ func (o *output[T]) Emit(v T) {
 	if !o.isSingle {
 		indent = "  "
 		if !o.hasPrevious {
-			fmt.Print("[\n")
+			fmt.Fprint(o.writer, "[\n")
 		} else {
-			fmt.Print(",\n")
+			fmt.Fprint(o.writer, ",\n")
 		}
 	}
 
 	formatted, _ := json.MarshalIndent(v, indent, "  ")
-	fmt.Print(indent + string(formatted))
+	fmt.Fprint(o.writer, indent+string(formatted))
 	o.hasPrevious = true
 }
 
@@ -59,7 +61,7 @@ func (o *output[T]) ErrorResponse(resp *resty.Response) error {
 	}
 
 	prettyJSON, _ := json.MarshalIndent(errorJson, "", "  ")
-	fmt.Println(string(prettyJSON))
+	fmt.Fprintln(o.writer, string(prettyJSON))
 
 	return errors.New("error from API")
 }
@@ -71,9 +73,9 @@ func (o *output[T]) ShouldStop() bool {
 func (o *output[T]) Done() {
 	if !o.isSingle {
 		if o.hasPrevious {
-			fmt.Print("\n]")
+			fmt.Fprint(o.writer, "\n]")
 		} else {
-			fmt.Println("[]")
+			fmt.Fprintln(o.writer, "[]")
 		}
 	}
 }
@@ -81,11 +83,13 @@ func (o *output[T]) Done() {
 func OutputSingle[T any](cmd *cobra.Command) Output[T] {
 	return &output[T]{
 		isSingle: true,
+		writer:   cmd.OutOrStdout(),
 	}
 }
 
 func OutputMultiple[T any](cmd *cobra.Command) Output[T] {
 	return &output[T]{
 		isSingle: false,
+		writer:   cmd.OutOrStdout(),
 	}
 }

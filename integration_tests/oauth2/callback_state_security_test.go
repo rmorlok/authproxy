@@ -58,7 +58,7 @@ func newCallbackStateSecurityRig(t *testing.T, name string) *callbackStateSecuri
 	userPassword := "p4ssw0rd-" + suffix
 	userEmail := name + "-" + suffix + "@example.com"
 
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 	connector := helpers.NewOAuth2Connector(connectorID, name, provider, helpers.OAuth2ConnectorOptions{
 		ClientID:     clientKey,
 		ClientSecret: clientSecret,
