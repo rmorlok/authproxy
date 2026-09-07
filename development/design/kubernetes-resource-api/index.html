@@ -1,0 +1,1263 @@
+<!DOCTYPE html><html lang="en" dir="ltr" data-theme="dark" data-has-toc data-has-sidebar class="astro-s76yvztf"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>Kubernetes-style resource API migration | AuthProxy</title><link rel="canonical" href="https://docs.authproxy.net/development/design/kubernetes-resource-api/"/><link rel="sitemap" href="/sitemap-index.xml"/><link rel="shortcut icon" href="/favicon.svg" type="image/svg+xml"/><meta name="generator" content="Astro v7.0.7"/><meta name="generator" content="Starlight v0.41.3"/><meta property="og:title" content="Kubernetes-style resource API migration"/><meta property="og:type" content="article"/><meta property="og:url" content="https://docs.authproxy.net/development/design/kubernetes-resource-api/"/><meta property="og:locale" content="en"/><meta property="og:description" content="Accepted contract and migration inventory for AuthProxy API v1 authproxy.net/v1alpha1 objects."/><meta property="og:site_name" content="AuthProxy"/><meta name="twitter:card" content="summary_large_image"/><meta name="description" content="Accepted contract and migration inventory for AuthProxy API v1 authproxy.net/v1alpha1 objects."/><script>
+	window.StarlightThemeProvider = (() => {
+		const storedTheme =
+			typeof localStorage !== 'undefined' && localStorage.getItem('starlight-theme');
+		const theme =
+			storedTheme ||
+			(window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+		document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark';
+		return {
+			updatePickers(theme = storedTheme || 'auto') {
+				document.querySelectorAll('starlight-theme-select').forEach((picker) => {
+					const select = picker.querySelector('select');
+					if (select) select.value = theme;
+					/** @type {HTMLTemplateElement | null} */
+					const tmpl = document.querySelector(`#theme-icons`);
+					const newIcon = tmpl && tmpl.content.querySelector('.' + theme);
+					if (newIcon) {
+						const oldIcon = picker.querySelector('svg.label-icon');
+						if (oldIcon) {
+							oldIcon.replaceChildren(...newIcon.cloneNode(true).childNodes);
+						}
+					}
+				});
+			},
+		};
+	})();
+</script><template id="theme-icons"><svg aria-hidden="true" class="light astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M5 12a1 1 0 0 0-1-1H3a1 1 0 0 0 0 2h1a1 1 0 0 0 1-1Zm.64 5-.71.71a1 1 0 0 0 0 1.41 1 1 0 0 0 1.41 0l.71-.71A1 1 0 0 0 5.64 17ZM12 5a1 1 0 0 0 1-1V3a1 1 0 0 0-2 0v1a1 1 0 0 0 1 1Zm5.66 2.34a1 1 0 0 0 .7-.29l.71-.71a1 1 0 1 0-1.41-1.41l-.66.71a1 1 0 0 0 0 1.41 1 1 0 0 0 .66.29Zm-12-.29a1 1 0 0 0 1.41 0 1 1 0 0 0 0-1.41l-.71-.71a1.004 1.004 0 1 0-1.43 1.41l.73.71ZM21 11h-1a1 1 0 0 0 0 2h1a1 1 0 0 0 0-2Zm-2.64 6A1 1 0 0 0 17 18.36l.71.71a1 1 0 0 0 1.41 0 1 1 0 0 0 0-1.41l-.76-.66ZM12 6.5a5.5 5.5 0 1 0 5.5 5.5A5.51 5.51 0 0 0 12 6.5Zm0 9a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Zm0 3.5a1 1 0 0 0-1 1v1a1 1 0 0 0 2 0v-1a1 1 0 0 0-1-1Z"/></svg><svg aria-hidden="true" class="dark astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21.64 13a1 1 0 0 0-1.05-.14 8.049 8.049 0 0 1-3.37.73 8.15 8.15 0 0 1-8.14-8.1 8.59 8.59 0 0 1 .25-2A1 1 0 0 0 8 2.36a10.14 10.14 0 1 0 14 11.69 1 1 0 0 0-.36-1.05Zm-9.5 6.69A8.14 8.14 0 0 1 7.08 5.22v.27a10.15 10.15 0 0 0 10.14 10.14 9.784 9.784 0 0 0 2.1-.22 8.11 8.11 0 0 1-7.18 4.32v-.04Z"/></svg><svg aria-hidden="true" class="auto astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg></template><link rel="stylesheet" href="/_astro/print.ehPL0gv-.css" media="print"><link rel="stylesheet" href="/_astro/common.BWFm95dk.css"><style>@layer starlight.components{.card-grid:where(.astro-xglws247){grid-template-columns:100%;gap:1rem;display:grid}.card-grid:where(.astro-xglws247)>*{margin-top:0!important}@media (width>=50rem){.card-grid:where(.astro-xglws247){grid-template-columns:1fr 1fr;gap:1.5rem}.stagger:where(.astro-xglws247){--stagger-height:5rem;padding-bottom:var(--stagger-height)}.stagger:where(.astro-xglws247)>:nth-child(2n){transform:translateY(var(--stagger-height))}}.sl-link-card:where(.astro-qs5jmmrk){border:1px solid var(--sl-color-gray-5);box-shadow:var(--sl-shadow-sm);border-radius:.5rem;grid-template-columns:1fr auto;gap:.5rem;padding:1rem;display:grid;position:relative}a:where(.astro-qs5jmmrk){line-height:var(--sl-line-height-headings);text-decoration:none}a:where(.astro-qs5jmmrk):before{content:"";position:absolute;inset:0}.stack:where(.astro-qs5jmmrk){flex-direction:column;gap:.5rem}.title:where(.astro-qs5jmmrk){color:var(--sl-color-white);font-weight:600;font-size:var(--sl-text-lg)}.description:where(.astro-qs5jmmrk){color:var(--sl-color-gray-3);line-height:1.5}.icon:where(.astro-qs5jmmrk){color:var(--sl-color-gray-3)}.sl-link-card:where(.astro-qs5jmmrk):hover{background:var(--sl-color-gray-7,var(--sl-color-gray-6));border-color:var(--sl-color-gray-2)}.sl-link-card:where(.astro-qs5jmmrk):hover .icon:where(.astro-qs5jmmrk){color:var(--sl-color-white)}}
+@layer starlight.components{svg:where(.astro-qa7dmyhc){color:var(--sl-icon-color);font-size:var(--sl-icon-size,1em);width:1em;height:1em}}
+</style><script type="module" src="/_astro/page.Bkmrpiyw.js"></script></head><body class="astro-s76yvztf"><a class="sl-skip-link astro-jueewyqi" href="#_top">Skip to content</a><div class="page sl-flex astro-q25odsi5"><header class="header astro-q25odsi5"><div class="header astro-u5sis26u"><div class="title-wrapper sl-flex astro-u5sis26u"><a href="/" class="site-title sl-flex astro-fb6jnt5f"><span class="astro-fb6jnt5f" translate="no">AuthProxy</span></a></div><div class="sl-flex print:hidden astro-u5sis26u"><site-search class="astro-u5sis26u astro-lx5wy5l3" data-translations="{&quot;placeholder&quot;:&quot;Search&quot;}"><button data-open-modal disabled aria-label="Search" aria-keyshortcuts="Control+K" class="astro-lx5wy5l3"><svg aria-hidden="true" class="astro-lx5wy5l3 astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21.71 20.29 18 16.61A9 9 0 1 0 16.61 18l3.68 3.68a.999.999 0 0 0 1.42 0 1 1 0 0 0 0-1.39ZM11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Z"/></svg><span class="sl-hidden md:sl-block astro-lx5wy5l3" aria-hidden="true">Search</span><kbd class="sl-hidden md:sl-flex astro-lx5wy5l3" style="display: none;"><kbd class="astro-lx5wy5l3">Ctrl</kbd><kbd class="astro-lx5wy5l3">K</kbd></kbd></button><dialog style="padding:0" aria-label="Search" class="astro-lx5wy5l3"><div class="dialog-frame sl-flex astro-lx5wy5l3"><button data-close-modal class="sl-flex md:sl-hidden astro-lx5wy5l3">Cancel</button><div class="search-container astro-lx5wy5l3"><div id="starlight__search" class="astro-lx5wy5l3"></div></div></div></dialog></site-search><script>
+	(() => {
+		const openBtn = document.querySelector('button[data-open-modal]');
+		const shortcut = openBtn?.querySelector('kbd');
+		if (!openBtn || !(shortcut instanceof HTMLElement)) return;
+		const platformKey = shortcut.querySelector('kbd');
+		if (platformKey && /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform)) {
+			platformKey.textContent = '⌘';
+			openBtn.setAttribute('aria-keyshortcuts', 'Meta+K');
+		}
+		shortcut.style.display = '';
+	})();
+</script><script type="module" src="/_astro/Search.astro_astro_type_script_index_0_lang.CM1HKbUQ.js"></script></div><div class="sl-hidden md:sl-flex print:hidden right-group astro-u5sis26u"><div class="sl-flex social-icons astro-u5sis26u"><a href="https://github.com/rmorlok/authproxy" rel="me" class="sl-flex astro-ftf4y5zb"><span class="sr-only astro-ftf4y5zb">GitHub</span><svg aria-hidden="true" class="astro-ftf4y5zb astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z"/></svg></a></div><starlight-theme-select><label style="--sl-select-width: 6.25em" class="astro-benwhybl"><span class="sr-only astro-benwhybl">Select theme</span><svg aria-hidden="true" class="icon label-icon astro-benwhybl astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg><select autocomplete="off" class="astro-benwhybl"><option value="dark" class="astro-benwhybl">Dark</option><option value="light" class="astro-benwhybl">Light</option><option value="auto" selected class="astro-benwhybl">Auto</option></select><svg aria-hidden="true" class="icon caret astro-benwhybl astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-theme-select><script>
+	StarlightThemeProvider.updatePickers();
+</script><script type="module">var e=`starlight-theme`,t=e=>e===`auto`||e===`dark`||e===`light`?e:`auto`,n=()=>t(typeof localStorage<`u`&&localStorage.getItem(e));function r(t){typeof localStorage<`u`&&localStorage.setItem(e,t===`light`||t===`dark`?t:``)}var i=()=>matchMedia(`(prefers-color-scheme: light)`).matches?`light`:`dark`;function a(e){StarlightThemeProvider.updatePickers(e),document.documentElement.dataset.theme=e===`auto`?i():e,r(e)}matchMedia(`(prefers-color-scheme: light)`).addEventListener(`change`,()=>{n()===`auto`&&a(`auto`)});var o=class extends HTMLElement{constructor(){super(),a(n()),this.querySelector(`select`)?.addEventListener(`change`,e=>{e.currentTarget instanceof HTMLSelectElement&&a(t(e.currentTarget.value))})}};customElements.define(`starlight-theme-select`,o);</script><script type="module">var e=class extends HTMLElement{constructor(){super();let e=this.querySelector(`select`);e&&(e.addEventListener(`change`,e=>{e.currentTarget instanceof HTMLSelectElement&&(window.location.pathname=e.currentTarget.value)}),window.addEventListener(`pageshow`,t=>{if(!t.persisted)return;let n=e.querySelector(`option[selected]`)?.index;n!==e.selectedIndex&&(e.selectedIndex=n??0)}))}};customElements.define(`starlight-lang-select`,e);</script></div></div></header><nav class="sidebar print:hidden astro-q25odsi5" aria-label="Main"><starlight-menu-button class="print:hidden astro-ujvxkxqt"><button aria-expanded="false" aria-label="Menu" aria-controls="starlight__sidebar" class="sl-flex md:sl-hidden astro-ujvxkxqt"><svg aria-hidden="true" class="open-menu astro-ujvxkxqt astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M3 8h18a1 1 0 1 0 0-2H3a1 1 0 0 0 0 2Zm18 8H3a1 1 0 0 0 0 2h18a1 1 0 0 0 0-2Zm0-5H3a1 1 0 0 0 0 2h18a1 1 0 0 0 0-2Z"/></svg><svg aria-hidden="true" class="close-menu astro-ujvxkxqt astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="m13.41 12 6.3-6.29a1.004 1.004 0 1 0-1.42-1.42L12 10.59l-6.29-6.3a1.004 1.004 0 0 0-1.42 1.42l6.3 6.29-6.3 6.29a1 1 0 0 0 0 1.42.998.998 0 0 0 1.42 0l6.29-6.3 6.29 6.3a.999.999 0 0 0 1.42 0 1 1 0 0 0 0-1.42L13.41 12Z"/></svg></button></starlight-menu-button><script type="module">var e=class extends HTMLElement{btn=this.querySelector(`button`);constructor(){super(),this.btn.addEventListener(`click`,()=>this.toggleExpanded());let e=this.closest(`nav`);e&&e.addEventListener(`keyup`,e=>this.closeOnEscape(e)),matchMedia(`(min-width: 50em)`).addEventListener(`change`,()=>this.setExpanded(!1))}setExpanded(e){this.setAttribute(`aria-expanded`,String(e)),document.body.toggleAttribute(`data-mobile-menu-expanded`,e),document.querySelectorAll(`.main-frame, .sl-skip-link`).forEach(t=>{t.toggleAttribute(`inert`,e)})}toggleExpanded(){this.setExpanded(this.getAttribute(`aria-expanded`)!==`true`)}closeOnEscape(e){e.code===`Escape`&&(this.setExpanded(!1),this.btn.focus())}};customElements.define(`starlight-menu-button`,e);</script><div id="starlight__sidebar" class="sidebar-pane astro-q25odsi5"><div class="sidebar-content sl-flex astro-q25odsi5"><sl-sidebar-state-persist data-hash="0dtrmq9" class="astro-6swq5fot"><script aria-hidden="true">
+		(() => {
+			try {
+				if (!matchMedia('(min-width: 50em)').matches) return;
+				/** @type {HTMLElement | null} */
+				const target = document.querySelector('sl-sidebar-state-persist');
+				const state = JSON.parse(sessionStorage.getItem('sl-sidebar-state') || '0');
+				if (!target || !state || target.dataset.hash !== state.hash) return;
+				window._starlightScrollRestore = state.scroll;
+				customElements.define(
+					'sl-sidebar-restore',
+					class SidebarRestore extends HTMLElement {
+						connectedCallback() {
+							try {
+								const idx = parseInt(this.dataset.index || '');
+								const details = this.closest('details');
+								if (details && typeof state.open[idx] === 'boolean') details.open = state.open[idx];
+							} catch {}
+						}
+					}
+				);
+			} catch {}
+		})();
+	</script><ul class="top-level astro-6v36i77p"><li class="astro-6v36i77p"><details open class="astro-6v36i77p"><summary class="astro-6v36i77p"><span class="group-label astro-6v36i77p"><span class="large astro-6v36i77p">Get started</span></span><svg aria-hidden="true" class="caret astro-6v36i77p astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="0"></sl-sidebar-restore><ul class="astro-6v36i77p"><li class="astro-6v36i77p"><a href="/" class="astro-6v36i77p"><span class="astro-6v36i77p">Documentation home</span></a></li><li class="astro-6v36i77p"><a href="/getting-started/demo/" class="astro-6v36i77p"><span class="astro-6v36i77p">Try the hosted demo</span></a></li><li class="astro-6v36i77p"><a href="/development/quick-start/" class="astro-6v36i77p"><span class="astro-6v36i77p">Development quick start</span></a></li></ul></details></li><li class="astro-6v36i77p"><details open class="astro-6v36i77p"><summary class="astro-6v36i77p"><span class="group-label astro-6v36i77p"><span class="large astro-6v36i77p">Concepts</span></span><svg aria-hidden="true" class="caret astro-6v36i77p astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="1"></sl-sidebar-restore><ul class="astro-6v36i77p"><li class="astro-6v36i77p"><a href="/concepts/" class="astro-6v36i77p"><span class="astro-6v36i77p">AuthProxy concepts</span></a></li><li class="astro-6v36i77p"><a href="/concepts/core-model/" class="astro-6v36i77p"><span class="astro-6v36i77p">The core resource model</span></a></li><li class="astro-6v36i77p"><a href="/concepts/labels-and-annotations/" class="astro-6v36i77p"><span class="astro-6v36i77p">Labels and Annotations</span></a></li></ul></details></li><li class="astro-6v36i77p"><details open class="astro-6v36i77p"><summary class="astro-6v36i77p"><span class="group-label astro-6v36i77p"><span class="large astro-6v36i77p">Integrate</span></span><svg aria-hidden="true" class="caret astro-6v36i77p astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="2"></sl-sidebar-restore><ul class="astro-6v36i77p"><li class="astro-6v36i77p"><a href="/integration/" class="astro-6v36i77p"><span class="astro-6v36i77p">Integrating AuthProxy</span></a></li><li class="astro-6v36i77p"><a href="/integration/host-application/" class="astro-6v36i77p"><span class="astro-6v36i77p">Host application integration</span></a></li><li class="astro-6v36i77p"><a href="/integration/marketplace/" class="astro-6v36i77p"><span class="astro-6v36i77p">Marketplace integration</span></a></li><li class="astro-6v36i77p"><a href="/integration/connector-setup-flow/" class="astro-6v36i77p"><span class="astro-6v36i77p">Connector Setup Flow</span></a></li><li class="astro-6v36i77p"><a href="/integration/connector-predicates/" class="astro-6v36i77p"><span class="astro-6v36i77p">Connector Predicates</span></a></li></ul></details></li><li class="astro-6v36i77p"><details open class="astro-6v36i77p"><summary class="astro-6v36i77p"><span class="group-label astro-6v36i77p"><span class="large astro-6v36i77p">SDKs &amp; API</span></span><svg aria-hidden="true" class="caret astro-6v36i77p astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="3"></sl-sidebar-restore><ul class="astro-6v36i77p"><li class="astro-6v36i77p"><a href="/sdks/" class="astro-6v36i77p"><span class="astro-6v36i77p">SDKs and API Clients</span></a></li><li class="astro-6v36i77p"><a href="/sdks/proxying/" class="astro-6v36i77p"><span class="astro-6v36i77p">Proxying Requests</span></a></li><li class="astro-6v36i77p"><a href="/sdks/javascript/" class="astro-6v36i77p"><span class="astro-6v36i77p">JavaScript and TypeScript SDK</span></a></li><li class="astro-6v36i77p"><a href="/development/cli/" class="astro-6v36i77p"><span class="astro-6v36i77p">Command-line interface (ap)</span></a></li><li class="astro-6v36i77p"><a href="/reference/resources/" class="astro-6v36i77p"><span class="astro-6v36i77p">Resource contracts</span></a></li><li class="astro-6v36i77p"><a href="/reference/api/" class="astro-6v36i77p"><span class="astro-6v36i77p">API reference</span></a></li></ul></details></li><li class="astro-6v36i77p"><details open class="astro-6v36i77p"><summary class="astro-6v36i77p"><span class="group-label astro-6v36i77p"><span class="large astro-6v36i77p">Deploy</span></span><svg aria-hidden="true" class="caret astro-6v36i77p astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="4"></sl-sidebar-restore><ul class="astro-6v36i77p"><li class="astro-6v36i77p"><a href="/deployment/" class="astro-6v36i77p"><span class="astro-6v36i77p">Deploy AuthProxy</span></a></li><li class="astro-6v36i77p"><a href="/deployment/helm/" class="astro-6v36i77p"><span class="astro-6v36i77p">Install AuthProxy with Helm</span></a></li><li class="astro-6v36i77p"><a href="/deployment/kustomize/" class="astro-6v36i77p"><span class="astro-6v36i77p">Demo Kustomize deployments</span></a></li><li class="astro-6v36i77p"><a href="/deployment/container-images/" class="astro-6v36i77p"><span class="astro-6v36i77p">Container images and registries</span></a></li><li class="astro-6v36i77p"><a href="/deployment/eks-runbook/" class="astro-6v36i77p"><span class="astro-6v36i77p">AuthProxy EKS Runbook</span></a></li></ul></details></li><li class="astro-6v36i77p"><details open class="astro-6v36i77p"><summary class="astro-6v36i77p"><span class="group-label astro-6v36i77p"><span class="large astro-6v36i77p">Operate</span></span><svg aria-hidden="true" class="caret astro-6v36i77p astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="5"></sl-sidebar-restore><ul class="astro-6v36i77p"><li class="astro-6v36i77p"><a href="/operations/" class="astro-6v36i77p"><span class="astro-6v36i77p">Operate AuthProxy</span></a></li><li class="astro-6v36i77p"><a href="/operations/load-testing/" class="astro-6v36i77p"><span class="astro-6v36i77p">Load testing</span></a></li><li class="astro-6v36i77p"><a href="/operations/telemetry/" class="astro-6v36i77p"><span class="astro-6v36i77p">Telemetry</span></a></li><li class="astro-6v36i77p"><a href="/operations/migrations/" class="astro-6v36i77p"><span class="astro-6v36i77p">Database migrations</span></a></li><li class="astro-6v36i77p"><a href="/operations/app-metrics/" class="astro-6v36i77p"><span class="astro-6v36i77p">Application Metrics</span></a></li><li class="astro-6v36i77p"><a href="/operations/rate-limits/" class="astro-6v36i77p"><span class="astro-6v36i77p">Rate Limits</span></a></li><li class="astro-6v36i77p"><a href="/operations/background-tasks/" class="astro-6v36i77p"><span class="astro-6v36i77p">View background tasks</span></a></li><li class="astro-6v36i77p"><a href="/operations/connector-lifecycle/" class="astro-6v36i77p"><span class="astro-6v36i77p">Connector Lifecycle Operations</span></a></li><li class="astro-6v36i77p"><a href="/operations/connector-version-migrations/" class="astro-6v36i77p"><span class="astro-6v36i77p">Connector Version Migrations</span></a></li><li class="astro-6v36i77p"><a href="/operations/blob-storage/" class="astro-6v36i77p"><span class="astro-6v36i77p">Viewing Blob Storage Data in MinIO</span></a></li><li class="astro-6v36i77p"><a href="/operations/redis-insight/" class="astro-6v36i77p"><span class="astro-6v36i77p">Viewing Redis Data</span></a></li></ul></details></li><li class="astro-6v36i77p"><details open class="astro-6v36i77p"><summary class="astro-6v36i77p"><span class="group-label astro-6v36i77p"><span class="large astro-6v36i77p">Security</span></span><svg aria-hidden="true" class="caret astro-6v36i77p astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="6"></sl-sidebar-restore><ul class="astro-6v36i77p"><li class="astro-6v36i77p"><a href="/security/" class="astro-6v36i77p"><span class="astro-6v36i77p">Security Overview</span></a></li><li class="astro-6v36i77p"><a href="/security/authentication-and-authorization/" class="astro-6v36i77p"><span class="astro-6v36i77p">Authentication and Authorization</span></a></li><li class="astro-6v36i77p"><a href="/security/permission-resources-and-verbs/" class="astro-6v36i77p"><span class="astro-6v36i77p">Permission Resources and Verbs</span></a></li><li class="astro-6v36i77p"><a href="/security/encryption/" class="astro-6v36i77p"><span class="astro-6v36i77p">Encryption</span></a></li></ul></details></li><li class="astro-6v36i77p"><details open class="astro-6v36i77p"><summary class="astro-6v36i77p"><span class="group-label astro-6v36i77p"><span class="large astro-6v36i77p">Develop</span></span><svg aria-hidden="true" class="caret astro-6v36i77p astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="7"></sl-sidebar-restore><ul class="astro-6v36i77p"><li class="astro-6v36i77p"><a href="/development/" class="astro-6v36i77p"><span class="astro-6v36i77p">Develop AuthProxy</span></a></li><li class="astro-6v36i77p"><a href="/development/local-development/" class="astro-6v36i77p"><span class="astro-6v36i77p">Local development</span></a></li><li class="astro-6v36i77p"><a href="/development/codebase/" class="astro-6v36i77p"><span class="astro-6v36i77p">Codebase layout</span></a></li><li class="astro-6v36i77p"><a href="/development/workflows/" class="astro-6v36i77p"><span class="astro-6v36i77p">Workflow Versioning</span></a></li><li class="astro-6v36i77p"><details open class="astro-6v36i77p"><summary class="astro-6v36i77p"><span class="group-label astro-6v36i77p"><span class="large astro-6v36i77p">Design notes</span></span><svg aria-hidden="true" class="caret astro-6v36i77p astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="8"></sl-sidebar-restore><ul class="astro-6v36i77p"><li class="astro-6v36i77p"><a href="/development/design/" class="astro-6v36i77p"><span class="astro-6v36i77p">Design notes</span></a></li><li class="astro-6v36i77p"><a href="/development/design/kubernetes-resource-api/" aria-current="page" class="astro-6v36i77p"><span class="astro-6v36i77p">Kubernetes-style resource API migration</span></a></li><li class="astro-6v36i77p"><a href="/development/design/key-model-migration/" class="astro-6v36i77p"><span class="astro-6v36i77p">Unified key model migration (historical)</span></a></li><li class="astro-6v36i77p"><a href="/development/design/oauth-provider-identity/" class="astro-6v36i77p"><span class="astro-6v36i77p">OAuth provider identity changes</span></a></li></ul></details></li></ul></details></li><li class="astro-6v36i77p"><details class="astro-6v36i77p"><summary class="astro-6v36i77p"><span class="group-label astro-6v36i77p"><span class="large astro-6v36i77p">Reference</span></span><svg aria-hidden="true" class="caret astro-6v36i77p astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="9"></sl-sidebar-restore><ul class="astro-6v36i77p"><li class="astro-6v36i77p"><a href="/reference/" class="astro-6v36i77p"><span class="astro-6v36i77p">Reference</span></a></li><li class="astro-6v36i77p"><a href="/reference/configuration/" class="astro-6v36i77p"><span class="astro-6v36i77p">Configuration reference</span></a></li><li class="astro-6v36i77p"><a href="/reference/related-projects/" class="astro-6v36i77p"><span class="astro-6v36i77p">Related projects</span></a></li></ul></details></li></ul><script aria-hidden="true">
+		(() => {
+			const scroller = document.getElementById('starlight__sidebar');
+			if (!window._starlightScrollRestore || !scroller) return;
+			scroller.scrollTop = window._starlightScrollRestore;
+			delete window._starlightScrollRestore;
+		})();
+	</script></sl-sidebar-state-persist><div class="md:sl-hidden"><div class="mobile-preferences sl-flex astro-3nxx6iak"><div class="social-icons astro-3nxx6iak"><a href="https://github.com/rmorlok/authproxy" rel="me" class="sl-flex astro-ftf4y5zb"><span class="sr-only astro-ftf4y5zb">GitHub</span><svg aria-hidden="true" class="astro-ftf4y5zb astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z"/></svg></a></div><starlight-theme-select><label style="--sl-select-width: 6.25em" class="astro-benwhybl"><span class="sr-only astro-benwhybl">Select theme</span><svg aria-hidden="true" class="icon label-icon astro-benwhybl astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg><select autocomplete="off" class="astro-benwhybl"><option value="dark" class="astro-benwhybl">Dark</option><option value="light" class="astro-benwhybl">Light</option><option value="auto" selected class="astro-benwhybl">Auto</option></select><svg aria-hidden="true" class="icon caret astro-benwhybl astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-theme-select><script>
+	StarlightThemeProvider.updatePickers();
+</script></div></div></div></div></nav><div class="main-frame astro-q25odsi5"><script type="module">var e=document.getElementById(`starlight__sidebar`),t=e?.querySelector(`sl-sidebar-state-persist`),n=`sl-sidebar-state`,r=()=>{let r=[],i=t?.dataset.hash||``;try{let e=sessionStorage.getItem(n),t=JSON.parse(e||`{}`);Array.isArray(t.open)&&t.hash===i&&(r=t.open)}catch{}return{hash:i,open:r,scroll:e?.scrollTop||0}},i=e=>{try{sessionStorage.setItem(n,JSON.stringify(e))}catch{}},a=()=>i(r()),o=(e,t)=>{let n=r();n.open[t]=e,i(n)};t?.addEventListener(`click`,e=>{if(!(e.target instanceof Element))return;let t=e.target.closest(`summary`)?.closest(`details`);if(!t)return;let n=t.querySelector(`sl-sidebar-restore`),r=parseInt(n?.dataset.index||``);isNaN(r)||o(!t.open,r)}),addEventListener(`visibilitychange`,()=>{document.visibilityState===`hidden`&&a()}),addEventListener(`pageHide`,a);</script><div class="lg:sl-flex astro-oygnnaui"><aside class="right-sidebar-container print:hidden astro-oygnnaui"><div class="right-sidebar astro-oygnnaui"><div class="lg:sl-hidden astro-5uyk3jmj"><mobile-starlight-toc data-min-h="2" data-max-h="3" class="astro-dqlgw6rx"><nav aria-labelledby="starlight__on-this-page--mobile" class="astro-dqlgw6rx"><details id="starlight__mobile-toc" class="astro-dqlgw6rx"><summary id="starlight__on-this-page--mobile" class="sl-flex astro-dqlgw6rx"><span class="toggle sl-flex astro-dqlgw6rx">On this page<svg aria-hidden="true" class="caret astro-dqlgw6rx astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></span><span class="display-current astro-dqlgw6rx"></span></summary><div class="dropdown astro-dqlgw6rx"><ul class="isMobile astro-ow5mdmq5" style="--depth: 0;"><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#_top" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Overview</span></a></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#status-and-delivery-model" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Status and delivery model</span></a></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#decision" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Decision</span></a><ul class="isMobile astro-ow5mdmq5" style="--depth: 1;"><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#version-and-kind" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Version and kind</span></a></li><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#resource-envelope" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Resource envelope</span></a></li><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#lists-references-and-actions" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Lists, references, and actions</span></a></li><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#shared-schema-ownership" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Shared schema ownership</span></a></li><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#connector-generations" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Connector generations</span></a></li></ul></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#registered-route-inventory" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Registered route inventory</span></a><ul class="isMobile astro-ow5mdmq5" style="--depth: 1;"><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#service-exposure" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Service exposure</span></a></li><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#managed-resource-routes" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Managed resource routes</span></a></li><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#read-models-analytical-apis-and-typed-actions" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Read models, analytical APIs, and typed actions</span></a></li><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#protocol-and-infrastructure-exceptions" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Protocol and infrastructure exceptions</span></a></li></ul></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#current-dto-to-target-inventory" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Current DTO-to-target inventory</span></a></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#configuration-inventory" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Configuration inventory</span></a></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#authentication-and-token-inventory" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Authentication and token inventory</span></a></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#internal-event-task-and-workflow-inventory" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Internal event, task, and workflow inventory</span></a><ul class="isMobile astro-ow5mdmq5" style="--depth: 1;"><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#asynq-tasks" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Asynq tasks</span></a></li><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#workflows" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Workflows</span></a></li><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#events-and-projections" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Events and projections</span></a></li></ul></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#first-party-consumer-and-generated-artifact-inventory" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">First-party consumer and generated-artifact inventory</span></a></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#implementation-sequence" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Implementation sequence</span></a></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#final-audit-rules" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Final audit rules</span></a></li></ul></div></details></nav></mobile-starlight-toc><script type="module" src="/_astro/MobileTableOfContents.astro_astro_type_script_index_0_lang.BcSo_yiZ.js"></script></div><div class="right-sidebar-panel sl-hidden lg:sl-block astro-5uyk3jmj"><div class="sl-container astro-5uyk3jmj"><starlight-toc data-min-h="2" data-max-h="3"><nav aria-labelledby="starlight__on-this-page"><h2 id="starlight__on-this-page">On this page</h2><ul class="astro-ow5mdmq5" style="--depth: 0;"><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#_top" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Overview</span></a></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#status-and-delivery-model" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Status and delivery model</span></a></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#decision" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Decision</span></a><ul class="astro-ow5mdmq5" style="--depth: 1;"><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#version-and-kind" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Version and kind</span></a></li><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#resource-envelope" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Resource envelope</span></a></li><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#lists-references-and-actions" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Lists, references, and actions</span></a></li><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#shared-schema-ownership" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Shared schema ownership</span></a></li><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#connector-generations" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Connector generations</span></a></li></ul></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#registered-route-inventory" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Registered route inventory</span></a><ul class="astro-ow5mdmq5" style="--depth: 1;"><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#service-exposure" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Service exposure</span></a></li><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#managed-resource-routes" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Managed resource routes</span></a></li><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#read-models-analytical-apis-and-typed-actions" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Read models, analytical APIs, and typed actions</span></a></li><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#protocol-and-infrastructure-exceptions" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Protocol and infrastructure exceptions</span></a></li></ul></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#current-dto-to-target-inventory" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Current DTO-to-target inventory</span></a></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#configuration-inventory" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Configuration inventory</span></a></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#authentication-and-token-inventory" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Authentication and token inventory</span></a></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#internal-event-task-and-workflow-inventory" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Internal event, task, and workflow inventory</span></a><ul class="astro-ow5mdmq5" style="--depth: 1;"><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#asynq-tasks" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Asynq tasks</span></a></li><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#workflows" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Workflows</span></a></li><li style="--depth: 1;" class="astro-ow5mdmq5"><a href="#events-and-projections" style="--depth: 1;" class="astro-ow5mdmq5"><span style="--depth: 1;" class="astro-ow5mdmq5">Events and projections</span></a></li></ul></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#first-party-consumer-and-generated-artifact-inventory" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">First-party consumer and generated-artifact inventory</span></a></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#implementation-sequence" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Implementation sequence</span></a></li><li style="--depth: 0;" class="astro-ow5mdmq5"><a href="#final-audit-rules" style="--depth: 0;" class="astro-ow5mdmq5"><span style="--depth: 0;" class="astro-ow5mdmq5">Final audit rules</span></a></li></ul></nav></starlight-toc><script type="module" src="/_astro/TableOfContents.astro_astro_type_script_index_0_lang.Csloo1VZ.js"></script></div></div></div></aside><div class="main-pane astro-oygnnaui"><main class="astro-s76yvztf" lang="en" dir="ltr"><div class="sl-banner astro-aiuewg3j" data-pagefind-ignore>Accepted design — implemented on the codex/k8s-resource-api feature branch and awaiting the final merge to main.</div><div class="content-panel astro-pm66xhbs"><div class="sl-container astro-pm66xhbs"><h1 id="_top" class="astro-3nltkhw2">Kubernetes-style resource API migration</h1></div></div><div class="content-panel astro-pm66xhbs"><div class="sl-container astro-pm66xhbs"><div class="sl-markdown-content"><p>This decision defines the target wire contract and the complete migration
+inventory for <a href="https://github.com/rmorlok/authproxy/issues/829">#829</a>. It is the
+gate for implementation work: a surface listed here must either adopt the
+resource contract or remain outside it for an explicit reason.</p>
+<p>The inventory was taken from <code dir="auto">main</code> at commit <code dir="auto">0ce5d49c</code> on August 16, 2026. It
+covers all routes emitted by the server route lister, the root configuration
+schema, JWT and one-time token claims, API schema types, registered Asynq tasks
+and workflows, generated contracts, and first-party consumers. A route or
+serialized type added while the feature branch is active must be added to this
+inventory.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="status-and-delivery-model">Status and delivery model</h2><a class="sl-anchor-link" href="#status-and-delivery-model"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Status and delivery model”</span></a></div>
+<ul>
+<li>Status: implementation complete on the feature branch; final verification
+and merge to <code dir="auto">main</code> are tracked by #849.</li>
+<li>Tracking issue: <a href="https://github.com/rmorlok/authproxy/issues/829">#829</a>.</li>
+<li>Feature branch: <code dir="auto">codex/k8s-resource-api</code>.</li>
+<li>Child PRs target the feature branch, not <code dir="auto">main</code>.</li>
+<li>The final integration PR targets <code dir="auto">main</code> and must not merge until every item in
+this inventory is migrated or retained as a documented exception.</li>
+</ul>
+<p>The HTTP route prefix stays <code dir="auto">/api/v1</code>. This is a breaking change to API v1, not
+the introduction of an HTTP v2. AuthProxy is not deployed to production, so the
+project will not carry compatibility handlers, legacy request decoders,
+dual-read or dual-write logic, or deprecation endpoints.</p>
+<p>Existing data-bearing demo and development environments must be destroyed and
+recreated when this work lands. In particular, old encrypted connector
+definitions are unsupported. No background task, resumable migration, or
+legacy decoder will rewrite them. The existing encrypted column can store the
+new definition representation, so the shape change alone does not require a SQL
+schema migration.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="decision">Decision</h2><a class="sl-anchor-link" href="#decision"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Decision”</span></a></div>
+<div class="sl-heading-wrapper level-h3"><h3 id="version-and-kind">Version and kind</h3><a class="sl-anchor-link" href="#version-and-kind"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Version and kind”</span></a></div>
+<p>Every AuthProxy resource uses:</p>
+<div class="expressive-code"><link rel="stylesheet" href="/_astro/ec.v4551.css"><script type="module" src="/_astro/ec.0vx5m.js"></script><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="yaml"><code><div class="ec-line"><div class="code"><span style="--0:#7FDBCA;--1:#111111">apiVersion</span><span style="--0:#D6DEEB;--1:#403F53">: </span><span style="--0:#ECC48D;--1:#3B61B0">authproxy.net/v1alpha1</span></div></div><div class="ec-line"><div class="code"><span style="--0:#7FDBCA;--1:#111111">kind</span><span style="--0:#D6DEEB;--1:#403F53">: </span><span style="--0:#ECC48D;--1:#3B61B0">Connector</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="apiVersion: authproxy.net/v1alpha1kind: Connector"><div></div></button></div></figure></div>
+<p><code dir="auto">apiVersion</code> versions the schema independently from the <code dir="auto">/api/v1</code> HTTP routing
+namespace. Kind names are singular PascalCase. A list uses <code dir="auto">&lt;Kind&gt;List</code>. A
+versioned connector definition is still <code dir="auto">kind: Connector</code>; its definition
+version is <code dir="auto">metadata.generation</code>.</p>
+<div class="sl-heading-wrapper level-h3"><h3 id="resource-envelope">Resource envelope</h3><a class="sl-anchor-link" href="#resource-envelope"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Resource envelope”</span></a></div>
+<div class="expressive-code"><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="yaml"><code><div class="ec-line"><div class="code"><span style="--0:#7FDBCA;--1:#111111">apiVersion</span><span style="--0:#D6DEEB;--1:#403F53">: </span><span style="--0:#ECC48D;--1:#3B61B0">authproxy.net/v1alpha1</span></div></div><div class="ec-line"><div class="code"><span style="--0:#7FDBCA;--1:#111111">kind</span><span style="--0:#D6DEEB;--1:#403F53">: </span><span style="--0:#ECC48D;--1:#3B61B0">Example</span></div></div><div class="ec-line"><div class="code"><span style="--0:#7FDBCA;--1:#111111">metadata</span><span style="--0:#D6DEEB;--1:#403F53">:</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#7FDBCA;--1:#111111">id</span><span style="--0:#D6DEEB;--1:#403F53">: </span><span style="--0:#ECC48D;--1:#3B61B0">ex_01JXYZ...</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#7FDBCA;--1:#111111">name</span><span style="--0:#D6DEEB;--1:#403F53">: </span><span style="--0:#ECC48D;--1:#3B61B0">example</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#7FDBCA;--1:#111111">namespace</span><span style="--0:#D6DEEB;--1:#403F53">: </span><span style="--0:#ECC48D;--1:#3B61B0">root.acme</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#7FDBCA;--1:#111111">generation</span><span style="--0:#D6DEEB;--1:#403F53">: </span><span style="--0:#F78C6C;--1:#AA0982">1</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#7FDBCA;--1:#111111">labels</span><span style="--0:#D6DEEB;--1:#403F53">: {}</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#7FDBCA;--1:#111111">annotations</span><span style="--0:#D6DEEB;--1:#403F53">: {}</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#7FDBCA;--1:#111111">createdAt</span><span style="--0:#D6DEEB;--1:#403F53">: </span><span style="--0:#82AAFF;--1:#3B61B0">2026-08-16T12:00:00Z</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#7FDBCA;--1:#111111">updatedAt</span><span style="--0:#D6DEEB;--1:#403F53">: </span><span style="--0:#82AAFF;--1:#3B61B0">2026-08-16T12:00:00Z</span></div></div><div class="ec-line"><div class="code"><span style="--0:#7FDBCA;--1:#111111">spec</span><span style="--0:#D6DEEB;--1:#403F53">: {}</span></div></div><div class="ec-line"><div class="code"><span style="--0:#7FDBCA;--1:#111111">status</span><span style="--0:#D6DEEB;--1:#403F53">: {}</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="apiVersion: authproxy.net/v1alpha1kind: Examplemetadata:  id: ex_01JXYZ...  name: example  namespace: root.acme  generation: 1  labels: {}  annotations: {}  createdAt: 2026-08-16T12:00:00Z  updatedAt: 2026-08-16T12:00:00Zspec: {}status: {}"><div></div></button></div></figure></div>
+<p>Fields are included only where the resource supports them:</p>
+<ul>
+<li><code dir="auto">metadata.id</code> is the durable AuthProxy identifier. It is normally
+server-owned, though configuration reconciliation may accept an explicit ID.</li>
+<li><code dir="auto">metadata.name</code> is the human-stable resource name.</li>
+<li><code dir="auto">metadata.namespace</code> is the owning namespace path. On a Namespace object it
+is the parent path; the namespace’s canonical path is derived from parent and
+name. Root has no parent.</li>
+<li><code dir="auto">metadata.generation</code> identifies a resource generation when AuthProxy has
+meaningful generations. Connector definition versions use it.</li>
+<li>labels, annotations, and timestamps have one representation in ObjectMeta.</li>
+<li><code dir="auto">spec</code> contains desired configuration.</li>
+<li><code dir="auto">status</code> contains server-observed state and is rejected on client writes.
+It is omitted when the resource has no useful observed state.</li>
+</ul>
+<p>Create and patch policies decide which metadata fields a caller may provide.
+Response construction must not reuse request validation accidentally.</p>
+<div class="sl-heading-wrapper level-h3"><h3 id="lists-references-and-actions">Lists, references, and actions</h3><a class="sl-anchor-link" href="#lists-references-and-actions"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Lists, references, and actions”</span></a></div>
+<p>Resource list responses use a Kubernetes-style list object:</p>
+<div class="expressive-code"><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="yaml"><code><div class="ec-line"><div class="code"><span style="--0:#7FDBCA;--1:#111111">apiVersion</span><span style="--0:#D6DEEB;--1:#403F53">: </span><span style="--0:#ECC48D;--1:#3B61B0">authproxy.net/v1alpha1</span></div></div><div class="ec-line"><div class="code"><span style="--0:#7FDBCA;--1:#111111">kind</span><span style="--0:#D6DEEB;--1:#403F53">: </span><span style="--0:#ECC48D;--1:#3B61B0">ConnectorList</span></div></div><div class="ec-line"><div class="code"><span style="--0:#7FDBCA;--1:#111111">metadata</span><span style="--0:#D6DEEB;--1:#403F53">:</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#7FDBCA;--1:#111111">continue</span><span style="--0:#D6DEEB;--1:#403F53">: </span><span style="--0:#D9F5DD;--1:#111111">""</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#7FDBCA;--1:#111111">remainingItemCount</span><span style="--0:#D6DEEB;--1:#403F53">: </span><span style="--0:#F78C6C;--1:#AA0982">0</span></div></div><div class="ec-line"><div class="code"><span style="--0:#7FDBCA;--1:#111111">items</span><span style="--0:#D6DEEB;--1:#403F53">: []</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="apiVersion: authproxy.net/v1alpha1kind: ConnectorListmetadata:  continue: &quot;&quot;  remainingItemCount: 0items: []"><div></div></button></div></figure></div>
+<p>References use a shared ObjectReference containing the minimum stable identity:
+<code dir="auto">apiVersion</code>, <code dir="auto">kind</code>, and the applicable <code dir="auto">id</code>, <code dir="auto">name</code>, <code dir="auto">namespace</code>, and
+<code dir="auto">generation</code>. References do not embed another resource’s spec or status.</p>
+<p>Imperative operations are typed action objects. They use TypeMeta plus a target
+reference in metadata and action input in spec; an asynchronous or otherwise
+observable result may use status. They are not durable managed resources. Kind
+names follow <code dir="auto">&lt;Resource&gt;&lt;Action&gt;</code>, such as <code dir="auto">ConnectionDisconnect</code>.</p>
+<p>Analytical results and protocol payloads do not become resources merely to gain
+an envelope. The inventory below identifies those exceptions.</p>
+<div class="sl-heading-wrapper level-h3"><h3 id="shared-schema-ownership">Shared schema ownership</h3><a class="sl-anchor-link" href="#shared-schema-ownership"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Shared schema ownership”</span></a></div>
+<p><a href="https://github.com/rmorlok/authproxy/issues/831">#831</a> implements the shared
+contract once rather than repeating it in every resource package:</p>
+<ul>
+<li><code dir="auto">internal/schema/resources/meta</code> owns TypeMeta, ObjectMeta, ObjectReference,
+Condition, the API-version primitive, and common metadata validation.</li>
+<li><code dir="auto">internal/schema/api/v1alpha1</code> owns ListMeta, resource-list and action
+transport composition, and version-specific API helpers. This keeps API
+envelopes and pagination out of the resource-definition tree.</li>
+<li><code dir="auto">internal/schema/manifest</code> owns strict JSON/YAML GVK dispatch and any required
+multi-document decoding.</li>
+<li>Each resource package owns its kind constant, Spec, Status, resource object,
+lifecycle validation, and resource-specific defaulting.</li>
+<li><code dir="auto">internal/schema/resources/actor</code> and
+<code dir="auto">internal/schema/resources/connection</code> become the homes for resource
+contracts currently split between auth/core/API packages.</li>
+<li><code dir="auto">internal/schema/resources/connectors</code> becomes provider-definition schema and
+validation only; logical connector identity and generation belong to the
+Connector resource type.</li>
+<li>Existing namespace, key, and rate-limit resource packages adopt the common
+metadata contract without importing <code dir="auto">internal/schema/api</code>.</li>
+<li><code dir="auto">internal/schema/api</code> changes the existing v1 transport directly and composes
+resource-owned contracts. Resource packages never import it.</li>
+</ul>
+<p>Shared helpers cover TypeMeta validation, source- and operation-aware
+defaulting, <code dir="auto">ValidateFor(create|update|response)</code>, immutable and server-owned
+metadata checks, metadata patch application with explicit nil-versus-empty
+semantics, deterministic spec canonicalization and hashing, and constructors
+for lists, references, and conditions. Database rows remain flat; conversion at
+core/database boundaries prevents persistence models from becoming public wire
+contracts. Authorization and business side effects remain in core and routes.</p>
+<div class="sl-heading-wrapper level-h3"><h3 id="connector-generations">Connector generations</h3><a class="sl-anchor-link" href="#connector-generations"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Connector generations”</span></a></div>
+<p>A logical connector keeps one <code dir="auto">metadata.id</code>, <code dir="auto">metadata.name</code>, and namespace.
+Each definition version is returned as another Connector object with a distinct
+<code dir="auto">metadata.generation</code>:</p>
+<div class="expressive-code"><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="yaml"><code><div class="ec-line"><div class="code"><span style="--0:#7FDBCA;--1:#111111">apiVersion</span><span style="--0:#D6DEEB;--1:#403F53">: </span><span style="--0:#ECC48D;--1:#3B61B0">authproxy.net/v1alpha1</span></div></div><div class="ec-line"><div class="code"><span style="--0:#7FDBCA;--1:#111111">kind</span><span style="--0:#D6DEEB;--1:#403F53">: </span><span style="--0:#ECC48D;--1:#3B61B0">Connector</span></div></div><div class="ec-line"><div class="code"><span style="--0:#7FDBCA;--1:#111111">metadata</span><span style="--0:#D6DEEB;--1:#403F53">:</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#7FDBCA;--1:#111111">id</span><span style="--0:#D6DEEB;--1:#403F53">: </span><span style="--0:#ECC48D;--1:#3B61B0">cxr_01JXYZ...</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#7FDBCA;--1:#111111">name</span><span style="--0:#D6DEEB;--1:#403F53">: </span><span style="--0:#ECC48D;--1:#3B61B0">greenhouse</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#7FDBCA;--1:#111111">namespace</span><span style="--0:#D6DEEB;--1:#403F53">: </span><span style="--0:#ECC48D;--1:#3B61B0">root</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#7FDBCA;--1:#111111">generation</span><span style="--0:#D6DEEB;--1:#403F53">: </span><span style="--0:#F78C6C;--1:#AA0982">3</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#7FDBCA;--1:#111111">labels</span><span style="--0:#D6DEEB;--1:#403F53">:</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#7FDBCA;--1:#111111">environment</span><span style="--0:#D6DEEB;--1:#403F53">: </span><span style="--0:#ECC48D;--1:#3B61B0">demo</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#7FDBCA;--1:#111111">createdAt</span><span style="--0:#D6DEEB;--1:#403F53">: </span><span style="--0:#82AAFF;--1:#3B61B0">2026-08-16T12:00:00Z</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#7FDBCA;--1:#111111">updatedAt</span><span style="--0:#D6DEEB;--1:#403F53">: </span><span style="--0:#82AAFF;--1:#3B61B0">2026-08-16T12:05:00Z</span></div></div><div class="ec-line"><div class="code"><span style="--0:#7FDBCA;--1:#111111">spec</span><span style="--0:#D6DEEB;--1:#403F53">:</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#7FDBCA;--1:#111111">release</span><span style="--0:#D6DEEB;--1:#403F53">:</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#7FDBCA;--1:#111111">desiredState</span><span style="--0:#D6DEEB;--1:#403F53">: </span><span style="--0:#ECC48D;--1:#3B61B0">primary</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#7FDBCA;--1:#111111">definition</span><span style="--0:#D6DEEB;--1:#403F53">:</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#7FDBCA;--1:#111111">displayName</span><span style="--0:#D6DEEB;--1:#403F53">: </span><span style="--0:#ECC48D;--1:#3B61B0">Greenhouse</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#7FDBCA;--1:#111111">description</span><span style="--0:#D6DEEB;--1:#403F53">: </span><span style="--0:#ECC48D;--1:#3B61B0">Connect AuthProxy to Greenhouse.</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#7FDBCA;--1:#111111">auth</span><span style="--0:#D6DEEB;--1:#403F53">:</span></div></div><div class="ec-line"><div class="code"><span class="indent">      </span><span style="--0:#7FDBCA;--1:#111111">type</span><span style="--0:#D6DEEB;--1:#403F53">: </span><span style="--0:#ECC48D;--1:#3B61B0">api-key</span></div></div><div class="ec-line"><div class="code"><span class="indent">      </span><span style="--0:#7FDBCA;--1:#111111">placement</span><span style="--0:#D6DEEB;--1:#403F53">:</span></div></div><div class="ec-line"><div class="code"><span class="indent">        </span><span style="--0:#7FDBCA;--1:#111111">type</span><span style="--0:#D6DEEB;--1:#403F53">: </span><span style="--0:#ECC48D;--1:#3B61B0">bearer</span></div></div><div class="ec-line"><div class="code"><span style="--0:#7FDBCA;--1:#111111">status</span><span style="--0:#D6DEEB;--1:#403F53">:</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#7FDBCA;--1:#111111">release</span><span style="--0:#D6DEEB;--1:#403F53">:</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#7FDBCA;--1:#111111">state</span><span style="--0:#D6DEEB;--1:#403F53">: </span><span style="--0:#ECC48D;--1:#3B61B0">primary</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="apiVersion: authproxy.net/v1alpha1kind: Connectormetadata:  id: cxr_01JXYZ...  name: greenhouse  namespace: root  generation: 3  labels:    environment: demo  createdAt: 2026-08-16T12:00:00Z  updatedAt: 2026-08-16T12:05:00Zspec:  release:    desiredState: primary  definition:    displayName: Greenhouse    description: Connect AuthProxy to Greenhouse.    auth:      type: api-key      placement:        type: bearerstatus:  release:    state: primary"><div></div></button></div></figure></div>
+<p>Only canonical <code dir="auto">spec.definition</code> is stored in the encrypted connector
+definition column. Identity, namespace, generation, release state, labels,
+annotations, timestamps, and status are not duplicated there. The internal
+semantic hash also covers canonical <code dir="auto">spec.definition</code> only. Consequently a
+metadata or release-state change does not manufacture a connector generation.</p>
+<p>Configuration may omit ID and generation to reconcile by namespace/name plus
+the semantic hash. When it supplies both <code dir="auto">metadata.id</code> and
+<code dir="auto">metadata.generation</code>, the existing explicit sequential-generation rules apply.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="registered-route-inventory">Registered route inventory</h2><a class="sl-anchor-link" href="#registered-route-inventory"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Registered route inventory”</span></a></div>
+<p>The tables use <code dir="auto">GET|POST</code> to mean that both methods are registered. A
+<code dir="auto">{labels,annotations}</code> family expands to both path segments; its <code dir="auto">:key</code> route
+expands to <code dir="auto">:label</code> or <code dir="auto">:annotation</code> as it exists today. Those expansions account
+for every concrete registration in the audited route set.</p>
+<div class="sl-heading-wrapper level-h3"><h3 id="service-exposure">Service exposure</h3><a class="sl-anchor-link" href="#service-exposure"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Service exposure”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>Admin API</th>
+<th>API</th>
+<th>Public</th>
+<th>Worker</th>
+<th>Owner</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Connector</td>
+<td>yes</td>
+<td>yes</td>
+<td>marketplace mode</td>
+<td>no</td>
+<td>#832, #839</td>
+</tr>
+<tr>
+<td>Connection and setup</td>
+<td>yes</td>
+<td>yes</td>
+<td>marketplace mode</td>
+<td>no</td>
+<td>#840</td>
+</tr>
+<tr>
+<td>Namespace</td>
+<td>yes</td>
+<td>yes</td>
+<td>no</td>
+<td>no</td>
+<td>#834</td>
+</tr>
+<tr>
+<td>Key</td>
+<td>yes</td>
+<td>no</td>
+<td>no</td>
+<td>no</td>
+<td>#835</td>
+</tr>
+<tr>
+<td>RateLimit</td>
+<td>yes</td>
+<td>yes</td>
+<td>no</td>
+<td>no</td>
+<td>#836</td>
+</tr>
+<tr>
+<td>Actor</td>
+<td>yes</td>
+<td>yes</td>
+<td>no</td>
+<td>no</td>
+<td>#837, #838</td>
+</tr>
+<tr>
+<td>Request events and metrics</td>
+<td>yes</td>
+<td>yes</td>
+<td>no</td>
+<td>no</td>
+<td>#842</td>
+</tr>
+<tr>
+<td>Notification</td>
+<td>yes</td>
+<td>yes</td>
+<td>marketplace mode</td>
+<td>no</td>
+<td>#841</td>
+</tr>
+<tr>
+<td>Resource search</td>
+<td>yes</td>
+<td>no</td>
+<td>no</td>
+<td>no</td>
+<td>#841</td>
+</tr>
+<tr>
+<td>Task resolution</td>
+<td>no</td>
+<td>yes</td>
+<td>marketplace mode</td>
+<td>no</td>
+<td>#843</td>
+</tr>
+<tr>
+<td>Task/workflow monitoring</td>
+<td>yes</td>
+<td>no</td>
+<td>no</td>
+<td>no</td>
+<td>#843</td>
+</tr>
+<tr>
+<td>Session</td>
+<td>UI mode</td>
+<td>no</td>
+<td>marketplace mode</td>
+<td>no</td>
+<td>#838, #848</td>
+</tr>
+<tr>
+<td>Connection proxy</td>
+<td>no</td>
+<td>yes</td>
+<td>proxy mode</td>
+<td>no</td>
+<td>#840</td>
+</tr>
+<tr>
+<td>OAuth/setup browser protocol</td>
+<td>no</td>
+<td>no</td>
+<td>yes</td>
+<td>no</td>
+<td>#840</td>
+</tr>
+<tr>
+<td>Ping/health</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>exception</td>
+</tr>
+<tr>
+<td>Swagger</td>
+<td>yes</td>
+<td>yes</td>
+<td>no</td>
+<td>no</td>
+<td>#833, #849</td>
+</tr>
+<tr>
+<td>Static SPA/error pages</td>
+<td>UI mode</td>
+<td>no</td>
+<td>UI mode</td>
+<td>no</td>
+<td>exception</td>
+</tr>
+</tbody>
+</table>
+<div class="sl-heading-wrapper level-h3"><h3 id="managed-resource-routes">Managed resource routes</h3><a class="sl-anchor-link" href="#managed-resource-routes"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Managed resource routes”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Resource</th>
+<th>Registered method and path</th>
+<th>Target</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Connector</td>
+<td>`GET</td>
+<td>POST /api/v1/connectors`</td>
+</tr>
+<tr>
+<td>Connector</td>
+<td>`GET</td>
+<td>PATCH /api/v1/connectors/:id`</td>
+</tr>
+<tr>
+<td>Connector generation</td>
+<td>`GET</td>
+<td>POST /api/v1/connectors/:id/generations`</td>
+</tr>
+<tr>
+<td>Connector generation</td>
+<td>`GET</td>
+<td>PATCH /api/v1/connectors/:id/generations/:generation`</td>
+</tr>
+<tr>
+<td>Connector action</td>
+<td><code dir="auto">POST /api/v1/connectors/:id/_disconnectAll</code></td>
+<td><code dir="auto">ConnectorDisconnectAll</code> action; task/workflow result in status</td>
+</tr>
+<tr>
+<td>Connector action</td>
+<td><code dir="auto">POST /api/v1/connectors/:id/_archive</code></td>
+<td><code dir="auto">ConnectorArchive</code> action; task locator in status</td>
+</tr>
+<tr>
+<td>Connector action</td>
+<td><code dir="auto">PUT /api/v1/connectors/:id/generations/:generation/_forceState</code></td>
+<td><code dir="auto">ConnectorForceState</code> action; response Connector</td>
+</tr>
+<tr>
+<td>Connector metadata</td>
+<td>Former <code dir="auto">/{labels,annotations}</code> subroutes</td>
+<td>removed; use <code dir="auto">PATCH</code> on Connector metadata</td>
+</tr>
+<tr>
+<td>Connector-generation metadata</td>
+<td>Former generation <code dir="auto">/{labels,annotations}</code> subroutes</td>
+<td>removed; use <code dir="auto">PATCH</code> on generation metadata</td>
+</tr>
+<tr>
+<td>Connection</td>
+<td><code dir="auto">POST /api/v1/connections/_initiate</code></td>
+<td><code dir="auto">ConnectionInitiate</code> request; <code dir="auto">ConnectionSetup</code> response action</td>
+</tr>
+<tr>
+<td>Connection</td>
+<td><code dir="auto">GET /api/v1/connections</code></td>
+<td><code dir="auto">ConnectionList</code></td>
+</tr>
+<tr>
+<td>Connection</td>
+<td>`GET</td>
+<td>PATCH /api/v1/connections/:id`</td>
+</tr>
+<tr>
+<td>Connection setup</td>
+<td><code dir="auto">POST /api/v1/connections/:id/_submit</code></td>
+<td><code dir="auto">ConnectionSetupSubmit</code> request; <code dir="auto">ConnectionSetup</code> response action</td>
+</tr>
+<tr>
+<td>Connection setup</td>
+<td><code dir="auto">GET /api/v1/connections/:id/_setupStep</code></td>
+<td><code dir="auto">ConnectionSetup</code> read projection</td>
+</tr>
+<tr>
+<td>Connection setup</td>
+<td><code dir="auto">GET /api/v1/connections/:id/_dataSource/:sourceId</code></td>
+<td><code dir="auto">DataSourceOptionList</code> projection</td>
+</tr>
+<tr>
+<td>Connection action</td>
+<td><code dir="auto">POST /api/v1/connections/:id/_disconnect</code></td>
+<td><code dir="auto">ConnectionDisconnect</code> action</td>
+</tr>
+<tr>
+<td>Connection action</td>
+<td><code dir="auto">POST /api/v1/connections/:id/_abort</code></td>
+<td><code dir="auto">ConnectionSetupAbort</code> action</td>
+</tr>
+<tr>
+<td>Connection action</td>
+<td><code dir="auto">POST /api/v1/connections/:id/_reconfigure</code></td>
+<td><code dir="auto">ConnectionReconfigure</code> action</td>
+</tr>
+<tr>
+<td>Connection action</td>
+<td><code dir="auto">POST /api/v1/connections/:id/_migrateVersion</code></td>
+<td><code dir="auto">ConnectionVersionMigration</code> action</td>
+</tr>
+<tr>
+<td>Connection action</td>
+<td><code dir="auto">POST /api/v1/connections/:id/_cancelSetup</code></td>
+<td><code dir="auto">ConnectionSetupCancel</code> action</td>
+</tr>
+<tr>
+<td>Connection action</td>
+<td><code dir="auto">POST /api/v1/connections/:id/_retry</code></td>
+<td><code dir="auto">ConnectionSetupRetry</code> action</td>
+</tr>
+<tr>
+<td>Connection action</td>
+<td><code dir="auto">POST /api/v1/connections/:id/_reauth</code></td>
+<td><code dir="auto">ConnectionReauthenticate</code> action</td>
+</tr>
+<tr>
+<td>Connection action</td>
+<td><code dir="auto">PUT /api/v1/connections/:id/_forceState</code></td>
+<td><code dir="auto">ConnectionForceState</code> action; response Connection</td>
+</tr>
+<tr>
+<td>Connection metadata</td>
+<td>Former <code dir="auto">/{labels,annotations}</code> subroutes</td>
+<td>removed; use <code dir="auto">PATCH</code> on Connection metadata</td>
+</tr>
+<tr>
+<td>Connection scopes</td>
+<td><code dir="auto">GET /api/v1/connections/:id/scopes</code></td>
+<td><code dir="auto">ConnectionScopeList</code> projection</td>
+</tr>
+<tr>
+<td>Namespace</td>
+<td>`GET</td>
+<td>POST /api/v1/namespaces`</td>
+</tr>
+<tr>
+<td>Namespace</td>
+<td>`GET</td>
+<td>PATCH /api/v1/namespaces/:path`</td>
+</tr>
+<tr>
+<td>Namespace metadata</td>
+<td>Former <code dir="auto">/{labels,annotations}</code> subroutes</td>
+<td>removed; use <code dir="auto">PATCH</code> on Namespace metadata</td>
+</tr>
+<tr>
+<td>Namespace key</td>
+<td>Former `GET</td>
+<td>PUT</td>
+</tr>
+<tr>
+<td>Key</td>
+<td>`GET</td>
+<td>POST /api/v1/keys`</td>
+</tr>
+<tr>
+<td>Key</td>
+<td>`GET</td>
+<td>PATCH</td>
+</tr>
+<tr>
+<td>Key metadata</td>
+<td>Former <code dir="auto">/{labels,annotations}</code> subroutes</td>
+<td>removed; use <code dir="auto">PATCH</code> on Key metadata</td>
+</tr>
+<tr>
+<td>RateLimit</td>
+<td>`GET</td>
+<td>POST /api/v1/rate-limits`</td>
+</tr>
+<tr>
+<td>RateLimit</td>
+<td>`GET</td>
+<td>PATCH</td>
+</tr>
+<tr>
+<td>RateLimit action</td>
+<td><code dir="auto">POST /api/v1/rate-limits/_dryRun</code></td>
+<td><code dir="auto">RateLimitDryRun</code> action; matches and failures in status</td>
+</tr>
+<tr>
+<td>RateLimit metadata</td>
+<td>Former <code dir="auto">/{labels,annotations}</code> subroutes</td>
+<td>removed; use <code dir="auto">PATCH</code> on RateLimit metadata</td>
+</tr>
+<tr>
+<td>Actor</td>
+<td>`GET</td>
+<td>POST /api/v1/actors`</td>
+</tr>
+<tr>
+<td>Actor</td>
+<td>`GET</td>
+<td>PATCH</td>
+</tr>
+<tr>
+<td>Actor alternate lookup</td>
+<td>`GET</td>
+<td>PATCH</td>
+</tr>
+<tr>
+<td>Actor metadata</td>
+<td>Former <code dir="auto">/{labels,annotations}</code> subroutes</td>
+<td>removed; use <code dir="auto">PATCH</code> on Actor metadata</td>
+</tr>
+</tbody>
+</table>
+<p>The metadata and namespace-key subroutes were intentionally removed. The
+breaking contract has one patch/default/validation path for ObjectMeta and
+Spec, rather than a parallel key-value API that recreates the duplication this
+project removes.</p>
+<div class="sl-heading-wrapper level-h3"><h3 id="read-models-analytical-apis-and-typed-actions">Read models, analytical APIs, and typed actions</h3><a class="sl-anchor-link" href="#read-models-analytical-apis-and-typed-actions"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Read models, analytical APIs, and typed actions”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>Registered method and path</th>
+<th>Classification and target</th>
+<th>Owner</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Notification</td>
+<td><code dir="auto">GET /api/v1/notifications</code></td>
+<td>read-only <code dir="auto">NotificationList</code>; each Notification has identity/content in metadata/spec and actor-specific viewed/actionability in status</td>
+<td>#841</td>
+</tr>
+<tr>
+<td>Notification view</td>
+<td><code dir="auto">POST /api/v1/notifications/_viewed</code>; <code dir="auto">POST /api/v1/notifications/:id/_viewed</code></td>
+<td><code dir="auto">NotificationView</code> action, accepting one or more Notification references</td>
+<td>#841</td>
+</tr>
+<tr>
+<td>Search</td>
+<td><code dir="auto">GET /api/v1/search/resources</code></td>
+<td><code dir="auto">SearchResultList</code> projection; items contain ObjectReference plus bounded summary/match fields, not copied resource specs</td>
+<td>#841</td>
+</tr>
+<tr>
+<td>Request event</td>
+<td><code dir="auto">GET /api/v1/metrics/request-events</code>; <code dir="auto">GET /api/v1/metrics/request-events/:id</code></td>
+<td>immutable read-only <code dir="auto">RequestEventList</code>/<code dir="auto">RequestEvent</code></td>
+<td>#842</td>
+</tr>
+<tr>
+<td>Metrics query</td>
+<td><code dir="auto">POST /api/v1/metrics/query</code></td>
+<td>analytical <code dir="auto">MetricsQuery</code>/<code dir="auto">MetricsQueryResult</code>; typed but not a managed resource</td>
+<td>#842</td>
+</tr>
+<tr>
+<td>Metrics schema</td>
+<td><code dir="auto">GET /api/v1/metrics/schema</code></td>
+<td><code dir="auto">MetricsSchema</code> projection; typed but not a managed resource</td>
+<td>#842</td>
+</tr>
+<tr>
+<td>Task resolution</td>
+<td><code dir="auto">GET /api/v1/tasks/:encryptedTaskInfo</code></td>
+<td>read-only <code dir="auto">Task</code> operational projection over Asynq or workflow state</td>
+<td>#843</td>
+</tr>
+<tr>
+<td>Task queues</td>
+<td><code dir="auto">GET /api/v1/task-monitoring/queues</code>; <code dir="auto">GET /api/v1/task-monitoring/queues/:queue</code>; <code dir="auto">GET /api/v1/task-monitoring/queues/:queue/history</code></td>
+<td><code dir="auto">TaskQueueList</code>, <code dir="auto">TaskQueue</code>, and <code dir="auto">TaskQueueHistory</code> operational projections</td>
+<td>#843</td>
+</tr>
+<tr>
+<td>Tasks</td>
+<td><code dir="auto">GET /api/v1/task-monitoring/queues/:queue/tasks/:state</code>; <code dir="auto">GET /api/v1/task-monitoring/queues/:queue/tasks/:state/:taskId</code></td>
+<td><code dir="auto">TaskList</code>/<code dir="auto">Task</code> operational projections</td>
+<td>#843</td>
+</tr>
+<tr>
+<td>Task workers/schedule</td>
+<td><code dir="auto">GET /api/v1/task-monitoring/servers</code>; <code dir="auto">GET /api/v1/task-monitoring/scheduler-entries</code></td>
+<td><code dir="auto">TaskServerList</code> and <code dir="auto">TaskScheduleList</code> projections</td>
+<td>#843</td>
+</tr>
+<tr>
+<td>Task actions</td>
+<td><code dir="auto">POST /api/v1/task-monitoring/queues/:queue/tasks/:taskId/_run</code>; <code dir="auto">POST /api/v1/task-monitoring/queues/:queue/tasks/:taskId/_archive</code>; <code dir="auto">POST /api/v1/task-monitoring/queues/:queue/tasks/:taskId/_cancel</code>; <code dir="auto">DELETE /api/v1/task-monitoring/queues/:queue/tasks/:taskId</code></td>
+<td><code dir="auto">TaskRun</code>, <code dir="auto">TaskArchive</code>, <code dir="auto">TaskCancel</code>, and <code dir="auto">TaskDelete</code> actions</td>
+<td>#843</td>
+</tr>
+<tr>
+<td>Queue actions</td>
+<td><code dir="auto">POST /api/v1/task-monitoring/queues/:queue/_pause</code>; <code dir="auto">POST /api/v1/task-monitoring/queues/:queue/_unpause</code>; <code dir="auto">POST /api/v1/task-monitoring/queues/:queue/archived/_runAll</code>; <code dir="auto">POST /api/v1/task-monitoring/queues/:queue/retry/_runAll</code>; <code dir="auto">DELETE /api/v1/task-monitoring/queues/:queue/archived</code>; <code dir="auto">DELETE /api/v1/task-monitoring/queues/:queue/completed</code></td>
+<td>typed queue/bulk actions with affected-count status</td>
+<td>#843</td>
+</tr>
+<tr>
+<td>Workflows</td>
+<td><code dir="auto">GET /api/v1/workflow-monitoring/instances</code>; <code dir="auto">GET /api/v1/workflow-monitoring/instances/:instanceId/:executionId</code></td>
+<td><code dir="auto">WorkflowInstanceList</code>/<code dir="auto">WorkflowInstance</code> operational projections</td>
+<td>#843</td>
+</tr>
+<tr>
+<td>Workflow history/tree</td>
+<td><code dir="auto">GET /api/v1/workflow-monitoring/instances/:instanceId/:executionId/history</code>; <code dir="auto">GET /api/v1/workflow-monitoring/instances/:instanceId/:executionId/tree</code></td>
+<td><code dir="auto">WorkflowHistoryEventList</code> and <code dir="auto">WorkflowInstanceTree</code> projections</td>
+<td>#843</td>
+</tr>
+<tr>
+<td>Workflow actions</td>
+<td><code dir="auto">POST /api/v1/workflow-monitoring/instances/:instanceId/:executionId/_cancel</code>; <code dir="auto">DELETE /api/v1/workflow-monitoring/instances/:instanceId/:executionId</code></td>
+<td><code dir="auto">WorkflowCancel</code> and <code dir="auto">WorkflowDelete</code> actions</td>
+<td>#843</td>
+</tr>
+</tbody>
+</table>
+<p>The exact read-model fields are implemented by the owning issues, but their
+classification is fixed here: they may use TypeMeta/kind for discriminated SDK
+types without pretending that Asynq queues, metric series, or search hits are
+declarative resources stored by AuthProxy.</p>
+<div class="sl-heading-wrapper level-h3"><h3 id="protocol-and-infrastructure-exceptions">Protocol and infrastructure exceptions</h3><a class="sl-anchor-link" href="#protocol-and-infrastructure-exceptions"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Protocol and infrastructure exceptions”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>Registered method and path</th>
+<th>Reason it remains unwrapped</th>
+<th>Owner</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Structured proxy</td>
+<td><code dir="auto">POST /api/v1/connections/:id/_proxy</code></td>
+<td>request/response represents arbitrary third-party HTTP traffic</td>
+<td>#840</td>
+</tr>
+<tr>
+<td>Raw proxy</td>
+<td>all methods on <code dir="auto">/api/v1/connections/:id/_proxyRaw</code></td>
+<td>streams third-party method, headers, status, and body without buffering or an AuthProxy envelope</td>
+<td>#840</td>
+</tr>
+<tr>
+<td>Session</td>
+<td><code dir="auto">POST /api/v1/session/_initiate</code>; <code dir="auto">POST /api/v1/session/_terminate</code></td>
+<td>authentication/cookie protocol; typed parameters and errors remain protocol objects</td>
+<td>#838, #848</td>
+</tr>
+<tr>
+<td>OAuth</td>
+<td><code dir="auto">GET /oauth2/redirect</code>; <code dir="auto">GET /oauth2/callback</code></td>
+<td>browser and provider redirect protocol with opaque provider query parameters</td>
+<td>#840</td>
+</tr>
+<tr>
+<td>Redirect setup</td>
+<td>`GET</td>
+<td>POST /setup/connections/:id/advance<code dir="auto">; </code>GET</td>
+<td>POST /setup/connections/:id/abort`</td>
+</tr>
+<tr>
+<td>Error page</td>
+<td><code dir="auto">POST /error</code></td>
+<td>browser HTML error rendering</td>
+<td>#848</td>
+</tr>
+<tr>
+<td>Health</td>
+<td><code dir="auto">GET /ping</code>; <code dir="auto">GET /healthz</code> on HTTP services and worker health server</td>
+<td>infrastructure probes must retain simple status semantics</td>
+<td>exception</td>
+</tr>
+<tr>
+<td>Swagger</td>
+<td><code dir="auto">GET /swagger</code>; <code dir="auto">GET /swagger/*any</code> on API and Admin API</td>
+<td>generated documentation assets</td>
+<td>#833, #849</td>
+</tr>
+<tr>
+<td>Static UI</td>
+<td>Admin and Marketplace SPA mounts/fallbacks</td>
+<td>static files and client-side routes, not API objects</td>
+<td>#845, #846</td>
+</tr>
+</tbody>
+</table>
+<p>There are no AuthProxy product webhook routes or serialized webhook delivery
+payloads in the audited revision. The <code dir="auto">webhooks:full</code> text in demo configuration
+is an OAuth provider scope literal. If webhook support is added before this
+migration finishes, its route and payload classification must be added here.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="current-dto-to-target-inventory">Current DTO-to-target inventory</h2><a class="sl-anchor-link" href="#current-dto-to-target-inventory"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Current DTO-to-target inventory”</span></a></div>
+<p>This table catches serialized types that are easier to miss than their route.
+OpenAPI-only adapters follow the same target as the runtime type and should
+disappear where the new resource structs are directly representable.</p>
+<table>
+<thead>
+<tr>
+<th>Current contract family</th>
+<th>Target</th>
+<th>Owner</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">ConnectorJson</code>, <code dir="auto">ConnectorVersionJson</code>, create/update/version request types</td>
+<td>Connector/ConnectorList using generation; create/patch policies over the same resource contract</td>
+<td>#832, #839</td>
+</tr>
+<tr>
+<td>connector lifecycle and force-state request/response types</td>
+<td>typed Connector actions and Connector/Task references in results</td>
+<td>#839, #843</td>
+</tr>
+<tr>
+<td><code dir="auto">ConnectionJson</code>, list/update types</td>
+<td>Connection/ConnectionList</td>
+<td>#840</td>
+</tr>
+<tr>
+<td>initiate/submit/setup redirect/form/verifying/complete/error variants and data-source options</td>
+<td>typed connection actions and setup/read projections</td>
+<td>#840</td>
+</tr>
+<tr>
+<td>disconnect, migrate-version, retry, reauth, force-state types</td>
+<td>typed Connection actions; <code dir="auto">targetVersion</code> becomes connector generation reference</td>
+<td>#840</td>
+</tr>
+<tr>
+<td><code dir="auto">NamespaceJson</code>, create/update/list types</td>
+<td>Namespace/NamespaceList</td>
+<td>#834</td>
+</tr>
+<tr>
+<td><code dir="auto">NamespaceKeyJson</code>, <code dir="auto">SetNamespaceKeyRequestJson</code></td>
+<td>removed; <code dir="auto">Namespace.spec.encryptionKeyRef</code> is authoritative</td>
+<td>#834, #835, #849</td>
+</tr>
+<tr>
+<td><code dir="auto">KeyJson</code>, create/update/list types</td>
+<td>Key/KeyList with write-only/redacted secret spec</td>
+<td>#835</td>
+</tr>
+<tr>
+<td><code dir="auto">RateLimitJson</code>, create/update/list types</td>
+<td>RateLimit/RateLimitList</td>
+<td>#836</td>
+</tr>
+<tr>
+<td>rate-limit dry-run and synthetic proxy request types</td>
+<td>RateLimitDryRun action and analytical status</td>
+<td>#836</td>
+</tr>
+<tr>
+<td><code dir="auto">ActorJson</code>, create/update/list types</td>
+<td>Actor/ActorList</td>
+<td>#837</td>
+</tr>
+<tr>
+<td><code dir="auto">NotificationJson</code>, upsert/list/view types</td>
+<td>read-only Notification resources, internal write model, and NotificationView action</td>
+<td>#841</td>
+</tr>
+<tr>
+<td><code dir="auto">SearchResourceSummaryJson</code>, match and response types</td>
+<td>ObjectReference-based ResourceSearchResultList projection</td>
+<td>#841</td>
+</tr>
+<tr>
+<td><code dir="auto">RequestEventJson</code> and list types</td>
+<td>immutable RequestEvent/RequestEventList</td>
+<td>#842</td>
+</tr>
+<tr>
+<td>metrics query/range/series/schema types</td>
+<td>typed analytical query/result/schema contracts, not managed resources</td>
+<td>#842</td>
+</tr>
+<tr>
+<td>task queue/server/scheduler/task/bulk result DTOs</td>
+<td>operational projections and typed actions</td>
+<td>#843</td>
+</tr>
+<tr>
+<td>workflow instance/history/tree/list DTOs</td>
+<td>operational projections and typed actions</td>
+<td>#843</td>
+</tr>
+<tr>
+<td><code dir="auto">KeyValueJson</code>, <code dir="auto">PutKeyValueRequestJson</code></td>
+<td>removed with label/annotation subroutes; ObjectMeta patching is authoritative</td>
+<td>#833 plus each resource issue</td>
+</tr>
+<tr>
+<td><code dir="auto">ErrorResponse</code></td>
+<td>common API error contract; not a resource</td>
+<td>#833</td>
+</tr>
+<tr>
+<td>session initiate types</td>
+<td>auth protocol contract; Actor inside JWT follows the resource policy</td>
+<td>#838</td>
+</tr>
+<tr>
+<td><code dir="auto">ProxyResponseJson</code> and raw proxy types</td>
+<td>third-party protocol payloads; no resource envelope</td>
+<td>#840</td>
+</tr>
+</tbody>
+</table>
+<div class="sl-heading-wrapper level-h2"><h2 id="configuration-inventory">Configuration inventory</h2><a class="sl-anchor-link" href="#configuration-inventory"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Configuration inventory”</span></a></div>
+<p>The root configuration file remains an operational configuration document. It
+does not itself become an AuthProxy resource list. Only entries that declare
+managed resources use manifests.</p>
+<table>
+<thead>
+<tr>
+<th>Configuration surface</th>
+<th>Target</th>
+<th>Owner</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">connectors.loadFromList</code></td>
+<td>list of complete Connector manifests; connector loader settings such as <code dir="auto">autoMigrationLockDuration</code> remain ordinary operational config</td>
+<td>#832, #839</td>
+</tr>
+<tr>
+<td>connector definition auth, scopes, probes, setup flow, migrations, telemetry, and rate-limiting blocks</td>
+<td>provider-only schema under <code dir="auto">Connector.spec.definition</code></td>
+<td>#832, #839</td>
+</tr>
+<tr>
+<td><code dir="auto">systemAuth.actors</code> inline list</td>
+<td>restricted Actor manifests; config normalization applies the config source policy</td>
+<td>#837, #838</td>
+</tr>
+<tr>
+<td><code dir="auto">ConfiguredActorsExternalSource</code></td>
+<td>remains a source descriptor; discovered entries normalize into Actor manifests before reconciliation</td>
+<td>#837, #838</td>
+</tr>
+<tr>
+<td><code dir="auto">AdminUser</code>/<code dir="auto">AdminUsers</code> schema types</td>
+<td>currently not wired into Root or a service; remove as dead schema or normalize through the same Actor policy before reuse</td>
+<td>#838</td>
+</tr>
+<tr>
+<td><code dir="auto">systemAuth.jwtSigningKey</code>, <code dir="auto">globalAesKey</code>, actor/admin public keys, TLS keys, and storage-provider <code dir="auto">KeyData</code></td>
+<td>cryptographic provider configuration, not durable Key resources; use ObjectReference only where they refer to a managed Key</td>
+<td>#835, #838</td>
+</tr>
+<tr>
+<td>database, Redis, blob storage, logging, telemetry, app metrics, OAuth timing, services, CORS, cookies, tasks, marketplace, host application, error pages, and dev settings</td>
+<td>remain operational config, not resource manifests</td>
+<td>explicit exception</td>
+</tr>
+<tr>
+<td><code dir="auto">connections.setupTtl</code></td>
+<td>remains operational lifecycle configuration; it does not declare Connection resources</td>
+<td>#840</td>
+</tr>
+<tr>
+<td><code dir="auto">dev_config</code>, deployment values/templates, demos, and integration fixtures</td>
+<td>update every embedded connector/actor manifest and remove old examples</td>
+<td>#848</td>
+</tr>
+<tr>
+<td>configuration JSON Schema</td>
+<td>regenerate for resource entries and retain operational blocks</td>
+<td>#831, #839, #848, #849</td>
+</tr>
+</tbody>
+</table>
+<p>No configuration compatibility decoder will accept both flat and resource
+forms. Unknown GVKs and old connector/actor shapes fail strict decoding.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="authentication-and-token-inventory">Authentication and token inventory</h2><a class="sl-anchor-link" href="#authentication-and-token-inventory"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Authentication and token inventory”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Serialized payload</th>
+<th>Target policy</th>
+<th>Owner</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">jwt.AuthProxyClaims</code></td>
+<td>registered JWT claims remain top-level; <code dir="auto">actor</code> becomes a restricted <code dir="auto">authproxy.net/v1alpha1</code> Actor object</td>
+<td>#838</td>
+</tr>
+<tr>
+<td>JWT Actor</td>
+<td>require <code dir="auto">sub == actor.spec.externalId</code>; namespace claim equals <code dir="auto">actor.metadata.namespace</code>; forbid metadata ID/timestamps/status/signing material; token permissions may only narrow Actor spec permissions</td>
+<td>#838</td>
+</tr>
+<tr>
+<td>session JWT/cookie authentication</td>
+<td>use the same AuthProxyClaims and restricted Actor contract; no second actor representation</td>
+<td>#838</td>
+</tr>
+<tr>
+<td>OAuth encrypted Redis state</td>
+<td>internal versioned protocol payload; use connector generation and stable resource references internally, not a public resource envelope</td>
+<td>#839, #840</td>
+</tr>
+<tr>
+<td>setup-token encrypted Redis <code dir="auto">Claims</code></td>
+<td>internal one-time protocol payload; retain connection/actor binding and update reference naming where resource changes require it</td>
+<td>#840</td>
+</tr>
+<tr>
+<td>encrypted <code dir="auto">tasks.TaskInfo</code> URL token</td>
+<td>internal locator for Asynq/workflow state; expose the resolved Task projection, not the locator payload</td>
+<td>#843</td>
+</tr>
+</tbody>
+</table>
+<p>Old flat JWT Actor claims are rejected after the breaking change. There is no
+dual claim decoder.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="internal-event-task-and-workflow-inventory">Internal event, task, and workflow inventory</h2><a class="sl-anchor-link" href="#internal-event-task-and-workflow-inventory"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Internal event, task, and workflow inventory”</span></a></div>
+<p>Internal queue/workflow payloads are persistence protocols, not API resources.
+They stay compact and explicitly versioned. If they embed resource identity,
+they adopt ID/reference/generation terminology and receive a payload version
+when the stored shape changes. Fresh environments mean no compatibility worker
+is required, but versioned names prevent ambiguity in new persisted work.</p>
+<div class="sl-heading-wrapper level-h3"><h3 id="asynq-tasks">Asynq tasks</h3><a class="sl-anchor-link" href="#asynq-tasks"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Asynq tasks”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Task type</th>
+<th>Current payload</th>
+<th>Target treatment</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">auth_tasks:clear_expired_nonces</code></td>
+<td>none</td>
+<td>unchanged internal task</td>
+</tr>
+<tr>
+<td><code dir="auto">auth_tasks:sync_external_source</code></td>
+<td>none</td>
+<td>actor loader produces Actor resources; #838</td>
+</tr>
+<tr>
+<td><code dir="auto">oauth2:refresh_expiring_oauth_tokens</code></td>
+<td>none</td>
+<td>unchanged scheduler</td>
+</tr>
+<tr>
+<td><code dir="auto">oauth2:refresh_oauth_token</code></td>
+<td>connection ID</td>
+<td>use stable Connection reference terminology; #840, #843</td>
+</tr>
+<tr>
+<td><code dir="auto">database:purge_soft_deleted</code></td>
+<td>none</td>
+<td>unchanged internal task</td>
+</tr>
+<tr>
+<td><code dir="auto">database:cleanup_stale_connections</code></td>
+<td>none</td>
+<td>unchanged internal task</td>
+</tr>
+<tr>
+<td><code dir="auto">database:propagate_namespace_labels</code></td>
+<td>namespace path</td>
+<td>update for canonical Namespace reference/path semantics; #834, #843</td>
+</tr>
+<tr>
+<td><code dir="auto">database:propagate_connector_labels</code></td>
+<td>connector ID</td>
+<td>update for Connector reference/generation rules; #839, #843</td>
+</tr>
+<tr>
+<td><code dir="auto">database:reconcile_carry_forward_labels</code></td>
+<td>none</td>
+<td>consume common metadata helpers; #831, #843</td>
+</tr>
+<tr>
+<td><code dir="auto">core:migrate_connections_between_connector_versions</code></td>
+<td>none</td>
+<td>rename version concepts to generation in behavior and monitoring; #839, #843</td>
+</tr>
+<tr>
+<td><code dir="auto">core:probe</code></td>
+<td>connection ID and probe ID</td>
+<td>internal task with Connection reference terminology; #840, #843</td>
+</tr>
+<tr>
+<td><code dir="auto">core:verify_connection</code></td>
+<td>connection ID</td>
+<td>internal task with Connection reference terminology; #840, #843</td>
+</tr>
+<tr>
+<td><code dir="auto">core:probe_outcome_cleanup</code></td>
+<td>retention seconds</td>
+<td>unchanged internal task</td>
+</tr>
+<tr>
+<td><code dir="auto">encrypt:reencrypt_all</code></td>
+<td>none</td>
+<td>unchanged; it is key rotation, not connector-format conversion</td>
+</tr>
+<tr>
+<td><code dir="auto">encrypt:generate_data_encryption_keys</code></td>
+<td>none</td>
+<td>consumes Key resources through core/database boundaries; #835, #843</td>
+</tr>
+<tr>
+<td><code dir="auto">encrypt:sync_keys_to_database</code></td>
+<td>none</td>
+<td>consumes Key resources through core/database boundaries; #835, #843</td>
+</tr>
+<tr>
+<td><code dir="auto">app_metrics:resource_snapshot</code></td>
+<td>none</td>
+<td>snapshot projections adopt resource metadata at read boundary; #842, #843</td>
+</tr>
+</tbody>
+</table>
+<p>No task may be added to convert legacy encrypted connector definitions.</p>
+<div class="sl-heading-wrapper level-h3"><h3 id="workflows">Workflows</h3><a class="sl-anchor-link" href="#workflows"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Workflows”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Workflow</th>
+<th>Current input</th>
+<th>Target treatment</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">core.connection.disconnect.v1</code></td>
+<td>connection ID, timeout</td>
+<td>internal v1 payload with stable Connection reference terminology</td>
+</tr>
+<tr>
+<td><code dir="auto">core.connector.disconnect_connections.v1</code></td>
+<td>connector ID, timeout</td>
+<td>internal v1 payload; Connector ID remains logical identity</td>
+</tr>
+<tr>
+<td><code dir="auto">core.connector.archive.v1</code></td>
+<td>connector ID, timeout</td>
+<td>internal v1 payload; API action resolves to this workflow</td>
+</tr>
+<tr>
+<td><code dir="auto">core.connection.migrate_version.v1</code></td>
+<td>connection ID, target version, timeout</td>
+<td>introduce a new workflow payload/name using target connector generation rather than silently changing persisted v1 semantics</td>
+</tr>
+</tbody>
+</table>
+<p>Workflow monitoring history attributes are backend-owned arbitrary data. They
+remain a projection and must be redacted/bounded; they are not decoded as
+AuthProxy resources.</p>
+<div class="sl-heading-wrapper level-h3"><h3 id="events-and-projections">Events and projections</h3><a class="sl-anchor-link" href="#events-and-projections"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Events and projections”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Producer/data</th>
+<th>Classification</th>
+<th>Owner</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>app-metrics request log / <code dir="auto">RequestEventJson</code></td>
+<td>immutable RequestEvent read resource with typed references; sensitive request/response fields remain redacted</td>
+<td>#842</td>
+</tr>
+<tr>
+<td>app-metrics resource snapshots and metric series</td>
+<td>analytical storage/projection, not resources</td>
+<td>#842</td>
+</tr>
+<tr>
+<td>core notification records and migration-hook notification definitions</td>
+<td>Notification read resource plus internal write model using ObjectReference</td>
+<td>#841</td>
+</tr>
+<tr>
+<td>OAuth callback rejection and token exchange/refresh log attributes</td>
+<td>structured telemetry/log events, not wire resources</td>
+<td>explicit exception</td>
+</tr>
+<tr>
+<td>OpenTelemetry spans/metrics and request-log labels</td>
+<td>consume already resolved common metadata; no resource envelope</td>
+<td>each resource issue, #849 audit</td>
+</tr>
+<tr>
+<td>webhooks</td>
+<td>no product payload exists in the audited revision</td>
+<td>inventory again before final merge</td>
+</tr>
+</tbody>
+</table>
+<div class="sl-heading-wrapper level-h2"><h2 id="first-party-consumer-and-generated-artifact-inventory">First-party consumer and generated-artifact inventory</h2><a class="sl-anchor-link" href="#first-party-consumer-and-generated-artifact-inventory"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “First-party consumer and generated-artifact inventory”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Consumer/artifact</th>
+<th>Required migration</th>
+<th>Owner</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">internal/schema/api/schema.json</code> and schema fixtures</td>
+<td>replace flat managed-resource fixtures and compile the new resource/action/projection definitions</td>
+<td>#831-#843</td>
+</tr>
+<tr>
+<td>API and Admin API Swagger/OpenAPI output under <code dir="auto">internal/service/*/swagger</code></td>
+<td>regenerate against <code dir="auto">/api/v1</code> resource objects; remove obsolete adapters</td>
+<td>#833, #849</td>
+</tr>
+<tr>
+<td>JavaScript SDK under <code dir="auto">sdks/js</code></td>
+<td>discriminated resource/list/action types, serializers, references, pagination, and JWT Actor helpers</td>
+<td>#844</td>
+</tr>
+<tr>
+<td>Admin UI under <code dir="auto">ui/admin</code></td>
+<td>queries, stores, forms, tables, search, fixtures, stories, mocks, tests, and screenshots</td>
+<td>#845</td>
+</tr>
+<tr>
+<td>Marketplace UI under <code dir="auto">ui/marketplace</code></td>
+<td>connector generations, connection setup, actor context, fixtures, stories, mocks, tests, and screenshots</td>
+<td>#846</td>
+</tr>
+<tr>
+<td>Terraform provider under <code dir="auto">terraform/provider</code></td>
+<td>map idiomatic HCL to resources; remove connector metadata-stripping workaround; preserve secret state rules</td>
+<td>#847</td>
+</tr>
+<tr>
+<td>CLI under <code dir="auto">cmd/cli</code></td>
+<td>JSON/YAML input/output, actor signing, resource printers, proxy/setup commands, and examples</td>
+<td>#838, #848</td>
+</tr>
+<tr>
+<td><code dir="auto">dev_config</code>, Docker Compose, Helm/Kustomize/deployment configuration, demos</td>
+<td>replace embedded resource data and document destructive recreation</td>
+<td>#848</td>
+</tr>
+<tr>
+<td>integration/load tests and golden fixtures</td>
+<td>new envelopes only on fresh SQLite/PostgreSQL environments</td>
+<td>#848</td>
+</tr>
+<tr>
+<td>Starlight docs and README references</td>
+<td>update concepts, API/config/JWT/Terraform/deployment examples and destructive migration note</td>
+<td>#849</td>
+</tr>
+<tr>
+<td>redaction, audit/request logging, caches, telemetry label projection, generic ID/name/namespace helpers</td>
+<td>audit for field-path and reference changes</td>
+<td>owning backend issues, #849 final audit</td>
+</tr>
+</tbody>
+</table>
+<p>Terraform’s HCL does not need literal <code dir="auto">api_version</code>, <code dir="auto">kind</code>, <code dir="auto">metadata</code>, and
+<code dir="auto">spec</code> blocks when that would make the provider unidiomatic. The provider owns a
+deterministic mapping to the API resource and exposes computed metadata/status
+where Terraform users need it.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="implementation-sequence">Implementation sequence</h2><a class="sl-anchor-link" href="#implementation-sequence"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Implementation sequence”</span></a></div>
+<ol>
+<li><a href="https://github.com/rmorlok/authproxy/issues/831">#831</a> adds shared metadata,
+validation/defaulting helpers, lists, references, conditions, and GVK
+decoding.</li>
+<li><a href="https://github.com/rmorlok/authproxy/issues/832">#832</a> separates Connector
+identity from provider definition and makes encrypted storage a clean break.</li>
+<li><a href="https://github.com/rmorlok/authproxy/issues/833">#833</a> changes common v1
+transport, list, error, binding, redaction, and OpenAPI machinery in place.</li>
+<li><a href="https://github.com/rmorlok/authproxy/issues?q=label%3Aproject%3Ak8s-resource-api">#834-#843</a>
+migrate managed resources, JWT actors, actions, projections, internal task
+payloads, and every backend route family above.</li>
+<li>#844-#848 migrate the JavaScript SDK, UIs, Terraform provider, CLI,
+configuration/deployment fixtures, demos, and integration tests.</li>
+<li><a href="https://github.com/rmorlok/authproxy/issues/849">#849</a> updates public
+documentation and generated artifacts, runs the old-shape audit, validates
+fresh SQLite and PostgreSQL environments, runs the full test matrix and
+<code dir="auto">./scripts/preflight.sh</code>, and opens the final PR to <code dir="auto">main</code>.</li>
+</ol>
+<div class="sl-heading-wrapper level-h2"><h2 id="final-audit-rules">Final audit rules</h2><a class="sl-anchor-link" href="#final-audit-rules"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Final audit rules”</span></a></div>
+<p>The feature branch is not complete until all of the following are true:</p>
+<ul>
+<li>Every managed <code dir="auto">/api/v1</code> response uses <code dir="auto">authproxy.net/v1alpha1</code> and its target
+resource or list kind.</li>
+<li>Create and patch requests use the same resource contract under explicit
+operation policies; no flat create/update DTO survives.</li>
+<li>No managed identity, namespace, generation, release state, label, annotation,
+timestamp, or status is duplicated into Connector <code dir="auto">spec.definition</code> or its
+encrypted database representation.</li>
+<li>No old flat Actor claim decoder remains.</li>
+<li>Every registered route is still represented in this inventory, including
+explicit unwrapped exceptions.</li>
+<li>Every serialized config, token, task, workflow, event, and projection named
+here is migrated or deliberately unchanged according to its classification.</li>
+<li>All first-party consumers use metadata/spec/status or their documented
+action/protocol projections.</li>
+<li>Existing environment reset instructions are prominent; there is no connector
+conversion job or legacy database test.</li>
+<li>Generated schemas and Swagger are current, documentation builds, UI PRs have
+screenshots, fresh SQLite/PostgreSQL tests pass, and repository preflight is
+green.</li>
+</ul>
+</div><footer class="sl-flex astro-nntpd7kr"><div class="meta sl-flex astro-nntpd7kr"><a href="https://github.com/rmorlok/authproxy/edit/main/docs/src/content/docs/development/design/kubernetes-resource-api.md" class="sl-flex print:hidden astro-56gmmyul"><svg aria-hidden="true" class="astro-56gmmyul astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.2em;"><path d="M22 7.24a1 1 0 0 0-.29-.71l-4.24-4.24a1 1 0 0 0-1.1-.22 1 1 0 0 0-.32.22l-2.83 2.83L2.29 16.05a1 1 0 0 0-.29.71V21a1 1 0 0 0 1 1h4.24a1 1 0 0 0 .76-.29l10.87-10.93L21.71 8c.1-.1.17-.2.22-.33a1 1 0 0 0 0-.24v-.14l.07-.05ZM6.83 20H4v-2.83l9.93-9.93 2.83 2.83L6.83 20ZM18.17 8.66l-2.83-2.83 1.42-1.41 2.82 2.82-1.41 1.42Z"/></svg>Edit page</a><p>Last updated: <time datetime="2026-09-07T18:56:55.000Z">Sep 7, 2026</time></p></div><div class="pagination-links print:hidden astro-anvk7qgk" dir="ltr"><a href="/development/design/" rel="prev" class="astro-anvk7qgk"><svg aria-hidden="true" class="astro-anvk7qgk astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17 11H9.41l3.3-3.29a1.004 1.004 0 1 0-1.42-1.42l-5 5a1 1 0 0 0-.21.33 1 1 0 0 0 0 .76 1 1 0 0 0 .21.33l5 5a1.002 1.002 0 0 0 1.639-.325 1 1 0 0 0-.219-1.095L9.41 13H17a1 1 0 0 0 0-2Z"/></svg><span class="astro-anvk7qgk">Previous<br class="astro-anvk7qgk"><span class="link-title astro-anvk7qgk">Design notes</span></span></a><a href="/development/design/key-model-migration/" rel="next" class="astro-anvk7qgk"><svg aria-hidden="true" class="astro-anvk7qgk astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17.92 11.62a1.001 1.001 0 0 0-.21-.33l-5-5a1.003 1.003 0 1 0-1.42 1.42l3.3 3.29H7a1 1 0 0 0 0 2h7.59l-3.3 3.29a1.002 1.002 0 0 0 .325 1.639 1 1 0 0 0 1.095-.219l5-5a1 1 0 0 0 .21-.33 1 1 0 0 0 0-.76Z"/></svg><span class="astro-anvk7qgk">Next<br class="astro-anvk7qgk"><span class="link-title astro-anvk7qgk">Unified key model migration (historical)</span></span></a></div></footer></div></div></main></div></div></div></div></body></html>
