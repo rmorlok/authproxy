@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/rmorlok/authproxy/integration_tests/helpers"
+	apauthcore "github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/schema/api"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
@@ -67,7 +68,7 @@ func smokeAdminPermissions(adminExternalID, userExternalID, connectionNamespace 
 			Verbs:     []string{"get", "create"},
 		},
 		{
-			Namespace:   smokeConnectorNamespace,
+			Namespace:   config.RootNamespace,
 			Resources:   []string{"actors"},
 			ResourceIds: []string{userExternalID},
 			Verbs:       []string{"get", "delete"},
@@ -100,6 +101,39 @@ func smokeUserPermissions(connectionNamespace string) []aschema.Permission {
 	}
 }
 
+func TestSmokePermissionsRespectActorHierarchy(t *testing.T) {
+	connectionNamespace := smokeConnectorNamespace + ".smoke-user"
+	tests := []struct {
+		name        string
+		actor       *apauthcore.Actor
+		permissions []aschema.Permission
+	}{
+		{
+			name:        "admin",
+			actor:       &apauthcore.Actor{Namespace: config.RootNamespace},
+			permissions: smokeAdminPermissions("smoke-admin", "smoke-user", connectionNamespace),
+		},
+		{
+			name:        "user",
+			actor:       &apauthcore.Actor{Namespace: config.RootNamespace},
+			permissions: smokeUserPermissions(connectionNamespace),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for i, permission := range tt.permissions {
+				require.NoErrorf(
+					t,
+					apauthcore.ValidatePermissionForActor(tt.actor, permission),
+					"permission %d",
+					i,
+				)
+			}
+		})
+	}
+}
+
 func newRemoteSmokeRig(t *testing.T) *helpers.RemoteAuthProxy {
 	t.Helper()
 
@@ -115,7 +149,7 @@ func newRemoteSmokeRig(t *testing.T) *helpers.RemoteAuthProxy {
 		AdminActorNamespace:   config.RootNamespace,
 		AdminActorPermissions: adminPermissions,
 		UserActorExternalID:   userExternalID,
-		UserActorNamespace:    smokeConnectorNamespace,
+		UserActorNamespace:    config.RootNamespace,
 		UserActorPermissions:  userPermissions,
 		ConnectorNamespace:    smokeConnectorNamespace,
 		ConnectionNamespace:   connectionNamespace,
@@ -132,12 +166,12 @@ func newRemoteSmokeRig(t *testing.T) *helpers.RemoteAuthProxy {
 	rig.EnsureNamespace(t, connectionNamespace)
 	rig.ProvisionUserFromJWT(t)
 
-	actor := rig.GetActorByExternalID(t, smokeConnectorNamespace, userExternalID)
-	require.Equal(t, smokeConnectorNamespace, actor.Metadata.Namespace)
+	actor := rig.GetActorByExternalID(t, config.RootNamespace, userExternalID)
+	require.Equal(t, config.RootNamespace, actor.Metadata.Namespace)
 	require.Equal(t, userExternalID, actor.Spec.ExternalId)
 	require.Equal(t, userPermissions, actor.Spec.Permissions)
 	t.Cleanup(func() {
-		rig.DeleteActorByExternalIDAsAdmin(t, smokeConnectorNamespace, userExternalID)
+		rig.DeleteActorByExternalIDAsAdmin(t, config.RootNamespace, userExternalID)
 	})
 	return rig
 }
