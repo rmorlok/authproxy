@@ -83,7 +83,6 @@ export default defineConfig({
             'operations/load-testing',
             'operations/telemetry',
             'operations/migrations',
-            'operations/api-v1-resource-cutover',
             'operations/app-metrics',
             'operations/rate-limits',
             'operations/background-tasks',

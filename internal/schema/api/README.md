@@ -17,11 +17,6 @@ read-only projections such as connection setup options and OAuth scopes. Keep
 route packages focused on binding, validation,
 authorization, and conversion to/from service-layer types.
 
-Labels, annotations, and namespace encryption-key assignment are not auxiliary
-subresources. They are fields on the parent resource's `metadata` or `spec` and
-must use that resource's patch contract. Do not reintroduce generic key/value
-route DTOs or per-key mutation endpoints.
-
 OpenAPI-only generator adapters live under `internal/schema/api/openapi`. Keep
 those adapters thin: they may compose API DTOs and canonical resources for
 documentation, but no runtime contract or behavior may depend on them.

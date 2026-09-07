@@ -49,10 +49,6 @@ system.
 
 ## Production baseline
 
-When upgrading a pre-resource-contract environment, follow the destructive
-[API v1 resource-contract cutover](/operations/api-v1-resource-cutover/)
-before accepting traffic.
-
 Before accepting traffic:
 
 - configure readiness checks for every enabled service and dependency;
@@ -66,5 +62,5 @@ Before accepting traffic:
 - test database and blob-store restores; and
 - document key, signing-key, database, and provider credential rotation.
 
-See [deployment](/deployment/) for topology and
-[security](/security/) for the review checklist.
+See [deployment](/deployment/) for topology and [security](/security/) for 
+the review checklist.

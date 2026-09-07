@@ -68,17 +68,6 @@ at that field and continues detecting drift in non-secret fields.
 Managed key material and actor signing material are write-only API values and
 are not exposed by this provider's HCL schema or copied into Terraform state.
 
-The HCL attribute names and types did not change for this API migration, so no
-Terraform state-schema upgrader is required. This does not provide compatibility
-with an old AuthProxy environment: destroy and recreate pre-resource-contract
-demo/development environments and their managed AuthProxy resources. Reconcile
-or recreate Terraform state through the normal workflow for that disposable
-environment instead of refreshing old remote IDs against this release.
-Connector `version` continues to hold the numeric generation.
-
-See the [API v1 resource-contract cutover](https://authproxy.net/operations/api-v1-resource-cutover/)
-for the complete destructive migration procedure.
-
 ## Building
 
 ```bash
