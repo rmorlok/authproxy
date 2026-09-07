@@ -96,23 +96,9 @@ export const getNamespaceByPath = (path: string) =>
 export const updateNamespace = (path: string, request: UpdateNamespaceRequest) =>
   client.patch<Namespace>(`/api/v1/namespaces/${path}`, request);
 
-export const getNamespaceLabels = (path: string) =>
-  client.get<Record<string, string>>(`/api/v1/namespaces/${path}/labels`);
-
-export const getNamespaceLabel = (path: string, labelKey: string) =>
-  client.get<{ key: string; value: string }>(`/api/v1/namespaces/${path}/labels/${labelKey}`);
-
-export const putNamespaceLabel = (path: string, labelKey: string, value: string) =>
-  client.put<{ key: string; value: string }>(`/api/v1/namespaces/${path}/labels/${labelKey}`, {
-    value,
-  });
-
-export const deleteNamespaceLabel = (path: string, labelKey: string) =>
-  client.delete(`/api/v1/namespaces/${path}/labels/${labelKey}`);
-
 /** Returns the Namespace resource whose spec contains the assigned key. */
 export const getNamespaceKey = (path: string) =>
-  client.get<Namespace>(`/api/v1/namespaces/${path}/key`);
+  getNamespaceByPath(path);
 
 export const setNamespaceKey = (
   path: string,
@@ -124,42 +110,24 @@ export const setNamespaceKey = (
     metadata: {},
     spec: { encryptionKeyRef },
   };
-  return client.put<Namespace>(`/api/v1/namespaces/${path}/key`, request);
+  return updateNamespace(path, request);
 };
 
-export const clearNamespaceKey = (path: string) =>
-  client.delete(`/api/v1/namespaces/${path}/key`);
-
-export const getNamespaceAnnotations = (path: string) =>
-  client.get<Record<string, string>>(`/api/v1/namespaces/${path}/annotations`);
-
-export const getNamespaceAnnotation = (path: string, annotationKey: string) =>
-  client.get<{ key: string; value: string }>(
-    `/api/v1/namespaces/${path}/annotations/${annotationKey}`,
-  );
-
-export const putNamespaceAnnotation = (path: string, annotationKey: string, value: string) =>
-  client.put<{ key: string; value: string }>(
-    `/api/v1/namespaces/${path}/annotations/${annotationKey}`,
-    { value },
-  );
-
-export const deleteNamespaceAnnotation = (path: string, annotationKey: string) =>
-  client.delete(`/api/v1/namespaces/${path}/annotations/${annotationKey}`);
+export const clearNamespaceKey = (path: string) => {
+  const request: UpdateNamespaceRequest = {
+    apiVersion: API_VERSION,
+    kind: NAMESPACE_KIND,
+    metadata: {},
+    spec: { encryptionKeyRef: null },
+  };
+  return updateNamespace(path, request);
+};
 
 export const namespaces = {
   list: listNamespaces,
   create: createNamespace,
   getByPath: getNamespaceByPath,
   update: updateNamespace,
-  getLabels: getNamespaceLabels,
-  getLabel: getNamespaceLabel,
-  putLabel: putNamespaceLabel,
-  deleteLabel: deleteNamespaceLabel,
-  getAnnotations: getNamespaceAnnotations,
-  getAnnotation: getNamespaceAnnotation,
-  putAnnotation: putNamespaceAnnotation,
-  deleteAnnotation: deleteNamespaceAnnotation,
   getKey: getNamespaceKey,
   setKey: setNamespaceKey,
   clearKey: clearNamespaceKey,

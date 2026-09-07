@@ -175,10 +175,10 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
       setLifecycleStatus({
         action,
         state: 'polling',
-        taskId: response.data.taskId,
+        taskId: response.data.status.taskId,
       });
 
-      const result = await tasks.pollForTaskFinalized(response.data.taskId, {
+      const result = await tasks.pollForTaskFinalized(response.data.status.taskId, {
         initialDelay: 1000,
         maxDelay: 5000,
         maxAttempts: 140,
@@ -189,7 +189,7 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
         setLifecycleStatus({
           action,
           state: 'failed',
-          taskId: response.data.taskId,
+          taskId: response.data.status.taskId,
           task: result.task,
           message: result.task?.status.state === TaskState.FAILED
             ? 'Workflow failed before completing.'
@@ -202,7 +202,7 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
       setLifecycleStatus({
         action,
         state: 'completed',
-        taskId: response.data.taskId,
+        taskId: response.data.status.taskId,
         task: result.task,
       });
       refreshConnectorData();
@@ -404,7 +404,7 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
                 </Stack>
                 <Stack direction="row" spacing={1}>
                   <Button size="small" onClick={() => onRowClick(v)}>View Definition</Button>
-                  <Button component={Link} size="small" to={`/connectors/${connectorId}/versions/${v.metadata.generation}`}>Open Page</Button>
+                  <Button component={Link} size="small" to={`/connectors/${connectorId}/generations/${v.metadata.generation}`}>Open Page</Button>
                 </Stack>
               </Stack>
             </Box>

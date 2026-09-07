@@ -193,10 +193,10 @@ function DetailCanvas({children}: {children: React.ReactNode}) {
 function responseData(url: string) {
   if (url === `/api/v1/namespaces/${namespace.metadata.id}`) return namespace;
   if (url === `/api/v1/connectors/${connector.metadata.id}`) return connector;
-  if (url === `/api/v1/connectors/${connector.metadata.id}/versions`) {
+  if (url === `/api/v1/connectors/${connector.metadata.id}/generations`) {
     return {apiVersion: API_VERSION, kind: 'ConnectorList', metadata: {}, items: [connector]};
   }
-  if (url === `/api/v1/connectors/${connector.metadata.id}/versions/${connector.metadata.generation}`) return connector;
+  if (url === `/api/v1/connectors/${connector.metadata.id}/generations/${connector.metadata.generation}`) return connector;
   if (url === `/api/v1/connections/${connection.metadata.id}`) return connection;
   if (url === `/api/v1/keys/${key.metadata.id}`) return key;
   if (url === `/api/v1/rate-limits/${rateLimit.metadata.id}`) return rateLimit;

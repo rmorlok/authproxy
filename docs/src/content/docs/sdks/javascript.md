@@ -75,8 +75,8 @@ import {connections, ConnectionState} from '@authproxy/api';
 
 const {data: connection} = await connections.get('cxn_abc');
 
-if (connection.state === ConnectionState.CONFIGURED) {
-  console.log(connection.name, connection.id);
+if (connection.status.lifecycle.state === ConnectionState.CONFIGURED) {
+  console.log(connection.metadata.name, connection.metadata.id);
 }
 ```
 
@@ -84,10 +84,10 @@ Actor calls use the canonical resource envelope. The SDK exports constants so
 callers do not need to repeat string literals:
 
 ```ts
-import {ACTOR_API_VERSION, ACTOR_KIND, actors} from '@authproxy/api';
+import {API_VERSION, ACTOR_KIND, actors} from '@authproxy/api';
 
 const {data: actor} = await actors.create({
-  apiVersion: ACTOR_API_VERSION,
+  apiVersion: API_VERSION,
   kind: ACTOR_KIND,
   metadata: {
     namespace: 'root.acme',
@@ -108,17 +108,30 @@ default to the generated ID when omitted. Updates and direct reads remain
 ID-addressed:
 
 ```ts
-import {connections, connectors} from '@authproxy/api';
+import {
+  API_VERSION,
+  CONNECTION_KIND,
+  CONNECTOR_KIND,
+  connections,
+  connectors,
+  objectReference,
+} from '@authproxy/api';
 
 await connections.initiate(
-  'cxr_01example',
-  'https://app.example.com/integrations/complete',
-  {'app.example.com/tenant': 'acme'},
-  'production-crm',
+  objectReference(CONNECTOR_KIND, {id: 'cxr_01example'}),
+  {
+    intoNamespace: 'root.acme',
+    name: 'production-crm',
+    labels: {'app.example.com/tenant': 'acme'},
+    returnToUrl: 'https://app.example.com/integrations/complete',
+  },
 );
 
 await connections.update('cxn_01example', {
-  name: 'production-salesforce',
+  apiVersion: API_VERSION,
+  kind: CONNECTION_KIND,
+  metadata: {name: 'production-salesforce'},
+  spec: {},
 });
 
 const {data: page} = await connections.list({
@@ -126,10 +139,15 @@ const {data: page} = await connections.list({
   namespace: 'root.acme',
 });
 
-console.log(page.items[0].name, page.items[0].id);
+console.log(page.items[0].metadata.name, page.items[0].metadata.id);
 
-// The logical connector name is shared by all versions.
-await connectors.update('cxr_01example', {name: 'salesforce'});
+// The logical connector name is shared by all generations.
+await connectors.update('cxr_01example', {
+  apiVersion: API_VERSION,
+  kind: CONNECTOR_KIND,
+  metadata: {name: 'salesforce'},
+  spec: {},
+});
 ```
 
 An exact-name list can return duplicate names when its namespace matcher spans
@@ -175,6 +193,14 @@ The Admin and Marketplace UIs import the SDK directly from source. Their Vite al
 ```
 
 New exports added under `sdks/js/src` are therefore available to those applications without publishing a package.
+
+Labels and annotations are part of resource metadata. The SDK intentionally
+does not expose the former per-key `/labels` and `/annotations` methods. Read
+the resource, merge or remove entries locally, and send the complete user-owned
+map in the resource's typed update request. Namespace key assignment follows
+the same rule through `Namespace.spec.encryptionKeyRef`; the ergonomic
+`namespaces.setKey` and `namespaces.clearKey` helpers serialize parent-resource
+patches.
 
 Build the distributable ESM and declaration files from the repository root:
 

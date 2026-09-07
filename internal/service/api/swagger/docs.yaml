@@ -22,9 +22,44 @@ definitions:
       returnToUrl:
         type: string
     type: object
+  api.ConnectionScopeJson:
+    properties:
+      granted:
+        type: boolean
+      name:
+        type: string
+      requested:
+        type: boolean
+    type: object
   api.ConnectionSetupControlSpec:
     properties:
       returnToUrl:
+        type: string
+    type: object
+  api.ConnectorForceStateSpec:
+    properties:
+      state:
+        example: primary
+        type: string
+    type: object
+  api.ConnectorLifecycleSpec:
+    properties:
+      timeoutSeconds:
+        example: 600
+        type: integer
+    type: object
+  api.ConnectorLifecycleStatus:
+    properties:
+      taskId:
+        type: string
+    type: object
+  api.DataSourceOptionJson:
+    properties:
+      label:
+        example: My Workspace
+        type: string
+      value:
+        example: ws-123
         type: string
     type: object
   api.MetricsSchemaMetricJson:
@@ -492,29 +527,42 @@ definitions:
       release:
         $ref: '#/definitions/openapi.ConnectorReleaseSpecPatchJson'
     type: object
-  openapi.DryRunRequestJson:
-    description: 'Dry-run input: a proxy-shaped request + request type + the identity
-      it runs under'
+  openapi.DryRunMatchJson:
     properties:
-      context: {}
-      request: {}
-      requestType:
-        example: proxy
+      algorithmSummary:
+        example: token bucket 60 @ 1/s
         type: string
+      bucketKey:
+        example: actor=act_abc|labels/team=acme
+        type: string
+      effectiveMode:
+        example: enforce
+        type: string
+      namespace:
+        example: root.acme
+        type: string
+      peekFailed:
+        type: boolean
+      rateLimitId:
+        example: rl_test550e8400abcde
+        type: string
+      remaining:
+        type: integer
+      retryAfterMs:
+        type: integer
+      wouldAllow:
+        type: boolean
     type: object
-  openapi.DryRunResponseJson:
-    description: Per-rule match + peek-driven would-allow result
+  openapi.DryRunNotMatchedJson:
     properties:
-      matched:
-        items: {}
-        type: array
-      notMatched:
-        items: {}
-        type: array
-      requestLabelSnapshot:
-        additionalProperties:
-          type: string
-        type: object
+      namespace:
+        example: root.acme
+        type: string
+      rateLimitId:
+        example: rl_test550e8400abcde
+        type: string
+      reason:
+        type: string
     type: object
   openapi.KeyJson:
     description: Kubernetes-style managed Key resource. Secret keyData fields are
@@ -797,6 +845,27 @@ definitions:
       viewed:
         type: boolean
     type: object
+  openapi.ProxyRequestJson:
+    description: Request to proxy or simulate an HTTP request
+    properties:
+      bodyJson: {}
+      bodyRaw:
+        items:
+          type: integer
+        type: array
+      headers:
+        type: object
+      labels:
+        additionalProperties:
+          type: string
+        type: object
+      method:
+        example: POST
+        type: string
+      url:
+        example: https://api.example.com/v1/users
+        type: string
+    type: object
   openapi.RateLimitAlgorithmJson:
     properties:
       fixedWindow:
@@ -862,6 +931,61 @@ definitions:
     required:
     - apiVersion
     - kind
+    type: object
+  openapi.RateLimitDryRunActionJson:
+    description: Kubernetes-style rate-limit dry-run action
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - RateLimitDryRun
+        example: RateLimitDryRun
+        type: string
+      metadata:
+        $ref: '#/definitions/openapi.ConnectionActionMetaJson'
+      spec:
+        $ref: '#/definitions/openapi.RateLimitDryRunSpecJson'
+      status:
+        $ref: '#/definitions/openapi.RateLimitDryRunStatusJson'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
+  openapi.RateLimitDryRunSpecJson:
+    description: Synthetic request evaluated by a rate-limit dry run
+    properties:
+      actorRef:
+        $ref: '#/definitions/meta.ObjectReference'
+      request:
+        $ref: '#/definitions/openapi.ProxyRequestJson'
+      requestType:
+        example: proxy
+        type: string
+    required:
+    - request
+    - requestType
+    type: object
+  openapi.RateLimitDryRunStatusJson:
+    description: Per-rule match and peek-driven would-allow result
+    properties:
+      matched:
+        items:
+          $ref: '#/definitions/openapi.DryRunMatchJson'
+        type: array
+      notMatched:
+        items:
+          $ref: '#/definitions/openapi.DryRunNotMatchedJson'
+        type: array
+      requestLabelSnapshot:
+        additionalProperties:
+          type: string
+        type: object
     type: object
   openapi.RateLimitFixedWindowJson:
     properties:
@@ -1409,26 +1533,6 @@ definitions:
         example: completed
         type: string
     type: object
-  routes.ConnectionScopesJson:
-    properties:
-      granted:
-        items:
-          type: string
-        type: array
-      requested:
-        items:
-          type: string
-        type: array
-    type: object
-  routes.DataSourceOptionJson:
-    properties:
-      label:
-        example: My Workspace
-        type: string
-      value:
-        example: ws-123
-        type: string
-    type: object
   routes.ErrorResponse:
     description: Standardized error response
     properties:
@@ -1438,22 +1542,6 @@ definitions:
         type: string
       stackTrace:
         description: Stack trace, only populated in debug mode.
-        type: string
-    type: object
-  routes.ForceConnectorVersionStateRequestJson:
-    description: Request to force a connector version state
-    properties:
-      state:
-        example: primary
-        type: string
-    type: object
-  routes.KeyValueJson:
-    properties:
-      key:
-        example: env
-        type: string
-      value:
-        example: production
         type: string
     type: object
   routes.OpenAPIConnectionDisconnectActionJson:
@@ -1577,6 +1665,27 @@ definitions:
     - metadata
     - spec
     type: object
+  routes.OpenAPIConnectionScopeListJson:
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/api.ConnectionScopeJson'
+        type: array
+      kind:
+        type: string
+      metadata:
+        $ref: '#/definitions/v1alpha1.ListMeta'
+    required:
+    - apiVersion
+    - items
+    - kind
+    - metadata
+    type: object
   routes.OpenAPIConnectionSetupActionJson:
     properties:
       apiVersion:
@@ -1669,6 +1778,29 @@ definitions:
     - metadata
     - spec
     type: object
+  routes.OpenAPIConnectorForceStateActionJson:
+    description: Kubernetes-style connector generation force-state action
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - ConnectorForceState
+        example: ConnectorForceState
+        type: string
+      metadata:
+        $ref: '#/definitions/openapi.ConnectionActionMetaJson'
+      spec:
+        $ref: '#/definitions/api.ConnectorForceStateSpec'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
   routes.OpenAPIConnectorJson:
     description: Kubernetes-style Connector resource
     properties:
@@ -1694,21 +1826,30 @@ definitions:
     - metadata
     - spec
     type: object
-  routes.OpenAPIConnectorLifecycleRequestJson:
-    description: Request to run a connector lifecycle operation
+  routes.OpenAPIConnectorLifecycleActionJson:
+    description: Kubernetes-style connector lifecycle action and task result
     properties:
-      timeoutSeconds:
-        example: 600
-        type: integer
-    type: object
-  routes.OpenAPIConnectorLifecycleResponseJson:
-    description: Response for connector lifecycle operation
-    properties:
-      connectorId:
-        example: cxr_test550e8400abcde
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
         type: string
-      taskId:
+      kind:
+        enum:
+        - ConnectorDisconnectAll
+        - ConnectorArchive
         type: string
+      metadata:
+        $ref: '#/definitions/openapi.ConnectionActionMetaJson'
+      spec:
+        $ref: '#/definitions/api.ConnectorLifecycleSpec'
+      status:
+        $ref: '#/definitions/api.ConnectorLifecycleStatus'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
     type: object
   routes.OpenAPIConnectorPatchJson:
     description: Kubernetes-style Connector patch
@@ -1734,6 +1875,27 @@ definitions:
     - kind
     - metadata
     - spec
+    type: object
+  routes.OpenAPIDataSourceOptionListJson:
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/api.DataSourceOptionJson'
+        type: array
+      kind:
+        type: string
+      metadata:
+        $ref: '#/definitions/v1alpha1.ListMeta'
+    required:
+    - apiVersion
+    - items
+    - kind
+    - metadata
     type: object
   routes.OpenAPIEmptyConnectionActionJson:
     properties:
@@ -1780,8 +1942,8 @@ definitions:
     - kind
     - metadata
     type: object
-  routes.OpenAPIListConnectorVersionsResponseJson:
-    description: Paginated list of connector versions
+  routes.OpenAPIListConnectorGenerationsResponseJson:
+    description: Paginated list of connector generations
     properties:
       apiVersion:
         enum:
@@ -2031,12 +2193,6 @@ definitions:
         type: string
       url:
         example: https://api.example.com/v1/users
-        type: string
-    type: object
-  routes.PutKeyValueRequestJson:
-    properties:
-      value:
-        example: production
         type: string
     type: object
   routes.SessionInitiateFailureResponse:
@@ -2306,348 +2462,6 @@ paths:
       security:
       - BearerAuth: []
       summary: Update actor by UUID
-      tags:
-      - actors
-  /actors/{id}/annotations:
-    get:
-      description: Get all annotations for an actor by ID
-      parameters:
-      - description: Actor UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get all annotations for an actor
-      tags:
-      - actors
-  /actors/{id}/annotations/{annotation}:
-    delete:
-      description: Delete a specific annotation by key from an actor
-      parameters:
-      - description: Actor UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Delete an annotation from an actor
-      tags:
-      - actors
-    get:
-      description: Get a specific annotation value by key for an actor
-      parameters:
-      - description: Actor UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get a specific annotation for an actor
-      tags:
-      - actors
-    put:
-      consumes:
-      - application/json
-      description: Set or update a specific annotation value by key for an actor
-      parameters:
-      - description: Actor UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      - description: Annotation value
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/routes.PutKeyValueRequestJson'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Set an annotation for an actor
-      tags:
-      - actors
-  /actors/{id}/labels:
-    get:
-      description: Get all labels associated with a specific actor
-      parameters:
-      - description: Actor UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get all labels for an actor
-      tags:
-      - actors
-  /actors/{id}/labels/{label}:
-    delete:
-      description: Delete a specific label by key from an actor
-      parameters:
-      - description: Actor UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Delete a label from an actor
-      tags:
-      - actors
-    get:
-      description: Get a specific label value by key for an actor
-      parameters:
-      - description: Actor UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get a specific label for an actor
-      tags:
-      - actors
-    put:
-      consumes:
-      - application/json
-      description: Set or update a specific label value by key for an actor
-      parameters:
-      - description: Actor UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      - description: Label value
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/routes.PutKeyValueRequestJson'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Set a label for an actor
       tags:
       - actors
   /actors/external-id/{externalId}:
@@ -3080,9 +2894,7 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/routes.DataSourceOptionJson'
-            type: array
+            $ref: '#/definitions/routes.OpenAPIDataSourceOptionListJson'
         "400":
           description: Bad Request
           schema:
@@ -3508,348 +3320,6 @@ paths:
       summary: Submit connection form
       tags:
       - connections
-  /connections/{id}/annotations:
-    get:
-      description: Get all annotations associated with a specific connection
-      parameters:
-      - description: Connection UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get all annotations for a connection
-      tags:
-      - connections
-  /connections/{id}/annotations/{annotation}:
-    delete:
-      description: Delete a specific annotation by key from a connection
-      parameters:
-      - description: Connection UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Delete an annotation from a connection
-      tags:
-      - connections
-    get:
-      description: Get a specific annotation value by key for a connection
-      parameters:
-      - description: Connection UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get a specific annotation for a connection
-      tags:
-      - connections
-    put:
-      consumes:
-      - application/json
-      description: Set or update a specific annotation value by key for a connection
-      parameters:
-      - description: Connection UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      - description: Annotation value
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/routes.PutKeyValueRequestJson'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Set an annotation for a connection
-      tags:
-      - connections
-  /connections/{id}/labels:
-    get:
-      description: Get all labels associated with a specific connection
-      parameters:
-      - description: Connection UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get all labels for a connection
-      tags:
-      - connections
-  /connections/{id}/labels/{label}:
-    delete:
-      description: Delete a specific label by key from a connection
-      parameters:
-      - description: Connection UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Delete a label from a connection
-      tags:
-      - connections
-    get:
-      description: Get a specific label value by key for a connection
-      parameters:
-      - description: Connection UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get a specific label for a connection
-      tags:
-      - connections
-    put:
-      consumes:
-      - application/json
-      description: Set or update a specific label value by key for a connection
-      parameters:
-      - description: Connection UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      - description: Label value
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/routes.PutKeyValueRequestJson'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Set a label for a connection
-      tags:
-      - connections
   /connections/{id}/scopes:
     get:
       description: Returns the requested and granted OAuth2 scopes for the connection's
@@ -3866,7 +3336,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.ConnectionScopesJson'
+            $ref: '#/definitions/routes.OpenAPIConnectionScopeListJson'
         "400":
           description: Bad Request
           schema:
@@ -3953,7 +3423,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: Create a new connector with version 1 in draft state
+      description: Create a new connector with generation 1 in draft state
       parameters:
       - description: Connector creation request
         in: body
@@ -4096,18 +3566,19 @@ paths:
         name: id
         required: true
         type: string
-      - description: Lifecycle operation options
+      - description: Archive action
         in: body
         name: request
+        required: true
         schema:
-          $ref: '#/definitions/routes.OpenAPIConnectorLifecycleRequestJson'
+          $ref: '#/definitions/routes.OpenAPIConnectorLifecycleActionJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIConnectorLifecycleResponseJson'
+            $ref: '#/definitions/routes.OpenAPIConnectorLifecycleActionJson'
         "400":
           description: Bad Request
           schema:
@@ -4148,18 +3619,19 @@ paths:
         name: id
         required: true
         type: string
-      - description: Lifecycle operation options
+      - description: Disconnect-all action
         in: body
         name: request
+        required: true
         schema:
-          $ref: '#/definitions/routes.OpenAPIConnectorLifecycleRequestJson'
+          $ref: '#/definitions/routes.OpenAPIConnectorLifecycleActionJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIConnectorLifecycleResponseJson'
+            $ref: '#/definitions/routes.OpenAPIConnectorLifecycleActionJson'
         "400":
           description: Bad Request
           schema:
@@ -4189,374 +3661,11 @@ paths:
       summary: Disconnect all connector connections
       tags:
       - connectors
-  /connectors/{id}/annotations:
+  /connectors/{id}/generations:
     get:
       consumes:
       - application/json
-      description: Get all annotations associated with a connector's latest version
-      parameters:
-      - description: Connector UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get all annotations for a connector
-      tags:
-      - connectors
-  /connectors/{id}/annotations/{annotation}:
-    delete:
-      consumes:
-      - application/json
-      description: Delete a specific annotation from a connector's draft version,
-        creating one if needed
-      parameters:
-      - description: Connector UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Delete an annotation from a connector
-      tags:
-      - connectors
-    get:
-      consumes:
-      - application/json
-      description: Get a specific annotation value by key for a connector
-      parameters:
-      - description: Connector UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get a specific annotation for a connector
-      tags:
-      - connectors
-    put:
-      consumes:
-      - application/json
-      description: Set or update a specific annotation value by key for a connector's
-        draft version, creating one if needed
-      parameters:
-      - description: Connector UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      - description: Annotation value
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/routes.PutKeyValueRequestJson'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Set an annotation for a connector
-      tags:
-      - connectors
-  /connectors/{id}/labels:
-    get:
-      consumes:
-      - application/json
-      description: Get all labels associated with the primary version of a connector
-      parameters:
-      - description: Connector UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get all labels for a connector
-      tags:
-      - connectors
-  /connectors/{id}/labels/{label}:
-    delete:
-      consumes:
-      - application/json
-      description: Delete a specific label from a connector's draft version, creating
-        one if needed
-      parameters:
-      - description: Connector UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Delete a label from a connector
-      tags:
-      - connectors
-    get:
-      consumes:
-      - application/json
-      description: Get a specific label value by key for the primary version of a
-        connector
-      parameters:
-      - description: Connector UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get a specific label for a connector
-      tags:
-      - connectors
-    put:
-      consumes:
-      - application/json
-      description: Set or update a specific label on a connector's draft version,
-        creating one if needed
-      parameters:
-      - description: Connector UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      - description: Label value
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/routes.PutKeyValueRequestJson'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Set a label for a connector
-      tags:
-      - connectors
-  /connectors/{id}/versions:
-    get:
-      consumes:
-      - application/json
-      description: List all versions of a specific connector
+      description: List all generations of a specific connector
       parameters:
       - description: Connector UUID
         in: path
@@ -4571,7 +3680,7 @@ paths:
         in: query
         name: limit
         type: integer
-      - description: Filter by version state
+      - description: Filter by generation state
         in: query
         name: state
         type: string
@@ -4597,7 +3706,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIListConnectorVersionsResponseJson'
+            $ref: '#/definitions/routes.OpenAPIListConnectorGenerationsResponseJson'
         "400":
           description: Bad Request
           schema:
@@ -4612,21 +3721,21 @@ paths:
             $ref: '#/definitions/routes.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: List connector versions
+      summary: List connector generations
       tags:
       - connectors
     post:
       consumes:
       - application/json
-      description: Create a new draft version for an existing connector
+      description: Create a new draft generation for an existing connector
       parameters:
       - description: Connector UUID
         in: path
         name: id
         required: true
         type: string
-      - description: Version creation request; an empty body clones the newest generation
-          as a draft
+      - description: Generation creation request; an empty body clones the newest
+          generation as a draft
         in: body
         name: request
         schema:
@@ -4664,23 +3773,23 @@ paths:
             $ref: '#/definitions/routes.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Create connector version
+      summary: Create connector generation
       tags:
       - connectors
-  /connectors/{id}/versions/{version}:
+  /connectors/{id}/generations/{generation}:
     get:
       consumes:
       - application/json
-      description: Get a specific version of a connector
+      description: Get a specific generation of a connector
       parameters:
       - description: Connector UUID
         in: path
         name: id
         required: true
         type: string
-      - description: Version number
+      - description: Generation number
         in: path
-        name: version
+        name: generation
         required: true
         type: integer
       produces:
@@ -4708,25 +3817,25 @@ paths:
             $ref: '#/definitions/routes.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Get connector version
+      summary: Get connector generation
       tags:
       - connectors
     patch:
       consumes:
       - application/json
-      description: Update a specific draft version of a connector
+      description: Update a specific draft generation of a connector
       parameters:
       - description: Connector UUID
         in: path
         name: id
         required: true
         type: string
-      - description: Version number
+      - description: Generation number
         in: path
-        name: version
+        name: generation
         required: true
         type: integer
-      - description: Version update request
+      - description: Generation update request
         in: body
         name: request
         required: true
@@ -4765,31 +3874,31 @@ paths:
             $ref: '#/definitions/routes.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Update connector version
+      summary: Update connector generation
       tags:
       - connectors
-  /connectors/{id}/versions/{version}/_forceState:
+  /connectors/{id}/generations/{generation}/_forceState:
     put:
       consumes:
       - application/json
-      description: Force a connector version to a specific state (admin operation)
+      description: Force a connector generation to a specific state (admin operation)
       parameters:
       - description: Connector UUID
         in: path
         name: id
         required: true
         type: string
-      - description: Version number
+      - description: Generation number
         in: path
-        name: version
+        name: generation
         required: true
         type: integer
-      - description: New state
+      - description: Force-state action
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.ForceConnectorVersionStateRequestJson'
+          $ref: '#/definitions/routes.OpenAPIConnectorForceStateActionJson'
       produces:
       - application/json
       responses:
@@ -4819,425 +3928,7 @@ paths:
             $ref: '#/definitions/routes.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Force connector version state
-      tags:
-      - connectors
-  /connectors/{id}/versions/{version}/annotations:
-    get:
-      consumes:
-      - application/json
-      description: Get all annotations associated with a specific version of a connector
-      parameters:
-      - description: Connector UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Version number
-        in: path
-        name: version
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get all annotations for a connector version
-      tags:
-      - connectors
-  /connectors/{id}/versions/{version}/annotations/{annotation}:
-    delete:
-      consumes:
-      - application/json
-      description: Delete a specific annotation from a specific draft version of a
-        connector
-      parameters:
-      - description: Connector UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Version number
-        in: path
-        name: version
-        required: true
-        type: integer
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "409":
-          description: Conflict
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Delete an annotation from a connector version
-      tags:
-      - connectors
-    get:
-      consumes:
-      - application/json
-      description: Get a specific annotation value by key for a specific version of
-        a connector
-      parameters:
-      - description: Connector UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Version number
-        in: path
-        name: version
-        required: true
-        type: integer
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get a specific annotation for a connector version
-      tags:
-      - connectors
-    put:
-      consumes:
-      - application/json
-      description: Set or update a specific annotation value by key for a specific
-        draft version of a connector
-      parameters:
-      - description: Connector UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Version number
-        in: path
-        name: version
-        required: true
-        type: integer
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      - description: Annotation value
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/routes.PutKeyValueRequestJson'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "409":
-          description: Conflict
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Set an annotation for a connector version
-      tags:
-      - connectors
-  /connectors/{id}/versions/{version}/labels:
-    get:
-      consumes:
-      - application/json
-      description: Get all labels associated with a specific version of a connector
-      parameters:
-      - description: Connector UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Version number
-        in: path
-        name: version
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get all labels for a connector version
-      tags:
-      - connectors
-  /connectors/{id}/versions/{version}/labels/{label}:
-    delete:
-      consumes:
-      - application/json
-      description: Delete a specific label from a specific draft version of a connector
-      parameters:
-      - description: Connector UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Version number
-        in: path
-        name: version
-        required: true
-        type: integer
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "409":
-          description: Conflict
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Delete a label from a connector version
-      tags:
-      - connectors
-    get:
-      consumes:
-      - application/json
-      description: Get a specific label value by key for a specific version of a connector
-      parameters:
-      - description: Connector UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Version number
-        in: path
-        name: version
-        required: true
-        type: integer
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get a specific label for a connector version
-      tags:
-      - connectors
-    put:
-      consumes:
-      - application/json
-      description: Set or update a specific label on a specific draft version of a
-        connector
-      parameters:
-      - description: Connector UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Version number
-        in: path
-        name: version
-        required: true
-        type: integer
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      - description: Label value
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/routes.PutKeyValueRequestJson'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "409":
-          description: Conflict
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Set a label for a connector version
+      summary: Force connector generation state
       tags:
       - connectors
   /keys:
@@ -5455,348 +4146,6 @@ paths:
       security:
       - BearerAuth: []
       summary: Update key
-      tags:
-      - keys
-  /keys/{id}/annotations:
-    get:
-      description: Get all annotations associated with a specific key
-      parameters:
-      - description: Key ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get all annotations for a key
-      tags:
-      - keys
-  /keys/{id}/annotations/{annotation}:
-    delete:
-      description: Delete a specific annotation by key from a key
-      parameters:
-      - description: Key ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Delete an annotation from a key
-      tags:
-      - keys
-    get:
-      description: Get a specific annotation value by key for a key
-      parameters:
-      - description: Key ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get a specific annotation for a key
-      tags:
-      - keys
-    put:
-      consumes:
-      - application/json
-      description: Set or update a specific annotation value by key for a key
-      parameters:
-      - description: Key ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      - description: Annotation value
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/routes.PutKeyValueRequestJson'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Set an annotation for a key
-      tags:
-      - keys
-  /keys/{id}/labels:
-    get:
-      description: Get all labels associated with a specific key
-      parameters:
-      - description: Key ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get all labels for a key
-      tags:
-      - keys
-  /keys/{id}/labels/{label}:
-    delete:
-      description: Delete a specific label by key from a key
-      parameters:
-      - description: Key ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Delete a label from a key
-      tags:
-      - keys
-    get:
-      description: Get a specific label value by key for a key
-      parameters:
-      - description: Key ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get a specific label for a key
-      tags:
-      - keys
-    put:
-      consumes:
-      - application/json
-      description: Set or update a specific label value by key for a key
-      parameters:
-      - description: Key ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      - description: Label value
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/routes.PutKeyValueRequestJson'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Set a label for a key
       tags:
       - keys
   /metrics/query:
@@ -6187,348 +4536,6 @@ paths:
       summary: Update namespace
       tags:
       - namespaces
-  /namespaces/{path}/annotations:
-    get:
-      description: Get all annotations associated with a specific namespace
-      parameters:
-      - description: Namespace path
-        in: path
-        name: path
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get all annotations for a namespace
-      tags:
-      - namespaces
-  /namespaces/{path}/annotations/{annotation}:
-    delete:
-      description: Delete a specific annotation by key from a namespace
-      parameters:
-      - description: Namespace path
-        in: path
-        name: path
-        required: true
-        type: string
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Delete an annotation from a namespace
-      tags:
-      - namespaces
-    get:
-      description: Get a specific annotation value by key for a namespace
-      parameters:
-      - description: Namespace path
-        in: path
-        name: path
-        required: true
-        type: string
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get a specific annotation for a namespace
-      tags:
-      - namespaces
-    put:
-      consumes:
-      - application/json
-      description: Set or update a specific annotation value by key for a namespace
-      parameters:
-      - description: Namespace path
-        in: path
-        name: path
-        required: true
-        type: string
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      - description: Annotation value
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/routes.PutKeyValueRequestJson'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Set an annotation for a namespace
-      tags:
-      - namespaces
-  /namespaces/{path}/labels:
-    get:
-      description: Get all labels associated with a specific namespace
-      parameters:
-      - description: Namespace path
-        in: path
-        name: path
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get all labels for a namespace
-      tags:
-      - namespaces
-  /namespaces/{path}/labels/{label}:
-    delete:
-      description: Delete a specific label by key from a namespace
-      parameters:
-      - description: Namespace path
-        in: path
-        name: path
-        required: true
-        type: string
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Delete a label from a namespace
-      tags:
-      - namespaces
-    get:
-      description: Get a specific label value by key for a namespace
-      parameters:
-      - description: Namespace path
-        in: path
-        name: path
-        required: true
-        type: string
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get a specific label for a namespace
-      tags:
-      - namespaces
-    put:
-      consumes:
-      - application/json
-      description: Set or update a specific label value by key for a namespace
-      parameters:
-      - description: Namespace path
-        in: path
-        name: path
-        required: true
-        type: string
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      - description: Label value
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/routes.PutKeyValueRequestJson'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Set a label for a namespace
-      tags:
-      - namespaces
   /notifications:
     get:
       description: List active actor-visible notifications
@@ -6772,19 +4779,19 @@ paths:
         uses Limiter.Peek to inspect counter state without writing. Useful for validating
         selectors / buckets / algorithms without sending real traffic.
       parameters:
-      - description: Dry-run input
+      - description: Dry-run action
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/openapi.DryRunRequestJson'
+          $ref: '#/definitions/openapi.RateLimitDryRunActionJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/openapi.DryRunResponseJson'
+            $ref: '#/definitions/openapi.RateLimitDryRunActionJson'
         "400":
           description: Bad Request
           schema:
@@ -6927,348 +4934,6 @@ paths:
       security:
       - BearerAuth: []
       summary: Update rate limit
-      tags:
-      - rate_limits
-  /rate-limits/{id}/annotations:
-    get:
-      description: Get all annotations associated with a specific rate limit
-      parameters:
-      - description: Rate limit ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get all annotations for a rate limit
-      tags:
-      - rate_limits
-  /rate-limits/{id}/annotations/{annotation}:
-    delete:
-      description: Delete a specific annotation by key from a rate limit
-      parameters:
-      - description: Rate limit ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Delete an annotation from a rate limit
-      tags:
-      - rate_limits
-    get:
-      description: Get a specific annotation value by key for a rate limit
-      parameters:
-      - description: Rate limit ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get a specific annotation for a rate limit
-      tags:
-      - rate_limits
-    put:
-      consumes:
-      - application/json
-      description: Set or update a specific annotation value by key for a rate limit
-      parameters:
-      - description: Rate limit ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      - description: Annotation value
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/routes.PutKeyValueRequestJson'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Set an annotation for a rate limit
-      tags:
-      - rate_limits
-  /rate-limits/{id}/labels:
-    get:
-      description: Get all labels associated with a specific rate limit
-      parameters:
-      - description: Rate limit ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get all labels for a rate limit
-      tags:
-      - rate_limits
-  /rate-limits/{id}/labels/{label}:
-    delete:
-      description: Delete a specific label by key from a rate limit
-      parameters:
-      - description: Rate limit ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Delete a label from a rate limit
-      tags:
-      - rate_limits
-    get:
-      description: Get a specific label value by key for a rate limit
-      parameters:
-      - description: Rate limit ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get a specific label for a rate limit
-      tags:
-      - rate_limits
-    put:
-      consumes:
-      - application/json
-      description: Set or update a specific label value by key for a rate limit
-      parameters:
-      - description: Rate limit ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      - description: Label value
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/routes.PutKeyValueRequestJson'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Set a label for a rate limit
       tags:
       - rate_limits
   /search/resources:

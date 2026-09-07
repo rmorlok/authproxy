@@ -31,12 +31,3 @@ type SessionInitiateFailureResponse struct {
 type SessionInitiateSuccessResponse struct {
 	ActorId apid.ID `json:"actorId" yaml:"actorId" swaggertype:"string" example:"act_test550e8400abcde"`
 }
-
-type KeyValueJson struct {
-	Key   string `json:"key" yaml:"key" example:"env"`
-	Value string `json:"value" yaml:"value" example:"production"`
-}
-
-type PutKeyValueRequestJson struct {
-	Value string `json:"value" yaml:"value" example:"production"`
-}

@@ -12,8 +12,8 @@ flowchart LR
     HostUser["Host user or service"] --> Actor["Actor"]
     Actor -->|"namespace permissions"| NS
     NS --> Connector["Connector"]
-    Connector --> V1["Version 1: active"]
-    Connector --> V2["Version 2: primary"]
+    Connector --> V1["Generation 1: active"]
+    Connector --> V2["Generation 2: primary"]
     V2 --> Connection["Connection"]
     NS --> Connection
     Connection --> Provider["Third-party account"]
@@ -46,7 +46,7 @@ Namespaces are the exception. Their ID is the full path, and their read-only
 name is derived from the final segment: `acme` for `root.tenants.acme`.
 Namespace/path rename is not supported.
 
-## Connectors and versions
+## Connectors and generations
 
 A **connector** is the reusable definition for a third-party system. It can
 describe:
@@ -57,21 +57,22 @@ describe:
 - probes that verify connection health
 - request authentication placement and rate-limit behavior
 
-The connector ID, name, namespace, labels, annotations, and timestamps belong
-to the logical connector and are shared by every version. Renaming a connector
-therefore changes the name projected by all versions without rewriting their
-encrypted definitions. Each version is a complete snapshot of the definition
-and has its own version ID, number, and one of four states:
+The connector ID, name, namespace, labels, and annotations belong to the
+logical connector and are shared by every generation. Renaming a connector
+therefore changes the name projected by all generations without rewriting
+their encrypted definitions. Each generation is a complete snapshot of the
+definition, selected by `metadata.generation`, and has one of four release
+states:
 
 | State | Meaning |
 |---|---|
 | `draft` | Editable work that is not offered for new connections. |
-| `primary` | The published version selected for new connections. |
-| `active` | A previously primary version still used by existing connections. |
-| `archived` | A retired version that is no longer available for new connections. |
+| `primary` | The published generation selected for new connections. |
+| `active` | A previously primary generation still used by existing connections. |
+| `archived` | A retired generation that is no longer available for new connections. |
 
-Publishing a new primary version moves the previous primary to `active`.
-Existing connections remain bound to their recorded version until they are
+Publishing a new primary generation moves the previous primary to `active`.
+Existing connections remain bound to their recorded generation until they are
 migrated; publishing does not silently reinterpret stored credentials.
 
 For connector-authored setup behavior, see [Connector setup
@@ -84,7 +85,7 @@ operations](/operations/connector-lifecycle/).
 
 A **connection** is one configured instance of a connector. It records:
 
-- the connector id and version
+- a typed connector reference containing the logical ID and exact generation
 - its immutable ID and mutable name
 - its namespace
 - encrypted OAuth tokens, API keys, and setup configuration

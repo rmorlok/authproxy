@@ -62,6 +62,7 @@ export default defineConfig({
             'sdks/proxying',
             'sdks/javascript',
             'development/cli',
+            'reference/resources',
             'reference/api',
           ],
         },

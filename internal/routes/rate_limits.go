@@ -1,7 +1,6 @@
 package routes
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -15,11 +14,13 @@ import (
 	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httperr"
-	"github.com/rmorlok/authproxy/internal/routes/key_value"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	schemaapiopenapi "github.com/rmorlok/authproxy/internal/schema/api/openapi"
 	scommon "github.com/rmorlok/authproxy/internal/schema/common"
+	actorschema "github.com/rmorlok/authproxy/internal/schema/resources/actor"
+	connectionschema "github.com/rmorlok/authproxy/internal/schema/resources/connection"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
+	namespaceschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -29,8 +30,7 @@ var (
 	_ = schemaapiopenapi.RateLimitJson{}
 	_ = schemaapiopenapi.RateLimitPatchJson{}
 	_ = schemaapiopenapi.ListRateLimitsResponseJson{}
-	_ = schemaapiopenapi.DryRunRequestJson{}
-	_ = schemaapiopenapi.DryRunResponseJson{}
+	_ = schemaapiopenapi.RateLimitDryRunActionJson{}
 )
 
 type ListRateLimitsRequestQueryParams struct {
@@ -47,35 +47,48 @@ func RateLimitToResource(r coreIface.RateLimit) *rlschema.RateLimit {
 }
 
 type RateLimitsRoutes struct {
-	cfg           config.C
-	core          coreIface.C
-	authService   auth.A
-	labelsAdapter key_value.Adapter[apid.ID]
-	annotsAdapter key_value.Adapter[apid.ID]
+	cfg         config.C
+	core        coreIface.C
+	authService auth.A
 }
 
 // dryRunRequestToCore translates the wire request to the structured input the core
 // service consumes. Nothing here does business logic — it's just shape.
-func dryRunRequestToCore(r schemaapi.DryRunRequestJson) coreIface.DryRunRateLimitRequest {
+func dryRunRequestToCore(r schemaapi.RateLimitDryRunAction) coreIface.DryRunRateLimitRequest {
+	var connectionID *apid.ID
+	var namespace *string
+	switch r.Metadata.Target.Kind {
+	case connectionschema.ConnectionKind:
+		value := apid.ID(r.Metadata.Target.ID)
+		connectionID = &value
+	case namespaceschema.NamespaceKind:
+		value := r.Metadata.Target.ID
+		namespace = &value
+	}
+	var actorID *apid.ID
+	if r.Spec.ActorRef != nil && r.Spec.ActorRef.Kind == actorschema.ActorKind {
+		value := apid.ID(r.Spec.ActorRef.ID)
+		actorID = &value
+	}
 	return coreIface.DryRunRateLimitRequest{
 		Request: coreIface.ProxyRequest{
-			URL:      r.Request.URL,
-			Method:   r.Request.Method,
-			Headers:  r.Request.Headers,
-			Labels:   r.Request.Labels,
-			BodyRaw:  r.Request.BodyRaw,
-			BodyJson: r.Request.BodyJson,
+			URL:      r.Spec.Request.URL,
+			Method:   r.Spec.Request.Method,
+			Headers:  r.Spec.Request.Headers,
+			Labels:   r.Spec.Request.Labels,
+			BodyRaw:  r.Spec.Request.BodyRaw,
+			BodyJson: r.Spec.Request.BodyJson,
 		},
-		RequestType: r.RequestType,
+		RequestType: r.Spec.RequestType,
 		Context: coreIface.DryRunRequestContext{
-			ConnectionId: r.Context.ConnectionId,
-			ActorId:      r.Context.ActorId,
-			Namespace:    r.Context.Namespace,
+			ConnectionId: connectionID,
+			ActorId:      actorID,
+			Namespace:    namespace,
 		},
 	}
 }
 
-func dryRunResponseFromCore(res coreIface.DryRunRateLimitResult) schemaapi.DryRunResponseJson {
+func dryRunResponseFromCore(res coreIface.DryRunRateLimitResult) schemaapi.RateLimitDryRunStatus {
 	matched := make([]schemaapi.DryRunMatchJson, len(res.Matched))
 	for i, m := range res.Matched {
 		matched[i] = schemaapi.DryRunMatchJson{
@@ -98,7 +111,7 @@ func dryRunResponseFromCore(res coreIface.DryRunRateLimitResult) schemaapi.DryRu
 			Reason:      nm.Reason,
 		}
 	}
-	return schemaapi.DryRunResponseJson{
+	return schemaapi.RateLimitDryRunStatus{
 		RequestLabelSnapshot: res.RequestLabelSnapshot,
 		Matched:              matched,
 		NotMatched:           notMatched,
@@ -447,8 +460,8 @@ func (r *RateLimitsRoutes) delete(gctx *gin.Context) {
 // @Tags			rate_limits
 // @Accept			json
 // @Produce		json
-// @Param			request	body		schemaapiopenapi.DryRunRequestJson	true	"Dry-run input"
-// @Success		200		{object}	schemaapiopenapi.DryRunResponseJson
+// @Param			request	body		schemaapiopenapi.RateLimitDryRunActionJson	true	"Dry-run action"
+// @Success		200		{object}	schemaapiopenapi.RateLimitDryRunActionJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		403		{object}	ErrorResponse
@@ -460,8 +473,8 @@ func (r *RateLimitsRoutes) dryRun(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
-	var req schemaapi.DryRunRequestJson
-	if err := apgin.BindJSONBody(gctx, &req); err != nil {
+	var req schemaapi.RateLimitDryRunAction
+	if err := apgin.BindActionJSON(gctx, &req, schemaapi.RateLimitDryRunActionKind); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
@@ -490,133 +503,15 @@ func (r *RateLimitsRoutes) dryRun(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, dryRunResponseFromCore(result))
-}
-
-// Label and annotation handlers delegate to the shared key_value adapter.
-
-// @Summary		Get all labels for a rate limit
-// @Description	Get all labels associated with a specific rate limit
-// @Tags			rate_limits
-// @Produce		json
-// @Param			id	path		string	true	"Rate limit ID"
-// @Success		200	{object}	map[string]string
-// @Failure		400	{object}	ErrorResponse
-// @Failure		401	{object}	ErrorResponse
-// @Failure		404	{object}	ErrorResponse
-// @Failure		500	{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/rate-limits/{id}/labels [get]
-func (r *RateLimitsRoutes) getLabels(gctx *gin.Context) { r.labelsAdapter.HandleList(gctx) }
-
-// @Summary		Get a specific label for a rate limit
-// @Description	Get a specific label value by key for a rate limit
-// @Tags			rate_limits
-// @Produce		json
-// @Param			id		path		string	true	"Rate limit ID"
-// @Param			label	path		string	true	"Label key"
-// @Success		200		{object}	KeyValueJson
-// @Failure		400		{object}	ErrorResponse
-// @Failure		401		{object}	ErrorResponse
-// @Failure		404		{object}	ErrorResponse
-// @Failure		500		{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/rate-limits/{id}/labels/{label} [get]
-func (r *RateLimitsRoutes) getLabel(gctx *gin.Context) { r.labelsAdapter.HandleGet(gctx) }
-
-// @Summary		Set a label for a rate limit
-// @Description	Set or update a specific label value by key for a rate limit
-// @Tags			rate_limits
-// @Accept			json
-// @Produce		json
-// @Param			id		path		string						true	"Rate limit ID"
-// @Param			label	path		string						true	"Label key"
-// @Param			request	body		PutKeyValueRequestJson	true	"Label value"
-// @Success		200		{object}	KeyValueJson
-// @Failure		400		{object}	ErrorResponse
-// @Failure		401		{object}	ErrorResponse
-// @Failure		403		{object}	ErrorResponse
-// @Failure		404		{object}	ErrorResponse
-// @Failure		500		{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/rate-limits/{id}/labels/{label} [put]
-func (r *RateLimitsRoutes) putLabel(gctx *gin.Context) { r.labelsAdapter.HandlePut(gctx) }
-
-// @Summary		Delete a label from a rate limit
-// @Description	Delete a specific label by key from a rate limit
-// @Tags			rate_limits
-// @Param			id		path	string	true	"Rate limit ID"
-// @Param			label	path	string	true	"Label key"
-// @Success		204		"No Content"
-// @Failure		400		{object}	ErrorResponse
-// @Failure		401		{object}	ErrorResponse
-// @Failure		403		{object}	ErrorResponse
-// @Failure		500		{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/rate-limits/{id}/labels/{label} [delete]
-func (r *RateLimitsRoutes) deleteLabel(gctx *gin.Context) { r.labelsAdapter.HandleDelete(gctx) }
-
-// @Summary		Get all annotations for a rate limit
-// @Description	Get all annotations associated with a specific rate limit
-// @Tags			rate_limits
-// @Produce		json
-// @Param			id	path		string	true	"Rate limit ID"
-// @Success		200	{object}	map[string]string
-// @Failure		400	{object}	ErrorResponse
-// @Failure		401	{object}	ErrorResponse
-// @Failure		404	{object}	ErrorResponse
-// @Failure		500	{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/rate-limits/{id}/annotations [get]
-func (r *RateLimitsRoutes) getAnnotations(gctx *gin.Context) { r.annotsAdapter.HandleList(gctx) }
-
-// @Summary		Get a specific annotation for a rate limit
-// @Description	Get a specific annotation value by key for a rate limit
-// @Tags			rate_limits
-// @Produce		json
-// @Param			id			path		string	true	"Rate limit ID"
-// @Param			annotation	path		string	true	"Annotation key"
-// @Success		200			{object}	KeyValueJson
-// @Failure		400			{object}	ErrorResponse
-// @Failure		401			{object}	ErrorResponse
-// @Failure		404			{object}	ErrorResponse
-// @Failure		500			{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/rate-limits/{id}/annotations/{annotation} [get]
-func (r *RateLimitsRoutes) getAnnotation(gctx *gin.Context) { r.annotsAdapter.HandleGet(gctx) }
-
-// @Summary		Set an annotation for a rate limit
-// @Description	Set or update a specific annotation value by key for a rate limit
-// @Tags			rate_limits
-// @Accept			json
-// @Produce		json
-// @Param			id			path		string						true	"Rate limit ID"
-// @Param			annotation	path		string						true	"Annotation key"
-// @Param			request		body		PutKeyValueRequestJson	true	"Annotation value"
-// @Success		200			{object}	KeyValueJson
-// @Failure		400			{object}	ErrorResponse
-// @Failure		401			{object}	ErrorResponse
-// @Failure		403			{object}	ErrorResponse
-// @Failure		404			{object}	ErrorResponse
-// @Failure		500			{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/rate-limits/{id}/annotations/{annotation} [put]
-func (r *RateLimitsRoutes) putAnnotation(gctx *gin.Context) { r.annotsAdapter.HandlePut(gctx) }
-
-// @Summary		Delete an annotation from a rate limit
-// @Description	Delete a specific annotation by key from a rate limit
-// @Tags			rate_limits
-// @Param			id			path	string	true	"Rate limit ID"
-// @Param			annotation	path	string	true	"Annotation key"
-// @Success		204			"No Content"
-// @Failure		400			{object}	ErrorResponse
-// @Failure		401			{object}	ErrorResponse
-// @Failure		403			{object}	ErrorResponse
-// @Failure		500			{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/rate-limits/{id}/annotations/{annotation} [delete]
-func (r *RateLimitsRoutes) deleteAnnotation(gctx *gin.Context) {
-	r.annotsAdapter.HandleDelete(gctx)
+	response := schemaapi.NewRateLimitDryRunResponse(
+		req.Metadata.Target,
+		req.Spec,
+		dryRunResponseFromCore(result),
+	)
+	if err := apgin.RenderActionJSON(gctx, http.StatusOK, &response, schemaapi.RateLimitDryRunActionKind); err != nil {
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+		val.MarkErrorReturn()
+	}
 }
 
 func (r *RateLimitsRoutes) Register(g gin.IRouter) {
@@ -681,165 +576,12 @@ func (r *RateLimitsRoutes) Register(g gin.IRouter) {
 			Build(),
 		r.delete,
 	)
-	g.GET(
-		"/rate-limits/:id/labels",
-		r.authService.NewRequiredBuilder().
-			ForResource("rate_limits").
-			ForIdField("id").
-			ForIdExtractor(idExtractor).
-			ForVerb("get").
-			Build(),
-		r.getLabels,
-	)
-	g.GET(
-		"/rate-limits/:id/labels/:label",
-		r.authService.NewRequiredBuilder().
-			ForResource("rate_limits").
-			ForIdField("id").
-			ForIdExtractor(idExtractor).
-			ForVerb("get").
-			Build(),
-		r.getLabel,
-	)
-	g.PUT(
-		"/rate-limits/:id/labels/:label",
-		r.authService.NewRequiredBuilder().
-			ForResource("rate_limits").
-			ForIdField("id").
-			ForIdExtractor(idExtractor).
-			ForVerb("update").
-			Build(),
-		r.putLabel,
-	)
-	g.DELETE(
-		"/rate-limits/:id/labels/:label",
-		r.authService.NewRequiredBuilder().
-			ForResource("rate_limits").
-			ForIdField("id").
-			ForIdExtractor(idExtractor).
-			ForVerb("update").
-			Build(),
-		r.deleteLabel,
-	)
-	g.GET(
-		"/rate-limits/:id/annotations",
-		r.authService.NewRequiredBuilder().
-			ForResource("rate_limits").
-			ForIdField("id").
-			ForIdExtractor(idExtractor).
-			ForVerb("get").
-			Build(),
-		r.getAnnotations,
-	)
-	g.GET(
-		"/rate-limits/:id/annotations/:annotation",
-		r.authService.NewRequiredBuilder().
-			ForResource("rate_limits").
-			ForIdField("id").
-			ForIdExtractor(idExtractor).
-			ForVerb("get").
-			Build(),
-		r.getAnnotation,
-	)
-	g.PUT(
-		"/rate-limits/:id/annotations/:annotation",
-		r.authService.NewRequiredBuilder().
-			ForResource("rate_limits").
-			ForIdField("id").
-			ForIdExtractor(idExtractor).
-			ForVerb("update").
-			Build(),
-		r.putAnnotation,
-	)
-	g.DELETE(
-		"/rate-limits/:id/annotations/:annotation",
-		r.authService.NewRequiredBuilder().
-			ForResource("rate_limits").
-			ForIdField("id").
-			ForIdExtractor(idExtractor).
-			ForVerb("update").
-			Build(),
-		r.deleteAnnotation,
-	)
 }
 
 func NewRateLimitsRoutes(cfg config.C, authService auth.A, c coreIface.C) *RateLimitsRoutes {
-	parseRateLimitID := func(gctx *gin.Context) (apid.ID, *httperr.Error) {
-		id := apid.ID(gctx.Param("id"))
-		if id.IsNil() {
-			return apid.Nil, httperr.BadRequest("id is required")
-		}
-		return id, nil
-	}
-
-	getRateLimit := func(ctx context.Context, id apid.ID) (key_value.Resource, error) {
-		rl, err := c.GetRateLimit(ctx, id)
-		if err != nil {
-			if errors.Is(err, core.ErrNotFound) {
-				return nil, database.ErrNotFound
-			}
-			return nil, err
-		}
-		if rl == nil {
-			return nil, nil
-		}
-		return rl, nil
-	}
-
-	idExtractor := func(rl interface{}) string {
-		return string(rl.(coreIface.RateLimit).GetId())
-	}
-
-	authGet := authService.NewRequiredBuilder().
-		ForResource("rate_limits").
-		ForIdField("id").
-		ForIdExtractor(idExtractor).
-		ForVerb("get").
-		Build()
-	authMutate := authService.NewRequiredBuilder().
-		ForResource("rate_limits").
-		ForIdField("id").
-		ForIdExtractor(idExtractor).
-		ForVerb("update").
-		Build()
-
-	labelsAdapter := key_value.Adapter[apid.ID]{
-		Kind:         key_value.Label,
-		ResourceName: "rate limit",
-		PathPrefix:   "/rate-limits/:id",
-		AuthGet:      authGet,
-		AuthMutate:   authMutate,
-		ParseID:      parseRateLimitID,
-		Get:          getRateLimit,
-		Put: func(ctx context.Context, id apid.ID, kv map[string]string) (key_value.Resource, error) {
-			return c.PutRateLimitLabels(ctx, id, kv)
-		},
-		Delete: func(ctx context.Context, id apid.ID, keys []string) (key_value.Resource, error) {
-			return c.DeleteRateLimitLabels(ctx, id, keys)
-		},
-	}
-
-	annotsAdapter := key_value.Adapter[apid.ID]{
-		Kind:         key_value.Annotation,
-		ResourceName: "rate limit",
-		PathPrefix:   "/rate-limits/:id",
-		AuthGet:      authGet,
-		AuthMutate:   authMutate,
-		ParseID:      parseRateLimitID,
-		Get:          getRateLimit,
-		Put: func(ctx context.Context, id apid.ID, kv map[string]string) (key_value.Resource, error) {
-			return c.PutRateLimitAnnotations(ctx, id, kv)
-		},
-		Delete: func(ctx context.Context, id apid.ID, keys []string) (key_value.Resource, error) {
-			return c.DeleteRateLimitAnnotations(ctx, id, keys)
-		},
-	}
-
 	return &RateLimitsRoutes{
-		cfg:           cfg,
-		authService:   authService,
-		core:          c,
-		labelsAdapter: labelsAdapter,
-		annotsAdapter: annotsAdapter,
+		cfg:         cfg,
+		authService: authService,
+		core:        c,
 	}
 }

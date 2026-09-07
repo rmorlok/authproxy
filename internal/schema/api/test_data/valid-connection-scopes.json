@@ -1,0 +1,17 @@
+{
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "ConnectionScopeList",
+  "metadata": {},
+  "items": [
+    {
+      "name": "read",
+      "requested": true,
+      "granted": true
+    },
+    {
+      "name": "admin",
+      "requested": true,
+      "granted": false
+    }
+  ]
+}

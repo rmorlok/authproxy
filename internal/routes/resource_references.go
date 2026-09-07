@@ -52,7 +52,7 @@ func searchResourceReference(
 		Name:      common.ResourceName(resource.Name),
 		Namespace: resource.Namespace,
 	}
-	
+
 	if kind == namespaceschema.NamespaceKind {
 		if err := namespaceschema.ValidatePath(resource.ResourceID); err != nil {
 			return meta.ObjectReference{}, fmt.Errorf("build namespace reference: %w", err)

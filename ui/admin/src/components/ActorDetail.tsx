@@ -148,11 +148,25 @@ export default function ActorDetail({actorId}: { actorId: string }) {
       <AnnotationsEditor
         annotations={actor.metadata.annotations}
         onPut={async (key, value) => {
-          await actors.putAnnotation(actor.metadata.id, key, value);
+          await actors.update(actor.metadata.id, {
+            apiVersion: API_VERSION,
+            kind: ACTOR_KIND,
+            metadata: {
+              annotations: {...actor.metadata.annotations, [key]: value},
+            },
+            spec: {},
+          });
           fetchActor();
         }}
         onDelete={async (key) => {
-          await actors.deleteAnnotation(actor.metadata.id, key);
+          const annotations = {...actor.metadata.annotations};
+          delete annotations[key];
+          await actors.update(actor.metadata.id, {
+            apiVersion: API_VERSION,
+            kind: ACTOR_KIND,
+            metadata: {annotations},
+            spec: {},
+          });
           fetchActor();
         }}
       />

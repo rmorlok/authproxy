@@ -469,7 +469,7 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
           <Box>
             <Typography variant="subtitle2" color="text.secondary">Name</Typography>
             <Typography variant="body1">
-              <Link to={`/connectors/${conn.spec.connectorRef.id}/versions/${conn.spec.connectorRef.generation}`} style={{color: 'inherit', textDecoration: 'none'}}>
+              <Link to={`/connectors/${conn.spec.connectorRef.id}/generations/${conn.spec.connectorRef.generation}`} style={{color: 'inherit', textDecoration: 'none'}}>
                 {connector?.metadata.name || conn.spec.connectorRef.name || conn.spec.connectorRef.id}
               </Link>
             </Typography>
@@ -477,7 +477,7 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
           <Box>
             <Typography variant="subtitle2" color="text.secondary">ID</Typography>
               <Typography variant="body1" sx={{wordBreak: 'break-all'}}>
-                  <Link to={`/connectors/${conn.spec.connectorRef.id}/versions/${conn.spec.connectorRef.generation}`} style={{color: 'inherit', textDecoration: 'none'}}>
+                  <Link to={`/connectors/${conn.spec.connectorRef.id}/generations/${conn.spec.connectorRef.generation}`} style={{color: 'inherit', textDecoration: 'none'}}>
                       {conn.spec.connectorRef.id || '—'}
               </Link>
             </Typography>
@@ -497,7 +497,7 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
           <Box>
             <Typography variant="subtitle2" color="text.secondary">Version</Typography>
             <Typography variant="body1">
-                <Link to={`/connectors/${conn.spec.connectorRef.id}/versions/${conn.spec.connectorRef.generation}`} style={{color: 'inherit', textDecoration: 'none'}}>
+                <Link to={`/connectors/${conn.spec.connectorRef.id}/generations/${conn.spec.connectorRef.generation}`} style={{color: 'inherit', textDecoration: 'none'}}>
                     {conn.spec.connectorRef.generation}
                 </Link>
             </Typography>

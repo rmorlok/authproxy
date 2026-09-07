@@ -12,8 +12,9 @@ from `internal/schema/common` and resource models from
 `internal/schema/resources/...`. Resource packages must not import this package.
 
 Auxiliary route DTOs also belong here: session initiation, request-events list
-envelopes, task status and monitoring responses, and shared label/annotation 
-key-value bodies. Keep route packages focused on binding, validation, 
+envelopes, task status and monitoring responses, typed imperative actions, and
+read-only projections such as connection setup options and OAuth scopes. Keep
+route packages focused on binding, validation,
 authorization, and conversion to/from service-layer types.
 
 OpenAPI-only generator adapters live under `internal/schema/api/openapi`. Keep

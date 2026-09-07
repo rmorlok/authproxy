@@ -1,15 +1,15 @@
 {
   "apiVersion": "authproxy.net/v1alpha1",
-  "kind": "ConnectorArchive",
+  "kind": "ConnectorForceState",
   "metadata": {
     "target": {
       "apiVersion": "authproxy.net/v1alpha1",
       "kind": "Connector",
-      "id": "cxr_test0000000000001"
+      "id": "cxr_test0000000000001",
+      "generation": 2
     }
   },
-  "spec": {},
-  "status": {
-    "taskId": "encrypted-task-info"
+  "spec": {
+    "state": "primary"
   }
 }

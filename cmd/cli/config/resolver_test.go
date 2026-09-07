@@ -55,7 +55,7 @@ func TestGrafanaPresetPermissions(t *testing.T) {
 		require.Contains(t, permissions, aschema.Permission{
 			Namespace: "root.**",
 			Resources: []string{"connectors"},
-			Verbs:     []string{"list/versions"},
+			Verbs:     []string{"list/generations"},
 		})
 		require.NotContains(t, permissions, aschema.Permission{
 			Namespace: "root.**",

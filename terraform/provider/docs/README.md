@@ -68,11 +68,6 @@ at that field and continues detecting drift in non-secret fields.
 Managed key material and actor signing material are write-only API values and
 are not exposed by this provider's HCL schema or copied into Terraform state.
 
-The HCL attribute names and types did not change for this API migration, so no
-Terraform state upgrader is required. The first refresh maps existing state to
-the v1alpha1 response fields; connector `version` continues to hold the numeric
-generation.
-
 ## Building
 
 ```bash

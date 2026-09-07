@@ -71,7 +71,7 @@ func (env *IntegrationTestEnv) CreateDraftConnectorVersion(
 	body, err := jsonMarshal(req)
 	require.NoError(t, err)
 
-	path := fmt.Sprintf("/api/v1/connectors/%s/versions", connectorID)
+	path := fmt.Sprintf("/api/v1/connectors/%s/generations", connectorID)
 	w := env.doSignedRequest(t, http.MethodPost, path, body, env.resolveActorOptions(opts))
 	require.Equalf(t, http.StatusCreated, w.Code, "create connector version failed: %s", w.Body.String())
 
@@ -91,10 +91,18 @@ func (env *IntegrationTestEnv) ForceConnectorVersionState(
 ) connectorschema.Connector {
 	t.Helper()
 
-	body, err := jsonMarshal(schemaapi.ForceConnectorVersionStateRequestJson{State: string(state)})
+	body, err := jsonMarshal(schemaapi.NewConnectorForceStateRequest(
+		meta.ObjectReference{
+			APIVersion: meta.APIVersionV1Alpha1,
+			Kind:       connectorschema.ConnectorKind,
+			ID:         connectorID.String(),
+			Generation: version,
+		},
+		state,
+	))
 	require.NoError(t, err)
 
-	path := fmt.Sprintf("/api/v1/connectors/%s/versions/%d/_forceState", connectorID, version)
+	path := fmt.Sprintf("/api/v1/connectors/%s/generations/%d/_forceState", connectorID, version)
 	w := env.doSignedRequest(t, http.MethodPut, path, body, env.resolveActorOptions(opts))
 	require.Equalf(t, http.StatusOK, w.Code, "force connector version state failed: %s", w.Body.String())
 

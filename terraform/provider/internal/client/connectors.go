@@ -139,7 +139,7 @@ func (c *Client) GetConnector(ctx context.Context, id string) (*Connector, error
 
 func (c *Client) GetConnectorVersion(ctx context.Context, id string, version uint64) (*Connector, error) {
 	var connector Connector
-	err := c.readConnector(ctx, fmt.Sprintf("/api/v1/connectors/%s/versions/%d", id, version), &connector)
+	err := c.readConnector(ctx, fmt.Sprintf("/api/v1/connectors/%s/generations/%d", id, version), &connector)
 	return &connector, err
 }
 
@@ -151,24 +151,24 @@ func (c *Client) UpdateConnector(ctx context.Context, id string, req UpdateConne
 
 func (c *Client) UpdateConnectorVersion(ctx context.Context, id string, version uint64, req UpdateConnectorRequest) (*Connector, error) {
 	var connector Connector
-	err := c.writeConnector(ctx, "PATCH", fmt.Sprintf("/api/v1/connectors/%s/versions/%d", id, version), req, &connector)
+	err := c.writeConnector(ctx, "PATCH", fmt.Sprintf("/api/v1/connectors/%s/generations/%d", id, version), req, &connector)
 	return &connector, err
 }
 
 func (c *Client) CreateConnectorVersion(ctx context.Context, id string, req CreateConnectorVersionRequest) (*Connector, error) {
 	var connector Connector
-	err := c.writeConnector(ctx, "POST", fmt.Sprintf("/api/v1/connectors/%s/versions", id), req, &connector)
+	err := c.writeConnector(ctx, "POST", fmt.Sprintf("/api/v1/connectors/%s/generations", id), req, &connector)
 	return &connector, err
 }
 
 func (c *Client) ForceConnectorVersionState(ctx context.Context, id string, version uint64, state string) error {
-	return c.put(ctx, fmt.Sprintf("/api/v1/connectors/%s/versions/%d/_forceState", id, version), ForceStateRequest{State: state}, nil)
+	return c.put(ctx, fmt.Sprintf("/api/v1/connectors/%s/generations/%d/_forceState", id, version), ForceStateRequest{State: state}, nil)
 }
 
 func (c *Client) ListConnectorVersions(ctx context.Context, id string) (*ListConnectorVersionsResponse, error) {
 	var response ListConnectorVersionsResponse
 	resp, err := c.http.R().SetContext(ctx).SetResult(&response).
-		Get(fmt.Sprintf("/api/v1/connectors/%s/versions", id))
+		Get(fmt.Sprintf("/api/v1/connectors/%s/generations", id))
 	if err != nil {
 		return &response, err
 	}
