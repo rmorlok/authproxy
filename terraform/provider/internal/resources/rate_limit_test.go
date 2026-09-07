@@ -6,9 +6,25 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	resourceschema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/rmorlok/authproxy/terraform/provider/internal/client"
 )
+
+func TestRateLimitReferenceIDsAreRequiredOnlyWhenTheirBlocksArePresent(t *testing.T) {
+	var response resource.SchemaResponse
+	(&RateLimitResource{}).Schema(t.Context(), resource.SchemaRequest{}, &response)
+
+	scope := response.Schema.Blocks["scope"].(resourceschema.SingleNestedBlock)
+	for _, blockName := range []string{"connector_ref", "connection_ref"} {
+		block := scope.Blocks[blockName].(resourceschema.SingleNestedBlock)
+		id := block.Attributes["id"].(resourceschema.StringAttribute)
+		if !id.Optional || id.Required {
+			t.Fatalf("%s.id must be schema-optional so omitting the block remains valid: %#v", blockName, id)
+		}
+	}
+}
 
 // --- buildRateLimitSpec: HCL model → wire payload ---
 //
@@ -72,7 +88,7 @@ func TestBuildRateLimitSpec_FixedWindow(t *testing.T) {
 		Bucket:   &rateLimitBucketModel{Dimensions: stringsToList([]string{"actor"})},
 		Algorithm: &rateLimitAlgorithmModel{
 			FixedWindow: &rateLimitFixedWindowModel{
-				Window: types.StringValue("1m"),
+				Window: newHumanDurationValue("1m"),
 				Limit:  types.Int64Value(100),
 			},
 		},
@@ -92,7 +108,7 @@ func TestBuildRateLimitSpec_SlidingWindow(t *testing.T) {
 		Bucket:   &rateLimitBucketModel{},
 		Algorithm: &rateLimitAlgorithmModel{
 			SlidingWindow: &rateLimitSlidingWindowModel{
-				Window: types.StringValue("5m"),
+				Window: newHumanDurationValue("5m"),
 				Limit:  types.Int64Value(50),
 				Mode:   types.StringValue("log"),
 			},
@@ -294,6 +310,16 @@ func TestSetRateLimitState_EmptyModeDefaultsToEnforce(t *testing.T) {
 	}
 }
 
+func TestHumanDurationSemanticEquality(t *testing.T) {
+	equal, diagnostics := newHumanDurationValue("1m").StringSemanticEquals(
+		t.Context(),
+		newHumanDurationValue("1m0s"),
+	)
+	if diagnostics.HasError() || !equal {
+		t.Fatal("equivalent duration strings must compare equal")
+	}
+}
+
 // --- exactly-one algorithm validator ---
 //
 // The validator runs at plan time and uses the framework's standard
@@ -326,7 +352,7 @@ func TestAlgorithmValidator_ExactlyOne(t *testing.T) {
 			"two variants",
 			&rateLimitAlgorithmModel{
 				TokenBucket: &rateLimitTokenBucketModel{Capacity: types.Int64Value(1), RefillRate: types.Float64Value(1)},
-				FixedWindow: &rateLimitFixedWindowModel{Window: types.StringValue("1m"), Limit: types.Int64Value(1)},
+				FixedWindow: &rateLimitFixedWindowModel{Window: newHumanDurationValue("1m"), Limit: types.Int64Value(1)},
 			},
 			1,
 		},
@@ -334,8 +360,8 @@ func TestAlgorithmValidator_ExactlyOne(t *testing.T) {
 			"three variants",
 			&rateLimitAlgorithmModel{
 				TokenBucket:   &rateLimitTokenBucketModel{Capacity: types.Int64Value(1), RefillRate: types.Float64Value(1)},
-				FixedWindow:   &rateLimitFixedWindowModel{Window: types.StringValue("1m"), Limit: types.Int64Value(1)},
-				SlidingWindow: &rateLimitSlidingWindowModel{Window: types.StringValue("1m"), Limit: types.Int64Value(1), Mode: types.StringValue("log")},
+				FixedWindow:   &rateLimitFixedWindowModel{Window: newHumanDurationValue("1m"), Limit: types.Int64Value(1)},
+				SlidingWindow: &rateLimitSlidingWindowModel{Window: newHumanDurationValue("1m"), Limit: types.Int64Value(1), Mode: types.StringValue("log")},
 			},
 			1,
 		},

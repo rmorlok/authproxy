@@ -147,6 +147,39 @@ func TestConnectorGenerationOperationsUseGenerationPaths(t *testing.T) {
 	}
 }
 
+func TestForceConnectorVersionStateUsesCanonicalActionEnvelope(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		if request.Method != http.MethodPut || request.URL.Path != "/api/v1/connectors/cxr_test/generations/2/_forceState" {
+			t.Errorf("request: %s %s", request.Method, request.URL.Path)
+		}
+		var action ActionRequest[ConnectorForceStateSpec]
+		if err := json.NewDecoder(request.Body).Decode(&action); err != nil {
+			t.Fatal(err)
+		}
+		if action.APIVersion != APIVersion || action.Kind != ConnectorForceStateKind {
+			t.Errorf("type metadata: %+v", action.TypeMeta)
+		}
+		target := action.Metadata.Target
+		if target.APIVersion != APIVersion || target.Kind != ConnectorKind ||
+			target.ID != "cxr_test" || target.Generation != 2 {
+			t.Errorf("target: %+v", target)
+		}
+		if action.Spec.State != "archived" {
+			t.Errorf("spec: %+v", action.Spec)
+		}
+		response.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	api, err := New(Config{Endpoint: server.URL, BearerToken: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := api.ForceConnectorVersionState(t.Context(), "cxr_test", 2, "archived"); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestDecodeConnectorDefinitionSummary(t *testing.T) {
 	tests := []struct {
 		name string

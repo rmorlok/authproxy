@@ -90,9 +90,13 @@ resource "authproxy_rate_limit" "test" {
 				),
 			},
 			{
-				ResourceName:      "authproxy_rate_limit.test",
-				ImportState:       true,
-				ImportStateVerify: true,
+				ResourceName: "authproxy_rate_limit.test",
+				ImportState:  true,
+				// ImportStateVerify compares raw state strings and does not use
+				// the provider's HumanDuration semantic equality ("1m" equals
+				// the API's normalized "1m0s"). Normal planning and refresh do.
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"algorithm.fixed_window.window"},
 			},
 		},
 	})

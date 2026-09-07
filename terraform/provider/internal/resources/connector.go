@@ -328,10 +328,16 @@ func setConnectorState(model *ConnectorResourceModel, connector *client.Connecto
 
 	if len(connector.Spec.Definition) > 0 {
 		definition := connector.Spec.Definition
-		if connector.DataRedacted && !model.Definition.IsNull() && !model.Definition.IsUnknown() {
-			if merged, err := preserveRedactedJSON(definition, []byte(model.Definition.ValueString())); err == nil {
-				definition = merged
-			}
+		priorDefinition := []byte(`{}`)
+		if !model.Definition.IsNull() && !model.Definition.IsUnknown() {
+			priorDefinition = []byte(model.Definition.ValueString())
+		}
+		if merged, err := reconcileConnectorDefinitionJSON(
+			definition,
+			priorDefinition,
+			connector.DataRedacted,
+		); err == nil {
+			definition = merged
 		}
 		model.Definition = jsontypes.NewNormalizedValue(string(definition))
 		if summary, err := client.DecodeConnectorDefinitionSummary(connector.Spec.Definition); err == nil {
@@ -345,22 +351,34 @@ func setConnectorState(model *ConnectorResourceModel, connector *client.Connecto
 // replaced with asterisks after apply while leaving all observable fields
 // available for drift detection.
 func preserveRedactedJSON(observed, prior []byte) (json.RawMessage, error) {
+	return reconcileConnectorDefinitionJSON(observed, prior, true)
+}
+
+// reconcileConnectorDefinitionJSON removes null values from the typed connector
+// fields that the API emits when they were omitted by the caller. It deliberately
+// leaves all other null values alone because connector definitions contain opaque
+// JSON Schema documents where null can be meaningful. When the response is
+// redacted the helper restores masked values from prior Terraform state.
+// Observable server changes are retained so normal drift detection continues to
+// work.
+func reconcileConnectorDefinitionJSON(observed, prior []byte, redacted bool) (json.RawMessage, error) {
 	var observedValue any
 	if err := json.Unmarshal(observed, &observedValue); err != nil {
 		return nil, err
 	}
+	normalizeConnectorDefinitionNulls(observedValue)
 	var priorValue any
 	if err := json.Unmarshal(prior, &priorValue); err != nil {
 		return nil, err
 	}
-	merged := preserveRedactedValue(observedValue, priorValue)
+	merged := reconcileConnectorDefinitionValue(observedValue, priorValue, redacted)
 	return json.Marshal(merged)
 }
 
-func preserveRedactedValue(observed, prior any) any {
+func reconcileConnectorDefinitionValue(observed, prior any, redacted bool) any {
 	switch value := observed.(type) {
 	case string:
-		if value != "" && strings.Trim(value, "*") == "" {
+		if redacted && value != "" && strings.Trim(value, "*") == "" {
 			if priorString, ok := prior.(string); ok &&
 				utf8.RuneCountInString(priorString) == utf8.RuneCountInString(value) {
 				return priorString
@@ -369,7 +387,8 @@ func preserveRedactedValue(observed, prior any) any {
 	case map[string]any:
 		priorMap, _ := prior.(map[string]any)
 		for key, item := range value {
-			value[key] = preserveRedactedValue(item, priorMap[key])
+			priorItem := priorMap[key]
+			value[key] = reconcileConnectorDefinitionValue(item, priorItem, redacted)
 		}
 	case []any:
 		priorSlice, _ := prior.([]any)
@@ -378,10 +397,26 @@ func preserveRedactedValue(observed, prior any) any {
 			if index < len(priorSlice) {
 				priorItem = priorSlice[index]
 			}
-			value[index] = preserveRedactedValue(item, priorItem)
+			value[index] = reconcileConnectorDefinitionValue(item, priorItem, redacted)
 		}
 	}
 	return observed
+}
+
+func normalizeConnectorDefinitionNulls(value any) {
+	definition, ok := value.(map[string]any)
+	if !ok {
+		return
+	}
+
+	if logo, exists := definition["logo"]; exists && logo == nil {
+		delete(definition, "logo")
+	}
+	if auth, ok := definition["auth"].(map[string]any); ok {
+		if scopes, exists := auth["scopes"]; exists && scopes == nil {
+			delete(auth, "scopes")
+		}
+	}
 }
 
 func desiredConnectorReleaseState(publish bool) string {

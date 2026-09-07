@@ -7,7 +7,10 @@ import (
 	"fmt"
 )
 
-const ConnectorKind = "Connector"
+const (
+	ConnectorKind           = "Connector"
+	ConnectorForceStateKind = "ConnectorForceState"
+)
 
 type ConnectorReleaseSpec struct {
 	DesiredState string `json:"desiredState,omitempty"`
@@ -64,7 +67,7 @@ type CreateConnectorVersionRequest struct {
 	Spec     ConnectorSpec  `json:"spec"`
 }
 
-type ForceStateRequest struct {
+type ConnectorForceStateSpec struct {
 	State string `json:"state"`
 }
 
@@ -162,7 +165,14 @@ func (c *Client) CreateConnectorVersion(ctx context.Context, id string, req Crea
 }
 
 func (c *Client) ForceConnectorVersionState(ctx context.Context, id string, version uint64, state string) error {
-	return c.put(ctx, fmt.Sprintf("/api/v1/connectors/%s/generations/%d/_forceState", id, version), ForceStateRequest{State: state}, nil)
+	target := NewIDReference(ConnectorKind, id)
+	target.Generation = version
+	request := NewActionRequest(
+		ConnectorForceStateKind,
+		*target,
+		ConnectorForceStateSpec{State: state},
+	)
+	return c.put(ctx, fmt.Sprintf("/api/v1/connectors/%s/generations/%d/_forceState", id, version), request, nil)
 }
 
 func (c *Client) ListConnectorVersions(ctx context.Context, id string) (*ListConnectorVersionsResponse, error) {

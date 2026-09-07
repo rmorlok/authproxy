@@ -68,3 +68,26 @@ type ResourceList[T any] struct {
 	Metadata ListMetadata `json:"metadata"`
 	Items    []T          `json:"items"`
 }
+
+// ActionMetadata identifies the resource targeted by an imperative API action.
+type ActionMetadata struct {
+	Target ObjectReference `json:"target"`
+}
+
+// ActionRequest is the Kubernetes-style envelope used by imperative API
+// operations. Actions are transports rather than durable resources, but use
+// the same type metadata and object-reference conventions.
+type ActionRequest[TSpec any] struct {
+	TypeMeta
+	Metadata ActionMetadata `json:"metadata"`
+	Spec     TSpec          `json:"spec"`
+}
+
+// NewActionRequest creates a canonical action request for target.
+func NewActionRequest[TSpec any](kind string, target ObjectReference, spec TSpec) ActionRequest[TSpec] {
+	return ActionRequest[TSpec]{
+		TypeMeta: NewTypeMeta(kind),
+		Metadata: ActionMetadata{Target: target},
+		Spec:     spec,
+	}
+}

@@ -48,7 +48,11 @@ func TestSetConnectorStateMapsCanonicalResourceWithoutDefinitionStripping(t *tes
 	if model.State.ValueString() != "primary" || model.DisplayName.ValueString() != "Example" {
 		t.Fatalf("status/definition mapping: %+v", model)
 	}
-	if !model.Definition.Equal(jsontypes.NewNormalizedValue(string(definition))) {
+	equal, diagnostics := model.Definition.StringSemanticEquals(
+		context.Background(),
+		jsontypes.NewNormalizedValue(string(definition)),
+	)
+	if diagnostics.HasError() || !equal {
 		t.Fatalf("definition changed while mapping to state: %s", model.Definition.ValueString())
 	}
 	var stateDefinition map[string]any
@@ -165,5 +169,97 @@ func TestSetConnectorStateRetainsSecretFromPriorStateOnRedactedRead(t *testing.T
 	}
 	if definition.Auth.ClientSecret != "client-secret" {
 		t.Fatalf("redacted response replaced prior secret: %q", definition.Auth.ClientSecret)
+	}
+}
+
+func TestSetConnectorStatePreservesOmittedAPINullFields(t *testing.T) {
+	plannedDefinition := `{"displayName":"Example","description":"Example connector","auth":{"type":"no-auth"}}`
+	model := ConnectorResourceModel{
+		Definition: jsontypes.NewNormalizedValue(plannedDefinition),
+	}
+	connector := &client.Connector{
+		Metadata: client.ObjectMetadata{ID: "cxr_test", Namespace: "root", Generation: 1},
+		Spec: client.ConnectorSpec{
+			Definition: json.RawMessage(`{"displayName":"Example","logo":null,"description":"Example connector","auth":{"type":"no-auth"}}`),
+		},
+		Status: &client.ConnectorStatus{Release: client.ConnectorReleaseStatus{State: "primary"}},
+	}
+
+	setConnectorState(&model, connector)
+
+	equal, diagnostics := model.Definition.StringSemanticEquals(
+		context.Background(),
+		jsontypes.NewNormalizedValue(plannedDefinition),
+	)
+	if diagnostics.HasError() || !equal {
+		t.Fatalf("API-added null field changed Terraform state: %s", model.Definition.ValueString())
+	}
+}
+
+func TestSetConnectorStateRemovesAPINullFieldsDuringImport(t *testing.T) {
+	connector := &client.Connector{
+		Metadata: client.ObjectMetadata{ID: "cxr_test", Namespace: "root", Generation: 1},
+		Spec: client.ConnectorSpec{
+			Definition: json.RawMessage(`{"displayName":"Example","logo":null,"description":"Example connector","auth":{"type":"no-auth"}}`),
+		},
+		Status: &client.ConnectorStatus{Release: client.ConnectorReleaseStatus{State: "primary"}},
+	}
+	var model ConnectorResourceModel
+
+	setConnectorState(&model, connector)
+
+	want := jsontypes.NewNormalizedValue(`{"displayName":"Example","description":"Example connector","auth":{"type":"no-auth"}}`)
+	equal, diagnostics := model.Definition.StringSemanticEquals(context.Background(), want)
+	if diagnostics.HasError() || !equal {
+		t.Fatalf("API-added null field remained in imported state: %s", model.Definition.ValueString())
+	}
+}
+
+func TestReconcileConnectorDefinitionRetainsObservableDrift(t *testing.T) {
+	observed := []byte(`{"displayName":"Example","logo":null,"description":"changed","auth":{"type":"no-auth"}}`)
+	prior := []byte(`{"displayName":"Example","description":"original","auth":{"type":"no-auth"}}`)
+	merged, err := reconcileConnectorDefinitionJSON(observed, prior, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := jsontypes.NewNormalizedValue(`{"displayName":"Example","description":"changed","auth":{"type":"no-auth"}}`)
+	equal, diagnostics := jsontypes.NewNormalizedValue(string(merged)).StringSemanticEquals(context.Background(), want)
+	if diagnostics.HasError() || !equal {
+		t.Fatalf("observable drift was lost: %s", merged)
+	}
+}
+
+func TestReconcileConnectorDefinitionPreservesJSONSchemaNulls(t *testing.T) {
+	observed := []byte(`{
+		"displayName":"Example",
+		"logo":null,
+		"auth":{"type":"no-auth"},
+		"setupFlow":{"configure":{"steps":[{
+			"type":"user-input",
+			"jsonSchema":{"properties":{"optional":{"default":null}}}
+		}]}}
+	}`)
+	merged, err := reconcileConnectorDefinitionJSON(observed, []byte(`{}`), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var definition map[string]any
+	if err := json.Unmarshal(merged, &definition); err != nil {
+		t.Fatal(err)
+	}
+	if _, exists := definition["logo"]; exists {
+		t.Fatalf("API-added logo null remained in state: %s", merged)
+	}
+	setupFlow := definition["setupFlow"].(map[string]any)
+	configure := setupFlow["configure"].(map[string]any)
+	steps := configure["steps"].([]any)
+	jsonSchema := steps[0].(map[string]any)["jsonSchema"].(map[string]any)
+	properties := jsonSchema["properties"].(map[string]any)
+	optional := properties["optional"].(map[string]any)
+	defaultValue, exists := optional["default"]
+	if !exists || defaultValue != nil {
+		t.Fatalf("meaningful JSON Schema null was not preserved: %s", merged)
 	}
 }

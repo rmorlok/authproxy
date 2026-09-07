@@ -77,14 +77,14 @@ type rateLimitAlgorithmModel struct {
 }
 
 type rateLimitFixedWindowModel struct {
-	Window types.String `tfsdk:"window"`
-	Limit  types.Int64  `tfsdk:"limit"`
+	Window humanDurationValue `tfsdk:"window"`
+	Limit  types.Int64        `tfsdk:"limit"`
 }
 
 type rateLimitSlidingWindowModel struct {
-	Window types.String `tfsdk:"window"`
-	Limit  types.Int64  `tfsdk:"limit"`
-	Mode   types.String `tfsdk:"mode"`
+	Window humanDurationValue `tfsdk:"window"`
+	Limit  types.Int64        `tfsdk:"limit"`
+	Mode   types.String       `tfsdk:"mode"`
 }
 
 type rateLimitTokenBucketModel struct {
@@ -151,13 +151,17 @@ func (r *RateLimitResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					"connector_ref": schema.SingleNestedBlock{
 						Description: "Target one connector across all of its generations.",
 						Attributes: map[string]schema.Attribute{
-							"id": schema.StringAttribute{Required: true},
+							// SingleNestedBlock has no Optional flag. Marking a child
+							// attribute Required makes Terraform require it even when
+							// the entire block is omitted, so presence is enforced by
+							// the resource validator below instead.
+							"id": schema.StringAttribute{Optional: true},
 						},
 					},
 					"connection_ref": schema.SingleNestedBlock{
 						Description: "Target one connection.",
 						Attributes: map[string]schema.Attribute{
-							"id": schema.StringAttribute{Required: true},
+							"id": schema.StringAttribute{Optional: true},
 						},
 					},
 				},
@@ -215,6 +219,7 @@ func (r *RateLimitResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 							"window": schema.StringAttribute{
 								Description: "Window length as a HumanDuration (e.g. '1m', '5m').",
 								Optional:    true,
+								CustomType:  humanDurationType{},
 							},
 							"limit": schema.Int64Attribute{
 								Description: "Maximum requests per window.",
@@ -228,6 +233,7 @@ func (r *RateLimitResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 							"window": schema.StringAttribute{
 								Description: "Window length as a HumanDuration.",
 								Optional:    true,
+								CustomType:  humanDurationType{},
 							},
 							"limit": schema.Int64Attribute{
 								Description: "Maximum requests within the trailing window.",
@@ -517,12 +523,12 @@ func setRateLimitState(model *RateLimitResourceModel, rl *client.RateLimit) {
 	switch {
 	case rl.Spec.Algorithm.FixedWindow != nil:
 		algoModel.FixedWindow = &rateLimitFixedWindowModel{
-			Window: types.StringValue(rl.Spec.Algorithm.FixedWindow.Window),
+			Window: newHumanDurationValue(rl.Spec.Algorithm.FixedWindow.Window),
 			Limit:  types.Int64Value(int64(rl.Spec.Algorithm.FixedWindow.Limit)),
 		}
 	case rl.Spec.Algorithm.SlidingWindow != nil:
 		algoModel.SlidingWindow = &rateLimitSlidingWindowModel{
-			Window: types.StringValue(rl.Spec.Algorithm.SlidingWindow.Window),
+			Window: newHumanDurationValue(rl.Spec.Algorithm.SlidingWindow.Window),
 			Limit:  types.Int64Value(int64(rl.Spec.Algorithm.SlidingWindow.Limit)),
 			Mode:   types.StringValue(rl.Spec.Algorithm.SlidingWindow.Mode),
 		}
@@ -598,9 +604,25 @@ func (v exactlyOneAlgorithmValidator) ValidateResource(ctx context.Context, req 
 		}
 		if model.Scope.ConnectorRef != nil {
 			set++
+			if model.Scope.ConnectorRef.ID.IsNull() ||
+				(!model.Scope.ConnectorRef.ID.IsUnknown() && model.Scope.ConnectorRef.ID.ValueString() == "") {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("scope").AtName("connector_ref").AtName("id"),
+					"Missing connector reference ID",
+					"scope.connector_ref.id must be set when connector_ref is configured.",
+				)
+			}
 		}
 		if model.Scope.ConnectionRef != nil {
 			set++
+			if model.Scope.ConnectionRef.ID.IsNull() ||
+				(!model.Scope.ConnectionRef.ID.IsUnknown() && model.Scope.ConnectionRef.ID.ValueString() == "") {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("scope").AtName("connection_ref").AtName("id"),
+					"Missing connection reference ID",
+					"scope.connection_ref.id must be set when connection_ref is configured.",
+				)
+			}
 		}
 		if set != 1 {
 			resp.Diagnostics.AddAttributeError(
