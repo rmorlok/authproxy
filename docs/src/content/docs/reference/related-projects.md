@@ -61,6 +61,49 @@ credential and request data.
 
 ---
 
+## Quick Comparison (High-Level)
+
+Licensing reviewed **2026-09-07**. “Commercial” indicates a paid product or SaaS
+offering; where a project also publishes code, the license and its scope are
+listed alongside it. Source-available licenses are marked separately from
+open-source licenses. SDK or connector licensing does not cover a hosted
+platform; self-hosting and edition restrictions are summarized in the last
+column and the product notes below.
+
+| Product/Project | Primary Use Case | License | Code vs UI | Eventing/Webhooks | Connector Definition | Self-hosting |
+| --- | --- | --- | --- | --- | --- | --- |
+| **[AuthProxy](https://docs.authproxy.net/)** | Embedded connection lifecycle and authenticating proxy | [MIT](https://github.com/rmorlok/authproxy/blob/main/LICENSE) | Code-first with embedded Marketplace and Admin UIs | Not a workflow or event platform | Declarative, versioned definitions maintained by the adopting team | Yes |
+| [Merge](https://www.merge.dev/) | Unified API for B2B SaaS data | Commercial | API-first (code) | Webhooks supported | Vendor-defined connectors maintained by Merge | Yes (paid option) |
+| [Kombo](https://www.kombo.dev/) | Unified HR/ATS/LMS/Payroll | Commercial | API-first (code) | Webhooks supported | Vendor-defined connectors maintained by Kombo | No public self-host option |
+| [Paragon](https://www.useparagon.com/) | Embedded integrations for SaaS | Commercial | Hybrid (SDK + UI) | Webhooks + workflow triggers | Prebuilt + custom connector builder | Yes (managed or unmanaged on-prem) |
+| [Prismatic](https://prismatic.io/) | Embedded iPaaS | Commercial | Hybrid | Webhooks + workflows | Prebuilt + SDK | Partial (on-prem agent) |
+| [Workato](https://www.workato.com/) | Traditional enterprise iPaaS | Commercial | UI-heavy | Triggers + actions | Prebuilt + custom connectors | Partial (on-prem agent) |
+| [Tray.io](https://tray.ai/) | Traditional + embedded iPaaS | Commercial | UI-heavy | Triggers + actions | Prebuilt + custom connector SDK | Partial (on-prem agent) |
+| [Cyclr](https://cyclr.com/) | Embedded iPaaS | Commercial | UI-heavy | Triggers + actions | Prebuilt + custom connector tools | Yes (self-hosted private cloud) |
+| [Pandium](https://www.pandium.com/) | Embedded iPaaS (code-first) | Commercial | Code-first | Webhooks supported | Auth-focused connectors + code integrations | No public self-host option |
+| [Ampersand](https://www.withampersand.com/) | Embedded iPaaS (code-first) | Commercial + [MIT](https://github.com/amp-labs/connectors/blob/main/LICENSE) connectors | Code-first | Subscribe to events | Declarative YAML + OSS connectors | No public self-host option (platform) |
+| [Nango](https://nango.dev/) | Integration infrastructure | Commercial + [ELv2](https://github.com/NangoHQ/nango/blob/master/LICENSE) (source-available) | Code-first | Webhooks + syncs | Prebuilt auth + custom integrations | Yes (limited free self-host; enterprise self-host) |
+| [n8n](https://n8n.io/) | Workflow automation | Commercial + [Sustainable Use License](https://github.com/n8n-io/n8n/blob/master/LICENSE.md) (source-available) | UI-heavy + code nodes | Webhooks + triggers | Community + core nodes | Yes (self-hosted editions) |
+| [Pipedream](https://pipedream.com/) | Workflow automation | Commercial + [source-available components](https://github.com/PipedreamHQ/pipedream/blob/master/LICENSE) | Code-first + UI | Webhooks + triggers | App actions + custom code | No (publicly stated) |
+| [Hookdeck](https://hookdeck.com/) | Inbound event gateway + outbound delivery | Commercial + [Apache-2.0](https://github.com/hookdeck/outpost/blob/main/LICENSE) Outpost | Hybrid (API + UI + CLI) | Core product | Sources, routing connections, destinations, and delivery policies | Outbound Outpost only (Apache-2.0) |
+| [Svix](https://www.svix.com/) | Outbound webhook delivery | Commercial + [MIT](https://github.com/svix/svix-webhooks/blob/main/LICENSE) | API-first + application portal | Core product | Applications, endpoints, event types, and delivery policies | Yes (MIT server) |
+| [Convoy](https://www.getconvoy.io/) | Bidirectional webhook gateway | Commercial + [ELv2](https://github.com/frain-dev/convoy/blob/main/LICENSE) (source-available) | API + operator UI | Core product | Sources, subscriptions, endpoints, and delivery policies | Yes (Elastic License 2.0) |
+| [Hook0](https://www.hook0.com/) | Outbound webhook delivery | Commercial + [SSPL-1.0](https://github.com/hook0/hook0/blob/master/LICENSE.txt) (source-available) | API + UI | Core product | Applications, event types, subscriptions, and endpoints | Yes (SSPL-1.0) |
+| [Octelium](https://octelium.com/) | Zero-trust access and identity-aware proxy | Commercial + [AGPL-3.0 cluster / Apache-2.0 clients](https://github.com/octelium/octelium#license) | Declarative config + CLI; enterprise web console | Access logs and protocol-aware auditing | Services, Users, Secrets, and Policies; no provider connector catalog | Yes (Apache-2.0 clients/APIs/SDK; AGPLv3 cluster) |
+| [Teleport](https://goteleport.com/) | Identity-aware infrastructure and MCP access | Commercial + [AGPL-3.0](https://github.com/gravitational/teleport/blob/master/LICENSE) source | CLI/config + management UI | Proxies and audits MCP tool access | Enrolled MCP servers and infrastructure resources | Yes (AGPL-3.0 source; restricted Community binaries; commercial editions) |
+| [Composio](https://composio.dev/) | AI agent tool access | Commercial + [MIT](https://github.com/ComposioHQ/composio/blob/next/LICENSE) SDKs | Code-first | Triggers supported | Toolkits + MCP servers | Not stated in docs |
+| [Metorial](https://metorial.com/) | MCP integration platform | Commercial + [FSL-1.1-ALv2](https://github.com/metorial/metorial-platform/blob/dev/LICENSE) platform (source-available) | Code-first | N/A (agent tool calls) | MCP servers (hosted or OSS) | Yes (source-available platform; FSL-1.1-ALv2) |
+| [Pica](https://picaos.com/) | Auth + actions for AI & SaaS | Commercial | Code-first + embeddable UI | Webhooks supported | AuthKit + Passthrough API | No public self-host option |
+| [Airweave](https://airweave.ai/) | Agent data ingestion | Commercial + [MIT](https://github.com/airweave-ai/airweave/blob/main/LICENSE) | Code-first | Sync + retrieval | Connectors for data sources | Yes (open source; self-host or hosted) |
+| [LiteLLM](https://www.litellm.ai/) | LLM gateway | Commercial + [MIT](https://github.com/BerriAI/litellm/blob/main/LICENSE) core | Code-first | N/A | Provider integrations | Yes (OSS self-host; cloud option) |
+| [Bifrost](https://www.getmaxim.ai/bifrost) | LLM and MCP tool gateway | Commercial + [Apache-2.0](https://github.com/maximhq/bifrost/blob/dev/LICENSE) | Code-first + management UI | MCP client/server and tool execution | Model providers + upstream MCP servers | Yes (Apache-2.0) |
+| [Kong](https://konghq.com/) | API, AI, and MCP traffic gateway | Commercial + [Apache-2.0](https://github.com/Kong/kong/blob/master/LICENSE) core | API/declarative config + management UI | Proxies, converts, and aggregates MCP tools | User-managed APIs, services, and MCP servers | Yes (Apache-2.0 core; MCP proxy is Enterprise) |
+| [Warden](https://wardengateway.com/) | Agent/workload access governance and credential brokerage | [MPL-2.0](https://github.com/stephnangue/warden/blob/main/LICENSE) | CLI/API + HCL policies | MCP request policy and audit; not a workflow engine | Mounted providers + credential sources/specs + roles | Yes (MPL-2.0) |
+| [Agent Vault](https://docs.agent-vault.dev/) | Credential brokerage for AI agents | [MIT](https://github.com/Infisical/agent-vault/blob/main/LICENSE) core | Code-first (CLI + SDK) | N/A (network-layer proxy) | User-registered services + credentials; no prebuilt connectors | Yes (OSS MIT; binary or Docker) |
+| [Apache Camel](https://camel.apache.org/) | Routing, mediation, and protocol integration framework | [Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0) | Code-first DSLs + Karavan low-code tooling | Routes, timers, polling, messaging components, Kamelets | Components, route DSLs, Kamelets | Yes (OSS library/runtime; Camel K on Kubernetes) |
+
+---
+
 ## Unified APIs
 
 | Product | Commercial / OSS | Traditional vs Embedded | Connector Count | Self-hosting | Notes |
@@ -86,7 +129,7 @@ credential and request data.
 | [Cyclr](https://cyclr.com/) | Commercial | Embedded | 600+ applications | Yes (self-hosted private cloud) | Embedded integration platform and connector library. |
 | [Pandium](https://www.pandium.com/) | Commercial | Embedded | 200+ connectors (docs mention 210) | No public self-host option; managed infrastructure | Code-first, connectors focus on auth + webhooks. |
 | [Ampersand](https://www.withampersand.com/) | Commercial + OSS connectors | Embedded | Not publicly stated | No public self-host for platform; OSS connectors library | Declarative, code-first integrations; open connectors repo. |
-| [Nango](https://nango.dev/) | Commercial + OSS (Elastic License) | Embedded / integration infrastructure | 500-700+ APIs (varies by page) | Yes (limited free self-host; enterprise self-host) | Code-first integration platform with auth, sync, webhooks. |
+| [Nango](https://nango.dev/) | Commercial + source-available (ELv2) | Embedded / integration infrastructure | 500-700+ APIs (varies by page) | Yes (limited free self-host; enterprise self-host) | Code-first integration platform with auth, sync, webhooks. |
 | [Frigg](https://friggframework.org/) | Open Source | Embedded framework | Not publicly stated | Yes (runs in your cloud) | OSS framework for building integrations in your own cloud. |
 
 ### Embedded iPaaS product notes
@@ -98,7 +141,7 @@ credential and request data.
 - **Cyclr**: Embedded iPaaS; marketing page claims 600+ applications supported. See: https://cyclr.com/application-connectors.
 - **Pandium**: Embedded iPaaS emphasizing code-first integrations; marketing lists 200+ connectors; docs note \"210\" connectors. Pandium emphasizes managed infrastructure for running integrations, with no self-host option mentioned. See: https://www.pandium.com/connectors and https://docs.pandium.com/connectors/connectors-101.
 - **Ampersand**: Code-first embedded integration platform; open-source connectors library on GitHub. Connector count not publicly stated. Ampersand docs describe the Ampersand server as a managed service; connectors library is open source. See: https://github.com/amp-labs/connectors and https://docs.withampersand.com/.
-- **Nango**: Code-first integration infrastructure with auth, sync, webhooks, and managed execution. Open-source core uses the Elastic License. Connector counts vary across pages: 500+ to 700+ depending on page (catalog and homepage). Nango offers a limited free self-hosted option plus an enterprise self-hosted edition. See: https://github.com/NangoHQ/nango, https://nango.dev/, https://www.nango.dev/api-integrations, and https://nango.dev/docs/guides/platform/self-hosting.
+- **Nango**: Code-first integration infrastructure with auth, sync, webhooks, and managed execution. Source-available core uses Elastic License 2.0. Connector counts vary across pages: 500+ to 700+ depending on page (catalog and homepage). Nango offers a limited free self-hosted option plus an enterprise self-hosted edition. See: https://github.com/NangoHQ/nango, https://nango.dev/, https://www.nango.dev/api-integrations, and https://nango.dev/docs/guides/platform/self-hosting.
 - **Frigg**: Open-source framework for building customer-facing integrations that runs in your cloud; provides an API module library, but no published connector count. See: https://lefthook.com/frigg/ and https://docs.friggframework.org/.
 
 ---
@@ -107,7 +150,7 @@ credential and request data.
 
 | Product | Commercial / OSS | Traditional vs Embedded | Connector Count | Self-hosting | Notes |
 | --- | --- | --- | --- | --- | --- |
-| [n8n](https://n8n.io/) | Open source + commercial hosting | Traditional iPaaS | 1,000+ apps | Yes (self-hosted editions) | Visual workflow automation, self-hostable. |
+| [n8n](https://n8n.io/) | Source-available + commercial hosting | Traditional iPaaS | 1,000+ apps | Yes (self-hosted editions) | Visual workflow automation, self-hostable. |
 | [Pipedream](https://pipedream.com/) | Commercial (free tier) | Traditional iPaaS | \"Thousands of apps\" | No (publicly stated no self-host option) | Code-first workflows with triggers/actions and webhook support. |
 | [Workato](https://www.workato.com/) | Commercial | Traditional iPaaS | 1,000+ connectors | Partial (on-prem agent for private systems) | Enterprise automation, recipe-based workflows. |
 | [Tray.io](https://tray.io/) | Commercial | Traditional iPaaS | Not publicly stated | Partial (on-prem agent for private systems) | Visual workflow builder with strong API tooling. |
@@ -115,7 +158,7 @@ credential and request data.
 
 ### Traditional iPaaS product notes
 
-- **n8n**: OSS workflow automation with a very large app catalog; their integrations pages note 1,000+ apps. Docs explicitly support self-hosted editions. See: https://n8n.io/integrations/ and https://docs.n8n.io/choose-n8n/.
+- **n8n**: Source-available workflow automation under the Sustainable Use License, with commercial hosting and enterprise licensing. It has a very large app catalog; their integrations pages note 1,000+ apps. Docs explicitly support self-hosted editions. See: https://n8n.io/integrations/ and https://docs.n8n.io/choose-n8n/.
 - **Pipedream**: Developer-first automation platform with triggers/actions and code steps; docs describe integrations as \"thousands of apps.\" Pipedream staff state there is no self-host option at this time. See: https://pipedream.com/docs/apps, https://pipedream.com/docs/workflows/building-workflows/triggers/, and https://pipedream.com/community/t/how-can-i-self-host-pipedream-on-my-development-machine-and-ec2-instance/4978.
 - **Workato** and **Tray.io**: included above; widely used enterprise iPaaS tools with large connector libraries and visual builders.
 - **Apache Camel**: Long-running open-source integration framework based on Enterprise Integration Patterns. Camel Core is a small embeddable Java library with DSLs for routes, URI-addressed endpoints, data formats, and a large component catalog; the current component reference lists 370 non-core components. It is not an embedded SaaS integration product by itself: teams operate it inside their own applications or infrastructure. Related projects make it more platform-like: Camel K runs Camel integrations natively on Kubernetes, Karavan provides a low-code UI for designing/configuring routes with Kamelets and components, and Kamelets package source/sink connector snippets behind simpler interfaces. Compared with AuthProxy, Camel is much broader for routing, transformation, and message mediation, but does not primarily focus on customer-facing connection lifecycle, tenant-scoped OAuth/API-key credential storage, or authenticating proxy behavior. See: https://camel.apache.org/manual/faq/what-is-camel.html, https://camel.apache.org/components/4.18.x/index.html, https://camel.apache.org/docs/, and https://camel.apache.org/.
@@ -244,7 +287,7 @@ They do not all provide customer-facing API integrations.
 | Product | Primary gateway role | API / tool coverage | Credential model | Self-hosting | Notes |
 | --- | --- | --- | --- | --- | --- |
 | [Composio](https://composio.dev) | Agent tool integration | 900-1000+ toolkits (500+ apps) | Managed application auth | Not stated in docs | Managed auth, triggers, tools, and MCP servers. |
-| [Metorial](https://metorial.com/) | MCP integration platform | 600+ MCP servers | Managed integration auth | Yes (open source; self-hostable) | MCP server catalog, deployment, and observability. |
+| [Metorial](https://metorial.com/) | MCP integration platform | 600+ MCP servers | Managed integration auth | Yes (source-available platform; FSL-1.1-ALv2) | MCP server catalog, deployment, and observability. |
 | [Pica](https://picaos.com) | Auth and tool-action gateway | 200+ integrations | Managed AuthKit connections | No public self-host option | AuthKit plus a passthrough API with 25k+ actions. |
 | [Airweave](https://airweave.ai/) | Agent data-ingestion gateway | 50+ data sources | Source connection credentials | Yes (open source; self-host or hosted) | Unified retrieval layer for agents. |
 | [LiteLLM](https://www.litellm.ai/) | LLM inference gateway | 100+ model providers | Centrally managed provider credentials | Yes (OSS self-host; cloud option) | Model routing, auth, quotas, and spend controls; not an MCP tool gateway. |
@@ -256,7 +299,7 @@ They do not all provide customer-facing API integrations.
 ### API, AI, and MCP gateway product notes
 
 - **Composio**: Managed auth and tool execution for AI agents. Docs mention 1000+ toolkits; the toolkits catalog shows ~900 toolkits; other pages reference 500+ apps. No self-host option is documented. See: https://docs.composio.dev/, https://docs.composio.dev/toolkits, and https://docs.composio.dev/toolkits/introduction.
-- **Metorial**: Open-source MCP integration platform; GitHub repo states it is open source and self-hostable, with a hosted option available. See: https://github.com/metorial/metorial.
+- **Metorial**: MCP integration platform with a commercial hosted offering and a self-hostable platform under FSL-1.1-ALv2, a source-available license that converts each version to Apache-2.0 after two years. See: https://metorial.com/ and [platform license](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
 - **Pica**: Integration infrastructure for SaaS + AI; AuthKit handles OAuth/token refresh and multi-tenant auth. Docs require a Pica account and API key, implying hosted service. See: https://docs.picaos.com/authkit/setup and https://docs.picaos.com/authkit.
 - **Airweave**: Open-source context retrieval layer with 50+ prebuilt connectors; focuses on ingestion and unified search for agents. Site FAQ says it is open source and can be self-hosted or used via hosted platform. See: https://airweave.ai/ and https://docs.airweave.ai/.
 - **LiteLLM**: Open-source LLM gateway supporting 100+ provider integrations, with spend tracking and routing. OSS page highlights self-hosting with no data sent to LiteLLM servers; docs show running the proxy via Docker or CLI. See: https://www.litellm.ai/oss and https://docs.litellm.ai/.
@@ -294,39 +337,3 @@ infrastructure policy is required.
 - **Hookdeck Outpost**: Apache-2.0 outbound event-delivery runtime. It supports multi-tenant webhooks plus destinations such as SQS, Kafka, RabbitMQ, EventBridge, and Pub/Sub, and includes retries, fan-out, OpenTelemetry, and an end-user portal. See: https://github.com/hookdeck/outpost.
 - **Svix Webhooks**: MIT-licensed server behind Svix's outbound webhook service. It is the other permissively licensed, self-hostable alternative in this comparison. See: https://github.com/svix/svix-webhooks.
 - **Apache Camel**: OSS integration building block for teams that want full control over routes, transports, and deployment. It is strongest when the problem is message routing, mediation, protocol bridging, transformation, or running integration logic inside Java/Spring Boot/Quarkus/Kubernetes environments. It is less directly comparable to embedded iPaaS products because it does not provide a hosted multi-tenant connection UI, unified API model, or credential lifecycle out of the box. See: https://camel.apache.org/manual/faq/what-is-camel.html and https://camel.apache.org/docs/.
-
----
-
-## Quick Comparison (High-Level)
-
-| Product | Primary Use Case | Code vs UI | Eventing/Webhooks | Connector Definition | Self-hosting |
-| --- | --- | --- | --- | --- | --- |
-| **AuthProxy** | Embedded connection lifecycle and authenticating proxy | Code-first with embedded Marketplace and Admin UIs | Not a workflow or event platform | Declarative, versioned definitions maintained by the adopting team | Yes |
-| Merge | Unified API for B2B SaaS data | API-first (code) | Webhooks supported | Vendor-defined connectors maintained by Merge | Yes (paid option) |
-| Kombo | Unified HR/ATS/LMS/Payroll | API-first (code) | Webhooks supported | Vendor-defined connectors maintained by Kombo | No public self-host option |
-| Paragon | Embedded integrations for SaaS | Hybrid (SDK + UI) | Webhooks + workflow triggers | Prebuilt + custom connector builder | Yes (managed or unmanaged on-prem) |
-| Prismatic | Embedded iPaaS | Hybrid | Webhooks + workflows | Prebuilt + SDK | Partial (on-prem agent) |
-| Workato | Traditional enterprise iPaaS | UI-heavy | Triggers + actions | Prebuilt + custom connectors | Partial (on-prem agent) |
-| Tray.io | Traditional + embedded iPaaS | UI-heavy | Triggers + actions | Prebuilt + custom connector SDK | Partial (on-prem agent) |
-| Cyclr | Embedded iPaaS | UI-heavy | Triggers + actions | Prebuilt + custom connector tools | Yes (self-hosted private cloud) |
-| Pandium | Embedded iPaaS (code-first) | Code-first | Webhooks supported | Auth-focused connectors + code integrations | No public self-host option |
-| Ampersand | Embedded iPaaS (code-first) | Code-first | Subscribe to events | Declarative YAML + OSS connectors | No public self-host option (platform) |
-| Nango | Integration infrastructure | Code-first | Webhooks + syncs | Prebuilt auth + custom integrations | Yes (limited free self-host; enterprise self-host) |
-| n8n | Workflow automation | UI-heavy + code nodes | Webhooks + triggers | Community + core nodes | Yes (self-hosted editions) |
-| Pipedream | Workflow automation | Code-first + UI | Webhooks + triggers | App actions + custom code | No (publicly stated) |
-| Hookdeck | Inbound event gateway + outbound delivery | Hybrid (API + UI + CLI) | Core product | Sources, routing connections, destinations, and delivery policies | Outbound Outpost only (Apache-2.0) |
-| Svix | Outbound webhook delivery | API-first + application portal | Core product | Applications, endpoints, event types, and delivery policies | Yes (MIT server) |
-| Convoy | Bidirectional webhook gateway | API + operator UI | Core product | Sources, subscriptions, endpoints, and delivery policies | Yes (Elastic License 2.0) |
-| Hook0 | Outbound webhook delivery | API + UI | Core product | Applications, event types, subscriptions, and endpoints | Yes (SSPL-1.0) |
-| Octelium | Zero-trust access and identity-aware proxy | Declarative config + CLI; enterprise web console | Access logs and protocol-aware auditing | Services, Users, Secrets, and Policies; no provider connector catalog | Yes (Apache-2.0 clients/APIs/SDK; AGPLv3 cluster) |
-| Teleport | Identity-aware infrastructure and MCP access | CLI/config + management UI | Proxies and audits MCP tool access | Enrolled MCP servers and infrastructure resources | Yes (AGPL-3.0 source; restricted Community binaries; commercial editions) |
-| Composio | AI agent tool access | Code-first | Triggers supported | Toolkits + MCP servers | Not stated in docs |
-| Metorial | MCP integration platform | Code-first | N/A (agent tool calls) | MCP servers (hosted or OSS) | Yes (open source; self-hostable) |
-| Pica | Auth + actions for AI & SaaS | Code-first + embeddable UI | Webhooks supported | AuthKit + Passthrough API | No public self-host option |
-| Airweave | Agent data ingestion | Code-first | Sync + retrieval | Connectors for data sources | Yes (open source; self-host or hosted) |
-| LiteLLM | LLM gateway | Code-first | N/A | Provider integrations | Yes (OSS self-host; cloud option) |
-| Bifrost | LLM and MCP tool gateway | Code-first + management UI | MCP client/server and tool execution | Model providers + upstream MCP servers | Yes (Apache-2.0) |
-| Kong | API, AI, and MCP traffic gateway | API/declarative config + management UI | Proxies, converts, and aggregates MCP tools | User-managed APIs, services, and MCP servers | Yes (Apache-2.0 core; MCP proxy is Enterprise) |
-| Warden | Agent/workload access governance and credential brokerage | CLI/API + HCL policies | MCP request policy and audit; not a workflow engine | Mounted providers + credential sources/specs + roles | Yes (MPL-2.0) |
-| Agent Vault | Credential brokerage for AI agents | Code-first (CLI + SDK) | N/A (network-layer proxy) | User-registered services + credentials; no prebuilt connectors | Yes (OSS MIT; binary or Docker) |
-| Apache Camel | Routing, mediation, and protocol integration framework | Code-first DSLs + Karavan low-code tooling | Routes, timers, polling, messaging components, Kamelets | Components, route DSLs, Kamelets | Yes (OSS library/runtime; Camel K on Kubernetes) |
