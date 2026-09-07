@@ -37,7 +37,7 @@ lifecycle around those calls.
 | Concept | Meaning |
 |---|---|
 | **Connector** | A definition of how to connect to one third-party system, including authentication, setup steps, scopes, and health probes. |
-| **Connector version** | An immutable published snapshot of a connector. New definitions are released as new versions so existing connections remain predictable. |
+| **Connector generation** | An immutable published snapshot of a connector. New definitions are released as new generations so existing connections remain predictable. |
 | **Connection** | A namespace-scoped instance of a connector containing encrypted credentials and setup state. |
 | **Namespace** | A hierarchical authorization and isolation boundary such as `root.tenants.acme`. |
 | **Actor** | A user or service identity that authenticates to AuthProxy and receives namespace-scoped permissions. |
@@ -52,7 +52,8 @@ tenant-shared connections and private per-user connections.
 
 See [The core resource model](/concepts/core-model/) for the detailed relationships and
 [Labels and annotations](/concepts/labels-and-annotations/) for metadata propagation and
-selectors.
+selectors. See [Resource contracts](/reference/resources/) for the exact JSON/YAML
+envelopes shared by these objects.
 
 ## Responsibilities
 

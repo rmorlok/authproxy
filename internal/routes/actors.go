@@ -1,7 +1,6 @@
 package routes
 
 import (
-	"context"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -14,7 +13,6 @@ import (
 	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httperr"
-	"github.com/rmorlok/authproxy/internal/routes/key_value"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	schemaapiopenapi "github.com/rmorlok/authproxy/internal/schema/api/openapi"
 	scommon "github.com/rmorlok/authproxy/internal/schema/common"
@@ -25,11 +23,9 @@ import (
 )
 
 type ActorsRoutes struct {
-	core          coreIface.C
-	auth          auth.A
-	logger        *slog.Logger
-	labelsAdapter key_value.Adapter[apid.ID]
-	annotsAdapter key_value.Adapter[apid.ID]
+	core   coreIface.C
+	auth   auth.A
+	logger *slog.Logger
 }
 
 var (
@@ -625,132 +621,6 @@ func (r *ActorsRoutes) updateByExternalId(gctx *gin.Context) {
 	}
 }
 
-// Label and annotation handlers for actors delegate to a shared
-// generic adapter (see internal/routes/key_value). The doc comments below
-// drive the OpenAPI spec; the bodies forward to the adapter.
-
-// @Summary		Get all labels for an actor
-// @Description	Get all labels associated with a specific actor
-// @Tags			actors
-// @Produce		json
-// @Param			id	path		string	true	"Actor UUID"
-// @Success		200	{object}	map[string]string
-// @Failure		400	{object}	ErrorResponse
-// @Failure		401	{object}	ErrorResponse
-// @Failure		404	{object}	ErrorResponse
-// @Failure		500	{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/actors/{id}/labels [get]
-func (r *ActorsRoutes) getLabels(gctx *gin.Context) { r.labelsAdapter.HandleList(gctx) }
-
-// @Summary		Get a specific label for an actor
-// @Description	Get a specific label value by key for an actor
-// @Tags			actors
-// @Produce		json
-// @Param			id		path		string	true	"Actor UUID"
-// @Param			label	path		string	true	"Label key"
-// @Success		200		{object}	KeyValueJson
-// @Failure		400		{object}	ErrorResponse
-// @Failure		401		{object}	ErrorResponse
-// @Failure		404		{object}	ErrorResponse
-// @Failure		500		{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/actors/{id}/labels/{label} [get]
-func (r *ActorsRoutes) getLabel(gctx *gin.Context) { r.labelsAdapter.HandleGet(gctx) }
-
-// @Summary		Set a label for an actor
-// @Description	Set or update a specific label value by key for an actor
-// @Tags			actors
-// @Accept			json
-// @Produce		json
-// @Param			id		path		string						true	"Actor UUID"
-// @Param			label	path		string						true	"Label key"
-// @Param			request	body		PutKeyValueRequestJson	true	"Label value"
-// @Success		200		{object}	KeyValueJson
-// @Failure		400		{object}	ErrorResponse
-// @Failure		401		{object}	ErrorResponse
-// @Failure		403		{object}	ErrorResponse
-// @Failure		404		{object}	ErrorResponse
-// @Failure		500		{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/actors/{id}/labels/{label} [put]
-func (r *ActorsRoutes) putLabel(gctx *gin.Context) { r.labelsAdapter.HandlePut(gctx) }
-
-// @Summary		Delete a label from an actor
-// @Description	Delete a specific label by key from an actor
-// @Tags			actors
-// @Param			id		path	string	true	"Actor UUID"
-// @Param			label	path	string	true	"Label key"
-// @Success		204		"No Content"
-// @Failure		400		{object}	ErrorResponse
-// @Failure		401		{object}	ErrorResponse
-// @Failure		403		{object}	ErrorResponse
-// @Failure		500		{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/actors/{id}/labels/{label} [delete]
-func (r *ActorsRoutes) deleteLabel(gctx *gin.Context) { r.labelsAdapter.HandleDelete(gctx) }
-
-// @Summary		Get all annotations for an actor
-// @Description	Get all annotations for an actor by ID
-// @Tags			actors
-// @Produce		json
-// @Param			id	path		string	true	"Actor UUID"
-// @Success		200	{object}	map[string]string
-// @Failure		400	{object}	ErrorResponse
-// @Failure		401	{object}	ErrorResponse
-// @Failure		404	{object}	ErrorResponse
-// @Failure		500	{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/actors/{id}/annotations [get]
-func (r *ActorsRoutes) getAnnotations(gctx *gin.Context) { r.annotsAdapter.HandleList(gctx) }
-
-// @Summary		Get a specific annotation for an actor
-// @Description	Get a specific annotation value by key for an actor
-// @Tags			actors
-// @Produce		json
-// @Param			id			path		string	true	"Actor UUID"
-// @Param			annotation	path		string	true	"Annotation key"
-// @Success		200			{object}	KeyValueJson
-// @Failure		400			{object}	ErrorResponse
-// @Failure		401			{object}	ErrorResponse
-// @Failure		404			{object}	ErrorResponse
-// @Failure		500			{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/actors/{id}/annotations/{annotation} [get]
-func (r *ActorsRoutes) getAnnotation(gctx *gin.Context) { r.annotsAdapter.HandleGet(gctx) }
-
-// @Summary		Set an annotation for an actor
-// @Description	Set or update a specific annotation value by key for an actor
-// @Tags			actors
-// @Accept			json
-// @Produce		json
-// @Param			id			path		string						true	"Actor UUID"
-// @Param			annotation	path		string						true	"Annotation key"
-// @Param			request		body		PutKeyValueRequestJson	true	"Annotation value"
-// @Success		200			{object}	KeyValueJson
-// @Failure		400			{object}	ErrorResponse
-// @Failure		401			{object}	ErrorResponse
-// @Failure		403			{object}	ErrorResponse
-// @Failure		404			{object}	ErrorResponse
-// @Failure		500			{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/actors/{id}/annotations/{annotation} [put]
-func (r *ActorsRoutes) putAnnotation(gctx *gin.Context) { r.annotsAdapter.HandlePut(gctx) }
-
-// @Summary		Delete an annotation from an actor
-// @Description	Delete a specific annotation by key from an actor
-// @Tags			actors
-// @Param			id			path	string	true	"Actor UUID"
-// @Param			annotation	path	string	true	"Annotation key"
-// @Success		204			"No Content"
-// @Failure		400			{object}	ErrorResponse
-// @Failure		401			{object}	ErrorResponse
-// @Failure		403			{object}	ErrorResponse
-// @Failure		500			{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/actors/{id}/annotations/{annotation} [delete]
-func (r *ActorsRoutes) deleteAnnotation(gctx *gin.Context) { r.annotsAdapter.HandleDelete(gctx) }
-
 func (r *ActorsRoutes) Register(g gin.IRouter) {
 	externalIDExtractor := func(obj interface{}) string {
 		return obj.(coreIface.Actor).GetExternalId()
@@ -831,78 +701,6 @@ func (r *ActorsRoutes) Register(g gin.IRouter) {
 			Build(),
 		r.update,
 	)
-	g.GET(
-		"/actors/:id/labels",
-		r.auth.NewRequiredBuilder().
-			ForResource("actors").
-			ForIdField("id").
-			ForVerb("get").
-			Build(),
-		r.getLabels,
-	)
-	g.GET(
-		"/actors/:id/labels/:label",
-		r.auth.NewRequiredBuilder().
-			ForResource("actors").
-			ForIdField("id").
-			ForVerb("get").
-			Build(),
-		r.getLabel,
-	)
-	g.PUT(
-		"/actors/:id/labels/:label",
-		r.auth.NewRequiredBuilder().
-			ForResource("actors").
-			ForIdField("id").
-			ForVerb("update").
-			Build(),
-		r.putLabel,
-	)
-	g.DELETE(
-		"/actors/:id/labels/:label",
-		r.auth.NewRequiredBuilder().
-			ForResource("actors").
-			ForIdField("id").
-			ForVerb("update").
-			Build(),
-		r.deleteLabel,
-	)
-	g.GET(
-		"/actors/:id/annotations",
-		r.auth.NewRequiredBuilder().
-			ForResource("actors").
-			ForIdField("id").
-			ForVerb("get").
-			Build(),
-		r.getAnnotations,
-	)
-	g.GET(
-		"/actors/:id/annotations/:annotation",
-		r.auth.NewRequiredBuilder().
-			ForResource("actors").
-			ForIdField("id").
-			ForVerb("get").
-			Build(),
-		r.getAnnotation,
-	)
-	g.PUT(
-		"/actors/:id/annotations/:annotation",
-		r.auth.NewRequiredBuilder().
-			ForResource("actors").
-			ForIdField("id").
-			ForVerb("update").
-			Build(),
-		r.putAnnotation,
-	)
-	g.DELETE(
-		"/actors/:id/annotations/:annotation",
-		r.auth.NewRequiredBuilder().
-			ForResource("actors").
-			ForIdField("id").
-			ForVerb("update").
-			Build(),
-		r.deleteAnnotation,
-	)
 }
 
 func NewActorsRoutes(
@@ -910,81 +708,9 @@ func NewActorsRoutes(
 	c coreIface.C,
 	logger *slog.Logger,
 ) *ActorsRoutes {
-	parseActorID := func(gctx *gin.Context) (apid.ID, *httperr.Error) {
-		id, err := apid.Parse(gctx.Param("id"))
-		if err != nil {
-			return apid.Nil, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err))
-		}
-		if id == apid.Nil {
-			return apid.Nil, httperr.BadRequest("id is required")
-		}
-		return id, nil
-	}
-
-	getActor := func(ctx context.Context, id apid.ID) (key_value.Resource, error) {
-		actor, err := c.GetActor(ctx, id)
-		if err != nil {
-			if errors.Is(err, core.ErrNotFound) {
-				return nil, database.ErrNotFound
-			}
-			return nil, err
-		}
-		if actor == nil {
-			return nil, nil
-		}
-		return actor, nil
-	}
-
-	authGet := authService.NewRequiredBuilder().
-		ForResource("actors").
-		ForIdField("id").
-		ForIdExtractor(func(obj interface{}) string { return obj.(coreIface.Actor).GetId().String() }).
-		ForVerb("get").
-		Build()
-	authMutate := authService.NewRequiredBuilder().
-		ForResource("actors").
-		ForIdField("id").
-		ForIdExtractor(func(obj interface{}) string { return obj.(coreIface.Actor).GetId().String() }).
-		ForVerb("update").
-		Build()
-
-	labelsAdapter := key_value.Adapter[apid.ID]{
-		Kind:         key_value.Label,
-		ResourceName: "actor",
-		PathPrefix:   "/actors/:id",
-		AuthGet:      authGet,
-		AuthMutate:   authMutate,
-		ParseID:      parseActorID,
-		Get:          getActor,
-		Put: func(ctx context.Context, id apid.ID, kv map[string]string) (key_value.Resource, error) {
-			return c.PutActorLabels(ctx, id, kv)
-		},
-		Delete: func(ctx context.Context, id apid.ID, keys []string) (key_value.Resource, error) {
-			return c.DeleteActorLabels(ctx, id, keys)
-		},
-	}
-
-	annotsAdapter := key_value.Adapter[apid.ID]{
-		Kind:         key_value.Annotation,
-		ResourceName: "actor",
-		PathPrefix:   "/actors/:id",
-		AuthGet:      authGet,
-		AuthMutate:   authMutate,
-		ParseID:      parseActorID,
-		Get:          getActor,
-		Put: func(ctx context.Context, id apid.ID, kv map[string]string) (key_value.Resource, error) {
-			return c.PutActorAnnotations(ctx, id, kv)
-		},
-		Delete: func(ctx context.Context, id apid.ID, keys []string) (key_value.Resource, error) {
-			return c.DeleteActorAnnotations(ctx, id, keys)
-		},
-	}
-
 	return &ActorsRoutes{
-		auth:          authService,
-		core:          c,
-		logger:        logger,
-		labelsAdapter: labelsAdapter,
-		annotsAdapter: annotsAdapter,
+		auth:   authService,
+		core:   c,
+		logger: logger,
 	}
 }

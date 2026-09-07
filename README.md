@@ -142,6 +142,10 @@ docker compose --profile server down
 For local UI sign-in, source-mode development, alternate data stores, tests,
 and observability, continue with the
 [development quick start](http://docs.authproxy.net/development/quick-start/).
+API clients use the breaking `authproxy.net/v1alpha1` resource contract under
+the existing `/api/v1` routes; see the [resource
+examples](http://docs.authproxy.net/reference/resources/) and [destructive
+pre-production cutover](http://docs.authproxy.net/operations/api-v1-resource-cutover/).
 
 ## License
 

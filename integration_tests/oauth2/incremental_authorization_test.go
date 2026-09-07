@@ -15,6 +15,7 @@ import (
 	"github.com/rmorlok/authproxy/integration_tests/helpers"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
+	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
@@ -197,10 +198,20 @@ func (r *incrementalAuthRig) requireConnectionScopes(t *testing.T, connectionID 
 	require.NoError(t, err)
 	require.Equalf(t, http.StatusOK, resp.StatusCode, "scopes endpoint failed: %s", string(body))
 
-	var out map[string][]string
-	require.NoErrorf(t, json.Unmarshal(body, &out), "decode scopes body: %s", string(body))
-	assert.ElementsMatch(t, wantRequested, out["requested"])
-	assert.ElementsMatch(t, wantGranted, out["granted"])
+	var list schemaapi.ConnectionScopeList
+	require.NoErrorf(t, json.Unmarshal(body, &list), "decode scopes body: %s", string(body))
+	requested := make([]string, 0, len(list.Items))
+	granted := make([]string, 0, len(list.Items))
+	for _, scope := range list.Items {
+		if scope.Requested {
+			requested = append(requested, scope.Name)
+		}
+		if scope.Granted {
+			granted = append(granted, scope.Name)
+		}
+	}
+	assert.ElementsMatch(t, wantRequested, requested)
+	assert.ElementsMatch(t, wantGranted, granted)
 }
 
 func TestIncrementalAuthorization_ReauthUpgradesScopes(t *testing.T) {

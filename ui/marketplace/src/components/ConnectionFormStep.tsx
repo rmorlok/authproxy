@@ -110,7 +110,7 @@ const ConnectionFormStep: React.FC<ConnectionFormStepProps> = ({
         setLoadingDataSources(true);
         Promise.all(
             entries.map(([propName, sourceId]) =>
-                connections.getDataSource(connectionId, sourceId).then((resp) => [propName, resp.data] as const)
+                connections.getDataSource(connectionId, sourceId).then((resp) => [propName, resp.data.items] as const)
             )
         )
             .then((results) => {

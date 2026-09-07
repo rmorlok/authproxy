@@ -77,7 +77,9 @@ Update with `PATCH /api/v1/rate-limits/{id}`. Send the resource type plus `metad
 
 Set `spec.scope` to `null` to restore namespace scope. Delete with `DELETE /api/v1/rate-limits/{id}`. List with `GET /api/v1/rate-limits` (supports `namespace`, `name`, `labelSelector`, and pagination cursor params).
 
-Labels and annotations also have sub-resource endpoints — see [Labels — API surface](/concepts/labels-and-annotations/#api-surface).
+Labels and annotations are read and replaced through resource metadata on the
+same `GET` and `PATCH` endpoints. See [Labels — API
+surface](/concepts/labels-and-annotations/#api-surface).
 
 ### Via server configuration
 
@@ -192,6 +194,83 @@ resource "authproxy_rate_limit" "salesforce_writes" {
 For namespace targeting, use `scope { namespace_matcher = "root.acme.payments.**" }`. The provider requires exactly one of `namespace_matcher`, `connector_ref`, or `connection_ref` whenever a scope block is present.
 
 Plan-time validation catches "exactly one of `fixed_window` / `sliding_window` / `token_bucket`" before `terraform apply`. The `namespace` is `ForceNew` — changing it replaces the resource. See [`authproxy_rate_limit` reference](https://github.com/rmorlok/authproxy/blob/main/terraform/provider/docs/resources/authproxy_rate_limit.md) for the full attribute reference, and [`examples/`](https://github.com/rmorlok/authproxy/tree/main/terraform/provider/examples/resources/authproxy_rate_limit/) for three end-to-end examples (token bucket, observe-mode rollout, sliding-window counter).
+
+## Test a rule without consuming counters
+
+`POST /api/v1/rate-limits/_dryRun` accepts a `RateLimitDryRun` action. Target a
+specific Connection to hydrate its connector, namespace, and labels, or target
+a Namespace to simulate namespace-only context. An optional Actor reference
+adds actor identity and labels. Targets and actor references are ID-only in
+this action.
+
+```json
+{
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "RateLimitDryRun",
+  "metadata": {
+    "target": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connection",
+      "id": "cxn_01example"
+    }
+  },
+  "spec": {
+    "request": {
+      "method": "POST",
+      "url": "https://api.example.com/v1/widgets",
+      "labels": {"team": "payments"}
+    },
+    "requestType": "proxy",
+    "actorRef": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Actor",
+      "id": "act_01example"
+    }
+  }
+}
+```
+
+The response repeats the action input and adds `status.matched`,
+`status.notMatched`, and the effective `status.requestLabelSnapshot`. A dry run
+peeks at counter state; it does not consume a token or increment a window.
+
+```json
+{
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "RateLimitDryRun",
+  "metadata": {
+    "target": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connection",
+      "id": "cxn_01example"
+    }
+  },
+  "spec": {
+    "request": {
+      "method": "POST",
+      "url": "https://api.example.com/v1/widgets"
+    },
+    "requestType": "proxy"
+  },
+  "status": {
+    "requestLabelSnapshot": {},
+    "matched": [
+      {
+        "rateLimitId": "rl_01example",
+        "namespace": "root.acme",
+        "effectiveMode": "enforce",
+        "bucketKey": "actor=act_01example",
+        "algorithmSummary": "token bucket 60 @ 1/s",
+        "wouldAllow": true,
+        "remaining": 59,
+        "retryAfterMs": 0,
+        "peekFailed": false
+      }
+    ],
+    "notMatched": []
+  }
+}
+```
 
 ## Selectors — picking which requests get limited
 

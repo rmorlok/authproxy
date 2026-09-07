@@ -1,3 +1,14 @@
 {
-  "timeoutSeconds": 600
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "ConnectorDisconnectAll",
+  "metadata": {
+    "target": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connector",
+      "id": "cxr_test0000000000001"
+    }
+  },
+  "spec": {
+    "timeoutSeconds": 600
+  }
 }

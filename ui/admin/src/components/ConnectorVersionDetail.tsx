@@ -24,7 +24,13 @@ import MuiLink from '@mui/material/Link';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
-import {connectors, Connector, ConnectorReleaseState} from '@authproxy/api';
+import {
+    API_VERSION,
+    CONNECTOR_KIND,
+    connectors,
+    Connector,
+    ConnectorReleaseState,
+} from '@authproxy/api';
 import AnnotationsEditor from "./AnnotationsEditor";
 import YAML from 'yaml';
 import {StateChip} from "./StateChip";
@@ -283,7 +289,14 @@ export default function ConnectorVersionDetail(
                 annotations={cv.metadata.annotations}
                 readOnly={cv.status.release.state !== ConnectorReleaseState.DRAFT}
                 onPut={async (key, value) => {
-                    await connectors.putGenerationAnnotation(cv.metadata.id, cv.metadata.generation, key, value);
+                    await connectors.updateGeneration(cv.metadata.id, cv.metadata.generation, {
+                        apiVersion: API_VERSION,
+                        kind: CONNECTOR_KIND,
+                        metadata: {
+                            annotations: {...cv.metadata.annotations, [key]: value},
+                        },
+                        spec: {},
+                    });
                     if (connectorId && version) {
                         fetchConnectorVersion();
                     } else {
@@ -292,7 +305,14 @@ export default function ConnectorVersionDetail(
                     }
                 }}
                 onDelete={async (key) => {
-                    await connectors.deleteGenerationAnnotation(cv.metadata.id, cv.metadata.generation, key);
+                    const annotations = {...cv.metadata.annotations};
+                    delete annotations[key];
+                    await connectors.updateGeneration(cv.metadata.id, cv.metadata.generation, {
+                        apiVersion: API_VERSION,
+                        kind: CONNECTOR_KIND,
+                        metadata: {annotations},
+                        spec: {},
+                    });
                     if (connectorId && version) {
                         fetchConnectorVersion();
                     } else {

@@ -1,9 +1,9 @@
 ---
 title: Kubernetes-style resource API migration
-description: Proposed contract and migration inventory for moving AuthProxy API v1 resources to authproxy.net/v1alpha1 objects.
+description: Accepted contract and migration inventory for AuthProxy API v1 authproxy.net/v1alpha1 objects.
 pagefind: false
 banner:
-  content: Proposal only — this contract is being implemented on the codex/k8s-resource-api feature branch and is not current product behavior.
+  content: Accepted design — implemented on the codex/k8s-resource-api feature branch and awaiting the final merge to main.
 ---
 
 This decision defines the target wire contract and the complete migration
@@ -20,7 +20,8 @@ inventory.
 
 ## Status and delivery model
 
-- Status: accepted for implementation; not yet shipped.
+- Status: implementation complete on the feature branch; final verification
+  and merge to `main` are tracked by #849.
 - Tracking issue: [#829](https://github.com/rmorlok/authproxy/issues/829).
 - Feature branch: `codex/k8s-resource-api`.
 - Child PRs target the feature branch, not `main`.
@@ -63,7 +64,7 @@ kind: Example
 metadata:
   id: ex_01JXYZ...
   name: example
-  namespace: root/acme
+  namespace: root.acme
   generation: 1
   labels: {}
   annotations: {}
@@ -159,7 +160,7 @@ Each definition version is returned as another Connector object with a distinct
 apiVersion: authproxy.net/v1alpha1
 kind: Connector
 metadata:
-  id: con_01JXYZ...
+  id: cxr_01JXYZ...
   name: greenhouse
   namespace: root
   generation: 3
@@ -178,15 +179,15 @@ spec:
       placement:
         type: bearer
 status:
-  state: primary
-  semanticHash: 0ad98e1
+  release:
+    state: primary
 ```
 
 Only canonical `spec.definition` is stored in the encrypted connector
 definition column. Identity, namespace, generation, release state, labels,
-annotations, timestamps, and status are not duplicated there. The semantic hash
-also covers canonical `spec.definition` only. Consequently a metadata or
-release-state change does not manufacture a connector generation.
+annotations, timestamps, and status are not duplicated there. The internal
+semantic hash also covers canonical `spec.definition` only. Consequently a
+metadata or release-state change does not manufacture a connector generation.
 
 Configuration may omit ID and generation to reconcile by namespace/name plus
 the semantic hash. When it supplies both `metadata.id` and
@@ -230,46 +231,46 @@ for every concrete registration in the audited route set.
 | Connector generation | `GET|POST /api/v1/connectors/:id/versions` | `ConnectorList` or `Connector`; retain URL but use `metadata.generation` |
 | Connector generation | `GET|PATCH /api/v1/connectors/:id/versions/:version` | `Connector`; route version maps to generation |
 | Connector action | `POST /api/v1/connectors/:id/_disconnectAll` | `ConnectorDisconnectAll` action; task/workflow result in status |
-| Connector action | `POST /api/v1/connectors/:id/_archive` | `ConnectorArchive` action; result references Connector |
+| Connector action | `POST /api/v1/connectors/:id/_archive` | `ConnectorArchive` action; task locator in status |
 | Connector action | `PUT /api/v1/connectors/:id/versions/:version/_forceState` | `ConnectorForceState` action; response Connector |
-| Connector metadata | `GET /api/v1/connectors/:id/{labels,annotations}` and `GET|PUT|DELETE /api/v1/connectors/:id/{labels,annotations}/:key` | retire; use `PATCH` on Connector metadata |
-| Connector-generation metadata | `GET /api/v1/connectors/:id/versions/:version/{labels,annotations}` and `GET|PUT|DELETE /api/v1/connectors/:id/versions/:version/{labels,annotations}/:key` | retire; use `PATCH` on generation metadata |
-| Connection | `POST /api/v1/connections/_initiate` | `ConnectionInitiate` action; response Connection plus setup status |
+| Connector metadata | Former `/{labels,annotations}` subroutes | removed; use `PATCH` on Connector metadata |
+| Connector-generation metadata | Former generation `/{labels,annotations}` subroutes | removed; use `PATCH` on generation metadata |
+| Connection | `POST /api/v1/connections/_initiate` | `ConnectionInitiate` request; `ConnectionSetup` response action |
 | Connection | `GET /api/v1/connections` | `ConnectionList` |
 | Connection | `GET|PATCH /api/v1/connections/:id` | `Connection`; patch metadata/spec |
-| Connection setup | `POST /api/v1/connections/:id/_submit` | `ConnectionSubmit` action |
-| Connection setup | `GET /api/v1/connections/:id/_setupStep` | `ConnectionSetupStep` read projection |
+| Connection setup | `POST /api/v1/connections/:id/_submit` | `ConnectionSetupSubmit` request; `ConnectionSetup` response action |
+| Connection setup | `GET /api/v1/connections/:id/_setupStep` | `ConnectionSetup` read projection |
 | Connection setup | `GET /api/v1/connections/:id/_dataSource/:sourceId` | `DataSourceOptionList` projection |
 | Connection action | `POST /api/v1/connections/:id/_disconnect` | `ConnectionDisconnect` action |
-| Connection action | `POST /api/v1/connections/:id/_abort` | `ConnectionAbort` action |
+| Connection action | `POST /api/v1/connections/:id/_abort` | `ConnectionSetupAbort` action |
 | Connection action | `POST /api/v1/connections/:id/_reconfigure` | `ConnectionReconfigure` action |
-| Connection action | `POST /api/v1/connections/:id/_migrateVersion` | `ConnectionMigrateGeneration` action |
-| Connection action | `POST /api/v1/connections/:id/_cancelSetup` | `ConnectionCancelSetup` action |
-| Connection action | `POST /api/v1/connections/:id/_retry` | `ConnectionRetry` action |
+| Connection action | `POST /api/v1/connections/:id/_migrateVersion` | `ConnectionVersionMigration` action |
+| Connection action | `POST /api/v1/connections/:id/_cancelSetup` | `ConnectionSetupCancel` action |
+| Connection action | `POST /api/v1/connections/:id/_retry` | `ConnectionSetupRetry` action |
 | Connection action | `POST /api/v1/connections/:id/_reauth` | `ConnectionReauthenticate` action |
 | Connection action | `PUT /api/v1/connections/:id/_forceState` | `ConnectionForceState` action; response Connection |
-| Connection metadata | `GET /api/v1/connections/:id/{labels,annotations}` and `GET|PUT|DELETE /api/v1/connections/:id/{labels,annotations}/:key` | retire; use `PATCH` on Connection metadata |
+| Connection metadata | Former `/{labels,annotations}` subroutes | removed; use `PATCH` on Connection metadata |
 | Connection scopes | `GET /api/v1/connections/:id/scopes` | `ConnectionScopeList` projection |
 | Namespace | `GET|POST /api/v1/namespaces` | `NamespaceList` or `Namespace` |
 | Namespace | `GET|PATCH /api/v1/namespaces/:path` | `Namespace`; `:path` remains lookup identity |
-| Namespace metadata | `GET /api/v1/namespaces/:path/{labels,annotations}` and `GET|PUT|DELETE /api/v1/namespaces/:path/{labels,annotations}/:key` | retire; use `PATCH` on Namespace metadata |
-| Namespace key | `GET|PUT|DELETE /api/v1/namespaces/:path/key` | retire; read or patch `Namespace.spec.keyRef` |
+| Namespace metadata | Former `/{labels,annotations}` subroutes | removed; use `PATCH` on Namespace metadata |
+| Namespace key | Former `GET|PUT|DELETE /api/v1/namespaces/:path/key` | removed; read or patch `Namespace.spec.encryptionKeyRef` |
 | Key | `GET|POST /api/v1/keys` | `KeyList` or `Key` |
 | Key | `GET|PATCH|DELETE /api/v1/keys/:id` | `Key`; secret spec is write-only/redacted |
-| Key metadata | `GET /api/v1/keys/:id/{labels,annotations}` and `GET|PUT|DELETE /api/v1/keys/:id/{labels,annotations}/:key` | retire; use `PATCH` on Key metadata |
+| Key metadata | Former `/{labels,annotations}` subroutes | removed; use `PATCH` on Key metadata |
 | RateLimit | `GET|POST /api/v1/rate-limits` | `RateLimitList` or `RateLimit` |
 | RateLimit | `GET|PATCH|DELETE /api/v1/rate-limits/:id` | `RateLimit` |
 | RateLimit action | `POST /api/v1/rate-limits/_dryRun` | `RateLimitDryRun` action; matches and failures in status |
-| RateLimit metadata | `GET /api/v1/rate-limits/:id/{labels,annotations}` and `GET|PUT|DELETE /api/v1/rate-limits/:id/{labels,annotations}/:key` | retire; use `PATCH` on RateLimit metadata |
+| RateLimit metadata | Former `/{labels,annotations}` subroutes | removed; use `PATCH` on RateLimit metadata |
 | Actor | `GET|POST /api/v1/actors` | `ActorList` or `Actor` |
 | Actor | `GET|PATCH|DELETE /api/v1/actors/:id` | `Actor` |
 | Actor alternate lookup | `GET|PATCH|DELETE /api/v1/actors/external-id/:externalId` | same Actor contract; external ID remains a lookup key |
-| Actor metadata | `GET /api/v1/actors/:id/{labels,annotations}` and `GET|PUT|DELETE /api/v1/actors/:id/{labels,annotations}/:key` | retire; use `PATCH` on Actor metadata |
+| Actor metadata | Former `/{labels,annotations}` subroutes | removed; use `PATCH` on Actor metadata |
 
-Retiring the metadata and namespace-key subroutes is intentional. The breaking
-contract should have one patch/default/validation path for ObjectMeta and Spec,
-not preserve a parallel key-value API that recreates the duplication this
-project is removing.
+The metadata and namespace-key subroutes were intentionally removed. The
+breaking contract has one patch/default/validation path for ObjectMeta and
+Spec, rather than a parallel key-value API that recreates the duplication this
+project removes.
 
 ### Read models, analytical APIs, and typed actions
 
@@ -277,14 +278,14 @@ project is removing.
 | --- | --- | --- | --- |
 | Notification | `GET /api/v1/notifications` | read-only `NotificationList`; each Notification has identity/content in metadata/spec and actor-specific viewed/actionability in status | #841 |
 | Notification view | `POST /api/v1/notifications/_viewed`; `POST /api/v1/notifications/:id/_viewed` | `NotificationView` action, accepting one or more Notification references | #841 |
-| Search | `GET /api/v1/search/resources` | `ResourceSearchResultList` projection; items contain ObjectReference plus bounded summary/match fields, not copied resource specs | #841 |
+| Search | `GET /api/v1/search/resources` | `SearchResultList` projection; items contain ObjectReference plus bounded summary/match fields, not copied resource specs | #841 |
 | Request event | `GET /api/v1/metrics/request-events`; `GET /api/v1/metrics/request-events/:id` | immutable read-only `RequestEventList`/`RequestEvent` | #842 |
 | Metrics query | `POST /api/v1/metrics/query` | analytical `MetricsQuery`/`MetricsQueryResult`; typed but not a managed resource | #842 |
 | Metrics schema | `GET /api/v1/metrics/schema` | `MetricsSchema` projection; typed but not a managed resource | #842 |
 | Task resolution | `GET /api/v1/tasks/:encryptedTaskInfo` | read-only `Task` operational projection over Asynq or workflow state | #843 |
 | Task queues | `GET /api/v1/task-monitoring/queues`; `GET /api/v1/task-monitoring/queues/:queue`; `GET /api/v1/task-monitoring/queues/:queue/history` | `TaskQueueList`, `TaskQueue`, and `TaskQueueHistory` operational projections | #843 |
 | Tasks | `GET /api/v1/task-monitoring/queues/:queue/tasks/:state`; `GET /api/v1/task-monitoring/queues/:queue/tasks/:state/:taskId` | `TaskList`/`Task` operational projections | #843 |
-| Task workers/schedule | `GET /api/v1/task-monitoring/servers`; `GET /api/v1/task-monitoring/scheduler-entries` | `TaskServerList` and `SchedulerEntryList` projections | #843 |
+| Task workers/schedule | `GET /api/v1/task-monitoring/servers`; `GET /api/v1/task-monitoring/scheduler-entries` | `TaskServerList` and `TaskScheduleList` projections | #843 |
 | Task actions | `POST /api/v1/task-monitoring/queues/:queue/tasks/:taskId/_run`; `POST /api/v1/task-monitoring/queues/:queue/tasks/:taskId/_archive`; `POST /api/v1/task-monitoring/queues/:queue/tasks/:taskId/_cancel`; `DELETE /api/v1/task-monitoring/queues/:queue/tasks/:taskId` | `TaskRun`, `TaskArchive`, `TaskCancel`, and `TaskDelete` actions | #843 |
 | Queue actions | `POST /api/v1/task-monitoring/queues/:queue/_pause`; `POST /api/v1/task-monitoring/queues/:queue/_unpause`; `POST /api/v1/task-monitoring/queues/:queue/archived/_runAll`; `POST /api/v1/task-monitoring/queues/:queue/retry/_runAll`; `DELETE /api/v1/task-monitoring/queues/:queue/archived`; `DELETE /api/v1/task-monitoring/queues/:queue/completed` | typed queue/bulk actions with affected-count status | #843 |
 | Workflows | `GET /api/v1/workflow-monitoring/instances`; `GET /api/v1/workflow-monitoring/instances/:instanceId/:executionId` | `WorkflowInstanceList`/`WorkflowInstance` operational projections | #843 |
@@ -329,7 +330,7 @@ disappear where the new resource structs are directly representable.
 | initiate/submit/setup redirect/form/verifying/complete/error variants and data-source options | typed connection actions and setup/read projections | #840 |
 | disconnect, migrate-version, retry, reauth, force-state types | typed Connection actions; `targetVersion` becomes connector generation reference | #840 |
 | `NamespaceJson`, create/update/list types | Namespace/NamespaceList | #834 |
-| `NamespaceKeyJson`, `SetNamespaceKeyRequestJson` | `Namespace.spec.keyRef`; no separate subresource DTO | #834, #835 |
+| `NamespaceKeyJson`, `SetNamespaceKeyRequestJson` | removed; `Namespace.spec.encryptionKeyRef` is authoritative | #834, #835, #849 |
 | `KeyJson`, create/update/list types | Key/KeyList with write-only/redacted secret spec | #835 |
 | `RateLimitJson`, create/update/list types | RateLimit/RateLimitList | #836 |
 | rate-limit dry-run and synthetic proxy request types | RateLimitDryRun action and analytical status | #836 |

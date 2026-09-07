@@ -1,4 +1,15 @@
 {
-  "taskId": "encrypted-task-info",
-  "connectorId": "cxr_test0000000000001"
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "ConnectorArchive",
+  "metadata": {
+    "target": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connector",
+      "id": "cxr_test0000000000001"
+    }
+  },
+  "spec": {},
+  "status": {
+    "taskId": "encrypted-task-info"
+  }
 }

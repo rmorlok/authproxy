@@ -87,16 +87,6 @@ export interface ListKeysParams {
   orderBy?: string;
 }
 
-export interface KeyLabel {
-  key: string;
-  value: string;
-}
-
-export interface KeyAnnotation {
-  key: string;
-  value: string;
-}
-
 export const listKeys = (params?: ListKeysParams) =>
   client.get<KeyList>('/api/v1/keys', { params });
 
@@ -110,42 +100,10 @@ export const updateKey = (id: string, request: UpdateKeyRequest) =>
 
 export const deleteKey = (id: string) => client.delete(`/api/v1/keys/${id}`);
 
-export const getKeyLabels = (id: string) =>
-  client.get<Record<string, string>>(`/api/v1/keys/${id}/labels`);
-
-export const getKeyLabel = (id: string, labelKey: string) =>
-  client.get<KeyLabel>(`/api/v1/keys/${id}/labels/${labelKey}`);
-
-export const putKeyLabel = (id: string, labelKey: string, value: string) =>
-  client.put<KeyLabel>(`/api/v1/keys/${id}/labels/${labelKey}`, { value });
-
-export const deleteKeyLabel = (id: string, labelKey: string) =>
-  client.delete(`/api/v1/keys/${id}/labels/${labelKey}`);
-
-export const getKeyAnnotations = (id: string) =>
-  client.get<Record<string, string>>(`/api/v1/keys/${id}/annotations`);
-
-export const getKeyAnnotation = (id: string, annotationKey: string) =>
-  client.get<KeyAnnotation>(`/api/v1/keys/${id}/annotations/${annotationKey}`);
-
-export const putKeyAnnotation = (id: string, annotationKey: string, value: string) =>
-  client.put<KeyAnnotation>(`/api/v1/keys/${id}/annotations/${annotationKey}`, { value });
-
-export const deleteKeyAnnotation = (id: string, annotationKey: string) =>
-  client.delete(`/api/v1/keys/${id}/annotations/${annotationKey}`);
-
 export const keys = {
   list: listKeys,
   create: createKey,
   get: getKey,
   update: updateKey,
   delete: deleteKey,
-  getLabels: getKeyLabels,
-  getLabel: getKeyLabel,
-  putLabel: putKeyLabel,
-  deleteLabel: deleteKeyLabel,
-  getAnnotations: getKeyAnnotations,
-  getAnnotation: getKeyAnnotation,
-  putAnnotation: putKeyAnnotation,
-  deleteAnnotation: deleteKeyAnnotation,
 };

@@ -8,6 +8,16 @@ repository also contains Kustomize overlays for the hosted demo and disposable
 pull-request environments; they are useful examples, but they are not a general
 production distribution.
 
+:::caution[API v1 resource cutover]
+
+Environments created before the `authproxy.net/v1alpha1` resource contract must
+be destroyed and recreated; database migrations do not convert old encrypted
+connector definitions. Follow the [API v1 resource-contract cutover
+guide](/operations/api-v1-resource-cutover/) before upgrading a demo or
+development deployment.
+
+:::
+
 ## Recommended production topology
 
 ```mermaid

@@ -17,6 +17,8 @@ import (
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
+	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -24,9 +26,15 @@ import (
 func (r *connectorDisconnectAllRig) archive(t *testing.T, connectorID apid.ID, timeoutSeconds int64) {
 	t.Helper()
 
-	reqBody, err := json.Marshal(schemaapi.ConnectorLifecycleRequestJson{
-		TimeoutSeconds: int64Ptr(timeoutSeconds),
-	})
+	reqBody, err := json.Marshal(schemaapi.NewConnectorLifecycleRequest(
+		schemaapi.ConnectorArchiveActionKind,
+		meta.ObjectReference{
+			APIVersion: meta.APIVersionV1Alpha1,
+			Kind:       cschema.ConnectorKind,
+			ID:         connectorID.String(),
+		},
+		schemaapi.ConnectorLifecycleSpec{TimeoutSeconds: int64Ptr(timeoutSeconds)},
+	))
 	require.NoError(t, err)
 
 	path := "/api/v1/connectors/" + connectorID.String() + "/_archive"
@@ -44,12 +52,14 @@ func (r *connectorDisconnectAllRig) archive(t *testing.T, connectorID apid.ID, t
 	r.env.ApiGin.ServeHTTP(w, req)
 	require.Equalf(t, http.StatusOK, w.Code, "archive failed: %s", w.Body.String())
 
-	var body schemaapi.ConnectorLifecycleResponseJson
+	var body schemaapi.ConnectorLifecycleAction
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
-	require.Equal(t, connectorID, body.ConnectorId)
-	require.NotEmpty(t, body.TaskId)
+	require.NoError(t, body.ValidateResponse(schemaapi.ConnectorArchiveActionKind))
+	require.Equal(t, connectorID.String(), body.Metadata.Target.ID)
+	require.NotNil(t, body.Status)
+	require.NotEmpty(t, body.Status.TaskID)
 
-	helpers.RequireWorkflowTaskCompleted(t, r.env, body.TaskId, time.Duration(timeoutSeconds+5)*time.Second)
+	helpers.RequireWorkflowTaskCompleted(t, r.env, body.Status.TaskID, time.Duration(timeoutSeconds+5)*time.Second)
 }
 
 func createArchiveVersionShape(t *testing.T, rig *connectorDisconnectAllRig, connector connectorDisconnectAllConnector) []uint64 {

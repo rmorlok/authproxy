@@ -2,6 +2,8 @@ import { client } from './client';
 import {
   ActionRequest,
   ActionResponse,
+  API_VERSION,
+  ListMetadata,
   MutableResourceMetadata,
   ObjectMetadata,
   ObjectReference,
@@ -308,6 +310,26 @@ export interface DataSourceOption {
   label: string;
 }
 
+export interface DataSourceOptionList {
+  apiVersion: typeof API_VERSION;
+  kind: 'DataSourceOptionList';
+  metadata: ListMetadata;
+  items: DataSourceOption[];
+}
+
+export interface ConnectionScope {
+  name: string;
+  requested: boolean;
+  granted: boolean;
+}
+
+export interface ConnectionScopeList {
+  apiVersion: typeof API_VERSION;
+  kind: 'ConnectionScopeList';
+  metadata: ListMetadata;
+  items: ConnectionScope[];
+}
+
 export interface ListConnectionsParams {
   name?: string;
   state?: ConnectionState;
@@ -390,38 +412,6 @@ export const forceConnectionState = (id: string, state: ConnectionState) => {
 export const updateConnection = (id: string, request: UpdateConnectionRequest) =>
   client.patch<Connection>(`/api/v1/connections/${id}`, request);
 
-export const getConnectionLabels = (id: string) =>
-  client.get<Record<string, string>>(`/api/v1/connections/${id}/labels`);
-
-export const getConnectionLabel = (id: string, labelKey: string) =>
-  client.get<{ key: string; value: string }>(`/api/v1/connections/${id}/labels/${labelKey}`);
-
-export const putConnectionLabel = (id: string, labelKey: string, value: string) =>
-  client.put<{ key: string; value: string }>(
-    `/api/v1/connections/${id}/labels/${labelKey}`,
-    { value },
-  );
-
-export const deleteConnectionLabel = (id: string, labelKey: string) =>
-  client.delete(`/api/v1/connections/${id}/labels/${labelKey}`);
-
-export const getConnectionAnnotations = (id: string) =>
-  client.get<Record<string, string>>(`/api/v1/connections/${id}/annotations`);
-
-export const getConnectionAnnotation = (id: string, annotationKey: string) =>
-  client.get<{ key: string; value: string }>(
-    `/api/v1/connections/${id}/annotations/${annotationKey}`,
-  );
-
-export const putConnectionAnnotation = (id: string, annotationKey: string, value: string) =>
-  client.put<{ key: string; value: string }>(
-    `/api/v1/connections/${id}/annotations/${annotationKey}`,
-    { value },
-  );
-
-export const deleteConnectionAnnotation = (id: string, annotationKey: string) =>
-  client.delete(`/api/v1/connections/${id}/annotations/${annotationKey}`);
-
 const emptyConnectionAction = <K extends EmptyConnectionActionKind>(id: string, kind: K) =>
   actionRequest(kind, connectionTarget(id), {});
 
@@ -438,9 +428,12 @@ export const getSetupStep = (connectionId: string, returnToUrl?: string) =>
   );
 
 export const getDataSource = (connectionId: string, sourceId: string) =>
-  client.get<DataSourceOption[]>(
+  client.get<DataSourceOptionList>(
     `/api/v1/connections/${connectionId}/_dataSource/${sourceId}`,
   );
+
+export const getConnectionScopes = (connectionId: string) =>
+  client.get<ConnectionScopeList>(`/api/v1/connections/${connectionId}/scopes`);
 
 export const reconfigureConnection = (id: string) =>
   client.post<ConnectionSetupResponse>(
@@ -484,16 +477,9 @@ export const connections = {
   update: updateConnection,
   getSetupStep,
   getDataSource,
+  getScopes: getConnectionScopes,
   reconfigure: reconfigureConnection,
   cancelSetup: cancelSetupConnection,
   retry: retryConnection,
   reauth: reauthConnection,
-  getLabels: getConnectionLabels,
-  getLabel: getConnectionLabel,
-  putLabel: putConnectionLabel,
-  deleteLabel: deleteConnectionLabel,
-  getAnnotations: getConnectionAnnotations,
-  getAnnotation: getConnectionAnnotation,
-  putAnnotation: putConnectionAnnotation,
-  deleteAnnotation: deleteConnectionAnnotation,
 };

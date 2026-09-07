@@ -1,24 +1,29 @@
 {
-  "request": {
-    "url": "https://api.example.com/v1/users",
-    "method": "POST",
-    "headers": {
-      "content-type": "application/json",
-      "x-trace": [
-        "one",
-        "two"
-      ]
-    },
-    "labels": {
-      "team": "payments"
-    },
-    "bodyJson": {
-      "name": "Ada"
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "RateLimitDryRun",
+  "metadata": {
+    "target": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Namespace",
+      "id": "root.acme"
     }
   },
-  "requestType": "proxy",
-  "context": {
-    "actorId": "act_test550e8400abcde",
-    "namespace": "root.acme"
+  "spec": {
+    "request": {
+      "url": "https://api.example.com/v1/users",
+      "method": "POST",
+      "headers": {
+        "content-type": "application/json",
+        "x-trace": ["one", "two"]
+      },
+      "labels": {"team": "payments"},
+      "bodyJson": {"name": "Ada"}
+    },
+    "requestType": "proxy",
+    "actorRef": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Actor",
+      "id": "act_test550e8400abcde"
+    }
   }
 }

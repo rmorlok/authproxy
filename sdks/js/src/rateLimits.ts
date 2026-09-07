@@ -1,11 +1,15 @@
 import { client } from './client';
 import {
+    ActionRequest,
+    ActionResponse,
     GenerationlessObjectReference,
     MutableResourceMetadata,
     NamespacedCreateMetadata,
     ObjectMetadata,
     ResourceList,
     TypeMeta,
+    actionRequest,
+    objectReference,
 } from './common';
 import { ProxyRequest } from './proxy';
 
@@ -190,11 +194,20 @@ export const deleteRateLimit = (id: string) => {
 export interface DryRunRateLimitRequest {
     request: ProxyRequest;
     requestType: string;
-    context: {
-        connectionId?: string;
+    context: (
+        | {connectionId: string; namespace?: never}
+        | {namespace: string; connectionId?: never}
+    ) & {
         actorId?: string;
-        namespace?: string;
     };
+}
+
+export const RATE_LIMIT_DRY_RUN_KIND = 'RateLimitDryRun' as const;
+
+export interface DryRunRateLimitSpec {
+    request: ProxyRequest;
+    requestType: string;
+    actorRef?: GenerationlessObjectReference<'Actor'>;
 }
 
 export interface DryRunRateLimitMatch {
@@ -221,11 +234,24 @@ export interface DryRunRateLimitNotMatched {
     reason: string;
 }
 
-export interface DryRunRateLimitResponse {
+export interface DryRunRateLimitStatus {
     requestLabelSnapshot: Record<string, string>;
     matched: DryRunRateLimitMatch[];
     notMatched: DryRunRateLimitNotMatched[];
 }
+
+export type DryRunRateLimitActionRequest = ActionRequest<
+    typeof RATE_LIMIT_DRY_RUN_KIND,
+    'Connection' | 'Namespace',
+    DryRunRateLimitSpec
+>;
+
+export type DryRunRateLimitResponse = ActionResponse<
+    typeof RATE_LIMIT_DRY_RUN_KIND,
+    'Connection' | 'Namespace',
+    DryRunRateLimitSpec,
+    DryRunRateLimitStatus
+>;
 
 /**
  * Evaluate which rate limits would apply to a synthesized request, and
@@ -235,44 +261,23 @@ export interface DryRunRateLimitResponse {
  * traffic.
  */
 export const dryRunRateLimit = (req: DryRunRateLimitRequest) => {
-    return client.post<DryRunRateLimitResponse>('/api/v1/rate-limits/_dryRun', req);
+    const target = req.context.connectionId
+        ? objectReference('Connection', {id: req.context.connectionId})
+        : objectReference('Namespace', {id: req.context.namespace});
+    const spec: DryRunRateLimitSpec = {
+        request: req.request,
+        requestType: req.requestType,
+        ...(req.context.actorId
+            ? {actorRef: objectReference('Actor', {id: req.context.actorId})}
+            : {}),
+    };
+    const action: DryRunRateLimitActionRequest = actionRequest(
+        RATE_LIMIT_DRY_RUN_KIND,
+        target,
+        spec,
+    );
+    return client.post<DryRunRateLimitResponse>('/api/v1/rate-limits/_dryRun', action);
 };
-
-// --- Label & annotation sub-resources, identical shape to keys. ---
-
-export interface RateLimitLabel {
-    key: string;
-    value: string;
-}
-
-export interface RateLimitAnnotation {
-    key: string;
-    value: string;
-}
-
-export const getRateLimitLabels = (id: string) =>
-    client.get<Record<string, string>>(`/api/v1/rate-limits/${id}/labels`);
-
-export const getRateLimitLabel = (id: string, labelKey: string) =>
-    client.get<RateLimitLabel>(`/api/v1/rate-limits/${id}/labels/${labelKey}`);
-
-export const putRateLimitLabel = (id: string, labelKey: string, value: string) =>
-    client.put<RateLimitLabel>(`/api/v1/rate-limits/${id}/labels/${labelKey}`, { value });
-
-export const deleteRateLimitLabel = (id: string, labelKey: string) =>
-    client.delete(`/api/v1/rate-limits/${id}/labels/${labelKey}`);
-
-export const getRateLimitAnnotations = (id: string) =>
-    client.get<Record<string, string>>(`/api/v1/rate-limits/${id}/annotations`);
-
-export const getRateLimitAnnotation = (id: string, annotationKey: string) =>
-    client.get<RateLimitAnnotation>(`/api/v1/rate-limits/${id}/annotations/${annotationKey}`);
-
-export const putRateLimitAnnotation = (id: string, annotationKey: string, value: string) =>
-    client.put<RateLimitAnnotation>(`/api/v1/rate-limits/${id}/annotations/${annotationKey}`, { value });
-
-export const deleteRateLimitAnnotation = (id: string, annotationKey: string) =>
-    client.delete(`/api/v1/rate-limits/${id}/annotations/${annotationKey}`);
 
 export const rateLimits = {
     list: listRateLimits,
@@ -281,12 +286,4 @@ export const rateLimits = {
     update: updateRateLimit,
     delete: deleteRateLimit,
     dryRun: dryRunRateLimit,
-    getLabels: getRateLimitLabels,
-    getLabel: getRateLimitLabel,
-    putLabel: putRateLimitLabel,
-    deleteLabel: deleteRateLimitLabel,
-    getAnnotations: getRateLimitAnnotations,
-    getAnnotation: getRateLimitAnnotation,
-    putAnnotation: putRateLimitAnnotation,
-    deleteAnnotation: deleteRateLimitAnnotation,
 };

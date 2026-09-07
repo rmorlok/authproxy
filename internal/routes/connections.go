@@ -1,7 +1,6 @@
 package routes
 
 import (
-	"context"
 	"errors"
 	"time"
 
@@ -17,7 +16,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/httpf"
-	"github.com/rmorlok/authproxy/internal/routes/key_value"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	schemaapiopenapi "github.com/rmorlok/authproxy/internal/schema/api/openapi"
 	scommon "github.com/rmorlok/authproxy/internal/schema/common"
@@ -31,19 +29,16 @@ import (
 )
 
 type ConnectionsRoutes struct {
-	cfg           config.C
-	auth          auth.A
-	core          coreIface.C
-	db            database.DB
-	r             apredis.Client
-	httpf         httpf.F
-	encrypt       encrypt.E
-	oauthf        oauth2.Factory
-	labelsAdapter key_value.Adapter[apid.ID]
-	annotsAdapter key_value.Adapter[apid.ID]
+	cfg     config.C
+	auth    auth.A
+	core    coreIface.C
+	db      database.DB
+	r       apredis.Client
+	httpf   httpf.F
+	encrypt encrypt.E
+	oauthf  oauth2.Factory
 }
 
-type DataSourceOptionJson = schemaapi.DataSourceOptionJson
 type ProxyResponse = schemaapi.ProxyResponseJson
 
 type OpenAPIConnectionJson = schemaapiopenapi.ConnectionJson
@@ -57,6 +52,8 @@ type OpenAPIEmptyConnectionActionJson = schemaapiopenapi.EmptyConnectionActionJs
 type OpenAPIConnectionDisconnectActionJson = schemaapiopenapi.ConnectionDisconnectActionJson
 type OpenAPIConnectionVersionMigrationActionJson = schemaapiopenapi.ConnectionVersionMigrationActionJson
 type OpenAPIConnectionForceStateActionJson = schemaapiopenapi.ConnectionForceStateActionJson
+type OpenAPIDataSourceOptionListJson = schemaapiopenapi.DataSourceOptionListJson
+type OpenAPIConnectionScopeListJson = schemaapiopenapi.ConnectionScopeListJson
 type ProxyRequest = schemaapiopenapi.ProxyRequestJson
 type OpenAPIProxyResponseJson = schemaapiopenapi.ProxyResponseJson
 
@@ -322,7 +319,7 @@ func (r *ConnectionsRoutes) getSetupStep(gctx *gin.Context) {
 // @Produce		json
 // @Param			id			path		string	true	"Connection ID"
 // @Param			sourceId	path		string	true	"Data Source ID"
-// @Success		200	{array}		DataSourceOptionJson
+// @Success		200	{object}		OpenAPIDataSourceOptionListJson
 // @Failure		400	{object}	ErrorResponse
 // @Failure		401	{object}	ErrorResponse
 // @Failure		404	{object}	ErrorResponse
@@ -375,7 +372,14 @@ func (r *ConnectionsRoutes) getDataSource(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, options)
+	items := make([]schemaapi.DataSourceOptionJson, len(options))
+	for i, option := range options {
+		items[i] = schemaapi.DataSourceOptionJson{
+			Value: option.Value,
+			Label: option.Label,
+		}
+	}
+	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewDataSourceOptionList(items))
 }
 
 type ListConnectionRequestQuery struct {
@@ -836,7 +840,7 @@ func (r *ConnectionsRoutes) migrateVersion(gctx *gin.Context) {
 			TargetConnectorRef: targetRef,
 		},
 	)
-	
+
 	if err := apgin.RenderActionJSON(
 		gctx,
 		http.StatusOK,
@@ -1447,146 +1451,12 @@ func (r *ConnectionsRoutes) update(gctx *gin.Context) {
 	}
 }
 
-// Label and annotation handlers for connections delegate to a shared
-// generic adapter (see internal/routes/key_value). The doc comments below
-// drive the OpenAPI spec; the bodies forward to the adapter.
-
-// @Summary		Get all labels for a connection
-// @Description	Get all labels associated with a specific connection
-// @Tags			connections
-// @Produce		json
-// @Param			id	path		string	true	"Connection UUID"
-// @Success		200	{object}	map[string]string
-// @Failure		400	{object}	ErrorResponse
-// @Failure		401	{object}	ErrorResponse
-// @Failure		404	{object}	ErrorResponse
-// @Failure		500	{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/connections/{id}/labels [get]
-func (r *ConnectionsRoutes) getLabels(gctx *gin.Context) { r.labelsAdapter.HandleList(gctx) }
-
-// @Summary		Get a specific label for a connection
-// @Description	Get a specific label value by key for a connection
-// @Tags			connections
-// @Produce		json
-// @Param			id		path		string	true	"Connection UUID"
-// @Param			label	path		string	true	"Label key"
-// @Success		200		{object}	KeyValueJson
-// @Failure		400		{object}	ErrorResponse
-// @Failure		401		{object}	ErrorResponse
-// @Failure		404		{object}	ErrorResponse
-// @Failure		500		{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/connections/{id}/labels/{label} [get]
-func (r *ConnectionsRoutes) getLabel(gctx *gin.Context) { r.labelsAdapter.HandleGet(gctx) }
-
-// @Summary		Set a label for a connection
-// @Description	Set or update a specific label value by key for a connection
-// @Tags			connections
-// @Accept			json
-// @Produce		json
-// @Param			id		path		string						true	"Connection UUID"
-// @Param			label	path		string						true	"Label key"
-// @Param			request	body		PutKeyValueRequestJson	true	"Label value"
-// @Success		200		{object}	KeyValueJson
-// @Failure		400		{object}	ErrorResponse
-// @Failure		401		{object}	ErrorResponse
-// @Failure		403		{object}	ErrorResponse
-// @Failure		404		{object}	ErrorResponse
-// @Failure		500		{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/connections/{id}/labels/{label} [put]
-func (r *ConnectionsRoutes) putLabel(gctx *gin.Context) { r.labelsAdapter.HandlePut(gctx) }
-
-// @Summary		Delete a label from a connection
-// @Description	Delete a specific label by key from a connection
-// @Tags			connections
-// @Param			id		path	string	true	"Connection UUID"
-// @Param			label	path	string	true	"Label key"
-// @Success		204		"No Content"
-// @Failure		400		{object}	ErrorResponse
-// @Failure		401		{object}	ErrorResponse
-// @Failure		403		{object}	ErrorResponse
-// @Failure		500		{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/connections/{id}/labels/{label} [delete]
-func (r *ConnectionsRoutes) deleteLabel(gctx *gin.Context) { r.labelsAdapter.HandleDelete(gctx) }
-
-// @Summary		Get all annotations for a connection
-// @Description	Get all annotations associated with a specific connection
-// @Tags			connections
-// @Produce		json
-// @Param			id	path		string	true	"Connection UUID"
-// @Success		200	{object}	map[string]string
-// @Failure		400	{object}	ErrorResponse
-// @Failure		401	{object}	ErrorResponse
-// @Failure		404	{object}	ErrorResponse
-// @Failure		500	{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/connections/{id}/annotations [get]
-func (r *ConnectionsRoutes) getAnnotations(gctx *gin.Context) { r.annotsAdapter.HandleList(gctx) }
-
-// @Summary		Get a specific annotation for a connection
-// @Description	Get a specific annotation value by key for a connection
-// @Tags			connections
-// @Produce		json
-// @Param			id			path		string	true	"Connection UUID"
-// @Param			annotation	path		string	true	"Annotation key"
-// @Success		200			{object}	KeyValueJson
-// @Failure		400			{object}	ErrorResponse
-// @Failure		401			{object}	ErrorResponse
-// @Failure		404			{object}	ErrorResponse
-// @Failure		500			{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/connections/{id}/annotations/{annotation} [get]
-func (r *ConnectionsRoutes) getAnnotation(gctx *gin.Context) { r.annotsAdapter.HandleGet(gctx) }
-
-// @Summary		Set an annotation for a connection
-// @Description	Set or update a specific annotation value by key for a connection
-// @Tags			connections
-// @Accept			json
-// @Produce		json
-// @Param			id			path		string						true	"Connection UUID"
-// @Param			annotation	path		string						true	"Annotation key"
-// @Param			request		body		PutKeyValueRequestJson	true	"Annotation value"
-// @Success		200			{object}	KeyValueJson
-// @Failure		400			{object}	ErrorResponse
-// @Failure		401			{object}	ErrorResponse
-// @Failure		403			{object}	ErrorResponse
-// @Failure		404			{object}	ErrorResponse
-// @Failure		500			{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/connections/{id}/annotations/{annotation} [put]
-func (r *ConnectionsRoutes) putAnnotation(gctx *gin.Context) { r.annotsAdapter.HandlePut(gctx) }
-
-// @Summary		Delete an annotation from a connection
-// @Description	Delete a specific annotation by key from a connection
-// @Tags			connections
-// @Param			id			path	string	true	"Connection UUID"
-// @Param			annotation	path	string	true	"Annotation key"
-// @Success		204			"No Content"
-// @Failure		400			{object}	ErrorResponse
-// @Failure		401			{object}	ErrorResponse
-// @Failure		403			{object}	ErrorResponse
-// @Failure		500			{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/connections/{id}/annotations/{annotation} [delete]
-func (r *ConnectionsRoutes) deleteAnnotation(gctx *gin.Context) { r.annotsAdapter.HandleDelete(gctx) }
-
-// ConnectionScopesJson exposes the OAuth2 scopes a connection requested at auth time and the
-// scopes the provider actually granted. The two sets can diverge when the provider chooses to
-// honor only a subset of the request (RFC 6749 §3.3).
-type ConnectionScopesJson struct {
-	Requested []string `json:"requested"`
-	Granted   []string `json:"granted"`
-}
-
 // @Summary		Get OAuth2 scopes for a connection
 // @Description	Returns the requested and granted OAuth2 scopes for the connection's current token. Only valid for OAuth2 connections.
 // @Tags			connections
 // @Produce		json
 // @Param			id	path		string	true	"Connection ID"
-// @Success		200	{object}	ConnectionScopesJson
+// @Success		200	{object}	OpenAPIConnectionScopeListJson
 // @Failure		400	{object}	ErrorResponse
 // @Failure		401	{object}	ErrorResponse
 // @Failure		404	{object}	ErrorResponse
@@ -1662,10 +1532,10 @@ func (r *ConnectionsRoutes) getScopes(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, ConnectionScopesJson{
-		Requested: oauth2.SplitScopes(token.RequestedScopes),
-		Granted:   oauth2.SplitScopes(token.Scopes),
-	})
+	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewConnectionScopeList(
+		oauth2.SplitScopes(token.RequestedScopes),
+		oauth2.SplitScopes(token.Scopes),
+	))
 }
 
 func (r *ConnectionsRoutes) Register(g gin.IRouter) {
@@ -1803,78 +1673,6 @@ func (r *ConnectionsRoutes) Register(g gin.IRouter) {
 		r.update,
 	)
 	g.GET(
-		"/connections/:id/labels",
-		r.auth.NewRequiredBuilder().
-			ForResource("connections").
-			ForVerb("get").
-			ForIdField("id").
-			Build(),
-		r.getLabels,
-	)
-	g.GET(
-		"/connections/:id/labels/:label",
-		r.auth.NewRequiredBuilder().
-			ForResource("connections").
-			ForVerb("get").
-			ForIdField("id").
-			Build(),
-		r.getLabel,
-	)
-	g.PUT(
-		"/connections/:id/labels/:label",
-		r.auth.NewRequiredBuilder().
-			ForResource("connections").
-			ForVerb("update").
-			ForIdField("id").
-			Build(),
-		r.putLabel,
-	)
-	g.DELETE(
-		"/connections/:id/labels/:label",
-		r.auth.NewRequiredBuilder().
-			ForResource("connections").
-			ForVerb("update").
-			ForIdField("id").
-			Build(),
-		r.deleteLabel,
-	)
-	g.GET(
-		"/connections/:id/annotations",
-		r.auth.NewRequiredBuilder().
-			ForResource("connections").
-			ForVerb("get").
-			ForIdField("id").
-			Build(),
-		r.getAnnotations,
-	)
-	g.GET(
-		"/connections/:id/annotations/:annotation",
-		r.auth.NewRequiredBuilder().
-			ForResource("connections").
-			ForVerb("get").
-			ForIdField("id").
-			Build(),
-		r.getAnnotation,
-	)
-	g.PUT(
-		"/connections/:id/annotations/:annotation",
-		r.auth.NewRequiredBuilder().
-			ForResource("connections").
-			ForVerb("update").
-			ForIdField("id").
-			Build(),
-		r.putAnnotation,
-	)
-	g.DELETE(
-		"/connections/:id/annotations/:annotation",
-		r.auth.NewRequiredBuilder().
-			ForResource("connections").
-			ForVerb("update").
-			ForIdField("id").
-			Build(),
-		r.deleteAnnotation,
-	)
-	g.GET(
 		"/connections/:id/scopes",
 		r.auth.NewRequiredBuilder().
 			ForResource("connections").
@@ -1895,81 +1693,14 @@ func NewConnectionsRoutes(
 	encrypt encrypt.E,
 	logger *slog.Logger,
 ) *ConnectionsRoutes {
-	parseConnID := func(gctx *gin.Context) (apid.ID, *httperr.Error) {
-		id, err := apid.Parse(gctx.Param("id"))
-		if err != nil {
-			return apid.Nil, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err))
-		}
-		if id == apid.Nil {
-			return apid.Nil, httperr.BadRequest("id is required")
-		}
-		return id, nil
-	}
-
-	getConn := func(ctx context.Context, id apid.ID) (key_value.Resource, error) {
-		conn, err := c.GetConnection(ctx, id)
-		if err != nil {
-			return nil, err
-		}
-		if conn == nil {
-			return nil, nil
-		}
-		return conn, nil
-	}
-
-	authGet := authService.NewRequiredBuilder().
-		ForResource("connections").
-		ForVerb("get").
-		ForIdField("id").
-		Build()
-	authMutate := authService.NewRequiredBuilder().
-		ForResource("connections").
-		ForVerb("update").
-		ForIdField("id").
-		Build()
-
-	labelsAdapter := key_value.Adapter[apid.ID]{
-		Kind:         key_value.Label,
-		ResourceName: "connection",
-		PathPrefix:   "/connections/:id",
-		AuthGet:      authGet,
-		AuthMutate:   authMutate,
-		ParseID:      parseConnID,
-		Get:          getConn,
-		Put: func(ctx context.Context, id apid.ID, kv map[string]string) (key_value.Resource, error) {
-			return db.PutConnectionLabels(ctx, id, kv)
-		},
-		Delete: func(ctx context.Context, id apid.ID, keys []string) (key_value.Resource, error) {
-			return db.DeleteConnectionLabels(ctx, id, keys)
-		},
-	}
-
-	annotsAdapter := key_value.Adapter[apid.ID]{
-		Kind:         key_value.Annotation,
-		ResourceName: "connection",
-		PathPrefix:   "/connections/:id",
-		AuthGet:      authGet,
-		AuthMutate:   authMutate,
-		ParseID:      parseConnID,
-		Get:          getConn,
-		Put: func(ctx context.Context, id apid.ID, kv map[string]string) (key_value.Resource, error) {
-			return db.PutConnectionAnnotations(ctx, id, kv)
-		},
-		Delete: func(ctx context.Context, id apid.ID, keys []string) (key_value.Resource, error) {
-			return db.DeleteConnectionAnnotations(ctx, id, keys)
-		},
-	}
-
 	return &ConnectionsRoutes{
-		cfg:           cfg,
-		auth:          authService,
-		core:          c,
-		db:            db,
-		r:             r,
-		httpf:         httpf,
-		encrypt:       encrypt,
-		oauthf:        oauth2.NewFactory(cfg, db, r, c, httpf, encrypt, logger),
-		labelsAdapter: labelsAdapter,
-		annotsAdapter: annotsAdapter,
+		cfg:     cfg,
+		auth:    authService,
+		core:    c,
+		db:      db,
+		r:       r,
+		httpf:   httpf,
+		encrypt: encrypt,
+		oauthf:  oauth2.NewFactory(cfg, db, r, c, httpf, encrypt, logger),
 	}
 }

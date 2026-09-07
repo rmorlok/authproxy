@@ -1,25 +1,41 @@
 {
-  "requestLabelSnapshot": {
-    "team": "payments"
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "RateLimitDryRun",
+  "metadata": {
+    "target": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connection",
+      "id": "cxn_test550e8400abcde"
+    }
   },
-  "matched": [
-    {
-      "rateLimitId": "rl_test550e8400abcde",
-      "namespace": "root.acme",
-      "effectiveMode": "enforce",
-      "bucketKey": "actor=act_test550e8400abcde|labels/team=payments",
-      "algorithmSummary": "fixed_window window=1m limit=100",
-      "wouldAllow": true,
-      "remaining": 99,
-      "retryAfterMs": 0,
-      "peekFailed": false
-    }
-  ],
-  "notMatched": [
-    {
-      "rateLimitId": "rl_other550e8400abcde",
-      "namespace": "root.acme",
-      "reason": "method did not match"
-    }
-  ]
+  "spec": {
+    "request": {
+      "url": "https://api.example.com/v1/users",
+      "method": "POST"
+    },
+    "requestType": "proxy"
+  },
+  "status": {
+    "requestLabelSnapshot": {"team": "payments"},
+    "matched": [
+      {
+        "rateLimitId": "rl_test550e8400abcde",
+        "namespace": "root.acme",
+        "effectiveMode": "enforce",
+        "bucketKey": "actor=act_test550e8400abcde|labels/team=payments",
+        "algorithmSummary": "fixed_window window=1m limit=100",
+        "wouldAllow": true,
+        "remaining": 99,
+        "retryAfterMs": 0,
+        "peekFailed": false
+      }
+    ],
+    "notMatched": [
+      {
+        "rateLimitId": "rl_other550e8400abcde",
+        "namespace": "root.acme",
+        "reason": "method did not match"
+      }
+    ]
+  }
 }

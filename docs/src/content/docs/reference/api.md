@@ -4,6 +4,8 @@ title: API reference
 
 AuthProxy exposes separate application-facing and administrative HTTP APIs.
 Both publish generated Swagger 2.0 documentation when the service is running.
+For the common envelope and examples of every managed kind, start with
+[Resource contracts](/reference/resources/).
 
 | API | Local Swagger UI | Checked-in JSON |
 |---|---|---|
@@ -44,9 +46,9 @@ or the canonical path for a namespace). Keep using the immutable ID in URLs,
 permissions, foreign-key fields, and stored references. Names are for display
 and discovery; renaming a resource does not change its URL.
 
-Create requests for actors, connectors, connections, keys, and rate limits may
-include `name`. If it is omitted, AuthProxy generates the ID first and uses that
-ID as the initial name:
+Create requests for actors, connectors, keys, and rate limits may include
+`metadata.name`; Connection initiation may include `spec.name`. If omitted,
+AuthProxy generates the ID first and uses that ID as the initial name:
 
 ```http
 POST /api/v1/connections/_initiate
@@ -99,10 +101,14 @@ does not expose a database constraint. Deleting a resource releases its name
 for reuse. The same name may appear on another resource type or in another
 namespace.
 
-A connector has one name shared by all definition versions. Rename it with
-`PATCH /api/v1/connectors/{connectorId}`. Version-specific create and update
+A connector has one name shared by all definition generations. Rename it with
+`PATCH /api/v1/connectors/{connectorId}`. Generation-specific create and update
 requests do not accept a separate name. A namespace name is read-only and is
 derived from the final segment of its path.
+
+Labels and annotations are also updated only through the parent resource's
+`metadata` patch. The former `/labels`, `/annotations`, and namespace `/key`
+subroutes do not exist in the resource contract.
 
 ### Query by name
 

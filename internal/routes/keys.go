@@ -15,7 +15,6 @@ import (
 	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httperr"
-	"github.com/rmorlok/authproxy/internal/routes/key_value"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	schemaapiopenapi "github.com/rmorlok/authproxy/internal/schema/api/openapi"
 	scommon "github.com/rmorlok/authproxy/internal/schema/common"
@@ -85,11 +84,9 @@ func keyToResource(
 }
 
 type KeysRoutes struct {
-	cfg           config.C
-	core          coreIface.C
-	authService   auth.A
-	labelsAdapter key_value.Adapter[apid.ID]
-	annotsAdapter key_value.Adapter[apid.ID]
+	cfg         config.C
+	core        coreIface.C
+	authService auth.A
 }
 
 // @Summary		Get key
@@ -715,148 +712,6 @@ func (r *KeysRoutes) delete(gctx *gin.Context) {
 	gctx.Status(http.StatusNoContent)
 }
 
-// Label and annotation handlers for keys delegate to a shared
-// generic adapter (see internal/routes/key_value). The doc comments below
-// drive the OpenAPI spec; the bodies forward to the adapter.
-
-// @Summary		Get all labels for a key
-// @Description	Get all labels associated with a specific key
-// @Tags			keys
-// @Produce		json
-// @Param			id	path		string	true	"Key ID"
-// @Success		200	{object}	map[string]string
-// @Failure		400	{object}	ErrorResponse
-// @Failure		401	{object}	ErrorResponse
-// @Failure		404	{object}	ErrorResponse
-// @Failure		500	{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/keys/{id}/labels [get]
-func (r *KeysRoutes) getLabels(gctx *gin.Context) {
-	r.labelsAdapter.HandleList(gctx)
-}
-
-// @Summary		Get a specific label for a key
-// @Description	Get a specific label value by key for a key
-// @Tags			keys
-// @Produce		json
-// @Param			id		path		string	true	"Key ID"
-// @Param			label	path		string	true	"Label key"
-// @Success		200		{object}	KeyValueJson
-// @Failure		400		{object}	ErrorResponse
-// @Failure		401		{object}	ErrorResponse
-// @Failure		404		{object}	ErrorResponse
-// @Failure		500		{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/keys/{id}/labels/{label} [get]
-func (r *KeysRoutes) getLabel(gctx *gin.Context) {
-	r.labelsAdapter.HandleGet(gctx)
-}
-
-// @Summary		Set a label for a key
-// @Description	Set or update a specific label value by key for a key
-// @Tags			keys
-// @Accept			json
-// @Produce		json
-// @Param			id		path		string						true	"Key ID"
-// @Param			label	path		string						true	"Label key"
-// @Param			request	body		PutKeyValueRequestJson	true	"Label value"
-// @Success		200		{object}	KeyValueJson
-// @Failure		400		{object}	ErrorResponse
-// @Failure		401		{object}	ErrorResponse
-// @Failure		403		{object}	ErrorResponse
-// @Failure		404		{object}	ErrorResponse
-// @Failure		500		{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/keys/{id}/labels/{label} [put]
-func (r *KeysRoutes) putLabel(gctx *gin.Context) {
-	r.labelsAdapter.HandlePut(gctx)
-}
-
-// @Summary		Delete a label from a key
-// @Description	Delete a specific label by key from a key
-// @Tags			keys
-// @Param			id		path	string	true	"Key ID"
-// @Param			label	path	string	true	"Label key"
-// @Success		204		"No Content"
-// @Failure		400		{object}	ErrorResponse
-// @Failure		401		{object}	ErrorResponse
-// @Failure		403		{object}	ErrorResponse
-// @Failure		500		{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/keys/{id}/labels/{label} [delete]
-func (r *KeysRoutes) deleteLabel(gctx *gin.Context) {
-	r.labelsAdapter.HandleDelete(gctx)
-}
-
-// @Summary		Get all annotations for a key
-// @Description	Get all annotations associated with a specific key
-// @Tags			keys
-// @Produce		json
-// @Param			id	path		string	true	"Key ID"
-// @Success		200	{object}	map[string]string
-// @Failure		400	{object}	ErrorResponse
-// @Failure		401	{object}	ErrorResponse
-// @Failure		404	{object}	ErrorResponse
-// @Failure		500	{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/keys/{id}/annotations [get]
-func (r *KeysRoutes) getAnnotations(gctx *gin.Context) {
-	r.annotsAdapter.HandleList(gctx)
-}
-
-// @Summary		Get a specific annotation for a key
-// @Description	Get a specific annotation value by key for a key
-// @Tags			keys
-// @Produce		json
-// @Param			id			path		string	true	"Key ID"
-// @Param			annotation	path		string	true	"Annotation key"
-// @Success		200			{object}	KeyValueJson
-// @Failure		400			{object}	ErrorResponse
-// @Failure		401			{object}	ErrorResponse
-// @Failure		404			{object}	ErrorResponse
-// @Failure		500			{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/keys/{id}/annotations/{annotation} [get]
-func (r *KeysRoutes) getAnnotation(gctx *gin.Context) {
-	r.annotsAdapter.HandleGet(gctx)
-}
-
-// @Summary		Set an annotation for a key
-// @Description	Set or update a specific annotation value by key for a key
-// @Tags			keys
-// @Accept			json
-// @Produce		json
-// @Param			id			path		string						true	"Key ID"
-// @Param			annotation	path		string						true	"Annotation key"
-// @Param			request		body		PutKeyValueRequestJson	true	"Annotation value"
-// @Success		200			{object}	KeyValueJson
-// @Failure		400			{object}	ErrorResponse
-// @Failure		401			{object}	ErrorResponse
-// @Failure		403			{object}	ErrorResponse
-// @Failure		404			{object}	ErrorResponse
-// @Failure		500			{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/keys/{id}/annotations/{annotation} [put]
-func (r *KeysRoutes) putAnnotation(gctx *gin.Context) {
-	r.annotsAdapter.HandlePut(gctx)
-}
-
-// @Summary		Delete an annotation from a key
-// @Description	Delete a specific annotation by key from a key
-// @Tags			keys
-// @Param			id			path	string	true	"Key ID"
-// @Param			annotation	path	string	true	"Annotation key"
-// @Success		204			"No Content"
-// @Failure		400			{object}	ErrorResponse
-// @Failure		401			{object}	ErrorResponse
-// @Failure		403			{object}	ErrorResponse
-// @Failure		500			{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/keys/{id}/annotations/{annotation} [delete]
-func (r *KeysRoutes) deleteAnnotation(gctx *gin.Context) {
-	r.annotsAdapter.HandleDelete(gctx)
-}
-
 func (r *KeysRoutes) Register(g gin.IRouter) {
 	idExtractor := func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }
 
@@ -908,163 +763,12 @@ func (r *KeysRoutes) Register(g gin.IRouter) {
 			Build(),
 		r.delete,
 	)
-	g.GET(
-		"/keys/:id/labels",
-		r.authService.NewRequiredBuilder().
-			ForResource("keys").
-			ForIdField("id").
-			ForIdExtractor(idExtractor).
-			ForVerb("get").
-			Build(),
-		r.getLabels,
-	)
-	g.GET(
-		"/keys/:id/labels/:label",
-		r.authService.NewRequiredBuilder().
-			ForResource("keys").
-			ForIdField("id").
-			ForIdExtractor(idExtractor).
-			ForVerb("get").
-			Build(),
-		r.getLabel,
-	)
-	g.PUT(
-		"/keys/:id/labels/:label",
-		r.authService.NewRequiredBuilder().
-			ForResource("keys").
-			ForIdField("id").
-			ForIdExtractor(idExtractor).
-			ForVerb("update").
-			Build(),
-		r.putLabel,
-	)
-	g.DELETE(
-		"/keys/:id/labels/:label",
-		r.authService.NewRequiredBuilder().
-			ForResource("keys").
-			ForIdField("id").
-			ForIdExtractor(idExtractor).
-			ForVerb("update").
-			Build(),
-		r.deleteLabel,
-	)
-	g.GET(
-		"/keys/:id/annotations",
-		r.authService.NewRequiredBuilder().
-			ForResource("keys").
-			ForIdField("id").
-			ForIdExtractor(idExtractor).
-			ForVerb("get").
-			Build(),
-		r.getAnnotations,
-	)
-	g.GET(
-		"/keys/:id/annotations/:annotation",
-		r.authService.NewRequiredBuilder().
-			ForResource("keys").
-			ForIdField("id").
-			ForIdExtractor(idExtractor).
-			ForVerb("get").
-			Build(),
-		r.getAnnotation,
-	)
-	g.PUT(
-		"/keys/:id/annotations/:annotation",
-		r.authService.NewRequiredBuilder().
-			ForResource("keys").
-			ForIdField("id").
-			ForIdExtractor(idExtractor).
-			ForVerb("update").
-			Build(),
-		r.putAnnotation,
-	)
-	g.DELETE(
-		"/keys/:id/annotations/:annotation",
-		r.authService.NewRequiredBuilder().
-			ForResource("keys").
-			ForIdField("id").
-			ForIdExtractor(idExtractor).
-			ForVerb("update").
-			Build(),
-		r.deleteAnnotation,
-	)
 }
 
 func NewKeysRoutes(cfg config.C, authService auth.A, c coreIface.C) *KeysRoutes {
-	parseKeyID := func(gctx *gin.Context) (apid.ID, *httperr.Error) {
-		id := apid.ID(gctx.Param("id"))
-		if id.IsNil() {
-			return apid.Nil, httperr.BadRequest("id is required")
-		}
-		return id, nil
-	}
-
-	getKey := func(ctx context.Context, id apid.ID) (key_value.Resource, error) {
-		ek, err := c.GetKey(ctx, id)
-		if err != nil {
-			if errors.Is(err, core.ErrNotFound) {
-				return nil, database.ErrNotFound
-			}
-			return nil, err
-		}
-		if ek == nil {
-			return nil, nil
-		}
-		return ek, nil
-	}
-
-	idExtractor := func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }
-
-	authGet := authService.NewRequiredBuilder().
-		ForResource("keys").
-		ForIdField("id").
-		ForIdExtractor(idExtractor).
-		ForVerb("get").
-		Build()
-	authMutate := authService.NewRequiredBuilder().
-		ForResource("keys").
-		ForIdField("id").
-		ForIdExtractor(idExtractor).
-		ForVerb("update").
-		Build()
-
-	labelsAdapter := key_value.Adapter[apid.ID]{
-		Kind:         key_value.Label,
-		ResourceName: "key",
-		PathPrefix:   "/keys/:id",
-		AuthGet:      authGet,
-		AuthMutate:   authMutate,
-		ParseID:      parseKeyID,
-		Get:          getKey,
-		Put: func(ctx context.Context, id apid.ID, kv map[string]string) (key_value.Resource, error) {
-			return c.PutKeyLabels(ctx, id, kv)
-		},
-		Delete: func(ctx context.Context, id apid.ID, keys []string) (key_value.Resource, error) {
-			return c.DeleteKeyLabels(ctx, id, keys)
-		},
-	}
-
-	annotsAdapter := key_value.Adapter[apid.ID]{
-		Kind:         key_value.Annotation,
-		ResourceName: "key",
-		PathPrefix:   "/keys/:id",
-		AuthGet:      authGet,
-		AuthMutate:   authMutate,
-		ParseID:      parseKeyID,
-		Get:          getKey,
-		Put: func(ctx context.Context, id apid.ID, kv map[string]string) (key_value.Resource, error) {
-			return c.PutKeyAnnotations(ctx, id, kv)
-		},
-		Delete: func(ctx context.Context, id apid.ID, keys []string) (key_value.Resource, error) {
-			return c.DeleteKeyAnnotations(ctx, id, keys)
-		},
-	}
-
 	return &KeysRoutes{
-		cfg:           cfg,
-		authService:   authService,
-		core:          c,
-		labelsAdapter: labelsAdapter,
-		annotsAdapter: annotsAdapter,
+		cfg:         cfg,
+		authService: authService,
+		core:        c,
 	}
 }

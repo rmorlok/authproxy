@@ -670,98 +670,6 @@ func TestRateLimits(t *testing.T) {
 		})
 	})
 
-	t.Run("label sub-resources", func(t *testing.T) {
-		tu, done := setup(t)
-		defer done()
-
-		created := createRateLimit(t, tu, "root", map[string]string{"env": "test"})
-
-		t.Run("get all labels", func(t *testing.T) {
-			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-				http.MethodGet, fmt.Sprintf("/rate-limits/%s/labels", created.GetId()), nil,
-				"root", "some-actor", aschema.AllPermissions())
-			require.NoError(t, err)
-			tu.Gin.ServeHTTP(w, req)
-			require.Equal(t, http.StatusOK, w.Code, w.Body.String())
-
-			var labels map[string]string
-			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &labels))
-			require.Equal(t, "test", labels["env"])
-		})
-
-		t.Run("put one label", func(t *testing.T) {
-			body, _ := json.Marshal(map[string]string{"value": "us-east"})
-			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-				http.MethodPut, fmt.Sprintf("/rate-limits/%s/labels/region", created.GetId()),
-				bytes.NewReader(body),
-				"root", "some-actor", aschema.AllPermissions())
-			require.NoError(t, err)
-			req.Header.Set("Content-Type", "application/json")
-			tu.Gin.ServeHTTP(w, req)
-			require.Equal(t, http.StatusOK, w.Code, w.Body.String())
-
-			// Re-read to confirm.
-			rl, err := tu.Db.GetRateLimit(context.Background(), created.GetId())
-			require.NoError(t, err)
-			require.Equal(t, "us-east", rl.Labels["region"])
-		})
-
-		t.Run("delete one label", func(t *testing.T) {
-			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-				http.MethodDelete, fmt.Sprintf("/rate-limits/%s/labels/env", created.GetId()), nil,
-				"root", "some-actor", aschema.AllPermissions())
-			require.NoError(t, err)
-			tu.Gin.ServeHTTP(w, req)
-			require.Equal(t, http.StatusNoContent, w.Code, w.Body.String())
-
-			rl, err := tu.Db.GetRateLimit(context.Background(), created.GetId())
-			require.NoError(t, err)
-			_, exists := rl.Labels["env"]
-			require.False(t, exists)
-		})
-	})
-
-	t.Run("annotation sub-resources", func(t *testing.T) {
-		tu, done := setup(t)
-		defer done()
-
-		created := createRateLimit(t, tu, "root", nil)
-
-		t.Run("put one annotation", func(t *testing.T) {
-			body, _ := json.Marshal(map[string]string{"value": "platform@example.com"})
-			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-				http.MethodPut, fmt.Sprintf("/rate-limits/%s/annotations/owner", created.GetId()),
-				bytes.NewReader(body),
-				"root", "some-actor", aschema.AllPermissions())
-			require.NoError(t, err)
-			req.Header.Set("Content-Type", "application/json")
-			tu.Gin.ServeHTTP(w, req)
-			require.Equal(t, http.StatusOK, w.Code, w.Body.String())
-
-			rl, err := tu.Db.GetRateLimit(context.Background(), created.GetId())
-			require.NoError(t, err)
-			require.Equal(t, "platform@example.com", rl.Annotations["owner"])
-		})
-
-		t.Run("get all annotations", func(t *testing.T) {
-			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-				http.MethodGet, fmt.Sprintf("/rate-limits/%s/annotations", created.GetId()), nil,
-				"root", "some-actor", aschema.AllPermissions())
-			require.NoError(t, err)
-			tu.Gin.ServeHTTP(w, req)
-			require.Equal(t, http.StatusOK, w.Code)
-
-			var annots map[string]string
-			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &annots))
-			require.Equal(t, "platform@example.com", annots["owner"])
-		})
-	})
-
 	// --- _dryRun ---
 	//
 	// installRules takes raw schema specs, persists them via
@@ -835,16 +743,36 @@ func TestRateLimits(t *testing.T) {
 		// each time.
 		baseBody := func() map[string]interface{} {
 			return map[string]interface{}{
-				"request": map[string]interface{}{
-					"method": "POST",
-					"url":    "https://api.example.com/v1/things",
+				"apiVersion": "authproxy.net/v1alpha1",
+				"kind":       "RateLimitDryRun",
+				"metadata": map[string]interface{}{
+					"target": map[string]interface{}{
+						"apiVersion": "authproxy.net/v1alpha1",
+						"kind":       "Namespace",
+						"id":         "root",
+					},
 				},
-				"requestType": "proxy",
-				"context": map[string]interface{}{
-					"namespace": "root",
-					"actorId":   "act_test",
+				"spec": map[string]interface{}{
+					"request": map[string]interface{}{
+						"method": "POST",
+						"url":    "https://api.example.com/v1/things",
+					},
+					"requestType": "proxy",
+					"actorRef": map[string]interface{}{
+						"apiVersion": "authproxy.net/v1alpha1",
+						"kind":       "Actor",
+						"id":         "act_test",
+					},
 				},
 			}
+		}
+
+		decodeStatus := func(t *testing.T, raw []byte) *schemaapi.RateLimitDryRunStatus {
+			t.Helper()
+			var action schemaapi.RateLimitDryRunAction
+			require.NoError(t, json.Unmarshal(raw, &action))
+			require.NotNil(t, action.Status)
+			return action.Status
 		}
 
 		t.Run("rejects when method missing", func(t *testing.T) {
@@ -852,7 +780,7 @@ func TestRateLimits(t *testing.T) {
 			defer done()
 
 			body := baseBody()
-			delete(body["request"].(map[string]interface{}), "method")
+			delete(body["spec"].(map[string]interface{})["request"].(map[string]interface{}), "method")
 			code, raw := postDryRun(t, tu, body, aschema.AllPermissions())
 			require.Equal(t, http.StatusBadRequest, code, string(raw))
 		})
@@ -862,17 +790,17 @@ func TestRateLimits(t *testing.T) {
 			defer done()
 
 			body := baseBody()
-			delete(body["request"].(map[string]interface{}), "url")
+			delete(body["spec"].(map[string]interface{})["request"].(map[string]interface{}), "url")
 			code, raw := postDryRun(t, tu, body, aschema.AllPermissions())
 			require.Equal(t, http.StatusBadRequest, code, string(raw))
 		})
 
-		t.Run("rejects when neither connectionId nor namespace given", func(t *testing.T) {
+		t.Run("rejects when target missing", func(t *testing.T) {
 			tu, done := setup(t)
 			defer done()
 
 			body := baseBody()
-			body["context"] = map[string]interface{}{}
+			body["metadata"] = map[string]interface{}{}
 			code, raw := postDryRun(t, tu, body, aschema.AllPermissions())
 			require.Equal(t, http.StatusBadRequest, code, string(raw))
 		})
@@ -890,8 +818,7 @@ func TestRateLimits(t *testing.T) {
 			// First call: would_allow=true on a fresh bucket; remaining=1.
 			code, raw := postDryRun(t, tu, body, aschema.AllPermissions())
 			require.Equal(t, http.StatusOK, code, string(raw))
-			var resp schemaapi.DryRunResponseJson
-			require.NoError(t, json.Unmarshal(raw, &resp))
+			resp := decodeStatus(t, raw)
 			require.Len(t, resp.Matched, 1)
 			require.Equal(t, ruleId, resp.Matched[0].RateLimitId)
 			require.True(t, resp.Matched[0].WouldAllow)
@@ -902,8 +829,7 @@ func TestRateLimits(t *testing.T) {
 			// consumed a token between the two calls.
 			code2, raw2 := postDryRun(t, tu, body, aschema.AllPermissions())
 			require.Equal(t, http.StatusOK, code2)
-			var resp2 schemaapi.DryRunResponseJson
-			require.NoError(t, json.Unmarshal(raw2, &resp2))
+			resp2 := decodeStatus(t, raw2)
 			require.Len(t, resp2.Matched, 1)
 			require.True(t, resp2.Matched[0].WouldAllow)
 			require.Equal(t, 1, resp2.Matched[0].Remaining, "Peek must not consume tokens between calls")
@@ -935,8 +861,7 @@ func TestRateLimits(t *testing.T) {
 
 			code, raw := postDryRun(t, tu, baseBody(), aschema.AllPermissions())
 			require.Equal(t, http.StatusOK, code, string(raw))
-			var resp schemaapi.DryRunResponseJson
-			require.NoError(t, json.Unmarshal(raw, &resp))
+			resp := decodeStatus(t, raw)
 			require.Empty(t, resp.Matched)
 			require.Len(t, resp.NotMatched, 2)
 
@@ -965,12 +890,11 @@ func TestRateLimits(t *testing.T) {
 			})
 
 			body := baseBody()
-			body["request"].(map[string]interface{})["url"] = "https://api.example.com/wrong/path"
+			body["spec"].(map[string]interface{})["request"].(map[string]interface{})["url"] = "https://api.example.com/wrong/path"
 			code, raw := postDryRun(t, tu, body, aschema.AllPermissions())
 			require.Equal(t, http.StatusOK, code, string(raw))
 
-			var resp schemaapi.DryRunResponseJson
-			require.NoError(t, json.Unmarshal(raw, &resp))
+			resp := decodeStatus(t, raw)
 			require.Len(t, resp.NotMatched, 1)
 			require.Equal(t, rules[0].Id, resp.NotMatched[0].RateLimitId)
 			require.Contains(t, resp.NotMatched[0].Reason, "prefix")
@@ -992,12 +916,11 @@ func TestRateLimits(t *testing.T) {
 			})
 
 			body := baseBody()
-			body["request"].(map[string]interface{})["labels"] = map[string]string{"team": "acme"}
+			body["spec"].(map[string]interface{})["request"].(map[string]interface{})["labels"] = map[string]string{"team": "acme"}
 			code, raw := postDryRun(t, tu, body, aschema.AllPermissions())
 			require.Equal(t, http.StatusOK, code, string(raw))
 
-			var resp schemaapi.DryRunResponseJson
-			require.NoError(t, json.Unmarshal(raw, &resp))
+			resp := decodeStatus(t, raw)
 			require.Len(t, resp.Matched, 1)
 			require.Equal(t, rules[0].Id, resp.Matched[0].RateLimitId)
 			require.Equal(t, "acme", resp.RequestLabelSnapshot["team"])
@@ -1013,8 +936,7 @@ func TestRateLimits(t *testing.T) {
 			code, raw := postDryRun(t, tu, baseBody(), aschema.AllPermissions())
 			require.Equal(t, http.StatusOK, code, string(raw))
 
-			var resp schemaapi.DryRunResponseJson
-			require.NoError(t, json.Unmarshal(raw, &resp))
+			resp := decodeStatus(t, raw)
 			require.Len(t, resp.Matched, 1)
 			require.Equal(t, rules[0].Id, resp.Matched[0].RateLimitId)
 			require.Equal(t, string(rlschema.ModeObserve), resp.Matched[0].EffectiveMode)
@@ -1045,8 +967,7 @@ func TestRateLimits(t *testing.T) {
 			code, raw := postDryRun(t, tu, baseBody(), aschema.AllPermissions())
 			require.Equal(t, http.StatusOK, code, string(raw))
 
-			var resp schemaapi.DryRunResponseJson
-			require.NoError(t, json.Unmarshal(raw, &resp))
+			resp := decodeStatus(t, raw)
 			// Cache held one rule in root.sibling — out of scope from
 			// root, so neither matched nor not-matched.
 			require.Empty(t, resp.Matched)
@@ -1069,8 +990,7 @@ func TestRateLimits(t *testing.T) {
 			for i := 0; i < 5; i++ {
 				code, raw := postDryRun(t, tu, req, aschema.AllPermissions())
 				require.Equal(t, http.StatusOK, code)
-				var resp schemaapi.DryRunResponseJson
-				require.NoError(t, json.Unmarshal(raw, &resp))
+				resp := decodeStatus(t, raw)
 				require.Len(t, resp.Matched, 1, "iteration %d", i+1)
 				require.True(t, resp.Matched[0].WouldAllow, "iteration %d: bucket should remain fresh", i+1)
 				require.Equal(t, 1, resp.Matched[0].Remaining, "iteration %d", i+1)

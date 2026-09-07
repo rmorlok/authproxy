@@ -9,6 +9,12 @@ vi.mock('./client', () => ({
 
 import { API_VERSION, objectReference } from './common';
 import {
+  archiveConnector,
+  ConnectorReleaseState,
+  disconnectAllConnectorConnections,
+  forceConnectorGenerationState,
+} from './connectors';
+import {
   abortConnection,
   ConnectionState,
   disconnectConnection,
@@ -18,6 +24,7 @@ import {
   submitConnection,
 } from './connections';
 import { markNotificationViewed, markNotificationsViewed } from './notifications';
+import { dryRunRateLimit } from './rateLimits';
 
 describe('v1alpha1 action serialization', () => {
   beforeEach(() => {
@@ -134,6 +141,66 @@ describe('v1alpha1 action serialization', () => {
         ],
       },
       spec: {},
+    });
+  });
+
+  it('builds logical and generation-specific connector actions', () => {
+    disconnectAllConnectorConnections('cxr_test', { timeoutSeconds: 600 });
+    archiveConnector('cxr_test');
+    forceConnectorGenerationState('cxr_test', 3, ConnectorReleaseState.PRIMARY);
+
+    expect(postMock).toHaveBeenNthCalledWith(1, '/api/v1/connectors/cxr_test/_disconnectAll', {
+      apiVersion: API_VERSION,
+      kind: 'ConnectorDisconnectAll',
+      metadata: {
+        target: { apiVersion: API_VERSION, kind: 'Connector', id: 'cxr_test' },
+      },
+      spec: { timeoutSeconds: 600 },
+    });
+    expect(postMock).toHaveBeenNthCalledWith(2, '/api/v1/connectors/cxr_test/_archive', {
+      apiVersion: API_VERSION,
+      kind: 'ConnectorArchive',
+      metadata: {
+        target: { apiVersion: API_VERSION, kind: 'Connector', id: 'cxr_test' },
+      },
+      spec: {},
+    });
+    expect(putMock).toHaveBeenCalledWith(
+      '/api/v1/connectors/cxr_test/versions/3/_forceState',
+      {
+        apiVersion: API_VERSION,
+        kind: 'ConnectorForceState',
+        metadata: {
+          target: {
+            apiVersion: API_VERSION,
+            kind: 'Connector',
+            id: 'cxr_test',
+            generation: 3,
+          },
+        },
+        spec: { state: ConnectorReleaseState.PRIMARY },
+      },
+    );
+  });
+
+  it('builds a rate-limit dry-run action from ergonomic context', () => {
+    dryRunRateLimit({
+      request: { method: 'GET', url: 'https://api.example.com/v1/things' },
+      requestType: 'proxy',
+      context: { namespace: 'root.acme', actorId: 'act_test' },
+    });
+
+    expect(postMock).toHaveBeenCalledWith('/api/v1/rate-limits/_dryRun', {
+      apiVersion: API_VERSION,
+      kind: 'RateLimitDryRun',
+      metadata: {
+        target: { apiVersion: API_VERSION, kind: 'Namespace', id: 'root.acme' },
+      },
+      spec: {
+        request: { method: 'GET', url: 'https://api.example.com/v1/things' },
+        requestType: 'proxy',
+        actorRef: { apiVersion: API_VERSION, kind: 'Actor', id: 'act_test' },
+      },
     });
   });
 });

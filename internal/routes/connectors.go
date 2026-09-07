@@ -17,7 +17,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/httperr"
-	"github.com/rmorlok/authproxy/internal/routes/key_value"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	schemaapiopenapi "github.com/rmorlok/authproxy/internal/schema/api/openapi"
 	"github.com/rmorlok/authproxy/internal/schema/common"
@@ -28,16 +27,12 @@ import (
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
-type ConnectorLifecycleRequestJson = schemaapi.ConnectorLifecycleRequestJson
-type ConnectorLifecycleResponseJson = schemaapi.ConnectorLifecycleResponseJson
-type ForceConnectorVersionStateRequestJson = schemaapi.ForceConnectorVersionStateRequestJson
-
 type OpenAPIListConnectorsResponseJson = schemaapiopenapi.ListConnectorsResponseJson
 type OpenAPIConnectorJson = schemaapiopenapi.ConnectorJson
 type OpenAPIConnectorPatchJson = schemaapiopenapi.ConnectorPatchJson
 type OpenAPIListConnectorVersionsResponseJson = schemaapiopenapi.ListConnectorVersionsResponseJson
-type OpenAPIConnectorLifecycleRequestJson = schemaapiopenapi.ConnectorLifecycleRequestJson
-type OpenAPIConnectorLifecycleResponseJson = schemaapiopenapi.ConnectorLifecycleResponseJson
+type OpenAPIConnectorLifecycleActionJson = schemaapiopenapi.ConnectorLifecycleActionJson
+type OpenAPIConnectorForceStateActionJson = schemaapiopenapi.ConnectorForceStateActionJson
 
 type ListConnectorsRequestQueryParams struct {
 	Cursor        *string                                   `form:"cursor"`
@@ -59,22 +54,18 @@ type ListConnectorVersionsRequestQueryParams struct {
 	OrderByVal    *string                                   `form:"orderBy"`
 }
 
-// connectorVersionID is the composite identifier used by the version-level
-// label/annotation adapters.
+// connectorVersionID is the composite identifier parsed from generation-level
+// connector routes.
 type connectorVersionID struct {
 	ConnectorID apid.ID
 	Version     uint64
 }
 
 type ConnectorsRoutes struct {
-	cfg                  config.C
-	connectors           connIface.C
-	authService          auth.A
-	encrypt              encrypt.E
-	labelsAdapter        key_value.Adapter[apid.ID]
-	annotsAdapter        key_value.Adapter[apid.ID]
-	versionLabelsAdapter key_value.Adapter[connectorVersionID]
-	versionAnnotsAdapter key_value.Adapter[connectorVersionID]
+	cfg         config.C
+	connectors  connIface.C
+	authService auth.A
+	encrypt     encrypt.E
 }
 
 const defaultConnectorLifecycleTimeout = 10 * time.Minute
@@ -761,146 +752,6 @@ func (r *ConnectorsRoutes) updateVersion(gctx *gin.Context) {
 	}
 }
 
-// @Summary		Get all labels for a connector
-// @Description	Get all labels associated with the primary version of a connector
-// @Tags			connectors
-// @Accept			json
-// @Produce		json
-// @Param			id	path		string	true	"Connector UUID"
-// @Success		200	{object}	map[string]string
-// @Failure		400	{object}	ErrorResponse
-// @Failure		401	{object}	ErrorResponse
-// @Failure		404	{object}	ErrorResponse
-// @Failure		500	{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/connectors/{id}/labels [get]
-func (r *ConnectorsRoutes) getLabels(gctx *gin.Context) { r.labelsAdapter.HandleList(gctx) }
-
-// @Summary		Get a specific label for a connector
-// @Description	Get a specific label value by key for the primary version of a connector
-// @Tags			connectors
-// @Accept			json
-// @Produce		json
-// @Param			id		path		string	true	"Connector UUID"
-// @Param			label	path		string	true	"Label key"
-// @Success		200		{object}	KeyValueJson
-// @Failure		400		{object}	ErrorResponse
-// @Failure		401		{object}	ErrorResponse
-// @Failure		404		{object}	ErrorResponse
-// @Failure		500		{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/connectors/{id}/labels/{label} [get]
-func (r *ConnectorsRoutes) getLabel(gctx *gin.Context) { r.labelsAdapter.HandleGet(gctx) }
-
-// @Summary		Set a label for a connector
-// @Description	Set or update a specific label on a connector's draft version, creating one if needed
-// @Tags			connectors
-// @Accept			json
-// @Produce		json
-// @Param			id		path		string						true	"Connector UUID"
-// @Param			label	path		string						true	"Label key"
-// @Param			request	body		PutKeyValueRequestJson	true	"Label value"
-// @Success		200		{object}	KeyValueJson
-// @Failure		400		{object}	ErrorResponse
-// @Failure		401		{object}	ErrorResponse
-// @Failure		403		{object}	ErrorResponse
-// @Failure		404		{object}	ErrorResponse
-// @Failure		500		{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/connectors/{id}/labels/{label} [put]
-func (r *ConnectorsRoutes) putLabel(gctx *gin.Context) { r.labelsAdapter.HandlePut(gctx) }
-
-// @Summary		Delete a label from a connector
-// @Description	Delete a specific label from a connector's draft version, creating one if needed
-// @Tags			connectors
-// @Accept			json
-// @Produce		json
-// @Param			id		path	string	true	"Connector UUID"
-// @Param			label	path	string	true	"Label key"
-// @Success		204		"No Content"
-// @Failure		400		{object}	ErrorResponse
-// @Failure		401		{object}	ErrorResponse
-// @Failure		403		{object}	ErrorResponse
-// @Failure		500		{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/connectors/{id}/labels/{label} [delete]
-func (r *ConnectorsRoutes) deleteLabel(gctx *gin.Context) { r.labelsAdapter.HandleDelete(gctx) }
-
-// @Summary		Get all labels for a connector version
-// @Description	Get all labels associated with a specific version of a connector
-// @Tags			connectors
-// @Accept			json
-// @Produce		json
-// @Param			id		path		string	true	"Connector UUID"
-// @Param			version	path		integer	true	"Version number"
-// @Success		200		{object}	map[string]string
-// @Failure		400		{object}	ErrorResponse
-// @Failure		401		{object}	ErrorResponse
-// @Failure		404		{object}	ErrorResponse
-// @Failure		500		{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/connectors/{id}/versions/{version}/labels [get]
-func (r *ConnectorsRoutes) getVersionLabels(gctx *gin.Context) {
-	r.versionLabelsAdapter.HandleList(gctx)
-}
-
-// @Summary		Get a specific label for a connector version
-// @Description	Get a specific label value by key for a specific version of a connector
-// @Tags			connectors
-// @Accept			json
-// @Produce		json
-// @Param			id		path		string	true	"Connector UUID"
-// @Param			version	path		integer	true	"Version number"
-// @Param			label	path		string	true	"Label key"
-// @Success		200		{object}	KeyValueJson
-// @Failure		400		{object}	ErrorResponse
-// @Failure		401		{object}	ErrorResponse
-// @Failure		404		{object}	ErrorResponse
-// @Failure		500		{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/connectors/{id}/versions/{version}/labels/{label} [get]
-func (r *ConnectorsRoutes) getVersionLabel(gctx *gin.Context) { r.versionLabelsAdapter.HandleGet(gctx) }
-
-// @Summary		Set a label for a connector version
-// @Description	Set or update a specific label on a specific draft version of a connector
-// @Tags			connectors
-// @Accept			json
-// @Produce		json
-// @Param			id		path		string						true	"Connector UUID"
-// @Param			version	path		integer						true	"Version number"
-// @Param			label	path		string						true	"Label key"
-// @Param			request	body		PutKeyValueRequestJson	true	"Label value"
-// @Success		200		{object}	KeyValueJson
-// @Failure		400		{object}	ErrorResponse
-// @Failure		401		{object}	ErrorResponse
-// @Failure		403		{object}	ErrorResponse
-// @Failure		404		{object}	ErrorResponse
-// @Failure		409		{object}	ErrorResponse
-// @Failure		500		{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/connectors/{id}/versions/{version}/labels/{label} [put]
-func (r *ConnectorsRoutes) putVersionLabel(gctx *gin.Context) { r.versionLabelsAdapter.HandlePut(gctx) }
-
-// @Summary		Delete a label from a connector version
-// @Description	Delete a specific label from a specific draft version of a connector
-// @Tags			connectors
-// @Accept			json
-// @Produce		json
-// @Param			id		path	string	true	"Connector UUID"
-// @Param			version	path	integer	true	"Version number"
-// @Param			label	path	string	true	"Label key"
-// @Success		204		"No Content"
-// @Failure		400		{object}	ErrorResponse
-// @Failure		401		{object}	ErrorResponse
-// @Failure		403		{object}	ErrorResponse
-// @Failure		409		{object}	ErrorResponse
-// @Failure		500		{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/connectors/{id}/versions/{version}/labels/{label} [delete]
-func (r *ConnectorsRoutes) deleteVersionLabel(gctx *gin.Context) {
-	r.versionLabelsAdapter.HandleDelete(gctx)
-}
-
 // @Summary		Force connector version state
 // @Description	Force a connector version to a specific state (admin operation)
 // @Tags			connectors
@@ -908,7 +759,7 @@ func (r *ConnectorsRoutes) deleteVersionLabel(gctx *gin.Context) {
 // @Produce		json
 // @Param			id		path		string								true	"Connector UUID"
 // @Param			version	path		integer								true	"Version number"
-// @Param			request	body		ForceConnectorVersionStateRequestJson	true	"New state"
+// @Param			request	body		OpenAPIConnectorForceStateActionJson	true	"Force-state action"
 // @Success		200		{object}	OpenAPIConnectorJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
@@ -930,22 +781,21 @@ func (r *ConnectorsRoutes) forceVersionState(gctx *gin.Context) {
 	connectorId := connectorVersionId.ConnectorID
 	version := connectorVersionId.Version
 
-	req := ForceConnectorVersionStateRequestJson{}
-	if err := apgin.BindJSONBody(gctx, &req); err != nil {
+	req := schemaapi.ConnectorForceStateAction{}
+	if err := apgin.BindActionJSON(gctx, &req, schemaapi.ConnectorForceStateActionKind); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
 	}
-
-	if req.State == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("state is required"))
+	if req.Metadata.Target.ID != connectorId.String() || req.Metadata.Target.Generation != version {
+		apgin.WriteError(gctx, nil, httperr.BadRequest("metadata.target must match the connector generation in the request path"))
 		val.MarkErrorReturn()
 		return
 	}
 
-	state := database.ConnectorDefinitionVersionState(req.State)
+	state := database.ConnectorDefinitionVersionState(req.Spec.State)
 	if !database.IsValidConnectorDefinitionVersionState(state) {
-		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid connector version state '%s'", req.State))
+		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid connector version state '%s'", req.Spec.State))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1004,34 +854,47 @@ func (r *ConnectorsRoutes) loadConnectorByID(ctx context.Context, connectorId ap
 	return result.Results[0], nil
 }
 
-func (r *ConnectorsRoutes) parseLifecycleRequest(gctx *gin.Context) (connIface.ConnectorLifecycleOptions, bool) {
+func connectorActionTarget(connectorID apid.ID, generation uint64) smeta.ObjectReference {
+	return smeta.ObjectReference{
+		APIVersion: smeta.APIVersionV1Alpha1,
+		Kind:       cschema.ConnectorKind,
+		ID:         connectorID.String(),
+		Generation: generation,
+	}
+}
+
+func (r *ConnectorsRoutes) parseLifecycleRequest(
+	gctx *gin.Context,
+	connectorID apid.ID,
+	kind smeta.Kind,
+) (schemaapi.ConnectorLifecycleSpec, connIface.ConnectorLifecycleOptions, bool) {
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
-	req := ConnectorLifecycleRequestJson{}
-	if gctx.Request.Body != http.NoBody && gctx.Request.ContentLength != 0 {
-		if err := apgin.BindJSONBody(gctx, &req); err != nil {
-			apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
-			val.MarkErrorReturn()
-			return connIface.ConnectorLifecycleOptions{}, false
-		}
+	req := schemaapi.ConnectorLifecycleAction{}
+	if err := apgin.BindActionJSON(gctx, &req, kind); err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		val.MarkErrorReturn()
+		return schemaapi.ConnectorLifecycleSpec{}, connIface.ConnectorLifecycleOptions{}, false
+	}
+	if req.Metadata.Target.ID != connectorID.String() {
+		apgin.WriteError(gctx, nil, httperr.BadRequest("metadata.target must match the connector in the request path"))
+		val.MarkErrorReturn()
+		return schemaapi.ConnectorLifecycleSpec{}, connIface.ConnectorLifecycleOptions{}, false
 	}
 
 	timeout := defaultConnectorLifecycleTimeout
-	if req.TimeoutSeconds != nil {
-		if *req.TimeoutSeconds <= 0 {
-			apgin.WriteError(gctx, nil, httperr.BadRequest("timeoutSeconds must be greater than zero"))
-			val.MarkErrorReturn()
-			return connIface.ConnectorLifecycleOptions{}, false
-		}
-		timeout = time.Duration(*req.TimeoutSeconds) * time.Second
+	if req.Spec.TimeoutSeconds != nil {
+		timeout = time.Duration(*req.Spec.TimeoutSeconds) * time.Second
 	}
 
-	return connIface.ConnectorLifecycleOptions{Timeout: timeout}, true
+	return req.Spec, connIface.ConnectorLifecycleOptions{Timeout: timeout}, true
 }
 
 func (r *ConnectorsRoutes) writeLifecycleTaskResponse(
 	gctx *gin.Context,
+	kind smeta.Kind,
 	connectorID apid.ID,
+	spec schemaapi.ConnectorLifecycleSpec,
 	taskInfo *tasks.TaskInfo,
 ) {
 	ctx := gctx.Request.Context()
@@ -1053,10 +916,16 @@ func (r *ConnectorsRoutes) writeLifecycleTaskResponse(
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, ConnectorLifecycleResponseJson{
-		TaskId:      taskId,
-		ConnectorId: connectorID,
-	})
+	response := schemaapi.NewConnectorLifecycleResponse(
+		kind,
+		connectorActionTarget(connectorID, 0),
+		spec,
+		taskId,
+	)
+	if err := apgin.RenderActionJSON(gctx, http.StatusOK, &response, kind); err != nil {
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+		val.MarkErrorReturn()
+	}
 }
 
 // @Summary		Disconnect all connector connections
@@ -1065,8 +934,8 @@ func (r *ConnectorsRoutes) writeLifecycleTaskResponse(
 // @Accept			json
 // @Produce		json
 // @Param			id		path		string							true	"Connector UUID"
-// @Param			request	body		OpenAPIConnectorLifecycleRequestJson	false	"Lifecycle operation options"
-// @Success		200		{object}	OpenAPIConnectorLifecycleResponseJson
+// @Param			request	body		OpenAPIConnectorLifecycleActionJson	true	"Disconnect-all action"
+// @Success		200		{object}	OpenAPIConnectorLifecycleActionJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		403		{object}	ErrorResponse
@@ -1103,7 +972,7 @@ func (r *ConnectorsRoutes) disconnectAll(gctx *gin.Context) {
 		return
 	}
 
-	opts, ok := r.parseLifecycleRequest(gctx)
+	spec, opts, ok := r.parseLifecycleRequest(gctx, connectorId, schemaapi.ConnectorDisconnectAllActionKind)
 	if !ok {
 		return
 	}
@@ -1115,7 +984,7 @@ func (r *ConnectorsRoutes) disconnectAll(gctx *gin.Context) {
 		return
 	}
 
-	r.writeLifecycleTaskResponse(gctx, connectorId, taskInfo)
+	r.writeLifecycleTaskResponse(gctx, schemaapi.ConnectorDisconnectAllActionKind, connectorId, spec, taskInfo)
 }
 
 // @Summary		Archive connector
@@ -1124,8 +993,8 @@ func (r *ConnectorsRoutes) disconnectAll(gctx *gin.Context) {
 // @Accept			json
 // @Produce		json
 // @Param			id		path		string							true	"Connector UUID"
-// @Param			request	body		OpenAPIConnectorLifecycleRequestJson	false	"Lifecycle operation options"
-// @Success		200		{object}	OpenAPIConnectorLifecycleResponseJson
+// @Param			request	body		OpenAPIConnectorLifecycleActionJson	true	"Archive action"
+// @Success		200		{object}	OpenAPIConnectorLifecycleActionJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		403		{object}	ErrorResponse
@@ -1162,7 +1031,7 @@ func (r *ConnectorsRoutes) archive(gctx *gin.Context) {
 		return
 	}
 
-	opts, ok := r.parseLifecycleRequest(gctx)
+	spec, opts, ok := r.parseLifecycleRequest(gctx, connectorId, schemaapi.ConnectorArchiveActionKind)
 	if !ok {
 		return
 	}
@@ -1174,151 +1043,7 @@ func (r *ConnectorsRoutes) archive(gctx *gin.Context) {
 		return
 	}
 
-	r.writeLifecycleTaskResponse(gctx, connectorId, taskInfo)
-}
-
-// @Summary		Get all annotations for a connector
-// @Description	Get all annotations associated with a connector's latest version
-// @Tags			connectors
-// @Accept			json
-// @Produce		json
-// @Param			id	path		string	true	"Connector UUID"
-// @Success		200	{object}	map[string]string
-// @Failure		400	{object}	ErrorResponse
-// @Failure		401	{object}	ErrorResponse
-// @Failure		404	{object}	ErrorResponse
-// @Failure		500	{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/connectors/{id}/annotations [get]
-func (r *ConnectorsRoutes) getAnnotations(gctx *gin.Context) { r.annotsAdapter.HandleList(gctx) }
-
-// @Summary		Get a specific annotation for a connector
-// @Description	Get a specific annotation value by key for a connector
-// @Tags			connectors
-// @Accept			json
-// @Produce		json
-// @Param			id			path		string	true	"Connector UUID"
-// @Param			annotation	path		string	true	"Annotation key"
-// @Success		200			{object}	KeyValueJson
-// @Failure		400			{object}	ErrorResponse
-// @Failure		401			{object}	ErrorResponse
-// @Failure		404			{object}	ErrorResponse
-// @Failure		500			{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/connectors/{id}/annotations/{annotation} [get]
-func (r *ConnectorsRoutes) getAnnotation(gctx *gin.Context) { r.annotsAdapter.HandleGet(gctx) }
-
-// @Summary		Set an annotation for a connector
-// @Description	Set or update a specific annotation value by key for a connector's draft version, creating one if needed
-// @Tags			connectors
-// @Accept			json
-// @Produce		json
-// @Param			id			path		string						true	"Connector UUID"
-// @Param			annotation	path		string						true	"Annotation key"
-// @Param			request		body		PutKeyValueRequestJson	true	"Annotation value"
-// @Success		200			{object}	KeyValueJson
-// @Failure		400			{object}	ErrorResponse
-// @Failure		401			{object}	ErrorResponse
-// @Failure		403			{object}	ErrorResponse
-// @Failure		404			{object}	ErrorResponse
-// @Failure		500			{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/connectors/{id}/annotations/{annotation} [put]
-func (r *ConnectorsRoutes) putAnnotation(gctx *gin.Context) { r.annotsAdapter.HandlePut(gctx) }
-
-// @Summary		Delete an annotation from a connector
-// @Description	Delete a specific annotation from a connector's draft version, creating one if needed
-// @Tags			connectors
-// @Accept			json
-// @Produce		json
-// @Param			id			path	string	true	"Connector UUID"
-// @Param			annotation	path	string	true	"Annotation key"
-// @Success		204			"No Content"
-// @Failure		400			{object}	ErrorResponse
-// @Failure		401			{object}	ErrorResponse
-// @Failure		403			{object}	ErrorResponse
-// @Failure		500			{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/connectors/{id}/annotations/{annotation} [delete]
-func (r *ConnectorsRoutes) deleteAnnotation(gctx *gin.Context) { r.annotsAdapter.HandleDelete(gctx) }
-
-// @Summary		Get all annotations for a connector version
-// @Description	Get all annotations associated with a specific version of a connector
-// @Tags			connectors
-// @Accept			json
-// @Produce		json
-// @Param			id		path		string	true	"Connector UUID"
-// @Param			version	path		integer	true	"Version number"
-// @Success		200		{object}	map[string]string
-// @Failure		400		{object}	ErrorResponse
-// @Failure		401		{object}	ErrorResponse
-// @Failure		404		{object}	ErrorResponse
-// @Failure		500		{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/connectors/{id}/versions/{version}/annotations [get]
-func (r *ConnectorsRoutes) getVersionAnnotations(gctx *gin.Context) {
-	r.versionAnnotsAdapter.HandleList(gctx)
-}
-
-// @Summary		Get a specific annotation for a connector version
-// @Description	Get a specific annotation value by key for a specific version of a connector
-// @Tags			connectors
-// @Accept			json
-// @Produce		json
-// @Param			id			path		string	true	"Connector UUID"
-// @Param			version		path		integer	true	"Version number"
-// @Param			annotation	path		string	true	"Annotation key"
-// @Success		200			{object}	KeyValueJson
-// @Failure		400			{object}	ErrorResponse
-// @Failure		401			{object}	ErrorResponse
-// @Failure		404			{object}	ErrorResponse
-// @Failure		500			{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/connectors/{id}/versions/{version}/annotations/{annotation} [get]
-func (r *ConnectorsRoutes) getVersionAnnotation(gctx *gin.Context) {
-	r.versionAnnotsAdapter.HandleGet(gctx)
-}
-
-// @Summary		Set an annotation for a connector version
-// @Description	Set or update a specific annotation value by key for a specific draft version of a connector
-// @Tags			connectors
-// @Accept			json
-// @Produce		json
-// @Param			id			path		string						true	"Connector UUID"
-// @Param			version		path		integer						true	"Version number"
-// @Param			annotation	path		string						true	"Annotation key"
-// @Param			request		body		PutKeyValueRequestJson	true	"Annotation value"
-// @Success		200			{object}	KeyValueJson
-// @Failure		400			{object}	ErrorResponse
-// @Failure		401			{object}	ErrorResponse
-// @Failure		403			{object}	ErrorResponse
-// @Failure		404			{object}	ErrorResponse
-// @Failure		409			{object}	ErrorResponse
-// @Failure		500			{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/connectors/{id}/versions/{version}/annotations/{annotation} [put]
-func (r *ConnectorsRoutes) putVersionAnnotation(gctx *gin.Context) {
-	r.versionAnnotsAdapter.HandlePut(gctx)
-}
-
-// @Summary		Delete an annotation from a connector version
-// @Description	Delete a specific annotation from a specific draft version of a connector
-// @Tags			connectors
-// @Accept			json
-// @Produce		json
-// @Param			id			path	string	true	"Connector UUID"
-// @Param			version		path	integer	true	"Version number"
-// @Param			annotation	path	string	true	"Annotation key"
-// @Success		204			"No Content"
-// @Failure		400			{object}	ErrorResponse
-// @Failure		401			{object}	ErrorResponse
-// @Failure		403			{object}	ErrorResponse
-// @Failure		409			{object}	ErrorResponse
-// @Failure		500			{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/connectors/{id}/versions/{version}/annotations/{annotation} [delete]
-func (r *ConnectorsRoutes) deleteVersionAnnotation(gctx *gin.Context) {
-	r.versionAnnotsAdapter.HandleDelete(gctx)
+	r.writeLifecycleTaskResponse(gctx, schemaapi.ConnectorArchiveActionKind, connectorId, spec, taskInfo)
 }
 
 func (r *ConnectorsRoutes) Register(g gin.IRouter) {
@@ -1411,403 +1136,13 @@ func (r *ConnectorsRoutes) Register(g gin.IRouter) {
 			Build(),
 		r.forceVersionState,
 	)
-	g.GET("/connectors/:id/labels",
-		r.authService.NewRequiredBuilder().
-			ForResource("connectors").
-			ForIdField("id").
-			ForVerb("get").
-			Build(),
-		r.getLabels,
-	)
-	g.GET("/connectors/:id/labels/:label",
-		r.authService.NewRequiredBuilder().
-			ForResource("connectors").
-			ForIdField("id").
-			ForVerb("get").
-			Build(),
-		r.getLabel,
-	)
-	g.PUT("/connectors/:id/labels/:label",
-		r.authService.NewRequiredBuilder().
-			ForResource("connectors").
-			ForIdField("id").
-			ForVerb("update").
-			Build(),
-		r.putLabel,
-	)
-	g.DELETE("/connectors/:id/labels/:label",
-		r.authService.NewRequiredBuilder().
-			ForResource("connectors").
-			ForIdField("id").
-			ForVerb("update").
-			Build(),
-		r.deleteLabel,
-	)
-	g.GET("/connectors/:id/versions/:version/labels",
-		r.authService.NewRequiredBuilder().
-			ForResource("connectors").
-			ForIdField("id").
-			ForVerb("list/versions").
-			Build(),
-		r.getVersionLabels,
-	)
-	g.GET("/connectors/:id/versions/:version/labels/:label",
-		r.authService.NewRequiredBuilder().
-			ForResource("connectors").
-			ForIdField("id").
-			ForVerb("list/versions").
-			Build(),
-		r.getVersionLabel,
-	)
-	g.PUT("/connectors/:id/versions/:version/labels/:label",
-		r.authService.NewRequiredBuilder().
-			ForResource("connectors").
-			ForIdField("id").
-			ForVerb("update").
-			Build(),
-		r.putVersionLabel,
-	)
-	g.DELETE("/connectors/:id/versions/:version/labels/:label",
-		r.authService.NewRequiredBuilder().
-			ForResource("connectors").
-			ForIdField("id").
-			ForVerb("update").
-			Build(),
-		r.deleteVersionLabel,
-	)
-	g.GET("/connectors/:id/annotations",
-		r.authService.NewRequiredBuilder().
-			ForResource("connectors").
-			ForIdField("id").
-			ForVerb("get").
-			Build(),
-		r.getAnnotations,
-	)
-	g.GET("/connectors/:id/annotations/:annotation",
-		r.authService.NewRequiredBuilder().
-			ForResource("connectors").
-			ForIdField("id").
-			ForVerb("get").
-			Build(),
-		r.getAnnotation,
-	)
-	g.PUT("/connectors/:id/annotations/:annotation",
-		r.authService.NewRequiredBuilder().
-			ForResource("connectors").
-			ForIdField("id").
-			ForVerb("update").
-			Build(),
-		r.putAnnotation,
-	)
-	g.DELETE("/connectors/:id/annotations/:annotation",
-		r.authService.NewRequiredBuilder().
-			ForResource("connectors").
-			ForIdField("id").
-			ForVerb("update").
-			Build(),
-		r.deleteAnnotation,
-	)
-	g.GET("/connectors/:id/versions/:version/annotations",
-		r.authService.NewRequiredBuilder().
-			ForResource("connectors").
-			ForIdField("id").
-			ForVerb("list/versions").
-			Build(),
-		r.getVersionAnnotations,
-	)
-	g.GET("/connectors/:id/versions/:version/annotations/:annotation",
-		r.authService.NewRequiredBuilder().
-			ForResource("connectors").
-			ForIdField("id").
-			ForVerb("list/versions").
-			Build(),
-		r.getVersionAnnotation,
-	)
-	g.PUT("/connectors/:id/versions/:version/annotations/:annotation",
-		r.authService.NewRequiredBuilder().
-			ForResource("connectors").
-			ForIdField("id").
-			ForVerb("update").
-			Build(),
-		r.putVersionAnnotation,
-	)
-	g.DELETE("/connectors/:id/versions/:version/annotations/:annotation",
-		r.authService.NewRequiredBuilder().
-			ForResource("connectors").
-			ForIdField("id").
-			ForVerb("update").
-			Build(),
-		r.deleteVersionAnnotation,
-	)
 }
 
 func NewConnectorsRoutes(cfg config.C, authService auth.A, c connIface.C, e encrypt.E) *ConnectorsRoutes {
-	routes := &ConnectorsRoutes{
+	return &ConnectorsRoutes{
 		cfg:         cfg,
 		authService: authService,
 		connectors:  c,
 		encrypt:     e,
 	}
-
-	getConnector := func(ctx context.Context, id apid.ID) (key_value.Resource, error) {
-		connector, err := routes.loadConnectorByID(ctx, id)
-		if errors.Is(err, core.ErrNotFound) {
-			return nil, database.ErrNotFound
-		}
-		return connector, err
-	}
-
-	getConnectorVersion := func(ctx context.Context, id connectorVersionID) (key_value.Resource, error) {
-		connector, err := c.GetConnectorVersion(ctx, id.ConnectorID, id.Version)
-		if err != nil {
-			if errors.Is(err, core.ErrNotFound) {
-				return nil, database.ErrNotFound
-			}
-			return nil, err
-		}
-		if connector == nil {
-			return nil, nil
-		}
-		return connector, nil
-	}
-
-	connectorIDExtractor := func(v interface{}) string {
-		return string(v.(connIface.Connector).GetId())
-	}
-
-	connectorAuthGet := authService.NewRequiredBuilder().
-		ForResource("connectors").
-		ForIdField("id").
-		ForIdExtractor(connectorIDExtractor).
-		ForVerb("get").
-		Build()
-	connectorAuthMutate := authService.NewRequiredBuilder().
-		ForResource("connectors").
-		ForIdField("id").
-		ForIdExtractor(connectorIDExtractor).
-		ForVerb("update").
-		Build()
-	versionAuthGet := authService.NewRequiredBuilder().
-		ForResource("connectors").
-		ForIdField("id").
-		ForIdExtractor(connectorIDExtractor).
-		ForVerb("list/versions").
-		Build()
-	versionAuthMutate := authService.NewRequiredBuilder().
-		ForResource("connectors").
-		ForIdField("id").
-		ForIdExtractor(connectorIDExtractor).
-		ForVerb("update").
-		Build()
-
-	putConnectorLabels := func(ctx context.Context, id apid.ID, kv map[string]string) (key_value.Resource, error) {
-		draft, err := c.GetOrCreateDraftConnectorVersion(ctx, id)
-		if err != nil {
-			if errors.Is(err, core.ErrNotFound) {
-				return nil, database.ErrNotFound
-			}
-			return nil, err
-		}
-		merged := make(map[string]string)
-		for k, v := range draft.GetLabels() {
-			merged[k] = v
-		}
-		for k, v := range kv {
-			merged[k] = v
-		}
-		return c.UpdateDraftConnectorVersion(ctx, id, draft.GetVersion(), draft.GetDefinition(), merged, draft.GetAnnotations())
-	}
-
-	deleteConnectorLabels := func(ctx context.Context, id apid.ID, keys []string) (key_value.Resource, error) {
-		draft, err := c.GetOrCreateDraftConnectorVersion(ctx, id)
-		if err != nil {
-			if errors.Is(err, core.ErrNotFound) {
-				return nil, database.ErrNotFound
-			}
-			return nil, err
-		}
-		merged := make(map[string]string)
-		for k, v := range draft.GetLabels() {
-			merged[k] = v
-		}
-		for _, k := range keys {
-			delete(merged, k)
-		}
-		return c.UpdateDraftConnectorVersion(ctx, id, draft.GetVersion(), draft.GetDefinition(), merged, draft.GetAnnotations())
-	}
-
-	putConnectorAnnotations := func(ctx context.Context, id apid.ID, kv map[string]string) (key_value.Resource, error) {
-		draft, err := c.GetOrCreateDraftConnectorVersion(ctx, id)
-		if err != nil {
-			if errors.Is(err, core.ErrNotFound) {
-				return nil, database.ErrNotFound
-			}
-			return nil, err
-		}
-		merged := make(map[string]string)
-		for k, v := range draft.GetAnnotations() {
-			merged[k] = v
-		}
-		for k, v := range kv {
-			merged[k] = v
-		}
-		return c.UpdateDraftConnectorVersion(ctx, id, draft.GetVersion(), draft.GetDefinition(), draft.GetLabels(), merged)
-	}
-
-	deleteConnectorAnnotations := func(ctx context.Context, id apid.ID, keys []string) (key_value.Resource, error) {
-		draft, err := c.GetOrCreateDraftConnectorVersion(ctx, id)
-		if err != nil {
-			if errors.Is(err, core.ErrNotFound) {
-				return nil, database.ErrNotFound
-			}
-			return nil, err
-		}
-		merged := make(map[string]string)
-		for k, v := range draft.GetAnnotations() {
-			merged[k] = v
-		}
-		for _, k := range keys {
-			delete(merged, k)
-		}
-		return c.UpdateDraftConnectorVersion(ctx, id, draft.GetVersion(), draft.GetDefinition(), draft.GetLabels(), merged)
-	}
-
-	putVersionLabels := func(ctx context.Context, id connectorVersionID, kv map[string]string) (key_value.Resource, error) {
-		connector, err := c.GetConnectorVersion(ctx, id.ConnectorID, id.Version)
-		if err != nil {
-			if errors.Is(err, core.ErrNotFound) {
-				return nil, database.ErrNotFound
-			}
-			return nil, err
-		}
-		if connector.GetState() != database.ConnectorDefinitionVersionStateDraft {
-			return nil, httperr.Conflictf("connector version '%s:%d' is not a draft", id.ConnectorID, id.Version)
-		}
-		merged := make(map[string]string)
-		for k, v := range connector.GetLabels() {
-			merged[k] = v
-		}
-		for k, v := range kv {
-			merged[k] = v
-		}
-		return c.UpdateDraftConnectorVersion(ctx, id.ConnectorID, id.Version, connector.GetDefinition(), merged, connector.GetAnnotations())
-	}
-
-	deleteVersionLabels := func(ctx context.Context, id connectorVersionID, keys []string) (key_value.Resource, error) {
-		connector, err := c.GetConnectorVersion(ctx, id.ConnectorID, id.Version)
-		if err != nil {
-			if errors.Is(err, core.ErrNotFound) {
-				return nil, database.ErrNotFound
-			}
-			return nil, err
-		}
-		if connector.GetState() != database.ConnectorDefinitionVersionStateDraft {
-			return nil, httperr.Conflictf("connector version '%s:%d' is not a draft", id.ConnectorID, id.Version)
-		}
-		merged := make(map[string]string)
-		for k, v := range connector.GetLabels() {
-			merged[k] = v
-		}
-		for _, k := range keys {
-			delete(merged, k)
-		}
-		return c.UpdateDraftConnectorVersion(ctx, id.ConnectorID, id.Version, connector.GetDefinition(), merged, connector.GetAnnotations())
-	}
-
-	putVersionAnnotations := func(ctx context.Context, id connectorVersionID, kv map[string]string) (key_value.Resource, error) {
-		connector, err := c.GetConnectorVersion(ctx, id.ConnectorID, id.Version)
-		if err != nil {
-			if errors.Is(err, core.ErrNotFound) {
-				return nil, database.ErrNotFound
-			}
-			return nil, err
-		}
-		if connector.GetState() != database.ConnectorDefinitionVersionStateDraft {
-			return nil, httperr.Conflictf("connector version '%s:%d' is not a draft", id.ConnectorID, id.Version)
-		}
-		merged := make(map[string]string)
-		for k, v := range connector.GetAnnotations() {
-			merged[k] = v
-		}
-		for k, v := range kv {
-			merged[k] = v
-		}
-		return c.UpdateDraftConnectorVersion(ctx, id.ConnectorID, id.Version, connector.GetDefinition(), connector.GetLabels(), merged)
-	}
-
-	deleteVersionAnnotations := func(ctx context.Context, id connectorVersionID, keys []string) (key_value.Resource, error) {
-		connector, err := c.GetConnectorVersion(ctx, id.ConnectorID, id.Version)
-		if err != nil {
-			if errors.Is(err, core.ErrNotFound) {
-				return nil, database.ErrNotFound
-			}
-			return nil, err
-		}
-		if connector.GetState() != database.ConnectorDefinitionVersionStateDraft {
-			return nil, httperr.Conflictf("connector version '%s:%d' is not a draft", id.ConnectorID, id.Version)
-		}
-		merged := make(map[string]string)
-		for k, v := range connector.GetAnnotations() {
-			merged[k] = v
-		}
-		for _, k := range keys {
-			delete(merged, k)
-		}
-		return c.UpdateDraftConnectorVersion(ctx, id.ConnectorID, id.Version, connector.GetDefinition(), connector.GetLabels(), merged)
-	}
-
-	labelsAdapter := key_value.Adapter[apid.ID]{
-		Kind:         key_value.Label,
-		ResourceName: "connector",
-		PathPrefix:   "/connectors/:id",
-		AuthGet:      connectorAuthGet,
-		AuthMutate:   connectorAuthMutate,
-		ParseID:      parseConnectorID,
-		Get:          getConnector,
-		Put:          putConnectorLabels,
-		Delete:       deleteConnectorLabels,
-	}
-
-	annotsAdapter := key_value.Adapter[apid.ID]{
-		Kind:         key_value.Annotation,
-		ResourceName: "connector",
-		PathPrefix:   "/connectors/:id",
-		AuthGet:      connectorAuthGet,
-		AuthMutate:   connectorAuthMutate,
-		ParseID:      parseConnectorID,
-		Get:          getConnector,
-		Put:          putConnectorAnnotations,
-		Delete:       deleteConnectorAnnotations,
-	}
-
-	versionLabelsAdapter := key_value.Adapter[connectorVersionID]{
-		Kind:         key_value.Label,
-		ResourceName: "connector version",
-		PathPrefix:   "/connectors/:id/versions/:version",
-		AuthGet:      versionAuthGet,
-		AuthMutate:   versionAuthMutate,
-		ParseID:      parseConnectorVersionID,
-		Get:          getConnectorVersion,
-		Put:          putVersionLabels,
-		Delete:       deleteVersionLabels,
-	}
-
-	versionAnnotsAdapter := key_value.Adapter[connectorVersionID]{
-		Kind:         key_value.Annotation,
-		ResourceName: "connector version",
-		PathPrefix:   "/connectors/:id/versions/:version",
-		AuthGet:      versionAuthGet,
-		AuthMutate:   versionAuthMutate,
-		ParseID:      parseConnectorVersionID,
-		Get:          getConnectorVersion,
-		Put:          putVersionAnnotations,
-		Delete:       deleteVersionAnnotations,
-	}
-
-	routes.labelsAdapter = labelsAdapter
-	routes.annotsAdapter = annotsAdapter
-	routes.versionLabelsAdapter = versionLabelsAdapter
-	routes.versionAnnotsAdapter = versionAnnotsAdapter
-
-	return routes
 }

@@ -12,8 +12,8 @@ import {ACTOR_KIND, createActor, updateActor} from './actors';
 import {API_VERSION, objectReference} from './common';
 import {initiateConnection, updateConnection} from './connections';
 import {CONNECTOR_KIND, updateConnector} from './connectors';
-import {createKey, KeyState, listKeys, updateKey} from './keys';
-import {listNamespaces} from './namespaces';
+import {createKey, KEY_KIND, KeyState, listKeys, updateKey} from './keys';
+import {clearNamespaceKey, listNamespaces, setNamespaceKey} from './namespaces';
 import {
     createRateLimit,
     RATE_LIMIT_KIND,
@@ -147,5 +147,29 @@ describe('resource name contracts', () => {
 
         expect(getMock).toHaveBeenCalledWith('/api/v1/keys', {params: {name: 'shared', namespace: 'root.**'}});
         expect(getMock).toHaveBeenCalledWith('/api/v1/namespaces', {params: {name: 'team'}});
+    });
+
+    it('updates namespace key assignment through the canonical resource patch', () => {
+        setNamespaceKey('root.acme', objectReference(KEY_KIND, {id: 'key_test'}));
+        clearNamespaceKey('root.acme');
+
+        expect(patchMock).toHaveBeenNthCalledWith(1, '/api/v1/namespaces/root.acme', {
+            apiVersion: API_VERSION,
+            kind: 'Namespace',
+            metadata: {},
+            spec: {
+                encryptionKeyRef: {
+                    apiVersion: API_VERSION,
+                    kind: KEY_KIND,
+                    id: 'key_test',
+                },
+            },
+        });
+        expect(patchMock).toHaveBeenNthCalledWith(2, '/api/v1/namespaces/root.acme', {
+            apiVersion: API_VERSION,
+            kind: 'Namespace',
+            metadata: {},
+            spec: {encryptionKeyRef: null},
+        });
     });
 });

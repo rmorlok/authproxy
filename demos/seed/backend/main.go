@@ -409,7 +409,10 @@ func createConnectorDraft(c *resty.Client, baseUrl string, connector cschema.Con
 func forceConnectorPrimary(c *resty.Client, baseUrl string, version cschema.Connector) error {
 	resp, err := c.R().
 		SetHeader("Content-Type", "application/json").
-		SetBody(api.ForceConnectorVersionStateRequestJson{State: string(cschema.ConnectorReleaseStatePrimary)}).
+		SetBody(api.NewConnectorForceStateRequest(
+			meta.NewObjectReference(version.TypeMeta, version.Metadata),
+			cschema.ConnectorReleaseStatePrimary,
+		)).
 		Put(fmt.Sprintf("%s/api/v1/connectors/%s/versions/%d/_forceState", baseUrl, version.GetId(), version.Metadata.Generation))
 	if err != nil {
 		return fmt.Errorf("PUT connector seed %s:%d primary: %w", version.GetId(), version.Metadata.Generation, err)

@@ -578,534 +578,6 @@ const docTemplateApi = `{
                 }
             }
         },
-        "/actors/{id}/annotations": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get all annotations for an actor by ID",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "actors"
-                ],
-                "summary": "Get all annotations for an actor",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Actor UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/actors/{id}/annotations/{annotation}": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get a specific annotation value by key for an actor",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "actors"
-                ],
-                "summary": "Get a specific annotation for an actor",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Actor UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Annotation key",
-                        "name": "annotation",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/routes.KeyValueJson"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Set or update a specific annotation value by key for an actor",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "actors"
-                ],
-                "summary": "Set an annotation for an actor",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Actor UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Annotation key",
-                        "name": "annotation",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Annotation value",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/routes.PutKeyValueRequestJson"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/routes.KeyValueJson"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Delete a specific annotation by key from an actor",
-                "tags": [
-                    "actors"
-                ],
-                "summary": "Delete an annotation from an actor",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Actor UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Annotation key",
-                        "name": "annotation",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/actors/{id}/labels": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get all labels associated with a specific actor",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "actors"
-                ],
-                "summary": "Get all labels for an actor",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Actor UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/actors/{id}/labels/{label}": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get a specific label value by key for an actor",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "actors"
-                ],
-                "summary": "Get a specific label for an actor",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Actor UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Label key",
-                        "name": "label",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/routes.KeyValueJson"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Set or update a specific label value by key for an actor",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "actors"
-                ],
-                "summary": "Set a label for an actor",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Actor UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Label key",
-                        "name": "label",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Label value",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/routes.PutKeyValueRequestJson"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/routes.KeyValueJson"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Delete a specific label by key from an actor",
-                "tags": [
-                    "actors"
-                ],
-                "summary": "Delete a label from an actor",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Actor UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Label key",
-                        "name": "label",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/connections": {
             "get": {
                 "security": [
@@ -1563,10 +1035,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/routes.DataSourceOptionJson"
-                            }
+                            "$ref": "#/definitions/routes.OpenAPIDataSourceOptionListJson"
                         }
                     },
                     "400": {
@@ -2202,534 +1671,6 @@ const docTemplateApi = `{
                 }
             }
         },
-        "/connections/{id}/annotations": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get all annotations associated with a specific connection",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "connections"
-                ],
-                "summary": "Get all annotations for a connection",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Connection UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/connections/{id}/annotations/{annotation}": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get a specific annotation value by key for a connection",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "connections"
-                ],
-                "summary": "Get a specific annotation for a connection",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Connection UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Annotation key",
-                        "name": "annotation",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/routes.KeyValueJson"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Set or update a specific annotation value by key for a connection",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "connections"
-                ],
-                "summary": "Set an annotation for a connection",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Connection UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Annotation key",
-                        "name": "annotation",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Annotation value",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/routes.PutKeyValueRequestJson"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/routes.KeyValueJson"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Delete a specific annotation by key from a connection",
-                "tags": [
-                    "connections"
-                ],
-                "summary": "Delete an annotation from a connection",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Connection UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Annotation key",
-                        "name": "annotation",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/connections/{id}/labels": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get all labels associated with a specific connection",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "connections"
-                ],
-                "summary": "Get all labels for a connection",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Connection UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/connections/{id}/labels/{label}": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get a specific label value by key for a connection",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "connections"
-                ],
-                "summary": "Get a specific label for a connection",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Connection UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Label key",
-                        "name": "label",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/routes.KeyValueJson"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Set or update a specific label value by key for a connection",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "connections"
-                ],
-                "summary": "Set a label for a connection",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Connection UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Label key",
-                        "name": "label",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Label value",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/routes.PutKeyValueRequestJson"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/routes.KeyValueJson"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Delete a specific label by key from a connection",
-                "tags": [
-                    "connections"
-                ],
-                "summary": "Delete a label from a connection",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Connection UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Label key",
-                        "name": "label",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/connections/{id}/scopes": {
             "get": {
                 "security": [
@@ -2758,7 +1699,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.ConnectionScopesJson"
+                            "$ref": "#/definitions/routes.OpenAPIConnectionScopeListJson"
                         }
                     },
                     "400": {
@@ -3119,11 +2060,12 @@ const docTemplateApi = `{
                         "required": true
                     },
                     {
-                        "description": "Lifecycle operation options",
+                        "description": "Archive action",
                         "name": "request",
                         "in": "body",
+                        "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPIConnectorLifecycleRequestJson"
+                            "$ref": "#/definitions/routes.OpenAPIConnectorLifecycleActionJson"
                         }
                     }
                 ],
@@ -3131,7 +2073,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPIConnectorLifecycleResponseJson"
+                            "$ref": "#/definitions/routes.OpenAPIConnectorLifecycleActionJson"
                         }
                     },
                     "400": {
@@ -3200,11 +2142,12 @@ const docTemplateApi = `{
                         "required": true
                     },
                     {
-                        "description": "Lifecycle operation options",
+                        "description": "Disconnect-all action",
                         "name": "request",
                         "in": "body",
+                        "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPIConnectorLifecycleRequestJson"
+                            "$ref": "#/definitions/routes.OpenAPIConnectorLifecycleActionJson"
                         }
                     }
                 ],
@@ -3212,7 +2155,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPIConnectorLifecycleResponseJson"
+                            "$ref": "#/definitions/routes.OpenAPIConnectorLifecycleActionJson"
                         }
                     },
                     "400": {
@@ -3247,558 +2190,6 @@ const docTemplateApi = `{
                     },
                     "501": {
                         "description": "Not Implemented",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/connectors/{id}/annotations": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get all annotations associated with a connector's latest version",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "connectors"
-                ],
-                "summary": "Get all annotations for a connector",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Connector UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/connectors/{id}/annotations/{annotation}": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get a specific annotation value by key for a connector",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "connectors"
-                ],
-                "summary": "Get a specific annotation for a connector",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Connector UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Annotation key",
-                        "name": "annotation",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/routes.KeyValueJson"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Set or update a specific annotation value by key for a connector's draft version, creating one if needed",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "connectors"
-                ],
-                "summary": "Set an annotation for a connector",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Connector UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Annotation key",
-                        "name": "annotation",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Annotation value",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/routes.PutKeyValueRequestJson"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/routes.KeyValueJson"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Delete a specific annotation from a connector's draft version, creating one if needed",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "connectors"
-                ],
-                "summary": "Delete an annotation from a connector",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Connector UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Annotation key",
-                        "name": "annotation",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/connectors/{id}/labels": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get all labels associated with the primary version of a connector",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "connectors"
-                ],
-                "summary": "Get all labels for a connector",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Connector UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/connectors/{id}/labels/{label}": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get a specific label value by key for the primary version of a connector",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "connectors"
-                ],
-                "summary": "Get a specific label for a connector",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Connector UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Label key",
-                        "name": "label",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/routes.KeyValueJson"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Set or update a specific label on a connector's draft version, creating one if needed",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "connectors"
-                ],
-                "summary": "Set a label for a connector",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Connector UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Label key",
-                        "name": "label",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Label value",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/routes.PutKeyValueRequestJson"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/routes.KeyValueJson"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Delete a specific label from a connector's draft version, creating one if needed",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "connectors"
-                ],
-                "summary": "Delete a label from a connector",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Connector UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Label key",
-                        "name": "label",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/routes.ErrorResponse"
                         }
@@ -4171,12 +2562,12 @@ const docTemplateApi = `{
                         "required": true
                     },
                     {
-                        "description": "New state",
+                        "description": "Force-state action",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.ForceConnectorVersionStateRequestJson"
+                            "$ref": "#/definitions/routes.OpenAPIConnectorForceStateActionJson"
                         }
                     }
                 ],
@@ -4207,638 +2598,6 @@ const docTemplateApi = `{
                     },
                     "404": {
                         "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/connectors/{id}/versions/{version}/annotations": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get all annotations associated with a specific version of a connector",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "connectors"
-                ],
-                "summary": "Get all annotations for a connector version",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Connector UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Version number",
-                        "name": "version",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/connectors/{id}/versions/{version}/annotations/{annotation}": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get a specific annotation value by key for a specific version of a connector",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "connectors"
-                ],
-                "summary": "Get a specific annotation for a connector version",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Connector UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Version number",
-                        "name": "version",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Annotation key",
-                        "name": "annotation",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/routes.KeyValueJson"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Set or update a specific annotation value by key for a specific draft version of a connector",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "connectors"
-                ],
-                "summary": "Set an annotation for a connector version",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Connector UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Version number",
-                        "name": "version",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Annotation key",
-                        "name": "annotation",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Annotation value",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/routes.PutKeyValueRequestJson"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/routes.KeyValueJson"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "409": {
-                        "description": "Conflict",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Delete a specific annotation from a specific draft version of a connector",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "connectors"
-                ],
-                "summary": "Delete an annotation from a connector version",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Connector UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Version number",
-                        "name": "version",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Annotation key",
-                        "name": "annotation",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "409": {
-                        "description": "Conflict",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/connectors/{id}/versions/{version}/labels": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get all labels associated with a specific version of a connector",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "connectors"
-                ],
-                "summary": "Get all labels for a connector version",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Connector UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Version number",
-                        "name": "version",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/connectors/{id}/versions/{version}/labels/{label}": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get a specific label value by key for a specific version of a connector",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "connectors"
-                ],
-                "summary": "Get a specific label for a connector version",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Connector UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Version number",
-                        "name": "version",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Label key",
-                        "name": "label",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/routes.KeyValueJson"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Set or update a specific label on a specific draft version of a connector",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "connectors"
-                ],
-                "summary": "Set a label for a connector version",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Connector UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Version number",
-                        "name": "version",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Label key",
-                        "name": "label",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Label value",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/routes.PutKeyValueRequestJson"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/routes.KeyValueJson"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "409": {
-                        "description": "Conflict",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Delete a specific label from a specific draft version of a connector",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "connectors"
-                ],
-                "summary": "Delete a label from a connector version",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Connector UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Version number",
-                        "name": "version",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Label key",
-                        "name": "label",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "409": {
-                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/routes.ErrorResponse"
                         }
@@ -5175,534 +2934,6 @@ const docTemplateApi = `{
                     },
                     "409": {
                         "description": "Conflict",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/keys/{id}/annotations": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get all annotations associated with a specific key",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "keys"
-                ],
-                "summary": "Get all annotations for a key",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Key ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/keys/{id}/annotations/{annotation}": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get a specific annotation value by key for a key",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "keys"
-                ],
-                "summary": "Get a specific annotation for a key",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Key ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Annotation key",
-                        "name": "annotation",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/routes.KeyValueJson"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Set or update a specific annotation value by key for a key",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "keys"
-                ],
-                "summary": "Set an annotation for a key",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Key ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Annotation key",
-                        "name": "annotation",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Annotation value",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/routes.PutKeyValueRequestJson"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/routes.KeyValueJson"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Delete a specific annotation by key from a key",
-                "tags": [
-                    "keys"
-                ],
-                "summary": "Delete an annotation from a key",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Key ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Annotation key",
-                        "name": "annotation",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/keys/{id}/labels": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get all labels associated with a specific key",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "keys"
-                ],
-                "summary": "Get all labels for a key",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Key ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/keys/{id}/labels/{label}": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get a specific label value by key for a key",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "keys"
-                ],
-                "summary": "Get a specific label for a key",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Key ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Label key",
-                        "name": "label",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/routes.KeyValueJson"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Set or update a specific label value by key for a key",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "keys"
-                ],
-                "summary": "Set a label for a key",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Key ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Label key",
-                        "name": "label",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Label value",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/routes.PutKeyValueRequestJson"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/routes.KeyValueJson"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Delete a specific label by key from a key",
-                "tags": [
-                    "keys"
-                ],
-                "summary": "Delete a label from a key",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Key ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Label key",
-                        "name": "label",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/routes.ErrorResponse"
                         }
@@ -6313,534 +3544,6 @@ const docTemplateApi = `{
                 }
             }
         },
-        "/namespaces/{path}/annotations": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get all annotations associated with a specific namespace",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "namespaces"
-                ],
-                "summary": "Get all annotations for a namespace",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Namespace path",
-                        "name": "path",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/namespaces/{path}/annotations/{annotation}": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get a specific annotation value by key for a namespace",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "namespaces"
-                ],
-                "summary": "Get a specific annotation for a namespace",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Namespace path",
-                        "name": "path",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Annotation key",
-                        "name": "annotation",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/routes.KeyValueJson"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Set or update a specific annotation value by key for a namespace",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "namespaces"
-                ],
-                "summary": "Set an annotation for a namespace",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Namespace path",
-                        "name": "path",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Annotation key",
-                        "name": "annotation",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Annotation value",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/routes.PutKeyValueRequestJson"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/routes.KeyValueJson"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Delete a specific annotation by key from a namespace",
-                "tags": [
-                    "namespaces"
-                ],
-                "summary": "Delete an annotation from a namespace",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Namespace path",
-                        "name": "path",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Annotation key",
-                        "name": "annotation",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/namespaces/{path}/labels": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get all labels associated with a specific namespace",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "namespaces"
-                ],
-                "summary": "Get all labels for a namespace",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Namespace path",
-                        "name": "path",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/namespaces/{path}/labels/{label}": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get a specific label value by key for a namespace",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "namespaces"
-                ],
-                "summary": "Get a specific label for a namespace",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Namespace path",
-                        "name": "path",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Label key",
-                        "name": "label",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/routes.KeyValueJson"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Set or update a specific label value by key for a namespace",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "namespaces"
-                ],
-                "summary": "Set a label for a namespace",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Namespace path",
-                        "name": "path",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Label key",
-                        "name": "label",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Label value",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/routes.PutKeyValueRequestJson"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/routes.KeyValueJson"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Delete a specific label by key from a namespace",
-                "tags": [
-                    "namespaces"
-                ],
-                "summary": "Delete a label from a namespace",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Namespace path",
-                        "name": "path",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Label key",
-                        "name": "label",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/notifications": {
             "get": {
                 "security": [
@@ -7226,12 +3929,12 @@ const docTemplateApi = `{
                 "summary": "Dry-run a rate-limit evaluation",
                 "parameters": [
                     {
-                        "description": "Dry-run input",
+                        "description": "Dry-run action",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/openapi.DryRunRequestJson"
+                            "$ref": "#/definitions/openapi.RateLimitDryRunActionJson"
                         }
                     }
                 ],
@@ -7239,7 +3942,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/openapi.DryRunResponseJson"
+                            "$ref": "#/definitions/openapi.RateLimitDryRunActionJson"
                         }
                     },
                     "400": {
@@ -7447,534 +4150,6 @@ const docTemplateApi = `{
                     },
                     "409": {
                         "description": "Conflict",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/rate-limits/{id}/annotations": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get all annotations associated with a specific rate limit",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "rate_limits"
-                ],
-                "summary": "Get all annotations for a rate limit",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Rate limit ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/rate-limits/{id}/annotations/{annotation}": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get a specific annotation value by key for a rate limit",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "rate_limits"
-                ],
-                "summary": "Get a specific annotation for a rate limit",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Rate limit ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Annotation key",
-                        "name": "annotation",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/routes.KeyValueJson"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Set or update a specific annotation value by key for a rate limit",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "rate_limits"
-                ],
-                "summary": "Set an annotation for a rate limit",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Rate limit ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Annotation key",
-                        "name": "annotation",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Annotation value",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/routes.PutKeyValueRequestJson"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/routes.KeyValueJson"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Delete a specific annotation by key from a rate limit",
-                "tags": [
-                    "rate_limits"
-                ],
-                "summary": "Delete an annotation from a rate limit",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Rate limit ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Annotation key",
-                        "name": "annotation",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/rate-limits/{id}/labels": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get all labels associated with a specific rate limit",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "rate_limits"
-                ],
-                "summary": "Get all labels for a rate limit",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Rate limit ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/rate-limits/{id}/labels/{label}": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get a specific label value by key for a rate limit",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "rate_limits"
-                ],
-                "summary": "Get a specific label for a rate limit",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Rate limit ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Label key",
-                        "name": "label",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/routes.KeyValueJson"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Set or update a specific label value by key for a rate limit",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "rate_limits"
-                ],
-                "summary": "Set a label for a rate limit",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Rate limit ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Label key",
-                        "name": "label",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Label value",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/routes.PutKeyValueRequestJson"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/routes.KeyValueJson"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Delete a specific label by key from a rate limit",
-                "tags": [
-                    "rate_limits"
-                ],
-                "summary": "Delete a label from a rate limit",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Rate limit ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Label key",
-                        "name": "label",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/routes.ErrorResponse"
                         }
@@ -8258,11 +4433,64 @@ const docTemplateApi = `{
                 }
             }
         },
+        "api.ConnectionScopeJson": {
+            "type": "object",
+            "properties": {
+                "granted": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "requested": {
+                    "type": "boolean"
+                }
+            }
+        },
         "api.ConnectionSetupControlSpec": {
             "type": "object",
             "properties": {
                 "returnToUrl": {
                     "type": "string"
+                }
+            }
+        },
+        "api.ConnectorForceStateSpec": {
+            "type": "object",
+            "properties": {
+                "state": {
+                    "type": "string",
+                    "example": "primary"
+                }
+            }
+        },
+        "api.ConnectorLifecycleSpec": {
+            "type": "object",
+            "properties": {
+                "timeoutSeconds": {
+                    "type": "integer",
+                    "example": 600
+                }
+            }
+        },
+        "api.ConnectorLifecycleStatus": {
+            "type": "object",
+            "properties": {
+                "taskId": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.DataSourceOptionJson": {
+            "type": "object",
+            "properties": {
+                "label": {
+                    "type": "string",
+                    "example": "My Workspace"
+                },
+                "value": {
+                    "type": "string",
+                    "example": "ws-123"
                 }
             }
         },
@@ -8958,35 +5186,56 @@ const docTemplateApi = `{
                 }
             }
         },
-        "openapi.DryRunRequestJson": {
-            "description": "Dry-run input: a proxy-shaped request + request type + the identity it runs under",
+        "openapi.DryRunMatchJson": {
             "type": "object",
             "properties": {
-                "context": {},
-                "request": {},
-                "requestType": {
+                "algorithmSummary": {
                     "type": "string",
-                    "example": "proxy"
+                    "example": "token bucket 60 @ 1/s"
+                },
+                "bucketKey": {
+                    "type": "string",
+                    "example": "actor=act_abc|labels/team=acme"
+                },
+                "effectiveMode": {
+                    "type": "string",
+                    "example": "enforce"
+                },
+                "namespace": {
+                    "type": "string",
+                    "example": "root.acme"
+                },
+                "peekFailed": {
+                    "type": "boolean"
+                },
+                "rateLimitId": {
+                    "type": "string",
+                    "example": "rl_test550e8400abcde"
+                },
+                "remaining": {
+                    "type": "integer"
+                },
+                "retryAfterMs": {
+                    "type": "integer"
+                },
+                "wouldAllow": {
+                    "type": "boolean"
                 }
             }
         },
-        "openapi.DryRunResponseJson": {
-            "description": "Per-rule match + peek-driven would-allow result",
+        "openapi.DryRunNotMatchedJson": {
             "type": "object",
             "properties": {
-                "matched": {
-                    "type": "array",
-                    "items": {}
+                "namespace": {
+                    "type": "string",
+                    "example": "root.acme"
                 },
-                "notMatched": {
-                    "type": "array",
-                    "items": {}
+                "rateLimitId": {
+                    "type": "string",
+                    "example": "rl_test550e8400abcde"
                 },
-                "requestLabelSnapshot": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
+                "reason": {
+                    "type": "string"
                 }
             }
         },
@@ -9387,6 +5636,36 @@ const docTemplateApi = `{
                 }
             }
         },
+        "openapi.ProxyRequestJson": {
+            "description": "Request to proxy or simulate an HTTP request",
+            "type": "object",
+            "properties": {
+                "bodyJson": {},
+                "bodyRaw": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "headers": {
+                    "type": "object"
+                },
+                "labels": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "method": {
+                    "type": "string",
+                    "example": "POST"
+                },
+                "url": {
+                    "type": "string",
+                    "example": "https://api.example.com/v1/users"
+                }
+            }
+        },
         "openapi.RateLimitAlgorithmJson": {
             "type": "object",
             "properties": {
@@ -9479,6 +5758,85 @@ const docTemplateApi = `{
                 "namespace": {
                     "type": "string",
                     "example": "root.acme"
+                }
+            }
+        },
+        "openapi.RateLimitDryRunActionJson": {
+            "description": "Kubernetes-style rate-limit dry-run action",
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "kind",
+                "metadata",
+                "spec"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "RateLimitDryRun"
+                    ],
+                    "example": "RateLimitDryRun"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/openapi.ConnectionActionMetaJson"
+                },
+                "spec": {
+                    "$ref": "#/definitions/openapi.RateLimitDryRunSpecJson"
+                },
+                "status": {
+                    "$ref": "#/definitions/openapi.RateLimitDryRunStatusJson"
+                }
+            }
+        },
+        "openapi.RateLimitDryRunSpecJson": {
+            "description": "Synthetic request evaluated by a rate-limit dry run",
+            "type": "object",
+            "required": [
+                "request",
+                "requestType"
+            ],
+            "properties": {
+                "actorRef": {
+                    "$ref": "#/definitions/meta.ObjectReference"
+                },
+                "request": {
+                    "$ref": "#/definitions/openapi.ProxyRequestJson"
+                },
+                "requestType": {
+                    "type": "string",
+                    "example": "proxy"
+                }
+            }
+        },
+        "openapi.RateLimitDryRunStatusJson": {
+            "description": "Per-rule match and peek-driven would-allow result",
+            "type": "object",
+            "properties": {
+                "matched": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/openapi.DryRunMatchJson"
+                    }
+                },
+                "notMatched": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/openapi.DryRunNotMatchedJson"
+                    }
+                },
+                "requestLabelSnapshot": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -10255,36 +6613,6 @@ const docTemplateApi = `{
                 }
             }
         },
-        "routes.ConnectionScopesJson": {
-            "type": "object",
-            "properties": {
-                "granted": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "requested": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                }
-            }
-        },
-        "routes.DataSourceOptionJson": {
-            "type": "object",
-            "properties": {
-                "label": {
-                    "type": "string",
-                    "example": "My Workspace"
-                },
-                "value": {
-                    "type": "string",
-                    "example": "ws-123"
-                }
-            }
-        },
         "routes.ErrorResponse": {
             "description": "Standardized error response",
             "type": "object",
@@ -10297,29 +6625,6 @@ const docTemplateApi = `{
                 "stackTrace": {
                     "description": "Stack trace, only populated in debug mode.",
                     "type": "string"
-                }
-            }
-        },
-        "routes.ForceConnectorVersionStateRequestJson": {
-            "description": "Request to force a connector version state",
-            "type": "object",
-            "properties": {
-                "state": {
-                    "type": "string",
-                    "example": "primary"
-                }
-            }
-        },
-        "routes.KeyValueJson": {
-            "type": "object",
-            "properties": {
-                "key": {
-                    "type": "string",
-                    "example": "env"
-                },
-                "value": {
-                    "type": "string",
-                    "example": "production"
                 }
             }
         },
@@ -10492,6 +6797,36 @@ const docTemplateApi = `{
                 }
             }
         },
+        "routes.OpenAPIConnectionScopeListJson": {
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "items",
+                "kind",
+                "metadata"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.ConnectionScopeJson"
+                    }
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/v1alpha1.ListMeta"
+                }
+            }
+        },
         "routes.OpenAPIConnectionSetupActionJson": {
             "type": "object",
             "required": [
@@ -10622,6 +6957,38 @@ const docTemplateApi = `{
                 }
             }
         },
+        "routes.OpenAPIConnectorForceStateActionJson": {
+            "description": "Kubernetes-style connector generation force-state action",
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "kind",
+                "metadata",
+                "spec"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "ConnectorForceState"
+                    ],
+                    "example": "ConnectorForceState"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/openapi.ConnectionActionMetaJson"
+                },
+                "spec": {
+                    "$ref": "#/definitions/api.ConnectorForceStateSpec"
+                }
+            }
+        },
         "routes.OpenAPIConnectorJson": {
             "description": "Kubernetes-style Connector resource",
             "type": "object",
@@ -10657,26 +7024,38 @@ const docTemplateApi = `{
                 }
             }
         },
-        "routes.OpenAPIConnectorLifecycleRequestJson": {
-            "description": "Request to run a connector lifecycle operation",
+        "routes.OpenAPIConnectorLifecycleActionJson": {
+            "description": "Kubernetes-style connector lifecycle action and task result",
             "type": "object",
+            "required": [
+                "apiVersion",
+                "kind",
+                "metadata",
+                "spec"
+            ],
             "properties": {
-                "timeoutSeconds": {
-                    "type": "integer",
-                    "example": 600
-                }
-            }
-        },
-        "routes.OpenAPIConnectorLifecycleResponseJson": {
-            "description": "Response for connector lifecycle operation",
-            "type": "object",
-            "properties": {
-                "connectorId": {
+                "apiVersion": {
                     "type": "string",
-                    "example": "cxr_test550e8400abcde"
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
                 },
-                "taskId": {
-                    "type": "string"
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "ConnectorDisconnectAll",
+                        "ConnectorArchive"
+                    ]
+                },
+                "metadata": {
+                    "$ref": "#/definitions/openapi.ConnectionActionMetaJson"
+                },
+                "spec": {
+                    "$ref": "#/definitions/api.ConnectorLifecycleSpec"
+                },
+                "status": {
+                    "$ref": "#/definitions/api.ConnectorLifecycleStatus"
                 }
             }
         },
@@ -10712,6 +7091,36 @@ const docTemplateApi = `{
                 },
                 "status": {
                     "$ref": "#/definitions/connectors.ConnectorStatus"
+                }
+            }
+        },
+        "routes.OpenAPIDataSourceOptionListJson": {
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "items",
+                "kind",
+                "metadata"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.DataSourceOptionJson"
+                    }
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/v1alpha1.ListMeta"
                 }
             }
         },
@@ -11135,15 +7544,6 @@ const docTemplateApi = `{
                 "url": {
                     "type": "string",
                     "example": "https://api.example.com/v1/users"
-                }
-            }
-        },
-        "routes.PutKeyValueRequestJson": {
-            "type": "object",
-            "properties": {
-                "value": {
-                    "type": "string",
-                    "example": "production"
                 }
             }
         },

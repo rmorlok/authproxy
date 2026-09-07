@@ -134,7 +134,7 @@ The dimensions are:
 - `resources`: API resource types, with `*` as a wildcard;
 - `verbs`: operations such as `get`, `list`, `create`, `update`, or `proxy`,
   with `*` as a wildcard; and
-- `resource_ids`: an optional restriction to named resources.
+- `resourceIds`: an optional restriction to immutable resource IDs.
 
 Actor permissions are additive: any actor permission that matches can allow an
 operation. If a JWT also carries permissions, those permissions are

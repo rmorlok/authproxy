@@ -15,6 +15,7 @@ const (
 	ConnectionDisconnectActionKind       meta.Kind = "ConnectionDisconnect"
 	ConnectionVersionMigrationActionKind meta.Kind = "ConnectionVersionMigration"
 	ConnectionForceStateActionKind       meta.Kind = "ConnectionForceState"
+	ConnectionScopeKind                  meta.Kind = "ConnectionScope"
 )
 
 type ListConnectionResponseJson struct {
@@ -30,6 +31,50 @@ func NewListConnectionResponseJson(
 			connectionschema.ConnectionKind,
 			items,
 			apiv1alpha1.ListMeta{Continue: continueToken},
+		),
+	}
+}
+
+// ConnectionScopeJson describes whether an OAuth2 scope was requested and/or
+// granted. Providers may grant a subset of the requested scopes or include
+// additional scopes in their response.
+type ConnectionScopeJson struct {
+	Name      string `json:"name" yaml:"name"`
+	Requested bool   `json:"requested" yaml:"requested"`
+	Granted   bool   `json:"granted" yaml:"granted"`
+}
+
+// ConnectionScopeList is the canonical projection of a connection's OAuth2
+// scope state.
+type ConnectionScopeList struct {
+	apiv1alpha1.ResourceList[ConnectionScopeJson] `json:",inline" yaml:",inline"`
+}
+
+func NewConnectionScopeList(requested, granted []string) ConnectionScopeList {
+	items := make([]ConnectionScopeJson, 0, len(requested)+len(granted))
+	byName := make(map[string]int, len(requested)+len(granted))
+	for _, name := range requested {
+		if index, ok := byName[name]; ok {
+			items[index].Requested = true
+			continue
+		}
+		byName[name] = len(items)
+		items = append(items, ConnectionScopeJson{Name: name, Requested: true})
+	}
+	for _, name := range granted {
+		if index, ok := byName[name]; ok {
+			items[index].Granted = true
+			continue
+		}
+		byName[name] = len(items)
+		items = append(items, ConnectionScopeJson{Name: name, Granted: true})
+	}
+
+	return ConnectionScopeList{
+		ResourceList: apiv1alpha1.NewResourceList(
+			ConnectionScopeKind,
+			items,
+			apiv1alpha1.ListMeta{},
 		),
 	}
 }

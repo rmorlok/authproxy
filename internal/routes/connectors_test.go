@@ -26,12 +26,12 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	httpf2 "github.com/rmorlok/authproxy/internal/httpf"
-	"github.com/rmorlok/authproxy/internal/routes/key_value"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	smeta "github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/rmorlok/authproxy/internal/tasks"
 	"github.com/rmorlok/authproxy/internal/test_utils"
 	"github.com/rmorlok/authproxy/internal/util"
@@ -57,6 +57,29 @@ func connectorNamePatch(name string) cschema.ConnectorPatch {
 	value := common.ResourceName(name)
 	patch.Metadata.Name = &value
 	return *patch
+}
+
+func connectorLifecycleRequest(
+	kind smeta.Kind,
+	connectorID string,
+	timeoutSeconds *int64,
+) schemaapi.ConnectorLifecycleAction {
+	return schemaapi.NewConnectorLifecycleRequest(
+		kind,
+		connectorActionTarget(apid.MustParse(connectorID), 0),
+		schemaapi.ConnectorLifecycleSpec{TimeoutSeconds: timeoutSeconds},
+	)
+}
+
+func connectorForceStateRequest(
+	connectorID string,
+	generation uint64,
+	state cschema.ConnectorReleaseState,
+) schemaapi.ConnectorForceStateAction {
+	return schemaapi.NewConnectorForceStateRequest(
+		connectorActionTarget(apid.MustParse(connectorID), generation),
+		state,
+	)
 }
 
 type fakeConnectorLifecycleCore struct {
@@ -409,7 +432,11 @@ func TestConnectors(t *testing.T) {
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPost,
 				"/connectors/cxr_test0000000000001/_archive",
-				util.JsonToReader(ConnectorLifecycleRequestJson{TimeoutSeconds: util.ToPtr(int64(0))}),
+				util.JsonToReader(connectorLifecycleRequest(
+					schemaapi.ConnectorArchiveActionKind,
+					"cxr_test0000000000001",
+					util.ToPtr(int64(0)),
+				)),
 				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.**", "connectors", "archive"),
@@ -428,7 +455,11 @@ func TestConnectors(t *testing.T) {
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPost,
 				"/connectors/cxr_test0000000000001/_disconnectAll",
-				util.JsonToReader(ConnectorLifecycleRequestJson{TimeoutSeconds: util.ToPtr(int64(600))}),
+				util.JsonToReader(connectorLifecycleRequest(
+					schemaapi.ConnectorDisconnectAllActionKind,
+					"cxr_test0000000000001",
+					util.ToPtr(int64(600)),
+				)),
 				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.**", "connectors", "disconnect_all"),
@@ -438,16 +469,18 @@ func TestConnectors(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ConnectorLifecycleResponseJson
+			var resp schemaapi.ConnectorLifecycleAction
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-			require.NotEmpty(t, resp.TaskId)
-			require.Equal(t, apid.MustParse("cxr_test0000000000001"), resp.ConnectorId)
+			require.Equal(t, schemaapi.ConnectorDisconnectAllActionKind, resp.Kind)
+			require.NotNil(t, resp.Status)
+			require.NotEmpty(t, resp.Status.TaskID)
+			require.Equal(t, "cxr_test0000000000001", resp.Metadata.Target.ID)
 			require.Len(t, tu.LifecycleCore.disconnectOpts, 1)
 			require.Equal(t, 600*time.Second, tu.LifecycleCore.disconnectOpts[0].Timeout)
 			assertWorkflowTaskPolls(
 				t,
 				tu,
-				resp.TaskId,
+				resp.Status.TaskID,
 				core.WorkflowNameDisconnectConnectorConnectionsV1,
 				"workflow-disconnect-1",
 				"workflow-execution-1",
@@ -461,7 +494,11 @@ func TestConnectors(t *testing.T) {
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPost,
 				"/connectors/cxr_test0000000000001/_archive",
-				nil,
+				util.JsonToReader(connectorLifecycleRequest(
+					schemaapi.ConnectorArchiveActionKind,
+					"cxr_test0000000000001",
+					nil,
+				)),
 				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.**", "connectors", "archive"),
@@ -471,16 +508,18 @@ func TestConnectors(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ConnectorLifecycleResponseJson
+			var resp schemaapi.ConnectorLifecycleAction
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-			require.NotEmpty(t, resp.TaskId)
-			require.Equal(t, apid.MustParse("cxr_test0000000000001"), resp.ConnectorId)
+			require.Equal(t, schemaapi.ConnectorArchiveActionKind, resp.Kind)
+			require.NotNil(t, resp.Status)
+			require.NotEmpty(t, resp.Status.TaskID)
+			require.Equal(t, "cxr_test0000000000001", resp.Metadata.Target.ID)
 			require.Len(t, tu.LifecycleCore.archiveOpts, 1)
 			require.Equal(t, 600*time.Second, tu.LifecycleCore.archiveOpts[0].Timeout)
 			assertWorkflowTaskPolls(
 				t,
 				tu,
-				resp.TaskId,
+				resp.Status.TaskID,
 				core.WorkflowNameArchiveConnectorV1,
 				"workflow-archive-1",
 				"workflow-execution-1",
@@ -1642,534 +1681,6 @@ func TestConnectors(t *testing.T) {
 		})
 	})
 
-	t.Run("labels", func(t *testing.T) {
-		connectorId := apid.MustParse("cxr_test0000000000001")
-
-		t.Run("get labels", func(t *testing.T) {
-			t.Run("unauthorized", func(t *testing.T) {
-				tu := setup(t, nil)
-				w := httptest.NewRecorder()
-				req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("/connectors/%s/labels", connectorId), nil)
-				require.NoError(t, err)
-
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusUnauthorized, w.Code)
-			})
-
-			t.Run("bad uuid", func(t *testing.T) {
-				tu := setup(t, nil)
-				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodGet,
-					"/connectors/bad-uuid/labels",
-					nil,
-					"root",
-					"some-actor",
-					aschema.AllPermissions(),
-				)
-				require.NoError(t, err)
-
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusBadRequest, w.Code)
-			})
-
-			t.Run("not found", func(t *testing.T) {
-				tu := setup(t, nil)
-				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodGet,
-					"/connectors/cxr_nonexistent00099/labels",
-					nil,
-					"root",
-					"some-actor",
-					aschema.AllPermissions(),
-				)
-				require.NoError(t, err)
-
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusNotFound, w.Code)
-			})
-
-			t.Run("valid", func(t *testing.T) {
-				tu := setup(t, nil)
-				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodGet,
-					fmt.Sprintf("/connectors/%s/labels", connectorId),
-					nil,
-					"root",
-					"some-actor",
-					aschema.PermissionsSingle("root.**", "connectors", "get"),
-				)
-				require.NoError(t, err)
-
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusOK, w.Code)
-
-				var resp map[string]string
-				err = json.Unmarshal(w.Body.Bytes(), &resp)
-				require.NoError(t, err)
-				require.Equal(t, "test-connector", resp["type"])
-			})
-		})
-
-		t.Run("get label", func(t *testing.T) {
-			t.Run("valid", func(t *testing.T) {
-				tu := setup(t, nil)
-				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodGet,
-					fmt.Sprintf("/connectors/%s/labels/type", connectorId),
-					nil,
-					"root",
-					"some-actor",
-					aschema.PermissionsSingle("root.**", "connectors", "get"),
-				)
-				require.NoError(t, err)
-
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusOK, w.Code)
-
-				var resp key_value.KeyValueJson
-				err = json.Unmarshal(w.Body.Bytes(), &resp)
-				require.NoError(t, err)
-				require.Equal(t, "type", resp.Key)
-				require.Equal(t, "test-connector", resp.Value)
-			})
-
-			t.Run("label not found", func(t *testing.T) {
-				tu := setup(t, nil)
-				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodGet,
-					fmt.Sprintf("/connectors/%s/labels/nonexistent", connectorId),
-					nil,
-					"root",
-					"some-actor",
-					aschema.PermissionsSingle("root.**", "connectors", "get"),
-				)
-				require.NoError(t, err)
-
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusNotFound, w.Code)
-			})
-		})
-
-		t.Run("put label", func(t *testing.T) {
-			t.Run("bad uuid", func(t *testing.T) {
-				tu := setup(t, nil)
-				body := key_value.PutKeyValueRequestJson{Value: "val"}
-				jsonBody, _ := json.Marshal(body)
-				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodPut,
-					"/connectors/bad-uuid/labels/env",
-					bytes.NewReader(jsonBody),
-					"root",
-					"some-actor",
-					aschema.AllPermissions(),
-				)
-				require.NoError(t, err)
-				req.Header.Set("Content-Type", "application/json")
-
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusBadRequest, w.Code)
-			})
-
-			t.Run("invalid key", func(t *testing.T) {
-				tu := setup(t, nil)
-				body := key_value.PutKeyValueRequestJson{Value: "val"}
-				jsonBody, _ := json.Marshal(body)
-				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodPut,
-					fmt.Sprintf("/connectors/%s/labels/!!invalid!!", connectorId),
-					bytes.NewReader(jsonBody),
-					"root",
-					"some-actor",
-					aschema.AllPermissions(),
-				)
-				require.NoError(t, err)
-				req.Header.Set("Content-Type", "application/json")
-
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusBadRequest, w.Code)
-			})
-
-			t.Run("not found", func(t *testing.T) {
-				tu := setup(t, nil)
-				body := key_value.PutKeyValueRequestJson{Value: "val"}
-				jsonBody, _ := json.Marshal(body)
-				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodPut,
-					"/connectors/cxr_nonexistent00099/labels/env",
-					bytes.NewReader(jsonBody),
-					"root",
-					"some-actor",
-					aschema.AllPermissions(),
-				)
-				require.NoError(t, err)
-				req.Header.Set("Content-Type", "application/json")
-
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusNotFound, w.Code)
-			})
-
-			t.Run("valid - creates draft and sets label", func(t *testing.T) {
-				tu := setup(t, nil)
-				body := key_value.PutKeyValueRequestJson{Value: "production"}
-				jsonBody, _ := json.Marshal(body)
-				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodPut,
-					fmt.Sprintf("/connectors/%s/labels/env", connectorId),
-					bytes.NewReader(jsonBody),
-					"root",
-					"some-actor",
-					aschema.AllPermissions(),
-				)
-				require.NoError(t, err)
-				req.Header.Set("Content-Type", "application/json")
-
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusOK, w.Code)
-
-				var resp key_value.KeyValueJson
-				err = json.Unmarshal(w.Body.Bytes(), &resp)
-				require.NoError(t, err)
-				require.Equal(t, "env", resp.Key)
-				require.Equal(t, "production", resp.Value)
-
-				// Verify the draft version has both the new label and existing labels
-				w = httptest.NewRecorder()
-				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodGet,
-					fmt.Sprintf("/connectors/%s/versions/2", connectorId),
-					nil,
-					"root",
-					"some-actor",
-					aschema.AllPermissions(),
-				)
-				require.NoError(t, err)
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusOK, w.Code)
-
-				var versionResp cschema.Connector
-				err = json.Unmarshal(w.Body.Bytes(), &versionResp)
-				require.NoError(t, err)
-				require.Equal(t, "production", versionResp.Metadata.Labels["env"])
-				require.Equal(t, "test-connector", versionResp.Metadata.Labels["type"])
-			})
-		})
-
-		t.Run("delete label", func(t *testing.T) {
-			t.Run("not found returns 204", func(t *testing.T) {
-				tu := setup(t, nil)
-				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodDelete,
-					"/connectors/cxr_nonexistent00099/labels/env",
-					nil,
-					"root",
-					"some-actor",
-					aschema.AllPermissions(),
-				)
-				require.NoError(t, err)
-
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusNoContent, w.Code)
-			})
-
-			t.Run("valid - creates draft and removes label", func(t *testing.T) {
-				tu := setup(t, nil)
-				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodDelete,
-					fmt.Sprintf("/connectors/%s/labels/type", connectorId),
-					nil,
-					"root",
-					"some-actor",
-					aschema.AllPermissions(),
-				)
-				require.NoError(t, err)
-
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusNoContent, w.Code)
-
-				// Verify the draft version no longer has the label
-				w = httptest.NewRecorder()
-				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodGet,
-					fmt.Sprintf("/connectors/%s/versions/2", connectorId),
-					nil,
-					"root",
-					"some-actor",
-					aschema.AllPermissions(),
-				)
-				require.NoError(t, err)
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusOK, w.Code)
-
-				var versionResp cschema.Connector
-				err = json.Unmarshal(w.Body.Bytes(), &versionResp)
-				require.NoError(t, err)
-				_, exists := versionResp.Metadata.Labels["type"]
-				require.False(t, exists)
-			})
-		})
-	})
-
-	t.Run("version labels", func(t *testing.T) {
-		connectorId := apid.MustParse("cxr_test0000000000001")
-
-		t.Run("get version labels", func(t *testing.T) {
-			t.Run("version not found", func(t *testing.T) {
-				tu := setup(t, nil)
-				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodGet,
-					fmt.Sprintf("/connectors/%s/versions/999/labels", connectorId),
-					nil,
-					"root",
-					"some-actor",
-					aschema.AllPermissions(),
-				)
-				require.NoError(t, err)
-
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusNotFound, w.Code)
-			})
-
-			t.Run("valid", func(t *testing.T) {
-				tu := setup(t, nil)
-				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodGet,
-					fmt.Sprintf("/connectors/%s/versions/1/labels", connectorId),
-					nil,
-					"root",
-					"some-actor",
-					aschema.PermissionsSingle("root.**", "connectors", "list/versions"),
-				)
-				require.NoError(t, err)
-
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusOK, w.Code)
-
-				var resp map[string]string
-				err = json.Unmarshal(w.Body.Bytes(), &resp)
-				require.NoError(t, err)
-				require.Equal(t, "test-connector", resp["type"])
-			})
-		})
-
-		t.Run("get version label", func(t *testing.T) {
-			t.Run("valid", func(t *testing.T) {
-				tu := setup(t, nil)
-				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodGet,
-					fmt.Sprintf("/connectors/%s/versions/1/labels/type", connectorId),
-					nil,
-					"root",
-					"some-actor",
-					aschema.PermissionsSingle("root.**", "connectors", "list/versions"),
-				)
-				require.NoError(t, err)
-
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusOK, w.Code)
-
-				var resp key_value.KeyValueJson
-				err = json.Unmarshal(w.Body.Bytes(), &resp)
-				require.NoError(t, err)
-				require.Equal(t, "type", resp.Key)
-				require.Equal(t, "test-connector", resp.Value)
-			})
-
-			t.Run("label not found", func(t *testing.T) {
-				tu := setup(t, nil)
-				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodGet,
-					fmt.Sprintf("/connectors/%s/versions/1/labels/nonexistent", connectorId),
-					nil,
-					"root",
-					"some-actor",
-					aschema.PermissionsSingle("root.**", "connectors", "list/versions"),
-				)
-				require.NoError(t, err)
-
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusNotFound, w.Code)
-			})
-		})
-
-		t.Run("put version label", func(t *testing.T) {
-			t.Run("conflict - not a draft", func(t *testing.T) {
-				tu := setup(t, nil)
-				body := key_value.PutKeyValueRequestJson{Value: "val"}
-				jsonBody, _ := json.Marshal(body)
-				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodPut,
-					fmt.Sprintf("/connectors/%s/versions/1/labels/env", connectorId),
-					bytes.NewReader(jsonBody),
-					"root",
-					"some-actor",
-					aschema.AllPermissions(),
-				)
-				require.NoError(t, err)
-				req.Header.Set("Content-Type", "application/json")
-
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusConflict, w.Code)
-			})
-
-			t.Run("valid - on draft version", func(t *testing.T) {
-				tu := setup(t, nil)
-
-				// First create a draft version
-				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodPost,
-					fmt.Sprintf("/connectors/%s/versions", connectorId),
-					nil,
-					"root",
-					"some-actor",
-					aschema.AllPermissions(),
-				)
-				require.NoError(t, err)
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusCreated, w.Code)
-
-				var createResp cschema.Connector
-				err = json.Unmarshal(w.Body.Bytes(), &createResp)
-				require.NoError(t, err)
-				draftVersion := createResp.Metadata.Generation
-
-				// Put a label on the draft version
-				body := key_value.PutKeyValueRequestJson{Value: "staging"}
-				jsonBody, _ := json.Marshal(body)
-				w = httptest.NewRecorder()
-				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodPut,
-					fmt.Sprintf("/connectors/%s/versions/%d/labels/env", connectorId, draftVersion),
-					bytes.NewReader(jsonBody),
-					"root",
-					"some-actor",
-					aschema.AllPermissions(),
-				)
-				require.NoError(t, err)
-				req.Header.Set("Content-Type", "application/json")
-
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusOK, w.Code)
-
-				var resp key_value.KeyValueJson
-				err = json.Unmarshal(w.Body.Bytes(), &resp)
-				require.NoError(t, err)
-				require.Equal(t, "env", resp.Key)
-				require.Equal(t, "staging", resp.Value)
-			})
-		})
-
-		t.Run("delete version label", func(t *testing.T) {
-			t.Run("conflict - not a draft", func(t *testing.T) {
-				tu := setup(t, nil)
-				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodDelete,
-					fmt.Sprintf("/connectors/%s/versions/1/labels/type", connectorId),
-					nil,
-					"root",
-					"some-actor",
-					aschema.AllPermissions(),
-				)
-				require.NoError(t, err)
-
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusConflict, w.Code)
-			})
-
-			t.Run("not found returns 204", func(t *testing.T) {
-				tu := setup(t, nil)
-				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodDelete,
-					"/connectors/cxr_nonexistent00099/versions/999/labels/env",
-					nil,
-					"root",
-					"some-actor",
-					aschema.AllPermissions(),
-				)
-				require.NoError(t, err)
-
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusNoContent, w.Code)
-			})
-
-			t.Run("valid - on draft version", func(t *testing.T) {
-				tu := setup(t, nil)
-
-				// First create a draft version
-				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodPost,
-					fmt.Sprintf("/connectors/%s/versions", connectorId),
-					nil,
-					"root",
-					"some-actor",
-					aschema.AllPermissions(),
-				)
-				require.NoError(t, err)
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusCreated, w.Code)
-
-				var createResp cschema.Connector
-				err = json.Unmarshal(w.Body.Bytes(), &createResp)
-				require.NoError(t, err)
-				draftVersion := createResp.Metadata.Generation
-
-				// Delete a label from the draft version
-				w = httptest.NewRecorder()
-				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodDelete,
-					fmt.Sprintf("/connectors/%s/versions/%d/labels/type", connectorId, draftVersion),
-					nil,
-					"root",
-					"some-actor",
-					aschema.AllPermissions(),
-				)
-				require.NoError(t, err)
-
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusNoContent, w.Code)
-
-				// Verify the label is gone
-				w = httptest.NewRecorder()
-				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodGet,
-					fmt.Sprintf("/connectors/%s/versions/%d/labels", connectorId, draftVersion),
-					nil,
-					"root",
-					"some-actor",
-					aschema.AllPermissions(),
-				)
-				require.NoError(t, err)
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusOK, w.Code)
-
-				var labels map[string]string
-				err = json.Unmarshal(w.Body.Bytes(), &labels)
-				require.NoError(t, err)
-				_, exists := labels["type"]
-				require.False(t, exists)
-			})
-		})
-	})
-
 	t.Run("force connector version state", func(t *testing.T) {
 		connectorId := "cxr_test0000000000001"
 
@@ -2179,7 +1690,7 @@ func TestConnectors(t *testing.T) {
 			req, err := http.NewRequest(
 				http.MethodPut,
 				fmt.Sprintf("/connectors/%s/versions/1/_forceState", connectorId),
-				util.JsonToReader(ForceConnectorVersionStateRequestJson{State: string(database.ConnectorDefinitionVersionStateArchived)}),
+				util.JsonToReader(connectorForceStateRequest(connectorId, 1, cschema.ConnectorReleaseStateArchived)),
 			)
 			require.NoError(t, err)
 			tu.Gin.ServeHTTP(w, req)
@@ -2192,7 +1703,7 @@ func TestConnectors(t *testing.T) {
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
 				"/connectors/bad-uuid/versions/1/_forceState",
-				util.JsonToReader(ForceConnectorVersionStateRequestJson{State: string(database.ConnectorDefinitionVersionStateArchived)}),
+				util.JsonToReader(connectorForceStateRequest(connectorId, 1, cschema.ConnectorReleaseStateArchived)),
 				"root",
 				"some-actor",
 				aschema.AllPermissions(),
@@ -2208,7 +1719,7 @@ func TestConnectors(t *testing.T) {
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
 				fmt.Sprintf("/connectors/%s/versions/99/_forceState", connectorId),
-				util.JsonToReader(ForceConnectorVersionStateRequestJson{State: string(database.ConnectorDefinitionVersionStateArchived)}),
+				util.JsonToReader(connectorForceStateRequest(connectorId, 99, cschema.ConnectorReleaseStateArchived)),
 				"root",
 				"some-actor",
 				aschema.AllPermissions(),
@@ -2224,7 +1735,7 @@ func TestConnectors(t *testing.T) {
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
 				fmt.Sprintf("/connectors/%s/versions/1/_forceState", connectorId),
-				util.JsonToReader(ForceConnectorVersionStateRequestJson{State: string(database.ConnectorDefinitionVersionStateArchived)}),
+				util.JsonToReader(connectorForceStateRequest(connectorId, 1, cschema.ConnectorReleaseStateArchived)),
 				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.**", "connectors", "force_state"),
@@ -2247,7 +1758,7 @@ func TestConnectors(t *testing.T) {
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
 				fmt.Sprintf("/connectors/%s/versions/1/_forceState", connectorId),
-				util.JsonToReader(ForceConnectorVersionStateRequestJson{State: string(database.ConnectorDefinitionVersionStatePrimary)}),
+				util.JsonToReader(connectorForceStateRequest(connectorId, 1, cschema.ConnectorReleaseStatePrimary)),
 				"root",
 				"some-actor",
 				aschema.AllPermissions(),
@@ -2261,542 +1772,6 @@ func TestConnectors(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, resp.Status)
 			require.Equal(t, cschema.ConnectorReleaseStatePrimary, resp.Status.Release.State)
-		})
-	})
-
-	t.Run("annotations", func(t *testing.T) {
-		connectorId := apid.MustParse("cxr_test0000000000001")
-
-		t.Run("get annotations", func(t *testing.T) {
-			t.Run("unauthorized", func(t *testing.T) {
-				tu := setup(t, nil)
-				w := httptest.NewRecorder()
-				req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("/connectors/%s/annotations", connectorId), nil)
-				require.NoError(t, err)
-
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusUnauthorized, w.Code)
-			})
-
-			t.Run("not found", func(t *testing.T) {
-				tu := setup(t, nil)
-				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodGet,
-					"/connectors/cxr_nonexistent00099/annotations",
-					nil,
-					"root",
-					"some-actor",
-					aschema.AllPermissions(),
-				)
-				require.NoError(t, err)
-
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusNotFound, w.Code)
-			})
-
-			t.Run("valid", func(t *testing.T) {
-				tu := setup(t, nil)
-				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodGet,
-					fmt.Sprintf("/connectors/%s/annotations", connectorId),
-					nil,
-					"root",
-					"some-actor",
-					aschema.PermissionsSingle("root.**", "connectors", "get"),
-				)
-				require.NoError(t, err)
-
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusOK, w.Code)
-
-				var resp map[string]string
-				err = json.Unmarshal(w.Body.Bytes(), &resp)
-				require.NoError(t, err)
-				require.NotNil(t, resp)
-			})
-		})
-
-		t.Run("get annotation", func(t *testing.T) {
-			t.Run("valid", func(t *testing.T) {
-				tu := setup(t, nil)
-
-				// First create a connector with annotations via POST
-				createRequest := connectorCreateRequest("root", cschema.ConnectorDefinition{DisplayName: "Annotated Connector"})
-				createRequest.Metadata.Annotations = map[string]string{"my-annotation": "some-value"}
-				createBody, _ := json.Marshal(createRequest)
-				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodPost,
-					"/connectors",
-					bytes.NewReader(createBody),
-					"root",
-					"some-actor",
-					aschema.AllPermissions(),
-				)
-				require.NoError(t, err)
-				req.Header.Set("Content-Type", "application/json")
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusCreated, w.Code)
-
-				var created cschema.Connector
-				err = json.Unmarshal(w.Body.Bytes(), &created)
-				require.NoError(t, err)
-
-				// Force the connector version to primary so it is visible via the connector-level routes
-				w = httptest.NewRecorder()
-				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodPut,
-					fmt.Sprintf("/connectors/%s/versions/%d/_forceState", created.GetId(), created.Metadata.Generation),
-					util.JsonToReader(ForceConnectorVersionStateRequestJson{State: string(database.ConnectorDefinitionVersionStatePrimary)}),
-					"root",
-					"some-actor",
-					aschema.AllPermissions(),
-				)
-				require.NoError(t, err)
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusOK, w.Code)
-
-				// Now get the annotation
-				w = httptest.NewRecorder()
-				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodGet,
-					fmt.Sprintf("/connectors/%s/annotations/my-annotation", created.GetId()),
-					nil,
-					"root",
-					"some-actor",
-					aschema.PermissionsSingle("root.**", "connectors", "get"),
-				)
-				require.NoError(t, err)
-
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusOK, w.Code)
-
-				var resp key_value.KeyValueJson
-				err = json.Unmarshal(w.Body.Bytes(), &resp)
-				require.NoError(t, err)
-				require.Equal(t, "my-annotation", resp.Key)
-				require.Equal(t, "some-value", resp.Value)
-			})
-
-			t.Run("annotation not found", func(t *testing.T) {
-				tu := setup(t, nil)
-				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodGet,
-					fmt.Sprintf("/connectors/%s/annotations/nonexistent", connectorId),
-					nil,
-					"root",
-					"some-actor",
-					aschema.PermissionsSingle("root.**", "connectors", "get"),
-				)
-				require.NoError(t, err)
-
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusNotFound, w.Code)
-			})
-		})
-
-		t.Run("put annotation", func(t *testing.T) {
-			t.Run("valid", func(t *testing.T) {
-				tu := setup(t, nil)
-				body := key_value.PutKeyValueRequestJson{Value: "production"}
-				jsonBody, _ := json.Marshal(body)
-				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodPut,
-					fmt.Sprintf("/connectors/%s/annotations/env", connectorId),
-					bytes.NewReader(jsonBody),
-					"root",
-					"some-actor",
-					aschema.AllPermissions(),
-				)
-				require.NoError(t, err)
-				req.Header.Set("Content-Type", "application/json")
-
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusOK, w.Code)
-
-				var resp key_value.KeyValueJson
-				err = json.Unmarshal(w.Body.Bytes(), &resp)
-				require.NoError(t, err)
-				require.Equal(t, "env", resp.Key)
-				require.Equal(t, "production", resp.Value)
-			})
-
-			t.Run("valid - creates draft and sets annotation", func(t *testing.T) {
-				tu := setup(t, nil)
-				body := key_value.PutKeyValueRequestJson{Value: "my-description"}
-				jsonBody, _ := json.Marshal(body)
-				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodPut,
-					fmt.Sprintf("/connectors/%s/annotations/description", connectorId),
-					bytes.NewReader(jsonBody),
-					"root",
-					"some-actor",
-					aschema.AllPermissions(),
-				)
-				require.NoError(t, err)
-				req.Header.Set("Content-Type", "application/json")
-
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusOK, w.Code)
-
-				var resp key_value.KeyValueJson
-				err = json.Unmarshal(w.Body.Bytes(), &resp)
-				require.NoError(t, err)
-				require.Equal(t, "description", resp.Key)
-				require.Equal(t, "my-description", resp.Value)
-
-				// Verify the draft version has the annotation
-				w = httptest.NewRecorder()
-				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodGet,
-					fmt.Sprintf("/connectors/%s/versions/2", connectorId),
-					nil,
-					"root",
-					"some-actor",
-					aschema.AllPermissions(),
-				)
-				require.NoError(t, err)
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusOK, w.Code)
-
-				var versionResp cschema.Connector
-				err = json.Unmarshal(w.Body.Bytes(), &versionResp)
-				require.NoError(t, err)
-				require.Equal(t, "my-description", versionResp.Metadata.Annotations["description"])
-			})
-		})
-
-		t.Run("delete annotation", func(t *testing.T) {
-			t.Run("valid", func(t *testing.T) {
-				tu := setup(t, nil)
-
-				// First put an annotation
-				body := key_value.PutKeyValueRequestJson{Value: "to-delete"}
-				jsonBody, _ := json.Marshal(body)
-				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodPut,
-					fmt.Sprintf("/connectors/%s/annotations/temp", connectorId),
-					bytes.NewReader(jsonBody),
-					"root",
-					"some-actor",
-					aschema.AllPermissions(),
-				)
-				require.NoError(t, err)
-				req.Header.Set("Content-Type", "application/json")
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusOK, w.Code)
-
-				// Now delete it
-				w = httptest.NewRecorder()
-				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodDelete,
-					fmt.Sprintf("/connectors/%s/annotations/temp", connectorId),
-					nil,
-					"root",
-					"some-actor",
-					aschema.AllPermissions(),
-				)
-				require.NoError(t, err)
-
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusNoContent, w.Code)
-			})
-
-			t.Run("valid - creates draft and removes annotation", func(t *testing.T) {
-				tu := setup(t, nil)
-
-				// First put an annotation so it exists (this creates draft version 2)
-				body := key_value.PutKeyValueRequestJson{Value: "will-be-removed"}
-				jsonBody, _ := json.Marshal(body)
-				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodPut,
-					fmt.Sprintf("/connectors/%s/annotations/removeme", connectorId),
-					bytes.NewReader(jsonBody),
-					"root",
-					"some-actor",
-					aschema.AllPermissions(),
-				)
-				require.NoError(t, err)
-				req.Header.Set("Content-Type", "application/json")
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusOK, w.Code)
-
-				// Delete the annotation (reuses draft version 2)
-				w = httptest.NewRecorder()
-				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodDelete,
-					fmt.Sprintf("/connectors/%s/annotations/removeme", connectorId),
-					nil,
-					"root",
-					"some-actor",
-					aschema.AllPermissions(),
-				)
-				require.NoError(t, err)
-
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusNoContent, w.Code)
-
-				// Verify the draft version no longer has the annotation
-				w = httptest.NewRecorder()
-				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodGet,
-					fmt.Sprintf("/connectors/%s/versions/2", connectorId),
-					nil,
-					"root",
-					"some-actor",
-					aschema.AllPermissions(),
-				)
-				require.NoError(t, err)
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusOK, w.Code)
-
-				var versionResp cschema.Connector
-				err = json.Unmarshal(w.Body.Bytes(), &versionResp)
-				require.NoError(t, err)
-				_, exists := versionResp.Metadata.Annotations["removeme"]
-				require.False(t, exists)
-			})
-		})
-	})
-
-	t.Run("version annotations", func(t *testing.T) {
-		connectorId := apid.MustParse("cxr_test0000000000001")
-
-		t.Run("get version annotations", func(t *testing.T) {
-			t.Run("valid", func(t *testing.T) {
-				tu := setup(t, nil)
-				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodGet,
-					fmt.Sprintf("/connectors/%s/versions/1/annotations", connectorId),
-					nil,
-					"root",
-					"some-actor",
-					aschema.PermissionsSingle("root.**", "connectors", "list/versions"),
-				)
-				require.NoError(t, err)
-
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusOK, w.Code)
-
-				var resp map[string]string
-				err = json.Unmarshal(w.Body.Bytes(), &resp)
-				require.NoError(t, err)
-				require.NotNil(t, resp)
-			})
-		})
-
-		t.Run("get version annotation", func(t *testing.T) {
-			t.Run("valid", func(t *testing.T) {
-				tu := setup(t, nil)
-
-				// First create a draft version and put an annotation on it
-				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodPost,
-					fmt.Sprintf("/connectors/%s/versions", connectorId),
-					nil,
-					"root",
-					"some-actor",
-					aschema.AllPermissions(),
-				)
-				require.NoError(t, err)
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusCreated, w.Code)
-
-				var createResp cschema.Connector
-				err = json.Unmarshal(w.Body.Bytes(), &createResp)
-				require.NoError(t, err)
-				draftVersion := createResp.Metadata.Generation
-
-				// Put an annotation on the draft
-				body := key_value.PutKeyValueRequestJson{Value: "draft-value"}
-				jsonBody, _ := json.Marshal(body)
-				w = httptest.NewRecorder()
-				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodPut,
-					fmt.Sprintf("/connectors/%s/versions/%d/annotations/info", connectorId, draftVersion),
-					bytes.NewReader(jsonBody),
-					"root",
-					"some-actor",
-					aschema.AllPermissions(),
-				)
-				require.NoError(t, err)
-				req.Header.Set("Content-Type", "application/json")
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusOK, w.Code)
-
-				// Now get the annotation
-				w = httptest.NewRecorder()
-				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodGet,
-					fmt.Sprintf("/connectors/%s/versions/%d/annotations/info", connectorId, draftVersion),
-					nil,
-					"root",
-					"some-actor",
-					aschema.PermissionsSingle("root.**", "connectors", "list/versions"),
-				)
-				require.NoError(t, err)
-
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusOK, w.Code)
-
-				var resp key_value.KeyValueJson
-				err = json.Unmarshal(w.Body.Bytes(), &resp)
-				require.NoError(t, err)
-				require.Equal(t, "info", resp.Key)
-				require.Equal(t, "draft-value", resp.Value)
-			})
-
-			t.Run("annotation not found", func(t *testing.T) {
-				tu := setup(t, nil)
-				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodGet,
-					fmt.Sprintf("/connectors/%s/versions/1/annotations/nonexistent", connectorId),
-					nil,
-					"root",
-					"some-actor",
-					aschema.PermissionsSingle("root.**", "connectors", "list/versions"),
-				)
-				require.NoError(t, err)
-
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusNotFound, w.Code)
-			})
-		})
-
-		t.Run("put version annotation", func(t *testing.T) {
-			t.Run("valid", func(t *testing.T) {
-				tu := setup(t, nil)
-
-				// First create a draft version
-				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodPost,
-					fmt.Sprintf("/connectors/%s/versions", connectorId),
-					nil,
-					"root",
-					"some-actor",
-					aschema.AllPermissions(),
-				)
-				require.NoError(t, err)
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusCreated, w.Code)
-
-				var createResp cschema.Connector
-				err = json.Unmarshal(w.Body.Bytes(), &createResp)
-				require.NoError(t, err)
-				draftVersion := createResp.Metadata.Generation
-
-				// Put an annotation on the draft version
-				body := key_value.PutKeyValueRequestJson{Value: "staging"}
-				jsonBody, _ := json.Marshal(body)
-				w = httptest.NewRecorder()
-				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodPut,
-					fmt.Sprintf("/connectors/%s/versions/%d/annotations/env", connectorId, draftVersion),
-					bytes.NewReader(jsonBody),
-					"root",
-					"some-actor",
-					aschema.AllPermissions(),
-				)
-				require.NoError(t, err)
-				req.Header.Set("Content-Type", "application/json")
-
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusOK, w.Code)
-
-				var resp key_value.KeyValueJson
-				err = json.Unmarshal(w.Body.Bytes(), &resp)
-				require.NoError(t, err)
-				require.Equal(t, "env", resp.Key)
-				require.Equal(t, "staging", resp.Value)
-			})
-		})
-
-		t.Run("delete version annotation", func(t *testing.T) {
-			t.Run("valid", func(t *testing.T) {
-				tu := setup(t, nil)
-
-				// First create a draft version
-				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodPost,
-					fmt.Sprintf("/connectors/%s/versions", connectorId),
-					nil,
-					"root",
-					"some-actor",
-					aschema.AllPermissions(),
-				)
-				require.NoError(t, err)
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusCreated, w.Code)
-
-				var createResp cschema.Connector
-				err = json.Unmarshal(w.Body.Bytes(), &createResp)
-				require.NoError(t, err)
-				draftVersion := createResp.Metadata.Generation
-
-				// Put an annotation on the draft
-				body := key_value.PutKeyValueRequestJson{Value: "to-delete"}
-				jsonBody, _ := json.Marshal(body)
-				w = httptest.NewRecorder()
-				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodPut,
-					fmt.Sprintf("/connectors/%s/versions/%d/annotations/temp", connectorId, draftVersion),
-					bytes.NewReader(jsonBody),
-					"root",
-					"some-actor",
-					aschema.AllPermissions(),
-				)
-				require.NoError(t, err)
-				req.Header.Set("Content-Type", "application/json")
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusOK, w.Code)
-
-				// Delete the annotation from the draft version
-				w = httptest.NewRecorder()
-				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodDelete,
-					fmt.Sprintf("/connectors/%s/versions/%d/annotations/temp", connectorId, draftVersion),
-					nil,
-					"root",
-					"some-actor",
-					aschema.AllPermissions(),
-				)
-				require.NoError(t, err)
-
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusNoContent, w.Code)
-
-				// Verify the annotation is gone
-				w = httptest.NewRecorder()
-				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
-					http.MethodGet,
-					fmt.Sprintf("/connectors/%s/versions/%d/annotations", connectorId, draftVersion),
-					nil,
-					"root",
-					"some-actor",
-					aschema.AllPermissions(),
-				)
-				require.NoError(t, err)
-				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusOK, w.Code)
-
-				var annotations map[string]string
-				err = json.Unmarshal(w.Body.Bytes(), &annotations)
-				require.NoError(t, err)
-				_, exists := annotations["temp"]
-				require.False(t, exists)
-			})
 		})
 	})
 

@@ -24,6 +24,7 @@ const (
 	ConnectionSetupCancelActionKind meta.Kind = "ConnectionSetupCancel"
 	ConnectionSetupRetryActionKind  meta.Kind = "ConnectionSetupRetry"
 	ConnectionReauthActionKind      meta.Kind = "ConnectionReauthenticate"
+	DataSourceOptionKind            meta.Kind = "DataSourceOption"
 )
 
 // ConnectionInitiateSpec contains the desired metadata and callback used to
@@ -277,4 +278,21 @@ func validateConnectionActionTarget(target meta.ObjectReference) error {
 type DataSourceOptionJson struct {
 	Value string `json:"value" yaml:"value" example:"ws-123"`
 	Label string `json:"label" yaml:"label" example:"My Workspace"`
+}
+
+// DataSourceOptionList is the canonical projection returned for dynamic setup
+// choices. Options are transport values rather than durable API resources, but
+// the collection still uses the shared Kubernetes-style list envelope.
+type DataSourceOptionList struct {
+	apiv1alpha1.ResourceList[DataSourceOptionJson] `json:",inline" yaml:",inline"`
+}
+
+func NewDataSourceOptionList(items []DataSourceOptionJson) DataSourceOptionList {
+	return DataSourceOptionList{
+		ResourceList: apiv1alpha1.NewResourceList(
+			DataSourceOptionKind,
+			items,
+			apiv1alpha1.ListMeta{},
+		),
+	}
 }

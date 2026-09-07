@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/rmorlok/authproxy/internal/apid"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	apiv1alpha1 "github.com/rmorlok/authproxy/internal/schema/api/v1alpha1"
 	authschema "github.com/rmorlok/authproxy/internal/schema/auth"
@@ -172,6 +171,20 @@ type ConnectionPatchJson struct {
 type ListConnectionResponseJson struct {
 	ResourceListJson
 	Items []ConnectionJson `json:"items" binding:"required"`
+}
+
+// DataSourceOptionListJson documents dynamic options using the standard list
+// envelope.
+type DataSourceOptionListJson struct {
+	ResourceListJson
+	Items []schemaapi.DataSourceOptionJson `json:"items" binding:"required"`
+}
+
+// ConnectionScopeListJson documents requested and granted OAuth2 scopes using
+// the standard list envelope.
+type ConnectionScopeListJson struct {
+	ResourceListJson
+	Items []schemaapi.ConnectionScopeJson `json:"items" binding:"required"`
 }
 
 // ConnectionActionMetaJson identifies the resource targeted by an action.
@@ -361,19 +374,26 @@ type NotificationBatchViewActionJson struct {
 	Status     *NotificationBatchViewStatusJson  `json:"status,omitempty"`
 }
 
-// ConnectorLifecycleRequestJson documents connector lifecycle operation bodies.
+// ConnectorLifecycleActionJson documents connector-wide lifecycle actions.
 //
-//	@Description	Request to run a connector lifecycle operation
-type ConnectorLifecycleRequestJson struct {
-	TimeoutSeconds *int64 `json:"timeoutSeconds,omitempty" example:"600"`
+//	@Description	Kubernetes-style connector lifecycle action and task result
+type ConnectorLifecycleActionJson struct {
+	APIVersion string                              `json:"apiVersion" binding:"required" enums:"authproxy.net/v1alpha1" example:"authproxy.net/v1alpha1"`
+	Kind       string                              `json:"kind" binding:"required" enums:"ConnectorDisconnectAll,ConnectorArchive"`
+	Metadata   ConnectionActionMetaJson            `json:"metadata" binding:"required"`
+	Spec       schemaapi.ConnectorLifecycleSpec    `json:"spec" binding:"required"`
+	Status     *schemaapi.ConnectorLifecycleStatus `json:"status,omitempty"`
 }
 
-// ConnectorLifecycleResponseJson documents connector lifecycle operation responses.
+// ConnectorForceStateActionJson documents an exact-generation force-state
+// request. The endpoint returns the updated Connector resource.
 //
-//	@Description	Response for connector lifecycle operation
-type ConnectorLifecycleResponseJson struct {
-	TaskId      string  `json:"taskId"`
-	ConnectorId apid.ID `json:"connectorId" swaggertype:"string" example:"cxr_test550e8400abcde"`
+//	@Description	Kubernetes-style connector generation force-state action
+type ConnectorForceStateActionJson struct {
+	APIVersion string                            `json:"apiVersion" binding:"required" enums:"authproxy.net/v1alpha1" example:"authproxy.net/v1alpha1"`
+	Kind       string                            `json:"kind" binding:"required" enums:"ConnectorForceState" example:"ConnectorForceState"`
+	Metadata   ConnectionActionMetaJson          `json:"metadata" binding:"required"`
+	Spec       schemaapi.ConnectorForceStateSpec `json:"spec" binding:"required"`
 }
 
 // KeySpecJson documents managed-key desired state while keeping polymorphic
@@ -576,31 +596,36 @@ type ProxyRequestJson struct {
 	BodyJson interface{}       `json:"bodyJson,omitempty"`
 }
 
-// DryRunRequestJson documents the rate-limit dry-run request body.
+// RateLimitDryRunSpecJson documents the synthetic request and optional actor
+// used by a dry-run action. metadata.target identifies a Connection or
+// Namespace.
 //
-//	@Description	Dry-run input: a proxy-shaped request + request type + the identity it runs under
-type DryRunRequestJson struct {
-	Request     interface{} `json:"request"`
-	RequestType string      `json:"requestType" example:"proxy"`
-	Context     interface{} `json:"context"`
+//	@Description	Synthetic request evaluated by a rate-limit dry run
+type RateLimitDryRunSpecJson struct {
+	Request     ProxyRequestJson      `json:"request" binding:"required"`
+	RequestType string                `json:"requestType" binding:"required" example:"proxy"`
+	ActorRef    *meta.ObjectReference `json:"actorRef,omitempty"`
 }
 
-// DryRunContextJson documents the dry-run identity context.
+// RateLimitDryRunStatusJson documents the observed dry-run result.
 //
-//	@Description	Identity the request runs under
-type DryRunContextJson struct {
-	ConnectionId string `json:"connectionId,omitempty"`
-	ActorId      string `json:"actorId,omitempty"`
-	Namespace    string `json:"namespace,omitempty" example:"root.acme"`
+//	@Description	Per-rule match and peek-driven would-allow result
+type RateLimitDryRunStatusJson struct {
+	RequestLabelSnapshot map[string]string      `json:"requestLabelSnapshot"`
+	Matched              []DryRunMatchJson      `json:"matched"`
+	NotMatched           []DryRunNotMatchedJson `json:"notMatched"`
 }
 
-// DryRunResponseJson documents the dry-run response.
+// RateLimitDryRunActionJson documents the complete dry-run request/response
+// envelope.
 //
-//	@Description	Per-rule match + peek-driven would-allow result
-type DryRunResponseJson struct {
-	RequestLabelSnapshot map[string]string `json:"requestLabelSnapshot"`
-	Matched              []interface{}     `json:"matched"`
-	NotMatched           []interface{}     `json:"notMatched"`
+//	@Description	Kubernetes-style rate-limit dry-run action
+type RateLimitDryRunActionJson struct {
+	APIVersion string                     `json:"apiVersion" binding:"required" enums:"authproxy.net/v1alpha1" example:"authproxy.net/v1alpha1"`
+	Kind       string                     `json:"kind" binding:"required" enums:"RateLimitDryRun" example:"RateLimitDryRun"`
+	Metadata   ConnectionActionMetaJson   `json:"metadata" binding:"required"`
+	Spec       RateLimitDryRunSpecJson    `json:"spec" binding:"required"`
+	Status     *RateLimitDryRunStatusJson `json:"status,omitempty"`
 }
 
 type DryRunMatchJson struct {

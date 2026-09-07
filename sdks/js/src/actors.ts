@@ -125,24 +125,6 @@ export const actorResourceToClaim = (actor: Actor): ActorClaim =>
     annotations: actor.metadata.annotations,
   });
 
-export interface PutActorLabelRequest {
-  value: string;
-}
-
-export interface ActorLabel {
-  key: string;
-  value: string;
-}
-
-export interface PutActorAnnotationRequest {
-  value: string;
-}
-
-export interface ActorAnnotation {
-  key: string;
-  value: string;
-}
-
 /**
  * Parameters used for listing actors.
  */
@@ -227,62 +209,6 @@ export const updateActorByExternalId = (
   });
 };
 
-/**
- * Get all labels for a specific actor by ID (uuid)
- */
-export const getActorLabels = (id: string) => {
-  return client.get<Record<string, string>>(`/api/v1/actors/${id}/labels`);
-};
-
-/**
- * Get a specific label for an actor by ID (uuid) and label key
- */
-export const getActorLabel = (id: string, labelKey: string) => {
-  return client.get<ActorLabel>(`/api/v1/actors/${id}/labels/${labelKey}`);
-};
-
-/**
- * Set a specific label for an actor by ID (uuid) and label key
- */
-export const putActorLabel = (id: string, labelKey: string, value: string) => {
-  return client.put<ActorLabel>(`/api/v1/actors/${id}/labels/${labelKey}`, { value });
-};
-
-/**
- * Delete a specific label for an actor by ID (uuid) and label key
- */
-export const deleteActorLabel = (id: string, labelKey: string) => {
-  return client.delete(`/api/v1/actors/${id}/labels/${labelKey}`);
-};
-
-/**
- * Get all annotations for a specific actor by ID (uuid)
- */
-export const getActorAnnotations = (id: string) => {
-  return client.get<Record<string, string>>(`/api/v1/actors/${id}/annotations`);
-};
-
-/**
- * Get a specific annotation for an actor by ID (uuid) and annotation key
- */
-export const getActorAnnotation = (id: string, annotationKey: string) => {
-  return client.get<ActorAnnotation>(`/api/v1/actors/${id}/annotations/${annotationKey}`);
-};
-
-/**
- * Set a specific annotation for an actor by ID (uuid) and annotation key
- */
-export const putActorAnnotation = (id: string, annotationKey: string, value: string) => {
-  return client.put<ActorAnnotation>(`/api/v1/actors/${id}/annotations/${annotationKey}`, { value });
-};
-
-/**
- * Delete a specific annotation for an actor by ID (uuid) and annotation key
- */
-export const deleteActorAnnotation = (id: string, annotationKey: string) => {
-  return client.delete(`/api/v1/actors/${id}/annotations/${annotationKey}`);
-};
-
 export const actors = {
   list: listActors,
   create: createActor,
@@ -293,12 +219,4 @@ export const actors = {
   deleteByExternalId: deleteActorByExternalId,
   update: updateActor,
   updateByExternalId: updateActorByExternalId,
-  getLabels: getActorLabels,
-  getLabel: getActorLabel,
-  putLabel: putActorLabel,
-  deleteLabel: deleteActorLabel,
-  getAnnotations: getActorAnnotations,
-  getAnnotation: getActorAnnotation,
-  putAnnotation: putActorAnnotation,
-  deleteAnnotation: deleteActorAnnotation,
 };
