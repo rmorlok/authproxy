@@ -190,6 +190,11 @@ describe('ConnectionDetail', () => {
     await user.click(screen.getByRole('button', {name: 'actions'}));
     await user.click(screen.getByRole('menuitem', {name: 'Change version…'}));
 
+    expect(connectors.listGenerations).toHaveBeenCalledWith(connection.spec.connectorRef.id, {
+      limit: 100,
+      orderBy: 'version desc',
+    });
+
     const dialog = await screen.findByRole('dialog', {name: 'Change connection version'});
     const target = within(dialog).getByRole('combobox', {name: 'Target version'}) as HTMLSelectElement;
     expect(target.value).toBe('3');

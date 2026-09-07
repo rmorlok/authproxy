@@ -83,7 +83,7 @@ describe('ConnectorDetail', () => {
     await screen.findByRole('heading', {name: 'example-connector'});
     await waitFor(() => expect(connectors.listGenerations).toHaveBeenCalledWith(
       connector.metadata.id,
-      {limit: 100, orderBy: 'generation desc'},
+      {limit: 100, orderBy: 'version desc'},
     ));
 
     const states = screen.getByText('Available States').parentElement;
