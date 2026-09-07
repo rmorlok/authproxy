@@ -15,7 +15,7 @@ import {
   DialogContent,
   LinearProgress,
 } from '@mui/material';
-import { ConnectionState, isCompleteResponse, isRedirectResponse } from '@authproxy/api';
+import { Connector, ConnectionState, isCompleteResponse, isRedirectResponse } from '@authproxy/api';
 import {
   clearRecentlyCompletedConnection,
   selectConnections,
@@ -52,6 +52,7 @@ import AddIcon from '@mui/icons-material/Add';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import { marketplaceTokens } from '../theme';
+import { connectorMatchesReference, connectorReference } from './connectorPresentation';
 
 /**
  * Component to display a list of connections
@@ -135,7 +136,7 @@ const ConnectionList: React.FC = () => {
       if (action.meta.requestStatus === 'fulfilled') {
         const response = action.payload as any;
         if (isRedirectResponse(response)) {
-          window.location.href = response.redirectUrl;
+          window.location.href = response.status.redirectUrl;
         } else if (isCompleteResponse(response)) {
           dispatch(fetchConnectionsAsync());
         } else {
@@ -149,13 +150,13 @@ const ConnectionList: React.FC = () => {
   const handleFormCancel = useCallback(() => {
     const connectionId = currentFormStep?.connectionId;
     const conn = connectionId
-      ? connections.find((c) => c.id === connectionId)
+      ? connections.find((c) => c.metadata.id === connectionId)
       : undefined;
     // If the connection is already ready, the form is from a reconfigure flow.
     // Clearing the form step alone leaves setup_step_id set on the server,
     // so the dialog reappears on next load — call cancel_setup to clear it server-side.
-    if (conn && conn.state === ConnectionState.CONFIGURED) {
-      dispatch(cancelSetupConnectionAsync(conn.id));
+    if (conn && conn.status.lifecycle.state === ConnectionState.CONFIGURED) {
+      dispatch(cancelSetupConnectionAsync(conn.metadata.id));
     }
     dispatch(clearFormStep());
   }, [dispatch, currentFormStep, connections]);
@@ -167,9 +168,9 @@ const ConnectionList: React.FC = () => {
       returnToUrl: window.location.href,
     })).then((action) => {
       if (action.meta.requestStatus === 'fulfilled') {
-        const response = action.payload as { type: string; redirectUrl?: string };
-        if (response.type === 'redirect' && response.redirectUrl) {
-          window.location.href = response.redirectUrl;
+        const response = action.payload as any;
+        if (isRedirectResponse(response)) {
+          window.location.href = response.status.redirectUrl;
         }
       }
     });
@@ -183,15 +184,15 @@ const ConnectionList: React.FC = () => {
     });
   }, [dispatch, verifyError]);
 
-  const handleConnect = useCallback((connectorId: string) => {
+  const handleConnect = useCallback((connector: Connector) => {
     dispatch(initiateConnectionAsync({
-      connectorId,
+      connectorRef: connectorReference(connector),
       returnToUrl: `${window.location.origin}/connections`,
     })).then((action) => {
       if (action.meta.requestStatus === 'fulfilled') {
         const response = action.payload as any;
         if (isRedirectResponse(response)) {
-          window.location.href = response.redirectUrl;
+          window.location.href = response.status.redirectUrl;
         } else if (isCompleteResponse(response)) {
           dispatch(fetchConnectionsAsync());
         }
@@ -229,7 +230,7 @@ const ConnectionList: React.FC = () => {
     return (
       <Grid container spacing={marketplaceTokens.spacing.gridGap}>
         {connectors.map((connector) => (
-          <Grid key={connector.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
+          <Grid key={`${connector.metadata.id}:${connector.metadata.generation}`} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
             <ConnectorCard
               connector={connector}
               onConnect={handleConnect}
@@ -296,10 +297,11 @@ const ConnectionList: React.FC = () => {
     content = (
       <Grid container spacing={marketplaceTokens.spacing.gridGap}>
         {connections.map((connection) => (
-          <Grid key={connection.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
+          <Grid key={connection.metadata.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
             <ConnectionCard
               connection={connection}
-              highlightNew={connection.id === recentlyCompletedConnectionId}
+              connector={connectors.find((connector) => connectorMatchesReference(connector, connection.spec.connectorRef))}
+              highlightNew={connection.metadata.id === recentlyCompletedConnectionId}
             />
           </Grid>
         ))}

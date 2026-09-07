@@ -39,10 +39,10 @@ import {
 import { marketplaceTokens } from '../theme';
 
 const notificationIcon = (notification: Notification) => {
-  if (notification.level === NotificationLevel.ERROR) {
+  if (notification.spec.level === NotificationLevel.ERROR) {
     return <ErrorOutlineIcon color="error" fontSize="small" />;
   }
-  if (notification.level === NotificationLevel.WARNING) {
+  if (notification.spec.level === NotificationLevel.WARNING) {
     return <WarningAmberIcon color="warning" fontSize="small" />;
   }
   return <InfoOutlinedIcon color="info" fontSize="small" />;
@@ -77,7 +77,7 @@ const Layout: React.FC = () => {
   const notificationsError = useSelector(selectNotificationsError);
   const unviewedNotificationCount = useSelector(selectUnviewedNotificationCount);
   const unviewedNotificationIds = useMemo(
-    () => notifications.filter((item) => !item.viewed).map((item) => item.id),
+    () => notifications.filter((item) => !item.status.viewed).map((item) => item.metadata.id),
     [notifications]
   );
 
@@ -112,17 +112,18 @@ const Layout: React.FC = () => {
   };
 
   const handleNotificationAction = (notification: Notification) => {
-    if (!notification.actionUrl || !notification.canAction) {
+    const actionUrl = notification.status.action?.url;
+    if (!actionUrl) {
       return;
     }
     handleNotificationsClose();
 
-    const route = routeFromActionUrl(notification.actionUrl);
+    const route = routeFromActionUrl(actionUrl);
     if (route) {
       navigate(route);
       return;
     }
-    window.location.href = notification.actionUrl;
+    window.location.href = actionUrl;
   };
 
   const toastsContent = toasts.length == 0 ? '' : toasts.map((toast, i) => (
@@ -149,7 +150,7 @@ const Layout: React.FC = () => {
     </MenuItem>
   ) : notifications.map((notification) => (
     <MenuItem
-      key={notification.id}
+      key={notification.metadata.id}
       disableRipple
       sx={{
         alignItems: 'flex-start',
@@ -164,11 +165,11 @@ const Layout: React.FC = () => {
         {notificationIcon(notification)}
       </ListItemIcon>
       <ListItemText
-        primary={notification.title}
-        secondary={notification.message}
+        primary={notification.spec.title}
+        secondary={notification.spec.message}
         primaryTypographyProps={{
           variant: 'subtitle2',
-          fontWeight: notification.viewed ? 500 : 700,
+          fontWeight: notification.status.viewed ? 500 : 700,
         }}
         secondaryTypographyProps={{
           variant: 'body2',
@@ -176,7 +177,7 @@ const Layout: React.FC = () => {
           sx: { mt: 0.5 },
         }}
       />
-      {notification.canAction && notification.actionUrl && (
+      {notification.status.action?.url && (
         <Button
           size="small"
           variant="outlined"

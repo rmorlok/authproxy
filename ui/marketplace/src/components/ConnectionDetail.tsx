@@ -27,7 +27,6 @@ import remarkGfm from 'remark-gfm';
 import {
   canBeDisconnected,
   ConnectionState,
-  DisconnectResponseJson,
   isCompleteResponse,
   isRedirectResponse,
   PollForTaskResult,
@@ -39,6 +38,7 @@ import {
   cancelSetupConnectionAsync,
   clearFormStep,
   disconnectConnectionAsync,
+  fetchConnectorsAsync,
   fetchConnectionsAsync,
   getSetupStepAsync,
   reauthConnectionAsync,
@@ -46,6 +46,8 @@ import {
   selectConnections,
   selectConnectionsError,
   selectConnectionsStatus,
+  selectConnectors,
+  selectConnectorsStatus,
   selectCurrentFormStep,
   selectFormSubmitError,
   selectSubmittingForm,
@@ -54,11 +56,12 @@ import {
 import { marketplaceTokens } from '../theme';
 import ConnectionSetupDialog from './ConnectionSetupDialog';
 import {
-  connectorInitials,
   markdownComponents,
   markdownUrlTransform,
 } from './ConnectorDetail';
 import { getConnectionStatusPresentation } from './connectionPresentation';
+import ConnectorLogo from './ConnectorLogo';
+import { connectorMatchesReference, getConnectorPresentation } from './connectorPresentation';
 
 interface ConnectionDetailProps {
   connectionId?: string;
@@ -70,7 +73,9 @@ const ConnectionDetail: React.FC<ConnectionDetailProps> = ({ connectionId: provi
   const [searchParams, setSearchParams] = useSearchParams();
   const connectionId = providedConnectionId ?? params.connectionId;
   const connections = useSelector(selectConnections);
+  const connectors = useSelector(selectConnectors);
   const status = useSelector(selectConnectionsStatus);
+  const connectorsStatus = useSelector(selectConnectorsStatus);
   const error = useSelector(selectConnectionsError);
   const currentFormStep = useSelector(selectCurrentFormStep);
   const isSubmittingForm = useSelector(selectSubmittingForm);
@@ -83,37 +88,43 @@ const ConnectionDetail: React.FC<ConnectionDetailProps> = ({ connectionId: provi
     if (status === 'idle') {
       dispatch(fetchConnectionsAsync());
     }
-  }, [dispatch, status]);
+    if (connectorsStatus === 'idle') {
+      dispatch(fetchConnectorsAsync());
+    }
+  }, [connectorsStatus, dispatch, status]);
 
   const connection = useMemo(() => (
-    connections.find((item) => item.id === connectionId)
+    connections.find((item) => item.metadata.id === connectionId)
   ), [connections, connectionId]);
 
-  const connector = connection?.connector;
+  const connector = useMemo(() => connection
+    ? connectors.find((item) => connectorMatchesReference(item, connection.spec.connectorRef))
+    : undefined, [connection, connectors]);
+  const connectorPresentation = connector ? getConnectorPresentation(connector) : undefined;
   const presentation = connection ? getConnectionStatusPresentation(connection) : null;
   const canReauth =
-    connection?.state === ConnectionState.CONFIGURED &&
+    connection?.status.lifecycle.state === ConnectionState.CONFIGURED &&
     (presentation?.requiresReconnection || !presentation?.requiresSetup);
-  const canReconfigure = connection?.state === ConnectionState.CONFIGURED && connector?.hasConfigure && !presentation?.requiresSetup;
+  const canReconfigure = connection?.status.lifecycle.state === ConnectionState.CONFIGURED && connectorPresentation?.hasConfigure && !presentation?.requiresSetup;
   const canDisconnect = connection ? canBeDisconnected(connection) : false;
-  const body = connector?.description || connector?.highlight || '';
+  const body = connectorPresentation?.description || connectorPresentation?.highlight || '';
 
   const handleReconfigureClick = useCallback(() => {
     if (!connection) return;
-    dispatch(reconfigureConnectionAsync(connection.id));
+    dispatch(reconfigureConnectionAsync(connection.metadata.id));
   }, [connection, dispatch]);
 
   const handleResumeSetupClick = useCallback(() => {
     if (!connection) return;
     setIsResumingSetup(true);
     dispatch(getSetupStepAsync({
-      connectionId: connection.id,
+      connectionId: connection.metadata.id,
       returnToUrl: window.location.href,
     })).then((action) => {
       if (action.meta.requestStatus === 'fulfilled') {
         const response = action.payload as any;
-        if (isRedirectResponse(response) && response.redirectUrl) {
-          window.location.href = response.redirectUrl;
+        if (isRedirectResponse(response) && response.status.redirectUrl) {
+          window.location.href = response.status.redirectUrl;
           return;
         }
         if (isCompleteResponse(response)) {
@@ -127,13 +138,13 @@ const ConnectionDetail: React.FC<ConnectionDetailProps> = ({ connectionId: provi
   const handleReauthClick = useCallback(() => {
     if (!connection) return;
     dispatch(reauthConnectionAsync({
-      connectionId: connection.id,
+      connectionId: connection.metadata.id,
       returnToUrl: window.location.href,
     })).then((action) => {
       if (action.meta.requestStatus === 'fulfilled') {
         const response = action.payload as any;
         if (isRedirectResponse(response)) {
-          window.location.href = response.redirectUrl;
+          window.location.href = response.status.redirectUrl;
         }
       }
     });
@@ -149,7 +160,7 @@ const ConnectionDetail: React.FC<ConnectionDetailProps> = ({ connectionId: provi
       return;
     }
 
-    const actionKey = `${connection.id}:${action}`;
+    const actionKey = `${connection.metadata.id}:${action}`;
     if (handledActionRef.current === actionKey) {
       return;
     }
@@ -187,16 +198,10 @@ const ConnectionDetail: React.FC<ConnectionDetailProps> = ({ connectionId: provi
     if (!connection) return;
     setOpenDisconnectDialog(false);
     try {
-      const disconnectResult = await dispatch(disconnectConnectionAsync(connection.id));
-      const responsePayload = disconnectResult.payload;
-
-      if (
-        responsePayload &&
-        typeof responsePayload === 'object' &&
-		'taskId' in responsePayload
-      ) {
+      const disconnectResult = await dispatch(disconnectConnectionAsync(connection.metadata.id));
+      if (disconnectConnectionAsync.fulfilled.match(disconnectResult)) {
         const taskPollResult =
-          await tasks.pollForTaskFinalized((responsePayload as DisconnectResponseJson).taskId);
+          await tasks.pollForTaskFinalized(disconnectResult.payload.status.taskId);
         if (taskPollResult.result !== PollForTaskResult.FINALIZED) {
           dispatch(addToast({
             message: 'Error while checking for status of disconnect',
@@ -233,7 +238,7 @@ const ConnectionDetail: React.FC<ConnectionDetailProps> = ({ connectionId: provi
       if (action.meta.requestStatus === 'fulfilled') {
         const response = action.payload as any;
         if (isRedirectResponse(response)) {
-          window.location.href = response.redirectUrl;
+          window.location.href = response.status.redirectUrl;
         } else {
           dispatch(fetchConnectionsAsync());
         }
@@ -242,8 +247,8 @@ const ConnectionDetail: React.FC<ConnectionDetailProps> = ({ connectionId: provi
   }, [dispatch, currentFormStep]);
 
   const handleFormCancel = useCallback(() => {
-    if (connection && connection.state === ConnectionState.CONFIGURED) {
-      dispatch(cancelSetupConnectionAsync(connection.id));
+    if (connection && connection.status.lifecycle.state === ConnectionState.CONFIGURED) {
+      dispatch(cancelSetupConnectionAsync(connection.metadata.id));
     }
     dispatch(clearFormStep());
   }, [dispatch, connection]);
@@ -259,7 +264,7 @@ const ConnectionDetail: React.FC<ConnectionDetailProps> = ({ connectionId: provi
     );
   } else if (status === 'failed') {
     content = <Alert severity="error">{error}</Alert>;
-  } else if (!connection || !connector || !presentation) {
+  } else if (!connection || !connector || !presentation || !connectorPresentation) {
     content = <Alert severity="warning">Connection not found.</Alert>;
   } else {
     content = (
@@ -274,47 +279,10 @@ const ConnectionDetail: React.FC<ConnectionDetailProps> = ({ connectionId: provi
           }}
         >
           <Box sx={{ display: 'flex', gap: 2.5, alignItems: 'center', minWidth: 0 }}>
-            {connector.logo ? (
-              <Box
-                component="img"
-                src={connector.logo}
-                alt={`${connector.displayName} logo`}
-                sx={{
-                  width: 88,
-                  height: 88,
-                  objectFit: 'contain',
-                  bgcolor: 'background.default',
-                  border: 1,
-                  borderColor: 'divider',
-                  borderRadius: marketplaceTokens.radius.card,
-                  p: 1.5,
-                  flexShrink: 0,
-                }}
-              />
-            ) : (
-              <Box
-                role="img"
-                aria-label={`${connector.displayName} logo`}
-                sx={{
-                  width: 88,
-                  height: 88,
-                  borderRadius: marketplaceTokens.radius.card,
-                  bgcolor: 'primary.dark',
-                  color: 'primary.contrastText',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                }}
-              >
-                <Typography variant="h4" component="span" sx={{ fontWeight: 700 }}>
-                  {connectorInitials(connector.displayName)}
-                </Typography>
-              </Box>
-            )}
+            <ConnectorLogo connector={connector} variant="detail" />
             <Box sx={{ minWidth: 0 }}>
               <Typography variant="h3" component="h1" sx={{ mb: 1 }}>
-                {connector.displayName}
+                {connectorPresentation.displayName}
               </Typography>
               <Box
                 sx={{
@@ -383,9 +351,9 @@ const ConnectionDetail: React.FC<ConnectionDetailProps> = ({ connectionId: provi
                 startIcon={<DeleteOutlineIcon />}
                 color="error"
                 onClick={() => setOpenDisconnectDialog(true)}
-                disabled={connection.state === ConnectionState.DISCONNECTING}
+                disabled={connection.status.lifecycle.state === ConnectionState.DISCONNECTING}
               >
-                {connection.state === ConnectionState.DISCONNECTING ? 'Disconnecting...' : 'Disconnect'}
+                {connection.status.lifecycle.state === ConnectionState.DISCONNECTING ? 'Disconnecting...' : 'Disconnect'}
               </Button>
             )}
           </Box>
@@ -444,7 +412,7 @@ const ConnectionDetail: React.FC<ConnectionDetailProps> = ({ connectionId: provi
         <DialogTitle>Disconnect Confirmation</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Are you sure you want to disconnect from {connector?.displayName || 'this connector'}?
+            Are you sure you want to disconnect from {connectorPresentation?.displayName || 'this connector'}?
           </DialogContentText>
         </DialogContent>
         <DialogActions>

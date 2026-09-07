@@ -67,7 +67,9 @@ export const notificationsSlice = createSlice({
                 state.markingViewed = false;
                 const viewedIds = new Set(action.payload);
                 state.items = state.items.map((item) => (
-                    viewedIds.has(item.id) ? {...item, viewed: true} : item
+                    viewedIds.has(item.metadata.id)
+                        ? {...item, status: {...item.status, viewed: true}}
+                        : item
                 ));
             })
             .addCase(markNotificationsViewedAsync.rejected, (state, action) => {
@@ -81,6 +83,6 @@ export const selectNotifications = (state: RootState) => state.notifications.ite
 export const selectNotificationsStatus = (state: RootState) => state.notifications.status;
 export const selectNotificationsError = (state: RootState) => state.notifications.error;
 export const selectUnviewedNotificationCount = (state: RootState) =>
-    state.notifications.items.filter((item) => !item.viewed).length;
+    state.notifications.items.filter((item) => !item.status.viewed).length;
 
 export default notificationsSlice.reducer;

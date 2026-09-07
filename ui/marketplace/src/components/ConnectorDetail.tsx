@@ -24,6 +24,8 @@ import {
 } from '../store';
 import { marketplaceTokens } from '../theme';
 import { useConnectorConnectionFlow } from './useConnectorConnectionFlow';
+import ConnectorLogo from './ConnectorLogo';
+import { getConnectorPresentation } from './connectorPresentation';
 
 interface ConnectorDetailProps {
   connectorId?: string;
@@ -129,10 +131,11 @@ const ConnectorDetail: React.FC<ConnectorDetailProps> = ({ connectorId }) => {
   }, [dispatch, status]);
 
   const connector = useMemo(() => (
-    connectors.find((item) => item.id === selectedConnectorId)
+    connectors.find((item) => item.metadata.id === selectedConnectorId)
   ), [connectors, selectedConnectorId]);
 
-  const body = connector?.description || connector?.highlight || '';
+  const presentation = connector ? getConnectorPresentation(connector) : undefined;
+  const body = presentation?.description || presentation?.highlight || '';
 
   let content;
   if (status === 'loading' || status === 'idle') {
@@ -164,51 +167,14 @@ const ConnectorDetail: React.FC<ConnectorDetailProps> = ({ connectorId }) => {
           }}
         >
           <Box sx={{ display: 'flex', gap: 2.5, alignItems: 'center', minWidth: 0 }}>
-            {connector.logo ? (
-              <Box
-                component="img"
-                src={connector.logo}
-                alt={`${connector.displayName} logo`}
-                sx={{
-                  width: 88,
-                  height: 88,
-                  objectFit: 'contain',
-                  bgcolor: 'background.default',
-                  border: 1,
-                  borderColor: 'divider',
-                  borderRadius: marketplaceTokens.radius.card,
-                  p: 1.5,
-                  flexShrink: 0,
-                }}
-              />
-            ) : (
-              <Box
-                role="img"
-                aria-label={`${connector.displayName} logo`}
-                sx={{
-                  width: 88,
-                  height: 88,
-                  borderRadius: marketplaceTokens.radius.card,
-                  bgcolor: 'primary.dark',
-                  color: 'primary.contrastText',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                }}
-              >
-                <Typography variant="h4" component="span" sx={{ fontWeight: 700 }}>
-                  {connectorInitials(connector.displayName)}
-                </Typography>
-              </Box>
-            )}
+            <ConnectorLogo connector={connector} variant="detail" />
             <Box sx={{ minWidth: 0 }}>
               <Typography variant="h3" component="h1" sx={{ mb: 1 }}>
-                {connector.displayName}
+                {presentation?.displayName}
               </Typography>
-              {connector.highlight && (
+              {presentation?.highlight && (
                 <Typography variant="body1" color="text.secondary">
-                  {connector.highlight}
+                  {presentation.highlight}
                 </Typography>
               )}
             </Box>
@@ -217,7 +183,7 @@ const ConnectorDetail: React.FC<ConnectorDetailProps> = ({ connectorId }) => {
             {isConnecting && <CircularProgress size={22} />}
             <Button
               variant="contained"
-              onClick={() => connect(connector.id)}
+              onClick={() => connect(connector)}
               disabled={isConnecting}
             >
               Connect

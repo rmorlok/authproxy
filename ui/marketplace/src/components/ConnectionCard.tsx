@@ -19,7 +19,7 @@ import {
   MenuItem,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import {tasks, Connection, ConnectionState, canBeDisconnected, isCompleteResponse, isRedirectResponse, PollForTaskResult, DisconnectResponseJson} from '@authproxy/api';
+import {tasks, Connection, Connector, ConnectionState, canBeDisconnected, isCompleteResponse, isRedirectResponse, PollForTaskResult} from '@authproxy/api';
 import { useDispatch } from 'react-redux';
 import {
   disconnectConnectionAsync,
@@ -40,8 +40,10 @@ import { marketplaceTokens } from '../theme';
 import ConnectorLogo from './ConnectorLogo';
 import { useNavigate } from 'react-router-dom';
 import { getConnectionStatusPresentation } from './connectionPresentation';
+import { getConnectorPresentation } from './connectorPresentation';
 interface ConnectionCardProps {
   connection: Connection;
+  connector?: Connector;
   highlightNew?: boolean;
 }
 
@@ -53,15 +55,17 @@ const truncateText = (text: string, maxLength: number = 120): string => {
 /**
  * Component to display a single connection with its details
  */
-const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection, highlightNew = false }) => {
+const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection, connector, highlightNew = false }) => {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
-  const connector = connection.connector;
+  const connectionId = connection.metadata.id;
+  const lifecycleState = connection.status.lifecycle.state;
+  const connectorPresentation = connector ? getConnectorPresentation(connector) : undefined;
 
   // Use highlight field if available, otherwise use truncated description.
   // Be defensive in case the connector is missing.
-  const displayText = connector?.highlight ?? (
-    connector?.description ? truncateText(connector.description) : ''
+  const displayText = connectorPresentation?.highlight ?? (
+    connectorPresentation?.description ? truncateText(connectorPresentation.description) : ''
   );
 
   // State for confirmation dialog
@@ -72,7 +76,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection, highlightNe
 
   // Handle reconfigure button click
   const handleReconfigureClick = () => {
-    dispatch(reconfigureConnectionAsync(connection.id));
+    dispatch(reconfigureConnectionAsync(connectionId));
   };
 
   const handleViewDetailsClick = () => {
@@ -80,19 +84,19 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection, highlightNe
       return;
     }
     handleActionsMenuClose();
-    navigate(`/connections/${encodeURIComponent(connection.id)}`);
+    navigate(`/connections/${encodeURIComponent(connectionId)}`);
   };
 
   const handleResumeSetupClick = () => {
     setIsResumingSetup(true);
     dispatch(getSetupStepAsync({
-      connectionId: connection.id,
+      connectionId,
       returnToUrl: window.location.href,
     })).then((action) => {
       if (action.meta.requestStatus === 'fulfilled') {
         const response = action.payload as any;
-        if (isRedirectResponse(response) && response.redirectUrl) {
-          window.location.href = response.redirectUrl;
+        if (isRedirectResponse(response) && response.status.redirectUrl) {
+          window.location.href = response.status.redirectUrl;
           return;
         }
         if (isCompleteResponse(response)) {
@@ -109,13 +113,13 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection, highlightNe
   const handleReauthClick = () => {
     handleActionsMenuClose();
     dispatch(reauthConnectionAsync({
-      connectionId: connection.id,
+      connectionId,
       returnToUrl: window.location.href,
     })).then((action) => {
       if (action.meta.requestStatus === 'fulfilled') {
         const response = action.payload as any;
         if (isRedirectResponse(response)) {
-          window.location.href = response.redirectUrl;
+          window.location.href = response.status.redirectUrl;
         }
       }
     });
@@ -133,8 +137,8 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection, highlightNe
   } = getConnectionStatusPresentation(connection);
   // Reauth is meaningful on configured connections unless healthy setup is the
   // only outstanding action. If health is unhealthy, reauth remains primary.
-  const canReauth = connection.state === ConnectionState.CONFIGURED && (requiresReconnection || !requiresSetup);
-  const canReconfigure = connection.state === ConnectionState.CONFIGURED && connector?.hasConfigure && !requiresSetup;
+  const canReauth = lifecycleState === ConnectionState.CONFIGURED && (requiresReconnection || !requiresSetup);
+  const canReconfigure = lifecycleState === ConnectionState.CONFIGURED && connectorPresentation?.hasConfigure && !requiresSetup;
 
   const handleActionsMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setActionsAnchorEl(event.currentTarget);
@@ -160,15 +164,10 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection, highlightNe
     setOpenDialog(false);
     try {
       // Dispatch the disconnect action
-      const disconnectResult = await dispatch(disconnectConnectionAsync(connection.id));
-      const responsePayload = disconnectResult.payload;
-
-      if (responsePayload &&
-          typeof responsePayload === 'object' &&
-		  'taskId' in responsePayload) {
-
+      const disconnectResult = await dispatch(disconnectConnectionAsync(connectionId));
+      if (disconnectConnectionAsync.fulfilled.match(disconnectResult)) {
         const taskPollResult =
-            await tasks.pollForTaskFinalized((responsePayload as DisconnectResponseJson).taskId);
+            await tasks.pollForTaskFinalized(disconnectResult.payload.status.taskId);
         if (taskPollResult.result !== PollForTaskResult.FINALIZED) {
             addToast({
               message: 'Error while checking for status of disconnect',
@@ -200,7 +199,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection, highlightNe
     <>
       <IconButton
         aria-label="Connection actions"
-        aria-controls={actionsMenuOpen ? `connection-actions-${connection.id}` : undefined}
+        aria-controls={actionsMenuOpen ? `connection-actions-${connectionId}` : undefined}
         aria-haspopup="menu"
         aria-expanded={actionsMenuOpen ? 'true' : undefined}
         size="small"
@@ -209,7 +208,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection, highlightNe
         <MoreVertIcon />
       </IconButton>
       <Menu
-        id={`connection-actions-${connection.id}`}
+        id={`connection-actions-${connectionId}`}
         anchorEl={actionsAnchorEl}
         open={actionsMenuOpen}
         onClose={handleActionsMenuClose}
@@ -232,13 +231,13 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection, highlightNe
         )}
         <MenuItem
           onClick={handleDisconnectClick}
-          disabled={connection.state === ConnectionState.DISCONNECTING}
+          disabled={lifecycleState === ConnectionState.DISCONNECTING}
           sx={{ color: 'error.main' }}
         >
           <ListItemIcon sx={{ color: 'error.main' }}>
             <DeleteOutlineIcon fontSize="small" />
           </ListItemIcon>
-          {connection.state === ConnectionState.DISCONNECTING ? 'Disconnecting...' : 'Disconnect'}
+          {lifecycleState === ConnectionState.DISCONNECTING ? 'Disconnecting...' : 'Disconnect'}
         </MenuItem>
       </Menu>
     </>
@@ -246,7 +245,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection, highlightNe
 
   return (
     <Card
-      data-testid={`connection-card-${connection.id}`}
+      data-testid={`connection-card-${connectionId}`}
       data-highlight-new={highlightNew ? 'true' : undefined}
       sx={{
         width: '100%',
@@ -286,7 +285,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection, highlightNe
       </Box>
       <CardContent sx={{ flexGrow: 1, width: '100%', boxSizing: 'border-box' }}>
         <Typography gutterBottom variant="h5" component="div">
-          {connector ? connector.displayName : 'Unknown Connector'}
+          {connectorPresentation?.displayName || connection.spec.connectorRef.name || 'Unknown Connector'}
         </Typography>
         <Box
           sx={{
@@ -406,9 +405,9 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection, highlightNe
                 size="small"
                 color="error"
                 onClick={handleDisconnectClick}
-                disabled={connection.state === ConnectionState.DISCONNECTING}
+                disabled={lifecycleState === ConnectionState.DISCONNECTING}
               >
-                {connection.state === ConnectionState.DISCONNECTING ? 'Disconnecting...' : 'Disconnect'}
+                {lifecycleState === ConnectionState.DISCONNECTING ? 'Disconnecting...' : 'Disconnect'}
               </Button>
             </>
           )}
@@ -423,7 +422,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection, highlightNe
         <DialogTitle>Disconnect Confirmation</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Are you sure you want to disconnect from {connector?.displayName || 'this connector'}?
+            Are you sure you want to disconnect from {connectorPresentation?.displayName || 'this connector'}?
           </DialogContentText>
         </DialogContent>
         <DialogActions>

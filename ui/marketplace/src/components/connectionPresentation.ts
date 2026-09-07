@@ -13,17 +13,18 @@ export interface ConnectionStatusPresentation {
 }
 
 export const getConnectionStatusPresentation = (connection: Connection): ConnectionStatusPresentation => {
-  const createdDate = new Date(connection.createdAt).toLocaleDateString();
-  const hasPendingSetup = Boolean(connection.setupStepId);
+  const createdDate = new Date(connection.metadata.createdAt).toLocaleDateString();
+  const hasPendingSetup = Boolean(connection.status.setup?.stepId);
+  const lifecycleState = connection.status.lifecycle.state;
   const isUnhealthy =
-    connection.state === ConnectionState.CONFIGURED &&
-    connection.healthState === ConnectionHealthState.UNHEALTHY;
+    lifecycleState === ConnectionState.CONFIGURED &&
+    connection.status.health.state === ConnectionHealthState.UNHEALTHY;
   const isHealthyConfigured =
-    connection.state === ConnectionState.CONFIGURED &&
+    lifecycleState === ConnectionState.CONFIGURED &&
     !isUnhealthy &&
     !hasPendingSetup;
-  const requiresSetup = connection.state === ConnectionState.SETUP || hasPendingSetup;
-  const requiresReconnection = isUnhealthy || connection.state === ConnectionState.DISABLED;
+  const requiresSetup = lifecycleState === ConnectionState.SETUP || hasPendingSetup;
+  const requiresReconnection = isUnhealthy || lifecycleState === ConnectionState.DISABLED;
   const statusBadgeLabel = requiresReconnection
     ? 'Requires reconnection'
     : requiresSetup
@@ -34,14 +35,14 @@ export const getConnectionStatusPresentation = (connection: Connection): Connect
     ? 'Reconnection required'
     : requiresSetup
       ? 'Setup required'
-      : connection.state === ConnectionState.DISCONNECTING
+      : lifecycleState === ConnectionState.DISCONNECTING
         ? 'Disconnecting'
-        : connection.state === ConnectionState.DISCONNECTED
+        : lifecycleState === ConnectionState.DISCONNECTED
           ? 'Disconnected'
           : `Connected on ${createdDate}`;
   const statusDotColor = requiresReconnection
     ? 'error.main'
-    : requiresSetup || connection.state === ConnectionState.DISCONNECTING
+    : requiresSetup || lifecycleState === ConnectionState.DISCONNECTING
       ? 'warning.main'
       : isHealthyConfigured
         ? 'success.main'
