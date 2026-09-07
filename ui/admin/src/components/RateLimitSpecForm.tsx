@@ -21,7 +21,7 @@ import {
     RateLimitSpec, RateLimitMode, PathMatchKind, SlidingWindowMode,
     RateLimitSelector, RateLimitBucket, RateLimitAlgorithm,
     RateLimitFixedWindow, RateLimitSlidingWindow, RateLimitTokenBucket,
-    RateLimitScope, RATE_LIMIT_API_VERSION,
+    API_VERSION, RateLimitScope,
 } from '@authproxy/api';
 
 // Mirrors the server's validHTTPMethods set in internal/schema/rate_limit/selector.go.
@@ -150,10 +150,10 @@ function ScopeSection({ value, onChange }: { value?: RateLimitScope; onChange: (
                 onChange({namespaceMatcher: ''});
                 break;
             case 'connector':
-                onChange({connectorRef: {apiVersion: RATE_LIMIT_API_VERSION, kind: 'Connector', id: ''}});
+                onChange({connectorRef: {apiVersion: API_VERSION, kind: 'Connector', id: ''}});
                 break;
             case 'connection':
-                onChange({connectionRef: {apiVersion: RATE_LIMIT_API_VERSION, kind: 'Connection', id: ''}});
+                onChange({connectionRef: {apiVersion: API_VERSION, kind: 'Connection', id: ''}});
                 break;
             default:
                 onChange(undefined);

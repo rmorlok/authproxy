@@ -1,4 +1,4 @@
-import type {SearchResourceSummary, SearchResourceType} from '@authproxy/api';
+import type {ManagedResourceKind, SearchResourceType, SearchResult} from '@authproxy/api';
 import {labelSelectorUsesSystemLabels, type ParsedSearchQuery} from './query';
 
 export const SEARCH_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -6,7 +6,7 @@ export const SEARCH_CACHE_MAX_ENTRIES = 500;
 export const SEARCH_RESULT_LIMIT = 50;
 
 interface CacheEntry {
-    item: SearchResourceSummary;
+    item: SearchResult;
     scopeKey: string;
     expiresAt: number;
 }
@@ -20,7 +20,7 @@ export class SearchResourceCache {
     private entries = new Map<string, CacheEntry>();
     private seeds = new Map<string, SeedState>();
 
-    put(scopeKey: string, items: SearchResourceSummary[], now = Date.now()): void {
+    put(scopeKey: string, items: SearchResult[], now = Date.now()): void {
         for (const item of items) {
             const key = this.key(scopeKey, item);
             this.entries.delete(key);
@@ -60,10 +60,10 @@ export class SearchResourceCache {
         return types.every((type) => !state.truncatedTypes.has(type));
     }
 
-    list(scopeKey: string, now = Date.now()): SearchResourceSummary[] {
+    list(scopeKey: string, now = Date.now()): SearchResult[] {
         this.prune(now);
         const prefix = `${scopeKey}|`;
-        const result: SearchResourceSummary[] = [];
+        const result: SearchResult[] = [];
         const touched: Array<[string, CacheEntry]> = [];
         for (const [key, entry] of this.entries) {
             if (key.startsWith(prefix)) {
@@ -103,15 +103,15 @@ export class SearchResourceCache {
         }
     }
 
-    private key(scopeKey: string, item: SearchResourceSummary): string {
-        return `${scopeKey}|${item.resourceType}|${item.resourceId}`;
+    private key(scopeKey: string, item: SearchResult): string {
+        return `${scopeKey}|${item.resourceRef.kind}|${searchResultId(item)}`;
     }
 }
 
 export function filterCachedResources(
-    items: SearchResourceSummary[],
+    items: SearchResult[],
     parsed: ParsedSearchQuery,
-): SearchResourceSummary[] {
+): SearchResult[] {
     if (parsed.error || parsed.direct) {
         return [];
     }
@@ -125,7 +125,7 @@ export function filterCachedResources(
     const types = new Set(parsed.resourceTypes);
     const needle = parsed.text.toLowerCase();
     const filtered = items.filter((item) => {
-        if (types.size > 0 && !types.has(item.resourceType)) {
+        if (types.size > 0 && !types.has(searchResultType(item))) {
             return false;
         }
         if (parsed.labelSelector && !matchesLabelSelector(item.labels, parsed.labelSelector)) {
@@ -140,28 +140,28 @@ export function filterCachedResources(
     return filtered
         .map((item) => ({item, score: localScore(item, needle)}))
         .sort((a, b) => b.score - a.score || Date.parse(b.item.updatedAt) - Date.parse(a.item.updatedAt) ||
-            a.item.resourceType.localeCompare(b.item.resourceType) ||
-            a.item.resourceId.localeCompare(b.item.resourceId))
+            searchResultType(a.item).localeCompare(searchResultType(b.item)) ||
+            searchResultId(a.item).localeCompare(searchResultId(b.item)))
         .map(({item}) => item)
         .slice(0, SEARCH_RESULT_LIMIT);
 }
 
 export function mergeSearchResults(
-    local: SearchResourceSummary[],
-    remote: SearchResourceSummary[],
+    local: SearchResult[],
+    remote: SearchResult[],
     retainLocalTypes?: SearchResourceType[],
-): SearchResourceSummary[] {
+): SearchResult[] {
     const seen = new Set<string>();
-    const result: SearchResourceSummary[] = [];
+    const result: SearchResult[] = [];
     // Once the server responds, its cross-type rank is authoritative. Cached
     // entries that were not returned remotely remain useful as a best-effort
     // tail when a type was truncated or incomplete.
     const retainedTypes = retainLocalTypes === undefined ? null : new Set(retainLocalTypes);
     const retainedLocal = retainedTypes === null
         ? local
-        : local.filter((item) => retainedTypes.has(item.resourceType));
+        : local.filter((item) => retainedTypes.has(searchResultType(item)));
     for (const item of [...remote, ...retainedLocal]) {
-        const key = `${item.resourceType}|${item.resourceId}`;
+        const key = `${item.resourceRef.kind}|${searchResultId(item)}`;
         if (seen.has(key)) continue;
         seen.add(key);
         result.push(item);
@@ -170,13 +170,13 @@ export function mergeSearchResults(
     return result;
 }
 
-function searchableValues(item: SearchResourceSummary): string[] {
-    return [item.name, ...Object.values(item.labels)];
+function searchableValues(item: SearchResult): string[] {
+    return [searchResultName(item), ...Object.values(item.labels)];
 }
 
-function localScore(item: SearchResourceSummary, needle: string): number {
+function localScore(item: SearchResult, needle: string): number {
     if (!needle) return 0;
-    const name = item.name.toLowerCase();
+    const name = searchResultName(item).toLowerCase();
     if (name === needle) return 3;
     if (name.startsWith(needle)) return 2;
     if (name.includes(needle)) return 1;
@@ -184,6 +184,35 @@ function localScore(item: SearchResourceSummary, needle: string): number {
         if (value.includes(needle)) return 1;
     }
     return 0;
+}
+
+const RESOURCE_TYPES_BY_KIND: Record<ManagedResourceKind, SearchResourceType> = {
+    Actor: 'actor',
+    Connection: 'connection',
+    Connector: 'connector',
+    Namespace: 'namespace',
+    Key: 'key',
+    RateLimit: 'rate_limit',
+};
+
+export function searchResourceTypeFromKind(kind: ManagedResourceKind): SearchResourceType {
+    return RESOURCE_TYPES_BY_KIND[kind];
+}
+
+export function searchResultType(item: SearchResult): SearchResourceType {
+    return searchResourceTypeFromKind(item.resourceRef.kind);
+}
+
+export function searchResultId(item: SearchResult): string {
+    return item.resourceRef.id || item.resourceRef.name || '';
+}
+
+export function searchResultName(item: SearchResult): string {
+    return item.resourceRef.name || searchResultId(item);
+}
+
+export function searchResultNamespace(item: SearchResult): string | undefined {
+    return item.resourceRef.namespace;
 }
 
 function matchesLabelSelector(labels: Record<string, string>, selector: string): boolean {

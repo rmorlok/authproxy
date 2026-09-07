@@ -28,7 +28,9 @@ import {
   Key,
   KeyState,
   keys,
+  KEY_KIND,
   NAMESPACE_PATH_SEPARATOR,
+  objectReference,
 } from '@authproxy/api';
 import ResourceIdentifier from './ResourceIdentifier';
 import ResourceMetadataMenuItems from './ResourceMetadataMenuItems';
@@ -38,8 +40,8 @@ import ResourceNameEditor from './ResourceNameEditor';
 function StateChip({state}: { state: NamespaceState }) {
   const colors: Record<string, "default" | "success" | "error" | "info" | "warning" | "primary" | "secondary"> = {
     [NamespaceState.ACTIVE]: 'success',
-    [NamespaceState.DISCONNECTING]: 'warning',
-    [NamespaceState.DISCONNECTED]: 'default',
+    [NamespaceState.DESTROYING]: 'warning',
+    [NamespaceState.DESTROYED]: 'default',
   };
   return <Chip label={state} color={colors[state] || 'default'} size="small"/>;
 }
@@ -128,7 +130,7 @@ export default function NamespaceDetail({namespacePath}: { namespacePath: string
     setActionError(null);
     setActionLoading(true);
     try {
-      await namespaces.setKey(namespacePath, selectedKeyId);
+      await namespaces.setKey(namespacePath, objectReference(KEY_KIND, {id: selectedKeyId}));
       setSelectorOpen(false);
       fetchNamespace();
     } catch (err: any) {
@@ -163,8 +165,8 @@ export default function NamespaceDetail({namespacePath}: { namespacePath: string
   // Group keys by namespace for the selector
   const keysByNamespace: Record<string, Key[]> = {};
   for (const ek of ancestorKeys) {
-    if (!keysByNamespace[ek.namespace]) keysByNamespace[ek.namespace] = [];
-    keysByNamespace[ek.namespace].push(ek);
+    if (!keysByNamespace[ek.metadata.namespace]) keysByNamespace[ek.metadata.namespace] = [];
+    keysByNamespace[ek.metadata.namespace].push(ek);
   }
 
   return (
@@ -177,17 +179,27 @@ export default function NamespaceDetail({namespacePath}: { namespacePath: string
         <Menu anchorEl={menuAnchorEl} open={Boolean(menuAnchorEl)} onClose={closeMenu} keepMounted>
           <ResourceMetadataMenuItems
             resource="namespace"
-            name={ns.name}
-            labels={ns.labels}
-            annotations={ns.annotations}
+            name={ns.metadata.name}
+            labels={ns.metadata.labels}
+            annotations={ns.metadata.annotations}
             onCloseMenu={closeMenu}
             renameDisabledReason="Namespace names are derived from their immutable paths."
             onUpdateLabels={async (labels) => {
-              await namespaces.update(namespacePath, {labels});
+              await namespaces.update(namespacePath, {
+                apiVersion: ns.apiVersion,
+                kind: ns.kind,
+                metadata: {labels},
+                spec: {},
+              });
               fetchNamespace();
             }}
             onUpdateAnnotations={async (annotations) => {
-              await namespaces.update(namespacePath, {annotations});
+              await namespaces.update(namespacePath, {
+                apiVersion: ns.apiVersion,
+                kind: ns.kind,
+                metadata: {annotations},
+                spec: {},
+              });
               fetchNamespace();
             }}
             disabled={actionLoading}
@@ -195,33 +207,33 @@ export default function NamespaceDetail({namespacePath}: { namespacePath: string
         </Menu>
       </Stack>
 
-      <ResourceNameEditor name={ns.name} resourceType="Namespace"/>
+      <ResourceNameEditor name={ns.metadata.name} resourceType="Namespace"/>
 
       {actionError && <Alert severity="error">{actionError}</Alert>}
 
-      <ResourceIdentifier label="Path" value={ns.path} copyLabel="Copy namespace path"/>
+      <ResourceIdentifier label="Path" value={ns.metadata.id} copyLabel="Copy namespace path"/>
 
       <Box>
         <Typography variant="subtitle2" color="text.secondary">State</Typography>
-        <Box sx={{mt: 0.5}}><StateChip state={ns.state}/></Box>
+        <Box sx={{mt: 0.5}}><StateChip state={ns.status.state}/></Box>
       </Box>
 
       <Stack direction={{xs: 'column', sm: 'row'}} spacing={4}>
         <Box>
           <Typography variant="subtitle2" color="text.secondary">Created</Typography>
-          <Typography variant="body1">{dayjs(ns.createdAt).format('MMM DD, YYYY, h:mm A')}</Typography>
+          <Typography variant="body1">{dayjs(ns.metadata.createdAt).format('MMM DD, YYYY, h:mm A')}</Typography>
         </Box>
         <Box>
           <Typography variant="subtitle2" color="text.secondary">Updated</Typography>
-          <Typography variant="body1">{dayjs(ns.updatedAt).format('MMM DD, YYYY, h:mm A')}</Typography>
+          <Typography variant="body1">{dayjs(ns.metadata.updatedAt).format('MMM DD, YYYY, h:mm A')}</Typography>
         </Box>
       </Stack>
 
       <Box>
         <Typography variant="subtitle2" color="text.secondary">Labels</Typography>
-        {ns.labels && Object.keys(ns.labels).length > 0 ? (
+        {ns.metadata.labels && Object.keys(ns.metadata.labels).length > 0 ? (
           <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{mt: 0.5}}>
-            {Object.entries(ns.labels).map(([key, value]) => (
+            {Object.entries(ns.metadata.labels).map(([key, value]) => (
               <Chip key={key} label={`${key}: ${value}`} size="small" variant="outlined"/>
             ))}
           </Stack>
@@ -230,18 +242,18 @@ export default function NamespaceDetail({namespacePath}: { namespacePath: string
         )}
       </Box>
 
-      <AnnotationsEditor annotations={ns.annotations} readOnly onPut={async () => {}} onDelete={async () => {}}/>
+      <AnnotationsEditor annotations={ns.metadata.annotations} readOnly onPut={async () => {}} onDelete={async () => {}}/>
 
       <Box>
         <Typography variant="subtitle2" color="text.secondary">Key</Typography>
-        {ns.keyId ? (
+        {ns.spec.encryptionKeyRef?.id ? (
           <Stack direction="row" spacing={1} alignItems="center" sx={{mt: 0.5}}>
-            <Link component={RouterLink} to={`/keys/${ns.keyId}`}>
+            <Link component={RouterLink} to={`/keys/${ns.spec.encryptionKeyRef.id}`}>
               <Typography variant="body1" component="code" sx={{
                 fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
                 fontSize: '0.9rem',
               }}>
-                {ns.keyId}
+                {ns.spec.encryptionKeyRef.id}
               </Typography>
             </Link>
             <Button size="small" onClick={openSelector} disabled={actionLoading || isRoot}>Change Key</Button>
@@ -282,8 +294,8 @@ export default function NamespaceDetail({namespacePath}: { namespacePath: string
                   return [
                     <ListSubheader key={`header-${p}`}>{p}</ListSubheader>,
                     ...keys.map(ek => (
-                      <MenuItem key={ek.id} value={ek.id}>
-                        {ek.name} · {ek.id}
+                      <MenuItem key={ek.metadata.id} value={ek.metadata.id}>
+                        {ek.metadata.name} · {ek.metadata.id}
                       </MenuItem>
                     )),
                   ];

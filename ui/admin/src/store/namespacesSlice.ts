@@ -1,7 +1,8 @@
 import {createAsyncThunk, createSlice, PayloadAction} from '@reduxjs/toolkit';
 import type {RootState, AppThunk} from './store';
 import {
-    namespaces, ListNamespaceParams, Namespace, NAMESPACE_PATH_SEPARATOR, ROOT_NAMESPACE_PATH, NamespaceState,
+    API_VERSION, namespaces, ListNamespaceParams, Namespace, NAMESPACE_KIND,
+    NAMESPACE_PATH_SEPARATOR, ROOT_NAMESPACE_PATH, NamespaceState,
 } from '@authproxy/api';
 
 interface NamespacesState {
@@ -70,11 +71,16 @@ export const loadCurrent = createAsyncThunk<
         const currentPath = normalizeNamespacePath(path);
 
         let current: Namespace = {
-            path: currentPath,
-            name: currentPath.split(NAMESPACE_PATH_SEPARATOR).pop() || currentPath,
-            state: NamespaceState.ACTIVE,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
+            apiVersion: API_VERSION,
+            kind: NAMESPACE_KIND,
+            metadata: {
+                id: currentPath,
+                name: currentPath.split(NAMESPACE_PATH_SEPARATOR).pop() || currentPath,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            },
+            spec: {},
+            status: {state: NamespaceState.ACTIVE},
         };
 
         const response = await namespaces.getByPath(currentPath);
@@ -118,7 +124,7 @@ export const loadCurrentChildren = createAsyncThunk<
             return {
                 childrenStatus: 'succeeded',
                 children: response.data.items,
-                childrenHasMore: Boolean(response.data.cursor),
+                childrenHasMore: Boolean(response.data.metadata.continue),
                 childrenError: null,
             };
         } else {

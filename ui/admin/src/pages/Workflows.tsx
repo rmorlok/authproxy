@@ -14,18 +14,18 @@ import {DataGrid, GridColDef, GridEventListener} from '@mui/x-data-grid';
 import {useQueryState, parseAsInteger} from 'nuqs';
 import {
     listWorkflowInstances,
-    WorkflowInstanceRef,
-    ListWorkflowInstancesResponse,
+    WorkflowInstance,
+    WorkflowInstanceList,
 } from '@authproxy/api';
 
 const stateColors: Record<string, 'primary' | 'secondary' | 'success' | 'warning' | 'default'> = {
     active: 'primary',
-    continuedAsNew: 'warning',
+    continued_as_new: 'warning',
     finished: 'success',
 };
 
-function workflowId(row: WorkflowInstanceRef) {
-    return `${row.instance?.instanceId ?? ''}:${row.instance?.executionId ?? ''}`;
+function workflowId(row: WorkflowInstance) {
+    return `${row.spec.instanceId}:${row.metadata.id}`;
 }
 
 function formatTimestamp(value?: string) {
@@ -37,13 +37,13 @@ export default function Workflows() {
     const [page, setPage] = useQueryState<number>('page', parseAsInteger.withDefault(1));
     const [pageSize, setPageSize] = useQueryState<number>('pageSize', parseAsInteger.withDefault(30));
     const [autoRefresh, setAutoRefresh] = useState(true);
-    const [instances, setInstances] = useState<WorkflowInstanceRef[]>([]);
+    const [instances, setInstances] = useState<WorkflowInstance[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [hasNextPage, setHasNextPage] = useState(false);
     const [rowCount, setRowCount] = useState(-1);
 
-    const responsesCacheRef = useRef<ListWorkflowInstancesResponse[]>([]);
+    const responsesCacheRef = useRef<WorkflowInstanceList[]>([]);
     const pageRequestCacheRef = useRef<Set<number>>(new Set());
 
     const fetchPage = useCallback(async (targetPageOneBased: number) => {
@@ -57,20 +57,22 @@ export default function Workflows() {
             if (cached) {
                 setInstances(cached.items);
                 setLoading(false);
-                setHasNextPage(!!cached.cursor);
+                setHasNextPage(!!cached.metadata.continue);
                 return;
             }
 
             while (responsesCacheRef.current.length <= targetPageZeroBased && (
                 responsesCacheRef.current.length === 0 ||
-                !!responsesCacheRef.current[responsesCacheRef.current.length - 1].cursor
+                !!responsesCacheRef.current[responsesCacheRef.current.length - 1].metadata.continue
             )) {
                 const thisPage = responsesCacheRef.current.length;
                 if (pageRequestCacheRef.current.has(thisPage)) break;
                 pageRequestCacheRef.current.add(thisPage);
 
                 const prevResp = responsesCacheRef.current[responsesCacheRef.current.length - 1];
-                const resp = await listWorkflowInstances(prevResp?.cursor ? {cursor: prevResp.cursor} : {limit: pageSize});
+                const resp = await listWorkflowInstances(
+                    prevResp?.metadata.continue ? {cursor: prevResp.metadata.continue} : {limit: pageSize},
+                );
 
                 if (resp.status !== 200) {
                     setError('Failed to fetch workflow instances from server');
@@ -82,9 +84,9 @@ export default function Workflows() {
 
             const data = responsesCacheRef.current[targetPageZeroBased];
             setInstances(data?.items || []);
-            setHasNextPage(!!data?.cursor);
+            setHasNextPage(!!data?.metadata.continue);
 
-            if (!data?.cursor) {
+            if (!data?.metadata.continue) {
                 setRowCount(
                     responsesCacheRef.current
                         .map((v) => v.items.length)
@@ -133,32 +135,32 @@ export default function Workflows() {
     }, [autoRefresh, refreshInstances]);
 
     const handleWorkflowClick: GridEventListener<'rowClick'> = (params) => {
-        const instance = params.row.instance;
-        if (!instance) return;
-        navigate(`/workflows/${encodeURIComponent(instance.instanceId)}/${encodeURIComponent(instance.executionId)}`);
+        const instance = params.row;
+        navigate(`/workflows/${encodeURIComponent(instance.spec.instanceId)}/${encodeURIComponent(instance.metadata.id)}`);
     };
 
-    const columns: GridColDef<WorkflowInstanceRef>[] = [
+    const columns: GridColDef<WorkflowInstance>[] = [
         {
             field: 'instanceId',
             headerName: 'Instance ID',
             flex: 1.2,
             minWidth: 180,
-            valueGetter: (_value, row) => row.instance?.instanceId ?? '',
+            valueGetter: (_value, row) => row.spec.instanceId,
         },
         {
             field: 'executionId',
             headerName: 'Execution ID',
             flex: 1.2,
             minWidth: 180,
-            valueGetter: (_value, row) => row.instance?.executionId ?? '',
+            valueGetter: (_value, row) => row.metadata.id,
         },
-        {field: 'queue', headerName: 'Queue', flex: 0.6, minWidth: 110},
+        {field: 'queue', headerName: 'Queue', flex: 0.6, minWidth: 110, valueGetter: (_, row) => row.spec.queue},
         {
             field: 'state',
             headerName: 'State',
             flex: 0.5,
             minWidth: 120,
+            valueGetter: (_, row) => row.status.state,
             renderCell: (params) => (
                 <Chip
                     label={params.value || 'unknown'}
@@ -173,6 +175,7 @@ export default function Workflows() {
             headerName: 'Created',
             flex: 0.8,
             minWidth: 160,
+            valueGetter: (_, row) => row.metadata.createdAt,
             renderCell: (params) => formatTimestamp(params.value as string | undefined),
         },
         {
@@ -180,6 +183,7 @@ export default function Workflows() {
             headerName: 'Completed',
             flex: 0.8,
             minWidth: 160,
+            valueGetter: (_, row) => row.status.completedAt,
             renderCell: (params) => formatTimestamp(params.value as string | undefined),
         },
     ];

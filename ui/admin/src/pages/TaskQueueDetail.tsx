@@ -38,11 +38,11 @@ import {
     runAllRetryTasks,
     deleteAllArchivedTasks,
     deleteAllCompletedTasks,
-    QueueInfo,
-    DailyStats,
-    MonitoringTaskInfo,
+    TaskQueue,
+    TaskQueueDailyStats,
+    TaskExecution,
     MonitoringTaskState,
-    ListResponse,
+    TaskExecutionList,
     ListTasksParams,
 } from '@authproxy/api';
 
@@ -72,21 +72,21 @@ export default function TaskQueueDetail() {
     const theme = useTheme();
     const {queue} = useParams<{ queue: string }>();
 
-    const [queueInfoState, setQueueInfoState] = useState<QueueInfo | null>(null);
+    const [queueInfoState, setQueueInfoState] = useState<TaskQueue | null>(null);
     const [tabIndex, setTabIndex] = useQueryState<number>('tab', parseAsInteger.withDefault(0));
     const [page, setPage] = useQueryState<number>('page', parseAsInteger.withDefault(1));
     const [pageSize, setPageSize] = useQueryState<number>('pageSize', parseAsInteger.withDefault(30));
     const [autoRefresh, setAutoRefresh] = useState(true);
 
-    const [history, setHistory] = useState<DailyStats[]>([]);
-    const [tasks, setTasks] = useState<MonitoringTaskInfo[]>([]);
+    const [history, setHistory] = useState<TaskQueueDailyStats[]>([]);
+    const [tasks, setTasks] = useState<TaskExecution[]>([]);
     const [tasksLoading, setTasksLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [hasNextPage, setHasNextPage] = useState(false);
     const [rowCount, setRowCount] = useState(-1);
 
     // Cursor cache for sequential page fetching
-    const responsesCacheRef = useRef<ListResponse<MonitoringTaskInfo>[]>([]);
+    const responsesCacheRef = useRef<TaskExecutionList[]>([]);
     const pageRequestCacheRef = useRef<Set<number>>(new Set());
 
     const currentState = TASK_STATES[tabIndex] || 'pending';
@@ -108,7 +108,7 @@ export default function TaskQueueDetail() {
         try {
             const resp = await getQueueHistory(queue, {days: 30});
             if (resp.status === 200) {
-                setHistory(resp.data.items);
+                setHistory(resp.data.status.items);
             }
         } catch {
             // ignore
@@ -137,14 +137,14 @@ export default function TaskQueueDetail() {
             if (cached) {
                 setTasks(cached.items);
                 setTasksLoading(false);
-                setHasNextPage(!!cached.cursor);
+                setHasNextPage(!!cached.metadata.continue);
                 return;
             }
 
             // Advance sequentially from the last known cursor
             while (responsesCacheRef.current.length <= targetPageZeroBased && (
                 responsesCacheRef.current.length === 0 ||
-                !!responsesCacheRef.current[responsesCacheRef.current.length - 1].cursor
+                !!responsesCacheRef.current[responsesCacheRef.current.length - 1].metadata.continue
             )) {
                 const thisPage = responsesCacheRef.current.length;
 
@@ -156,8 +156,8 @@ export default function TaskQueueDetail() {
 
                 const prevResp = responsesCacheRef.current[responsesCacheRef.current.length - 1];
 
-                const params: ListTasksParams = prevResp?.cursor
-                    ? {cursor: prevResp.cursor}
+                const params: ListTasksParams = prevResp?.metadata.continue
+                    ? {cursor: prevResp.metadata.continue}
                     : {limit: pageSize};
 
                 const resp = await listTasksByState(queue, currentState, params);
@@ -173,7 +173,7 @@ export default function TaskQueueDetail() {
             const data = responsesCacheRef.current[targetPageZeroBased];
             setTasks(data?.items || []);
 
-            const hnp = !!data?.cursor;
+            const hnp = !!data?.metadata.continue;
             setHasNextPage(hnp);
 
             if (!hnp) {
@@ -288,31 +288,34 @@ export default function TaskQueueDetail() {
     };
 
     // Task table columns
-    const taskColumns: GridColDef<MonitoringTaskInfo>[] = [
+    const taskColumns: GridColDef<TaskExecution>[] = [
         {
             field: 'id',
             headerName: 'ID',
             flex: 0.8,
             minWidth: 100,
+            valueGetter: (_, row) => row.metadata.id,
             renderCell: (params) => (
                 <Tooltip title={params.value}>
                     <span>{(params.value as string).substring(0, 12)}...</span>
                 </Tooltip>
             ),
         },
-        {field: 'type', headerName: 'Type', flex: 1, minWidth: 120},
+        {field: 'type', headerName: 'Type', flex: 1, minWidth: 120, valueGetter: (_, row) => row.spec.type},
         {
             field: 'retried',
             headerName: 'Retried',
             flex: 0.5,
             minWidth: 80,
-            renderCell: (params) => `${params.row.retried}/${params.row.maxRetry}`,
+            valueGetter: (_, row) => row.status.retried,
+            renderCell: (params) => `${params.row.status.retried}/${params.row.spec.maxRetry}`,
         },
         {
             field: 'lastErr',
             headerName: 'Last Error',
             flex: 1.2,
             minWidth: 120,
+            valueGetter: (_, row) => row.status.lastError,
             renderCell: (params) => params.value ? (
                 <Tooltip title={params.value as string}>
                     <span style={{
@@ -328,7 +331,8 @@ export default function TaskQueueDetail() {
             headerName: 'Next Process At',
             flex: 0.8,
             minWidth: 140,
-            renderCell: (params) => params.value || params.row.completedAt || '-',
+            valueGetter: (_, row) => row.status.nextProcessAt,
+            renderCell: (params) => params.value || params.row.status.completedAt || '-',
         },
         {
             field: 'actions',
@@ -338,13 +342,13 @@ export default function TaskQueueDetail() {
             sortable: false,
             renderCell: (params) => {
                 const row = params.row;
-                const state = row.state as MonitoringTaskState;
+                const state = row.status.state as MonitoringTaskState;
                 return (
                     <Stack direction="row" spacing={0}>
                         {(state === 'scheduled' || state === 'retry' || state === 'archived') && (
                             <Tooltip title="Run now">
                                 <IconButton size="small"
-                                            onClick={() => handleRunTask(row.queue, row.id)}>
+                                            onClick={() => handleRunTask(row.spec.queue, row.metadata.id)}>
                                     <PlayArrowIcon fontSize="small"/>
                                 </IconButton>
                             </Tooltip>
@@ -352,7 +356,7 @@ export default function TaskQueueDetail() {
                         {(state === 'pending' || state === 'scheduled' || state === 'retry') && (
                             <Tooltip title="Archive">
                                 <IconButton size="small"
-                                            onClick={() => handleArchiveTask(row.queue, row.id)}>
+                                            onClick={() => handleArchiveTask(row.spec.queue, row.metadata.id)}>
                                     <ArchiveIcon fontSize="small"/>
                                 </IconButton>
                             </Tooltip>
@@ -360,7 +364,7 @@ export default function TaskQueueDetail() {
                         {state === 'active' && (
                             <Tooltip title="Cancel">
                                 <IconButton size="small"
-                                            onClick={() => handleCancelTask(row.queue, row.id)}>
+                                            onClick={() => handleCancelTask(row.spec.queue, row.metadata.id)}>
                                     <CancelIcon fontSize="small"/>
                                 </IconButton>
                             </Tooltip>
@@ -368,7 +372,7 @@ export default function TaskQueueDetail() {
                         {(state !== 'active') && (
                             <Tooltip title="Delete">
                                 <IconButton size="small"
-                                            onClick={() => handleDeleteTask(row.queue, row.id)}>
+                                            onClick={() => handleDeleteTask(row.spec.queue, row.metadata.id)}>
                                     <DeleteIcon fontSize="small"/>
                                 </IconButton>
                             </Tooltip>
@@ -392,13 +396,13 @@ export default function TaskQueueDetail() {
             <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{mb: 2}}>
                 <Stack direction="row" spacing={1} alignItems="center">
                     <Typography component="h2" variant="h6">Queue: {queue}</Typography>
-                    {queueInfoState?.paused && (
+                    {queueInfoState?.status.paused && (
                         <Chip label="PAUSED" color="warning" size="small"/>
                     )}
                 </Stack>
                 <Stack direction="row" spacing={2} alignItems="center">
                     {queueInfoState && (
-                        queueInfoState.paused ? (
+                        queueInfoState.status.paused ? (
                             <Tooltip title="Unpause queue">
                                 <IconButton onClick={handleUnpauseQueue} color="primary">
                                     <PlayCircleOutlineIcon/>
@@ -432,13 +436,13 @@ export default function TaskQueueDetail() {
             {/* Summary Cards */}
             {queueInfoState && (
                 <Stack direction="row" spacing={2} sx={{mb: 3}} flexWrap="wrap">
-                    <SummaryCard label="Pending" value={queueInfoState.pending}
+                    <SummaryCard label="Pending" value={queueInfoState.status.pending}
                                  color={(theme.vars || theme).palette.info.main}/>
-                    <SummaryCard label="Active" value={queueInfoState.active}
+                    <SummaryCard label="Active" value={queueInfoState.status.active}
                                  color={(theme.vars || theme).palette.primary.main}/>
-                    <SummaryCard label="Retry" value={queueInfoState.retry}
+                    <SummaryCard label="Retry" value={queueInfoState.status.retry}
                                  color={(theme.vars || theme).palette.warning.main}/>
-                    <SummaryCard label="Archived" value={queueInfoState.archived}
+                    <SummaryCard label="Archived" value={queueInfoState.status.archived}
                                  color={(theme.vars || theme).palette.error.main}/>
                 </Stack>
             )}
@@ -489,7 +493,7 @@ export default function TaskQueueDetail() {
                         sx={{mb: 2}}
                     >
                         {TASK_STATES.map((state) => {
-                            const count = queueInfoState ? (queueInfoState as unknown as Record<string, number>)[state] ?? 0 : 0;
+                            const count = queueInfoState ? queueInfoState.status[state] ?? 0 : 0;
                             return (
                                 <Tab
                                     key={state}
@@ -541,7 +545,7 @@ export default function TaskQueueDetail() {
                         autoHeight
                         rows={tasks}
                         columns={taskColumns}
-                        getRowId={(row) => row.id}
+                        getRowId={(row) => row.metadata.id}
                         loading={tasksLoading}
                         paginationMode="server"
                         paginationModel={{page: page - 1, pageSize}}

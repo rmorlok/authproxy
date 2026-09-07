@@ -4,10 +4,13 @@ import {Provider} from 'react-redux';
 import {configureStore} from '@reduxjs/toolkit';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import type {
-    SearchResourceSummary,
+import {
+    API_VERSION,
+    type ManagedResourceKind,
     SearchResourcesParams,
-    SearchResourcesResponse,
+    type SearchResourceType,
+    type SearchResult,
+    type SearchResultList,
 } from '@authproxy/api';
 import namespaceReducer from '../store/namespacesSlice';
 import {CommandPaletteProvider, useCommandPalette} from '../search/CommandPalette';
@@ -20,8 +23,8 @@ const namespace = resource('namespace', 'root.platform', 'Platform', {team: 'pla
 
 interface PaletteStoryProps {
     initialQuery: string;
-    seed: SearchResourcesResponse;
-    query?: SearchResourcesResponse;
+    seed: SearchResultList;
+    query?: SearchResultList;
 }
 
 function PaletteStory({initialQuery, seed, query = emptyResponse()}: PaletteStoryProps) {
@@ -114,17 +117,21 @@ export const TruncatedAndIncomplete: Story = {
 };
 
 function resource(
-    resourceType: SearchResourceSummary['resourceType'],
+    resourceType: SearchResourceType,
     resourceId: string,
     name: string,
     labels: Record<string, string>,
     resourceNamespace = 'root.acme',
-): SearchResourceSummary {
+): SearchResult {
+    const kind = resourceKind(resourceType);
     return {
-        resourceType: resourceType,
-        resourceId: resourceId,
-        name,
-        namespace: resourceNamespace,
+        resourceRef: {
+            apiVersion: API_VERSION,
+            kind,
+            id: resourceId,
+            name,
+            namespace: resourceNamespace,
+        },
         labels,
         matchedLabels: [],
         updatedAt: '2026-07-12T12:00:00Z',
@@ -132,17 +139,33 @@ function resource(
 }
 
 function response(
-    items: SearchResourceSummary[],
-    truncatedTypes: SearchResourcesResponse['truncatedTypes'] = [],
-    incompleteTypes: SearchResourcesResponse['incompleteTypes'] = [],
-): SearchResourcesResponse {
+    items: SearchResult[],
+    truncatedTypes: SearchResourceType[] = [],
+    incompleteTypes: SearchResourceType[] = [],
+): SearchResultList {
     return {
+        apiVersion: API_VERSION,
+        kind: 'SearchResultList',
+        metadata: {
+            truncatedKinds: truncatedTypes.map(resourceKind),
+            incompleteKinds: incompleteTypes.map(resourceKind),
+        },
         items,
-        truncatedTypes: truncatedTypes,
-        incompleteTypes: incompleteTypes,
     };
 }
 
-function emptyResponse(): SearchResourcesResponse {
+function emptyResponse(): SearchResultList {
     return response([]);
+}
+
+function resourceKind(resourceType: SearchResourceType): ManagedResourceKind {
+    const kinds: Record<SearchResourceType, ManagedResourceKind> = {
+        actor: 'Actor',
+        connection: 'Connection',
+        connector: 'Connector',
+        namespace: 'Namespace',
+        key: 'Key',
+        rate_limit: 'RateLimit',
+    };
+    return kinds[resourceType];
 }

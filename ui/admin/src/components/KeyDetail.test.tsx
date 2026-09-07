@@ -17,6 +17,8 @@ vi.mock('@authproxy/api', () => {
   };
 
   return {
+    API_VERSION: 'authproxy.net/v1alpha1',
+    KEY_KIND: 'Key',
     KeyState: {
       ACTIVE: 'active',
       DISABLED: 'disabled',
@@ -26,25 +28,28 @@ vi.mock('@authproxy/api', () => {
 });
 
 const initialKey = {
-  id: 'key_test',
-  name: 'primary-key',
-  namespace: 'root.dev',
-  state: KeyState.ACTIVE,
-  keyData: {
-    awsKmsKeyId: 'alias/authproxy',
-    awsRegion: 'us-east-1',
-    awsCredentials: {
-      type: 'implicit',
+  apiVersion: 'authproxy.net/v1alpha1' as const,
+  kind: 'Key' as const,
+  metadata: {
+    id: 'key_test',
+    name: 'primary-key',
+    namespace: 'root.dev',
+    labels: {environment: 'dev'},
+    annotations: {owner: 'platform'},
+    createdAt: '2026-06-20T00:00:00.000Z',
+    updatedAt: '2026-06-20T00:00:00.000Z',
+  },
+  spec: {
+    usage: 'data_encryption',
+    materialType: 'external',
+    desiredState: KeyState.ACTIVE,
+    keyData: {
+      awsKmsKeyId: 'alias/authproxy',
+      awsRegion: 'us-east-1',
+      awsCredentials: {type: 'implicit'},
     },
   },
-  labels: {
-    environment: 'dev',
-  },
-  annotations: {
-    owner: 'platform',
-  },
-  createdAt: '2026-06-20T00:00:00.000Z',
-  updatedAt: '2026-06-20T00:00:00.000Z',
+  status: {state: KeyState.ACTIVE, keyDataConfigured: true},
 };
 
 function renderKeyDetail() {
@@ -62,15 +67,13 @@ describe('KeyDetail', () => {
       status: 200,
       data: {
         ...initialKey,
-        state: KeyState.DISABLED,
-        labels: {
-          ...initialKey.labels,
-          tier: 'internal',
+        metadata: {
+          ...initialKey.metadata,
+          labels: {...initialKey.metadata.labels, tier: 'internal'},
+          annotations: {...initialKey.metadata.annotations, rotation: 'manual'},
         },
-        annotations: {
-          ...initialKey.annotations,
-          rotation: 'manual',
-        },
+        spec: {...initialKey.spec, desiredState: KeyState.DISABLED},
+        status: {...initialKey.status, state: KeyState.DISABLED},
       },
     } as any);
   });
@@ -106,15 +109,13 @@ describe('KeyDetail', () => {
 
     await waitFor(() => {
       expect(keys.update).toHaveBeenCalledWith('key_test', {
-        state: KeyState.DISABLED,
-        labels: {
-          environment: 'dev',
-          tier: 'internal',
+        apiVersion: 'authproxy.net/v1alpha1',
+        kind: 'Key',
+        metadata: {
+          labels: {environment: 'dev', tier: 'internal'},
+          annotations: {owner: 'platform', rotation: 'manual'},
         },
-        annotations: {
-          owner: 'platform',
-          rotation: 'manual',
-        },
+        spec: {desiredState: KeyState.DISABLED},
       });
     });
     await waitFor(() => {
@@ -140,19 +141,19 @@ describe('KeyDetail', () => {
 
     await waitFor(() => {
       expect(keys.update).toHaveBeenCalledWith('key_test', {
-        state: KeyState.ACTIVE,
-        keyData: {
-          awsKmsKeyId: 'alias/authproxy-v2',
-          awsRegion: 'us-east-1',
-          awsCredentials: {
-            type: 'implicit',
+        apiVersion: 'authproxy.net/v1alpha1',
+        kind: 'Key',
+        metadata: {
+          labels: {environment: 'dev'},
+          annotations: {owner: 'platform'},
+        },
+        spec: {
+          desiredState: KeyState.ACTIVE,
+          keyData: {
+            awsKmsKeyId: 'alias/authproxy-v2',
+            awsRegion: 'us-east-1',
+            awsCredentials: {type: 'implicit'},
           },
-        },
-        labels: {
-          environment: 'dev',
-        },
-        annotations: {
-          owner: 'platform',
         },
       });
     });
@@ -164,9 +165,9 @@ describe('KeyDetail', () => {
       status: 200,
       data: {
         ...initialKey,
-        labels: {
-          ...initialKey.labels,
-          'apxy/key/-/id': 'key_test',
+        metadata: {
+          ...initialKey.metadata,
+          labels: {...initialKey.metadata.labels, 'apxy/key/-/id': 'key_test'},
         },
       },
     } as any);
@@ -187,13 +188,13 @@ describe('KeyDetail', () => {
 
     await waitFor(() => {
       expect(keys.update).toHaveBeenCalledWith('key_test', {
-        state: KeyState.ACTIVE,
-        labels: {
-          environment: 'dev',
+        apiVersion: 'authproxy.net/v1alpha1',
+        kind: 'Key',
+        metadata: {
+          labels: {environment: 'dev'},
+          annotations: {owner: 'platform'},
         },
-        annotations: {
-          owner: 'platform',
-        },
+        spec: {desiredState: KeyState.ACTIVE},
       });
     });
   });

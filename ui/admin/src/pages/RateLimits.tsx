@@ -21,9 +21,9 @@ import Alert from '@mui/material/Alert';
 import TextField from '@mui/material/TextField';
 import {
     listRateLimits, RateLimit, RateLimitMode, RateLimitSpec,
-    ListResponse, ListRateLimitsParams, namespaceAndChildren,
+    RateLimitList, ListRateLimitsParams, namespaceAndChildren,
     createRateLimit, updateRateLimit, CreateRateLimitRequest,
-    RATE_LIMIT_API_VERSION, RATE_LIMIT_KIND,
+    API_VERSION, RATE_LIMIT_KIND,
 } from '@authproxy/api';
 import RateLimitSpecEditor from '../components/RateLimitSpecEditor';
 import { EMPTY_SPEC } from '../components/RateLimitSpecForm';
@@ -110,7 +110,7 @@ export default function RateLimits() {
     const [createName, setCreateName] = useState('');
     const [createSpec, setCreateSpec] = useState<RateLimitSpec>(EMPTY_SPEC);
 
-    const responsesCacheRef = useRef<ListResponse<RateLimit>[]>([]);
+    const responsesCacheRef = useRef<RateLimitList[]>([]);
     const pageRequestCacheRef = useRef<Set<number>>(new Set());
 
     const handleRowClick: GridEventListener<'rowClick'> = (params, event) => {
@@ -151,13 +151,13 @@ export default function RateLimits() {
             if (cached) {
                 setRows(cached.items);
                 setLoading(false);
-                setHasNextPage(!!cached.cursor);
+                setHasNextPage(!!cached.metadata.continue);
                 return;
             }
 
             while (responsesCacheRef.current.length <= targetPageZeroBased && (
                     responsesCacheRef.current.length === 0 ||
-                    !!responsesCacheRef.current[responsesCacheRef.current.length - 1].cursor
+                    !!responsesCacheRef.current[responsesCacheRef.current.length - 1].metadata.continue
                 )
             ) {
                 if (pageRequestCacheRef.current.has(targetPageZeroBased)) {
@@ -168,7 +168,7 @@ export default function RateLimits() {
                 const thisPage = responsesCacheRef.current.length;
                 const prevResp = responsesCacheRef.current[responsesCacheRef.current.length - 1];
 
-                const params: ListRateLimitsParams = prevResp?.cursor ? {cursor: prevResp.cursor} : {
+                const params: ListRateLimitsParams = prevResp?.metadata.continue ? {cursor: prevResp.metadata.continue} : {
                     namespace: namespaceAndChildren(ns),
                     orderBy: sort || undefined,
                     limit: pageSize,
@@ -195,7 +195,7 @@ export default function RateLimits() {
 
             setRows(items);
 
-            const hnp = !!data?.cursor;
+            const hnp = !!data?.metadata.continue;
             setHasNextPage(hnp);
 
             if(!hnp) {
@@ -233,7 +233,7 @@ export default function RateLimits() {
 
         try {
             const resp = await updateRateLimit(id, {
-                apiVersion: RATE_LIMIT_API_VERSION,
+                apiVersion: API_VERSION,
                 kind: RATE_LIMIT_KIND,
                 metadata: {},
                 spec: nextSpec,
@@ -262,7 +262,7 @@ export default function RateLimits() {
         setCreateError(null);
         try {
             const request: CreateRateLimitRequest = {
-                apiVersion: RATE_LIMIT_API_VERSION,
+                apiVersion: API_VERSION,
                 kind: RATE_LIMIT_KIND,
                 metadata: {
                     namespace: ns || 'root',
