@@ -101,11 +101,18 @@ func (r *KeyResource) Create(ctx context.Context, req resource.CreateRequest, re
 		return
 	}
 
+	spec := client.KeySpec{KeyData: map[string]any{"numBytes": 32}}
+	if !plan.State.IsNull() && !plan.State.IsUnknown() {
+		spec.DesiredState = plan.State.ValueString()
+	}
 	ek, err := r.client.CreateKey(ctx, client.CreateKeyRequest{
-		Namespace:   plan.Namespace.ValueString(),
-		Labels:      labels,
-		Annotations: annotations,
-		KeyData:     map[string]interface{}{"numBytes": 32},
+		TypeMeta: client.NewTypeMeta(client.KeyKind),
+		Metadata: client.ObjectMetadata{
+			Namespace:   plan.Namespace.ValueString(),
+			Labels:      labels,
+			Annotations: annotations,
+		},
+		Spec: spec,
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create key", err.Error())
@@ -154,16 +161,20 @@ func (r *KeyResource) Update(ctx context.Context, req resource.UpdateRequest, re
 		return
 	}
 
-	updateReq := client.UpdateKeyRequest{}
+	updateReq := client.UpdateKeyRequest{
+		TypeMeta: client.NewTypeMeta(client.KeyKind),
+		Metadata: &client.ObjectMetadataPatch{},
+		Spec:     &client.KeySpecPatch{},
+	}
 	if !plan.State.IsNull() && !plan.State.IsUnknown() {
 		s := plan.State.ValueString()
-		updateReq.State = &s
+		updateReq.Spec.DesiredState = &s
 	}
 	if labels != nil {
-		updateReq.Labels = &labels
+		updateReq.Metadata.Labels = &labels
 	}
 	if annotations != nil {
-		updateReq.Annotations = &annotations
+		updateReq.Metadata.Annotations = &annotations
 	}
 
 	ek, err := r.client.UpdateKey(ctx, plan.Id.ValueString(), updateReq)
@@ -194,11 +205,15 @@ func (r *KeyResource) ImportState(ctx context.Context, req resource.ImportStateR
 }
 
 func setKeyState(model *KeyResourceModel, ek *client.Key) {
-	model.Id = types.StringValue(ek.Id)
-	model.Namespace = types.StringValue(ek.Namespace)
-	model.State = types.StringValue(ek.State)
-	model.Labels = labelsToMap(ek.Labels)
-	model.Annotations = annotationsToMap(ek.Annotations)
-	model.CreatedAt = types.StringValue(ek.CreatedAt.Format("2006-01-02T15:04:05Z07:00"))
-	model.UpdatedAt = types.StringValue(ek.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"))
+	model.Id = types.StringValue(ek.Metadata.ID)
+	model.Namespace = types.StringValue(ek.Metadata.Namespace)
+	if ek.Status != nil {
+		model.State = types.StringValue(ek.Status.State)
+	} else {
+		model.State = types.StringValue(ek.Spec.DesiredState)
+	}
+	model.Labels = labelsToMap(ek.Metadata.Labels)
+	model.Annotations = annotationsToMap(ek.Metadata.Annotations)
+	model.CreatedAt = timestampToString(ek.Metadata.CreatedAt)
+	model.UpdatedAt = timestampToString(ek.Metadata.UpdatedAt)
 }

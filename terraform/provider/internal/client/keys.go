@@ -3,48 +3,61 @@ package client
 import (
 	"context"
 	"fmt"
-	"time"
 )
 
+const KeyKind = "Key"
+
+type KeySpec struct {
+	Usage        string         `json:"usage,omitempty"`
+	MaterialType string         `json:"materialType,omitempty"`
+	DesiredState string         `json:"desiredState,omitempty"`
+	KeyData      map[string]any `json:"keyData,omitempty"`
+}
+
+type KeyStatus struct {
+	State             string `json:"state"`
+	KeyDataConfigured bool   `json:"keyDataConfigured"`
+}
+
 type Key struct {
-	Id          string            `json:"id"`
-	Namespace   string            `json:"namespace"`
-	State       string            `json:"state"`
-	Labels      map[string]string `json:"labels,omitempty"`
-	Annotations map[string]string `json:"annotations,omitempty"`
-	CreatedAt   time.Time         `json:"createdAt"`
-	UpdatedAt   time.Time         `json:"updatedAt"`
+	TypeMeta
+	Metadata ObjectMetadata `json:"metadata"`
+	Spec     KeySpec        `json:"spec"`
+	Status   *KeyStatus     `json:"status,omitempty"`
 }
 
 type CreateKeyRequest struct {
-	Namespace   string                 `json:"namespace"`
-	Labels      map[string]string      `json:"labels,omitempty"`
-	Annotations map[string]string      `json:"annotations,omitempty"`
-	KeyData     map[string]interface{} `json:"keyData"`
+	TypeMeta
+	Metadata ObjectMetadata `json:"metadata"`
+	Spec     KeySpec        `json:"spec"`
+}
+
+type KeySpecPatch struct {
+	DesiredState *string `json:"desiredState,omitempty"`
 }
 
 type UpdateKeyRequest struct {
-	State       *string            `json:"state,omitempty"`
-	Labels      *map[string]string `json:"labels,omitempty"`
-	Annotations *map[string]string `json:"annotations,omitempty"`
+	TypeMeta
+	Metadata *ObjectMetadataPatch `json:"metadata"`
+	Spec     *KeySpecPatch        `json:"spec"`
 }
 
 func (c *Client) CreateKey(ctx context.Context, req CreateKeyRequest) (*Key, error) {
-	var ek Key
-	err := c.post(ctx, "/api/v1/keys", req, &ek)
-	return &ek, err
+	var key Key
+	err := c.post(ctx, "/api/v1/keys", req, &key)
+	return &key, err
 }
 
 func (c *Client) GetKey(ctx context.Context, id string) (*Key, error) {
-	var ek Key
-	err := c.get(ctx, fmt.Sprintf("/api/v1/keys/%s", id), &ek)
-	return &ek, err
+	var key Key
+	err := c.get(ctx, fmt.Sprintf("/api/v1/keys/%s", id), &key)
+	return &key, err
 }
 
 func (c *Client) UpdateKey(ctx context.Context, id string, req UpdateKeyRequest) (*Key, error) {
-	var ek Key
-	err := c.patch(ctx, fmt.Sprintf("/api/v1/keys/%s", id), req, &ek)
-	return &ek, err
+	var key Key
+	err := c.patch(ctx, fmt.Sprintf("/api/v1/keys/%s", id), req, &key)
+	return &key, err
 }
 
 func (c *Client) DeleteKey(ctx context.Context, id string) error {

@@ -18,11 +18,12 @@ resource "authproxy_namespace" "production" {
 
 - `path` - (Required, ForceNew) The namespace path. Must start with "root".
 - `labels` - (Optional) A map of labels for the namespace.
+- `annotations` - (Optional) A map of annotations for the namespace.
 
 ## Attribute Reference
 
 - `state` - The namespace state.
-- `key_id` - The ID of the key associated with this namespace.
+- `key_id` - The ID from `spec.encryptionKeyRef`, if configured.
 - `created_at` - Timestamp of creation.
 - `updated_at` - Timestamp of last update.
 

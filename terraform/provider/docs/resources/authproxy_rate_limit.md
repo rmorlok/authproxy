@@ -2,6 +2,8 @@
 
 Manages an AuthProxy rate-limit resource. Every field maps to a typed HCL attribute so authors get plan-time validation and field-level diffs — no `jsonencode` required.
 
+The provider serializes these attributes into the `authproxy.net/v1alpha1` resource envelope: ownership and user metadata live under `metadata`, the policy lives under `spec`, and observed effective mode is read from `status`.
+
 ## Example Usage
 
 ```hcl

@@ -7,18 +7,13 @@ import (
 
 func TestCreateRateLimitRequestUsesCanonicalResourceEnvelope(t *testing.T) {
 	req := CreateRateLimitRequest{
-		APIVersion: RateLimitAPIVersion,
-		Kind:       RateLimitKind,
-		Metadata: RateLimitMetadata{
+		TypeMeta: NewTypeMeta(RateLimitKind),
+		Metadata: ObjectMetadata{
 			Name:      "salesforce-v3",
 			Namespace: "root.acme",
 		},
 		Spec: RateLimitSpec{
-			Scope: &RateLimitScope{ConnectorRef: &ObjectReference{
-				APIVersion: RateLimitAPIVersion,
-				Kind:       "Connector",
-				ID:         "cxr_salesforce",
-			}},
+			Scope:    &RateLimitScope{ConnectorRef: NewIDReference(ConnectorKind, "cxr_salesforce")},
 			Selector: RateLimitSelector{},
 			Bucket:   RateLimitBucket{},
 			Algorithm: RateLimitAlgorithm{
@@ -35,7 +30,7 @@ func TestCreateRateLimitRequestUsesCanonicalResourceEnvelope(t *testing.T) {
 	if err := json.Unmarshal(data, &body); err != nil {
 		t.Fatal(err)
 	}
-	if body["apiVersion"] != RateLimitAPIVersion || body["kind"] != RateLimitKind {
+	if body["apiVersion"] != APIVersion || body["kind"] != RateLimitKind {
 		t.Fatalf("type metadata: %s", data)
 	}
 	if _, exists := body["definition"]; exists {
@@ -48,10 +43,9 @@ func TestCreateRateLimitRequestUsesCanonicalResourceEnvelope(t *testing.T) {
 
 func TestUpdateRateLimitRequestEncodesNilScopeAsNull(t *testing.T) {
 	req := UpdateRateLimitRequest{
-		APIVersion: RateLimitAPIVersion,
-		Kind:       RateLimitKind,
-		Metadata:   &RateLimitMetadataPatch{},
-		Spec:       &RateLimitSpecPatch{},
+		TypeMeta: NewTypeMeta(RateLimitKind),
+		Metadata: &ObjectMetadataPatch{},
+		Spec:     &RateLimitSpecPatch{},
 	}
 
 	data, err := json.Marshal(req)

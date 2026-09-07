@@ -72,8 +72,8 @@ func (d *ActorDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 	config.ExternalId = types.StringValue(a.Spec.ExternalID)
 	config.Labels = labelsToMap(a.Metadata.Labels)
 	config.Annotations = annotationsToMap(a.Metadata.Annotations)
-	config.CreatedAt = types.StringValue(a.Metadata.CreatedAt.Format("2006-01-02T15:04:05Z07:00"))
-	config.UpdatedAt = types.StringValue(a.Metadata.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"))
+	config.CreatedAt = timestampToString(a.Metadata.CreatedAt)
+	config.UpdatedAt = timestampToString(a.Metadata.UpdatedAt)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &config)...)
 }

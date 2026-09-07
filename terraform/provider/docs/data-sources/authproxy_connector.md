@@ -17,11 +17,12 @@ data "authproxy_connector" "gmail" {
 ## Attribute Reference
 
 - `namespace` - The namespace.
-- `version` - The current version number.
+- `version` - The selected connector generation (`metadata.generation`).
 - `state` - The current version state.
 - `display_name` - The display name.
 - `description` - The description.
-- `logo` - The logo.
+- `logo` - The public URL or data URL from `spec.definition.logo`.
 - `labels` - Labels map.
+- `annotations` - Annotations map.
 - `created_at` - Timestamp of creation.
 - `updated_at` - Timestamp of last update.

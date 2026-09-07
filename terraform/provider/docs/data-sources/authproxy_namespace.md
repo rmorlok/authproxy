@@ -19,5 +19,6 @@ data "authproxy_namespace" "production" {
 - `state` - The namespace state.
 - `key_id` - The key ID, if set.
 - `labels` - Labels map.
+- `annotations` - Annotations map.
 - `created_at` - Timestamp of creation.
 - `updated_at` - Timestamp of last update.

@@ -43,7 +43,7 @@ func (d *ConnectorDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 		Attributes: map[string]schema.Attribute{
 			"id":           schema.StringAttribute{Required: true},
 			"namespace":    schema.StringAttribute{Computed: true},
-			"version":      schema.Int64Attribute{Computed: true},
+			"version":      schema.Int64Attribute{Computed: true, Description: "The selected connector metadata.generation."},
 			"state":        schema.StringAttribute{Computed: true},
 			"display_name": schema.StringAttribute{Computed: true},
 			"description":  schema.StringAttribute{Computed: true},
@@ -76,16 +76,25 @@ func (d *ConnectorDataSource) Read(ctx context.Context, req datasource.ReadReque
 		return
 	}
 
-	config.Namespace = types.StringValue(conn.Namespace)
-	config.Version = types.Int64Value(int64(conn.Version))
-	config.State = types.StringValue(conn.State)
-	config.DisplayName = types.StringValue(conn.DisplayName)
-	config.Description = types.StringValue(conn.Description)
-	config.Logo = types.StringValue(conn.Logo)
-	config.Labels = labelsToMap(conn.Labels)
-	config.Annotations = annotationsToMap(conn.Annotations)
-	config.CreatedAt = types.StringValue(conn.CreatedAt.Format("2006-01-02T15:04:05Z07:00"))
-	config.UpdatedAt = types.StringValue(conn.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"))
+	config.Namespace = types.StringValue(conn.Metadata.Namespace)
+	config.Version = types.Int64Value(int64(conn.Metadata.Generation))
+	if conn.Status != nil {
+		config.State = types.StringValue(conn.Status.Release.State)
+	} else {
+		config.State = types.StringNull()
+	}
+	if summary, err := client.DecodeConnectorDefinitionSummary(conn.Spec.Definition); err == nil {
+		config.DisplayName = types.StringValue(summary.DisplayName)
+		config.Description = types.StringValue(summary.Description)
+		config.Logo = types.StringValue(summary.Logo)
+	} else {
+		resp.Diagnostics.AddError("Failed to decode connector definition", err.Error())
+		return
+	}
+	config.Labels = labelsToMap(conn.Metadata.Labels)
+	config.Annotations = annotationsToMap(conn.Metadata.Annotations)
+	config.CreatedAt = timestampToString(conn.Metadata.CreatedAt)
+	config.UpdatedAt = timestampToString(conn.Metadata.UpdatedAt)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &config)...)
 }

@@ -104,9 +104,8 @@ func (r *ActorResource) Create(ctx context.Context, req resource.CreateRequest, 
 	}
 
 	a, err := r.client.CreateActor(ctx, client.CreateActorRequest{
-		APIVersion: client.ActorAPIVersion,
-		Kind:       client.ActorKind,
-		Metadata: client.ActorMetadata{
+		TypeMeta: client.NewTypeMeta(client.ActorKind),
+		Metadata: client.ObjectMetadata{
 			Namespace:   plan.Namespace.ValueString(),
 			Labels:      labels,
 			Annotations: annotations,
@@ -161,9 +160,8 @@ func (r *ActorResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	}
 
 	a, err := r.client.UpdateActor(ctx, plan.Id.ValueString(), client.UpdateActorRequest{
-		APIVersion: client.ActorAPIVersion,
-		Kind:       client.ActorKind,
-		Metadata: &client.ActorMetadataPatch{
+		TypeMeta: client.NewTypeMeta(client.ActorKind),
+		Metadata: &client.ObjectMetadataPatch{
 			Labels:      &labels,
 			Annotations: &annotations,
 		},
@@ -201,6 +199,6 @@ func setActorState(model *ActorResourceModel, a *client.Actor) {
 	model.ExternalId = types.StringValue(a.Spec.ExternalID)
 	model.Labels = labelsToMap(a.Metadata.Labels)
 	model.Annotations = annotationsToMap(a.Metadata.Annotations)
-	model.CreatedAt = types.StringValue(a.Metadata.CreatedAt.Format("2006-01-02T15:04:05Z07:00"))
-	model.UpdatedAt = types.StringValue(a.Metadata.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"))
+	model.CreatedAt = timestampToString(a.Metadata.CreatedAt)
+	model.UpdatedAt = timestampToString(a.Metadata.UpdatedAt)
 }

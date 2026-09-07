@@ -7,9 +7,8 @@ import (
 
 func TestCreateActorRequestUsesCanonicalResourceEnvelope(t *testing.T) {
 	req := CreateActorRequest{
-		APIVersion: ActorAPIVersion,
-		Kind:       ActorKind,
-		Metadata: ActorMetadata{
+		TypeMeta: NewTypeMeta(ActorKind),
+		Metadata: ObjectMetadata{
 			Namespace: "root.acme",
 			Labels:    map[string]string{"team": "platform"},
 		},
@@ -24,7 +23,7 @@ func TestCreateActorRequestUsesCanonicalResourceEnvelope(t *testing.T) {
 	if err := json.Unmarshal(data, &body); err != nil {
 		t.Fatal(err)
 	}
-	if body["apiVersion"] != ActorAPIVersion || body["kind"] != ActorKind {
+	if body["apiVersion"] != APIVersion || body["kind"] != ActorKind {
 		t.Fatalf("type metadata: %s", data)
 	}
 	if _, exists := body["externalId"]; exists {
@@ -41,10 +40,9 @@ func TestCreateActorRequestUsesCanonicalResourceEnvelope(t *testing.T) {
 func TestUpdateActorRequestIncludesRequiredPatchSections(t *testing.T) {
 	labels := map[string]string{"team": "security"}
 	req := UpdateActorRequest{
-		APIVersion: ActorAPIVersion,
-		Kind:       ActorKind,
-		Metadata:   &ActorMetadataPatch{Labels: &labels},
-		Spec:       &ActorSpecPatch{},
+		TypeMeta: NewTypeMeta(ActorKind),
+		Metadata: &ObjectMetadataPatch{Labels: &labels},
+		Spec:     &ActorSpecPatch{},
 	}
 
 	data, err := json.Marshal(req)

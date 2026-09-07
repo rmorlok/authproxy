@@ -19,5 +19,6 @@ data "authproxy_key" "main" {
 - `namespace` - The namespace.
 - `state` - The current state.
 - `labels` - Labels map.
+- `annotations` - Annotations map.
 - `created_at` - Timestamp of creation.
 - `updated_at` - Timestamp of last update.
