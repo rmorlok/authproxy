@@ -111,6 +111,7 @@ export default defineConfig({
               collapsed: true,
               items: [
                 'development/design',
+                'development/design/kubernetes-resource-api',
                 'development/design/key-model-migration',
                 'development/design/oauth-provider-identity',
               ],
