@@ -18,6 +18,9 @@ import (
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/schema/config"
+	actorschema "github.com/rmorlok/authproxy/internal/schema/resources/actor"
+	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	nschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/util"
 )
 
@@ -25,38 +28,46 @@ var testConnectorID = apid.MustParse("cxr_testgmail0000001")
 
 const testBaseURL = "http://seed.test"
 
-func demoUserSeed() ActorSeed {
-	return ActorSeed{
-		ExternalId: "demo-user",
-		Namespace:  "root.demo",
-		Permissions: []aschema.Permission{
-			{
-				Namespace: "root.demo",
-				Resources: []string{"connectors"},
-				Verbs:     []string{"list"},
-			},
-			{
-				Namespace: "root.demo.{{external_id}}",
-				Resources: []string{"connections"},
-				Verbs:     []string{"create", "list", "get", "update", "disconnect"},
-			},
+func demoUserSeed() actorschema.Actor {
+	actor := actorschema.NewActor()
+	actor.Metadata.Name = "demo-user"
+	actor.Metadata.Namespace = "root.demo"
+	actor.Metadata.Labels = map[string]string{"demo": "true", "role": "user"}
+	actor.Spec.ExternalId = "demo-user"
+	actor.Spec.Permissions = []aschema.Permission{
+		{
+			Namespace: "root.demo",
+			Resources: []string{"connectors"},
+			Verbs:     []string{"list"},
 		},
-		Labels: map[string]string{"demo": "true", "role": "user"},
+		{
+			Namespace: "root.demo.{{external_id}}",
+			Resources: []string{"connections"},
+			Verbs:     []string{"create", "list", "get", "update", "disconnect"},
+		},
 	}
+	return *actor
+}
+
+func demoNamespaceSeed(t *testing.T) nschema.Namespace {
+	t.Helper()
+	ns, err := nschema.NewNamespaceForPath("root.demo")
+	require.NoError(t, err)
+	ns.Metadata.Labels = map[string]string{"demo": "true"}
+	return *ns
 }
 
 func TestUpsertNamespaceCreatesMissingNamespace(t *testing.T) {
-	seed := NamespaceSeed{Path: "root.demo", Labels: map[string]string{"demo": "true"}}
+	seed := demoNamespaceSeed(t)
 	client := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method + " " + r.URL.Path {
 		case "GET /api/v1/namespaces/root.demo":
 			w.WriteHeader(http.StatusNotFound)
 		case "POST /api/v1/namespaces":
-			var req api.CreateNamespaceRequestJson
+			var req nschema.Namespace
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
-			require.Equal(t, seed.Path, req.Path)
-			require.Equal(t, seed.Labels, req.Labels)
-			writeJSON(t, w, api.NamespaceJson{Path: seed.Path, Labels: seed.Labels})
+			require.Equal(t, seed, req)
+			writeJSON(t, w, seed)
 		default:
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
 		}
@@ -68,18 +79,18 @@ func TestUpsertNamespaceCreatesMissingNamespace(t *testing.T) {
 }
 
 func TestUpsertNamespaceIgnoresSystemManagedLabels(t *testing.T) {
-	seed := NamespaceSeed{Path: "root.demo", Labels: map[string]string{"demo": "true"}}
+	seed := demoNamespaceSeed(t)
 	client := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodGet, r.Method)
-		writeJSON(t, w, api.NamespaceJson{
-			Path: seed.Path,
-			Labels: map[string]string{
-				"demo":           "true",
-				"apxy/ns/-/id":   "root.demo",
-				"apxy/ns/-/name": "demo",
-				"apxy/ns/-/ns":   "root.demo",
-			},
-		})
+		existing := seed.Clone()
+		existing.Metadata.ID = "root.demo"
+		existing.Metadata.Labels = map[string]string{
+			"demo":           "true",
+			"apxy/ns/-/id":   "root.demo",
+			"apxy/ns/-/name": "demo",
+			"apxy/ns/-/ns":   "root.demo",
+		}
+		writeJSON(t, w, existing)
 	}))
 
 	action, err := upsertNamespace(client, testBaseURL, seed)
@@ -88,32 +99,25 @@ func TestUpsertNamespaceIgnoresSystemManagedLabels(t *testing.T) {
 }
 
 func TestUpsertNamespaceReconcilesUserMetadata(t *testing.T) {
-	seed := NamespaceSeed{
-		Path:        "root.demo",
-		Labels:      map[string]string{"demo": "true"},
-		Annotations: map[string]string{"description": "Demo resources"},
-	}
+	seed := demoNamespaceSeed(t)
+	seed.Metadata.Annotations = map[string]string{"description": "Demo resources"}
 	client := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method + " " + r.URL.Path {
 		case "GET /api/v1/namespaces/root.demo":
-			writeJSON(t, w, api.NamespaceJson{
-				Path: seed.Path,
-				Labels: map[string]string{
-					"demo":         "false",
-					"apxy/ns/-/id": "root.demo",
-				},
-				Annotations: map[string]string{"description": "Stale description"},
-			})
+			existing := seed.Clone()
+			existing.Metadata.ID = "root.demo"
+			existing.Metadata.Labels = map[string]string{
+				"demo":         "false",
+				"apxy/ns/-/id": "root.demo",
+			}
+			existing.Metadata.Annotations = map[string]string{"description": "Stale description"}
+			writeJSON(t, w, existing)
 		case "PATCH /api/v1/namespaces/root.demo":
-			var req api.UpdateNamespaceRequestJson
+			var req nschema.NamespacePatch
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
-			require.Equal(t, seed.Labels, req.Labels)
-			require.Equal(t, seed.Annotations, req.Annotations)
-			writeJSON(t, w, api.NamespaceJson{
-				Path:        seed.Path,
-				Labels:      seed.Labels,
-				Annotations: seed.Annotations,
-			})
+			require.Equal(t, seed.Metadata.Labels, *req.Metadata.Labels)
+			require.Equal(t, seed.Metadata.Annotations, *req.Metadata.Annotations)
+			writeJSON(t, w, seed)
 		default:
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
 		}
@@ -125,58 +129,46 @@ func TestUpsertNamespaceReconcilesUserMetadata(t *testing.T) {
 }
 
 func TestUpsertNamespaceClearsUnconfiguredUserMetadata(t *testing.T) {
-	seed := NamespaceSeed{Path: "root.demo"}
+	seed, err := nschema.NewNamespaceForPath("root.demo")
+	require.NoError(t, err)
 	client := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method + " " + r.URL.Path {
 		case "GET /api/v1/namespaces/root.demo":
-			writeJSON(t, w, api.NamespaceJson{
-				Path:        seed.Path,
-				Labels:      map[string]string{"legacy": "true"},
-				Annotations: map[string]string{"legacy": "true"},
-			})
+			existing := seed.Clone()
+			existing.Metadata.ID = "root.demo"
+			existing.Metadata.Labels = map[string]string{"legacy": "true"}
+			existing.Metadata.Annotations = map[string]string{"legacy": "true"}
+			writeJSON(t, w, existing)
 		case "PATCH /api/v1/namespaces/root.demo":
-			var req api.UpdateNamespaceRequestJson
+			var req nschema.NamespacePatch
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
-			require.NotNil(t, req.Labels)
-			require.Empty(t, req.Labels)
-			require.NotNil(t, req.Annotations)
-			require.Empty(t, req.Annotations)
-			writeJSON(t, w, api.NamespaceJson{Path: seed.Path})
+			require.NotNil(t, req.Metadata.Labels)
+			require.Empty(t, *req.Metadata.Labels)
+			require.NotNil(t, req.Metadata.Annotations)
+			require.Empty(t, *req.Metadata.Annotations)
+			writeJSON(t, w, seed)
 		default:
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
 		}
 	}))
 
-	action, err := upsertNamespace(client, testBaseURL, seed)
+	action, err := upsertNamespace(client, testBaseURL, *seed)
 	require.NoError(t, err)
 	require.Equal(t, seedUpdated, action)
 }
 
-func TestUpsertActorCreatesThenAppliesPermissions(t *testing.T) {
+func TestUpsertActorCreatesMissingActor(t *testing.T) {
 	seed := demoUserSeed()
 	client := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method + " " + r.URL.Path {
 		case "GET /api/v1/actors/external-id/demo-user":
-			require.Equal(t, seed.Namespace, r.URL.Query().Get("namespace"))
+			require.Equal(t, seed.Metadata.Namespace, r.URL.Query().Get("namespace"))
 			w.WriteHeader(http.StatusNotFound)
 		case "POST /api/v1/actors":
-			var req api.CreateActorRequestJson
+			var req actorschema.Actor
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
-			require.Equal(t, seed.ExternalId, req.ExternalId)
-			require.Equal(t, seed.Namespace, req.Namespace)
-			writeJSON(t, w, api.ActorJson{ExternalId: seed.ExternalId, Namespace: seed.Namespace})
-		case "PATCH /api/v1/actors/external-id/demo-user":
-			require.Equal(t, seed.Namespace, r.URL.Query().Get("namespace"))
-			var req api.UpdateActorRequestJson
-			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
-			require.Equal(t, seed.Permissions, req.Permissions)
-			require.Equal(t, seed.Labels, req.Labels)
-			writeJSON(t, w, api.ActorJson{
-				ExternalId:  seed.ExternalId,
-				Namespace:   seed.Namespace,
-				Permissions: seed.Permissions,
-				Labels:      seed.Labels,
-			})
+			require.Equal(t, seed, req)
+			writeJSON(t, w, seed)
 		default:
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
 		}
@@ -191,12 +183,9 @@ func TestUpsertActorVerifiesExistingActorWithoutChangingIt(t *testing.T) {
 	seed := demoUserSeed()
 	client := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodGet, r.Method)
-		writeJSON(t, w, api.ActorJson{
-			ExternalId:  seed.ExternalId,
-			Namespace:   seed.Namespace,
-			Permissions: seed.Permissions,
-			Labels:      seed.Labels,
-		})
+		existing := seed.Clone()
+		existing.Metadata.ID = "act_demouser000001"
+		writeJSON(t, w, existing)
 	}))
 
 	action, err := upsertActor(client, testBaseURL, seed)
@@ -209,17 +198,16 @@ func TestUpsertActorReconcilesDrift(t *testing.T) {
 	client := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
-			writeJSON(t, w, api.ActorJson{
-				ExternalId:  seed.ExternalId,
-				Namespace:   seed.Namespace,
-				Permissions: aschema.AllPermissions(),
-				Labels:      seed.Labels,
-			})
+			existing := seed.Clone()
+			existing.Metadata.ID = "act_demouser000001"
+			existing.Spec.Permissions = aschema.AllPermissions()
+			writeJSON(t, w, existing)
 		case http.MethodPatch:
-			var req api.UpdateActorRequestJson
+			require.Equal(t, "/api/v1/actors/act_demouser000001", r.URL.Path)
+			var req actorschema.ActorPatch
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
-			require.Equal(t, seed.Permissions, req.Permissions)
-			writeJSON(t, w, api.ActorJson{})
+			require.Equal(t, seed.Spec.Permissions, *req.Spec.Permissions)
+			writeJSON(t, w, seed)
 		default:
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
 		}
@@ -231,32 +219,26 @@ func TestUpsertActorReconcilesDrift(t *testing.T) {
 }
 
 func TestUpsertConnectorCreatesAndPublishesMissingSeed(t *testing.T) {
-	seed := ConnectorSeed{
-		Key:        "demo-noauth",
-		Definition: mustConnector(t, "Demo NoAuth"),
-		Labels: map[string]string{
-			"demo": "true",
-		},
-	}
+	seed := seedConnector(t, "demo-noauth", "Demo NoAuth")
 
 	forcedPrimary := false
 	client := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method + " " + r.URL.Path {
 		case "GET /api/v1/connectors":
-			require.Equal(t, defaultNamespace, r.URL.Query().Get("namespace"))
-			require.Equal(t, seedLabelKey+"=demo-noauth", r.URL.Query().Get("labelSelector"))
-			writeJSON(t, w, api.ListConnectorsResponseJson{})
+			require.Equal(t, "root", r.URL.Query().Get("namespace"))
+			require.Equal(t, "demo-noauth", r.URL.Query().Get("name"))
+			writeJSON(t, w, api.NewListConnectorsResponseJson(nil, ""))
 		case "POST /api/v1/connectors":
-			var req api.CreateConnectorRequestJson
+			var req cschema.Connector
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
-			require.Equal(t, defaultNamespace, req.Namespace)
-			require.Equal(t, "Demo NoAuth", req.Definition.DisplayName)
-			require.Equal(t, "demo-noauth", req.Labels[seedLabelKey])
-			require.Equal(t, "true", req.Labels["demo"])
-			writeJSON(t, w, connectorVersion(req.Definition, req.Labels, api.ConnectorVersionStateDraft, 1))
-		case "PUT /api/v1/connectors/cxr_testgmail0000001/versions/1/_forceState":
+			require.Equal(t, "root", req.Metadata.Namespace)
+			require.Equal(t, "demo-noauth", string(req.Metadata.Name))
+			require.Equal(t, "Demo NoAuth", req.Spec.Definition.DisplayName)
+			require.Equal(t, "true", req.Metadata.Labels["demo"])
+			writeJSON(t, w, connectorVersion(req.Spec.Definition, req.Metadata.Labels, cschema.ConnectorReleaseStateDraft, 1))
+		case "PUT /api/v1/connectors/cxr_testgmail0000001/generations/1/_forceState":
 			forcedPrimary = true
-			writeJSON(t, w, connectorVersion(seed.Definition, connectorLabels(seed), api.ConnectorVersionStatePrimary, 1))
+			writeJSON(t, w, connectorVersion(seed.Spec.Definition, seed.Metadata.Labels, cschema.ConnectorReleaseStatePrimary, 1))
 		default:
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
 		}
@@ -269,23 +251,23 @@ func TestUpsertConnectorCreatesAndPublishesMissingSeed(t *testing.T) {
 }
 
 func TestUpsertConnectorSkipsMatchingPrimarySeed(t *testing.T) {
-	seed := ConnectorSeed{
-		Key:        "demo-noauth",
-		Namespace:  "root",
-		Definition: mustConnector(t, "Demo NoAuth"),
-		Labels: map[string]string{
-			"demo": "true",
-		},
-	}
+	seed := seedConnector(t, "demo-noauth", "Demo NoAuth")
 
 	client := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method + " " + r.URL.Path {
 		case "GET /api/v1/connectors":
-			writeJSON(t, w, api.ListConnectorsResponseJson{
-				Items: []api.ConnectorJson{connectorSummary(seed, api.ConnectorVersionStatePrimary, 1)},
-			})
-		case "GET /api/v1/connectors/cxr_testgmail0000001/versions/1":
-			writeJSON(t, w, connectorVersion(seed.Definition, connectorLabels(seed), api.ConnectorVersionStatePrimary, 1))
+			writeJSON(t, w, api.NewListConnectorsResponseJson(
+				[]cschema.Connector{
+					connectorSummary(
+						seed,
+						cschema.ConnectorReleaseStatePrimary,
+						1, // version
+					),
+				},
+				"", // continueToken
+			))
+		case "GET /api/v1/connectors/cxr_testgmail0000001/generations/1":
+			writeJSON(t, w, connectorVersion(seed.Spec.Definition, seed.Metadata.Labels, cschema.ConnectorReleaseStatePrimary, 1))
 		default:
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
 		}
@@ -297,33 +279,28 @@ func TestUpsertConnectorSkipsMatchingPrimarySeed(t *testing.T) {
 }
 
 func TestUpsertConnectorPublishesNewVersionWhenDefinitionChanges(t *testing.T) {
-	seed := ConnectorSeed{
-		Key:        "demo-noauth",
-		Namespace:  "root",
-		Definition: mustConnector(t, "New Demo NoAuth"),
-	}
+	seed := seedConnector(t, "demo-noauth", "New Demo NoAuth")
 	oldDefinition := mustConnector(t, "Old Demo NoAuth")
 	forcedPrimary := false
 
 	client := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method + " " + r.URL.Path {
 		case "GET /api/v1/connectors":
-			writeJSON(t, w, api.ListConnectorsResponseJson{
-				Items: []api.ConnectorJson{connectorSummary(seed, api.ConnectorVersionStatePrimary, 1)},
-			})
-		case "GET /api/v1/connectors/cxr_testgmail0000001/versions/1":
-			writeJSON(t, w, connectorVersion(oldDefinition, connectorLabels(seed), api.ConnectorVersionStatePrimary, 1))
-		case "POST /api/v1/connectors/cxr_testgmail0000001/versions":
-			var req api.CreateConnectorVersionRequestJson
+			writeJSON(t, w, api.NewListConnectorsResponseJson(
+				[]cschema.Connector{connectorSummary(seed, cschema.ConnectorReleaseStatePrimary, 1)},
+				"",
+			))
+		case "GET /api/v1/connectors/cxr_testgmail0000001/generations/1":
+			writeJSON(t, w, connectorVersion(oldDefinition, seed.Metadata.Labels, cschema.ConnectorReleaseStatePrimary, 1))
+		case "POST /api/v1/connectors/cxr_testgmail0000001/generations":
+			var req cschema.Connector
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
-			require.NotNil(t, req.Definition)
-			require.Equal(t, "New Demo NoAuth", req.Definition.DisplayName)
-			require.NotNil(t, req.Labels)
-			require.Equal(t, "demo-noauth", (*req.Labels)[seedLabelKey])
-			writeJSON(t, w, connectorVersion(*req.Definition, *req.Labels, api.ConnectorVersionStateDraft, 2))
-		case "PUT /api/v1/connectors/cxr_testgmail0000001/versions/2/_forceState":
+			require.Equal(t, "New Demo NoAuth", req.Spec.Definition.DisplayName)
+			require.NotNil(t, req.Metadata.Labels)
+			writeJSON(t, w, connectorVersion(req.Spec.Definition, req.Metadata.Labels, cschema.ConnectorReleaseStateDraft, 2))
+		case "PUT /api/v1/connectors/cxr_testgmail0000001/generations/2/_forceState":
 			forcedPrimary = true
-			writeJSON(t, w, connectorVersion(seed.Definition, connectorLabels(seed), api.ConnectorVersionStatePrimary, 2))
+			writeJSON(t, w, connectorVersion(seed.Spec.Definition, seed.Metadata.Labels, cschema.ConnectorReleaseStatePrimary, 2))
 		default:
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
 		}
@@ -454,6 +431,63 @@ func TestPostOAuth2TestProviderTreatsDuplicateAsAlreadyPresent(t *testing.T) {
 	}
 }
 
+func TestDeploymentSeedConfigsContainCanonicalResources(t *testing.T) {
+	for _, overlay := range []string{"demo", "dev"} {
+		t.Run(overlay, func(t *testing.T) {
+			manifestData, err := os.ReadFile(filepath.Join(
+				"..", "..", "..", "deploy", "kustomize", "authproxy-demo", "overlays", overlay, "seed", "seed-config.yaml",
+			))
+			require.NoError(t, err)
+
+			var manifest struct {
+				APIVersion string `yaml:"apiVersion"`
+				Kind       string `yaml:"kind"`
+				Metadata   struct {
+					Name string `yaml:"name"`
+				} `yaml:"metadata"`
+				Data map[string]string `yaml:"data"`
+			}
+			require.NoError(t, util.DecodeYAMLStrict(manifestData, &manifest))
+			require.Equal(t, "v1", manifest.APIVersion)
+			require.Equal(t, "ConfigMap", manifest.Kind)
+
+			seedPath := filepath.Join(t.TempDir(), "seed.yaml")
+			require.NoError(t, os.WriteFile(seedPath, []byte(manifest.Data["seed.yaml"]), 0o600))
+			cfg, err := loadConfig(seedPath)
+			require.NoError(t, err)
+			require.NotEmpty(t, cfg.Actors)
+			require.NotEmpty(t, cfg.Connectors)
+			for _, actor := range cfg.Actors {
+				require.Equal(t, "authproxy.net/v1alpha1", string(actor.APIVersion))
+				require.Equal(t, "Actor", string(actor.Kind))
+			}
+			for _, connector := range cfg.Connectors {
+				require.Equal(t, "authproxy.net/v1alpha1", string(connector.APIVersion))
+				require.Equal(t, "Connector", string(connector.Kind))
+			}
+		})
+	}
+}
+
+func TestLoadConfigRejectsLegacyFlatResources(t *testing.T) {
+	seedPath := filepath.Join(t.TempDir(), "seed.yaml")
+	require.NoError(t, os.WriteFile(seedPath, []byte(`
+actors:
+  - externalId: demo-admin
+    namespace: root
+connectors:
+  - key: demo-noauth
+    namespace: root
+    definition:
+      displayName: Demo NoAuth
+      auth:
+        type: no-auth
+`), 0o600))
+
+	_, err := loadConfig(seedPath)
+	require.ErrorContains(t, err, "parse seed config")
+}
+
 func TestSeedConfigParsesOAuthConnectorSetupVariants(t *testing.T) {
 	data := []byte(`
 oauth2TestProvider:
@@ -468,51 +502,57 @@ oauth2TestProvider:
     - username: demo-oauth-user@example.test
       password: demo-password
 connectors:
-  - key: demo-oauth-tenant
-    namespace: root
-    definition:
-      displayName: Demo OAuth Tenant
-      description: Demo OAuth connector with pre-connect config
+  - apiVersion: authproxy.net/v1alpha1
+    kind: Connector
+    metadata:
+      name: demo-oauth-tenant
+      namespace: root
       labels:
         type: demo-oauth-tenant
-      auth:
-        type: OAuth2
-        clientId: demo-oauth-tenant
-        clientSecret: demo-oauth-tenant-secret
-        authorization:
-          endpoint: https://example.test/oauth2/web/authorize
-          queryOverrides:
-            tenant: "{{cfg.tenant}}"
-        token:
-          endpoint: http://go-oauth2-server/v1/oauth/tokens
-        scopes:
-          - id: read
-            reason: Read demo data
-      setupFlow:
-        preconnect:
-          steps:
-            - id: tenant
-              title: Choose tenant
-              jsonSchema:
-                type: object
-                required:
-                  - tenant
-                properties:
-                  tenant:
-                    type: string
-              uiSchema:
-                type: VerticalLayout
-                elements:
-                  - type: Control
-                    scope: "#/properties/tenant"
+    spec:
+      release:
+        desiredState: primary
+      definition:
+        displayName: Demo OAuth Tenant
+        description: Demo OAuth connector with pre-connect config
+        auth:
+          type: OAuth2
+          clientId: demo-oauth-tenant
+          clientSecret: demo-oauth-tenant-secret
+          authorization:
+            endpoint: https://example.test/oauth2/web/authorize
+            queryOverrides:
+              tenant: "{{cfg.tenant}}"
+          token:
+            endpoint: http://go-oauth2-server/v1/oauth/tokens
+          scopes:
+            - id: read
+              reason: Read demo data
+        setupFlow:
+          preconnect:
+            steps:
+              - id: tenant
+                title: Choose tenant
+                jsonSchema:
+                  type: object
+                  required:
+                    - tenant
+                  properties:
+                    tenant:
+                      type: string
+                uiSchema:
+                  type: VerticalLayout
+                  elements:
+                    - type: Control
+                      scope: "#/properties/tenant"
 `)
 	var cfg SeedConfig
 	require.NoError(t, yaml.Unmarshal(data, &cfg))
 	require.NotNil(t, cfg.OAuth2TestProvider)
 	require.Len(t, cfg.OAuth2TestProvider.Clients, 1)
 	require.Len(t, cfg.Connectors, 1)
-	require.NoError(t, cfg.Connectors[0].Definition.Validate(&common.ValidationContext{}))
-	require.True(t, cfg.Connectors[0].Definition.SetupFlow.HasPreconnect())
+	require.NoError(t, cfg.Connectors[0].Spec.Definition.Validate(&common.ValidationContext{}))
+	require.True(t, cfg.Connectors[0].Spec.Definition.SetupFlow.HasPreconnect())
 }
 
 func TestSeedConfigParsesAPIKeyConnector(t *testing.T) {
@@ -524,29 +564,35 @@ oauth2TestProvider:
       key: demo-api-key
       placement: bearer
 connectors:
-  - key: demo-api-key
-    namespace: root
-    definition:
-      displayName: Demo API Key
-      description: Demo API key connector
+  - apiVersion: authproxy.net/v1alpha1
+    kind: Connector
+    metadata:
+      name: demo-api-key
+      namespace: root
       labels:
         type: demo-api-key
-      auth:
-        type: api-key
-        placement:
-          type: bearer
-      probes:
-        - id: verify-api-key
-          proxyHttp:
-            method: GET
-            url: http://go-oauth2-server/test/api-key-resource/demo-api-key
+    spec:
+      release:
+        desiredState: primary
+      definition:
+        displayName: Demo API Key
+        description: Demo API key connector
+        auth:
+          type: api-key
+          placement:
+            type: bearer
+        probes:
+          - id: verify-api-key
+            proxyHttp:
+              method: GET
+              url: http://go-oauth2-server/test/api-key-resource/demo-api-key
 `)
 	var cfg SeedConfig
 	require.NoError(t, yaml.Unmarshal(data, &cfg))
 	require.NotNil(t, cfg.OAuth2TestProvider)
 	require.Len(t, cfg.OAuth2TestProvider.APIKeyResourcePolicies, 1)
 	require.Len(t, cfg.Connectors, 1)
-	require.NoError(t, cfg.Connectors[0].Definition.Validate(&common.ValidationContext{}))
+	require.NoError(t, cfg.Connectors[0].Spec.Definition.Validate(&common.ValidationContext{}))
 }
 
 func TestDeploymentSeedConfigsUseIsolatedDemoResources(t *testing.T) {
@@ -568,7 +614,8 @@ func TestDeploymentSeedConfigsUseIsolatedDemoResources(t *testing.T) {
 			var cfg SeedConfig
 			require.NoError(t, util.DecodeYAMLStrict([]byte(configMap.Data["seed.yaml"]), &cfg))
 			require.NotNil(t, cfg.OAuth2TestProvider)
-			require.Equal(t, []NamespaceSeed{{Path: "root.demo", Labels: map[string]string{"demo": "true"}}}, cfg.Namespaces)
+			require.Len(t, cfg.Namespaces, 1)
+			require.Equal(t, demoNamespaceSeed(t), cfg.Namespaces[0])
 			require.Len(t, cfg.Actors, 1)
 			require.Equal(t, demoUserSeed(), cfg.Actors[0])
 			require.Len(t, cfg.Connectors, 5)
@@ -579,10 +626,11 @@ func TestDeploymentSeedConfigsUseIsolatedDemoResources(t *testing.T) {
 			}
 			oauthConnectorCount := 0
 			for _, connector := range cfg.Connectors {
-				require.Equal(t, "root.demo", connectorNamespace(connector))
-				require.NoError(t, connector.Definition.Validate(&common.ValidationContext{}))
+				require.Equal(t, "root.demo", connector.Metadata.Namespace)
+				require.NotEmpty(t, connector.Metadata.Labels["demo.authproxy.net/seed-key"])
+				require.NoError(t, connector.Spec.Definition.Validate(&common.ValidationContext{}))
 
-				oauthAuth, ok := connector.Definition.Auth.Inner().(*config.AuthOAuth2)
+				oauthAuth, ok := connector.Spec.Definition.Auth.Inner().(*config.AuthOAuth2)
 				if !ok {
 					continue
 				}
@@ -590,7 +638,7 @@ func TestDeploymentSeedConfigsUseIsolatedDemoResources(t *testing.T) {
 				clientID, err := oauthAuth.ClientId.GetValue(context.Background())
 				require.NoError(t, err)
 				providerClient, ok := providerClients[clientID]
-				require.Truef(t, ok, "OAuth connector %q references unseeded provider client %q", connector.Key, clientID)
+				require.Truef(t, ok, "OAuth connector %q references unseeded provider client %q", connector.Metadata.Name, clientID)
 				require.Equal(t, string(oauthAuth.GetTokenEndpointAuthMethodOrDefault()), providerClient.TokenEndpointAuthMethod)
 			}
 			require.Equal(t, 3, oauthConnectorCount)
@@ -603,14 +651,14 @@ func TestComposeSeedConfigUsesIsolatedDemoResources(t *testing.T) {
 	cfg, err := loadConfig(path)
 	require.NoError(t, err)
 	require.Len(t, cfg.Namespaces, 1)
-	require.Equal(t, "root.demo", cfg.Namespaces[0].Path)
-	require.Equal(t, []ActorSeed{demoUserSeed()}, cfg.Actors)
+	require.Equal(t, demoNamespaceSeed(t), cfg.Namespaces[0])
+	require.Equal(t, []actorschema.Actor{demoUserSeed()}, cfg.Actors)
 	require.Len(t, cfg.Connectors, 1)
-	require.Equal(t, "root.demo", connectorNamespace(cfg.Connectors[0]))
-	require.NoError(t, cfg.Connectors[0].Definition.Validate(&common.ValidationContext{}))
+	require.Equal(t, "root.demo", cfg.Connectors[0].Metadata.Namespace)
+	require.NoError(t, cfg.Connectors[0].Spec.Definition.Validate(&common.ValidationContext{}))
 }
 
-func mustConnector(t *testing.T, displayName string) config.Connector {
+func mustConnector(t *testing.T, displayName string) config.ConnectorDefinition {
 	t.Helper()
 
 	data := []byte(`
@@ -621,37 +669,39 @@ labels:
 auth:
   type: no-auth
 `)
-	var connector config.Connector
+	var connector config.ConnectorDefinition
 	require.NoError(t, yaml.Unmarshal(data, &connector))
 	return connector
 }
 
-func connectorSummary(seed ConnectorSeed, state api.ConnectorVersionState, version uint64) api.ConnectorJson {
-	return api.ConnectorJson{
-		Id:          testConnectorID,
-		Version:     version,
-		Namespace:   connectorNamespace(seed),
-		State:       state,
-		DisplayName: seed.Definition.DisplayName,
-		Description: seed.Definition.Description,
-		Labels:      connectorLabels(seed),
-	}
+func seedConnector(t *testing.T, name, displayName string) cschema.Connector {
+	t.Helper()
+	resource := cschema.NewConnector()
+	resource.Metadata.Name = common.ResourceName(name)
+	resource.Metadata.Namespace = "root"
+	resource.Metadata.Labels = map[string]string{"demo": "true"}
+	resource.Spec.Release.DesiredState = cschema.ConnectorReleaseStatePrimary
+	resource.Spec.Definition = mustConnector(t, displayName)
+	return *resource
 }
 
-func connectorVersion(def config.Connector, labels map[string]string, state api.ConnectorVersionState, version uint64) api.ConnectorVersionJson {
-	namespace := defaultNamespace
-	def.Id = testConnectorID
-	def.Version = version
-	def.Namespace = &namespace
-	def.State = string(state)
-	return api.ConnectorVersionJson{
-		Id:         testConnectorID,
-		Version:    version,
-		Namespace:  namespace,
-		State:      state,
-		Definition: def,
-		Labels:     labels,
+func connectorSummary(seed cschema.Connector, state cschema.ConnectorReleaseState, version uint64) cschema.Connector {
+	return connectorVersion(seed.Spec.Definition, seed.Metadata.Labels, state, version)
+}
+
+func connectorVersion(def config.ConnectorDefinition, labels map[string]string, state cschema.ConnectorReleaseState, version uint64) cschema.Connector {
+	resource := cschema.NewConnector()
+	resource.Metadata.ID = testConnectorID.String()
+	resource.Metadata.Name = "demo-noauth"
+	resource.Metadata.Namespace = "root"
+	resource.Metadata.Generation = version
+	resource.Metadata.Labels = labels
+	resource.Spec.Release.DesiredState = cschema.DesiredReleaseStateForObserved(state)
+	resource.Spec.Definition = def
+	resource.Status = &cschema.ConnectorStatus{
+		Release: cschema.ConnectorReleaseStatus{State: state},
 	}
+	return *resource
 }
 
 func writeJSON(t *testing.T, w http.ResponseWriter, v any) {

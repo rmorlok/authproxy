@@ -14,6 +14,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
+	smeta "github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/util"
 )
@@ -312,7 +313,7 @@ func (n *Notification) Validate() error {
 	if err := namespace.ValidatePath(n.Namespace); err != nil {
 		result = multierror.Append(result, fmt.Errorf("invalid notification namespace: %w", err))
 	}
-	if err := ValidateLabels(n.Labels); err != nil {
+	if err := smeta.ValidateLabels(n.Labels); err != nil {
 		result = multierror.Append(result, fmt.Errorf("invalid notification labels: %w", err))
 	}
 	if n.Title == "" {

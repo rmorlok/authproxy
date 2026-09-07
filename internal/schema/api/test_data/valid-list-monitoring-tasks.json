@@ -1,14 +1,26 @@
 {
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "TaskExecutionList",
+  "metadata": {
+    "continue": "next"
+  },
   "items": [
     {
-      "id": "task-1",
-      "queue": "default",
-      "type": "sync",
-      "payload": "{\"id\":\"1\"}",
-      "state": "pending",
-      "maxRetry": 5,
-      "retried": 1
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "TaskExecution",
+      "metadata": {
+        "id": "task-1"
+      },
+      "spec": {
+        "queue": "default",
+        "type": "sync",
+        "payload": "{\"id\":\"1\"}",
+        "maxRetry": 5
+      },
+      "status": {
+        "state": "pending",
+        "retried": 1
+      }
     }
-  ],
-  "cursor": "next"
+  ]
 }

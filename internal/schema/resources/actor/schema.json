@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/schema/resources/actor/schema.json",
+  "$defs": {
+    "ActorSpec": {
+      "type": "object",
+      "properties": {
+        "externalId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "permissions": {
+          "type": "array",
+          "items": {
+            "$ref": "../../auth/schema.json#/$defs/Permission"
+          }
+        },
+        "signingKey": {
+          "$ref": "../key/schema.json#/$defs/SigningKey",
+          "writeOnly": true
+        }
+      },
+      "required": ["externalId"],
+      "additionalProperties": false
+    },
+    "ActorStatus": {
+      "type": "object",
+      "properties": {
+        "signingKeyConfigured": {
+          "type": "boolean"
+        }
+      },
+      "required": ["signingKeyConfigured"],
+      "additionalProperties": false
+    },
+    "ActorSpecPatch": {
+      "type": "object",
+      "properties": {
+        "externalId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "permissions": {
+          "type": "array",
+          "items": {
+            "$ref": "../../auth/schema.json#/$defs/Permission"
+          }
+        },
+        "signingKey": {
+          "oneOf": [
+            { "$ref": "../key/schema.json#/$defs/SigningKey" },
+            { "type": "null" }
+          ],
+          "writeOnly": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "ActorPatch": {
+      "allOf": [
+        { "$ref": "../meta/schema.json#/$defs/Resource" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "Actor" },
+            "metadata": {
+              "allOf": [
+                { "$ref": "../meta/schema.json#/$defs/ObjectMetaPatch" },
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "pattern": "^act_" },
+                    "namespace": { "$ref": "../namespace/schema.json#/$defs/NamespacePath" }
+                  }
+                }
+              ]
+            },
+            "spec": { "$ref": "#/$defs/ActorSpecPatch" },
+            "status": { "$ref": "#/$defs/ActorStatus" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    }
+  },
+  "allOf": [
+    { "$ref": "../meta/schema.json#/$defs/Resource" },
+    {
+      "type": "object",
+      "properties": {
+        "apiVersion": { "const": "authproxy.net/v1alpha1" },
+        "kind": { "const": "Actor" },
+        "metadata": {
+          "allOf": [
+            { "$ref": "../meta/schema.json#/$defs/ObjectMeta" },
+            {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string", "pattern": "^act_" },
+                "namespace": { "$ref": "../namespace/schema.json#/$defs/NamespacePath" }
+              }
+            }
+          ]
+        },
+        "spec": { "$ref": "#/$defs/ActorSpec" },
+        "status": { "$ref": "#/$defs/ActorStatus" }
+      }
+    }
+  ],
+  "unevaluatedProperties": false
+}

@@ -21,6 +21,7 @@ import (
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -51,7 +52,7 @@ func newConnectorDisconnectAllRig(t *testing.T, name string, connectorCount int)
 	for i := 0; i < connectorCount; i++ {
 		clientKey := fmt.Sprintf("%s-client-%d-%s", name, i, suffix)
 		clientSecret := fmt.Sprintf("%s-secret-%d-%s", name, i, suffix)
-		connectorID := apid.New(apid.PrefixConnectorVersion)
+		connectorID := apid.New(apid.PrefixConnector)
 		connector := helpers.NewOAuth2Connector(connectorID, fmt.Sprintf("%s-%d", name, i), provider, helpers.OAuth2ConnectorOptions{
 			ClientID:          clientKey,
 			ClientSecret:      clientSecret,
@@ -59,7 +60,7 @@ func newConnectorDisconnectAllRig(t *testing.T, name string, connectorCount int)
 			IncludeRevocation: true,
 		})
 
-		oauthAuth := connector.Auth.InnerVal.(*cschema.AuthOAuth2)
+		oauthAuth := connector.Spec.Definition.Auth.InnerVal.(*cschema.AuthOAuth2)
 		supportedTokens := cschema.AuthOAuth2RevocationSupportedTypeRefreshToken
 		oauthAuth.Revocation.SupportedTokens = &supportedTokens
 		oauthAuth.Revocation.FormOverrides = map[string]string{
@@ -139,9 +140,15 @@ func (r *connectorDisconnectAllRig) completeAuthFlow(t *testing.T, connector con
 func (r *connectorDisconnectAllRig) disconnectAll(t *testing.T, connectorID apid.ID, timeoutSeconds int64) {
 	t.Helper()
 
-	reqBody, err := json.Marshal(schemaapi.ConnectorLifecycleRequestJson{
-		TimeoutSeconds: int64Ptr(timeoutSeconds),
-	})
+	reqBody, err := json.Marshal(schemaapi.NewConnectorLifecycleRequest(
+		schemaapi.ConnectorDisconnectAllActionKind,
+		meta.ObjectReference{
+			APIVersion: meta.APIVersionV1Alpha1,
+			Kind:       cschema.ConnectorKind,
+			ID:         connectorID.String(),
+		},
+		schemaapi.ConnectorLifecycleSpec{TimeoutSeconds: int64Ptr(timeoutSeconds)},
+	))
 	require.NoError(t, err)
 
 	path := "/api/v1/connectors/" + connectorID.String() + "/_disconnectAll"
@@ -159,12 +166,14 @@ func (r *connectorDisconnectAllRig) disconnectAll(t *testing.T, connectorID apid
 	r.env.ApiGin.ServeHTTP(w, req)
 	require.Equalf(t, http.StatusOK, w.Code, "disconnect all failed: %s", w.Body.String())
 
-	var body schemaapi.ConnectorLifecycleResponseJson
+	var body schemaapi.ConnectorLifecycleAction
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
-	require.Equal(t, connectorID, body.ConnectorId)
-	require.NotEmpty(t, body.TaskId)
+	require.NoError(t, body.ValidateResponse(schemaapi.ConnectorDisconnectAllActionKind))
+	require.Equal(t, connectorID.String(), body.Metadata.Target.ID)
+	require.NotNil(t, body.Status)
+	require.NotEmpty(t, body.Status.TaskID)
 
-	helpers.RequireWorkflowTaskCompleted(t, r.env, body.TaskId, time.Duration(timeoutSeconds+5)*time.Second)
+	helpers.RequireWorkflowTaskCompleted(t, r.env, body.Status.TaskID, time.Duration(timeoutSeconds+5)*time.Second)
 }
 
 func requireConnectionDeletedByID(t *testing.T, env *helpers.IntegrationTestEnv, connectionID string) {

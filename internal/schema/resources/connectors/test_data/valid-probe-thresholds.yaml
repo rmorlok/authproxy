@@ -1,34 +1,42 @@
-labels:
-  type: asana
-displayName: Asana
-logo:
-  publicUrl: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Asana_logo.svg/2880px-Asana_logo.svg.png
-description: |
-  Allow our agent organize your work
-probes:
-  - id: strict-ping
-    cron: "*/5 * * * *"
-    failureThreshold: 5
-    recoveryThreshold: 2
-    http:
-      method: GET
-      url: https://example.com/ping
-  - id: defaults-applied
-    period: 1h
-    proxyHttp:
-      method: GET
-      url: https://example.com/test
-auth:
-  type: OAuth2
-  clientId:
-    envVar: ASANA_CLIENT_ID
-  clientSecret:
-    envVar: ASANA_CLIENT_SECRET
-  authorization:
-    endpoint: https://app.asana.com/-/oauth_authorize
-  token:
-    endpoint: https://app.asana.com/-/oauth_token
-  scopes:
-    - id: projects:read
-      reason: |
-        We need access to see the projects
+apiVersion: authproxy.net/v1alpha1
+kind: Connector
+metadata:
+  name: probe-thresholds
+  labels:
+    type: asana
+spec:
+  definition:
+    displayName: Asana
+    logo:
+      publicUrl: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Asana_logo.svg/2880px-Asana_logo.svg.png
+    description: 'Allow our agent organize your work
+
+'
+    probes:
+    - id: strict-ping
+      cron: "*/5 * * * *"
+      failureThreshold: 5
+      recoveryThreshold: 2
+      http:
+        method: GET
+        url: https://example.com/ping
+    - id: defaults-applied
+      period: 1h
+      proxyHttp:
+        method: GET
+        url: https://example.com/test
+    auth:
+      type: OAuth2
+      clientId:
+        envVar: ASANA_CLIENT_ID
+      clientSecret:
+        envVar: ASANA_CLIENT_SECRET
+      authorization:
+        endpoint: https://app.asana.com/-/oauth_authorize
+      token:
+        endpoint: https://app.asana.com/-/oauth_token
+      scopes:
+      - id: projects:read
+        reason: 'We need access to see the projects
+
+'

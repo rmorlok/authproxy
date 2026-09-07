@@ -13,8 +13,8 @@ import (
 	"github.com/rmorlok/authproxy/integration_tests/helpers"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
-	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
+	"github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -59,8 +59,8 @@ func TestOAuth2VersionMigrationScopeExpansionRequiresReauth(t *testing.T) {
 		helpers.NotificationKeySuffixAuthRequired,
 	)
 	assertNoAuthProxyCopy(t, notification)
-	assert.True(t, notification.CanAction)
-	assert.Contains(t, notification.ActionUrl, "action=reauth")
+	require.NotNil(t, notification.Status.Action)
+	assert.Contains(t, notification.Status.Action.URL, "action=reauth")
 
 	reauthRedirect := rig.env.ReauthOAuth2Connection(t, connectionID, rig.returnToURL)
 	rig.requireRedirectScopes(t, reauthRedirect, "read write")
@@ -102,8 +102,9 @@ func TestOAuth2VersionMigrationScopeExpansionRollbackRestoresConnection(t *testi
 	)
 
 	rollback := rig.env.MigrateConnectionVersionAndWait(t, connectionID, 1, oauthMigrationTimeout)
-	require.Equal(t, uint64(2), rollback.SourceVersion)
-	require.Equal(t, uint64(1), rollback.TargetVersion)
+	require.NotNil(t, rollback.Status)
+	require.Equal(t, uint64(2), rollback.Status.SourceConnectorRef.Generation)
+	require.Equal(t, uint64(1), rollback.Status.TargetConnectorRef.Generation)
 
 	restored := rig.env.GetConnection(t, connectionID)
 	require.Equal(t, uint64(1), restored.ConnectorVersion)
@@ -125,7 +126,7 @@ func newOAuthMigrationRig(t *testing.T, name string) *oauthMigrationRig {
 	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
 	clientKey := name + "-client-" + suffix
 	clientSecret := name + "-secret-" + suffix
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 
 	env := helpers.Setup(t, helpers.SetupOptions{
 		Service:       helpers.ServiceTypeAPI,
@@ -144,10 +145,11 @@ func newOAuthMigrationRig(t *testing.T, name string) *oauthMigrationRig {
 	}
 
 	created := env.CreateConnector(t, rig.connectorDefinition(name+"-v1", []string{"read"}), nil, nil)
-	require.Equal(t, uint64(1), created.Version)
-	rig.connectorID = created.Id
-	primary := env.ForceConnectorVersionState(t, created.Id, created.Version, schemaapi.ConnectorVersionStatePrimary)
-	require.Equal(t, schemaapi.ConnectorVersionStatePrimary, primary.State)
+	require.Equal(t, uint64(1), created.Metadata.Generation)
+	rig.connectorID = created.GetId()
+	primary := env.ForceConnectorVersionState(t, created.GetId(), created.Metadata.Generation, connectors.ConnectorReleaseStatePrimary)
+	require.NotNil(t, primary.Status)
+	require.Equal(t, connectors.ConnectorReleaseStatePrimary, primary.Status.Release.State)
 
 	registered := provider.CreateClient(helpers.CreateClientRequest{
 		Key:                     clientKey,
@@ -169,12 +171,20 @@ func newOAuthMigrationRig(t *testing.T, name string) *oauthMigrationRig {
 	return rig
 }
 
-func (r *oauthMigrationRig) connectorDefinition(displayName string, scopes []string) sconfig.Connector {
-	return helpers.NewOAuth2Connector(r.connectorID, displayName, r.provider, helpers.OAuth2ConnectorOptions{
-		ClientID:     r.clientKey,
-		ClientSecret: r.clientSecret,
-		Scopes:       scopes,
-	})
+func (r *oauthMigrationRig) connectorDefinition(
+	displayName string,
+	scopes []string,
+) sconfig.ConnectorDefinition {
+	return helpers.NewOAuth2Connector(
+		r.connectorID,
+		displayName,
+		r.provider,
+		helpers.OAuth2ConnectorOptions{
+			ClientID:     r.clientKey,
+			ClientSecret: r.clientSecret,
+			Scopes:       scopes,
+		},
+	).Spec.Definition
 }
 
 func (r *oauthMigrationRig) createHealthyReadConnection(t *testing.T) string {
@@ -203,7 +213,7 @@ func (r *oauthMigrationRig) publishRequiredScopeVersion(t *testing.T, scopes []s
 		nil,
 		nil,
 	)
-	require.Equal(t, uint64(2), published.Version)
+	require.Equal(t, uint64(2), published.Metadata.Generation)
 }
 
 func (r *oauthMigrationRig) requireRedirectScopes(t *testing.T, redirectURL, want string) {

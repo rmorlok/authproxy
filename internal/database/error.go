@@ -11,6 +11,10 @@ import (
 // ErrNotFound is returned when a database operation that is expected to find a record does not find the record.
 var ErrNotFound = errors.New("record not found")
 
+// ErrInvalidReference is returned when an object reference cannot identify a
+// supported resource because its GVK, identity, or generation is invalid.
+var ErrInvalidReference = errors.New("invalid object reference")
+
 // ErrNamespaceDoesNotExist is returned when a namespace does not exist for a resource that is attempting to
 // be created in the specified namespace.
 var ErrNamespaceDoesNotExist = errors.New("namespace does not exist")

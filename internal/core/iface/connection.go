@@ -10,6 +10,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	connectionschema "github.com/rmorlok/authproxy/internal/schema/resources/connection"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
 
@@ -32,6 +33,7 @@ type Connection interface {
 	GetAnnotations() map[string]string
 	GetSetupStep() *cschema.SetupStep
 	GetSetupError() *string
+	GetResource(ctx context.Context) (*connectionschema.Connection, error)
 	GetJavascriptContext(ctx context.Context) (apjs.Context, error)
 
 	/*

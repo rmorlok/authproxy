@@ -1,7 +1,9 @@
-import { client } from './client';
 import { BackoffConfig } from './backoff';
+import { client } from './client';
+import { ObjectMetadata, TypeMeta } from './common';
 
-// Task models
+export const TASK_KIND = 'Task' as const;
+
 export enum TaskState {
   UNKNOWN = 'unknown',
   ACTIVE = 'active',
@@ -12,59 +14,49 @@ export enum TaskState {
   COMPLETED = 'completed',
 }
 
-export interface TaskInfoJson {
-  id: string;
-  type: string;
-  state: TaskState;
-  updatedAt?: string;
+export interface Task extends TypeMeta<typeof TASK_KIND> {
+  metadata: ObjectMetadata & { id: string };
+  spec: {
+    type: string;
+  };
+  status: {
+    state: TaskState;
+  };
 }
 
-/**
- * Get task information
- */
-export const getTask = (id: string) => {
-  return client.get<TaskInfoJson>(`/api/v1/tasks/${id}`);
-};
+export const getTask = (id: string) => client.get<Task>(`/api/v1/tasks/${id}`);
 
-// Default configuration
 const defaultBackoffConfig: BackoffConfig = {
-  initialDelay: 1000, // Start with 1 second
-  maxDelay: 120_000, // Max delay of 20 minutes
-  maxAttempts: 10, // Try up to 10 times
-  backoffFactor: 2, // Double the delay each time
+  initialDelay: 1_000,
+  maxDelay: 120_000,
+  maxAttempts: 10,
+  backoffFactor: 2,
 };
 
-/**
- * The final state of a call to poll for a task to be finalized.
- */
 export enum PollForTaskResult {
   FINALIZED = 'finalized',
   RETRIES_EXHAUSTED = 'retries_exhausted',
   ERROR = 'error',
 }
 
-/**
- * Poll for a task to reach a final state (COMPLETED or FAILED), with exponential backoff.
- */
+export interface PollForTaskFinalizedResult {
+  result: PollForTaskResult;
+  task?: Task;
+}
+
+/** Polls until the task is completed/failed or the configured backoff is exhausted. */
 export const pollForTaskFinalized = async (
   taskId: string,
-  config = defaultBackoffConfig
-): Promise<{
-  result: PollForTaskResult;
-  taskInfo?: TaskInfoJson;
-}> => {
-  // Merge provided config with defaults
+  config: BackoffConfig = defaultBackoffConfig,
+): Promise<PollForTaskFinalizedResult> => {
   const fullConfig = { ...defaultBackoffConfig, ...config };
   const { initialDelay, maxDelay, maxAttempts, backoffFactor } = fullConfig;
 
   let attempts = 0;
   let delay = initialDelay;
 
-  const poll = async (): Promise<{
-    result: PollForTaskResult;
-    taskInfo?: TaskInfoJson;
-  }> => {
-    attempts++;
+  const poll = async (): Promise<PollForTaskFinalizedResult> => {
+    attempts += 1;
 
     try {
       const response = await getTask(taskId);
@@ -72,13 +64,9 @@ export const pollForTaskFinalized = async (
         return { result: PollForTaskResult.ERROR };
       }
 
-      const taskInfo = response.data;
-
-      if (
-        taskInfo.state === TaskState.COMPLETED ||
-        taskInfo.state === TaskState.FAILED
-      ) {
-        return { result: PollForTaskResult.FINALIZED, taskInfo };
+      const task = response.data;
+      if (task.status.state === TaskState.COMPLETED || task.status.state === TaskState.FAILED) {
+        return { result: PollForTaskResult.FINALIZED, task };
       }
 
       if (attempts >= maxAttempts) {
@@ -88,7 +76,7 @@ export const pollForTaskFinalized = async (
       await new Promise((resolve) => setTimeout(resolve, delay));
       delay = Math.min(delay * backoffFactor, maxDelay);
       return poll();
-    } catch (error) {
+    } catch (_error) {
       if (attempts >= maxAttempts) {
         return { result: PollForTaskResult.ERROR };
       }

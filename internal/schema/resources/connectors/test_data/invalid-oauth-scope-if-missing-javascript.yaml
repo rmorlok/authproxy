@@ -1,18 +1,24 @@
-labels:
-  type: google-drive
-displayName: Google Drive
-description: Invalid scope predicate example
-auth:
-  type: OAuth2
-  clientId:
-    envVar: GOOGLE_CLIENT_ID
-  clientSecret:
-    envVar: GOOGLE_CLIENT_SECRET
-  authorization:
-    endpoint: https://accounts.google.com/o/oauth2/v2/auth
-  token:
-    endpoint: https://oauth2.googleapis.com/token
-  scopes:
-    - id: https://www.googleapis.com/auth/drive.file
-      if: {}
-      reason: We need to be able to write files
+apiVersion: authproxy.net/v1alpha1
+kind: Connector
+metadata:
+  name: oauth-scope-if-missing-javascript
+  labels:
+    type: google-drive
+spec:
+  definition:
+    displayName: Google Drive
+    description: Invalid scope predicate example
+    auth:
+      type: OAuth2
+      clientId:
+        envVar: GOOGLE_CLIENT_ID
+      clientSecret:
+        envVar: GOOGLE_CLIENT_SECRET
+      authorization:
+        endpoint: https://accounts.google.com/o/oauth2/v2/auth
+      token:
+        endpoint: https://oauth2.googleapis.com/token
+      scopes:
+      - id: https://www.googleapis.com/auth/drive.file
+        if: {}
+        reason: We need to be able to write files

@@ -2,6 +2,8 @@
 
 Manages an AuthProxy rate-limit resource. Every field maps to a typed HCL attribute so authors get plan-time validation and field-level diffs — no `jsonencode` required.
 
+The provider serializes these attributes into the `authproxy.net/v1alpha1` resource envelope: ownership and user metadata live under `metadata`, the policy lives under `spec`, and observed effective mode is read from `status`.
+
 ## Example Usage
 
 ```hcl
@@ -14,6 +16,10 @@ resource "authproxy_rate_limit" "team_acme_writes" {
   }
   annotations = {
     owner = "platform@example.com"
+  }
+
+  scope {
+    namespace_matcher = "root.acme.payments.**"
   }
 
   selector {
@@ -46,6 +52,12 @@ resource "authproxy_rate_limit" "team_acme_writes" {
 - `mode` - (Optional) Either `enforce` (default) or `observe`. In `observe` mode the rule evaluates and records matches but never returns a 429 — useful for safe rollout.
 - `labels` - (Optional) Map of user labels.
 - `annotations` - (Optional) Map of annotations.
+- `scope` - (Optional block) Narrows the owning namespace cascade. Omit the block to apply to the namespace and all descendants. When present, exactly one of `namespace_matcher`, `connector_ref`, or `connection_ref` is required.
+  - `namespace_matcher` - (Optional, mutually exclusive with the reference blocks) An exact or recursive matcher at or below `namespace`, such as `root.acme.payments.**`.
+  - `connector_ref` - (Optional block, mutually exclusive with the other scope variants) A connector ID. The rule applies across every generation of that connector.
+    - `id` - Connector ID (`cxr_...`).
+  - `connection_ref` - (Optional block, mutually exclusive with the other scope variants) One connection.
+    - `id` - Connection ID (`cxn_...`).
 - `selector` - (Required block) Match criteria; all clauses ANDed.
   - `label_selector` - (Optional) Kubernetes-style selector evaluated against the per-request label snapshot.
   - `methods` - (Optional) List of HTTP verbs. Empty / omitted = any.

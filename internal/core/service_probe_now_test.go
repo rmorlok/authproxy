@@ -23,9 +23,7 @@ import (
 // + Enqueue for each.
 func TestEnqueueProbeNow_EnqueuesEachProbeWhenThrottleAllows(t *testing.T) {
 	connectionId := apid.New(apid.PrefixConnection)
-	connector := &cschema.Connector{
-		Id:          apid.New(apid.PrefixConnectorVersion),
-		Version:     1,
+	connector := &cschema.ConnectorDefinition{
 		DisplayName: "probe-now-happy",
 		Auth:        &cschema.Auth{InnerVal: &cschema.AuthApiKey{Type: cschema.AuthTypeAPIKey}},
 		Probes: []cschema.Probe{
@@ -38,8 +36,8 @@ func TestEnqueueProbeNow_EnqueuesEachProbeWhenThrottleAllows(t *testing.T) {
 		Namespace:        "root",
 		State:            database.ConnectionStateConfigured,
 		HealthState:      database.ConnectionHealthStateHealthy,
-		ConnectorId:      connector.Id,
-		ConnectorVersion: connector.Version,
+		ConnectorId:      apid.New(apid.PrefixConnectorVersion),
+		ConnectorVersion: 1,
 	}
 
 	svc, _, _, ctrl := setupVerifyTest(t, connectionId, conn, connector)
@@ -52,9 +50,7 @@ func TestEnqueueProbeNow_EnqueuesEachProbeWhenThrottleAllows(t *testing.T) {
 
 func TestEnqueueProbeNow_EnqueuesOnlyEnabledProbes(t *testing.T) {
 	connectionId := apid.New(apid.PrefixConnection)
-	connector := &cschema.Connector{
-		Id:          apid.New(apid.PrefixConnectorVersion),
-		Version:     1,
+	connector := &cschema.ConnectorDefinition{
 		DisplayName: "probe-now-conditional",
 		Auth:        &cschema.Auth{InnerVal: &cschema.AuthApiKey{Type: cschema.AuthTypeAPIKey}},
 		Probes: []cschema.Probe{
@@ -71,8 +67,8 @@ func TestEnqueueProbeNow_EnqueuesOnlyEnabledProbes(t *testing.T) {
 		Namespace:        "root",
 		State:            database.ConnectionStateConfigured,
 		HealthState:      database.ConnectionHealthStateHealthy,
-		ConnectorId:      connector.Id,
-		ConnectorVersion: connector.Version,
+		ConnectorId:      apid.New(apid.PrefixConnectorVersion),
+		ConnectorVersion: 1,
 	}
 
 	svc, _, _, ctrl := setupVerifyTest(t, connectionId, conn, connector)
@@ -88,9 +84,7 @@ func TestEnqueueProbeNow_EnqueuesOnlyEnabledProbes(t *testing.T) {
 // called, gomock's controller fails at Finish.
 func TestEnqueueProbeNow_ThrottleSkipsEnqueue(t *testing.T) {
 	connectionId := apid.New(apid.PrefixConnection)
-	connector := &cschema.Connector{
-		Id:          apid.New(apid.PrefixConnectorVersion),
-		Version:     1,
+	connector := &cschema.ConnectorDefinition{
 		DisplayName: "probe-now-throttled",
 		Auth:        &cschema.Auth{InnerVal: &cschema.AuthApiKey{Type: cschema.AuthTypeAPIKey}},
 		Probes: []cschema.Probe{
@@ -102,8 +96,8 @@ func TestEnqueueProbeNow_ThrottleSkipsEnqueue(t *testing.T) {
 		Namespace:        "root",
 		State:            database.ConnectionStateConfigured,
 		HealthState:      database.ConnectionHealthStateHealthy,
-		ConnectorId:      connector.Id,
-		ConnectorVersion: connector.Version,
+		ConnectorId:      apid.New(apid.PrefixConnectorVersion),
+		ConnectorVersion: 1,
 	}
 
 	svc, _, _, ctrl := setupVerifyTest(t, connectionId, conn, connector)
@@ -119,9 +113,7 @@ func TestEnqueueProbeNow_ThrottleSkipsEnqueue(t *testing.T) {
 // throttled — only the allowed one results in an Enqueue.
 func TestEnqueueProbeNow_MixedThrottle(t *testing.T) {
 	connectionId := apid.New(apid.PrefixConnection)
-	connector := &cschema.Connector{
-		Id:          apid.New(apid.PrefixConnectorVersion),
-		Version:     1,
+	connector := &cschema.ConnectorDefinition{
 		DisplayName: "probe-now-mixed",
 		Auth:        &cschema.Auth{InnerVal: &cschema.AuthApiKey{Type: cschema.AuthTypeAPIKey}},
 		Probes: []cschema.Probe{
@@ -134,8 +126,8 @@ func TestEnqueueProbeNow_MixedThrottle(t *testing.T) {
 		Namespace:        "root",
 		State:            database.ConnectionStateConfigured,
 		HealthState:      database.ConnectionHealthStateHealthy,
-		ConnectorId:      connector.Id,
-		ConnectorVersion: connector.Version,
+		ConnectorId:      apid.New(apid.PrefixConnectorVersion),
+		ConnectorVersion: 1,
 	}
 
 	svc, _, _, ctrl := setupVerifyTest(t, connectionId, conn, connector)
@@ -159,9 +151,7 @@ func TestEnqueueProbeNow_MixedThrottle(t *testing.T) {
 // returns nil without touching Redis or asynq.
 func TestEnqueueProbeNow_NoProbesShortCircuits(t *testing.T) {
 	connectionId := apid.New(apid.PrefixConnection)
-	connector := &cschema.Connector{
-		Id:          apid.New(apid.PrefixConnectorVersion),
-		Version:     1,
+	connector := &cschema.ConnectorDefinition{
 		DisplayName: "probe-now-no-probes",
 		Auth:        &cschema.Auth{InnerVal: &cschema.AuthApiKey{Type: cschema.AuthTypeAPIKey}},
 	}
@@ -170,8 +160,8 @@ func TestEnqueueProbeNow_NoProbesShortCircuits(t *testing.T) {
 		Namespace:        "root",
 		State:            database.ConnectionStateConfigured,
 		HealthState:      database.ConnectionHealthStateHealthy,
-		ConnectorId:      connector.Id,
-		ConnectorVersion: connector.Version,
+		ConnectorId:      apid.New(apid.PrefixConnectorVersion),
+		ConnectorVersion: 1,
 	}
 
 	svc, _, _, ctrl := setupVerifyTest(t, connectionId, conn, connector)
@@ -187,9 +177,7 @@ func TestEnqueueProbeNow_NoProbesShortCircuits(t *testing.T) {
 // contract).
 func TestEnqueueProbeNow_RedisErrorIsSwallowedPerProbe(t *testing.T) {
 	connectionId := apid.New(apid.PrefixConnection)
-	connector := &cschema.Connector{
-		Id:          apid.New(apid.PrefixConnectorVersion),
-		Version:     1,
+	connector := &cschema.ConnectorDefinition{
 		DisplayName: "probe-now-redis-err",
 		Auth:        &cschema.Auth{InnerVal: &cschema.AuthApiKey{Type: cschema.AuthTypeAPIKey}},
 		Probes: []cschema.Probe{
@@ -202,8 +190,8 @@ func TestEnqueueProbeNow_RedisErrorIsSwallowedPerProbe(t *testing.T) {
 		Namespace:        "root",
 		State:            database.ConnectionStateConfigured,
 		HealthState:      database.ConnectionHealthStateHealthy,
-		ConnectorId:      connector.Id,
-		ConnectorVersion: connector.Version,
+		ConnectorId:      apid.New(apid.PrefixConnectorVersion),
+		ConnectorVersion: 1,
 	}
 
 	svc, _, _, ctrl := setupVerifyTest(t, connectionId, conn, connector)

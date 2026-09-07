@@ -327,8 +327,7 @@ func TestGetOAuth2State_AcceptsDistinctActorAndConnectionNamespaces(t *testing.T
 
 	connector := &mockCore.Connector{
 		Id: connectorId,
-		Definition: &sconfig.Connector{
-			Id: connectorId,
+		Definition: &sconfig.ConnectorDefinition{
 			Auth: &sconfig.Auth{InnerVal: &sconfig.AuthOAuth2{
 				Type: sconfig.AuthTypeOAuth2,
 			}},

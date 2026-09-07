@@ -102,12 +102,12 @@ func mkProxyReq(t *testing.T, ctx context.Context, rawurl string) *http.Request 
 	return req
 }
 
-func mkEnfRule(id string, def rlschema.RateLimit) *database.RateLimit {
+func mkEnfRule(id string, def rlschema.RateLimitSpec) *database.RateLimit {
 	return &database.RateLimit{Id: apid.ID(id), Namespace: "root", Definition: def}
 }
 
-func minimalTokenBucketDef(capacity int, mode rlschema.Mode) rlschema.RateLimit {
-	return rlschema.RateLimit{
+func minimalTokenBucketDef(capacity int, mode rlschema.Mode) rlschema.RateLimitSpec {
+	return rlschema.RateLimitSpec{
 		Mode:     mode,
 		Selector: rlschema.Selector{},
 		Bucket:   rlschema.Bucket{Dimensions: []string{rlschema.DimensionActor}},
@@ -187,6 +187,46 @@ func TestEnforcer_RuleDoesNotMatch_PassThrough(t *testing.T) {
 	require.Empty(t, attr.RateLimitMatched)
 }
 
+func TestEnforcer_NamespaceCascade(t *testing.T) {
+	env := newEnforcerEnv(t)
+	rt := newEnforcer(t, env, httpf.RequestInfo{Namespace: "root.acme.team"}, newFakeTransport()).(*EnforcerRoundTripper)
+	descendantsMatcher := "root.acme.**"
+	exactMatcher := "root.acme.team"
+	parentExactMatcher := "root.acme"
+	otherMatcher := "root.other.**"
+	narrowed := func(matcher *string) rlschema.RateLimitSpec {
+		def := minimalTokenBucketDef(1, rlschema.ModeEnforce)
+		def.Scope = &rlschema.RateLimitScope{NamespaceMatcher: matcher}
+		return def
+	}
+
+	rules := []*database.RateLimit{
+		{Id: "rl_root", Namespace: "root", Definition: minimalTokenBucketDef(1, rlschema.ModeEnforce)},
+		{Id: "rl_parent", Namespace: "root.acme", Definition: minimalTokenBucketDef(1, rlschema.ModeEnforce)},
+		{Id: "rl_exact", Namespace: "root.acme.team", Definition: minimalTokenBucketDef(1, rlschema.ModeEnforce)},
+		{Id: "rl_sibling", Namespace: "root.other", Definition: minimalTokenBucketDef(1, rlschema.ModeEnforce)},
+		{Id: "rl_prefix_collision", Namespace: "root.ac", Definition: minimalTokenBucketDef(1, rlschema.ModeEnforce)},
+		{Id: "rl_narrow_descendants", Namespace: "root", Definition: narrowed(&descendantsMatcher)},
+		{Id: "rl_narrow_exact", Namespace: "root", Definition: narrowed(&exactMatcher)},
+		{Id: "rl_parent_exact", Namespace: "root", Definition: narrowed(&parentExactMatcher)},
+		{Id: "rl_narrow_other", Namespace: "root", Definition: narrowed(&otherMatcher)},
+	}
+
+	matches := rt.findMatches(rules, &RequestContext{
+		Type:      common.RequestTypeProxy,
+		Method:    http.MethodGet,
+		Namespace: "root.acme.team",
+	})
+	require.Len(t, matches, 5)
+	require.Equal(t, []apid.ID{"rl_root", "rl_parent", "rl_exact", "rl_narrow_descendants", "rl_narrow_exact"}, []apid.ID{
+		matches[0].rule.Id,
+		matches[1].rule.Id,
+		matches[2].rule.Id,
+		matches[3].rule.Id,
+		matches[4].rule.Id,
+	})
+}
+
 // --- rejection ---
 
 func TestEnforcer_SingleRuleRejects_SyntheticRetryAfterAndAttribution(t *testing.T) {
@@ -231,7 +271,7 @@ func TestEnforcer_MultiRuleAllApply_MostRestrictiveWins(t *testing.T) {
 	// Two enforce rules, both saturated. rule "long" has a longer
 	// retry-after; we expect the firing rule to be that one.
 	env.loadRules(
-		mkEnfRule("rl_short", rlschema.RateLimit{
+		mkEnfRule("rl_short", rlschema.RateLimitSpec{
 			Mode:     rlschema.ModeEnforce,
 			Selector: rlschema.Selector{},
 			Bucket:   rlschema.Bucket{Dimensions: []string{rlschema.DimensionActor}},
@@ -241,7 +281,7 @@ func TestEnforcer_MultiRuleAllApply_MostRestrictiveWins(t *testing.T) {
 				},
 			},
 		}),
-		mkEnfRule("rl_long", rlschema.RateLimit{
+		mkEnfRule("rl_long", rlschema.RateLimitSpec{
 			Mode:     rlschema.ModeEnforce,
 			Selector: rlschema.Selector{},
 			Bucket:   rlschema.Bucket{Dimensions: []string{rlschema.DimensionActor}},

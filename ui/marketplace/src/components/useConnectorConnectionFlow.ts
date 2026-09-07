@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { isCompleteResponse, isRedirectResponse } from '@authproxy/api';
+import { Connector, isCompleteResponse, isRedirectResponse } from '@authproxy/api';
 import {
   abortConnectionAsync,
   clearFormStep,
@@ -14,6 +14,7 @@ import {
   submitConnectionFormAsync,
 } from '../store';
 import { AppDispatch } from '../store';
+import { connectorReference } from './connectorPresentation';
 
 export function useConnectorConnectionFlow() {
   const dispatch = useDispatch<AppDispatch>();
@@ -25,15 +26,15 @@ export function useConnectorConnectionFlow() {
 
   const returnToUrl = useCallback(() => `${window.location.origin}/connections`, []);
 
-  const connect = useCallback((connectorId: string) => {
+  const connect = useCallback((connector: Connector) => {
     dispatch(initiateConnectionAsync({
-      connectorId,
+      connectorRef: connectorReference(connector),
       returnToUrl: returnToUrl(),
     })).then((action) => {
       if (action.meta.requestStatus === 'fulfilled') {
         const response = action.payload as any;
         if (isRedirectResponse(response)) {
-          window.location.href = response.redirectUrl;
+          window.location.href = response.status.redirectUrl;
         } else if (isCompleteResponse(response)) {
           navigate('/connections');
           dispatch(fetchConnectionsAsync());
@@ -53,7 +54,7 @@ export function useConnectorConnectionFlow() {
       if (action.meta.requestStatus === 'fulfilled') {
         const response = action.payload as any;
         if (isRedirectResponse(response)) {
-          window.location.href = response.redirectUrl;
+          window.location.href = response.status.redirectUrl;
         } else if (isCompleteResponse(response)) {
           navigate('/connections');
           dispatch(fetchConnectionsAsync());

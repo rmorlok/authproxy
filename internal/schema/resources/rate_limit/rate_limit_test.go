@@ -11,10 +11,10 @@ import (
 // vc returns a fresh root validation context for direct Validate-method tests.
 func vc() *common.ValidationContext { return &common.ValidationContext{} }
 
-// validRateLimit returns a fully-populated, valid RateLimit for use as a
+// validRateLimit returns a fully-populated, valid RateLimitSpec for use as a
 // starting point in negative tests.
-func validRateLimit() *RateLimit {
-	return &RateLimit{
+func validRateLimit() *RateLimitSpec {
+	return &RateLimitSpec{
 		Mode: ModeEnforce,
 		Selector: Selector{
 			LabelSelector: "apxy/connector/-/id=salesforce",
@@ -39,12 +39,12 @@ func TestRateLimit_Validate_HappyPath(t *testing.T) {
 }
 
 func TestRateLimit_EffectiveMode(t *testing.T) {
-	require.Equal(t, ModeEnforce, (&RateLimit{}).EffectiveMode())
-	require.Equal(t, ModeObserve, (&RateLimit{Mode: ModeObserve}).EffectiveMode())
+	require.Equal(t, ModeEnforce, (&RateLimitSpec{}).EffectiveMode())
+	require.Equal(t, ModeObserve, (&RateLimitSpec{Mode: ModeObserve}).EffectiveMode())
 
 	// Method on a nil receiver still returns the default — handy for code
-	// paths that may receive a missing definition.
-	var nilRl *RateLimit
+	// paths that may receive a missing spec.
+	var nilRl *RateLimitSpec
 	require.Equal(t, ModeEnforce, nilRl.EffectiveMode())
 }
 

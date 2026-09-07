@@ -23,6 +23,11 @@ import (
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
+	actorschema "github.com/rmorlok/authproxy/internal/schema/resources/actor"
+	connectionschema "github.com/rmorlok/authproxy/internal/schema/resources/connection"
+	connectorschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
+	namespaceschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/test_utils"
 	"github.com/stretchr/testify/require"
 )
@@ -97,7 +102,7 @@ func TestResourceSearchRouteQueryAndPermissions(t *testing.T) {
 
 	t.Run("requires authentication", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		req, err := http.NewRequest(http.MethodGet, "/search/resources?q=payments&resourceType=actor", nil)
+		req, err := http.NewRequest(http.MethodGet, "/search/resources?q=payments&kind=Actor", nil)
 		require.NoError(t, err)
 		setup.gin.ServeHTTP(w, req)
 		require.Equal(t, http.StatusUnauthorized, w.Code)
@@ -111,15 +116,20 @@ func TestResourceSearchRouteQueryAndPermissions(t *testing.T) {
 			ResourceIds: []string{allowed.Id.String()},
 			Verbs:       []string{"list", "get"},
 		}}
-		req := signedSearchRequest(t, setup, "/search/resources?q=payments&resourceType=actor&namespace=root.team.**", permissions)
+		req := signedSearchRequest(t, setup, "/search/resources?q=payments&kind=Actor&namespace=root.team.**", permissions)
 		setup.gin.ServeHTTP(w, req)
 		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 
 		var response schemaapi.SearchResourcesResponseJson
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
 		require.Len(t, response.Items, 1)
-		require.Equal(t, allowed.Id.String(), response.Items[0].ResourceId)
-		require.Equal(t, "payments-service", response.Items[0].Name)
+		require.Equal(t, meta.NewTypeMeta(actorschema.ActorKind), meta.TypeMeta{
+			APIVersion: response.Items[0].ResourceRef.APIVersion,
+			Kind:       response.Items[0].ResourceRef.Kind,
+		})
+		require.Equal(t, allowed.Id.String(), response.Items[0].ResourceRef.ID)
+		require.Equal(t, scommon.ResourceName("payments-service"), response.Items[0].ResourceRef.Name)
+		require.Equal(t, "root.team", response.Items[0].ResourceRef.Namespace)
 		require.Equal(t, map[string]string{"env": "prod"}, response.Items[0].Labels)
 	})
 }
@@ -200,29 +210,31 @@ func TestResourceNamesEndToEndAcrossVersionsAndAuthorization(t *testing.T) {
 	setup.gin.ServeHTTP(w, signedSearchRequest(
 		t,
 		setup,
-		"/search/resources?q=billing-provider&resourceType=connector&namespace=root.**",
+		"/search/resources?q=billing-provider&kind=Connector&namespace=root.**",
 		permissions,
 	))
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	var response schemaapi.SearchResourcesResponseJson
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
 	require.Len(t, response.Items, 1, "the hidden duplicate and extra connector version must not leak")
-	require.Equal(t, allowedConnectorID.String(), response.Items[0].ResourceId)
-	require.Equal(t, "billing-provider", response.Items[0].Name)
-	require.Equal(t, "root.allowed", response.Items[0].Namespace)
+	require.Equal(t, connectorschema.ConnectorKind, response.Items[0].ResourceRef.Kind)
+	require.Equal(t, allowedConnectorID.String(), response.Items[0].ResourceRef.ID)
+	require.Equal(t, scommon.ResourceName("billing-provider"), response.Items[0].ResourceRef.Name)
+	require.Equal(t, "root.allowed", response.Items[0].ResourceRef.Namespace)
 
 	w = httptest.NewRecorder()
 	setup.gin.ServeHTTP(w, signedSearchRequest(
 		t,
 		setup,
-		"/search/resources?q=billing-live&resourceType=connection&namespace=root.**",
+		"/search/resources?q=billing-live&kind=Connection&namespace=root.**",
 		permissions,
 	))
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
 	require.Len(t, response.Items, 1)
-	require.Equal(t, connectionID.String(), response.Items[0].ResourceId)
-	require.Equal(t, "billing-live", response.Items[0].Name)
+	require.Equal(t, connectionschema.ConnectionKind, response.Items[0].ResourceRef.Kind)
+	require.Equal(t, connectionID.String(), response.Items[0].ResourceRef.ID)
+	require.Equal(t, scommon.ResourceName("billing-live"), response.Items[0].ResourceRef.Name)
 }
 
 func TestResourceSearchRouteValidation(t *testing.T) {
@@ -233,7 +245,8 @@ func TestResourceSearchRouteValidation(t *testing.T) {
 		"/search/resources?q=ab",
 		"/search/resources?mode=invalid&q=valid",
 		"/search/resources?mode=seed&q=invalid",
-		"/search/resources?q=valid&resourceType=unknown",
+		"/search/resources?q=valid&resourceType=actor",
+		"/search/resources?q=valid&kind=Unknown",
 		"/search/resources?labelSelector=" + url.QueryEscape("bad key=value"),
 		"/search/resources?labelSelector=" + url.QueryEscape(","),
 		"/search/resources?labelSelector=" + url.QueryEscape("env=prod,"),
@@ -279,7 +292,7 @@ func TestResourceSearchRouteSeedCoversRemainingTypes(t *testing.T) {
 	setup.gin.ServeHTTP(w, signedSearchRequest(
 		t,
 		setup,
-		"/search/resources?mode=seed&resourceType=namespace&resourceType=key&resourceType=rate_limit&limit=50",
+		"/search/resources?mode=seed&kind=Namespace&kind=Key&kind=RateLimit&limit=50",
 		aschema.AllPermissions(),
 	))
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
@@ -288,10 +301,15 @@ func TestResourceSearchRouteSeedCoversRemainingTypes(t *testing.T) {
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
 	require.Len(t, response.Items, 3)
 	for _, item := range response.Items {
-		require.Equal(t, "seed", item.Name)
+		if item.ResourceRef.Kind == namespaceschema.NamespaceKind {
+			require.Equal(t, "root.seed", item.ResourceRef.ID)
+			require.Empty(t, item.ResourceRef.Name)
+		} else {
+			require.Equal(t, scommon.ResourceName("seed"), item.ResourceRef.Name)
+		}
 	}
-	require.Empty(t, response.TruncatedTypes)
-	require.Empty(t, response.IncompleteTypes)
+	require.Empty(t, response.Metadata.TruncatedKinds)
+	require.Empty(t, response.Metadata.IncompleteKinds)
 
 	mu.Lock()
 	defer mu.Unlock()
@@ -319,11 +337,11 @@ func TestResourceSearchRouteReturnsIncompleteTypes(t *testing.T) {
 		}
 	})
 	w := httptest.NewRecorder()
-	setup.gin.ServeHTTP(w, signedSearchRequest(t, setup, "/search/resources?q=payments&resourceType=actor", aschema.AllPermissions()))
+	setup.gin.ServeHTTP(w, signedSearchRequest(t, setup, "/search/resources?q=payments&kind=Actor", aschema.AllPermissions()))
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	var response schemaapi.SearchResourcesResponseJson
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
-	require.Equal(t, []schemaapi.SearchResourceType{schemaapi.SearchResourceTypeActor}, response.IncompleteTypes)
+	require.Equal(t, []meta.Kind{actorschema.ActorKind}, response.Metadata.IncompleteKinds)
 	require.Empty(t, response.Items)
 }
 
@@ -345,13 +363,13 @@ func TestResourceSearchRouteOverallDeadlineDoesNotWaitForIgnoredCancellation(t *
 	setup.routes.overallTimeout = 20 * time.Millisecond
 
 	w := httptest.NewRecorder()
-	setup.gin.ServeHTTP(w, signedSearchRequest(t, setup, "/search/resources?q=payments&resourceType=actor", aschema.AllPermissions()))
+	setup.gin.ServeHTTP(w, signedSearchRequest(t, setup, "/search/resources?q=payments&kind=Actor", aschema.AllPermissions()))
 	close(release)
 
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	var response schemaapi.SearchResourcesResponseJson
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
-	require.Equal(t, []schemaapi.SearchResourceType{schemaapi.SearchResourceTypeActor}, response.IncompleteTypes)
+	require.Equal(t, []meta.Kind{actorschema.ActorKind}, response.Metadata.IncompleteKinds)
 }
 
 func TestResourceSearchRouteUnexpectedDatabaseFailure(t *testing.T) {
@@ -364,6 +382,6 @@ func TestResourceSearchRouteUnexpectedDatabaseFailure(t *testing.T) {
 		}
 	})
 	w := httptest.NewRecorder()
-	setup.gin.ServeHTTP(w, signedSearchRequest(t, setup, "/search/resources?q=payments&resourceType=actor", aschema.AllPermissions()))
+	setup.gin.ServeHTTP(w, signedSearchRequest(t, setup, "/search/resources?q=payments&kind=Actor", aschema.AllPermissions()))
 	require.Equal(t, http.StatusInternalServerError, w.Code, w.Body.String())
 }

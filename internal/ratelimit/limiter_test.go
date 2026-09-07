@@ -52,7 +52,7 @@ func mkBucket() BucketKey {
 	return BucketKey{Components: []BucketKeyComponent{{Name: "actor", Value: "act_test"}}}
 }
 
-func mustNewLimiter(t *testing.T, env *limiterEnv, def rlschema.RateLimit) Limiter {
+func mustNewLimiter(t *testing.T, env *limiterEnv, def rlschema.RateLimitSpec) Limiter {
 	t.Helper()
 	rl := &database.RateLimit{
 		Id:         apid.New(apid.PrefixRateLimit),
@@ -68,18 +68,18 @@ func TestNewLimiter_DispatchesByVariant(t *testing.T) {
 	env := newLimiterEnv(t)
 	cases := []struct {
 		name string
-		def  rlschema.RateLimit
+		def  rlschema.RateLimitSpec
 	}{
-		{"fixed_window", rlschema.RateLimit{Algorithm: rlschema.Algorithm{
+		{"fixed_window", rlschema.RateLimitSpec{Algorithm: rlschema.Algorithm{
 			FixedWindow: &rlschema.FixedWindow{Window: common.HumanDuration{Duration: time.Minute}, Limit: 5},
 		}}},
-		{"sliding_window_log", rlschema.RateLimit{Algorithm: rlschema.Algorithm{
+		{"sliding_window_log", rlschema.RateLimitSpec{Algorithm: rlschema.Algorithm{
 			SlidingWindow: &rlschema.SlidingWindow{Window: common.HumanDuration{Duration: time.Minute}, Limit: 5, Mode: rlschema.SlidingWindowModeLog},
 		}}},
-		{"sliding_window_counter", rlschema.RateLimit{Algorithm: rlschema.Algorithm{
+		{"sliding_window_counter", rlschema.RateLimitSpec{Algorithm: rlschema.Algorithm{
 			SlidingWindow: &rlschema.SlidingWindow{Window: common.HumanDuration{Duration: time.Minute}, Limit: 5, Mode: rlschema.SlidingWindowModeCounter},
 		}}},
-		{"token_bucket", rlschema.RateLimit{Algorithm: rlschema.Algorithm{
+		{"token_bucket", rlschema.RateLimitSpec{Algorithm: rlschema.Algorithm{
 			TokenBucket: &rlschema.TokenBucket{Capacity: 5, RefillRate: 1.0},
 		}}},
 	}
@@ -95,7 +95,7 @@ func TestNewLimiter_NoVariantSet(t *testing.T) {
 	env := newLimiterEnv(t)
 	rl := &database.RateLimit{
 		Id:         apid.New(apid.PrefixRateLimit),
-		Definition: rlschema.RateLimit{},
+		Definition: rlschema.RateLimitSpec{},
 	}
 	_, err := NewLimiter(rl, env.rds, aplog.NewNoopLogger())
 	require.Error(t, err)
@@ -111,7 +111,7 @@ func TestNewLimiter_NilRateLimit(t *testing.T) {
 
 func TestFixedWindow_BelowLimitAllowed(t *testing.T) {
 	env := newLimiterEnv(t)
-	l := mustNewLimiter(t, env, rlschema.RateLimit{Algorithm: rlschema.Algorithm{
+	l := mustNewLimiter(t, env, rlschema.RateLimitSpec{Algorithm: rlschema.Algorithm{
 		FixedWindow: &rlschema.FixedWindow{Window: common.HumanDuration{Duration: time.Minute}, Limit: 3},
 	}})
 	for i := 0; i < 3; i++ {
@@ -124,7 +124,7 @@ func TestFixedWindow_BelowLimitAllowed(t *testing.T) {
 
 func TestFixedWindow_ExceedsLimitRejected(t *testing.T) {
 	env := newLimiterEnv(t)
-	l := mustNewLimiter(t, env, rlschema.RateLimit{Algorithm: rlschema.Algorithm{
+	l := mustNewLimiter(t, env, rlschema.RateLimitSpec{Algorithm: rlschema.Algorithm{
 		FixedWindow: &rlschema.FixedWindow{Window: common.HumanDuration{Duration: time.Minute}, Limit: 2},
 	}})
 	for i := 0; i < 2; i++ {
@@ -139,7 +139,7 @@ func TestFixedWindow_ExceedsLimitRejected(t *testing.T) {
 
 func TestFixedWindow_WindowRollover(t *testing.T) {
 	env := newLimiterEnv(t)
-	l := mustNewLimiter(t, env, rlschema.RateLimit{Algorithm: rlschema.Algorithm{
+	l := mustNewLimiter(t, env, rlschema.RateLimitSpec{Algorithm: rlschema.Algorithm{
 		FixedWindow: &rlschema.FixedWindow{Window: common.HumanDuration{Duration: time.Minute}, Limit: 2},
 	}})
 	// Saturate the first window.
@@ -158,7 +158,7 @@ func TestFixedWindow_WindowRollover(t *testing.T) {
 
 func TestFixedWindow_PerBucketIsolation(t *testing.T) {
 	env := newLimiterEnv(t)
-	l := mustNewLimiter(t, env, rlschema.RateLimit{Algorithm: rlschema.Algorithm{
+	l := mustNewLimiter(t, env, rlschema.RateLimitSpec{Algorithm: rlschema.Algorithm{
 		FixedWindow: &rlschema.FixedWindow{Window: common.HumanDuration{Duration: time.Minute}, Limit: 1},
 	}})
 	bucketA := BucketKey{Components: []BucketKeyComponent{{Name: "actor", Value: "a"}}}
@@ -179,7 +179,7 @@ func TestFixedWindow_PerBucketIsolation(t *testing.T) {
 
 func TestSlidingWindowLog_BasicAllowReject(t *testing.T) {
 	env := newLimiterEnv(t)
-	l := mustNewLimiter(t, env, rlschema.RateLimit{Algorithm: rlschema.Algorithm{
+	l := mustNewLimiter(t, env, rlschema.RateLimitSpec{Algorithm: rlschema.Algorithm{
 		SlidingWindow: &rlschema.SlidingWindow{
 			Window: common.HumanDuration{Duration: time.Minute}, Limit: 2, Mode: rlschema.SlidingWindowModeLog,
 		},
@@ -197,7 +197,7 @@ func TestSlidingWindowLog_BasicAllowReject(t *testing.T) {
 
 func TestSlidingWindowLog_OldEntriesEvicted(t *testing.T) {
 	env := newLimiterEnv(t)
-	l := mustNewLimiter(t, env, rlschema.RateLimit{Algorithm: rlschema.Algorithm{
+	l := mustNewLimiter(t, env, rlschema.RateLimitSpec{Algorithm: rlschema.Algorithm{
 		SlidingWindow: &rlschema.SlidingWindow{
 			Window: common.HumanDuration{Duration: time.Minute}, Limit: 2, Mode: rlschema.SlidingWindowModeLog,
 		},
@@ -219,7 +219,7 @@ func TestSlidingWindowLog_OldEntriesEvicted(t *testing.T) {
 
 func TestSlidingWindowLog_RetryAfterShrinksAsTimePasses(t *testing.T) {
 	env := newLimiterEnv(t)
-	l := mustNewLimiter(t, env, rlschema.RateLimit{Algorithm: rlschema.Algorithm{
+	l := mustNewLimiter(t, env, rlschema.RateLimitSpec{Algorithm: rlschema.Algorithm{
 		SlidingWindow: &rlschema.SlidingWindow{
 			Window: common.HumanDuration{Duration: time.Minute}, Limit: 1, Mode: rlschema.SlidingWindowModeLog,
 		},
@@ -242,7 +242,7 @@ func TestSlidingWindowLog_RetryAfterShrinksAsTimePasses(t *testing.T) {
 
 func TestSlidingWindowCounter_BasicAllowReject(t *testing.T) {
 	env := newLimiterEnv(t)
-	l := mustNewLimiter(t, env, rlschema.RateLimit{Algorithm: rlschema.Algorithm{
+	l := mustNewLimiter(t, env, rlschema.RateLimitSpec{Algorithm: rlschema.Algorithm{
 		SlidingWindow: &rlschema.SlidingWindow{
 			Window: common.HumanDuration{Duration: time.Minute}, Limit: 3, Mode: rlschema.SlidingWindowModeCounter,
 		},
@@ -261,7 +261,7 @@ func TestSlidingWindowCounter_BasicAllowReject(t *testing.T) {
 
 func TestSlidingWindowCounter_PreviousWindowDecays(t *testing.T) {
 	env := newLimiterEnv(t)
-	l := mustNewLimiter(t, env, rlschema.RateLimit{Algorithm: rlschema.Algorithm{
+	l := mustNewLimiter(t, env, rlschema.RateLimitSpec{Algorithm: rlschema.Algorithm{
 		SlidingWindow: &rlschema.SlidingWindow{
 			Window: common.HumanDuration{Duration: 60 * time.Second}, Limit: 4, Mode: rlschema.SlidingWindowModeCounter,
 		},
@@ -289,7 +289,7 @@ func TestSlidingWindowCounter_PreviousWindowDecays(t *testing.T) {
 
 func TestTokenBucket_BurstThenLimit(t *testing.T) {
 	env := newLimiterEnv(t)
-	l := mustNewLimiter(t, env, rlschema.RateLimit{Algorithm: rlschema.Algorithm{
+	l := mustNewLimiter(t, env, rlschema.RateLimitSpec{Algorithm: rlschema.Algorithm{
 		TokenBucket: &rlschema.TokenBucket{Capacity: 3, RefillRate: 1.0},
 	}})
 
@@ -309,7 +309,7 @@ func TestTokenBucket_BurstThenLimit(t *testing.T) {
 
 func TestTokenBucket_Refill(t *testing.T) {
 	env := newLimiterEnv(t)
-	l := mustNewLimiter(t, env, rlschema.RateLimit{Algorithm: rlschema.Algorithm{
+	l := mustNewLimiter(t, env, rlschema.RateLimitSpec{Algorithm: rlschema.Algorithm{
 		TokenBucket: &rlschema.TokenBucket{Capacity: 2, RefillRate: 2.0},
 	}})
 
@@ -332,7 +332,7 @@ func TestTokenBucket_Refill(t *testing.T) {
 
 func TestTokenBucket_RefillCappedAtCapacity(t *testing.T) {
 	env := newLimiterEnv(t)
-	l := mustNewLimiter(t, env, rlschema.RateLimit{Algorithm: rlschema.Algorithm{
+	l := mustNewLimiter(t, env, rlschema.RateLimitSpec{Algorithm: rlschema.Algorithm{
 		TokenBucket: &rlschema.TokenBucket{Capacity: 5, RefillRate: 1.0},
 	}})
 
@@ -357,7 +357,7 @@ func TestTokenBucket_RefillCappedAtCapacity(t *testing.T) {
 
 func TestTokenBucket_FractionalRefillRate(t *testing.T) {
 	env := newLimiterEnv(t)
-	l := mustNewLimiter(t, env, rlschema.RateLimit{Algorithm: rlschema.Algorithm{
+	l := mustNewLimiter(t, env, rlschema.RateLimitSpec{Algorithm: rlschema.Algorithm{
 		TokenBucket: &rlschema.TokenBucket{Capacity: 1, RefillRate: 0.5},
 	}})
 
@@ -394,7 +394,7 @@ func TestFixedWindow_FailOpenOnRedisDown(t *testing.T) {
 
 	rl := &database.RateLimit{
 		Id: apid.New(apid.PrefixRateLimit),
-		Definition: rlschema.RateLimit{Algorithm: rlschema.Algorithm{
+		Definition: rlschema.RateLimitSpec{Algorithm: rlschema.Algorithm{
 			FixedWindow: &rlschema.FixedWindow{Window: common.HumanDuration{Duration: time.Minute}, Limit: 1},
 		}},
 	}
@@ -413,7 +413,7 @@ func TestSlidingWindowLog_FailOpenOnRedisDown(t *testing.T) {
 
 	rl := &database.RateLimit{
 		Id: apid.New(apid.PrefixRateLimit),
-		Definition: rlschema.RateLimit{Algorithm: rlschema.Algorithm{
+		Definition: rlschema.RateLimitSpec{Algorithm: rlschema.Algorithm{
 			SlidingWindow: &rlschema.SlidingWindow{
 				Window: common.HumanDuration{Duration: time.Minute}, Limit: 1, Mode: rlschema.SlidingWindowModeLog,
 			},
@@ -433,7 +433,7 @@ func TestSlidingWindowCounter_FailOpenOnRedisDown(t *testing.T) {
 
 	rl := &database.RateLimit{
 		Id: apid.New(apid.PrefixRateLimit),
-		Definition: rlschema.RateLimit{Algorithm: rlschema.Algorithm{
+		Definition: rlschema.RateLimitSpec{Algorithm: rlschema.Algorithm{
 			SlidingWindow: &rlschema.SlidingWindow{
 				Window: common.HumanDuration{Duration: time.Minute}, Limit: 1, Mode: rlschema.SlidingWindowModeCounter,
 			},
@@ -453,7 +453,7 @@ func TestTokenBucket_FailOpenOnRedisDown(t *testing.T) {
 
 	rl := &database.RateLimit{
 		Id: apid.New(apid.PrefixRateLimit),
-		Definition: rlschema.RateLimit{Algorithm: rlschema.Algorithm{
+		Definition: rlschema.RateLimitSpec{Algorithm: rlschema.Algorithm{
 			TokenBucket: &rlschema.TokenBucket{Capacity: 1, RefillRate: 1.0},
 		}},
 	}
@@ -474,7 +474,7 @@ func TestFixedWindow_ConcurrentDecides(t *testing.T) {
 	const limit = 50
 	const goroutines = 200
 
-	l := mustNewLimiter(t, env, rlschema.RateLimit{Algorithm: rlschema.Algorithm{
+	l := mustNewLimiter(t, env, rlschema.RateLimitSpec{Algorithm: rlschema.Algorithm{
 		FixedWindow: &rlschema.FixedWindow{Window: common.HumanDuration{Duration: time.Hour}, Limit: limit},
 	}})
 

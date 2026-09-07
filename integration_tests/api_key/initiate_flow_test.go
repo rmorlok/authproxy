@@ -120,7 +120,7 @@ func runPerPlacementLifecycle(
 
 	// Connector definitions need a connector id; suffix with the placement
 	// label so parallel runs of this helper don't collide on the id namespace.
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 	connectorOpts.ProbeURL = stub.BaseURL + "/probe-" + label
 	conn := helpers.NewApiKeyConnector(connectorID, fmt.Sprintf("api-key-%s", label), connectorOpts)
 
@@ -131,15 +131,15 @@ func runPerPlacementLifecycle(
 	defer env.Cleanup()
 
 	connectionID, form := env.InitiateApiKeyConnection(t, connectorID)
-	require.Equalf(t, helpers.ApiKeySubmitFormStepId(), form.StepId,
-		"initiate should return the synthesized credentials step id; got %q", form.StepId)
+	require.Equalf(t, helpers.ApiKeySubmitFormStepId(), form.StepID,
+		"initiate should return the synthesized credentials step id; got %q", form.StepID)
 
 	// No prior credential bytes should ever appear in a form payload —
 	// even on first initiate the synthesized JSON schema is built from the
 	// connector definition only. Catching it here too costs nothing and
 	// guards against accidental regressions where the schema gains a
 	// pre-filled default field that leaks state.
-	rawSchema := string(form.JsonSchema)
+	rawSchema := string(form.JSONSchema)
 	for _, v := range credentialPayload {
 		if vs, ok := v.(string); ok {
 			assert.NotContainsf(t, rawSchema, vs,
@@ -147,7 +147,7 @@ func runPerPlacementLifecycle(
 		}
 	}
 
-	w := env.SubmitApiKeyCredentials(t, connectionID, form.StepId, credentialPayload)
+	w := env.SubmitApiKeyCredentials(t, connectionID, form.StepID, credentialPayload)
 	require.Equalf(t, http.StatusOK, w.Code, "submit failed: %s", w.Body.String())
 
 	// Submit transitions the connection into the verify phase (probes

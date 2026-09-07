@@ -20,12 +20,78 @@ import (
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	hmock "github.com/rmorlok/authproxy/internal/httpf/mock"
+	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	cfgschema "github.com/rmorlok/authproxy/internal/schema/config"
+	actorschema "github.com/rmorlok/authproxy/internal/schema/resources/actor"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
+	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 	"github.com/rmorlok/authproxy/internal/test_utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type configuredConnector struct {
+	Id          apid.ID
+	Name        string
+	Namespace   *string
+	Version     uint64
+	State       string
+	Labels      map[string]string
+	Annotations map[string]string
+	DisplayName string
+}
+
+func configuredConnectorResource(value configuredConnector) cschema.Connector {
+	resource := cschema.Connector{
+		TypeMeta: meta.NewTypeMeta(cschema.ConnectorKind),
+		Metadata: meta.ObjectMeta{
+			ID:          value.Id.String(),
+			Name:        scommon.ResourceName(value.Name),
+			Generation:  value.Version,
+			Labels:      value.Labels,
+			Annotations: value.Annotations,
+		},
+		Spec: cschema.ConnectorSpec{
+			Release:    cschema.ConnectorReleaseSpec{DesiredState: cschema.ConnectorReleaseState(value.State)},
+			Definition: cschema.ConnectorDefinition{DisplayName: value.DisplayName},
+		},
+	}
+	if value.Namespace != nil {
+		resource.Metadata.Namespace = *value.Namespace
+	}
+	return resource
+}
+
+func configuredConnectorResources(values []configuredConnector) []cschema.Connector {
+	resources := make([]cschema.Connector, len(values))
+	for i, value := range values {
+		resources[i] = configuredConnectorResource(value)
+	}
+	return resources
+}
+
+func appendConfiguredConnector(resources []cschema.Connector, value configuredConnector) []cschema.Connector {
+	return append(resources, configuredConnectorResource(value))
+}
+
+func configuredRateLimit(id, name, namespace string) rlschema.RateLimit {
+	return rlschema.RateLimit{
+		TypeMeta: meta.NewTypeMeta(rlschema.RateLimitKind),
+		Metadata: meta.ObjectMeta{
+			ID:        id,
+			Name:      scommon.ResourceName(name),
+			Namespace: namespace,
+		},
+		Spec: rlschema.RateLimitSpec{
+			Selector: rlschema.Selector{},
+			Bucket:   rlschema.Bucket{},
+			Algorithm: rlschema.Algorithm{
+				TokenBucket: &rlschema.TokenBucket{Capacity: 10, RefillRate: 1},
+			},
+		},
+	}
+}
 
 func displayNameExpr(cfg config.C) string {
 	if cfg.GetRoot().Database.GetProvider() == cfgschema.DatabaseProviderPostgres {
@@ -51,17 +117,13 @@ func TestMigration(t *testing.T) {
 	var service iface.C
 	var asynqClient apasynq.Client
 
-	setup := func(t *testing.T, connectors []cschema.Connector) func() {
-		cfg = config.FromRoot(&cfgschema.Root{
-			DevSettings: &cfgschema.DevSettings{
-				Enabled:                  true,
-				FakeEncryption:           true,
-				FakeEncryptionSkipBase64: true,
-			},
-			Connectors: &cfgschema.Connectors{
-				LoadFromList: connectors,
-			},
-		})
+	setupRoot := func(t *testing.T, root *cfgschema.Root) func() {
+		root.DevSettings = &cfgschema.DevSettings{
+			Enabled:                  true,
+			FakeEncryption:           true,
+			FakeEncryptionSkipBase64: true,
+		}
+		cfg = config.FromRoot(root)
 
 		logger := slog.Default()
 		cfg, db, rawDb = database.MustApplyBlankTestDbConfigRaw(t, cfg)
@@ -85,9 +147,87 @@ func TestMigration(t *testing.T) {
 		}
 	}
 
+	setup := func(t *testing.T, connectors []configuredConnector) func() {
+		return setupRoot(t, &cfgschema.Root{
+			DevSettings: &cfgschema.DevSettings{
+				Enabled:                  true,
+				FakeEncryption:           true,
+				FakeEncryptionSkipBase64: true,
+			},
+			Connectors: &cfgschema.Connectors{
+				LoadFromList: configuredConnectorResources(connectors),
+			},
+		})
+	}
+
+	t.Run("rate limits", func(t *testing.T) {
+		ns := "root.acme"
+		first := configuredRateLimit("rl_test0000000000001", "tenant-default", ns)
+		second := configuredRateLimit("", "salesforce", ns)
+		second.Spec.Scope = &rlschema.RateLimitScope{ConnectorRef: &meta.ObjectReference{
+			APIVersion: meta.APIVersionV1Alpha1,
+			Kind:       cschema.ConnectorKind,
+			Name:       "salesforce",
+			Namespace:  ns,
+		}}
+		root := &cfgschema.Root{
+			Connectors: &cfgschema.Connectors{LoadFromList: configuredConnectorResources([]configuredConnector{{
+				Name:        "salesforce",
+				Namespace:   &ns,
+				DisplayName: "Salesforce",
+			}})},
+			RateLimits: &cfgschema.RateLimits{LoadFromList: []rlschema.RateLimit{first, second}},
+		}
+		cleanup := setupRoot(t, root)
+		defer cleanup()
+
+		require.NoError(t, service.Migrate(context.Background()))
+
+		storedFirst, err := db.GetRateLimit(context.Background(), apid.MustParse("rl_test0000000000001"))
+		require.NoError(t, err)
+		require.Equal(t, scommon.ResourceName("tenant-default"), storedFirst.Name)
+		require.Equal(t, "config", storedFirst.Labels[rateLimitSourceLabelKey])
+
+		storedSecondPage := db.ListRateLimitsBuilder().ForNamespaceMatchers([]string{ns}).ForName("salesforce").FetchPage(context.Background())
+		require.NoError(t, storedSecondPage.Error)
+		require.Len(t, storedSecondPage.Results, 1)
+		storedSecond := storedSecondPage.Results[0]
+		require.NotNil(t, storedSecond.Definition.Scope)
+		require.NotNil(t, storedSecond.Definition.Scope.ConnectorRef)
+		require.NotEmpty(t, storedSecond.Definition.Scope.ConnectorRef.ID)
+		require.Empty(t, storedSecond.Definition.Scope.ConnectorRef.Name)
+		require.Zero(t, storedSecond.Definition.Scope.ConnectorRef.Generation)
+
+		// Reconciliation updates the same explicit identity instead of creating
+		// another row, and a removed config-owned resource is cleaned up.
+		root.RateLimits.LoadFromList[0].Metadata.Name = "tenant-renamed"
+		root.RateLimits.LoadFromList[0].Metadata.Labels = map[string]string{"team": "platform"}
+		root.RateLimits.LoadFromList[0].Spec.Mode = rlschema.ModeObserve
+		root.RateLimits.LoadFromList = root.RateLimits.LoadFromList[:1]
+
+		apiID := apid.MustParse("rl_test0000000000099")
+		require.NoError(t, db.CreateRateLimit(context.Background(), &database.RateLimit{
+			Id:         apiID,
+			Namespace:  ns,
+			Name:       "api-owned",
+			Definition: configuredRateLimit("", "", ns).Spec,
+		}))
+		require.NoError(t, service.Migrate(context.Background()))
+
+		storedFirst, err = db.GetRateLimit(context.Background(), apid.MustParse("rl_test0000000000001"))
+		require.NoError(t, err)
+		require.Equal(t, scommon.ResourceName("tenant-renamed"), storedFirst.Name)
+		require.Equal(t, rlschema.ModeObserve, storedFirst.Definition.Mode)
+		require.Equal(t, "platform", storedFirst.Labels["team"])
+		_, err = db.GetRateLimit(context.Background(), storedSecond.Id)
+		require.ErrorIs(t, err, database.ErrNotFound)
+		_, err = db.GetRateLimit(context.Background(), apiID)
+		require.NoError(t, err, "API-owned rate limits must not be removed by config reconciliation")
+	})
+
 	t.Run("connectors", func(t *testing.T) {
 		t.Run("no connectors", func(t *testing.T) {
-			cleanup := setup(t, []cschema.Connector{})
+			cleanup := setup(t, []configuredConnector{})
 			defer cleanup()
 
 			err := service.MigrateConnectors(context.Background())
@@ -106,7 +246,7 @@ func TestMigration(t *testing.T) {
 
 		t.Run("names reconcile connector identity", func(t *testing.T) {
 			t.Run("annotation changes preserve the generated connector id", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{{
+				cleanup := setup(t, []configuredConnector{{
 					Name:        "configured",
 					Labels:      map[string]string{"type": "test"},
 					Annotations: map[string]string{"example.com/owner": "before@example.com"},
@@ -121,7 +261,7 @@ func TestMigration(t *testing.T) {
 				generatedID := first.Results[0].Id
 				require.Equal(t, "before@example.com", first.Results[0].Annotations["example.com/owner"])
 
-				cfg.GetRoot().Connectors.LoadFromList[0].Annotations["example.com/owner"] = "after@example.com"
+				cfg.GetRoot().Connectors.LoadFromList[0].Metadata.Annotations["example.com/owner"] = "after@example.com"
 				require.NoError(t, service.MigrateConnectors(context.Background()))
 
 				result := db.ListConnectorsBuilder().ForName("configured").FetchPage(context.Background())
@@ -132,11 +272,11 @@ func TestMigration(t *testing.T) {
 
 				versions := db.ListConnectorDefinitionVersionsBuilder().ForId(generatedID).FetchPage(context.Background())
 				require.NoError(t, versions.Error)
-				require.Len(t, versions.Results, 2)
+				require.Len(t, versions.Results, 1, "metadata-only changes must not create a connector generation")
 			})
 
 			t.Run("label changes preserve the generated connector id", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{{
+				cleanup := setup(t, []configuredConnector{{
 					Name:        "configured",
 					Labels:      map[string]string{"type": "before"},
 					DisplayName: "Before",
@@ -149,8 +289,8 @@ func TestMigration(t *testing.T) {
 				require.Len(t, first.Results, 1)
 				generatedID := first.Results[0].Id
 
-				cfg.GetRoot().Connectors.LoadFromList[0].Labels["type"] = "after"
-				cfg.GetRoot().Connectors.LoadFromList[0].DisplayName = "After"
+				cfg.GetRoot().Connectors.LoadFromList[0].Metadata.Labels["type"] = "after"
+				cfg.GetRoot().Connectors.LoadFromList[0].Spec.Definition.DisplayName = "After"
 				require.NoError(t, service.MigrateConnectors(context.Background()))
 
 				result := db.ListConnectorsBuilder().ForName("configured").FetchPage(context.Background())
@@ -166,7 +306,7 @@ func TestMigration(t *testing.T) {
 
 			t.Run("explicit id can rename without creating a version", func(t *testing.T) {
 				connectorID := apid.MustParse("cxr_test0000000000001")
-				cleanup := setup(t, []cschema.Connector{{
+				cleanup := setup(t, []configuredConnector{{
 					Id:          connectorID,
 					Name:        "before",
 					Labels:      map[string]string{"type": "same"},
@@ -175,7 +315,7 @@ func TestMigration(t *testing.T) {
 				defer cleanup()
 
 				require.NoError(t, service.MigrateConnectors(context.Background()))
-				cfg.GetRoot().Connectors.LoadFromList[0].Name = "after"
+				cfg.GetRoot().Connectors.LoadFromList[0].Metadata.Name = "after"
 				require.NoError(t, service.MigrateConnectors(context.Background()))
 
 				renamed := db.ListConnectorsBuilder().ForName("after").FetchPage(context.Background())
@@ -189,9 +329,37 @@ func TestMigration(t *testing.T) {
 				require.Len(t, versions.Results, 1)
 			})
 
+			t.Run("metadata and release changes do not create a version", func(t *testing.T) {
+				connectorID := apid.MustParse("cxr_test0000000000001")
+				cleanup := setup(t, []configuredConnector{{
+					Id:          connectorID,
+					Name:        "configured",
+					State:       "draft",
+					Labels:      map[string]string{"environment": "demo"},
+					Annotations: map[string]string{"example.com/owner": "integrations"},
+					DisplayName: "Unchanged definition",
+				}})
+				defer cleanup()
+
+				require.NoError(t, service.MigrateConnectors(context.Background()))
+				resource := &cfg.GetRoot().Connectors.LoadFromList[0]
+				resource.Metadata.Labels = map[string]string{"environment": "production"}
+				resource.Metadata.Annotations = map[string]string{"example.com/owner": "platform"}
+				resource.Spec.Release.DesiredState = cschema.ConnectorReleaseStatePrimary
+				require.NoError(t, service.MigrateConnectors(context.Background()))
+
+				versions := db.ListConnectorDefinitionVersionsBuilder().ForId(connectorID).FetchPage(context.Background())
+				require.NoError(t, versions.Error)
+				require.Len(t, versions.Results, 1)
+				require.Equal(t, database.ConnectorDefinitionVersionStatePrimary, versions.Results[0].State)
+				userLabels, _ := database.SplitUserAndApxyLabels(versions.Results[0].Labels)
+				require.Equal(t, database.Labels{"environment": "production"}, userLabels)
+				require.Equal(t, database.Annotations{"example.com/owner": "platform"}, versions.Results[0].Annotations)
+			})
+
 			t.Run("explicit id can rename while adding a version", func(t *testing.T) {
 				connectorID := apid.MustParse("cxr_test0000000000001")
-				cleanup := setup(t, []cschema.Connector{{
+				cleanup := setup(t, []configuredConnector{{
 					Id:          connectorID,
 					Name:        "before",
 					Version:     1,
@@ -201,9 +369,9 @@ func TestMigration(t *testing.T) {
 				defer cleanup()
 
 				require.NoError(t, service.MigrateConnectors(context.Background()))
-				cfg.GetRoot().Connectors.LoadFromList[0].Name = "after"
-				cfg.GetRoot().Connectors.LoadFromList[0].Version = 2
-				cfg.GetRoot().Connectors.LoadFromList[0].DisplayName = "Version two"
+				cfg.GetRoot().Connectors.LoadFromList[0].Metadata.Name = "after"
+				cfg.GetRoot().Connectors.LoadFromList[0].Metadata.Generation = 2
+				cfg.GetRoot().Connectors.LoadFromList[0].Spec.Definition.DisplayName = "Version two"
 				require.NoError(t, service.MigrateConnectors(context.Background()))
 
 				renamed := db.ListConnectorsBuilder().ForName("after").FetchPage(context.Background())
@@ -219,7 +387,7 @@ func TestMigration(t *testing.T) {
 			t.Run("same name in different namespaces creates different connectors", func(t *testing.T) {
 				firstNamespace := "root.first"
 				secondNamespace := "root.second"
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{Name: "shared", Namespace: &firstNamespace, Labels: map[string]string{"type": "same"}},
 					{Name: "shared", Namespace: &secondNamespace, Labels: map[string]string{"type": "same"}},
 				})
@@ -236,7 +404,7 @@ func TestMigration(t *testing.T) {
 
 		t.Run("id and version", func(t *testing.T) {
 			t.Run("single initial", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{
 						Id:      apid.MustParse("cxr_test0000000000001"),
 						Version: 1,
@@ -266,7 +434,7 @@ func TestMigration(t *testing.T) {
 			})
 
 			t.Run("double initial same type", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{
 						Id:      apid.MustParse("cxr_test0000000000001"),
 						Version: 1,
@@ -306,7 +474,7 @@ func TestMigration(t *testing.T) {
 			})
 
 			t.Run("double initial different type", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{
 						Id:      apid.MustParse("cxr_test0000000000001"),
 						Version: 1,
@@ -346,7 +514,7 @@ func TestMigration(t *testing.T) {
 			})
 
 			t.Run("unchanged from initial", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{
 						Id:      apid.MustParse("cxr_test0000000000001"),
 						Version: 1,
@@ -379,7 +547,7 @@ func TestMigration(t *testing.T) {
 			})
 
 			t.Run("changed once", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
 						Version:     1,
@@ -398,8 +566,8 @@ func TestMigration(t *testing.T) {
 					"renamed",
 				))
 
-				cfg.GetRoot().Connectors.LoadFromList[0].Version = 2
-				cfg.GetRoot().Connectors.LoadFromList[0].DisplayName = "changed"
+				cfg.GetRoot().Connectors.LoadFromList[0].Metadata.Generation = 2
+				cfg.GetRoot().Connectors.LoadFromList[0].Spec.Definition.DisplayName = "changed"
 
 				err = service.MigrateConnectors(context.Background())
 				require.NoError(t, err)
@@ -436,7 +604,7 @@ func TestMigration(t *testing.T) {
 			})
 
 			t.Run("add draft version", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
 						Version:     1,
@@ -450,7 +618,7 @@ func TestMigration(t *testing.T) {
 				require.NoError(t, err)
 
 				// Draft versions can be added; non-specified versions default to primary
-				cfg.GetRoot().Connectors.LoadFromList = append(cfg.GetRoot().Connectors.LoadFromList, cschema.Connector{
+				cfg.GetRoot().Connectors.LoadFromList = appendConfiguredConnector(cfg.GetRoot().Connectors.LoadFromList, configuredConnector{
 					Id:          apid.MustParse("cxr_test0000000000001"),
 					Version:     2,
 					State:       "draft",
@@ -487,7 +655,7 @@ func TestMigration(t *testing.T) {
 			})
 
 			t.Run("changed once then unchanged", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
 						Version:     1,
@@ -500,8 +668,8 @@ func TestMigration(t *testing.T) {
 				err := service.MigrateConnectors(context.Background())
 				require.NoError(t, err)
 
-				cfg.GetRoot().Connectors.LoadFromList[0].Version = 2
-				cfg.GetRoot().Connectors.LoadFromList[0].DisplayName = "changed"
+				cfg.GetRoot().Connectors.LoadFromList[0].Metadata.Generation = 2
+				cfg.GetRoot().Connectors.LoadFromList[0].Spec.Definition.DisplayName = "changed"
 
 				err = service.MigrateConnectors(context.Background())
 				require.NoError(t, err)
@@ -535,7 +703,7 @@ func TestMigration(t *testing.T) {
 			})
 
 			t.Run("changed twice", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
 						Version:     1,
@@ -548,14 +716,14 @@ func TestMigration(t *testing.T) {
 				err := service.MigrateConnectors(context.Background())
 				require.NoError(t, err)
 
-				cfg.GetRoot().Connectors.LoadFromList[0].Version = 2
-				cfg.GetRoot().Connectors.LoadFromList[0].DisplayName = "changed"
+				cfg.GetRoot().Connectors.LoadFromList[0].Metadata.Generation = 2
+				cfg.GetRoot().Connectors.LoadFromList[0].Spec.Definition.DisplayName = "changed"
 
 				err = service.MigrateConnectors(context.Background())
 				require.NoError(t, err)
 
-				cfg.GetRoot().Connectors.LoadFromList[0].Version = 3
-				cfg.GetRoot().Connectors.LoadFromList[0].DisplayName = "changed again"
+				cfg.GetRoot().Connectors.LoadFromList[0].Metadata.Generation = 3
+				cfg.GetRoot().Connectors.LoadFromList[0].Spec.Definition.DisplayName = "changed again"
 
 				err = service.MigrateConnectors(context.Background())
 				require.NoError(t, err)
@@ -592,7 +760,7 @@ func TestMigration(t *testing.T) {
 			})
 
 			t.Run("cannot change published version", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
 						Version:     1,
@@ -605,7 +773,7 @@ func TestMigration(t *testing.T) {
 				err := service.MigrateConnectors(context.Background())
 				require.NoError(t, err)
 
-				cfg.GetRoot().Connectors.LoadFromList[0].DisplayName = "changed"
+				cfg.GetRoot().Connectors.LoadFromList[0].Spec.Definition.DisplayName = "changed"
 
 				err = service.MigrateConnectors(context.Background())
 				require.Error(t, err)
@@ -630,7 +798,7 @@ func TestMigration(t *testing.T) {
 			})
 
 			t.Run("does not allow duplicate id versions initial", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
 						Version:     1,
@@ -662,7 +830,7 @@ func TestMigration(t *testing.T) {
 			})
 
 			t.Run("does not allow duplicate id versions when migrated", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
 						Version:     1,
@@ -675,7 +843,7 @@ func TestMigration(t *testing.T) {
 				err := service.MigrateConnectors(context.Background())
 				require.NoError(t, err)
 
-				cfg.GetRoot().Connectors.LoadFromList = append(cfg.GetRoot().Connectors.LoadFromList, cschema.Connector{
+				cfg.GetRoot().Connectors.LoadFromList = appendConfiguredConnector(cfg.GetRoot().Connectors.LoadFromList, configuredConnector{
 					Id:          apid.MustParse("cxr_test0000000000001"),
 					Version:     1,
 					Labels:      map[string]string{"type": "fake"},
@@ -707,7 +875,7 @@ func TestMigration(t *testing.T) {
 
 		t.Run("id", func(t *testing.T) {
 			t.Run("single initial", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{
 						Id:     apid.MustParse("cxr_test0000000000001"),
 						Labels: map[string]string{"type": "fake"},
@@ -736,7 +904,7 @@ func TestMigration(t *testing.T) {
 			})
 
 			t.Run("double initial same type", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{
 						Id:     apid.MustParse("cxr_test0000000000001"),
 						Labels: map[string]string{"type": "fake"},
@@ -774,7 +942,7 @@ func TestMigration(t *testing.T) {
 			})
 
 			t.Run("unchanged from initial", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{
 						Id:     apid.MustParse("cxr_test0000000000001"),
 						Labels: map[string]string{"type": "fake"},
@@ -806,7 +974,7 @@ func TestMigration(t *testing.T) {
 			})
 
 			t.Run("changed once", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
 						Labels:      map[string]string{"type": "fake"},
@@ -818,7 +986,7 @@ func TestMigration(t *testing.T) {
 				err := service.MigrateConnectors(context.Background())
 				require.NoError(t, err)
 
-				cfg.GetRoot().Connectors.LoadFromList[0].DisplayName = "changed"
+				cfg.GetRoot().Connectors.LoadFromList[0].Spec.Definition.DisplayName = "changed"
 
 				err = service.MigrateConnectors(context.Background())
 				require.NoError(t, err)
@@ -849,7 +1017,7 @@ func TestMigration(t *testing.T) {
 			})
 
 			t.Run("add draft version", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
 						Labels:      map[string]string{"type": "fake"},
@@ -861,7 +1029,7 @@ func TestMigration(t *testing.T) {
 				err := service.MigrateConnectors(context.Background())
 				require.NoError(t, err)
 
-				cfg.GetRoot().Connectors.LoadFromList = append(cfg.GetRoot().Connectors.LoadFromList, cschema.Connector{
+				cfg.GetRoot().Connectors.LoadFromList = appendConfiguredConnector(cfg.GetRoot().Connectors.LoadFromList, configuredConnector{
 					Id:          apid.MustParse("cxr_test0000000000001"),
 					Labels:      map[string]string{"type": "fake"},
 					State:       "draft",
@@ -897,7 +1065,7 @@ func TestMigration(t *testing.T) {
 			})
 
 			t.Run("changed once then unchanged", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
 						Labels:      map[string]string{"type": "fake"},
@@ -909,7 +1077,7 @@ func TestMigration(t *testing.T) {
 				err := service.MigrateConnectors(context.Background())
 				require.NoError(t, err)
 
-				cfg.GetRoot().Connectors.LoadFromList[0].DisplayName = "changed"
+				cfg.GetRoot().Connectors.LoadFromList[0].Spec.Definition.DisplayName = "changed"
 
 				err = service.MigrateConnectors(context.Background())
 				require.NoError(t, err)
@@ -943,7 +1111,7 @@ func TestMigration(t *testing.T) {
 			})
 
 			t.Run("changed twice", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
 						Labels:      map[string]string{"type": "fake"},
@@ -955,12 +1123,12 @@ func TestMigration(t *testing.T) {
 				err := service.MigrateConnectors(context.Background())
 				require.NoError(t, err)
 
-				cfg.GetRoot().Connectors.LoadFromList[0].DisplayName = "changed"
+				cfg.GetRoot().Connectors.LoadFromList[0].Spec.Definition.DisplayName = "changed"
 
 				err = service.MigrateConnectors(context.Background())
 				require.NoError(t, err)
 
-				cfg.GetRoot().Connectors.LoadFromList[0].DisplayName = "changed again"
+				cfg.GetRoot().Connectors.LoadFromList[0].Spec.Definition.DisplayName = "changed again"
 
 				err = service.MigrateConnectors(context.Background())
 				require.NoError(t, err)
@@ -997,7 +1165,7 @@ func TestMigration(t *testing.T) {
 			})
 
 			t.Run("does not allow duplicate id initial", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
 						Labels:      map[string]string{"type": "fake"},
@@ -1027,7 +1195,7 @@ func TestMigration(t *testing.T) {
 			})
 
 			t.Run("does not allow duplicate id when migrated", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
 						Labels:      map[string]string{"type": "fake"},
@@ -1039,7 +1207,7 @@ func TestMigration(t *testing.T) {
 				err := service.MigrateConnectors(context.Background())
 				require.NoError(t, err)
 
-				cfg.GetRoot().Connectors.LoadFromList = append(cfg.GetRoot().Connectors.LoadFromList, cschema.Connector{
+				cfg.GetRoot().Connectors.LoadFromList = appendConfiguredConnector(cfg.GetRoot().Connectors.LoadFromList, configuredConnector{
 					Id:          apid.MustParse("cxr_test0000000000001"),
 					Labels:      map[string]string{"type": "fake"},
 					DisplayName: "second",
@@ -1070,7 +1238,7 @@ func TestMigration(t *testing.T) {
 
 		t.Run("name and version", func(t *testing.T) {
 			t.Run("changed once preserves generated id", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{
 						Name:        "fake",
 						Version:     1,
@@ -1083,8 +1251,8 @@ func TestMigration(t *testing.T) {
 				err := service.MigrateConnectors(context.Background())
 				require.NoError(t, err)
 
-				cfg.GetRoot().Connectors.LoadFromList[0].Version = 2
-				cfg.GetRoot().Connectors.LoadFromList[0].DisplayName = "changed"
+				cfg.GetRoot().Connectors.LoadFromList[0].Metadata.Generation = 2
+				cfg.GetRoot().Connectors.LoadFromList[0].Spec.Definition.DisplayName = "changed"
 
 				err = service.MigrateConnectors(context.Background())
 				require.NoError(t, err)
@@ -1129,7 +1297,7 @@ func TestMigration(t *testing.T) {
 			})
 
 			t.Run("initial version must start at one", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{
 						Name:        "fake",
 						Version:     2,
@@ -1154,7 +1322,7 @@ func TestMigration(t *testing.T) {
 			})
 
 			t.Run("cannot change published version", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{
 						Name:        "fake",
 						Version:     1,
@@ -1167,7 +1335,7 @@ func TestMigration(t *testing.T) {
 				err := service.MigrateConnectors(context.Background())
 				require.NoError(t, err)
 
-				cfg.GetRoot().Connectors.LoadFromList[0].DisplayName = "changed"
+				cfg.GetRoot().Connectors.LoadFromList[0].Spec.Definition.DisplayName = "changed"
 
 				err = service.MigrateConnectors(context.Background())
 				require.Error(t, err)
@@ -1195,7 +1363,7 @@ func TestMigration(t *testing.T) {
 
 		t.Run("name only", func(t *testing.T) {
 			t.Run("single initial", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{
 						Name:   "fake",
 						Labels: map[string]string{"type": "fake"},
@@ -1222,7 +1390,7 @@ func TestMigration(t *testing.T) {
 			})
 
 			t.Run("unchanged initial", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{
 						Name:   "fake",
 						Labels: map[string]string{"type": "fake"},
@@ -1252,7 +1420,7 @@ func TestMigration(t *testing.T) {
 			})
 
 			t.Run("changed once", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{
 						Name:        "fake",
 						Labels:      map[string]string{"type": "fake"},
@@ -1264,7 +1432,7 @@ func TestMigration(t *testing.T) {
 				err := service.MigrateConnectors(context.Background())
 				require.NoError(t, err)
 
-				cfg.GetRoot().Connectors.LoadFromList[0].DisplayName = "changed"
+				cfg.GetRoot().Connectors.LoadFromList[0].Spec.Definition.DisplayName = "changed"
 
 				err = service.MigrateConnectors(context.Background())
 				require.NoError(t, err)
@@ -1292,7 +1460,7 @@ func TestMigration(t *testing.T) {
 			})
 
 			t.Run("changed once then unchanged", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{
 						Name:        "fake",
 						Labels:      map[string]string{"type": "fake"},
@@ -1304,7 +1472,7 @@ func TestMigration(t *testing.T) {
 				err := service.MigrateConnectors(context.Background())
 				require.NoError(t, err)
 
-				cfg.GetRoot().Connectors.LoadFromList[0].DisplayName = "changed"
+				cfg.GetRoot().Connectors.LoadFromList[0].Spec.Definition.DisplayName = "changed"
 
 				err = service.MigrateConnectors(context.Background())
 				require.NoError(t, err)
@@ -1335,7 +1503,7 @@ func TestMigration(t *testing.T) {
 			})
 
 			t.Run("changed twice", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{
 						Name:        "fake",
 						Labels:      map[string]string{"type": "fake"},
@@ -1347,12 +1515,12 @@ func TestMigration(t *testing.T) {
 				err := service.MigrateConnectors(context.Background())
 				require.NoError(t, err)
 
-				cfg.GetRoot().Connectors.LoadFromList[0].DisplayName = "changed"
+				cfg.GetRoot().Connectors.LoadFromList[0].Spec.Definition.DisplayName = "changed"
 
 				err = service.MigrateConnectors(context.Background())
 				require.NoError(t, err)
 
-				cfg.GetRoot().Connectors.LoadFromList[0].DisplayName = "changed again"
+				cfg.GetRoot().Connectors.LoadFromList[0].Spec.Definition.DisplayName = "changed again"
 
 				err = service.MigrateConnectors(context.Background())
 				require.NoError(t, err)
@@ -1385,7 +1553,7 @@ func TestMigration(t *testing.T) {
 			})
 
 			t.Run("does not allow duplicate name without id initial", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{
 						Name:        "fake",
 						Labels:      map[string]string{"type": "fake"},
@@ -1415,7 +1583,7 @@ func TestMigration(t *testing.T) {
 			})
 
 			t.Run("does not allow duplicate name without id when migrated", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{
 						Name:        "fake",
 						Labels:      map[string]string{"type": "fake"},
@@ -1427,7 +1595,7 @@ func TestMigration(t *testing.T) {
 				err := service.MigrateConnectors(context.Background())
 				require.NoError(t, err)
 
-				cfg.GetRoot().Connectors.LoadFromList = append(cfg.GetRoot().Connectors.LoadFromList, cschema.Connector{
+				cfg.GetRoot().Connectors.LoadFromList = appendConfiguredConnector(cfg.GetRoot().Connectors.LoadFromList, configuredConnector{
 					Name:        "fake",
 					Labels:      map[string]string{"type": "fake"},
 					DisplayName: "second",
@@ -1456,7 +1624,7 @@ func TestMigration(t *testing.T) {
 
 		t.Run("bad config files", func(t *testing.T) {
 			t.Run("duplicate id version type", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
 						Version:     1,
@@ -1488,7 +1656,7 @@ func TestMigration(t *testing.T) {
 			})
 
 			t.Run("duplicate id version state primary", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
 						Version:     1,
@@ -1522,7 +1690,7 @@ func TestMigration(t *testing.T) {
 			})
 
 			t.Run("duplicate id version state draft", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
 						Version:     1,
@@ -1556,7 +1724,7 @@ func TestMigration(t *testing.T) {
 			})
 
 			t.Run("duplicate id version", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
 						Version:     1,
@@ -1588,7 +1756,7 @@ func TestMigration(t *testing.T) {
 			})
 
 			t.Run("id with and without version", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
 						Version:     1,
@@ -1619,7 +1787,7 @@ func TestMigration(t *testing.T) {
 			})
 
 			t.Run("id version and name without id", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
 						Name:        "fake",
@@ -1638,7 +1806,7 @@ func TestMigration(t *testing.T) {
 				err := service.MigrateConnectors(context.Background())
 				require.Error(t, err)
 
-				cleanup2 := setup(t, []cschema.Connector{
+				cleanup2 := setup(t, []configuredConnector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
 						Name:        "fake",
@@ -1658,7 +1826,7 @@ func TestMigration(t *testing.T) {
 				err = service.MigrateConnectors(context.Background())
 				require.Error(t, err)
 
-				cleanup3 := setup(t, []cschema.Connector{
+				cleanup3 := setup(t, []configuredConnector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
 						Name:        "fake",
@@ -1692,7 +1860,7 @@ func TestMigration(t *testing.T) {
 			})
 
 			t.Run("id and name without id", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
 						Name:        "fake",
@@ -1710,7 +1878,7 @@ func TestMigration(t *testing.T) {
 				err := service.MigrateConnectors(context.Background())
 				require.Error(t, err)
 
-				cleanup2 := setup(t, []cschema.Connector{
+				cleanup2 := setup(t, []configuredConnector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
 						Name:        "fake",
@@ -1729,7 +1897,7 @@ func TestMigration(t *testing.T) {
 				err = service.MigrateConnectors(context.Background())
 				require.Error(t, err)
 
-				cleanup3 := setup(t, []cschema.Connector{
+				cleanup3 := setup(t, []configuredConnector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
 						Name:        "fake",
@@ -1764,7 +1932,7 @@ func TestMigration(t *testing.T) {
 
 		t.Run("orphan cleanup", func(t *testing.T) {
 			t.Run("config-sourced connector with no connections is removed", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{
 						Id:      apid.MustParse("cxr_test0000000000001"),
 						Version: 1,
@@ -1802,7 +1970,7 @@ func TestMigration(t *testing.T) {
 			})
 
 			t.Run("config-sourced connector with live connections is demoted", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{
 						Id:      apid.MustParse("cxr_test0000000000001"),
 						Version: 1,
@@ -1851,7 +2019,7 @@ func TestMigration(t *testing.T) {
 			})
 
 			t.Run("api-created connectors are not touched", func(t *testing.T) {
-				cleanup := setup(t, []cschema.Connector{
+				cleanup := setup(t, []configuredConnector{
 					{
 						Id:      apid.MustParse("cxr_test0000000000001"),
 						Version: 1,
@@ -1899,21 +2067,21 @@ func TestMigration(t *testing.T) {
 
 	t.Run("namespaces", func(t *testing.T) {
 		t.Run("includes configured actor namespaces", func(t *testing.T) {
-			cleanup := setup(t, []cschema.Connector{})
+			cleanup := setup(t, []configuredConnector{})
 			defer cleanup()
 
-			cfg.GetRoot().SystemAuth.Actors = &cfgschema.ConfiguredActors{
-				InnerVal: cfgschema.ConfiguredActorsList{{
-					ExternalId: "smoke-user",
-					Namespace:  "root.smoke",
-					Key: &cfgschema.Key{
-						InnerVal: &cfgschema.KeyShared{
-							SharedKey: &cfgschema.KeyData{
-								InnerVal: &cfgschema.KeyDataBase64Val{Base64: "dGVzdA=="},
-							},
-						},
+			actor := actorschema.NewActor()
+			actor.Metadata.Namespace = "root.smoke"
+			actor.Spec.ExternalId = "smoke-user"
+			actor.Spec.SigningKey = &cfgschema.Key{
+				InnerVal: &cfgschema.KeyShared{
+					SharedKey: &cfgschema.KeyData{
+						InnerVal: &cfgschema.KeyDataBase64Val{Base64: "dGVzdA=="},
 					},
-				}},
+				},
+			}
+			cfg.GetRoot().SystemAuth.Actors = &cfgschema.ConfiguredActors{
+				InnerVal: cfgschema.ConfiguredActorsList{actor},
 			}
 
 			require.NoError(t, service.Migrate(context.Background()))

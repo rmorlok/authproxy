@@ -14,6 +14,7 @@ type configuredActorData struct {
 	externalId   string
 	permissions  []aschema.Permission
 	labels       database.Labels
+	annotations  database.Annotations
 	encryptedKey *encfield.EncryptedField
 }
 
@@ -38,7 +39,7 @@ func (a *configuredActorData) GetLabels() map[string]string {
 }
 
 func (a *configuredActorData) GetAnnotations() map[string]string {
-	return nil
+	return a.annotations
 }
 
 func (a *configuredActorData) GetEncryptedKey() *encfield.EncryptedField {

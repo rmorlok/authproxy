@@ -1,10 +1,19 @@
 {
-  "items": [
-    {
-      "queue": "default",
-      "processed": 10,
-      "failed": 1,
-      "date": "2026-01-02"
-    }
-  ]
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "TaskQueueHistory",
+  "metadata": {
+    "id": "default"
+  },
+  "spec": {
+    "days": 30
+  },
+  "status": {
+    "items": [
+      {
+        "date": "2026-01-02",
+        "processed": 10,
+        "failed": 1
+      }
+    ]
+  }
 }

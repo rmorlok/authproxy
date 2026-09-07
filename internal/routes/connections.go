@@ -1,7 +1,6 @@
 package routes
 
 import (
-	"context"
 	"errors"
 	"time"
 
@@ -17,12 +16,12 @@ import (
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/httpf"
-	"github.com/rmorlok/authproxy/internal/routes/key_value"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	schemaapiopenapi "github.com/rmorlok/authproxy/internal/schema/api/openapi"
 	scommon "github.com/rmorlok/authproxy/internal/schema/common"
+	connectionschema "github.com/rmorlok/authproxy/internal/schema/resources/connection"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
-	"github.com/rmorlok/authproxy/internal/util"
+	smeta "github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 
 	"log/slog"
@@ -30,52 +29,115 @@ import (
 )
 
 type ConnectionsRoutes struct {
-	cfg           config.C
-	auth          auth.A
-	core          coreIface.C
-	db            database.DB
-	r             apredis.Client
-	httpf         httpf.F
-	encrypt       encrypt.E
-	oauthf        oauth2.Factory
-	labelsAdapter key_value.Adapter[apid.ID]
-	annotsAdapter key_value.Adapter[apid.ID]
+	cfg     config.C
+	auth    auth.A
+	core    coreIface.C
+	db      database.DB
+	r       apredis.Client
+	httpf   httpf.F
+	encrypt encrypt.E
+	oauthf  oauth2.Factory
 }
 
-type InitiateConnectionRequest = schemaapi.InitiateConnectionRequest
-type ConnectionSetupRedirect = schemaapi.ConnectionSetupRedirect
-type ConnectionSetupForm = schemaapi.ConnectionSetupForm
-type ConnectionSetupComplete = schemaapi.ConnectionSetupComplete
-type SubmitConnectionRequest = schemaapi.SubmitConnectionRequest
-type DataSourceOptionJson = schemaapi.DataSourceOptionJson
-type ConnectionState = schemaapi.ConnectionState
-type ConnectionHealthState = schemaapi.ConnectionHealthState
-type ConnectionJson = schemaapi.ConnectionJson
-type ListConnectionResponseJson = schemaapi.ListConnectionResponseJson
-type DisconnectConnectionRequestJson = schemaapi.DisconnectConnectionRequestJson
-type DisconnectResponseJson = schemaapi.DisconnectResponseJson
-type MigrateConnectionVersionRequestJson = schemaapi.MigrateConnectionVersionRequestJson
-type MigrateConnectionVersionResponseJson = schemaapi.MigrateConnectionVersionResponseJson
-type ForceStateRequestJson = schemaapi.ForceConnectionStateRequestJson
-type UpdateConnectionRequestJson = schemaapi.UpdateConnectionRequestJson
 type ProxyResponse = schemaapi.ProxyResponseJson
 
 type OpenAPIConnectionJson = schemaapiopenapi.ConnectionJson
+type OpenAPIConnectionPatchJson = schemaapiopenapi.ConnectionPatchJson
 type OpenAPIListConnectionResponseJson = schemaapiopenapi.ListConnectionResponseJson
-type OpenAPIDisconnectConnectionRequestJson = schemaapiopenapi.DisconnectConnectionRequestJson
-type OpenAPIDisconnectResponseJson = schemaapiopenapi.DisconnectResponseJson
-type OpenAPIMigrateConnectionVersionRequestJson = schemaapiopenapi.MigrateConnectionVersionRequestJson
-type OpenAPIMigrateConnectionVersionResponseJson = schemaapiopenapi.MigrateConnectionVersionResponseJson
+type OpenAPIConnectionInitiateActionJson = schemaapiopenapi.ConnectionInitiateActionJson
+type OpenAPIConnectionSetupActionJson = schemaapiopenapi.ConnectionSetupActionJson
+type OpenAPIConnectionSetupSubmitActionJson = schemaapiopenapi.ConnectionSetupSubmitActionJson
+type OpenAPIConnectionSetupControlActionJson = schemaapiopenapi.ConnectionSetupControlActionJson
+type OpenAPIEmptyConnectionActionJson = schemaapiopenapi.EmptyConnectionActionJson
+type OpenAPIConnectionDisconnectActionJson = schemaapiopenapi.ConnectionDisconnectActionJson
+type OpenAPIConnectionVersionMigrationActionJson = schemaapiopenapi.ConnectionVersionMigrationActionJson
+type OpenAPIConnectionForceStateActionJson = schemaapiopenapi.ConnectionForceStateActionJson
+type OpenAPIDataSourceOptionListJson = schemaapiopenapi.DataSourceOptionListJson
+type OpenAPIConnectionScopeListJson = schemaapiopenapi.ConnectionScopeListJson
 type ProxyRequest = schemaapiopenapi.ProxyRequestJson
 type OpenAPIProxyResponseJson = schemaapiopenapi.ProxyResponseJson
+
+func connectionSetupAction(
+	resp coreIface.ConnectionSetupResponse,
+) (schemaapi.ConnectionSetupAction, error) {
+	status := schemaapi.ConnectionSetupActionStatus{
+		Type: schemaapi.ConnectionSetupResponseType(resp.GetType()),
+	}
+
+	switch typed := resp.(type) {
+	case *coreIface.ConnectionSetupRedirect:
+		status.RedirectURL = typed.RedirectUrl
+	case *coreIface.ConnectionSetupForm:
+		status.StepID = typed.StepId
+		status.StepTitle = typed.StepTitle
+		status.StepDescription = typed.StepDescription
+		status.JSONSchema = typed.JsonSchema
+		status.UISchema = typed.UiSchema
+		redactedData, err := schemaapi.RedactConnectionSetupData(typed.Data)
+		if err != nil {
+			return schemaapi.ConnectionSetupAction{}, err
+		}
+		status.Data = redactedData
+	case *coreIface.ConnectionSetupComplete, *coreIface.ConnectionSetupVerifying:
+	case *coreIface.ConnectionSetupError:
+		status.Error = typed.Error
+		status.CanRetry = typed.CanRetry
+	default:
+		return schemaapi.ConnectionSetupAction{}, errors.New("unknown connection setup response")
+	}
+
+	return schemaapi.NewConnectionSetupAction(
+		connectionschema.NewConnectionReference(resp.GetId()),
+		status,
+	), nil
+}
+
+func validateConnectionActionPathTarget(
+	target smeta.ObjectReference,
+	connection coreIface.Connection,
+) error {
+	if target.ID != "" && target.ID != connection.GetId().String() {
+		return errors.New("metadata.target.id does not match the connection path")
+	}
+
+	if target.HasNamespacedName() &&
+		(target.Namespace != connection.GetNamespace() ||
+			target.Name != connection.GetName()) {
+		return errors.New("metadata.target namespace/name does not match the connection path")
+	}
+
+	return nil
+}
+
+func renderConnectionSetupAction(
+	gctx *gin.Context,
+	val *auth.ResourcePermissionValidator,
+	resp coreIface.ConnectionSetupResponse,
+) {
+	action, err := connectionSetupAction(resp)
+	if err != nil {
+		apgin.WriteErr(gctx, nil, err)
+		val.MarkErrorReturn()
+		return
+	}
+	if err := apgin.RenderActionJSON(
+		gctx,
+		http.StatusOK,
+		&action,
+		schemaapi.ConnectionSetupActionKind,
+	); err != nil {
+		apgin.WriteErr(gctx, nil, err)
+		val.MarkErrorReturn()
+	}
+}
 
 // @Summary		Initiate connection
 // @Description	Initiate a new connection to an external service through a connector
 // @Tags			connections
 // @Accept			json
 // @Produce		json
-// @Param			request	body		InitiateConnectionRequest	true	"Connection initiation request"
-// @Success		200		{object}	ConnectionSetupRedirect
+// @Param			request	body		OpenAPIConnectionInitiateActionJson	true	"Connection initiation action"
+// @Success		200		{object}	OpenAPIConnectionSetupActionJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		409		{object}	ErrorResponse
@@ -86,22 +148,36 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
-	var req coreIface.InitiateConnectionRequest
-	if err := bindJSONBody(gctx, &req); err != nil {
+	var req schemaapi.ConnectionInitiateAction
+	if err := apgin.BindActionJSON(
+		gctx,
+		&req,
+		schemaapi.ConnectionInitiateActionKind,
+	); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
 	}
 
 	// InitiateConnection also performs request validation for security
-	resp, err := r.core.InitiateConnection(ctx, req)
+	resp, err := r.core.InitiateConnection(
+		ctx,
+		coreIface.InitiateConnectionRequest{
+			ConnectorRef:  req.Metadata.Target,
+			IntoNamespace: req.Spec.IntoNamespace,
+			Name:          req.Spec.Name,
+			Labels:        req.Spec.Labels,
+			Annotations:   req.Spec.Annotations,
+			ReturnToUrl:   req.Spec.ReturnToURL,
+		},
+	)
 	if err != nil {
 		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, resp)
+	renderConnectionSetupAction(gctx, val, resp)
 }
 
 // @Summary		Submit connection form
@@ -110,8 +186,8 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 // @Accept			json
 // @Produce		json
 // @Param			id		path		string					true	"Connection ID"
-// @Param			request	body		SubmitConnectionRequest	true	"Form submission data"
-// @Success		200		{object}	ConnectionSetupComplete
+// @Param			request	body		OpenAPIConnectionSetupSubmitActionJson	true	"Form submission action"
+// @Success		200		{object}	OpenAPIConnectionSetupActionJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		501		{object}	ErrorResponse
@@ -146,21 +222,40 @@ func (r *ConnectionsRoutes) submit(gctx *gin.Context) {
 		return
 	}
 
-	var req coreIface.SubmitConnectionRequest
-	if err := bindJSONBody(gctx, &req); err != nil {
+	var req schemaapi.ConnectionSetupSubmitAction
+	if err := apgin.BindActionJSON(
+		gctx,
+		&req,
+		schemaapi.ConnectionSetupSubmitActionKind,
+	); err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		val.MarkErrorReturn()
+		return
+	}
+	if err := validateConnectionActionPathTarget(
+		req.Metadata.Target,
+		c,
+	); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
 	}
 
-	resp, err := c.SubmitForm(ctx, req)
+	resp, err := c.SubmitForm(
+		ctx,
+		coreIface.SubmitConnectionRequest{
+			StepId:      req.Spec.StepID,
+			Data:        req.Spec.Data,
+			ReturnToUrl: req.Spec.ReturnToURL,
+		},
+	)
 	if err != nil {
 		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, resp)
+	renderConnectionSetupAction(gctx, val, resp)
 }
 
 // @Summary		Get setup step
@@ -169,7 +264,7 @@ func (r *ConnectionsRoutes) submit(gctx *gin.Context) {
 // @Produce		json
 // @Param			id	path		string	true	"Connection ID"
 // @Param			returnToUrl	query	string	false	"URL to return to after a resumed redirect step"
-// @Success		200	{object}	ConnectionSetupComplete
+// @Success		200	{object}	OpenAPIConnectionSetupActionJson
 // @Failure		400	{object}	ErrorResponse
 // @Failure		401	{object}	ErrorResponse
 // @Failure		404	{object}	ErrorResponse
@@ -215,7 +310,7 @@ func (r *ConnectionsRoutes) getSetupStep(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, resp)
+	renderConnectionSetupAction(gctx, val, resp)
 }
 
 // @Summary		Get data source options
@@ -224,7 +319,7 @@ func (r *ConnectionsRoutes) getSetupStep(gctx *gin.Context) {
 // @Produce		json
 // @Param			id			path		string	true	"Connection ID"
 // @Param			sourceId	path		string	true	"Data Source ID"
-// @Success		200	{array}		DataSourceOptionJson
+// @Success		200	{object}		OpenAPIDataSourceOptionListJson
 // @Failure		400	{object}	ErrorResponse
 // @Failure		401	{object}	ErrorResponse
 // @Failure		404	{object}	ErrorResponse
@@ -277,26 +372,14 @@ func (r *ConnectionsRoutes) getDataSource(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, options)
-}
-
-func ConnectionToJson(conn coreIface.Connection) ConnectionJson {
-	connector := ConnectorVersionToConnectorJson(conn.GetConnector())
-
-	return ConnectionJson{
-		Id:          conn.GetId(),
-		Namespace:   conn.GetNamespace(),
-		Name:        conn.GetName(),
-		Labels:      conn.GetLabels(),
-		Annotations: conn.GetAnnotations(),
-		State:       schemaapi.ConnectionState(conn.GetState()),
-		HealthState: schemaapi.ConnectionHealthState(conn.GetHealthState()),
-		SetupStep:   conn.GetSetupStep(),
-		SetupError:  conn.GetSetupError(),
-		Connector:   connector,
-		CreatedAt:   conn.GetCreatedAt(),
-		UpdatedAt:   conn.GetUpdatedAt(),
+	items := make([]schemaapi.DataSourceOptionJson, len(options))
+	for i, option := range options {
+		items[i] = schemaapi.DataSourceOptionJson{
+			Value: option.Value,
+			Label: option.Label,
+		}
 	}
+	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewDataSourceOptionList(items))
 }
 
 type ListConnectionRequestQuery struct {
@@ -377,7 +460,9 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 			b = b.ForConnectorId(connectorId)
 		}
 
-		b = b.ForNamespaceMatchers(val.GetEffectiveNamespaceMatchers(req.NamespaceVal))
+		b = b.ForNamespaceMatchers(
+			val.GetEffectiveNamespaceMatchers(req.NamespaceVal),
+		)
 
 		if req.NameVal != nil {
 			name := scommon.ResourceName(*req.NameVal)
@@ -421,12 +506,26 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, ListConnectionResponseJson{
-		Items: util.Map(auth.FilterForValidatedResources(val, result.Results), func(c coreIface.Connection) ConnectionJson {
-			return ConnectionToJson(c)
-		}),
-		Cursor: result.Cursor,
-	})
+	connections := auth.FilterForValidatedResources(val, result.Results)
+	items := make([]connectionschema.Connection, 0, len(connections))
+	for _, connection := range connections {
+		resource, err := connection.GetResource(ctx)
+		if err != nil {
+			apgin.WriteErr(gctx, nil, err)
+			val.MarkErrorReturn()
+			return
+		}
+		if err := resource.ValidateFor(
+			smeta.ValidationModeResponse,
+			nil, // validation context
+		); err != nil {
+			apgin.WriteErr(gctx, nil, err)
+			val.MarkErrorReturn()
+			return
+		}
+		items = append(items, *resource)
+	}
+	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewListConnectionResponseJson(items, result.Cursor))
 }
 
 // @Summary		Get connection
@@ -483,7 +582,20 @@ func (r *ConnectionsRoutes) get(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, ConnectionToJson(c))
+	resource, err := c.GetResource(ctx)
+	if err != nil {
+		apgin.WriteErr(gctx, nil, err)
+		val.MarkErrorReturn()
+		return
+	}
+	if err := apgin.RenderResourceJSON(
+		gctx,
+		http.StatusOK,
+		resource,
+	); err != nil {
+		apgin.WriteErr(gctx, nil, err)
+		val.MarkErrorReturn()
+	}
 }
 
 // @Summary		Disconnect connection
@@ -492,8 +604,8 @@ func (r *ConnectionsRoutes) get(gctx *gin.Context) {
 // @Accept			json
 // @Produce		json
 // @Param			id	path		string	true	"Connection UUID"
-// @Param			request	body		OpenAPIDisconnectConnectionRequestJson	false	"Disconnect options"
-// @Success		200	{object}	OpenAPIDisconnectResponseJson
+// @Param			request	body		OpenAPIConnectionDisconnectActionJson	true	"Disconnect action"
+// @Success		200	{object}	OpenAPIConnectionDisconnectActionJson
 // @Failure		400	{object}	ErrorResponse
 // @Failure		401	{object}	ErrorResponse
 // @Failure		403	{object}	ErrorResponse
@@ -529,10 +641,26 @@ func (r *ConnectionsRoutes) disconnect(gctx *gin.Context) {
 		return
 	}
 
-	opts, ok := r.parseConnectionDisconnectRequest(gctx)
-	if !ok {
+	var req schemaapi.ConnectionDisconnectAction
+	if err := apgin.BindActionJSON(
+		gctx,
+		&req,
+		schemaapi.ConnectionDisconnectActionKind,
+	); err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		val.MarkErrorReturn()
 		return
 	}
+
+	if err := validateConnectionActionPathTarget(
+		req.Metadata.Target,
+		c,
+	); err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		val.MarkErrorReturn()
+		return
+	}
+	opts := connectionDisconnectOptions(req.Spec)
 
 	ti, err := r.core.DisconnectConnection(ctx, id, opts)
 	if err != nil {
@@ -553,40 +681,40 @@ func (r *ConnectionsRoutes) disconnect(gctx *gin.Context) {
 	}
 
 	// Hard code the disconnecting state to avoid race condictions with task workers
-	connJson := ConnectionToJson(c)
-	connJson.State = schemaapi.ConnectionState(database.ConnectionStateDisconnecting)
-
-	response := DisconnectResponseJson{
-		TaskId:     taskId,
-		Connection: connJson,
+	connectionResource, err := c.GetResource(ctx)
+	if err != nil {
+		apgin.WriteErr(gctx, nil, err)
+		val.MarkErrorReturn()
+		return
 	}
-
-	apgin.APIJSON(gctx, http.StatusOK, response)
+	connectionResource.Status.Lifecycle.State = connectionschema.ConnectionStateDisconnecting
+	response := schemaapi.NewConnectionDisconnectResponse(
+		req.Metadata.Target,
+		req.Spec,
+		schemaapi.ConnectionDisconnectStatus{
+			TaskID:     taskId,
+			Connection: *connectionResource,
+		},
+	)
+	if err := apgin.RenderActionJSON(
+		gctx,
+		http.StatusOK,
+		&response,
+		schemaapi.ConnectionDisconnectActionKind,
+	); err != nil {
+		apgin.WriteErr(gctx, nil, err)
+		val.MarkErrorReturn()
+	}
 }
 
-func (r *ConnectionsRoutes) parseConnectionDisconnectRequest(gctx *gin.Context) (coreIface.ConnectionDisconnectOptions, bool) {
-	val := auth.MustGetValidatorFromGinContext(gctx)
-
-	req := DisconnectConnectionRequestJson{}
-	if gctx.Request.Body != http.NoBody && gctx.Request.ContentLength != 0 {
-		if err := bindJSONBody(gctx, &req); err != nil {
-			apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
-			val.MarkErrorReturn()
-			return coreIface.ConnectionDisconnectOptions{}, false
-		}
-	}
-
+func connectionDisconnectOptions(
+	spec schemaapi.ConnectionDisconnectSpec,
+) coreIface.ConnectionDisconnectOptions {
 	timeout := defaultConnectorLifecycleTimeout
-	if req.TimeoutSeconds != nil {
-		if *req.TimeoutSeconds <= 0 {
-			apgin.WriteError(gctx, nil, httperr.BadRequest("timeoutSeconds must be greater than zero"))
-			val.MarkErrorReturn()
-			return coreIface.ConnectionDisconnectOptions{}, false
-		}
-		timeout = time.Duration(*req.TimeoutSeconds) * time.Second
+	if spec.TimeoutSeconds != nil {
+		timeout = time.Duration(*spec.TimeoutSeconds) * time.Second
 	}
-
-	return coreIface.ConnectionDisconnectOptions{Timeout: timeout}, true
+	return coreIface.ConnectionDisconnectOptions{Timeout: timeout}
 }
 
 // @Summary		Migrate connection connector version
@@ -595,8 +723,8 @@ func (r *ConnectionsRoutes) parseConnectionDisconnectRequest(gctx *gin.Context) 
 // @Accept			json
 // @Produce		json
 // @Param			id		path		string										true	"Connection UUID"
-// @Param			request	body		OpenAPIMigrateConnectionVersionRequestJson	true	"Migration options"
-// @Success		200		{object}	OpenAPIMigrateConnectionVersionResponseJson
+// @Param			request	body		OpenAPIConnectionVersionMigrationActionJson	true	"Migration action"
+// @Success		200		{object}	OpenAPIConnectionVersionMigrationActionJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		403		{object}	ErrorResponse
@@ -631,10 +759,46 @@ func (r *ConnectionsRoutes) migrateVersion(gctx *gin.Context) {
 		return
 	}
 
-	opts, ok := r.parseConnectionMigrationRequest(gctx)
-	if !ok {
+	var req schemaapi.ConnectionVersionMigrationAction
+	if err := apgin.BindActionJSON(
+		gctx,
+		&req,
+		schemaapi.ConnectionVersionMigrationActionKind,
+	); err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		val.MarkErrorReturn()
 		return
 	}
+
+	if err := validateConnectionActionPathTarget(
+		req.Metadata.Target,
+		c,
+	); err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		val.MarkErrorReturn()
+		return
+	}
+
+	targetConnector, err := r.core.ResolveConnectorReference(
+		ctx,
+		req.Spec.ConnectorRef,
+	)
+	if err != nil {
+		apgin.WriteErr(gctx, nil, err)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if targetConnector.GetId() != c.GetConnectorId() {
+		apgin.WriteError(gctx, nil, httperr.BadRequest("connectorRef must identify the connection's connector"))
+		val.MarkErrorReturn()
+		return
+	}
+
+	opts := connectionMigrationOptions(
+		targetConnector.GetVersion(),
+		req.Spec.TimeoutSeconds,
+	)
 
 	task, err := r.core.MigrateConnectionVersion(ctx, id, opts)
 	if err != nil {
@@ -653,50 +817,62 @@ func (r *ConnectionsRoutes) migrateVersion(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, MigrateConnectionVersionResponseJson{
-		TaskId:        taskId,
-		ConnectionId:  task.ConnectionID,
-		SourceVersion: task.SourceVersion,
-		TargetVersion: task.TargetVersion,
-	})
+	sourceRef := smeta.ObjectReference{
+		APIVersion: smeta.APIVersionV1Alpha1,
+		Kind:       cschema.ConnectorKind,
+		ID:         c.GetConnectorId().String(),
+		Name:       c.GetConnector().GetName(),
+		Namespace:  c.GetConnector().GetNamespace(),
+		Generation: c.GetConnectorVersion(),
+	}
+	targetRef := req.Spec.ConnectorRef
+	targetRef.ID = targetConnector.GetId().String()
+	targetRef.Name = targetConnector.GetName()
+	targetRef.Namespace = targetConnector.GetNamespace()
+	targetRef.Generation = targetConnector.GetVersion()
+
+	response := schemaapi.NewConnectionVersionMigrationResponse(
+		req.Metadata.Target,
+		req.Spec,
+		schemaapi.ConnectionVersionMigrationStatus{
+			TaskID:             taskId,
+			SourceConnectorRef: sourceRef,
+			TargetConnectorRef: targetRef,
+		},
+	)
+
+	if err := apgin.RenderActionJSON(
+		gctx,
+		http.StatusOK,
+		&response,
+		schemaapi.ConnectionVersionMigrationActionKind,
+	); err != nil {
+		apgin.WriteErr(gctx, nil, err)
+		val.MarkErrorReturn()
+	}
 }
 
-func (r *ConnectionsRoutes) parseConnectionMigrationRequest(gctx *gin.Context) (coreIface.ConnectionMigrationOptions, bool) {
-	val := auth.MustGetValidatorFromGinContext(gctx)
-
-	req := MigrateConnectionVersionRequestJson{}
-	if err := bindJSONBody(gctx, &req); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
-		val.MarkErrorReturn()
-		return coreIface.ConnectionMigrationOptions{}, false
-	}
-	if req.TargetVersion == 0 {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("targetVersion is required"))
-		val.MarkErrorReturn()
-		return coreIface.ConnectionMigrationOptions{}, false
-	}
-
+func connectionMigrationOptions(
+	targetVersion uint64,
+	timeoutSeconds *int64,
+) coreIface.ConnectionMigrationOptions {
 	timeout := defaultConnectorLifecycleTimeout
-	if req.TimeoutSeconds != nil {
-		if *req.TimeoutSeconds <= 0 {
-			apgin.WriteError(gctx, nil, httperr.BadRequest("timeoutSeconds must be greater than zero"))
-			val.MarkErrorReturn()
-			return coreIface.ConnectionMigrationOptions{}, false
-		}
-		timeout = time.Duration(*req.TimeoutSeconds) * time.Second
+	if timeoutSeconds != nil {
+		timeout = time.Duration(*timeoutSeconds) * time.Second
 	}
-
 	return coreIface.ConnectionMigrationOptions{
-		TargetVersion: req.TargetVersion,
+		TargetVersion: targetVersion,
 		Timeout:       timeout,
-	}, true
+	}
 }
 
 // @Summary		Abort connection setup
 // @Description	Abort an in-progress connection setup, cleaning up credentials and deleting the connection
 // @Tags			connections
+// @Accept			json
 // @Produce		json
 // @Param			id	path		string	true	"Connection UUID"
+// @Param			request	body	OpenAPIEmptyConnectionActionJson	true	"Abort action"
 // @Success		204
 // @Failure		400	{object}	ErrorResponse
 // @Failure		401	{object}	ErrorResponse
@@ -735,6 +911,24 @@ func (r *ConnectionsRoutes) abort(gctx *gin.Context) {
 		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
+	var req schemaapi.EmptyConnectionAction
+	if err := apgin.BindActionJSON(
+		gctx,
+		&req,
+		schemaapi.ConnectionSetupAbortActionKind,
+	); err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		val.MarkErrorReturn()
+		return
+	}
+	if err := validateConnectionActionPathTarget(
+		req.Metadata.Target,
+		c,
+	); err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		val.MarkErrorReturn()
+		return
+	}
 
 	err = r.core.AbortConnection(ctx, id)
 	if err != nil {
@@ -749,9 +943,11 @@ func (r *ConnectionsRoutes) abort(gctx *gin.Context) {
 // @Summary		Reconfigure connection
 // @Description	Restart the configure phase for a completed connection, allowing re-entry of post-auth settings
 // @Tags			connections
+// @Accept			json
 // @Produce		json
 // @Param			id	path		string	true	"Connection UUID"
-// @Success		200	{object}	ConnectionSetupForm
+// @Param			request	body	OpenAPIEmptyConnectionActionJson	true	"Reconfigure action"
+// @Success		200	{object}	OpenAPIConnectionSetupActionJson
 // @Failure		400	{object}	ErrorResponse
 // @Failure		401	{object}	ErrorResponse
 // @Failure		404	{object}	ErrorResponse
@@ -789,6 +985,24 @@ func (r *ConnectionsRoutes) reconfigure(gctx *gin.Context) {
 		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
+	var req schemaapi.EmptyConnectionAction
+	if err := apgin.BindActionJSON(
+		gctx,
+		&req,
+		schemaapi.ConnectionReconfigureActionKind,
+	); err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		val.MarkErrorReturn()
+		return
+	}
+	if err := validateConnectionActionPathTarget(
+		req.Metadata.Target,
+		c,
+	); err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		val.MarkErrorReturn()
+		return
+	}
 
 	resp, err := c.Reconfigure(ctx)
 	if err != nil {
@@ -797,14 +1011,16 @@ func (r *ConnectionsRoutes) reconfigure(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, resp)
+	renderConnectionSetupAction(gctx, val, resp)
 }
 
 // @Summary		Cancel in-flight setup
 // @Description	Abandon a reconfigure attempt on a ready connection by clearing setup_step and setup_error. The connection remains ready and its previously stored configuration continues to apply.
 // @Tags			connections
+// @Accept			json
 // @Produce		json
 // @Param			id	path		string	true	"Connection UUID"
+// @Param			request	body	OpenAPIEmptyConnectionActionJson	true	"Cancel setup action"
 // @Success		204
 // @Failure		400	{object}	ErrorResponse
 // @Failure		401	{object}	ErrorResponse
@@ -843,6 +1059,24 @@ func (r *ConnectionsRoutes) cancelSetup(gctx *gin.Context) {
 		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
+	var req schemaapi.EmptyConnectionAction
+	if err := apgin.BindActionJSON(
+		gctx,
+		&req,
+		schemaapi.ConnectionSetupCancelActionKind,
+	); err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		val.MarkErrorReturn()
+		return
+	}
+	if err := validateConnectionActionPathTarget(
+		req.Metadata.Target,
+		c,
+	); err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		val.MarkErrorReturn()
+		return
+	}
 
 	if err := c.CancelSetup(ctx); err != nil {
 		apgin.WriteErr(gctx, nil, err)
@@ -853,18 +1087,14 @@ func (r *ConnectionsRoutes) cancelSetup(gctx *gin.Context) {
 	gctx.Status(http.StatusNoContent)
 }
 
-type RetryConnectionRequest struct {
-	ReturnToUrl string `json:"returnToUrl,omitempty"`
-}
-
 // @Summary		Retry connection setup
 // @Description	Retry a connection setup that ended in a terminal failure state. Applies to any setup-phase failure: an auth-phase failure such as an OAuth token-exchange error (auth_failed) or a probe failure during verify (verify_failed). Clears the recorded error and either returns to the first preconnect step (if the connector defines one, so the user can correct any input that led to the failure) or re-initiates the auth flow from scratch.
 // @Tags			connections
 // @Accept			json
 // @Produce		json
 // @Param			id		path	string					true	"Connection UUID"
-// @Param			request	body	RetryConnectionRequest	true	"Retry request"
-// @Success		200	{object}	ConnectionSetupForm
+// @Param			request	body	OpenAPIConnectionSetupControlActionJson	true	"Retry action"
+// @Success		200	{object}	OpenAPIConnectionSetupActionJson
 // @Failure		400	{object}	ErrorResponse
 // @Failure		401	{object}	ErrorResponse
 // @Failure		404	{object}	ErrorResponse
@@ -903,26 +1133,33 @@ func (r *ConnectionsRoutes) retry(gctx *gin.Context) {
 		return
 	}
 
-	var req RetryConnectionRequest
-	// Body is optional — returnToUrl is only needed when the connector has no preconnect steps.
-	if err := bindOptionalJSONBody(gctx, &req); err != nil {
+	var req schemaapi.ConnectionSetupControlAction
+	if err := apgin.BindActionJSON(
+		gctx,
+		&req,
+		schemaapi.ConnectionSetupRetryActionKind,
+	); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
+	if err := validateConnectionActionPathTarget(
+		req.Metadata.Target,
+		c,
+	); err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		val.MarkErrorReturn()
+		return
+	}
 
-	resp, err := r.core.RetryConnectionSetup(ctx, id, req.ReturnToUrl)
+	resp, err := r.core.RetryConnectionSetup(ctx, id, req.Spec.ReturnToURL)
 	if err != nil {
 		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, resp)
-}
-
-type ReauthConnectionRequest struct {
-	ReturnToUrl string `json:"returnToUrl,omitempty"`
+	renderConnectionSetupAction(gctx, val, resp)
 }
 
 // @Summary		Re-authenticate a connection
@@ -931,8 +1168,8 @@ type ReauthConnectionRequest struct {
 // @Accept			json
 // @Produce		json
 // @Param			id		path	string					true	"Connection UUID"
-// @Param			request	body	ReauthConnectionRequest	true	"Reauth request"
-// @Success		200	{object}	ConnectionSetupForm
+// @Param			request	body	OpenAPIConnectionSetupControlActionJson	true	"Reauthentication action"
+// @Success		200	{object}	OpenAPIConnectionSetupActionJson
 // @Failure		400	{object}	ErrorResponse
 // @Failure		401	{object}	ErrorResponse
 // @Failure		404	{object}	ErrorResponse
@@ -971,22 +1208,33 @@ func (r *ConnectionsRoutes) reauth(gctx *gin.Context) {
 		return
 	}
 
-	var req ReauthConnectionRequest
-	// Body is optional — returnToUrl is only needed for OAuth2 connectors with no preconnect steps.
-	if err := bindOptionalJSONBody(gctx, &req); err != nil {
+	var req schemaapi.ConnectionSetupControlAction
+	if err := apgin.BindActionJSON(
+		gctx,
+		&req,
+		schemaapi.ConnectionReauthActionKind,
+	); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
+	if err := validateConnectionActionPathTarget(
+		req.Metadata.Target,
+		c,
+	); err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		val.MarkErrorReturn()
+		return
+	}
 
-	resp, err := r.core.ReauthConnection(ctx, id, req.ReturnToUrl)
+	resp, err := r.core.ReauthConnection(ctx, id, req.Spec.ReturnToURL)
 	if err != nil {
 		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, resp)
+	renderConnectionSetupAction(gctx, val, resp)
 }
 
 // @Summary		Force connection state
@@ -995,8 +1243,8 @@ func (r *ConnectionsRoutes) reauth(gctx *gin.Context) {
 // @Accept			json
 // @Produce		json
 // @Param			id		path		string				true	"Connection UUID"
-// @Param			request	body		ForceStateRequestJson	true	"New state"
-// @Success		200		{object}	OpenAPIConnectionJson
+// @Param			request	body		OpenAPIConnectionForceStateActionJson	true	"Force-state action"
+// @Success		200		{object}	OpenAPIConnectionForceStateActionJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		403		{object}	ErrorResponse
@@ -1021,16 +1269,13 @@ func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 		return
 	}
 
-	req := ForceStateRequestJson{}
-	err = bindJSONBody(gctx, &req)
-	if err != nil {
+	var req schemaapi.ConnectionForceStateAction
+	if err := apgin.BindActionJSON(
+		gctx,
+		&req,
+		schemaapi.ConnectionForceStateActionKind,
+	); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if req.State == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("state is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1052,10 +1297,32 @@ func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
+	if err := validateConnectionActionPathTarget(
+		req.Metadata.Target,
+		c,
+	); err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		val.MarkErrorReturn()
+		return
+	}
 
-	state := database.ConnectionState(req.State)
+	state := database.ConnectionState(req.Spec.State)
 	if c.GetState() == state {
-		apgin.APIJSON(gctx, http.StatusOK, ConnectionToJson(c))
+		resource, err := c.GetResource(ctx)
+		if err != nil {
+			apgin.WriteErr(gctx, nil, err)
+			val.MarkErrorReturn()
+			return
+		}
+		response := schemaapi.NewConnectionForceStateResponse(
+			req.Metadata.Target,
+			req.Spec,
+			*resource,
+		)
+		if err := apgin.RenderActionJSON(gctx, http.StatusOK, &response, schemaapi.ConnectionForceStateActionKind); err != nil {
+			apgin.WriteErr(gctx, nil, err)
+			val.MarkErrorReturn()
+		}
 		return
 	}
 
@@ -1066,7 +1333,21 @@ func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, ConnectionToJson(c))
+	resource, err := c.GetResource(ctx)
+	if err != nil {
+		apgin.WriteErr(gctx, nil, err)
+		val.MarkErrorReturn()
+		return
+	}
+	response := schemaapi.NewConnectionForceStateResponse(
+		req.Metadata.Target,
+		req.Spec,
+		*resource,
+	)
+	if err := apgin.RenderActionJSON(gctx, http.StatusOK, &response, schemaapi.ConnectionForceStateActionKind); err != nil {
+		apgin.WriteErr(gctx, nil, err)
+		val.MarkErrorReturn()
+	}
 }
 
 // @Summary		Update connection
@@ -1075,7 +1356,7 @@ func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 // @Accept			json
 // @Produce		json
 // @Param			id		path		string						true	"Connection UUID"
-// @Param			request	body		UpdateConnectionRequestJson	true	"Connection update request"
+// @Param			request	body		OpenAPIConnectionPatchJson	true	"Connection update request"
 // @Success		200		{object}	OpenAPIConnectionJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
@@ -1102,26 +1383,15 @@ func (r *ConnectionsRoutes) update(gctx *gin.Context) {
 		return
 	}
 
-	var req UpdateConnectionRequestJson
-	if err := bindJSONBody(gctx, &req); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
+	var req connectionschema.ConnectionPatch
+	if err := apgin.BindResourceJSON(
+		gctx,
+		&req,
+		smeta.ValidationModeUpdate,
+	); err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
-	}
-
-	if req.Labels != nil {
-		if err := database.ValidateUserLabels(req.Labels); err != nil {
-			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid labels: %s", err.Error()))
-			val.MarkErrorReturn()
-			return
-		}
-	}
-	if req.Annotations != nil {
-		if err := database.Annotations(req.Annotations).Validate(); err != nil {
-			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid annotations: %s", err.Error()))
-			val.MarkErrorReturn()
-			return
-		}
 	}
 
 	c, err := r.core.GetConnection(ctx, id)
@@ -1142,196 +1412,43 @@ func (r *ConnectionsRoutes) update(gctx *gin.Context) {
 		return
 	}
 
-	if req.Name != nil {
-		name, httpErr := optionalResourceName(req.Name, "connection")
-		if httpErr != nil {
-			apgin.WriteError(gctx, nil, httpErr)
+	originalNamespace := c.GetNamespace()
+	updated, err := r.core.UpdateConnection(ctx, id, &req)
+	if err != nil {
+		name := c.GetName()
+		if req.Metadata != nil && req.Metadata.Name != nil {
+			name = *req.Metadata.Name
+		}
+		if conflictErr := resourceNameConflictError(
+			err,
+			"connection",
+			name,
+			originalNamespace,
+		); conflictErr != nil {
+			apgin.WriteError(gctx, nil, conflictErr)
 			val.MarkErrorReturn()
 			return
 		}
-		originalNamespace := c.GetNamespace()
-		c, err = r.core.UpdateConnectionName(ctx, id, name)
-		if err != nil {
-			if conflictErr := resourceNameConflictError(err, "connection", name, originalNamespace); conflictErr != nil {
-				apgin.WriteError(gctx, nil, conflictErr)
-				val.MarkErrorReturn()
-				return
-			}
-			apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
-			val.MarkErrorReturn()
-			return
-		}
+		apgin.WriteError(
+			gctx,
+			nil, // logger
+			httperr.InternalServerError(httperr.WithInternalErr(err)),
+		)
+		val.MarkErrorReturn()
+		return
 	}
 
-	if req.Labels != nil {
-		_, err = r.db.UpdateConnectionLabels(ctx, id, req.Labels)
-		if err != nil {
-			apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
-			val.MarkErrorReturn()
-			return
-		}
-
-		// Re-fetch connection to get updated state with connector info
-		c, err = r.core.GetConnection(ctx, id)
-		if err != nil {
-			apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
-			val.MarkErrorReturn()
-			return
-		}
+	resource, err := updated.GetResource(ctx)
+	if err != nil {
+		apgin.WriteErr(gctx, nil, err)
+		val.MarkErrorReturn()
+		return
 	}
 
-	if req.Annotations != nil {
-		_, err = r.db.UpdateConnectionAnnotations(ctx, id, req.Annotations)
-		if err != nil {
-			apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
-			val.MarkErrorReturn()
-			return
-		}
-
-		// Re-fetch connection to get updated state with connector info.
-		c, err = r.core.GetConnection(ctx, id)
-		if err != nil {
-			apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
-			val.MarkErrorReturn()
-			return
-		}
+	if err := apgin.RenderResourceJSON(gctx, http.StatusOK, resource); err != nil {
+		apgin.WriteErr(gctx, nil, err)
+		val.MarkErrorReturn()
 	}
-
-	apgin.APIJSON(gctx, http.StatusOK, ConnectionToJson(c))
-}
-
-// Label and annotation handlers for connections delegate to a shared
-// generic adapter (see internal/routes/key_value). The doc comments below
-// drive the OpenAPI spec; the bodies forward to the adapter.
-
-// @Summary		Get all labels for a connection
-// @Description	Get all labels associated with a specific connection
-// @Tags			connections
-// @Produce		json
-// @Param			id	path		string	true	"Connection UUID"
-// @Success		200	{object}	map[string]string
-// @Failure		400	{object}	ErrorResponse
-// @Failure		401	{object}	ErrorResponse
-// @Failure		404	{object}	ErrorResponse
-// @Failure		500	{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/connections/{id}/labels [get]
-func (r *ConnectionsRoutes) getLabels(gctx *gin.Context) { r.labelsAdapter.HandleList(gctx) }
-
-// @Summary		Get a specific label for a connection
-// @Description	Get a specific label value by key for a connection
-// @Tags			connections
-// @Produce		json
-// @Param			id		path		string	true	"Connection UUID"
-// @Param			label	path		string	true	"Label key"
-// @Success		200		{object}	KeyValueJson
-// @Failure		400		{object}	ErrorResponse
-// @Failure		401		{object}	ErrorResponse
-// @Failure		404		{object}	ErrorResponse
-// @Failure		500		{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/connections/{id}/labels/{label} [get]
-func (r *ConnectionsRoutes) getLabel(gctx *gin.Context) { r.labelsAdapter.HandleGet(gctx) }
-
-// @Summary		Set a label for a connection
-// @Description	Set or update a specific label value by key for a connection
-// @Tags			connections
-// @Accept			json
-// @Produce		json
-// @Param			id		path		string						true	"Connection UUID"
-// @Param			label	path		string						true	"Label key"
-// @Param			request	body		PutKeyValueRequestJson	true	"Label value"
-// @Success		200		{object}	KeyValueJson
-// @Failure		400		{object}	ErrorResponse
-// @Failure		401		{object}	ErrorResponse
-// @Failure		403		{object}	ErrorResponse
-// @Failure		404		{object}	ErrorResponse
-// @Failure		500		{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/connections/{id}/labels/{label} [put]
-func (r *ConnectionsRoutes) putLabel(gctx *gin.Context) { r.labelsAdapter.HandlePut(gctx) }
-
-// @Summary		Delete a label from a connection
-// @Description	Delete a specific label by key from a connection
-// @Tags			connections
-// @Param			id		path	string	true	"Connection UUID"
-// @Param			label	path	string	true	"Label key"
-// @Success		204		"No Content"
-// @Failure		400		{object}	ErrorResponse
-// @Failure		401		{object}	ErrorResponse
-// @Failure		403		{object}	ErrorResponse
-// @Failure		500		{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/connections/{id}/labels/{label} [delete]
-func (r *ConnectionsRoutes) deleteLabel(gctx *gin.Context) { r.labelsAdapter.HandleDelete(gctx) }
-
-// @Summary		Get all annotations for a connection
-// @Description	Get all annotations associated with a specific connection
-// @Tags			connections
-// @Produce		json
-// @Param			id	path		string	true	"Connection UUID"
-// @Success		200	{object}	map[string]string
-// @Failure		400	{object}	ErrorResponse
-// @Failure		401	{object}	ErrorResponse
-// @Failure		404	{object}	ErrorResponse
-// @Failure		500	{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/connections/{id}/annotations [get]
-func (r *ConnectionsRoutes) getAnnotations(gctx *gin.Context) { r.annotsAdapter.HandleList(gctx) }
-
-// @Summary		Get a specific annotation for a connection
-// @Description	Get a specific annotation value by key for a connection
-// @Tags			connections
-// @Produce		json
-// @Param			id			path		string	true	"Connection UUID"
-// @Param			annotation	path		string	true	"Annotation key"
-// @Success		200			{object}	KeyValueJson
-// @Failure		400			{object}	ErrorResponse
-// @Failure		401			{object}	ErrorResponse
-// @Failure		404			{object}	ErrorResponse
-// @Failure		500			{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/connections/{id}/annotations/{annotation} [get]
-func (r *ConnectionsRoutes) getAnnotation(gctx *gin.Context) { r.annotsAdapter.HandleGet(gctx) }
-
-// @Summary		Set an annotation for a connection
-// @Description	Set or update a specific annotation value by key for a connection
-// @Tags			connections
-// @Accept			json
-// @Produce		json
-// @Param			id			path		string						true	"Connection UUID"
-// @Param			annotation	path		string						true	"Annotation key"
-// @Param			request		body		PutKeyValueRequestJson	true	"Annotation value"
-// @Success		200			{object}	KeyValueJson
-// @Failure		400			{object}	ErrorResponse
-// @Failure		401			{object}	ErrorResponse
-// @Failure		403			{object}	ErrorResponse
-// @Failure		404			{object}	ErrorResponse
-// @Failure		500			{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/connections/{id}/annotations/{annotation} [put]
-func (r *ConnectionsRoutes) putAnnotation(gctx *gin.Context) { r.annotsAdapter.HandlePut(gctx) }
-
-// @Summary		Delete an annotation from a connection
-// @Description	Delete a specific annotation by key from a connection
-// @Tags			connections
-// @Param			id			path	string	true	"Connection UUID"
-// @Param			annotation	path	string	true	"Annotation key"
-// @Success		204			"No Content"
-// @Failure		400			{object}	ErrorResponse
-// @Failure		401			{object}	ErrorResponse
-// @Failure		403			{object}	ErrorResponse
-// @Failure		500			{object}	ErrorResponse
-// @Security		BearerAuth
-// @Router			/connections/{id}/annotations/{annotation} [delete]
-func (r *ConnectionsRoutes) deleteAnnotation(gctx *gin.Context) { r.annotsAdapter.HandleDelete(gctx) }
-
-// ConnectionScopesJson exposes the OAuth2 scopes a connection requested at auth time and the
-// scopes the provider actually granted. The two sets can diverge when the provider chooses to
-// honor only a subset of the request (RFC 6749 §3.3).
-type ConnectionScopesJson struct {
-	Requested []string `json:"requested"`
-	Granted   []string `json:"granted"`
 }
 
 // @Summary		Get OAuth2 scopes for a connection
@@ -1339,7 +1456,7 @@ type ConnectionScopesJson struct {
 // @Tags			connections
 // @Produce		json
 // @Param			id	path		string	true	"Connection ID"
-// @Success		200	{object}	ConnectionScopesJson
+// @Success		200	{object}	OpenAPIConnectionScopeListJson
 // @Failure		400	{object}	ErrorResponse
 // @Failure		401	{object}	ErrorResponse
 // @Failure		404	{object}	ErrorResponse
@@ -1382,12 +1499,20 @@ func (r *ConnectionsRoutes) getScopes(gctx *gin.Context) {
 
 	connector := c.GetConnector().GetDefinition()
 	if connector.Auth == nil {
-		apgin.WriteError(gctx, nil, httperr.New(http.StatusUnprocessableEntity, "scopes are only available for OAuth2 connections"))
+		apgin.WriteError(
+			gctx,
+			nil, // logger
+			httperr.New(http.StatusUnprocessableEntity, "scopes are only available for OAuth2 connections"),
+		)
 		val.MarkErrorReturn()
 		return
 	}
 	if _, ok := connector.Auth.Inner().(*cschema.AuthOAuth2); !ok {
-		apgin.WriteError(gctx, nil, httperr.New(http.StatusUnprocessableEntity, "scopes are only available for OAuth2 connections"))
+		apgin.WriteError(
+			gctx,
+			nil, // logger
+			httperr.New(http.StatusUnprocessableEntity, "scopes are only available for OAuth2 connections"),
+		)
 		val.MarkErrorReturn()
 		return
 	}
@@ -1395,7 +1520,11 @@ func (r *ConnectionsRoutes) getScopes(gctx *gin.Context) {
 	token, err := r.db.GetOAuth2Token(ctx, id)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFound("no oauth2 token exists for this connection"))
+			apgin.WriteError(
+				gctx,
+				nil, // logger
+				httperr.NotFound("no oauth2 token exists for this connection"),
+			)
 		} else {
 			apgin.WriteErr(gctx, nil, err)
 		}
@@ -1403,10 +1532,10 @@ func (r *ConnectionsRoutes) getScopes(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, ConnectionScopesJson{
-		Requested: oauth2.SplitScopes(token.RequestedScopes),
-		Granted:   oauth2.SplitScopes(token.Scopes),
-	})
+	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewConnectionScopeList(
+		oauth2.SplitScopes(token.RequestedScopes),
+		oauth2.SplitScopes(token.Scopes),
+	))
 }
 
 func (r *ConnectionsRoutes) Register(g gin.IRouter) {
@@ -1544,78 +1673,6 @@ func (r *ConnectionsRoutes) Register(g gin.IRouter) {
 		r.update,
 	)
 	g.GET(
-		"/connections/:id/labels",
-		r.auth.NewRequiredBuilder().
-			ForResource("connections").
-			ForVerb("get").
-			ForIdField("id").
-			Build(),
-		r.getLabels,
-	)
-	g.GET(
-		"/connections/:id/labels/:label",
-		r.auth.NewRequiredBuilder().
-			ForResource("connections").
-			ForVerb("get").
-			ForIdField("id").
-			Build(),
-		r.getLabel,
-	)
-	g.PUT(
-		"/connections/:id/labels/:label",
-		r.auth.NewRequiredBuilder().
-			ForResource("connections").
-			ForVerb("update").
-			ForIdField("id").
-			Build(),
-		r.putLabel,
-	)
-	g.DELETE(
-		"/connections/:id/labels/:label",
-		r.auth.NewRequiredBuilder().
-			ForResource("connections").
-			ForVerb("update").
-			ForIdField("id").
-			Build(),
-		r.deleteLabel,
-	)
-	g.GET(
-		"/connections/:id/annotations",
-		r.auth.NewRequiredBuilder().
-			ForResource("connections").
-			ForVerb("get").
-			ForIdField("id").
-			Build(),
-		r.getAnnotations,
-	)
-	g.GET(
-		"/connections/:id/annotations/:annotation",
-		r.auth.NewRequiredBuilder().
-			ForResource("connections").
-			ForVerb("get").
-			ForIdField("id").
-			Build(),
-		r.getAnnotation,
-	)
-	g.PUT(
-		"/connections/:id/annotations/:annotation",
-		r.auth.NewRequiredBuilder().
-			ForResource("connections").
-			ForVerb("update").
-			ForIdField("id").
-			Build(),
-		r.putAnnotation,
-	)
-	g.DELETE(
-		"/connections/:id/annotations/:annotation",
-		r.auth.NewRequiredBuilder().
-			ForResource("connections").
-			ForVerb("update").
-			ForIdField("id").
-			Build(),
-		r.deleteAnnotation,
-	)
-	g.GET(
 		"/connections/:id/scopes",
 		r.auth.NewRequiredBuilder().
 			ForResource("connections").
@@ -1636,81 +1693,14 @@ func NewConnectionsRoutes(
 	encrypt encrypt.E,
 	logger *slog.Logger,
 ) *ConnectionsRoutes {
-	parseConnID := func(gctx *gin.Context) (apid.ID, *httperr.Error) {
-		id, err := apid.Parse(gctx.Param("id"))
-		if err != nil {
-			return apid.Nil, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err))
-		}
-		if id == apid.Nil {
-			return apid.Nil, httperr.BadRequest("id is required")
-		}
-		return id, nil
-	}
-
-	getConn := func(ctx context.Context, id apid.ID) (key_value.Resource, error) {
-		conn, err := c.GetConnection(ctx, id)
-		if err != nil {
-			return nil, err
-		}
-		if conn == nil {
-			return nil, nil
-		}
-		return conn, nil
-	}
-
-	authGet := authService.NewRequiredBuilder().
-		ForResource("connections").
-		ForVerb("get").
-		ForIdField("id").
-		Build()
-	authMutate := authService.NewRequiredBuilder().
-		ForResource("connections").
-		ForVerb("update").
-		ForIdField("id").
-		Build()
-
-	labelsAdapter := key_value.Adapter[apid.ID]{
-		Kind:         key_value.Label,
-		ResourceName: "connection",
-		PathPrefix:   "/connections/:id",
-		AuthGet:      authGet,
-		AuthMutate:   authMutate,
-		ParseID:      parseConnID,
-		Get:          getConn,
-		Put: func(ctx context.Context, id apid.ID, kv map[string]string) (key_value.Resource, error) {
-			return db.PutConnectionLabels(ctx, id, kv)
-		},
-		Delete: func(ctx context.Context, id apid.ID, keys []string) (key_value.Resource, error) {
-			return db.DeleteConnectionLabels(ctx, id, keys)
-		},
-	}
-
-	annotsAdapter := key_value.Adapter[apid.ID]{
-		Kind:         key_value.Annotation,
-		ResourceName: "connection",
-		PathPrefix:   "/connections/:id",
-		AuthGet:      authGet,
-		AuthMutate:   authMutate,
-		ParseID:      parseConnID,
-		Get:          getConn,
-		Put: func(ctx context.Context, id apid.ID, kv map[string]string) (key_value.Resource, error) {
-			return db.PutConnectionAnnotations(ctx, id, kv)
-		},
-		Delete: func(ctx context.Context, id apid.ID, keys []string) (key_value.Resource, error) {
-			return db.DeleteConnectionAnnotations(ctx, id, keys)
-		},
-	}
-
 	return &ConnectionsRoutes{
-		cfg:           cfg,
-		auth:          authService,
-		core:          c,
-		db:            db,
-		r:             r,
-		httpf:         httpf,
-		encrypt:       encrypt,
-		oauthf:        oauth2.NewFactory(cfg, db, r, c, httpf, encrypt, logger),
-		labelsAdapter: labelsAdapter,
-		annotsAdapter: annotsAdapter,
+		cfg:     cfg,
+		auth:    authService,
+		core:    c,
+		db:      db,
+		r:       r,
+		httpf:   httpf,
+		encrypt: encrypt,
+		oauthf:  oauth2.NewFactory(cfg, db, r, c, httpf, encrypt, logger),
 	}
 }

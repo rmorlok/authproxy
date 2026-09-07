@@ -1,12 +1,19 @@
-labels:
-  type: openweathermap-query
-displayName: OpenWeatherMap (query key)
-logo:
-  publicUrl: https://example.com/owm.png
-description: |
-  Weather data with the API key passed as a query parameter.
-auth:
-  type: api-key
-  placement:
-    type: query
-    paramName: appid
+apiVersion: authproxy.net/v1alpha1
+kind: Connector
+metadata:
+  name: api-key-query
+  labels:
+    type: openweathermap-query
+spec:
+  definition:
+    displayName: OpenWeatherMap (query key)
+    logo:
+      publicUrl: https://example.com/owm.png
+    description: 'Weather data with the API key passed as a query parameter.
+
+'
+    auth:
+      type: api-key
+      placement:
+        type: query
+        paramName: appid

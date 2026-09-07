@@ -1,85 +1,66 @@
 basePath: /api/v1
 definitions:
-  api.ActorJson:
-    description: Actor identity within a namespace
+  actor.ActorStatus:
+    properties:
+      signingKeyConfigured:
+        type: boolean
+    type: object
+  api.ConnectionInitiateSpec:
     properties:
       annotations:
         additionalProperties:
           type: string
         type: object
-      createdAt:
-        type: string
-      externalId:
-        example: user-123
-        type: string
-      id:
-        example: act_test550e8400abcde
+      intoNamespace:
         type: string
       labels:
         additionalProperties:
           type: string
         type: object
       name:
-        example: billing-service
         type: string
-      namespace:
-        example: root.acme
-        type: string
-      permissions:
-        items:
-          $ref: '#/definitions/auth.Permission'
-        type: array
-      updatedAt:
+      returnToUrl:
         type: string
     type: object
-  api.ConnectorJson:
-    description: Connector API summary response
+  api.ConnectionScopeJson:
     properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      createdAt:
-        type: string
-      description:
-        example: Salesforce CRM integration
-        type: string
-      displayName:
-        example: Salesforce
-        type: string
-      hasConfigure:
-        example: false
+      granted:
         type: boolean
-      highlight:
-        example: CRM platform
-        type: string
-      id:
-        example: cxr_test550e8400abcde
-        type: string
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-      logo:
-        example: https://example.com/logo.png
-        type: string
       name:
-        example: salesforce
         type: string
-      namespace:
-        example: root.acme
+      requested:
+        type: boolean
+    type: object
+  api.ConnectionSetupControlSpec:
+    properties:
+      returnToUrl:
         type: string
+    type: object
+  api.ConnectorForceStateSpec:
+    properties:
       state:
         example: primary
         type: string
-      statusPageUrl:
-        example: https://status.salesforce.com
-        type: string
-      updatedAt:
-        type: string
-      version:
-        example: 1
+    type: object
+  api.ConnectorLifecycleSpec:
+    properties:
+      timeoutSeconds:
+        example: 600
         type: integer
+    type: object
+  api.ConnectorLifecycleStatus:
+    properties:
+      taskId:
+        type: string
+    type: object
+  api.DataSourceOptionJson:
+    properties:
+      label:
+        example: My Workspace
+        type: string
+      value:
+        example: ws-123
+        type: string
     type: object
   api.MetricsSchemaMetricJson:
     description: Supported metric definition
@@ -104,36 +85,6 @@ definitions:
         example: request_events
         type: string
     type: object
-  api.NamespaceJson:
-    description: Namespace for organizing resources
-    properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      createdAt:
-        type: string
-      keyId:
-        example: key_test550e8400abcd
-        type: string
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-      name:
-        description: Name is automatically set to the final segment of Path and cannot
-          be changed.
-        example: acme
-        type: string
-      path:
-        example: root.acme
-        type: string
-      state:
-        example: active
-        type: string
-      updatedAt:
-        type: string
-    type: object
   auth.Permission:
     properties:
       namespace:
@@ -151,8 +102,72 @@ definitions:
           type: string
         type: array
     type: object
-  routes.ActorJson:
-    description: Actor identity within a namespace
+  connection.ConnectionConfigurationStatus:
+    properties:
+      configured:
+        type: boolean
+      schema:
+        type: object
+    type: object
+  connection.ConnectionHealthStatus:
+    properties:
+      state:
+        type: string
+    type: object
+  connection.ConnectionLifecycleStatus:
+    properties:
+      state:
+        type: string
+    type: object
+  connection.ConnectionSetupStatus:
+    properties:
+      error:
+        type: string
+      stepId:
+        type: string
+    type: object
+  connection.ConnectionSpecPatch:
+    type: object
+  connection.ConnectionStatus:
+    properties:
+      configuration:
+        $ref: '#/definitions/connection.ConnectionConfigurationStatus'
+      health:
+        $ref: '#/definitions/connection.ConnectionHealthStatus'
+      lifecycle:
+        $ref: '#/definitions/connection.ConnectionLifecycleStatus'
+      setup:
+        $ref: '#/definitions/connection.ConnectionSetupStatus'
+    type: object
+  connectors.ConnectorReleaseSpec:
+    properties:
+      desiredState:
+        type: string
+    type: object
+  connectors.ConnectorReleaseStatus:
+    properties:
+      state:
+        type: string
+    type: object
+  connectors.ConnectorStatus:
+    properties:
+      release:
+        $ref: '#/definitions/connectors.ConnectorReleaseStatus'
+    type: object
+  key.KeyStatus:
+    properties:
+      keyDataConfigured:
+        type: boolean
+      state:
+        type: string
+    type: object
+  meta.APIVersion:
+    enum:
+    - authproxy.net/v1alpha1
+    type: string
+    x-enum-varnames:
+    - APIVersionV1Alpha1
+  meta.ObjectMeta:
     properties:
       annotations:
         additionalProperties:
@@ -160,105 +175,22 @@ definitions:
         type: object
       createdAt:
         type: string
-      externalId:
-        example: user-123
-        type: string
+      generation:
+        type: integer
       id:
-        example: act_test550e8400abcde
         type: string
       labels:
         additionalProperties:
           type: string
         type: object
       name:
-        example: billing-service
         type: string
       namespace:
-        example: root.acme
         type: string
-      permissions:
-        items:
-          $ref: '#/definitions/auth.Permission'
-        type: array
       updatedAt:
         type: string
     type: object
-  routes.ConnectionScopesJson:
-    properties:
-      granted:
-        items:
-          type: string
-        type: array
-      requested:
-        items:
-          type: string
-        type: array
-    type: object
-  routes.ConnectionSetupComplete:
-    description: Completion response for connection setup
-    properties:
-      id:
-        description: Connection UUID.
-        example: cxn_test550e8400abcde
-        type: string
-      type:
-        description: Response type.
-        example: complete
-        type: string
-    type: object
-  routes.ConnectionSetupForm:
-    description: Form response for connection setup
-    properties:
-      data:
-        description: |-
-          Existing values for fields in this step. Present when reconfiguring a
-          configured connection so clients can initialize the form without exposing
-          configuration values owned by other setup steps.
-        type: object
-      id:
-        description: Connection UUID.
-        example: cxn_test550e8400abcde
-        type: string
-      jsonSchema:
-        description: JSON Schema defining the form fields.
-        type: object
-      stepDescription:
-        description: Step description.
-        type: string
-      stepId:
-        description: Step ID being submitted.
-        example: preconnect:0
-        type: string
-      stepTitle:
-        description: Step title.
-        example: Choose workspace
-        type: string
-      type:
-        description: Response type.
-        example: form
-        type: string
-      uiSchema:
-        description: UI Schema for JSON Forms rendering.
-        type: object
-    type: object
-  routes.ConnectionSetupRedirect:
-    description: Redirect response for connection setup
-    properties:
-      id:
-        description: Connection UUID.
-        example: cxn_test550e8400abcde
-        type: string
-      redirectUrl:
-        description: URL to redirect the user to.
-        example: https://oauth.provider.com/authorize?...
-        type: string
-      type:
-        description: Response type.
-        example: redirect
-        type: string
-    type: object
-  routes.ConnectorJson:
-    description: Connector API summary response
+  meta.ObjectMetaPatch:
     properties:
       annotations:
         additionalProperties:
@@ -266,27 +198,729 @@ definitions:
         type: object
       createdAt:
         type: string
-      description:
-        example: Salesforce CRM integration
-        type: string
-      displayName:
-        example: Salesforce
-        type: string
-      hasConfigure:
-        example: false
-        type: boolean
-      highlight:
-        example: CRM platform
-        type: string
+      generation:
+        type: integer
       id:
-        example: cxr_test550e8400abcde
         type: string
       labels:
         additionalProperties:
           type: string
         type: object
-      logo:
-        example: https://example.com/logo.png
+      name:
+        type: string
+      namespace:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  meta.ObjectReference:
+    properties:
+      apiVersion:
+        $ref: '#/definitions/meta.APIVersion'
+      generation:
+        type: integer
+      id:
+        type: string
+      kind:
+        type: string
+      name:
+        type: string
+      namespace:
+        type: string
+    type: object
+  namespace.Namespace:
+    properties:
+      apiVersion:
+        $ref: '#/definitions/meta.APIVersion'
+      kind:
+        type: string
+      metadata:
+        $ref: '#/definitions/meta.ObjectMeta'
+      spec:
+        $ref: '#/definitions/namespace.NamespaceSpec'
+      status:
+        $ref: '#/definitions/namespace.NamespaceStatus'
+    type: object
+  namespace.NamespacePatch:
+    properties:
+      apiVersion:
+        $ref: '#/definitions/meta.APIVersion'
+      kind:
+        type: string
+      metadata:
+        $ref: '#/definitions/meta.ObjectMetaPatch'
+      spec:
+        $ref: '#/definitions/namespace.NamespaceSpecPatch'
+      status:
+        $ref: '#/definitions/namespace.NamespaceStatus'
+    type: object
+  namespace.NamespaceSpec:
+    properties:
+      encryptionKeyRef:
+        $ref: '#/definitions/meta.ObjectReference'
+    type: object
+  namespace.NamespaceSpecPatch:
+    properties:
+      encryptionKeyRef:
+        $ref: '#/definitions/meta.ObjectReference'
+    type: object
+  namespace.NamespaceStatus:
+    properties:
+      state:
+        type: string
+    type: object
+  openapi.ActorJson:
+    description: Kubernetes-style Actor resource. Signing key material is write-only
+      and never returned.
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - Actor
+        example: Actor
+        type: string
+      metadata:
+        $ref: '#/definitions/meta.ObjectMeta'
+      spec:
+        $ref: '#/definitions/openapi.ActorSpecJson'
+      status:
+        $ref: '#/definitions/actor.ActorStatus'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
+  openapi.ActorPatchJson:
+    description: Kubernetes-style Actor patch. External identity and namespace are
+      immutable; signingKey null removes actor-specific signing material.
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - Actor
+        example: Actor
+        type: string
+      metadata:
+        $ref: '#/definitions/meta.ObjectMetaPatch'
+      spec:
+        $ref: '#/definitions/openapi.ActorSpecPatchJson'
+      status:
+        $ref: '#/definitions/actor.ActorStatus'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
+  openapi.ActorSpecJson:
+    properties:
+      externalId:
+        example: user-123
+        type: string
+      permissions:
+        items:
+          $ref: '#/definitions/auth.Permission'
+        type: array
+      signingKey:
+        type: object
+    required:
+    - externalId
+    type: object
+  openapi.ActorSpecPatchJson:
+    properties:
+      externalId:
+        example: user-123
+        type: string
+      permissions:
+        items:
+          $ref: '#/definitions/auth.Permission'
+        type: array
+      signingKey:
+        type: object
+    type: object
+  openapi.ConnectionActionMetaJson:
+    properties:
+      target:
+        $ref: '#/definitions/meta.ObjectReference'
+    required:
+    - target
+    type: object
+  openapi.ConnectionDisconnectSpecJson:
+    properties:
+      timeoutSeconds:
+        example: 600
+        type: integer
+    type: object
+  openapi.ConnectionDisconnectStatusJson:
+    properties:
+      connection:
+        $ref: '#/definitions/openapi.ConnectionJson'
+      taskId:
+        type: string
+    type: object
+  openapi.ConnectionForceStateSpecJson:
+    properties:
+      state:
+        enum:
+        - setup
+        - configured
+        - disabled
+        - disconnecting
+        - disconnected
+        type: string
+    required:
+    - state
+    type: object
+  openapi.ConnectionForceStateStatusJson:
+    properties:
+      connection:
+        $ref: '#/definitions/openapi.ConnectionJson'
+    type: object
+  openapi.ConnectionJson:
+    description: Kubernetes-style Connection resource
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - Connection
+        example: Connection
+        type: string
+      metadata:
+        $ref: '#/definitions/meta.ObjectMeta'
+      spec:
+        $ref: '#/definitions/openapi.ConnectionSpecJson'
+      status:
+        $ref: '#/definitions/connection.ConnectionStatus'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
+  openapi.ConnectionSetupActionStatusJson:
+    properties:
+      canRetry:
+        type: boolean
+      data:
+        type: object
+      error:
+        type: string
+      jsonSchema:
+        type: object
+      redirectUrl:
+        type: string
+      stepDescription:
+        type: string
+      stepId:
+        type: string
+      stepTitle:
+        type: string
+      type:
+        enum:
+        - redirect
+        - form
+        - complete
+        - verifying
+        - error
+        type: string
+      uiSchema:
+        type: object
+    type: object
+  openapi.ConnectionSetupSubmitSpecJson:
+    properties:
+      data:
+        additionalProperties: true
+        type: object
+      returnToUrl:
+        type: string
+      stepId:
+        type: string
+    required:
+    - data
+    - stepId
+    type: object
+  openapi.ConnectionSpecJson:
+    properties:
+      configuration:
+        type: object
+      connectorRef:
+        $ref: '#/definitions/meta.ObjectReference'
+    required:
+    - connectorRef
+    type: object
+  openapi.ConnectionVersionMigrationSpecJson:
+    properties:
+      connectorRef:
+        $ref: '#/definitions/meta.ObjectReference'
+      timeoutSeconds:
+        example: 600
+        type: integer
+    required:
+    - connectorRef
+    type: object
+  openapi.ConnectionVersionMigrationStatusJson:
+    properties:
+      sourceConnectorRef:
+        $ref: '#/definitions/meta.ObjectReference'
+      targetConnectorRef:
+        $ref: '#/definitions/meta.ObjectReference'
+      taskId:
+        type: string
+    type: object
+  openapi.ConnectorJson:
+    description: Kubernetes-style Connector resource
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - Connector
+        example: Connector
+        type: string
+      metadata:
+        $ref: '#/definitions/meta.ObjectMeta'
+      spec:
+        $ref: '#/definitions/openapi.ConnectorSpecJson'
+      status:
+        $ref: '#/definitions/connectors.ConnectorStatus'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
+  openapi.ConnectorReleaseSpecPatchJson:
+    properties:
+      desiredState:
+        enum:
+        - draft
+        - primary
+        type: string
+    type: object
+  openapi.ConnectorSpecJson:
+    properties:
+      definition:
+        type: object
+      release:
+        $ref: '#/definitions/connectors.ConnectorReleaseSpec'
+    type: object
+  openapi.ConnectorSpecPatchJson:
+    properties:
+      definition:
+        type: object
+      release:
+        $ref: '#/definitions/openapi.ConnectorReleaseSpecPatchJson'
+    type: object
+  openapi.DryRunMatchJson:
+    properties:
+      algorithmSummary:
+        example: token bucket 60 @ 1/s
+        type: string
+      bucketKey:
+        example: actor=act_abc|labels/team=acme
+        type: string
+      effectiveMode:
+        example: enforce
+        type: string
+      namespace:
+        example: root.acme
+        type: string
+      peekFailed:
+        type: boolean
+      rateLimitId:
+        example: rl_test550e8400abcde
+        type: string
+      remaining:
+        type: integer
+      retryAfterMs:
+        type: integer
+      wouldAllow:
+        type: boolean
+    type: object
+  openapi.DryRunNotMatchedJson:
+    properties:
+      namespace:
+        example: root.acme
+        type: string
+      rateLimitId:
+        example: rl_test550e8400abcde
+        type: string
+      reason:
+        type: string
+    type: object
+  openapi.KeyJson:
+    description: Kubernetes-style managed Key resource. Secret keyData fields are
+      always redacted in responses.
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - Key
+        example: Key
+        type: string
+      metadata:
+        $ref: '#/definitions/meta.ObjectMeta'
+      spec:
+        $ref: '#/definitions/openapi.KeySpecJson'
+      status:
+        $ref: '#/definitions/key.KeyStatus'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
+  openapi.KeyPatchJson:
+    description: Kubernetes-style managed Key patch. Status and server-owned metadata
+      are rejected.
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - Key
+        example: Key
+        type: string
+      metadata:
+        $ref: '#/definitions/meta.ObjectMetaPatch'
+      spec:
+        $ref: '#/definitions/openapi.KeySpecPatchJson'
+      status:
+        $ref: '#/definitions/key.KeyStatus'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
+  openapi.KeySpecJson:
+    properties:
+      desiredState:
+        enum:
+        - active
+        - disabled
+        type: string
+      keyData:
+        type: object
+      materialType:
+        enum:
+        - symmetric
+        - public
+        - private
+        - external
+        type: string
+      usage:
+        enum:
+        - data_encryption
+        type: string
+    type: object
+  openapi.KeySpecPatchJson:
+    properties:
+      desiredState:
+        enum:
+        - active
+        - disabled
+        type: string
+      keyData:
+        type: object
+      materialType:
+        enum:
+        - symmetric
+        - public
+        - private
+        - external
+        type: string
+      usage:
+        enum:
+        - data_encryption
+        type: string
+    type: object
+  openapi.ListActorsResponseJson:
+    description: Paginated list of actors
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      items:
+        description: List of actors.
+        items:
+          $ref: '#/definitions/openapi.ActorJson'
+        type: array
+      kind:
+        type: string
+      metadata:
+        $ref: '#/definitions/v1alpha1.ListMeta'
+    required:
+    - apiVersion
+    - items
+    - kind
+    - metadata
+    type: object
+  openapi.ListKeysResponseJson:
+    description: Paginated list of keys
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/openapi.KeyJson'
+        type: array
+      kind:
+        type: string
+      metadata:
+        $ref: '#/definitions/v1alpha1.ListMeta'
+    required:
+    - apiVersion
+    - items
+    - kind
+    - metadata
+    type: object
+  openapi.ListNamespacesResponseJson:
+    description: Paginated list of namespaces
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      items:
+        description: List of namespaces.
+        items:
+          $ref: '#/definitions/namespace.Namespace'
+        type: array
+      kind:
+        type: string
+      metadata:
+        $ref: '#/definitions/v1alpha1.ListMeta'
+    required:
+    - apiVersion
+    - items
+    - kind
+    - metadata
+    type: object
+  openapi.ListRateLimitsResponseJson:
+    description: Paginated list of rate limits
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/openapi.RateLimitJson'
+        type: array
+      kind:
+        type: string
+      metadata:
+        $ref: '#/definitions/v1alpha1.ListMeta'
+    required:
+    - apiVersion
+    - items
+    - kind
+    - metadata
+    type: object
+  openapi.NotificationActionStatusJson:
+    properties:
+      url:
+        type: string
+    required:
+    - url
+    type: object
+  openapi.NotificationBatchViewMetadataJson:
+    properties:
+      targets:
+        items:
+          $ref: '#/definitions/meta.ObjectReference'
+        type: array
+    required:
+    - targets
+    type: object
+  openapi.NotificationBatchViewStatusJson:
+    properties:
+      viewedCount:
+        type: integer
+    type: object
+  openapi.NotificationJson:
+    description: Actor-visible, resource-shaped notification projection
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - Notification
+        example: Notification
+        type: string
+      metadata:
+        $ref: '#/definitions/meta.ObjectMeta'
+      spec:
+        $ref: '#/definitions/openapi.NotificationSpecJson'
+      status:
+        $ref: '#/definitions/openapi.NotificationStatusJson'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    - status
+    type: object
+  openapi.NotificationSpecJson:
+    properties:
+      context:
+        type: object
+      key:
+        type: string
+      level:
+        enum:
+        - info
+        - warning
+        - error
+        example: warning
+        type: string
+      message:
+        type: string
+      resourceRef:
+        $ref: '#/definitions/meta.ObjectReference'
+      title:
+        type: string
+    required:
+    - key
+    - level
+    - message
+    - resourceRef
+    - title
+    type: object
+  openapi.NotificationStatusJson:
+    properties:
+      action:
+        $ref: '#/definitions/openapi.NotificationActionStatusJson'
+      resolvedAt:
+        type: string
+      state:
+        enum:
+        - active
+        - resolved
+        example: active
+        type: string
+      viewed:
+        type: boolean
+    required:
+    - state
+    type: object
+  openapi.NotificationViewSpecJson:
+    type: object
+  openapi.NotificationViewStatusJson:
+    properties:
+      viewed:
+        type: boolean
+    type: object
+  openapi.ProxyRequestJson:
+    description: Request to proxy or simulate an HTTP request
+    properties:
+      bodyJson: {}
+      bodyRaw:
+        items:
+          type: integer
+        type: array
+      headers:
+        type: object
+      labels:
+        additionalProperties:
+          type: string
+        type: object
+      method:
+        example: POST
+        type: string
+      url:
+        example: https://api.example.com/v1/users
+        type: string
+    type: object
+  openapi.RateLimitAlgorithmJson:
+    properties:
+      fixedWindow:
+        $ref: '#/definitions/openapi.RateLimitFixedWindowJson'
+      slidingWindow:
+        $ref: '#/definitions/openapi.RateLimitSlidingWindowJson'
+      tokenBucket:
+        $ref: '#/definitions/openapi.RateLimitTokenBucketJson'
+    type: object
+  openapi.RateLimitBucketJson:
+    properties:
+      dimensions:
+        items:
+          type: string
+        type: array
+    type: object
+  openapi.RateLimitConnectionReferenceJson:
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      id:
+        example: cxn_01example
+        type: string
+      kind:
+        enum:
+        - Connection
+        example: Connection
+        type: string
+      name:
+        example: salesforce-production
+        type: string
+      namespace:
+        example: root.acme
+        type: string
+    required:
+    - apiVersion
+    - kind
+    type: object
+  openapi.RateLimitConnectorReferenceJson:
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      id:
+        example: cxr_01example
+        type: string
+      kind:
+        enum:
+        - Connector
+        example: Connector
         type: string
       name:
         example: salesforce
@@ -294,64 +928,609 @@ definitions:
       namespace:
         example: root.acme
         type: string
-      state:
-        example: primary
-        type: string
-      statusPageUrl:
-        example: https://status.salesforce.com
-        type: string
-      updatedAt:
-        type: string
-      version:
-        example: 1
-        type: integer
+    required:
+    - apiVersion
+    - kind
     type: object
-  routes.CreateActorRequestJson:
-    description: Actor creation request
+  openapi.RateLimitDryRunActionJson:
+    description: Kubernetes-style rate-limit dry-run action
     properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      externalId:
-        example: user-123
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
         type: string
-      labels:
+      kind:
+        enum:
+        - RateLimitDryRun
+        example: RateLimitDryRun
+        type: string
+      metadata:
+        $ref: '#/definitions/openapi.ConnectionActionMetaJson'
+      spec:
+        $ref: '#/definitions/openapi.RateLimitDryRunSpecJson'
+      status:
+        $ref: '#/definitions/openapi.RateLimitDryRunStatusJson'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
+  openapi.RateLimitDryRunSpecJson:
+    description: Synthetic request evaluated by a rate-limit dry run
+    properties:
+      actorRef:
+        $ref: '#/definitions/meta.ObjectReference'
+      request:
+        $ref: '#/definitions/openapi.ProxyRequestJson'
+      requestType:
+        example: proxy
+        type: string
+    required:
+    - request
+    - requestType
+    type: object
+  openapi.RateLimitDryRunStatusJson:
+    description: Per-rule match and peek-driven would-allow result
+    properties:
+      matched:
+        items:
+          $ref: '#/definitions/openapi.DryRunMatchJson'
+        type: array
+      notMatched:
+        items:
+          $ref: '#/definitions/openapi.DryRunNotMatchedJson'
+        type: array
+      requestLabelSnapshot:
         additionalProperties:
           type: string
         type: object
+    type: object
+  openapi.RateLimitFixedWindowJson:
+    properties:
+      limit:
+        example: 100
+        type: integer
+      window:
+        example: 1m
+        type: string
+    type: object
+  openapi.RateLimitJson:
+    description: Kubernetes-style RateLimit resource
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - RateLimit
+        example: RateLimit
+        type: string
+      metadata:
+        $ref: '#/definitions/meta.ObjectMeta'
+      spec:
+        $ref: '#/definitions/openapi.RateLimitSpecJson'
+      status:
+        $ref: '#/definitions/openapi.RateLimitStatusJson'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
+  openapi.RateLimitPatchJson:
+    description: Kubernetes-style RateLimit patch. Status and server-owned metadata
+      are rejected.
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - RateLimit
+        example: RateLimit
+        type: string
+      metadata:
+        $ref: '#/definitions/meta.ObjectMetaPatch'
+      spec:
+        $ref: '#/definitions/openapi.RateLimitSpecPatchJson'
+      status:
+        $ref: '#/definitions/openapi.RateLimitStatusJson'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
+  openapi.RateLimitPathMatchJson:
+    properties:
+      kind:
+        enum:
+        - prefix
+        - glob
+        - regex
+        type: string
+      value:
+        type: string
+    type: object
+  openapi.RateLimitScopeJson:
+    properties:
+      connectionRef:
+        $ref: '#/definitions/openapi.RateLimitConnectionReferenceJson'
+      connectorRef:
+        $ref: '#/definitions/openapi.RateLimitConnectorReferenceJson'
+      namespaceMatcher:
+        example: root.acme.payments.**
+        type: string
+    type: object
+  openapi.RateLimitSelectorJson:
+    properties:
+      labelSelector:
+        type: string
+      methods:
+        items:
+          type: string
+        type: array
+      pathMatch:
+        $ref: '#/definitions/openapi.RateLimitPathMatchJson'
+      requestTypes:
+        items:
+          enum:
+          - global
+          - proxy
+          - oauth
+          - public
+          - probe
+          type: string
+        type: array
+    type: object
+  openapi.RateLimitSlidingWindowJson:
+    properties:
+      limit:
+        example: 100
+        type: integer
+      mode:
+        enum:
+        - log
+        - counter
+        type: string
+      window:
+        example: 1m
+        type: string
+    type: object
+  openapi.RateLimitSpecJson:
+    properties:
+      algorithm:
+        $ref: '#/definitions/openapi.RateLimitAlgorithmJson'
+      bucket:
+        $ref: '#/definitions/openapi.RateLimitBucketJson'
+      mode:
+        enum:
+        - enforce
+        - observe
+        type: string
+      scope:
+        $ref: '#/definitions/openapi.RateLimitScopeJson'
+      selector:
+        $ref: '#/definitions/openapi.RateLimitSelectorJson'
+    required:
+    - algorithm
+    - bucket
+    - selector
+    type: object
+  openapi.RateLimitSpecPatchJson:
+    properties:
+      algorithm:
+        $ref: '#/definitions/openapi.RateLimitAlgorithmJson'
+      bucket:
+        $ref: '#/definitions/openapi.RateLimitBucketJson'
+      mode:
+        enum:
+        - enforce
+        - observe
+        type: string
+      scope:
+        $ref: '#/definitions/openapi.RateLimitScopeJson'
+      selector:
+        $ref: '#/definitions/openapi.RateLimitSelectorJson'
+    type: object
+  openapi.RateLimitStatusJson:
+    properties:
+      effectiveMode:
+        enum:
+        - enforce
+        - observe
+        type: string
+    type: object
+  openapi.RateLimitTokenBucketJson:
+    properties:
+      capacity:
+        example: 60
+        type: integer
+      refillRate:
+        example: 1
+        type: number
+    type: object
+  openapi.RequestEventActorReferenceJson:
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      id:
+        example: act_01example
+        type: string
+      kind:
+        enum:
+        - Actor
+        example: Actor
+        type: string
       name:
         example: billing-service
         type: string
       namespace:
         example: root.acme
         type: string
+    required:
+    - apiVersion
+    - id
+    - kind
     type: object
-  routes.CreateNamespaceRequestJson:
-    description: Namespace creation request
+  openapi.RequestEventCaptureJson:
     properties:
-      annotations:
+      request:
+        $ref: '#/definitions/openapi.RequestEventCapturedRequestJson'
+      response:
+        $ref: '#/definitions/openapi.RequestEventCapturedResponseJson'
+    required:
+    - request
+    - response
+    type: object
+  openapi.RequestEventCapturedRequestJson:
+    properties:
+      body:
+        format: byte
+        type: string
+      headers:
         additionalProperties:
-          type: string
+          items:
+            type: string
+          type: array
         type: object
-      labels:
+      url:
+        example: https://api.example.com/v1/users
+        type: string
+    required:
+    - headers
+    - url
+    type: object
+  openapi.RequestEventCapturedResponseJson:
+    properties:
+      body:
+        format: byte
+        type: string
+      headers:
         additionalProperties:
-          type: string
+          items:
+            type: string
+          type: array
         type: object
-      path:
+    required:
+    - headers
+    type: object
+  openapi.RequestEventConnectionReferenceJson:
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      id:
+        example: cxn_01example
+        type: string
+      kind:
+        enum:
+        - Connection
+        example: Connection
+        type: string
+      name:
+        example: production
+        type: string
+      namespace:
         example: root.acme
         type: string
+    required:
+    - apiVersion
+    - id
+    - kind
     type: object
-  routes.DataSourceOptionJson:
-    description: Data source option for form select fields
+  openapi.RequestEventConnectorReferenceJson:
     properties:
-      label:
-        description: Human-readable label.
-        example: My Workspace
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
         type: string
-      value:
-        description: Option value.
-        example: ws-123
+      generation:
+        example: 3
+        type: integer
+      id:
+        example: cxr_01example
+        type: string
+      kind:
+        enum:
+        - Connector
+        example: Connector
+        type: string
+      name:
+        example: provider
+        type: string
+      namespace:
+        example: root.integrations
+        type: string
+    required:
+    - apiVersion
+    - id
+    - kind
+    type: object
+  openapi.RequestEventJson:
+    description: Immutable, resource-shaped HTTP request event projection
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - RequestEvent
+        example: RequestEvent
+        type: string
+      metadata:
+        $ref: '#/definitions/meta.ObjectMeta'
+      spec:
+        $ref: '#/definitions/openapi.RequestEventSpecJson'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
+  openapi.RequestEventListMetaJson:
+    properties:
+      continue:
+        type: string
+      total:
+        type: integer
+    type: object
+  openapi.RequestEventNamespaceReferenceJson:
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      id:
+        example: root.acme
+        type: string
+      kind:
+        enum:
+        - Namespace
+        example: Namespace
+        type: string
+    required:
+    - apiVersion
+    - id
+    - kind
+    type: object
+  openapi.RequestEventRateLimitJson:
+    properties:
+      bucket:
+        additionalProperties:
+          type: string
+        type: object
+      mode:
+        enum:
+        - enforce
+        - observe
+        example: enforce
+        type: string
+      rateLimitRef:
+        $ref: '#/definitions/openapi.RequestEventRateLimitReferenceJson'
+    required:
+    - mode
+    - rateLimitRef
+    type: object
+  openapi.RequestEventRateLimitReferenceJson:
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      id:
+        example: rl_01example
+        type: string
+      kind:
+        enum:
+        - RateLimit
+        example: RateLimit
+        type: string
+    required:
+    - apiVersion
+    - id
+    - kind
+    type: object
+  openapi.RequestEventRequestJson:
+    properties:
+      bodySkipped:
+        enum:
+        - streaming
+        - too_large
+        type: string
+      host:
+        example: api.example.com
+        type: string
+      httpVersion:
+        example: HTTP/2.0
+        type: string
+      method:
+        example: GET
+        type: string
+      mimeType:
+        example: application/json
+        type: string
+      path:
+        example: /v1/users
+        type: string
+      scheme:
+        example: https
+        type: string
+      sizeBytes:
+        type: integer
+    required:
+    - host
+    - method
+    - path
+    - scheme
+    type: object
+  openapi.RequestEventResponseJson:
+    properties:
+      bodySkipped:
+        enum:
+        - streaming
+        - too_large
+        type: string
+      error:
+        type: string
+      httpVersion:
+        example: HTTP/2.0
+        type: string
+      mimeType:
+        example: application/json
+        type: string
+      sizeBytes:
+        type: integer
+      source:
+        enum:
+        - upstream
+        - connector_rate_limiter
+        - rate_limit
+        example: upstream
+        type: string
+      statusCode:
+        example: 200
+        type: integer
+    type: object
+  openapi.RequestEventSpecJson:
+    properties:
+      actorRef:
+        $ref: '#/definitions/openapi.RequestEventActorReferenceJson'
+      capture:
+        $ref: '#/definitions/openapi.RequestEventCaptureJson'
+      captureAvailable:
+        type: boolean
+      connectionRef:
+        $ref: '#/definitions/openapi.RequestEventConnectionReferenceJson'
+      connectorRef:
+        $ref: '#/definitions/openapi.RequestEventConnectorReferenceJson'
+      correlationId:
+        type: string
+      durationMilliseconds:
+        example: 150
+        type: integer
+      internalTimeout:
+        type: boolean
+      namespaceRef:
+        $ref: '#/definitions/openapi.RequestEventNamespaceReferenceJson'
+      rateLimit:
+        $ref: '#/definitions/openapi.RequestEventRateLimitJson'
+      rateLimitsMatched:
+        items:
+          $ref: '#/definitions/openapi.RequestEventRateLimitJson'
+        type: array
+      request:
+        $ref: '#/definitions/openapi.RequestEventRequestJson'
+      requestCancelled:
+        type: boolean
+      requestType:
+        enum:
+        - global
+        - proxy
+        - oauth
+        - public
+        - probe
+        example: proxy
+        type: string
+      response:
+        $ref: '#/definitions/openapi.RequestEventResponseJson'
+    required:
+    - durationMilliseconds
+    - namespaceRef
+    - request
+    - requestType
+    - response
+    type: object
+  openapi.SearchResultListMetaJson:
+    properties:
+      incompleteKinds:
+        items:
+          type: string
+        type: array
+      truncatedKinds:
+        items:
+          type: string
+        type: array
+    type: object
+  openapi.TaskJson:
+    description: Background task status
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - Task
+        example: Task
+        type: string
+      metadata:
+        $ref: '#/definitions/meta.ObjectMeta'
+      spec:
+        $ref: '#/definitions/openapi.TaskSpecJson'
+      status:
+        $ref: '#/definitions/openapi.TaskStatusJson'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    - status
+    type: object
+  openapi.TaskSpecJson:
+    properties:
+      type:
+        type: string
+    type: object
+  openapi.TaskStatusJson:
+    properties:
+      state:
+        enum:
+        - unknown
+        - active
+        - pending
+        - scheduled
+        - retry
+        - failed
+        - completed
+        example: completed
         type: string
     type: object
   routes.ErrorResponse:
@@ -365,416 +1544,494 @@ definitions:
         description: Stack trace, only populated in debug mode.
         type: string
     type: object
-  routes.ForceConnectorVersionStateRequestJson:
-    description: Request to force a connector version state
+  routes.OpenAPIConnectionDisconnectActionJson:
     properties:
-      state:
-        example: primary
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
         type: string
+      kind:
+        enum:
+        - ConnectionDisconnect
+        example: ConnectionDisconnect
+        type: string
+      metadata:
+        $ref: '#/definitions/openapi.ConnectionActionMetaJson'
+      spec:
+        $ref: '#/definitions/openapi.ConnectionDisconnectSpecJson'
+      status:
+        $ref: '#/definitions/openapi.ConnectionDisconnectStatusJson'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
     type: object
-  routes.ForceStateRequestJson:
-    description: Request to force a connection state
+  routes.OpenAPIConnectionForceStateActionJson:
     properties:
-      state:
-        example: configured
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
         type: string
+      kind:
+        enum:
+        - ConnectionForceState
+        example: ConnectionForceState
+        type: string
+      metadata:
+        $ref: '#/definitions/openapi.ConnectionActionMetaJson'
+      spec:
+        $ref: '#/definitions/openapi.ConnectionForceStateSpecJson'
+      status:
+        $ref: '#/definitions/openapi.ConnectionForceStateStatusJson'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
     type: object
-  routes.InitiateConnectionRequest:
-    description: Request to initiate a connection
+  routes.OpenAPIConnectionInitiateActionJson:
     properties:
-      connectorId:
-        description: ID of the connector to initiate the connection for.
-        example: cxr_test550e8400abcde
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
         type: string
-      connectorVersion:
-        description: Version of the connector to initiate connection for; if not specified
-          defaults to the primary version.
-        example: 1
-        type: integer
-      intoNamespace:
-        description: |-
-          The namespace to create the connection in. Must be the namespace of connector or a child namespace of that
-          namespace. Defaults to the connector namespace if not specified.
-        example: root.acme
+      kind:
+        enum:
+        - ConnectionInitiate
+        example: ConnectionInitiate
         type: string
-      name:
-        description: Optional mutable name for the connection. Defaults to the generated
-          connection ID.
-        example: production-crm
-        type: string
-      returnToUrl:
-        description: The URL to return to after the connection is completed.
-        example: https://example.com/callback
-        type: string
-    type: object
-  routes.KeyValueJson:
-    properties:
-      key:
-        example: env
-        type: string
-      value:
-        example: production
-        type: string
-    type: object
-  routes.MarkNotificationsViewedRequestJson:
-    properties:
-      ids:
-        example:
-        - ntf_test550e8400abcde
-        items:
-          type: string
-        type: array
-    type: object
-  routes.NamespaceJson:
-    description: Namespace for organizing resources
-    properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      createdAt:
-        type: string
-      keyId:
-        example: key_test550e8400abcd
-        type: string
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-      name:
-        description: Name is automatically set to the final segment of Path and cannot
-          be changed.
-        example: acme
-        type: string
-      path:
-        example: root.acme
-        type: string
-      state:
-        example: active
-        type: string
-      updatedAt:
-        type: string
+      metadata:
+        $ref: '#/definitions/openapi.ConnectionActionMetaJson'
+      spec:
+        $ref: '#/definitions/api.ConnectionInitiateSpec'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
     type: object
   routes.OpenAPIConnectionJson:
-    description: Connection to an external service
+    description: Kubernetes-style Connection resource
     properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      connector: {}
-      createdAt:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
         type: string
-      healthState:
-        example: healthy
+      kind:
+        enum:
+        - Connection
+        example: Connection
         type: string
-      id:
-        example: cxn_test550e8400abcde
-        type: string
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-      name:
-        example: production-crm
-        type: string
-      namespace:
-        example: root.acme
-        type: string
-      setupError:
-        type: string
-      setupStepId:
-        example: tenant
-        type: string
-      state:
-        example: configured
-        type: string
-      updatedAt:
-        type: string
+      metadata:
+        $ref: '#/definitions/meta.ObjectMeta'
+      spec:
+        $ref: '#/definitions/openapi.ConnectionSpecJson'
+      status:
+        $ref: '#/definitions/connection.ConnectionStatus'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
     type: object
-  routes.OpenAPIConnectorLifecycleRequestJson:
-    description: Request to run a connector lifecycle operation
+  routes.OpenAPIConnectionPatchJson:
+    description: Kubernetes-style Connection patch. Connector and actor bindings are
+      immutable.
     properties:
-      timeoutSeconds:
-        example: 600
-        type: integer
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - Connection
+        example: Connection
+        type: string
+      metadata:
+        $ref: '#/definitions/meta.ObjectMetaPatch'
+      spec:
+        $ref: '#/definitions/connection.ConnectionSpecPatch'
+      status:
+        $ref: '#/definitions/connection.ConnectionStatus'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
     type: object
-  routes.OpenAPIConnectorLifecycleResponseJson:
-    description: Response for connector lifecycle operation
+  routes.OpenAPIConnectionScopeListJson:
     properties:
-      connectorId:
-        example: cxr_test550e8400abcde
-        type: string
-      taskId:
-        type: string
-    type: object
-  routes.OpenAPIConnectorVersionJson:
-    description: Detailed connector version information
-    properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      createdAt:
-        type: string
-      definition: {}
-      id:
-        example: cxr_test550e8400abcde
-        type: string
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-      name:
-        example: salesforce
-        type: string
-      namespace:
-        example: root.acme
-        type: string
-      state:
-        example: primary
-        type: string
-      updatedAt:
-        type: string
-      version:
-        example: 1
-        type: integer
-    type: object
-  routes.OpenAPICreateConnectorRequestJson:
-    description: Request to create a new connector
-    properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      definition: {}
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-      name:
-        example: salesforce
-        type: string
-      namespace:
-        example: root.acme
-        type: string
-    type: object
-  routes.OpenAPICreateConnectorVersionRequestJson:
-    description: Request to create a new draft connector version
-    properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      definition: {}
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-    type: object
-  routes.OpenAPICreateKeyRequestJson:
-    description: Request to create a key
-    properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      keyData:
-        additionalProperties: true
-        type: object
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-      name:
-        example: primary-encryption-key
-        type: string
-      namespace:
-        example: root.acme
-        type: string
-    type: object
-  routes.OpenAPICreateRateLimitRequestJson:
-    description: Request to create a rate limit
-    properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      definition:
-        additionalProperties: {}
-        type: object
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-      name:
-        example: public-api
-        type: string
-      namespace:
-        example: root.acme
-        type: string
-    type: object
-  routes.OpenAPIDisconnectConnectionRequestJson:
-    description: Request body for connection disconnect operations
-    properties:
-      timeoutSeconds:
-        example: 600
-        type: integer
-    type: object
-  routes.OpenAPIDisconnectResponseJson:
-    description: Response for disconnect operation
-    properties:
-      connection: {}
-      taskId:
-        type: string
-    type: object
-  routes.OpenAPIDryRunRequestJson:
-    description: 'Dry-run input: a proxy-shaped request + request type + the identity
-      it runs under'
-    properties:
-      context: {}
-      request: {}
-      requestType:
-        example: proxy
-        type: string
-    type: object
-  routes.OpenAPIDryRunResponseJson:
-    description: Per-rule match + peek-driven would-allow result
-    properties:
-      matched:
-        items: {}
-        type: array
-      notMatched:
-        items: {}
-        type: array
-      requestLabelSnapshot:
-        additionalProperties:
-          type: string
-        type: object
-    type: object
-  routes.OpenAPIKeyJson:
-    description: Key API response
-    properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      createdAt:
-        type: string
-      id:
-        example: key_test550e8400abcd
-        type: string
-      keyData:
-        type: object
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-      name:
-        example: primary-encryption-key
-        type: string
-      namespace:
-        example: root.acme
-        type: string
-      state:
-        example: active
-        type: string
-      updatedAt:
-        type: string
-    type: object
-  routes.OpenAPIListActorsResponseJson:
-    description: Paginated list of actors
-    properties:
-      cursor:
-        description: Pagination cursor for next page.
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
         type: string
       items:
-        description: List of actors.
         items:
-          $ref: '#/definitions/api.ActorJson'
+          $ref: '#/definitions/api.ConnectionScopeJson'
         type: array
+      kind:
+        type: string
+      metadata:
+        $ref: '#/definitions/v1alpha1.ListMeta'
+    required:
+    - apiVersion
+    - items
+    - kind
+    - metadata
+    type: object
+  routes.OpenAPIConnectionSetupActionJson:
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - ConnectionSetup
+        example: ConnectionSetup
+        type: string
+      metadata:
+        $ref: '#/definitions/openapi.ConnectionActionMetaJson'
+      spec:
+        type: object
+      status:
+        $ref: '#/definitions/openapi.ConnectionSetupActionStatusJson'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
+  routes.OpenAPIConnectionSetupControlActionJson:
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - ConnectionSetupRetry
+        - ConnectionReauthenticate
+        type: string
+      metadata:
+        $ref: '#/definitions/openapi.ConnectionActionMetaJson'
+      spec:
+        $ref: '#/definitions/api.ConnectionSetupControlSpec'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
+  routes.OpenAPIConnectionSetupSubmitActionJson:
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - ConnectionSetupSubmit
+        example: ConnectionSetupSubmit
+        type: string
+      metadata:
+        $ref: '#/definitions/openapi.ConnectionActionMetaJson'
+      spec:
+        $ref: '#/definitions/openapi.ConnectionSetupSubmitSpecJson'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
+  routes.OpenAPIConnectionVersionMigrationActionJson:
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - ConnectionVersionMigration
+        example: ConnectionVersionMigration
+        type: string
+      metadata:
+        $ref: '#/definitions/openapi.ConnectionActionMetaJson'
+      spec:
+        $ref: '#/definitions/openapi.ConnectionVersionMigrationSpecJson'
+      status:
+        $ref: '#/definitions/openapi.ConnectionVersionMigrationStatusJson'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
+  routes.OpenAPIConnectorForceStateActionJson:
+    description: Kubernetes-style connector generation force-state action
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - ConnectorForceState
+        example: ConnectorForceState
+        type: string
+      metadata:
+        $ref: '#/definitions/openapi.ConnectionActionMetaJson'
+      spec:
+        $ref: '#/definitions/api.ConnectorForceStateSpec'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
+  routes.OpenAPIConnectorJson:
+    description: Kubernetes-style Connector resource
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - Connector
+        example: Connector
+        type: string
+      metadata:
+        $ref: '#/definitions/meta.ObjectMeta'
+      spec:
+        $ref: '#/definitions/openapi.ConnectorSpecJson'
+      status:
+        $ref: '#/definitions/connectors.ConnectorStatus'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
+  routes.OpenAPIConnectorLifecycleActionJson:
+    description: Kubernetes-style connector lifecycle action and task result
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - ConnectorDisconnectAll
+        - ConnectorArchive
+        type: string
+      metadata:
+        $ref: '#/definitions/openapi.ConnectionActionMetaJson'
+      spec:
+        $ref: '#/definitions/api.ConnectorLifecycleSpec'
+      status:
+        $ref: '#/definitions/api.ConnectorLifecycleStatus'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
+  routes.OpenAPIConnectorPatchJson:
+    description: Kubernetes-style Connector patch
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - Connector
+        example: Connector
+        type: string
+      metadata:
+        $ref: '#/definitions/meta.ObjectMetaPatch'
+      spec:
+        $ref: '#/definitions/openapi.ConnectorSpecPatchJson'
+      status:
+        $ref: '#/definitions/connectors.ConnectorStatus'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
+  routes.OpenAPIDataSourceOptionListJson:
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/api.DataSourceOptionJson'
+        type: array
+      kind:
+        type: string
+      metadata:
+        $ref: '#/definitions/v1alpha1.ListMeta'
+    required:
+    - apiVersion
+    - items
+    - kind
+    - metadata
+    type: object
+  routes.OpenAPIEmptyConnectionActionJson:
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - ConnectionSetupAbort
+        - ConnectionReconfigure
+        - ConnectionSetupCancel
+        type: string
+      metadata:
+        $ref: '#/definitions/openapi.ConnectionActionMetaJson'
+      spec:
+        type: object
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
     type: object
   routes.OpenAPIListConnectionResponseJson:
     description: Paginated list of connections
     properties:
-      cursor:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
         type: string
       items:
-        items: {}
+        items:
+          $ref: '#/definitions/openapi.ConnectionJson'
         type: array
+      kind:
+        type: string
+      metadata:
+        $ref: '#/definitions/v1alpha1.ListMeta'
+    required:
+    - apiVersion
+    - items
+    - kind
+    - metadata
     type: object
-  routes.OpenAPIListConnectorVersionsResponseJson:
-    description: Paginated list of connector versions
+  routes.OpenAPIListConnectorGenerationsResponseJson:
+    description: Paginated list of connector generations
     properties:
-      cursor:
-        description: Pagination cursor for next page.
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
         type: string
       items:
-        description: List of connector versions.
-        items: {}
+        items:
+          $ref: '#/definitions/openapi.ConnectorJson'
         type: array
+      kind:
+        type: string
+      metadata:
+        $ref: '#/definitions/v1alpha1.ListMeta'
+    required:
+    - apiVersion
+    - items
+    - kind
+    - metadata
     type: object
   routes.OpenAPIListConnectorsResponseJson:
     description: Paginated list of connectors
     properties:
-      cursor:
-        description: Pagination cursor for next page.
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
         type: string
       items:
-        description: List of connectors.
         items:
-          $ref: '#/definitions/api.ConnectorJson'
+          $ref: '#/definitions/openapi.ConnectorJson'
         type: array
-    type: object
-  routes.OpenAPIListKeysResponseJson:
-    description: Paginated list of keys
-    properties:
-      cursor:
+      kind:
         type: string
-      items:
-        items: {}
-        type: array
-    type: object
-  routes.OpenAPIListNamespacesResponseJson:
-    description: Paginated list of namespaces
-    properties:
-      cursor:
-        description: Pagination cursor for next page.
-        type: string
-      items:
-        description: List of namespaces.
-        items:
-          $ref: '#/definitions/api.NamespaceJson'
-        type: array
+      metadata:
+        $ref: '#/definitions/v1alpha1.ListMeta'
+    required:
+    - apiVersion
+    - items
+    - kind
+    - metadata
     type: object
   routes.OpenAPIListNotificationsResponseJson:
     description: Paginated list of actor-visible notifications
     properties:
-      cursor:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
         type: string
       items:
-        items: {}
+        items:
+          $ref: '#/definitions/openapi.NotificationJson'
         type: array
-    type: object
-  routes.OpenAPIListRateLimitsResponseJson:
-    description: Paginated list of rate limits
-    properties:
-      cursor:
+      kind:
         type: string
-      items:
-        items: {}
-        type: array
+      metadata:
+        $ref: '#/definitions/v1alpha1.ListMeta'
+    required:
+    - apiVersion
+    - items
+    - kind
+    - metadata
     type: object
   routes.OpenAPIListRequestEventsResponse:
-    description: Paginated list of request events entries
+    description: Paginated list of immutable request-event projections
     properties:
-      cursor:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
         type: string
       items:
-        items: {}
+        items:
+          $ref: '#/definitions/openapi.RequestEventJson'
         type: array
-      total:
-        type: integer
+      kind:
+        enum:
+        - RequestEventList
+        example: RequestEventList
+        type: string
+      metadata:
+        $ref: '#/definitions/openapi.RequestEventListMetaJson'
+    required:
+    - apiVersion
+    - items
+    - kind
+    - metadata
     type: object
   routes.OpenAPIMetricsSchemaResponse:
     description: Application metrics schema response
@@ -784,30 +2041,53 @@ definitions:
           $ref: '#/definitions/api.MetricsSchemaMetricJson'
         type: array
     type: object
-  routes.OpenAPIMigrateConnectionVersionRequestJson:
-    description: Request body for connection connector-version migration operations
+  routes.OpenAPINotificationBatchViewActionJson:
     properties:
-      targetVersion:
-        example: 3
-        type: integer
-      timeoutSeconds:
-        example: 600
-        type: integer
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - NotificationBatchView
+        example: NotificationBatchView
+        type: string
+      metadata:
+        $ref: '#/definitions/openapi.NotificationBatchViewMetadataJson'
+      spec:
+        $ref: '#/definitions/openapi.NotificationViewSpecJson'
+      status:
+        $ref: '#/definitions/openapi.NotificationBatchViewStatusJson'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
     type: object
-  routes.OpenAPIMigrateConnectionVersionResponseJson:
-    description: Response for connection connector-version migration operation
+  routes.OpenAPINotificationViewActionJson:
     properties:
-      connectionId:
-        example: cxn_test550e8400abcde
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
         type: string
-      sourceVersion:
-        example: 1
-        type: integer
-      targetVersion:
-        example: 3
-        type: integer
-      taskId:
+      kind:
+        enum:
+        - NotificationView
+        example: NotificationView
         type: string
+      metadata:
+        $ref: '#/definitions/v1alpha1.ActionMeta'
+      spec:
+        $ref: '#/definitions/openapi.NotificationViewSpecJson'
+      status:
+        $ref: '#/definitions/openapi.NotificationViewStatusJson'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
     type: object
   routes.OpenAPIProxyResponseJson:
     description: Response from a proxied HTTP request
@@ -825,103 +2105,37 @@ definitions:
         example: 200
         type: integer
     type: object
-  routes.OpenAPIRateLimitJson:
-    description: Rate-limit API response
-    properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      createdAt:
-        type: string
-      definition:
-        additionalProperties: {}
-        type: object
-      id:
-        example: rl_test550e8400abcde
-        type: string
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-      name:
-        example: public-api
-        type: string
-      namespace:
-        example: root.acme
-        type: string
-      updatedAt:
-        type: string
-    type: object
   routes.OpenAPIRequestEventsEntry:
-    description: HTTP request events entry
+    description: Immutable, resource-shaped HTTP request event projection
     properties:
-      connectionId:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
         type: string
-      connectorId:
+      kind:
+        enum:
+        - RequestEvent
+        example: RequestEvent
         type: string
-      connectorVersion:
-        type: integer
-      correlationId:
-        type: string
-      duration:
-        example: 150
-        type: integer
-      host:
-        example: api.example.com
-        type: string
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-      method:
-        example: GET
-        type: string
-      namespace:
-        example: root.acme
-        type: string
-      path:
-        example: /v1/users
-        type: string
-      rateLimitBucket:
-        additionalProperties:
-          type: string
-        type: object
-      rateLimitId:
-        type: string
-      rateLimitMatched:
-        items: {}
-        type: array
-      rateLimitMode:
-        type: string
-      requestId:
-        example: req_test550e8400abcde
-        type: string
-      responseSource:
-        example: upstream
-        type: string
-      responseStatusCode:
-        example: 200
-        type: integer
-      scheme:
-        example: https
-        type: string
-      timestamp:
-        type: string
-      type:
-        example: proxy
-        type: string
+      metadata:
+        $ref: '#/definitions/meta.ObjectMeta'
+      spec:
+        $ref: '#/definitions/openapi.RequestEventSpecJson'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
     type: object
   routes.OpenAPISearchResourcesResponseJson:
     properties:
-      incompleteTypes:
-        items:
-          type: string
-        type: array
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
       items:
-        description: |-
-          This anonymous shape mirrors schemaapi.SearchResourceSummaryJson while
-          avoiding swaggo's inability to resolve same-package nested named types.
         items:
           properties:
             labels:
@@ -932,114 +2146,33 @@ definitions:
               items:
                 properties:
                   key:
-                    example: name
+                    example: team
                     type: string
                   value:
-                    example: payments-production
+                    example: payments
                     type: string
                 type: object
               type: array
-            name:
-              example: production-crm
-              type: string
-            namespace:
-              example: root.acme
-              type: string
-            resourceId:
-              example: cxn_test550e8400abcde
-              type: string
-            resourceType:
-              example: connection
-              type: string
+            resourceRef:
+              $ref: '#/definitions/meta.ObjectReference'
             updatedAt:
               type: string
+          required:
+          - resourceRef
           type: object
         type: array
-      truncatedTypes:
-        items:
-          type: string
-        type: array
-    type: object
-  routes.OpenAPITaskInfoJson:
-    description: Background task status
-    properties:
-      id:
+      kind:
+        enum:
+        - SearchResultList
+        example: SearchResultList
         type: string
-      state:
-        example: completed
-        type: string
-      type:
-        type: string
-      updatedAt:
-        type: string
-    type: object
-  routes.OpenAPIUpdateConnectorRequestJson:
-    description: Request to update a logical connector
-    properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      definition: {}
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-      name:
-        example: salesforce
-        type: string
-    type: object
-  routes.OpenAPIUpdateConnectorVersionRequestJson:
-    description: Request to update a connector definition version
-    properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      definition: {}
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-    type: object
-  routes.OpenAPIUpdateKeyRequestJson:
-    description: Request to update a key
-    properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      keyData:
-        additionalProperties: true
-        type: object
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-      name:
-        example: primary-encryption-key
-        type: string
-      state:
-        example: disabled
-        type: string
-    type: object
-  routes.OpenAPIUpdateRateLimitRequestJson:
-    description: Request to update a rate limit
-    properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      definition:
-        additionalProperties: {}
-        type: object
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-      name:
-        example: public-api
-        type: string
+      metadata:
+        $ref: '#/definitions/openapi.SearchResultListMetaJson'
+    required:
+    - apiVersion
+    - items
+    - kind
+    - metadata
     type: object
   routes.ProxyRequest:
     description: Request to proxy or simulate an HTTP request
@@ -1062,22 +2195,6 @@ definitions:
         example: https://api.example.com/v1/users
         type: string
     type: object
-  routes.PutKeyValueRequestJson:
-    properties:
-      value:
-        example: production
-        type: string
-    type: object
-  routes.ReauthConnectionRequest:
-    properties:
-      returnToUrl:
-        type: string
-    type: object
-  routes.RetryConnectionRequest:
-    properties:
-      returnToUrl:
-        type: string
-    type: object
   routes.SessionInitiateFailureResponse:
     properties:
       redirectUrl:
@@ -1096,69 +2213,19 @@ definitions:
         example: act_test550e8400abcde
         type: string
     type: object
-  routes.SubmitConnectionRequest:
-    description: Form submission data
+  v1alpha1.ActionMeta:
     properties:
-      data:
-        description: Data is the form data submitted by the user for the current step.
-        type: object
-      returnToUrl:
-        description: |-
-          ReturnToUrl is required when the next step after form submission is an auth redirect.
-          The client should provide this so the OAuth callback knows where to return.
-        example: https://example.com/callback
-        type: string
-      stepId:
-        description: StepId is the id of the step being submitted. Must match the
-          current setup step's id.
-        example: preconnect:0
-        type: string
+      target:
+        $ref: '#/definitions/meta.ObjectReference'
     type: object
-  routes.UpdateActorRequestJson:
-    description: Actor update request
+  v1alpha1.ListMeta:
     properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-      name:
-        example: billing-service
+      continue:
         type: string
-      permissions:
-        items:
-          $ref: '#/definitions/auth.Permission'
-        type: array
-    type: object
-  routes.UpdateConnectionRequestJson:
-    description: Request to update a connection's labels and annotations
-    properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-      name:
-        example: production-crm
+      remainingItemCount:
+        type: integer
+      resourceVersion:
         type: string
-    type: object
-  routes.UpdateNamespaceRequestJson:
-    description: Namespace update request
-    properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      labels:
-        additionalProperties:
-          type: string
-        type: object
     type: object
 host: localhost:8082
 info:
@@ -1209,7 +2276,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIListActorsResponseJson'
+            $ref: '#/definitions/openapi.ListActorsResponseJson'
         "400":
           description: Bad Request
           schema:
@@ -1237,14 +2304,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.CreateActorRequestJson'
+          $ref: '#/definitions/openapi.ActorJson'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/routes.ActorJson'
+            $ref: '#/definitions/openapi.ActorJson'
         "400":
           description: Bad Request
           schema:
@@ -1323,7 +2390,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.ActorJson'
+            $ref: '#/definitions/openapi.ActorJson'
         "400":
           description: Bad Request
           schema:
@@ -1360,14 +2427,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.UpdateActorRequestJson'
+          $ref: '#/definitions/openapi.ActorPatchJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.ActorJson'
+            $ref: '#/definitions/openapi.ActorJson'
         "400":
           description: Bad Request
           schema:
@@ -1395,348 +2462,6 @@ paths:
       security:
       - BearerAuth: []
       summary: Update actor by UUID
-      tags:
-      - actors
-  /actors/{id}/annotations:
-    get:
-      description: Get all annotations for an actor by ID
-      parameters:
-      - description: Actor UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get all annotations for an actor
-      tags:
-      - actors
-  /actors/{id}/annotations/{annotation}:
-    delete:
-      description: Delete a specific annotation by key from an actor
-      parameters:
-      - description: Actor UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Delete an annotation from an actor
-      tags:
-      - actors
-    get:
-      description: Get a specific annotation value by key for an actor
-      parameters:
-      - description: Actor UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get a specific annotation for an actor
-      tags:
-      - actors
-    put:
-      consumes:
-      - application/json
-      description: Set or update a specific annotation value by key for an actor
-      parameters:
-      - description: Actor UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      - description: Annotation value
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/routes.PutKeyValueRequestJson'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Set an annotation for an actor
-      tags:
-      - actors
-  /actors/{id}/labels:
-    get:
-      description: Get all labels associated with a specific actor
-      parameters:
-      - description: Actor UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get all labels for an actor
-      tags:
-      - actors
-  /actors/{id}/labels/{label}:
-    delete:
-      description: Delete a specific label by key from an actor
-      parameters:
-      - description: Actor UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Delete a label from an actor
-      tags:
-      - actors
-    get:
-      description: Get a specific label value by key for an actor
-      parameters:
-      - description: Actor UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get a specific label for an actor
-      tags:
-      - actors
-    put:
-      consumes:
-      - application/json
-      description: Set or update a specific label value by key for an actor
-      parameters:
-      - description: Actor UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      - description: Label value
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/routes.PutKeyValueRequestJson'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Set a label for an actor
       tags:
       - actors
   /actors/external-id/{externalId}:
@@ -1800,7 +2525,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.ActorJson'
+            $ref: '#/definitions/openapi.ActorJson'
         "400":
           description: Bad Request
           schema:
@@ -1841,14 +2566,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.UpdateActorRequestJson'
+          $ref: '#/definitions/openapi.ActorPatchJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.ActorJson'
+            $ref: '#/definitions/openapi.ActorJson'
         "400":
           description: Bad Request
           schema:
@@ -1942,19 +2667,19 @@ paths:
       - application/json
       description: Initiate a new connection to an external service through a connector
       parameters:
-      - description: Connection initiation request
+      - description: Connection initiation action
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.InitiateConnectionRequest'
+          $ref: '#/definitions/routes.OpenAPIConnectionInitiateActionJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.ConnectionSetupRedirect'
+            $ref: '#/definitions/routes.OpenAPIConnectionSetupActionJson'
         "400":
           description: Bad Request
           schema:
@@ -2030,7 +2755,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.UpdateConnectionRequestJson'
+          $ref: '#/definitions/routes.OpenAPIConnectionPatchJson'
       produces:
       - application/json
       responses:
@@ -2069,6 +2794,8 @@ paths:
       - connections
   /connections/{id}/_abort:
     post:
+      consumes:
+      - application/json
       description: Abort an in-progress connection setup, cleaning up credentials
         and deleting the connection
       parameters:
@@ -2077,6 +2804,12 @@ paths:
         name: id
         required: true
         type: string
+      - description: Abort action
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.OpenAPIEmptyConnectionActionJson'
       produces:
       - application/json
       responses:
@@ -2101,6 +2834,8 @@ paths:
       - connections
   /connections/{id}/_cancelSetup:
     post:
+      consumes:
+      - application/json
       description: Abandon a reconfigure attempt on a ready connection by clearing
         setup_step and setup_error. The connection remains ready and its previously
         stored configuration continues to apply.
@@ -2110,6 +2845,12 @@ paths:
         name: id
         required: true
         type: string
+      - description: Cancel setup action
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.OpenAPIEmptyConnectionActionJson'
       produces:
       - application/json
       responses:
@@ -2153,9 +2894,7 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/routes.DataSourceOptionJson'
-            type: array
+            $ref: '#/definitions/routes.OpenAPIDataSourceOptionListJson'
         "400":
           description: Bad Request
           schema:
@@ -2184,18 +2923,19 @@ paths:
         name: id
         required: true
         type: string
-      - description: Disconnect options
+      - description: Disconnect action
         in: body
         name: request
+        required: true
         schema:
-          $ref: '#/definitions/routes.OpenAPIDisconnectConnectionRequestJson'
+          $ref: '#/definitions/routes.OpenAPIConnectionDisconnectActionJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIDisconnectResponseJson'
+            $ref: '#/definitions/routes.OpenAPIConnectionDisconnectActionJson'
         "400":
           description: Bad Request
           schema:
@@ -2228,19 +2968,19 @@ paths:
         name: id
         required: true
         type: string
-      - description: New state
+      - description: Force-state action
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.ForceStateRequestJson'
+          $ref: '#/definitions/routes.OpenAPIConnectionForceStateActionJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIConnectionJson'
+            $ref: '#/definitions/routes.OpenAPIConnectionForceStateActionJson'
         "400":
           description: Bad Request
           schema:
@@ -2278,19 +3018,19 @@ paths:
         name: id
         required: true
         type: string
-      - description: Migration options
+      - description: Migration action
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.OpenAPIMigrateConnectionVersionRequestJson'
+          $ref: '#/definitions/routes.OpenAPIConnectionVersionMigrationActionJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIMigrateConnectionVersionResponseJson'
+            $ref: '#/definitions/routes.OpenAPIConnectionVersionMigrationActionJson'
         "400":
           description: Bad Request
           schema:
@@ -2383,19 +3123,19 @@ paths:
         name: id
         required: true
         type: string
-      - description: Reauth request
+      - description: Reauthentication action
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.ReauthConnectionRequest'
+          $ref: '#/definitions/routes.OpenAPIConnectionSetupControlActionJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.ConnectionSetupForm'
+            $ref: '#/definitions/routes.OpenAPIConnectionSetupActionJson'
         "400":
           description: Bad Request
           schema:
@@ -2415,6 +3155,8 @@ paths:
       - connections
   /connections/{id}/_reconfigure:
     post:
+      consumes:
+      - application/json
       description: Restart the configure phase for a completed connection, allowing
         re-entry of post-auth settings
       parameters:
@@ -2423,13 +3165,19 @@ paths:
         name: id
         required: true
         type: string
+      - description: Reconfigure action
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.OpenAPIEmptyConnectionActionJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.ConnectionSetupForm'
+            $ref: '#/definitions/routes.OpenAPIConnectionSetupActionJson'
         "400":
           description: Bad Request
           schema:
@@ -2463,19 +3211,19 @@ paths:
         name: id
         required: true
         type: string
-      - description: Retry request
+      - description: Retry action
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.RetryConnectionRequest'
+          $ref: '#/definitions/routes.OpenAPIConnectionSetupControlActionJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.ConnectionSetupForm'
+            $ref: '#/definitions/routes.OpenAPIConnectionSetupActionJson'
         "400":
           description: Bad Request
           schema:
@@ -2513,7 +3261,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.ConnectionSetupComplete'
+            $ref: '#/definitions/routes.OpenAPIConnectionSetupActionJson'
         "400":
           description: Bad Request
           schema:
@@ -2542,19 +3290,19 @@ paths:
         name: id
         required: true
         type: string
-      - description: Form submission data
+      - description: Form submission action
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.SubmitConnectionRequest'
+          $ref: '#/definitions/routes.OpenAPIConnectionSetupSubmitActionJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.ConnectionSetupComplete'
+            $ref: '#/definitions/routes.OpenAPIConnectionSetupActionJson'
         "400":
           description: Bad Request
           schema:
@@ -2570,348 +3318,6 @@ paths:
       security:
       - BearerAuth: []
       summary: Submit connection form
-      tags:
-      - connections
-  /connections/{id}/annotations:
-    get:
-      description: Get all annotations associated with a specific connection
-      parameters:
-      - description: Connection UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get all annotations for a connection
-      tags:
-      - connections
-  /connections/{id}/annotations/{annotation}:
-    delete:
-      description: Delete a specific annotation by key from a connection
-      parameters:
-      - description: Connection UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Delete an annotation from a connection
-      tags:
-      - connections
-    get:
-      description: Get a specific annotation value by key for a connection
-      parameters:
-      - description: Connection UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get a specific annotation for a connection
-      tags:
-      - connections
-    put:
-      consumes:
-      - application/json
-      description: Set or update a specific annotation value by key for a connection
-      parameters:
-      - description: Connection UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      - description: Annotation value
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/routes.PutKeyValueRequestJson'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Set an annotation for a connection
-      tags:
-      - connections
-  /connections/{id}/labels:
-    get:
-      description: Get all labels associated with a specific connection
-      parameters:
-      - description: Connection UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get all labels for a connection
-      tags:
-      - connections
-  /connections/{id}/labels/{label}:
-    delete:
-      description: Delete a specific label by key from a connection
-      parameters:
-      - description: Connection UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Delete a label from a connection
-      tags:
-      - connections
-    get:
-      description: Get a specific label value by key for a connection
-      parameters:
-      - description: Connection UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get a specific label for a connection
-      tags:
-      - connections
-    put:
-      consumes:
-      - application/json
-      description: Set or update a specific label value by key for a connection
-      parameters:
-      - description: Connection UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      - description: Label value
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/routes.PutKeyValueRequestJson'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Set a label for a connection
       tags:
       - connections
   /connections/{id}/scopes:
@@ -2930,7 +3336,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.ConnectionScopesJson'
+            $ref: '#/definitions/routes.OpenAPIConnectionScopeListJson'
         "400":
           description: Bad Request
           schema:
@@ -3017,21 +3423,21 @@ paths:
     post:
       consumes:
       - application/json
-      description: Create a new connector with version 1 in draft state
+      description: Create a new connector with generation 1 in draft state
       parameters:
       - description: Connector creation request
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.OpenAPICreateConnectorRequestJson'
+          $ref: '#/definitions/routes.OpenAPIConnectorJson'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/routes.OpenAPIConnectorVersionJson'
+            $ref: '#/definitions/routes.OpenAPIConnectorJson'
         "400":
           description: Bad Request
           schema:
@@ -3074,7 +3480,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.ConnectorJson'
+            $ref: '#/definitions/routes.OpenAPIConnectorJson'
         "400":
           description: Bad Request
           schema:
@@ -3111,14 +3517,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.OpenAPIUpdateConnectorRequestJson'
+          $ref: '#/definitions/routes.OpenAPIConnectorPatchJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIConnectorVersionJson'
+            $ref: '#/definitions/routes.OpenAPIConnectorJson'
         "400":
           description: Bad Request
           schema:
@@ -3160,18 +3566,19 @@ paths:
         name: id
         required: true
         type: string
-      - description: Lifecycle operation options
+      - description: Archive action
         in: body
         name: request
+        required: true
         schema:
-          $ref: '#/definitions/routes.OpenAPIConnectorLifecycleRequestJson'
+          $ref: '#/definitions/routes.OpenAPIConnectorLifecycleActionJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIConnectorLifecycleResponseJson'
+            $ref: '#/definitions/routes.OpenAPIConnectorLifecycleActionJson'
         "400":
           description: Bad Request
           schema:
@@ -3212,18 +3619,19 @@ paths:
         name: id
         required: true
         type: string
-      - description: Lifecycle operation options
+      - description: Disconnect-all action
         in: body
         name: request
+        required: true
         schema:
-          $ref: '#/definitions/routes.OpenAPIConnectorLifecycleRequestJson'
+          $ref: '#/definitions/routes.OpenAPIConnectorLifecycleActionJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIConnectorLifecycleResponseJson'
+            $ref: '#/definitions/routes.OpenAPIConnectorLifecycleActionJson'
         "400":
           description: Bad Request
           schema:
@@ -3253,374 +3661,11 @@ paths:
       summary: Disconnect all connector connections
       tags:
       - connectors
-  /connectors/{id}/annotations:
+  /connectors/{id}/generations:
     get:
       consumes:
       - application/json
-      description: Get all annotations associated with a connector's latest version
-      parameters:
-      - description: Connector UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get all annotations for a connector
-      tags:
-      - connectors
-  /connectors/{id}/annotations/{annotation}:
-    delete:
-      consumes:
-      - application/json
-      description: Delete a specific annotation from a connector's draft version,
-        creating one if needed
-      parameters:
-      - description: Connector UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Delete an annotation from a connector
-      tags:
-      - connectors
-    get:
-      consumes:
-      - application/json
-      description: Get a specific annotation value by key for a connector
-      parameters:
-      - description: Connector UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get a specific annotation for a connector
-      tags:
-      - connectors
-    put:
-      consumes:
-      - application/json
-      description: Set or update a specific annotation value by key for a connector's
-        draft version, creating one if needed
-      parameters:
-      - description: Connector UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      - description: Annotation value
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/routes.PutKeyValueRequestJson'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Set an annotation for a connector
-      tags:
-      - connectors
-  /connectors/{id}/labels:
-    get:
-      consumes:
-      - application/json
-      description: Get all labels associated with the primary version of a connector
-      parameters:
-      - description: Connector UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get all labels for a connector
-      tags:
-      - connectors
-  /connectors/{id}/labels/{label}:
-    delete:
-      consumes:
-      - application/json
-      description: Delete a specific label from a connector's draft version, creating
-        one if needed
-      parameters:
-      - description: Connector UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Delete a label from a connector
-      tags:
-      - connectors
-    get:
-      consumes:
-      - application/json
-      description: Get a specific label value by key for the primary version of a
-        connector
-      parameters:
-      - description: Connector UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get a specific label for a connector
-      tags:
-      - connectors
-    put:
-      consumes:
-      - application/json
-      description: Set or update a specific label on a connector's draft version,
-        creating one if needed
-      parameters:
-      - description: Connector UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      - description: Label value
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/routes.PutKeyValueRequestJson'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Set a label for a connector
-      tags:
-      - connectors
-  /connectors/{id}/versions:
-    get:
-      consumes:
-      - application/json
-      description: List all versions of a specific connector
+      description: List all generations of a specific connector
       parameters:
       - description: Connector UUID
         in: path
@@ -3635,7 +3680,7 @@ paths:
         in: query
         name: limit
         type: integer
-      - description: Filter by version state
+      - description: Filter by generation state
         in: query
         name: state
         type: string
@@ -3661,7 +3706,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIListConnectorVersionsResponseJson'
+            $ref: '#/definitions/routes.OpenAPIListConnectorGenerationsResponseJson'
         "400":
           description: Bad Request
           schema:
@@ -3676,31 +3721,32 @@ paths:
             $ref: '#/definitions/routes.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: List connector versions
+      summary: List connector generations
       tags:
       - connectors
     post:
       consumes:
       - application/json
-      description: Create a new draft version for an existing connector
+      description: Create a new draft generation for an existing connector
       parameters:
       - description: Connector UUID
         in: path
         name: id
         required: true
         type: string
-      - description: Version creation request
+      - description: Generation creation request; an empty body clones the newest
+          generation as a draft
         in: body
         name: request
         schema:
-          $ref: '#/definitions/routes.OpenAPICreateConnectorVersionRequestJson'
+          $ref: '#/definitions/routes.OpenAPIConnectorJson'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/routes.OpenAPIConnectorVersionJson'
+            $ref: '#/definitions/routes.OpenAPIConnectorJson'
         "400":
           description: Bad Request
           schema:
@@ -3727,23 +3773,23 @@ paths:
             $ref: '#/definitions/routes.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Create connector version
+      summary: Create connector generation
       tags:
       - connectors
-  /connectors/{id}/versions/{version}:
+  /connectors/{id}/generations/{generation}:
     get:
       consumes:
       - application/json
-      description: Get a specific version of a connector
+      description: Get a specific generation of a connector
       parameters:
       - description: Connector UUID
         in: path
         name: id
         required: true
         type: string
-      - description: Version number
+      - description: Generation number
         in: path
-        name: version
+        name: generation
         required: true
         type: integer
       produces:
@@ -3752,7 +3798,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIConnectorVersionJson'
+            $ref: '#/definitions/routes.OpenAPIConnectorJson'
         "400":
           description: Bad Request
           schema:
@@ -3771,37 +3817,37 @@ paths:
             $ref: '#/definitions/routes.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Get connector version
+      summary: Get connector generation
       tags:
       - connectors
     patch:
       consumes:
       - application/json
-      description: Update a specific draft version of a connector
+      description: Update a specific draft generation of a connector
       parameters:
       - description: Connector UUID
         in: path
         name: id
         required: true
         type: string
-      - description: Version number
+      - description: Generation number
         in: path
-        name: version
+        name: generation
         required: true
         type: integer
-      - description: Version update request
+      - description: Generation update request
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.OpenAPIUpdateConnectorVersionRequestJson'
+          $ref: '#/definitions/routes.OpenAPIConnectorPatchJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIConnectorVersionJson'
+            $ref: '#/definitions/routes.OpenAPIConnectorJson'
         "400":
           description: Bad Request
           schema:
@@ -3828,38 +3874,38 @@ paths:
             $ref: '#/definitions/routes.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Update connector version
+      summary: Update connector generation
       tags:
       - connectors
-  /connectors/{id}/versions/{version}/_forceState:
+  /connectors/{id}/generations/{generation}/_forceState:
     put:
       consumes:
       - application/json
-      description: Force a connector version to a specific state (admin operation)
+      description: Force a connector generation to a specific state (admin operation)
       parameters:
       - description: Connector UUID
         in: path
         name: id
         required: true
         type: string
-      - description: Version number
+      - description: Generation number
         in: path
-        name: version
+        name: generation
         required: true
         type: integer
-      - description: New state
+      - description: Force-state action
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.ForceConnectorVersionStateRequestJson'
+          $ref: '#/definitions/routes.OpenAPIConnectorForceStateActionJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIConnectorVersionJson'
+            $ref: '#/definitions/routes.OpenAPIConnectorJson'
         "400":
           description: Bad Request
           schema:
@@ -3882,425 +3928,7 @@ paths:
             $ref: '#/definitions/routes.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Force connector version state
-      tags:
-      - connectors
-  /connectors/{id}/versions/{version}/annotations:
-    get:
-      consumes:
-      - application/json
-      description: Get all annotations associated with a specific version of a connector
-      parameters:
-      - description: Connector UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Version number
-        in: path
-        name: version
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get all annotations for a connector version
-      tags:
-      - connectors
-  /connectors/{id}/versions/{version}/annotations/{annotation}:
-    delete:
-      consumes:
-      - application/json
-      description: Delete a specific annotation from a specific draft version of a
-        connector
-      parameters:
-      - description: Connector UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Version number
-        in: path
-        name: version
-        required: true
-        type: integer
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "409":
-          description: Conflict
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Delete an annotation from a connector version
-      tags:
-      - connectors
-    get:
-      consumes:
-      - application/json
-      description: Get a specific annotation value by key for a specific version of
-        a connector
-      parameters:
-      - description: Connector UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Version number
-        in: path
-        name: version
-        required: true
-        type: integer
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get a specific annotation for a connector version
-      tags:
-      - connectors
-    put:
-      consumes:
-      - application/json
-      description: Set or update a specific annotation value by key for a specific
-        draft version of a connector
-      parameters:
-      - description: Connector UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Version number
-        in: path
-        name: version
-        required: true
-        type: integer
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      - description: Annotation value
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/routes.PutKeyValueRequestJson'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "409":
-          description: Conflict
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Set an annotation for a connector version
-      tags:
-      - connectors
-  /connectors/{id}/versions/{version}/labels:
-    get:
-      consumes:
-      - application/json
-      description: Get all labels associated with a specific version of a connector
-      parameters:
-      - description: Connector UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Version number
-        in: path
-        name: version
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get all labels for a connector version
-      tags:
-      - connectors
-  /connectors/{id}/versions/{version}/labels/{label}:
-    delete:
-      consumes:
-      - application/json
-      description: Delete a specific label from a specific draft version of a connector
-      parameters:
-      - description: Connector UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Version number
-        in: path
-        name: version
-        required: true
-        type: integer
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "409":
-          description: Conflict
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Delete a label from a connector version
-      tags:
-      - connectors
-    get:
-      consumes:
-      - application/json
-      description: Get a specific label value by key for a specific version of a connector
-      parameters:
-      - description: Connector UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Version number
-        in: path
-        name: version
-        required: true
-        type: integer
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get a specific label for a connector version
-      tags:
-      - connectors
-    put:
-      consumes:
-      - application/json
-      description: Set or update a specific label on a specific draft version of a
-        connector
-      parameters:
-      - description: Connector UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Version number
-        in: path
-        name: version
-        required: true
-        type: integer
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      - description: Label value
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/routes.PutKeyValueRequestJson'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "409":
-          description: Conflict
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Set a label for a connector version
+      summary: Force connector generation state
       tags:
       - connectors
   /keys:
@@ -4343,7 +3971,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIListKeysResponseJson'
+            $ref: '#/definitions/openapi.ListKeysResponseJson'
         "400":
           description: Bad Request
           schema:
@@ -4371,14 +3999,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.OpenAPICreateKeyRequestJson'
+          $ref: '#/definitions/openapi.KeyJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIKeyJson'
+            $ref: '#/definitions/openapi.KeyJson'
         "400":
           description: Bad Request
           schema:
@@ -4449,7 +4077,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIKeyJson'
+            $ref: '#/definitions/openapi.KeyJson'
         "400":
           description: Bad Request
           schema:
@@ -4474,7 +4102,8 @@ paths:
     patch:
       consumes:
       - application/json
-      description: Update a key's properties
+      description: Update a key's desired state, provider configuration, name, labels,
+        or annotations
       parameters:
       - description: Key ID
         in: path
@@ -4486,14 +4115,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.OpenAPIUpdateKeyRequestJson'
+          $ref: '#/definitions/openapi.KeyPatchJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIKeyJson'
+            $ref: '#/definitions/openapi.KeyJson'
         "400":
           description: Bad Request
           schema:
@@ -4517,348 +4146,6 @@ paths:
       security:
       - BearerAuth: []
       summary: Update key
-      tags:
-      - keys
-  /keys/{id}/annotations:
-    get:
-      description: Get all annotations associated with a specific key
-      parameters:
-      - description: Key ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get all annotations for a key
-      tags:
-      - keys
-  /keys/{id}/annotations/{annotation}:
-    delete:
-      description: Delete a specific annotation by key from a key
-      parameters:
-      - description: Key ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Delete an annotation from a key
-      tags:
-      - keys
-    get:
-      description: Get a specific annotation value by key for a key
-      parameters:
-      - description: Key ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get a specific annotation for a key
-      tags:
-      - keys
-    put:
-      consumes:
-      - application/json
-      description: Set or update a specific annotation value by key for a key
-      parameters:
-      - description: Key ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      - description: Annotation value
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/routes.PutKeyValueRequestJson'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Set an annotation for a key
-      tags:
-      - keys
-  /keys/{id}/labels:
-    get:
-      description: Get all labels associated with a specific key
-      parameters:
-      - description: Key ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get all labels for a key
-      tags:
-      - keys
-  /keys/{id}/labels/{label}:
-    delete:
-      description: Delete a specific label by key from a key
-      parameters:
-      - description: Key ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Delete a label from a key
-      tags:
-      - keys
-    get:
-      description: Get a specific label value by key for a key
-      parameters:
-      - description: Key ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get a specific label for a key
-      tags:
-      - keys
-    put:
-      consumes:
-      - application/json
-      description: Set or update a specific label value by key for a key
-      parameters:
-      - description: Key ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      - description: Label value
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/routes.PutKeyValueRequestJson'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Set a label for a key
       tags:
       - keys
   /metrics/query:
@@ -4905,7 +4192,8 @@ paths:
     get:
       consumes:
       - application/json
-      description: List request events entries with optional filtering and pagination
+      description: List immutable request-event projections with optional filtering
+        and pagination
       parameters:
       - description: Pagination cursor
         in: query
@@ -5003,7 +4291,7 @@ paths:
     get:
       consumes:
       - application/json
-      description: Get a specific request events entry by its UUID
+      description: Get a specific immutable request event by its ID
       parameters:
       - description: Request events entry UUID
         in: path
@@ -5106,7 +4394,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIListNamespacesResponseJson'
+            $ref: '#/definitions/openapi.ListNamespacesResponseJson'
         "400":
           description: Bad Request
           schema:
@@ -5134,14 +4422,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.CreateNamespaceRequestJson'
+          $ref: '#/definitions/namespace.Namespace'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.NamespaceJson'
+            $ref: '#/definitions/namespace.Namespace'
         "400":
           description: Bad Request
           schema:
@@ -5180,7 +4468,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.NamespaceJson'
+            $ref: '#/definitions/namespace.Namespace'
         "400":
           description: Bad Request
           schema:
@@ -5205,8 +4493,9 @@ paths:
     patch:
       consumes:
       - application/json
-      description: Update a namespace's labels and annotations. Its path and derived
-        name cannot be changed.
+      description: Update a namespace's desired encryption key, labels, and annotations.
+        Set spec.encryptionKeyRef to null to clear it. Namespace identity cannot be
+        changed.
       parameters:
       - description: Namespace path
         in: path
@@ -5218,14 +4507,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.UpdateNamespaceRequestJson'
+          $ref: '#/definitions/namespace.NamespacePatch'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.NamespaceJson'
+            $ref: '#/definitions/namespace.Namespace'
         "400":
           description: Bad Request
           schema:
@@ -5245,348 +4534,6 @@ paths:
       security:
       - BearerAuth: []
       summary: Update namespace
-      tags:
-      - namespaces
-  /namespaces/{path}/annotations:
-    get:
-      description: Get all annotations associated with a specific namespace
-      parameters:
-      - description: Namespace path
-        in: path
-        name: path
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get all annotations for a namespace
-      tags:
-      - namespaces
-  /namespaces/{path}/annotations/{annotation}:
-    delete:
-      description: Delete a specific annotation by key from a namespace
-      parameters:
-      - description: Namespace path
-        in: path
-        name: path
-        required: true
-        type: string
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Delete an annotation from a namespace
-      tags:
-      - namespaces
-    get:
-      description: Get a specific annotation value by key for a namespace
-      parameters:
-      - description: Namespace path
-        in: path
-        name: path
-        required: true
-        type: string
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get a specific annotation for a namespace
-      tags:
-      - namespaces
-    put:
-      consumes:
-      - application/json
-      description: Set or update a specific annotation value by key for a namespace
-      parameters:
-      - description: Namespace path
-        in: path
-        name: path
-        required: true
-        type: string
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      - description: Annotation value
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/routes.PutKeyValueRequestJson'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Set an annotation for a namespace
-      tags:
-      - namespaces
-  /namespaces/{path}/labels:
-    get:
-      description: Get all labels associated with a specific namespace
-      parameters:
-      - description: Namespace path
-        in: path
-        name: path
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get all labels for a namespace
-      tags:
-      - namespaces
-  /namespaces/{path}/labels/{label}:
-    delete:
-      description: Delete a specific label by key from a namespace
-      parameters:
-      - description: Namespace path
-        in: path
-        name: path
-        required: true
-        type: string
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Delete a label from a namespace
-      tags:
-      - namespaces
-    get:
-      description: Get a specific label value by key for a namespace
-      parameters:
-      - description: Namespace path
-        in: path
-        name: path
-        required: true
-        type: string
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get a specific label for a namespace
-      tags:
-      - namespaces
-    put:
-      consumes:
-      - application/json
-      description: Set or update a specific label value by key for a namespace
-      parameters:
-      - description: Namespace path
-        in: path
-        name: path
-        required: true
-        type: string
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      - description: Label value
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/routes.PutKeyValueRequestJson'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Set a label for a namespace
       tags:
       - namespaces
   /notifications:
@@ -5643,17 +4590,19 @@ paths:
       - application/json
       description: Mark multiple notifications viewed for the authenticated actor
       parameters:
-      - description: Notification IDs
+      - description: Notification batch view action
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.MarkNotificationsViewedRequestJson'
+          $ref: '#/definitions/routes.OpenAPINotificationBatchViewActionJson'
       produces:
       - application/json
       responses:
-        "204":
-          description: No Content
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.OpenAPINotificationBatchViewActionJson'
         "400":
           description: Bad Request
           schema:
@@ -5681,6 +4630,8 @@ paths:
       - notifications
   /notifications/{id}/_viewed:
     post:
+      consumes:
+      - application/json
       description: Mark a notification viewed for the authenticated actor
       parameters:
       - description: Notification ID
@@ -5688,11 +4639,19 @@ paths:
         name: id
         required: true
         type: string
+      - description: Notification view action
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.OpenAPINotificationViewActionJson'
       produces:
       - application/json
       responses:
-        "204":
-          description: No Content
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.OpenAPINotificationViewActionJson'
         "400":
           description: Bad Request
           schema:
@@ -5754,7 +4713,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIListRateLimitsResponseJson'
+            $ref: '#/definitions/openapi.ListRateLimitsResponseJson'
         "400":
           description: Bad Request
           schema:
@@ -5782,14 +4741,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.OpenAPICreateRateLimitRequestJson'
+          $ref: '#/definitions/openapi.RateLimitJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIRateLimitJson'
+            $ref: '#/definitions/openapi.RateLimitJson'
         "400":
           description: Bad Request
           schema:
@@ -5820,19 +4779,19 @@ paths:
         uses Limiter.Peek to inspect counter state without writing. Useful for validating
         selectors / buckets / algorithms without sending real traffic.
       parameters:
-      - description: Dry-run input
+      - description: Dry-run action
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.OpenAPIDryRunRequestJson'
+          $ref: '#/definitions/openapi.RateLimitDryRunActionJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIDryRunResponseJson'
+            $ref: '#/definitions/openapi.RateLimitDryRunActionJson'
         "400":
           description: Bad Request
           schema:
@@ -5907,7 +4866,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIRateLimitJson'
+            $ref: '#/definitions/openapi.RateLimitJson'
         "400":
           description: Bad Request
           schema:
@@ -5932,7 +4891,7 @@ paths:
     patch:
       consumes:
       - application/json
-      description: Update a rate limit's name, definition, labels, or annotations
+      description: Update a rate limit's name, spec, labels, or annotations
       parameters:
       - description: Rate limit ID
         in: path
@@ -5944,14 +4903,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.OpenAPIUpdateRateLimitRequestJson'
+          $ref: '#/definitions/openapi.RateLimitPatchJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIRateLimitJson'
+            $ref: '#/definitions/openapi.RateLimitJson'
         "400":
           description: Bad Request
           schema:
@@ -5977,348 +4936,6 @@ paths:
       summary: Update rate limit
       tags:
       - rate_limits
-  /rate-limits/{id}/annotations:
-    get:
-      description: Get all annotations associated with a specific rate limit
-      parameters:
-      - description: Rate limit ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get all annotations for a rate limit
-      tags:
-      - rate_limits
-  /rate-limits/{id}/annotations/{annotation}:
-    delete:
-      description: Delete a specific annotation by key from a rate limit
-      parameters:
-      - description: Rate limit ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Delete an annotation from a rate limit
-      tags:
-      - rate_limits
-    get:
-      description: Get a specific annotation value by key for a rate limit
-      parameters:
-      - description: Rate limit ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get a specific annotation for a rate limit
-      tags:
-      - rate_limits
-    put:
-      consumes:
-      - application/json
-      description: Set or update a specific annotation value by key for a rate limit
-      parameters:
-      - description: Rate limit ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Annotation key
-        in: path
-        name: annotation
-        required: true
-        type: string
-      - description: Annotation value
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/routes.PutKeyValueRequestJson'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Set an annotation for a rate limit
-      tags:
-      - rate_limits
-  /rate-limits/{id}/labels:
-    get:
-      description: Get all labels associated with a specific rate limit
-      parameters:
-      - description: Rate limit ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get all labels for a rate limit
-      tags:
-      - rate_limits
-  /rate-limits/{id}/labels/{label}:
-    delete:
-      description: Delete a specific label by key from a rate limit
-      parameters:
-      - description: Rate limit ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Delete a label from a rate limit
-      tags:
-      - rate_limits
-    get:
-      description: Get a specific label value by key for a rate limit
-      parameters:
-      - description: Rate limit ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get a specific label for a rate limit
-      tags:
-      - rate_limits
-    put:
-      consumes:
-      - application/json
-      description: Set or update a specific label value by key for a rate limit
-      parameters:
-      - description: Rate limit ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Label key
-        in: path
-        name: label
-        required: true
-        type: string
-      - description: Label value
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/routes.PutKeyValueRequestJson'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.KeyValueJson'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Set a label for a rate limit
-      tags:
-      - rate_limits
   /search/resources:
     get:
       description: Search durable resources by first-class name, label value, and
@@ -6329,11 +4946,11 @@ paths:
         name: mode
         type: string
       - collectionFormat: multi
-        description: Resource types; may be repeated
+        description: Resource kinds; may be repeated
         in: query
         items:
           type: string
-        name: resourceType
+        name: kind
         type: array
       - description: Case-insensitive literal resource-name or label-value substring
           (minimum 3 characters)
@@ -6449,7 +5066,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPITaskInfoJson'
+            $ref: '#/definitions/openapi.TaskJson'
         "400":
           description: Bad Request
           schema:

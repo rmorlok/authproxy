@@ -11,40 +11,57 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
-	"github.com/rmorlok/authproxy/internal/util"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 )
 
-func (s *service) CreateConnectorVersion(ctx context.Context, namespace string, name scommon.ResourceName, definition *cschema.Connector, labels map[string]string, annotations map[string]string) (iface.Connector, error) {
-	id := apctx.GetIdGenerator(ctx).New(apid.PrefixConnectorVersion)
+func (s *service) CreateConnector(
+	ctx context.Context,
+	resource *cschema.Connector,
+) (iface.Connector, error) {
+	if resource == nil {
+		return nil, fmt.Errorf("connector cannot be nil")
+	}
 
-	def := definition.Clone()
-	def.Id = id
-	def.Version = 1
-	def.Namespace = util.ToPtr(namespace)
-	def.State = string(database.ConnectorDefinitionVersionStateDraft)
+	if err := resource.ValidateFor(meta.ValidationModeCreate, nil); err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrInvalidArgument, err)
+	}
+
+	id := apctx.GetIdGenerator(ctx).New(apid.PrefixConnector)
+	normalized := resource.ApplyAPICreateDefaults(id)
+	state := database.ConnectorDefinitionVersionState(
+		normalized.Spec.Release.DesiredState,
+	)
 
 	c, err := newConnectorBuilder(s).
-		WithConfig(def).
+		WithDefinition(&normalized.Spec.Definition).
 		WithId(id).
 		WithVersion(1).
-		WithState(database.ConnectorDefinitionVersionStateDraft).
+		WithState(state).
 		Build()
 	if err != nil {
 		return nil, fmt.Errorf("failed to build connector version: %w", err)
 	}
 
-	c.ConnectorWithDefinition.Labels = labels
-	c.ConnectorWithDefinition.Annotations = annotations
-	c.ConnectorWithDefinition.Name = name
+	c.ConnectorWithDefinition.Labels = normalized.Metadata.Labels
+	c.ConnectorWithDefinition.Annotations = normalized.Metadata.Annotations
+	c.ConnectorWithDefinition.Name = normalized.Metadata.Name
+	c.ConnectorWithDefinition.Namespace = normalized.Metadata.Namespace
 
-	if err := s.db.UpsertConnectorDefinitionVersion(ctx, &c.ConnectorWithDefinition); err != nil {
+	if err := s.db.UpsertConnectorDefinitionVersion(
+		ctx,
+		&c.ConnectorWithDefinition,
+	); err != nil {
 		return nil, fmt.Errorf("failed to upsert connector version: %w", err)
 	}
 
 	return s.getConnectorVersion(ctx, id, 1)
 }
 
-func (s *service) UpdateConnectorName(ctx context.Context, id apid.ID, name scommon.ResourceName) error {
+func (s *service) UpdateConnectorName(
+	ctx context.Context,
+	id apid.ID,
+	name scommon.ResourceName,
+) error {
 	if err := s.db.UpdateConnectorName(ctx, id, name); err != nil {
 		if errors.Is(err, database.ErrNotFound) {
 			return ErrNotFound
@@ -55,9 +72,19 @@ func (s *service) UpdateConnectorName(ctx context.Context, id apid.ID, name scom
 	return nil
 }
 
-func (s *service) CreateDraftConnectorVersion(ctx context.Context, id apid.ID, definition *cschema.Connector, labels map[string]string, annotations map[string]string) (iface.Connector, error) {
+func (s *service) CreateDraftConnectorVersion(
+	ctx context.Context,
+	id apid.ID,
+	definition *cschema.ConnectorDefinition,
+	labels map[string]string,
+	annotations map[string]string,
+) (iface.Connector, error) {
 	// Check for existing draft
-	existingDraft, err := s.db.GetConnectorDefinitionVersionForState(ctx, id, database.ConnectorDefinitionVersionStateDraft)
+	existingDraft, err := s.db.GetConnectorDefinitionVersionForState(
+		ctx,
+		id,
+		database.ConnectorDefinitionVersionStateDraft,
+	)
 	if err != nil && !errors.Is(err, database.ErrNotFound) {
 		return nil, fmt.Errorf("failed to check for existing draft: %w", err)
 	}
@@ -77,7 +104,7 @@ func (s *service) CreateDraftConnectorVersion(ctx context.Context, id apid.ID, d
 	newVersion := latest.Version + 1
 
 	// If definition is nil, clone from the latest version
-	var def *cschema.Connector
+	var def *cschema.ConnectorDefinition
 	if definition != nil {
 		def = definition.Clone()
 	} else {
@@ -89,13 +116,8 @@ func (s *service) CreateDraftConnectorVersion(ctx context.Context, id apid.ID, d
 		def = latestDef.Clone()
 	}
 
-	def.Id = id
-	def.Version = newVersion
-	def.Namespace = util.ToPtr(latest.Namespace)
-	def.State = string(database.ConnectorDefinitionVersionStateDraft)
-
 	c, err := newConnectorBuilder(s).
-		WithConfig(def).
+		WithDefinition(def).
 		WithId(id).
 		WithVersion(newVersion).
 		WithState(database.ConnectorDefinitionVersionStateDraft).
@@ -115,10 +137,82 @@ func (s *service) CreateDraftConnectorVersion(ctx context.Context, id apid.ID, d
 	} else {
 		c.ConnectorWithDefinition.Annotations = latest.Annotations
 	}
+	c.ConnectorWithDefinition.Namespace = latest.Namespace
+	c.ConnectorWithDefinition.Name = latest.Name
 
-	if err := s.db.UpsertConnectorDefinitionVersion(ctx, &c.ConnectorWithDefinition); err != nil {
+	if err := s.db.UpsertConnectorDefinitionVersion(
+		ctx,
+		&c.ConnectorWithDefinition,
+	); err != nil {
 		return nil, fmt.Errorf("failed to upsert connector version: %w", err)
 	}
 
 	return s.getConnectorVersion(ctx, id, newVersion)
+}
+
+// CreateConnectorVersion creates the next generation from a canonical
+// Connector request. A nil request preserves the existing blank-POST behavior
+// and clones the newest generation as a draft.
+func (s *service) CreateConnectorVersion(
+	ctx context.Context,
+	id apid.ID,
+	resource *cschema.Connector,
+) (iface.Connector, error) {
+	if resource == nil {
+		return s.CreateDraftConnectorVersion(ctx, id, nil, nil, nil)
+	}
+
+	if err := resource.ValidateFor(meta.ValidationModeCreate, nil); err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrInvalidArgument, err)
+	}
+
+	currentPage := s.ListConnectorsBuilder().
+		ForId(id).
+		Limit(1).
+		FetchPage(ctx)
+	if currentPage.Error != nil {
+		return nil, currentPage.Error
+	}
+	if len(currentPage.Results) == 0 {
+		return nil, ErrNotFound
+	}
+
+	current := currentPage.Results[0]
+	if resource.Metadata.Namespace != current.GetNamespace() {
+		return nil, fmt.Errorf("%w: metadata.namespace must match the logical connector", ErrInvalidArgument)
+	}
+
+	if resource.Metadata.Name != "" &&
+		resource.Metadata.Name != current.GetName() {
+		return nil, fmt.Errorf("%w: metadata.name must match the logical connector", ErrInvalidArgument)
+	}
+
+	desiredState := resource.Spec.Release.DesiredState
+	if desiredState == "" {
+		desiredState = cschema.ConnectorReleaseStateDraft
+	}
+
+	created, err := s.CreateDraftConnectorVersion(
+		ctx,
+		id,
+		&resource.Spec.Definition,
+		resource.Metadata.Labels,
+		resource.Metadata.Annotations,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if desiredState == cschema.ConnectorReleaseStatePrimary {
+		if err := created.SetState(
+			ctx,
+			database.ConnectorDefinitionVersionStatePrimary,
+		); err != nil {
+			return nil, err
+		}
+
+		return s.getConnectorVersion(ctx, id, created.GetVersion())
+	}
+
+	return created, nil
 }

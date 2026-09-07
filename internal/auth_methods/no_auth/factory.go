@@ -12,7 +12,10 @@ import (
 // a uniform auth_methods.Factory registry.
 type Factory interface {
 	NewAuthenticator(connection coreIface.Connection) auth_methods.Authenticator
-	ManifestSetupSteps(connection coreIface.Connection, connector *cschema.Connector) []coreIface.ManifestSetupStep
+	ManifestSetupSteps(
+		connection coreIface.Connection,
+		connector *cschema.ConnectorDefinition,
+	) []coreIface.ManifestSetupStep
 }
 
 type factory struct{}
@@ -27,13 +30,18 @@ var _ auth_methods.Factory = (*factory)(nil)
 // NewAuthenticator returns the per-connection Authenticator. The connection
 // argument is unused — no-auth applies nothing — but kept in the signature
 // for symmetry with the other auth methods' factories.
-func (f *factory) NewAuthenticator(_ coreIface.Connection) auth_methods.Authenticator {
+func (f *factory) NewAuthenticator(
+	_ coreIface.Connection,
+) auth_methods.Authenticator {
 	return &noAuthAuthenticator{}
 }
 
 // ManifestSetupSteps returns nil — no-auth connectors have no credential to
 // collect or authorize, so the setup flow consists only of the schema-
 // defined preconnect + configure steps.
-func (f *factory) ManifestSetupSteps(_ coreIface.Connection, _ *cschema.Connector) []coreIface.ManifestSetupStep {
+func (f *factory) ManifestSetupSteps(
+	_ coreIface.Connection,
+	_ *cschema.ConnectorDefinition,
+) []coreIface.ManifestSetupStep {
 	return nil
 }

@@ -20,7 +20,7 @@ import Divider from '@mui/material/Divider';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import {
     dryRunRateLimit,
-    DryRunRateLimitResponse,
+    DryRunRateLimitStatus,
     DryRunRateLimitMatch,
     DryRunRateLimitNotMatched,
 } from '@authproxy/api';
@@ -45,7 +45,7 @@ export default function RateLimitDryRun() {
     });
     const [requestType, setRequestType] = useState<RequestType>('proxy');
     const [running, setRunning] = useState(false);
-    const [result, setResult] = useState<DryRunRateLimitResponse | null>(null);
+    const [result, setResult] = useState<DryRunRateLimitStatus | null>(null);
     const [error, setError] = useState<string | null>(null);
 
     const canRun = useMemo(() => {
@@ -57,17 +57,29 @@ export default function RateLimitDryRun() {
         setRunning(true);
         setError(null);
         setResult(null);
+        const context = formValue.context.connectionId
+            ? {
+                connectionId: formValue.context.connectionId,
+                actorId: formValue.context.actorId,
+            }
+            : formValue.context.namespace
+                ? {
+                    namespace: formValue.context.namespace,
+                    actorId: formValue.context.actorId,
+                }
+                : null;
+        if (!context) {
+            setError('Connection ID or namespace is required');
+            setRunning(false);
+            return;
+        }
         try {
             const resp = await dryRunRateLimit({
                 request: formValue.request,
                 requestType: requestType,
-                context: {
-                    connectionId: formValue.context.connectionId,
-                    actorId: formValue.context.actorId,
-                    namespace: formValue.context.namespace,
-                },
+                context,
             });
-            setResult(resp.data);
+            setResult(resp.data.status);
         } catch (e: any) {
             const msg = e?.response?.data?.error || e?.message || 'Dry-run failed';
             setError(msg);
@@ -131,7 +143,7 @@ export default function RateLimitDryRun() {
     );
 }
 
-function ResultsPanel({ result }: { result: DryRunRateLimitResponse }) {
+function ResultsPanel({ result }: { result: DryRunRateLimitStatus }) {
     const hasAny = result.matched.length > 0 || result.notMatched.length > 0;
     return (
         <Stack spacing={3}>

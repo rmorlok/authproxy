@@ -8,17 +8,40 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	"github.com/rmorlok/authproxy/internal/apctx"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/encfield"
 	"github.com/rmorlok/authproxy/internal/encrypt"
+	encryptmock "github.com/rmorlok/authproxy/internal/encrypt/mock"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
+	actorschema "github.com/rmorlok/authproxy/internal/schema/resources/actor"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	tu "github.com/rmorlok/authproxy/internal/test_utils"
 	"github.com/stretchr/testify/require"
 	clock "k8s.io/utils/clock/testing"
 )
+
+func testConfiguredActor(
+	externalID string,
+	key *sconfig.Key,
+	permissions []aschema.Permission,
+	labels map[string]string,
+) *actorschema.Actor {
+	return &actorschema.Actor{
+		TypeMeta: meta.NewTypeMeta(actorschema.ActorKind),
+		Metadata: meta.ObjectMeta{Namespace: "root", Labels: labels},
+		Spec: actorschema.ActorSpec{
+			ExternalId:  externalID,
+			Permissions: permissions,
+			SigningKey:  key,
+		},
+	}
+}
 
 func externalActorsInRoot(keysPath string) *sconfig.ConfiguredActors {
 	return &sconfig.ConfiguredActors{
@@ -51,32 +74,37 @@ func TestSyncActorsList(t *testing.T) {
 	}
 
 	t.Run("syncs actors from list", func(t *testing.T) {
-		actors := &sconfig.ConfiguredActors{
-			InnerVal: sconfig.ConfiguredActorsList{
-				{
-					ExternalId: "alice",
-					Labels:     map[string]string{"authproxy.io/team": "engineering"},
-					Key: &sconfig.Key{
-						InnerVal: &sconfig.KeyShared{
-							SharedKey: &sconfig.KeyData{
-								InnerVal: &sconfig.KeyDataBase64Val{Base64: "dGVzdGtleTEyMw=="},
-							},
-						},
-					},
-					Permissions: []aschema.Permission{
-						{Namespace: "root", Resources: []string{"*"}, Verbs: []string{"*"}},
+		aliceConfig := testConfiguredActor(
+			"alice",
+			&sconfig.Key{
+				InnerVal: &sconfig.KeyShared{
+					SharedKey: &sconfig.KeyData{
+						InnerVal: &sconfig.KeyDataBase64Val{Base64: "dGVzdGtleTEyMw=="},
 					},
 				},
-				{
-					ExternalId: "bob",
-					Key: &sconfig.Key{
+			},
+			[]aschema.Permission{
+				{Namespace: "root", Resources: []string{"*"}, Verbs: []string{"*"}},
+			},
+			map[string]string{"authproxy.io/team": "engineering"},
+		)
+		aliceConfig.Metadata.Name = "alice-admin"
+		aliceConfig.Metadata.Annotations = map[string]string{"owner": "platform"}
+		actors := &sconfig.ConfiguredActors{
+			InnerVal: sconfig.ConfiguredActorsList{
+				aliceConfig,
+				testConfiguredActor(
+					"bob",
+					&sconfig.Key{
 						InnerVal: &sconfig.KeyShared{
 							SharedKey: &sconfig.KeyData{
 								InnerVal: &sconfig.KeyDataBase64Val{Base64: "dGVzdGtleTQ1Ng=="},
 							},
 						},
 					},
-				},
+					nil,
+					nil,
+				),
 			},
 		}
 
@@ -90,6 +118,8 @@ func TestSyncActorsList(t *testing.T) {
 		alice, err := db.GetActorByExternalId(ctx, "root", "alice")
 		require.NoError(t, err)
 		require.Equal(t, "engineering", alice.Labels["authproxy.io/team"])
+		require.Equal(t, "alice-admin", string(alice.Name))
+		require.Equal(t, "platform", alice.Annotations["owner"])
 		require.NotNil(t, alice.EncryptedKey)
 		require.Equal(t, LabelValueConfigList, alice.Labels[LabelConfiguredActorSyncSource])
 
@@ -99,21 +129,52 @@ func TestSyncActorsList(t *testing.T) {
 		require.NotNil(t, bob.EncryptedKey)
 	})
 
-	t.Run("syncs actor into configured namespace", func(t *testing.T) {
-		actors := &sconfig.ConfiguredActors{
-			InnerVal: sconfig.ConfiguredActorsList{
-				{
-					ExternalId: "smoke-user",
-					Namespace:  "root.smoke",
-					Key: &sconfig.Key{
-						InnerVal: &sconfig.KeyShared{
-							SharedKey: &sconfig.KeyData{
-								InnerVal: &sconfig.KeyDataBase64Val{Base64: "dGVzdA=="},
-							},
-						},
+	t.Run("encrypts signing keys with the actor namespace key", func(t *testing.T) {
+		actor := testConfiguredActor(
+			"alice",
+			&sconfig.Key{
+				InnerVal: &sconfig.KeyShared{
+					SharedKey: &sconfig.KeyData{
+						InnerVal: &sconfig.KeyDataBase64Val{Base64: "dGVzdGtleTEyMw=="},
 					},
 				},
 			},
+			nil,
+			nil,
+		)
+		actor.Metadata.Namespace = "root.team"
+		actors := &sconfig.ConfiguredActors{
+			InnerVal: sconfig.ConfiguredActorsList{actor},
+		}
+
+		cfg := setup(t, actors)
+		require.NoError(t, db.CreateNamespace(ctx, &database.Namespace{Path: actor.Metadata.Namespace}))
+
+		ctrl := gomock.NewController(t)
+		mockEncrypt := encryptmock.NewMockE(ctrl)
+		encrypted := encfield.EncryptedField{ID: apid.New(apid.PrefixDataEncryptionKey), Data: "ciphertext"}
+		mockEncrypt.EXPECT().
+			EncryptStringForNamespace(ctx, actor.Metadata.Namespace, gomock.Any()).
+			Return(encrypted, nil)
+
+		svc := NewService(cfg, db, redis, mockEncrypt, cfg.GetRootLogger())
+		require.NoError(t, svc.SyncActorList(ctx))
+
+		stored, err := db.GetActorByExternalId(ctx, actor.Metadata.Namespace, actor.Spec.ExternalId)
+		require.NoError(t, err)
+		require.Equal(t, &encrypted, stored.EncryptedKey)
+	})
+
+	t.Run("syncs actor into configured namespace", func(t *testing.T) {
+		actor := testConfiguredActor(
+			"smoke-user",
+			&sconfig.Key{InnerVal: &sconfig.KeyShared{SharedKey: &sconfig.KeyData{InnerVal: &sconfig.KeyDataBase64Val{Base64: "dGVzdA=="}}}},
+			nil,
+			nil,
+		)
+		actor.Metadata.Namespace = "root.smoke"
+		actors := &sconfig.ConfiguredActors{
+			InnerVal: sconfig.ConfiguredActorsList{actor},
 		}
 
 		cfg := setup(t, actors)
@@ -129,8 +190,9 @@ func TestSyncActorsList(t *testing.T) {
 
 	t.Run("removes stale actor after namespace changes", func(t *testing.T) {
 		key := &sconfig.Key{InnerVal: &sconfig.KeyShared{SharedKey: &sconfig.KeyData{InnerVal: &sconfig.KeyDataBase64Val{Base64: "dGVzdA=="}}}}
+		actor := testConfiguredActor("smoke-user", key, nil, nil)
 		actors := &sconfig.ConfiguredActors{
-			InnerVal: sconfig.ConfiguredActorsList{{ExternalId: "smoke-user", Key: key}},
+			InnerVal: sconfig.ConfiguredActorsList{actor},
 		}
 
 		cfg := setup(t, actors)
@@ -138,12 +200,10 @@ func TestSyncActorsList(t *testing.T) {
 		require.NoError(t, svc.SyncActorList(ctx))
 
 		require.NoError(t, db.EnsureNamespaceByPath(ctx, "root.smoke"))
+		movedActor := testConfiguredActor("smoke-user", key, nil, nil)
+		movedActor.Metadata.Namespace = "root.smoke"
 		cfg.GetRoot().SystemAuth.Actors = &sconfig.ConfiguredActors{
-			InnerVal: sconfig.ConfiguredActorsList{{
-				ExternalId: "smoke-user",
-				Namespace:  "root.smoke",
-				Key:        key,
-			}},
+			InnerVal: sconfig.ConfiguredActorsList{movedActor},
 		}
 		require.NoError(t, svc.SyncActorList(ctx))
 
@@ -156,8 +216,8 @@ func TestSyncActorsList(t *testing.T) {
 	t.Run("deletes stale actors", func(t *testing.T) {
 		actors := &sconfig.ConfiguredActors{
 			InnerVal: sconfig.ConfiguredActorsList{
-				{ExternalId: "alice", Key: &sconfig.Key{InnerVal: &sconfig.KeyShared{SharedKey: &sconfig.KeyData{InnerVal: &sconfig.KeyDataBase64Val{Base64: "dGVzdA=="}}}}},
-				{ExternalId: "bob", Key: &sconfig.Key{InnerVal: &sconfig.KeyShared{SharedKey: &sconfig.KeyData{InnerVal: &sconfig.KeyDataBase64Val{Base64: "dGVzdA=="}}}}},
+				testConfiguredActor("alice", &sconfig.Key{InnerVal: &sconfig.KeyShared{SharedKey: &sconfig.KeyData{InnerVal: &sconfig.KeyDataBase64Val{Base64: "dGVzdA=="}}}}, nil, nil),
+				testConfiguredActor("bob", &sconfig.Key{InnerVal: &sconfig.KeyShared{SharedKey: &sconfig.KeyData{InnerVal: &sconfig.KeyDataBase64Val{Base64: "dGVzdA=="}}}}, nil, nil),
 			},
 		}
 
@@ -171,7 +231,7 @@ func TestSyncActorsList(t *testing.T) {
 		// Remove bob from config
 		cfg.GetRoot().SystemAuth.Actors = &sconfig.ConfiguredActors{
 			InnerVal: sconfig.ConfiguredActorsList{
-				{ExternalId: "alice", Key: &sconfig.Key{InnerVal: &sconfig.KeyShared{SharedKey: &sconfig.KeyData{InnerVal: &sconfig.KeyDataBase64Val{Base64: "dGVzdA=="}}}}},
+				testConfiguredActor("alice", &sconfig.Key{InnerVal: &sconfig.KeyShared{SharedKey: &sconfig.KeyData{InnerVal: &sconfig.KeyDataBase64Val{Base64: "dGVzdA=="}}}}, nil, nil),
 			},
 		}
 
@@ -191,16 +251,18 @@ func TestSyncActorsList(t *testing.T) {
 	t.Run("encrypted key can be decrypted", func(t *testing.T) {
 		actors := &sconfig.ConfiguredActors{
 			InnerVal: sconfig.ConfiguredActorsList{
-				{
-					ExternalId: "alice",
-					Key: &sconfig.Key{
+				testConfiguredActor(
+					"alice",
+					&sconfig.Key{
 						InnerVal: &sconfig.KeyShared{
 							SharedKey: &sconfig.KeyData{
 								InnerVal: &sconfig.KeyDataBase64Val{Base64: "dGVzdGtleTEyMzQ1Njc4OTAxMjM0NTY="},
 							},
 						},
 					},
-				},
+					nil,
+					nil,
+				),
 			},
 		}
 
@@ -246,6 +308,21 @@ func TestSyncActorsList(t *testing.T) {
 
 		err := svc.SyncActorList(ctx)
 		require.NoError(t, err)
+	})
+
+	t.Run("rejects invalid canonical actors before sync", func(t *testing.T) {
+		actors := &sconfig.ConfiguredActors{
+			InnerVal: sconfig.ConfiguredActorsList{
+				actorschema.NewActor(),
+			},
+		}
+
+		cfg := setup(t, actors)
+		svc := NewService(cfg, db, redis, enc, cfg.GetRootLogger())
+
+		err := svc.SyncActorList(ctx)
+		require.ErrorContains(t, err, "invalid configured actor")
+		require.ErrorContains(t, err, "$.systemAuth.actors[0]")
 	})
 }
 
@@ -404,16 +481,18 @@ func TestSyncConfiguredActorsExternalSource(t *testing.T) {
 	t.Run("skips sync for non-external-source actors", func(t *testing.T) {
 		actors := &sconfig.ConfiguredActors{
 			InnerVal: sconfig.ConfiguredActorsList{
-				{
-					ExternalId: "alice",
-					Key: &sconfig.Key{
+				testConfiguredActor(
+					"alice",
+					&sconfig.Key{
 						InnerVal: &sconfig.KeyShared{
 							SharedKey: &sconfig.KeyData{
 								InnerVal: &sconfig.KeyDataBase64Val{Base64: "dGVzdA=="},
 							},
 						},
 					},
-				},
+					nil,
+					nil,
+				),
 			},
 		}
 

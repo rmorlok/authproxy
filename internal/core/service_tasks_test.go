@@ -23,9 +23,9 @@ func TestGetCronTasks_SchedulesOnlyEnabledPeriodicProbes(t *testing.T) {
 
 	svc, db, _, _, _, encrypt := FullMockService(t, ctrl)
 	connectionId := apid.New(apid.PrefixConnection)
-	connector := &cschema.Connector{
-		Id:          apid.New(apid.PrefixConnectorVersion),
-		Version:     1,
+	connectorId := apid.New(apid.PrefixConnectorVersion)
+	connectorVersion := uint64(1)
+	connector := &cschema.ConnectorDefinition{
 		DisplayName: "periodic-conditional",
 		Auth:        &cschema.Auth{InnerVal: &cschema.AuthApiKey{Type: cschema.AuthTypeAPIKey}},
 		Probes: []cschema.Probe{
@@ -51,8 +51,8 @@ func TestGetCronTasks_SchedulesOnlyEnabledPeriodicProbes(t *testing.T) {
 		Namespace:        "root",
 		State:            database.ConnectionStateConfigured,
 		HealthState:      database.ConnectionHealthStateHealthy,
-		ConnectorId:      connector.Id,
-		ConnectorVersion: connector.Version,
+		ConnectorId:      connectorId,
+		ConnectorVersion: connectorVersion,
 	}
 	encryptedDef := encfield.EncryptedField{ID: "ekv_mock", Data: "encrypted-def"}
 	connJSON, err := json.Marshal(connector)
@@ -62,10 +62,10 @@ func TestGetCronTasks_SchedulesOnlyEnabledPeriodicProbes(t *testing.T) {
 		ListConnectionsBuilder().
 		Return(&staticListConnectionsBuilder{connections: []database.Connection{conn}})
 	db.EXPECT().
-		GetConnectorDefinitionVersion(gomock.Any(), connector.Id, connector.Version).
+		GetConnectorDefinitionVersion(gomock.Any(), connectorId, connectorVersion).
 		Return(&database.ConnectorWithDefinition{
-			Id:                  connector.Id,
-			Version:             connector.Version,
+			Id:                  connectorId,
+			Version:             connectorVersion,
 			State:               database.ConnectorDefinitionVersionStatePrimary,
 			EncryptedDefinition: encryptedDef,
 		}, nil)

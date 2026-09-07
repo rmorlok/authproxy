@@ -20,12 +20,13 @@ import Tooltip from '@mui/material/Tooltip';
 import Alert from '@mui/material/Alert';
 import TextField from '@mui/material/TextField';
 import {
-    listRateLimits, RateLimit, RateLimitMode, RateLimitDefinition,
-    ListResponse, ListRateLimitsParams,
+    listRateLimits, RateLimit, RateLimitMode, RateLimitSpec,
+    RateLimitList, ListRateLimitsParams,
     createRateLimit, updateRateLimit, CreateRateLimitRequest,
+    API_VERSION, RATE_LIMIT_KIND,
 } from '@authproxy/api';
-import RateLimitDefinitionEditor from '../components/RateLimitDefinitionEditor';
-import { EMPTY_DEFINITION } from '../components/RateLimitDefinitionForm';
+import RateLimitSpecEditor from '../components/RateLimitSpecEditor';
+import { EMPTY_SPEC } from '../components/RateLimitSpecForm';
 import dayjs from 'dayjs';
 import {useQueryState, parseAsInteger, parseAsStringLiteral, parseAsString} from 'nuqs'
 import {useNavigate} from "react-router-dom";
@@ -36,7 +37,7 @@ import {ResourceLabelChips} from '../components/ResourceMetadataFields';
 
 // Summarise the algorithm variant in one short string. Keeps the column
 // scannable instead of showing the full JSON.
-function algorithmSummary(def: RateLimitDefinition): string {
+function algorithmSummary(def: RateLimitSpec): string {
     if (def.algorithm.fixedWindow) {
         const fw = def.algorithm.fixedWindow;
         return `fixed ${fw.limit}/${fw.window}`;
@@ -52,7 +53,7 @@ function algorithmSummary(def: RateLimitDefinition): string {
     return '—';
 }
 
-function selectorSummary(def: RateLimitDefinition): string {
+function selectorSummary(def: RateLimitSpec): string {
     const parts: string[] = [];
     if (def.selector.methods && def.selector.methods.length > 0) {
         parts.push(def.selector.methods.join('|'));
@@ -69,7 +70,7 @@ function selectorSummary(def: RateLimitDefinition): string {
     return parts.length === 0 ? 'any' : parts.join(' · ');
 }
 
-function bucketSummary(def: RateLimitDefinition): string {
+function bucketSummary(def: RateLimitSpec): string {
     if (!def.bucket.dimensions || def.bucket.dimensions.length === 0) {
         return 'global';
     }
@@ -109,9 +110,9 @@ export default function RateLimits() {
     const [createLoading, setCreateLoading] = useState(false);
     const [createError, setCreateError] = useState<string | null>(null);
     const [createName, setCreateName] = useState('');
-    const [createDef, setCreateDef] = useState<RateLimitDefinition>(EMPTY_DEFINITION);
+    const [createSpec, setCreateSpec] = useState<RateLimitSpec>(EMPTY_SPEC);
 
-    const responsesCacheRef = useRef<ListResponse<RateLimit>[]>([]);
+    const responsesCacheRef = useRef<RateLimitList[]>([]);
     const pageRequestCacheRef = useRef<Set<number>>(new Set());
 
     const handleRowClick: GridEventListener<'rowClick'> = (params, event) => {
@@ -152,13 +153,13 @@ export default function RateLimits() {
             if (cached) {
                 setRows(cached.items);
                 setLoading(false);
-                setHasNextPage(!!cached.cursor);
+                setHasNextPage(!!cached.metadata.continue);
                 return;
             }
 
             while (responsesCacheRef.current.length <= targetPageZeroBased && (
                     responsesCacheRef.current.length === 0 ||
-                    !!responsesCacheRef.current[responsesCacheRef.current.length - 1].cursor
+                    !!responsesCacheRef.current[responsesCacheRef.current.length - 1].metadata.continue
                 )
             ) {
                 if (pageRequestCacheRef.current.has(targetPageZeroBased)) {
@@ -169,7 +170,7 @@ export default function RateLimits() {
                 const thisPage = responsesCacheRef.current.length;
                 const prevResp = responsesCacheRef.current[responsesCacheRef.current.length - 1];
 
-                const params: ListRateLimitsParams = prevResp?.cursor ? {cursor: prevResp.cursor} : {
+                const params: ListRateLimitsParams = prevResp?.metadata.continue ? {cursor: prevResp.metadata.continue} : {
                     namespace: namespaceMatcher,
                     orderBy: sort || undefined,
                     limit: pageSize,
@@ -191,12 +192,12 @@ export default function RateLimits() {
             // Mode filter is client-side because the list endpoint doesn't
             // accept it yet — a small set, cheap to filter in the browser.
             if (modeFilter) {
-                items = items.filter(rl => (rl.definition.mode || RateLimitMode.ENFORCE) === modeFilter);
+                items = items.filter(rl => (rl.spec.mode || RateLimitMode.ENFORCE) === modeFilter);
             }
 
             setRows(items);
 
-            const hnp = !!data?.cursor;
+            const hnp = !!data?.metadata.continue;
             setHasNextPage(hnp);
 
             if(!hnp) {
@@ -221,28 +222,33 @@ export default function RateLimits() {
     // Flip a rate limit between enforce and observe. Optimistic update
     // with a revert on failure so the Switch feels responsive.
     const toggleMode = async (rl: RateLimit) => {
-        const id = rl.id;
+        const id = rl.metadata.id;
         if (pendingToggle[id]) return;
         setPendingToggle(prev => ({ ...prev, [id]: true }));
 
-        const current = rl.definition.mode || RateLimitMode.ENFORCE;
+        const current = rl.spec.mode || RateLimitMode.ENFORCE;
         const next = current === RateLimitMode.ENFORCE ? RateLimitMode.OBSERVE : RateLimitMode.ENFORCE;
-        const nextDef: RateLimitDefinition = { ...rl.definition, mode: next };
+        const nextSpec: RateLimitSpec = { ...rl.spec, mode: next };
 
         // Optimistic update — apply locally so the Switch flips immediately.
-        setRows(prev => prev.map(r => r.id === id ? { ...r, definition: nextDef } : r));
+        setRows(prev => prev.map(r => r.metadata.id === id ? { ...r, spec: nextSpec } : r));
 
         try {
-            const resp = await updateRateLimit(id, { definition: nextDef });
+            const resp = await updateRateLimit(id, {
+                apiVersion: API_VERSION,
+                kind: RATE_LIMIT_KIND,
+                metadata: {},
+                spec: nextSpec,
+            });
             // Refresh the row from the server's response so any computed
             // fields (updated_at, etc.) reflect reality.
-            setRows(prev => prev.map(r => r.id === id ? resp.data : r));
+            setRows(prev => prev.map(r => r.metadata.id === id ? resp.data : r));
             // Invalidate the cached page so a subsequent navigation away
             // and back doesn't show stale data.
             responsesCacheRef.current = [];
         } catch (e: any) {
             // Revert.
-            setRows(prev => prev.map(r => r.id === id ? rl : r));
+            setRows(prev => prev.map(r => r.metadata.id === id ? rl : r));
             setError(e?.response?.data?.error || e?.message || 'Failed to update rate-limit mode');
         } finally {
             setPendingToggle(prev => {
@@ -258,14 +264,18 @@ export default function RateLimits() {
         setCreateError(null);
         try {
             const request: CreateRateLimitRequest = {
-                namespace: ns,
-                name: createName.trim() || undefined,
-                definition: createDef,
+                apiVersion: API_VERSION,
+                kind: RATE_LIMIT_KIND,
+                metadata: {
+                    namespace: ns || 'root',
+                    name: createName.trim() || undefined,
+                },
+                spec: createSpec,
             };
             await createRateLimit(request);
             setCreateOpen(false);
             setCreateName('');
-            setCreateDef(EMPTY_DEFINITION);
+            setCreateSpec(EMPTY_SPEC);
             resetPagination();
             fetchPage(1);
         } catch (err: any) {
@@ -283,6 +293,7 @@ export default function RateLimits() {
             flex: 0.6,
             minWidth: 140,
             sortable: true,
+            valueGetter: (_value, row) => row.metadata.name,
         },
         {
             field: 'id',
@@ -290,6 +301,7 @@ export default function RateLimits() {
             flex: 0.7,
             minWidth: 200,
             sortable: false,
+            valueGetter: (_value, row) => row.metadata.id,
             renderCell: (params) => (
                 <Typography variant="body2" component="code" sx={{
                     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
@@ -307,9 +319,9 @@ export default function RateLimits() {
             sortable: false,
             renderCell: (params) => {
                 const rl = params.row;
-                const mode = (rl.definition.mode || RateLimitMode.ENFORCE) as RateLimitMode;
+                const mode = (rl.spec.mode || RateLimitMode.ENFORCE) as RateLimitMode;
                 const isEnforce = mode === RateLimitMode.ENFORCE;
-                const pending = !!pendingToggle[rl.id];
+                const pending = !!pendingToggle[rl.metadata.id];
                 return (
                     <Stack direction="row" spacing={1} alignItems="center" sx={{ height: '100%' }}>
                         <Chip
@@ -338,7 +350,7 @@ export default function RateLimits() {
             flex: 0.7,
             minWidth: 200,
             sortable: false,
-            valueGetter: (_value, row) => algorithmSummary((row as RateLimit).definition),
+            valueGetter: (_value, row) => algorithmSummary((row as RateLimit).spec),
         },
         {
             field: 'selector',
@@ -346,7 +358,7 @@ export default function RateLimits() {
             flex: 1,
             minWidth: 200,
             sortable: false,
-            valueGetter: (_value, row) => selectorSummary((row as RateLimit).definition),
+            valueGetter: (_value, row) => selectorSummary((row as RateLimit).spec),
         },
         {
             field: 'bucket',
@@ -354,7 +366,7 @@ export default function RateLimits() {
             flex: 0.5,
             minWidth: 120,
             sortable: false,
-            valueGetter: (_value, row) => bucketSummary((row as RateLimit).definition),
+            valueGetter: (_value, row) => bucketSummary((row as RateLimit).spec),
         },
         {
             field: 'namespace',
@@ -362,6 +374,7 @@ export default function RateLimits() {
             flex: 0.5,
             minWidth: 110,
             sortable: false,
+            valueGetter: (_value, row) => row.metadata.namespace,
         },
         {
             field: 'labels',
@@ -369,6 +382,7 @@ export default function RateLimits() {
             flex: 0.7,
             minWidth: 140,
             sortable: false,
+            valueGetter: (_value, row) => row.metadata.labels,
             renderCell: (params) => <ResourceLabelChips labels={params.value as Record<string, string> | undefined}/>,
         },
         {
@@ -377,7 +391,7 @@ export default function RateLimits() {
             flex: 0.6,
             minWidth: 160,
             sortable: true,
-            valueGetter: (value) => dayjs(value).format('MMM DD, YYYY, h:mm A'),
+            valueGetter: (_value, row) => dayjs(row.metadata.createdAt).format('MMM DD, YYYY, h:mm A'),
         },
     ], [pendingToggle]);
 
@@ -417,7 +431,7 @@ export default function RateLimits() {
                 <DataGrid
                     rows={rows}
                     columns={columns}
-                    getRowId={(row) => row.id}
+                    getRowId={(row) => row.metadata.id}
                     getRowClassName={() => 'clickable-row'}
                     loading={loading}
                     sortingMode="server"
@@ -452,7 +466,7 @@ export default function RateLimits() {
                         fullWidth
                         sx={{mb: 2}}
                     />
-                    <RateLimitDefinitionEditor value={createDef} onChange={setCreateDef} />
+                    <RateLimitSpecEditor value={createSpec} onChange={setCreateSpec} />
                     {createError && <Alert severity="error" sx={{ mt: 2 }}>{createError}</Alert>}
                 </DialogContent>
                 <DialogActions>

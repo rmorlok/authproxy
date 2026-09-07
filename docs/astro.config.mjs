@@ -62,6 +62,7 @@ export default defineConfig({
             'sdks/proxying',
             'sdks/javascript',
             'development/cli',
+            'reference/resources',
             'reference/api',
           ],
         },
@@ -112,6 +113,7 @@ export default defineConfig({
               collapsed: true,
               items: [
                 'development/design',
+                'development/design/kubernetes-resource-api',
                 'development/design/key-model-migration',
                 'development/design/oauth-provider-identity',
               ],

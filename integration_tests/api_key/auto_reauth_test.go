@@ -40,7 +40,7 @@ func TestApiKeyAutoReauth(t *testing.T) {
 	})
 
 	one := 1
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 	conn := helpers.NewApiKeyConnector(connectorID, "api-key-auto-reauth", helpers.ApiKeyConnectorOptions{
 		Placement: connectors.ApiKeyPlacementBearer,
 		ProbeURL:  stub.BaseURL + "/probe",
@@ -60,7 +60,7 @@ func TestApiKeyAutoReauth(t *testing.T) {
 
 	// Drive to Ready with the v1 key.
 	connectionID, form := env.InitiateApiKeyConnection(t, connectorID)
-	w := env.SubmitApiKeyCredentials(t, connectionID, form.StepId, map[string]any{"api_key": keyV1})
+	w := env.SubmitApiKeyCredentials(t, connectionID, form.StepID, map[string]any{"api_key": keyV1})
 	require.Equalf(t, http.StatusOK, w.Code, "submit failed: %s", w.Body.String())
 	require.NoError(t, env.RunVerifyConnection(t, connectionID))
 

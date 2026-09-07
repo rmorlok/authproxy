@@ -6,7 +6,14 @@ vi.mock('./client', () => ({
   client: {patch: patchMock},
 }));
 
-import {updateActor, type Permission} from './actors';
+import {ACTOR_KIND, updateActor, type Permission, type UpdateActorRequest} from './actors';
+
+const actorPatch = (permissions: Permission[]): UpdateActorRequest => ({
+  apiVersion: 'authproxy.net/v1alpha1',
+  kind: ACTOR_KIND,
+  metadata: {},
+  spec: {permissions},
+});
 
 describe('actor permission contracts', () => {
   beforeEach(() => {
@@ -21,8 +28,9 @@ describe('actor permission contracts', () => {
       verbs: ['get', 'proxy'],
     }];
 
-    updateActor('act_test', {permissions});
+    const request = actorPatch(permissions);
+    updateActor('act_test', request);
 
-    expect(patchMock).toHaveBeenCalledWith('/api/v1/actors/act_test', {permissions});
+    expect(patchMock).toHaveBeenCalledWith('/api/v1/actors/act_test', request);
   });
 });

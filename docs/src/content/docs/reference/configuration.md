@@ -32,18 +32,25 @@ immutable `id`:
 ```yaml
 connectors:
   loadFromList:
-    - name: google-drive
-      namespace: root.integrations
-      labels:
-        type: google-drive
-      annotations:
-        example.com/owner: integrations@example.com
-      displayName: Google Drive
-      logo:
-        publicUrl: https://example.com/google-drive.svg
-      description: Connect to Google Drive.
-      auth:
-        type: no-auth
+    - apiVersion: authproxy.net/v1alpha1
+      kind: Connector
+      metadata:
+        name: google-drive
+        namespace: root.integrations
+        labels:
+          type: google-drive
+        annotations:
+          example.com/owner: integrations@example.com
+      spec:
+        release:
+          desiredState: primary
+        definition:
+          displayName: Google Drive
+          logo:
+            publicUrl: https://example.com/google-drive.svg
+          description: Connect to Google Drive.
+          auth:
+            type: no-auth
 ```
 
 With the development-only `serve --auto-migrate` option, AuthProxy reconciles
@@ -59,15 +66,18 @@ its ID fixed and change `name`. Changing the name of an ID-less entry describes
 a new connector, so the old config-managed connector enters the normal orphan
 cleanup flow.
 
-The former `connectors.identifyingLabels` setting has been removed. Delete it
-from existing configuration and add a stable `name` to every connector entry
-that does not already specify `id`.
+The former flat connector form and `connectors.identifyingLabels` setting have
+been removed. Every entry must be an `authproxy.net/v1alpha1` `Connector`
+resource. Delete `identifyingLabels` from existing configuration and add a
+stable `metadata.name` to every connector entry that does not already specify
+`metadata.id`.
 
 ## Configured actor namespaces
 
-Configured actors live in `root` unless a namespace is specified. Inline actor
-entries accept `namespace` directly. For actors discovered from public-key
-directories, key each source by the namespace that owns its actors:
+Inline configured actors are complete `authproxy.net/v1alpha1` `Actor`
+resources and set their namespace in `metadata.namespace`. For actors
+discovered from public-key directories, key each source by the namespace that
+owns its actors:
 
 ```yaml
 systemAuth:

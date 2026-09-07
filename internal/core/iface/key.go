@@ -7,6 +7,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	keyschema "github.com/rmorlok/authproxy/internal/schema/resources/key"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
@@ -14,11 +15,12 @@ type Key interface {
 	GetId() apid.ID
 	GetNamespace() string
 	GetName() common.ResourceName
-	GetState() database.KeyState
+	GetState() keyschema.KeyState
 	GetLabels() map[string]string
 	GetAnnotations() map[string]string
 	GetCreatedAt() time.Time
 	GetUpdatedAt() time.Time
+	GetResource() *keyschema.Key
 }
 
 type ListKeysExecutor interface {

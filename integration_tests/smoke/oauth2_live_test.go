@@ -21,6 +21,7 @@ import (
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/schema/config"
+	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -121,9 +122,9 @@ func newRemoteSmokeRig(t *testing.T) *helpers.RemoteAuthProxy {
 	})
 	rig.EnsureNamespace(t, smokeConnectorNamespace)
 	adminActor := rig.GetActorByExternalID(t, config.RootNamespace, adminExternalID)
-	require.Equal(t, config.RootNamespace, adminActor.Namespace)
-	require.Equal(t, adminExternalID, adminActor.ExternalId)
-	require.Equal(t, adminPermissions, adminActor.Permissions)
+	require.Equal(t, config.RootNamespace, adminActor.Metadata.Namespace)
+	require.Equal(t, adminExternalID, adminActor.Spec.ExternalId)
+	require.Equal(t, adminPermissions, adminActor.Spec.Permissions)
 	t.Cleanup(func() {
 		rig.DeleteActorByExternalIDAsAdmin(t, config.RootNamespace, adminExternalID)
 	})
@@ -132,9 +133,9 @@ func newRemoteSmokeRig(t *testing.T) *helpers.RemoteAuthProxy {
 	rig.ProvisionUserFromJWT(t)
 
 	actor := rig.GetActorByExternalID(t, smokeConnectorNamespace, userExternalID)
-	require.Equal(t, smokeConnectorNamespace, actor.Namespace)
-	require.Equal(t, userExternalID, actor.ExternalId)
-	require.Equal(t, userPermissions, actor.Permissions)
+	require.Equal(t, smokeConnectorNamespace, actor.Metadata.Namespace)
+	require.Equal(t, userExternalID, actor.Spec.ExternalId)
+	require.Equal(t, userPermissions, actor.Spec.Permissions)
 	t.Cleanup(func() {
 		rig.DeleteActorByExternalIDAsAdmin(t, smokeConnectorNamespace, userExternalID)
 	})
@@ -156,34 +157,31 @@ func cloneSeededConnectorsIntoSmokeNamespace(
 	runID := fmt.Sprintf("%d", suffix)
 	const runLabel = "smoke.authproxy.net/run-id"
 	for i, source := range sources {
-		detailed := rig.GetConnectorVersionAsAdmin(t, source.Id, source.Version)
-		definition := detailed.Definition
-		definition.Id = apid.New(apid.PrefixConnectorVersion)
-		definition.Version = 1
-		definition.Name = common.ResourceName(fmt.Sprintf("%s-smoke-%d-%d", source.Name, suffix, i))
-		namespace := smokeConnectorNamespace
-		definition.Namespace = &namespace
-		if source.Labels["demo.authproxy.net/seed-key"] == "demo-oauth-simple" {
-			replacement := helpers.NewOAuth2Connector(definition.Id, string(definition.Name), provider, helpers.OAuth2ConnectorOptions{
+		detailed := rig.GetConnectorVersionAsAdmin(t, source.GetId(), source.Metadata.Generation)
+		resource := cschema.NewConnector()
+		resource.Metadata.Name = common.ResourceName(fmt.Sprintf("%s-smoke-%d-%d", source.Metadata.Name, suffix, i))
+		resource.Spec.Definition = detailed.Spec.Definition
+		if source.Metadata.Labels["demo.authproxy.net/seed-key"] == "demo-oauth-simple" {
+			replacement := helpers.NewOAuth2Connector(apid.New(apid.PrefixConnector), string(resource.Metadata.Name), provider, helpers.OAuth2ConnectorOptions{
 				ClientID:     oauthClientID,
 				ClientSecret: oauthClientSecret,
 				Scopes:       []string{"read", "profile"},
 			})
-			definition.Auth = replacement.Auth
+			resource.Spec.Definition.Auth = replacement.Spec.Definition.Auth
 		}
 
-		labels := make(map[string]string, len(source.Labels)+1)
-		for key, value := range source.Labels {
+		labels := make(map[string]string, len(source.Metadata.Labels)+1)
+		for key, value := range source.Metadata.Labels {
 			if !strings.HasPrefix(key, "apxy/") {
 				labels[key] = value
 			}
 		}
 		labels["smoke"] = "true"
 		labels[runLabel] = runID
-		created := rig.CreateConnectorWithLabels(t, definition, labels)
-		rig.ForceConnectorVersionState(t, created.Id, created.Version, string(api.ConnectorVersionStatePrimary))
+		created := rig.CreateConnectorWithLabels(t, *resource, labels)
+		rig.ForceConnectorVersionState(t, created.GetId(), created.Metadata.Generation, cschema.ConnectorReleaseStatePrimary)
 		t.Cleanup(func() {
-			rig.ForceConnectorVersionState(t, created.Id, created.Version, string(api.ConnectorVersionStateArchived))
+			rig.ForceConnectorVersionState(t, created.GetId(), created.Metadata.Generation, cschema.ConnectorReleaseStateArchived)
 		})
 	}
 	return runLabel + "=" + runID
@@ -222,20 +220,20 @@ func TestRemoteOAuth2ProxySmoke(t *testing.T) {
 	})
 	require.NotEmpty(t, user.ID)
 
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 	connector := helpers.NewOAuth2Connector(connectorID, "smoke-oauth2-"+suffix, provider, helpers.OAuth2ConnectorOptions{
 		ClientID:     clientKey,
 		ClientSecret: clientSecret,
 		Scopes:       []string{"read"},
 	})
 	created := rig.CreateConnector(t, connector)
-	require.Equal(t, uint64(1), created.Version)
-	rig.ForceConnectorVersionState(t, created.Id, created.Version, string(api.ConnectorVersionStatePrimary))
+	require.Equal(t, uint64(1), created.Metadata.Generation)
+	rig.ForceConnectorVersionState(t, created.GetId(), created.Metadata.Generation, cschema.ConnectorReleaseStatePrimary)
 	t.Cleanup(func() {
-		rig.ForceConnectorVersionState(t, created.Id, created.Version, string(api.ConnectorVersionStateArchived))
+		rig.ForceConnectorVersionState(t, created.GetId(), created.Metadata.Generation, cschema.ConnectorReleaseStateArchived)
 	})
 
-	connectionID, redirectURL := rig.InitiateOAuth2Connection(t, created.Id, rig.PublicURL+"/connections")
+	connectionID, redirectURL := rig.InitiateOAuth2Connection(t, created.GetId(), rig.PublicURL+"/connections")
 	require.NotEmpty(t, connectionID)
 
 	authorizeURL := rig.FollowOAuth2Redirect(t, redirectURL)
@@ -295,7 +293,7 @@ func TestRemoteSeededOAuthConnectorSmoke(t *testing.T) {
 	connector := rig.FindConnectorBySeedKey(t, "demo-oauth-simple")
 
 	startedAt := time.Now().Add(-1 * time.Second)
-	connectionID, redirectURL := rig.InitiateOAuth2Connection(t, connector.Id, rig.PublicURL+"/connections")
+	connectionID, redirectURL := rig.InitiateOAuth2Connection(t, connector.GetId(), rig.PublicURL+"/connections")
 	authorizeURL := rig.FollowOAuth2Redirect(t, redirectURL)
 	authorizeParams := parseQuery(t, authorizeURL)
 	clientID := authorizeParams.Get("client_id")
@@ -353,9 +351,9 @@ func TestRemoteSeededConnectorsSmoke(t *testing.T) {
 
 	runSelector := cloneSeededConnectorsIntoSmokeNamespace(t, rig, provider, oauthClientID, oauthClientSecret)
 	items := rig.ListConnectors(t, runSelector)
-	bySeedKey := map[string]api.ConnectorJson{}
+	bySeedKey := map[string]cschema.Connector{}
 	for _, item := range items {
-		if key := item.Labels["demo.authproxy.net/seed-key"]; key != "" {
+		if key := item.Metadata.Labels["demo.authproxy.net/seed-key"]; key != "" {
 			bySeedKey[key] = item
 		}
 	}
@@ -368,11 +366,12 @@ func TestRemoteSeededConnectorsSmoke(t *testing.T) {
 			"demo-oauth-tenant":    "Demo OAuth: Tenant Selection",
 			"demo-oauth-configure": "Demo OAuth: Resource Configuration",
 		}
-		for seedKey, displayName := range expected {
-			connector, ok := bySeedKey[seedKey]
-			require.Truef(t, ok, "missing seeded connector %q (%s); present seed keys: %v", seedKey, displayName, sortedKeys(bySeedKey))
-			require.Equalf(t, displayName, connector.DisplayName, "seeded connector %q display name changed", seedKey)
-			require.Equalf(t, api.ConnectorVersionStatePrimary, connector.State, "seeded connector %q should be primary", seedKey)
+		for name, displayName := range expected {
+			connector, ok := bySeedKey[name]
+			require.Truef(t, ok, "missing seeded connector %q (%s); present keys: %v", name, displayName, sortedKeys(bySeedKey))
+			require.Equalf(t, displayName, connector.Spec.Definition.DisplayName, "seeded connector %q display name changed", name)
+			require.NotNil(t, connector.Status)
+			require.Equalf(t, cschema.ConnectorReleaseStatePrimary, connector.Status.Release.State, "seeded connector %q should be primary", name)
 		}
 	})
 
@@ -380,7 +379,7 @@ func TestRemoteSeededConnectorsSmoke(t *testing.T) {
 		startedAt := time.Now().Add(-1 * time.Second)
 		connector, ok := bySeedKey["demo-oauth-simple"]
 		require.True(t, ok, "isolated seeded OAuth connector was not created")
-		connectionID, redirectURL := rig.InitiateOAuth2Connection(t, connector.Id, rig.PublicURL+"/connections")
+		connectionID, redirectURL := rig.InitiateOAuth2Connection(t, connector.GetId(), rig.PublicURL+"/connections")
 
 		authorizeURL := rig.FollowOAuth2Redirect(t, redirectURL)
 		authorizeParams := parseQuery(t, authorizeURL)
@@ -417,7 +416,7 @@ func TestRemoteSeededConnectorsSmoke(t *testing.T) {
 	t.Run("seeded API key connector completes and proxies", func(t *testing.T) {
 		connector, ok := bySeedKey["demo-api-key-bearer"]
 		require.True(t, ok, "isolated seeded API-key connector was not created")
-		connectionID, stepID := rig.InitiateAPIKeyConnection(t, connector.Id)
+		connectionID, stepID := rig.InitiateAPIKeyConnection(t, connector.GetId())
 		respType := rig.SubmitAPIKeyCredentials(t, connectionID, stepID, "demo-api-key")
 		switch respType {
 		case api.ConnectionSetupResponseTypeComplete:
@@ -443,7 +442,7 @@ func parseQuery(t *testing.T, rawURL string) url.Values {
 	return parsed.Query()
 }
 
-func sortedKeys(connectors map[string]api.ConnectorJson) []string {
+func sortedKeys(connectors map[string]cschema.Connector) []string {
 	keys := make([]string, 0, len(connectors))
 	for key := range connectors {
 		keys = append(keys, key)

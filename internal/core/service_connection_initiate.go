@@ -15,12 +15,13 @@ import (
 )
 
 /*
- * This file contains the logic for initiating connections. This is in the core service because despite it being
- * heavily tied to the request/response structure, it also deeply depends on the connector configuration logic.
+ * This file contains the logic for initiating connections. This is in the core
+ * service because despite it being heavily tied to the request/response
+ * structure, it also deeply depends on the connector configuration logic.
  */
 
-// InitiateConnection starts the process of initiating the connection. This method provides auth validation as part of
-// the logic.
+// InitiateConnection starts the process of initiating the connection. This
+// method provides auth validation as part of the logic.
 func (s *service) InitiateConnection(
 	ctx context.Context,
 	req iface.InitiateConnectionRequest,
@@ -31,21 +32,15 @@ func (s *service) InitiateConnection(
 		return nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err))
 	}
 
-	var err error
-	var c iface.Connector
-	if req.HasVersion() {
-		c, err = s.GetConnectorVersion(ctx, req.ConnectorId, req.ConnectorVersion)
-	} else {
-		c, err = s.GetConnectorVersionForState(ctx, req.ConnectorId, database.ConnectorDefinitionVersionStatePrimary)
-	}
-
+	c, err := s.ResolveConnectorReference(ctx, req.ConnectorRef)
 	if err != nil {
 		val.MarkErrorReturn()
-
 		if errors.Is(err, ErrNotFound) {
-			return nil, httperr.NotFoundf("connector '%s' not found", req.ConnectorId)
+			return nil, httperr.NotFound("connector not found")
 		}
-
+		if errors.Is(err, ErrInvalidArgument) {
+			return nil, httperr.BadRequest("invalid connector reference", httperr.WithInternalErr(err))
+		}
 		return nil, httperr.InternalServerError(httperr.WithInternalErr(err))
 	}
 
@@ -82,12 +77,16 @@ func (s *service) InitiateConnection(
 
 	actor := apauth.ActorFromContext(ctx)
 	if !namespace.IsSameOrChild(actor.GetNamespace(), targetNamespace) {
+		val.MarkErrorReturn()
 		return nil, httperr.Forbidden("connection namespace must be child of creating actor")
 	}
 
 	// Primary validation for the request -- make sure the user can initiate
 	// connections in the target namespace with the specified connector id.
-	if err := val.ValidateNamespaceResourceId(targetNamespace, c.GetId().String()); err != nil {
+	if err := val.ValidateNamespaceResourceId(
+		targetNamespace,
+		c.GetId().String(),
+	); err != nil {
 		val.MarkErrorReturn()
 		return nil, httperr.Forbidden(err.Error(), httperr.WithInternalErr(err))
 	}
@@ -102,7 +101,14 @@ func (s *service) InitiateConnection(
 	if req.Name != nil {
 		name = *req.Name
 	}
-	connectionIface, err := s.CreateConnection(ctx, targetNamespace, name, c)
+	connectionIface, err := s.CreateConnection(
+		ctx,
+		targetNamespace,
+		name,
+		req.Labels,
+		req.Annotations,
+		c,
+	)
 	if err != nil {
 		val.MarkErrorReturn()
 		if errors.Is(err, database.ErrDuplicate) {
@@ -110,6 +116,7 @@ func (s *service) InitiateConnection(
 		}
 		return nil, httperr.InternalServerError(httperr.WithInternalErr(err))
 	}
+
 	// CreateConnection returns the concrete *connection typed as iface; we
 	// need the concrete to invoke the dispatch helpers.
 	connection, ok := connectionIface.(*connection)

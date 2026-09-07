@@ -1,29 +1,38 @@
 {
-  "id": "cxn_test550e8400abcde",
-  "namespace": "root.acme",
-  "labels": {
-    "team": "platform"
-  },
-  "annotations": {
-    "owner": "integrations"
-  },
-  "state": "configured",
-  "healthState": "healthy",
-  "setupStepId": "tenant",
-  "connector": {
-    "id": "cxr_test550e8400abcde",
-    "version": 1,
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "Connection",
+  "metadata": {
+    "id": "cxn_test550e8400abcde",
+    "name": "production-crm",
     "namespace": "root.acme",
-    "state": "primary",
-    "displayName": "Salesforce",
-    "highlight": "CRM platform",
-    "description": "Salesforce CRM integration",
-    "statusPageUrl": "https://status.salesforce.com",
-    "logo": "https://example.com/logo.png",
-    "hasConfigure": false,
+    "labels": { "team": "platform" },
+    "annotations": { "owner": "integrations" },
     "createdAt": "2026-05-25T12:00:00Z",
     "updatedAt": "2026-05-25T12:30:00Z"
   },
-  "createdAt": "2026-05-25T12:00:00Z",
-  "updatedAt": "2026-05-25T12:30:00Z"
+  "spec": {
+    "connectorRef": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connector",
+      "id": "cxr_test550e8400abcde",
+      "name": "salesforce",
+      "namespace": "root.acme",
+      "generation": 1
+    },
+    "configuration": { "tenant": "acme" }
+  },
+  "status": {
+    "lifecycle": { "state": "configured" },
+    "health": { "state": "healthy" },
+    "setup": { "stepId": "tenant" },
+    "configuration": {
+      "configured": true,
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": { "tenant": { "type": "string" } },
+        "additionalProperties": true
+      }
+    }
+  }
 }

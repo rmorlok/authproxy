@@ -194,9 +194,62 @@ POST /api/v1/notifications/{id}/_viewed
 POST /api/v1/notifications/_viewed
 ```
 
-`GET /notifications` returns actor-filtered active notifications with `viewed`,
-`canAction`, and `actionUrl` when the actor is allowed to perform the action.
-Clients should only follow `actionUrl` when `canAction` is true.
+`GET /notifications` returns a `NotificationList`. Each item is a read-only,
+resource-shaped projection of a durable notification row. It is not a
+client-managed desired resource: `status.viewed` is specific to the
+authenticated actor, and `status.action` is present only when that actor can
+perform the suggested action.
+
+```json
+{
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "Notification",
+  "metadata": {
+    "id": "ntf_01example",
+    "namespace": "root.acme",
+    "createdAt": "2026-08-16T12:00:00Z",
+    "updatedAt": "2026-08-16T12:00:00Z"
+  },
+  "spec": {
+    "key": "connection:cxn_01example:auth_required",
+    "level": "warning",
+    "resourceRef": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connection",
+      "id": "cxn_01example"
+    },
+    "title": "Connection requires re-authentication",
+    "message": "Reconnect to refresh credentials."
+  },
+  "status": {
+    "state": "active",
+    "viewed": false,
+    "action": {"url": "/connections/cxn_01example?action=reauth"}
+  }
+}
+```
+
+Marking one notification viewed uses a typed action and returns the same action
+with `status.viewed: true`:
+
+```json
+{
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "NotificationView",
+  "metadata": {
+    "target": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Notification",
+      "id": "ntf_01example"
+    }
+  },
+  "spec": {}
+}
+```
+
+The batch endpoint uses `kind: NotificationBatchView`, with Notification
+references in `metadata.targets` and an empty `spec`. Its response reports
+`status.viewedCount`.
 
 ## API
 
@@ -207,8 +260,24 @@ POST /api/v1/connections/{id}/_migrateVersion
 Content-Type: application/json
 
 {
-  "targetVersion": 3,
-  "timeoutSeconds": 600
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "ConnectionVersionMigration",
+  "metadata": {
+    "target": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connection",
+      "id": "cxn_..."
+    }
+  },
+  "spec": {
+    "connectorRef": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connector",
+      "id": "cxr_...",
+      "generation": 3
+    },
+    "timeoutSeconds": 600
+  }
 }
 ```
 
@@ -216,10 +285,39 @@ The response binds the workflow task to the caller:
 
 ```json
 {
-  "taskId": "tsk_...",
-  "connectionId": "cxn_...",
-  "sourceVersion": 1,
-  "targetVersion": 3
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "ConnectionVersionMigration",
+  "metadata": {
+    "target": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connection",
+      "id": "cxn_..."
+    }
+  },
+  "spec": {
+    "connectorRef": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connector",
+      "id": "cxr_...",
+      "generation": 3
+    },
+    "timeoutSeconds": 600
+  },
+  "status": {
+    "taskId": "tsk_...",
+    "sourceConnectorRef": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connector",
+      "id": "cxr_...",
+      "generation": 1
+    },
+    "targetConnectorRef": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connector",
+      "id": "cxr_...",
+      "generation": 3
+    }
+  }
 }
 ```
 

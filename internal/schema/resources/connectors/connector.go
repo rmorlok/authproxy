@@ -1,106 +1,112 @@
 package connectors
 
 import (
-	"crypto/sha1"
-	"encoding/hex"
-	"encoding/json"
+	"fmt"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/rmorlok/authproxy/internal/apid"
-	"github.com/rmorlok/authproxy/internal/apjs"
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	nschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 )
 
+const ConnectorKind meta.Kind = "Connector"
+
+type ConnectorReleaseState string
+
+const (
+	ConnectorReleaseStateDraft    ConnectorReleaseState = "draft"
+	ConnectorReleaseStatePrimary  ConnectorReleaseState = "primary"
+	ConnectorReleaseStateActive   ConnectorReleaseState = "active"
+	ConnectorReleaseStateArchived ConnectorReleaseState = "archived"
+)
+
+// Connector is the versioned Kubernetes-style resource for a connector.
+// Metadata identifies the logical connector and generation; Spec.Definition
+// contains provider behavior; Status contains server-observed release state.
 type Connector struct {
-	// Id is the global id for this connector. This does not change version to version. In the config file, this can
-	// be omitted when Name is specified; the logical connector is then reconciled by name within its namespace.
-	Id apid.ID `json:"id" yaml:"id"`
+	meta.TypeMeta `json:",inline" yaml:",inline"`
+	Metadata      meta.ObjectMeta  `json:"metadata" yaml:"metadata"`
+	Spec          ConnectorSpec    `json:"spec" yaml:"spec"`
+	Status        *ConnectorStatus `json:"status,omitempty" yaml:"status,omitempty"`
+}
 
-	// Name is the mutable name of the logical connector. Config entries without an explicit ID must specify a name so
-	// AuthProxy can reconcile the same logical connector across reloads. When an ID is specified and name is omitted,
-	// a newly created connector defaults its name to the ID.
-	Name common.ResourceName `json:"name,omitempty" yaml:"name,omitempty" swaggerignore:"true"`
+type ConnectorSpec struct {
+	Release    ConnectorReleaseSpec `json:"release,omitempty" yaml:"release,omitempty"`
+	Definition ConnectorDefinition  `json:"definition" yaml:"definition"`
+}
 
-	// Version is the logical version of the connector. When auth materially changes, such as adding new scopes,
-	// changing client ids/secrets, adding configuration settings, etc. the logical version of the connector must change
-	// so that existing connections can be managed through the migration process. If specified explicitly in the config
-	// file, this version will prevent changes to the system by preventing startup. If unspecified, the system will
-	// automatically create versions based on the configuration changing. If specified explicitly, this version must
-	// start with 1 (zero implies unspecified).
-	Version uint64 `json:"version,omitempty" yaml:"version,omitempty"`
+// ConnectorReleaseSpec expresses the desired release state for this
+// generation. Config may request draft or primary; active and archived are
+// observed lifecycle states and therefore appear only in status.
+type ConnectorReleaseSpec struct {
+	DesiredState ConnectorReleaseState `json:"desiredState,omitempty" yaml:"desiredState,omitempty"`
+}
 
-	// Namespace is the namespace in which this connector lives. The value is a path to this namespace nested within
-	// the parent namespaces. The path must begin with "root". If unspecified, the value is assumed to be "root".
-	//
-	// Example: `root/prod/some-feature`
-	Namespace *string `json:"namespace,omitempty" yaml:"namespace,omitempty"`
+type ConnectorStatus struct {
+	Release ConnectorReleaseStatus `json:"release" yaml:"release"`
+}
 
-	// State is the release state of the connector. Must either be primary or draft if specified. Defaults to primary
-	// if unspecified.
-	State string `json:"state,omitempty" yaml:"state,omitempty"`
+type ConnectorReleaseStatus struct {
+	State ConnectorReleaseState `json:"state" yaml:"state"`
+}
 
-	// DisplayName is the human readable name of the connector. This is displayed to the user in the marketplace portal.
-	DisplayName string `json:"displayName" yaml:"displayName"`
+// ConnectorPatch is a presence-aware update to one Connector generation.
+// Metadata and Spec are required objects so a malformed partial envelope does
+// not silently bypass resource validation.
+type ConnectorPatch struct {
+	meta.TypeMeta `json:",inline" yaml:",inline"`
+	Metadata      *meta.ObjectMetaPatch `json:"metadata" yaml:"metadata"`
+	Spec          *ConnectorSpecPatch   `json:"spec" yaml:"spec"`
+	Status        *ConnectorStatus      `json:"status,omitempty" yaml:"status,omitempty"`
+}
 
-	// Logo is the logo of the connector. This is displayed to the user in the marketplace portal.
-	Logo *common.Image `json:"logo" yaml:"logo"`
+// ConnectorSpecPatch contains mutable desired-state updates. Release and
+// definition use presence tracking so explicit null values are rejected rather
+// than interpreted as omitted fields.
+type ConnectorSpecPatch struct {
+	Release    *ConnectorReleaseSpecPatch `json:"release,omitempty" yaml:"release,omitempty"`
+	Definition *ConnectorDefinition       `json:"definition,omitempty" yaml:"definition,omitempty"`
 
-	// Highlight is a short blurb about the connector. This is displayed to the user in the marketplace portal.
-	Highlight string `json:"highlight,omitempty" yaml:"highlight,omitempty"`
+	releasePresent    bool
+	definitionPresent bool
+}
 
-	// Description is a longer description of the connector. This is displayed to the user in the marketplace portal.
-	Description string `json:"description" yaml:"description"`
+// ConnectorReleaseSpecPatch contains a desired release-state transition.
+type ConnectorReleaseSpecPatch struct {
+	DesiredState *ConnectorReleaseState `json:"desiredState,omitempty" yaml:"desiredState,omitempty"`
 
-	// StatusPageUrl is a URL to the status page for the external service this connector integrates with.
-	// This helps users track 3rd party outages that may affect their connections.
-	StatusPageUrl string `json:"statusPageUrl,omitempty" yaml:"statusPageUrl,omitempty"`
+	desiredStatePresent bool
+}
 
-	// MarketplaceUrl is a URL to the marketplace listing for this connector's external service.
-	// For example, this could link to the app's listing in the service's app marketplace.
-	MarketplaceUrl string `json:"marketplaceUrl,omitempty" yaml:"marketplaceUrl,omitempty"`
+func NewConnector() *Connector {
+	return &Connector{TypeMeta: meta.NewTypeMeta(ConnectorKind)}
+}
 
-	// DeveloperConsoleUrl is a URL to the developer console for this connector's external service.
-	// This is where developers manage their app's configuration, API keys, etc.
-	DeveloperConsoleUrl string `json:"developerConsoleUrl,omitempty" yaml:"developerConsoleUrl,omitempty"`
+// NewConnectorPatch returns an empty Connector update envelope.
+func NewConnectorPatch() *ConnectorPatch {
+	return &ConnectorPatch{
+		TypeMeta: meta.NewTypeMeta(ConnectorKind),
+		Metadata: &meta.ObjectMetaPatch{},
+		Spec:     &ConnectorSpecPatch{},
+	}
+}
 
-	// OAuthClientUrl is a URL to the OAuth client management page for this connector's external service.
-	// This is typically a sub-page of the developer console where the OAuth client credentials are managed.
-	OAuthClientUrl string `json:"oauthClientUrl,omitempty" yaml:"oauthClientUrl,omitempty"`
-
-	// Auth is how this connector authenticates. Possible values are of type OAuth2 or APIKey. See individual
-	// documentation for each struct for more details.
-	Auth *Auth `json:"auth" yaml:"auth"`
-
-	// Javascript is connector-level JavaScript that defines shared constants
-	// and functions available to connector-authored predicates and transforms.
-	Javascript string `json:"javascript,omitempty" yaml:"javascript,omitempty"`
-
-	// Migrations are optional connector-authored hooks used to migrate an
-	// existing connection's stored configuration, labels, and annotations
-	// between connector versions.
-	Migrations *Migrations `json:"migrations,omitempty" yaml:"migrations,omitempty"`
-
-	// RateLimiting configures how 429 rate limiting responses from the 3rd party are handled.
-	// If unset, default behavior is enabled (parse Retry-After header, 60s default backoff).
-	RateLimiting *RateLimiting `json:"rateLimiting,omitempty" yaml:"rateLimiting,omitempty"`
-
-	// Probes are a list of probes to run against connections of this connector type to validation the connection.
-	Probes []Probe `json:"probes,omitempty" yaml:"probes,omitempty"`
-
-	// SetupFlow defines the multi-step setup flow for configuring connections.
-	// Includes optional preconnect forms (before auth) and configure forms (after auth).
-	SetupFlow *SetupFlow `json:"setupFlow,omitempty" yaml:"setupFlow,omitempty"`
-
-	// Labels are the labels for the connector.
-	Labels map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
-
-	// Annotations are the annotations for the connector.
-	Annotations map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-
-	// Telemetry carries per-connector overrides for OpenTelemetry behaviour
-	// on outbound calls routed through this connector. See ConnectorTelemetry.
-	Telemetry *ConnectorTelemetry `json:"telemetry,omitempty" yaml:"telemetry,omitempty"`
+// ApplyAPICreateDefaults returns a copy with server-assigned identity and
+// generation. API-created connectors default to draft so publishing remains an
+// explicit release decision; configuration retains its existing primary
+// default during reconciliation.
+func (c *Connector) ApplyAPICreateDefaults(id apid.ID) *Connector {
+	clone := c.Clone()
+	clone.Metadata.ID = id.String()
+	clone.Metadata.Generation = 1
+	if clone.Metadata.Name == "" {
+		clone.Metadata.Name = common.ResourceName(id.String())
+	}
+	if clone.Spec.Release.DesiredState == "" {
+		clone.Spec.Release.DesiredState = ConnectorReleaseStateDraft
+	}
+	return clone
 }
 
 func (c *Connector) Clone() *Connector {
@@ -109,194 +115,309 @@ func (c *Connector) Clone() *Connector {
 	}
 
 	clone := *c
-
-	if c.Logo != nil {
-		clone.Logo = c.Logo.CloneImage()
+	clone.Metadata = meta.CloneObjectMeta(c.Metadata)
+	clone.Spec.Definition = *c.Spec.Definition.Clone()
+	if c.Status != nil {
+		status := *c.Status
+		clone.Status = &status
 	}
-
-	if c.Auth != nil {
-		clone.Auth = c.Auth.CloneValue()
-	}
-
-	if c.RateLimiting != nil {
-		clone.RateLimiting = c.RateLimiting.Clone()
-	}
-
-	if c.Migrations != nil {
-		clone.Migrations = c.Migrations.Clone()
-	}
-
-	if c.Labels != nil {
-		clone.Labels = make(map[string]string, len(c.Labels))
-		for k, v := range c.Labels {
-			clone.Labels[k] = v
-		}
-	}
-
-	if c.Annotations != nil {
-		clone.Annotations = make(map[string]string, len(c.Annotations))
-		for k, v := range c.Annotations {
-			clone.Annotations[k] = v
-		}
-	}
-
-	clone.Telemetry = c.Telemetry.Clone()
-
 	return &clone
 }
 
+// Validate applies configuration-file resource rules. API handlers use
+// ValidateFor with the lifecycle mode appropriate to the request.
 func (c *Connector) Validate(vc *common.ValidationContext) error {
-	result := &multierror.Error{}
-	if c.Name != "" {
-		if err := c.Name.Validate(); err != nil {
-			result = multierror.Append(result, vc.NewErrorfForField("name", "%v", err))
+	return c.ValidateFor(meta.ValidationModeConfig, vc)
+}
+
+func (c *Connector) ValidateFor(
+	mode meta.ValidationMode,
+	vc *common.ValidationContext,
+) error {
+	if c == nil {
+		return fmt.Errorf("connector is required")
+	}
+	if vc == nil {
+		vc = &common.ValidationContext{Path: "$"}
+	}
+
+	requireStoredIdentity := mode == meta.ValidationModePersistence ||
+		mode == meta.ValidationModeResponse
+	requireNamespace := mode != meta.ValidationModeConfig
+
+	var result *multierror.Error
+	if err := meta.ValidateResource(
+		c.TypeMeta,
+		c.Metadata,
+		meta.ValidationOptions{
+			Mode:               mode,
+			Path:               vc,
+			ExpectedAPIVersion: meta.APIVersionV1Alpha1,
+			ExpectedKind:       ConnectorKind,
+			RequireID:          requireStoredIdentity,
+			RequireName:        requireStoredIdentity,
+			RequireNamespace:   requireNamespace,
+			IDValidator:        ValidateID,
+			NamespaceValidator: nschema.ValidatePath,
+		},
+	); err != nil {
+		result = multierror.Append(result, err)
+	}
+	if requireStoredIdentity && c.Metadata.Generation == 0 {
+		result = multierror.Append(result, vc.NewErrorForField("metadata.generation", "is required"))
+	}
+
+	switch c.Spec.Release.DesiredState {
+	case "", ConnectorReleaseStateDraft, ConnectorReleaseStatePrimary:
+	default:
+		result = multierror.Append(result, vc.NewErrorfForField("spec.release.desiredState", "must be either %q or %q", ConnectorReleaseStateDraft, ConnectorReleaseStatePrimary))
+	}
+
+	if err := c.Spec.Definition.Validate(vc.
+		PushField("spec").
+		PushField("definition"),
+	); err != nil {
+		result = multierror.Append(result, err)
+	}
+	if err := meta.ValidateStatus(c.Status, mode, vc); err != nil {
+		result = multierror.Append(result, err)
+	}
+	if c.Status != nil {
+		switch c.Status.Release.State {
+		case ConnectorReleaseStateDraft,
+			ConnectorReleaseStatePrimary,
+			ConnectorReleaseStateActive,
+			ConnectorReleaseStateArchived:
+		default:
+			result = multierror.Append(result, vc.NewErrorfForField("status.release.state", "is not a recognized connector release state"))
 		}
 	}
-	javascript, err := apjs.CompileAndValidateLibrary(c.Javascript)
+	if requireStoredIdentity && c.Status == nil {
+		result = multierror.Append(result, vc.NewErrorForField("status", "is required"))
+	}
+	if requireStoredIdentity && c.Spec.Release.DesiredState == "" {
+		result = multierror.Append(result, vc.NewErrorForField("spec.release.desiredState", "is required"))
+	}
+	if requireStoredIdentity && c.Status != nil {
+		observed := c.Status.Release.State
+		switch c.Spec.Release.DesiredState {
+		case ConnectorReleaseStateDraft:
+			if observed != ConnectorReleaseStateDraft {
+				result = multierror.Append(result, vc.NewErrorForField("status.release.state", "must be draft when desiredState is draft"))
+			}
+		case ConnectorReleaseStatePrimary:
+			if observed != ConnectorReleaseStatePrimary &&
+				observed != ConnectorReleaseStateActive &&
+				observed != ConnectorReleaseStateArchived {
+				result = multierror.Append(result, vc.NewErrorForField("status.release.state", "must be primary, active, or archived when desiredState is primary"))
+			}
+		}
+	}
+
+	return result.ErrorOrNil()
+}
+
+// ValidateID validates the stable logical connector identifier.
+func ValidateID(value string) error {
+	id, err := apid.Parse(value)
 	if err != nil {
-		result = multierror.Append(result, vc.NewErrorfForField("javascript", "invalid connector javascript: %v", err))
-		javascript = nil
+		return err
+	}
+	if id.Prefix() != apid.PrefixConnector {
+		return fmt.Errorf("must be a connector id")
+	}
+	return nil
+}
+
+// DesiredReleaseStateForObserved maps the database's observed lifecycle state
+// back to declarative intent. Draft generations remain draft; every published
+// generation retains primary intent even after it becomes active or archived.
+func DesiredReleaseStateForObserved(state ConnectorReleaseState) ConnectorReleaseState {
+	if state == ConnectorReleaseStateDraft {
+		return ConnectorReleaseStateDraft
+	}
+	return ConnectorReleaseStatePrimary
+}
+
+// ValidateFor validates a partial Connector at the API update boundary.
+func (c *ConnectorPatch) ValidateFor(
+	mode meta.ValidationMode,
+	vc *common.ValidationContext,
+) error {
+	if c == nil {
+		return fmt.Errorf("connector patch is required")
+	}
+	if vc == nil {
+		vc = &common.ValidationContext{Path: "$"}
 	}
 
-	if c.State != "" {
-		if c.State != "draft" && c.State != "primary" {
-			result = multierror.Append(result, vc.NewErrorfForField("state", "connector state must be either draft or primary"))
-		}
+	var result *multierror.Error
+	if err := meta.ValidateTypeMeta(c.TypeMeta, meta.APIVersionV1Alpha1, ConnectorKind, vc); err != nil {
+		result = multierror.Append(result, err)
 	}
-
-	if c.Namespace != nil {
-		if err := nschema.ValidatePath(*c.Namespace); err != nil {
-			result = multierror.Append(result, err)
-		}
+	if c.Metadata == nil {
+		result = multierror.Append(result, vc.NewErrorForField("metadata", "is required and must not be null"))
+	} else if err := meta.ValidateObjectMetaPatch(*c.Metadata, meta.ValidationOptions{
+		Mode:               mode,
+		Path:               vc,
+		IDValidator:        ValidateID,
+		NamespaceValidator: nschema.ValidatePath,
+	}); err != nil {
+		result = multierror.Append(result, err)
 	}
-
-	if c.RateLimiting != nil {
-		if err := c.RateLimiting.Validate(vc.PushField("rate_limiting")); err != nil {
-			result = multierror.Append(result, err)
-		}
+	if c.Spec == nil {
+		result = multierror.Append(result, vc.NewErrorForField("spec", "is required and must not be null"))
+	} else if err := c.Spec.validate(vc.PushField("spec")); err != nil {
+		result = multierror.Append(result, err)
 	}
-
-	if c.Migrations != nil {
-		if err := c.Migrations.Validate(vc.PushField("migrations")); err != nil {
-			result = multierror.Append(result, err)
-		}
-	}
-
-	if c.Auth != nil {
-		if av, ok := c.Auth.Inner().(AuthJavascriptValidator); ok {
-			if err := av.ValidateWithJavascript(vc.PushField("auth"), javascript); err != nil {
-				result = multierror.Append(result, err)
-			}
-		} else if av, ok := c.Auth.Inner().(AuthValidator); ok {
-			if err := av.Validate(vc.PushField("auth")); err != nil {
-				result = multierror.Append(result, err)
-			}
-		}
-	}
-
-	for i, probe := range c.Probes {
-		if err := probe.ValidateWithJavascript(vc.PushField("probes").PushIndex(i), javascript); err != nil {
-			result = multierror.Append(result, err)
-		}
-	}
-
-	if c.SetupFlow != nil {
-		if err := c.SetupFlow.ValidateWithJavascript(vc.PushField("setup_flow"), javascript); err != nil {
-			result = multierror.Append(result, err)
-		}
-	}
-
-	if err := c.validateMustacheReferences(vc); err != nil {
+	if err := meta.ValidateStatus(c.Status, mode, vc); err != nil {
 		result = multierror.Append(result, err)
 	}
 
 	return result.ErrorOrNil()
 }
 
-// Hash computes a semantic hash of the connector data. It does not account for data that is not stored in the
-// configuration directly (e.g. environment variables referenced). A change in the hash implies that a new version
-// must be created if the existing version is already live.
-func (c *Connector) Hash() string {
-	if c == nil {
-		return ""
+func (c *ConnectorSpecPatch) validate(vc *common.ValidationContext) error {
+	var result *multierror.Error
+	if c.releasePresent && c.Release == nil {
+		result = multierror.Append(result, vc.NewErrorForField("release", "must not be null"))
+	} else if c.Release != nil {
+		if c.Release.desiredStatePresent && c.Release.DesiredState == nil {
+			result = multierror.Append(result, vc.NewErrorForField("release.desiredState", "must not be null"))
+		} else if c.Release.DesiredState != nil {
+			switch *c.Release.DesiredState {
+			case ConnectorReleaseStateDraft, ConnectorReleaseStatePrimary:
+			default:
+				result = multierror.Append(result, vc.NewErrorfForField("release.desiredState", "must be either %q or %q", ConnectorReleaseStateDraft, ConnectorReleaseStatePrimary))
+			}
+		}
 	}
-	definition := c.Clone()
-	// Name belongs to the logical connector rather than an individual
-	// definition version, so a rename must not change the definition hash.
-	definition.Name = ""
-	jsonData, err := json.Marshal(definition)
+	if c.definitionPresent && c.Definition == nil {
+		result = multierror.Append(result, vc.NewErrorForField("definition", "must not be null"))
+	} else if c.Definition != nil {
+		if err := c.Definition.Validate(vc.PushField("definition")); err != nil {
+			result = multierror.Append(result, err)
+		}
+	}
+	return result.ErrorOrNil()
+}
+
+// HasRelease reports whether the patch contains a release object, including an
+// explicit null value.
+func (c *ConnectorSpecPatch) HasRelease() bool {
+	return c != nil && (c.releasePresent || c.Release != nil)
+}
+
+// HasDefinition reports whether the patch contains a definition, including an
+// explicit null value.
+func (c *ConnectorSpecPatch) HasDefinition() bool {
+	return c != nil && (c.definitionPresent || c.Definition != nil)
+}
+
+// HasDesiredState reports whether desiredState was provided, including null.
+func (c *ConnectorReleaseSpecPatch) HasDesiredState() bool {
+	return c != nil && (c.desiredStatePresent || c.DesiredState != nil)
+}
+
+// ApplyTo applies this patch to a copy of current and enforces immutable
+// connector identity and generation fields.
+func (c *ConnectorPatch) ApplyTo(
+	current *Connector,
+	vc *common.ValidationContext,
+) (*Connector, error) {
+	if current == nil {
+		return nil, fmt.Errorf("current connector is required")
+	}
+	if vc == nil {
+		vc = &common.ValidationContext{Path: "$"}
+	}
+	if err := c.ValidateFor(meta.ValidationModeUpdate, vc); err != nil {
+		return nil, err
+	}
+
+	updated := current.Clone()
+	updated.Metadata = meta.ApplyObjectMetaPatch(updated.Metadata, *c.Metadata)
+	if c.Spec.Release != nil && c.Spec.Release.DesiredState != nil {
+		updated.Spec.Release.DesiredState = *c.Spec.Release.DesiredState
+	}
+	if c.Spec.Definition != nil {
+		updated.Spec.Definition = *c.Spec.Definition.Clone()
+	}
+	if err := ValidateUpdate(current, updated, vc); err != nil {
+		return nil, err
+	}
+	return updated, nil
+}
+
+// ValidateUpdate rejects changes to stable connector identity. Names, labels,
+// annotations, provider definitions, and desired release state are mutable;
+// namespace and generation are not.
+func ValidateUpdate(before, after *Connector, vc *common.ValidationContext) error {
+	if before == nil || after == nil {
+		return fmt.Errorf("before and after connectors are required")
+	}
+	if vc == nil {
+		vc = &common.ValidationContext{Path: "$"}
+	}
+
+	var result *multierror.Error
+	if err := meta.ValidateTypeMetaUpdate(before.TypeMeta, after.TypeMeta, vc); err != nil {
+		result = multierror.Append(result, err)
+	}
+	if err := meta.ValidateMetadataUpdate(before.Metadata, after.Metadata, meta.UpdateOptions{ImmutableNamespace: true}, vc); err != nil {
+		result = multierror.Append(result, err)
+	}
+	return result.ErrorOrNil()
+}
+
+func (c *Connector) HasId() bool { return c != nil && c.Metadata.ID != "" }
+
+func (c *Connector) GetId() apid.ID {
+	if !c.HasId() {
+		return apid.Nil
+	}
+	id, err := apid.Parse(c.Metadata.ID)
 	if err != nil {
-		return ""
+		return apid.Nil
 	}
-	h := sha1.New()
-	h.Write(jsonData)
-	return hex.EncodeToString(h.Sum(nil))[:7]
+	return id
 }
 
-// HasUuid returns true if the connector has a UUID. This implies that the configuration set a UUID explicitly.
-func (c *Connector) HasId() bool {
-	if c == nil {
-		return false
+func (c *Connector) SetId(id apid.ID) {
+	if c != nil {
+		c.Metadata.ID = id.String()
 	}
-
-	return c.Id != apid.Nil
 }
 
-// HasName returns true when the configuration explicitly specifies a name.
 func (c *Connector) HasName() bool {
-	return c != nil && c.Name != ""
+	return c != nil && c.Metadata.Name != ""
 }
 
-// HasVersion returns true if the connector has a version. This implies that the configuration set a version explicitly.
-func (c *Connector) HasVersion() bool {
-	if c == nil {
-		return false
-	}
-
-	return c.Version > 0
+func (c *Connector) HasGeneration() bool {
+	return c != nil && c.Metadata.Generation > 0
 }
 
-// HasState returns true if the connector has a state. This implies that the configuration set a state explicitly.
 func (c *Connector) HasState() bool {
-	if c == nil {
-		return false
-	}
-
-	return c.State != ""
+	return c != nil && c.Spec.Release.DesiredState != ""
 }
 
-// HasNamespace returns true if the connector has a namespace set. This implies that the configuration set a namespace explicitly.
 func (c *Connector) HasNamespace() bool {
-	if c == nil {
-		return false
-	}
-
-	return c.Namespace != nil
+	return c != nil && c.Metadata.Namespace != ""
 }
 
-// HasProbes returns true if the connector has one or more probes, false otherwise
-func (c *Connector) HasProbes() bool {
-	if c == nil {
-		return false
-	}
-
-	return len(c.Probes) > 0
-}
-
-// IsDraft returns true if the connector has an explicitly defined state and that state is draft.
 func (c *Connector) IsDraft() bool {
-	if c == nil {
-		return false
-	}
-
-	return c.State == "draft"
+	return c != nil && c.Spec.Release.DesiredState == ConnectorReleaseStateDraft
 }
-
-// GetNamespace returns the namespace of the connector. Defaults to root if unspecified.
 func (c *Connector) GetNamespace() string {
-	if c == nil || c.Namespace == nil {
+	if c == nil || c.Metadata.Namespace == "" {
 		return nschema.Root
 	}
+	return c.Metadata.Namespace
+}
 
-	return *c.Namespace
+func (c *Connector) DefinitionHash() string {
+	if c == nil {
+		return ""
+	}
+	return c.Spec.Definition.Hash()
 }

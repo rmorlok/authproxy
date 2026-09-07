@@ -10,9 +10,6 @@ import {
   ConnectionHealthState,
   ConnectionState,
   Connector,
-  ConnectorVersionState,
-  NotificationLevel,
-  NotificationState,
 } from '@authproxy/api';
 import { createMarketplaceTheme } from '../theme';
 import { MarketplaceColorMode } from '../marketplaceConfig';
@@ -25,6 +22,7 @@ import connectorsReducer from '../store/connectorsSlice';
 import connectionsReducer from '../store/connectionsSlice';
 import notificationsReducer from '../store/notificationsSlice';
 import toastsReducer from '../store/toastsSlice';
+import { connectionFixture, connectorFixture, notificationFixture } from '../testing/resources';
 
 const logoDataUri = (label: string, background: string, foreground = '#ffffff') => {
   const initials = label
@@ -38,37 +36,24 @@ const logoDataUri = (label: string, background: string, foreground = '#ffffff') 
 };
 
 const connectors: Connector[] = [
-  {
+  connectorFixture({
     id: 'google-drive',
-    namespace: 'root',
-    version: 1,
-    state: ConnectorVersionState.ACTIVE,
     displayName: 'Google Drive',
     description: 'Have the agent track your work in Google Drive.',
     highlight: 'Have the agent track your work in Google Drive.',
-    logo: logoDataUri('Google Drive', '#188038'),
+    logo: {publicUrl: logoDataUri('Google Drive', '#188038')},
     hasConfigure: false,
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-01T00:00:00Z',
-  },
-  {
+  }),
+  connectorFixture({
     id: 'greenhouse',
-    namespace: 'root',
-    version: 1,
-    state: ConnectorVersionState.ACTIVE,
     displayName: 'Greenhouse',
     description: 'This integration pushes candidates to greenhouse.',
     highlight: 'This integration pushes candidates to greenhouse.',
-    logo: logoDataUri('Greenhouse', '#24a47f'),
+    logo: {publicUrl: logoDataUri('Greenhouse', '#24a47f')},
     hasConfigure: false,
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-01T00:00:00Z',
-  },
-  {
+  }),
+  connectorFixture({
     id: 'google-calendar',
-    namespace: 'root',
-    version: 1,
-    state: ConnectorVersionState.ACTIVE,
     displayName: 'Google Calendar',
     description: `Google Calendar lets agents coordinate scheduling work without needing direct access to your primary app.
 
@@ -85,63 +70,47 @@ const connectors: Connector[] = [
 
 Use this connector when the assistant should propose meeting times, create holds, or keep follow-up work attached to calendar events.`,
     highlight: 'Coordinate meetings, availability, and follow-up from Google Calendar.',
-    logo: logoDataUri('Google Calendar', '#1a73e8'),
+    logo: {publicUrl: logoDataUri('Google Calendar', '#1a73e8')},
     hasConfigure: true,
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-01T00:00:00Z',
-  },
-  {
+  }),
+  connectorFixture({
     id: 'gmail',
-    namespace: 'root',
-    version: 1,
-    state: ConnectorVersionState.ACTIVE,
     displayName: 'GMail',
     description: 'Have the agent respond to your emails without you needing to be involved. Like magic.',
     highlight: 'Have the agent respond to your emails without you needing to be involved. Like magic.',
-    logo: logoDataUri('GMail', '#d93025'),
+    logo: {publicUrl: logoDataUri('GMail', '#d93025')},
     hasConfigure: false,
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-01T00:00:00Z',
-  },
-  {
+  }),
+  connectorFixture({
     id: 'pipedrive',
-    namespace: 'root',
-    version: 1,
-    state: ConnectorVersionState.ACTIVE,
     displayName: 'pipedrive',
     description: 'Allow our agent to handle your sales support.',
     highlight: 'Allow our agent to handle your sales support.',
-    logo: logoDataUri('pipedrive', '#017a5e'),
+    logo: {publicUrl: logoDataUri('pipedrive', '#017a5e')},
     hasConfigure: false,
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-01T00:00:00Z',
-  },
-  {
+  }),
+  connectorFixture({
     id: 'asana',
-    namespace: 'root',
-    version: 1,
-    state: ConnectorVersionState.ACTIVE,
     displayName: 'Asana',
     description: 'Allow our agent organize your work.',
     highlight: 'Allow our agent organize your work.',
-    logo: logoDataUri('Asana', '#f06a6a'),
+    logo: {publicUrl: logoDataUri('Asana', '#f06a6a')},
     hasConfigure: false,
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-01T00:00:00Z',
-  },
+  }),
 ];
+
+interface ConnectionOverrides {
+  state?: ConnectionState;
+  healthState?: ConnectionHealthState;
+  setupStepId?: string;
+}
 
 const connectionFor = (
   connector: Connector,
-  overrides: Partial<Connection> = {},
-): Connection => ({
-  id: `cxn_${connector.id}`,
-  namespace: 'root',
+  overrides: ConnectionOverrides = {},
+): Connection => connectionFixture({
+  id: `cxn_${connector.metadata.id}`,
   connector,
-  state: ConnectionState.CONFIGURED,
-  healthState: ConnectionHealthState.HEALTHY,
-  createdAt: '2024-04-01T12:00:00Z',
-  updatedAt: '2024-04-01T12:00:00Z',
   ...overrides,
 });
 
@@ -369,22 +338,10 @@ export const ConnectionsWithNotifications: Story = {
     notificationsState: {
       ...baseNotificationsState,
       items: [
-        {
+        notificationFixture({
           id: 'ntf_reauth',
-          key: 'connection:cxn_google-calendar:auth_required',
-          level: NotificationLevel.WARNING,
-          state: NotificationState.ACTIVE,
-          resourceType: 'connection',
-          resourceId: 'cxn_google-calendar',
-          namespace: 'root',
-          title: 'Connection requires re-authentication',
-          message: 'Reconnect this connection to continue using it.',
           actionUrl: '/connections/cxn_google-calendar?action=reauth',
-          canAction: true,
-          viewed: false,
-          createdAt: '2026-07-12T12:00:00Z',
-          updatedAt: '2026-07-12T12:00:00Z',
-        },
+        }),
       ],
     },
   },

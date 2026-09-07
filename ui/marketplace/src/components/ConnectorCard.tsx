@@ -14,10 +14,11 @@ import remarkGfm from 'remark-gfm';
 import { Connector } from '@authproxy/api';
 import { marketplaceTokens } from '../theme';
 import ConnectorLogo from './ConnectorLogo';
+import { getConnectorPresentation } from './connectorPresentation';
 
 interface ConnectorCardProps {
   connector: Connector;
-  onConnect: (connectorId: string) => void;
+  onConnect: (connector: Connector) => void;
   onDetails?: (connectorId: string) => void;
   isConnecting: boolean;
 }
@@ -31,13 +32,14 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
   onDetails,
   isConnecting
 }) => {
-  const displayText = connector.highlight || connector.description;
+  const presentation = getConnectorPresentation(connector);
+  const displayText = presentation.highlight || presentation.description;
   const cardBody = (
     <>
       <ConnectorLogo connector={connector} variant="media" />
       <CardContent sx={{ flexGrow: 1, width: '100%' }}>
         <Typography gutterBottom variant="h5" component="div">
-          {connector.displayName}
+          {presentation.displayName}
         </Typography>
         {displayText && (
           <Box sx={{
@@ -87,9 +89,9 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
     >
       {onDetails ? (
         <CardActionArea
-          onClick={() => onDetails(connector.id)}
+          onClick={() => onDetails(connector.metadata.id)}
           sx={{ flexGrow: 1, alignItems: 'stretch', display: 'flex', flexDirection: 'column' }}
-          aria-label={`View ${connector.displayName} details`}
+          aria-label={`View ${presentation.displayName} details`}
         >
           {cardBody}
         </CardActionArea>
@@ -103,7 +105,7 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
           <Button
             size="small"
             color="inherit"
-            onClick={() => onDetails(connector.id)}
+            onClick={() => onDetails(connector.metadata.id)}
             sx={{
               color: 'text.secondary',
               '&:hover': {
@@ -118,7 +120,7 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
         <Button 
           size="small" 
           color="primary" 
-          onClick={() => onConnect(connector.id)}
+          onClick={() => onConnect(connector)}
           disabled={isConnecting}
           sx={{ ml: 'auto' }}
         >

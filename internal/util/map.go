@@ -1,5 +1,7 @@
 package util
 
+import "sort"
+
 // Map applies a function to each element of the input slice and returns a new slice with the results
 func Map[T any, U any](input []T, transform func(T) U) []U {
 	// Create a new slice with the same length as input to hold the results
@@ -34,4 +36,15 @@ func FlatMap[T, V any](input []T, transform func(T) []V) []V {
 		result = append(result, transform(item)...)
 	}
 	return result
+}
+
+// SortedStringMapKeys returns a sorted slice of keys from a string map.
+func SortedStringMapKeys[T any](values map[string]T) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+
+	sort.Strings(keys)
+	return keys
 }

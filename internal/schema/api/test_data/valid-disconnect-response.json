@@ -1,23 +1,49 @@
 {
-  "taskId": "task-123",
-  "connection": {
-    "id": "cxn_test550e8400abcde",
-    "namespace": "root.acme",
-    "state": "disconnecting",
-    "healthState": "healthy",
-    "connector": {
-      "id": "cxr_test550e8400abcde",
-      "version": 1,
-      "namespace": "root.acme",
-      "state": "primary",
-      "displayName": "Salesforce",
-      "description": "Salesforce CRM integration",
-      "logo": "https://example.com/logo.png",
-      "hasConfigure": false,
-      "createdAt": "2026-05-25T12:00:00Z",
-      "updatedAt": "2026-05-25T12:30:00Z"
-    },
-    "createdAt": "2026-05-25T12:00:00Z",
-    "updatedAt": "2026-05-25T12:30:00Z"
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "ConnectionDisconnect",
+  "metadata": {
+    "target": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connection",
+      "id": "cxn_test550e8400abcde"
+    }
+  },
+  "spec": { "timeoutSeconds": 600 },
+  "status": {
+    "taskId": "task-123",
+    "connection": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connection",
+      "metadata": {
+        "id": "cxn_test550e8400abcde",
+        "name": "production-crm",
+        "namespace": "root.acme",
+        "createdAt": "2026-05-25T12:00:00Z",
+        "updatedAt": "2026-05-25T12:30:00Z"
+      },
+      "spec": {
+        "connectorRef": {
+          "apiVersion": "authproxy.net/v1alpha1",
+          "kind": "Connector",
+          "id": "cxr_test550e8400abcde",
+          "name": "salesforce",
+          "namespace": "root.acme",
+          "generation": 1
+        }
+      },
+      "status": {
+        "lifecycle": { "state": "disconnecting" },
+        "health": { "state": "healthy" },
+        "configuration": {
+          "configured": true,
+          "schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true
+          }
+        }
+      }
+    }
   }
 }

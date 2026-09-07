@@ -3,7 +3,6 @@
 package oauth2
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -16,7 +15,7 @@ import (
 	"github.com/rmorlok/authproxy/integration_tests/helpers"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
-	coreIface "github.com/rmorlok/authproxy/internal/schema/api"
+	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
@@ -52,7 +51,7 @@ func newIncrementalAuthRig(t *testing.T, name string) *incrementalAuthRig {
 	userPassword := "p4ssw0rd-" + suffix
 	userEmail := name + "-" + suffix + "@example.com"
 
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 	connector := helpers.NewOAuth2Connector(connectorID, name, provider, helpers.OAuth2ConnectorOptions{
 		ClientID:       clientKey,
 		ClientSecret:   clientSecret,
@@ -122,43 +121,7 @@ func (r *incrementalAuthRig) startReauth(t *testing.T, connectionID string, scop
 		r.provider.Script(r.clientKey, helpers.EndpointToken, *failure)
 	}
 
-	body, err := json.Marshal(struct {
-		ReturnToUrl string `json:"returnToUrl,omitempty"`
-	}{
-		ReturnToUrl: r.returnToURL,
-	})
-	require.NoError(t, err)
-
-	path := "/api/v1/connections/" + connectionID + "/_reauth"
-	req, err := r.env.ApiAuthUtil.NewSignedRequestForActorExternalId(
-		http.MethodPost,
-		path,
-		bytes.NewReader(body),
-		sconfig.RootNamespace,
-		"test-actor",
-		aschema.AllPermissions(),
-	)
-	require.NoError(t, err)
-
-	abs, err := url.Parse(r.env.ServerURL + path)
-	require.NoError(t, err)
-	req.URL = abs
-	req.Host = abs.Host
-	req.RequestURI = ""
-
-	resp, err := http.DefaultClient.Do(req)
-	require.NoError(t, err)
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	require.NoError(t, err)
-	require.Equalf(t, http.StatusOK, resp.StatusCode, "reauth failed: %s", string(respBody))
-
-	var out coreIface.ConnectionSetupRedirect
-	require.NoErrorf(t, json.Unmarshal(respBody, &out), "decode reauth body: %s", string(respBody))
-	require.Equal(t, coreIface.ConnectionSetupResponseTypeRedirect, out.Type)
-	require.NotEmpty(t, out.RedirectUrl)
-	return out.RedirectUrl
+	return r.env.ReauthOAuth2Connection(t, connectionID, r.returnToURL)
 }
 
 func (r *incrementalAuthRig) approveOAuthRedirect(t *testing.T, redirectURL string, scopeOverride *string) {
@@ -235,10 +198,20 @@ func (r *incrementalAuthRig) requireConnectionScopes(t *testing.T, connectionID 
 	require.NoError(t, err)
 	require.Equalf(t, http.StatusOK, resp.StatusCode, "scopes endpoint failed: %s", string(body))
 
-	var out map[string][]string
-	require.NoErrorf(t, json.Unmarshal(body, &out), "decode scopes body: %s", string(body))
-	assert.ElementsMatch(t, wantRequested, out["requested"])
-	assert.ElementsMatch(t, wantGranted, out["granted"])
+	var list schemaapi.ConnectionScopeList
+	require.NoErrorf(t, json.Unmarshal(body, &list), "decode scopes body: %s", string(body))
+	requested := make([]string, 0, len(list.Items))
+	granted := make([]string, 0, len(list.Items))
+	for _, scope := range list.Items {
+		if scope.Requested {
+			requested = append(requested, scope.Name)
+		}
+		if scope.Granted {
+			granted = append(granted, scope.Name)
+		}
+	}
+	assert.ElementsMatch(t, wantRequested, requested)
+	assert.ElementsMatch(t, wantGranted, granted)
 }
 
 func TestIncrementalAuthorization_ReauthUpgradesScopes(t *testing.T) {

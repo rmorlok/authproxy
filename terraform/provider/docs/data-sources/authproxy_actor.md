@@ -19,5 +19,6 @@ data "authproxy_actor" "existing" {
 - `namespace` - The namespace.
 - `external_id` - The external identifier.
 - `labels` - Labels map.
+- `annotations` - Annotations map.
 - `created_at` - Timestamp of creation.
 - `updated_at` - Timestamp of last update.

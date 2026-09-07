@@ -20,12 +20,16 @@ resource "authproxy_actor" "service_account" {
 - `namespace` - (Required, ForceNew) The namespace this actor belongs to.
 - `external_id` - (Required, ForceNew) The external identifier for this actor.
 - `labels` - (Optional) A map of labels.
+- `annotations` - (Optional) A map of annotations.
 
 ## Attribute Reference
 
 - `id` - The actor ID.
 - `created_at` - Timestamp of creation.
 - `updated_at` - Timestamp of last update.
+
+Actor signing material is write-only and is not exposed by this provider or
+stored in Terraform state.
 
 ## Import
 

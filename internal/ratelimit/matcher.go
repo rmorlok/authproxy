@@ -8,6 +8,7 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	nschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 )
 
@@ -21,7 +22,10 @@ import (
 //   - a non-nil error only for malformed rule data that escaped schema
 //     validation (e.g. an uncompilable regex). Callers should log + skip
 //     such rules — they shouldn't be able to reach the runtime.
-func Match(rule rlschema.RateLimit, ctx *RequestContext) (matched bool, key BucketKey, err error) {
+func Match(
+	rule rlschema.RateLimitSpec,
+	ctx *RequestContext,
+) (matched bool, key BucketKey, err error) {
 	matched, key, _, err = MatchExplain(rule, ctx)
 	return
 }
@@ -32,11 +36,28 @@ func Match(rule rlschema.RateLimit, ctx *RequestContext) (matched bool, key Buck
 //
 // Reason strings stay narrow and human-readable; callers display them
 // verbatim. The same clause priority used by Match is preserved: the
-// first clause that fails wins (request_type → method → label_selector
-// → path_match).
-func MatchExplain(rule rlschema.RateLimit, ctx *RequestContext) (matched bool, key BucketKey, reason string, err error) {
+// first clause that fails wins (scope → request_type → method →
+// label_selector → path_match).
+func MatchExplain(
+	rule rlschema.RateLimitSpec,
+	ctx *RequestContext,
+) (matched bool, key BucketKey, reason string, err error) {
 	if ctx == nil {
 		return false, BucketKey{}, "request context not provided", nil
+	}
+
+	if rule.Scope != nil {
+		if matcher := rule.Scope.NamespaceMatcher; matcher != nil && !nschema.Matches(*matcher, ctx.Namespace) {
+			return false, BucketKey{}, fmt.Sprintf("namespace %q does not match scoped namespace matcher %q", ctx.Namespace, *matcher), nil
+		}
+		if ref := rule.Scope.ConnectionRef; ref != nil && ref.ID != ctx.ConnectionID.String() {
+			return false, BucketKey{}, fmt.Sprintf("connection %q does not match scoped connection %q", ctx.ConnectionID, ref.ID), nil
+		}
+		if ref := rule.Scope.ConnectorRef; ref != nil {
+			if ref.ID != ctx.ConnectorID.String() {
+				return false, BucketKey{}, fmt.Sprintf("connector %q does not match scoped connector %q", ctx.ConnectorID, ref.ID), nil
+			}
+		}
 	}
 
 	allowedTypes := rule.Selector.EffectiveRequestTypes()
@@ -82,18 +103,23 @@ func MatchExplain(rule rlschema.RateLimit, ctx *RequestContext) (matched bool, k
 // allowed is the *effective* list — callers should pass
 // rule.Selector.EffectiveRequestTypes() so the default [proxy, probe] is
 // applied when the rule omits the field.
-func matchRequestType(allowed []common.RequestType, ctxType common.RequestType) bool {
+func matchRequestType(
+	allowed []common.RequestType,
+	ctxType common.RequestType,
+) bool {
 	if len(allowed) == 0 {
 		// Defensive: EffectiveRequestTypes never returns an empty slice
 		// because schema validation rejects an explicit empty list. If
 		// we ever see one, fail closed (don't match).
 		return false
 	}
+
 	for _, t := range allowed {
 		if t == ctxType {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -105,11 +131,13 @@ func matchMethods(allowed []string, ctxMethod string) bool {
 	if len(allowed) == 0 {
 		return true
 	}
+
 	for _, m := range allowed {
 		if m == ctxMethod {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -117,11 +145,16 @@ func matchMethods(allowed []string, ctxMethod string) bool {
 // per-request label snapshot. Parsing happens on every call rather than
 // being cached — the enforcement layer can add caching later if profiling
 // shows it matters.
-func matchLabelSelector(selector string, labels map[string]string) (bool, error) {
+func matchLabelSelector(
+	selector string,
+	labels map[string]string,
+) (bool, error) {
 	parsed, err := database.ParseLabelSelector(selector)
+
 	if err != nil {
 		return false, err
 	}
+
 	return parsed.Matches(labels), nil
 }
 
@@ -133,13 +166,19 @@ func matchLabelSelector(selector string, labels map[string]string) (bool, error)
 // Glob semantics use Go's path.Match, where '*' does not cross '/' — same
 // behavior as filepath.Match for shell globs. For full doublestar
 // behaviour, callers can use kind=regex.
-func matchPath(pm *rlschema.PathMatch, p string, urlPresent bool) (bool, error) {
+func matchPath(
+	pm *rlschema.PathMatch,
+	p string,
+	urlPresent bool,
+) (bool, error) {
 	if pm == nil {
 		return true, nil
 	}
+
 	if !urlPresent {
 		return false, nil
 	}
+
 	switch pm.Kind {
 	case rlschema.PathMatchKindPrefix:
 		return strings.HasPrefix(p, pm.Value), nil

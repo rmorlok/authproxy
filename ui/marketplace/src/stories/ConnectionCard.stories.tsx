@@ -1,11 +1,12 @@
 import * as React from 'react';
 import {Meta, StoryObj} from '@storybook/react';
 import ConnectionCard, {ConnectionCardSkeleton} from '../components/ConnectionCard';
-import {Connection, ConnectionState, ConnectionHealthState, ConnectorVersionState} from '@authproxy/api';
+import {Connection, ConnectionState, ConnectionHealthState} from '@authproxy/api';
 import {Provider} from 'react-redux';
 import {configureStore} from '@reduxjs/toolkit';
 import connectorsReducer from '../store/connectorsSlice';
 import connectionsReducer from '../store/connectionsSlice';
+import {connectionFixture, connectorFixture} from '../testing/resources';
 
 const logoDataUri = (label: string, background: string) => {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="280" height="140" viewBox="0 0 280 140" role="img" aria-label="${label} logo"><rect width="280" height="140" rx="8" fill="${background}"/><text x="50%" y="54%" text-anchor="middle" dominant-baseline="middle" fill="#fff" font-family="Inter, Arial, sans-serif" font-size="42" font-weight="700">GC</text></svg>`;
@@ -19,6 +20,23 @@ const wideLogoDataUri = (label: string) => {
 
 const googleCalendarLogo = logoDataUri('Google Calendar', '#1a73e8');
 const wideFormatLogo = wideLogoDataUri('Wide Format Systems');
+const googleConnector = connectorFixture({
+  displayName: 'Google Calendar',
+  description: 'Connect to your Google Calendar to manage events and appointments.',
+  logo: {publicUrl: googleCalendarLogo},
+});
+const configurableConnector = connectorFixture({
+  displayName: 'Google Calendar',
+  description: 'Connect to your Google Calendar to manage events and appointments.',
+  logo: {publicUrl: googleCalendarLogo},
+  hasConfigure: true,
+});
+const wideConnector = connectorFixture({
+  id: 'wide-format-systems',
+  displayName: 'Wide Format Systems',
+  highlight: 'A wide logo should scale down inside the header without being cut off.',
+  logo: {publicUrl: wideFormatLogo},
+});
 
 // Create a mock store with connectors and connections
 const mockStore = configureStore({
@@ -29,12 +47,7 @@ const mockStore = configureStore({
   preloadedState: {
     connectors: {
       items: [
-        {
-          id: 'google-calendar',
-          displayName: 'Google Calendar',
-          description: 'Connect to your Google Calendar to manage events and appointments.',
-          logo: googleCalendarLogo,
-        },
+        googleConnector,
       ],
       status: 'succeeded',
       error: null,
@@ -71,126 +84,111 @@ const meta: Meta<typeof ConnectionCard> = {
 export default meta;
 type Story = StoryObj<typeof ConnectionCard>;
 
-const mockConnection: Connection = {
+const mockConnection: Connection = connectionFixture({
   id: '123e4567-e89b-12d3-a456-426614174000',
-  connector: {
-      type: 'google-calendar',
-      id: "923e4567-e89b-12d3-a456-426614174009",
-      version: 0,
-      state: ConnectorVersionState.PRIMARY,
-      displayName: "Google Calendar",
-      description: "A google calendar connector",
-      logo: googleCalendarLogo
-  },
+  connector: googleConnector,
   state: ConnectionState.CONFIGURED,
   healthState: ConnectionHealthState.HEALTHY,
-  createdAt: '2023-04-01T12:00:00Z',
-  updatedAt: '2023-04-01T12:00:00Z',
-};
+});
 
 export const Connected: Story = {
   args: {
     connection: mockConnection,
+    connector: googleConnector,
   },
 };
 
 export const NewlyConnected: Story = {
   args: {
     connection: mockConnection,
+    connector: googleConnector,
     highlightNew: true,
   },
 };
 
 export const ConnectedConfigurable: Story = {
   args: {
-    connection: {
-      ...mockConnection,
-      connector: {
-        ...mockConnection.connector,
-        hasConfigure: true,
-      },
-    },
+    connection: connectionFixture({id: mockConnection.metadata.id, connector: configurableConnector}),
+    connector: configurableConnector,
   },
 };
 
 export const WideLogo: Story = {
   args: {
-    connection: {
-      ...mockConnection,
-      connector: {
-        ...mockConnection.connector,
-        displayName: 'Wide Format Systems',
-        highlight: 'A wide logo should scale down inside the header without being cut off.',
-        logo: wideFormatLogo,
-      },
-    },
+    connection: connectionFixture({id: mockConnection.metadata.id, connector: wideConnector}),
+    connector: wideConnector,
   },
 };
 
 export const Unhealthy: Story = {
   args: {
-    connection: {
-      ...mockConnection,
-      connector: {
-        ...mockConnection.connector,
-        hasConfigure: true,
-      },
+    connection: connectionFixture({
+      id: mockConnection.metadata.id,
+      connector: configurableConnector,
       healthState: ConnectionHealthState.UNHEALTHY,
-    },
+    }),
+    connector: configurableConnector,
   },
 };
 
 export const Created: Story = {
   args: {
-    connection: {
-      ...mockConnection,
+    connection: connectionFixture({
+      id: mockConnection.metadata.id,
+      connector: googleConnector,
       state: ConnectionState.SETUP,
-    },
+    }),
+    connector: googleConnector,
   },
 };
 
 export const Failed: Story = {
   args: {
-    connection: {
-      ...mockConnection,
+    connection: connectionFixture({
+      id: mockConnection.metadata.id,
+      connector: googleConnector,
       state: ConnectionState.DISABLED,
-    },
+    }),
+    connector: googleConnector,
   },
 };
 
 export const Disconnecting: Story = {
   args: {
-    connection: {
-      ...mockConnection,
+    connection: connectionFixture({
+      id: mockConnection.metadata.id,
+      connector: googleConnector,
       state: ConnectionState.DISCONNECTING,
-    },
+    }),
+    connector: googleConnector,
   },
 };
 
 export const Disconnected: Story = {
   args: {
-    connection: {
-      ...mockConnection,
+    connection: connectionFixture({
+      id: mockConnection.metadata.id,
+      connector: googleConnector,
       state: ConnectionState.DISCONNECTED,
-    },
+    }),
+    connector: googleConnector,
   },
 };
 
 export const UnknownConnector: Story = {
   args: {
-    connection: {
-      ...mockConnection,
-      connectorId: 'unknown-connector',
-    },
+    connection: connectionFixture({connector: connectorFixture({id: 'unknown-connector'})}),
   },
 };
 
 export const WithTaskInProgress: Story = {
   args: {
-    connection: {
-      ...mockConnection,
+    connection: connectionFixture({
+      id: mockConnection.metadata.id,
+      connector: googleConnector,
       state: ConnectionState.DISCONNECTING,
-    },
+    }),
+    connector: googleConnector,
   },
   decorators: [
     (Story) => {
@@ -202,12 +200,7 @@ export const WithTaskInProgress: Story = {
         preloadedState: {
           connectors: {
             items: [
-              {
-                id: 'google-calendar',
-                displayName: 'Google Calendar',
-                description: 'Connect to your Google Calendar to manage events and appointments.',
-                logo: googleCalendarLogo,
-              },
+              googleConnector,
             ],
             status: 'succeeded',
             error: null,

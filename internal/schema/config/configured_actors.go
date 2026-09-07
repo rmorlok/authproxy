@@ -4,39 +4,68 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/hashicorp/go-multierror"
+	"github.com/rmorlok/authproxy/internal/schema/common"
+	actorschema "github.com/rmorlok/authproxy/internal/schema/resources/actor"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/rmorlok/authproxy/internal/util"
 	"gopkg.in/yaml.v3"
 )
 
 type ConfiguredActorsType interface {
-	All() []*ConfiguredActor
-	GetByExternalId(externalId string) (*ConfiguredActor, bool)
-	GetBySubject(subject string) (*ConfiguredActor, bool)
+	All() []*actorschema.Actor
+	GetByExternalId(externalId string) (*actorschema.Actor, bool)
+	GetBySubject(subject string) (*actorschema.Actor, bool)
 }
 
 type ConfiguredActors struct {
 	InnerVal ConfiguredActorsType `json:"-" yaml:"-"`
 }
 
-func (ca *ConfiguredActors) All() []*ConfiguredActor {
+func (ca *ConfiguredActors) All() []*actorschema.Actor {
 	if ca == nil || ca.InnerVal == nil {
 		return nil
 	}
 	return ca.InnerVal.All()
 }
 
-func (ca *ConfiguredActors) GetByExternalId(externalId string) (*ConfiguredActor, bool) {
+func (ca *ConfiguredActors) GetByExternalId(externalId string) (*actorschema.Actor, bool) {
 	if ca == nil || ca.InnerVal == nil {
 		return nil, false
 	}
 	return ca.InnerVal.GetByExternalId(externalId)
 }
 
-func (ca *ConfiguredActors) GetBySubject(subject string) (*ConfiguredActor, bool) {
+func (ca *ConfiguredActors) GetBySubject(subject string) (*actorschema.Actor, bool) {
 	if ca == nil || ca.InnerVal == nil {
 		return nil, false
 	}
 	return ca.InnerVal.GetBySubject(subject)
+}
+
+// Validate checks statically configured Actor resources. External key sources
+// are materialized and validated when synchronized so configuration loading
+// does not depend on the source directory being available yet.
+func (ca *ConfiguredActors) Validate(vc *common.ValidationContext) error {
+	if ca == nil || ca.InnerVal == nil {
+		return nil
+	}
+	list, ok := ca.InnerVal.(ConfiguredActorsList)
+	if !ok {
+		return nil
+	}
+	var result *multierror.Error
+	for i, actor := range list {
+		itemContext := vc.PushIndex(i)
+		if actor == nil {
+			result = multierror.Append(result, itemContext.NewError("actor is required"))
+			continue
+		}
+		if err := actor.ValidateFor(meta.ValidationModeConfig, itemContext); err != nil {
+			result = multierror.Append(result, err)
+		}
+	}
+	return result.ErrorOrNil()
 }
 
 func (ca *ConfiguredActors) MarshalJSON() ([]byte, error) {

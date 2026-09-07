@@ -27,7 +27,7 @@ import (
 // reinitialises and asserts that {Peek, Peek, Peek} followed by Decide
 // returns the same Decision. Any state mutation in Peek would cause
 // drift between the two Decides.
-func peekDoesNotMutate(t *testing.T, env *limiterEnv, def rlschema.RateLimit) {
+func peekDoesNotMutate(t *testing.T, env *limiterEnv, def rlschema.RateLimitSpec) {
 	t.Helper()
 
 	baseline := mustNewLimiter(t, env, def)
@@ -52,7 +52,7 @@ func peekDoesNotMutate(t *testing.T, env *limiterEnv, def rlschema.RateLimit) {
 
 func TestPeek_FixedWindow_FreshState(t *testing.T) {
 	env := newLimiterEnv(t)
-	l := mustNewLimiter(t, env, rlschema.RateLimit{Algorithm: rlschema.Algorithm{
+	l := mustNewLimiter(t, env, rlschema.RateLimitSpec{Algorithm: rlschema.Algorithm{
 		FixedWindow: &rlschema.FixedWindow{Window: common.HumanDuration{Duration: time.Minute}, Limit: 5},
 	}})
 
@@ -64,7 +64,7 @@ func TestPeek_FixedWindow_FreshState(t *testing.T) {
 
 func TestPeek_FixedWindow_Saturated(t *testing.T) {
 	env := newLimiterEnv(t)
-	l := mustNewLimiter(t, env, rlschema.RateLimit{Algorithm: rlschema.Algorithm{
+	l := mustNewLimiter(t, env, rlschema.RateLimitSpec{Algorithm: rlschema.Algorithm{
 		FixedWindow: &rlschema.FixedWindow{Window: common.HumanDuration{Duration: time.Minute}, Limit: 2},
 	}})
 
@@ -80,7 +80,7 @@ func TestPeek_FixedWindow_Saturated(t *testing.T) {
 }
 
 func TestPeek_FixedWindow_DoesNotMutate(t *testing.T) {
-	peekDoesNotMutate(t, newLimiterEnv(t), rlschema.RateLimit{Algorithm: rlschema.Algorithm{
+	peekDoesNotMutate(t, newLimiterEnv(t), rlschema.RateLimitSpec{Algorithm: rlschema.Algorithm{
 		FixedWindow: &rlschema.FixedWindow{Window: common.HumanDuration{Duration: time.Minute}, Limit: 5},
 	}})
 }
@@ -90,7 +90,7 @@ func TestPeek_FixedWindow_FailOpenOnRedisDown(t *testing.T) {
 	r := newFailedRedis(t)
 	rl := &database.RateLimit{
 		Id: apid.New(apid.PrefixRateLimit),
-		Definition: rlschema.RateLimit{Algorithm: rlschema.Algorithm{
+		Definition: rlschema.RateLimitSpec{Algorithm: rlschema.Algorithm{
 			FixedWindow: &rlschema.FixedWindow{Window: common.HumanDuration{Duration: time.Minute}, Limit: 1},
 		}},
 	}
@@ -107,7 +107,7 @@ func TestPeek_FixedWindow_FailOpenOnRedisDown(t *testing.T) {
 
 func TestPeek_SlidingWindowLog_FreshState(t *testing.T) {
 	env := newLimiterEnv(t)
-	l := mustNewLimiter(t, env, rlschema.RateLimit{Algorithm: rlschema.Algorithm{
+	l := mustNewLimiter(t, env, rlschema.RateLimitSpec{Algorithm: rlschema.Algorithm{
 		SlidingWindow: &rlschema.SlidingWindow{
 			Window: common.HumanDuration{Duration: time.Minute}, Limit: 4, Mode: rlschema.SlidingWindowModeLog,
 		},
@@ -121,7 +121,7 @@ func TestPeek_SlidingWindowLog_FreshState(t *testing.T) {
 
 func TestPeek_SlidingWindowLog_Saturated(t *testing.T) {
 	env := newLimiterEnv(t)
-	l := mustNewLimiter(t, env, rlschema.RateLimit{Algorithm: rlschema.Algorithm{
+	l := mustNewLimiter(t, env, rlschema.RateLimitSpec{Algorithm: rlschema.Algorithm{
 		SlidingWindow: &rlschema.SlidingWindow{
 			Window: common.HumanDuration{Duration: time.Minute}, Limit: 2, Mode: rlschema.SlidingWindowModeLog,
 		},
@@ -137,7 +137,7 @@ func TestPeek_SlidingWindowLog_Saturated(t *testing.T) {
 }
 
 func TestPeek_SlidingWindowLog_DoesNotMutate(t *testing.T) {
-	peekDoesNotMutate(t, newLimiterEnv(t), rlschema.RateLimit{Algorithm: rlschema.Algorithm{
+	peekDoesNotMutate(t, newLimiterEnv(t), rlschema.RateLimitSpec{Algorithm: rlschema.Algorithm{
 		SlidingWindow: &rlschema.SlidingWindow{
 			Window: common.HumanDuration{Duration: time.Minute}, Limit: 5, Mode: rlschema.SlidingWindowModeLog,
 		},
@@ -149,7 +149,7 @@ func TestPeek_SlidingWindowLog_FailOpenOnRedisDown(t *testing.T) {
 	r := newFailedRedis(t)
 	rl := &database.RateLimit{
 		Id: apid.New(apid.PrefixRateLimit),
-		Definition: rlschema.RateLimit{Algorithm: rlschema.Algorithm{
+		Definition: rlschema.RateLimitSpec{Algorithm: rlschema.Algorithm{
 			SlidingWindow: &rlschema.SlidingWindow{
 				Window: common.HumanDuration{Duration: time.Minute}, Limit: 1, Mode: rlschema.SlidingWindowModeLog,
 			},
@@ -167,7 +167,7 @@ func TestPeek_SlidingWindowLog_FailOpenOnRedisDown(t *testing.T) {
 
 func TestPeek_SlidingWindowCounter_FreshState(t *testing.T) {
 	env := newLimiterEnv(t)
-	l := mustNewLimiter(t, env, rlschema.RateLimit{Algorithm: rlschema.Algorithm{
+	l := mustNewLimiter(t, env, rlschema.RateLimitSpec{Algorithm: rlschema.Algorithm{
 		SlidingWindow: &rlschema.SlidingWindow{
 			Window: common.HumanDuration{Duration: time.Minute}, Limit: 5, Mode: rlschema.SlidingWindowModeCounter,
 		},
@@ -181,7 +181,7 @@ func TestPeek_SlidingWindowCounter_FreshState(t *testing.T) {
 
 func TestPeek_SlidingWindowCounter_Saturated(t *testing.T) {
 	env := newLimiterEnv(t)
-	l := mustNewLimiter(t, env, rlschema.RateLimit{Algorithm: rlschema.Algorithm{
+	l := mustNewLimiter(t, env, rlschema.RateLimitSpec{Algorithm: rlschema.Algorithm{
 		SlidingWindow: &rlschema.SlidingWindow{
 			Window: common.HumanDuration{Duration: time.Minute}, Limit: 2, Mode: rlschema.SlidingWindowModeCounter,
 		},
@@ -197,7 +197,7 @@ func TestPeek_SlidingWindowCounter_Saturated(t *testing.T) {
 }
 
 func TestPeek_SlidingWindowCounter_DoesNotMutate(t *testing.T) {
-	peekDoesNotMutate(t, newLimiterEnv(t), rlschema.RateLimit{Algorithm: rlschema.Algorithm{
+	peekDoesNotMutate(t, newLimiterEnv(t), rlschema.RateLimitSpec{Algorithm: rlschema.Algorithm{
 		SlidingWindow: &rlschema.SlidingWindow{
 			Window: common.HumanDuration{Duration: time.Minute}, Limit: 5, Mode: rlschema.SlidingWindowModeCounter,
 		},
@@ -209,7 +209,7 @@ func TestPeek_SlidingWindowCounter_FailOpenOnRedisDown(t *testing.T) {
 	r := newFailedRedis(t)
 	rl := &database.RateLimit{
 		Id: apid.New(apid.PrefixRateLimit),
-		Definition: rlschema.RateLimit{Algorithm: rlschema.Algorithm{
+		Definition: rlschema.RateLimitSpec{Algorithm: rlschema.Algorithm{
 			SlidingWindow: &rlschema.SlidingWindow{
 				Window: common.HumanDuration{Duration: time.Minute}, Limit: 1, Mode: rlschema.SlidingWindowModeCounter,
 			},
@@ -227,7 +227,7 @@ func TestPeek_SlidingWindowCounter_FailOpenOnRedisDown(t *testing.T) {
 
 func TestPeek_TokenBucket_FreshState(t *testing.T) {
 	env := newLimiterEnv(t)
-	l := mustNewLimiter(t, env, rlschema.RateLimit{Algorithm: rlschema.Algorithm{
+	l := mustNewLimiter(t, env, rlschema.RateLimitSpec{Algorithm: rlschema.Algorithm{
 		TokenBucket: &rlschema.TokenBucket{Capacity: 5, RefillRate: 1.0},
 	}})
 
@@ -239,7 +239,7 @@ func TestPeek_TokenBucket_FreshState(t *testing.T) {
 
 func TestPeek_TokenBucket_Saturated(t *testing.T) {
 	env := newLimiterEnv(t)
-	l := mustNewLimiter(t, env, rlschema.RateLimit{Algorithm: rlschema.Algorithm{
+	l := mustNewLimiter(t, env, rlschema.RateLimitSpec{Algorithm: rlschema.Algorithm{
 		TokenBucket: &rlschema.TokenBucket{Capacity: 2, RefillRate: 1.0},
 	}})
 
@@ -257,7 +257,7 @@ func TestPeek_TokenBucket_Saturated(t *testing.T) {
 
 func TestPeek_TokenBucket_AccountsForRefill(t *testing.T) {
 	env := newLimiterEnv(t)
-	l := mustNewLimiter(t, env, rlschema.RateLimit{Algorithm: rlschema.Algorithm{
+	l := mustNewLimiter(t, env, rlschema.RateLimitSpec{Algorithm: rlschema.Algorithm{
 		TokenBucket: &rlschema.TokenBucket{Capacity: 1, RefillRate: 1.0},
 	}})
 
@@ -279,7 +279,7 @@ func TestPeek_TokenBucket_AccountsForRefill(t *testing.T) {
 }
 
 func TestPeek_TokenBucket_DoesNotMutate(t *testing.T) {
-	peekDoesNotMutate(t, newLimiterEnv(t), rlschema.RateLimit{Algorithm: rlschema.Algorithm{
+	peekDoesNotMutate(t, newLimiterEnv(t), rlschema.RateLimitSpec{Algorithm: rlschema.Algorithm{
 		TokenBucket: &rlschema.TokenBucket{Capacity: 5, RefillRate: 1.0},
 	}})
 }
@@ -289,7 +289,7 @@ func TestPeek_TokenBucket_FailOpenOnRedisDown(t *testing.T) {
 	r := newFailedRedis(t)
 	rl := &database.RateLimit{
 		Id: apid.New(apid.PrefixRateLimit),
-		Definition: rlschema.RateLimit{Algorithm: rlschema.Algorithm{
+		Definition: rlschema.RateLimitSpec{Algorithm: rlschema.Algorithm{
 			TokenBucket: &rlschema.TokenBucket{Capacity: 1, RefillRate: 1.0},
 		}},
 	}

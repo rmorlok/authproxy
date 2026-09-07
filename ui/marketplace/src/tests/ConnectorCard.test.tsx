@@ -3,23 +3,17 @@ import {beforeEach, describe, expect, test, vi} from 'vitest';
 import {fireEvent, render, screen} from '@testing-library/react';
 import '@testing-library/jest-dom';
 import ConnectorCard, {ConnectorCardSkeleton} from '../components/ConnectorCard';
-import {Connector, ConnectorVersionState} from '@authproxy/api';
+import {Connector} from '@authproxy/api';
+import {connectorFixture} from '../testing/resources';
 
 describe('ConnectorCard', () => {
-    const mockConnector: Connector = {
-        id: 'google-calendar',
-        name: 'google-calendar',
-        namespace: 'root',
-        version: 1,
-        state: ConnectorVersionState.ACTIVE,
+    const mockConnector: Connector = connectorFixture({
         displayName: 'Google Calendar',
         description: 'Connect to your Google Calendar to manage events and appointments.',
         highlight: 'Manage events and appointments from Google Calendar.',
-        logo: 'https://example.com/google-calendar-logo.png',
+        logo: {publicUrl: 'https://example.com/google-calendar-logo.png'},
         hasConfigure: false,
-        createdAt: '2023-04-01T12:00:00Z',
-        updatedAt: '2023-04-01T12:00:00Z',
-    };
+    });
 
     const mockOnConnect = vi.fn();
     const mockOnDetails = vi.fn();
@@ -73,7 +67,13 @@ describe('ConnectorCard', () => {
     test('falls back to the description when the highlight is absent', () => {
         render(
             <ConnectorCard
-                connector={{...mockConnector, highlight: undefined}}
+                connector={{
+                    ...mockConnector,
+                    spec: {
+                        ...mockConnector.spec,
+                        definition: {...mockConnector.spec.definition, highlight: undefined},
+                    },
+                }}
                 onConnect={mockOnConnect}
                 isConnecting={false}
             />
@@ -95,9 +95,9 @@ describe('ConnectorCard', () => {
         // Click the connect button
         fireEvent.click(screen.getByText('Connect'));
 
-        // Check if onConnect was called with the correct connector ID
+        // The selected resource carries the generation used for initiation.
         expect(mockOnConnect).toHaveBeenCalledTimes(1);
-        expect(mockOnConnect).toHaveBeenCalledWith('google-calendar');
+        expect(mockOnConnect).toHaveBeenCalledWith(mockConnector);
     });
 
     test('disables the connect button when isConnecting is true', () => {
@@ -123,7 +123,17 @@ describe('ConnectorCard', () => {
     test('renders initials when the connector has no logo', () => {
         render(
             <ConnectorCard
-                connector={{...mockConnector, displayName: 'No Logo Connector', logo: ''}}
+                connector={{
+                    ...mockConnector,
+                    spec: {
+                        ...mockConnector.spec,
+                        definition: {
+                            ...mockConnector.spec.definition,
+                            displayName: 'No Logo Connector',
+                            logo: undefined,
+                        },
+                    },
+                }}
                 onConnect={mockOnConnect}
                 isConnecting={false}
             />

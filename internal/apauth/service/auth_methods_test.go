@@ -24,6 +24,8 @@ import (
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
+	actorschema "github.com/rmorlok/authproxy/internal/schema/resources/actor"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/rmorlok/authproxy/internal/test_utils"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/stretchr/testify/require"
@@ -33,6 +35,26 @@ import (
 
 func pathToTestData(path string) string {
 	return "../../../test_data/" + path
+}
+
+func testConfiguredActor(
+	externalID string,
+	key *sconfig.Key,
+	permissions []aschema.Permission,
+) *actorschema.Actor {
+	return &actorschema.Actor{
+		TypeMeta: meta.NewTypeMeta(actorschema.ActorKind),
+		Metadata: meta.ObjectMeta{Namespace: "root"},
+		Spec: actorschema.ActorSpec{
+			ExternalId:  externalID,
+			Permissions: permissions,
+			SigningKey:  key,
+		},
+	}
+}
+
+func jwtActor(value *core.Actor) *jwt2.ActorClaim {
+	return jwt2.NewActorClaim(value)
 }
 
 func TestAuth_Token(t *testing.T) {
@@ -45,7 +67,7 @@ func TestAuth_Token(t *testing.T) {
 
 	claims, err := j.Parse(testContext, res)
 	require.NoError(t, err)
-	require.NotNil(t, testClaims().Actor.Id, claims.Actor.Id)
+	require.Equal(t, testClaims().Actor, claims.Actor)
 }
 
 func TestAuth_RoundtripGlobaleAESKey(t *testing.T) {
@@ -64,10 +86,10 @@ func TestAuth_RoundtripGlobaleAESKey(t *testing.T) {
 			IssuedAt:  &jwt.NumericDate{apctx.GetClock(testContext).Now()},
 		},
 
-		Actor: &core.Actor{
+		Actor: jwtActor(&core.Actor{
 			ExternalId: "id1",
 			Namespace:  "root",
-		},
+		}),
 	}
 
 	t.Run("via service methods", func(t *testing.T) {
@@ -75,7 +97,7 @@ func TestAuth_RoundtripGlobaleAESKey(t *testing.T) {
 		require.NoError(t, err)
 		rtClaims, err := j.Parse(testContext, tok)
 		require.NoError(t, err)
-		require.Equal(t, claims.Actor.Id, rtClaims.Actor.Id)
+		require.Equal(t, claims.Actor, rtClaims.Actor)
 
 		tokRunes := []rune(tok)
 		if len(tokRunes) >= 10 {
@@ -95,7 +117,7 @@ func TestAuth_RoundtripGlobaleAESKey(t *testing.T) {
 		require.NoError(t, err)
 		rtClaims, err := j.Parse(testContext, tok)
 		require.NoError(t, err)
-		require.Equal(t, claims.Actor.Id, rtClaims.Actor.Id)
+		require.Equal(t, claims.Actor, rtClaims.Actor)
 
 		tokRunes := []rune(tok)
 		if len(tokRunes) >= 10 {
@@ -123,17 +145,17 @@ func TestAuth_RoundtripPublicPrivate(t *testing.T) {
 			IssuedAt:  &jwt.NumericDate{apctx.GetClock(testContext).Now()},
 		},
 
-		Actor: &core.Actor{
+		Actor: jwtActor(&core.Actor{
 			ExternalId: "id1",
 			Namespace:  "root",
-		},
+		}),
 	}
 
 	tok, err := j.Token(testContext, &claims)
 	require.NoError(t, err)
 	rtClaims, err := j.Parse(testContext, tok)
 	require.NoError(t, err)
-	require.Equal(t, claims.Actor.Id, rtClaims.Actor.Id)
+	require.Equal(t, claims.Actor, rtClaims.Actor)
 
 	tokRunes := []rune(tok)
 	if len(tokRunes) >= 10 {
@@ -173,10 +195,10 @@ func TestAuth_SecretKey(t *testing.T) {
 			IssuedAt:  &jwt.NumericDate{apctx.GetClock(testContext).Now()},
 		},
 
-		Actor: &core.Actor{
+		Actor: jwtActor(&core.Actor{
 			ExternalId: "external-id7",
 			Namespace:  "root",
-		},
+		}),
 	}
 
 	tb, err := jwt2.NewJwtTokenBuilder().WithConfigKey(testContext, cfg.GetRoot().SystemAuth.JwtSigningKey)
@@ -187,7 +209,7 @@ func TestAuth_SecretKey(t *testing.T) {
 
 	rtClaims, err := authService.Parse(testContext, tok)
 	require.NoError(t, err)
-	require.Equal(t, claims.Actor.Id, rtClaims.Actor.Id)
+	require.Equal(t, claims.Actor, rtClaims.Actor)
 
 	tokRunes := []rune(tok)
 	if len(tokRunes) >= 10 {
@@ -210,7 +232,7 @@ func TestAuth_Parse(t *testing.T) {
 		claims, err := j.Parse(testContext, tok)
 		require.NoError(t, err)
 		require.False(t, claims.IsExpired(testContext))
-		require.Equal(t, testClaims().Actor.ExternalId, claims.Actor.ExternalId)
+		require.Equal(t, testClaims().Actor.Spec.ExternalId, claims.Actor.Spec.ExternalId)
 
 	})
 	t.Run("expired", func(t *testing.T) {
@@ -225,10 +247,10 @@ func TestAuth_Parse(t *testing.T) {
 				IssuedAt:  &jwt.NumericDate{apctx.GetClock(testContext).Now()},
 			},
 
-			Actor: &core.Actor{
+			Actor: jwtActor(&core.Actor{
 				ExternalId: "id1",
 				Namespace:  "root",
-			},
+			}),
 		}
 
 		tok, err := j.Token(testContext, &org)
@@ -255,10 +277,10 @@ func TestAuth_Parse(t *testing.T) {
 				IssuedAt:  &jwt.NumericDate{apctx.GetClock(testContext).Now()},
 			},
 
-			Actor: &core.Actor{
+			Actor: jwtActor(&core.Actor{
 				ExternalId: "id1",
 				Namespace:  "root",
-			},
+			}),
 		}
 
 		tok, err := j.Token(testContext, &org)
@@ -352,10 +374,7 @@ func TestAuth_Parse(t *testing.T) {
 			SystemAuth: sconfig.SystemAuth{
 				Actors: &sconfig.ConfiguredActors{
 					InnerVal: sconfig.ConfiguredActorsList{
-						&sconfig.ConfiguredActor{
-							ExternalId: "bobdole",
-							Key:        bobdoleKey,
-						},
+						testConfiguredActor("bobdole", bobdoleKey, nil),
 					},
 				},
 				JwtTokenDurationVal: 12 * time.Hour,
@@ -524,11 +543,11 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 				ra, err := raw.establishAuthFromRequest(testContext, true, req, w)
 				require.NoError(t, err)
 				require.True(t, ra.IsAuthenticated())
-				require.Equal(t, testClaims().Actor.ExternalId, ra.MustGetActor().ExternalId)
+				require.Equal(t, testClaims().Actor.Spec.ExternalId, ra.MustGetActor().ExternalId)
 
-				actor, err := db.GetActorByExternalId(testContext, "root", testClaims().Actor.ExternalId)
+				actor, err := db.GetActorByExternalId(testContext, "root", testClaims().Actor.Spec.ExternalId)
 				require.NoError(t, err)
-				require.Equal(t, testClaims().Actor.ExternalId, actor.ExternalId)
+				require.Equal(t, testClaims().Actor.Spec.ExternalId, actor.ExternalId)
 			})
 
 			t.Run("actor loaded from database", func(t *testing.T) {
@@ -538,7 +557,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 				dbActor := &database.Actor{
 					Id:         dbActorId,
 					Namespace:  "root",
-					ExternalId: testClaims().Actor.ExternalId,
+					ExternalId: testClaims().Actor.Spec.ExternalId,
 				}
 				require.NoError(t, db.CreateActor(testContext, dbActor))
 
@@ -554,7 +573,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 				ra, err := raw.establishAuthFromRequest(testContext, true, req, w)
 				require.NoError(t, err)
 				require.True(t, ra.IsAuthenticated())
-				require.Equal(t, testClaims().Actor.ExternalId, ra.MustGetActor().ExternalId)
+				require.Equal(t, testClaims().Actor.Spec.ExternalId, ra.MustGetActor().ExternalId)
 			})
 
 			t.Run("actor permissions updated in database", func(t *testing.T) {
@@ -600,11 +619,11 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 						NotBefore: &jwt.NumericDate{time.Date(2018, 5, 21, 6, 30, 22, 0, time.UTC)},
 						IssuedAt:  &jwt.NumericDate{apctx.GetClock(testContext).Now()},
 					},
-					Actor: &core.Actor{
+					Actor: jwtActor(&core.Actor{
 						ExternalId:  externalId,
 						Namespace:   "root",
 						Permissions: newPerms,
-					},
+					}),
 				}
 
 				tok, err := a.Token(testContext, claims)
@@ -651,11 +670,11 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 						NotBefore: &jwt.NumericDate{time.Date(2018, 5, 21, 6, 30, 22, 0, time.UTC)},
 						IssuedAt:  &jwt.NumericDate{apctx.GetClock(testContext).Now()},
 					},
-					Actor: &core.Actor{
+					Actor: jwtActor(&core.Actor{
 						ExternalId:  externalId,
 						Namespace:   "root",
 						Annotations: map[string]string{"tenant": "acme"},
-					},
+					}),
 				}
 
 				tok, err := a.Token(testContext, claims)
@@ -694,7 +713,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 			_, err = raw.establishAuthFromRequest(futureCtx, true, req, w)
 			require.NotNil(t, err)
 
-			actor, err := db.GetActorByExternalId(testContext, "root", testClaims().Actor.ExternalId)
+			actor, err := db.GetActorByExternalId(testContext, "root", testClaims().Actor.Spec.ExternalId)
 			require.ErrorIs(t, err, database.ErrNotFound)
 			require.Nil(t, actor)
 		})
@@ -708,7 +727,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 			_, err := raw.establishAuthFromRequest(testContext, true, req, w)
 			require.NotNil(t, err)
 
-			actor, err := db.GetActorByExternalId(testContext, "root", testClaims().Actor.ExternalId)
+			actor, err := db.GetActorByExternalId(testContext, "root", testClaims().Actor.Spec.ExternalId)
 			require.ErrorIs(t, err, database.ErrNotFound)
 			require.Nil(t, actor)
 		})
@@ -785,10 +804,9 @@ func TestAuth_ActorPermissionsSync(t *testing.T) {
 			},
 			Actors: &sconfig.ConfiguredActors{
 				InnerVal: sconfig.ConfiguredActorsList{
-					&sconfig.ConfiguredActor{
-						ExternalId:  "aid1",
-						Permissions: configPerms,
-						Key: &sconfig.Key{
+					testConfiguredActor(
+						"aid1",
+						&sconfig.Key{
 							InnerVal: &sconfig.KeyPublicPrivate{
 								PublicKey: &sconfig.KeyData{
 									InnerVal: &sconfig.KeyDataFile{
@@ -802,7 +820,8 @@ func TestAuth_ActorPermissionsSync(t *testing.T) {
 								},
 							},
 						},
-					},
+						configPerms,
+					),
 				},
 			},
 			GlobalAESKey: &sconfig.KeyData{
@@ -977,19 +996,14 @@ func TestAuth_TopLevelPermissionsRestrictRequest(t *testing.T) {
 			Resources: []string{"connections"},
 			Verbs:     []string{"list"},
 		},
-		{
-			Namespace: "root.**",
-			Resources: []string{"actors"},
-			Verbs:     []string{"list"},
-		},
 	}
 
 	claims := *testClaims()
-	claims.Actor = &core.Actor{
+	claims.Actor = jwtActor(&core.Actor{
 		ExternalId:  "grafana-token",
 		Namespace:   "root",
 		Permissions: actorPermissions,
-	}
+	})
 	claims.Subject = "grafana-token"
 	claims.Permissions = tokenPermissions
 
@@ -1007,6 +1021,56 @@ func TestAuth_TopLevelPermissionsRestrictRequest(t *testing.T) {
 	require.True(t, ra.Allows("root.prod", "connections", "list", ""))
 	require.False(t, ra.Allows("root.prod", "connections", "get", ""))
 	require.False(t, ra.Allows("root.prod", "actors", "list", ""))
+}
+
+func TestAuth_TopLevelPermissionsCannotEscalateDatabaseActor(t *testing.T) {
+	cfg := config.FromRoot(&testConfigPublicPrivateKey)
+	cfg, db := database.MustApplyBlankTestDbConfig(t, cfg)
+	authService := NewService(
+		cfg,
+		cfg.MustGetService(sconfig.ServiceIdAdminApi).(sconfig.HttpService),
+		db,
+		nil,
+		nil,
+		test_utils.NewTestLogger(),
+	)
+	raw := authService.(*service)
+
+	externalID := "restricted-database-actor"
+	require.NoError(t, db.EnsureNamespaceByPath(testContext, "root.platform"))
+	require.NoError(t, db.CreateActor(testContext, &database.Actor{
+		Id:         apid.New(apid.PrefixActor),
+		ExternalId: externalID,
+		Namespace:  "root.platform",
+		Permissions: database.Permissions{{
+			Namespace: "root.platform.**",
+			Resources: []string{"connections"},
+			Verbs:     []string{"get"},
+		}},
+	}))
+
+	claims := &jwt2.AuthProxyClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:  externalID,
+			Audience: []string{string(sconfig.ServiceIdAdminApi)},
+		},
+		Namespace: "root.platform",
+		Permissions: []aschema.Permission{{
+			Namespace: "root.**",
+			Resources: []string{"actors"},
+			Verbs:     []string{"delete"},
+		}},
+	}
+	token, err := authService.Token(testContext, claims)
+	require.NoError(t, err)
+
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Add(JwtHeaderKey, fmt.Sprintf("Bearer %s", token))
+	ra, err := raw.establishAuthFromRequest(testContext, true, req, httptest.NewRecorder())
+	require.Error(t, err)
+	require.ErrorIs(t, err, jwt2.ErrInvalidClaims)
+	require.Contains(t, err.Error(), "token permissions exceed actor permissions")
+	require.False(t, ra.IsAuthenticated())
 }
 
 func TestAuth_Nonce(t *testing.T) {
@@ -1049,7 +1113,7 @@ func TestAuth_Nonce(t *testing.T) {
 		req := httptest.NewRequest("GET", "/?authToken="+tok, nil).WithContext(ctx)
 		ts.Gin.ServeHTTP(w, req)
 		require.Equal(t, http.StatusOK, w.Code)
-		require.Equal(t, c.Actor.ExternalId, w.Body.String())
+		require.Equal(t, c.Actor.Spec.ExternalId, w.Body.String())
 	})
 
 	t.Run("expired", func(t *testing.T) {
@@ -1083,7 +1147,7 @@ func TestAuth_Nonce(t *testing.T) {
 		req := httptest.NewRequest("GET", "/?authToken="+tok, nil).WithContext(ctx)
 		ts.Gin.ServeHTTP(w, req)
 		require.Equal(t, http.StatusOK, w.Code)
-		require.Equal(t, c.Actor.ExternalId, w.Body.String())
+		require.Equal(t, c.Actor.Spec.ExternalId, w.Body.String())
 
 		// Second request fail
 		w = httptest.NewRecorder()
@@ -1147,10 +1211,10 @@ func testClaims() *jwt2.AuthProxyClaims {
 		},
 
 		Namespace: "root",
-		Actor: &core.Actor{
+		Actor: jwtActor(&core.Actor{
 			ExternalId: "id1",
 			Namespace:  "root",
-		},
+		}),
 	}
 }
 
@@ -1174,9 +1238,9 @@ var testConfigPublicPrivateKey = sconfig.Root{
 		},
 		Actors: &sconfig.ConfiguredActors{
 			InnerVal: sconfig.ConfiguredActorsList{
-				&sconfig.ConfiguredActor{
-					ExternalId: "aid1",
-					Key: &sconfig.Key{
+				testConfiguredActor(
+					"aid1",
+					&sconfig.Key{
 						InnerVal: &sconfig.KeyPublicPrivate{
 							PublicKey: &sconfig.KeyData{
 								InnerVal: &sconfig.KeyDataFile{
@@ -1190,7 +1254,8 @@ var testConfigPublicPrivateKey = sconfig.Root{
 							},
 						},
 					},
-				},
+					nil,
+				),
 			},
 		},
 		GlobalAESKey: &sconfig.KeyData{

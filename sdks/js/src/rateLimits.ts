@@ -1,10 +1,21 @@
 import { client } from './client';
-import { ListResponse } from './common';
+import {
+    ActionRequest,
+    ActionResponse,
+    GenerationlessObjectReference,
+    MutableResourceMetadata,
+    NamespacedCreateMetadata,
+    ObjectMetadata,
+    ResourceList,
+    TypeMeta,
+    actionRequest,
+    objectReference,
+} from './common';
 import { ProxyRequest } from './proxy';
 
-// Rate-limit models. Mirror the server's routes.RateLimitJson shape and
-// the internal rate_limit schema package — kept here verbatim so SDK
-// consumers can author definitions in TypeScript with full type safety.
+// Rate-limit models mirror the canonical authproxy.net/v1alpha1 resource.
+
+export const RATE_LIMIT_KIND = 'RateLimit' as const;
 
 export enum RateLimitMode {
     ENFORCE = 'enforce',
@@ -69,44 +80,64 @@ export interface RateLimitTokenBucket {
  * Tagged union — exactly one variant must be set. The server (and the
  * Terraform provider) validate this at write time.
  */
-export interface RateLimitAlgorithm {
-    fixedWindow?: RateLimitFixedWindow;
-    slidingWindow?: RateLimitSlidingWindow;
-    tokenBucket?: RateLimitTokenBucket;
-}
+export type RateLimitAlgorithm =
+    | {fixedWindow: RateLimitFixedWindow; slidingWindow?: never; tokenBucket?: never}
+    | {slidingWindow: RateLimitSlidingWindow; fixedWindow?: never; tokenBucket?: never}
+    | {tokenBucket: RateLimitTokenBucket; fixedWindow?: never; slidingWindow?: never};
 
-export interface RateLimitDefinition {
+export type RateLimitConnectorReference = GenerationlessObjectReference<'Connector'>;
+
+export type RateLimitConnectionReference = GenerationlessObjectReference<'Connection'>;
+
+export type RateLimitScope =
+    | {namespaceMatcher: string; connectorRef?: never; connectionRef?: never}
+    | {connectorRef: RateLimitConnectorReference; connectionRef?: never; namespaceMatcher?: never}
+    | {connectionRef: RateLimitConnectionReference; connectorRef?: never; namespaceMatcher?: never};
+
+export interface RateLimitSpec {
+    /** Omit to apply across metadata.namespace and all descendants. */
+    scope?: RateLimitScope;
     mode?: RateLimitMode;
     selector: RateLimitSelector;
     bucket: RateLimitBucket;
     algorithm: RateLimitAlgorithm;
 }
 
-export interface RateLimit {
+export interface RateLimitMetadata extends ObjectMetadata {
     id: string;
     name: string;
     namespace: string;
-    definition: RateLimitDefinition;
-    labels?: Record<string, string>;
-    annotations?: Record<string, string>;
     createdAt: string;
     updatedAt: string;
 }
 
-export interface CreateRateLimitRequest {
-    namespace: string;
-    name?: string;
-    definition: RateLimitDefinition;
-    labels?: Record<string, string>;
-    annotations?: Record<string, string>;
+export interface RateLimitStatus {
+    effectiveMode: RateLimitMode;
 }
 
-export interface UpdateRateLimitRequest {
-    name?: string;
-    definition?: RateLimitDefinition;
-    labels?: Record<string, string>;
-    annotations?: Record<string, string>;
+export interface RateLimit extends TypeMeta<typeof RATE_LIMIT_KIND> {
+    metadata: RateLimitMetadata;
+    spec: RateLimitSpec;
+    status: RateLimitStatus;
 }
+
+export interface CreateRateLimitRequest extends TypeMeta<typeof RATE_LIMIT_KIND> {
+    metadata: NamespacedCreateMetadata;
+    spec: RateLimitSpec;
+}
+
+export interface UpdateRateLimitRequest extends TypeMeta<typeof RATE_LIMIT_KIND> {
+    metadata: MutableResourceMetadata;
+    spec: {
+        scope?: RateLimitScope | null;
+        mode?: RateLimitMode;
+        selector?: RateLimitSelector;
+        bucket?: RateLimitBucket;
+        algorithm?: RateLimitAlgorithm;
+    };
+}
+
+export type RateLimitList = ResourceList<RateLimit>;
 
 export interface ListRateLimitsParams {
     name?: string;
@@ -120,8 +151,8 @@ export interface ListRateLimitsParams {
 /**
  * List rate limits with optional filtering and pagination.
  */
-export const listRateLimits = (params: ListRateLimitsParams) => {
-    return client.get<ListResponse<RateLimit>>('/api/v1/rate-limits', { params });
+export const listRateLimits = (params?: ListRateLimitsParams) => {
+    return client.get<RateLimitList>('/api/v1/rate-limits', { params });
 };
 
 /**
@@ -139,8 +170,8 @@ export const getRateLimit = (id: string) => {
 };
 
 /**
- * Update a rate limit's definition, labels, or annotations. Pass only the
- * fields you want to change; omitted fields are left untouched.
+ * Update a rate limit's spec or metadata. Fields omitted inside metadata and
+ * spec are left untouched; scope may be null to restore namespace scope.
  */
 export const updateRateLimit = (id: string, request: UpdateRateLimitRequest) => {
     return client.patch<RateLimit>(`/api/v1/rate-limits/${id}`, request);
@@ -163,11 +194,20 @@ export const deleteRateLimit = (id: string) => {
 export interface DryRunRateLimitRequest {
     request: ProxyRequest;
     requestType: string;
-    context: {
-        connectionId?: string;
+    context: (
+        | {connectionId: string; namespace?: never}
+        | {namespace: string; connectionId?: never}
+    ) & {
         actorId?: string;
-        namespace?: string;
     };
+}
+
+export const RATE_LIMIT_DRY_RUN_KIND = 'RateLimitDryRun' as const;
+
+export interface DryRunRateLimitSpec {
+    request: ProxyRequest;
+    requestType: string;
+    actorRef?: GenerationlessObjectReference<'Actor'>;
 }
 
 export interface DryRunRateLimitMatch {
@@ -194,11 +234,24 @@ export interface DryRunRateLimitNotMatched {
     reason: string;
 }
 
-export interface DryRunRateLimitResponse {
+export interface DryRunRateLimitStatus {
     requestLabelSnapshot: Record<string, string>;
     matched: DryRunRateLimitMatch[];
     notMatched: DryRunRateLimitNotMatched[];
 }
+
+export type DryRunRateLimitActionRequest = ActionRequest<
+    typeof RATE_LIMIT_DRY_RUN_KIND,
+    'Connection' | 'Namespace',
+    DryRunRateLimitSpec
+>;
+
+export type DryRunRateLimitResponse = ActionResponse<
+    typeof RATE_LIMIT_DRY_RUN_KIND,
+    'Connection' | 'Namespace',
+    DryRunRateLimitSpec,
+    DryRunRateLimitStatus
+>;
 
 /**
  * Evaluate which rate limits would apply to a synthesized request, and
@@ -208,44 +261,23 @@ export interface DryRunRateLimitResponse {
  * traffic.
  */
 export const dryRunRateLimit = (req: DryRunRateLimitRequest) => {
-    return client.post<DryRunRateLimitResponse>('/api/v1/rate-limits/_dryRun', req);
+    const target = req.context.connectionId
+        ? objectReference('Connection', {id: req.context.connectionId})
+        : objectReference('Namespace', {id: req.context.namespace});
+    const spec: DryRunRateLimitSpec = {
+        request: req.request,
+        requestType: req.requestType,
+        ...(req.context.actorId
+            ? {actorRef: objectReference('Actor', {id: req.context.actorId})}
+            : {}),
+    };
+    const action: DryRunRateLimitActionRequest = actionRequest(
+        RATE_LIMIT_DRY_RUN_KIND,
+        target,
+        spec,
+    );
+    return client.post<DryRunRateLimitResponse>('/api/v1/rate-limits/_dryRun', action);
 };
-
-// --- Label & annotation sub-resources, identical shape to keys. ---
-
-export interface RateLimitLabel {
-    key: string;
-    value: string;
-}
-
-export interface RateLimitAnnotation {
-    key: string;
-    value: string;
-}
-
-export const getRateLimitLabels = (id: string) =>
-    client.get<Record<string, string>>(`/api/v1/rate-limits/${id}/labels`);
-
-export const getRateLimitLabel = (id: string, labelKey: string) =>
-    client.get<RateLimitLabel>(`/api/v1/rate-limits/${id}/labels/${labelKey}`);
-
-export const putRateLimitLabel = (id: string, labelKey: string, value: string) =>
-    client.put<RateLimitLabel>(`/api/v1/rate-limits/${id}/labels/${labelKey}`, { value });
-
-export const deleteRateLimitLabel = (id: string, labelKey: string) =>
-    client.delete(`/api/v1/rate-limits/${id}/labels/${labelKey}`);
-
-export const getRateLimitAnnotations = (id: string) =>
-    client.get<Record<string, string>>(`/api/v1/rate-limits/${id}/annotations`);
-
-export const getRateLimitAnnotation = (id: string, annotationKey: string) =>
-    client.get<RateLimitAnnotation>(`/api/v1/rate-limits/${id}/annotations/${annotationKey}`);
-
-export const putRateLimitAnnotation = (id: string, annotationKey: string, value: string) =>
-    client.put<RateLimitAnnotation>(`/api/v1/rate-limits/${id}/annotations/${annotationKey}`, { value });
-
-export const deleteRateLimitAnnotation = (id: string, annotationKey: string) =>
-    client.delete(`/api/v1/rate-limits/${id}/annotations/${annotationKey}`);
 
 export const rateLimits = {
     list: listRateLimits,
@@ -254,12 +286,4 @@ export const rateLimits = {
     update: updateRateLimit,
     delete: deleteRateLimit,
     dryRun: dryRunRateLimit,
-    getLabels: getRateLimitLabels,
-    getLabel: getRateLimitLabel,
-    putLabel: putRateLimitLabel,
-    deleteLabel: deleteRateLimitLabel,
-    getAnnotations: getRateLimitAnnotations,
-    getAnnotation: getRateLimitAnnotation,
-    putAnnotation: putRateLimitAnnotation,
-    deleteAnnotation: deleteRateLimitAnnotation,
 };

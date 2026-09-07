@@ -81,7 +81,7 @@ func (r *ConnectionsProxyRoutes) proxy(gctx *gin.Context) {
 	}
 
 	var proxyRequest iface.ProxyRequest
-	if err := bindJSONBody(gctx, &proxyRequest); err != nil {
+	if err := apgin.BindJSONBody(gctx, &proxyRequest); err != nil {
 		apgin.WriteError(gctx, r.logger, httperr.BadRequest("invalid proxy request payload", httperr.WithInternalErr(err)))
 		return
 	}

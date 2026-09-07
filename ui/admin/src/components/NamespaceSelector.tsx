@@ -34,7 +34,13 @@ import {
 import CircularProgress from "@mui/material/CircularProgress";
 import {AppDispatch} from "../store";
 import {useEffect} from "react";
-import {NAMESPACE_PATH_SEPARATOR, namespaces, ROOT_NAMESPACE_PATH} from "@authproxy/api";
+import {
+    API_VERSION,
+    NAMESPACE_KIND,
+    NAMESPACE_PATH_SEPARATOR,
+    namespaces,
+    ROOT_NAMESPACE_PATH,
+} from "@authproxy/api";
 import {useCommandPalette} from '../search/CommandPalette';
 import {useNavigate} from 'react-router-dom';
 import {namespaceDetailPath} from '../util';
@@ -134,12 +140,12 @@ export default function NamespaceSelector() {
     const [createLoading, setCreateLoading] = React.useState(false);
 
     useEffect(() => {
-        setVal(ns?.path || "");
+        setVal(ns?.metadata.id || "");
     }, [ns]);
 
     const refreshList = () => {
-        if(ns?.path) {
-            dispatch(setCurrentNamespace(ns.path));
+        if(ns?.metadata.id) {
+            dispatch(setCurrentNamespace(ns.metadata.id));
         }
     }
 
@@ -175,7 +181,7 @@ export default function NamespaceSelector() {
         }
 
         if (path === ACTION_VIEW_CURRENT) {
-            navigate(namespaceDetailPath(ns?.path || ROOT_NAMESPACE_PATH));
+            navigate(namespaceDetailPath(ns?.metadata.id || ROOT_NAMESPACE_PATH));
             return;
         }
 
@@ -184,7 +190,7 @@ export default function NamespaceSelector() {
         }
 
         if (path === ACTION_NAVIGATE_PARENT) {
-            path = parentNamespace(ns?.path);
+            path = parentNamespace(ns?.metadata.id);
         }
 
         if (path.startsWith(ACTION_PREFIX)) {
@@ -195,7 +201,7 @@ export default function NamespaceSelector() {
         setVal(path);
     };
 
-    const createNamespacePath = childNamespacePath(ns?.path, createName.trim());
+    const createNamespacePath = childNamespacePath(ns?.metadata.id, createName.trim());
 
     const submitCreate = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -207,15 +213,20 @@ export default function NamespaceSelector() {
             return;
         }
 
-        const path = childNamespacePath(ns?.path, leafName);
+        const parentPath = ns?.metadata.id || ROOT_NAMESPACE_PATH;
         setCreateError(null);
         setCreateLoading(true);
         try {
-            const res = await namespaces.create({path});
+            const res = await namespaces.create({
+                apiVersion: API_VERSION,
+                kind: NAMESPACE_KIND,
+                metadata: {name: leafName, namespace: parentPath},
+                spec: {},
+            });
             setCreateOpen(false);
             setCreateName("");
-            dispatch(setCurrentNamespace(res.data.path));
-            setVal(res.data.path);
+            dispatch(setCurrentNamespace(res.data.metadata.id));
+            setVal(res.data.metadata.id);
         } catch (err: any) {
             const msg = err?.response?.data?.error || err.message || 'Failed to create namespace';
             setCreateError(msg);
@@ -235,16 +246,16 @@ export default function NamespaceSelector() {
 
     if(loadingStatus === 'succeeded') {
         currentNamespaceItem = (
-            <MenuItem value={ns?.path}>
+            <MenuItem value={ns?.metadata.id}>
                 <ListItemAvatar>
-                    <Avatar alt={ns?.path}>
-                        {ns?.path == ROOT_NAMESPACE_PATH ?
+                    <Avatar alt={ns?.metadata.id}>
+                        {ns?.metadata.id == ROOT_NAMESPACE_PATH ?
                             <AccountTreeIcon sx={{fontSize: '1rem'}}/> :
                             <FolderIcon sx={{fontSize: '1rem'}}/>
                         }
                     </Avatar>
                 </ListItemAvatar>
-                <ListItemText primary={leafNamespace(ns?.path)} secondary={ns?.path}/>
+                <ListItemText primary={leafNamespace(ns?.metadata.id)} secondary={ns?.metadata.id}/>
             </MenuItem>
         );
     } else if(loadingStatus === 'failed') {
@@ -272,13 +283,13 @@ export default function NamespaceSelector() {
     if(childLoadingStatus === 'succeeded') {
         childNamespaceItems = children.flatMap((child, idx) => {
             const items = [
-                <MenuItem key={child?.path} value={child?.path}>
+                <MenuItem key={child.metadata.id} value={child.metadata.id}>
                     <ListItemAvatar>
-                        <Avatar alt={child?.path}>
+                        <Avatar alt={child.metadata.id}>
                             <FolderIcon sx={{fontSize: '1rem'}}/>
                         </Avatar>
                     </ListItemAvatar>
-                    <ListItemText primary={leafNamespace(child?.path)} secondary={child?.path}/>
+                    <ListItemText primary={leafNamespace(child.metadata.id)} secondary={child.metadata.id}/>
                 </MenuItem>
             ];
 
@@ -353,14 +364,14 @@ export default function NamespaceSelector() {
                     ])
                 }
 
-                {depth(ns?.path) > 0 ?
+                {depth(ns?.metadata.id) > 0 ?
                     ([
                         <ListSubheader key="navigate-header" sx={{pt: 0}}>Navigate</ListSubheader>,
                         <MenuItem key={ACTION_NAVIGATE_PARENT} value={ACTION_NAVIGATE_PARENT}>
                             <ListItemIcon>
                                 <ArrowBackIcon />
                             </ListItemIcon>
-                            <ListItemText primary="Go to parent" secondary={`Return to ${parentNamespace(ns?.path)}`} />
+                            <ListItemText primary="Go to parent" secondary={`Return to ${parentNamespace(ns?.metadata.id)}`} />
                         </MenuItem>
                     ]) : []
                 }
@@ -372,7 +383,7 @@ export default function NamespaceSelector() {
                     </ListItemIcon>
                     <ListItemText primary="View Current" secondary="Open namespace details" />
                 </MenuItem>
-                {depth(ns?.path) > 0 ? (
+                {depth(ns?.metadata.id) > 0 ? (
                     <MenuItem value={ACTION_NAVIGATE_ROOT}>
                         <ListItemIcon>
                             <AccountTreeIcon sx={{fontSize: '1rem'}}/>
@@ -390,7 +401,7 @@ export default function NamespaceSelector() {
                     <ListItemIcon>
                         <AddRoundedIcon />
                     </ListItemIcon>
-                    <ListItemText primary="Add namespace" secondary={`Add a new namespace under ${ns?.path || 'root'}.`} />
+                    <ListItemText primary="Add namespace" secondary={`Add a new namespace under ${ns?.metadata.id || 'root'}.`} />
                 </MenuItem>
             </Select>
             <Dialog

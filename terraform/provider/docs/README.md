@@ -33,6 +33,7 @@ provider "authproxy" {
 - `authproxy_key` - Manages keys
 - `authproxy_actor` - Manages actors (users/entities that own connections)
 - `authproxy_connector` - Manages connectors with automatic version lifecycle
+- `authproxy_rate_limit` - Manages namespace-scoped rate-limit policies
 
 ## Data Sources
 
@@ -40,6 +41,32 @@ provider "authproxy" {
 - `data.authproxy_key` - Reads an existing key
 - `data.authproxy_actor` - Reads an existing actor
 - `data.authproxy_connector` - Reads an existing connector
+
+## API Resource Mapping
+
+The provider keeps its idiomatic HCL interface while communicating with the
+admin API using `authproxy.net/v1alpha1` resources. Users do not write the API
+envelope in HCL; the provider maps fields as follows:
+
+| Terraform value | API field |
+|---|---|
+| Resource or namespace ID/path | `metadata.id` |
+| Namespace ownership | `metadata.namespace` |
+| Labels and annotations | `metadata.labels` and `metadata.annotations` |
+| Connector `version` | `metadata.generation` |
+| Desired configuration | `spec` |
+| Observed lifecycle state | `status` |
+
+Connector `definition` maps only to `spec.definition`; connector identity,
+labels, annotations, generation, and release state are never mixed into that
+document. Connector definitions are sensitive because they may contain OAuth
+client secrets. Terraform still stores sensitive values in state, so use an
+encrypted state backend with appropriately restricted access. When the API
+redacts a connector secret on read, the provider retains the prior state value
+at that field and continues detecting drift in non-secret fields.
+
+Managed key material and actor signing material are write-only API values and
+are not exposed by this provider's HCL schema or copied into Terraform state.
 
 ## Building
 

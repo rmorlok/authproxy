@@ -36,11 +36,14 @@ func Test_SchemaAgainstRealData(t *testing.T) {
 	c := jsonschemav5.NewCompiler()
 
 	_ = loadSchema(t, c, "../resources/namespace/schema.json")
+	_ = loadSchema(t, c, "../resources/meta/schema.json")
 	_ = loadSchema(t, c, "../auth/schema.json")
 	_ = loadSchema(t, c, "../common/schema.json")
 	_ = loadSchema(t, c, "../resources/connectors/schema-oauth.json")
 	_ = loadSchema(t, c, "../resources/connectors/schema.json")
 	_ = loadSchema(t, c, "../resources/key/schema.json")
+	_ = loadSchema(t, c, "../resources/actor/schema.json")
+	_ = loadSchema(t, c, "../resources/rate_limit/schema.json")
 	schemaId := loadSchema(t, c, "./schema.json")
 
 	require.Equal(t, SchemaIdConfig, schemaId, "schema ID should be the same as the one in the schema")
@@ -99,11 +102,14 @@ func Test_SchemaAppMetricsShape(t *testing.T) {
 	c := jsonschemav5.NewCompiler()
 
 	_ = loadSchema(t, c, "../resources/namespace/schema.json")
+	_ = loadSchema(t, c, "../resources/meta/schema.json")
 	_ = loadSchema(t, c, "../auth/schema.json")
 	_ = loadSchema(t, c, "../common/schema.json")
 	_ = loadSchema(t, c, "../resources/connectors/schema-oauth.json")
 	_ = loadSchema(t, c, "../resources/connectors/schema.json")
 	_ = loadSchema(t, c, "../resources/key/schema.json")
+	_ = loadSchema(t, c, "../resources/actor/schema.json")
+	_ = loadSchema(t, c, "../resources/rate_limit/schema.json")
 	schemaId := loadSchema(t, c, "./schema.json")
 
 	schema, err := c.Compile(schemaId)
@@ -164,11 +170,14 @@ func compileTestSchema(t *testing.T, schemaJSON string) *jsonschemav5.Schema {
 	c := jsonschemav5.NewCompiler()
 
 	_ = loadSchema(t, c, "../resources/namespace/schema.json")
+	_ = loadSchema(t, c, "../resources/meta/schema.json")
 	_ = loadSchema(t, c, "../auth/schema.json")
 	_ = loadSchema(t, c, "../common/schema.json")
 	_ = loadSchema(t, c, "../resources/connectors/schema-oauth.json")
 	_ = loadSchema(t, c, "../resources/connectors/schema.json")
 	_ = loadSchema(t, c, "../resources/key/schema.json")
+	_ = loadSchema(t, c, "../resources/actor/schema.json")
+	_ = loadSchema(t, c, "../resources/rate_limit/schema.json")
 
 	sid := loadSchema(t, c, "./schema.json")
 	require.Equal(t, SchemaIdConfig, sid)
@@ -294,7 +303,7 @@ func TestSchemaDefinitions(t *testing.T) {
   "required": ["test"],
   "properties": {
 	"test": {
-		"$ref": "../resources/key/schema.json#/$defs/Key"
+		"$ref": "../resources/key/schema.json#/$defs/SigningKey"
     }
   }
 }`,
@@ -735,54 +744,6 @@ func TestSchemaDefinitions(t *testing.T) {
 			},
 		},
 		{
-			Name: "ConfiguredActor",
-			Schema: `
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/schema/config/test.json",
-  "type": "object",
-  "additionalProperties": false,
-  "required": ["test"],
-  "properties": {
-	"test": {
-		"$ref": "./schema.json#/$defs/ConfiguredActor"
-    }
-  }
-}`,
-			Tests: []test{
-				{
-					Name:  "minimal",
-					Valid: true,
-					Data:  `{"test": {"externalId": "actor-1", "key": {"sharedKey": {"value": "secret"}}}}`,
-				},
-				{
-					Name:  "with permissions",
-					Valid: true,
-					Data:  `{"test": {"externalId": "actor-1", "namespace": "root.operators", "key": {"sharedKey": {"value": "secret"}}, "permissions": [{"namespace": "root", "resources": ["*"], "verbs": ["*"]}]}}`,
-				},
-				{
-					Name:  "with labels",
-					Valid: true,
-					Data:  `{"test": {"externalId": "actor-1", "key": {"sharedKey": {"value": "secret"}}, "labels": {"env": "prod"}}}`,
-				},
-				{
-					Name:  "missing external_id",
-					Valid: false,
-					Data:  `{"test": {"key": {"sharedKey": {"value": "secret"}}}}`,
-				},
-				{
-					Name:  "missing key",
-					Valid: false,
-					Data:  `{"test": {"externalId": "actor-1"}}`,
-				},
-				{
-					Name:  "invalid namespace",
-					Valid: false,
-					Data:  `{"test": {"externalId": "actor-1", "namespace": "other", "key": {"sharedKey": {"value": "secret"}}}}`,
-				},
-			},
-		},
-		{
 			Name: "ConfiguredActors",
 			Schema: `
 {
@@ -801,6 +762,11 @@ func TestSchemaDefinitions(t *testing.T) {
 				{
 					Name:  "inline list",
 					Valid: true,
+					Data:  `{"test": [{"apiVersion":"authproxy.net/v1alpha1","kind":"Actor","metadata":{"namespace":"root"},"spec":{"externalId":"actor-1","signingKey":{"sharedKey":{"value":"secret"}}}}]}`,
+				},
+				{
+					Name:  "legacy inline actor rejected",
+					Valid: false,
 					Data:  `{"test": [{"externalId": "actor-1", "key": {"sharedKey": {"value": "secret"}}}]}`,
 				},
 				{
@@ -990,7 +956,7 @@ func TestSchemaDefinitions(t *testing.T) {
 				{
 					Name:  "actors as inline list",
 					Valid: true,
-					Data:  `{"test": {"actors": [{"externalId": "svc", "key": {"sharedKey": {"value": "secret"}}}]}}`,
+					Data:  `{"test":{"actors":[{"apiVersion":"authproxy.net/v1alpha1","kind":"Actor","metadata":{"namespace":"root"},"spec":{"externalId":"svc","signingKey":{"sharedKey":{"value":"secret"}}}}]}}`,
 				},
 				{
 					Name:  "extra property",
@@ -1033,12 +999,55 @@ func TestSchemaDefinitions(t *testing.T) {
 				{
 					Name:  "connector with name",
 					Valid: true,
-					Data:  `{"test":{"loadFromList":[{"name":"example","labels":{},"displayName":"Example","logo":{"publicUrl":"https://example.com/logo.svg"},"auth":{"type":"no-auth"}}]}}`,
+					Data:  `{"test":{"loadFromList":[{"apiVersion":"authproxy.net/v1alpha1","kind":"Connector","metadata":{"name":"example","labels":{}},"spec":{"definition":{"displayName":"Example","logo":{"publicUrl":"https://example.com/logo.svg"},"auth":{"type":"no-auth"}}}}]}}`,
 				},
 				{
 					Name:  "connector without id or name",
 					Valid: false,
-					Data:  `{"test":{"loadFromList":[{"labels":{},"displayName":"Example","logo":{"publicUrl":"https://example.com/logo.svg"},"auth":{"type":"no-auth"}}]}}`,
+					Data:  `{"test":{"loadFromList":[{"apiVersion":"authproxy.net/v1alpha1","kind":"Connector","metadata":{"labels":{}},"spec":{"definition":{"displayName":"Example","logo":{"publicUrl":"https://example.com/logo.svg"},"auth":{"type":"no-auth"}}}}]}}`,
+				},
+				{
+					Name:  "extra property",
+					Valid: false,
+					Data:  `{"test": {"extra": "field"}}`,
+				},
+			},
+		},
+		{
+			Name: "RateLimits",
+			Schema: `
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/schema/config/test.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["test"],
+  "properties": {
+	"test": {
+		"$ref": "./schema.json#/$defs/RateLimits"
+    }
+  }
+}`,
+			Tests: []test{
+				{
+					Name:  "minimal",
+					Valid: true,
+					Data:  `{"test": {}}`,
+				},
+				{
+					Name:  "canonical resource",
+					Valid: true,
+					Data:  `{"test":{"loadFromList":[{"apiVersion":"authproxy.net/v1alpha1","kind":"RateLimit","metadata":{"name":"tenant-default","namespace":"root.acme"},"spec":{"scope":{"namespaceMatcher":"root.acme.payments.**"},"selector":{},"bucket":{},"algorithm":{"tokenBucket":{"capacity":10,"refillRate":1}}}}]}}`,
+				},
+				{
+					Name:  "resource without id or name",
+					Valid: false,
+					Data:  `{"test":{"loadFromList":[{"apiVersion":"authproxy.net/v1alpha1","kind":"RateLimit","metadata":{"namespace":"root.acme"},"spec":{"selector":{},"bucket":{},"algorithm":{"tokenBucket":{"capacity":10,"refillRate":1}}}}]}}`,
+				},
+				{
+					Name:  "legacy flat resource",
+					Valid: false,
+					Data:  `{"test":{"loadFromList":[{"name":"tenant-default","namespace":"root.acme","definition":{"selector":{},"bucket":{},"algorithm":{"tokenBucket":{"capacity":10,"refillRate":1}}}}]}}`,
 				},
 				{
 					Name:  "extra property",

@@ -15,6 +15,7 @@ import (
 	"github.com/rmorlok/authproxy/integration_tests/helpers"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
+	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
@@ -58,7 +59,7 @@ func newScopeMismatchSetup(t *testing.T, name string, required, optional []strin
 	scopes := append([]string{}, required...)
 	scopes = append(scopes, optional...)
 
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 	connector := helpers.NewOAuth2Connector(connectorID, name, provider, helpers.OAuth2ConnectorOptions{
 		ClientID:       clientKey,
 		ClientSecret:   clientSecret,
@@ -170,8 +171,17 @@ func (s *scopeMismatchSetup) fetchConnectionScopes(t *testing.T, connectionID st
 		return resp.StatusCode, nil
 	}
 
-	var out map[string][]string
-	require.NoErrorf(t, json.Unmarshal(body, &out), "decode scopes body: %s", string(body))
+	var list schemaapi.ConnectionScopeList
+	require.NoErrorf(t, json.Unmarshal(body, &list), "decode scopes body: %s", string(body))
+	out := map[string][]string{"requested": {}, "granted": {}}
+	for _, scope := range list.Items {
+		if scope.Requested {
+			out["requested"] = append(out["requested"], scope.Name)
+		}
+		if scope.Granted {
+			out["granted"] = append(out["granted"], scope.Name)
+		}
+	}
 	return resp.StatusCode, out
 }
 

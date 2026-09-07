@@ -9,6 +9,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	nsschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 )
 
@@ -34,8 +35,8 @@ func (m *Namespace) GetName() common.ResourceName {
 	return nsschema.NameFromPath(m.Path)
 }
 
-func (m *Namespace) GetState() database.NamespaceState {
-	return m.State
+func (m *Namespace) GetState() nsschema.NamespaceState {
+	return nsschema.NamespaceState(m.State)
 }
 
 func (m *Namespace) GetCreatedAt() time.Time {
@@ -58,6 +59,23 @@ func (m *Namespace) GetAnnotations() map[string]string {
 	return m.Annotations
 }
 
+func (m *Namespace) GetResource() *nsschema.Namespace {
+	resource, err := nsschema.NewNamespaceResourceForPath(m.Path)
+	if err != nil {
+		return nil
+	}
+	resource.Metadata.Labels = m.Labels
+	resource.Metadata.Annotations = m.Annotations
+	resource.Metadata.CreatedAt = &m.CreatedAt
+	resource.Metadata.UpdatedAt = &m.UpdatedAt
+	resource.Metadata = meta.NormalizeObjectMeta(resource.Metadata)
+	resource.Status = &nsschema.NamespaceStatus{State: nsschema.NamespaceState(m.State)}
+	if m.KeyId != nil {
+		resource.Spec.EncryptionKeyRef = nsschema.NewEncryptionKeyReference(*m.KeyId)
+	}
+	return resource
+}
+
 var _ iface.Namespace = (*Namespace)(nil)
 
 type NamespaceMatcher struct {
@@ -75,7 +93,7 @@ func (m NamespaceMatcher) Matches(x interface{}) bool {
 		return false
 	}
 
-	if m.ExpectedState != "" && c.GetState() != m.ExpectedState {
+	if m.ExpectedState != "" && c.GetState() != nsschema.NamespaceState(m.ExpectedState) {
 		return false
 	}
 

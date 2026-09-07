@@ -15,6 +15,7 @@ import (
 func DecodeJSONStrict(data []byte, destination any) error {
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
+
 	if err := decoder.Decode(destination); err != nil {
 		return err
 	}
@@ -35,6 +36,7 @@ func DecodeJSONStrict(data []byte, destination any) error {
 func DecodeYAMLStrict(data []byte, destination any) error {
 	decoder := yaml.NewDecoder(bytes.NewReader(data))
 	decoder.KnownFields(true)
+
 	if err := decoder.Decode(destination); err != nil {
 		return err
 	}

@@ -15,18 +15,18 @@ import {
     listQueues,
     listServers,
     listSchedulerEntries,
-    QueueInfo,
-    ServerInfo,
-    SchedulerEntry,
+    TaskQueue,
+    TaskServer,
+    TaskSchedule,
 } from '@authproxy/api';
 
 export default function Tasks() {
     const navigate = useNavigate();
 
-    const [queues, setQueues] = useState<QueueInfo[]>([]);
+    const [queues, setQueues] = useState<TaskQueue[]>([]);
     const [autoRefresh, setAutoRefresh] = useState(true);
-    const [servers, setServers] = useState<ServerInfo[]>([]);
-    const [schedulerEntries, setSchedulerEntries] = useState<SchedulerEntry[]>([]);
+    const [servers, setServers] = useState<TaskServer[]>([]);
+    const [schedulerEntries, setSchedulerEntries] = useState<TaskSchedule[]>([]);
     const [error, setError] = useState<string | null>(null);
 
     const fetchQueues = useCallback(async () => {
@@ -75,55 +75,63 @@ export default function Tasks() {
     }, [autoRefresh, fetchQueues]);
 
     const handleQueueClick: GridEventListener<'rowClick'> = (params) => {
-        navigate(`/internal-tasks/queues/${params.row.queue}`);
+        navigate(`/internal-tasks/queues/${params.row.metadata.id}`);
     };
 
-    const queueColumns: GridColDef<QueueInfo>[] = [
-        {field: 'queue', headerName: 'Queue', flex: 1, minWidth: 120},
-        {field: 'size', headerName: 'Total', flex: 0.4, minWidth: 70},
+    const queueColumns: GridColDef<TaskQueue>[] = [
+        {field: 'queue', headerName: 'Queue', flex: 1, minWidth: 120, valueGetter: (_, row) => row.metadata.id},
+        {field: 'size', headerName: 'Total', flex: 0.4, minWidth: 70, valueGetter: (_, row) => row.status.size},
         {
             field: 'pending', headerName: 'Pending', flex: 0.4, minWidth: 70,
+            valueGetter: (_, row) => row.status.pending,
             renderCell: (params) => params.value ? (
                 <Chip label={params.value} size="small" color="info" variant="outlined"/>
             ) : <span>0</span>,
         },
         {
             field: 'active', headerName: 'Active', flex: 0.4, minWidth: 70,
+            valueGetter: (_, row) => row.status.active,
             renderCell: (params) => params.value ? (
                 <Chip label={params.value} size="small" color="primary" variant="outlined"/>
             ) : <span>0</span>,
         },
-        {field: 'scheduled', headerName: 'Scheduled', flex: 0.4, minWidth: 80},
+        {field: 'scheduled', headerName: 'Scheduled', flex: 0.4, minWidth: 80, valueGetter: (_, row) => row.status.scheduled},
         {
             field: 'retry', headerName: 'Retry', flex: 0.4, minWidth: 70,
+            valueGetter: (_, row) => row.status.retry,
             renderCell: (params) => params.value ? (
                 <Chip label={params.value} size="small" color="warning" variant="outlined"/>
             ) : <span>0</span>,
         },
         {
             field: 'archived', headerName: 'Archived', flex: 0.4, minWidth: 70,
+            valueGetter: (_, row) => row.status.archived,
             renderCell: (params) => params.value ? (
                 <Chip label={params.value} size="small" color="error" variant="outlined"/>
             ) : <span>0</span>,
         },
-        {field: 'completed', headerName: 'Completed', flex: 0.4, minWidth: 80},
+        {field: 'completed', headerName: 'Completed', flex: 0.4, minWidth: 80, valueGetter: (_, row) => row.status.completed},
         {
             field: 'processedTotal', headerName: 'Processed', flex: 0.5, minWidth: 80,
+            valueGetter: (_, row) => row.status.processedTotal,
         },
         {
             field: 'failedTotal', headerName: 'Failed', flex: 0.4, minWidth: 70,
+            valueGetter: (_, row) => row.status.failedTotal,
             renderCell: (params) => params.value ? (
                 <Typography color="error" variant="body2">{params.value}</Typography>
             ) : <span>0</span>,
         },
         {
             field: 'paused', headerName: 'Status', flex: 0.4, minWidth: 80,
+            valueGetter: (_, row) => row.status.paused,
             renderCell: (params) => params.value ?
                 <Chip label="Paused" size="small" color="warning"/> :
                 <Chip label="Active" size="small" color="success" variant="outlined"/>,
         },
         {
             field: 'latencySeconds', headerName: 'Latency', flex: 0.4, minWidth: 80,
+            valueGetter: (_, row) => row.status.latencySeconds,
             renderCell: (params) => {
                 const secs = params.value as number;
                 if (secs < 1) return '<1s';
@@ -133,37 +141,39 @@ export default function Tasks() {
         },
     ];
 
-    const serverColumns: GridColDef<ServerInfo>[] = [
-        {field: 'host', headerName: 'Host', flex: 0.8, minWidth: 100},
-        {field: 'pid', headerName: 'PID', flex: 0.4, minWidth: 60},
-        {field: 'concurrency', headerName: 'Concurrency', flex: 0.4, minWidth: 80},
+    const serverColumns: GridColDef<TaskServer>[] = [
+        {field: 'host', headerName: 'Host', flex: 0.8, minWidth: 100, valueGetter: (_, row) => row.spec.host},
+        {field: 'pid', headerName: 'PID', flex: 0.4, minWidth: 60, valueGetter: (_, row) => row.spec.pid},
+        {field: 'concurrency', headerName: 'Concurrency', flex: 0.4, minWidth: 80, valueGetter: (_, row) => row.spec.concurrency},
         {
             field: 'queues',
             headerName: 'Queues',
             flex: 0.8,
             minWidth: 120,
+            valueGetter: (_, row) => row.spec.queues,
             renderCell: (params) => {
                 const queues = params.value as Record<string, number>;
                 return Object.entries(queues).map(([q, p]) => `${q}:${p}`).join(', ');
             },
         },
-        {field: 'status', headerName: 'Status', flex: 0.4, minWidth: 80},
-        {field: 'started', headerName: 'Started', flex: 0.8, minWidth: 140},
+        {field: 'status', headerName: 'Status', flex: 0.4, minWidth: 80, valueGetter: (_, row) => row.status.state},
+        {field: 'started', headerName: 'Started', flex: 0.8, minWidth: 140, valueGetter: (_, row) => row.metadata.createdAt},
         {
             field: 'activeWorkers',
             headerName: 'Active Workers',
             flex: 0.4,
             minWidth: 100,
+            valueGetter: (_, row) => row.status.activeWorkers,
             renderCell: (params) => (params.value as unknown[]).length,
         },
     ];
 
-    const schedulerColumns: GridColDef<SchedulerEntry>[] = [
-        {field: 'id', headerName: 'ID', flex: 0.6, minWidth: 80},
-        {field: 'spec', headerName: 'Cron Spec', flex: 0.6, minWidth: 100},
-        {field: 'taskType', headerName: 'Task Type', flex: 0.8, minWidth: 120},
-        {field: 'next', headerName: 'Next Run', flex: 0.8, minWidth: 140},
-        {field: 'prev', headerName: 'Last Run', flex: 0.8, minWidth: 140, renderCell: (params) => params.value || '-'},
+    const schedulerColumns: GridColDef<TaskSchedule>[] = [
+        {field: 'id', headerName: 'ID', flex: 0.6, minWidth: 80, valueGetter: (_, row) => row.metadata.id},
+        {field: 'spec', headerName: 'Cron Spec', flex: 0.6, minWidth: 100, valueGetter: (_, row) => row.spec.schedule},
+        {field: 'taskType', headerName: 'Task Type', flex: 0.8, minWidth: 120, valueGetter: (_, row) => row.spec.taskType},
+        {field: 'next', headerName: 'Next Run', flex: 0.8, minWidth: 140, valueGetter: (_, row) => row.status.nextRunAt},
+        {field: 'prev', headerName: 'Last Run', flex: 0.8, minWidth: 140, valueGetter: (_, row) => row.status.previousRunAt, renderCell: (params) => params.value || '-'},
     ];
 
     return (
@@ -197,7 +207,7 @@ export default function Tasks() {
                         autoHeight
                         rows={queues}
                         columns={queueColumns}
-                        getRowId={(row) => row.queue}
+                        getRowId={(row) => row.metadata.id}
                         getRowClassName={() => 'clickable-row'}
                         onRowClick={handleQueueClick}
                         hideFooterSelectedRowCount
@@ -220,7 +230,7 @@ export default function Tasks() {
                                 autoHeight
                                 rows={servers}
                                 columns={serverColumns}
-                                getRowId={(row) => row.id}
+                                getRowId={(row) => row.metadata.id}
                                 hideFooterSelectedRowCount
                                 density="compact"
                                 disableColumnResize
@@ -240,7 +250,7 @@ export default function Tasks() {
                                 autoHeight
                                 rows={schedulerEntries}
                                 columns={schedulerColumns}
-                                getRowId={(row) => row.id}
+                                getRowId={(row) => row.metadata.id}
                                 hideFooterSelectedRowCount
                                 density="compact"
                                 disableColumnResize

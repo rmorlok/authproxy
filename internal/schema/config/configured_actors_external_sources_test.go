@@ -64,10 +64,10 @@ func TestConfiguredActorsExternalSources(t *testing.T) {
 
 		loaded := sources.All()
 		require.Len(t, loaded, 2)
-		require.Equal(t, "admin", loaded[0].ExternalId)
-		require.Equal(t, "root", loaded[0].Namespace)
-		require.Equal(t, "smoke-user", loaded[1].ExternalId)
-		require.Equal(t, "root.smoke", loaded[1].Namespace)
-		require.Equal(t, "root.smoke.{{external_id}}", loaded[1].Permissions[0].Namespace)
+		require.Equal(t, "admin", loaded[0].Spec.ExternalId)
+		require.Equal(t, "root", loaded[0].Metadata.Namespace)
+		require.Equal(t, "smoke-user", loaded[1].Spec.ExternalId)
+		require.Equal(t, "root.smoke", loaded[1].Metadata.Namespace)
+		require.Equal(t, "root.smoke.{{external_id}}", loaded[1].Spec.Permissions[0].Namespace)
 	})
 }

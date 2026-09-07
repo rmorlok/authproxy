@@ -8,14 +8,17 @@ import {MemoryRouter, useLocation} from 'react-router-dom';
 import {beforeEach, describe, expect, test, vi} from 'vitest';
 import {
     Connector,
-    ConnectorVersionState,
+    API_VERSION,
+    CONNECTOR_KIND,
     connections,
+    objectReference,
 } from '@authproxy/api';
 import ConnectorList from '../components/ConnectorList';
 import authReducer from '../store/sessionSlice';
 import connectorsReducer from '../store/connectorsSlice';
 import connectionsReducer from '../store/connectionsSlice';
 import toastsReducer from '../store/toastsSlice';
+import {completeSetupResponseFixture, connectorFixture} from '../testing/resources';
 
 vi.mock('@authproxy/api', async () => {
     const actual = await vi.importActual<typeof import('@authproxy/api')>('@authproxy/api');
@@ -43,20 +46,13 @@ function createStore(preloadedState?: any) {
     });
 }
 
-const connector: Connector = {
-    id: 'google-calendar',
-    name: 'google-calendar',
-    namespace: 'root',
-    version: 1,
-    state: ConnectorVersionState.ACTIVE,
+const connector: Connector = connectorFixture({
     displayName: 'Google Calendar',
     description: 'Calendar app',
     highlight: 'Calendar highlight',
-    logo: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg"/%3E',
+    logo: {publicUrl: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg"/%3E'},
     hasConfigure: false,
-    createdAt: '2023-04-01T12:00:00Z',
-    updatedAt: '2023-04-01T12:00:00Z',
-};
+});
 
 const baseConnectionsState = {
     items: [],
@@ -106,9 +102,9 @@ describe('ConnectorList', () => {
         vi.mocked(connections.list).mockReset();
         vi.mocked(connections.submit).mockReset();
         vi.mocked(connections.abort).mockResolvedValue({} as any);
-        vi.mocked(connections.initiate).mockResolvedValue({data: {id: 'c-new', type: 'complete'}} as any);
-        vi.mocked(connections.list).mockResolvedValue({status: 200, data: {items: [], cursor: ''}} as any);
-        vi.mocked(connections.submit).mockResolvedValue({data: {id: 'c-setup', type: 'complete'}} as any);
+        vi.mocked(connections.initiate).mockResolvedValue({data: completeSetupResponseFixture('c-new')} as any);
+        vi.mocked(connections.list).mockResolvedValue({status: 200, data: {apiVersion: API_VERSION, kind: 'ConnectionList', metadata: {}, items: []}} as any);
+        vi.mocked(connections.submit).mockResolvedValue({data: completeSetupResponseFixture('c-setup')} as any);
     });
 
     test('renders skeletons while connectors load', () => {
@@ -149,8 +145,8 @@ describe('ConnectorList', () => {
 
         await waitFor(() => {
             expect(connections.initiate).toHaveBeenCalledWith(
-                'google-calendar',
-                `${window.location.origin}/connections`,
+                objectReference(CONNECTOR_KIND, {id: 'google-calendar', generation: 1}),
+                {returnToUrl: `${window.location.origin}/connections`},
             );
         });
     });
@@ -160,13 +156,11 @@ describe('ConnectorList', () => {
             connectors: {
                 items: [
                     connector,
-                    {
-                        ...connector,
+                    connectorFixture({
                         id: 'gmail',
                         displayName: 'GMail',
-                        highlight: undefined,
                         description: 'Have the agent respond to your emails without you needing to be involved. Like magic.',
-                    },
+                    }),
                 ],
                 status: 'succeeded',
                 error: null,
@@ -283,9 +277,11 @@ describe('ConnectorList', () => {
         await waitFor(() => {
             expect(connections.submit).toHaveBeenCalledWith(
                 'c-setup',
-                'tenant',
-                expect.any(Object),
-                `${window.location.origin}/connections`,
+                {
+                    stepId: 'tenant',
+                    data: expect.any(Object),
+                    returnToUrl: `${window.location.origin}/connections`,
+                },
             );
         });
     });

@@ -12,8 +12,8 @@ import Typography from '@mui/material/Typography';
 import {DataGrid, GridColDef, GridEventListener, GridSortModel} from '@mui/x-data-grid';
 import {
     ListNamespaceParams,
-    ListResponse,
     Namespace,
+    NamespaceList,
     NamespaceState,
     namespaces,
 } from '@authproxy/api';
@@ -42,6 +42,7 @@ export const columns: GridColDef<Namespace>[] = [
         flex: 0.7,
         minWidth: 120,
         sortable: false,
+        valueGetter: (_, row) => row.metadata.name,
     },
     {
         field: 'path',
@@ -49,6 +50,7 @@ export const columns: GridColDef<Namespace>[] = [
         flex: 1,
         minWidth: 180,
         sortable: true,
+        valueGetter: (_, row) => row.metadata.id,
     },
     {
         field: 'state',
@@ -56,6 +58,7 @@ export const columns: GridColDef<Namespace>[] = [
         flex: 0.4,
         minWidth: 100,
         sortable: true,
+        valueGetter: (_, row) => row.status.state,
         renderCell: (params) => renderState(params.value as NamespaceState),
     },
     {
@@ -64,7 +67,7 @@ export const columns: GridColDef<Namespace>[] = [
         flex: 0.8,
         minWidth: 140,
         sortable: false,
-        valueGetter: (value) => value || 'Inherited',
+        valueGetter: (_, row) => row.spec.encryptionKeyRef?.id || 'Inherited',
     },
     {
         field: 'labels',
@@ -72,6 +75,7 @@ export const columns: GridColDef<Namespace>[] = [
         flex: 0.9,
         minWidth: 160,
         sortable: false,
+        valueGetter: (_, row) => row.metadata.labels,
         renderCell: (params) => <ResourceLabelChips labels={params.value as Record<string, string> | undefined}/>,
     },
     {
@@ -80,7 +84,7 @@ export const columns: GridColDef<Namespace>[] = [
         flex: 0.9,
         minWidth: 170,
         sortable: true,
-        valueGetter: (value) => dayjs(value).format('MMM DD, YYYY, h:mm A'),
+        valueGetter: (_, row) => dayjs(row.metadata.createdAt).format('MMM DD, YYYY, h:mm A'),
     },
     {
         field: 'updatedAt',
@@ -88,7 +92,7 @@ export const columns: GridColDef<Namespace>[] = [
         flex: 0.9,
         minWidth: 170,
         sortable: true,
-        valueGetter: (value) => dayjs(value).format('MMM DD, YYYY, h:mm A'),
+        valueGetter: (_, row) => dayjs(row.metadata.updatedAt).format('MMM DD, YYYY, h:mm A'),
     },
 ];
 
@@ -118,7 +122,7 @@ export default function Namespaces() {
     );
     const [sort, setSort] = useQueryState<string>('sort', parseAsString.withDefault(''));
 
-    const responsesCacheRef = useRef<ListResponse<Namespace>[]>([]);
+    const responsesCacheRef = useRef<NamespaceList[]>([]);
     const pageRequestCacheRef = useRef<Set<number>>(new Set());
 
     const resetPagination = () => {
@@ -139,13 +143,13 @@ export default function Namespaces() {
             const cached = responsesCacheRef.current[targetPageZeroBased];
             if (cached) {
                 setRows(cached.items);
-                setHasNextPage(Boolean(cached.cursor));
+                setHasNextPage(Boolean(cached.metadata.continue));
                 return;
             }
 
             while (
                 responsesCacheRef.current.length <= targetPageZeroBased &&
-                (responsesCacheRef.current.length === 0 || Boolean(responsesCacheRef.current.at(-1)?.cursor))
+                (responsesCacheRef.current.length === 0 || Boolean(responsesCacheRef.current.at(-1)?.metadata.continue))
             ) {
                 const thisPage = responsesCacheRef.current.length;
                 if (pageRequestCacheRef.current.has(thisPage)) {
@@ -154,8 +158,8 @@ export default function Namespaces() {
                 pageRequestCacheRef.current.add(thisPage);
 
                 const previousResponse = responsesCacheRef.current.at(-1);
-                const params: ListNamespaceParams = previousResponse?.cursor
-                    ? {cursor: previousResponse.cursor}
+                const params: ListNamespaceParams = previousResponse?.metadata.continue
+                    ? {cursor: previousResponse.metadata.continue}
                     : {
                         state: (stateFilter as NamespaceState) || undefined,
                         namespace: namespaceMatcher,
@@ -174,7 +178,7 @@ export default function Namespaces() {
 
             const data = responsesCacheRef.current[targetPageZeroBased];
             setRows(data?.items || []);
-            const pageHasNext = Boolean(data?.cursor);
+            const pageHasNext = Boolean(data?.metadata.continue);
             setHasNextPage(pageHasNext);
 
             if (!pageHasNext) {
@@ -197,7 +201,7 @@ export default function Namespaces() {
     }, [page]);
 
     const handleRowClick: GridEventListener<'rowClick'> = (params, event) => {
-        const itemUrl = namespaceDetailPath(params.row.path);
+        const itemUrl = namespaceDetailPath(params.row.metadata.id);
         if (event.ctrlKey || event.metaKey || event.button === 1) {
             window.open(itemUrl, '_blank');
         } else {
@@ -243,7 +247,7 @@ export default function Namespaces() {
                     autoHeight
                     rows={rows}
                     columns={columns}
-                    getRowId={(row) => row.path}
+                    getRowId={(row) => row.metadata.id}
                     getRowClassName={(params) =>
                         params.indexRelativeToCurrentPage % 2 === 0
                             ? 'clickable-row even'

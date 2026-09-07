@@ -1,30 +1,36 @@
-labels:
-  type: migration-test
-displayName: Migration Test
-logo:
-  publicUrl: https://example.com/logo.png
-description: Tests connector version migration hooks
-auth:
-  type: no-auth
-javascript: |
-  function migrateUp() {
-    return {
-      config: {
-        set: {
-          migrated: true
-        }
+apiVersion: authproxy.net/v1alpha1
+kind: Connector
+metadata:
+  name: connector-migrations
+  labels:
+    type: migration-test
+spec:
+  definition:
+    displayName: Migration Test
+    logo:
+      publicUrl: https://example.com/logo.png
+    description: Tests connector version migration hooks
+    auth:
+      type: no-auth
+    javascript: |
+      function migrateUp() {
+        return {
+          config: {
+            set: {
+              migrated: true
+            }
+          }
+        };
       }
-    };
-  }
-  function migrateDown() {
-    return {
-      config: {
-        unset: ["migrated"]
+      function migrateDown() {
+        return {
+          config: {
+            unset: ["migrated"]
+          }
+        };
       }
-    };
-  }
-migrations:
-  up:
-    javascript: migrateUp()
-  down:
-    javascript: migrateDown()
+    migrations:
+      up:
+        javascript: migrateUp()
+      down:
+        javascript: migrateDown()

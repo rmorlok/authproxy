@@ -8,7 +8,7 @@ import IconButton from '@mui/material/IconButton';
 import Menu from '@mui/material/Menu';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import dayjs from 'dayjs';
-import {Actor, actors} from '@authproxy/api';
+import {API_VERSION, ACTOR_KIND, Actor, actors} from '@authproxy/api';
 import AnnotationsEditor from "./AnnotationsEditor";
 import ActorPermissionsEditor from './ActorPermissionsEditor';
 import ResourceNameEditor from './ResourceNameEditor';
@@ -58,17 +58,27 @@ export default function ActorDetail({actorId}: { actorId: string }) {
         <Menu anchorEl={menuAnchorEl} open={Boolean(menuAnchorEl)} onClose={closeMenu} keepMounted>
           <ResourceMetadataMenuItems
             resource="actor"
-            name={actor.name}
-            labels={actor.labels}
-            annotations={actor.annotations}
+            name={actor.metadata.name}
+            labels={actor.metadata.labels}
+            annotations={actor.metadata.annotations}
             onCloseMenu={closeMenu}
             includeRename={false}
             onUpdateLabels={async (labels) => {
-              const response = await actors.update(actor.id, {labels});
+              const response = await actors.update(actor.metadata.id, {
+                apiVersion: API_VERSION,
+                kind: ACTOR_KIND,
+                metadata: {labels},
+                spec: {},
+              });
               setActor(response.data);
             }}
             onUpdateAnnotations={async (annotations) => {
-              const response = await actors.update(actor.id, {annotations});
+              const response = await actors.update(actor.metadata.id, {
+                apiVersion: API_VERSION,
+                kind: ACTOR_KIND,
+                metadata: {annotations},
+                spec: {},
+              });
               setActor(response.data);
             }}
           />
@@ -76,28 +86,38 @@ export default function ActorDetail({actorId}: { actorId: string }) {
       </Stack>
 
       <ResourceNameEditor
-        name={actor.name}
+        name={actor.metadata.name}
         resourceType="Actor"
         onRename={async (name) => {
-          const response = await actors.update(actor.id, {name});
+          const response = await actors.update(actor.metadata.id, {
+            apiVersion: API_VERSION,
+            kind: ACTOR_KIND,
+            metadata: {name},
+            spec: {},
+          });
           setActor(response.data);
         }}
       />
 
-      <ResourceIdentifier value={actor.id} copyLabel="Copy actor id"/>
+      <ResourceIdentifier value={actor.metadata.id} copyLabel="Copy actor id"/>
 
       <Stack direction={{xs: 'column', sm: 'row'}} spacing={4}>
         <Box>
           <Typography variant="subtitle2" color="text.secondary">External ID</Typography>
-          <Typography variant="body1">{actor.externalId}</Typography>
+          <Typography variant="body1">{actor.spec.externalId}</Typography>
         </Box>
-        <ResourceNamespace namespace={actor.namespace}/>
+        <ResourceNamespace namespace={actor.metadata.namespace}/>
       </Stack>
 
       <ActorPermissionsEditor
-        permissions={actor.permissions}
+        permissions={actor.spec.permissions}
         onSave={async (permissions) => {
-          const response = await actors.update(actor.id, {permissions});
+          const response = await actors.update(actor.metadata.id, {
+            apiVersion: API_VERSION,
+            kind: ACTOR_KIND,
+            metadata: {},
+            spec: {permissions},
+          });
           setActor(response.data);
         }}
       />
@@ -105,18 +125,18 @@ export default function ActorDetail({actorId}: { actorId: string }) {
       <Stack direction={{xs: 'column', sm: 'row'}} spacing={4}>
         <Box>
           <Typography variant="subtitle2" color="text.secondary">Created</Typography>
-          <Typography variant="body1">{dayjs(actor.createdAt).format('MMM DD, YYYY, h:mm A')}</Typography>
+          <Typography variant="body1">{dayjs(actor.metadata.createdAt).format('MMM DD, YYYY, h:mm A')}</Typography>
         </Box>
         <Box>
           <Typography variant="subtitle2" color="text.secondary">Updated</Typography>
-          <Typography variant="body1">{dayjs(actor.updatedAt).format('MMM DD, YYYY, h:mm A')}</Typography>
+          <Typography variant="body1">{dayjs(actor.metadata.updatedAt).format('MMM DD, YYYY, h:mm A')}</Typography>
         </Box>
       </Stack>
 
-      <ResourceLabels labels={actor.labels}/>
+      <ResourceLabels labels={actor.metadata.labels}/>
 
       <AnnotationsEditor
-        annotations={actor.annotations}
+        annotations={actor.metadata.annotations}
         readOnly
         onPut={async () => {}}
         onDelete={async () => {}}

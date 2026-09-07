@@ -1,13 +1,19 @@
-labels:
-  type: google-drive
-displayName: Google Drive
-description: Invalid probe predicate example
-auth:
-  type: no-auth
-probes:
-  - id: drive-health
-    period: 1m
-    if: {}
-    http:
-      method: GET
-      url: https://example.com/health
+apiVersion: authproxy.net/v1alpha1
+kind: Connector
+metadata:
+  name: probe-if-missing-javascript
+  labels:
+    type: google-drive
+spec:
+  definition:
+    displayName: Google Drive
+    description: Invalid probe predicate example
+    auth:
+      type: no-auth
+    probes:
+    - id: drive-health
+      period: 1m
+      if: {}
+      http:
+        method: GET
+        url: https://example.com/health

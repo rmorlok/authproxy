@@ -1,0 +1,18 @@
+{
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "TaskExecutionRun",
+  "metadata": {
+    "target": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "TaskExecution",
+      "id": "task-a"
+    }
+  },
+  "spec": {
+    "queue": "default"
+  },
+  "status": {
+    "succeeded": true,
+    "affectedCount": 1
+  }
+}

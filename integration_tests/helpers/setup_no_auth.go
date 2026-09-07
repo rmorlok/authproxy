@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/rmorlok/authproxy/internal/apid"
-	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
+	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	"github.com/stretchr/testify/require"
 )
 
@@ -22,19 +22,15 @@ func (env *IntegrationTestEnv) InitiateNoAuthConnection(
 		"InitiateNoAuthConnection requires either in-process gin or a running HTTP server")
 
 	cfg := env.resolveActorOptions(opts)
-	body, err := jsonMarshal(coreIface.InitiateConnectionRequest{
-		ConnectorId:   connectorID,
-		IntoNamespace: cfg.actorNamespace,
-	})
+	body, err := jsonMarshal(connectionInitiateAction(connectorID, cfg.actorNamespace, ""))
 	require.NoError(t, err)
 
 	w := env.doSignedRequest(t, http.MethodPost, "/api/v1/connections/_initiate", body, cfg)
 	require.Equalf(t, http.StatusOK, w.Code, "initiate failed: %s", w.Body.String())
 
-	var response coreIface.ConnectionSetupComplete
-	require.NoError(t, jsonUnmarshal(w.Body.Bytes(), &response))
-	require.Equal(t, coreIface.ConnectionSetupResponseTypeComplete, response.Type,
+	response := decodeConnectionSetupAction(t, w.Body.Bytes())
+	require.Equal(t, schemaapi.ConnectionSetupResponseTypeComplete, response.Status.Type,
 		"expected no-auth connection to complete immediately: %s", w.Body.String())
-	require.NotEqual(t, apid.Nil, response.Id)
-	return response.Id.String()
+	require.NotEmpty(t, response.Metadata.Target.ID)
+	return response.Metadata.Target.ID
 }

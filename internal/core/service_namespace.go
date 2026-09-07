@@ -10,6 +10,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	dbtasks "github.com/rmorlok/authproxy/internal/database/tasks"
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -19,7 +20,10 @@ import (
 // apxy/ns/* portion. Failures to enqueue are logged but do not fail the
 // originating user request — the daily consistency checker (#198) will
 // catch any drift if the task is dropped.
-func (s *service) enqueueNamespaceLabelPropagation(ctx context.Context, nsPath string) {
+func (s *service) enqueueNamespaceLabelPropagation(
+	ctx context.Context,
+	nsPath string,
+) {
 	task, err := dbtasks.NewPropagateNamespaceLabelsTask(nsPath)
 	if err != nil {
 		s.logger.Error("failed to build namespace label propagation task", "namespace_path", nsPath, "error", err)
@@ -30,7 +34,11 @@ func (s *service) enqueueNamespaceLabelPropagation(ctx context.Context, nsPath s
 	}
 }
 
-func (s *service) EnsureNamespaceAncestorPath(ctx context.Context, targetNamespace string, labels map[string]string) (iface.Namespace, error) {
+func (s *service) EnsureNamespaceAncestorPath(
+	ctx context.Context,
+	targetNamespace string,
+	labels map[string]string,
+) (iface.Namespace, error) {
 	if err := namespace.ValidatePath(targetNamespace); err != nil {
 		return nil, err
 	}
@@ -65,7 +73,10 @@ func (s *service) EnsureNamespaceAncestorPath(ctx context.Context, targetNamespa
 	return wrapNamespace(*final, s), nil
 }
 
-func (s *service) GetNamespace(ctx context.Context, path string) (iface.Namespace, error) {
+func (s *service) GetNamespace(
+	ctx context.Context,
+	path string,
+) (iface.Namespace, error) {
 	ns, err := s.db.GetNamespace(ctx, path)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
@@ -78,7 +89,11 @@ func (s *service) GetNamespace(ctx context.Context, path string) (iface.Namespac
 	return wrapNamespace(*ns, s), nil
 }
 
-func (s *service) UpdateNamespaceLabels(ctx context.Context, path string, labels map[string]string) (iface.Namespace, error) {
+func (s *service) UpdateNamespaceLabels(
+	ctx context.Context,
+	path string,
+	labels map[string]string,
+) (iface.Namespace, error) {
 	ns, err := s.db.UpdateNamespaceLabels(ctx, path, labels)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
@@ -92,7 +107,11 @@ func (s *service) UpdateNamespaceLabels(ctx context.Context, path string, labels
 	return wrapNamespace(*ns, s), nil
 }
 
-func (s *service) PutNamespaceLabels(ctx context.Context, path string, labels map[string]string) (iface.Namespace, error) {
+func (s *service) PutNamespaceLabels(
+	ctx context.Context,
+	path string,
+	labels map[string]string,
+) (iface.Namespace, error) {
 	ns, err := s.db.PutNamespaceLabels(ctx, path, labels)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
@@ -106,7 +125,13 @@ func (s *service) PutNamespaceLabels(ctx context.Context, path string, labels ma
 	return wrapNamespace(*ns, s), nil
 }
 
-func (s *service) DeleteNamespaceLabels(ctx context.Context, path string, keys []string) (iface.Namespace, error) {
+// DeleteNamespaceLabels deletes one or more labels from a namespace, enqueues
+// namespace label propagation, an returns the final namespace.
+func (s *service) DeleteNamespaceLabels(
+	ctx context.Context,
+	path string,
+	keys []string,
+) (iface.Namespace, error) {
 	ns, err := s.db.DeleteNamespaceLabels(ctx, path, keys)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
@@ -120,7 +145,11 @@ func (s *service) DeleteNamespaceLabels(ctx context.Context, path string, keys [
 	return wrapNamespace(*ns, s), nil
 }
 
-func (s *service) UpdateNamespaceAnnotations(ctx context.Context, path string, annotations map[string]string) (iface.Namespace, error) {
+func (s *service) UpdateNamespaceAnnotations(
+	ctx context.Context,
+	path string,
+	annotations map[string]string,
+) (iface.Namespace, error) {
 	ns, err := s.db.UpdateNamespaceAnnotations(ctx, path, annotations)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
@@ -133,7 +162,11 @@ func (s *service) UpdateNamespaceAnnotations(ctx context.Context, path string, a
 	return wrapNamespace(*ns, s), nil
 }
 
-func (s *service) PutNamespaceAnnotations(ctx context.Context, path string, annotations map[string]string) (iface.Namespace, error) {
+func (s *service) PutNamespaceAnnotations(
+	ctx context.Context,
+	path string,
+	annotations map[string]string,
+) (iface.Namespace, error) {
 	ns, err := s.db.PutNamespaceAnnotations(ctx, path, annotations)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
@@ -146,7 +179,11 @@ func (s *service) PutNamespaceAnnotations(ctx context.Context, path string, anno
 	return wrapNamespace(*ns, s), nil
 }
 
-func (s *service) DeleteNamespaceAnnotations(ctx context.Context, path string, keys []string) (iface.Namespace, error) {
+func (s *service) DeleteNamespaceAnnotations(
+	ctx context.Context,
+	path string,
+	keys []string,
+) (iface.Namespace, error) {
 	ns, err := s.db.DeleteNamespaceAnnotations(ctx, path, keys)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
@@ -159,7 +196,11 @@ func (s *service) DeleteNamespaceAnnotations(ctx context.Context, path string, k
 	return wrapNamespace(*ns, s), nil
 }
 
-func (s *service) SetNamespaceKey(ctx context.Context, path string, ekId apid.ID) (iface.Namespace, error) {
+func (s *service) SetNamespaceKey(
+	ctx context.Context,
+	path string,
+	ekId apid.ID,
+) (iface.Namespace, error) {
 	// Validate the encryption key exists
 	_, err := s.GetKey(ctx, ekId)
 	if err != nil {
@@ -177,7 +218,10 @@ func (s *service) SetNamespaceKey(ctx context.Context, path string, ekId apid.ID
 	return wrapNamespace(*ns, s), nil
 }
 
-func (s *service) ClearNamespaceKey(ctx context.Context, path string) (iface.Namespace, error) {
+func (s *service) ClearNamespaceKey(
+	ctx context.Context,
+	path string,
+) (iface.Namespace, error) {
 	ns, err := s.db.SetNamespaceKeyId(ctx, path, nil)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
@@ -189,14 +233,31 @@ func (s *service) ClearNamespaceKey(ctx context.Context, path string) (iface.Nam
 	return wrapNamespace(*ns, s), nil
 }
 
-func (s *service) CreateNamespace(ctx context.Context, path string, labels map[string]string) (iface.Namespace, error) {
-	ns := &database.Namespace{
-		Path:   path,
-		State:  database.NamespaceStateActive,
-		Labels: database.Labels(labels),
+// CreateNamespace creates a new namespace and returns the final namespace.
+func (s *service) CreateNamespace(
+	ctx context.Context,
+	resource *namespace.Namespace,
+) (iface.Namespace, error) {
+	if err := resource.ValidateFor(meta.ValidationModeCreate, nil); err != nil {
+		return nil, err
 	}
 
-	err := s.db.CreateNamespace(ctx, ns)
+	ns, err := databaseNamespaceFromResource(resource)
+	if err != nil {
+		return nil, err
+	}
+
+	if resource.Spec.EncryptionKeyRef != nil {
+		key, err := s.ResolveKeyReference(ctx, *resource.Spec.EncryptionKeyRef)
+		if err != nil {
+			return nil, err
+		}
+
+		keyID := key.GetId()
+		ns.KeyId = &keyID
+	}
+
+	err = s.db.CreateNamespace(ctx, ns)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +271,9 @@ type listNamespaceWrapper struct {
 	s *service
 }
 
-func (l *listNamespaceWrapper) convertPageResult(result pagination.PageResult[database.Namespace]) pagination.PageResult[iface.Namespace] {
+func (l *listNamespaceWrapper) convertPageResult(
+	result pagination.PageResult[database.Namespace],
+) pagination.PageResult[iface.Namespace] {
 	if result.Error != nil {
 		return pagination.PageResult[iface.Namespace]{Error: result.Error}
 	}
@@ -236,14 +299,26 @@ func (l *listNamespaceWrapper) executor() database.ListNamespacesExecutor {
 	}
 }
 
-func (l *listNamespaceWrapper) FetchPage(ctx context.Context) pagination.PageResult[iface.Namespace] {
+func (l *listNamespaceWrapper) FetchPage(
+	ctx context.Context,
+) pagination.PageResult[iface.Namespace] {
 	return l.convertPageResult(l.executor().FetchPage(ctx))
 }
 
-func (l *listNamespaceWrapper) Enumerate(ctx context.Context, callback pagination.EnumerateCallback[iface.Namespace]) error {
-	return l.executor().Enumerate(ctx, func(result pagination.PageResult[database.Namespace]) (keepGoing pagination.KeepGoing, err error) {
-		return callback(l.convertPageResult(result))
-	})
+func (l *listNamespaceWrapper) Enumerate(
+	ctx context.Context,
+	callback pagination.EnumerateCallback[iface.Namespace],
+) error {
+	return l.
+		executor().
+		Enumerate(
+			ctx,
+			func(
+				result pagination.PageResult[database.Namespace],
+			) (keepGoing pagination.KeepGoing, err error) {
+				return callback(l.convertPageResult(result))
+			},
+		)
 }
 
 func (l *listNamespaceWrapper) Limit(lim int32) iface.ListNamespacesBuilder {
@@ -295,9 +370,9 @@ func (l *listNamespaceWrapper) ForName(name common.ResourceName) iface.ListNames
 	}
 }
 
-func (l *listNamespaceWrapper) ForState(s database.NamespaceState) iface.ListNamespacesBuilder {
+func (l *listNamespaceWrapper) ForState(s namespace.NamespaceState) iface.ListNamespacesBuilder {
 	return &listNamespaceWrapper{
-		l: l.l.ForState(s),
+		l: l.l.ForState(database.NamespaceState(s)),
 		s: l.s,
 	}
 }

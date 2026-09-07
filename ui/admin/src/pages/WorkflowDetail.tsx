@@ -26,13 +26,12 @@ import {
     getWorkflowTree,
     removeWorkflowInstance,
     WorkflowHistoryEvent,
-    WorkflowInstanceInfo,
-    WorkflowInstanceTree,
+    WorkflowInstance,
 } from '@authproxy/api';
 
 const stateColors: Record<string, 'primary' | 'secondary' | 'success' | 'warning' | 'default'> = {
     active: 'primary',
-    continuedAsNew: 'warning',
+    continued_as_new: 'warning',
     finished: 'success',
 };
 
@@ -50,26 +49,26 @@ function stringify(value: unknown) {
     }
 }
 
-function TreeNode({node, depth = 0}: { node: WorkflowInstanceTree; depth?: number }) {
+function TreeNode({node, depth = 0}: { node: WorkflowInstance; depth?: number }) {
     return (
         <Box sx={{pl: depth * 2, py: 0.75}}>
             <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                <Typography variant="body2" fontWeight={600}>{node.workflowName || node.instance?.instanceId || 'Workflow'}</Typography>
+                <Typography variant="body2" fontWeight={600}>{node.spec.workflowName || node.spec.instanceId || 'Workflow'}</Typography>
                 <Chip
-                    label={node.state || 'unknown'}
+                    label={node.status.state || 'unknown'}
                     size="small"
-                    color={stateColors[node.state] ?? 'default'}
-                    variant={node.state === 'finished' ? 'outlined' : 'filled'}
+                    color={stateColors[node.status.state] ?? 'default'}
+                    variant={node.status.state === 'finished' ? 'outlined' : 'filled'}
                 />
-                {node.error && <Chip label="Error" size="small" color="error"/>}
-                {node.queue && <Typography variant="caption" color="text.secondary">{node.queue}</Typography>}
+                {node.status.error && <Chip label="Error" size="small" color="error"/>}
+                {node.spec.queue && <Typography variant="caption" color="text.secondary">{node.spec.queue}</Typography>}
             </Stack>
             <Typography variant="caption" color="text.secondary">
-                {node.instance?.instanceId || '-'} / {node.instance?.executionId || '-'}
+                {node.spec.instanceId || '-'} / {node.metadata.id || '-'}
             </Typography>
-            {node.children?.map((child) => (
+            {node.status.children?.map((child) => (
                 <TreeNode
-                    key={`${child.instance?.instanceId ?? ''}:${child.instance?.executionId ?? ''}`}
+                    key={`${child.spec.instanceId}:${child.metadata.id}`}
                     node={child}
                     depth={depth + 1}
                 />
@@ -84,8 +83,8 @@ export default function WorkflowDetail() {
     const decodedInstanceId = instanceId ? decodeURIComponent(instanceId) : '';
     const decodedExecutionId = executionId ? decodeURIComponent(executionId) : '';
 
-    const [info, setInfo] = useState<WorkflowInstanceInfo | null>(null);
-    const [tree, setTree] = useState<WorkflowInstanceTree | null>(null);
+    const [info, setInfo] = useState<WorkflowInstance | null>(null);
+    const [tree, setTree] = useState<WorkflowInstance | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [actionError, setActionError] = useState<string | null>(null);
@@ -144,21 +143,23 @@ export default function WorkflowDetail() {
     };
 
     const historyColumns: GridColDef<WorkflowHistoryEvent>[] = [
-        {field: 'sequenceId', headerName: 'Seq', flex: 0.35, minWidth: 70},
-        {field: 'type', headerName: 'Type', flex: 0.9, minWidth: 180},
+        {field: 'sequenceId', headerName: 'Seq', flex: 0.35, minWidth: 70, valueGetter: (_, row) => row.spec.sequenceId},
+        {field: 'type', headerName: 'Type', flex: 0.9, minWidth: 180, valueGetter: (_, row) => row.spec.type},
         {
             field: 'timestamp',
             headerName: 'Timestamp',
             flex: 0.8,
             minWidth: 170,
+            valueGetter: (_, row) => row.metadata.createdAt,
             renderCell: (params) => formatTimestamp(params.value as string | undefined),
         },
-        {field: 'scheduleEventId', headerName: 'Schedule Event', flex: 0.5, minWidth: 120},
+        {field: 'scheduleEventId', headerName: 'Schedule Event', flex: 0.5, minWidth: 120, valueGetter: (_, row) => row.spec.scheduleEventId},
         {
             field: 'attributes',
             headerName: 'Attributes',
             flex: 1.4,
             minWidth: 240,
+            valueGetter: (_, row) => row.spec.attributes,
             renderCell: (params) => {
                 const text = stringify(params.value);
                 if (!text) return null;
@@ -171,20 +172,20 @@ export default function WorkflowDetail() {
         },
     ];
 
-    const history = info?.history || [];
-    const canCancel = info?.state === 'active';
+    const history = info?.status.history || [];
+    const canCancel = info?.status.state === 'active';
 
     return (
         <Box sx={{width: '100%', maxWidth: {sm: '100%', md: '1700px'}}}>
             <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{mb: 2}}>
                 <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                     <Typography component="h2" variant="h6">Workflow Instance</Typography>
-                    {info?.state && (
+                    {info?.status.state && (
                         <Chip
-                            label={info.state}
-                            color={stateColors[info.state] ?? 'default'}
+                            label={info.status.state}
+                            color={stateColors[info.status.state] ?? 'default'}
                             size="small"
-                            variant={info.state === 'finished' ? 'outlined' : 'filled'}
+                            variant={info.status.state === 'finished' ? 'outlined' : 'filled'}
                         />
                     )}
                 </Stack>
@@ -232,12 +233,12 @@ export default function WorkflowDetail() {
                             <Stack spacing={1}>
                                 <Typography variant="body2"><strong>Instance ID:</strong> {decodedInstanceId}</Typography>
                                 <Typography variant="body2"><strong>Execution ID:</strong> {decodedExecutionId}</Typography>
-                                <Typography variant="body2"><strong>Queue:</strong> {info?.queue || '-'}</Typography>
-                                <Typography variant="body2"><strong>Created:</strong> {formatTimestamp(info?.createdAt)}</Typography>
-                                <Typography variant="body2"><strong>Completed:</strong> {formatTimestamp(info?.completedAt)}</Typography>
-                                {info?.instance?.parent && (
+                                <Typography variant="body2"><strong>Queue:</strong> {info?.spec.queue || '-'}</Typography>
+                                <Typography variant="body2"><strong>Created:</strong> {formatTimestamp(info?.metadata.createdAt)}</Typography>
+                                <Typography variant="body2"><strong>Completed:</strong> {formatTimestamp(info?.status.completedAt)}</Typography>
+                                {info?.spec.parentRef && (
                                     <Typography variant="body2">
-                                        <strong>Parent:</strong> {info.instance.parent.instanceId} / {info.instance.parent.executionId}
+                                        <strong>Parent:</strong> {info.spec.parentRef.instanceId} / {info.spec.parentRef.target.id || '-'}
                                     </Typography>
                                 )}
                             </Stack>
@@ -268,7 +269,7 @@ export default function WorkflowDetail() {
                                 autoHeight
                                 rows={history}
                                 columns={historyColumns}
-                                getRowId={(row) => `${row.sequenceId ?? ''}:${row.id ?? ''}:${row.type ?? ''}`}
+                                getRowId={(row) => `${row.spec.sequenceId ?? ''}:${row.metadata.id ?? ''}:${row.spec.type ?? ''}`}
                                 loading={loading}
                                 hideFooterSelectedRowCount
                                 density="compact"

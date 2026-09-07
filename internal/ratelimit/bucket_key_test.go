@@ -86,14 +86,14 @@ func TestBucketKey_String_Escapes(t *testing.T) {
 
 func TestResolveBucketKey_Empty(t *testing.T) {
 	// Empty dimensions list = single global bucket per rule.
-	rule := rlschema.RateLimit{Bucket: rlschema.Bucket{}}
+	rule := rlschema.RateLimitSpec{Bucket: rlschema.Bucket{}}
 	ctx := &RequestContext{ActorID: apid.ID("act_x")}
 	k := ResolveBucketKey(rule, ctx)
 	require.True(t, k.IsGlobal())
 }
 
 func TestResolveBucketKey_ReservedDimensions(t *testing.T) {
-	rule := rlschema.RateLimit{Bucket: rlschema.Bucket{
+	rule := rlschema.RateLimitSpec{Bucket: rlschema.Bucket{
 		Dimensions: []string{
 			rlschema.DimensionActor,
 			rlschema.DimensionConnection,
@@ -119,7 +119,7 @@ func TestResolveBucketKey_ReservedDimensions(t *testing.T) {
 }
 
 func TestResolveBucketKey_LabelDimensions(t *testing.T) {
-	rule := rlschema.RateLimit{Bucket: rlschema.Bucket{
+	rule := rlschema.RateLimitSpec{Bucket: rlschema.Bucket{
 		Dimensions: []string{"labels/team", "labels/region"},
 	}}
 	ctx := &RequestContext{Labels: map[string]string{
@@ -134,7 +134,7 @@ func TestResolveBucketKey_MissingValuesResolveEmpty(t *testing.T) {
 	// Missing reserved + missing label both resolve to "" — distinct
 	// from a present-but-empty value only in semantics. The downstream
 	// counter sees the resolved tuple as opaque.
-	rule := rlschema.RateLimit{Bucket: rlschema.Bucket{
+	rule := rlschema.RateLimitSpec{Bucket: rlschema.Bucket{
 		Dimensions: []string{
 			rlschema.DimensionActor,
 			"labels/missing",
@@ -146,7 +146,7 @@ func TestResolveBucketKey_MissingValuesResolveEmpty(t *testing.T) {
 }
 
 func TestResolveBucketKey_NilContext(t *testing.T) {
-	rule := rlschema.RateLimit{Bucket: rlschema.Bucket{
+	rule := rlschema.RateLimitSpec{Bucket: rlschema.Bucket{
 		Dimensions: []string{rlschema.DimensionActor},
 	}}
 	k := ResolveBucketKey(rule, nil)
@@ -157,7 +157,7 @@ func TestResolveBucketKey_ZeroConnectorVersionResolvesEmpty(t *testing.T) {
 	// 0 means "no connector version" (unset) — distinct from version 0,
 	// which is impossible per apid conventions. Render as "" so it
 	// doesn't bucket alongside other small versions.
-	rule := rlschema.RateLimit{Bucket: rlschema.Bucket{
+	rule := rlschema.RateLimitSpec{Bucket: rlschema.Bucket{
 		Dimensions: []string{rlschema.DimensionConnectorVersion},
 	}}
 	ctx := &RequestContext{ConnectorVersion: 0}
@@ -169,7 +169,7 @@ func TestResolveBucketKey_UnknownDimensionResolvesEmpty(t *testing.T) {
 	// Schema validation should prevent unknown dimensions; if one slips
 	// through we still render the key deterministically rather than
 	// panicking or producing a malformed string.
-	rule := rlschema.RateLimit{Bucket: rlschema.Bucket{
+	rule := rlschema.RateLimitSpec{Bucket: rlschema.Bucket{
 		Dimensions: []string{"made_up_thing"},
 	}}
 	ctx := &RequestContext{}

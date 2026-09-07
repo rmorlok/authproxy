@@ -1,99 +1,12 @@
 package database
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
 func TestAnnotations(t *testing.T) {
-	t.Run("ValidateAnnotationKey", func(t *testing.T) {
-		t.Run("valid keys", func(t *testing.T) {
-			validKeys := []string{
-				"a",
-				"key",
-				"my-key",
-				"my_key",
-				"my.key",
-				"example.com/my-key",
-				"app.kubernetes.io/name",
-			}
-
-			for _, key := range validKeys {
-				t.Run(key, func(t *testing.T) {
-					err := ValidateAnnotationKey(key)
-					require.NoError(t, err, "key %q should be valid", key)
-				})
-			}
-		})
-
-		t.Run("invalid keys", func(t *testing.T) {
-			invalidKeys := []struct {
-				key    string
-				reason string
-			}{
-				{"", "empty key"},
-				{"-key", "starts with hyphen"},
-				{"my key", "contains space"},
-				{"/name", "empty prefix"},
-				{strings.Repeat("a", 64), "name too long"},
-			}
-
-			for _, tc := range invalidKeys {
-				t.Run(tc.reason, func(t *testing.T) {
-					err := ValidateAnnotationKey(tc.key)
-					require.Error(t, err, "key %q should be invalid: %s", tc.key, tc.reason)
-				})
-			}
-		})
-	})
-
-	t.Run("ValidateAnnotationValue", func(t *testing.T) {
-		// Annotation values have no format restriction
-		t.Run("any string is valid", func(t *testing.T) {
-			validValues := []string{
-				"",
-				"simple",
-				"has spaces",
-				"has-special@chars#!",
-				strings.Repeat("a", 1000), // long values are fine
-				"multi\nline\nvalue",
-			}
-			for _, v := range validValues {
-				require.NoError(t, ValidateAnnotationValue(v))
-			}
-		})
-	})
-
-	t.Run("ValidateAnnotations", func(t *testing.T) {
-		t.Run("valid annotations", func(t *testing.T) {
-			annotations := Annotations{
-				"app":                "my application description",
-				"example.com/note":   "this can be any string value with spaces & symbols!",
-				"example.com/config": `{"key": "value"}`,
-				"example.com/empty":  "",
-			}
-			require.NoError(t, ValidateAnnotations(annotations))
-		})
-
-		t.Run("invalid key", func(t *testing.T) {
-			annotations := Annotations{
-				"-bad-key": "value",
-			}
-			require.Error(t, ValidateAnnotations(annotations))
-		})
-
-		t.Run("total size exceeds limit", func(t *testing.T) {
-			annotations := Annotations{
-				"key": strings.Repeat("x", AnnotationsTotalMaxSize),
-			}
-			err := ValidateAnnotations(annotations)
-			require.Error(t, err)
-			require.Contains(t, err.Error(), "exceeds maximum")
-		})
-	})
-
 	t.Run("Annotations.Validate", func(t *testing.T) {
 		t.Run("valid annotations", func(t *testing.T) {
 			annotations := Annotations{

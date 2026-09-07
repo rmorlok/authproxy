@@ -16,6 +16,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apgin"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
+	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -112,13 +113,13 @@ func TestTaskMonitoringRoutes(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ListQueuesResponseJson
+			var resp schemaapi.ListTaskQueuesResponseJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Len(t, resp.Items, 1)
-			require.Equal(t, "default", resp.Items[0].Queue)
-			require.Equal(t, 5, resp.Items[0].Pending)
-			require.Equal(t, 2, resp.Items[0].Active)
+			require.Equal(t, "default", resp.Items[0].Metadata.ID)
+			require.Equal(t, 5, resp.Items[0].Status.Pending)
+			require.Equal(t, 2, resp.Items[0].Status.Active)
 		})
 
 		t.Run("inspector error", func(t *testing.T) {
@@ -171,12 +172,12 @@ func TestTaskMonitoringRoutes(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp QueueInfoJson
+			var resp schemaapi.TaskQueueJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
-			require.Equal(t, "default", resp.Queue)
-			require.Equal(t, 3, resp.Pending)
-			require.True(t, resp.Paused)
+			require.Equal(t, "default", resp.Metadata.ID)
+			require.Equal(t, 3, resp.Status.Pending)
+			require.True(t, resp.Status.Paused)
 		})
 	})
 
@@ -204,12 +205,14 @@ func TestTaskMonitoringRoutes(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ListQueueHistoryResponseJson
+			var resp schemaapi.TaskQueueHistoryJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
-			require.Len(t, resp.Items, 1)
-			require.Equal(t, 100, resp.Items[0].Processed)
-			require.Equal(t, 5, resp.Items[0].Failed)
+			require.Equal(t, "default", resp.Metadata.ID)
+			require.Equal(t, 30, resp.Spec.Days)
+			require.Len(t, resp.Status.Items, 1)
+			require.Equal(t, 100, resp.Status.Items[0].Processed)
+			require.Equal(t, 5, resp.Status.Items[0].Failed)
 		})
 
 		t.Run("custom days", func(t *testing.T) {
@@ -293,15 +296,15 @@ func TestTaskMonitoringRoutes(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ListMonitoringTasksResponseJson
+			var resp schemaapi.ListTaskExecutionsResponseJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Len(t, resp.Items, 1)
-			require.Equal(t, "task-1", resp.Items[0].ID)
-			require.Equal(t, "email:send", resp.Items[0].Type)
-			require.Equal(t, "pending", resp.Items[0].State)
-			require.Equal(t, `{"to":"user@example.com"}`, resp.Items[0].Payload)
-			require.Empty(t, resp.Cursor, "cursor should be empty when no more pages")
+			require.Equal(t, "task-1", resp.Items[0].Metadata.ID)
+			require.Equal(t, "email:send", resp.Items[0].Spec.Type)
+			require.Equal(t, "pending", resp.Items[0].Status.State)
+			require.Equal(t, `{"to":"user@example.com"}`, resp.Items[0].Spec.Payload)
+			require.Empty(t, resp.Metadata.Continue, "cursor should be empty when no more pages")
 		})
 
 		t.Run("pending tasks with more pages", func(t *testing.T) {
@@ -342,11 +345,11 @@ func TestTaskMonitoringRoutes(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ListMonitoringTasksResponseJson
+			var resp schemaapi.ListTaskExecutionsResponseJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Len(t, resp.Items, 1)
-			require.NotEmpty(t, resp.Cursor, "cursor should be present when more pages exist")
+			require.NotEmpty(t, resp.Metadata.Continue, "cursor should be present when more pages exist")
 		})
 
 		t.Run("invalid state", func(t *testing.T) {
@@ -419,11 +422,11 @@ func TestTaskMonitoringRoutes(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp MonitoringTaskInfoJson
+			var resp schemaapi.TaskExecutionJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
-			require.Equal(t, "task-123", resp.ID)
-			require.Equal(t, "email:send", resp.Type)
+			require.Equal(t, "task-123", resp.Metadata.ID)
+			require.Equal(t, "email:send", resp.Spec.Type)
 		})
 	})
 
@@ -468,13 +471,13 @@ func TestTaskMonitoringRoutes(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ListServersResponseJson
+			var resp schemaapi.ListTaskServersResponseJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Len(t, resp.Items, 1)
-			require.Equal(t, "server-1", resp.Items[0].ID)
-			require.Equal(t, 10, resp.Items[0].Concurrency)
-			require.Len(t, resp.Items[0].ActiveWorkers, 1)
+			require.Equal(t, "server-1", resp.Items[0].Metadata.ID)
+			require.Equal(t, 10, resp.Items[0].Spec.Concurrency)
+			require.Len(t, resp.Items[0].Status.ActiveWorkers, 1)
 		})
 	})
 
@@ -508,13 +511,13 @@ func TestTaskMonitoringRoutes(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ListSchedulerEntriesResponseJson
+			var resp schemaapi.ListTaskSchedulesResponseJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Len(t, resp.Items, 1)
-			require.Equal(t, "entry-1", resp.Items[0].ID)
-			require.Equal(t, "*/5 * * * *", resp.Items[0].Spec)
-			require.Equal(t, "probe:check", resp.Items[0].TaskType)
+			require.Equal(t, "entry-1", resp.Items[0].Metadata.ID)
+			require.Equal(t, "*/5 * * * *", resp.Items[0].Spec.Schedule)
+			require.Equal(t, "probe:check", resp.Items[0].Spec.TaskType)
 		})
 	})
 
@@ -539,6 +542,13 @@ func TestTaskMonitoringRoutes(t *testing.T) {
 
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp schemaapi.TaskExecutionActionJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, schemaapi.TaskExecutionRunActionKind, resp.Kind)
+			require.Equal(t, "task-1", resp.Metadata.Target.ID)
+			require.Equal(t, "default", resp.Spec.Queue)
+			require.True(t, resp.Status.Succeeded)
 		})
 
 		t.Run("runTask error", func(t *testing.T) {
@@ -601,6 +611,10 @@ func TestTaskMonitoringRoutes(t *testing.T) {
 
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp schemaapi.TaskExecutionActionJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, schemaapi.TaskExecutionArchiveActionKind, resp.Kind)
 		})
 
 		t.Run("cancelTask success", func(t *testing.T) {
@@ -623,6 +637,10 @@ func TestTaskMonitoringRoutes(t *testing.T) {
 
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp schemaapi.TaskExecutionActionJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, schemaapi.TaskExecutionCancelActionKind, resp.Kind)
 		})
 
 		t.Run("deleteTask success", func(t *testing.T) {
@@ -645,6 +663,10 @@ func TestTaskMonitoringRoutes(t *testing.T) {
 
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp schemaapi.TaskExecutionActionJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, schemaapi.TaskExecutionDeleteActionKind, resp.Kind)
 		})
 
 		t.Run("pauseQueue success", func(t *testing.T) {
@@ -667,6 +689,10 @@ func TestTaskMonitoringRoutes(t *testing.T) {
 
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp schemaapi.TaskQueueActionJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, schemaapi.TaskQueuePauseActionKind, resp.Kind)
 		})
 
 		t.Run("unpauseQueue success", func(t *testing.T) {
@@ -689,6 +715,10 @@ func TestTaskMonitoringRoutes(t *testing.T) {
 
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp schemaapi.TaskQueueActionJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, schemaapi.TaskQueueUnpauseActionKind, resp.Kind)
 		})
 
 		t.Run("runAllArchivedTasks success", func(t *testing.T) {
@@ -712,10 +742,12 @@ func TestTaskMonitoringRoutes(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp BulkActionResponseJson
+			var resp schemaapi.TaskQueueActionJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
-			require.Equal(t, 5, resp.AffectedCount)
+			require.Equal(t, schemaapi.TaskQueueRunAllActionKind, resp.Kind)
+			require.Equal(t, "archived", resp.Spec.State)
+			require.Equal(t, 5, resp.Status.AffectedCount)
 		})
 
 		t.Run("runAllRetryTasks success", func(t *testing.T) {
@@ -739,10 +771,12 @@ func TestTaskMonitoringRoutes(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp BulkActionResponseJson
+			var resp schemaapi.TaskQueueActionJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
-			require.Equal(t, 3, resp.AffectedCount)
+			require.Equal(t, schemaapi.TaskQueueRunAllActionKind, resp.Kind)
+			require.Equal(t, "retry", resp.Spec.State)
+			require.Equal(t, 3, resp.Status.AffectedCount)
 		})
 
 		t.Run("deleteAllArchivedTasks success", func(t *testing.T) {
@@ -766,10 +800,12 @@ func TestTaskMonitoringRoutes(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp BulkActionResponseJson
+			var resp schemaapi.TaskQueueActionJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
-			require.Equal(t, 7, resp.AffectedCount)
+			require.Equal(t, schemaapi.TaskQueueDeleteAllActionKind, resp.Kind)
+			require.Equal(t, "archived", resp.Spec.State)
+			require.Equal(t, 7, resp.Status.AffectedCount)
 		})
 
 		t.Run("deleteAllCompletedTasks success", func(t *testing.T) {
@@ -793,10 +829,12 @@ func TestTaskMonitoringRoutes(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp BulkActionResponseJson
+			var resp schemaapi.TaskQueueActionJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
-			require.Equal(t, 12, resp.AffectedCount)
+			require.Equal(t, schemaapi.TaskQueueDeleteAllActionKind, resp.Kind)
+			require.Equal(t, "completed", resp.Spec.State)
+			require.Equal(t, 12, resp.Status.AffectedCount)
 		})
 	})
 }

@@ -10,7 +10,7 @@ import (
 
 func TestConnectorJavascriptValidation(t *testing.T) {
 	t.Run("helpers are available to connector predicates", func(t *testing.T) {
-		connector := Connector{
+		connector := ConnectorDefinition{
 			Javascript: `
 				function isEnabled(cfg) {
 					return cfg.enabled === true;
@@ -56,7 +56,7 @@ func TestConnectorJavascriptValidation(t *testing.T) {
 	})
 
 	t.Run("top level javascript must compile and run", func(t *testing.T) {
-		connector := Connector{
+		connector := ConnectorDefinition{
 			Javascript: `throw new Error("boom")`,
 			Auth:       &Auth{InnerVal: &AuthNoAuth{Type: AuthTypeNoAuth}},
 		}
@@ -68,7 +68,7 @@ func TestConnectorJavascriptValidation(t *testing.T) {
 	})
 
 	t.Run("helpers are unavailable when connector javascript is absent", func(t *testing.T) {
-		connector := Connector{
+		connector := ConnectorDefinition{
 			Auth: &Auth{InnerVal: &AuthNoAuth{Type: AuthTypeNoAuth}},
 			SetupFlow: &SetupFlow{
 				Configure: &SetupFlowPhase{
@@ -90,7 +90,7 @@ func TestConnectorJavascriptValidation(t *testing.T) {
 	})
 
 	t.Run("reserved runtime variable declarations are rejected", func(t *testing.T) {
-		connector := Connector{
+		connector := ConnectorDefinition{
 			Javascript: `const cfg = {}`,
 			Auth:       &Auth{InnerVal: &AuthNoAuth{Type: AuthTypeNoAuth}},
 		}

@@ -37,9 +37,7 @@ func TestProbeKeepMinimum_UsesDefaultsWhenUnset(t *testing.T) {
 
 func TestEnabledProbeThresholdsForConnection_ExcludesDisabledProbes(t *testing.T) {
 	connectionId := apid.New(apid.PrefixConnection)
-	connector := &cschema.Connector{
-		Id:          apid.New(apid.PrefixConnectorVersion),
-		Version:     1,
+	connector := &cschema.ConnectorDefinition{
 		DisplayName: "cleanup-conditional",
 		Auth:        &cschema.Auth{InnerVal: &cschema.AuthApiKey{Type: cschema.AuthTypeAPIKey}},
 		Probes: []cschema.Probe{
@@ -59,8 +57,8 @@ func TestEnabledProbeThresholdsForConnection_ExcludesDisabledProbes(t *testing.T
 		Namespace:        "root",
 		State:            database.ConnectionStateConfigured,
 		HealthState:      database.ConnectionHealthStateHealthy,
-		ConnectorId:      connector.Id,
-		ConnectorVersion: connector.Version,
+		ConnectorId:      apid.New(apid.PrefixConnectorVersion),
+		ConnectorVersion: 1,
 	}
 
 	svc, _, _, ctrl := setupVerifyTest(t, connectionId, conn, connector)

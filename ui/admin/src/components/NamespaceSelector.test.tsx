@@ -27,6 +27,8 @@ vi.mock('@authproxy/api', () => {
     };
 
     return {
+        API_VERSION: 'authproxy.net/v1alpha1',
+        NAMESPACE_KIND: 'Namespace',
         NAMESPACE_PATH_SEPARATOR: '.',
         ROOT_NAMESPACE_PATH: 'root',
         NamespaceState: {
@@ -39,11 +41,16 @@ vi.mock('@authproxy/api', () => {
 });
 
 const rootNamespace = {
-    path: ROOT_NAMESPACE_PATH,
-    name: ROOT_NAMESPACE_PATH,
-    state: NamespaceState.ACTIVE,
-    createdAt: '2026-06-20T00:00:00.000Z',
-    updatedAt: '2026-06-20T00:00:00.000Z',
+    apiVersion: 'authproxy.net/v1alpha1' as const,
+    kind: 'Namespace' as const,
+    metadata: {
+        id: ROOT_NAMESPACE_PATH,
+        name: ROOT_NAMESPACE_PATH,
+        createdAt: '2026-06-20T00:00:00.000Z',
+        updatedAt: '2026-06-20T00:00:00.000Z',
+    },
+    spec: {},
+    status: {state: NamespaceState.ACTIVE},
 };
 
 function CurrentPath() {
@@ -56,8 +63,14 @@ function renderSelector({
 }: {childrenHasMore?: boolean; currentPath?: string} = {}) {
     const currentNamespace = {
         ...rootNamespace,
-        path: currentPath,
-        name: currentPath.split('.').at(-1) || currentPath,
+        metadata: {
+            ...rootNamespace.metadata,
+            id: currentPath,
+            name: currentPath.split('.').at(-1) || currentPath,
+            namespace: currentPath.includes('.')
+                ? currentPath.split('.').slice(0, -1).join('.')
+                : undefined,
+        },
     };
     const store = configureStore({
         reducer: {
@@ -106,8 +119,7 @@ describe('NamespaceSelector', () => {
         const store = renderSelector();
         const createdNamespace = {
             ...rootNamespace,
-            path: 'root.team-a',
-            name: 'team-a',
+            metadata: {...rootNamespace.metadata, id: 'root.team-a', name: 'team-a', namespace: 'root'},
         };
         vi.mocked(namespaces.create).mockResolvedValue({status: 200, data: createdNamespace} as any);
         vi.mocked(namespaces.getByPath).mockResolvedValue({status: 200, data: createdNamespace} as any);
@@ -120,7 +132,12 @@ describe('NamespaceSelector', () => {
         await user.click(screen.getByRole('button', {name: 'Create'}));
 
         await waitFor(() => {
-            expect(namespaces.create).toHaveBeenCalledWith({path: 'root.team-a'});
+            expect(namespaces.create).toHaveBeenCalledWith({
+                apiVersion: 'authproxy.net/v1alpha1',
+                kind: 'Namespace',
+                metadata: {name: 'team-a', namespace: 'root'},
+                spec: {},
+            });
         });
         expect(store.getState().namespaces.currentPath).toBe('root.team-a');
     });

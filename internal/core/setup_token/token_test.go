@@ -12,8 +12,8 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apredis"
-	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/core/setup_token"
+	"github.com/rmorlok/authproxy/internal/encrypt"
 )
 
 // testEnv wires an in-memory redis (via apredis test helper) + fake encrypt

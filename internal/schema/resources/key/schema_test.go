@@ -28,6 +28,8 @@ func loadSchemaInto(t *testing.T, c *jsonschemav5.Compiler, path string) string 
 func TestSchemaId(t *testing.T) {
 	c := jsonschemav5.NewCompiler()
 	_ = loadSchemaInto(t, c, "../../common/schema.json")
+	_ = loadSchemaInto(t, c, "../meta/schema.json")
+	_ = loadSchemaInto(t, c, "../namespace/schema.json")
 	id := loadSchemaInto(t, c, "./schema.json")
 	require.Equal(t, SchemaIdKey, id)
 }
@@ -90,8 +92,8 @@ func TestSchema(t *testing.T) {
 			},
 		},
 		{
-			Name:   "Key",
-			Schema: mkSchema("./schema.json#/$defs/Key"),
+			Name:   "SigningKey",
+			Schema: mkSchema("./schema.json#/$defs/SigningKey"),
 			Tests: []testCase{
 				{"shared key", true, `{"test": {"sharedKey": {"value": "my-shared-key"}}}`},
 				{"public key", true, `{"test": {"publicKey": {"path": "/keys/pub"}}}`},
@@ -102,6 +104,26 @@ func TestSchema(t *testing.T) {
 				{"unknown property", false, `{"test": {"foo": {"value": "x"}}}`},
 			},
 		},
+		{
+			Name:   "ManagedKey",
+			Schema: mkSchema("./schema.json"),
+			Tests: []testCase{
+				{"resource", true, `{"test":{"apiVersion":"authproxy.net/v1alpha1","kind":"Key","metadata":{"id":"key_test550e8400abcd","name":"primary-key","namespace":"root.acme"},"spec":{"usage":"data_encryption","materialType":"symmetric","desiredState":"active","keyData":{"value":"***"}},"status":{"state":"active","keyDataConfigured":true}}}`},
+				{"create defaults omitted", true, `{"test":{"apiVersion":"authproxy.net/v1alpha1","kind":"Key","metadata":{"namespace":"root"},"spec":{"keyData":{"numBytes":32}}}}`},
+				{"wrong kind", false, `{"test":{"apiVersion":"authproxy.net/v1alpha1","kind":"Connector","metadata":{"namespace":"root"},"spec":{"keyData":{"numBytes":32}}}}`},
+				{"legacy flat shape", false, `{"test":{"id":"key_test550e8400abcd","namespace":"root","state":"active"}}`},
+			},
+		},
+		{
+			Name:   "ManagedKeyPatch",
+			Schema: mkSchema("./schema.json#/$defs/KeyPatch"),
+			Tests: []testCase{
+				{"desired state", true, `{"test":{"apiVersion":"authproxy.net/v1alpha1","kind":"Key","metadata":{},"spec":{"desiredState":"disabled"}}}`},
+				{"provider update", true, `{"test":{"apiVersion":"authproxy.net/v1alpha1","kind":"Key","metadata":{},"spec":{"keyData":{"value":"replacement"}}}}`},
+				{"null provider", false, `{"test":{"apiVersion":"authproxy.net/v1alpha1","kind":"Key","metadata":{},"spec":{"keyData":null}}}`},
+				{"legacy flat patch", false, `{"test":{"state":"disabled"}}`},
+			},
+		},
 	}
 
 	for _, entity := range entities {
@@ -110,6 +132,8 @@ func TestSchema(t *testing.T) {
 				t.Run(test.Name, func(t *testing.T) {
 					c := jsonschemav5.NewCompiler()
 					_ = loadSchemaInto(t, c, "../../common/schema.json")
+					_ = loadSchemaInto(t, c, "../meta/schema.json")
+					_ = loadSchemaInto(t, c, "../namespace/schema.json")
 					schemaID := loadSchemaInto(t, c, "./schema.json")
 					require.Equal(t, SchemaIdKey, schemaID)
 					require.NoError(t, c.AddResource(testSchemaId, strings.NewReader(entity.Schema)))

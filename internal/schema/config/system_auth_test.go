@@ -3,6 +3,8 @@ package config
 import (
 	"testing"
 
+	actorschema "github.com/rmorlok/authproxy/internal/schema/resources/actor"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
@@ -100,11 +102,15 @@ jwtSigningKey:
   privateKey:
     path: ./dev_config/keys/system
 actors:
-  - externalId: bobdole
-    namespace: root.admins
-    key:
-      publicKey:
-        path: ./dev_config/keys/actors/bobdole.pub
+  - apiVersion: authproxy.net/v1alpha1
+    kind: Actor
+    metadata:
+      namespace: root.admins
+    spec:
+      externalId: bobdole
+      signingKey:
+        publicKey:
+          path: ./dev_config/keys/actors/bobdole.pub
 `
 			expected := SystemAuth{
 				JwtSigningKey: &Key{
@@ -123,14 +129,17 @@ actors:
 				},
 				Actors: &ConfiguredActors{
 					InnerVal: ConfiguredActorsList{
-						&ConfiguredActor{
-							ExternalId: "bobdole",
-							Namespace:  "root.admins",
-							Key: &Key{
-								InnerVal: &KeyPublicPrivate{
-									PublicKey: &KeyData{
-										InnerVal: &KeyDataFile{
-											Path: "./dev_config/keys/actors/bobdole.pub",
+						&actorschema.Actor{
+							TypeMeta: meta.NewTypeMeta(actorschema.ActorKind),
+							Metadata: meta.ObjectMeta{Namespace: "root.admins"},
+							Spec: actorschema.ActorSpec{
+								ExternalId: "bobdole",
+								SigningKey: &Key{
+									InnerVal: &KeyPublicPrivate{
+										PublicKey: &KeyData{
+											InnerVal: &KeyDataFile{
+												Path: "./dev_config/keys/actors/bobdole.pub",
+											},
 										},
 									},
 								},

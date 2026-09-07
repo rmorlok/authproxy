@@ -9,6 +9,7 @@ import (
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 	"golang.org/x/time/rate"
@@ -49,6 +50,17 @@ type DB interface {
 	SetCursorEncryptor(e pagination.CursorEncryptor)
 	Ping(ctx context.Context) bool
 	SearchResources(ctx context.Context, params SearchResourcesParams) (SearchResourcesResult, error)
+
+	/*
+	 * Object references
+	 */
+
+	ResolveActorReference(ctx context.Context, reference meta.ObjectReference) (*Actor, error)
+	ResolveConnectionReference(ctx context.Context, reference meta.ObjectReference) (*Connection, error)
+	ResolveConnectorReference(ctx context.Context, reference meta.ObjectReference) (*Connector, error)
+	ResolveKeyReference(ctx context.Context, reference meta.ObjectReference) (*Key, error)
+	ResolveNamespaceReference(ctx context.Context, reference meta.ObjectReference) (*Namespace, error)
+	ResolveRateLimitReference(ctx context.Context, reference meta.ObjectReference) (*RateLimit, error)
 
 	/*
 	 *  Namespaces
@@ -103,6 +115,16 @@ type DB interface {
 	UpsertConnectorDefinitionVersion(ctx context.Context, cv *ConnectorWithDefinition) error
 	SetConnectorDefinitionVersionState(ctx context.Context, id apid.ID, version uint64, state ConnectorDefinitionVersionState) error
 	UpdateConnectorName(ctx context.Context, id apid.ID, name scommon.ResourceName) error
+	UpdateConnectorLabels(
+		ctx context.Context,
+		id apid.ID,
+		labels map[string]string,
+	) (*Connector, error)
+	UpdateConnectorAnnotations(
+		ctx context.Context,
+		id apid.ID,
+		annotations map[string]string,
+	) (*Connector, error)
 	DeleteConnector(ctx context.Context, id apid.ID) error
 	ListConnectorDefinitionVersionsBuilder() ListConnectorDefinitionVersionsBuilder
 	ListConnectorDefinitionVersionsFromCursor(ctx context.Context, cursor string) (ListConnectorDefinitionVersionsExecutor, error)
@@ -249,7 +271,7 @@ type DB interface {
 	GetRateLimit(ctx context.Context, id apid.ID) (*RateLimit, error)
 	CreateRateLimit(ctx context.Context, rl *RateLimit) error
 	UpdateRateLimitName(ctx context.Context, id apid.ID, name scommon.ResourceName) (*RateLimit, error)
-	UpdateRateLimitDefinition(ctx context.Context, id apid.ID, def rlschema.RateLimit) (*RateLimit, error)
+	UpdateRateLimitDefinition(ctx context.Context, id apid.ID, def rlschema.RateLimitSpec) (*RateLimit, error)
 	DeleteRateLimit(ctx context.Context, id apid.ID) error
 	UpdateRateLimitLabels(ctx context.Context, id apid.ID, labels map[string]string) (*RateLimit, error)
 	PutRateLimitLabels(ctx context.Context, id apid.ID, labels map[string]string) (*RateLimit, error)

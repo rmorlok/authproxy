@@ -30,6 +30,16 @@ type apiWrapper struct {
 	InnerVal any `json:"-" yaml:"-"`
 }
 
+type APIEmbeddedMeta struct {
+	APIVersion string `json:"apiVersion" yaml:"apiVersion"`
+	Kind       string `json:"kind" yaml:"kind"`
+}
+
+type apiEmbeddedSecretPayload struct {
+	APIEmbeddedMeta `json:",inline" yaml:",inline"`
+	Secret          string `json:"secret" yaml:"secret" apiredact:"secret"`
+}
+
 func (w apiWrapper) MarshalJSON() ([]byte, error) {
 	return json.Marshal(w.InnerVal)
 }
@@ -54,6 +64,33 @@ func TestMarshalJSONForAPI_RedactsSecretFields(t *testing.T) {
 
 	require.Equal(t, "secret", payload.Items[0].Secret)
 	require.Equal(t, "sëcret", payload.Map["one"].Secret)
+}
+
+func TestMarshalForAPIKeepsEmbeddedMetadataInlineWhenRedacting(t *testing.T) {
+	payload := apiEmbeddedSecretPayload{
+		APIEmbeddedMeta: APIEmbeddedMeta{APIVersion: "authproxy.net/v1alpha1", Kind: "Widget"},
+		Secret:          "secret",
+	}
+
+	jsonData, report, err := MarshalJSONForAPI(context.Background(), payload)
+	require.NoError(t, err)
+	require.True(t, report.Redacted)
+	require.JSONEq(t, `{
+      "apiVersion":"authproxy.net/v1alpha1",
+      "kind":"Widget",
+      "secret":"******"
+    }`, string(jsonData))
+
+	yamlData, report, err := MarshalYAMLForAPI(context.Background(), payload)
+	require.NoError(t, err)
+	require.True(t, report.Redacted)
+	var decoded map[string]any
+	require.NoError(t, yaml.Unmarshal(yamlData, &decoded))
+	require.Equal(t, map[string]any{
+		"apiVersion": "authproxy.net/v1alpha1",
+		"kind":       "Widget",
+		"secret":     "******",
+	}, decoded)
 }
 
 func TestStandardJSONMarshalIgnoresRedactionTags(t *testing.T) {

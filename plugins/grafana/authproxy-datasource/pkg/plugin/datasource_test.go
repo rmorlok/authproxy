@@ -153,8 +153,12 @@ func TestQueryDataVariables(t *testing.T) {
 			name:     "namespaces",
 			variable: variableQueryOptions{Type: "namespaces", LabelSelector: "env=demo"},
 			wantPath: "/api/v1/namespaces",
-			response: listResponse[namedResource]{Items: []namedResource{{Path: "root/demo", DisplayName: "Demo"}}},
-			wantText: "Demo", wantValue: "root/demo",
+			response: listResponse[namedResource]{Items: []namedResource{{
+				APIVersion: "authproxy.net/v1alpha1",
+				Kind:       "Namespace",
+				Metadata:   &resourceMetadata{ID: "root/demo", Name: "demo"},
+			}}},
+			wantText: "demo", wantValue: "root/demo",
 		},
 		{
 			name:     "connectors",
@@ -175,14 +179,23 @@ func TestQueryDataVariables(t *testing.T) {
 			name:     "actors",
 			variable: variableQueryOptions{Type: "actors"},
 			wantPath: "/api/v1/actors",
-			response: listResponse[namedResource]{Items: []namedResource{{ID: "act_123", ExternalID: "svc-demo"}}},
+			response: listResponse[namedResource]{Items: []namedResource{{
+				APIVersion: "authproxy.net/v1alpha1",
+				Kind:       "Actor",
+				Metadata:   &resourceMetadata{ID: "act_123", Name: "service-actor"},
+				Spec:       &resourceSpec{ExternalID: "svc-demo"},
+			}}},
 			wantText: "svc-demo", wantValue: "act_123",
 		},
 		{
 			name:     "rate limits",
 			variable: variableQueryOptions{Type: "rate_limits"},
 			wantPath: "/api/v1/rate-limits",
-			response: listResponse[namedResource]{Items: []namedResource{{ID: "rl_123", Name: "global-openai"}}},
+			response: listResponse[namedResource]{Items: []namedResource{{
+				APIVersion: "authproxy.net/v1alpha1",
+				Kind:       "RateLimit",
+				Metadata:   &resourceMetadata{ID: "rl_123", Name: "global-openai"},
+			}}},
 			wantText: "global-openai", wantValue: "rl_123",
 		},
 	}

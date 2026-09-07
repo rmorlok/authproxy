@@ -101,7 +101,7 @@ func escapeBucketField(s string) string {
 // "labels/<key>" resolves to the request's per-call label snapshot. A
 // dimension referencing data not present on the request resolves to "" —
 // callers will see this as a distinct bucket from values that *are* present.
-func ResolveBucketKey(rule rlschema.RateLimit, ctx *RequestContext) BucketKey {
+func ResolveBucketKey(rule rlschema.RateLimitSpec, ctx *RequestContext) BucketKey {
 	dims := rule.Bucket.Dimensions
 	if len(dims) == 0 {
 		return BucketKey{}

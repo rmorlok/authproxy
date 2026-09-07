@@ -63,7 +63,12 @@ password is unset, the first deploy generates a random password and stores it
 in the cluster Secret.
 
 Both demo and dev deployment workflows run their seed job after the environment
-is ready. The job idempotently provisions `root.demo`, verifies or creates the
-least-privilege `demo-user`, publishes demo connectors in `root.demo`, and
-archives legacy seeded connectors from `root`. The `Seed Demo` GitHub Actions
-workflow remains available to rerun the same job on demand.
+is ready. The `Seed Demo` GitHub Actions workflow remains available to rerun
+the demo seed job on demand.
+
+The job idempotently provisions `root.demo`, verifies or creates the
+least-privilege `demo-user`, and publishes demo connectors in `root.demo`.
+The seed ConfigMaps contain complete `authproxy.net/v1alpha1` `Namespace`,
+`Actor`, and `Connector` resources. Connector seed identity is its exact
+`metadata.namespace` and `metadata.name`; labels are ordinary resource
+metadata. The seed binary rejects the former flat resource forms.

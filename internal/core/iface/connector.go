@@ -23,6 +23,7 @@ type Connector interface {
 	GetUpdatedAt() time.Time
 	GetLabels() map[string]string
 	GetAnnotations() map[string]string
-	GetDefinition() *cschema.Connector
+	GetDefinition() *cschema.ConnectorDefinition
+	GetResource() *cschema.Connector
 	SetState(ctx context.Context, state database.ConnectorDefinitionVersionState) error
 }

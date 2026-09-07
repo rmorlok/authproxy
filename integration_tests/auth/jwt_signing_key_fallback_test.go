@@ -13,6 +13,8 @@ import (
 	"github.com/rmorlok/authproxy/internal/apauth/service"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
+	actorschema "github.com/rmorlok/authproxy/internal/schema/resources/actor"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/stretchr/testify/require"
 )
 
@@ -28,13 +30,17 @@ func TestJWTSigningKeyFallbackForActorWithKey(t *testing.T) {
 			)
 			root.SystemAuth.Actors = &sconfig.ConfiguredActors{
 				InnerVal: sconfig.ConfiguredActorsList{
-					&sconfig.ConfiguredActor{
-						ExternalId: actorExternalID,
-						Key: publicPrivateKey(
-							"./test_data/admin_user_keys/bobdole.pub",
-							"",
-						),
-						Permissions: aschema.AllPermissions(),
+					&actorschema.Actor{
+						TypeMeta: meta.NewTypeMeta(actorschema.ActorKind),
+						Metadata: meta.ObjectMeta{Namespace: sconfig.RootNamespace},
+						Spec: actorschema.ActorSpec{
+							ExternalId: actorExternalID,
+							SigningKey: publicPrivateKey(
+								"./test_data/admin_user_keys/bobdole.pub",
+								"",
+							),
+							Permissions: aschema.AllPermissions(),
+						},
 					},
 				},
 			}

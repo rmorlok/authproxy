@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	smeta "github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"gopkg.in/h2non/gentleman.v2"
 )
 
@@ -74,7 +74,7 @@ func (r *ProxyRequest) Validate() error {
 	}
 
 	if r.Labels != nil {
-		if err := database.ValidateUserLabels(r.Labels); err != nil {
+		if err := smeta.ValidateUserLabels(r.Labels); err != nil {
 			errors = append(errors, "invalid labels: "+err.Error())
 		}
 	}

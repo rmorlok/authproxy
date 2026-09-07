@@ -16,7 +16,7 @@ recovery, or workforce/customer identity provider.
 
 ## Map Host Identities to Actors
 
-An actor represents a user or service principal. Its `externalId` should be a
+An actor represents a user or service principal. Its `spec.externalId` should be a
 stable, non-reassignable identifier from the host system. Avoid mutable values
 such as email addresses when a durable user id is available.
 
@@ -25,7 +25,7 @@ For example:
 ```text
 Host tenant:    org_123
 Host principal: usr_456
-AuthProxy actor externalId: usr_456
+AuthProxy actor spec.externalId: usr_456
 AuthProxy resource namespace: root.tenants.org_123
 ```
 
@@ -52,6 +52,30 @@ nonce can establish authentication only once. A subject-only token must resolve
 to an existing database actor. Integrations that include a full actor claim
 should treat the signed claim as an authoritative upsert from the host identity
 source.
+
+When present, the JWT actor is a restricted Actor resource:
+
+```yaml
+sub: usr_456
+namespace: root.tenants.org_123
+actor:
+  apiVersion: authproxy.net/v1alpha1
+  kind: Actor
+  metadata:
+    name: user-456
+    namespace: root.tenants.org_123
+  spec:
+    externalId: usr_456
+    permissions:
+      - namespace: root.tenants.org_123.**
+        resources: [connections]
+        verbs: [get, list, proxy]
+```
+
+`sub` must match `actor.spec.externalId`, and the top-level namespace must
+match `actor.metadata.namespace`. JWT actors cannot contain `metadata.id`,
+`metadata.generation`, `metadata.createdAt`, `metadata.updatedAt`, `status`, or
+`spec.signingKey`. AuthProxy also rejects unknown fields.
 
 ## Browser Session Handoff
 
@@ -110,7 +134,7 @@ The dimensions are:
 - `resources`: API resource types, with `*` as a wildcard;
 - `verbs`: operations such as `get`, `list`, `create`, `update`, or `proxy`,
   with `*` as a wildcard; and
-- `resource_ids`: an optional restriction to named resources.
+- `resourceIds`: an optional restriction to immutable resource IDs.
 
 See [Permission Resources and Verbs](/security/permission-resources-and-verbs/)
 for the complete matrix of exact resource and verb strings.
@@ -118,8 +142,9 @@ for the complete matrix of exact resource and verb strings.
 Actor permissions are additive: any actor permission that matches can allow an
 operation. If a JWT also carries permissions, those permissions are
 restrictions. The action must be allowed by both the actor's stored permissions
-and the token's permission set. A caller cannot add a broad token permission to
-expand a narrow actor grant.
+and the token's permission set. Every token restriction must be contained by
+the actor's base permissions; AuthProxy rejects the JWT when its namespace,
+resource, verb, or resource-id scope is broader.
 
 Routes validate the namespace and, where relevant, the loaded resource id.
 List and aggregate routes constrain their database queries to effective

@@ -61,7 +61,7 @@ export const router = createBrowserRouter([
                 ],
             },
             {
-                path: 'connectors/:id/versions/:version',
+                path: 'connectors/:id/generations/:generation',
                 element: <ConnectorVersionDetail />,
                 handle: [
                     {
@@ -73,12 +73,12 @@ export const router = createBrowserRouter([
                         path: (params: Params<string>) => `/connectors/${params.id}`,
                     },
                     {
-                        title: 'Versions',
+                        title: 'Generations',
                         path: (params: Params<string>) => `/connectors/${params.id}`,
                     },
                     {
-                        attr: 'version',
-                        path: (params: Params<string>) => `/connectors/${params.id}/versions/${params.version}`,
+                        attr: 'generation',
+                        path: (params: Params<string>) => `/connectors/${params.id}/generations/${params.generation}`,
                     }
                 ],
             },

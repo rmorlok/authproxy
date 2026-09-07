@@ -24,8 +24,13 @@ import MuiLink from '@mui/material/Link';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
-import {connectors, ConnectorVersion, ConnectorVersionState} from '@authproxy/api';
-import AnnotationsEditor from "./AnnotationsEditor";
+import {
+    API_VERSION,
+    CONNECTOR_KIND,
+    connectors,
+    Connector,
+    ConnectorReleaseState,
+} from '@authproxy/api';
 import YAML from 'yaml';
 import {StateChip} from "./StateChip";
 import ResourceIdentifier from './ResourceIdentifier';
@@ -36,18 +41,29 @@ import { yaml as yamlMode } from "@codemirror/lang-yaml";
 import { json as jsonMode } from "@codemirror/lang-json";
 import { oneDark } from "@codemirror/theme-one-dark";
 
-function getLogoUrlFromDefinition(cv: ConnectorVersion): string {
-    if (!cv || !cv.definition || !cv.definition.logo) return "";
+interface AdminConnectorDefinition extends Record<string, unknown> {
+    displayName?: string;
+    description?: string;
+    highlight?: string;
+    logo?: {publicUrl?: string; base64?: string; mimeType?: string};
+    statusPageUrl?: string;
+    marketplaceUrl?: string;
+    developerConsoleUrl?: string;
+    oauthClientUrl?: string;
+}
 
-    if (cv.definition.logo.publicUrl) {
-        return cv.definition.logo.publicUrl;
+function getLogoUrlFromDefinition(definition?: AdminConnectorDefinition): string {
+    if (!definition?.logo) return "";
+
+    if (definition.logo.publicUrl) {
+        return definition.logo.publicUrl;
     }
 
-    if (cv.definition.logo.base64) {
-        if (cv.definition.logo.mimeType === "image/svg+xml") {
-            return `data:${cv.definition.logo.mimeType};base64,${cv.definition.logo.base64}`;
+    if (definition.logo.base64) {
+        if (definition.logo.mimeType === "image/svg+xml") {
+            return `data:${definition.logo.mimeType};base64,${definition.logo.base64}`;
         } else {
-            return `data:image/png;base64,${cv.definition.logo.base64}`;
+            return `data:image/png;base64,${definition.logo.base64}`;
         }
     }
 
@@ -55,12 +71,13 @@ function getLogoUrlFromDefinition(cv: ConnectorVersion): string {
 }
 
 export default function ConnectorVersionDetail(
-    { connectorId, version, connectorVersion}: ({ connectorId?: string, version?: number, connectorVersion?: ConnectorVersion})
+    { connectorId, version, connectorVersion}: ({ connectorId?: string, version?: number, connectorVersion?: Connector})
 ) {
     const theme = useTheme();
     const [loading, setLoading] = useState(!connectorVersion);
     const [error, setError] = useState<string | null>(null);
-    const [cv, setCv] = useState<ConnectorVersion | null>(connectorVersion || null);
+    const [cv, setCv] = useState<Connector | null>(connectorVersion || null);
+    const definition = cv?.spec.definition as AdminConnectorDefinition | undefined;
 
     // versions state
     const [viewMode, setViewMode] = useState<'json' | 'yaml' | 'visual'>('yaml');
@@ -70,31 +87,31 @@ export default function ConnectorVersionDetail(
     // Force state UI
     const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
     const [forceStateOpen, setForceStateOpen] = useState(false);
-    const [selectedState, setSelectedState] = useState<ConnectorVersionState | ''>('');
+    const [selectedState, setSelectedState] = useState<ConnectorReleaseState | ''>('');
     const [actionLoading, setActionLoading] = useState(false);
     const [actionError, setActionError] = useState<string | null>(null);
 
-    const stateOptions = useMemo(() => Object.values(ConnectorVersionState), []);
+    const stateOptions = useMemo(() => Object.values(ConnectorReleaseState), []);
 
     useEffect(() => {
-        if (!cv?.definition) {
+        if (!definition) {
             setDefinitionFormatted("")
             setLangMode(yamlMode);
         } else if (viewMode === 'json') {
-            setDefinitionFormatted(JSON.stringify(cv?.definition, null, 2));
+            setDefinitionFormatted(JSON.stringify(definition, null, 2));
             setLangMode(jsonMode);
         } else {
-            setDefinitionFormatted(YAML.stringify(cv.definition as any));
+            setDefinitionFormatted(YAML.stringify(definition));
             setLangMode(yamlMode);
         }
-    }, [viewMode, cv?.definition]);
+    }, [viewMode, definition]);
 
     useEffect(() => {
         if (cv || !connectorId || !version) return;
         let cancelled = false;
         setLoading(true);
         setError(null);
-        connectors.getVersion(connectorId, version)
+        connectors.getGeneration(connectorId, version)
             .then(res => {
                 if (cancelled) return;
                 setCv(res.data);
@@ -121,7 +138,7 @@ export default function ConnectorVersionDetail(
 
     const onClickForceState = () => {
         setActionError(null);
-        setSelectedState(cv.state as ConnectorVersionState);
+        setSelectedState(cv.status.release.state);
         closeMenu();
         setForceStateOpen(true);
     };
@@ -131,7 +148,7 @@ export default function ConnectorVersionDetail(
         setActionError(null);
         setActionLoading(true);
         try {
-            const response = await connectors.forceVersionState(cv.id, cv.version, selectedState as ConnectorVersionState);
+            const response = await connectors.forceGenerationState(cv.metadata.id, cv.metadata.generation, selectedState);
             setCv(response.data);
             setForceStateOpen(false);
         } catch (err: any) {
@@ -179,12 +196,12 @@ export default function ConnectorVersionDetail(
                 borderRadius: 1,
                 p: 1
             }}>
-                {cv.definition.description && (
-                    <Typography variant="body1" color="text.secondary">{cv.definition.description}</Typography>
+                {definition?.description && (
+                    <Typography variant="body1" color="text.secondary">{definition.description}</Typography>
                 )}
 
-                {cv.definition.highlight && (
-                    <Alert severity="info">{cv.definition.highlight}</Alert>
+                {definition?.highlight && (
+                    <Alert severity="info">{definition.highlight}</Alert>
                 )}
             </Box>
         );
@@ -193,29 +210,39 @@ export default function ConnectorVersionDetail(
     return (
         <Stack spacing={2} sx={{p: 2}}>
             <Stack direction="row" spacing={2} alignItems="center">
-                {cv.definition.logo &&
-                    <Avatar alt={cv.definition.displayName} src={getLogoUrlFromDefinition(cv)} sx={{width: 40, height: 40}}/>}
-                <Typography variant="h5">{cv.definition.displayName || cv.labels?.type || 'Unnamed Connector'}</Typography>
-                <StateChip state={cv.state}/>
+                {definition?.logo &&
+                    <Avatar alt={definition.displayName} src={getLogoUrlFromDefinition(definition)} sx={{width: 40, height: 40}}/>}
+                <Typography variant="h5">{definition?.displayName || cv.metadata.labels?.type || 'Unnamed Connector'}</Typography>
+                <StateChip state={cv.status.release.state}/>
                 <IconButton aria-label="actions" onClick={openMenu} size="small">
                     <MoreVertIcon/>
                 </IconButton>
                 <Menu anchorEl={menuAnchorEl} open={Boolean(menuAnchorEl)} onClose={closeMenu} keepMounted>
                     <ResourceMetadataMenuItems
                         resource="connector version"
-                        labels={cv.labels}
-                        annotations={cv.annotations}
+                        labels={cv.metadata.labels}
+                        annotations={cv.metadata.annotations}
                         onCloseMenu={closeMenu}
                         includeRename={false}
                         onUpdateLabels={async (labels) => {
-                            const response = await connectors.updateVersion(cv.id, cv.version, {labels});
+                            const response = await connectors.updateGeneration(cv.metadata.id, cv.metadata.generation, {
+                                apiVersion: API_VERSION,
+                                kind: CONNECTOR_KIND,
+                                metadata: {labels},
+                                spec: {},
+                            });
                             setCv(response.data);
                         }}
                         onUpdateAnnotations={async (annotations) => {
-                            const response = await connectors.updateVersion(cv.id, cv.version, {annotations});
+                            const response = await connectors.updateGeneration(cv.metadata.id, cv.metadata.generation, {
+                                apiVersion: API_VERSION,
+                                kind: CONNECTOR_KIND,
+                                metadata: {annotations},
+                                spec: {},
+                            });
                             setCv(response.data);
                         }}
-                        disabled={cv.state !== ConnectorVersionState.DRAFT || actionLoading}
+                        disabled={cv.status.release.state !== ConnectorReleaseState.DRAFT || actionLoading}
                     />
                     <Divider/>
                     <MenuItem onClick={onClickForceState}>Force state…</MenuItem>
@@ -224,25 +251,25 @@ export default function ConnectorVersionDetail(
 
             {actionError && <Alert severity="error">{actionError}</Alert>}
 
-            {(cv.definition.statusPageUrl || cv.definition.marketplaceUrl || cv.definition.developerConsoleUrl || cv.definition.oauthClientUrl) && (
+            {(definition?.statusPageUrl || definition?.marketplaceUrl || definition?.developerConsoleUrl || definition?.oauthClientUrl) && (
                 <Stack direction="row" spacing={2} flexWrap="wrap">
-                    {cv.definition.statusPageUrl && (
-                        <MuiLink href={cv.definition.statusPageUrl} target="_blank" rel="noopener noreferrer" underline="hover" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+                    {definition.statusPageUrl && (
+                        <MuiLink href={definition.statusPageUrl} target="_blank" rel="noopener noreferrer" underline="hover" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
                             Status Page <OpenInNewIcon fontSize="inherit" />
                         </MuiLink>
                     )}
-                    {cv.definition.marketplaceUrl && (
-                        <MuiLink href={cv.definition.marketplaceUrl} target="_blank" rel="noopener noreferrer" underline="hover" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+                    {definition.marketplaceUrl && (
+                        <MuiLink href={definition.marketplaceUrl} target="_blank" rel="noopener noreferrer" underline="hover" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
                             Marketplace <OpenInNewIcon fontSize="inherit" />
                         </MuiLink>
                     )}
-                    {cv.definition.developerConsoleUrl && (
-                        <MuiLink href={cv.definition.developerConsoleUrl} target="_blank" rel="noopener noreferrer" underline="hover" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+                    {definition.developerConsoleUrl && (
+                        <MuiLink href={definition.developerConsoleUrl} target="_blank" rel="noopener noreferrer" underline="hover" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
                             Developer Console <OpenInNewIcon fontSize="inherit" />
                         </MuiLink>
                     )}
-                    {cv.definition.oauthClientUrl && (
-                        <MuiLink href={cv.definition.oauthClientUrl} target="_blank" rel="noopener noreferrer" underline="hover" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+                    {definition.oauthClientUrl && (
+                        <MuiLink href={definition.oauthClientUrl} target="_blank" rel="noopener noreferrer" underline="hover" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
                             OAuth Client <OpenInNewIcon fontSize="inherit" />
                         </MuiLink>
                     )}
@@ -250,17 +277,15 @@ export default function ConnectorVersionDetail(
             )}
 
             <Stack direction={{xs: 'column', sm: 'row'}} spacing={4}>
-                <ResourceIdentifier label="Connector ID" value={cv.id} copyLabel="Copy connector id"/>
-                <ResourceNamespace namespace={cv.namespace}/>
+                <ResourceIdentifier label="Connector ID" value={cv.metadata.id} copyLabel="Copy connector id"/>
+                <ResourceNamespace namespace={cv.metadata.namespace}/>
                 <Box>
                     <Typography variant="subtitle2" color="text.secondary">Version</Typography>
-                    <Typography variant="body1">{cv.version}</Typography>
+                    <Typography variant="body1">{cv.metadata.generation}</Typography>
                 </Box>
             </Stack>
 
-            <ResourceLabels labels={cv.labels}/>
-
-            <AnnotationsEditor annotations={cv.annotations} readOnly onPut={async () => {}} onDelete={async () => {}}/>
+            <ResourceLabels labels={cv.metadata.labels}/>
 
             <Box sx={{mt: 1, mb: 1}}>
                 <ToggleButtonGroup
@@ -289,7 +314,7 @@ export default function ConnectorVersionDetail(
                             labelId="force-cv-state-label"
                             label="State"
                             value={selectedState || ''}
-                            onChange={(e) => setSelectedState((e.target as HTMLSelectElement).value as ConnectorVersionState)}
+                            onChange={(e) => setSelectedState((e.target as HTMLSelectElement).value as ConnectorReleaseState)}
                         >
                             <option aria-label="None" value="" />
                             {stateOptions.map(s => (

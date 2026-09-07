@@ -11,7 +11,7 @@ import InputLabel from '@mui/material/InputLabel';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import {
-    listConnectors, ConnectorVersionState, Connector, ListResponse, ListConnectorsParams
+    listConnectors, ConnectorReleaseState, Connector, ConnectorList, ListConnectorsParams
 } from '@authproxy/api';
 import dayjs from 'dayjs';
 import {useQueryState, parseAsInteger, parseAsStringLiteral, parseAsString} from 'nuqs'
@@ -21,12 +21,12 @@ import {selectCurrentNamespaceMatcher} from "../store/namespacesSlice";
 import {toSnakeCase} from '../util';
 import {ResourceLabelChips} from '../components/ResourceMetadataFields';
 
-function renderState(state: ConnectorVersionState) {
-    const colors: Record<ConnectorVersionState, "default" | "success" | "error" | "info" | "warning" | "primary" | "secondary"> = {
-        [ConnectorVersionState.DRAFT]: 'secondary',
-        [ConnectorVersionState.PRIMARY]: 'primary',
-        [ConnectorVersionState.ACTIVE]: 'info',
-        [ConnectorVersionState.ARCHIVED]: 'default',
+function renderState(state: ConnectorReleaseState) {
+    const colors: Record<ConnectorReleaseState, "default" | "success" | "error" | "info" | "warning" | "primary" | "secondary"> = {
+        [ConnectorReleaseState.DRAFT]: 'secondary',
+        [ConnectorReleaseState.PRIMARY]: 'primary',
+        [ConnectorReleaseState.ACTIVE]: 'info',
+        [ConnectorReleaseState.ARCHIVED]: 'default',
     };
 
     return <Chip label={state} color={colors[state]} size="small" />;
@@ -39,6 +39,7 @@ export const columns: GridColDef<Connector>[] = [
         flex: 0.7,
         minWidth: 120,
         sortable: true,
+        valueGetter: (_, row) => row.metadata.name,
     },
     {
         field: 'id',
@@ -46,6 +47,7 @@ export const columns: GridColDef<Connector>[] = [
         flex: 0.8,
         minWidth: 110,
         sortable: true,
+        valueGetter: (_, row) => row.metadata.id,
     },
     {
         field: 'version',
@@ -53,6 +55,7 @@ export const columns: GridColDef<Connector>[] = [
         flex: 0.4,
         minWidth: 70,
         sortable: true,
+        valueGetter: (_, row) => row.metadata.generation,
     },
     {
         field: 'namespace',
@@ -60,6 +63,7 @@ export const columns: GridColDef<Connector>[] = [
         flex: 0.4,
         minWidth: 90,
         sortable: true,
+        valueGetter: (_, row) => row.metadata.namespace,
     },
     {
         field: 'state',
@@ -67,7 +71,8 @@ export const columns: GridColDef<Connector>[] = [
         flex: 0.3,
         minWidth: 60,
         sortable: true,
-        renderCell: (params) => renderState(params.value as ConnectorVersionState),
+        valueGetter: (_, row) => row.status.release.state,
+        renderCell: (params) => renderState(params.value as ConnectorReleaseState),
     },
     {
         field: 'labels',
@@ -75,6 +80,7 @@ export const columns: GridColDef<Connector>[] = [
         flex: 0.7,
         minWidth: 120,
         sortable: false,
+        valueGetter: (_, row) => row.metadata.labels,
         renderCell: (params) => <ResourceLabelChips labels={params.value as Record<string, string> | undefined}/>,
     },
     {
@@ -83,6 +89,7 @@ export const columns: GridColDef<Connector>[] = [
         flex: 0.5,
         minWidth: 80,
         sortable: false,
+        valueGetter: (_, row) => row.spec.definition.displayName,
     },
     {
         field: 'description',
@@ -90,6 +97,7 @@ export const columns: GridColDef<Connector>[] = [
         flex: 0.8,
         minWidth: 80,
         sortable: false,
+        valueGetter: (_, row) => row.spec.definition.description,
     },
     {
         field: 'createdAt',
@@ -97,8 +105,8 @@ export const columns: GridColDef<Connector>[] = [
         flex: 1,
         minWidth: 80,
         sortable: true,
-        valueGetter: (value, _) => {
-            return dayjs(value).format('MMM DD, YYYY, h:mm A');
+        valueGetter: (_, row) => {
+            return dayjs(row.metadata.createdAt).format('MMM DD, YYYY, h:mm A');
         }
 
     },
@@ -108,8 +116,8 @@ export const columns: GridColDef<Connector>[] = [
         flex: 1,
         minWidth: 100,
         sortable: true,
-        valueGetter: (value) => {
-            return dayjs(value).format('MMM DD, YYYY, h:mm A');
+        valueGetter: (_, row) => {
+            return dayjs(row.metadata.updatedAt).format('MMM DD, YYYY, h:mm A');
         }
 
     },
@@ -119,10 +127,10 @@ export default function Connectors() {
     const defaultPageSize = 20;
     const stateOptions = useMemo(() => [
         { label: 'All', value: '' },
-        { label: 'Draft', value: ConnectorVersionState.DRAFT },
-        { label: 'Primary', value: ConnectorVersionState.PRIMARY },
-        { label: 'Active', value: ConnectorVersionState.ACTIVE },
-        { label: 'Archived', value: ConnectorVersionState.ARCHIVED },
+        { label: 'Draft', value: ConnectorReleaseState.DRAFT },
+        { label: 'Primary', value: ConnectorReleaseState.PRIMARY },
+        { label: 'Active', value: ConnectorReleaseState.ACTIVE },
+        { label: 'Archived', value: ConnectorReleaseState.ARCHIVED },
     ], []);
     const navigate = useNavigate();
     const stateVals = useMemo(() => stateOptions.map(opt => opt.value), [stateOptions]);
@@ -141,7 +149,7 @@ export default function Connectors() {
     const [hasNextPage, setHasNextPage] = useState<boolean>(false);
 
     // Simple cache to allow going back without re-fetching
-    const responsesCacheRef = useRef<ListResponse<Connector>[]>([]);
+    const responsesCacheRef = useRef<ConnectorList[]>([]);
     const pageRequestCacheRef = useRef<Set<number>>(new Set());
 
     // Handle row click with meta/ctrl key checking
@@ -191,14 +199,14 @@ export default function Connectors() {
             if (cached) {
                 setRows(cached.items);
                 setLoading(false);
-                setHasNextPage(!!cached.cursor);
+                setHasNextPage(!!cached.metadata.continue);
                 return;
             }
 
             // If we don't know the cursor for this page yet, advance sequentially from the last known
             while (responsesCacheRef.current.length <= targetPageZeroBased && (
                     responsesCacheRef.current.length === 0 ||
-                    !!responsesCacheRef.current[responsesCacheRef.current.length - 1].cursor
+                    !!responsesCacheRef.current[responsesCacheRef.current.length - 1].metadata.continue
                 )
                 ) {
                 // Avoid multiple calls for the same page
@@ -210,8 +218,8 @@ export default function Connectors() {
                 const thisPage = responsesCacheRef.current.length;
                 const prevResp = responsesCacheRef.current[responsesCacheRef.current.length - 1];
 
-                const params: ListConnectorsParams = prevResp?.cursor ? {cursor: prevResp.cursor} : {
-                    state: (stateFilter as ConnectorVersionState) || undefined,
+                const params: ListConnectorsParams = prevResp?.metadata.continue ? {cursor: prevResp.metadata.continue} : {
+                    state: (stateFilter as ConnectorReleaseState) || undefined,
                     namespace: namespaceMatcher,
                     orderBy: sort || undefined,
                     limit: pageSize,
@@ -230,7 +238,7 @@ export default function Connectors() {
             const data = responsesCacheRef.current[targetPageZeroBased];
             setRows(data?.items || []);
 
-            const hnp = !!data?.cursor;
+            const hnp = !!data?.metadata.continue;
             setHasNextPage(hnp);
 
             if(!hnp) {
@@ -287,7 +295,7 @@ export default function Connectors() {
                     autoHeight
                     rows={rows}
                     columns={columns}
-                    getRowId={(row) => row.id}
+                    getRowId={(row) => row.metadata.id}
                     getRowClassName={(params) =>
                         params.indexRelativeToCurrentPage % 2 === 0 ? 'clickable-row even' : 'clickable-row odd'
                     }

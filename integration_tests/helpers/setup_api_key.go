@@ -12,8 +12,8 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/auth_methods/api_key"
-	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
+	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/schema/resources/connectors"
@@ -67,10 +67,7 @@ func NewApiKeyConnector(connectorID apid.ID, displayName string, opts ApiKeyConn
 		placement.UsernameField = opts.UsernameField
 	}
 
-	c := sconfig.Connector{
-		Id:          connectorID,
-		Version:     1,
-		Labels:      map[string]string{"type": displayName},
+	c := NewConfiguredConnector(connectorID, displayName, connectors.ConnectorDefinition{
 		DisplayName: displayName,
 		Auth: &connectors.Auth{
 			InnerVal: &connectors.AuthApiKey{
@@ -78,7 +75,7 @@ func NewApiKeyConnector(connectorID apid.ID, displayName string, opts ApiKeyConn
 				Placement: placement,
 			},
 		},
-	}
+	})
 
 	if opts.ProbeURL != "" {
 		probe := connectors.Probe{
@@ -90,7 +87,7 @@ func NewApiKeyConnector(connectorID apid.ID, displayName string, opts ApiKeyConn
 			FailureThreshold:  opts.ProbeFailureThreshold,
 			RecoveryThreshold: opts.ProbeRecoveryThreshold,
 		}
-		c.Probes = []connectors.Probe{probe}
+		c.Spec.Definition.Probes = []connectors.Probe{probe}
 	}
 
 	// Normalize synthesizes the credentials setup-flow step on top of the
@@ -107,33 +104,24 @@ func NewApiKeyConnector(connectorID apid.ID, displayName string, opts ApiKeyConn
 // step), not a redirect. Returns the new connection id and the form payload.
 // Signed by default as actor "test-actor" in the root namespace; pass
 // WithActor(...) to mirror a specific tenant.
-func (env *IntegrationTestEnv) InitiateApiKeyConnection(t *testing.T, connectorID apid.ID, opts ...ActorOption) (connectionID string, form *coreIface.ConnectionSetupForm) {
+func (env *IntegrationTestEnv) InitiateApiKeyConnection(t *testing.T, connectorID apid.ID, opts ...ActorOption) (connectionID string, form *schemaapi.ConnectionSetupActionStatus) {
 	t.Helper()
 	require.Truef(t, env.ApiGin != nil || env.ServerURL != "",
 		"InitiateApiKeyConnection requires either in-process gin or a running HTTP server")
 
 	cfg := env.resolveActorOptions(opts)
 
-	body, err := jsonMarshal(coreIface.InitiateConnectionRequest{
-		ConnectorId:   connectorID,
-		IntoNamespace: cfg.actorNamespace,
-	})
+	body, err := jsonMarshal(connectionInitiateAction(connectorID, cfg.actorNamespace, ""))
 	require.NoError(t, err)
 
 	w := env.doSignedRequest(t, http.MethodPost, "/api/v1/connections/_initiate", body, cfg)
 	require.Equalf(t, http.StatusOK, w.Code, "initiate failed: %s", w.Body.String())
 
-	var generic struct {
-		Type string `json:"type"`
-		Id   string `json:"id"`
-	}
-	require.NoError(t, jsonUnmarshal(w.Body.Bytes(), &generic))
-	require.Equal(t, string(coreIface.ConnectionSetupResponseTypeForm), generic.Type,
-		"expected api-key connector to return form response (got %s): %s", generic.Type, w.Body.String())
-
-	var resp coreIface.ConnectionSetupForm
-	require.NoError(t, jsonUnmarshal(w.Body.Bytes(), &resp))
-	return resp.Id.String(), &resp
+	response := decodeConnectionSetupAction(t, w.Body.Bytes())
+	require.Equal(t, schemaapi.ConnectionSetupResponseTypeForm, response.Status.Type,
+		"expected api-key connector to return form response (got %s): %s", response.Status.Type, w.Body.String())
+	require.NotEmpty(t, response.Metadata.Target.ID)
+	return response.Metadata.Target.ID, response.Status
 }
 
 // SubmitApiKeyCredentials POSTs to /api/v1/connections/{id}/_submit with the
@@ -145,10 +133,7 @@ func (env *IntegrationTestEnv) SubmitApiKeyCredentials(t *testing.T, connectionI
 
 	rawData, err := json.Marshal(data)
 	require.NoError(t, err)
-	body, err := jsonMarshal(coreIface.SubmitConnectionRequest{
-		StepId: stepID,
-		Data:   rawData,
-	})
+	body, err := jsonMarshal(connectionSetupSubmitAction(connectionID, stepID, rawData))
 	require.NoError(t, err)
 
 	return env.doSignedRequest(t, http.MethodPost,
@@ -162,9 +147,11 @@ func (env *IntegrationTestEnv) ReauthConnection(t *testing.T, connectionID strin
 	t.Helper()
 	cfg := env.resolveActorOptions(opts)
 
-	// Body is optional for api-key; sending an empty struct exercises the
-	// JSON unmarshal path on the route.
-	body, err := jsonMarshal(struct{}{})
+	body, err := jsonMarshal(connectionSetupControlAction(
+		schemaapi.ConnectionReauthActionKind,
+		connectionID,
+		"",
+	))
 	require.NoError(t, err)
 
 	return env.doSignedRequest(t, http.MethodPost,

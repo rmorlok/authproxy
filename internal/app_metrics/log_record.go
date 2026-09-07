@@ -8,13 +8,10 @@ import (
 	"github.com/rmorlok/authproxy/internal/httpf"
 )
 
-// LogRecord represents a record of an HTTP request as is stored in the request events. This
-// data is redacted to avoid containing sensitive information like information in headers. For a given
-// record, the full request may be stored as well, which would correspond to the data in the
-// Entry struct.
-//
-// JSON tagging on this struct is used so the same data structure can be passed directly to endpoint
-// responses. It is not use for internal storage.
+// LogRecord is the searchable, non-payload record stored for an HTTP request.
+// It contains no captured URL, headers, or body; those may be stored separately
+// in an encrypted FullLog. API routes convert this storage model to the public
+// RequestEvent projection rather than serializing it directly.
 type LogRecord struct {
 	Namespace           string              `json:"namespace"`
 	Type                httpf.RequestType   `json:"type"`

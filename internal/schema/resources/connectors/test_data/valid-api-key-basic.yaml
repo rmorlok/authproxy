@@ -1,13 +1,20 @@
-labels:
-  type: legacy-basic
-displayName: Legacy Basic Auth Service
-logo:
-  publicUrl: https://example.com/legacy.png
-description: >
-  Service that authenticates via HTTP Basic Auth using an account id and an API
-  key.
-auth:
-  type: api-key
-  placement:
-    type: basic
-    usernameField: account_id
+apiVersion: authproxy.net/v1alpha1
+kind: Connector
+metadata:
+  name: api-key-basic
+  labels:
+    type: legacy-basic
+spec:
+  definition:
+    displayName: Legacy Basic Auth Service
+    logo:
+      publicUrl: https://example.com/legacy.png
+    description: 'Service that authenticates via HTTP Basic Auth using an account
+      id and an API key.
+
+'
+    auth:
+      type: api-key
+      placement:
+        type: basic
+        usernameField: account_id

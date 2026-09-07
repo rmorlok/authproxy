@@ -16,8 +16,10 @@ import (
 )
 
 // MockConnectionRetrieval sets up the service to retrieve a connection with an associated connector any number of times
-func MockConnectionRetrieval(ctx context.Context, dbMock *mockDb.MockDB, e *mockE.MockE, connUuuid apid.ID, c *cschema.Connector) {
+func MockConnectionRetrieval(ctx context.Context, dbMock *mockDb.MockDB, e *mockE.MockE, connUuuid apid.ID, definition *cschema.ConnectorDefinition) {
 	clock := apctx.GetClock(ctx)
+	connectorID := apid.New(apid.PrefixConnector)
+	version := uint64(1)
 
 	dbMock.
 		EXPECT().
@@ -25,44 +27,50 @@ func MockConnectionRetrieval(ctx context.Context, dbMock *mockDb.MockDB, e *mock
 		Return(&database.Connection{
 			Id:               connUuuid,
 			State:            database.ConnectionStateConfigured,
-			ConnectorId:      c.Id,
-			ConnectorVersion: c.Version,
+			ConnectorId:      connectorID,
+			ConnectorVersion: version,
 			CreatedAt:        clock.Now(),
 			UpdatedAt:        clock.Now(),
 		}, nil).
 		AnyTimes()
 
-	MockConnectorRetrival(ctx, dbMock, e, c)
+	mockConnectorDefinitionRetrieval(ctx, dbMock, e, connectorID, version, database.ConnectorDefinitionVersionStatePrimary, nil, nil, definition)
 }
 
 // MockConnectorRetrival sets up mocks to retrieve a connector from the service any number of times.
 func MockConnectorRetrival(ctx context.Context, dbMock *mockDb.MockDB, e *mockE.MockE, c *cschema.Connector) {
 	state := database.ConnectorDefinitionVersionStatePrimary
-	if c.State != "" {
-		state = database.ConnectorDefinitionVersionState(c.State)
+	if c.Spec.Release.DesiredState != "" {
+		state = database.ConnectorDefinitionVersionState(c.Spec.Release.DesiredState)
 	}
+	connectorID := c.GetId()
 
+	mockConnectorDefinitionRetrieval(ctx, dbMock, e, connectorID, c.Metadata.Generation, state, c.Metadata.Labels, c.Metadata.Annotations, &c.Spec.Definition)
+}
+
+func mockConnectorDefinitionRetrieval(ctx context.Context, dbMock *mockDb.MockDB, e *mockE.MockE, connectorID apid.ID, version uint64, state database.ConnectorDefinitionVersionState, labels, annotations map[string]string, definition *cschema.ConnectorDefinition) {
 	clock := apctx.GetClock(ctx)
 	encryptedDefinition := encfield.EncryptedField{
 		ID:   "dek_mock",
-		Data: fmt.Sprintf("%s-encrypted-definition", c.Id.String()),
+		Data: fmt.Sprintf("%s-encrypted-definition", connectorID.String()),
 	}
 
 	dbMock.
 		EXPECT().
-		GetConnectorDefinitionVersion(gomock.Any(), c.Id, c.Version).
+		GetConnectorDefinitionVersion(gomock.Any(), connectorID, version).
 		Return(&database.ConnectorWithDefinition{
-			Id:                  c.Id,
-			Version:             c.Version,
+			Id:                  connectorID,
+			Version:             version,
 			State:               state,
-			Labels:              c.Labels,
+			Labels:              labels,
+			Annotations:         annotations,
 			EncryptedDefinition: encryptedDefinition,
 			CreatedAt:           clock.Now(),
 			UpdatedAt:           clock.Now(),
 		}, nil).
 		AnyTimes()
 
-	connJson, err := json.Marshal(c)
+	connJson, err := json.Marshal(definition)
 	if err != nil {
 		panic(err)
 	}

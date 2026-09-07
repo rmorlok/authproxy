@@ -201,7 +201,7 @@ function ConnectionSection({
         return () => { cancelled = true; };
     }, [namespace]);
 
-    const options = useMemo(() => connections.map((c) => c.id), [connections]);
+    const options = useMemo(() => connections.map((c) => c.metadata.id), [connections]);
     const selected = options.find((id) => id === connectionId) || null;
 
     return (
@@ -214,8 +214,10 @@ function ConnectionSection({
                 loading={loading}
                 onChange={(_, id) => onChange(id || undefined)}
                 getOptionLabel={(id) => {
-                    const c = connections.find((c) => c.id === id);
-                    return c ? `${c.id} — ${c.connector?.id || ''} (${c.namespace})` : id;
+                    const c = connections.find((c) => c.metadata.id === id);
+                    return c
+                        ? `${c.metadata.id} — ${c.spec.connectorRef.id || ''} (${c.metadata.namespace})`
+                        : id;
                 }}
                 renderInput={(params) => (
                     <TextField

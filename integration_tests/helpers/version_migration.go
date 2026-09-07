@@ -12,10 +12,13 @@ import (
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/apid"
-	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
+	apiv1alpha1 "github.com/rmorlok/authproxy/internal/schema/api/v1alpha1"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
+	connectionschema "github.com/rmorlok/authproxy/internal/schema/resources/connection"
+	connectorschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/stretchr/testify/require"
 )
 
@@ -24,25 +27,25 @@ import (
 // same management API shape a host application would use.
 func (env *IntegrationTestEnv) CreateConnector(
 	t *testing.T,
-	definition sconfig.Connector,
+	definition sconfig.ConnectorDefinition,
 	labels map[string]string,
 	annotations map[string]string,
 	opts ...ActorOption,
-) schemaapi.ConnectorVersionJson {
+) connectorschema.Connector {
 	t.Helper()
 
-	body, err := jsonMarshal(schemaapi.CreateConnectorRequestJson{
-		Namespace:   sconfig.RootNamespace,
-		Definition:  definition,
-		Labels:      labels,
-		Annotations: annotations,
-	})
+	resource := connectorschema.NewConnector()
+	resource.Metadata.Namespace = sconfig.RootNamespace
+	resource.Metadata.Labels = labels
+	resource.Metadata.Annotations = annotations
+	resource.Spec.Definition = definition
+	body, err := jsonMarshal(resource)
 	require.NoError(t, err)
 
 	w := env.doSignedRequest(t, http.MethodPost, "/api/v1/connectors", body, env.resolveActorOptions(opts))
 	require.Equalf(t, http.StatusCreated, w.Code, "create connector failed: %s", w.Body.String())
 
-	var out schemaapi.ConnectorVersionJson
+	var out connectorschema.Connector
 	require.NoError(t, jsonUnmarshal(w.Body.Bytes(), &out))
 	return out
 }
@@ -52,29 +55,27 @@ func (env *IntegrationTestEnv) CreateConnector(
 func (env *IntegrationTestEnv) CreateDraftConnectorVersion(
 	t *testing.T,
 	connectorID apid.ID,
-	definition sconfig.Connector,
+	definition sconfig.ConnectorDefinition,
 	labels map[string]string,
 	annotations map[string]string,
 	opts ...ActorOption,
-) schemaapi.ConnectorVersionJson {
+) connectorschema.Connector {
 	t.Helper()
 
-	req := schemaapi.CreateConnectorVersionRequestJson{Definition: &definition}
-	if labels != nil {
-		req.Labels = &labels
-	}
-	if annotations != nil {
-		req.Annotations = &annotations
-	}
+	req := connectorschema.NewConnector()
+	req.Metadata.Namespace = sconfig.RootNamespace
+	req.Metadata.Labels = labels
+	req.Metadata.Annotations = annotations
+	req.Spec.Definition = definition
 
 	body, err := jsonMarshal(req)
 	require.NoError(t, err)
 
-	path := fmt.Sprintf("/api/v1/connectors/%s/versions", connectorID)
+	path := fmt.Sprintf("/api/v1/connectors/%s/generations", connectorID)
 	w := env.doSignedRequest(t, http.MethodPost, path, body, env.resolveActorOptions(opts))
 	require.Equalf(t, http.StatusCreated, w.Code, "create connector version failed: %s", w.Body.String())
 
-	var out schemaapi.ConnectorVersionJson
+	var out connectorschema.Connector
 	require.NoError(t, jsonUnmarshal(w.Body.Bytes(), &out))
 	return out
 }
@@ -85,19 +86,27 @@ func (env *IntegrationTestEnv) ForceConnectorVersionState(
 	t *testing.T,
 	connectorID apid.ID,
 	version uint64,
-	state schemaapi.ConnectorVersionState,
+	state connectorschema.ConnectorReleaseState,
 	opts ...ActorOption,
-) schemaapi.ConnectorVersionJson {
+) connectorschema.Connector {
 	t.Helper()
 
-	body, err := jsonMarshal(schemaapi.ForceConnectorVersionStateRequestJson{State: string(state)})
+	body, err := jsonMarshal(schemaapi.NewConnectorForceStateRequest(
+		meta.ObjectReference{
+			APIVersion: meta.APIVersionV1Alpha1,
+			Kind:       connectorschema.ConnectorKind,
+			ID:         connectorID.String(),
+			Generation: version,
+		},
+		state,
+	))
 	require.NoError(t, err)
 
-	path := fmt.Sprintf("/api/v1/connectors/%s/versions/%d/_forceState", connectorID, version)
+	path := fmt.Sprintf("/api/v1/connectors/%s/generations/%d/_forceState", connectorID, version)
 	w := env.doSignedRequest(t, http.MethodPut, path, body, env.resolveActorOptions(opts))
 	require.Equalf(t, http.StatusOK, w.Code, "force connector version state failed: %s", w.Body.String())
 
-	var out schemaapi.ConnectorVersionJson
+	var out connectorschema.Connector
 	require.NoError(t, jsonUnmarshal(w.Body.Bytes(), &out))
 	return out
 }
@@ -108,15 +117,15 @@ func (env *IntegrationTestEnv) ForceConnectorVersionState(
 func (env *IntegrationTestEnv) PublishConnectorVersion(
 	t *testing.T,
 	connectorID apid.ID,
-	definition sconfig.Connector,
+	definition sconfig.ConnectorDefinition,
 	labels map[string]string,
 	annotations map[string]string,
 	opts ...ActorOption,
-) schemaapi.ConnectorVersionJson {
+) connectorschema.Connector {
 	t.Helper()
 
 	draft := env.CreateDraftConnectorVersion(t, connectorID, definition, labels, annotations, opts...)
-	return env.ForceConnectorVersionState(t, connectorID, draft.Version, schemaapi.ConnectorVersionStatePrimary, opts...)
+	return env.ForceConnectorVersionState(t, connectorID, draft.Metadata.Generation, connectorschema.ConnectorReleaseStatePrimary, opts...)
 }
 
 // MigrateConnectionVersion starts the durable connection-version migration
@@ -127,13 +136,23 @@ func (env *IntegrationTestEnv) MigrateConnectionVersion(
 	targetVersion uint64,
 	timeoutSeconds int64,
 	opts ...ActorOption,
-) schemaapi.MigrateConnectionVersionResponseJson {
+) schemaapi.ConnectionVersionMigrationAction {
 	t.Helper()
 
-	req := schemaapi.MigrateConnectionVersionRequestJson{TargetVersion: targetVersion}
-	if timeoutSeconds > 0 {
-		req.TimeoutSeconds = &timeoutSeconds
+	parsedConnectionID, err := apid.Parse(connectionID)
+	require.NoError(t, err)
+	connection := env.GetConnection(t, connectionID)
+	spec := schemaapi.ConnectionVersionMigrationSpec{
+		ConnectorRef: connectorReference(connection.ConnectorId, targetVersion),
 	}
+	if timeoutSeconds > 0 {
+		spec.TimeoutSeconds = &timeoutSeconds
+	}
+	req := schemaapi.ConnectionVersionMigrationAction{Action: apiv1alpha1.Action[schemaapi.ConnectionVersionMigrationSpec, schemaapi.ConnectionVersionMigrationStatus]{
+		TypeMeta: meta.NewTypeMeta(schemaapi.ConnectionVersionMigrationActionKind),
+		Metadata: apiv1alpha1.ActionMeta{Target: connectionschema.NewConnectionReference(parsedConnectionID)},
+		Spec:     spec,
+	}}
 	body, err := jsonMarshal(req)
 	require.NoError(t, err)
 
@@ -141,11 +160,13 @@ func (env *IntegrationTestEnv) MigrateConnectionVersion(
 	w := env.doSignedRequest(t, http.MethodPost, path, body, env.resolveActorOptions(opts))
 	require.Equalf(t, http.StatusOK, w.Code, "migrate connection version failed: %s", w.Body.String())
 
-	var out schemaapi.MigrateConnectionVersionResponseJson
+	var out schemaapi.ConnectionVersionMigrationAction
 	require.NoError(t, jsonUnmarshal(w.Body.Bytes(), &out))
-	require.Equal(t, connectionID, out.ConnectionId.String())
-	require.Equal(t, targetVersion, out.TargetVersion)
-	require.NotEmpty(t, out.TaskId)
+	require.NoError(t, out.ValidateResponse(schemaapi.ConnectionVersionMigrationActionKind))
+	require.Equal(t, connectionID, out.Metadata.Target.ID)
+	require.Equal(t, targetVersion, out.Spec.ConnectorRef.Generation)
+	require.NotNil(t, out.Status)
+	require.NotEmpty(t, out.Status.TaskID)
 	return out
 }
 
@@ -158,7 +179,7 @@ func (env *IntegrationTestEnv) MigrateConnectionVersionAndWait(
 	targetVersion uint64,
 	timeout time.Duration,
 	opts ...ActorOption,
-) schemaapi.MigrateConnectionVersionResponseJson {
+) schemaapi.ConnectionVersionMigrationAction {
 	t.Helper()
 
 	timeoutSeconds := int64(timeout.Seconds())
@@ -166,7 +187,8 @@ func (env *IntegrationTestEnv) MigrateConnectionVersionAndWait(
 		timeoutSeconds = 10
 	}
 	resp := env.MigrateConnectionVersion(t, connectionID, targetVersion, timeoutSeconds, opts...)
-	RequireWorkflowTaskCompleted(t, env, resp.TaskId, timeout, opts...)
+	require.NotNil(t, resp.Status)
+	RequireWorkflowTaskCompleted(t, env, resp.Status.TaskID, timeout, opts...)
 	return resp
 }
 
@@ -183,10 +205,7 @@ func (env *IntegrationTestEnv) SubmitSetupForm(
 
 	rawData, err := json.Marshal(data)
 	require.NoError(t, err)
-	body, err := jsonMarshal(iface.SubmitConnectionRequest{
-		StepId: stepID,
-		Data:   rawData,
-	})
+	body, err := jsonMarshal(connectionSetupSubmitAction(connectionID, stepID, rawData))
 	require.NoError(t, err)
 
 	return env.doSignedRequest(t, http.MethodPost, "/api/v1/connections/"+connectionID+"/_submit", body, env.resolveActorOptions(opts))
@@ -254,13 +273,10 @@ func (env *IntegrationTestEnv) ListConnectionNotifications(
 ) []schemaapi.NotificationJson {
 	t.Helper()
 
-	id, err := apid.Parse(connectionID)
-	require.NoError(t, err)
-
 	items := env.ListNotifications(t, state, includeViewed, opts...)
 	filtered := make([]schemaapi.NotificationJson, 0, len(items))
 	for _, n := range items {
-		if n.ResourceType == "connection" && n.ResourceId == id {
+		if n.Spec.ResourceRef.Kind == connectionschema.ConnectionKind && n.Spec.ResourceRef.ID == connectionID {
 			filtered = append(filtered, n)
 		}
 	}
@@ -280,8 +296,8 @@ func (env *IntegrationTestEnv) RequireSingleActiveConnectionNotification(
 
 	items := env.ListConnectionNotifications(t, connectionID, schemaapi.NotificationStateActive, false, opts...)
 	require.Len(t, items, 1, "expected one active connection notification")
-	require.Truef(t, strings.HasSuffix(items[0].Key, ":"+keySuffix),
-		"notification key %q should end with %q", items[0].Key, keySuffix)
+	require.Truef(t, strings.HasSuffix(items[0].Spec.Key, ":"+keySuffix),
+		"notification key %q should end with %q", items[0].Spec.Key, keySuffix)
 	return items[0]
 }
 
@@ -308,8 +324,8 @@ func (env *IntegrationTestEnv) RequireResolvedConnectionNotification(
 
 	items := env.ListConnectionNotifications(t, connectionID, schemaapi.NotificationStateResolved, true, opts...)
 	for _, n := range items {
-		if strings.HasSuffix(n.Key, ":"+keySuffix) {
-			require.NotNil(t, n.ResolvedAt, "resolved notification should include resolved_at")
+		if strings.HasSuffix(n.Spec.Key, ":"+keySuffix) {
+			require.NotNil(t, n.Status.ResolvedAt, "resolved notification should include status.resolvedAt")
 			return n
 		}
 	}

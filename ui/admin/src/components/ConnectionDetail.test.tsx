@@ -8,7 +8,7 @@ import ConnectionDetail from './ConnectionDetail';
 import {
   ConnectionHealthState,
   ConnectionState,
-  ConnectorVersionState,
+  ConnectorReleaseState,
   PollForTaskResult,
   TaskState,
   connections,
@@ -27,13 +27,17 @@ vi.mock('@authproxy/api', () => {
     update: vi.fn(),
   };
   const connectorApi = {
-    listVersions: vi.fn(),
+    getGeneration: vi.fn(),
+    listGenerations: vi.fn(),
   };
   const taskApi = {
     pollForTaskFinalized: vi.fn(),
   };
 
   return {
+    API_VERSION: 'authproxy.net/v1alpha1',
+    CONNECTION_KIND: 'Connection',
+    CONNECTOR_KIND: 'Connector',
     ConnectionHealthState: {
       HEALTHY: 'healthy',
       UNHEALTHY: 'unhealthy',
@@ -45,7 +49,7 @@ vi.mock('@authproxy/api', () => {
       DISCONNECTING: 'disconnecting',
       DISCONNECTED: 'disconnected',
     },
-    ConnectorVersionState: {
+    ConnectorReleaseState: {
       DRAFT: 'draft',
       PRIMARY: 'primary',
       ACTIVE: 'active',
@@ -68,40 +72,61 @@ vi.mock('@authproxy/api', () => {
 });
 
 const connection = {
-  id: 'cxn_test',
-  name: 'production-crm',
-  namespace: 'root',
-  state: ConnectionState.CONFIGURED,
-  healthState: ConnectionHealthState.HEALTHY,
-  connector: {
-    id: 'cxr_test',
-    name: 'example-connector',
-    version: 2,
+  apiVersion: 'authproxy.net/v1alpha1' as const,
+  kind: 'Connection' as const,
+  metadata: {
+    id: 'cxn_test',
+    name: 'production-crm',
     namespace: 'root',
-    state: ConnectorVersionState.ACTIVE,
-    displayName: 'Example connector',
-    description: '',
-    logo: '',
-    hasConfigure: false,
     createdAt: '2026-07-25T00:00:00.000Z',
     updatedAt: '2026-07-25T00:00:00.000Z',
   },
-  createdAt: '2026-07-25T00:00:00.000Z',
-  updatedAt: '2026-07-25T00:00:00.000Z',
+  spec: {
+    connectorRef: {
+      apiVersion: 'authproxy.net/v1alpha1' as const,
+      kind: 'Connector' as const,
+      id: 'cxr_test',
+      name: 'example-connector',
+      namespace: 'root',
+      generation: 2,
+    },
+  },
+  status: {
+    lifecycle: {state: ConnectionState.CONFIGURED},
+    health: {state: ConnectionHealthState.HEALTHY},
+    configuration: {configured: true, schema: {}},
+  },
 };
 
+function connector(generation: number, state: ConnectorReleaseState) {
+  return {
+    apiVersion: 'authproxy.net/v1alpha1' as const,
+    kind: 'Connector' as const,
+    metadata: {
+    id: 'cxr_test',
+    name: 'example-connector',
+    namespace: 'root',
+      generation,
+    createdAt: '2026-07-25T00:00:00.000Z',
+    updatedAt: '2026-07-25T00:00:00.000Z',
+  },
+    spec: {definition: {displayName: 'Example connector'}},
+    status: {release: {state}},
+  };
+}
+
 const connectorVersions = [
-  {id: 'cxr_test', name: 'example-connector', version: 4, state: ConnectorVersionState.DRAFT},
-  {id: 'cxr_test', name: 'example-connector', version: 3, state: ConnectorVersionState.PRIMARY},
-  {id: 'cxr_test', name: 'example-connector', version: 2, state: ConnectorVersionState.ACTIVE},
-  {id: 'cxr_test', name: 'example-connector', version: 1, state: ConnectorVersionState.ACTIVE},
-  {id: 'cxr_test', name: 'example-connector', version: 0, state: ConnectorVersionState.ARCHIVED},
+  connector(4, ConnectorReleaseState.DRAFT),
+  connector(3, ConnectorReleaseState.PRIMARY),
+  connector(2, ConnectorReleaseState.ACTIVE),
+  connector(1, ConnectorReleaseState.ACTIVE),
+  connector(0, ConnectorReleaseState.ARCHIVED),
 ];
 
 function renderConnectionDetail() {
   render(
     <MemoryRouter>
-      <ConnectionDetail connectionId={connection.id}/>
+      <ConnectionDetail connectionId={connection.metadata.id}/>
     </MemoryRouter>,
   );
 }
@@ -109,23 +134,34 @@ function renderConnectionDetail() {
 describe('ConnectionDetail', () => {
   beforeEach(() => {
     vi.mocked(connections.get).mockResolvedValue({status: 200, data: connection} as any);
-    vi.mocked(connectors.listVersions).mockResolvedValue({status: 200, data: {items: connectorVersions}} as any);
+    vi.mocked(connectors.getGeneration).mockResolvedValue({status: 200, data: connectorVersions[2]} as any);
+    vi.mocked(connectors.listGenerations).mockResolvedValue({
+      status: 200,
+      data: {apiVersion: 'authproxy.net/v1alpha1', kind: 'ConnectorList', metadata: {}, items: connectorVersions},
+    } as any);
     vi.mocked(connections.migrateVersion).mockResolvedValue({
       status: 200,
       data: {
-        taskId: 'task_test',
-        connectionId: connection.id,
-        sourceVersion: 2,
-        targetVersion: 3,
+        apiVersion: 'authproxy.net/v1alpha1',
+        kind: 'ConnectionVersionMigration',
+        metadata: {target: {apiVersion: 'authproxy.net/v1alpha1', kind: 'Connection', id: connection.metadata.id}},
+        spec: {connectorRef: {...connection.spec.connectorRef, generation: 3}},
+        status: {taskId: 'task_test'},
       },
     } as any);
     vi.mocked(connections.update).mockResolvedValue({
       status: 200,
-      data: {...connection, name: 'customer-crm'},
+      data: {...connection, metadata: {...connection.metadata, name: 'customer-crm'}},
     } as any);
     vi.mocked(tasks.pollForTaskFinalized).mockResolvedValue({
       result: PollForTaskResult.FINALIZED,
-      taskInfo: {id: 'task_test', state: TaskState.COMPLETED},
+      task: {
+        apiVersion: 'authproxy.net/v1alpha1',
+        kind: 'Task',
+        metadata: {id: 'task_test'},
+        spec: {type: 'connection-version-migration'},
+        status: {state: TaskState.COMPLETED},
+      },
     } as any);
   });
 
@@ -142,7 +178,7 @@ describe('ConnectionDetail', () => {
         status: 200,
         data: {
           ...connection,
-          healthState: ConnectionHealthState.UNHEALTHY,
+          status: {...connection.status, health: {state: ConnectionHealthState.UNHEALTHY}},
         },
       } as any);
     renderConnectionDetail();
@@ -164,8 +200,8 @@ describe('ConnectionDetail', () => {
     await user.click(within(dialog).getByRole('button', {name: 'Migrate to v3'}));
 
     await waitFor(() => {
-      expect(connections.migrateVersion).toHaveBeenCalledWith(connection.id, {
-        targetVersion: 3,
+      expect(connections.migrateVersion).toHaveBeenCalledWith(connection.metadata.id, {
+        connectorRef: {...connection.spec.connectorRef, generation: 3},
         timeoutSeconds: 600,
       });
     });
@@ -192,8 +228,8 @@ describe('ConnectionDetail', () => {
     await user.click(within(dialog).getByRole('button', {name: 'Rollback to v1'}));
 
     await waitFor(() => {
-      expect(connections.migrateVersion).toHaveBeenCalledWith(connection.id, {
-        targetVersion: 1,
+      expect(connections.migrateVersion).toHaveBeenCalledWith(connection.metadata.id, {
+        connectorRef: {...connection.spec.connectorRef, generation: 1},
         timeoutSeconds: 600,
       });
     });
@@ -202,9 +238,9 @@ describe('ConnectionDetail', () => {
 
   it('explains when no other connector versions are eligible instead of rendering an empty selector', async () => {
     const user = userEvent.setup();
-    vi.mocked(connectors.listVersions).mockResolvedValue({
+    vi.mocked(connectors.listGenerations).mockResolvedValue({
       status: 200,
-      data: {items: [{...connectorVersions[2]}]},
+      data: {apiVersion: 'authproxy.net/v1alpha1', kind: 'ConnectorList', metadata: {}, items: [{...connectorVersions[2]}]},
     } as any);
     renderConnectionDetail();
 
@@ -230,7 +266,12 @@ describe('ConnectionDetail', () => {
     await user.type(input, 'customer-crm');
     await user.click(screen.getByRole('button', {name: 'Save'}));
 
-    await waitFor(() => expect(connections.update).toHaveBeenCalledWith('cxn_test', {name: 'customer-crm'}));
+    await waitFor(() => expect(connections.update).toHaveBeenCalledWith('cxn_test', {
+      apiVersion: 'authproxy.net/v1alpha1',
+      kind: 'Connection',
+      metadata: {name: 'customer-crm'},
+      spec: {},
+    }));
     expect(await screen.findByRole('heading', {name: 'customer-crm'})).toBeTruthy();
     expect(screen.getByText('cxn_test')).toBeTruthy();
   });

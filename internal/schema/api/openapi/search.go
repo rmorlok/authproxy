@@ -1,23 +1,30 @@
 package openapi
 
-import "time"
+import (
+	"time"
 
-// SearchResourcesResponseJson documents the bounded resource-search response.
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
+)
+
+type SearchResultListMetaJson struct {
+	TruncatedKinds  []string `json:"truncatedKinds"`
+	IncompleteKinds []string `json:"incompleteKinds"`
+}
+
+// SearchResourcesResponseJson documents the heterogeneous resource-search
+// projection. Each result carries one typed ObjectReference rather than a
+// second flat identity envelope.
 type SearchResourcesResponseJson struct {
-	// This anonymous shape mirrors schemaapi.SearchResourceSummaryJson while
-	// avoiding swaggo's inability to resolve same-package nested named types.
-	Items []struct {
-		ResourceType  string            `json:"resourceType" example:"connection"`
-		ResourceId    string            `json:"resourceId" example:"cxn_test550e8400abcde"`
-		Name          string            `json:"name" example:"production-crm"`
-		Namespace     string            `json:"namespace" example:"root.acme"`
-		Labels        map[string]string `json:"labels"`
+	APIVersion string                   `json:"apiVersion" binding:"required" enums:"authproxy.net/v1alpha1" example:"authproxy.net/v1alpha1"`
+	Kind       string                   `json:"kind" binding:"required" enums:"SearchResultList" example:"SearchResultList"`
+	Metadata   SearchResultListMetaJson `json:"metadata" binding:"required"`
+	Items      []struct {
+		ResourceRef   meta.ObjectReference `json:"resourceRef" binding:"required"`
+		Labels        map[string]string    `json:"labels"`
 		MatchedLabels []struct {
-			Key   string `json:"key" example:"name"`
-			Value string `json:"value" example:"payments-production"`
+			Key   string `json:"key" example:"team"`
+			Value string `json:"value" example:"payments"`
 		} `json:"matchedLabels"`
 		UpdatedAt time.Time `json:"updatedAt"`
-	} `json:"items"`
-	TruncatedTypes  []string `json:"truncatedTypes"`
-	IncompleteTypes []string `json:"incompleteTypes"`
+	} `json:"items" binding:"required"`
 }

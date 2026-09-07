@@ -8,10 +8,9 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import {
   Connection,
-  ConnectionHealthState,
+  API_VERSION,
   ConnectionState,
   Connector,
-  ConnectorVersionState,
   connections,
   PollForTaskResult,
   tasks,
@@ -21,6 +20,7 @@ import authReducer from '../store/sessionSlice';
 import connectorsReducer from '../store/connectorsSlice';
 import connectionsReducer from '../store/connectionsSlice';
 import toastsReducer from '../store/toastsSlice';
+import {completeSetupResponseFixture, connectionFixture, connectorFixture} from '../testing/resources';
 
 vi.mock('@authproxy/api', async () => {
   const actual = await vi.importActual<typeof import('@authproxy/api')>('@authproxy/api');
@@ -43,31 +43,21 @@ vi.mock('@authproxy/api', async () => {
   };
 });
 
-const connector: Connector = {
+const connector: Connector = connectorFixture({
   id: 'gmail',
-  name: 'gmail',
-  namespace: 'root',
-  version: 1,
-  state: ConnectorVersionState.ACTIVE,
   displayName: 'GMail',
   description: 'Have the agent respond to your emails without you needing to be involved. Like magic.',
   highlight: 'Respond to email automatically.',
-  logo: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg"/%3E',
+  logo: {publicUrl: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg"/%3E'},
   hasConfigure: true,
-  createdAt: '2023-04-01T12:00:00Z',
-  updatedAt: '2023-04-01T12:00:00Z',
-};
+});
 
-const connection: Connection = {
+const connection: Connection = connectionFixture({
   id: 'c-gmail',
   name: 'primary-gmail',
-  namespace: 'root',
   connector,
   state: ConnectionState.CONFIGURED,
-  healthState: ConnectionHealthState.HEALTHY,
-  createdAt: '2023-04-01T12:00:00Z',
-  updatedAt: '2023-04-01T12:00:00Z',
-};
+});
 
 const baseConnectionsState = {
   items: [connection],
@@ -97,7 +87,7 @@ function renderConnectionDetail(preloadedState: any = {}, initialEntry = '/conne
     }),
     preloadedState: {
       auth: { actorId: 'actor_test', status: 'authenticated' },
-      connectors: { items: [], status: 'succeeded', error: null },
+      connectors: { items: [connector], status: 'succeeded', error: null },
       connections: baseConnectionsState,
       toasts: { items: [] },
       ...preloadedState,
@@ -130,18 +120,21 @@ describe('ConnectionDetail', () => {
     vi.mocked(connections.cancelSetup).mockResolvedValue({} as any);
     vi.mocked(connections.disconnect).mockResolvedValue({
       data: {
-        taskId: 'task-123',
-        connection: {
+        apiVersion: API_VERSION,
+        kind: 'ConnectionDisconnect',
+        metadata: {target: {apiVersion: API_VERSION, kind: 'Connection', id: connection.metadata.id}},
+        spec: {},
+        status: {taskId: 'task-123', connection: {
           ...connection,
-          state: ConnectionState.DISCONNECTING,
-        },
+          status: {...connection.status, lifecycle: {state: ConnectionState.DISCONNECTING}},
+        }},
       },
     } as any);
-    vi.mocked(connections.getSetupStep).mockResolvedValue({ data: { id: connection.id, type: 'complete' } } as any);
-    vi.mocked(connections.list).mockResolvedValue({ status: 200, data: { items: [connection], cursor: '' } } as any);
-    vi.mocked(connections.reauth).mockResolvedValue({ data: { id: connection.id, type: 'complete' } } as any);
-    vi.mocked(connections.reconfigure).mockResolvedValue({ data: { id: connection.id, type: 'complete' } } as any);
-    vi.mocked(connections.submit).mockResolvedValue({ data: { id: connection.id, type: 'complete' } } as any);
+    vi.mocked(connections.getSetupStep).mockResolvedValue({ data: completeSetupResponseFixture(connection.metadata.id) } as any);
+    vi.mocked(connections.list).mockResolvedValue({ status: 200, data: { apiVersion: API_VERSION, kind: 'ConnectionList', metadata: {}, items: [connection] } } as any);
+    vi.mocked(connections.reauth).mockResolvedValue({ data: completeSetupResponseFixture(connection.metadata.id) } as any);
+    vi.mocked(connections.reconfigure).mockResolvedValue({ data: completeSetupResponseFixture(connection.metadata.id) } as any);
+    vi.mocked(connections.submit).mockResolvedValue({ data: completeSetupResponseFixture(connection.metadata.id) } as any);
     vi.mocked(tasks.pollForTaskFinalized).mockResolvedValue({
       result: PollForTaskResult.FINALIZED,
     } as any);
@@ -165,10 +158,10 @@ describe('ConnectionDetail', () => {
     renderConnectionDetail();
 
     await user.click(screen.getByRole('button', { name: /Reconfigure/i }));
-    expect(connections.reconfigure).toHaveBeenCalledWith(connection.id);
+    expect(connections.reconfigure).toHaveBeenCalledWith(connection.metadata.id);
 
     await user.click(screen.getByRole('button', { name: /Re-authenticate/i }));
-    expect(connections.reauth).toHaveBeenCalledWith(connection.id, window.location.href);
+    expect(connections.reauth).toHaveBeenCalledWith(connection.metadata.id, {returnToUrl: window.location.href});
   });
 
   test('disconnects from the detail page after confirmation', async () => {
@@ -180,16 +173,17 @@ describe('ConnectionDetail', () => {
     await user.click(screen.getByRole('button', { name: /^Disconnect$/i }));
 
     await waitFor(() => {
-      expect(connections.disconnect).toHaveBeenCalledWith(connection.id);
+      expect(connections.disconnect).toHaveBeenCalledWith(connection.metadata.id);
     });
   });
 
   test('offers resume setup for setup-state connections', async () => {
     const user = userEvent.setup();
-    const setupConnection = {
-      ...connection,
+    const setupConnection = connectionFixture({
+      id: connection.metadata.id,
+      connector,
       state: ConnectionState.SETUP,
-    };
+    });
     renderConnectionDetail({
       connections: {
         ...baseConnectionsState,
@@ -201,7 +195,7 @@ describe('ConnectionDetail', () => {
     await user.click(screen.getByRole('button', { name: /Resume setup/i }));
 
     await waitFor(() => {
-      expect(connections.getSetupStep).toHaveBeenCalledWith(setupConnection.id, window.location.href);
+      expect(connections.getSetupStep).toHaveBeenCalledWith(setupConnection.metadata.id, window.location.href);
     });
   });
 
@@ -209,15 +203,16 @@ describe('ConnectionDetail', () => {
     renderConnectionDetail({}, '/connections/c-gmail?action=reauth');
 
     await waitFor(() => {
-      expect(connections.reauth).toHaveBeenCalledWith(connection.id, window.location.href);
+      expect(connections.reauth).toHaveBeenCalledWith(connection.metadata.id, {returnToUrl: window.location.href});
     });
   });
 
   test('resumes pending setup from notification action URL', async () => {
-    const pendingSetupConnection = {
-      ...connection,
+    const pendingSetupConnection = connectionFixture({
+      id: connection.metadata.id,
+      connector,
       setupStepId: 'workspace',
-    };
+    });
 
     renderConnectionDetail({
       connections: {
@@ -227,7 +222,7 @@ describe('ConnectionDetail', () => {
     }, '/connections/c-gmail?action=configure');
 
     await waitFor(() => {
-      expect(connections.getSetupStep).toHaveBeenCalledWith(pendingSetupConnection.id, window.location.href);
+      expect(connections.getSetupStep).toHaveBeenCalledWith(pendingSetupConnection.metadata.id, window.location.href);
     });
   });
 });

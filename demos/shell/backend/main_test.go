@@ -96,9 +96,9 @@ func TestSignTokenForFreshUserIncludesLeastPrivilegeActor(t *testing.T) {
 	require.Equal(t, externalID, claims.Subject)
 	require.False(t, claims.ActorSigned)
 	require.NotNil(t, claims.Actor)
-	require.Equal(t, externalID, claims.Actor.ExternalId)
-	require.Equal(t, demoNamespace, claims.Actor.Namespace)
-	require.Equal(t, map[string]string{"demo": "true", "role": "user"}, claims.Actor.Labels)
+	require.Equal(t, externalID, claims.Actor.Spec.ExternalId)
+	require.Equal(t, demoNamespace, claims.Actor.Metadata.Namespace)
+	require.Equal(t, map[string]string{"demo": "true", "role": "user"}, claims.Actor.Metadata.Labels)
 	require.Equal(t, []aschema.Permission{
 		{
 			Namespace: demoNamespace,
@@ -110,7 +110,7 @@ func TestSignTokenForFreshUserIncludesLeastPrivilegeActor(t *testing.T) {
 			Resources: []string{"connections"},
 			Verbs:     []string{"create", "list", "get", "update", "disconnect"},
 		},
-	}, claims.Actor.Permissions)
+	}, claims.Actor.Spec.Permissions)
 }
 
 func TestLoadTelemetryLinksFromGrafanaBaseURL(t *testing.T) {

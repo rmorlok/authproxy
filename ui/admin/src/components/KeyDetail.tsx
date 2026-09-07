@@ -19,7 +19,7 @@ import InputLabel from '@mui/material/InputLabel';
 import Select from '@mui/material/Select';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import dayjs from 'dayjs';
-import {Key, keys, KeyState, UpdateKeyRequest} from '@authproxy/api';
+import {API_VERSION, KEY_KIND, Key, keys, KeyState, UpdateKeyRequest} from '@authproxy/api';
 import { useNavigate } from "react-router-dom";
 import ResourceIdentifier from './ResourceIdentifier';
 import ResourceMetadataMenuItems from './ResourceMetadataMenuItems';
@@ -101,11 +101,11 @@ export default function KeyDetail({keyId}: { keyId: string }) {
 
   const onClickEdit = () => {
     setActionError(null);
-    setEditState(ek.state);
-    setEditKeyData(keyDataFormStateFromConfig(ek.keyData));
+    setEditState(ek.status.state);
+    setEditKeyData(keyDataFormStateFromConfig(ek.spec.keyData));
     setEditKeyDataDirty(false);
-    setEditLabelRows(mapToRows(ek.labels, {readonlyKeyPrefix: SYSTEM_LABEL_PREFIX}));
-    setEditAnnotationRows(mapToRows(ek.annotations));
+    setEditLabelRows(mapToRows(ek.metadata.labels, {readonlyKeyPrefix: SYSTEM_LABEL_PREFIX}));
+    setEditAnnotationRows(mapToRows(ek.metadata.annotations));
     closeMenu();
     setEditOpen(true);
   };
@@ -140,14 +140,18 @@ export default function KeyDetail({keyId}: { keyId: string }) {
     setActionLoading(true);
     try {
       const request: UpdateKeyRequest = {
-        state: editState,
-        labels: rowsToMap(editLabelRows, {includeReadonly: false}),
-        annotations: rowsToMap(editAnnotationRows),
+        apiVersion: API_VERSION,
+        kind: KEY_KIND,
+        metadata: {
+          labels: rowsToMap(editLabelRows, {includeReadonly: false}),
+          annotations: rowsToMap(editAnnotationRows),
+        },
+        spec: {desiredState: editState},
       };
       if (editKeyDataDirty) {
-        request.keyData = buildKeyDataPayload(editKeyData);
+        request.spec.keyData = buildKeyDataPayload(editKeyData);
       }
-      const resp = await keys.update(ek.id, request);
+      const resp = await keys.update(ek.metadata.id, request);
       setEk(resp.data);
       setEditOpen(false);
     } catch (err: any) {
@@ -175,7 +179,7 @@ export default function KeyDetail({keyId}: { keyId: string }) {
     setActionError(null);
     setActionLoading(true);
     try {
-      await keys.delete(ek.id);
+      await keys.delete(ek.metadata.id);
       setConfirmDeleteOpen(false);
       navigate('/keys');
     } catch (err: any) {
@@ -191,24 +195,34 @@ export default function KeyDetail({keyId}: { keyId: string }) {
       <Stack direction="row" justifyContent="space-between" alignItems="center">
         <Typography variant="h5">Key</Typography>
         <Stack direction="row" spacing={1} alignItems="center">
-          <StateChip state={ek.state}/>
+          <StateChip state={ek.status.state}/>
           <IconButton aria-label="actions" onClick={openMenu} size="small">
             <MoreVertIcon/>
           </IconButton>
           <Menu anchorEl={menuAnchorEl} open={Boolean(menuAnchorEl)} onClose={closeMenu} keepMounted>
             <ResourceMetadataMenuItems
               resource="key"
-              name={ek.name}
-              labels={ek.labels}
-              annotations={ek.annotations}
+              name={ek.metadata.name}
+              labels={ek.metadata.labels}
+              annotations={ek.metadata.annotations}
               onCloseMenu={closeMenu}
               includeRename={false}
               onUpdateLabels={async (labels) => {
-                const response = await keys.update(ek.id, {labels});
+                const response = await keys.update(ek.metadata.id, {
+                  apiVersion: API_VERSION,
+                  kind: KEY_KIND,
+                  metadata: {labels},
+                  spec: {},
+                });
                 setEk(response.data);
               }}
               onUpdateAnnotations={async (annotations) => {
-                const response = await keys.update(ek.id, {annotations});
+                const response = await keys.update(ek.metadata.id, {
+                  apiVersion: API_VERSION,
+                  kind: KEY_KIND,
+                  metadata: {annotations},
+                  spec: {},
+                });
                 setEk(response.data);
               }}
               disabled={actionLoading}
@@ -224,25 +238,30 @@ export default function KeyDetail({keyId}: { keyId: string }) {
       {actionError && <Alert severity="error">{actionError}</Alert>}
 
       <ResourceNameEditor
-        name={ek.name}
+        name={ek.metadata.name}
         resourceType="Key"
         onRename={async (name) => {
-          const response = await keys.update(ek.id, {name});
+          const response = await keys.update(ek.metadata.id, {
+            apiVersion: API_VERSION,
+            kind: KEY_KIND,
+            metadata: {name},
+            spec: {},
+          });
           setEk(response.data);
         }}
       />
 
-      <ResourceIdentifier value={ek.id} copyLabel="Copy key id"/>
+      <ResourceIdentifier value={ek.metadata.id} copyLabel="Copy key id"/>
 
-      <ResourceNamespace namespace={ek.namespace}/>
+      <ResourceNamespace namespace={ek.metadata.namespace}/>
 
       <Box>
         <Typography variant="subtitle2" color="text.secondary">Key Data</Typography>
-        {ek.keyData ? (
+        {ek.spec.keyData ? (
           <Stack spacing={1} sx={{mt: 0.5}}>
             <Stack direction="row" spacing={0.5} flexWrap="wrap">
-              <Chip label={keyDataSourceLabel(ek.keyData)} size="small" color="primary" variant="outlined"/>
-              {keyDataDisplayFields(ek.keyData).map(({key, value}) => (
+              <Chip label={keyDataSourceLabel(ek.spec.keyData)} size="small" color="primary" variant="outlined"/>
+              {keyDataDisplayFields(ek.spec.keyData).map(({key, value}) => (
                 <Chip key={key} label={`${key}: ${value}`} size="small" variant="outlined"/>
               ))}
             </Stack>
@@ -255,17 +274,17 @@ export default function KeyDetail({keyId}: { keyId: string }) {
       <Stack direction={{xs: 'column', sm: 'row'}} spacing={4}>
         <Box>
           <Typography variant="subtitle2" color="text.secondary">Created</Typography>
-          <Typography variant="body1">{dayjs(ek.createdAt).format('MMM DD, YYYY, h:mm A')}</Typography>
+          <Typography variant="body1">{dayjs(ek.metadata.createdAt).format('MMM DD, YYYY, h:mm A')}</Typography>
         </Box>
         <Box>
           <Typography variant="subtitle2" color="text.secondary">Updated</Typography>
-          <Typography variant="body1">{dayjs(ek.updatedAt).format('MMM DD, YYYY, h:mm A')}</Typography>
+          <Typography variant="body1">{dayjs(ek.metadata.updatedAt).format('MMM DD, YYYY, h:mm A')}</Typography>
         </Box>
       </Stack>
 
-      <ResourceLabels labels={ek.labels}/>
+      <ResourceLabels labels={ek.metadata.labels}/>
 
-      <AnnotationsEditor annotations={ek.annotations} readOnly onPut={async () => {}} onDelete={async () => {}}/>
+      <AnnotationsEditor annotations={ek.metadata.annotations} readOnly onPut={async () => {}} onDelete={async () => {}}/>
 
       <Dialog open={editOpen} onClose={closeEditDialog} fullWidth maxWidth="md">
         <DialogTitle>Edit key</DialogTitle>

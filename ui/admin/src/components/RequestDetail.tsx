@@ -25,49 +25,11 @@ import CloseIcon from '@mui/icons-material/Close';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import {Duration, HttpStatusChip} from '../util'
-import {getRequestEvent, RequestEvent, RequestEventRecord} from '@authproxy/api';
+import {getRequestEvent, RequestEvent} from '@authproxy/api';
 import Chip from "@mui/material/Chip";
 import {ResourceLabelChips} from './ResourceMetadataFields';
 
-function requestEventFromRecord(record: RequestEventRecord): RequestEvent {
-    const reqHeaders: Record<string, string[]> = {};
-    if (record.requestMimeType) {
-        reqHeaders['Content-Type'] = [record.requestMimeType];
-    }
-
-    const resHeaders: Record<string, string[]> = {};
-    if (record.responseMimeType) {
-        resHeaders['Content-Type'] = [record.responseMimeType];
-    }
-
-    const url = record.host ? `${record.scheme || 'https'}://${record.host}${record.path || ''}` : (record.path || '');
-
-    return {
-        id: record.requestId,
-        ns: record.namespace,
-        cid: record.correlationId || '',
-        ts: record.timestamp,
-        dur: record.duration,
-        full: false,
-        req: {
-            u: url,
-            v: record.requestHttpVersion || '',
-            m: record.method || '',
-            h: reqHeaders,
-            cl: record.requestSizeBytes,
-            b: '',
-        },
-        res: {
-            v: record.responseHttpVersion || '',
-            sc: record.responseStatusCode || 0,
-            h: resHeaders,
-            cl: record.responseSizeBytes,
-            err: record.responseError,
-        },
-    };
-}
-
-function useRequest(id: string | undefined, fallbackRecord?: RequestEventRecord) {
+function useRequest(id: string | undefined, fallbackRecord?: RequestEvent) {
     const [data, setData] = useState<RequestEvent | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -84,12 +46,12 @@ function useRequest(id: string | undefined, fallbackRecord?: RequestEventRecord)
                 const resp = await getRequestEvent(id);
                 if (!active) return;
                 if (resp.status === 200) setData(resp.data);
-                else if (resp.status === 404 && fallbackRecord) setData(requestEventFromRecord(fallbackRecord));
+                else if (resp.status === 404 && fallbackRecord) setData(fallbackRecord);
                 else setError('Failed to load request');
             } catch (e: any) {
                 if (!active) return;
                 if (e?.response?.status === 404 && fallbackRecord) {
-                    setData(requestEventFromRecord(fallbackRecord));
+                    setData(fallbackRecord);
                 } else {
                     setError(e?.message || 'Failed to load request');
                 }
@@ -105,6 +67,23 @@ function useRequest(id: string | undefined, fallbackRecord?: RequestEventRecord)
     }, [id, fallbackRecord]);
 
     return {data, loading, error};
+}
+
+function eventRequestUrl(entry: RequestEvent): string {
+    const capturedUrl = entry.spec.capture?.request.url;
+    if (capturedUrl) return capturedUrl;
+    const request = entry.spec.request;
+    return request.host
+        ? `${request.scheme || 'https'}://${request.host}${request.path || ''}`
+        : request.path || '';
+}
+
+function eventRequestHeaders(entry: RequestEvent): Record<string, string[]> {
+    return entry.spec.capture?.request.headers || {};
+}
+
+function eventResponseHeaders(entry: RequestEvent): Record<string, string[]> {
+    return entry.spec.capture?.response.headers || {};
 }
 
 function decodeBase64ToText(b64?: string): string {
@@ -167,18 +146,23 @@ function headersToHar(headers: Record<string, string[]> | undefined): {name: str
 }
 
 function toHar(entry: RequestEvent) {
-    const urlObj = new URL(entry.req.u);
+    const requestUrl = eventRequestUrl(entry);
+    const requestHeaders = eventRequestHeaders(entry);
+    const responseHeaders = eventResponseHeaders(entry);
+    const requestBody = entry.spec.capture?.request.body;
+    const responseBody = entry.spec.capture?.response.body;
+    const urlObj = new URL(requestUrl);
     const queryString = Array.from(urlObj.searchParams.entries()).map(([name, value]) => ({name, value}));
 
-    const reqIsText = isTextContentType(entry.req.h);
-    const reqBodyText = entry.req.b ? (reqIsText ? decodeBase64ToText(entry.req.b) : entry.req.b) : undefined;
-    const reqEncoding = entry.req.b && !reqIsText ? 'base64' : undefined;
-    const reqMime = headerValues(entry.req.h, 'content-type')[0];
+    const reqIsText = isTextContentType(requestHeaders);
+    const reqBodyText = requestBody ? (reqIsText ? decodeBase64ToText(requestBody) : requestBody) : undefined;
+    const reqEncoding = requestBody && !reqIsText ? 'base64' : undefined;
+    const reqMime = headerValues(requestHeaders, 'content-type')[0];
 
-    const resIsText = isTextContentType(entry.res.h);
-    const resBodyText = entry.res.b ? (resIsText ? decodeBase64ToText(entry.res.b) : entry.res.b) : undefined;
-    const resEncoding = entry.res.b && !resIsText ? 'base64' : undefined;
-    const resMime = headerValues(entry.res.h, 'content-type')[0];
+    const resIsText = isTextContentType(responseHeaders);
+    const resBodyText = responseBody ? (resIsText ? decodeBase64ToText(responseBody) : responseBody) : undefined;
+    const resEncoding = responseBody && !resIsText ? 'base64' : undefined;
+    const resMime = headerValues(responseHeaders, 'content-type')[0];
 
     const har = {
         log: {
@@ -186,38 +170,38 @@ function toHar(entry: RequestEvent) {
             creator: { name: 'AuthProxy Admin', version: 'dev' },
             entries: [
                 {
-                    startedDateTime: entry.ts,
-                    time: entry.dur,
+                    startedDateTime: entry.metadata.createdAt,
+                    time: entry.spec.durationMilliseconds,
                     request: {
-                        method: entry.req.m,
-                        url: entry.req.u,
-                        httpVersion: entry.req.v,
+                        method: entry.spec.request.method,
+                        url: requestUrl,
+                        httpVersion: entry.spec.request.httpVersion || '',
                         cookies: [],
-                        headers: headersToHar(entry.req.h),
+                        headers: headersToHar(requestHeaders),
                         queryString,
                         headersSize: -1,
-                        bodySize: typeof entry.req.cl === 'number' ? entry.req.cl : -1,
-                        postData: entry.req.b ? ({
+                        bodySize: entry.spec.request.sizeBytes ?? -1,
+                        postData: requestBody ? ({
                             mimeType: reqMime || '',
                             text: reqBodyText,
                             ...(reqEncoding ? {encoding: reqEncoding} : {}),
                         }) : undefined,
                     },
                     response: {
-                        status: entry.res.sc,
+                        status: entry.spec.response.statusCode || 0,
                         statusText: '',
-                        httpVersion: entry.res.v,
+                        httpVersion: entry.spec.response.httpVersion || '',
                         cookies: [],
-                        headers: headersToHar(entry.res.h),
+                        headers: headersToHar(responseHeaders),
                         content: {
-                            size: typeof entry.res.cl === 'number' ? entry.res.cl : -1,
+                            size: entry.spec.response.sizeBytes ?? -1,
                             mimeType: resMime || '',
                             text: resBodyText,
                             ...(resEncoding ? {encoding: resEncoding} : {}),
                         },
-                        redirectURL: headerValues(entry.res.h, 'location')[0] || '',
+                        redirectURL: headerValues(responseHeaders, 'location')[0] || '',
                         headersSize: -1,
-                        bodySize: typeof entry.res.cl === 'number' ? entry.res.cl : -1,
+                        bodySize: entry.spec.response.sizeBytes ?? -1,
                     },
                     cache: {},
                     timings: {
@@ -225,13 +209,13 @@ function toHar(entry: RequestEvent) {
                         dns: -1,
                         connect: -1,
                         send: -1,
-                        wait: entry.dur,
+                        wait: entry.spec.durationMilliseconds,
                         receive: -1,
                         ssl: -1,
                     },
                     serverIPAddress: undefined,
                     connection: undefined,
-                    pageref: entry.cid || undefined,
+                    pageref: entry.spec.correlationId || undefined,
                 }
             ]
         }
@@ -246,23 +230,23 @@ function shellEscapeSingleQuotes(s: string): string {
 
 function toCurl(entry: RequestEvent): string {
     const lines: string[] = [];
-    lines.push(`curl -X ${entry.req.m} \\\n  '${entry.req.u}'`);
+    lines.push(`curl -X ${entry.spec.request.method} \\\n  '${eventRequestUrl(entry)}'`);
     // headers
     const excluded = new Set(['host', 'content-length']);
-    for (const [k, vals] of Object.entries(entry.req.h || {})) {
+    for (const [k, vals] of Object.entries(eventRequestHeaders(entry) || {})) {
         if (excluded.has(k.toLowerCase())) continue;
         for (const v of vals || []) {
             lines.push(`  -H '${shellEscapeSingleQuotes(`${k}: ${v}`)}'`);
         }
     }
-    if (entry.req.b) {
-        const isText = isTextContentType(entry.req.h);
+    if (entry.spec.capture?.request.body) {
+        const isText = isTextContentType(eventRequestHeaders(entry));
         if (isText) {
-            const body = decodeBase64ToText(entry.req.b);
+            const body = decodeBase64ToText(entry.spec.capture?.request.body);
             lines.push(`  --data-binary '${shellEscapeSingleQuotes(body)}'`);
         } else {
             // Fallback: use base64 decode inline (bash)
-            lines.push(`  --data-binary @<(base64 -d <<< '${entry.req.b}')`);
+            lines.push(`  --data-binary @<(base64 -d <<< '${entry.spec.capture?.request.body}')`);
         }
     }
     return lines.join(' \\\n');
@@ -308,7 +292,7 @@ function CopyMenu({data}: {data: RequestEvent}) {
                     <ListItemIcon><ContentCopyIcon fontSize="small" /></ListItemIcon>
                     <ListItemText>Copy as cURL</ListItemText>
                 </MenuItem>
-                <MenuItem onClick={async () => { await navigator.clipboard.writeText(`${window.location.origin}/requests/${data.id}`); handleClose(); }}>
+                <MenuItem onClick={async () => { await navigator.clipboard.writeText(`${window.location.origin}/requests/${data.metadata.id}`); handleClose(); }}>
                     <ListItemIcon><ContentCopyIcon fontSize="small" /></ListItemIcon>
                     <ListItemText>Copy Admin URL</ListItemText>
                 </MenuItem>
@@ -359,7 +343,7 @@ function CopyButton({getText}: { getText: () => string }) {
 
 export interface RequestDetailProps {
     requestId: string;
-    record?: RequestEventRecord;
+    record?: RequestEvent;
     onClose?: () => void;
     showOpenFullPage?: boolean;
 }
@@ -369,26 +353,26 @@ export default function RequestDetail({requestId, record, onClose, showOpenFullP
     const [tab, setTab] = useState(0);
     const [pretty, setPretty] = useState(true);
 
-    const reqText = useMemo(() => decodeBase64ToText(data?.req?.b), [data?.req?.b]);
-    const resText = useMemo(() => decodeBase64ToText(data?.res?.b), [data?.res?.b]);
+    const reqText = useMemo(() => decodeBase64ToText(data?.spec.capture?.request.body), [data?.spec.capture?.request.body]);
+    const resText = useMemo(() => decodeBase64ToText(data?.spec.capture?.response.body), [data?.spec.capture?.response.body]);
 
     const prettyReq = useMemo(() => {
         if (!pretty) return reqText;
-        if (isJsonContentType(data?.req?.h)) {
+        if (isJsonContentType(data ? eventRequestHeaders(data) : undefined)) {
             const fm = tryFormatJson(reqText);
             if (fm) return fm;
         }
         return reqText;
-    }, [pretty, reqText, data?.req?.h]);
+    }, [pretty, reqText, data ? eventRequestHeaders(data) : undefined]);
 
     const prettyRes = useMemo(() => {
         if (!pretty) return resText;
-        if (isJsonContentType(data?.res?.h)) {
+        if (isJsonContentType(data ? eventResponseHeaders(data) : undefined)) {
             const fm = tryFormatJson(resText);
             if (fm) return fm;
         }
         return resText;
-    }, [pretty, resText, data?.res?.h]);
+    }, [pretty, resText, data ? eventResponseHeaders(data) : undefined]);
 
     let heading = (<Typography variant="h6">Request Detail</Typography>);
     if (!loading && !error && data) {
@@ -396,18 +380,18 @@ export default function RequestDetail({requestId, record, onClose, showOpenFullP
             <Box sx={{p: 0, flex: 1, minWidth: 0}}>
             <Stack spacing={1}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
-                    <HttpStatusChip value={data.res.sc} size="medium" sx={{ fontSize: '0.9rem', flexShrink: 0 }}/>
+                    <HttpStatusChip value={data.spec.response.statusCode || 0} size="medium" sx={{ fontSize: '0.9rem', flexShrink: 0 }}/>
                     <Typography
                         variant="h6"
                         noWrap
-                        title={`${data.req.m} ${data.req.u}`}
+                        title={`${data.spec.request.method} ${eventRequestUrl(data)}`}
                         sx={{minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis'}}>
-                        {data.req.m} {data.req.u}
+                        {data.spec.request.method} {eventRequestUrl(data)}
                     </Typography>
-                    {!data.full && (<Tooltip title="only partial data is stored"><Chip label="abridged" size="small" sx={{ fontSize: '0.7rem' }}/></Tooltip>) }
+                    {!data.spec.captureAvailable && (<Tooltip title="only partial data is stored"><Chip label="abridged" size="small" sx={{ fontSize: '0.7rem' }}/></Tooltip>) }
                 </Box>
-                {data.res.err && (
-                    <Typography variant="body2" color="error">Error: {data.res.err}</Typography>
+                {data.spec.response.error && (
+                    <Typography variant="body2" color="error">Error: {data.spec.response.error}</Typography>
                 )}
             </Stack>
         </Box>
@@ -464,37 +448,37 @@ export default function RequestDetail({requestId, record, onClose, showOpenFullP
                                 <Typography variant="subtitle2">Overview</Typography>
                                 <Table size="small">
                                     <TableBody>
-                                        <TableRow><TableCell>ID</TableCell><TableCell>{data.id}</TableCell></TableRow>
-                                        {data.ns && (
-                                            <TableRow><TableCell>Namespace</TableCell><TableCell>{data.ns}</TableCell></TableRow>
+                                        <TableRow><TableCell>ID</TableCell><TableCell>{data.metadata.id}</TableCell></TableRow>
+                                        {data.metadata.namespace && (
+                                            <TableRow><TableCell>Namespace</TableCell><TableCell>{data.metadata.namespace}</TableCell></TableRow>
                                         )}
-                                        {data.cid && (
+                                        {data.spec.correlationId && (
                                             <TableRow><TableCell>Correlation
-                                                ID</TableCell><TableCell>{data.cid}</TableCell></TableRow>
+                                                ID</TableCell><TableCell>{data.spec.correlationId}</TableCell></TableRow>
                                         )}
-                                        <TableRow><TableCell>Timestamp</TableCell><TableCell>{data.ts}</TableCell></TableRow>
-                                        <TableRow><TableCell>Time</TableCell><TableCell><Duration value={data.dur} /></TableCell></TableRow>
-                                        <TableRow><TableCell>Method</TableCell><TableCell>{data.req.m}</TableCell></TableRow>
+                                        <TableRow><TableCell>Timestamp</TableCell><TableCell>{data.metadata.createdAt}</TableCell></TableRow>
+                                        <TableRow><TableCell>Time</TableCell><TableCell><Duration value={data.spec.durationMilliseconds} /></TableCell></TableRow>
+                                        <TableRow><TableCell>Method</TableCell><TableCell>{data.spec.request.method}</TableCell></TableRow>
                                         <TableRow><TableCell>URL</TableCell><TableCell
-                                            sx={{wordBreak: 'break-all'}}>{data.req.u}</TableCell></TableRow>
-                                        <TableRow><TableCell>Status</TableCell><TableCell>{data.res.sc}</TableCell></TableRow>
+                                            sx={{wordBreak: 'break-all'}}>{eventRequestUrl(data)}</TableCell></TableRow>
+                                        <TableRow><TableCell>Status</TableCell><TableCell>{data.spec.response.statusCode}</TableCell></TableRow>
                                         <TableRow><TableCell>Request
-                                            Version</TableCell><TableCell>{data.req.v}</TableCell></TableRow>
-                                        {typeof data.req.cl === 'number' && (
+                                            Version</TableCell><TableCell>{data.spec.request.httpVersion}</TableCell></TableRow>
+                                        {typeof data.spec.request.sizeBytes === 'number' && (
                                             <TableRow><TableCell>Request
-                                                Size</TableCell><TableCell>{data.req.cl} bytes</TableCell></TableRow>
+                                                Size</TableCell><TableCell>{data.spec.request.sizeBytes} bytes</TableCell></TableRow>
                                         )}
                                         <TableRow><TableCell>Response
-                                            Version</TableCell><TableCell>{data.res.v}</TableCell></TableRow>
-                                        {typeof data.res.cl === 'number' && (
+                                            Version</TableCell><TableCell>{data.spec.response.httpVersion}</TableCell></TableRow>
+                                        {typeof data.spec.response.sizeBytes === 'number' && (
                                             <TableRow><TableCell>Response
-                                                Size</TableCell><TableCell>{data.res.cl} bytes</TableCell></TableRow>
+                                                Size</TableCell><TableCell>{data.spec.response.sizeBytes} bytes</TableCell></TableRow>
                                         )}
-                                        {record?.labels && Object.keys(record.labels).length > 0 && (
+                                        {data.metadata.labels && Object.keys(data.metadata.labels).length > 0 && (
                                             <TableRow>
                                                 <TableCell>Labels</TableCell>
                                                 <TableCell>
-                                                    <ResourceLabelChips labels={record.labels}/>
+                                                    <ResourceLabelChips labels={data.metadata.labels}/>
                                                 </TableCell>
                                             </TableRow>
                                         )}
@@ -506,9 +490,9 @@ export default function RequestDetail({requestId, record, onClose, showOpenFullP
                         {tab === 1 && (
                             <Box>
                                 <Typography variant="subtitle2" sx={{mb: 1}}>Request</Typography>
-                                <HeadersTable headers={data.req.h}/>
+                                <HeadersTable headers={eventRequestHeaders(data)}/>
                                 <Typography variant="subtitle2" sx={{mb: 1}} style={{marginTop: "25px"}}>Response</Typography>
-                                <HeadersTable headers={data.res.h}/>
+                                <HeadersTable headers={eventResponseHeaders(data)}/>
                             </Box>
                         )}
 

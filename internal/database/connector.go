@@ -11,6 +11,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	scommon "github.com/rmorlok/authproxy/internal/schema/common"
+	smeta "github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 )
 
@@ -206,4 +207,117 @@ func (s *service) UpdateConnectorName(ctx context.Context, id apid.ID, name scom
 	}
 
 	return s.updateResourceNameAndSelfLabels(ctx, ConnectorsTable, id, name)
+}
+
+// UpdateConnectorLabels replaces all user-owned labels on a logical connector
+// while preserving its system-managed labels.
+func (s *service) UpdateConnectorLabels(
+	ctx context.Context,
+	id apid.ID,
+	labels map[string]string,
+) (*Connector, error) {
+	if id.IsNil() {
+		return nil, errors.New("connector id is required")
+	}
+	if labels != nil {
+		if err := smeta.ValidateUserLabels(labels); err != nil {
+			return nil, fmt.Errorf("invalid labels: %w", err)
+		}
+	}
+
+	var result *Connector
+	err := s.transaction(func(tx *sql.Tx) error {
+		var connector Connector
+		err := s.sq.
+			Select(connector.cols()...).
+			From(ConnectorsTable).
+			Where(sq.Eq{"id": id, "deleted_at": nil}).
+			RunWith(tx).
+			QueryRowContext(ctx).
+			Scan(connector.fields()...)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrNotFound
+			}
+			return err
+		}
+
+		merged, now, err := s.replaceUserLabelsInTableTx(
+			ctx,
+			tx,
+			ConnectorsTable,
+			sq.Eq{"id": id, "deleted_at": nil},
+			labels,
+		)
+		if err != nil {
+			return err
+		}
+
+		connector.Labels = merged
+		connector.UpdatedAt = now
+		result = &connector
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+// UpdateConnectorAnnotations replaces all annotations on a logical connector.
+func (s *service) UpdateConnectorAnnotations(
+	ctx context.Context,
+	id apid.ID,
+	annotations map[string]string,
+) (*Connector, error) {
+	if id.IsNil() {
+		return nil, errors.New("connector id is required")
+	}
+	if annotations != nil {
+		if err := smeta.ValidateAnnotations(annotations); err != nil {
+			return nil, fmt.Errorf("invalid annotations: %w", err)
+		}
+	}
+
+	var result *Connector
+	err := s.transaction(func(tx *sql.Tx) error {
+		var connector Connector
+		err := s.sq.
+			Select(connector.cols()...).
+			From(ConnectorsTable).
+			Where(sq.Eq{"id": id, "deleted_at": nil}).
+			RunWith(tx).
+			QueryRowContext(ctx).
+			Scan(connector.fields()...)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrNotFound
+			}
+			return err
+		}
+
+		now, err := s.updateAnnotationsInTableTx(
+			ctx,
+			tx,
+			ConnectorsTable,
+			sq.Eq{"id": id, "deleted_at": nil},
+			annotations,
+		)
+		if err != nil {
+			return err
+		}
+
+		connector.Annotations = Annotations(annotations)
+		connector.UpdatedAt = now
+		result = &connector
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }

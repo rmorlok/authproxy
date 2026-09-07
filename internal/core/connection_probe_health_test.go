@@ -67,7 +67,7 @@ func newProbeHealthTestConn(
 ) (*connection, *mockDb.MockDB, *bytes.Buffer) {
 	t.Helper()
 	s, db, _, _, _, _ := FullMockService(t, ctrl)
-	c := NewTestConnector(cschema.Connector{Probes: probes})
+	c := NewTestConnector(cschema.ConnectorDefinition{Probes: probes})
 	connId := apid.New(apid.PrefixConnection)
 
 	var buf bytes.Buffer
@@ -342,7 +342,7 @@ func TestRecordPeriodicProbeOutcome_ApiKeyStampsLastValidatedAt(t *testing.T) {
 	defer ctrl.Finish()
 
 	s, db, _, _, _, _ := FullMockService(t, ctrl)
-	c := NewTestConnector(cschema.Connector{
+	c := NewTestConnector(cschema.ConnectorDefinition{
 		Auth: &cschema.Auth{InnerVal: &cschema.AuthApiKey{
 			Type:      cschema.AuthTypeAPIKey,
 			Placement: &cschema.ApiKeyPlacement{Type: cschema.ApiKeyPlacementBearer},
@@ -390,7 +390,7 @@ func TestRecordPeriodicProbeOutcome_OAuth2SkipsLastValidatedAt(t *testing.T) {
 	defer ctrl.Finish()
 
 	s, db, _, _, _, _ := FullMockService(t, ctrl)
-	c := NewTestConnector(cschema.Connector{
+	c := NewTestConnector(cschema.ConnectorDefinition{
 		Auth: &cschema.Auth{InnerVal: &cschema.AuthOAuth2{Type: cschema.AuthTypeOAuth2}},
 	})
 	connId := apid.New(apid.PrefixConnection)

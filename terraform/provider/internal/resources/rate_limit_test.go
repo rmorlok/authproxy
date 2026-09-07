@@ -6,11 +6,27 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	resourceschema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/rmorlok/authproxy/terraform/provider/internal/client"
 )
 
-// --- buildDefinition: HCL model → wire payload ---
+func TestRateLimitReferenceIDsAreRequiredOnlyWhenTheirBlocksArePresent(t *testing.T) {
+	var response resource.SchemaResponse
+	(&RateLimitResource{}).Schema(t.Context(), resource.SchemaRequest{}, &response)
+
+	scope := response.Schema.Blocks["scope"].(resourceschema.SingleNestedBlock)
+	for _, blockName := range []string{"connector_ref", "connection_ref"} {
+		block := scope.Blocks[blockName].(resourceschema.SingleNestedBlock)
+		id := block.Attributes["id"].(resourceschema.StringAttribute)
+		if !id.Optional || id.Required {
+			t.Fatalf("%s.id must be schema-optional so omitting the block remains valid: %#v", blockName, id)
+		}
+	}
+}
+
+// --- buildRateLimitSpec: HCL model → wire payload ---
 //
 // These tests pin the projection both directions: they prove that what
 // the user writes in HCL ends up in the API request body unchanged.
@@ -18,7 +34,7 @@ import (
 // (no test fixture exists for any TF resource in this repo); the
 // example HCL in examples/resources/ is the end-to-end deliverable.
 
-func TestBuildDefinition_TokenBucket(t *testing.T) {
+func TestBuildRateLimitSpec_TokenBucket(t *testing.T) {
 	plan := &RateLimitResourceModel{
 		Mode: types.StringValue("enforce"),
 		Selector: &rateLimitSelectorModel{
@@ -41,9 +57,9 @@ func TestBuildDefinition_TokenBucket(t *testing.T) {
 		},
 	}
 
-	def, err := buildDefinition(context.Background(), plan)
+	def, err := buildRateLimitSpec(context.Background(), plan)
 	if err != nil {
-		t.Fatalf("buildDefinition: %v", err)
+		t.Fatalf("buildRateLimitSpec: %v", err)
 	}
 
 	if def.Mode != "enforce" {
@@ -66,18 +82,18 @@ func TestBuildDefinition_TokenBucket(t *testing.T) {
 	}
 }
 
-func TestBuildDefinition_FixedWindow(t *testing.T) {
+func TestBuildRateLimitSpec_FixedWindow(t *testing.T) {
 	plan := &RateLimitResourceModel{
 		Selector: &rateLimitSelectorModel{Methods: stringsToList([]string{"GET"})},
 		Bucket:   &rateLimitBucketModel{Dimensions: stringsToList([]string{"actor"})},
 		Algorithm: &rateLimitAlgorithmModel{
 			FixedWindow: &rateLimitFixedWindowModel{
-				Window: types.StringValue("1m"),
+				Window: newHumanDurationValue("1m"),
 				Limit:  types.Int64Value(100),
 			},
 		},
 	}
-	def, err := buildDefinition(context.Background(), plan)
+	def, err := buildRateLimitSpec(context.Background(), plan)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,19 +102,19 @@ func TestBuildDefinition_FixedWindow(t *testing.T) {
 	}
 }
 
-func TestBuildDefinition_SlidingWindow(t *testing.T) {
+func TestBuildRateLimitSpec_SlidingWindow(t *testing.T) {
 	plan := &RateLimitResourceModel{
 		Selector: &rateLimitSelectorModel{},
 		Bucket:   &rateLimitBucketModel{},
 		Algorithm: &rateLimitAlgorithmModel{
 			SlidingWindow: &rateLimitSlidingWindowModel{
-				Window: types.StringValue("5m"),
+				Window: newHumanDurationValue("5m"),
 				Limit:  types.Int64Value(50),
 				Mode:   types.StringValue("log"),
 			},
 		},
 	}
-	def, err := buildDefinition(context.Background(), plan)
+	def, err := buildRateLimitSpec(context.Background(), plan)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +124,7 @@ func TestBuildDefinition_SlidingWindow(t *testing.T) {
 	}
 }
 
-func TestBuildDefinition_EmptyOptionalFieldsOmitted(t *testing.T) {
+func TestBuildRateLimitSpec_EmptyOptionalFieldsOmitted(t *testing.T) {
 	// Confirm that null/empty optional fields don't end up serialised
 	// into the request body — the JSON encoder's omitempty + our nil
 	// returns from listToStrings keep things minimal.
@@ -117,7 +133,7 @@ func TestBuildDefinition_EmptyOptionalFieldsOmitted(t *testing.T) {
 		Bucket:    &rateLimitBucketModel{},
 		Algorithm: &rateLimitAlgorithmModel{TokenBucket: &rateLimitTokenBucketModel{Capacity: types.Int64Value(1), RefillRate: types.Float64Value(1)}},
 	}
-	def, err := buildDefinition(context.Background(), plan)
+	def, err := buildRateLimitSpec(context.Background(), plan)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,14 +148,85 @@ func TestBuildDefinition_EmptyOptionalFieldsOmitted(t *testing.T) {
 	}
 }
 
+func TestBuildRateLimitSpec_ConnectorScope(t *testing.T) {
+	plan := &RateLimitResourceModel{
+		Scope: &rateLimitScopeModel{ConnectorRef: &rateLimitConnectorRefModel{
+			ID: types.StringValue("cxr_salesforce"),
+		}},
+		Selector:  &rateLimitSelectorModel{},
+		Bucket:    &rateLimitBucketModel{},
+		Algorithm: &rateLimitAlgorithmModel{TokenBucket: &rateLimitTokenBucketModel{Capacity: types.Int64Value(1), RefillRate: types.Float64Value(1)}},
+	}
+
+	spec, err := buildRateLimitSpec(context.Background(), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.Scope == nil || spec.Scope.ConnectorRef == nil {
+		t.Fatalf("connector scope: %+v", spec.Scope)
+	}
+	if got := spec.Scope.ConnectorRef; got.APIVersion != client.APIVersion || got.Kind != "Connector" || got.ID != "cxr_salesforce" {
+		t.Errorf("connector ref: %+v", got)
+	}
+}
+
+func TestBuildRateLimitSpec_NamespaceMatcherScope(t *testing.T) {
+	plan := &RateLimitResourceModel{
+		Scope:     &rateLimitScopeModel{NamespaceMatcher: types.StringValue("root.platform.payments.**")},
+		Selector:  &rateLimitSelectorModel{},
+		Bucket:    &rateLimitBucketModel{},
+		Algorithm: &rateLimitAlgorithmModel{TokenBucket: &rateLimitTokenBucketModel{Capacity: types.Int64Value(1), RefillRate: types.Float64Value(1)}},
+	}
+
+	spec, err := buildRateLimitSpec(context.Background(), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.Scope == nil || spec.Scope.NamespaceMatcher != "root.platform.payments.**" {
+		t.Fatalf("namespace matcher scope: %+v", spec.Scope)
+	}
+}
+
+func TestBuildRateLimitSpec_ConnectionScope(t *testing.T) {
+	plan := &RateLimitResourceModel{
+		Scope:     &rateLimitScopeModel{ConnectionRef: &rateLimitConnectionRefModel{ID: types.StringValue("cxn_customer")}},
+		Selector:  &rateLimitSelectorModel{},
+		Bucket:    &rateLimitBucketModel{},
+		Algorithm: &rateLimitAlgorithmModel{TokenBucket: &rateLimitTokenBucketModel{Capacity: types.Int64Value(1), RefillRate: types.Float64Value(1)}},
+	}
+
+	spec, err := buildRateLimitSpec(context.Background(), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.Scope == nil || spec.Scope.ConnectionRef == nil {
+		t.Fatalf("connection scope: %+v", spec.Scope)
+	}
+	if got := spec.Scope.ConnectionRef; got.APIVersion != client.APIVersion || got.Kind != "Connection" || got.ID != "cxn_customer" {
+		t.Errorf("connection ref: %+v", got)
+	}
+}
+
 // --- setRateLimitState: wire payload → state model ---
 
 func TestSetRateLimitState_PopulatesAllFields(t *testing.T) {
 	now := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
 	rl := &client.RateLimit{
-		Id:        "rl_test123",
-		Namespace: "root.acme",
-		Definition: client.RateLimitDefinition{
+		TypeMeta: client.NewTypeMeta(client.RateLimitKind),
+		Metadata: client.ObjectMetadata{
+			ID:          "rl_test123",
+			Namespace:   "root.acme",
+			Labels:      map[string]string{"team": "acme", "apxy/rl/-/id": "rl_test123"},
+			Annotations: map[string]string{"owner": "platform@example.com"},
+			CreatedAt:   &now,
+			UpdatedAt:   &now,
+		},
+		Spec: client.RateLimitSpec{
+			Scope: &client.RateLimitScope{ConnectorRef: &client.ObjectReference{
+				APIVersion: client.APIVersion,
+				Kind:       "Connector",
+				ID:         "cxr_salesforce",
+			}},
 			Mode: "observe",
 			Selector: client.RateLimitSelector{
 				LabelSelector: "env=prod",
@@ -152,10 +239,6 @@ func TestSetRateLimitState_PopulatesAllFields(t *testing.T) {
 				TokenBucket: &client.RateLimitTokenBucket{Capacity: 60, RefillRate: 0.5},
 			},
 		},
-		Labels:      map[string]string{"team": "acme", "apxy/rl/-/id": "rl_test123"},
-		Annotations: map[string]string{"owner": "platform@example.com"},
-		CreatedAt:   now,
-		UpdatedAt:   now,
 	}
 
 	var model RateLimitResourceModel
@@ -169,6 +252,9 @@ func TestSetRateLimitState_PopulatesAllFields(t *testing.T) {
 	}
 	if model.Mode.ValueString() != "observe" {
 		t.Errorf("mode: %s", model.Mode.ValueString())
+	}
+	if model.Scope == nil || model.Scope.ConnectorRef == nil || model.Scope.ConnectorRef.ID.ValueString() != "cxr_salesforce" {
+		t.Errorf("scope/connector_ref: %+v", model.Scope)
 	}
 
 	// apxy/ system labels must be stripped — helpers.labelsToMap policy.
@@ -193,18 +279,44 @@ func TestSetRateLimitState_PopulatesAllFields(t *testing.T) {
 	}
 }
 
+func TestSetRateLimitState_NamespaceMatcherScope(t *testing.T) {
+	rl := &client.RateLimit{
+		Metadata: client.ObjectMetadata{ID: "rl_test123", Namespace: "root.acme"},
+		Spec: client.RateLimitSpec{
+			Scope:     &client.RateLimitScope{NamespaceMatcher: "root.acme.payments.**"},
+			Algorithm: client.RateLimitAlgorithm{TokenBucket: &client.RateLimitTokenBucket{Capacity: 1, RefillRate: 1}},
+		},
+	}
+
+	var model RateLimitResourceModel
+	setRateLimitState(&model, rl)
+	if model.Scope == nil || model.Scope.NamespaceMatcher.ValueString() != "root.acme.payments.**" {
+		t.Fatalf("namespace matcher scope: %+v", model.Scope)
+	}
+}
+
 func TestSetRateLimitState_EmptyModeDefaultsToEnforce(t *testing.T) {
 	// The server stores Mode="" for the default ("enforce"); the
 	// provider surfaces it explicitly so plan/apply consistency holds.
 	rl := &client.RateLimit{
-		Id:         "rl_x",
-		Namespace:  "root",
-		Definition: client.RateLimitDefinition{Algorithm: client.RateLimitAlgorithm{TokenBucket: &client.RateLimitTokenBucket{Capacity: 1, RefillRate: 1}}},
+		TypeMeta: client.NewTypeMeta(client.RateLimitKind),
+		Metadata: client.ObjectMetadata{ID: "rl_x", Namespace: "root"},
+		Spec:     client.RateLimitSpec{Algorithm: client.RateLimitAlgorithm{TokenBucket: &client.RateLimitTokenBucket{Capacity: 1, RefillRate: 1}}},
 	}
 	var m RateLimitResourceModel
 	setRateLimitState(&m, rl)
 	if m.Mode.ValueString() != "enforce" {
 		t.Errorf("mode: got %q, want %q", m.Mode.ValueString(), "enforce")
+	}
+}
+
+func TestHumanDurationSemanticEquality(t *testing.T) {
+	equal, diagnostics := newHumanDurationValue("1m").StringSemanticEquals(
+		t.Context(),
+		newHumanDurationValue("1m0s"),
+	)
+	if diagnostics.HasError() || !equal {
+		t.Fatal("equivalent duration strings must compare equal")
 	}
 }
 
@@ -240,7 +352,7 @@ func TestAlgorithmValidator_ExactlyOne(t *testing.T) {
 			"two variants",
 			&rateLimitAlgorithmModel{
 				TokenBucket: &rateLimitTokenBucketModel{Capacity: types.Int64Value(1), RefillRate: types.Float64Value(1)},
-				FixedWindow: &rateLimitFixedWindowModel{Window: types.StringValue("1m"), Limit: types.Int64Value(1)},
+				FixedWindow: &rateLimitFixedWindowModel{Window: newHumanDurationValue("1m"), Limit: types.Int64Value(1)},
 			},
 			1,
 		},
@@ -248,8 +360,8 @@ func TestAlgorithmValidator_ExactlyOne(t *testing.T) {
 			"three variants",
 			&rateLimitAlgorithmModel{
 				TokenBucket:   &rateLimitTokenBucketModel{Capacity: types.Int64Value(1), RefillRate: types.Float64Value(1)},
-				FixedWindow:   &rateLimitFixedWindowModel{Window: types.StringValue("1m"), Limit: types.Int64Value(1)},
-				SlidingWindow: &rateLimitSlidingWindowModel{Window: types.StringValue("1m"), Limit: types.Int64Value(1), Mode: types.StringValue("log")},
+				FixedWindow:   &rateLimitFixedWindowModel{Window: newHumanDurationValue("1m"), Limit: types.Int64Value(1)},
+				SlidingWindow: &rateLimitSlidingWindowModel{Window: newHumanDurationValue("1m"), Limit: types.Int64Value(1), Mode: types.StringValue("log")},
 			},
 			1,
 		},

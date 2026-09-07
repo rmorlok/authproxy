@@ -59,6 +59,12 @@ type (
 	AuthOauth2PKCE          = connectors.AuthOauth2PKCE
 	AuthOauth2Token         = connectors.AuthOauth2Token
 	Connector               = connectors.Connector
+	ConnectorDefinition     = connectors.ConnectorDefinition
+	ConnectorSpec           = connectors.ConnectorSpec
+	ConnectorReleaseSpec    = connectors.ConnectorReleaseSpec
+	ConnectorReleaseState   = connectors.ConnectorReleaseState
+	ConnectorStatus         = connectors.ConnectorStatus
+	ConnectorReleaseStatus  = connectors.ConnectorReleaseStatus
 	Connectors              = connectors.Connectors
 	PKCEMethod              = connectors.PKCEMethod
 	OAuth2GrantType         = connectors.OAuth2GrantType
@@ -71,12 +77,20 @@ type (
 var (
 	NewScopeRequiredBool      = connectors.NewScopeRequiredBool
 	NewScopeRequiredPredicate = connectors.NewScopeRequiredPredicate
+	NewConnector              = connectors.NewConnector
 )
 
 // Re-export constants from the connectors sub-package
 const (
 	AuthTypeOAuth2 = connectors.AuthTypeOAuth2
 	AuthTypeAPIKey = connectors.AuthTypeAPIKey
+	AuthTypeNoAuth = connectors.AuthTypeNoAuth
+	ConnectorKind  = connectors.ConnectorKind
+
+	ConnectorReleaseStateDraft    = connectors.ConnectorReleaseStateDraft
+	ConnectorReleaseStatePrimary  = connectors.ConnectorReleaseStatePrimary
+	ConnectorReleaseStateActive   = connectors.ConnectorReleaseStateActive
+	ConnectorReleaseStateArchived = connectors.ConnectorReleaseStateArchived
 
 	ApiKeyPlacementBearer = connectors.ApiKeyPlacementBearer
 	ApiKeyPlacementHeader = connectors.ApiKeyPlacementHeader
@@ -96,8 +110,8 @@ const (
 
 // Re-export types from the key resource sub-package
 type (
-	Key                                = keyschema.Key
-	KeyType                            = keyschema.KeyType
+	Key                                = keyschema.SigningKey
+	KeyType                            = keyschema.SigningKeyType
 	KeyShared                          = keyschema.KeyShared
 	KeyPublicPrivate                   = keyschema.KeyPublicPrivate
 	KeyData                            = keyschema.KeyData

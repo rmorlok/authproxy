@@ -3,6 +3,8 @@ package resources
 import (
 	"context"
 	"encoding/json"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -45,7 +47,7 @@ func (r *ConnectorResource) Metadata(_ context.Context, req resource.MetadataReq
 
 func (r *ConnectorResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages an AuthProxy connector. Automatically handles version lifecycle: when the definition changes, a new version is created and optionally promoted to primary.",
+		Description: "Manages an AuthProxy connector and its generation lifecycle. Published definition changes create a new generation; draft definition changes update that draft in place.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "The stable connector ID (persists across version changes).",
@@ -64,6 +66,7 @@ func (r *ConnectorResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 			"definition": schema.StringAttribute{
 				Description: "The connector definition as JSON (auth config, probes, rate limiting, etc.).",
 				Required:    true,
+				Sensitive:   true,
 				CustomType:  jsontypes.NormalizedType{},
 			},
 			"labels": schema.MapAttribute{
@@ -79,13 +82,13 @@ func (r *ConnectorResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				ElementType: types.StringType,
 			},
 			"publish": schema.BoolAttribute{
-				Description: "Whether to promote new versions to primary state. When true (default), new versions are automatically set as primary. When false, versions remain in draft state.",
+				Description: "Whether to publish newly created or currently managed draft generations. Changing this from true to false does not demote an already published generation.",
 				Optional:    true,
 				Computed:    true,
 				Default:     booldefault.StaticBool(true),
 			},
 			"version": schema.Int64Attribute{
-				Description: "The current version number.",
+				Description: "The current API metadata.generation, exposed under the provider's established version attribute.",
 				Computed:    true,
 			},
 			"state": schema.StringAttribute{
@@ -129,29 +132,20 @@ func (r *ConnectorResource) Create(ctx context.Context, req resource.CreateReque
 	defJSON := json.RawMessage(plan.Definition.ValueString())
 
 	cv, err := r.client.CreateConnector(ctx, client.CreateConnectorRequest{
-		Namespace:   plan.Namespace.ValueString(),
-		Definition:  defJSON,
-		Labels:      labels,
-		Annotations: annotations,
+		TypeMeta: client.NewTypeMeta(client.ConnectorKind),
+		Metadata: client.ObjectMetadata{
+			Namespace:   plan.Namespace.ValueString(),
+			Labels:      labels,
+			Annotations: annotations,
+		},
+		Spec: client.ConnectorSpec{
+			Release:    client.ConnectorReleaseSpec{DesiredState: desiredConnectorReleaseState(plan.Publish.ValueBool())},
+			Definition: defJSON,
+		},
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create connector", err.Error())
 		return
-	}
-
-	// If publish is true, promote to primary
-	if plan.Publish.ValueBool() {
-		err = r.client.ForceConnectorVersionState(ctx, cv.Id, cv.Version, "primary")
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to promote connector to primary", err.Error())
-			return
-		}
-		// Re-read to get updated state
-		cv, err = r.client.GetConnectorVersion(ctx, cv.Id, cv.Version)
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to read connector after promotion", err.Error())
-			return
-		}
 	}
 
 	setConnectorState(&plan, cv)
@@ -167,8 +161,17 @@ func (r *ConnectorResource) Read(ctx context.Context, req resource.ReadRequest, 
 
 	id := state.Id.ValueString()
 
-	// Read the connector to get the latest version
-	conn, err := r.client.GetConnector(ctx, id)
+	var connector *client.Connector
+	var err error
+	// A draft is not the logical connector's primary generation. Preserve the
+	// exact generation managed by Terraform; published resources deliberately
+	// follow the API's primary generation so out-of-band promotion is detected.
+	if !state.Publish.IsNull() && !state.Publish.IsUnknown() && !state.Publish.ValueBool() &&
+		!state.Version.IsNull() && !state.Version.IsUnknown() && state.Version.ValueInt64() > 0 {
+		connector, err = r.client.GetConnectorVersion(ctx, id, uint64(state.Version.ValueInt64()))
+	} else {
+		connector, err = r.client.GetConnector(ctx, id)
+	}
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -178,14 +181,7 @@ func (r *ConnectorResource) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 
-	// Get the full version details (with definition)
-	cv, err := r.client.GetConnectorVersion(ctx, id, conn.Version)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to read connector version", err.Error())
-		return
-	}
-
-	setConnectorState(&state, cv)
+	setConnectorState(&state, connector)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -211,71 +207,68 @@ func (r *ConnectorResource) Update(ctx context.Context, req resource.UpdateReque
 	definitionChanged := !plan.Definition.Equal(state.Definition)
 	publishChanged := !plan.Publish.Equal(state.Publish)
 
-	var cv *client.ConnectorVersion
+	var cv *client.Connector
 	var err error
 
 	if definitionChanged {
-		// Definition changed: create a new version
 		defJSON := json.RawMessage(plan.Definition.ValueString())
-		labelsPtr := &labels
-		annotationsPtr := &annotations
-
-		cv, err = r.client.CreateConnectorVersion(ctx, id, client.CreateConnectorVersionRequest{
-			Definition:  &defJSON,
-			Labels:      labelsPtr,
-			Annotations: annotationsPtr,
-		})
+		if state.State.ValueString() == "draft" {
+			desiredState := desiredConnectorReleaseState(plan.Publish.ValueBool())
+			cv, err = r.client.UpdateConnectorVersion(ctx, id, uint64(state.Version.ValueInt64()), client.UpdateConnectorRequest{
+				TypeMeta: client.NewTypeMeta(client.ConnectorKind),
+				Metadata: connectorMetadataPatch(labels, annotations),
+				Spec: &client.ConnectorSpecPatch{
+					Release:    &client.ConnectorReleaseSpecPatch{DesiredState: &desiredState},
+					Definition: &defJSON,
+				},
+			})
+		} else {
+			cv, err = r.client.CreateConnectorVersion(ctx, id, client.CreateConnectorVersionRequest{
+				TypeMeta: client.NewTypeMeta(client.ConnectorKind),
+				Metadata: client.ObjectMetadata{
+					Namespace:   plan.Namespace.ValueString(),
+					Labels:      labels,
+					Annotations: annotations,
+				},
+				Spec: client.ConnectorSpec{
+					Release:    client.ConnectorReleaseSpec{DesiredState: desiredConnectorReleaseState(plan.Publish.ValueBool())},
+					Definition: defJSON,
+				},
+			})
+		}
 		if err != nil {
-			resp.Diagnostics.AddError("Failed to create new connector version", err.Error())
+			resp.Diagnostics.AddError("Failed to update connector definition", err.Error())
 			return
 		}
-
-		if plan.Publish.ValueBool() {
-			err = r.client.ForceConnectorVersionState(ctx, id, cv.Version, "primary")
-			if err != nil {
-				resp.Diagnostics.AddError("Failed to promote new version to primary", err.Error())
-				return
-			}
-			cv, err = r.client.GetConnectorVersion(ctx, id, cv.Version)
-			if err != nil {
-				resp.Diagnostics.AddError("Failed to read connector version after promotion", err.Error())
-				return
-			}
-		}
 	} else if publishChanged && plan.Publish.ValueBool() {
-		// Publish changed from false to true: promote current draft version
+		// Publish changed from false to true: promote the exact draft generation.
 		currentVersion := uint64(state.Version.ValueInt64())
-		err = r.client.ForceConnectorVersionState(ctx, id, currentVersion, "primary")
+		desiredState := "primary"
+		cv, err = r.client.UpdateConnectorVersion(ctx, id, currentVersion, client.UpdateConnectorRequest{
+			TypeMeta: client.NewTypeMeta(client.ConnectorKind),
+			Metadata: connectorMetadataPatch(labels, annotations),
+			Spec: &client.ConnectorSpecPatch{Release: &client.ConnectorReleaseSpecPatch{
+				DesiredState: &desiredState,
+			}},
+		})
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to promote version to primary", err.Error())
 			return
 		}
-		cv, err = r.client.GetConnectorVersion(ctx, id, currentVersion)
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to read connector version after promotion", err.Error())
-			return
-		}
 	} else {
-		// Only labels/annotations changed: use connector-level PATCH which handles
-		// draft creation internally (version-level PATCH requires draft state).
-		updateReq := client.UpdateConnectorRequest{Labels: &labels, Annotations: &annotations}
-		cv, err = r.client.UpdateConnector(ctx, id, updateReq)
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to update connector labels", err.Error())
-			return
+		updateReq := client.UpdateConnectorRequest{
+			TypeMeta: client.NewTypeMeta(client.ConnectorKind),
+			Metadata: connectorMetadataPatch(labels, annotations),
+			Spec:     &client.ConnectorSpecPatch{},
 		}
-
-		if plan.Publish.ValueBool() && cv.State == "draft" {
-			err = r.client.ForceConnectorVersionState(ctx, id, cv.Version, "primary")
-			if err != nil {
-				resp.Diagnostics.AddError("Failed to promote version after label update", err.Error())
-				return
-			}
-			cv, err = r.client.GetConnectorVersion(ctx, id, cv.Version)
-			if err != nil {
-				resp.Diagnostics.AddError("Failed to read connector version after promotion", err.Error())
-				return
-			}
+		if state.State.ValueString() == "draft" {
+			cv, err = r.client.UpdateConnectorVersion(ctx, id, uint64(state.Version.ValueInt64()), updateReq)
+		} else {
+			cv, err = r.client.UpdateConnector(ctx, id, updateReq)
+		}
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to update connector metadata", err.Error())
+			return
 		}
 	}
 
@@ -303,8 +296,8 @@ func (r *ConnectorResource) Delete(ctx context.Context, req resource.DeleteReque
 	}
 
 	for _, v := range versions.Items {
-		if v.State != "archived" {
-			err = r.client.ForceConnectorVersionState(ctx, id, v.Version, "archived")
+		if v.Status != nil && v.Status.Release.State != "archived" {
+			err = r.client.ForceConnectorVersionState(ctx, id, v.Metadata.Generation, "archived")
 			if err != nil {
 				resp.Diagnostics.AddError("Failed to archive connector version", err.Error())
 				return
@@ -319,49 +312,127 @@ func (r *ConnectorResource) ImportState(ctx context.Context, req resource.Import
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, pathAttr("publish"), true)...)
 }
 
-// connectorMetadataFields are fields the API adds to the definition response
-// that are not part of the user-provided definition. These must be stripped
-// before storing the definition in state to avoid "inconsistent result" errors.
-var connectorMetadataFields = []string{
-	"id", "version", "namespace", "state", "logo",
-	"labels", "annotations", "createdAt", "updatedAt",
+func setConnectorState(model *ConnectorResourceModel, connector *client.Connector) {
+	model.Id = types.StringValue(connector.Metadata.ID)
+	model.Namespace = types.StringValue(connector.Metadata.Namespace)
+	model.Version = types.Int64Value(int64(connector.Metadata.Generation))
+	model.Labels = labelsToMap(connector.Metadata.Labels)
+	model.Annotations = annotationsToMap(connector.Metadata.Annotations)
+	model.CreatedAt = timestampToString(connector.Metadata.CreatedAt)
+	model.UpdatedAt = timestampToString(connector.Metadata.UpdatedAt)
+	if connector.Status != nil {
+		model.State = types.StringValue(connector.Status.Release.State)
+	} else {
+		model.State = types.StringNull()
+	}
+
+	if len(connector.Spec.Definition) > 0 {
+		definition := connector.Spec.Definition
+		priorDefinition := []byte(`{}`)
+		if !model.Definition.IsNull() && !model.Definition.IsUnknown() {
+			priorDefinition = []byte(model.Definition.ValueString())
+		}
+		if merged, err := reconcileConnectorDefinitionJSON(
+			definition,
+			priorDefinition,
+			connector.DataRedacted,
+		); err == nil {
+			definition = merged
+		}
+		model.Definition = jsontypes.NewNormalizedValue(string(definition))
+		if summary, err := client.DecodeConnectorDefinitionSummary(connector.Spec.Definition); err == nil {
+			model.DisplayName = types.StringValue(summary.DisplayName)
+		}
+	}
 }
 
-func setConnectorState(model *ConnectorResourceModel, cv *client.ConnectorVersion) {
-	model.Id = types.StringValue(cv.Id)
-	model.Namespace = types.StringValue(cv.Namespace)
-	model.Version = types.Int64Value(int64(cv.Version))
-	model.State = types.StringValue(cv.State)
-	model.Labels = labelsToMap(cv.Labels)
-	model.Annotations = annotationsToMap(cv.Annotations)
-	model.CreatedAt = types.StringValue(cv.CreatedAt.Format("2006-01-02T15:04:05Z07:00"))
-	model.UpdatedAt = types.StringValue(cv.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"))
+// preserveRedactedJSON keeps prior Terraform state at fields the API explicitly
+// masked in a response. This prevents write-only connector secrets from being
+// replaced with asterisks after apply while leaving all observable fields
+// available for drift detection.
+func preserveRedactedJSON(observed, prior []byte) (json.RawMessage, error) {
+	return reconcileConnectorDefinitionJSON(observed, prior, true)
+}
 
-	if cv.Definition != nil {
-		// Strip metadata fields that the API adds but aren't part of the
-		// user-provided definition.
-		var defMap map[string]json.RawMessage
-		if err := json.Unmarshal(cv.Definition, &defMap); err == nil {
-			for _, field := range connectorMetadataFields {
-				delete(defMap, field)
+// reconcileConnectorDefinitionJSON removes null values from the typed connector
+// fields that the API emits when they were omitted by the caller. It deliberately
+// leaves all other null values alone because connector definitions contain opaque
+// JSON Schema documents where null can be meaningful. When the response is
+// redacted the helper restores masked values from prior Terraform state.
+// Observable server changes are retained so normal drift detection continues to
+// work.
+func reconcileConnectorDefinitionJSON(observed, prior []byte, redacted bool) (json.RawMessage, error) {
+	var observedValue any
+	if err := json.Unmarshal(observed, &observedValue); err != nil {
+		return nil, err
+	}
+	normalizeConnectorDefinitionNulls(observedValue)
+	var priorValue any
+	if err := json.Unmarshal(prior, &priorValue); err != nil {
+		return nil, err
+	}
+	merged := reconcileConnectorDefinitionValue(observedValue, priorValue, redacted)
+	return json.Marshal(merged)
+}
+
+func reconcileConnectorDefinitionValue(observed, prior any, redacted bool) any {
+	switch value := observed.(type) {
+	case string:
+		if redacted && value != "" && strings.Trim(value, "*") == "" {
+			if priorString, ok := prior.(string); ok &&
+				utf8.RuneCountInString(priorString) == utf8.RuneCountInString(value) {
+				return priorString
 			}
-			if cleaned, err := json.Marshal(defMap); err == nil {
-				model.Definition = jsontypes.NewNormalizedValue(string(cleaned))
-			} else {
-				model.Definition = jsontypes.NewNormalizedValue(string(cv.Definition))
+		}
+	case map[string]any:
+		priorMap, _ := prior.(map[string]any)
+		for key, item := range value {
+			priorItem := priorMap[key]
+			value[key] = reconcileConnectorDefinitionValue(item, priorItem, redacted)
+		}
+	case []any:
+		priorSlice, _ := prior.([]any)
+		for index, item := range value {
+			var priorItem any
+			if index < len(priorSlice) {
+				priorItem = priorSlice[index]
 			}
-		} else {
-			model.Definition = jsontypes.NewNormalizedValue(string(cv.Definition))
+			value[index] = reconcileConnectorDefinitionValue(item, priorItem, redacted)
 		}
 	}
+	return observed
+}
 
-	// Extract display_name from definition
-	var def struct {
-		DisplayName string `json:"displayName"`
+func normalizeConnectorDefinitionNulls(value any) {
+	definition, ok := value.(map[string]any)
+	if !ok {
+		return
 	}
-	if cv.Definition != nil {
-		if err := json.Unmarshal(cv.Definition, &def); err == nil {
-			model.DisplayName = types.StringValue(def.DisplayName)
+
+	if logo, exists := definition["logo"]; exists && logo == nil {
+		delete(definition, "logo")
+	}
+	if auth, ok := definition["auth"].(map[string]any); ok {
+		if scopes, exists := auth["scopes"]; exists && scopes == nil {
+			delete(auth, "scopes")
 		}
 	}
+}
+
+func desiredConnectorReleaseState(publish bool) string {
+	if publish {
+		return "primary"
+	}
+	return "draft"
+}
+
+func connectorMetadataPatch(labels, annotations map[string]string) *client.ObjectMetadataPatch {
+	patch := &client.ObjectMetadataPatch{}
+	if labels != nil {
+		patch.Labels = &labels
+	}
+	if annotations != nil {
+		patch.Annotations = &annotations
+	}
+	return patch
 }

@@ -21,10 +21,15 @@ PATCH /api/v1/connections/cxn_abc123
 Content-Type: application/json
 
 {
-  "labels": {
-    "app.example.com/tenant-id": "tenant-42",
-    "app.example.com/env": "production"
-  }
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "Connection",
+  "metadata": {
+    "labels": {
+      "app.example.com/tenant-id": "tenant-42",
+      "app.example.com/env": "production"
+    }
+  },
+  "spec": {}
 }
 ```
 
@@ -250,17 +255,28 @@ apxy/cxr/-/name=salesforce
 
 ## API surface
 
-Every resource that supports labels exposes the same four sub-resource endpoints, layered on top of the resource's CRUD URLs. Substitute the resource's URL segment (e.g., `connections`, `rate-limits`, `keys`):
+Labels and annotations have one wire representation: `metadata.labels` and
+`metadata.annotations` on the parent resource. Read them with the parent
+resource's `GET` endpoint and replace a complete user-owned map through its
+typed `PATCH` endpoint. For example:
 
-| Method + Path | Behaviour |
-|---|---|
-| `GET /api/v1/<resource>/:id/labels` | Read all labels |
-| `GET /api/v1/<resource>/:id/labels/:label` | Read one label by key |
-| `PUT /api/v1/<resource>/:id/labels/:label` | Set / update one label |
-| `DELETE /api/v1/<resource>/:id/labels/:label` | Remove one label |
+```json
+{
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "Connection",
+  "metadata": {
+    "annotations": {
+      "app.example.com/owner": "platform@example.com"
+    }
+  },
+  "spec": {}
+}
+```
 
-Annotations have the same shape under `/annotations`.
-
-The resource-level `PATCH` endpoint additionally supports replacing the entire user-label set in one shot via a top-level `labels` field. `PUT`s on the sub-resource path use merge semantics; `PATCH` on the parent with `labels` populated is a full replace.
+Omitting a map leaves it unchanged. Supplying `{}` clears all user-owned
+entries. Supplying a populated map replaces the complete user-owned map; read
+the current resource and merge client-side when editing a single entry. The
+former `/labels`, `/annotations`, and per-key subroutes were removed as part of
+the breaking v1 resource-contract cutover.
 
 System (`apxy/`) labels survive a full replace — only user labels are replaced.

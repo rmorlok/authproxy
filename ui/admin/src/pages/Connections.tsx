@@ -15,7 +15,7 @@ import {
     ConnectionState,
     listConnections,
     ListConnectionsParams,
-    ListResponse
+    ConnectionList,
 } from '@authproxy/api';
 import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
@@ -43,18 +43,21 @@ export const columns: GridColDef<Connection>[] = [
         flex: 0.8,
         minWidth: 120,
         sortable: true,
+        valueGetter: (_, row) => row.metadata.name,
     },
     { field: 'id',
         headerName: 'ID',
         flex: 0.8,
         minWidth: 110,
         sortable: true,
+        valueGetter: (_, row) => row.metadata.id,
     },
     { field: 'namespace',
         headerName: 'Namespace',
         flex: 0.4,
         minWidth: 90,
         sortable: true,
+        valueGetter: (_, row) => row.metadata.namespace,
     },
     {
         field: 'state',
@@ -62,6 +65,7 @@ export const columns: GridColDef<Connection>[] = [
         flex: 0.4,
         minWidth: 80,
         sortable: true,
+        valueGetter: (_, row) => row.status.lifecycle.state,
         renderCell: (params) => renderState(params.value as ConnectionState),
     },
     {
@@ -70,15 +74,8 @@ export const columns: GridColDef<Connection>[] = [
         flex: 0.7,
         minWidth: 120,
         sortable: false,
+        valueGetter: (_, row) => row.metadata.labels,
         renderCell: (params) => <ResourceLabelChips labels={params.value as Record<string, string> | undefined}/>,
-    },
-    {
-        field: 'connector.labels',
-        headerName: 'Connector Labels',
-        flex: 0.7,
-        minWidth: 120,
-        sortable: false,
-        renderCell: (params) => <ResourceLabelChips labels={params.row.connector?.labels}/>,
     },
     {
         field: 'connector.name',
@@ -86,7 +83,7 @@ export const columns: GridColDef<Connection>[] = [
         flex: 0.6,
         minWidth: 100,
         sortable: false,
-        valueGetter: (_, row) => row.connector.name,
+        valueGetter: (_, row) => row.spec.connectorRef.name || '',
     },
     {
         field: 'connector.id',
@@ -94,7 +91,7 @@ export const columns: GridColDef<Connection>[] = [
         flex: 0.8,
         minWidth: 80,
         sortable: false,
-        valueGetter: (_, row) => row.connector.id,
+        valueGetter: (_, row) => row.spec.connectorRef.id || '',
     },
     {
         field: 'connector.version',
@@ -102,7 +99,7 @@ export const columns: GridColDef<Connection>[] = [
         flex: 0.4,
         minWidth: 80,
         sortable: false,
-        valueGetter: (_, row) => row.connector.version,
+        valueGetter: (_, row) => row.spec.connectorRef.generation,
     },
     {
         field: 'createdAt',
@@ -112,8 +109,8 @@ export const columns: GridColDef<Connection>[] = [
         flex: 1,
         minWidth: 80,
         sortable: true,
-        valueGetter: (value, _) => {
-            return dayjs(value).format('MMM DD, YYYY, h:mm A');
+        valueGetter: (_, row) => {
+            return dayjs(row.metadata.createdAt).format('MMM DD, YYYY, h:mm A');
         }
 
     },
@@ -125,8 +122,8 @@ export const columns: GridColDef<Connection>[] = [
         flex: 1,
         minWidth: 100,
         sortable: true,
-        valueGetter: (value) => {
-            return dayjs(value).format('MMM DD, YYYY, h:mm A');
+        valueGetter: (_, row) => {
+            return dayjs(row.metadata.updatedAt).format('MMM DD, YYYY, h:mm A');
         }
 
     },
@@ -159,7 +156,7 @@ export default function Connections() {
     const [hasNextPage, setHasNextPage] = useState<boolean>(false);
 
     // Simple cache to allow going back without re-fetching
-    const responsesCacheRef = useRef<ListResponse<Connection>[]>([]);
+    const responsesCacheRef = useRef<ConnectionList[]>([]);
     const pageRequestCacheRef = useRef<Set<number>>(new Set());
 
     // Handle row click with meta/ctrl key checking
@@ -209,14 +206,14 @@ export default function Connections() {
             if (cached) {
                 setRows(cached.items);
                 setLoading(false);
-                setHasNextPage(!!cached.cursor);
+                setHasNextPage(!!cached.metadata.continue);
                 return;
             }
 
             // If we don't know the cursor for this page yet, advance sequentially from the last known
             while (responsesCacheRef.current.length <= targetPageZeroBased && (
                 responsesCacheRef.current.length === 0 ||
-                !!responsesCacheRef.current[responsesCacheRef.current.length - 1].cursor
+                    !!responsesCacheRef.current[responsesCacheRef.current.length - 1].metadata.continue
                 )
             ) {
                 // Avoid multiple calls for the same page
@@ -228,7 +225,7 @@ export default function Connections() {
                 const thisPage = responsesCacheRef.current.length;
                 const prevResp = responsesCacheRef.current[responsesCacheRef.current.length - 1];
 
-                const params: ListConnectionsParams = prevResp?.cursor ? {cursor: prevResp.cursor} : {
+                const params: ListConnectionsParams = prevResp?.metadata.continue ? {cursor: prevResp.metadata.continue} : {
                     state: (stateFilter as ConnectionState) || undefined,
                     namespace: namespaceMatcher,
                     orderBy: sort || undefined,
@@ -248,7 +245,7 @@ export default function Connections() {
             const data = responsesCacheRef.current[targetPageZeroBased];
             setRows(data?.items || []);
 
-            const hnp = !!data?.cursor;
+            const hnp = !!data?.metadata.continue;
             setHasNextPage(hnp);
 
             if(!hnp) {
@@ -305,7 +302,7 @@ export default function Connections() {
                     autoHeight
                     rows={rows}
                     columns={columns}
-                    getRowId={(row) => (row as Connection).id}
+                    getRowId={(row) => row.metadata.id}
                     getRowClassName={(params) =>
                         params.indexRelativeToCurrentPage % 2 === 0 ? 'clickable-row even' : 'clickable-row odd'
                     }

@@ -42,7 +42,7 @@ system.
   connector-level handling of provider 429 responses.
 - [Background tasks](/operations/background-tasks/) — run the worker and inspect queues.
 - [Connector lifecycle](/operations/connector-lifecycle/) — disconnect or archive a
-  connector version and monitor the resulting task.
+  logical connector across its generations and monitor the resulting task.
 - [Connector version migrations](/operations/connector-version-migrations/) — move
   existing connections to a new connector version, run hooks, handle required
   setup or re-authentication, and surface actor notifications.
@@ -62,5 +62,5 @@ Before accepting traffic:
 - test database and blob-store restores; and
 - document key, signing-key, database, and provider credential rotation.
 
-See [deployment](/deployment/) for topology and
-[security](/security/) for the review checklist.
+See [deployment](/deployment/) for topology and [security](/security/) for 
+the review checklist.

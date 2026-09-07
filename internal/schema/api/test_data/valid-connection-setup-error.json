@@ -1,6 +1,17 @@
 {
-  "id": "cxn_test0000000000002",
-  "type": "error",
-  "error": "probe verification failed",
-  "canRetry": true
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "ConnectionSetup",
+  "metadata": {
+    "target": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connection",
+      "id": "cxn_test0000000000002"
+    }
+  },
+  "spec": {},
+  "status": {
+    "type": "error",
+    "error": "probe verification failed",
+    "canRetry": true
+  }
 }

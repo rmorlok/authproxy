@@ -28,7 +28,7 @@ func TestBuildConnectionMigrationCandidateAssemblesTargetState(t *testing.T) {
 		connectorID,
 		1,
 		database.ConnectorDefinitionVersionStateActive,
-		cschema.Connector{
+		cschema.ConnectorDefinition{
 			Auth: cschema.NewNoAuth(),
 			SetupFlow: &cschema.SetupFlow{
 				Configure: &cschema.SetupFlowPhase{
@@ -49,7 +49,7 @@ func TestBuildConnectionMigrationCandidateAssemblesTargetState(t *testing.T) {
 		connectorID,
 		2,
 		database.ConnectorDefinitionVersionStateActive,
-		cschema.Connector{
+		cschema.ConnectorDefinition{
 			Auth: cschema.NewNoAuth(),
 			Probes: []cschema.Probe{
 				{Id: "existing-probe"},
@@ -125,7 +125,7 @@ func TestBuildConnectionMigrationCandidateRejectsNoopAndInactiveTargets(t *testi
 			ConnectorVersion: 1,
 		}, nil)
 		db.EXPECT().GetConnectorDefinitionVersion(gomock.Any(), connectorID, uint64(1)).Return(
-			migrationTestDBConnectorVersion(t, e, connectorID, 1, database.ConnectorDefinitionVersionStateActive, cschema.Connector{}),
+			migrationTestDBConnectorVersion(t, e, connectorID, 1, database.ConnectorDefinitionVersionStateActive, cschema.ConnectorDefinition{}),
 			nil,
 		)
 
@@ -142,11 +142,11 @@ func TestBuildConnectionMigrationCandidateRejectsNoopAndInactiveTargets(t *testi
 			ConnectorVersion: 1,
 		}, nil)
 		db.EXPECT().GetConnectorDefinitionVersion(gomock.Any(), connectorID, uint64(1)).Return(
-			migrationTestDBConnectorVersion(t, e, connectorID, 1, database.ConnectorDefinitionVersionStateActive, cschema.Connector{}),
+			migrationTestDBConnectorVersion(t, e, connectorID, 1, database.ConnectorDefinitionVersionStateActive, cschema.ConnectorDefinition{}),
 			nil,
 		)
 		db.EXPECT().GetConnectorDefinitionVersion(gomock.Any(), connectorID, uint64(2)).Return(
-			migrationTestDBConnectorVersion(t, e, connectorID, 2, database.ConnectorDefinitionVersionStateArchived, cschema.Connector{}),
+			migrationTestDBConnectorVersion(t, e, connectorID, 2, database.ConnectorDefinitionVersionStateArchived, cschema.ConnectorDefinition{}),
 			nil,
 		)
 
@@ -165,7 +165,7 @@ func TestMigrationVersionPathOrdersUpAndDown(t *testing.T) {
 	for version := uint64(1); version <= 3; version++ {
 		db.EXPECT().
 			GetConnectorDefinitionVersion(gomock.Any(), connectorID, version).
-			Return(migrationTestDBConnectorVersion(t, e, connectorID, version, database.ConnectorDefinitionVersionStateActive, cschema.Connector{}), nil).
+			Return(migrationTestDBConnectorVersion(t, e, connectorID, version, database.ConnectorDefinitionVersionStateActive, cschema.ConnectorDefinition{}), nil).
 			AnyTimes()
 	}
 

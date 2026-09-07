@@ -41,7 +41,7 @@ func TestUserDenialFlow(t *testing.T) {
 	userPassword := "p4ssw0rd-" + suffix
 	userEmail := "deny-" + suffix + "@example.com"
 
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 	connector := helpers.NewOAuth2Connector(connectorID, "user-denial-test", provider, helpers.OAuth2ConnectorOptions{
 		ClientID:     clientKey,
 		ClientSecret: clientSecret,

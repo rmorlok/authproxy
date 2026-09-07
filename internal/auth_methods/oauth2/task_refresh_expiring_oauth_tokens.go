@@ -35,9 +35,9 @@ func (th *taskHandler) refreshExpiringOauth2Tokens(ctx context.Context, t *asynq
 	// Establish the smallest value of refreshWithIn for all active connector versions
 	// TODO: migrate this to use the database stored versions
 	for _, connector := range th.cfg.GetRoot().Connectors.GetConnectors() {
-		connectorIdToConnector[connector.Id] = &connector
+		connectorIdToConnector[connector.GetId()] = &connector
 
-		if o2, ok := connector.Auth.Inner().(*config.AuthOAuth2); ok {
+		if o2, ok := connector.Spec.Definition.Auth.Inner().(*config.AuthOAuth2); ok {
 			if o2.Token.GetRefreshInBackgroundOrDefault() &&
 				o2.Token.GetRefreshTimeBeforeExpiryOrDefault(refreshWithin) > refreshWithin {
 				refreshWithin = o2.Token.GetRefreshTimeBeforeExpiryOrDefault(refreshWithin)

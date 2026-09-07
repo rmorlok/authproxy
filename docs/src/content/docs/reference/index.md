@@ -6,6 +6,8 @@ description: Find AuthProxy API, configuration, CLI, SDK, Terraform, and compara
 Use these pages when you need an exact contract or need to place AuthProxy
 among adjacent products.
 
+- [Resource contracts](/reference/resources/) — canonical resources, lists,
+  references, actions, and projections.
 - [API reference](/reference/api/) — Swagger endpoints and checked-in specifications.
 - [Configuration reference](/reference/configuration/) — the canonical JSON Schema,
   example configurations, and chart values.

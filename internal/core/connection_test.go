@@ -7,11 +7,11 @@ import (
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
 
-func newTestConnection(definition cschema.Connector) *connection {
+func newTestConnection(definition cschema.ConnectorDefinition) *connection {
 	return newTestConnectionWithDetails(apid.New(apid.PrefixActor), database.ConnectionStateConfigured, definition)
 }
 
-func newTestConnectionWithDetails(u apid.ID, s database.ConnectionState, definition cschema.Connector) *connection {
+func newTestConnectionWithDetails(u apid.ID, s database.ConnectionState, definition cschema.ConnectorDefinition) *connection {
 	c := NewTestConnector(definition)
 	return &connection{
 		Connection: database.Connection{

@@ -4,7 +4,7 @@ import {
     Connection,
     connections,
     ConnectionState,
-    DisconnectResponseJson,
+    ConnectionDisconnectResponse,
     ConnectionSetupFormResponse,
     ConnectionSetupResponse,
     isCompleteResponse,
@@ -26,13 +26,13 @@ interface FormStep {
 
 function formStepFromResponse(response: ConnectionSetupFormResponse): FormStep {
     return {
-        connectionId: response.id,
-        stepId: response.stepId,
-        stepTitle: response.stepTitle,
-        stepDescription: response.stepDescription,
-        jsonSchema: response.jsonSchema,
-        uiSchema: response.uiSchema,
-        data: response.data,
+        connectionId: response.metadata.target.id ?? '',
+        stepId: response.status.stepId,
+        stepTitle: response.status.stepTitle,
+        stepDescription: response.status.stepDescription,
+        jsonSchema: response.status.jsonSchema,
+        uiSchema: response.status.uiSchema,
+        data: response.status.data,
     };
 }
 
@@ -47,16 +47,16 @@ function applySetupResponse(state: ConnectionsState, response: ConnectionSetupRe
         return;
     }
     if (isVerifyingResponse(response)) {
-        state.verifyingConnectionId = response.id;
+        state.verifyingConnectionId = response.metadata.target.id ?? null;
         state.currentFormStep = null;
         state.verifyError = null;
         return;
     }
     if (isErrorResponse(response)) {
         state.verifyError = {
-            connectionId: response.id,
-            message: response.error,
-            canRetry: response.canRetry,
+            connectionId: response.metadata.target.id ?? '',
+            message: response.status.error,
+            canRetry: Boolean(response.status.canRetry),
         };
         state.verifyingConnectionId = null;
         state.currentFormStep = null;
@@ -121,8 +121,8 @@ export const fetchConnectionsAsync = createAsyncThunk(
             allItems = allItems.concat(response.data.items);
         }
 
-        while(response.data.cursor && response.data.cursor !== "") {
-            response = await connections.list({cursor: response.data.cursor});
+        while(response.data.metadata.continue) {
+            response = await connections.list({cursor: response.data.metadata.continue});
             if(response.status === 200) {
                 allItems = allItems.concat(response.data.items);
             } else {
@@ -136,8 +136,11 @@ export const fetchConnectionsAsync = createAsyncThunk(
 
 export const initiateConnectionAsync = createAsyncThunk(
     'connections/initiateConnection',
-    async ({connectorId, returnToUrl}: { connectorId: string, returnToUrl: string }) => {
-        const response = await connections.initiate(connectorId, returnToUrl);
+    async ({connectorRef, returnToUrl}: {
+        connectorRef: Parameters<typeof connections.initiate>[0],
+        returnToUrl: string,
+    }) => {
+        const response = await connections.initiate(connectorRef, {returnToUrl});
         return response.data;
     }
 );
@@ -150,7 +153,7 @@ export const submitConnectionFormAsync = createAsyncThunk(
         data: unknown,
         returnToUrl?: string,
     }) => {
-        const response = await connections.submit(connectionId, stepId, data, returnToUrl);
+        const response = await connections.submit(connectionId, {stepId, data, returnToUrl});
         return response.data;
     }
 );
@@ -192,7 +195,7 @@ export const reconfigureConnectionAsync = createAsyncThunk(
 export const retryConnectionAsync = createAsyncThunk(
     'connections/retryConnection',
     async ({connectionId, returnToUrl}: { connectionId: string, returnToUrl?: string }) => {
-        const response = await connections.retry(connectionId, returnToUrl);
+        const response = await connections.retry(connectionId, {returnToUrl});
         return response.data;
     }
 );
@@ -200,14 +203,14 @@ export const retryConnectionAsync = createAsyncThunk(
 export const reauthConnectionAsync = createAsyncThunk(
     'connections/reauthConnection',
     async ({connectionId, returnToUrl}: { connectionId: string, returnToUrl?: string }) => {
-        const response = await connections.reauth(connectionId, returnToUrl);
+        const response = await connections.reauth(connectionId, {returnToUrl});
         return response.data;
     }
 );
 
 export const disconnectConnectionAsync = createAsyncThunk(
     'connections/disconnectConnection',
-    async (connectionId: string, _): Promise<DisconnectResponseJson> => {
+    async (connectionId: string, _): Promise<ConnectionDisconnectResponse> => {
         const response = await connections.disconnect(connectionId);
 
         return response.data;
@@ -263,7 +266,7 @@ export const connectionsSlice = createSlice({
                 state.initiatingConnection = false;
                 applySetupResponse(state, action.payload);
                 if (isCompleteResponse(action.payload)) {
-                    state.recentlyCompletedConnectionId = action.payload.id;
+                    state.recentlyCompletedConnectionId = action.payload.metadata.target.id ?? null;
                 }
             })
             .addCase(initiateConnectionAsync.rejected, (state, action) => {
@@ -280,7 +283,7 @@ export const connectionsSlice = createSlice({
                 state.submittingForm = false;
                 applySetupResponse(state, action.payload);
                 if (isCompleteResponse(action.payload)) {
-                    state.recentlyCompletedConnectionId = action.payload.id;
+                    state.recentlyCompletedConnectionId = action.payload.metadata.target.id ?? null;
                 }
             })
             .addCase(submitConnectionFormAsync.rejected, (state, action) => {
@@ -293,7 +296,7 @@ export const connectionsSlice = createSlice({
                 state.currentFormStep = null;
                 state.verifyingConnectionId = null;
                 state.verifyError = null;
-                state.items = state.items.filter(conn => conn.id !== action.payload);
+                state.items = state.items.filter(conn => conn.metadata.id !== action.payload);
             })
 
             // Cancel setup (reconfigure abandonment on a ready connection)
@@ -301,12 +304,14 @@ export const connectionsSlice = createSlice({
                 state.currentFormStep = null;
                 state.verifyingConnectionId = null;
                 state.verifyError = null;
-                const idx = state.items.findIndex(c => c.id === action.payload);
+                const idx = state.items.findIndex(c => c.metadata.id === action.payload);
                 if (idx !== -1) {
                     state.items[idx] = {
                         ...state.items[idx],
-                        setupStepId: undefined,
-                        setupError: undefined,
+                        status: {
+                            ...state.items[idx].status,
+                            setup: undefined,
+                        },
                     };
                 }
             })
@@ -315,7 +320,7 @@ export const connectionsSlice = createSlice({
             .addCase(getSetupStepAsync.fulfilled, (state, action) => {
                 applySetupResponse(state, action.payload);
                 if (isCompleteResponse(action.payload)) {
-                    state.recentlyCompletedConnectionId = action.payload.id;
+                    state.recentlyCompletedConnectionId = action.payload.metadata.target.id ?? null;
                 }
             })
 
@@ -369,12 +374,12 @@ export const connectionsSlice = createSlice({
             })
             .addCase(disconnectConnectionAsync.fulfilled, (state, action) => {
                 state.disconnectingConnection = false;
-                state.currentTaskId = action.payload.taskId;
+                state.currentTaskId = action.payload.status.taskId;
 
                 // Update the connection in the items array
-                const index = state.items.findIndex(conn => conn.id === action.payload.connection.id);
+                const index = state.items.findIndex(conn => conn.metadata.id === action.payload.status.connection.metadata.id);
                 if (index !== -1) {
-                    state.items[index] = action.payload.connection;
+                    state.items[index] = action.payload.status.connection;
                 }
             })
             .addCase(disconnectConnectionAsync.rejected, (state, action) => {
@@ -413,6 +418,6 @@ export const selectRecentlyCompletedConnectionId = (state: RootState) => state.c
 
 // Helper selectors
 export const selectActiveConnections = (state: RootState) =>
-    state.connections.items.filter(conn => conn.state === ConnectionState.CONFIGURED);
+    state.connections.items.filter(conn => conn.status.lifecycle.state === ConnectionState.CONFIGURED);
 
 export default connectionsSlice.reducer;

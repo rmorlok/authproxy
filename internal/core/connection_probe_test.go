@@ -11,8 +11,8 @@ import (
 )
 
 func TestConnection_Probe(t *testing.T) {
-	noProbes := newTestConnection(cschema.Connector{})
-	hasProbes := newTestConnection(cschema.Connector{
+	noProbes := newTestConnection(cschema.ConnectorDefinition{})
+	hasProbes := newTestConnection(cschema.ConnectorDefinition{
 		Probes: []cschema.Probe{
 			{
 				Id:     "probe-1",
@@ -51,7 +51,7 @@ func TestConnection_Probe(t *testing.T) {
 func newConditionalProbeTestConnection(t *testing.T) *connection {
 	t.Helper()
 
-	conn := newTestConnection(cschema.Connector{
+	conn := newTestConnection(cschema.ConnectorDefinition{
 		Javascript: `
 			function isEuRegion() {
 				return cfg.region === "eu";
@@ -118,7 +118,7 @@ func TestConnection_GetEnabledProbe(t *testing.T) {
 }
 
 func TestConnection_GetEnabledProbePredicateError(t *testing.T) {
-	conn := newTestConnection(cschema.Connector{
+	conn := newTestConnection(cschema.ConnectorDefinition{
 		Probes: []cschema.Probe{
 			{
 				Id: "broken",
@@ -134,7 +134,7 @@ func TestConnection_GetEnabledProbePredicateError(t *testing.T) {
 }
 
 func TestConnection_GetEnabledProbesPredicateError(t *testing.T) {
-	conn := newTestConnection(cschema.Connector{
+	conn := newTestConnection(cschema.ConnectorDefinition{
 		Probes: []cschema.Probe{
 			{
 				Id: "broken",

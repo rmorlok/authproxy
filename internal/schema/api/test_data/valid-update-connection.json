@@ -1,8 +1,9 @@
 {
-  "labels": {
-    "team": "platform"
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "Connection",
+  "metadata": {
+    "labels": { "team": "platform" },
+    "annotations": { "owner": "integrations" }
   },
-  "annotations": {
-    "owner": "integrations"
-  }
+  "spec": {}
 }

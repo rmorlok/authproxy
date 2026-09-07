@@ -73,6 +73,12 @@ Every signed token has an **actor** (who is making the call) and a **service-id 
 - Service allowlist defaults to `all`. Override with `--apis admin-api,api` to scope a token down. Valid IDs: `admin-api`, `api`, `public`, `worker`.
 - `--admin` flips the token's permissions to match the `systemAuth.actors.permissions` block on the server (full access in the dev config).
 
+The CLI emits a subject-only token: the selected actor ID is placed in `sub`,
+and the server resolves the existing actor in the selected namespace. It does
+not embed or provision an actor resource. Applications that do embed actors
+must use the restricted `authproxy.net/v1alpha1` Actor claim described in
+[Authentication and Authorization](/security/authentication-and-authorization/#authentication-paths).
+
 ## Commands
 
 ### `ap list connectors` / `ap list connections`
@@ -83,19 +89,22 @@ the name to recognize a resource, but pass the ID to commands and URLs that
 address it directly.
 
 ```bash
-ap list connectors --name salesforce --state active --output table
+ap list connectors --name salesforce --state active
 ap list connections --name production-crm --order "created_at DESC"
 ```
 
 `--name` is an exact, case-sensitive filter. If the caller can list several
 namespaces, the same name can produce more than one result; compare namespace
 and ID before acting. Other useful flags are `--state`, `--type` (connectors
-only), `--order "<field> ASC|DESC"`, plus the global output flags from the
-`Output` helper (`--output json|jsonl|table`, `--limit`, …).
+only), and `--order "<field> ASC|DESC"`. Pagination is automatic and the
+complete result is printed as a JSON array.
 
-JSON and JSONL output retain the existing `id` field and add `name`; scripts
-that need durable identity should continue reading `id`. The CLI does not yet
-have dedicated create or rename commands, so use the API for those operations.
+JSON output contains complete `authproxy.net/v1alpha1` resources, including
+`apiVersion`, `kind`, `metadata`, `spec`, and (when available) `status`.
+Scripts that need durable identity should read `metadata.id`; the display name
+is `metadata.name`, and connector generations use `metadata.generation`. The
+CLI does not yet have dedicated create or rename commands, so use the API for
+those operations.
 See [Resource identity and names](/reference/api/#resource-identity-and-names)
 for create, rename-by-ID, conflict, and query examples.
 
@@ -131,7 +140,10 @@ ap sign-jwt --actorId grafana --apis api,admin-api --grafana-preset logs
 ap sign-jwt --actorId grafana --apis api,admin-api --grafana-preset logs --no-expiry
 ```
 
-Grafana presets use top-level JWT permissions. Those permissions only restrict the token; the backing actor still needs matching normal permissions.
+Grafana presets use top-level JWT permissions. Those permissions only restrict
+the token; the backing actor still needs matching normal permissions. The
+server rejects a token whose top-level permissions are broader than the
+backing actor's grants.
 
 Permission namespaces in a permissions file support the same actor templates as normal actor permissions: `{{externalId}}`, `{{labels.<label>}}`, and `{{annotations.<annotation>}}`. These render against the backing actor, and missing label or annotation values make the permission fail to match.
 

@@ -1,36 +1,43 @@
-labels:
-  type: calendar-js
-displayName: Calendar JS
-logo:
-  publicUrl: https://example.com/calendar-logo.png
-description: |
-  OAuth2 connector fixture with connector-level JavaScript helpers.
-auth:
-  type: OAuth2
-  clientId:
-    envVar: CALENDAR_CLIENT_ID
-  clientSecret:
-    envVar: CALENDAR_CLIENT_SECRET
-  authorization:
-    endpoint: https://example.com/oauth/authorize
-  token:
-    endpoint: https://example.com/oauth/token
-  scopes:
-    - id: calendar.read
-      reason: Read calendars
-javascript: |
-  function isPersonalCalendar(cfg) {
-    return cfg.calendar_id === "personal";
-  }
-setupFlow:
-  configure:
-    steps:
-      - id: select_calendar
-        title: Select Calendar
-        jsonSchema:
-          type: object
-          properties:
-            calendar_id:
-              type: string
-        if:
-          javascript: isPersonalCalendar(cfg)
+apiVersion: authproxy.net/v1alpha1
+kind: Connector
+metadata:
+  name: oauth-connector-with-javascript
+  labels:
+    type: calendar-js
+spec:
+  definition:
+    displayName: Calendar JS
+    logo:
+      publicUrl: https://example.com/calendar-logo.png
+    description: 'OAuth2 connector fixture with connector-level JavaScript helpers.
+
+'
+    auth:
+      type: OAuth2
+      clientId:
+        envVar: CALENDAR_CLIENT_ID
+      clientSecret:
+        envVar: CALENDAR_CLIENT_SECRET
+      authorization:
+        endpoint: https://example.com/oauth/authorize
+      token:
+        endpoint: https://example.com/oauth/token
+      scopes:
+      - id: calendar.read
+        reason: Read calendars
+    javascript: |
+      function isPersonalCalendar(cfg) {
+        return cfg.calendar_id === "personal";
+      }
+    setupFlow:
+      configure:
+        steps:
+        - id: select_calendar
+          title: Select Calendar
+          jsonSchema:
+            type: object
+            properties:
+              calendar_id:
+                type: string
+          if:
+            javascript: isPersonalCalendar(cfg)

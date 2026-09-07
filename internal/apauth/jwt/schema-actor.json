@@ -1,38 +1,45 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/jwt/schema-actor.json",
+  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/internal/apauth/jwt/schema-actor.json",
+  "title": "AuthProxy JWT Actor Claim",
+  "description": "The restricted authproxy.net/v1alpha1 Actor resource allowed in a JWT. Server identity, lifecycle state, and signing material are forbidden.",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "spec"],
   "properties": {
-    "id": {
-      "type": "string",
-      "description": "Unique identifier for the actor. Required. This value should generally be the ID of the actor in the host system (e.g. user ID in a database)."
-    },
-    "admin": {
-      "type": "boolean",
-      "description": "Whether the actor is an admin. Optional. Defaults to false."
-    },
-    "super_admin": {
-      "type": "boolean",
-      "description": "Whether the actor is a super admin. Optional. Defaults to false."
-    },
-    "email": {
-      "type": "string",
-      "description": "The email address of the actor. Optional."
-    },
-    "permissions": {
-      "type": "array",
-      "description": "A list of permissions that the actor has. Required."
-    },
-    "labels": {
+    "apiVersion": { "const": "authproxy.net/v1alpha1" },
+    "kind": { "const": "Actor" },
+    "metadata": {
       "type": "object",
-      "additionalProperties": { "type": "string" },
-      "description": "Labels to carry on the actor."
+      "required": ["namespace"],
+      "properties": {
+        "name": { "type": "string" },
+        "namespace": { "type": "string" },
+        "labels": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
     },
-    "annotations": {
+    "spec": {
       "type": "object",
-      "additionalProperties": { "type": "string" },
-      "description": "Annotations to carry on the actor."
+      "required": ["externalId"],
+      "properties": {
+        "externalId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "permissions": {
+          "type": "array",
+          "items": { "$ref": "../../schema/auth/schema.json#/$defs/Permission" }
+        }
+      },
+      "additionalProperties": false
     }
   },
-  "additionalProperties": false,
-  "type": "object"
+  "additionalProperties": false
 }

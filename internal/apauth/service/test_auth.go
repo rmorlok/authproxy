@@ -133,7 +133,7 @@ func (atu *AuthTestUtil) claimsForActor(ctx context.Context, a core.Actor) *jwt2
 			ID:       idGen.NewString(apid.PrefixJwtId),
 		},
 		Namespace: a.Namespace,
-		Actor:     &a,
+		Actor:     jwt2.NewActorClaim(&a),
 	}
 
 	if claims.Subject == "" {

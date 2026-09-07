@@ -1,0 +1,24 @@
+{
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "WorkflowInstanceList",
+  "metadata": {
+    "continue": "next"
+  },
+  "items": [
+    {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "WorkflowInstance",
+      "metadata": {
+        "id": "exec-a"
+      },
+      "spec": {
+        "instanceId": "workflow-a",
+        "queue": "default"
+      },
+      "status": {
+        "state": "finished",
+        "completedAt": "2026-01-02T03:04:05Z"
+      }
+    }
+  ]
+}

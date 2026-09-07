@@ -67,14 +67,14 @@ func RequireWorkflowTaskCompleted(
 	taskID string,
 	timeout time.Duration,
 	opts ...ActorOption,
-) schemaapi.TaskInfoJson {
+) schemaapi.TaskJson {
 	t.Helper()
 
 	cfg := env.resolveActorOptions(opts)
 	var lastStatus int
 	var lastBody string
 	var lastState schemaapi.TaskState
-	var result schemaapi.TaskInfoJson
+	var result schemaapi.TaskJson
 
 	require.Eventually(t, func() bool {
 		req, err := env.ApiAuthUtil.NewSignedRequestForActorExternalId(
@@ -117,10 +117,10 @@ func RequireWorkflowTaskCompleted(
 		}
 
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &result))
-		lastState = result.State
-		require.Equal(t, taskID, result.Id)
+		lastState = result.Status.State
+		require.Equal(t, taskID, result.Metadata.ID)
 
-		switch result.State {
+		switch result.Status.State {
 		case schemaapi.TaskStateCompleted:
 			return true
 		case schemaapi.TaskStateFailed:

@@ -39,7 +39,9 @@ func (c *connection) getProxyImpl() (iface.Proxy, error) {
 	return c.proxyImpl, c.proxyImplErr
 }
 
-func (c *connection) resolveAuthenticator(connector *cschema.Connector) (auth_methods.Authenticator, error) {
+func (c *connection) resolveAuthenticator(
+	connector *cschema.ConnectorDefinition,
+) (auth_methods.Authenticator, error) {
 	factory := c.s.getAuthMethodFactory(connector)
 	if factory == nil {
 		return nil, ErrProxyNotImplemented

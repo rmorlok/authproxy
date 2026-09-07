@@ -4,9 +4,9 @@
 //
 // Idempotency model: namespaces and actors are created when absent and
 // reconciled to the desired state when present. For each desired connector,
-// list by the stable demo seed label, create it when absent, or publish a new
-// version when the definition changes. Re-running the seed job is a no-op once
-// the state matches.
+// list by its namespace/name identity, create it when absent, or publish a new
+// generation when the definition changes. Re-running the seed job is a no-op
+// once the state matches.
 //
 // Auth: signs requests as the demo-admin actor using the same keypair the
 // demo-shell uses for that actor. AuthProxy already trusts that
@@ -28,42 +28,20 @@ import (
 	"github.com/go-resty/resty/v2"
 	"github.com/rmorlok/authproxy/internal/apauth/jwt"
 	"github.com/rmorlok/authproxy/internal/schema/api"
-	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/schema/config"
+	actorschema "github.com/rmorlok/authproxy/internal/schema/resources/actor"
+	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
+	nschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/util"
 )
 
 // SeedConfig is the YAML shape the binary consumes.
 type SeedConfig struct {
-	Namespaces         []NamespaceSeed         `yaml:"namespaces"`
-	Actors             []ActorSeed             `yaml:"actors"`
+	Namespaces         []nschema.Namespace     `yaml:"namespaces"`
+	Actors             []actorschema.Actor     `yaml:"actors"`
 	OAuth2TestProvider *OAuth2TestProviderSeed `yaml:"oauth2TestProvider"`
-	Connectors         []ConnectorSeed         `yaml:"connectors"`
-}
-
-type NamespaceSeed struct {
-	Path        string            `yaml:"path"`
-	Labels      map[string]string `yaml:"labels,omitempty"`
-	Annotations map[string]string `yaml:"annotations,omitempty"`
-}
-
-type ActorSeed struct {
-	ExternalId  string               `yaml:"externalId"`
-	Namespace   string               `yaml:"namespace,omitempty"`
-	Permissions []aschema.Permission `yaml:"permissions"`
-	Labels      map[string]string    `yaml:"labels,omitempty"`
-	Annotations map[string]string    `yaml:"annotations,omitempty"`
-}
-
-type ConnectorSeed struct {
-	// Key is the stable seed identity. AuthProxy generates connector IDs
-	// for API-created connectors, so the seed job stores this key as an
-	// API label and uses it for future idempotent upgrades.
-	Key         string            `yaml:"key"`
-	Namespace   string            `yaml:"namespace,omitempty"`
-	Definition  config.Connector  `yaml:"definition"`
-	Labels      map[string]string `yaml:"labels,omitempty"`
-	Annotations map[string]string `yaml:"annotations,omitempty"`
+	Connectors         []cschema.Connector     `yaml:"connectors"`
 }
 
 type OAuth2TestProviderSeed struct {
@@ -117,8 +95,6 @@ type settings struct {
 const (
 	seedRetryTimeout  = 5 * time.Minute
 	seedRetryInterval = 5 * time.Second
-	seedLabelKey      = "demo.authproxy.net/seed-key"
-	defaultNamespace  = "root"
 )
 
 type seedAction string
@@ -156,6 +132,24 @@ func loadConfig(path string) (*SeedConfig, error) {
 	if err := util.DecodeYAMLStrict(data, &c); err != nil {
 		return nil, fmt.Errorf("parse seed config %q: %w", path, err)
 	}
+	for i := range c.Namespaces {
+		if err := c.Namespaces[i].ValidateFor(meta.ValidationModeCreate, nil); err != nil {
+			return nil, fmt.Errorf("validate seed namespace %d: %w", i, err)
+		}
+	}
+	for i := range c.Actors {
+		if err := c.Actors[i].ValidateFor(meta.ValidationModeCreate, nil); err != nil {
+			return nil, fmt.Errorf("validate seed actor %d: %w", i, err)
+		}
+	}
+	for i := range c.Connectors {
+		if err := c.Connectors[i].ValidateFor(meta.ValidationModeCreate, nil); err != nil {
+			return nil, fmt.Errorf("validate seed connector %d: %w", i, err)
+		}
+		if c.Connectors[i].Metadata.Name == "" {
+			return nil, fmt.Errorf("validate seed connector %d: metadata.name is required for idempotent seeding", i)
+		}
+	}
 	return &c, nil
 }
 
@@ -181,148 +175,150 @@ func newSignedClient(s settings) (*resty.Client, error) {
 	return c, nil
 }
 
-func upsertNamespace(c *resty.Client, baseUrl string, ns NamespaceSeed) (seedAction, error) {
-	var existing api.NamespaceJson
+func upsertNamespace(c *resty.Client, baseURL string, ns nschema.Namespace) (seedAction, error) {
+	path, err := nschema.PathFromMetadata(ns.Metadata)
+	if err != nil {
+		return "", fmt.Errorf("derive namespace path: %w", err)
+	}
+
+	var existing nschema.Namespace
 	getResp, err := c.R().
 		SetHeader("Accept", "application/json").
 		SetResult(&existing).
-		Get(fmt.Sprintf("%s/api/v1/namespaces/%s", baseUrl, ns.Path))
+		Get(fmt.Sprintf("%s/api/v1/namespaces/%s", baseURL, path))
 	if err != nil {
-		return "", fmt.Errorf("GET namespace %q: %w", ns.Path, err)
+		return "", fmt.Errorf("GET namespace %q: %w", path, err)
 	}
 
 	switch getResp.StatusCode() {
 	case http.StatusOK:
-		if stringMapsEqual(ns.Labels, userLabels(existing.Labels)) &&
-			stringMapsEqual(ns.Annotations, existing.Annotations) {
+		if stringMapsEqual(ns.Metadata.Labels, userLabels(existing.Metadata.Labels)) &&
+			stringMapsEqual(ns.Metadata.Annotations, existing.Metadata.Annotations) {
 			return seedAlreadyPresent, nil
 		}
-		if err := updateNamespace(c, baseUrl, ns); err != nil {
+		if err := updateNamespace(c, baseURL, ns); err != nil {
 			return "", err
 		}
 		return seedUpdated, nil
 	case http.StatusNotFound:
-		// fall through to create
+		// Create below.
 	default:
-		return "", fmt.Errorf("GET namespace %q returned %d: %s", ns.Path, getResp.StatusCode(), getResp.String())
+		return "", fmt.Errorf("GET namespace %q returned %d: %s", path, getResp.StatusCode(), getResp.String())
 	}
 
 	postResp, err := c.R().
 		SetHeader("Content-Type", "application/json").
-		SetBody(api.CreateNamespaceRequestJson{
-			Path:        ns.Path,
-			Labels:      ns.Labels,
-			Annotations: ns.Annotations,
-		}).
-		Post(fmt.Sprintf("%s/api/v1/namespaces", baseUrl))
+		SetBody(ns).
+		Post(fmt.Sprintf("%s/api/v1/namespaces", baseURL))
 	if err != nil {
-		return "", fmt.Errorf("POST namespace %q: %w", ns.Path, err)
+		return "", fmt.Errorf("POST namespace %q: %w", path, err)
 	}
 	if postResp.StatusCode() >= 400 {
-		return "", fmt.Errorf("POST namespace %q returned %d: %s", ns.Path, postResp.StatusCode(), postResp.String())
+		return "", fmt.Errorf("POST namespace %q returned %d: %s", path, postResp.StatusCode(), postResp.String())
 	}
 	return seedCreated, nil
 }
 
-func updateNamespace(c *resty.Client, baseUrl string, ns NamespaceSeed) error {
-	labels := ns.Labels
+func updateNamespace(c *resty.Client, baseURL string, ns nschema.Namespace) error {
+	path, err := nschema.PathFromMetadata(ns.Metadata)
+	if err != nil {
+		return fmt.Errorf("derive namespace path: %w", err)
+	}
+	labels := ns.Metadata.Labels
 	if labels == nil {
 		labels = map[string]string{}
 	}
-	annotations := ns.Annotations
+	annotations := ns.Metadata.Annotations
 	if annotations == nil {
 		annotations = map[string]string{}
 	}
+	patch := nschema.NewNamespacePatch()
+	patch.Metadata.Labels = &labels
+	patch.Metadata.Annotations = &annotations
 
 	patchResp, err := c.R().
 		SetHeader("Content-Type", "application/json").
-		SetBody(api.UpdateNamespaceRequestJson{
-			Labels:      labels,
-			Annotations: annotations,
-		}).
-		Patch(fmt.Sprintf("%s/api/v1/namespaces/%s", baseUrl, ns.Path))
+		SetBody(patch).
+		Patch(fmt.Sprintf("%s/api/v1/namespaces/%s", baseURL, path))
 	if err != nil {
-		return fmt.Errorf("PATCH namespace %q: %w", ns.Path, err)
+		return fmt.Errorf("PATCH namespace %q: %w", path, err)
 	}
 	if patchResp.StatusCode() >= 400 {
-		return fmt.Errorf("PATCH namespace %q returned %d: %s", ns.Path, patchResp.StatusCode(), patchResp.String())
+		return fmt.Errorf("PATCH namespace %q returned %d: %s", path, patchResp.StatusCode(), patchResp.String())
 	}
 	return nil
 }
 
-// upsertActor creates the actor if it doesn't already exist by external_id and
-// reconciles its mutable state when necessary.
-func upsertActor(c *resty.Client, baseUrl string, a ActorSeed) (seedAction, error) {
-	// GET by external_id (with optional namespace).
-	var existing api.ActorJson
+// upsertActor creates the actor if absent and reconciles its mutable state.
+func upsertActor(c *resty.Client, baseURL string, actor actorschema.Actor) (seedAction, error) {
+	var existing actorschema.Actor
 	getReq := c.R().SetHeader("Accept", "application/json").SetResult(&existing)
-	if a.Namespace != "" {
-		getReq.SetQueryParam("namespace", a.Namespace)
-	}
-	getResp, err := getReq.Get(fmt.Sprintf("%s/api/v1/actors/external-id/%s", baseUrl, a.ExternalId))
+	getReq.SetQueryParam("namespace", actor.Metadata.Namespace)
+	getResp, err := getReq.Get(fmt.Sprintf("%s/api/v1/actors/external-id/%s", baseURL, actor.Spec.ExternalId))
 	if err != nil {
-		return "", fmt.Errorf("GET actor %q: %w", a.ExternalId, err)
+		return "", fmt.Errorf("GET actor %q: %w", actor.Spec.ExternalId, err)
 	}
 
 	switch getResp.StatusCode() {
 	case http.StatusOK:
-		if existing.Namespace != a.Namespace ||
-			existing.ExternalId != a.ExternalId {
-			return "", fmt.Errorf("actor %q exists in namespace %q but does not match the configured state", a.ExternalId, a.Namespace)
+		if existing.Metadata.Namespace != actor.Metadata.Namespace || existing.Spec.ExternalId != actor.Spec.ExternalId {
+			return "", fmt.Errorf("actor %q exists in namespace %q but does not match the configured state", actor.Spec.ExternalId, actor.Metadata.Namespace)
 		}
-		if !reflect.DeepEqual(existing.Permissions, a.Permissions) ||
-			!stringMapsEqual(existing.Labels, a.Labels) ||
-			!stringMapsEqual(existing.Annotations, a.Annotations) {
-			if err := updateActor(c, baseUrl, a); err != nil {
+		if existing.Metadata.Name != actor.Metadata.Name ||
+			!reflect.DeepEqual(existing.Spec.Permissions, actor.Spec.Permissions) ||
+			!stringMapsEqual(userLabels(existing.Metadata.Labels), actor.Metadata.Labels) ||
+			!stringMapsEqual(existing.Metadata.Annotations, actor.Metadata.Annotations) {
+			actor.Metadata.ID = existing.Metadata.ID
+			if err := updateActor(c, baseURL, actor); err != nil {
 				return "", err
 			}
 			return seedUpdated, nil
 		}
 		return seedAlreadyPresent, nil
 	case http.StatusNotFound:
-		// fall through to create
+		// Create below.
 	default:
-		return "", fmt.Errorf("GET actor %q returned %d: %s", a.ExternalId, getResp.StatusCode(), getResp.String())
+		return "", fmt.Errorf("GET actor %q returned %d: %s", actor.Spec.ExternalId, getResp.StatusCode(), getResp.String())
 	}
 
-	body := api.CreateActorRequestJson{
-		ExternalId:  a.ExternalId,
-		Namespace:   a.Namespace,
-		Labels:      a.Labels,
-		Annotations: a.Annotations,
-	}
 	postResp, err := c.R().
 		SetHeader("Content-Type", "application/json").
-		SetBody(body).
-		Post(fmt.Sprintf("%s/api/v1/actors", baseUrl))
+		SetBody(actor).
+		Post(fmt.Sprintf("%s/api/v1/actors", baseURL))
 	if err != nil {
-		return "", fmt.Errorf("POST actor %q: %w", a.ExternalId, err)
+		return "", fmt.Errorf("POST actor %q: %w", actor.Spec.ExternalId, err)
 	}
 	if postResp.StatusCode() >= 400 {
-		return "", fmt.Errorf("POST actor %q returned %d: %s", a.ExternalId, postResp.StatusCode(), postResp.String())
-	}
-
-	if err := updateActor(c, baseUrl, a); err != nil {
-		return "", err
+		return "", fmt.Errorf("POST actor %q returned %d: %s", actor.Spec.ExternalId, postResp.StatusCode(), postResp.String())
 	}
 	return seedCreated, nil
 }
 
-func updateActor(c *resty.Client, baseUrl string, a ActorSeed) error {
+func updateActor(c *resty.Client, baseURL string, actor actorschema.Actor) error {
+	labels := actor.Metadata.Labels
+	if labels == nil {
+		labels = map[string]string{}
+	}
+	annotations := actor.Metadata.Annotations
+	if annotations == nil {
+		annotations = map[string]string{}
+	}
+	permissions := actorschema.ClonePermissions(actor.Spec.Permissions)
+	patch := actorschema.NewActorPatch()
+	patch.Metadata.Name = &actor.Metadata.Name
+	patch.Metadata.Labels = &labels
+	patch.Metadata.Annotations = &annotations
+	patch.Spec.Permissions = &permissions
+
 	patchResp, err := c.R().
 		SetHeader("Content-Type", "application/json").
-		SetQueryParam("namespace", a.Namespace).
-		SetBody(api.UpdateActorRequestJson{
-			Permissions: a.Permissions,
-			Labels:      a.Labels,
-			Annotations: a.Annotations,
-		}).
-		Patch(fmt.Sprintf("%s/api/v1/actors/external-id/%s", baseUrl, a.ExternalId))
+		SetBody(patch).
+		Patch(fmt.Sprintf("%s/api/v1/actors/%s", baseURL, actor.Metadata.ID))
 	if err != nil {
-		return fmt.Errorf("PATCH actor %q permissions: %w", a.ExternalId, err)
+		return fmt.Errorf("PATCH actor %q: %w", actor.Spec.ExternalId, err)
 	}
 	if patchResp.StatusCode() >= 400 {
-		return fmt.Errorf("PATCH actor %q permissions returned %d: %s", a.ExternalId, patchResp.StatusCode(), patchResp.String())
+		return fmt.Errorf("PATCH actor %q returned %d: %s", actor.Spec.ExternalId, patchResp.StatusCode(), patchResp.String())
 	}
 	return nil
 }
@@ -411,40 +407,25 @@ const (
 	connectorUpdated        connectorAction = "updated"
 )
 
-func connectorNamespace(seed ConnectorSeed) string {
-	if seed.Namespace != "" {
-		return seed.Namespace
-	}
-	if seed.Definition.Namespace != nil && *seed.Definition.Namespace != "" {
-		return *seed.Definition.Namespace
-	}
-	return defaultNamespace
+func connectorDefinitionsEqual(want cschema.ConnectorDefinition, got cschema.Connector) bool {
+	return reflect.DeepEqual(normalizeForJSON(want), normalizeForJSON(got.Spec.Definition))
 }
 
-func connectorLabels(seed ConnectorSeed) map[string]string {
-	labels := make(map[string]string, len(seed.Labels)+1)
-	for k, v := range seed.Labels {
-		labels[k] = v
-	}
-	labels[seedLabelKey] = seed.Key
-	return labels
+func connectorRequestForSeed(seed cschema.Connector) cschema.Connector {
+	resource := seed.Clone()
+	resource.Metadata.ID = ""
+	resource.Metadata.Generation = 0
+	resource.Metadata.CreatedAt = nil
+	resource.Metadata.UpdatedAt = nil
+	resource.Status = nil
+	return *resource
 }
 
-func connectorDefinitionsEqual(want config.Connector, got api.ConnectorVersionJson) bool {
-	namespace := got.Namespace
-	normalizedWant := want
-	normalizedWant.Id = got.Id
-	normalizedWant.Version = got.Version
-	normalizedWant.Namespace = &namespace
-	normalizedWant.State = string(got.State)
-
-	normalizedGot := got.Definition
-	normalizedGot.Id = got.Id
-	normalizedGot.Version = got.Version
-	normalizedGot.Namespace = &namespace
-	normalizedGot.State = string(got.State)
-
-	return reflect.DeepEqual(normalizeForJSON(normalizedWant), normalizeForJSON(normalizedGot))
+func connectorObservedState(connector cschema.Connector) cschema.ConnectorReleaseState {
+	if connector.Status == nil {
+		return ""
+	}
+	return connector.Status.Release.State
 }
 
 func stringMapsEqual(a, b map[string]string) bool {
@@ -485,103 +466,100 @@ func normalizeForJSON(v any) any {
 	return out
 }
 
-func listSeededConnector(c *resty.Client, baseUrl string, seed ConnectorSeed) (*api.ConnectorJson, error) {
+func listSeededConnector(c *resty.Client, baseUrl string, seed cschema.Connector) (*cschema.Connector, error) {
 	var list api.ListConnectorsResponseJson
 	resp, err := c.R().
 		SetHeader("Accept", "application/json").
-		SetQueryParam("namespace", connectorNamespace(seed)).
-		SetQueryParam("labelSelector", fmt.Sprintf("%s=%s", seedLabelKey, seed.Key)).
-		SetQueryParam("limit", "1").
+		SetQueryParam("namespace", seed.Metadata.Namespace).
+		SetQueryParam("name", string(seed.Metadata.Name)).
+		SetQueryParam("limit", "2").
 		SetResult(&list).
 		Get(fmt.Sprintf("%s/api/v1/connectors", baseUrl))
 	if err != nil {
-		return nil, fmt.Errorf("GET connector seed %q: %w", seed.Key, err)
+		return nil, fmt.Errorf("GET connector seed %q: %w", seed.Metadata.Name, err)
 	}
 	if resp.StatusCode() >= 400 {
-		return nil, fmt.Errorf("GET connector seed %q returned %d: %s", seed.Key, resp.StatusCode(), resp.String())
+		return nil, fmt.Errorf("GET connector seed %q returned %d: %s", seed.Metadata.Name, resp.StatusCode(), resp.String())
 	}
 	if len(list.Items) == 0 {
 		return nil, nil
 	}
+	if len(list.Items) > 1 {
+		return nil, fmt.Errorf("GET connector seed %q returned %d exact-name matches", seed.Metadata.Name, len(list.Items))
+	}
 	return &list.Items[0], nil
 }
 
-func getConnectorVersion(c *resty.Client, baseUrl string, connector api.ConnectorJson) (*api.ConnectorVersionJson, error) {
-	var version api.ConnectorVersionJson
+func getConnectorVersion(c *resty.Client, baseUrl string, connector cschema.Connector) (*cschema.Connector, error) {
+	var version cschema.Connector
 	resp, err := c.R().
 		SetHeader("Accept", "application/json").
 		SetResult(&version).
-		Get(fmt.Sprintf("%s/api/v1/connectors/%s/versions/%d", baseUrl, connector.Id, connector.Version))
+		Get(fmt.Sprintf("%s/api/v1/connectors/%s/generations/%d", baseUrl, connector.GetId(), connector.Metadata.Generation))
 	if err != nil {
-		return nil, fmt.Errorf("GET connector version %s:%d: %w", connector.Id, connector.Version, err)
+		return nil, fmt.Errorf("GET connector version %s:%d: %w", connector.GetId(), connector.Metadata.Generation, err)
 	}
 	if resp.StatusCode() >= 400 {
-		return nil, fmt.Errorf("GET connector version %s:%d returned %d: %s", connector.Id, connector.Version, resp.StatusCode(), resp.String())
+		return nil, fmt.Errorf("GET connector version %s:%d returned %d: %s", connector.GetId(), connector.Metadata.Generation, resp.StatusCode(), resp.String())
 	}
 	return &version, nil
 }
 
-func createConnector(c *resty.Client, baseUrl string, seed ConnectorSeed) (*api.ConnectorVersionJson, error) {
-	body := api.CreateConnectorRequestJson{
-		Namespace:   connectorNamespace(seed),
-		Definition:  seed.Definition,
-		Labels:      connectorLabels(seed),
-		Annotations: seed.Annotations,
-	}
-	var created api.ConnectorVersionJson
+func createConnector(c *resty.Client, baseUrl string, seed cschema.Connector) (*cschema.Connector, error) {
+	body := connectorRequestForSeed(seed)
+	var created cschema.Connector
 	resp, err := c.R().
 		SetHeader("Content-Type", "application/json").
 		SetBody(body).
 		SetResult(&created).
 		Post(fmt.Sprintf("%s/api/v1/connectors", baseUrl))
 	if err != nil {
-		return nil, fmt.Errorf("POST connector seed %q: %w", seed.Key, err)
+		return nil, fmt.Errorf("POST connector seed %q: %w", seed.Metadata.Name, err)
 	}
 	if resp.StatusCode() >= 400 {
-		return nil, fmt.Errorf("POST connector seed %q returned %d: %s", seed.Key, resp.StatusCode(), resp.String())
+		return nil, fmt.Errorf("POST connector seed %q returned %d: %s", seed.Metadata.Name, resp.StatusCode(), resp.String())
 	}
 	return &created, nil
 }
 
-func createConnectorDraft(c *resty.Client, baseUrl string, connector api.ConnectorJson, seed ConnectorSeed) (*api.ConnectorVersionJson, error) {
-	labels := connectorLabels(seed)
-	body := api.CreateConnectorVersionRequestJson{
-		Definition:  &seed.Definition,
-		Labels:      &labels,
-		Annotations: &seed.Annotations,
-	}
-	var created api.ConnectorVersionJson
+func createConnectorDraft(c *resty.Client, baseUrl string, connector cschema.Connector, seed cschema.Connector) (*cschema.Connector, error) {
+	body := connectorRequestForSeed(seed)
+	body.Metadata.Name = connector.Metadata.Name
+	var created cschema.Connector
 	resp, err := c.R().
 		SetHeader("Content-Type", "application/json").
 		SetBody(body).
 		SetResult(&created).
-		Post(fmt.Sprintf("%s/api/v1/connectors/%s/versions", baseUrl, connector.Id))
+		Post(fmt.Sprintf("%s/api/v1/connectors/%s/generations", baseUrl, connector.GetId()))
 	if err != nil {
-		return nil, fmt.Errorf("POST connector seed %q version: %w", seed.Key, err)
+		return nil, fmt.Errorf("POST connector seed %q version: %w", seed.Metadata.Name, err)
 	}
 	if resp.StatusCode() >= 400 {
-		return nil, fmt.Errorf("POST connector seed %q version returned %d: %s", seed.Key, resp.StatusCode(), resp.String())
+		return nil, fmt.Errorf("POST connector seed %q version returned %d: %s", seed.Metadata.Name, resp.StatusCode(), resp.String())
 	}
 	return &created, nil
 }
 
-func forceConnectorPrimary(c *resty.Client, baseUrl string, version api.ConnectorVersionJson) error {
+func forceConnectorPrimary(c *resty.Client, baseUrl string, version cschema.Connector) error {
 	resp, err := c.R().
 		SetHeader("Content-Type", "application/json").
-		SetBody(api.ForceConnectorVersionStateRequestJson{State: string(api.ConnectorVersionStatePrimary)}).
-		Put(fmt.Sprintf("%s/api/v1/connectors/%s/versions/%d/_forceState", baseUrl, version.Id, version.Version))
+		SetBody(api.NewConnectorForceStateRequest(
+			meta.NewObjectReference(version.TypeMeta, version.Metadata),
+			cschema.ConnectorReleaseStatePrimary,
+		)).
+		Put(fmt.Sprintf("%s/api/v1/connectors/%s/generations/%d/_forceState", baseUrl, version.GetId(), version.Metadata.Generation))
 	if err != nil {
-		return fmt.Errorf("PUT connector seed %s:%d primary: %w", version.Id, version.Version, err)
+		return fmt.Errorf("PUT connector seed %s:%d primary: %w", version.GetId(), version.Metadata.Generation, err)
 	}
 	if resp.StatusCode() >= 400 {
-		return fmt.Errorf("PUT connector seed %s:%d primary returned %d: %s", version.Id, version.Version, resp.StatusCode(), resp.String())
+		return fmt.Errorf("PUT connector seed %s:%d primary returned %d: %s", version.GetId(), version.Metadata.Generation, resp.StatusCode(), resp.String())
 	}
 	return nil
 }
 
-func upsertConnector(c *resty.Client, baseUrl string, seed ConnectorSeed) (connectorAction, error) {
-	if seed.Key == "" {
-		return "", fmt.Errorf("connector seed key is required")
+func upsertConnector(c *resty.Client, baseUrl string, seed cschema.Connector) (connectorAction, error) {
+	if seed.Metadata.Name == "" {
+		return "", fmt.Errorf("connector seed metadata.name is required")
 	}
 
 	existing, err := listSeededConnector(c, baseUrl, seed)
@@ -594,7 +572,7 @@ func upsertConnector(c *resty.Client, baseUrl string, seed ConnectorSeed) (conne
 		if err != nil {
 			return "", err
 		}
-		if created.State != api.ConnectorVersionStatePrimary {
+		if connectorObservedState(*created) != cschema.ConnectorReleaseStatePrimary {
 			if err := forceConnectorPrimary(c, baseUrl, *created); err != nil {
 				return "", err
 			}
@@ -607,10 +585,10 @@ func upsertConnector(c *resty.Client, baseUrl string, seed ConnectorSeed) (conne
 		return "", err
 	}
 
-	if connectorDefinitionsEqual(seed.Definition, *version) &&
-		stringMapsEqual(connectorLabels(seed), version.Labels) &&
-		stringMapsEqual(seed.Annotations, version.Annotations) {
-		if version.State != api.ConnectorVersionStatePrimary {
+	if connectorDefinitionsEqual(seed.Spec.Definition, *version) &&
+		stringMapsEqual(seed.Metadata.Labels, userLabels(version.Metadata.Labels)) &&
+		stringMapsEqual(seed.Metadata.Annotations, version.Metadata.Annotations) {
+		if connectorObservedState(*version) != cschema.ConnectorReleaseStatePrimary {
 			if err := forceConnectorPrimary(c, baseUrl, *version); err != nil {
 				return "", err
 			}
@@ -642,6 +620,10 @@ func run(logger *slog.Logger) error {
 	providerClient := resty.New().SetTimeout(30 * time.Second)
 
 	for _, ns := range cfg.Namespaces {
+		path, pathErr := nschema.PathFromMetadata(ns.Metadata)
+		if pathErr != nil {
+			return fmt.Errorf("derive seed namespace path: %w", pathErr)
+		}
 		deadline := time.Now().Add(seedRetryTimeout)
 		var action seedAction
 		for attempt := 1; ; attempt++ {
@@ -650,12 +632,12 @@ func run(logger *slog.Logger) error {
 				break
 			}
 			if time.Now().After(deadline) {
-				return fmt.Errorf("upsert namespace %q after %s: %w", ns.Path, seedRetryTimeout, err)
+				return fmt.Errorf("upsert namespace %q after %s: %w", path, seedRetryTimeout, err)
 			}
-			logger.Warn("namespace seed attempt failed; retrying", "path", ns.Path, "attempt", attempt, "err", err)
+			logger.Warn("namespace seed attempt failed; retrying", "path", path, "attempt", attempt, "err", err)
 			time.Sleep(seedRetryInterval)
 		}
-		logger.Info("namespace seed complete", "path", ns.Path, "action", action)
+		logger.Info("namespace seed complete", "path", path, "action", action)
 	}
 
 	for _, a := range cfg.Actors {
@@ -667,11 +649,11 @@ func run(logger *slog.Logger) error {
 				break
 			}
 			if time.Now().After(deadline) {
-				return fmt.Errorf("upsert actor %q after %s: %w", a.ExternalId, seedRetryTimeout, err)
+				return fmt.Errorf("upsert actor %q after %s: %w", a.Spec.ExternalId, seedRetryTimeout, err)
 			}
 			logger.Warn("actor seed attempt failed; retrying",
-				"external_id", a.ExternalId,
-				"namespace", a.Namespace,
+				"external_id", a.Spec.ExternalId,
+				"namespace", a.Metadata.Namespace,
 				"attempt", attempt,
 				"err", err,
 			)
@@ -679,11 +661,11 @@ func run(logger *slog.Logger) error {
 		}
 		switch action {
 		case seedCreated:
-			logger.Info("actor created", "external_id", a.ExternalId, "namespace", a.Namespace)
+			logger.Info("actor created", "external_id", a.Spec.ExternalId, "namespace", a.Metadata.Namespace)
 		case seedUpdated:
-			logger.Info("actor updated", "external_id", a.ExternalId, "namespace", a.Namespace)
+			logger.Info("actor updated", "external_id", a.Spec.ExternalId, "namespace", a.Metadata.Namespace)
 		case seedAlreadyPresent:
-			logger.Info("actor already present", "external_id", a.ExternalId, "namespace", a.Namespace)
+			logger.Info("actor already present", "external_id", a.Spec.ExternalId, "namespace", a.Metadata.Namespace)
 		}
 	}
 
@@ -722,11 +704,11 @@ func run(logger *slog.Logger) error {
 				break
 			}
 			if time.Now().After(deadline) {
-				return fmt.Errorf("upsert connector %q after %s: %w", connector.Key, seedRetryTimeout, err)
+				return fmt.Errorf("upsert connector %q after %s: %w", connector.Metadata.Name, seedRetryTimeout, err)
 			}
 			logger.Warn("connector seed attempt failed; retrying",
-				"key", connector.Key,
-				"namespace", connectorNamespace(connector),
+				"name", connector.Metadata.Name,
+				"namespace", connector.Metadata.Namespace,
 				"attempt", attempt,
 				"err", err,
 			)
@@ -735,11 +717,11 @@ func run(logger *slog.Logger) error {
 
 		switch action {
 		case connectorCreated:
-			logger.Info("connector created", "key", connector.Key, "namespace", connectorNamespace(connector))
+			logger.Info("connector created", "name", connector.Metadata.Name, "namespace", connector.Metadata.Namespace)
 		case connectorUpdated:
-			logger.Info("connector updated", "key", connector.Key, "namespace", connectorNamespace(connector))
+			logger.Info("connector updated", "name", connector.Metadata.Name, "namespace", connector.Metadata.Namespace)
 		case connectorAlreadyPresent:
-			logger.Info("connector already present", "key", connector.Key, "namespace", connectorNamespace(connector))
+			logger.Info("connector already present", "name", connector.Metadata.Name, "namespace", connector.Metadata.Namespace)
 		}
 	}
 	return nil

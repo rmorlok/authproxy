@@ -10,6 +10,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	smeta "github.com/rmorlok/authproxy/internal/schema/resources/meta"
 )
 
 // applyMigrationHookForVersion applies the javascript upgrade/downgrade hook,
@@ -100,16 +101,16 @@ func applyMigrationHookPatch(
 
 	// Update the user labels
 	for key, value := range patch.Labels.Set {
-		if err := database.ValidateUserLabelKey(key); err != nil {
+		if err := smeta.ValidateUserLabelKey(key); err != nil {
 			return err
 		}
-		if err := database.ValidateLabelValue(value); err != nil {
+		if err := smeta.ValidateLabelValue(value); err != nil {
 			return err
 		}
 		candidate.UserLabels[key] = value
 	}
 	for _, key := range patch.Labels.Unset {
-		if err := database.ValidateUserLabelKey(key); err != nil {
+		if err := smeta.ValidateUserLabelKey(key); err != nil {
 			return err
 		}
 		delete(candidate.UserLabels, key)
@@ -117,13 +118,13 @@ func applyMigrationHookPatch(
 
 	// Update the annotations
 	for key, value := range patch.Annotations.Set {
-		if err := database.ValidateAnnotationKey(key); err != nil {
+		if err := smeta.ValidateAnnotationKey(key); err != nil {
 			return err
 		}
 		candidate.Annotations[key] = value
 	}
 	for _, key := range patch.Annotations.Unset {
-		if err := database.ValidateAnnotationKey(key); err != nil {
+		if err := smeta.ValidateAnnotationKey(key); err != nil {
 			return err
 		}
 		delete(candidate.Annotations, key)

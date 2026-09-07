@@ -85,7 +85,22 @@ type listResponse[T any] struct {
 	Total  *int64 `json:"total,omitempty"`
 }
 
+type resourceMetadata struct {
+	ID        string            `json:"id"`
+	Name      string            `json:"name"`
+	Namespace string            `json:"namespace"`
+	Labels    map[string]string `json:"labels,omitempty"`
+}
+
+type resourceSpec struct {
+	ExternalID string `json:"externalId"`
+}
+
 type namedResource struct {
+	APIVersion  string            `json:"apiVersion"`
+	Kind        string            `json:"kind"`
+	Metadata    *resourceMetadata `json:"metadata,omitempty"`
+	Spec        *resourceSpec     `json:"spec,omitempty"`
 	ID          string            `json:"id"`
 	Path        string            `json:"path"`
 	ExternalID  string            `json:"externalId"`

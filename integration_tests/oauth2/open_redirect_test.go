@@ -29,7 +29,7 @@ func TestOAuth2OpenRedirectProtection_InvalidReturnURLFallsBackToMarketplace(t *
 	userPassword := "p4ssw0rd-" + suffix
 	userEmail := "open-redirect-" + suffix + "@example.com"
 
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 	connector := helpers.NewOAuth2Connector(connectorID, "open-redirect-test", provider, helpers.OAuth2ConnectorOptions{
 		ClientID:     clientKey,
 		ClientSecret: clientSecret,

@@ -183,22 +183,24 @@ func (b *TestGinServerBuilder) Build() TestSetup {
 				GlobalAESKey: sconfig.NewKeyDataRandomBytes(),
 				Actors: &sconfig.ConfiguredActors{
 					InnerVal: sconfig.ConfiguredActorsList{
-						&sconfig.ConfiguredActor{
-							ExternalId: "bobdole",
-							Key: &sconfig.Key{
+						testConfiguredActor(
+							"bobdole",
+							&sconfig.Key{
 								InnerVal: &sconfig.KeyShared{
 									SharedKey: adminSigningKey,
 								},
 							},
-						},
-						&sconfig.ConfiguredActor{
-							ExternalId: "ronaldreagan",
-							Key: &sconfig.Key{
+							nil,
+						),
+						testConfiguredActor(
+							"ronaldreagan",
+							&sconfig.Key{
 								InnerVal: &sconfig.KeyShared{
 									SharedKey: adminSigningKey,
 								},
 							},
-						},
+							nil,
+						),
 					},
 				},
 			},
@@ -347,7 +349,7 @@ func (ts *TestSetup) MustGetValidSigningTokenForUser() *sconfig.Key {
 }
 
 func (ts *TestSetup) MustGetValidSigningTokenForConfiguredActor() *sconfig.Key {
-	return ts.Cfg.GetRoot().SystemAuth.Actors.All()[0].Key
+	return ts.Cfg.GetRoot().SystemAuth.Actors.All()[0].Spec.SigningKey
 }
 
 func (ts *TestSetup) GET(ctx context.Context, path string) (responseJson gin.H, statusCode int, debugHeader string) {

@@ -29,7 +29,7 @@ func setupVerifyTest(
 	t *testing.T,
 	connectionId apid.ID,
 	conn *database.Connection,
-	connector *cschema.Connector,
+	connector *cschema.ConnectorDefinition,
 ) (*service, *mockDb.MockDB, *mockEncrypt.MockE, *gomock.Controller) {
 	t.Helper()
 	ctrl := gomock.NewController(t)
@@ -51,10 +51,10 @@ func setupVerifyTest(
 
 	encryptedDef := encfield.EncryptedField{ID: "dek_mock", Data: "encrypted-def"}
 	db.EXPECT().
-		GetConnectorDefinitionVersion(gomock.Any(), connector.Id, connector.Version).
+		GetConnectorDefinitionVersion(gomock.Any(), conn.ConnectorId, conn.ConnectorVersion).
 		Return(&database.ConnectorWithDefinition{
-			Id:                  connector.Id,
-			Version:             connector.Version,
+			Id:                  conn.ConnectorId,
+			Version:             conn.ConnectorVersion,
 			State:               database.ConnectorDefinitionVersionStatePrimary,
 			EncryptedDefinition: encryptedDef,
 		}, nil).
@@ -75,9 +75,7 @@ func setupVerifyTest(
 // times) → onVerifyPassed clears setup_step and advances state to Ready.
 func TestRunVerifyConnection_NoProbes_AdvancesToReady(t *testing.T) {
 	connectionId := apid.New(apid.PrefixConnection)
-	connector := &cschema.Connector{
-		Id:          apid.New(apid.PrefixConnectorVersion),
-		Version:     1,
+	connector := &cschema.ConnectorDefinition{
 		DisplayName: "verify-test",
 		Auth:        &cschema.Auth{InnerVal: &cschema.AuthApiKey{Type: cschema.AuthTypeAPIKey}},
 		// No probes → runVerifyConnection's loop does nothing.
@@ -88,8 +86,8 @@ func TestRunVerifyConnection_NoProbes_AdvancesToReady(t *testing.T) {
 		Namespace:        "root",
 		State:            database.ConnectionStateSetup,
 		HealthState:      database.ConnectionHealthStateHealthy,
-		ConnectorId:      connector.Id,
-		ConnectorVersion: connector.Version,
+		ConnectorId:      apid.New(apid.PrefixConnectorVersion),
+		ConnectorVersion: 1,
 		SetupStep:        &verifyStep,
 	}
 
@@ -112,9 +110,7 @@ func TestRunVerifyConnection_NoProbes_AdvancesToReady(t *testing.T) {
 
 func TestRunVerifyConnection_AllProbesDisabled_AdvancesToReady(t *testing.T) {
 	connectionId := apid.New(apid.PrefixConnection)
-	connector := &cschema.Connector{
-		Id:          apid.New(apid.PrefixConnectorVersion),
-		Version:     1,
+	connector := &cschema.ConnectorDefinition{
 		DisplayName: "verify-disabled-test",
 		Auth:        &cschema.Auth{InnerVal: &cschema.AuthApiKey{Type: cschema.AuthTypeAPIKey}},
 		Probes: []cschema.Probe{{
@@ -132,8 +128,8 @@ func TestRunVerifyConnection_AllProbesDisabled_AdvancesToReady(t *testing.T) {
 		Namespace:        "root",
 		State:            database.ConnectionStateSetup,
 		HealthState:      database.ConnectionHealthStateHealthy,
-		ConnectorId:      connector.Id,
-		ConnectorVersion: connector.Version,
+		ConnectorId:      apid.New(apid.PrefixConnectorVersion),
+		ConnectorVersion: 1,
 		SetupStep:        &verifyStep,
 	}
 
@@ -154,9 +150,7 @@ func TestRunVerifyConnection_AllProbesDisabled_AdvancesToReady(t *testing.T) {
 
 func TestRunVerifyConnection_MixedProbePredicates_RunOnlyEnabled(t *testing.T) {
 	connectionId := apid.New(apid.PrefixConnection)
-	connector := &cschema.Connector{
-		Id:          apid.New(apid.PrefixConnectorVersion),
-		Version:     1,
+	connector := &cschema.ConnectorDefinition{
 		DisplayName: "verify-mixed-test",
 		Auth:        &cschema.Auth{InnerVal: &cschema.AuthApiKey{Type: cschema.AuthTypeAPIKey}},
 		Probes: []cschema.Probe{
@@ -183,8 +177,8 @@ func TestRunVerifyConnection_MixedProbePredicates_RunOnlyEnabled(t *testing.T) {
 		Namespace:        "root",
 		State:            database.ConnectionStateSetup,
 		HealthState:      database.ConnectionHealthStateHealthy,
-		ConnectorId:      connector.Id,
-		ConnectorVersion: connector.Version,
+		ConnectorId:      apid.New(apid.PrefixConnectorVersion),
+		ConnectorVersion: 1,
 		SetupStep:        &verifyStep,
 	}
 
@@ -212,9 +206,7 @@ func TestRunVerifyConnection_MixedProbePredicates_RunOnlyEnabled(t *testing.T) {
 // must return nil and must not write to the DB.
 func TestRunVerifyConnection_StalePhase_SkipsCleanly(t *testing.T) {
 	connectionId := apid.New(apid.PrefixConnection)
-	connector := &cschema.Connector{
-		Id:          apid.New(apid.PrefixConnectorVersion),
-		Version:     1,
+	connector := &cschema.ConnectorDefinition{
 		DisplayName: "stale-test",
 		Auth:        &cschema.Auth{InnerVal: &cschema.AuthApiKey{Type: cschema.AuthTypeAPIKey}},
 	}
@@ -223,8 +215,8 @@ func TestRunVerifyConnection_StalePhase_SkipsCleanly(t *testing.T) {
 		Namespace:        "root",
 		State:            database.ConnectionStateConfigured,
 		HealthState:      database.ConnectionHealthStateHealthy,
-		ConnectorId:      connector.Id,
-		ConnectorVersion: connector.Version,
+		ConnectorId:      apid.New(apid.PrefixConnectorVersion),
+		ConnectorVersion: 1,
 		SetupStep:        nil, // already past verify
 	}
 
@@ -265,9 +257,7 @@ func TestRunVerifyConnection_ConnectionNotFound(t *testing.T) {
 // SkipRetry surfaces so the retry loop doesn't fight recorded state.
 func TestRunVerifyConnection_ProbeFailure(t *testing.T) {
 	connectionId := apid.New(apid.PrefixConnection)
-	connector := &cschema.Connector{
-		Id:          apid.New(apid.PrefixConnectorVersion),
-		Version:     1,
+	connector := &cschema.ConnectorDefinition{
 		DisplayName: "fail-test",
 		Auth:        &cschema.Auth{InnerVal: &cschema.AuthApiKey{Type: cschema.AuthTypeAPIKey}},
 		Probes: []cschema.Probe{{
@@ -284,8 +274,8 @@ func TestRunVerifyConnection_ProbeFailure(t *testing.T) {
 		Namespace:        "root",
 		State:            database.ConnectionStateSetup,
 		HealthState:      database.ConnectionHealthStateHealthy,
-		ConnectorId:      connector.Id,
-		ConnectorVersion: connector.Version,
+		ConnectorId:      apid.New(apid.PrefixConnectorVersion),
+		ConnectorVersion: 1,
 		SetupStep:        &verifyStep,
 	}
 

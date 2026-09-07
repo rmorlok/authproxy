@@ -1,0 +1,18 @@
+{
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "WorkflowInstanceCancel",
+  "metadata": {
+    "target": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "WorkflowInstance",
+      "id": "exec-a"
+    }
+  },
+  "spec": {
+    "instanceId": "workflow-a"
+  },
+  "status": {
+    "succeeded": true,
+    "affectedCount": 1
+  }
+}

@@ -5,7 +5,7 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import {DataGrid, GridColDef, GridSortModel} from '@mui/x-data-grid';
 import {
-    listActors, Actor, ListResponse, ListActorsParams
+    listActors, Actor, ActorList, ListActorsParams
 } from '@authproxy/api';
 import dayjs from 'dayjs';
 import {useQueryState, parseAsInteger, parseAsString} from 'nuqs'
@@ -22,6 +22,7 @@ export const columns: GridColDef<Actor>[] = [
         flex: 0.8,
         minWidth: 120,
         sortable: true,
+        valueGetter: (_, row) => row.metadata.name,
     },
     {
         field: 'id',
@@ -29,6 +30,7 @@ export const columns: GridColDef<Actor>[] = [
         flex: 0.8,
         minWidth: 110,
         sortable: true,
+        valueGetter: (_, row) => row.metadata.id,
     },
     {
         field: 'externalId',
@@ -36,6 +38,7 @@ export const columns: GridColDef<Actor>[] = [
         flex: 0.4,
         minWidth: 80,
         sortable: true,
+        valueGetter: (_, row) => row.spec.externalId,
     },
     {
         field: 'namespace',
@@ -43,6 +46,7 @@ export const columns: GridColDef<Actor>[] = [
         flex: 0.5,
         minWidth: 90,
         sortable: true,
+        valueGetter: (_, row) => row.metadata.namespace,
     },
     {
         field: 'labels',
@@ -50,6 +54,7 @@ export const columns: GridColDef<Actor>[] = [
         flex: 0.7,
         minWidth: 120,
         sortable: false,
+        valueGetter: (_, row) => row.metadata.labels,
         renderCell: (params) => <ResourceLabelChips labels={params.value as Record<string, string> | undefined}/>,
     },
     {
@@ -58,8 +63,8 @@ export const columns: GridColDef<Actor>[] = [
         flex: 1,
         minWidth: 80,
         sortable: true,
-        valueGetter: (value, _) => {
-            return dayjs(value).format('MMM DD, YYYY, h:mm A');
+        valueGetter: (_, row) => {
+            return dayjs(row.metadata.createdAt).format('MMM DD, YYYY, h:mm A');
         }
 
     },
@@ -69,8 +74,8 @@ export const columns: GridColDef<Actor>[] = [
         flex: 1,
         minWidth: 100,
         sortable: true,
-        valueGetter: (value) => {
-            return dayjs(value).format('MMM DD, YYYY, h:mm A');
+        valueGetter: (_, row) => {
+            return dayjs(row.metadata.updatedAt).format('MMM DD, YYYY, h:mm A');
         }
 
     },
@@ -93,7 +98,7 @@ export default function Actors() {
     const [hasNextPage, setHasNextPage] = useState<boolean>(false);
 
     // Simple cache to allow going back without re-fetching
-    const responsesCacheRef = useRef<ListResponse<Actor>[]>([]);
+    const responsesCacheRef = useRef<ActorList[]>([]);
     const pageRequestCacheRef = useRef<Set<number>>(new Set());
 
     const handleSortModelChange = React.useCallback((sortModel: GridSortModel) => {
@@ -126,14 +131,14 @@ export default function Actors() {
             if (cached) {
                 setRows(cached.items);
                 setLoading(false);
-                setHasNextPage(!!cached.cursor);
+                setHasNextPage(!!cached.metadata.continue);
                 return;
             }
 
             // If we don't know the cursor for this page yet, advance sequentially from the last known
             while (responsesCacheRef.current.length <= targetPageZeroBased && (
                     responsesCacheRef.current.length === 0 ||
-                    !!responsesCacheRef.current[responsesCacheRef.current.length - 1].cursor
+                    !!responsesCacheRef.current[responsesCacheRef.current.length - 1].metadata.continue
                 )
                 ) {
                 // Avoid multiple calls for the same page
@@ -145,7 +150,7 @@ export default function Actors() {
                 const thisPage = responsesCacheRef.current.length;
                 const prevResp = responsesCacheRef.current[responsesCacheRef.current.length - 1];
 
-                const params: ListActorsParams = prevResp?.cursor ? {cursor: prevResp.cursor} : {
+                const params: ListActorsParams = prevResp?.metadata.continue ? {cursor: prevResp.metadata.continue} : {
                     namespace: namespaceMatcher,
                     orderBy: sort || undefined,
                     limit: pageSize,
@@ -164,7 +169,7 @@ export default function Actors() {
             const data = responsesCacheRef.current[targetPageZeroBased];
             setRows(data?.items || []);
 
-            const hnp = !!data?.cursor;
+            const hnp = !!data?.metadata.continue;
             setHasNextPage(hnp);
 
             if(!hnp) {
@@ -199,11 +204,11 @@ export default function Actors() {
                     autoHeight
                     rows={rows}
                     columns={columns}
-                    getRowId={(row) => row.id}
+                    getRowId={(row) => row.metadata.id}
                     getRowClassName={(params) =>
                         params.indexRelativeToCurrentPage % 2 === 0 ? 'even' : 'odd'
                     }
-                    onRowClick={(params) => navigate(`/actors/${params.row.id}`)}
+                    onRowClick={(params) => navigate(`/actors/${params.row.metadata.id}`)}
                     sx={{cursor: 'pointer'}}
                     loading={loading}
                     sortingMode="server"

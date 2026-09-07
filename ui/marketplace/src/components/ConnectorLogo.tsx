@@ -2,12 +2,11 @@ import React from 'react';
 import { Box, Typography } from '@mui/material';
 import { Connector } from '@authproxy/api';
 import { marketplaceTokens } from '../theme';
-
-type ConnectorLogoShape = Pick<Connector, 'displayName' | 'logo'>;
+import { getConnectorPresentation } from './connectorPresentation';
 
 interface ConnectorLogoProps {
-  connector?: ConnectorLogoShape;
-  variant?: 'media' | 'compact';
+  connector?: Connector;
+  variant?: 'media' | 'compact' | 'detail';
 }
 
 const connectorInitials = (displayName: string): string => {
@@ -48,12 +47,26 @@ const variantSizing = {
     },
     initialsVariant: 'subtitle1' as const,
   },
+  detail: {
+    outer: {
+      width: 88,
+      height: 88,
+      p: 1.5,
+      flexShrink: 0,
+    },
+    frame: {
+      width: '100%',
+      height: '100%',
+    },
+    initialsVariant: 'h4' as const,
+  },
 };
 
 const ConnectorLogo: React.FC<ConnectorLogoProps> = ({ connector, variant = 'compact' }) => {
   const [logoFailed, setLogoFailed] = React.useState(false);
-  const displayName = connector?.displayName || 'Unknown Connector';
-  const logo = connector?.logo;
+  const presentation = connector ? getConnectorPresentation(connector) : undefined;
+  const displayName = presentation?.displayName || 'Unknown Connector';
+  const logo = presentation?.logoUrl;
   const sizing = variantSizing[variant];
 
   React.useEffect(() => {

@@ -48,7 +48,7 @@ func newOAuth2(
 	connDef := c.GetDefinition()
 	auth, ok := connDef.Auth.Inner().(*sconfig.AuthOAuth2)
 	if !ok {
-		panic(fmt.Sprintf("connector id %s is not an oauth2 connector", connDef.Id))
+		panic(fmt.Sprintf("connector id %s is not an oauth2 connector", c.GetId()))
 	}
 
 	return &oAuth2Connection{

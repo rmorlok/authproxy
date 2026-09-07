@@ -1,4 +1,11 @@
 {
-  "value": "ws-123",
-  "label": "My Workspace"
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "DataSourceOptionList",
+  "metadata": {},
+  "items": [
+    {
+      "value": "ws-123",
+      "label": "My Workspace"
+    }
+  ]
 }

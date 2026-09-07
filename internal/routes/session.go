@@ -72,7 +72,7 @@ func (r *SessionRoutes) initiate(gctx *gin.Context) {
 	logger.Debug("received initiate request")
 
 	var req SessionInitiateParams
-	if err := bindJSONBody(gctx, &req); err != nil {
+	if err := apgin.BindJSONBody(gctx, &req); err != nil {
 		apgin.WriteError(gctx, r.logger, httperr.BadRequestErr(err))
 		return
 	}

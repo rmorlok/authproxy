@@ -1,29 +1,85 @@
 {
-  "namespace": "root.acme",
-  "type": "proxy",
-  "requestId": "req_test550e8400abcde",
-  "correlationId": "corr-123",
-  "timestamp": "2026-01-02T03:04:05Z",
-  "duration": 150,
-  "connectionId": "cxn_test550e8400abcde",
-  "connectorId": "cxr_test550e8400abcde",
-  "connectorVersion": 2,
-  "method": "GET",
-  "host": "api.example.com",
-  "scheme": "https",
-  "path": "/v1/users",
-  "responseStatusCode": 200,
-  "labels": {
-    "team": "api"
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "RequestEvent",
+  "metadata": {
+    "id": "req_test550e8400abcde",
+    "namespace": "root.acme",
+    "labels": {
+      "team": "api"
+    },
+    "createdAt": "2026-01-02T03:04:05Z"
   },
-  "responseSource": "upstream",
-  "rateLimitMatched": [
-    {
-      "id": "rl_test550e8400abcde",
-      "mode": "observe",
-      "bucket": {
-        "actor": "act_test550e8400abcde"
+  "spec": {
+    "requestType": "proxy",
+    "correlationId": "corr-123",
+    "durationMilliseconds": 150,
+    "namespaceRef": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Namespace",
+      "id": "root.acme"
+    },
+    "actorRef": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Actor",
+      "id": "act_test550e8400abcde",
+      "name": "service-actor",
+      "namespace": "root.acme"
+    },
+    "connectionRef": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connection",
+      "id": "cxn_test550e8400abcde",
+      "name": "production",
+      "namespace": "root.acme"
+    },
+    "connectorRef": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connector",
+      "id": "cxr_test550e8400abcde",
+      "name": "provider",
+      "namespace": "root.integrations",
+      "generation": 2
+    },
+    "request": {
+      "method": "GET",
+      "host": "api.example.com",
+      "scheme": "https",
+      "path": "/v1/users",
+      "httpVersion": "HTTP/2.0"
+    },
+    "response": {
+      "statusCode": 200,
+      "httpVersion": "HTTP/2.0",
+      "source": "upstream"
+    },
+    "captureAvailable": true,
+    "capture": {
+      "request": {
+        "url": "https://api.example.com/v1/users?cursor=next",
+        "headers": {
+          "Authorization": ["Bearer example"]
+        },
+        "body": "e30="
+      },
+      "response": {
+        "headers": {
+          "Content-Type": ["application/json"]
+        },
+        "body": "e30="
       }
-    }
-  ]
+    },
+    "rateLimitsMatched": [
+      {
+        "rateLimitRef": {
+          "apiVersion": "authproxy.net/v1alpha1",
+          "kind": "RateLimit",
+          "id": "rl_test550e8400abcde"
+        },
+        "mode": "observe",
+        "bucket": {
+          "actor": "act_test550e8400abcde"
+        }
+      }
+    ]
+  }
 }

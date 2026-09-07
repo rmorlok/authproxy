@@ -13,8 +13,8 @@ import (
 )
 
 // validDef returns a known-good definition for use across CRUD tests.
-func validDef() rlschema.RateLimit {
-	return rlschema.RateLimit{
+func validDef() rlschema.RateLimitSpec {
+	return rlschema.RateLimitSpec{
 		Mode: rlschema.ModeEnforce,
 		Selector: rlschema.Selector{
 			Methods: []string{"GET"},
@@ -37,10 +37,13 @@ func TestRateLimit_CRUD(t *testing.T) {
 	ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 	// Create
+	matcher := "root.payments.**"
+	definition := validDef()
+	definition.Scope = &rlschema.RateLimitScope{NamespaceMatcher: &matcher}
 	rl := &RateLimit{
 		Id:         apid.New(apid.PrefixRateLimit),
 		Namespace:  "root",
-		Definition: validDef(),
+		Definition: definition,
 		Labels:     Labels{"team": "platform"},
 	}
 	require.NoError(t, db.CreateRateLimit(ctx, rl))
@@ -53,6 +56,9 @@ func TestRateLimit_CRUD(t *testing.T) {
 	require.Equal(t, rl.Id, got.Id)
 	require.Equal(t, "root", got.Namespace)
 	require.Equal(t, rlschema.ModeEnforce, got.Definition.Mode)
+	require.NotNil(t, got.Definition.Scope)
+	require.NotNil(t, got.Definition.Scope.NamespaceMatcher)
+	require.Equal(t, matcher, *got.Definition.Scope.NamespaceMatcher)
 	require.NotNil(t, got.Definition.Algorithm.TokenBucket)
 	require.Equal(t, 60, got.Definition.Algorithm.TokenBucket.Capacity)
 
@@ -113,6 +119,17 @@ func TestRateLimit_UpdateDefinition_RejectsInvalid(t *testing.T) {
 	_, err := db.UpdateRateLimitDefinition(ctx, rl.Id, bad)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "exactly one of")
+
+	outsideMatcher := "root.other.**"
+	badScope := validDef()
+	badScope.Scope = &rlschema.RateLimitScope{NamespaceMatcher: &outsideMatcher}
+	// Persist a row in the child namespace, then verify a direct definition
+	// update cannot widen its enforcement boundary to a sibling.
+	require.NoError(t, db.CreateNamespace(ctx, &Namespace{Path: "root.acme", State: NamespaceStateActive}))
+	child := &RateLimit{Id: apid.New(apid.PrefixRateLimit), Namespace: "root.acme", Definition: validDef()}
+	require.NoError(t, db.CreateRateLimit(ctx, child))
+	_, err = db.UpdateRateLimitDefinition(ctx, child.Id, badScope)
+	require.ErrorContains(t, err, "must match only namespace")
 }
 
 func TestRateLimit_Validation(t *testing.T) {
@@ -148,7 +165,7 @@ func TestRateLimit_Validation(t *testing.T) {
 	rl = &RateLimit{
 		Id:        apid.New(apid.PrefixRateLimit),
 		Namespace: "root",
-		Definition: rlschema.RateLimit{
+		Definition: rlschema.RateLimitSpec{
 			Selector: rlschema.Selector{Methods: []string{"GET"}},
 			Bucket:   rlschema.Bucket{},
 			// Algorithm intentionally empty.
@@ -318,11 +335,11 @@ func TestRateLimit_DefinitionRoundTripJSON(t *testing.T) {
 
 	cases := []struct {
 		name string
-		def  rlschema.RateLimit
+		def  rlschema.RateLimitSpec
 	}{
 		{
 			name: "fixed_window",
-			def: rlschema.RateLimit{
+			def: rlschema.RateLimitSpec{
 				Mode:     rlschema.ModeEnforce,
 				Selector: rlschema.Selector{Methods: []string{"GET"}, RequestTypes: []common.RequestType{common.RequestTypeProxy}},
 				Bucket:   rlschema.Bucket{Dimensions: []string{rlschema.DimensionActor}},
@@ -335,7 +352,7 @@ func TestRateLimit_DefinitionRoundTripJSON(t *testing.T) {
 		},
 		{
 			name: "sliding_window_log",
-			def: rlschema.RateLimit{
+			def: rlschema.RateLimitSpec{
 				Selector: rlschema.Selector{Methods: []string{"POST"}, RequestTypes: []common.RequestType{common.RequestTypeProxy}},
 				Bucket:   rlschema.Bucket{Dimensions: []string{rlschema.DimensionConnection}},
 				Algorithm: rlschema.Algorithm{
@@ -347,7 +364,7 @@ func TestRateLimit_DefinitionRoundTripJSON(t *testing.T) {
 		},
 		{
 			name: "token_bucket_observe",
-			def: rlschema.RateLimit{
+			def: rlschema.RateLimitSpec{
 				Mode:     rlschema.ModeObserve,
 				Selector: rlschema.Selector{},
 				Bucket:   rlschema.Bucket{},

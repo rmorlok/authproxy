@@ -11,7 +11,7 @@ import InputLabel from '@mui/material/InputLabel';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import {
-    ListResponse, RequestEventRecord,
+    RequestEvent, RequestEventList,
     RequestType, ResponseSource, ListRequestEventsParams, listRequestEvents
 } from '@authproxy/api';
 import { Link as RouterLink } from 'react-router-dom';
@@ -26,14 +26,14 @@ import {useSelector} from "react-redux";
 import {selectCurrentNamespaceMatcher} from "../store/namespacesSlice";
 import {ResourceLabelChips} from '../components/ResourceMetadataFields';
 
-export const columns: (GridColDef<RequestEventRecord> & {hideInitial?: boolean})[] = [
+export const columns: (GridColDef<RequestEvent> & {hideInitial?: boolean})[] = [
     {
         field: 'timestamp',
         headerName: 'Timestamp',
         minWidth: 220,
         sortable: true,
-        valueGetter: (value, _) => {
-            return dayjs(value).format('YYYY-MM-DDTHH:mm:ssZ[Z]');
+        valueGetter: (_, row) => {
+            return dayjs(row.metadata.createdAt).format('YYYY-MM-DDTHH:mm:ssZ[Z]');
         }
     },
     {
@@ -41,12 +41,14 @@ export const columns: (GridColDef<RequestEventRecord> & {hideInitial?: boolean})
         headerName: 'Method',
         align: 'center',
         sortable: true,
+        valueGetter: (_, row) => row.spec.request.method,
     },
     {
         field: 'responseStatusCode',
         headerName: 'Status',
         sortable: true,
         align: 'center',
+        valueGetter: (_, row) => row.spec.response.statusCode,
         renderCell: (params) => (<HttpStatusChip value={params.value} />),
     },
     {
@@ -57,6 +59,7 @@ export const columns: (GridColDef<RequestEventRecord> & {hideInitial?: boolean})
         headerName: 'Source',
         description: 'who produced the response (upstream / connector rate limiter / rate limit resource)',
         sortable: true,
+        valueGetter: (_, row) => row.spec.response.source,
         renderCell: (params) => {
             const v = (params.value as ResponseSource) || ResponseSource.UPSTREAM;
             const label = v === ResponseSource.UPSTREAM ? 'upstream'
@@ -78,6 +81,7 @@ export const columns: (GridColDef<RequestEventRecord> & {hideInitial?: boolean})
         sortable: true,
         hideInitial: true,
         minWidth: 220,
+        valueGetter: (_, row) => row.spec.rateLimit?.rateLimitRef.id,
         renderCell: (params) => {
             const id = params.value as string;
             if (!id) return null;
@@ -97,28 +101,33 @@ export const columns: (GridColDef<RequestEventRecord> & {hideInitial?: boolean})
         field: 'type',
         headerName: 'Type',
         sortable: true,
+        valueGetter: (_, row) => row.spec.requestType,
     },
     {
         field: 'requestId',
         headerName: 'ID',
         sortable: true,
         hideInitial: true,
+        valueGetter: (_, row) => row.metadata.id,
     },
     {
         field: 'correlationId',
         headerName: 'Correlation ID',
         sortable: true,
         hideInitial: true,
+        valueGetter: (_, row) => row.spec.correlationId,
     },
     {
         field: 'namespace',
         headerName: 'Namespace',
         sortable: true,
+        valueGetter: (_, row) => row.spec.namespaceRef.id || row.spec.namespaceRef.name,
     },
     {
         field: 'duration',
         headerName: 'Duration',
         sortable: true,
+        valueGetter: (_, row) => row.spec.durationMilliseconds,
         renderCell: (params) => (<Duration value={params.value} />),
 
     },
@@ -127,12 +136,14 @@ export const columns: (GridColDef<RequestEventRecord> & {hideInitial?: boolean})
         headerName: 'Connection ID',
         minWidth: 290,
         sortable: true,
+        valueGetter: (_, row) => row.spec.connectionRef?.id,
     },
     {
         field: 'connectorVersion',
         headerName: 'Connector Version',
         sortable: false,
         hideInitial: true,
+        valueGetter: (_, row) => row.spec.connectorRef?.generation,
     },
     {
         field: 'labels',
@@ -140,6 +151,7 @@ export const columns: (GridColDef<RequestEventRecord> & {hideInitial?: boolean})
         sortable: false,
         minWidth: 200,
         hideInitial: true,
+        valueGetter: (_, row) => row.metadata.labels,
         renderCell: (params) => <ResourceLabelChips labels={params.value as Record<string, string> | undefined}/>,
     },
     {
@@ -147,12 +159,14 @@ export const columns: (GridColDef<RequestEventRecord> & {hideInitial?: boolean})
         headerName: 'Host',
         sortable: true,
         hideInitial: true,
+        valueGetter: (_, row) => row.spec.request.host,
     },
     {
         field: 'scheme',
         headerName: 'Scheme',
         sortable: true,
         hideInitial: true,
+        valueGetter: (_, row) => row.spec.request.scheme,
     },
     {
         field: 'path',
@@ -160,12 +174,14 @@ export const columns: (GridColDef<RequestEventRecord> & {hideInitial?: boolean})
         sortable: true,
         minWidth: 200,
         flex: 1,
+        valueGetter: (_, row) => row.spec.request.path,
     },
     {
         field: 'requestHttpVersion',
         headerName: 'Req. HTTP Version',
         sortable: true,
         hideInitial: true,
+        valueGetter: (_, row) => row.spec.request.httpVersion,
     },
     {
         field: 'requestSizeBytes',
@@ -173,6 +189,7 @@ export const columns: (GridColDef<RequestEventRecord> & {hideInitial?: boolean})
         description: 'request size in bytes',
         sortable: true,
         hideInitial: true,
+        valueGetter: (_, row) => row.spec.request.sizeBytes,
     },
     {
         field: 'requestMimeType',
@@ -180,6 +197,7 @@ export const columns: (GridColDef<RequestEventRecord> & {hideInitial?: boolean})
         description: 'request mime type',
         sortable: true,
         hideInitial: true,
+        valueGetter: (_, row) => row.spec.request.mimeType,
     },
     {
         field: 'responseHttpVersion',
@@ -187,12 +205,14 @@ export const columns: (GridColDef<RequestEventRecord> & {hideInitial?: boolean})
         description: 'response http version',
         sortable: false,
         hideInitial: true,
+        valueGetter: (_, row) => row.spec.response.httpVersion,
     },
     {
         field: 'responseSizeBytes',
         headerName: 'Size',
         description: 'response size in bytes',
         sortable: false,
+        valueGetter: (_, row) => row.spec.response.sizeBytes,
     },
     {
         field: 'responseMimeType',
@@ -200,12 +220,14 @@ export const columns: (GridColDef<RequestEventRecord> & {hideInitial?: boolean})
         description: 'response mime type',
         sortable: false,
         minWidth: 250,
+        valueGetter: (_, row) => row.spec.response.mimeType,
     },
     {
         field: 'responseError',
         headerName: 'Error',
         description: 'error message from executing request',
         sortable: false,
+        valueGetter: (_, row) => row.spec.response.error,
     },
     {
         field: 'internalTimeout',
@@ -213,6 +235,7 @@ export const columns: (GridColDef<RequestEventRecord> & {hideInitial?: boolean})
         description: 'did request recording timeout before completing',
         sortable: false,
         hideInitial: true,
+        valueGetter: (_, row) => row.spec.internalTimeout,
     },
     {
         field: 'requestCancelled',
@@ -220,6 +243,7 @@ export const columns: (GridColDef<RequestEventRecord> & {hideInitial?: boolean})
         description: 'was the request cancelled before the full body was consumed',
         sortable: false,
         hideInitial: true,
+        valueGetter: (_, row) => row.spec.requestCancelled,
     },
     {
         field: 'fullRequestRecorded',
@@ -227,6 +251,7 @@ export const columns: (GridColDef<RequestEventRecord> & {hideInitial?: boolean})
         description: 'was the full request/response recorded',
         sortable: false,
         hideInitial: true,
+        valueGetter: (_, row) => row.spec.captureAvailable,
     },
 ];
 
@@ -247,7 +272,7 @@ export default function Requests() {
     const stateVals = useMemo(() => stateOptions.map(opt => opt.value), [stateOptions]);
     const namespaceMatcher = useSelector(selectCurrentNamespaceMatcher);
 
-    const [rows, setRows] = useState<RequestEventRecord[]>([]);
+    const [rows, setRows] = useState<RequestEvent[]>([]);
     const [rowCount, setRowCount] = useState<number>(-1);
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
@@ -263,7 +288,7 @@ export default function Requests() {
     const [hasNextPage, setHasNextPage] = useState<boolean>(false);
 
     // Simple cache to allow going back without re-fetching
-    const responsesCacheRef = useRef<ListResponse<RequestEventRecord>[]>([]);
+    const responsesCacheRef = useRef<RequestEventList[]>([]);
     const pageRequestCacheRef = useRef<Set<number>>(new Set());
 
     // Handle row click with meta/ctrl key checking
@@ -313,14 +338,14 @@ export default function Requests() {
             if (cached) {
                 setRows(cached.items);
                 setLoading(false);
-                setHasNextPage(!!cached.cursor);
+                setHasNextPage(!!cached.metadata.continue);
                 return;
             }
 
             // If we don't know the cursor for this page yet, advance sequentially from the last known
             while (responsesCacheRef.current.length <= targetPageZeroBased && (
                     responsesCacheRef.current.length === 0 ||
-                    !!responsesCacheRef.current[responsesCacheRef.current.length - 1].cursor
+                    !!responsesCacheRef.current[responsesCacheRef.current.length - 1].metadata.continue
                 )
                 ) {
                 // Avoid multiple calls for the same page
@@ -332,7 +357,7 @@ export default function Requests() {
                 const thisPage = responsesCacheRef.current.length;
                 const prevResp = responsesCacheRef.current[responsesCacheRef.current.length - 1];
 
-                const params: ListRequestEventsParams = prevResp?.cursor ? {cursor: prevResp.cursor} : {
+                const params: ListRequestEventsParams = prevResp?.metadata.continue ? {cursor: prevResp.metadata.continue} : {
                     namespace: namespaceMatcher,
                     requestType: (typeFilter as RequestType) || undefined,
                     labelSelector: labelSelector || undefined,
@@ -353,7 +378,7 @@ export default function Requests() {
             const data = responsesCacheRef.current[targetPageZeroBased];
             setRows(data?.items || []);
 
-            const hnp = !!data?.cursor;
+            const hnp = !!data?.metadata.continue;
             setHasNextPage(hnp);
 
             if(!hnp) {
@@ -421,7 +446,7 @@ export default function Requests() {
                 <DataGrid
                     rows={rows}
                     columns={columns}
-                    getRowId={(row) => row.requestId}
+                    getRowId={(row) => row.metadata.id}
                     getRowClassName={(params) =>
                         params.indexRelativeToCurrentPage % 2 === 0 ? 'clickable-row even' : 'clickable-row odd'
                     }
@@ -487,7 +512,7 @@ export default function Requests() {
             >
                 <Box sx={{width: {xs: '100vw', sm: 520, md: 720}, pl: 2}}>
                     {(() => {
-                        const rec = rows.find(r => r.requestId === requestId);
+                        const rec = rows.find(r => r.metadata.id === requestId);
                         if (!requestId) return null;
                         return (
                             <RequestDetail

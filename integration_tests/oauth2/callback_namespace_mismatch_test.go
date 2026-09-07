@@ -13,6 +13,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/auth_methods/oauth2"
 	"github.com/rmorlok/authproxy/internal/database"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
+	nschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -41,7 +42,7 @@ func TestCallbackRejection_NamespaceMismatchActor(t *testing.T) {
 	clientKey := "ns-mismatch-actor-client-" + suffix
 	clientSecret := "ns-mismatch-actor-secret-" + suffix
 
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 	connector := helpers.NewOAuth2Connector(connectorID, "ns-mismatch-actor-test", provider, helpers.OAuth2ConnectorOptions{
 		ClientID:     clientKey,
 		ClientSecret: clientSecret,
@@ -58,7 +59,9 @@ func TestCallbackRejection_NamespaceMismatchActor(t *testing.T) {
 	defer env.Cleanup()
 
 	ctx := context.Background()
-	_, err := env.Core.CreateNamespace(ctx, tenantA, nil)
+	tenantResource, err := nschema.NewNamespaceForPath(tenantA)
+	require.NoError(t, err)
+	_, err = env.Core.CreateNamespace(ctx, tenantResource)
 	require.NoError(t, err)
 
 	provider.CreateClient(helpers.CreateClientRequest{
@@ -151,7 +154,7 @@ func TestCallbackRejection_NamespaceMismatchConnection(t *testing.T) {
 	clientKey := "ns-mismatch-conn-client-" + suffix
 	clientSecret := "ns-mismatch-conn-secret-" + suffix
 
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 	connector := helpers.NewOAuth2Connector(connectorID, "ns-mismatch-conn-test", provider, helpers.OAuth2ConnectorOptions{
 		ClientID:     clientKey,
 		ClientSecret: clientSecret,
@@ -168,9 +171,13 @@ func TestCallbackRejection_NamespaceMismatchConnection(t *testing.T) {
 	defer env.Cleanup()
 
 	ctx := context.Background()
-	_, err := env.Core.CreateNamespace(ctx, tenantA, nil)
+	namespaceA, err := nschema.NewNamespaceForPath(tenantA)
 	require.NoError(t, err)
-	_, err = env.Core.CreateNamespace(ctx, tenantB, nil)
+	_, err = env.Core.CreateNamespace(ctx, namespaceA)
+	require.NoError(t, err)
+	namespaceB, err := nschema.NewNamespaceForPath(tenantB)
+	require.NoError(t, err)
+	_, err = env.Core.CreateNamespace(ctx, namespaceB)
 	require.NoError(t, err)
 
 	provider.CreateClient(helpers.CreateClientRequest{

@@ -1,131 +1,198 @@
 package api
 
 import (
-	"time"
+	"fmt"
 
-	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/hashicorp/go-multierror"
+	apiv1alpha1 "github.com/rmorlok/authproxy/internal/schema/api/v1alpha1"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
+	nschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 )
-
-// ConnectorVersionState is the API-visible lifecycle state of a connector version.
-type ConnectorVersionState string
 
 const (
-	ConnectorVersionStateDraft    ConnectorVersionState = "draft"
-	ConnectorVersionStatePrimary  ConnectorVersionState = "primary"
-	ConnectorVersionStateActive   ConnectorVersionState = "active"
-	ConnectorVersionStateArchived ConnectorVersionState = "archived"
+	ConnectorDisconnectAllActionKind meta.Kind = "ConnectorDisconnectAll"
+	ConnectorArchiveActionKind       meta.Kind = "ConnectorArchive"
+	ConnectorForceStateActionKind    meta.Kind = "ConnectorForceState"
 )
 
-// ConnectorJson represents the API summary projection of a connector version.
-//
-//	@Description	Connector API summary response
-type ConnectorJson struct {
-	Id            apid.ID               `json:"id" yaml:"id" swaggertype:"string" example:"cxr_test550e8400abcde"`
-	Version       uint64                `json:"version" yaml:"version" example:"1"`
-	Namespace     string                `json:"namespace" yaml:"namespace" example:"root.acme"`
-	Name          common.ResourceName   `json:"name" yaml:"name" swaggertype:"string" example:"salesforce"`
-	State         ConnectorVersionState `json:"state" yaml:"state" swaggertype:"string" example:"primary"`
-	DisplayName   string                `json:"displayName" yaml:"displayName" example:"Salesforce"`
-	Highlight     string                `json:"highlight,omitempty" yaml:"highlight,omitempty" example:"CRM platform"`
-	Description   string                `json:"description" yaml:"description" example:"Salesforce CRM integration"`
-	StatusPageUrl string                `json:"statusPageUrl,omitempty" yaml:"statusPageUrl,omitempty" example:"https://status.salesforce.com"`
-	Logo          string                `json:"logo" yaml:"logo" example:"https://example.com/logo.png"`
-	HasConfigure  bool                  `json:"hasConfigure" yaml:"hasConfigure" example:"false"`
-	Labels        map[string]string     `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Annotations   map[string]string     `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	CreatedAt     time.Time             `json:"createdAt" yaml:"createdAt"`
-	UpdatedAt     time.Time             `json:"updatedAt" yaml:"updatedAt"`
-}
-
 type ListConnectorsResponseJson struct {
-	Items  []ConnectorJson `json:"items" yaml:"items"`
-	Cursor string          `json:"cursor,omitempty" yaml:"cursor,omitempty"`
+	apiv1alpha1.ResourceList[cschema.Connector] `json:",inline" yaml:",inline"`
 }
 
-// ConnectorVersionJson represents a single connector version returned by the API.
-//
-//	@Description	Detailed connector version information
-type ConnectorVersionJson struct {
-	Id          apid.ID               `json:"id" yaml:"id" swaggertype:"string" example:"cxr_test550e8400abcde"`
-	Version     uint64                `json:"version" yaml:"version" example:"1"`
-	Namespace   string                `json:"namespace" yaml:"namespace" example:"root.acme"`
-	Name        common.ResourceName   `json:"name" yaml:"name" swaggertype:"string" example:"salesforce"`
-	State       ConnectorVersionState `json:"state" yaml:"state" swaggertype:"string" example:"primary"`
-	Definition  cschema.Connector     `json:"definition" yaml:"definition"`
-	Labels      map[string]string     `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Annotations map[string]string     `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	CreatedAt   time.Time             `json:"createdAt" yaml:"createdAt"`
-	UpdatedAt   time.Time             `json:"updatedAt" yaml:"updatedAt"`
+func NewListConnectorsResponseJson(
+	items []cschema.Connector,
+	continueToken string,
+) ListConnectorsResponseJson {
+	return ListConnectorsResponseJson{
+		ResourceList: apiv1alpha1.NewResourceList(
+			cschema.ConnectorKind,
+			items,
+			apiv1alpha1.ListMeta{Continue: continueToken},
+		),
+	}
 }
 
-type ListConnectorVersionsResponseJson struct {
-	Items  []ConnectorVersionJson `json:"items" yaml:"items"`
-	Cursor string                 `json:"cursor,omitempty" yaml:"cursor,omitempty"`
+type ListConnectorGenerationsResponseJson struct {
+	apiv1alpha1.ResourceList[cschema.Connector] `json:",inline" yaml:",inline"`
 }
 
-// CreateConnectorRequestJson is the request body for POST /connectors.
-//
-//	@Description	Request to create a new connector
-type CreateConnectorRequestJson struct {
-	Namespace   string               `json:"namespace" yaml:"namespace" example:"root.acme"`
-	Name        *common.ResourceName `json:"name,omitempty" yaml:"name,omitempty" swaggertype:"string" example:"salesforce"`
-	Definition  cschema.Connector    `json:"definition" yaml:"definition"`
-	Labels      map[string]string    `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Annotations map[string]string    `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+func NewListConnectorGenerationsResponseJson(
+	items []cschema.Connector,
+	continueToken string,
+) ListConnectorGenerationsResponseJson {
+	return ListConnectorGenerationsResponseJson{
+		ResourceList: apiv1alpha1.NewResourceList(
+			cschema.ConnectorKind,
+			items,
+			apiv1alpha1.ListMeta{Continue: continueToken},
+		),
+	}
 }
 
-// UpdateConnectorRequestJson is the request body for PATCH /connectors/:id.
-//
-//	@Description	Request to update a logical connector
-type UpdateConnectorRequestJson struct {
-	Name        *common.ResourceName `json:"name,omitempty" yaml:"name,omitempty" swaggertype:"string" example:"salesforce"`
-	Definition  *cschema.Connector   `json:"definition,omitempty" yaml:"definition,omitempty"`
-	Labels      *map[string]string   `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Annotations *map[string]string   `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-}
-
-// UpdateConnectorVersionRequestJson is the request body for PATCH /connectors/:id/versions/:version.
-// Connector-level fields such as name are intentionally excluded.
-//
-//	@Description Request to update a connector definition version
-type UpdateConnectorVersionRequestJson struct {
-	Definition  *cschema.Connector `json:"definition,omitempty" yaml:"definition,omitempty"`
-	Labels      *map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Annotations *map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-}
-
-// CreateConnectorVersionRequestJson is the request body for POST /connectors/:id/versions.
-//
-//	@Description	Request to create a new draft connector version
-type CreateConnectorVersionRequestJson struct {
-	Definition  *cschema.Connector `json:"definition,omitempty" yaml:"definition,omitempty"`
-	Labels      *map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Annotations *map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-}
-
-// ConnectorLifecycleRequestJson is the request body for connector-level
-// lifecycle operations that run asynchronously.
-//
-//	@Description	Request to run a connector lifecycle operation
-type ConnectorLifecycleRequestJson struct {
+// ConnectorLifecycleSpec contains options for connector-level lifecycle
+// operations that run asynchronously.
+type ConnectorLifecycleSpec struct {
 	TimeoutSeconds *int64 `json:"timeoutSeconds,omitempty" yaml:"timeoutSeconds,omitempty" example:"600"`
 }
 
-// ConnectorLifecycleResponseJson is returned after starting a connector-level
-// lifecycle workflow.
-//
-//	@Description	Response for connector lifecycle operation
-type ConnectorLifecycleResponseJson struct {
-	TaskId      string  `json:"taskId" yaml:"taskId"`
-	ConnectorId apid.ID `json:"connectorId" yaml:"connectorId" swaggertype:"string" example:"cxr_test550e8400abcde"`
+// ConnectorLifecycleStatus identifies the asynchronous task created for a
+// lifecycle operation. The connector itself is identified by metadata.target.
+type ConnectorLifecycleStatus struct {
+	TaskID string `json:"taskId" yaml:"taskId"`
 }
 
-// ForceConnectorVersionStateRequestJson is the request body for
-// PUT /connectors/:id/versions/:version/_force_state.
-//
-//	@Description	Request to force a connector version state
-type ForceConnectorVersionStateRequestJson struct {
-	State string `json:"state" yaml:"state" example:"primary"`
+// ConnectorLifecycleAction is shared by disconnect-all and archive. Its kind
+// distinguishes the operation and metadata.target identifies the logical
+// connector across all generations.
+type ConnectorLifecycleAction struct {
+	apiv1alpha1.Action[ConnectorLifecycleSpec, ConnectorLifecycleStatus] `json:",inline" yaml:",inline"`
+}
+
+func NewConnectorLifecycleRequest(
+	kind meta.Kind,
+	target meta.ObjectReference,
+	spec ConnectorLifecycleSpec,
+) ConnectorLifecycleAction {
+	request := apiv1alpha1.NewActionRequest(kind, target, spec)
+	return ConnectorLifecycleAction{Action: apiv1alpha1.Action[ConnectorLifecycleSpec, ConnectorLifecycleStatus]{
+		TypeMeta: request.TypeMeta,
+		Metadata: request.Metadata,
+		Spec:     request.Spec,
+	}}
+}
+
+func (a *ConnectorLifecycleAction) ValidateRequest(expectedKind meta.Kind) error {
+	if err := a.Action.ValidateRequest(expectedKind); err != nil {
+		return err
+	}
+	return a.validateFields(false)
+}
+
+func (a *ConnectorLifecycleAction) ValidateResponse(expectedKind meta.Kind) error {
+	if err := a.Action.ValidateResponse(expectedKind); err != nil {
+		return err
+	}
+	return a.validateFields(true)
+}
+
+func (a *ConnectorLifecycleAction) validateFields(requireStatus bool) error {
+	if err := validateConnectorActionTarget(a.Metadata.Target, false); err != nil {
+		return err
+	}
+	if a.Spec.TimeoutSeconds != nil && *a.Spec.TimeoutSeconds <= 0 {
+		return fmt.Errorf("$.spec.timeoutSeconds: must be greater than zero")
+	}
+	if requireStatus && a.Status == nil {
+		return fmt.Errorf("$.status: is required")
+	}
+	if requireStatus && a.Status.TaskID == "" {
+		return fmt.Errorf("$.status.taskId: is required")
+	}
+	return nil
+}
+
+func NewConnectorLifecycleResponse(
+	kind meta.Kind,
+	target meta.ObjectReference,
+	spec ConnectorLifecycleSpec,
+	taskID string,
+) ConnectorLifecycleAction {
+	return ConnectorLifecycleAction{Action: apiv1alpha1.NewActionResponse(
+		kind,
+		target,
+		spec,
+		ConnectorLifecycleStatus{TaskID: taskID},
+	)}
+}
+
+// ConnectorForceStateSpec is the desired observed state for one exact
+// connector generation.
+type ConnectorForceStateSpec struct {
+	State cschema.ConnectorReleaseState `json:"state" yaml:"state" example:"primary"`
+}
+
+type ConnectorForceStateAction struct {
+	apiv1alpha1.Action[ConnectorForceStateSpec, struct{}] `json:",inline" yaml:",inline"`
+}
+
+func NewConnectorForceStateRequest(
+	target meta.ObjectReference,
+	state cschema.ConnectorReleaseState,
+) ConnectorForceStateAction {
+	request := apiv1alpha1.NewActionRequest(
+		ConnectorForceStateActionKind,
+		target,
+		ConnectorForceStateSpec{State: state},
+	)
+	return ConnectorForceStateAction{Action: request}
+}
+
+func (a *ConnectorForceStateAction) ValidateRequest(expectedKind meta.Kind) error {
+	if err := a.Action.ValidateRequest(expectedKind); err != nil {
+		return err
+	}
+	if err := validateConnectorActionTarget(a.Metadata.Target, true); err != nil {
+		return err
+	}
+	switch a.Spec.State {
+	case cschema.ConnectorReleaseStateDraft,
+		cschema.ConnectorReleaseStatePrimary,
+		cschema.ConnectorReleaseStateActive,
+		cschema.ConnectorReleaseStateArchived:
+		return nil
+	default:
+		return fmt.Errorf("$.spec.state: is not a recognized connector release state")
+	}
+}
+
+func validateConnectorActionTarget(target meta.ObjectReference, requireGeneration bool) error {
+	vc := &common.ValidationContext{Path: "$.metadata.target"}
+	var result *multierror.Error
+	if err := meta.ValidateObjectReferenceWithOptions(
+		target,
+		meta.ObjectReferenceValidationOptions{
+			ExpectedAPIVersion: meta.APIVersionV1Alpha1,
+			ExpectedKind:       cschema.ConnectorKind,
+			IDValidator:        cschema.ValidateID,
+			NamespaceValidator: nschema.ValidatePath,
+		},
+		vc,
+	); err != nil {
+		result = multierror.Append(result, err)
+	}
+	if target.ID == "" {
+		result = multierror.Append(result, vc.NewErrorForField("id", "is required for connector action targets"))
+	}
+	if target.Name != "" || target.Namespace != "" {
+		result = multierror.Append(result, vc.NewError("connector action targets support id only"))
+	}
+	if requireGeneration && target.Generation == 0 {
+		result = multierror.Append(result, vc.NewErrorForField("generation", "is required"))
+	}
+	if !requireGeneration && target.Generation != 0 {
+		result = multierror.Append(result, vc.NewErrorForField("generation", "does not apply to logical connector actions"))
+	}
+	return result.ErrorOrNil()
 }

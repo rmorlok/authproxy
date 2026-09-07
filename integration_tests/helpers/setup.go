@@ -27,6 +27,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/rmorlok/authproxy/internal/service"
 	"github.com/rmorlok/authproxy/internal/service/admin_api"
 	api_service "github.com/rmorlok/authproxy/internal/service/api"
@@ -415,26 +416,51 @@ func Setup(t *testing.T, opts SetupOptions) *IntegrationTestEnv {
 }
 
 // NewNoAuthConnector creates a connector configuration for a NoAuth service.
-func NewNoAuthConnector(connectorID apid.ID, displayName string, rateLimiting *connectors.RateLimiting) sconfig.Connector {
-	return sconfig.Connector{
-		Id:          connectorID,
-		Version:     1,
-		Labels:      map[string]string{"type": displayName},
-		DisplayName: displayName,
-		Auth: &connectors.Auth{
-			InnerVal: &connectors.AuthNoAuth{
-				Type: connectors.AuthTypeNoAuth,
+func NewNoAuthConnector(
+	connectorID apid.ID,
+	displayName string,
+	rateLimiting *connectors.RateLimiting,
+) sconfig.Connector {
+	return NewConfiguredConnector(
+		connectorID,
+		displayName,
+		connectors.ConnectorDefinition{
+			DisplayName: displayName,
+			Auth: &connectors.Auth{
+				InnerVal: &connectors.AuthNoAuth{
+					Type: connectors.AuthTypeNoAuth,
+				},
 			},
+			RateLimiting: rateLimiting,
 		},
-		RateLimiting: rateLimiting,
+	)
+}
+
+func NewConfiguredConnector(
+	connectorID apid.ID,
+	displayName string,
+	definition connectors.ConnectorDefinition,
+) sconfig.Connector {
+	return sconfig.Connector{
+		TypeMeta: meta.NewTypeMeta(connectors.ConnectorKind),
+		Metadata: meta.ObjectMeta{
+			ID:         connectorID.String(),
+			Generation: 1,
+			Labels:     map[string]string{"type": displayName},
+		},
+		Spec: connectors.ConnectorSpec{Definition: definition},
 	}
 }
 
-// DoProxyRequest performs a proxy request through the integration test environment.
-// Routes through the in-process gin engine when StartHTTPServer=false, or hits the
-// real HTTP server at env.ServerURL when StartHTTPServer=true. Returns a recorder
-// either way so callers can read status/body uniformly.
-func (env *IntegrationTestEnv) DoProxyRequest(t *testing.T, connectionID, targetURL, method string) *httptest.ResponseRecorder {
+// DoProxyRequest performs a proxy request through the integration test
+// environment. Routes through the in-process gin engine when
+// StartHTTPServer=false, or hits the real HTTP server at env.ServerURL when
+// StartHTTPServer=true. Returns a recorder either way so callers can read
+// status/body uniformly.
+func (env *IntegrationTestEnv) DoProxyRequest(
+	t *testing.T,
+	connectionID, targetURL, method string,
+) *httptest.ResponseRecorder {
 	t.Helper()
 	require.Truef(t, env.ApiGin != nil || env.ServerURL != "", "DoProxyRequest requires either in-process gin or a running HTTP server")
 
@@ -466,21 +492,26 @@ func (env *IntegrationTestEnv) DoProxyRequest(t *testing.T, connectionID, target
 	// HTTP mode: rewrite the path-only URL onto env.ServerURL and send.
 	abs, err := url.Parse(env.ServerURL + path)
 	require.NoError(t, err)
+
 	req.URL = abs
 	req.Host = abs.Host
 	req.RequestURI = ""
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
+
 	defer resp.Body.Close()
 	w.Code = resp.StatusCode
+
 	for k, vs := range resp.Header {
 		for _, v := range vs {
 			w.Header().Add(k, v)
 		}
 	}
+
 	if _, err := w.Body.ReadFrom(resp.Body); err != nil {
 		require.NoError(t, err)
 	}
+
 	return w
 }
 

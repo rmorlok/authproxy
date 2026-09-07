@@ -2,10 +2,10 @@ package core
 
 import (
 	"context"
-	"crypto/sha1"
-	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"log/slog"
+	"maps"
 	"sync"
 	"time"
 
@@ -16,6 +16,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/rmorlok/authproxy/internal/util"
 )
 
@@ -27,7 +28,7 @@ type Connector struct {
 
 	s     *service
 	defMu sync.RWMutex
-	def   *cschema.Connector
+	def   *cschema.ConnectorDefinition
 
 	jsMu     sync.RWMutex
 	jsLib    *apjs.Library
@@ -46,6 +47,41 @@ func wrapConnector(c database.ConnectorWithDefinition, s *service) *Connector {
 			WithConnectorId(c.Id).
 			WithConnectorVersion(c.Version).
 			Build(),
+	}
+}
+
+// connectorResourceFromDatabase converts a hydrated persistence row into the
+// canonical versioned Connector resource. The database state is observed
+// state; published generations retain primary desired state after they become
+// active or archived.
+func connectorResourceFromDatabase(
+	c database.ConnectorWithDefinition,
+	definition *cschema.ConnectorDefinition,
+) *cschema.Connector {
+	createdAt := c.CreatedAt
+	updatedAt := c.UpdatedAt
+	observed := cschema.ConnectorReleaseState(c.State)
+	return &cschema.Connector{
+		TypeMeta: meta.NewTypeMeta(cschema.ConnectorKind),
+		Metadata: meta.NormalizeObjectMeta(meta.ObjectMeta{
+			ID:          c.Id.String(),
+			Name:        c.Name,
+			Namespace:   c.Namespace,
+			Generation:  c.Version,
+			Labels:      maps.Clone(map[string]string(c.Labels)),
+			Annotations: maps.Clone(map[string]string(c.Annotations)),
+			CreatedAt:   &createdAt,
+			UpdatedAt:   &updatedAt,
+		}),
+		Spec: cschema.ConnectorSpec{
+			Release: cschema.ConnectorReleaseSpec{
+				DesiredState: cschema.DesiredReleaseStateForObserved(observed),
+			},
+			Definition: *definition.Clone(),
+		},
+		Status: &cschema.ConnectorStatus{
+			Release: cschema.ConnectorReleaseStatus{State: observed},
+		},
 	}
 }
 
@@ -73,8 +109,15 @@ func (c *Connector) GetHash() string {
 	return util.Must(c.getHash())
 }
 
-func (c *Connector) GetDefinition() *cschema.Connector {
+func (c *Connector) GetDefinition() *cschema.ConnectorDefinition {
 	return util.Must(c.getDefinition())
+}
+
+func (c *Connector) GetResource() *cschema.Connector {
+	return connectorResourceFromDatabase(
+		c.ConnectorWithDefinition,
+		c.GetDefinition(),
+	)
 }
 
 func (c *Connector) GetCreatedAt() time.Time {
@@ -93,7 +136,7 @@ func (c *Connector) GetAnnotations() map[string]string {
 	return c.ConnectorWithDefinition.Annotations
 }
 
-func (c *Connector) getDefinition() (*cschema.Connector, error) {
+func (c *Connector) getDefinition() (*cschema.ConnectorDefinition, error) {
 	c.defMu.RLock()
 	if c.def != nil {
 		defer c.defMu.RUnlock()
@@ -109,7 +152,7 @@ func (c *Connector) getDefinition() (*cschema.Connector, error) {
 			return nil, err
 		}
 
-		var def cschema.Connector
+		var def cschema.ConnectorDefinition
 		err = json.Unmarshal([]byte(decrypted), &def)
 		if err != nil {
 			return nil, err
@@ -124,24 +167,22 @@ func (c *Connector) getHash() (string, error) {
 	if c.Hash != "" {
 		return c.Hash, nil
 	}
-	decrypted, err := c.s.encrypt.DecryptString(context.Background(), c.ConnectorWithDefinition.EncryptedDefinition)
+	definition, err := c.getDefinition()
 	if err != nil {
 		return "", err
 	}
-	hash := sha1.Sum([]byte(decrypted))
-	return hex.EncodeToString(hash[:])[:7], nil
+	return meta.SemanticSpecHash(definition)
 }
 
-func (c *Connector) setDefinition(def *cschema.Connector) error {
+func (c *Connector) setDefinition(def *cschema.ConnectorDefinition) error {
 	c.defMu.Lock()
+	if def == nil {
+		c.defMu.Unlock()
+		return fmt.Errorf("connector definition is required")
+	}
 
-	// A connector name belongs to the logical connector row. Keep it out of
-	// the encrypted, version-specific definition so renaming never changes the
-	// definition hash or produces stale duplicated metadata in API responses.
 	storedDefinition := def.Clone()
-	storedDefinition.Name = ""
-
-	jsonBytes, err := json.Marshal(storedDefinition)
+	jsonBytes, err := meta.CanonicalSpecJSON(storedDefinition)
 	if err != nil {
 		c.defMu.Unlock()
 		return err
@@ -152,7 +193,11 @@ func (c *Connector) setDefinition(def *cschema.Connector) error {
 		c.defMu.Unlock()
 		return err
 	}
-	c.Hash = storedDefinition.Hash()
+	c.Hash, err = meta.SemanticSpecHash(storedDefinition)
+	if err != nil {
+		c.defMu.Unlock()
+		return err
+	}
 	c.ConnectorWithDefinition.EncryptedDefinition = encrypted
 	c.def = storedDefinition
 	c.defMu.Unlock()

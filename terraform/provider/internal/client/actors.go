@@ -3,29 +3,34 @@ package client
 import (
 	"context"
 	"fmt"
-	"time"
 )
 
+const ActorKind = "Actor"
+
+// These local wire models keep the Terraform provider independent from the
+// server's internal packages while mirroring its canonical resource contract.
+type ActorSpec struct {
+	ExternalID string `json:"externalId"`
+}
+
+type ActorSpecPatch struct{}
+
 type Actor struct {
-	Id          string            `json:"id"`
-	Namespace   string            `json:"namespace"`
-	ExternalId  string            `json:"externalId"`
-	Labels      map[string]string `json:"labels,omitempty"`
-	Annotations map[string]string `json:"annotations,omitempty"`
-	CreatedAt   time.Time         `json:"createdAt"`
-	UpdatedAt   time.Time         `json:"updatedAt"`
+	TypeMeta
+	Metadata ObjectMetadata `json:"metadata"`
+	Spec     ActorSpec      `json:"spec"`
 }
 
 type CreateActorRequest struct {
-	ExternalId  string            `json:"externalId"`
-	Namespace   string            `json:"namespace"`
-	Labels      map[string]string `json:"labels,omitempty"`
-	Annotations map[string]string `json:"annotations,omitempty"`
+	TypeMeta
+	Metadata ObjectMetadata `json:"metadata"`
+	Spec     ActorSpec      `json:"spec"`
 }
 
 type UpdateActorRequest struct {
-	Labels      map[string]string `json:"labels,omitempty"`
-	Annotations map[string]string `json:"annotations,omitempty"`
+	TypeMeta
+	Metadata *ObjectMetadataPatch `json:"metadata"`
+	Spec     *ActorSpecPatch      `json:"spec"`
 }
 
 func (c *Client) CreateActor(ctx context.Context, req CreateActorRequest) (*Actor, error) {

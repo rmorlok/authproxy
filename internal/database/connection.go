@@ -14,6 +14,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/encfield"
 	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	smeta "github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -599,10 +600,10 @@ func (u ConnectionVersionMigrationUpdate) validate() error {
 	if u.ConnectorVersion == 0 {
 		result = multierror.Append(result, errors.New("connector version is required"))
 	}
-	if err := ValidateUserLabels(u.UserLabels); err != nil {
+	if err := smeta.ValidateUserLabels(u.UserLabels); err != nil {
 		result = multierror.Append(result, fmt.Errorf("invalid migration labels: %w", err))
 	}
-	if err := ValidateAnnotations(u.Annotations); err != nil {
+	if err := smeta.ValidateAnnotations(u.Annotations); err != nil {
 		result = multierror.Append(result, fmt.Errorf("invalid migration annotations: %w", err))
 	}
 	if u.HealthState != nil && !IsValidConnectionHealthState(*u.HealthState) {
@@ -1007,7 +1008,7 @@ func (s *service) UpdateConnectionLabels(ctx context.Context, id apid.ID, labels
 	}
 
 	if labels != nil {
-		if err := ValidateUserLabels(labels); err != nil {
+		if err := smeta.ValidateUserLabels(labels); err != nil {
 			return nil, fmt.Errorf("invalid labels: %w", err)
 		}
 	}
@@ -1060,7 +1061,7 @@ func (s *service) PutConnectionLabels(ctx context.Context, id apid.ID, labels ma
 		return s.GetConnection(ctx, id)
 	}
 
-	if err := ValidateUserLabels(labels); err != nil {
+	if err := smeta.ValidateUserLabels(labels); err != nil {
 		return nil, fmt.Errorf("invalid labels: %w", err)
 	}
 
@@ -1108,7 +1109,7 @@ func (s *service) UpdateConnectionAnnotations(ctx context.Context, id apid.ID, a
 	}
 
 	if annotations != nil {
-		if err := ValidateAnnotations(annotations); err != nil {
+		if err := smeta.ValidateAnnotations(annotations); err != nil {
 			return nil, fmt.Errorf("invalid annotations: %w", err)
 		}
 	}
@@ -1159,7 +1160,7 @@ func (s *service) PutConnectionAnnotations(ctx context.Context, id apid.ID, anno
 		return s.GetConnection(ctx, id)
 	}
 
-	if err := ValidateAnnotations(annotations); err != nil {
+	if err := smeta.ValidateAnnotations(annotations); err != nil {
 		return nil, fmt.Errorf("invalid annotations: %w", err)
 	}
 
@@ -1256,7 +1257,7 @@ func (s *service) DeleteConnectionLabels(ctx context.Context, id apid.ID, keys [
 		return s.GetConnection(ctx, id)
 	}
 
-	if err := ValidateUserLabelDeletionKeys(keys); err != nil {
+	if err := smeta.ValidateUserLabelDeletionKeys(keys); err != nil {
 		return nil, fmt.Errorf("invalid label keys: %w", err)
 	}
 

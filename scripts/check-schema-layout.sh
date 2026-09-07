@@ -14,8 +14,13 @@ if rg -n '"github\.com/rmorlok/authproxy/internal/schema/api' internal/schema/re
   fail "resource schema packages must not import internal/schema/api"
 fi
 
+if rg -n '"github\.com/rmorlok/authproxy/internal/schema/api/openapi' internal/schema/api \
+  --glob '*.go' --glob '!openapi/**'; then
+  fail "runtime API contracts must not import OpenAPI-only projections"
+fi
+
 if rg -n '^type[[:space:]]+[A-Za-z0-9_]*(RequestJson|ResponseJson)[[:space:]]+struct' internal/routes; then
-  fail "route-local public API request/response DTOs must live in internal/schema/api"
+  fail "route-local endpoint-specific request/response DTOs must live in internal/schema/api"
 fi
 
 if rg -n '^type[[:space:]]+Swagger[A-Za-z0-9_]*[[:space:]]+(struct|=)' internal/routes; then

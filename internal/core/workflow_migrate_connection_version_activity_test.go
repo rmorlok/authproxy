@@ -27,7 +27,7 @@ func (f *migrationRefreshTestFactory) NewAuthenticator(connection iface.Connecti
 
 func (f *migrationRefreshTestFactory) ManifestSetupSteps(
 	iface.Connection,
-	*cschema.Connector,
+	*cschema.ConnectorDefinition,
 ) []iface.ManifestSetupStep {
 	return nil
 }
@@ -119,7 +119,7 @@ func TestRefreshAuthAfterConnectionMigrationCallsRefresh(t *testing.T) {
 		connectorID,
 		2,
 		database.ConnectorDefinitionVersionStateActive,
-		cschema.Connector{Auth: cschema.NewNoAuth()},
+		cschema.ConnectorDefinition{Auth: cschema.NewNoAuth()},
 	)
 	target := wrapConnector(*targetDB, s)
 	auth := &migrationRefreshTestAuthenticator{}
@@ -159,7 +159,7 @@ func TestRefreshAuthAfterConnectionMigrationReturnsRefreshError(t *testing.T) {
 		connectorID,
 		2,
 		database.ConnectorDefinitionVersionStateActive,
-		cschema.Connector{Auth: cschema.NewNoAuth()},
+		cschema.ConnectorDefinition{Auth: cschema.NewNoAuth()},
 	)
 	target := wrapConnector(*targetDB, s)
 	wantErr := errors.New("refresh failed")
@@ -196,7 +196,7 @@ func TestRefreshAuthAfterConnectionMigrationValidatesFactory(t *testing.T) {
 		connectorID,
 		2,
 		database.ConnectorDefinitionVersionStateActive,
-		cschema.Connector{Auth: cschema.NewNoAuth()},
+		cschema.ConnectorDefinition{Auth: cschema.NewNoAuth()},
 	)
 	target := wrapConnector(*targetDB, s)
 	updated := &database.Connection{

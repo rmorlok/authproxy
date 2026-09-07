@@ -32,7 +32,7 @@ Decide these mappings before writing UI code:
 
 | Question | Recommended starting point |
 |---|---|
-| What identifies a user? | The host's immutable user id becomes the actor `external_id`. |
+| What identifies a user? | The host's immutable user id becomes the Actor's `spec.externalId`. |
 | What isolates tenants? | Give each tenant a stable child namespace under a common parent. |
 | Are credentials shared? | Put shared connections at the tenant or team namespace; put private connections in a user child namespace. |
 | How are installations found? | Store the AuthProxy connection id, add a host installation-id label, or do both. |

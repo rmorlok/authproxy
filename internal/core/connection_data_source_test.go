@@ -18,7 +18,7 @@ func TestGetDataSource(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		conn, proxy := newProbeTestConnection(t, ctrl, cschema.Connector{
+		conn, proxy := newProbeTestConnection(t, ctrl, cschema.ConnectorDefinition{
 			Javascript: `
 				function workspaceOptions(items) {
 					return items.map(function(item) {

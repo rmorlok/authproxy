@@ -14,6 +14,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	scommon "github.com/rmorlok/authproxy/internal/schema/common"
+	smeta "github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 	"github.com/rmorlok/authproxy/internal/util"
@@ -22,13 +23,14 @@ import (
 
 const RateLimitsTable = "rate_limits"
 
-// RateLimit is the database envelope for a rate-limit resource. Definition
-// holds the JSON-serialised configuration (mode, selector, bucket, algorithm).
+// RateLimit is the flat persistence model for a canonical RateLimit resource.
+// Definition stores only RateLimitSpec in the existing JSON column; core owns
+// conversion to and from apiVersion/kind/metadata/spec/status.
 type RateLimit struct {
 	Id          apid.ID
 	Namespace   string
 	Name        scommon.ResourceName
-	Definition  rlschema.RateLimit
+	Definition  rlschema.RateLimitSpec
 	Labels      Labels
 	Annotations Annotations
 	CreatedAt   time.Time
@@ -88,12 +90,12 @@ func (rl *RateLimit) normalize() {
 	}
 }
 
-// rateLimitDefDB is a database-side wrapper around rlschema.RateLimit that
+// rateLimitDefDB is a database-side wrapper around rlschema.RateLimitSpec that
 // implements driver.Valuer and sql.Scanner for the definition column.
-type rateLimitDefDB rlschema.RateLimit
+type rateLimitDefDB rlschema.RateLimitSpec
 
 func (d rateLimitDefDB) Value() (driver.Value, error) {
-	return json.Marshal(rlschema.RateLimit(d))
+	return json.Marshal(rlschema.RateLimitSpec(d))
 }
 
 func (d *rateLimitDefDB) Scan(src interface{}) error {
@@ -108,7 +110,7 @@ func (d *rateLimitDefDB) Scan(src interface{}) error {
 	default:
 		return fmt.Errorf("rateLimitDefDB: cannot scan %T", src)
 	}
-	return json.Unmarshal(b, (*rlschema.RateLimit)(d))
+	return json.Unmarshal(b, (*rlschema.RateLimitSpec)(d))
 }
 
 func (rl *RateLimit) Validate() error {
@@ -128,7 +130,7 @@ func (rl *RateLimit) Validate() error {
 		result = multierror.Append(result, errors.New("namespace is required"))
 	}
 
-	if err := rl.Definition.Validate(); err != nil {
+	if err := rl.Definition.ValidateForNamespace(rl.Namespace); err != nil {
 		result = multierror.Append(result, fmt.Errorf("invalid definition: %w", err))
 	}
 
@@ -213,19 +215,18 @@ func (s *service) CreateRateLimit(ctx context.Context, rl *RateLimit) error {
 }
 
 // UpdateRateLimitDefinition replaces the definition column. The caller is
-// responsible for validation; this method runs Validate() on a candidate
-// RateLimit so misconfigured definitions never reach the database.
-func (s *service) UpdateRateLimitDefinition(ctx context.Context, id apid.ID, def rlschema.RateLimit) (*RateLimit, error) {
+// responsible for validation; this method also checks the definition against
+// the stored owning namespace so an invalid scope never reaches the database.
+func (s *service) UpdateRateLimitDefinition(ctx context.Context, id apid.ID, def rlschema.RateLimitSpec) (*RateLimit, error) {
 	if id.IsNil() {
 		return nil, errors.New("rate limit id is required")
 	}
 
-	candidate := &RateLimit{
-		Id:         id,
-		Namespace:  "validation-only",
-		Definition: def,
+	existing, err := s.GetRateLimit(ctx, id)
+	if err != nil {
+		return nil, err
 	}
-	if err := candidate.Definition.Validate(); err != nil {
+	if err := def.ValidateForNamespace(existing.Namespace); err != nil {
 		return nil, fmt.Errorf("invalid definition: %w", err)
 	}
 
@@ -300,7 +301,7 @@ func (s *service) UpdateRateLimitLabels(ctx context.Context, id apid.ID, labels 
 	}
 
 	if labels != nil {
-		if err := ValidateUserLabels(labels); err != nil {
+		if err := smeta.ValidateUserLabels(labels); err != nil {
 			return nil, fmt.Errorf("invalid labels: %w", err)
 		}
 	}
@@ -347,7 +348,7 @@ func (s *service) PutRateLimitLabels(ctx context.Context, id apid.ID, labels map
 		return s.GetRateLimit(ctx, id)
 	}
 
-	if err := ValidateUserLabels(labels); err != nil {
+	if err := smeta.ValidateUserLabels(labels); err != nil {
 		return nil, fmt.Errorf("invalid labels: %w", err)
 	}
 
@@ -393,7 +394,7 @@ func (s *service) DeleteRateLimitLabels(ctx context.Context, id apid.ID, keys []
 		return s.GetRateLimit(ctx, id)
 	}
 
-	if err := ValidateUserLabelDeletionKeys(keys); err != nil {
+	if err := smeta.ValidateUserLabelDeletionKeys(keys); err != nil {
 		return nil, fmt.Errorf("invalid label keys: %w", err)
 	}
 
@@ -436,7 +437,7 @@ func (s *service) UpdateRateLimitAnnotations(ctx context.Context, id apid.ID, an
 	}
 
 	if annotations != nil {
-		if err := ValidateAnnotations(annotations); err != nil {
+		if err := smeta.ValidateAnnotations(annotations); err != nil {
 			return nil, fmt.Errorf("invalid annotations: %w", err)
 		}
 	}
@@ -483,7 +484,7 @@ func (s *service) PutRateLimitAnnotations(ctx context.Context, id apid.ID, annot
 		return s.GetRateLimit(ctx, id)
 	}
 
-	if err := ValidateAnnotations(annotations); err != nil {
+	if err := smeta.ValidateAnnotations(annotations); err != nil {
 		return nil, fmt.Errorf("invalid annotations: %w", err)
 	}
 

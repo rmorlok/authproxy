@@ -17,9 +17,12 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
+	apiv1alpha1 "github.com/rmorlok/authproxy/internal/schema/api/v1alpha1"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
+	connectionschema "github.com/rmorlok/authproxy/internal/schema/resources/connection"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -45,14 +48,14 @@ func newDisconnectRevocationRig(t *testing.T, name string) *disconnectRevocation
 	clientSecret := name + "-secret-" + suffix
 	userEmail := name + "-" + suffix + "@example.com"
 
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 	connector := helpers.NewOAuth2Connector(connectorID, name, provider, helpers.OAuth2ConnectorOptions{
 		ClientID:          clientKey,
 		ClientSecret:      clientSecret,
 		Scopes:            []string{"read"},
 		IncludeRevocation: true,
 	})
-	oauthAuth := connector.Auth.InnerVal.(*cschema.AuthOAuth2)
+	oauthAuth := connector.Spec.Definition.Auth.InnerVal.(*cschema.AuthOAuth2)
 	supportedTokens := cschema.AuthOAuth2RevocationSupportedTypeRefreshToken
 	oauthAuth.Revocation.SupportedTokens = &supportedTokens
 	oauthAuth.Revocation.FormOverrides = map[string]string{
@@ -123,9 +126,13 @@ func (r *disconnectRevocationRig) completeAuthFlow(t *testing.T) string {
 func (r *disconnectRevocationRig) disconnect(t *testing.T, connectionID string) {
 	t.Helper()
 
-	reqBody, err := json.Marshal(schemaapi.DisconnectConnectionRequestJson{
-		TimeoutSeconds: int64Ptr(10),
-	})
+	id, err := apid.Parse(connectionID)
+	require.NoError(t, err)
+	reqBody, err := json.Marshal(schemaapi.ConnectionDisconnectAction{Action: apiv1alpha1.Action[schemaapi.ConnectionDisconnectSpec, schemaapi.ConnectionDisconnectStatus]{
+		TypeMeta: meta.NewTypeMeta(schemaapi.ConnectionDisconnectActionKind),
+		Metadata: apiv1alpha1.ActionMeta{Target: connectionschema.NewConnectionReference(id)},
+		Spec:     schemaapi.ConnectionDisconnectSpec{TimeoutSeconds: int64Ptr(10)},
+	}})
 	require.NoError(t, err)
 
 	path := "/api/v1/connections/" + connectionID + "/_disconnect"
@@ -143,17 +150,14 @@ func (r *disconnectRevocationRig) disconnect(t *testing.T, connectionID string) 
 	r.env.ApiGin.ServeHTTP(w, req)
 	require.Equalf(t, http.StatusOK, w.Code, "disconnect failed: %s", w.Body.String())
 
-	var body struct {
-		Connection struct {
-			State string `json:"state"`
-		} `json:"connection"`
-		TaskID string `json:"taskId"`
-	}
+	var body schemaapi.ConnectionDisconnectAction
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
-	assert.Equal(t, string(database.ConnectionStateDisconnecting), body.Connection.State)
-	assert.NotEmpty(t, body.TaskID)
+	require.NotNil(t, body.Status)
+	require.NotNil(t, body.Status.Connection.Status)
+	assert.Equal(t, connectionschema.ConnectionStateDisconnecting, body.Status.Connection.Status.Lifecycle.State)
+	assert.NotEmpty(t, body.Status.TaskID)
 
-	helpers.RequireWorkflowTaskCompleted(t, r.env, body.TaskID, 15*time.Second)
+	helpers.RequireWorkflowTaskCompleted(t, r.env, body.Status.TaskID, 15*time.Second)
 }
 
 func int64Ptr(v int64) *int64 {

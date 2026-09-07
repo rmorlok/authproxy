@@ -101,10 +101,13 @@ func (r *NamespaceResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
+	metadata := client.NamespaceMetadataForPath(plan.Path.ValueString())
+	metadata.Labels = labels
+	metadata.Annotations = annotations
 	ns, err := r.client.CreateNamespace(ctx, client.CreateNamespaceRequest{
-		Path:        plan.Path.ValueString(),
-		Labels:      labels,
-		Annotations: annotations,
+		TypeMeta: client.NewTypeMeta(client.NamespaceKind),
+		Metadata: metadata,
+		Spec:     client.NamespaceSpec{},
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create namespace", err.Error())
@@ -153,9 +156,17 @@ func (r *NamespaceResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
+	metadata := &client.ObjectMetadataPatch{}
+	if labels != nil {
+		metadata.Labels = &labels
+	}
+	if annotations != nil {
+		metadata.Annotations = &annotations
+	}
 	ns, err := r.client.UpdateNamespace(ctx, plan.Path.ValueString(), client.UpdateNamespaceRequest{
-		Labels:      labels,
-		Annotations: annotations,
+		TypeMeta: client.NewTypeMeta(client.NamespaceKind),
+		Metadata: metadata,
+		Spec:     &client.NamespaceSpecPatch{},
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update namespace", err.Error())
@@ -184,15 +195,19 @@ func (r *NamespaceResource) ImportState(ctx context.Context, req resource.Import
 }
 
 func setNamespaceState(model *NamespaceResourceModel, ns *client.Namespace) {
-	model.Path = types.StringValue(ns.Path)
-	model.State = types.StringValue(ns.State)
-	if ns.KeyId != nil {
-		model.KeyId = types.StringValue(*ns.KeyId)
+	model.Path = types.StringValue(ns.Metadata.ID)
+	if ns.Status != nil {
+		model.State = types.StringValue(ns.Status.State)
+	} else {
+		model.State = types.StringNull()
+	}
+	if ns.Spec.EncryptionKeyRef != nil && ns.Spec.EncryptionKeyRef.ID != "" {
+		model.KeyId = types.StringValue(ns.Spec.EncryptionKeyRef.ID)
 	} else {
 		model.KeyId = types.StringNull()
 	}
-	model.Labels = labelsToMap(ns.Labels)
-	model.Annotations = annotationsToMap(ns.Annotations)
-	model.CreatedAt = types.StringValue(ns.CreatedAt.Format("2006-01-02T15:04:05Z07:00"))
-	model.UpdatedAt = types.StringValue(ns.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"))
+	model.Labels = labelsToMap(ns.Metadata.Labels)
+	model.Annotations = annotationsToMap(ns.Metadata.Annotations)
+	model.CreatedAt = timestampToString(ns.Metadata.CreatedAt)
+	model.UpdatedAt = timestampToString(ns.Metadata.UpdatedAt)
 }

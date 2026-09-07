@@ -1,25 +1,36 @@
 {
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "TaskServerList",
+  "metadata": {},
   "items": [
     {
-      "id": "srv-1",
-      "host": "worker.local",
-      "pid": 1234,
-      "concurrency": 10,
-      "queues": {
-        "default": 1
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "TaskServer",
+      "metadata": {
+        "id": "srv-1",
+        "createdAt": "2026-01-02T03:04:05Z"
       },
-      "strictPriority": false,
-      "started": "2026-01-02T03:04:05Z",
-      "status": "active",
-      "activeWorkers": [
-        {
-          "taskId": "task-1",
-          "taskType": "sync",
-          "queue": "default",
-          "started": "2026-01-02T03:04:05Z",
-          "deadline": "2026-01-02T03:05:05Z"
-        }
-      ]
+      "spec": {
+        "host": "worker.local",
+        "pid": 1234,
+        "concurrency": 10,
+        "queues": {
+          "default": 1
+        },
+        "strictPriority": false
+      },
+      "status": {
+        "state": "active",
+        "activeWorkers": [
+          {
+            "taskId": "task-1",
+            "taskType": "sync",
+            "queue": "default",
+            "startedAt": "2026-01-02T03:04:05Z",
+            "deadline": "2026-01-02T03:05:05Z"
+          }
+        ]
+      }
     }
   ]
 }

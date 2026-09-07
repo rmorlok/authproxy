@@ -157,12 +157,8 @@ func GetGinServer(
 		dm.GetAppMetricsService(),
 	)
 	routesActors := common_routes.NewActorsRoutes(
-		dm.GetConfig(),
 		authService,
-		dm.GetDatabase(),
-		dm.GetRedisClient(),
-		dm.GetHttpf(),
-		dm.GetEncryptService(),
+		dm.GetCoreService(),
 		logger,
 	)
 	routesKeys := common_routes.NewKeysRoutes(

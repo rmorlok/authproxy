@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 
+	actorschema "github.com/rmorlok/authproxy/internal/schema/resources/actor"
 	"github.com/rmorlok/authproxy/internal/util"
 	"gopkg.in/yaml.v3"
 )
@@ -18,7 +19,7 @@ type ConfiguredActorsExternalSources struct {
 	SyncCronSchedule string
 }
 
-func (s *ConfiguredActorsExternalSources) All() []*ConfiguredActor {
+func (s *ConfiguredActorsExternalSources) All() []*actorschema.Actor {
 	if s == nil {
 		return nil
 	}
@@ -29,23 +30,23 @@ func (s *ConfiguredActorsExternalSources) All() []*ConfiguredActor {
 	}
 	slices.Sort(namespaces)
 
-	var actors []*ConfiguredActor
+	var actors []*actorschema.Actor
 	for _, namespace := range namespaces {
 		actors = append(actors, s.Sources[namespace].AllInNamespace(namespace)...)
 	}
 	return actors
 }
 
-func (s *ConfiguredActorsExternalSources) GetByExternalId(externalId string) (*ConfiguredActor, bool) {
+func (s *ConfiguredActorsExternalSources) GetByExternalId(externalId string) (*actorschema.Actor, bool) {
 	for _, actor := range s.All() {
-		if actor.ExternalId == externalId {
+		if actor.Spec.ExternalId == externalId {
 			return actor, true
 		}
 	}
 	return nil, false
 }
 
-func (s *ConfiguredActorsExternalSources) GetBySubject(subject string) (*ConfiguredActor, bool) {
+func (s *ConfiguredActorsExternalSources) GetBySubject(subject string) (*actorschema.Actor, bool) {
 	return s.GetByExternalId(subject)
 }
 

@@ -22,6 +22,7 @@ type Root struct {
 	Oauth           OAuth           `json:"oauth" yaml:"oauth"`
 	ErrorPages      ErrorPages      `json:"errorPages,omitempty" yaml:"errorPages,omitempty"`
 	Connectors      *Connectors     `json:"connectors" yaml:"connectors"`
+	RateLimits      *RateLimits     `json:"rateLimits,omitempty" yaml:"rateLimits,omitempty"`
 	AppMetrics      *AppMetrics     `json:"appMetrics,omitempty" yaml:"appMetrics,omitempty"`
 	Connections     *Connections    `json:"connections,omitempty" yaml:"connections,omitempty"`
 	Tasks           *Tasks          `json:"tasks,omitempty" yaml:"tasks,omitempty"`
@@ -47,6 +48,10 @@ func (r *Root) Validate() error {
 		result = multierror.Append(result, err)
 	}
 
+	if err := r.RateLimits.Validate(vc.PushField("rateLimits")); err != nil {
+		result = multierror.Append(result, err)
+	}
+
 	if err := r.HostApplication.Validate(vc.PushField("host_application")); err != nil {
 		result = multierror.Append(result, err)
 	}
@@ -69,6 +74,10 @@ func (r *Root) Validate() error {
 	}
 
 	if err := r.SystemAuth.DataEncryptionKeys.Validate(vc.PushField("system_auth").PushField("data_encryption_keys")); err != nil {
+		result = multierror.Append(result, err)
+	}
+
+	if err := r.SystemAuth.Actors.Validate(vc.PushField("systemAuth").PushField("actors")); err != nil {
 		result = multierror.Append(result, err)
 	}
 

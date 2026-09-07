@@ -68,12 +68,16 @@ func (d *KeyDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 		return
 	}
 
-	config.Namespace = types.StringValue(ek.Namespace)
-	config.State = types.StringValue(ek.State)
-	config.Labels = labelsToMap(ek.Labels)
-	config.Annotations = annotationsToMap(ek.Annotations)
-	config.CreatedAt = types.StringValue(ek.CreatedAt.Format("2006-01-02T15:04:05Z07:00"))
-	config.UpdatedAt = types.StringValue(ek.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"))
+	config.Namespace = types.StringValue(ek.Metadata.Namespace)
+	if ek.Status != nil {
+		config.State = types.StringValue(ek.Status.State)
+	} else {
+		config.State = types.StringValue(ek.Spec.DesiredState)
+	}
+	config.Labels = labelsToMap(ek.Metadata.Labels)
+	config.Annotations = annotationsToMap(ek.Metadata.Annotations)
+	config.CreatedAt = timestampToString(ek.Metadata.CreatedAt)
+	config.UpdatedAt = timestampToString(ek.Metadata.UpdatedAt)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &config)...)
 }

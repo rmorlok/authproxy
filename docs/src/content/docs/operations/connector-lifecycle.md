@@ -7,7 +7,11 @@ AuthProxy exposes connector-wide lifecycle operations for administrative cleanup
 - `POST /connectors/{id}/_disconnectAll`
 - `POST /connectors/{id}/_archive`
 
-Both endpoints start go-workflows-backed background work and return a `taskId` that can be polled with `GET /tasks/{taskId}`. They run on the normal worker service, share the application database through the workflow backend, and use the same task polling contract as other long-running work.
+Both endpoints accept and return typed `authproxy.net/v1alpha1` actions. The
+response puts the encrypted task locator in `status.taskId`; poll it with
+`GET /tasks/{taskId}`. The workflows run on the normal worker service, share
+the application database through the workflow backend, and use the same task
+polling contract as other long-running work.
 
 Admin lists display the connector name, but lifecycle URLs continue to use the
 immutable connector ID. Renaming a connector does not change an in-flight task,
@@ -15,19 +19,39 @@ workflow instance ID, or any connector-version reference.
 
 ## Choosing An Operation
 
-Use **disconnect all** when a connector should remain available, but every current connection for that connector version should be disconnected and removed. This is the operational cleanup action for compromised credentials, connector configuration problems, or a deliberate reset before users reconnect. It does not change connector version state.
+Use **disconnect all** when a logical connector should remain available, but
+every current connection across all of its generations should be disconnected
+and removed. This is the operational cleanup action for compromised
+credentials, connector configuration problems, or a deliberate reset before
+users reconnect. It does not change any connector generation's release state.
 
-Use **archive** when a connector version is being retired. Archive first prepares the connector versions so no new connections can be created, then disconnects existing connections, then archives all versions of the connector after the disconnect work reaches a terminal state.
+Use **archive** when a logical connector is being retired. Archive first
+prepares its generations so no new connections can be created, then disconnects
+existing connections, then archives every generation after the disconnect work
+reaches a terminal state.
 
 The archive preparation step moves draft versions to `archived` and moves the current primary version to `active`. Moving the primary version out of `primary` prevents new connections while existing connections are being cleaned up. After cleanup, the finalize step moves every remaining version for that connector to `archived`.
 
-## Request Shape
+## Request shape
 
-Both endpoints accept an optional JSON body:
+The body is required. Disconnect-all uses `kind: ConnectorDisconnectAll` and
+archive uses `kind: ConnectorArchive`. Both target the logical connector ID,
+without a generation, because the operation covers every generation:
 
 ```json
 {
-  "timeoutSeconds": 600
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "ConnectorDisconnectAll",
+  "metadata": {
+    "target": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connector",
+      "id": "cxr_01example"
+    }
+  },
+  "spec": {
+    "timeoutSeconds": 600
+  }
 }
 ```
 
@@ -37,12 +61,26 @@ The caller needs `connectors:disconnect_all` permission for disconnect-all and `
 
 ## Task Polling
 
-The start response contains a secure task token:
+The response repeats the action target and spec and adds the secure task token
+under status:
 
 ```json
 {
-  "taskId": "encrypted-task-info",
-  "connectorId": "cxr_..."
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "ConnectorDisconnectAll",
+  "metadata": {
+    "target": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connector",
+      "id": "cxr_01example"
+    }
+  },
+  "spec": {
+    "timeoutSeconds": 600
+  },
+  "status": {
+    "taskId": "encrypted-task-info"
+  }
 }
 ```
 

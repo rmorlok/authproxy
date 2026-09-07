@@ -68,16 +68,20 @@ func (d *NamespaceDataSource) Read(ctx context.Context, req datasource.ReadReque
 		return
 	}
 
-	config.State = types.StringValue(ns.State)
-	if ns.KeyId != nil {
-		config.KeyId = types.StringValue(*ns.KeyId)
+	if ns.Status != nil {
+		config.State = types.StringValue(ns.Status.State)
+	} else {
+		config.State = types.StringNull()
+	}
+	if ns.Spec.EncryptionKeyRef != nil && ns.Spec.EncryptionKeyRef.ID != "" {
+		config.KeyId = types.StringValue(ns.Spec.EncryptionKeyRef.ID)
 	} else {
 		config.KeyId = types.StringNull()
 	}
-	config.Labels = labelsToMap(ns.Labels)
-	config.Annotations = annotationsToMap(ns.Annotations)
-	config.CreatedAt = types.StringValue(ns.CreatedAt.Format("2006-01-02T15:04:05Z07:00"))
-	config.UpdatedAt = types.StringValue(ns.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"))
+	config.Labels = labelsToMap(ns.Metadata.Labels)
+	config.Annotations = annotationsToMap(ns.Metadata.Annotations)
+	config.CreatedAt = timestampToString(ns.Metadata.CreatedAt)
+	config.UpdatedAt = timestampToString(ns.Metadata.UpdatedAt)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &config)...)
 }

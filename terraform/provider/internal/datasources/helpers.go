@@ -3,6 +3,7 @@ package datasources
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -53,4 +54,11 @@ func labelsToMap(labels map[string]string) types.Map {
 	}
 	m, _ := types.MapValueFrom(context.Background(), types.StringType, elements)
 	return m
+}
+
+func timestampToString(value *time.Time) types.String {
+	if value == nil {
+		return types.StringNull()
+	}
+	return types.StringValue(value.Format(time.RFC3339))
 }
