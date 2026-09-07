@@ -238,7 +238,7 @@ products use the term for at least three different boundaries:
   section above.
 
 These are worth tracking because they can sit next to AuthProxy in an agent
-architecture, and some are beginning to overlap with credential lifecycle.
+architecture, and some also manage upstream credential lifecycle.
 They do not all provide customer-facing API integrations.
 
 | Product | Primary gateway role | API / tool coverage | Credential model | Self-hosting | Notes |
@@ -250,6 +250,7 @@ They do not all provide customer-facing API integrations.
 | [LiteLLM](https://www.litellm.ai/) | LLM inference gateway | 100+ model providers | Centrally managed provider credentials | Yes (OSS self-host; cloud option) | Model routing, auth, quotas, and spend controls; not an MCP tool gateway. |
 | [Bifrost](https://docs.getbifrost.ai/) | LLM inference + MCP tool gateway | 20+ model providers; arbitrary MCP servers | Provider keys; shared or per-user MCP OAuth | Yes (open source; Apache-2.0) | Acts as an MCP client and server, filters tools, and gates execution or autonomous agent mode. |
 | [Kong](https://konghq.com/) | API, AI, and MCP traffic gateway | User-managed APIs and MCP servers | Gateway auth; OAuth or credential pass-through for MCP | Yes (Apache-2.0 core; commercial editions) | Proxies APIs and MCP servers, converts REST operations into tools, aggregates tools, and applies traffic policy. MCP proxy features require AI Gateway Enterprise. |
+| [Warden](https://github.com/stephnangue/warden) | Identity-aware credential and MCP gateway | Cloud, SaaS, LLM APIs, and MCP servers; generic REST provider | Role-bound credential sources/specs; dynamic tokens, API keys, and OAuth2 consent/refresh | Yes (open source; MPL-2.0) | Namespace isolation, request policy, MCP tool/argument authorization, and audit devices. |
 | [Agent Vault](https://github.com/Infisical/agent-vault) | Credential proxy for AI agents | Any HTTPS service (no connector catalog) | User-registered credentials injected at the network layer | Yes (open source; MIT) | Keeps credentials out of agent processes and constrains network access. |
 
 ### API, AI, and MCP gateway product notes
@@ -263,10 +264,56 @@ They do not all provide customer-facing API integrations.
 - **Kong**: General-purpose API gateway available as an Apache-2.0 core, commercial self-managed editions, and the Konnect managed control plane. Kong centralizes routing and plugins for authentication, authorization, rate limiting, transformations, and observability across APIs. Its enterprise AI MCP Proxy can front existing MCP servers, convert OpenAPI-described REST operations into MCP tools, aggregate tool sets, and apply per-tool ACLs and standard Kong policies. This is a traffic and protocol control plane, not a tenant connection lifecycle: upstream APIs, MCP servers, identities, and credentials must still be provisioned. See: https://github.com/Kong/kong, https://developer.konghq.com/mcp/, and https://developer.konghq.com/plugins/ai-mcp-proxy/.
 - **Agent Vault**: Open-source HTTP credential proxy by Infisical, purpose-built for AI agents. Agents get a scoped session and a local `HTTPS_PROXY`; Agent Vault injects the credential at the network layer so credentials are never returned to the agent. Works with any HTTP-speaking agent (Claude Code, Cursor, Codex, custom Python/TypeScript, sandboxed processes) and any HTTPS API — there is no prebuilt connector catalog; you register your own services and credentials. Ships as a binary, Docker image, or from source; MIT-licensed with a separate `ee/` directory for enterprise features. Offers a container-sandbox mode (iptables-locked egress through the proxy) and an SDK for orchestrating sandboxed agents (Docker/Daytona/E2B). See: https://github.com/Infisical/agent-vault, https://docs.agent-vault.dev, and https://infisical.com/blog/agent-vault-the-open-source-credential-proxy-and-vault-for-agents.
 
-For AuthProxy, the most direct MCP-gateway overlap is Bifrost's per-user OAuth
-and token refresh for upstream MCP servers. Kong overlaps at the authenticated
-proxy and policy layer. The zero-trust access platforms above overlap in
-identity, authorization, and audit. AuthProxy remains distinct when the product
+### Warden compared with AuthProxy
+
+Reviewed on **2026-09-07** against Warden commit
+[`9554d4e`](https://github.com/stephnangue/warden/tree/9554d4ecb78d50fc4a4993a1a5477cda4d0133a7).
+This is a documentation and source comparison, not a runtime security or
+performance assessment.
+
+Warden is a Go gateway for brokering agent and workload access to enterprise
+systems. It authenticates callers with JWTs, client certificates, SPIFFE, or
+Kubernetes identities, then applies policy and injects upstream credentials.
+Its focus is access governance across mounted providers, including native
+HTTP APIs and MCP servers. See its [project overview](https://github.com/stephnangue/warden#readme).
+
+| Concern | Warden | AuthProxy |
+| --- | --- | --- |
+| Resource model | Namespace-scoped provider mounts, roles, policies, credential sources, and credential specs | Namespace-scoped connectors and connections; actors receive permissions, and the host maps tenant/user ownership |
+| Upstream credentials | Static keys, dynamically minted credentials, external-vault/federation paths, and OAuth2 grants | Encrypted connection credentials with OAuth2, API-key, and no-auth connector methods |
+| User consent | Documented native OAuth setup uses `warden cred spec connect` with browser consent and a loopback callback; sealed grants support refresh-token rotation | Embedded Marketplace setup flows, server-side OAuth callbacks, and connection refresh |
+| Authorization focus | Path capabilities and CEL request conditions, including MCP tool names and arguments | Actor permissions on AuthProxy resources and connection use |
+| Integration lifecycle | Operators configure mounts, credential sources/specs, and role bindings | Declarative versioned connectors, setup flows, connection health probes, and connector-version migrations |
+
+Warden's [OAuth2 driver](https://github.com/stephnangue/warden/blob/9554d4ecb78d50fc4a4993a1a5477cda4d0133a7/site/src/content/docs/credential-drivers/oauth2.md)
+explicitly supports both client credentials and authorization-code grants.
+It therefore overlaps with AuthProxy beyond simple API-key injection. Its
+[policy model](https://wardengateway.com/concepts/policies/) and
+[MCP provider](https://wardengateway.com/provider-backends/mcp/) add agent-facing
+controls over upstream operations. The documented setup is operator/CLI led;
+it is not presented as an embeddable SaaS connection marketplace.
+
+Warden is self-hostable under MPL-2.0. Operating it includes managing its
+seal/unseal configuration and storage; its documented HA topology uses
+PostgreSQL-backed leader election with active/standby nodes. See the
+[architecture](https://wardengateway.com/architecture/) and
+[license](https://github.com/stephnangue/warden/blob/9554d4ecb78d50fc4a4993a1a5477cda4d0133a7/LICENSE).
+
+Evaluate Warden when the primary requirement is identity-based agent access,
+dynamic credential brokerage, and MCP-aware request policy. Evaluate AuthProxy
+when the product needs customer-facing connection setup and ongoing integration
+lifecycle through the [Marketplace](/integration/marketplace/),
+[core resource model](/concepts/core-model/), and
+[connector migrations](/operations/connector-version-migrations/). Both preserve
+native upstream APIs; neither choice removes the application's responsibility
+for provider-specific business logic.
+
+### Gateway comparison takeaway
+
+Warden's credential brokerage and OAuth2 lifecycle, and Bifrost's per-user OAuth
+and token refresh for upstream MCP servers, directly overlap with AuthProxy.
+Kong overlaps at the authenticated proxy and policy layer. The zero-trust access
+platforms above overlap in identity, authorization, and audit. AuthProxy remains distinct when the product
 needs an embeddable connection UI, versioned connector definitions, health and
 lifecycle management, and unrestricted forwarding to each provider's native
 API. An MCP gateway could consume tools backed by AuthProxy connections, or
@@ -325,5 +372,6 @@ infrastructure policy is required.
 | LiteLLM | LLM gateway | Code-first | N/A | Provider integrations | Yes (OSS self-host; cloud option) |
 | Bifrost | LLM and MCP tool gateway | Code-first + management UI | MCP client/server and tool execution | Model providers + upstream MCP servers | Yes (Apache-2.0) |
 | Kong | API, AI, and MCP traffic gateway | API/declarative config + management UI | Proxies, converts, and aggregates MCP tools | User-managed APIs, services, and MCP servers | Yes (Apache-2.0 core; MCP proxy is Enterprise) |
+| Warden | Agent/workload access governance and credential brokerage | CLI/API + HCL policies | MCP request policy and audit; not a workflow engine | Mounted providers + credential sources/specs + roles | Yes (MPL-2.0) |
 | Agent Vault | Credential brokerage for AI agents | Code-first (CLI + SDK) | N/A (network-layer proxy) | User-registered services + credentials; no prebuilt connectors | Yes (OSS MIT; binary or Docker) |
 | Apache Camel | Routing, mediation, and protocol integration framework | Code-first DSLs + Karavan low-code tooling | Routes, timers, polling, messaging components, Kamelets | Components, route DSLs, Kamelets | Yes (OSS library/runtime; Camel K on Kubernetes) |
