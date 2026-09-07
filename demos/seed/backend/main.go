@@ -361,7 +361,7 @@ func getConnectorVersion(c *resty.Client, baseUrl string, connector cschema.Conn
 	resp, err := c.R().
 		SetHeader("Accept", "application/json").
 		SetResult(&version).
-		Get(fmt.Sprintf("%s/api/v1/connectors/%s/versions/%d", baseUrl, connector.GetId(), connector.Metadata.Generation))
+		Get(fmt.Sprintf("%s/api/v1/connectors/%s/generations/%d", baseUrl, connector.GetId(), connector.Metadata.Generation))
 	if err != nil {
 		return nil, fmt.Errorf("GET connector version %s:%d: %w", connector.GetId(), connector.Metadata.Generation, err)
 	}
@@ -396,7 +396,7 @@ func createConnectorDraft(c *resty.Client, baseUrl string, connector cschema.Con
 		SetHeader("Content-Type", "application/json").
 		SetBody(body).
 		SetResult(&created).
-		Post(fmt.Sprintf("%s/api/v1/connectors/%s/versions", baseUrl, connector.GetId()))
+		Post(fmt.Sprintf("%s/api/v1/connectors/%s/generations", baseUrl, connector.GetId()))
 	if err != nil {
 		return nil, fmt.Errorf("POST connector seed %q version: %w", seed.Metadata.Name, err)
 	}
@@ -413,7 +413,7 @@ func forceConnectorPrimary(c *resty.Client, baseUrl string, version cschema.Conn
 			meta.NewObjectReference(version.TypeMeta, version.Metadata),
 			cschema.ConnectorReleaseStatePrimary,
 		)).
-		Put(fmt.Sprintf("%s/api/v1/connectors/%s/versions/%d/_forceState", baseUrl, version.GetId(), version.Metadata.Generation))
+		Put(fmt.Sprintf("%s/api/v1/connectors/%s/generations/%d/_forceState", baseUrl, version.GetId(), version.Metadata.Generation))
 	if err != nil {
 		return fmt.Errorf("PUT connector seed %s:%d primary: %w", version.GetId(), version.Metadata.Generation, err)
 	}

@@ -2,17 +2,23 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const postMock = vi.hoisted(() => vi.fn());
 const putMock = vi.hoisted(() => vi.fn());
+const getMock = vi.hoisted(() => vi.fn());
+const patchMock = vi.hoisted(() => vi.fn());
 
 vi.mock('./client', () => ({
-  client: { post: postMock, put: putMock },
+  client: { get: getMock, patch: patchMock, post: postMock, put: putMock },
 }));
 
 import { API_VERSION, objectReference } from './common';
 import {
   archiveConnector,
   ConnectorReleaseState,
+  createConnectorGeneration,
   disconnectAllConnectorConnections,
   forceConnectorGenerationState,
+  getConnectorGeneration,
+  listConnectorGenerations,
+  updateConnectorGeneration,
 } from './connectors';
 import {
   abortConnection,
@@ -28,8 +34,45 @@ import { dryRunRateLimit } from './rateLimits';
 
 describe('v1alpha1 action serialization', () => {
   beforeEach(() => {
+    getMock.mockReset();
+    patchMock.mockReset();
     postMock.mockReset();
     putMock.mockReset();
+  });
+
+  it('uses generation paths for connector generation operations', () => {
+    listConnectorGenerations('cxr_test', {limit: 10});
+    getConnectorGeneration('cxr_test', 3);
+    createConnectorGeneration('cxr_test');
+    updateConnectorGeneration('cxr_test', 3, {
+      apiVersion: API_VERSION,
+      kind: 'Connector',
+      metadata: {labels: {environment: 'production'}},
+      spec: {},
+    });
+
+    expect(getMock).toHaveBeenNthCalledWith(
+      1,
+      '/api/v1/connectors/cxr_test/generations',
+      {params: {limit: 10}},
+    );
+    expect(getMock).toHaveBeenNthCalledWith(
+      2,
+      '/api/v1/connectors/cxr_test/generations/3',
+    );
+    expect(postMock).toHaveBeenCalledWith(
+      '/api/v1/connectors/cxr_test/generations',
+      undefined,
+    );
+    expect(patchMock).toHaveBeenCalledWith(
+      '/api/v1/connectors/cxr_test/generations/3',
+      {
+        apiVersion: API_VERSION,
+        kind: 'Connector',
+        metadata: {labels: {environment: 'production'}},
+        spec: {},
+      },
+    );
   });
 
   it('targets a connector reference when initiating a connection', () => {
@@ -166,7 +209,7 @@ describe('v1alpha1 action serialization', () => {
       spec: {},
     });
     expect(putMock).toHaveBeenCalledWith(
-      '/api/v1/connectors/cxr_test/versions/3/_forceState',
+      '/api/v1/connectors/cxr_test/generations/3/_forceState',
       {
         apiVersion: API_VERSION,
         kind: 'ConnectorForceState',

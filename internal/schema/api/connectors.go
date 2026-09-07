@@ -34,15 +34,15 @@ func NewListConnectorsResponseJson(
 	}
 }
 
-type ListConnectorVersionsResponseJson struct {
+type ListConnectorGenerationsResponseJson struct {
 	apiv1alpha1.ResourceList[cschema.Connector] `json:",inline" yaml:",inline"`
 }
 
-func NewListConnectorVersionsResponseJson(
+func NewListConnectorGenerationsResponseJson(
 	items []cschema.Connector,
 	continueToken string,
-) ListConnectorVersionsResponseJson {
-	return ListConnectorVersionsResponseJson{
+) ListConnectorGenerationsResponseJson {
+	return ListConnectorGenerationsResponseJson{
 		ResourceList: apiv1alpha1.NewResourceList(
 			cschema.ConnectorKind,
 			items,

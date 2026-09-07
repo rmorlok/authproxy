@@ -162,7 +162,7 @@ func (h *RemoteAuthProxy) ForceConnectorVersionState(t *testing.T, connectorID a
 		t,
 		h.AdminActorExternalID,
 		http.MethodPut,
-		fmt.Sprintf("%s/api/v1/connectors/%s/versions/%d/_forceState", h.AdminURL, connectorID, version),
+		fmt.Sprintf("%s/api/v1/connectors/%s/generations/%d/_forceState", h.AdminURL, connectorID, version),
 		schemaapi.NewConnectorForceStateRequest(
 			meta.ObjectReference{
 				APIVersion: meta.APIVersionV1Alpha1,

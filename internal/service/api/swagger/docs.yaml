@@ -1942,8 +1942,8 @@ definitions:
     - kind
     - metadata
     type: object
-  routes.OpenAPIListConnectorVersionsResponseJson:
-    description: Paginated list of connector versions
+  routes.OpenAPIListConnectorGenerationsResponseJson:
+    description: Paginated list of connector generations
     properties:
       apiVersion:
         enum:
@@ -3423,7 +3423,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: Create a new connector with version 1 in draft state
+      description: Create a new connector with generation 1 in draft state
       parameters:
       - description: Connector creation request
         in: body
@@ -3661,11 +3661,11 @@ paths:
       summary: Disconnect all connector connections
       tags:
       - connectors
-  /connectors/{id}/versions:
+  /connectors/{id}/generations:
     get:
       consumes:
       - application/json
-      description: List all versions of a specific connector
+      description: List all generations of a specific connector
       parameters:
       - description: Connector UUID
         in: path
@@ -3680,7 +3680,7 @@ paths:
         in: query
         name: limit
         type: integer
-      - description: Filter by version state
+      - description: Filter by generation state
         in: query
         name: state
         type: string
@@ -3706,7 +3706,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIListConnectorVersionsResponseJson'
+            $ref: '#/definitions/routes.OpenAPIListConnectorGenerationsResponseJson'
         "400":
           description: Bad Request
           schema:
@@ -3721,21 +3721,21 @@ paths:
             $ref: '#/definitions/routes.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: List connector versions
+      summary: List connector generations
       tags:
       - connectors
     post:
       consumes:
       - application/json
-      description: Create a new draft version for an existing connector
+      description: Create a new draft generation for an existing connector
       parameters:
       - description: Connector UUID
         in: path
         name: id
         required: true
         type: string
-      - description: Version creation request; an empty body clones the newest generation
-          as a draft
+      - description: Generation creation request; an empty body clones the newest
+          generation as a draft
         in: body
         name: request
         schema:
@@ -3773,23 +3773,23 @@ paths:
             $ref: '#/definitions/routes.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Create connector version
+      summary: Create connector generation
       tags:
       - connectors
-  /connectors/{id}/versions/{version}:
+  /connectors/{id}/generations/{generation}:
     get:
       consumes:
       - application/json
-      description: Get a specific version of a connector
+      description: Get a specific generation of a connector
       parameters:
       - description: Connector UUID
         in: path
         name: id
         required: true
         type: string
-      - description: Version number
+      - description: Generation number
         in: path
-        name: version
+        name: generation
         required: true
         type: integer
       produces:
@@ -3817,25 +3817,25 @@ paths:
             $ref: '#/definitions/routes.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Get connector version
+      summary: Get connector generation
       tags:
       - connectors
     patch:
       consumes:
       - application/json
-      description: Update a specific draft version of a connector
+      description: Update a specific draft generation of a connector
       parameters:
       - description: Connector UUID
         in: path
         name: id
         required: true
         type: string
-      - description: Version number
+      - description: Generation number
         in: path
-        name: version
+        name: generation
         required: true
         type: integer
-      - description: Version update request
+      - description: Generation update request
         in: body
         name: request
         required: true
@@ -3874,23 +3874,23 @@ paths:
             $ref: '#/definitions/routes.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Update connector version
+      summary: Update connector generation
       tags:
       - connectors
-  /connectors/{id}/versions/{version}/_forceState:
+  /connectors/{id}/generations/{generation}/_forceState:
     put:
       consumes:
       - application/json
-      description: Force a connector version to a specific state (admin operation)
+      description: Force a connector generation to a specific state (admin operation)
       parameters:
       - description: Connector UUID
         in: path
         name: id
         required: true
         type: string
-      - description: Version number
+      - description: Generation number
         in: path
-        name: version
+        name: generation
         required: true
         type: integer
       - description: Force-state action
@@ -3928,7 +3928,7 @@ paths:
             $ref: '#/definitions/routes.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Force connector version state
+      summary: Force connector generation state
       tags:
       - connectors
   /keys:

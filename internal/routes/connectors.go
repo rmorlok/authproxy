@@ -30,7 +30,7 @@ import (
 type OpenAPIListConnectorsResponseJson = schemaapiopenapi.ListConnectorsResponseJson
 type OpenAPIConnectorJson = schemaapiopenapi.ConnectorJson
 type OpenAPIConnectorPatchJson = schemaapiopenapi.ConnectorPatchJson
-type OpenAPIListConnectorVersionsResponseJson = schemaapiopenapi.ListConnectorVersionsResponseJson
+type OpenAPIListConnectorGenerationsResponseJson = schemaapiopenapi.ListConnectorGenerationsResponseJson
 type OpenAPIConnectorLifecycleActionJson = schemaapiopenapi.ConnectorLifecycleActionJson
 type OpenAPIConnectorForceStateActionJson = schemaapiopenapi.ConnectorForceStateActionJson
 
@@ -44,7 +44,7 @@ type ListConnectorsRequestQueryParams struct {
 	OrderByVal    *string                                   `form:"orderBy"`
 }
 
-type ListConnectorVersionsRequestQueryParams struct {
+type ListConnectorGenerationsRequestQueryParams struct {
 	Cursor        *string                                   `form:"cursor"`
 	LimitVal      *int32                                    `form:"limit"`
 	StateVal      *database.ConnectorDefinitionVersionState `form:"state"`
@@ -54,11 +54,11 @@ type ListConnectorVersionsRequestQueryParams struct {
 	OrderByVal    *string                                   `form:"orderBy"`
 }
 
-// connectorVersionID is the composite identifier parsed from generation-level
+// connectorGenerationID is the composite identifier parsed from generation-level
 // connector routes.
-type connectorVersionID struct {
+type connectorGenerationID struct {
 	ConnectorID apid.ID
-	Version     uint64
+	Generation  uint64
 }
 
 type ConnectorsRoutes struct {
@@ -85,20 +85,20 @@ func parseConnectorID(gctx *gin.Context) (apid.ID, *httperr.Error) {
 	return id, nil
 }
 
-func parseConnectorVersionID(gctx *gin.Context) (connectorVersionID, *httperr.Error) {
+func parseConnectorGenerationID(gctx *gin.Context) (connectorGenerationID, *httperr.Error) {
 	id, herr := parseConnectorID(gctx)
 	if herr != nil {
-		return connectorVersionID{}, herr
+		return connectorGenerationID{}, herr
 	}
-	versionStr := gctx.Param("version")
-	if versionStr == "" {
-		return connectorVersionID{}, httperr.BadRequest("version is required")
+	generationStr := gctx.Param("generation")
+	if generationStr == "" {
+		return connectorGenerationID{}, httperr.BadRequest("generation is required")
 	}
-	version, err := strconv.ParseUint(versionStr, 10, 64)
+	generation, err := strconv.ParseUint(generationStr, 10, 64)
 	if err != nil {
-		return connectorVersionID{}, httperr.BadRequest("failed to parse version as an integer")
+		return connectorGenerationID{}, httperr.BadRequest("failed to parse generation as an integer")
 	}
-	return connectorVersionID{ConnectorID: id, Version: version}, nil
+	return connectorGenerationID{ConnectorID: id, Generation: generation}, nil
 }
 
 // @Summary		Get connector
@@ -253,39 +253,39 @@ func (r *ConnectorsRoutes) list(gctx *gin.Context) {
 	))
 }
 
-// @Summary		Get connector version
-// @Description	Get a specific version of a connector
+// @Summary		Get connector generation
+// @Description	Get a specific generation of a connector
 // @Tags			connectors
 // @Accept			json
 // @Produce		json
 // @Param			id		path		string	true	"Connector UUID"
-// @Param			version	path		integer	true	"Version number"
+// @Param			generation	path		integer	true	"Generation number"
 // @Success		200		{object}	OpenAPIConnectorJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		404		{object}	ErrorResponse
 // @Failure		500		{object}	ErrorResponse
 // @Security		BearerAuth
-// @Router			/connectors/{id}/versions/{version} [get]
-func (r *ConnectorsRoutes) getVersion(gctx *gin.Context) {
+// @Router			/connectors/{id}/generations/{generation} [get]
+func (r *ConnectorsRoutes) getGeneration(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
-	connectorVersionId, httpErr := parseConnectorVersionID(gctx)
+	generationID, httpErr := parseConnectorGenerationID(gctx)
 	if httpErr != nil {
 		apgin.WriteError(gctx, nil, httpErr)
 		val.MarkErrorReturn()
 		return
 	}
-	connectorId := connectorVersionId.ConnectorID
-	version := connectorVersionId.Version
+	connectorId := generationID.ConnectorID
+	generation := generationID.Generation
 
 	b := r.connectors.
 		ListConnectorVersionsBuilder().
 		ForId(connectorId).
 		Limit(1)
 
-	b = b.ForVersion(version)
+	b = b.ForVersion(generation)
 
 	// TODO: support lookup by certain states
 
@@ -297,7 +297,7 @@ func (r *ConnectorsRoutes) getVersion(gctx *gin.Context) {
 	}
 
 	if len(result.Results) == 0 {
-		apgin.WriteError(gctx, nil, httperr.NotFoundf("connector version '%s:%d' not found", connectorId, version))
+		apgin.WriteError(gctx, nil, httperr.NotFoundf("connector generation '%s:%d' not found", connectorId, generation))
 		val.MarkErrorReturn()
 		return
 	}
@@ -315,26 +315,26 @@ func (r *ConnectorsRoutes) getVersion(gctx *gin.Context) {
 	}
 }
 
-// @Summary		List connector versions
-// @Description	List all versions of a specific connector
+// @Summary		List connector generations
+// @Description	List all generations of a specific connector
 // @Tags			connectors
 // @Accept			json
 // @Produce		json
 // @Param			id				path		string	true	"Connector UUID"
 // @Param			cursor			query		string	false	"Pagination cursor"
 // @Param			limit			query		integer	false	"Maximum number of results to return"
-// @Param			state			query		string	false	"Filter by version state"
+// @Param			state			query		string	false	"Filter by generation state"
 // @Param			namespace		query		string	false	"Filter by namespace"
 // @Param			name			query		string	false	"Filter by exact resource name"
 // @Param			labelSelector	query		string	false	"Filter by label selector"
 // @Param			orderBy		query		string	false	"Order by field (e.g., 'version:desc')"
-// @Success		200				{object}	OpenAPIListConnectorVersionsResponseJson
+// @Success		200				{object}	OpenAPIListConnectorGenerationsResponseJson
 // @Failure		400				{object}	ErrorResponse
 // @Failure		401				{object}	ErrorResponse
 // @Failure		500				{object}	ErrorResponse
 // @Security		BearerAuth
-// @Router			/connectors/{id}/versions [get]
-func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
+// @Router			/connectors/{id}/generations [get]
+func (r *ConnectorsRoutes) listGenerations(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
@@ -348,7 +348,7 @@ func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
 		return
 	}
 
-	var req ListConnectorVersionsRequestQueryParams
+	var req ListConnectorGenerationsRequestQueryParams
 	if err := gctx.ShouldBindQuery(&req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
@@ -363,7 +363,7 @@ func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
 		apgin.APIJSON(
 			gctx,
 			http.StatusOK,
-			schemaapi.NewListConnectorVersionsResponseJson(
+			schemaapi.NewListConnectorGenerationsResponseJson(
 				nil, // items
 				"",  // continueToken
 			),
@@ -380,7 +380,7 @@ func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
 				nil, // logger
 				httperr.InternalServerError(
 					httperr.WithInternalErr(err),
-					httperr.WithResponseMsg("failed to list connector versions from cursor"),
+					httperr.WithResponseMsg("failed to list connector generations from cursor"),
 				),
 			)
 
@@ -450,7 +450,7 @@ func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
 		return
 	}
 
-	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewListConnectorVersionsResponseJson(
+	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewListConnectorGenerationsResponseJson(
 		util.Map(auth.FilterForValidatedResources(val, result.Results), func(c connIface.Connector) cschema.Connector {
 			return *c.GetResource()
 		}),
@@ -459,7 +459,7 @@ func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
 }
 
 // @Summary		Create connector
-// @Description	Create a new connector with version 1 in draft state
+// @Description	Create a new connector with generation 1 in draft state
 // @Tags			connectors
 // @Accept			json
 // @Produce		json
@@ -586,13 +586,13 @@ func (r *ConnectorsRoutes) updateConnector(gctx *gin.Context) {
 	}
 }
 
-// @Summary		Create connector version
-// @Description	Create a new draft version for an existing connector
+// @Summary		Create connector generation
+// @Description	Create a new draft generation for an existing connector
 // @Tags			connectors
 // @Accept			json
 // @Produce		json
 // @Param			id		path		string									true	"Connector UUID"
-// @Param			request	body		OpenAPIConnectorJson	false	"Version creation request; an empty body clones the newest generation as a draft"
+// @Param			request	body		OpenAPIConnectorJson	false	"Generation creation request; an empty body clones the newest generation as a draft"
 // @Success		201		{object}	OpenAPIConnectorJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
@@ -601,8 +601,8 @@ func (r *ConnectorsRoutes) updateConnector(gctx *gin.Context) {
 // @Failure		409		{object}	ErrorResponse
 // @Failure		500		{object}	ErrorResponse
 // @Security		BearerAuth
-// @Router			/connectors/{id}/versions [post]
-func (r *ConnectorsRoutes) createVersion(gctx *gin.Context) {
+// @Router			/connectors/{id}/generations [post]
+func (r *ConnectorsRoutes) createGeneration(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
@@ -631,7 +631,7 @@ func (r *ConnectorsRoutes) createVersion(gctx *gin.Context) {
 	}
 
 	var req *cschema.Connector
-	// Support a blank post to create a new draft version of the connector
+	// Support a blank post to create a new draft generation of the connector.
 	if gctx.Request.ContentLength > 0 {
 		req = cschema.NewConnector()
 		if err := apgin.BindResourceJSON(gctx, req, smeta.ValidationModeCreate); err != nil {
@@ -644,7 +644,7 @@ func (r *ConnectorsRoutes) createVersion(gctx *gin.Context) {
 	result, err := r.connectors.CreateConnectorVersion(ctx, connectorId, req)
 	if err != nil {
 		if errors.Is(err, core.ErrDraftAlreadyExists) {
-			apgin.WriteError(gctx, nil, httperr.Conflict("a draft version already exists for this connector"))
+			apgin.WriteError(gctx, nil, httperr.Conflict("a draft generation already exists for this connector"))
 			val.MarkErrorReturn()
 			return
 		}
@@ -669,14 +669,14 @@ func (r *ConnectorsRoutes) createVersion(gctx *gin.Context) {
 	}
 }
 
-// @Summary		Update connector version
-// @Description	Update a specific draft version of a connector
+// @Summary		Update connector generation
+// @Description	Update a specific draft generation of a connector
 // @Tags			connectors
 // @Accept			json
 // @Produce		json
 // @Param			id		path		string							true	"Connector UUID"
-// @Param			version	path		integer							true	"Version number"
-// @Param			request	body		OpenAPIConnectorPatchJson	true	"Version update request"
+// @Param			generation	path		integer							true	"Generation number"
+// @Param			request		body		OpenAPIConnectorPatchJson	true	"Generation update request"
 // @Success		200		{object}	OpenAPIConnectorJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
@@ -685,19 +685,19 @@ func (r *ConnectorsRoutes) createVersion(gctx *gin.Context) {
 // @Failure		409		{object}	ErrorResponse
 // @Failure		500		{object}	ErrorResponse
 // @Security		BearerAuth
-// @Router			/connectors/{id}/versions/{version} [patch]
-func (r *ConnectorsRoutes) updateVersion(gctx *gin.Context) {
+// @Router			/connectors/{id}/generations/{generation} [patch]
+func (r *ConnectorsRoutes) updateGeneration(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
-	connectorVersionId, httpErr := parseConnectorVersionID(gctx)
+	generationID, httpErr := parseConnectorGenerationID(gctx)
 	if httpErr != nil {
 		apgin.WriteError(gctx, nil, httpErr)
 		val.MarkErrorReturn()
 		return
 	}
-	connectorId := connectorVersionId.ConnectorID
-	version := connectorVersionId.Version
+	connectorId := generationID.ConnectorID
+	generation := generationID.Generation
 
 	var req cschema.ConnectorPatch
 	if err := apgin.BindResourceJSON(gctx, &req, smeta.ValidationModeUpdate); err != nil {
@@ -706,10 +706,10 @@ func (r *ConnectorsRoutes) updateVersion(gctx *gin.Context) {
 		return
 	}
 
-	existing, err := r.connectors.GetConnectorVersion(ctx, connectorId, version)
+	existing, err := r.connectors.GetConnectorVersion(ctx, connectorId, generation)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFoundf("connector version '%s:%d' not found", connectorId, version))
+			apgin.WriteError(gctx, nil, httperr.NotFoundf("connector generation '%s:%d' not found", connectorId, generation))
 			val.MarkErrorReturn()
 			return
 		}
@@ -724,15 +724,15 @@ func (r *ConnectorsRoutes) updateVersion(gctx *gin.Context) {
 	}
 
 	if existing.GetState() != database.ConnectorDefinitionVersionStateDraft {
-		apgin.WriteError(gctx, nil, httperr.Conflictf("connector version '%s:%d' is not a draft", connectorId, version))
+		apgin.WriteError(gctx, nil, httperr.Conflictf("connector generation '%s:%d' is not a draft", connectorId, generation))
 		val.MarkErrorReturn()
 		return
 	}
 
-	result, err := r.connectors.UpdateConnectorVersion(ctx, connectorId, version, &req)
+	result, err := r.connectors.UpdateConnectorVersion(ctx, connectorId, generation, &req)
 	if err != nil {
 		if errors.Is(err, core.ErrNotDraft) {
-			apgin.WriteError(gctx, nil, httperr.Conflictf("connector version '%s:%d' is not a draft", connectorId, version))
+			apgin.WriteError(gctx, nil, httperr.Conflictf("connector generation '%s:%d' is not a draft", connectorId, generation))
 			val.MarkErrorReturn()
 			return
 		}
@@ -752,13 +752,13 @@ func (r *ConnectorsRoutes) updateVersion(gctx *gin.Context) {
 	}
 }
 
-// @Summary		Force connector version state
-// @Description	Force a connector version to a specific state (admin operation)
+// @Summary		Force connector generation state
+// @Description	Force a connector generation to a specific state (admin operation)
 // @Tags			connectors
 // @Accept			json
 // @Produce		json
 // @Param			id		path		string								true	"Connector UUID"
-// @Param			version	path		integer								true	"Version number"
+// @Param			generation	path		integer								true	"Generation number"
 // @Param			request	body		OpenAPIConnectorForceStateActionJson	true	"Force-state action"
 // @Success		200		{object}	OpenAPIConnectorJson
 // @Failure		400		{object}	ErrorResponse
@@ -767,19 +767,19 @@ func (r *ConnectorsRoutes) updateVersion(gctx *gin.Context) {
 // @Failure		404		{object}	ErrorResponse
 // @Failure		500		{object}	ErrorResponse
 // @Security		BearerAuth
-// @Router			/connectors/{id}/versions/{version}/_forceState [put]
-func (r *ConnectorsRoutes) forceVersionState(gctx *gin.Context) {
+// @Router			/connectors/{id}/generations/{generation}/_forceState [put]
+func (r *ConnectorsRoutes) forceGenerationState(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
-	connectorVersionId, httpErr := parseConnectorVersionID(gctx)
+	generationID, httpErr := parseConnectorGenerationID(gctx)
 	if httpErr != nil {
 		apgin.WriteError(gctx, nil, httpErr)
 		val.MarkErrorReturn()
 		return
 	}
-	connectorId := connectorVersionId.ConnectorID
-	version := connectorVersionId.Version
+	connectorId := generationID.ConnectorID
+	generation := generationID.Generation
 
 	req := schemaapi.ConnectorForceStateAction{}
 	if err := apgin.BindActionJSON(gctx, &req, schemaapi.ConnectorForceStateActionKind); err != nil {
@@ -787,7 +787,7 @@ func (r *ConnectorsRoutes) forceVersionState(gctx *gin.Context) {
 		val.MarkErrorReturn()
 		return
 	}
-	if req.Metadata.Target.ID != connectorId.String() || req.Metadata.Target.Generation != version {
+	if req.Metadata.Target.ID != connectorId.String() || req.Metadata.Target.Generation != generation {
 		apgin.WriteError(gctx, nil, httperr.BadRequest("metadata.target must match the connector generation in the request path"))
 		val.MarkErrorReturn()
 		return
@@ -795,15 +795,15 @@ func (r *ConnectorsRoutes) forceVersionState(gctx *gin.Context) {
 
 	state := database.ConnectorDefinitionVersionState(req.Spec.State)
 	if !database.IsValidConnectorDefinitionVersionState(state) {
-		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid connector version state '%s'", req.Spec.State))
+		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid connector generation state '%s'", req.Spec.State))
 		val.MarkErrorReturn()
 		return
 	}
 
-	c, err := r.connectors.GetConnectorVersion(ctx, connectorId, version)
+	c, err := r.connectors.GetConnectorVersion(ctx, connectorId, generation)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFoundf("connector version '%s:%d' not found", connectorId, version))
+			apgin.WriteError(gctx, nil, httperr.NotFoundf("connector generation '%s:%d' not found", connectorId, generation))
 			val.MarkErrorReturn()
 			return
 		}
@@ -1064,22 +1064,22 @@ func (r *ConnectorsRoutes) Register(g gin.IRouter) {
 			Build(),
 		r.get,
 	)
-	g.GET("/connectors/:id/versions",
+	g.GET("/connectors/:id/generations",
 		r.authService.NewRequiredBuilder().
 			ForResource("connectors").
 			ForIdField("id").
-			ForVerb("list/versions").
+			ForVerb("list/generations").
 			Build(),
-		r.listVersions,
+		r.listGenerations,
 	)
 	g.GET(
-		"/connectors/:id/versions/:version",
+		"/connectors/:id/generations/:generation",
 		r.authService.NewRequiredBuilder().
 			ForResource("connectors").
 			ForIdField("id").
-			ForVerb("list/versions").
+			ForVerb("list/generations").
 			Build(),
-		r.getVersion,
+		r.getGeneration,
 	)
 	g.POST("/connectors",
 		r.authService.NewRequiredBuilder().
@@ -1096,13 +1096,13 @@ func (r *ConnectorsRoutes) Register(g gin.IRouter) {
 			Build(),
 		r.updateConnector,
 	)
-	g.POST("/connectors/:id/versions",
+	g.POST("/connectors/:id/generations",
 		r.authService.NewRequiredBuilder().
 			ForResource("connectors").
 			ForIdField("id").
 			ForVerb("create").
 			Build(),
-		r.createVersion,
+		r.createGeneration,
 	)
 	g.POST("/connectors/:id/_disconnectAll",
 		r.authService.NewRequiredBuilder().
@@ -1120,21 +1120,21 @@ func (r *ConnectorsRoutes) Register(g gin.IRouter) {
 			Build(),
 		r.archive,
 	)
-	g.PATCH("/connectors/:id/versions/:version",
+	g.PATCH("/connectors/:id/generations/:generation",
 		r.authService.NewRequiredBuilder().
 			ForResource("connectors").
 			ForIdField("id").
 			ForVerb("update").
 			Build(),
-		r.updateVersion,
+		r.updateGeneration,
 	)
-	g.PUT("/connectors/:id/versions/:version/_forceState",
+	g.PUT("/connectors/:id/generations/:generation/_forceState",
 		r.authService.NewRequiredBuilder().
 			ForResource("connectors").
 			ForIdField("id").
 			ForVerb("force_state").
 			Build(),
-		r.forceVersionState,
+		r.forceGenerationState,
 	)
 }
 

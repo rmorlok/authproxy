@@ -87,7 +87,7 @@ type ConnectorSpecJson struct {
 }
 
 // ConnectorJson documents one logical connector generation. Every connector
-// endpoint uses this same kind; metadata.generation selects the version.
+// endpoint uses this same kind; metadata.generation selects the generation.
 //
 //	@Description	Kubernetes-style Connector resource
 type ConnectorJson struct {
@@ -128,10 +128,10 @@ type ListConnectorsResponseJson struct {
 	Items []ConnectorJson `json:"items" binding:"required"`
 }
 
-// ListConnectorVersionsResponseJson documents the paginated connector version list response.
+// ListConnectorGenerationsResponseJson documents the paginated connector generation list response.
 //
-//	@Description	Paginated list of connector versions
-type ListConnectorVersionsResponseJson struct {
+//	@Description	Paginated list of connector generations
+type ListConnectorGenerationsResponseJson struct {
 	ResourceListJson
 	Items []ConnectorJson `json:"items" binding:"required"`
 }

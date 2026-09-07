@@ -228,11 +228,11 @@ for every concrete registration in the audited route set.
 | --- | --- | --- |
 | Connector | `GET|POST /api/v1/connectors` | `ConnectorList` or `Connector` |
 | Connector | `GET|PATCH /api/v1/connectors/:id` | `Connector`; patch metadata/spec |
-| Connector generation | `GET|POST /api/v1/connectors/:id/versions` | `ConnectorList` or `Connector`; retain URL but use `metadata.generation` |
-| Connector generation | `GET|PATCH /api/v1/connectors/:id/versions/:version` | `Connector`; route version maps to generation |
+| Connector generation | `GET|POST /api/v1/connectors/:id/generations` | `ConnectorList` or `Connector`; use `metadata.generation` |
+| Connector generation | `GET|PATCH /api/v1/connectors/:id/generations/:generation` | `Connector`; path generation matches `metadata.generation` |
 | Connector action | `POST /api/v1/connectors/:id/_disconnectAll` | `ConnectorDisconnectAll` action; task/workflow result in status |
 | Connector action | `POST /api/v1/connectors/:id/_archive` | `ConnectorArchive` action; task locator in status |
-| Connector action | `PUT /api/v1/connectors/:id/versions/:version/_forceState` | `ConnectorForceState` action; response Connector |
+| Connector action | `PUT /api/v1/connectors/:id/generations/:generation/_forceState` | `ConnectorForceState` action; response Connector |
 | Connector metadata | Former `/{labels,annotations}` subroutes | removed; use `PATCH` on Connector metadata |
 | Connector-generation metadata | Former generation `/{labels,annotations}` subroutes | removed; use `PATCH` on generation metadata |
 | Connection | `POST /api/v1/connections/_initiate` | `ConnectionInitiate` request; `ConnectionSetup` response action |

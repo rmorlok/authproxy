@@ -404,7 +404,7 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
                 </Stack>
                 <Stack direction="row" spacing={1}>
                   <Button size="small" onClick={() => onRowClick(v)}>View Definition</Button>
-                  <Button component={Link} size="small" to={`/connectors/${connectorId}/versions/${v.metadata.generation}`}>Open Page</Button>
+                  <Button component={Link} size="small" to={`/connectors/${connectorId}/generations/${v.metadata.generation}`}>Open Page</Button>
                 </Stack>
               </Stack>
             </Box>

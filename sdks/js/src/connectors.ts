@@ -142,15 +142,15 @@ export const listConnectorGenerations = (
   id: string,
   params?: ListConnectorGenerationsParams,
 ) =>
-  client.get<ConnectorList>(`/api/v1/connectors/${id}/versions`, { params });
+  client.get<ConnectorList>(`/api/v1/connectors/${id}/generations`, { params });
 
 export const createConnectorGeneration = (
   id: string,
   request?: CreateConnectorRequest,
-) => client.post<Connector>(`/api/v1/connectors/${id}/versions`, request);
+) => client.post<Connector>(`/api/v1/connectors/${id}/generations`, request);
 
 export const getConnectorGeneration = (id: string, generation: number) =>
-  client.get<Connector>(`/api/v1/connectors/${id}/versions/${generation}`);
+  client.get<Connector>(`/api/v1/connectors/${id}/generations/${generation}`);
 
 const connectorTarget = (
   id: string,
@@ -162,7 +162,7 @@ export const updateConnectorGeneration = (
   id: string,
   generation: number,
   request: UpdateConnectorRequest,
-) => client.patch<Connector>(`/api/v1/connectors/${id}/versions/${generation}`, request);
+) => client.patch<Connector>(`/api/v1/connectors/${id}/generations/${generation}`, request);
 
 export const forceConnectorGenerationState = (
   id: string,
@@ -175,7 +175,7 @@ export const forceConnectorGenerationState = (
     {state},
   );
   return client.put<Connector>(
-    `/api/v1/connectors/${id}/versions/${generation}/_forceState`,
+    `/api/v1/connectors/${id}/generations/${generation}/_forceState`,
     request,
   );
 };

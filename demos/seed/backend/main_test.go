@@ -42,7 +42,7 @@ func TestUpsertConnectorCreatesAndPublishesMissingSeed(t *testing.T) {
 			require.Equal(t, "Demo NoAuth", req.Spec.Definition.DisplayName)
 			require.Equal(t, "true", req.Metadata.Labels["demo"])
 			writeJSON(t, w, connectorVersion(req.Spec.Definition, req.Metadata.Labels, cschema.ConnectorReleaseStateDraft, 1))
-		case "PUT /api/v1/connectors/cxr_testgmail0000001/versions/1/_forceState":
+		case "PUT /api/v1/connectors/cxr_testgmail0000001/generations/1/_forceState":
 			forcedPrimary = true
 			writeJSON(t, w, connectorVersion(seed.Spec.Definition, seed.Metadata.Labels, cschema.ConnectorReleaseStatePrimary, 1))
 		default:
@@ -72,7 +72,7 @@ func TestUpsertConnectorSkipsMatchingPrimarySeed(t *testing.T) {
 				},
 				"", // continueToken
 			))
-		case "GET /api/v1/connectors/cxr_testgmail0000001/versions/1":
+		case "GET /api/v1/connectors/cxr_testgmail0000001/generations/1":
 			writeJSON(t, w, connectorVersion(seed.Spec.Definition, seed.Metadata.Labels, cschema.ConnectorReleaseStatePrimary, 1))
 		default:
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
@@ -96,15 +96,15 @@ func TestUpsertConnectorPublishesNewVersionWhenDefinitionChanges(t *testing.T) {
 				[]cschema.Connector{connectorSummary(seed, cschema.ConnectorReleaseStatePrimary, 1)},
 				"",
 			))
-		case "GET /api/v1/connectors/cxr_testgmail0000001/versions/1":
+		case "GET /api/v1/connectors/cxr_testgmail0000001/generations/1":
 			writeJSON(t, w, connectorVersion(oldDefinition, seed.Metadata.Labels, cschema.ConnectorReleaseStatePrimary, 1))
-		case "POST /api/v1/connectors/cxr_testgmail0000001/versions":
+		case "POST /api/v1/connectors/cxr_testgmail0000001/generations":
 			var req cschema.Connector
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
 			require.Equal(t, "New Demo NoAuth", req.Spec.Definition.DisplayName)
 			require.NotNil(t, req.Metadata.Labels)
 			writeJSON(t, w, connectorVersion(req.Spec.Definition, req.Metadata.Labels, cschema.ConnectorReleaseStateDraft, 2))
-		case "PUT /api/v1/connectors/cxr_testgmail0000001/versions/2/_forceState":
+		case "PUT /api/v1/connectors/cxr_testgmail0000001/generations/2/_forceState":
 			forcedPrimary = true
 			writeJSON(t, w, connectorVersion(seed.Spec.Definition, seed.Metadata.Labels, cschema.ConnectorReleaseStatePrimary, 2))
 		default:

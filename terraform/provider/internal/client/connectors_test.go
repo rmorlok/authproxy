@@ -92,6 +92,61 @@ func TestConnectorVersionListUsesCanonicalEnvelope(t *testing.T) {
 	}
 }
 
+func TestConnectorGenerationOperationsUseGenerationPaths(t *testing.T) {
+	expected := []struct {
+		method string
+		path   string
+	}{
+		{method: http.MethodGet, path: "/api/v1/connectors/cxr_test/generations/2"},
+		{method: http.MethodPatch, path: "/api/v1/connectors/cxr_test/generations/2"},
+		{method: http.MethodPost, path: "/api/v1/connectors/cxr_test/generations"},
+		{method: http.MethodPut, path: "/api/v1/connectors/cxr_test/generations/2/_forceState"},
+		{method: http.MethodGet, path: "/api/v1/connectors/cxr_test/generations"},
+	}
+	requestIndex := 0
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		if requestIndex >= len(expected) {
+			t.Errorf("unexpected request: %s %s", request.Method, request.URL.Path)
+			return
+		}
+		want := expected[requestIndex]
+		requestIndex++
+		if request.Method != want.method || request.URL.Path != want.path {
+			t.Errorf("request %d: got %s %s, want %s %s", requestIndex, request.Method, request.URL.Path, want.method, want.path)
+		}
+		response.Header().Set("Content-Type", "application/json")
+		if request.Method == http.MethodGet && request.URL.Path == "/api/v1/connectors/cxr_test/generations" {
+			_, _ = response.Write([]byte(`{"apiVersion":"authproxy.net/v1alpha1","kind":"ConnectorList","metadata":{},"items":[]}`))
+			return
+		}
+		_, _ = response.Write([]byte(`{"apiVersion":"authproxy.net/v1alpha1","kind":"Connector","metadata":{"id":"cxr_test","generation":2},"spec":{"definition":{}},"status":{"release":{"state":"draft"}}}`))
+	}))
+	defer server.Close()
+
+	api, err := New(Config{Endpoint: server.URL, BearerToken: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := api.GetConnectorVersion(t.Context(), "cxr_test", 2); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := api.UpdateConnectorVersion(t.Context(), "cxr_test", 2, UpdateConnectorRequest{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := api.CreateConnectorVersion(t.Context(), "cxr_test", CreateConnectorVersionRequest{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := api.ForceConnectorVersionState(t.Context(), "cxr_test", 2, "primary"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := api.ListConnectorVersions(t.Context(), "cxr_test"); err != nil {
+		t.Fatal(err)
+	}
+	if requestIndex != len(expected) {
+		t.Fatalf("received %d requests, want %d", requestIndex, len(expected))
+	}
+}
+
 func TestDecodeConnectorDefinitionSummary(t *testing.T) {
 	tests := []struct {
 		name string

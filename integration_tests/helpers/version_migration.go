@@ -71,7 +71,7 @@ func (env *IntegrationTestEnv) CreateDraftConnectorVersion(
 	body, err := jsonMarshal(req)
 	require.NoError(t, err)
 
-	path := fmt.Sprintf("/api/v1/connectors/%s/versions", connectorID)
+	path := fmt.Sprintf("/api/v1/connectors/%s/generations", connectorID)
 	w := env.doSignedRequest(t, http.MethodPost, path, body, env.resolveActorOptions(opts))
 	require.Equalf(t, http.StatusCreated, w.Code, "create connector version failed: %s", w.Body.String())
 
@@ -102,7 +102,7 @@ func (env *IntegrationTestEnv) ForceConnectorVersionState(
 	))
 	require.NoError(t, err)
 
-	path := fmt.Sprintf("/api/v1/connectors/%s/versions/%d/_forceState", connectorID, version)
+	path := fmt.Sprintf("/api/v1/connectors/%s/generations/%d/_forceState", connectorID, version)
 	w := env.doSignedRequest(t, http.MethodPut, path, body, env.resolveActorOptions(opts))
 	require.Equalf(t, http.StatusOK, w.Code, "force connector version state failed: %s", w.Body.String())
 

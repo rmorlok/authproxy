@@ -17,7 +17,7 @@ func TestListConstructorsUseV1Alpha1Envelope(t *testing.T) {
 		{name: "actors", expectedKind: "ActorList", value: NewListActorsResponseJson(nil, "next")},
 		{name: "namespaces", expectedKind: "NamespaceList", value: NewListNamespacesResponseJson(nil, "next")},
 		{name: "connectors", expectedKind: "ConnectorList", value: NewListConnectorsResponseJson(nil, "next")},
-		{name: "connector generations", expectedKind: "ConnectorList", value: NewListConnectorVersionsResponseJson(nil, "next")},
+		{name: "connector generations", expectedKind: "ConnectorList", value: NewListConnectorGenerationsResponseJson(nil, "next")},
 		{name: "connections", expectedKind: "ConnectionList", value: NewListConnectionResponseJson(nil, "next")},
 		{name: "keys", expectedKind: "KeyList", value: NewListKeysResponseJson(nil, "next")},
 		{name: "rate limits", expectedKind: "RateLimitList", value: NewListRateLimitsResponseJson(nil, "next")},

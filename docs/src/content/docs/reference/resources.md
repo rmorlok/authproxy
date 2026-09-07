@@ -171,14 +171,14 @@ status:
     state: primary
 ```
 
-The version URLs remain for compatibility with the existing route layout:
+Connector generation endpoints use `generations` consistently in their paths:
 
 - `GET /api/v1/connectors/{id}` resolves the primary generation unless a
   generation is explicitly requested elsewhere.
-- `GET /api/v1/connectors/{id}/versions` returns `ConnectorList`.
-- `GET /api/v1/connectors/{id}/versions/{generation}` returns one Connector.
-- `POST /api/v1/connectors/{id}/versions` creates the next generation.
-- `PATCH /api/v1/connectors/{id}/versions/{generation}` updates a draft.
+- `GET /api/v1/connectors/{id}/generations` returns `ConnectorList`.
+- `GET /api/v1/connectors/{id}/generations/{generation}` returns one Connector.
+- `POST /api/v1/connectors/{id}/generations` creates the next generation.
+- `PATCH /api/v1/connectors/{id}/generations/{generation}` updates a draft.
 
 Only canonical `spec.definition` is encrypted in the connector-definition
 column. Identity, generation, release state, metadata, and status are not

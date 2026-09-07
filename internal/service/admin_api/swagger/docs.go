@@ -1830,7 +1830,7 @@ const docTemplateadmin_api = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Create a new connector with version 1 in draft state",
+                "description": "Create a new connector with generation 1 in draft state",
                 "consumes": [
                     "application/json"
                 ],
@@ -2197,14 +2197,14 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "/connectors/{id}/versions": {
+        "/connectors/{id}/generations": {
             "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "List all versions of a specific connector",
+                "description": "List all generations of a specific connector",
                 "consumes": [
                     "application/json"
                 ],
@@ -2214,7 +2214,7 @@ const docTemplateadmin_api = `{
                 "tags": [
                     "connectors"
                 ],
-                "summary": "List connector versions",
+                "summary": "List connector generations",
                 "parameters": [
                     {
                         "type": "string",
@@ -2237,7 +2237,7 @@ const docTemplateadmin_api = `{
                     },
                     {
                         "type": "string",
-                        "description": "Filter by version state",
+                        "description": "Filter by generation state",
                         "name": "state",
                         "in": "query"
                     },
@@ -2270,7 +2270,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPIListConnectorVersionsResponseJson"
+                            "$ref": "#/definitions/routes.OpenAPIListConnectorGenerationsResponseJson"
                         }
                     },
                     "400": {
@@ -2299,7 +2299,7 @@ const docTemplateadmin_api = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Create a new draft version for an existing connector",
+                "description": "Create a new draft generation for an existing connector",
                 "consumes": [
                     "application/json"
                 ],
@@ -2309,7 +2309,7 @@ const docTemplateadmin_api = `{
                 "tags": [
                     "connectors"
                 ],
-                "summary": "Create connector version",
+                "summary": "Create connector generation",
                 "parameters": [
                     {
                         "type": "string",
@@ -2319,7 +2319,7 @@ const docTemplateadmin_api = `{
                         "required": true
                     },
                     {
-                        "description": "Version creation request; an empty body clones the newest generation as a draft",
+                        "description": "Generation creation request; an empty body clones the newest generation as a draft",
                         "name": "request",
                         "in": "body",
                         "schema": {
@@ -2373,14 +2373,14 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "/connectors/{id}/versions/{version}": {
+        "/connectors/{id}/generations/{generation}": {
             "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Get a specific version of a connector",
+                "description": "Get a specific generation of a connector",
                 "consumes": [
                     "application/json"
                 ],
@@ -2390,7 +2390,7 @@ const docTemplateadmin_api = `{
                 "tags": [
                     "connectors"
                 ],
-                "summary": "Get connector version",
+                "summary": "Get connector generation",
                 "parameters": [
                     {
                         "type": "string",
@@ -2401,8 +2401,8 @@ const docTemplateadmin_api = `{
                     },
                     {
                         "type": "integer",
-                        "description": "Version number",
-                        "name": "version",
+                        "description": "Generation number",
+                        "name": "generation",
                         "in": "path",
                         "required": true
                     }
@@ -2446,7 +2446,7 @@ const docTemplateadmin_api = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Update a specific draft version of a connector",
+                "description": "Update a specific draft generation of a connector",
                 "consumes": [
                     "application/json"
                 ],
@@ -2456,7 +2456,7 @@ const docTemplateadmin_api = `{
                 "tags": [
                     "connectors"
                 ],
-                "summary": "Update connector version",
+                "summary": "Update connector generation",
                 "parameters": [
                     {
                         "type": "string",
@@ -2467,13 +2467,13 @@ const docTemplateadmin_api = `{
                     },
                     {
                         "type": "integer",
-                        "description": "Version number",
-                        "name": "version",
+                        "description": "Generation number",
+                        "name": "generation",
                         "in": "path",
                         "required": true
                     },
                     {
-                        "description": "Version update request",
+                        "description": "Generation update request",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -2528,14 +2528,14 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "/connectors/{id}/versions/{version}/_forceState": {
+        "/connectors/{id}/generations/{generation}/_forceState": {
             "put": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Force a connector version to a specific state (admin operation)",
+                "description": "Force a connector generation to a specific state (admin operation)",
                 "consumes": [
                     "application/json"
                 ],
@@ -2545,7 +2545,7 @@ const docTemplateadmin_api = `{
                 "tags": [
                     "connectors"
                 ],
-                "summary": "Force connector version state",
+                "summary": "Force connector generation state",
                 "parameters": [
                     {
                         "type": "string",
@@ -2556,8 +2556,8 @@ const docTemplateadmin_api = `{
                     },
                     {
                         "type": "integer",
-                        "description": "Version number",
-                        "name": "version",
+                        "description": "Generation number",
+                        "name": "generation",
                         "in": "path",
                         "required": true
                     },
@@ -7187,8 +7187,8 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "routes.OpenAPIListConnectorVersionsResponseJson": {
-            "description": "Paginated list of connector versions",
+        "routes.OpenAPIListConnectorGenerationsResponseJson": {
+            "description": "Paginated list of connector generations",
             "type": "object",
             "required": [
                 "apiVersion",

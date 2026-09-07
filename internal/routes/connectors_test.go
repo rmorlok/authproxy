@@ -219,45 +219,45 @@ func TestParseConnectorID(t *testing.T) {
 	})
 }
 
-func TestParseConnectorVersionID(t *testing.T) {
+func TestParseConnectorGenerationID(t *testing.T) {
 	t.Run("valid", func(t *testing.T) {
 		gctx, _ := gin.CreateTestContext(httptest.NewRecorder())
 		gctx.Params = gin.Params{
 			{Key: "id", Value: "cxr_test0000000000001"},
-			{Key: "version", Value: "42"},
+			{Key: "generation", Value: "42"},
 		}
 
-		id, httpErr := parseConnectorVersionID(gctx)
+		id, httpErr := parseConnectorGenerationID(gctx)
 		require.Nil(t, httpErr)
-		require.Equal(t, connectorVersionID{
+		require.Equal(t, connectorGenerationID{
 			ConnectorID: apid.MustParse("cxr_test0000000000001"),
-			Version:     42,
+			Generation:  42,
 		}, id)
 	})
 
-	t.Run("missing version", func(t *testing.T) {
+	t.Run("missing generation", func(t *testing.T) {
 		gctx, _ := gin.CreateTestContext(httptest.NewRecorder())
 		gctx.Params = gin.Params{{Key: "id", Value: "cxr_test0000000000001"}}
 
-		id, httpErr := parseConnectorVersionID(gctx)
-		require.Equal(t, connectorVersionID{}, id)
+		id, httpErr := parseConnectorGenerationID(gctx)
+		require.Equal(t, connectorGenerationID{}, id)
 		require.NotNil(t, httpErr)
 		require.Equal(t, http.StatusBadRequest, httpErr.Status)
-		require.Equal(t, "version is required", httpErr.Error())
+		require.Equal(t, "generation is required", httpErr.Error())
 	})
 
-	t.Run("invalid version", func(t *testing.T) {
+	t.Run("invalid generation", func(t *testing.T) {
 		gctx, _ := gin.CreateTestContext(httptest.NewRecorder())
 		gctx.Params = gin.Params{
 			{Key: "id", Value: "cxr_test0000000000001"},
-			{Key: "version", Value: "latest"},
+			{Key: "generation", Value: "latest"},
 		}
 
-		id, httpErr := parseConnectorVersionID(gctx)
-		require.Equal(t, connectorVersionID{}, id)
+		id, httpErr := parseConnectorGenerationID(gctx)
+		require.Equal(t, connectorGenerationID{}, id)
 		require.NotNil(t, httpErr)
 		require.Equal(t, http.StatusBadRequest, httpErr.Status)
-		require.Equal(t, "failed to parse version as an integer", httpErr.Error())
+		require.Equal(t, "failed to parse generation as an integer", httpErr.Error())
 	})
 }
 
@@ -788,13 +788,13 @@ func TestConnectors(t *testing.T) {
 		})
 	})
 
-	t.Run("versions", func(t *testing.T) {
+	t.Run("generations", func(t *testing.T) {
 		t.Run("get", func(t *testing.T) {
 			tu := setup(t, nil)
 
 			t.Run("unauthorized", func(t *testing.T) {
 				w := httptest.NewRecorder()
-				req, err := http.NewRequest(http.MethodGet, "/connectors/test-connector/versions/1", nil)
+				req, err := http.NewRequest(http.MethodGet, "/connectors/test-connector/generations/1", nil)
 				require.NoError(t, err)
 
 				tu.Gin.ServeHTTP(w, req)
@@ -803,7 +803,7 @@ func TestConnectors(t *testing.T) {
 
 			t.Run("malformed id", func(t *testing.T) {
 				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connectors/bad-connector/versions/1", nil, "root", "some-actor", aschema.AllPermissions())
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connectors/bad-connector/generations/1", nil, "root", "some-actor", aschema.AllPermissions())
 				require.NoError(t, err)
 
 				tu.Gin.ServeHTTP(w, req)
@@ -812,16 +812,16 @@ func TestConnectors(t *testing.T) {
 
 			t.Run("invalid id", func(t *testing.T) {
 				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connectors/bad_notavalidid/versions/1", nil, "root", "some-actor", aschema.AllPermissions())
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connectors/bad_notavalidid/generations/1", nil, "root", "some-actor", aschema.AllPermissions())
 				require.NoError(t, err)
 
 				tu.Gin.ServeHTTP(w, req)
 				require.Equal(t, http.StatusBadRequest, w.Code)
 			})
 
-			t.Run("invalid version", func(t *testing.T) {
+			t.Run("invalid generation", func(t *testing.T) {
 				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connectors/bad_notavalidid/versions/999", nil, "root", "some-actor", aschema.AllPermissions())
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connectors/bad_notavalidid/generations/999", nil, "root", "some-actor", aschema.AllPermissions())
 				require.NoError(t, err)
 
 				tu.Gin.ServeHTTP(w, req)
@@ -832,7 +832,7 @@ func TestConnectors(t *testing.T) {
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 					http.MethodGet,
-					"/connectors/cxr_test0000000000001/versions/1",
+					"/connectors/cxr_test0000000000001/generations/1",
 					nil,
 					"root",
 					"some-actor",
@@ -848,11 +848,11 @@ func TestConnectors(t *testing.T) {
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 					http.MethodGet,
-					"/connectors/cxr_test0000000000001/versions/1",
+					"/connectors/cxr_test0000000000001/generations/1",
 					nil,
 					"root",
 					"some-actor",
-					aschema.PermissionsSingleWithResourceIds("root.**", "connectors", "list/versions", "cxr_test0000000000001"),
+					aschema.PermissionsSingleWithResourceIds("root.**", "connectors", "list/generations", "cxr_test0000000000001"),
 				)
 				require.NoError(t, err)
 
@@ -869,11 +869,11 @@ func TestConnectors(t *testing.T) {
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 					http.MethodGet,
-					"/connectors/cxr_test0000000000001/versions/1",
+					"/connectors/cxr_test0000000000001/generations/1",
 					nil,
 					"root",
 					"some-actor",
-					aschema.PermissionsSingleWithResourceIds("root.**", "connectors", "list/versions", "cxr_test2000000000002"),
+					aschema.PermissionsSingleWithResourceIds("root.**", "connectors", "list/generations", "cxr_test2000000000002"),
 				)
 				require.NoError(t, err)
 
@@ -885,11 +885,11 @@ func TestConnectors(t *testing.T) {
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 					http.MethodGet,
-					"/connectors/cxr_test0000000000001/versions/1",
+					"/connectors/cxr_test0000000000001/generations/1",
 					nil,
 					"root",
 					"some-actor",
-					aschema.PermissionsSingle("root.**", "connectors", "list/versions"),
+					aschema.PermissionsSingle("root.**", "connectors", "list/generations"),
 				)
 				require.NoError(t, err)
 
@@ -914,11 +914,11 @@ func TestConnectors(t *testing.T) {
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 					http.MethodGet,
-					"/connectors/cxr_test0000000000001/versions/1",
+					"/connectors/cxr_test0000000000001/generations/1",
 					nil,
 					"root",
 					"some-actor",
-					aschema.PermissionsSingle("root.**", "connectors", "list/versions"),
+					aschema.PermissionsSingle("root.**", "connectors", "list/generations"),
 				)
 				require.NoError(t, err)
 
@@ -946,7 +946,7 @@ func TestConnectors(t *testing.T) {
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 					http.MethodGet,
-					"/connectors/cxr_test0000000000001/versions/1",
+					"/connectors/cxr_test0000000000001/generations/1",
 					nil,
 					"root",
 					"some-actor",
@@ -954,7 +954,7 @@ func TestConnectors(t *testing.T) {
 						{
 							Namespace: "root.**",
 							Resources: []string{"connectors"},
-							Verbs:     []string{"list/versions"},
+							Verbs:     []string{"list/generations"},
 						},
 						{
 							Namespace: "root.**",
@@ -983,7 +983,7 @@ func TestConnectors(t *testing.T) {
 
 			t.Run("unauthorized", func(t *testing.T) {
 				w := httptest.NewRecorder()
-				req, err := http.NewRequest(http.MethodGet, "/connectors/cxr_test0000000000001/versions", nil)
+				req, err := http.NewRequest(http.MethodGet, "/connectors/cxr_test0000000000001/generations", nil)
 				require.NoError(t, err)
 
 				tu.Gin.ServeHTTP(w, req)
@@ -994,18 +994,18 @@ func TestConnectors(t *testing.T) {
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 					http.MethodGet,
-					"/connectors/cxr_test0000000000001/versions?orderBy=version%20asc",
+					"/connectors/cxr_test0000000000001/generations?orderBy=version%20asc",
 					nil,
 					"root",
 					"some-actor",
-					aschema.PermissionsSingle("root.**", "connectors", "list/versions"),
+					aschema.PermissionsSingle("root.**", "connectors", "list/generations"),
 				)
 				require.NoError(t, err)
 
 				tu.Gin.ServeHTTP(w, req)
 				require.Equal(t, http.StatusOK, w.Code)
 
-				var resp schemaapi.ListConnectorVersionsResponseJson
+				var resp schemaapi.ListConnectorGenerationsResponseJson
 				err = json.Unmarshal(w.Body.Bytes(), &resp)
 				require.NoError(t, err)
 				require.Len(t, resp.Items, 1)
@@ -1014,14 +1014,14 @@ func TestConnectors(t *testing.T) {
 
 			t.Run("namespace filter", func(t *testing.T) {
 				w := httptest.NewRecorder()
-				// Namespace filter doesn't actually make sense here because versions can't change namespaces
+				// Namespace filter doesn't actually make sense here because generations can't change namespaces.
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 					http.MethodGet,
-					"/connectors/cxr_test0000000000001/versions?orderBy=version%20asc&namespace=root.child",
+					"/connectors/cxr_test0000000000001/generations?orderBy=version%20asc&namespace=root.child",
 					nil,
 					"root",
 					"some-actor",
-					aschema.PermissionsSingle("root.**", "connectors", "list/versions"),
+					aschema.PermissionsSingle("root.**", "connectors", "list/generations"),
 				)
 				require.NoError(t, err)
 
@@ -1397,7 +1397,7 @@ func TestConnectors(t *testing.T) {
 		t.Run("unauthorized", func(t *testing.T) {
 			tu := setup(t, nil)
 			w := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("/connectors/%s/versions", connectorId), nil)
+			req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("/connectors/%s/generations", connectorId), nil)
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -1409,7 +1409,7 @@ func TestConnectors(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPost,
-				"/connectors/cxr_nonexistent00099/versions",
+				"/connectors/cxr_nonexistent00099/generations",
 				nil,
 				"root",
 				"some-actor",
@@ -1426,7 +1426,7 @@ func TestConnectors(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPost,
-				fmt.Sprintf("/connectors/%s/versions", connectorId),
+				fmt.Sprintf("/connectors/%s/generations", connectorId),
 				nil,
 				"root",
 				"some-actor",
@@ -1453,7 +1453,7 @@ func TestConnectors(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPost,
-				fmt.Sprintf("/connectors/%s/versions", connectorId),
+				fmt.Sprintf("/connectors/%s/generations", connectorId),
 				nil,
 				"root",
 				"some-actor",
@@ -1467,7 +1467,7 @@ func TestConnectors(t *testing.T) {
 			w = httptest.NewRecorder()
 			req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPost,
-				fmt.Sprintf("/connectors/%s/versions", connectorId),
+				fmt.Sprintf("/connectors/%s/generations", connectorId),
 				nil,
 				"root",
 				"some-actor",
@@ -1489,7 +1489,7 @@ func TestConnectors(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPost,
-				fmt.Sprintf("/connectors/%s/versions", connectorId),
+				fmt.Sprintf("/connectors/%s/generations", connectorId),
 				bytes.NewReader(jsonBody),
 				"root",
 				"some-actor",
@@ -1510,7 +1510,7 @@ func TestConnectors(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPost,
-				fmt.Sprintf("/connectors/%s/versions", connectorId),
+				fmt.Sprintf("/connectors/%s/generations", connectorId),
 				bytes.NewReader(jsonBody),
 				"root",
 				"some-actor",
@@ -1537,7 +1537,7 @@ func TestConnectors(t *testing.T) {
 			body := connectorDefinitionPatch(&cschema.ConnectorDefinition{DisplayName: "Updated"})
 			jsonBody, _ := json.Marshal(body)
 			w := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodPatch, fmt.Sprintf("/connectors/%s/versions/1", connectorId), bytes.NewReader(jsonBody))
+			req, err := http.NewRequest(http.MethodPatch, fmt.Sprintf("/connectors/%s/generations/1", connectorId), bytes.NewReader(jsonBody))
 			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/json")
 
@@ -1552,7 +1552,7 @@ func TestConnectors(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPatch,
-				"/connectors/cxr_nonexistent00099/versions/1",
+				"/connectors/cxr_nonexistent00099/generations/1",
 				bytes.NewReader(jsonBody),
 				"root",
 				"some-actor",
@@ -1567,13 +1567,13 @@ func TestConnectors(t *testing.T) {
 
 		t.Run("conflict - not a draft", func(t *testing.T) {
 			tu := setup(t, nil)
-			// Version 1 was migrated as primary, not draft
+			// Generation 1 was migrated as primary, not draft.
 			body := connectorDefinitionPatch(&cschema.ConnectorDefinition{DisplayName: "Updated"})
 			jsonBody, _ := json.Marshal(body)
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPatch,
-				fmt.Sprintf("/connectors/%s/versions/1", connectorId),
+				fmt.Sprintf("/connectors/%s/generations/1", connectorId),
 				bytes.NewReader(jsonBody),
 				"root",
 				"some-actor",
@@ -1589,11 +1589,11 @@ func TestConnectors(t *testing.T) {
 		t.Run("invalid definition", func(t *testing.T) {
 			tu := setup(t, nil)
 
-			// First create a draft version
+			// First create a draft generation.
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPost,
-				fmt.Sprintf("/connectors/%s/versions", connectorId),
+				fmt.Sprintf("/connectors/%s/generations", connectorId),
 				nil,
 				"root",
 				"some-actor",
@@ -1617,7 +1617,7 @@ func TestConnectors(t *testing.T) {
 			w = httptest.NewRecorder()
 			req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPatch,
-				fmt.Sprintf("/connectors/%s/versions/%d", connectorId, draftVersion),
+				fmt.Sprintf("/connectors/%s/generations/%d", connectorId, draftVersion),
 				bytes.NewReader(jsonBody),
 				"root",
 				"some-actor",
@@ -1630,14 +1630,14 @@ func TestConnectors(t *testing.T) {
 			require.Equal(t, http.StatusBadRequest, w.Code)
 		})
 
-		t.Run("valid - update draft version", func(t *testing.T) {
+		t.Run("valid - update draft generation", func(t *testing.T) {
 			tu := setup(t, nil)
 
-			// First create a draft version
+			// First create a draft generation.
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPost,
-				fmt.Sprintf("/connectors/%s/versions", connectorId),
+				fmt.Sprintf("/connectors/%s/generations", connectorId),
 				nil,
 				"root",
 				"some-actor",
@@ -1658,7 +1658,7 @@ func TestConnectors(t *testing.T) {
 			w = httptest.NewRecorder()
 			req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPatch,
-				fmt.Sprintf("/connectors/%s/versions/%d", connectorId, draftVersion),
+				fmt.Sprintf("/connectors/%s/generations/%d", connectorId, draftVersion),
 				bytes.NewReader(jsonBody),
 				"root",
 				"some-actor",
@@ -1681,7 +1681,7 @@ func TestConnectors(t *testing.T) {
 		})
 	})
 
-	t.Run("force connector version state", func(t *testing.T) {
+	t.Run("force connector generation state", func(t *testing.T) {
 		connectorId := "cxr_test0000000000001"
 
 		t.Run("unauthorized", func(t *testing.T) {
@@ -1689,7 +1689,7 @@ func TestConnectors(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := http.NewRequest(
 				http.MethodPut,
-				fmt.Sprintf("/connectors/%s/versions/1/_forceState", connectorId),
+				fmt.Sprintf("/connectors/%s/generations/1/_forceState", connectorId),
 				util.JsonToReader(connectorForceStateRequest(connectorId, 1, cschema.ConnectorReleaseStateArchived)),
 			)
 			require.NoError(t, err)
@@ -1702,7 +1702,7 @@ func TestConnectors(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
-				"/connectors/bad-uuid/versions/1/_forceState",
+				"/connectors/bad-uuid/generations/1/_forceState",
 				util.JsonToReader(connectorForceStateRequest(connectorId, 1, cschema.ConnectorReleaseStateArchived)),
 				"root",
 				"some-actor",
@@ -1718,7 +1718,7 @@ func TestConnectors(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
-				fmt.Sprintf("/connectors/%s/versions/99/_forceState", connectorId),
+				fmt.Sprintf("/connectors/%s/generations/99/_forceState", connectorId),
 				util.JsonToReader(connectorForceStateRequest(connectorId, 99, cschema.ConnectorReleaseStateArchived)),
 				"root",
 				"some-actor",
@@ -1734,7 +1734,7 @@ func TestConnectors(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
-				fmt.Sprintf("/connectors/%s/versions/1/_forceState", connectorId),
+				fmt.Sprintf("/connectors/%s/generations/1/_forceState", connectorId),
 				util.JsonToReader(connectorForceStateRequest(connectorId, 1, cschema.ConnectorReleaseStateArchived)),
 				"root",
 				"some-actor",
@@ -1757,7 +1757,7 @@ func TestConnectors(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
-				fmt.Sprintf("/connectors/%s/versions/1/_forceState", connectorId),
+				fmt.Sprintf("/connectors/%s/generations/1/_forceState", connectorId),
 				util.JsonToReader(connectorForceStateRequest(connectorId, 1, cschema.ConnectorReleaseStatePrimary)),
 				"root",
 				"some-actor",
@@ -1838,7 +1838,7 @@ func TestConnectors(t *testing.T) {
 
 		for _, path := range []string{
 			"/connectors/" + custom.GetId().String(),
-			fmt.Sprintf("/connectors/%s/versions/%d", custom.GetId(), custom.Metadata.Generation),
+			fmt.Sprintf("/connectors/%s/generations/%d", custom.GetId(), custom.Metadata.Generation),
 		} {
 			w = httptest.NewRecorder()
 			req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
@@ -1865,7 +1865,7 @@ func TestConnectors(t *testing.T) {
 
 		w = httptest.NewRecorder()
 		req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
-			http.MethodPatch, fmt.Sprintf("/connectors/%s/versions/%d", custom.GetId(), custom.Metadata.Generation),
+			http.MethodPatch, fmt.Sprintf("/connectors/%s/generations/%d", custom.GetId(), custom.Metadata.Generation),
 			util.JsonToReader(connectorNamePatch("divergent")),
 			"root", "some-actor", aschema.AllPermissions(),
 		)
@@ -1879,7 +1879,7 @@ func TestConnectors(t *testing.T) {
 		divergent.Metadata.Name = "divergent"
 		w = httptest.NewRecorder()
 		req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
-			http.MethodPost, "/connectors/"+seededID.String()+"/versions",
+			http.MethodPost, "/connectors/"+seededID.String()+"/generations",
 			util.JsonToReader(divergent),
 			"root", "some-actor", aschema.AllPermissions(),
 		)
