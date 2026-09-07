@@ -222,13 +222,15 @@ func TestBuildImplicitResourceLabels(t *testing.T) {
 func TestBuildCarriedLabels(t *testing.T) {
 	t.Run("re-keys user labels under parent rt", func(t *testing.T) {
 		parent := Labels{
-			"type":    "google_drive",
-			"variant": "shared",
+			"type":                        "google_drive",
+			"variant":                     "shared",
+			"demo.authproxy.net/seed-key": "demo-oauth-simple",
 		}
 		out := BuildCarriedLabels("cxr", parent)
 		require.Equal(t, Labels{
-			"apxy/cxr/type":    "google_drive",
-			"apxy/cxr/variant": "shared",
+			"apxy/cxr/type":                        "google_drive",
+			"apxy/cxr/variant":                     "shared",
+			"apxy/cxr/demo.authproxy.net/seed-key": "demo-oauth-simple",
 		}, out)
 		require.NoError(t, out.Validate())
 	})

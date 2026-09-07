@@ -114,9 +114,14 @@ func TestSmokePermissionsRespectActorHierarchy(t *testing.T) {
 			permissions: smokeAdminPermissions("smoke-admin", "smoke-user", connectionNamespace),
 		},
 		{
-			name:        "user",
+			name:        "user with smoke connector",
 			actor:       &apauthcore.Actor{Namespace: config.RootNamespace},
 			permissions: smokeUserPermissions(connectionNamespace),
+		},
+		{
+			name:        "user with demo connector",
+			actor:       &apauthcore.Actor{Namespace: config.RootNamespace},
+			permissions: smokeUserPermissions(demoConnectorNamespace + ".smoke-user"),
 		},
 	}
 
@@ -134,12 +139,12 @@ func TestSmokePermissionsRespectActorHierarchy(t *testing.T) {
 	}
 }
 
-func newRemoteSmokeRig(t *testing.T) *helpers.RemoteAuthProxy {
+func newRemoteSmokeRig(t *testing.T, connectionParentNamespace string) *helpers.RemoteAuthProxy {
 	t.Helper()
 
 	adminExternalID := newSmokeActorExternalID(t, "smoke-admin")
 	userExternalID := newSmokeActorExternalID(t, "smoke-user")
-	connectionNamespace := smokeConnectorNamespace + "." + userExternalID
+	connectionNamespace := connectionParentNamespace + "." + userExternalID
 	adminPermissions := smokeAdminPermissions(adminExternalID, userExternalID, connectionNamespace)
 	userPermissions := smokeUserPermissions(connectionNamespace)
 	rig := helpers.NewRemoteAuthProxy(t, helpers.RemoteAuthProxyOptions{
@@ -229,7 +234,7 @@ func TestRemoteOAuth2ProxySmoke(t *testing.T) {
 		t.Skip("set SMOKE_GLOBAL_KEY or pass -global-key")
 	}
 
-	rig := newRemoteSmokeRig(t)
+	rig := newRemoteSmokeRig(t, smokeConnectorNamespace)
 	provider := helpers.NewOAuth2TestProviderAt(t, rig.ProviderURL)
 
 	startedAt := time.Now().Add(-1 * time.Second)
@@ -322,7 +327,7 @@ func TestRemoteSeededOAuthConnectorSmoke(t *testing.T) {
 		t.Skip("set SMOKE_GLOBAL_KEY or pass -global-key")
 	}
 
-	rig := newRemoteSmokeRig(t)
+	rig := newRemoteSmokeRig(t, demoConnectorNamespace)
 	provider := helpers.NewOAuth2TestProviderAt(t, rig.ProviderURL)
 	connector := rig.FindConnectorBySeedKey(t, "demo-oauth-simple")
 
@@ -369,7 +374,7 @@ func TestRemoteSeededConnectorsSmoke(t *testing.T) {
 		t.Skip("set SMOKE_GLOBAL_KEY or pass -global-key")
 	}
 
-	rig := newRemoteSmokeRig(t)
+	rig := newRemoteSmokeRig(t, smokeConnectorNamespace)
 	provider := helpers.NewOAuth2TestProviderAt(t, rig.ProviderURL)
 	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
 	oauthClientID := "seeded-smoke-client-" + suffix

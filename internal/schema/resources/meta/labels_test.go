@@ -21,6 +21,7 @@ func TestLabelValidation(t *testing.T) {
 			"apxy/cxr/-/id",
 			"apxy/cxn/-/ns",
 			"apxy/cxr/cxn/userkey",
+			"apxy/cxr/demo.authproxy.net/seed-key",
 		}
 		for _, key := range validKeys {
 			t.Run("valid "+key, func(t *testing.T) {
@@ -49,6 +50,7 @@ func TestLabelValidation(t *testing.T) {
 			"apxy/cxr//id",
 			"apxy/cxr/-/",
 			"apxy/cx@r/id",
+			"apxy/cxr/invalid..prefix/name",
 			"apxy/cxr/-/-bad",
 		}
 		for _, key := range invalidKeys {
