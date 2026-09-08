@@ -76,7 +76,12 @@ func project(input, safe any) any {
 		}
 		// A field omitted by the typed serializer has no printable value. Retain
 		// explicit null/zero/empty scalars, but fail closed for other values.
-		if input == "" || input == false || input == 0 || input == int64(0) || input == uint64(0) || input == float64(0) {
+		if input == "" ||
+			input == false ||
+			input == 0 ||
+			input == int64(0) ||
+			input == uint64(0) ||
+			input == float64(0) {
 			return input
 		}
 		return nil
@@ -102,6 +107,7 @@ func (l *inputLoader) decode(source string, data []byte) error {
 		if err := l.ctx.Err(); err != nil {
 			return err
 		}
+
 		var node yaml.Node
 		err := dec.Decode(&node)
 		if err == io.EOF {
@@ -112,16 +118,20 @@ func (l *inputLoader) decode(source string, data []byte) error {
 		if err != nil {
 			return fmt.Errorf("%s: malformed YAML or JSON", location)
 		}
+
 		if util.YamlDocumentEmpty(&node) {
 			continue
 		}
+
 		if err := checkNode(&node); err != nil {
 			return fmt.Errorf("%s: %w", location, err)
 		}
+
 		var object map[string]any
 		if err := node.Decode(&object); err != nil || object == nil {
 			return fmt.Errorf("%s: expected a resource object", location)
 		}
+
 		if err := l.object(location, object, ""); err != nil {
 			return err
 		}
@@ -134,6 +144,7 @@ func checkNode(n *yaml.Node) error {
 	if n.Kind == yaml.AliasNode {
 		return fmt.Errorf("line %d: YAML aliases are unsupported", n.Line)
 	}
+
 	if n.Kind == yaml.MappingNode {
 		seen := map[string]bool{}
 		for i := 0; i < len(n.Content); i += 2 {
@@ -147,32 +158,45 @@ func checkNode(n *yaml.Node) error {
 			seen[k.Value] = true
 		}
 	}
+
 	for _, child := range n.Content {
 		if err := checkNode(child); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
-func (l *inputLoader) object(source string, object map[string]any, expectedKind string) error {
+func (l *inputLoader) object(
+	source string,
+	object map[string]any,
+	expectedKind string,
+) error {
 	fail := func(message string) error { return fmt.Errorf("%s: %s", source, message) }
 	version, _ := object["apiVersion"].(string)
 	kind, _ := object["kind"].(string)
+
 	if version != string(meta.APIVersionV1Alpha1) {
 		return fail("unsupported or missing apiVersion (expected authproxy.net/v1alpha1)")
 	}
-	if expectedKind != "" && expectedKind != "*" && kind != expectedKind {
+
+	if expectedKind != "" &&
+		expectedKind != "*" &&
+		kind != expectedKind {
 		return fail("list item kind does not match its list")
 	}
+
 	if strings.HasSuffix(kind, "List") || kind == "List" {
 		if expectedKind != "" {
 			return fail("nested lists are unsupported")
 		}
+
 		base := strings.TrimSuffix(kind, "List")
 		if base != "" && !supportedKind(base) {
 			return fail("unsupported list kind")
 		}
+
 		for field := range object {
 			if field != "apiVersion" && field != "kind" && field != "metadata" && field != "items" {
 				return fail("unknown list field")
@@ -302,53 +326,71 @@ func (l *inputLoader) object(source string, object map[string]any, expectedKind 
 
 func supportedKind(kind string) bool {
 	switch kind {
-	case "Namespace", "Actor", "Connector", "Key", "RateLimit", "Connection":
+	case "Namespace",
+	"Actor",
+	"Connector",
+	"Key",
+	"RateLimit",
+	"Connection":
 		return true
 	}
 	return false
 }
+
 func validateNamespace(value string) error { return ns.ValidatePath(value) }
+
 func normalizeIdentity(kind string, m *meta.ObjectMeta, fallback string) error {
 	if kind == "Namespace" && m.ID != "" {
 		canonical, err := ns.NewResourceMetadata(m.ID)
 		if err != nil {
 			return fmt.Errorf("invalid Namespace metadata.id")
 		}
-		if (m.Name != "" && m.Name != canonical.Name) || (m.Namespace != "" && m.Namespace != canonical.Namespace) {
+
+		if (m.Name != "" && m.Name != canonical.Name) ||
+			(m.Namespace != "" && m.Namespace != canonical.Namespace) {
 			return fmt.Errorf("Namespace identity fields disagree")
 		}
+
 		m.Name = canonical.Name
 		m.Namespace = canonical.Namespace
 	} else {
-		root := kind == "Namespace" && m.Name == common.ResourceName(ns.Root) && m.Namespace == ""
+		root := kind == "Namespace" &&
+			m.Name == common.ResourceName(ns.Root) &&
+			m.Namespace == ""
 		if m.Namespace == "" && !root {
 			m.Namespace = fallback
 		}
 	}
+
 	if m.Namespace != "" {
 		if err := ns.ValidatePath(m.Namespace); err != nil {
 			return fmt.Errorf("invalid metadata.namespace")
 		}
 	}
+
 	if m.Name != "" {
 		if err := m.Name.Validate(); err != nil {
 			return fmt.Errorf("invalid metadata.name")
 		}
 	}
+
 	if kind == "Namespace" {
 		if _, err := ns.PathFromMetadata(*m); err != nil {
 			return fmt.Errorf("Namespace requires id or name and parent namespace (except root)")
 		}
 		return nil
 	}
+
 	if m.ID == "" && (m.Name == "" || m.Namespace == "") {
 		return fmt.Errorf("metadata.id or metadata.namespace and metadata.name are required; use --namespace to supply a missing namespace")
 	}
+
 	if m.ID != "" {
 		validators := map[string]func(string) error{"Actor": actor.ValidateID, "Connector": connectors.ValidateID, "Key": key.ValidateID, "RateLimit": rl.ValidateID, "Connection": connection.ValidateID}
 		if err := validators[kind](m.ID); err != nil {
 			return fmt.Errorf("invalid metadata.id for %s", kind)
 		}
 	}
+	
 	return nil
 }
