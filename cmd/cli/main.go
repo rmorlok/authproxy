@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/spf13/cobra"
 )
@@ -15,6 +17,7 @@ func main() {
 	}
 
 	rootCmd.AddCommand(cmdList())
+	rootCmd.AddCommand(cmdApply())
 	rootCmd.AddCommand(cmdSignJwt())
 	rootCmd.AddCommand(cmdVerifyJwt())
 	rootCmd.AddCommand(cmdSigningProxy())
@@ -22,5 +25,7 @@ func main() {
 	rootCmd.AddCommand(cmdSignMarketplaceLoginUrl())
 	rootCmd.AddCommand(cmdMarketplaceLoginRedirect())
 
-	rootCmd.Execute()
+	if err := rootCmd.Execute(); err != nil {
+		os.Exit(1)
+	}
 }
