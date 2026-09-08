@@ -2261,7 +2261,7 @@ const docTemplateApi = `{
                     },
                     {
                         "type": "string",
-                        "description": "Order by field (e.g., 'version:desc')",
+                        "description": "Order by field (e.g., 'generation desc')",
                         "name": "orderBy",
                         "in": "query"
                     }

@@ -106,7 +106,7 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
     let cancelled = false;
     setVersionsError(null);
     setVersions([]);
-    connectors.listGenerations(connectorId, { limit: 100, orderBy: 'version desc' })
+    connectors.listGenerations(connectorId, { limit: 100, orderBy: 'generation desc' })
       .then(resp => {
         if (cancelled) return;
         setVersions(resp.data.items || []);

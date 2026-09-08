@@ -327,7 +327,7 @@ func (r *ConnectorsRoutes) getGeneration(gctx *gin.Context) {
 // @Param			namespace		query		string	false	"Filter by namespace"
 // @Param			name			query		string	false	"Filter by exact resource name"
 // @Param			labelSelector	query		string	false	"Filter by label selector"
-// @Param			orderBy		query		string	false	"Order by field (e.g., 'version:desc')"
+// @Param			orderBy		query		string	false	"Order by field (e.g., 'generation desc')"
 // @Success		200				{object}	OpenAPIListConnectorGenerationsResponseJson
 // @Failure		400				{object}	ErrorResponse
 // @Failure		401				{object}	ErrorResponse
@@ -423,20 +423,24 @@ func (r *ConnectorsRoutes) listGenerations(gctx *gin.Context) {
 		}
 
 		if req.OrderByVal != nil {
-			field, order, err := pagination.SplitOrderByParam[database.ConnectorDefinitionVersionOrderByField](*req.OrderByVal)
+			field, order, err := pagination.SplitOrderByParam[string](*req.OrderByVal)
 			if err != nil {
 				apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
 				val.MarkErrorReturn()
 				return
 			}
 
-			if !database.IsValidConnectorDefinitionVersionOrderByField(field) {
+			databaseField := database.ConnectorDefinitionVersionOrderByField(field)
+			if field == "generation" {
+				databaseField = database.ConnectorDefinitionVersionOrderByVersion
+			} else if databaseField == database.ConnectorDefinitionVersionOrderByVersion ||
+				!database.IsValidConnectorDefinitionVersionOrderByField(databaseField) {
 				apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid sort field '%s'", field))
 				val.MarkErrorReturn()
 				return
 			}
 
-			b.OrderBy(field, order)
+			b.OrderBy(databaseField, order)
 		}
 
 		ex = b

@@ -994,7 +994,7 @@ func TestConnectors(t *testing.T) {
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 					http.MethodGet,
-					"/connectors/cxr_test0000000000001/generations?orderBy=version%20asc",
+					"/connectors/cxr_test0000000000001/generations?orderBy=generation%20asc",
 					nil,
 					"root",
 					"some-actor",
@@ -1012,12 +1012,29 @@ func TestConnectors(t *testing.T) {
 				require.Equal(t, apid.MustParse("cxr_test0000000000001"), resp.Items[0].GetId())
 			})
 
+			t.Run("rejects legacy version sort field", func(t *testing.T) {
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					"/connectors/cxr_test0000000000001/generations?orderBy=version%20asc",
+					nil,
+					"root",
+					"some-actor",
+					aschema.PermissionsSingle("root.**", "connectors", "list/generations"),
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusBadRequest, w.Code)
+				require.JSONEq(t, `{"error":"invalid sort field 'version'"}`, w.Body.String())
+			})
+
 			t.Run("namespace filter", func(t *testing.T) {
 				w := httptest.NewRecorder()
 				// Namespace filter doesn't actually make sense here because generations can't change namespaces.
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 					http.MethodGet,
-					"/connectors/cxr_test0000000000001/generations?orderBy=version%20asc&namespace=root.child",
+					"/connectors/cxr_test0000000000001/generations?orderBy=generation%20asc&namespace=root.child",
 					nil,
 					"root",
 					"some-actor",

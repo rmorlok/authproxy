@@ -192,7 +192,7 @@ describe('ConnectionDetail', () => {
 
     expect(connectors.listGenerations).toHaveBeenCalledWith(connection.spec.connectorRef.id, {
       limit: 100,
-      orderBy: 'version desc',
+      orderBy: 'generation desc',
     });
 
     const dialog = await screen.findByRole('dialog', {name: 'Change connection version'});

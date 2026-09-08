@@ -258,7 +258,7 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
       }
       const response = await connectors.listGenerations(connectorId, {
         limit: 100,
-        orderBy: 'version desc',
+        orderBy: 'generation desc',
       });
       const eligible = response.data.items.filter((version) =>
         version.metadata.generation !== conn.spec.connectorRef.generation &&
