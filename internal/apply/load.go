@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/schema/registry"
 )
 
 const maxSourceBytes = 16 << 20
@@ -44,7 +45,7 @@ func Load(ctx context.Context, options Options) ([]Document, error) {
 			return nil, fmt.Errorf("--namespace: %w", err)
 		}
 	}
-	loader := inputLoader{ctx: ctx, options: options, selector: selector, seen: map[string]string{}, scheme: newScheme()}
+	loader := inputLoader{ctx: ctx, options: options, selector: selector, seen: map[string]string{}, scheme: registry.NewResourceScheme()}
 	for _, filename := range options.Filenames {
 		if err := loader.load(filename); err != nil {
 			return nil, err

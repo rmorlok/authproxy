@@ -11,7 +11,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/apserde"
 	apiv1alpha1 "github.com/rmorlok/authproxy/internal/schema/api/v1alpha1"
 	"github.com/rmorlok/authproxy/internal/schema/common"
-	"github.com/rmorlok/authproxy/internal/schema/manifest"
 	"github.com/rmorlok/authproxy/internal/schema/resources/actor"
 	"github.com/rmorlok/authproxy/internal/schema/resources/connection"
 	"github.com/rmorlok/authproxy/internal/schema/resources/connectors"
@@ -89,17 +88,6 @@ func project(input, safe any) any {
 }
 
 type decoder interface{ DecodeYAML([]byte) (any, error) }
-
-func newScheme() *manifest.Scheme {
-	s := manifest.NewScheme()
-	manifest.MustRegisterType[actor.Actor](s, manifest.GVK{APIVersion: meta.APIVersionV1Alpha1, Kind: actor.ActorKind})
-	manifest.MustRegisterType[connection.Connection](s, manifest.GVK{APIVersion: meta.APIVersionV1Alpha1, Kind: connection.ConnectionKind})
-	manifest.MustRegisterType[connectors.Connector](s, manifest.GVK{APIVersion: meta.APIVersionV1Alpha1, Kind: connectors.ConnectorKind})
-	manifest.MustRegisterType[key.Key](s, manifest.GVK{APIVersion: meta.APIVersionV1Alpha1, Kind: key.KeyKind})
-	manifest.MustRegisterType[ns.Namespace](s, manifest.GVK{APIVersion: meta.APIVersionV1Alpha1, Kind: ns.NamespaceKind})
-	manifest.MustRegisterType[rl.RateLimit](s, manifest.GVK{APIVersion: meta.APIVersionV1Alpha1, Kind: rl.RateLimitKind})
-	return s
-}
 
 func (l *inputLoader) decode(source string, data []byte) error {
 	dec := yaml.NewDecoder(bytes.NewReader(data))
@@ -327,11 +315,11 @@ func (l *inputLoader) object(
 func supportedKind(kind string) bool {
 	switch kind {
 	case "Namespace",
-	"Actor",
-	"Connector",
-	"Key",
-	"RateLimit",
-	"Connection":
+		"Actor",
+		"Connector",
+		"Key",
+		"RateLimit",
+		"Connection":
 		return true
 	}
 	return false
@@ -391,6 +379,6 @@ func normalizeIdentity(kind string, m *meta.ObjectMeta, fallback string) error {
 			return fmt.Errorf("invalid metadata.id for %s", kind)
 		}
 	}
-	
+
 	return nil
 }
