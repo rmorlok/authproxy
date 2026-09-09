@@ -186,10 +186,14 @@ func (l *inputLoader) object(
 		}
 
 		for field := range object {
-			if field != "apiVersion" && field != "kind" && field != "metadata" && field != "items" {
+			if field != "apiVersion" &&
+				field != "kind" &&
+				field != "metadata" &&
+				field != "items" {
 				return fail("unknown list field")
 			}
 		}
+
 		if value, ok := object["metadata"]; ok {
 			payload, _ := yaml.Marshal(value)
 			var m apiv1alpha1.ListMeta
@@ -200,52 +204,64 @@ func (l *inputLoader) object(
 				return fail("incomplete paginated list; supply all resources")
 			}
 		}
+
 		items, ok := object["items"].([]any)
 		if !ok {
 			return fail("list items must be an array")
 		}
+
 		if base == "" {
 			base = "*"
 		}
+
 		for i, item := range items {
 			child, ok := item.(map[string]any)
 			if !ok {
 				return fail(fmt.Sprintf("item %d: expected resource object", i+1))
 			}
+
 			if err := l.object(fmt.Sprintf("%s: item %d", source, i+1), child, base); err != nil {
 				return err
 			}
 		}
 		return nil
 	}
+
 	if !supportedKind(kind) {
 		return fail("unsupported or missing resource kind")
 	}
+
 	if _, ok := object["status"]; ok {
 		return fail("status is server-owned")
 	}
+
 	metadata, ok := object["metadata"].(map[string]any)
 	if !ok {
 		return fail("metadata must be an object")
 	}
+
 	for _, field := range []string{"createdAt", "updatedAt"} {
 		if _, ok := metadata[field]; ok {
 			return fail("metadata." + field + " is server-owned")
 		}
 	}
+
 	if _, ok := metadata["generation"]; ok && kind != "Connector" {
 		return fail("metadata.generation is only supported for Connector targets")
 	}
+
 	if value, exists := object["spec"]; exists {
 		if _, ok := value.(map[string]any); !ok {
 			return fail("spec must be an object")
 		}
 	}
+
 	if kind == "Connection" {
 		if spec, ok := object["spec"].(map[string]any); ok && len(spec) > 0 {
 			return fail("Connection apply supports existing mutable metadata only")
 		}
 	}
+
 	for _, field := range []string{"id", "name", "namespace"} {
 		if value, exists := metadata[field]; exists {
 			if str, ok := value.(string); !ok || str == "" {
@@ -253,6 +269,7 @@ func (l *inputLoader) object(
 			}
 		}
 	}
+	
 	var m meta.ObjectMeta
 	payload, err := yaml.Marshal(metadata)
 	if err != nil {
