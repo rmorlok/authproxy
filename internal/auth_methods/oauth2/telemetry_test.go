@@ -110,7 +110,7 @@ func TestTelemetry_WithSpanRecordsErrors(t *testing.T) {
 	tel, err := newTelemetry(fx.providers, &sconfig.Telemetry{Enabled: enabledPtr(true)})
 	require.NoError(t, err)
 
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 
 	// Success path leaves span status unset.
 	require.NoError(t, tel.withSpan(context.Background(), "refresh", connectorID, func(ctx context.Context) error {
@@ -140,7 +140,7 @@ func TestTelemetry_NoOpWhenProvidersDisabled(t *testing.T) {
 	tel, err := newTelemetry(aptelemetry.NoopProviders(), &sconfig.Telemetry{Enabled: enabledPtr(true)})
 	require.NoError(t, err)
 
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 	tel.recordRefreshSuccess(context.Background(), nil)
 	tel.recordRefreshFailure(context.Background(), "x", nil)
 	tel.recordRevocation(context.Background(), revocationKindRefresh, true, nil)

@@ -525,7 +525,7 @@ func (s *service) hydrateDryRunContext(ctx context.Context, req iface.DryRunRate
 		rc.Namespace = conn.GetNamespace()
 		rc.ConnectionID = conn.GetId()
 		rc.ConnectorID = conn.GetConnectorId()
-		rc.ConnectorVersion = conn.GetConnectorVersion()
+		rc.ConnectorGeneration = conn.GetConnectorGeneration()
 		// Connection labels already carry forward namespace + connector
 		// labels — copy so manual overrides don't mutate the core's map.
 		if connLabels := conn.GetLabels(); len(connLabels) > 0 {

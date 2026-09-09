@@ -98,7 +98,7 @@ func TestResolveObjectReferenceWrapsResources(t *testing.T) {
 	})
 }
 
-func TestResolveConnectorReferenceHydratesDefinitionVersion(t *testing.T) {
+func TestResolveConnectorReferenceHydratesDefinitionGeneration(t *testing.T) {
 	ctx := context.Background()
 	connectorID := apid.New(apid.PrefixConnector)
 	logicalConnector := &database.Connector{
@@ -124,7 +124,7 @@ func TestResolveConnectorReferenceHydratesDefinitionVersion(t *testing.T) {
 			connectorResourceForMock(
 				connectorID,
 				2,
-				database.ConnectorDefinitionVersionStateActive,
+				database.ConnectorGenerationStateActive,
 				nil,
 				definition,
 			),
@@ -132,7 +132,7 @@ func TestResolveConnectorReferenceHydratesDefinitionVersion(t *testing.T) {
 
 		resolved, err := s.ResolveConnectorReference(ctx, ref)
 		require.NoError(t, err)
-		require.Equal(t, uint64(2), resolved.GetVersion())
+		require.Equal(t, uint64(2), resolved.GetGeneration())
 		require.Equal(t, "Billing", resolved.GetDefinition().DisplayName)
 	})
 
@@ -145,17 +145,17 @@ func TestResolveConnectorReferenceHydratesDefinitionVersion(t *testing.T) {
 		require.NoError(t, err)
 
 		db.EXPECT().ResolveConnectorReference(ctx, ref).Return(logicalConnector, nil)
-		db.EXPECT().GetConnectorDefinitionVersionForState(
+		db.EXPECT().GetConnectorGenerationForState(
 			ctx,
 			connectorID,
-			database.ConnectorDefinitionVersionStatePrimary,
+			database.ConnectorGenerationStatePrimary,
 		).Return(
 			&database.ConnectorWithDefinition{
 				Id:                  connectorID,
 				Namespace:           logicalConnector.Namespace,
 				Name:                logicalConnector.Name,
-				Version:             2,
-				State:               database.ConnectorDefinitionVersionStatePrimary,
+				Generation:          2,
+				State:               database.ConnectorGenerationStatePrimary,
 				EncryptedDefinition: encryptedDefinition,
 			},
 			nil,
@@ -164,8 +164,8 @@ func TestResolveConnectorReferenceHydratesDefinitionVersion(t *testing.T) {
 
 		resolved, err := s.ResolveConnectorReference(ctx, ref)
 		require.NoError(t, err)
-		require.Equal(t, uint64(2), resolved.GetVersion())
-		require.Equal(t, database.ConnectorDefinitionVersionStatePrimary, resolved.GetState())
+		require.Equal(t, uint64(2), resolved.GetGeneration())
+		require.Equal(t, database.ConnectorGenerationStatePrimary, resolved.GetState())
 		require.Equal(t, logicalConnector.Name, resolved.GetName())
 	})
 }
@@ -176,11 +176,11 @@ func TestResolveConnectionReferenceHydratesPinnedConnector(t *testing.T) {
 	ctx := context.Background()
 	connectorID := apid.New(apid.PrefixConnector)
 	connection := &database.Connection{
-		Id:               apid.New(apid.PrefixConnection),
-		Namespace:        "root.team",
-		Name:             "production",
-		ConnectorId:      connectorID,
-		ConnectorVersion: 4,
+		Id:                  apid.New(apid.PrefixConnection),
+		Namespace:           "root.team",
+		Name:                "production",
+		ConnectorId:         connectorID,
+		ConnectorGeneration: 4,
 	}
 	ref := coreReference(connectionschema.ConnectionKind, connection.Id.String())
 	db.EXPECT().ResolveConnectionReference(ctx, ref).Return(connection, nil)
@@ -191,7 +191,7 @@ func TestResolveConnectionReferenceHydratesPinnedConnector(t *testing.T) {
 		connectorResourceForMock(
 			connectorID,
 			4,
-			database.ConnectorDefinitionVersionStatePrimary,
+			database.ConnectorGenerationStatePrimary,
 			nil,
 			connectorschema.ConnectorDefinition{
 				DisplayName: "Billing",
@@ -204,7 +204,7 @@ func TestResolveConnectionReferenceHydratesPinnedConnector(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, connection.Id, resolved.GetId())
 	require.Equal(t, connectorID, resolved.GetConnector().GetId())
-	require.Equal(t, uint64(4), resolved.GetConnector().GetVersion())
+	require.Equal(t, uint64(4), resolved.GetConnector().GetGeneration())
 }
 
 func TestResolveObjectReferenceNormalizesDatabaseErrors(t *testing.T) {
@@ -292,17 +292,17 @@ func TestResolveObjectReferencePropagatesUnexpectedDatabaseErrors(t *testing.T) 
 	})
 }
 
-func TestResolveConnectorReferenceReturnsNotFoundWithoutDefinitionVersion(t *testing.T) {
+func TestResolveConnectorReferenceReturnsNotFoundWithoutDefinitionGeneration(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	s, db, _, _, _, _ := FullMockService(t, ctrl)
 	ctx := context.Background()
 	connector := &database.Connector{Id: apid.New(apid.PrefixConnector)}
 	ref := coreReference(connectorschema.ConnectorKind, connector.Id.String())
 	db.EXPECT().ResolveConnectorReference(ctx, ref).Return(connector, nil)
-	db.EXPECT().GetConnectorDefinitionVersionForState(
+	db.EXPECT().GetConnectorGenerationForState(
 		ctx,
 		connector.Id,
-		database.ConnectorDefinitionVersionStatePrimary,
+		database.ConnectorGenerationStatePrimary,
 	).Return(nil, database.ErrNotFound)
 
 	resolved, err := s.ResolveConnectorReference(ctx, ref)

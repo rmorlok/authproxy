@@ -119,7 +119,7 @@ func searchSourceFor(resourceType SearchResourceType, provider config.DatabasePr
 			updatedExpression: "src.updated_at",
 			withName:          "search_connector_rows",
 			withSQL: "\n" +
-				"SELECT c.id, c.name, c.namespace, c.labels, c.updated_at, dv.state, dv.version, ROW_NUMBER() OVER (\n" +
+				"SELECT c.id, c.name, c.namespace, c.labels, c.updated_at, dv.state, dv.generation, ROW_NUMBER() OVER (\n" +
 				"  PARTITION BY dv.connector_id\n" +
 				"  ORDER BY CASE dv.state\n" +
 				"    WHEN 'primary' THEN 1\n" +
@@ -127,9 +127,9 @@ func searchSourceFor(resourceType SearchResourceType, provider config.DatabasePr
 				"    WHEN 'active' THEN 3\n" +
 				"    WHEN 'archived' THEN 4\n" +
 				"    ELSE 5\n" +
-				"  END, dv.version DESC\n" +
+				"  END, dv.generation DESC\n" +
 				") AS search_row_num\n" +
-				"FROM connector_definition_versions dv\n" +
+				"FROM connector_generations dv\n" +
 				"JOIN connectors c ON c.id = dv.connector_id\n" +
 				"WHERE c.deleted_at IS NULL AND dv.deleted_at IS NULL\n",
 			extraWhere: sq.Eq{"src.search_row_num": 1},

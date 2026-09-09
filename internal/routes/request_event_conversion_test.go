@@ -36,7 +36,7 @@ func TestRequestEventToJSONBuildsImmutableProjectionAndReferences(t *testing.T) 
 		MillisecondDuration: app_metrics.MillisecondDuration(150 * time.Millisecond),
 		ConnectionId:        connectionID,
 		ConnectorId:         connectorID,
-		ConnectorVersion:    3,
+		ConnectorGeneration: 3,
 		Method:              "POST",
 		Host:                "api.example.com",
 		Scheme:              "https",

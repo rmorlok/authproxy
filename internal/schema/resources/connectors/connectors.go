@@ -70,10 +70,10 @@ func (c *Connectors) ValidateIdentities(vc *common.ValidationContext) error {
 		Name      common.ResourceName
 	}
 	type identityDetails struct {
-		ids         map[apid.ID]struct{}
-		hasNoId     bool
-		versions    map[uint64]int
-		unversioned map[string]int
+		ids               map[apid.ID]struct{}
+		hasNoId           bool
+		generations       map[uint64]int
+		withoutGeneration map[string]int
 	}
 
 	byName := make(map[nameKey]*identityDetails)
@@ -98,7 +98,7 @@ func (c *Connectors) ValidateIdentities(vc *common.ValidationContext) error {
 		nk := nameKey{Namespace: connector.GetNamespace(), Name: name}
 		nameDetails := byName[nk]
 		if nameDetails == nil {
-			nameDetails = &identityDetails{ids: make(map[apid.ID]struct{}), versions: make(map[uint64]int)}
+			nameDetails = &identityDetails{ids: make(map[apid.ID]struct{}), generations: make(map[uint64]int)}
 			byName[nk] = nameDetails
 		}
 		if connector.HasId() {
@@ -114,17 +114,17 @@ func (c *Connectors) ValidateIdentities(vc *common.ValidationContext) error {
 		}
 		logicalDetails := byLogical[lk]
 		if logicalDetails == nil {
-			logicalDetails = &identityDetails{versions: make(map[uint64]int), unversioned: make(map[string]int)}
+			logicalDetails = &identityDetails{generations: make(map[uint64]int), withoutGeneration: make(map[string]int)}
 			byLogical[lk] = logicalDetails
 		}
 		if connector.HasGeneration() {
-			logicalDetails.versions[connector.Metadata.Generation]++
+			logicalDetails.generations[connector.Metadata.Generation]++
 		} else {
 			state := string(connector.Spec.Release.DesiredState)
 			if state == "" {
 				state = "primary"
 			}
-			logicalDetails.unversioned[state]++
+			logicalDetails.withoutGeneration[state]++
 		}
 
 		if connector.HasId() {
@@ -162,29 +162,29 @@ func (c *Connectors) ValidateIdentities(vc *common.ValidationContext) error {
 	}
 
 	for key, details := range byLogical {
-		if len(details.unversioned) > 0 && len(details.versions) > 0 {
+		if len(details.withoutGeneration) > 0 && len(details.generations) > 0 {
 			if key.Id != apid.Nil {
-				result = multierror.Append(result, vc.NewErrorf("connector %s has multiple entries without differentiated versions", key.Id))
+				result = multierror.Append(result, vc.NewErrorf("connector %s has multiple entries without differentiated generations", key.Id))
 			} else {
-				result = multierror.Append(result, vc.NewErrorf("connector name %q in namespace %q has multiple entries without differentiated versions", key.Name, key.Namespace))
+				result = multierror.Append(result, vc.NewErrorf("connector name %q in namespace %q has multiple entries without differentiated generations", key.Name, key.Namespace))
 			}
 		}
-		for state, count := range details.unversioned {
+		for state, count := range details.withoutGeneration {
 			if count <= 1 {
 				continue
 			}
 			if key.Id != apid.Nil {
-				result = multierror.Append(result, vc.NewErrorf("connector %s has multiple unversioned entries for state %q", key.Id, state))
+				result = multierror.Append(result, vc.NewErrorf("connector %s has multiple entries without an explicit generation for state %q", key.Id, state))
 			} else {
-				result = multierror.Append(result, vc.NewErrorf("connector name %q in namespace %q has multiple unversioned entries for state %q", key.Name, key.Namespace, state))
+				result = multierror.Append(result, vc.NewErrorf("connector name %q in namespace %q has multiple entries without an explicit generation for state %q", key.Name, key.Namespace, state))
 			}
 		}
-		for version, count := range details.versions {
+		for generation, count := range details.generations {
 			if count > 1 {
 				if key.Id != apid.Nil {
-					result = multierror.Append(result, vc.NewErrorf("duplicate connectors exist for id %s with version %d", key.Id, version))
+					result = multierror.Append(result, vc.NewErrorf("duplicate connectors exist for id %s with generation %d", key.Id, generation))
 				} else {
-					result = multierror.Append(result, vc.NewErrorf("duplicate connectors exist for name %q in namespace %q with version %d", key.Name, key.Namespace, version))
+					result = multierror.Append(result, vc.NewErrorf("duplicate connectors exist for name %q in namespace %q with generation %d", key.Name, key.Namespace, generation))
 				}
 			}
 		}

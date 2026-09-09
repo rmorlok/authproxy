@@ -385,6 +385,25 @@ definitions:
       connection:
         $ref: '#/definitions/openapi.ConnectionJson'
     type: object
+  openapi.ConnectionGenerationMigrationSpecJson:
+    properties:
+      connectorRef:
+        $ref: '#/definitions/meta.ObjectReference'
+      timeoutSeconds:
+        example: 600
+        type: integer
+    required:
+    - connectorRef
+    type: object
+  openapi.ConnectionGenerationMigrationStatusJson:
+    properties:
+      sourceConnectorRef:
+        $ref: '#/definitions/meta.ObjectReference'
+      targetConnectorRef:
+        $ref: '#/definitions/meta.ObjectReference'
+      taskId:
+        type: string
+    type: object
   openapi.ConnectionJson:
     description: Kubernetes-style Connection resource
     properties:
@@ -460,25 +479,6 @@ definitions:
         $ref: '#/definitions/meta.ObjectReference'
     required:
     - connectorRef
-    type: object
-  openapi.ConnectionVersionMigrationSpecJson:
-    properties:
-      connectorRef:
-        $ref: '#/definitions/meta.ObjectReference'
-      timeoutSeconds:
-        example: 600
-        type: integer
-    required:
-    - connectorRef
-    type: object
-  openapi.ConnectionVersionMigrationStatusJson:
-    properties:
-      sourceConnectorRef:
-        $ref: '#/definitions/meta.ObjectReference'
-      targetConnectorRef:
-        $ref: '#/definitions/meta.ObjectReference'
-      taskId:
-        type: string
     type: object
   openapi.ConnectorJson:
     description: Kubernetes-style Connector resource
@@ -1592,6 +1592,30 @@ definitions:
     - metadata
     - spec
     type: object
+  routes.OpenAPIConnectionGenerationMigrationActionJson:
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - ConnectionGenerationMigration
+        example: ConnectionGenerationMigration
+        type: string
+      metadata:
+        $ref: '#/definitions/openapi.ConnectionActionMetaJson'
+      spec:
+        $ref: '#/definitions/openapi.ConnectionGenerationMigrationSpecJson'
+      status:
+        $ref: '#/definitions/openapi.ConnectionGenerationMigrationStatusJson'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
   routes.OpenAPIConnectionInitiateActionJson:
     properties:
       apiVersion:
@@ -1748,30 +1772,6 @@ definitions:
         $ref: '#/definitions/openapi.ConnectionActionMetaJson'
       spec:
         $ref: '#/definitions/openapi.ConnectionSetupSubmitSpecJson'
-    required:
-    - apiVersion
-    - kind
-    - metadata
-    - spec
-    type: object
-  routes.OpenAPIConnectionVersionMigrationActionJson:
-    properties:
-      apiVersion:
-        enum:
-        - authproxy.net/v1alpha1
-        example: authproxy.net/v1alpha1
-        type: string
-      kind:
-        enum:
-        - ConnectionVersionMigration
-        example: ConnectionVersionMigration
-        type: string
-      metadata:
-        $ref: '#/definitions/openapi.ConnectionActionMetaJson'
-      spec:
-        $ref: '#/definitions/openapi.ConnectionVersionMigrationSpecJson'
-      status:
-        $ref: '#/definitions/openapi.ConnectionVersionMigrationStatusJson'
     required:
     - apiVersion
     - kind
@@ -3006,12 +3006,12 @@ paths:
       summary: Force connection state
       tags:
       - connections
-  /connections/{id}/_migrateVersion:
+  /connections/{id}/_migrateGeneration:
     post:
       consumes:
       - application/json
       description: Start a workflow that migrates an existing connection to another
-        version of the same connector
+        generation of the same connector
       parameters:
       - description: Connection UUID
         in: path
@@ -3023,14 +3023,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.OpenAPIConnectionVersionMigrationActionJson'
+          $ref: '#/definitions/routes.OpenAPIConnectionGenerationMigrationActionJson'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.OpenAPIConnectionVersionMigrationActionJson'
+            $ref: '#/definitions/routes.OpenAPIConnectionGenerationMigrationActionJson'
         "400":
           description: Bad Request
           schema:
@@ -3053,7 +3053,7 @@ paths:
             $ref: '#/definitions/routes.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Migrate connection connector version
+      summary: Migrate connection connector generation
       tags:
       - connections
   /connections/{id}/_proxy:
@@ -4231,9 +4231,9 @@ paths:
         in: query
         name: connectorId
         type: string
-      - description: Filter by connector version
+      - description: Filter by connector generation
         in: query
-        name: connectorVersion
+        name: connectorGeneration
         type: integer
       - description: Filter by HTTP method
         in: query

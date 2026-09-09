@@ -53,7 +53,7 @@ export interface ConnectorStatus {
 
 /**
  * Every connector generation is a Connector resource. The logical connector
- * is metadata.id; metadata.generation selects a specific version.
+ * is metadata.id; metadata.generation selects a specific generation.
  */
 export interface Connector extends TypeMeta<typeof CONNECTOR_KIND> {
   metadata: ConnectorMetadata;

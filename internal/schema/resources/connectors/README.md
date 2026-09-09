@@ -1,6 +1,6 @@
 # Connector Resource Schema
 
-This package separates the versioned `Connector` resource from its provider-only `ConnectorDefinition`. Resource identity, generation, labels, annotations, release intent, and observed state belong in the resource envelope. Only `spec.definition` is encrypted in the connector-definition database column and included in the semantic definition hash.
+This package separates the generation-addressed `Connector` resource from its provider-only `ConnectorDefinition`. Resource identity, generation, labels, annotations, release intent, and observed state belong in the resource envelope. Only `spec.definition` is encrypted in the connector-generation database column and included in the semantic definition hash.
 
 ```yaml
 apiVersion: authproxy.net/v1alpha1

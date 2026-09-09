@@ -139,16 +139,16 @@ func TestTelemetryRoundTripper_EmitsClientSpanAndMetrics(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, factory)
 
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 	connectionID := apid.New(apid.PrefixConnection)
 
 	ri := RequestInfo{
-		Namespace:        "root.team-a",
-		Type:             RequestTypeProxy,
-		ConnectorId:      connectorID,
-		ConnectorVersion: 7,
-		ConnectionId:     connectionID,
-		Labels:           map[string]string{"tenant_id": "t1"},
+		Namespace:           "root.team-a",
+		Type:                RequestTypeProxy,
+		ConnectorId:         connectorID,
+		ConnectorGeneration: 7,
+		ConnectionId:        connectionID,
+		Labels:              map[string]string{"tenant_id": "t1"},
 	}
 	upstream := &stubTransport{status: http.StatusOK, body: "hello"}
 	rt := factory.NewRoundTripper(ri, upstream)
@@ -172,7 +172,7 @@ func TestTelemetryRoundTripper_EmitsClientSpanAndMetrics(t *testing.T) {
 	require.Equal(t, string(RequestTypeProxy), attrs["authproxy.request.type"])
 	require.Equal(t, "root.team-a", attrs["authproxy.namespace"])
 	require.Equal(t, connectorID.String(), attrs["authproxy.connector_id"])
-	require.EqualValues(t, 7, attrs["authproxy.connector_version"])
+	require.EqualValues(t, 7, attrs["authproxy.connector_generation"])
 	require.Equal(t, connectionID.String(), attrs["authproxy.connection_id"])
 	require.Equal(t, "t1", attrs["tenant_id"])
 	require.Equal(t, codes.Unset, span.Status().Code, "2xx must leave span status Unset")
@@ -260,7 +260,7 @@ func TestTelemetryRoundTripper_ConnectorIdentityFromRequestInfo(t *testing.T) {
 	factory, err := NewTelemetryFactory(fx.providers, cfg)
 	require.NoError(t, err)
 
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 	ri := RequestInfo{
 		Type:        RequestTypeProxy,
 		ConnectorId: connectorID,

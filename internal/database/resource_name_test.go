@@ -83,12 +83,12 @@ func namedResourceHarnesses() []namedResourceHarness {
 			prefix:       apid.PrefixConnection,
 			create: func(ctx context.Context, db DB, id apid.ID, ns string, name scommon.ResourceName) error {
 				return db.CreateConnection(ctx, &Connection{
-					Id:               id,
-					Name:             name,
-					Namespace:        ns,
-					State:            ConnectionStateSetup,
-					ConnectorId:      apid.New(apid.PrefixConnectorVersion),
-					ConnectorVersion: 1,
+					Id:                  id,
+					Name:                name,
+					Namespace:           ns,
+					State:               ConnectionStateSetup,
+					ConnectorId:         apid.New(apid.PrefixConnector),
+					ConnectorGeneration: 1,
 				})
 			},
 			getName: func(ctx context.Context, db DB, id apid.ID) (scommon.ResourceName, error) {
@@ -468,7 +468,7 @@ func TestResourceNameMigrationBackfillsExistingRows(t *testing.T) {
 	`, deletedActorID))
 	require.NoError(t, err)
 	_, err = rawDB.Exec(`
-		INSERT INTO connections (id, namespace, state, connector_id, connector_version)
+		INSERT INTO connections (id, namespace, state, connector_id, connector_generation)
 		VALUES ('cxn_migration', 'root', 'setup', 'cxr_migration', 1)
 	`)
 	require.NoError(t, err)

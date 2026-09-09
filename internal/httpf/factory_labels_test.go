@@ -18,11 +18,11 @@ type stubConnection struct {
 	labels    map[string]string
 }
 
-func (s *stubConnection) GetId() apid.ID               { return s.id }
-func (s *stubConnection) GetNamespace() string         { return s.namespace }
-func (s *stubConnection) GetConnectorId() apid.ID      { return s.cvID }
-func (s *stubConnection) GetConnectorVersion() uint64  { return s.cvVersion }
-func (s *stubConnection) GetLabels() map[string]string { return s.labels }
+func (s *stubConnection) GetId() apid.ID                 { return s.id }
+func (s *stubConnection) GetNamespace() string           { return s.namespace }
+func (s *stubConnection) GetConnectorId() apid.ID        { return s.cvID }
+func (s *stubConnection) GetConnectorGeneration() uint64 { return s.cvVersion }
+func (s *stubConnection) GetLabels() map[string]string   { return s.labels }
 
 // stubActor is a minimal Actor implementation for testing.
 type stubActor struct {

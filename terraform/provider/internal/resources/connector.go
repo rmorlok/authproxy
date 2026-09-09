@@ -30,7 +30,7 @@ type ConnectorResourceModel struct {
 	Labels      types.Map            `tfsdk:"labels"`
 	Annotations types.Map            `tfsdk:"annotations"`
 	Publish     types.Bool           `tfsdk:"publish"`
-	Version     types.Int64          `tfsdk:"version"`
+	Generation  types.Int64          `tfsdk:"generation"`
 	State       types.String         `tfsdk:"state"`
 	DisplayName types.String         `tfsdk:"display_name"`
 	CreatedAt   types.String         `tfsdk:"created_at"`
@@ -50,7 +50,7 @@ func (r *ConnectorResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 		Description: "Manages an AuthProxy connector and its generation lifecycle. Published definition changes create a new generation; draft definition changes update that draft in place.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Description: "The stable connector ID (persists across version changes).",
+				Description: "The stable connector ID (persists across generation changes).",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
@@ -87,12 +87,12 @@ func (r *ConnectorResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Computed:    true,
 				Default:     booldefault.StaticBool(true),
 			},
-			"version": schema.Int64Attribute{
-				Description: "The current API metadata.generation, exposed under the provider's established version attribute.",
+			"generation": schema.Int64Attribute{
+				Description: "The current connector metadata.generation.",
 				Computed:    true,
 			},
 			"state": schema.StringAttribute{
-				Description: "The current version state (draft, primary, active, archived).",
+				Description: "The current generation state (draft, primary, active, archived).",
 				Computed:    true,
 			},
 			"display_name": schema.StringAttribute{
@@ -167,8 +167,8 @@ func (r *ConnectorResource) Read(ctx context.Context, req resource.ReadRequest, 
 	// exact generation managed by Terraform; published resources deliberately
 	// follow the API's primary generation so out-of-band promotion is detected.
 	if !state.Publish.IsNull() && !state.Publish.IsUnknown() && !state.Publish.ValueBool() &&
-		!state.Version.IsNull() && !state.Version.IsUnknown() && state.Version.ValueInt64() > 0 {
-		connector, err = r.client.GetConnectorVersion(ctx, id, uint64(state.Version.ValueInt64()))
+		!state.Generation.IsNull() && !state.Generation.IsUnknown() && state.Generation.ValueInt64() > 0 {
+		connector, err = r.client.GetConnectorGeneration(ctx, id, uint64(state.Generation.ValueInt64()))
 	} else {
 		connector, err = r.client.GetConnector(ctx, id)
 	}
@@ -214,7 +214,7 @@ func (r *ConnectorResource) Update(ctx context.Context, req resource.UpdateReque
 		defJSON := json.RawMessage(plan.Definition.ValueString())
 		if state.State.ValueString() == "draft" {
 			desiredState := desiredConnectorReleaseState(plan.Publish.ValueBool())
-			cv, err = r.client.UpdateConnectorVersion(ctx, id, uint64(state.Version.ValueInt64()), client.UpdateConnectorRequest{
+			cv, err = r.client.UpdateConnectorGeneration(ctx, id, uint64(state.Generation.ValueInt64()), client.UpdateConnectorRequest{
 				TypeMeta: client.NewTypeMeta(client.ConnectorKind),
 				Metadata: connectorMetadataPatch(labels, annotations),
 				Spec: &client.ConnectorSpecPatch{
@@ -223,7 +223,7 @@ func (r *ConnectorResource) Update(ctx context.Context, req resource.UpdateReque
 				},
 			})
 		} else {
-			cv, err = r.client.CreateConnectorVersion(ctx, id, client.CreateConnectorVersionRequest{
+			cv, err = r.client.CreateConnectorGeneration(ctx, id, client.CreateConnectorGenerationRequest{
 				TypeMeta: client.NewTypeMeta(client.ConnectorKind),
 				Metadata: client.ObjectMetadata{
 					Namespace:   plan.Namespace.ValueString(),
@@ -242,9 +242,9 @@ func (r *ConnectorResource) Update(ctx context.Context, req resource.UpdateReque
 		}
 	} else if publishChanged && plan.Publish.ValueBool() {
 		// Publish changed from false to true: promote the exact draft generation.
-		currentVersion := uint64(state.Version.ValueInt64())
+		currentGeneration := uint64(state.Generation.ValueInt64())
 		desiredState := "primary"
-		cv, err = r.client.UpdateConnectorVersion(ctx, id, currentVersion, client.UpdateConnectorRequest{
+		cv, err = r.client.UpdateConnectorGeneration(ctx, id, currentGeneration, client.UpdateConnectorRequest{
 			TypeMeta: client.NewTypeMeta(client.ConnectorKind),
 			Metadata: connectorMetadataPatch(labels, annotations),
 			Spec: &client.ConnectorSpecPatch{Release: &client.ConnectorReleaseSpecPatch{
@@ -252,7 +252,7 @@ func (r *ConnectorResource) Update(ctx context.Context, req resource.UpdateReque
 			}},
 		})
 		if err != nil {
-			resp.Diagnostics.AddError("Failed to promote version to primary", err.Error())
+			resp.Diagnostics.AddError("Failed to promote generation to primary", err.Error())
 			return
 		}
 	} else {
@@ -262,7 +262,7 @@ func (r *ConnectorResource) Update(ctx context.Context, req resource.UpdateReque
 			Spec:     &client.ConnectorSpecPatch{},
 		}
 		if state.State.ValueString() == "draft" {
-			cv, err = r.client.UpdateConnectorVersion(ctx, id, uint64(state.Version.ValueInt64()), updateReq)
+			cv, err = r.client.UpdateConnectorGeneration(ctx, id, uint64(state.Generation.ValueInt64()), updateReq)
 		} else {
 			cv, err = r.client.UpdateConnector(ctx, id, updateReq)
 		}
@@ -285,21 +285,21 @@ func (r *ConnectorResource) Delete(ctx context.Context, req resource.DeleteReque
 
 	id := state.Id.ValueString()
 
-	// List all versions and archive non-archived ones
-	versions, err := r.client.ListConnectorVersions(ctx, id)
+	// List all generations and archive non-archived ones
+	generations, err := r.client.ListConnectorGenerations(ctx, id)
 	if err != nil {
 		if client.IsNotFound(err) {
 			return
 		}
-		resp.Diagnostics.AddError("Failed to list connector versions", err.Error())
+		resp.Diagnostics.AddError("Failed to list connector generations", err.Error())
 		return
 	}
 
-	for _, v := range versions.Items {
+	for _, v := range generations.Items {
 		if v.Status != nil && v.Status.Release.State != "archived" {
-			err = r.client.ForceConnectorVersionState(ctx, id, v.Metadata.Generation, "archived")
+			err = r.client.ForceConnectorGenerationState(ctx, id, v.Metadata.Generation, "archived")
 			if err != nil {
-				resp.Diagnostics.AddError("Failed to archive connector version", err.Error())
+				resp.Diagnostics.AddError("Failed to archive connector generation", err.Error())
 				return
 			}
 		}
@@ -315,7 +315,7 @@ func (r *ConnectorResource) ImportState(ctx context.Context, req resource.Import
 func setConnectorState(model *ConnectorResourceModel, connector *client.Connector) {
 	model.Id = types.StringValue(connector.Metadata.ID)
 	model.Namespace = types.StringValue(connector.Metadata.Namespace)
-	model.Version = types.Int64Value(int64(connector.Metadata.Generation))
+	model.Generation = types.Int64Value(int64(connector.Metadata.Generation))
 	model.Labels = labelsToMap(connector.Metadata.Labels)
 	model.Annotations = annotationsToMap(connector.Metadata.Annotations)
 	model.CreatedAt = timestampToString(connector.Metadata.CreatedAt)

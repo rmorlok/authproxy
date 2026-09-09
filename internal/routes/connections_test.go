@@ -93,28 +93,28 @@ func TestConnections(t *testing.T) {
 	}
 
 	connectorId := apid.MustParse("cxr_test0000000000001")
-	connectorVersion := uint64(1)
+	connectorGeneration := uint64(1)
 	oauthConnectorId := apid.MustParse("cxr_test0000000000002")
-	oauthConnectorVersion := uint64(1)
+	oauthConnectorGeneration := uint64(1)
 	configurationConnectorId := apid.MustParse("cxr_test0000000000003")
 	demoConnectorId := apid.MustParse("cxr_test0000000000004")
-	demoConnectorVersion := uint64(1)
+	demoConnectorGeneration := uint64(1)
 	demoConnectorNamespace := "root.demo"
 
 	setup := func(t *testing.T, cfg config.C) (*TestSetup, func()) {
 		cfg = config.FromRoot(&sconfig.Root{
 			Connectors: &sconfig.Connectors{
 				LoadFromList: []sconfig.Connector{
-					configuredConnectorResource(connectorId, connectorVersion, "root", map[string]string{"type": "test-connector"}, cschema.ConnectorDefinition{
+					configuredConnectorResource(connectorId, connectorGeneration, "root", map[string]string{"type": "test-connector"}, cschema.ConnectorDefinition{
 						DisplayName: "Test Connector",
 					}),
-					configuredConnectorResource(oauthConnectorId, oauthConnectorVersion, "root", map[string]string{"type": "oauth2-connector"}, cschema.ConnectorDefinition{
+					configuredConnectorResource(oauthConnectorId, oauthConnectorGeneration, "root", map[string]string{"type": "oauth2-connector"}, cschema.ConnectorDefinition{
 						DisplayName: "OAuth2 Test Connector",
 						Auth: &sconfig.Auth{InnerVal: &sconfig.AuthOAuth2{
 							Type: sconfig.AuthTypeOAuth2,
 						}},
 					}),
-					configuredConnectorResource(configurationConnectorId, connectorVersion, "root", map[string]string{"type": "configuration-connector"}, cschema.ConnectorDefinition{
+					configuredConnectorResource(configurationConnectorId, connectorGeneration, "root", map[string]string{"type": "configuration-connector"}, cschema.ConnectorDefinition{
 						DisplayName: "Configuration Test Connector",
 						SetupFlow: &cschema.SetupFlow{
 							Preconnect: &cschema.SetupFlowPhase{Steps: []cschema.SetupFlowStep{{
@@ -130,7 +130,7 @@ func TestConnections(t *testing.T) {
 							}}},
 						},
 					}),
-					configuredConnectorResource(demoConnectorId, demoConnectorVersion, demoConnectorNamespace, map[string]string{"type": "demo-connector"}, cschema.ConnectorDefinition{
+					configuredConnectorResource(demoConnectorId, demoConnectorGeneration, demoConnectorNamespace, map[string]string{"type": "demo-connector"}, cschema.ConnectorDefinition{
 						DisplayName: "Demo Connector",
 					}),
 				},
@@ -167,11 +167,11 @@ func TestConnections(t *testing.T) {
 		defer done()
 		u := apid.New(apid.PrefixConnection)
 		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
-			Id:               u,
-			Namespace:        sconfig.RootNamespace,
-			ConnectorId:      configurationConnectorId,
-			ConnectorVersion: connectorVersion,
-			State:            database.ConnectionStateSetup,
+			Id:                  u,
+			Namespace:           sconfig.RootNamespace,
+			ConnectorId:         configurationConnectorId,
+			ConnectorGeneration: connectorGeneration,
+			State:               database.ConnectionStateSetup,
 		})
 		require.NoError(t, err)
 		encryptedConfiguration, err := tu.Encrypt.EncryptStringForNamespace(
@@ -230,7 +230,7 @@ func TestConnections(t *testing.T) {
 			require.Equal(t, u.String(), resp.Metadata.ID)
 			require.Equal(t, connectionschema.ConnectionStateSetup, resp.Status.Lifecycle.State)
 			require.Equal(t, configurationConnectorId.String(), resp.Spec.ConnectorRef.ID)
-			require.Equal(t, connectorVersion, resp.Spec.ConnectorRef.Generation)
+			require.Equal(t, connectorGeneration, resp.Spec.ConnectorRef.Generation)
 			require.Equal(t, "acme", resp.Spec.Configuration["tenant"])
 			require.Equal(t, "sales", resp.Spec.Configuration["workspace"])
 			require.True(t, resp.Status.Configuration.Configured)
@@ -318,44 +318,44 @@ func TestConnections(t *testing.T) {
 
 		u := apid.New(apid.PrefixConnection)
 		err := tu.Db.CreateConnection(ctx, &database.Connection{
-			Id:               u,
-			Namespace:        "root",
-			ConnectorId:      connectorId,
-			ConnectorVersion: connectorVersion,
-			State:            database.ConnectionStateSetup,
+			Id:                  u,
+			Namespace:           "root",
+			ConnectorId:         connectorId,
+			ConnectorGeneration: connectorGeneration,
+			State:               database.ConnectionStateSetup,
 		})
 		require.NoError(t, err)
 
 		now = now.Add(time.Second)
 		c.SetTime(now)
 		err = tu.Db.CreateConnection(ctx, &database.Connection{
-			Id:               apid.New(apid.PrefixConnection),
-			Namespace:        "root.child",
-			ConnectorId:      connectorId,
-			ConnectorVersion: connectorVersion,
-			State:            database.ConnectionStateSetup,
+			Id:                  apid.New(apid.PrefixConnection),
+			Namespace:           "root.child",
+			ConnectorId:         connectorId,
+			ConnectorGeneration: connectorGeneration,
+			State:               database.ConnectionStateSetup,
 		})
 		require.NoError(t, err)
 
 		now = now.Add(time.Second)
 		c.SetTime(now)
 		err = tu.Db.CreateConnection(ctx, &database.Connection{
-			Id:               apid.New(apid.PrefixConnection),
-			Namespace:        "root.child",
-			ConnectorId:      connectorId,
-			ConnectorVersion: connectorVersion,
-			State:            database.ConnectionStateSetup,
+			Id:                  apid.New(apid.PrefixConnection),
+			Namespace:           "root.child",
+			ConnectorId:         connectorId,
+			ConnectorGeneration: connectorGeneration,
+			State:               database.ConnectionStateSetup,
 		})
 		require.NoError(t, err)
 
 		now = now.Add(time.Second)
 		c.SetTime(now)
 		err = tu.Db.CreateConnection(ctx, &database.Connection{
-			Id:               apid.New(apid.PrefixConnection),
-			Namespace:        "root.child.grandchild",
-			ConnectorId:      connectorId,
-			ConnectorVersion: connectorVersion,
-			State:            database.ConnectionStateSetup,
+			Id:                  apid.New(apid.PrefixConnection),
+			Namespace:           "root.child.grandchild",
+			ConnectorId:         connectorId,
+			ConnectorGeneration: connectorGeneration,
+			State:               database.ConnectionStateSetup,
 		})
 		require.NoError(t, err)
 
@@ -461,11 +461,11 @@ func TestConnections(t *testing.T) {
 		t.Run("filter to connector id", func(t *testing.T) {
 			oauthConnectionId := apid.New(apid.PrefixConnection)
 			err := tu.Db.CreateConnection(ctx, &database.Connection{
-				Id:               oauthConnectionId,
-				Namespace:        "root",
-				ConnectorId:      oauthConnectorId,
-				ConnectorVersion: oauthConnectorVersion,
-				State:            database.ConnectionStateSetup,
+				Id:                  oauthConnectionId,
+				Namespace:           "root",
+				ConnectorId:         oauthConnectorId,
+				ConnectorGeneration: oauthConnectorGeneration,
+				State:               database.ConnectionStateSetup,
 			})
 			require.NoError(t, err)
 
@@ -496,12 +496,12 @@ func TestConnections(t *testing.T) {
 		t.Run("filter with label_selector", func(t *testing.T) {
 			connId := apid.New(apid.PrefixConnection)
 			err := tu.Db.CreateConnection(ctx, &database.Connection{
-				Id:               connId,
-				Namespace:        "root",
-				ConnectorId:      connectorId,
-				ConnectorVersion: connectorVersion,
-				State:            database.ConnectionStateSetup,
-				Labels:           database.Labels{"env": "test-label-conn"},
+				Id:                  connId,
+				Namespace:           "root",
+				ConnectorId:         connectorId,
+				ConnectorGeneration: connectorGeneration,
+				State:               database.ConnectionStateSetup,
+				Labels:              database.Labels{"env": "test-label-conn"},
 			})
 			require.NoError(t, err)
 
@@ -526,11 +526,11 @@ func TestConnections(t *testing.T) {
 		defer done()
 		u := apid.New(apid.PrefixConnection)
 		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
-			Id:               u,
-			Namespace:        sconfig.RootNamespace,
-			ConnectorId:      connectorId,
-			ConnectorVersion: connectorVersion,
-			State:            database.ConnectionStateConfigured,
+			Id:                  u,
+			Namespace:           sconfig.RootNamespace,
+			ConnectorId:         connectorId,
+			ConnectorGeneration: connectorGeneration,
+			State:               database.ConnectionStateConfigured,
 		})
 		require.NoError(t, err)
 
@@ -629,33 +629,33 @@ func TestConnections(t *testing.T) {
 		})
 	})
 
-	t.Run("migrate connection version", func(t *testing.T) {
+	t.Run("migrate connection generation", func(t *testing.T) {
 		tu, done := setup(t, nil)
 		defer done()
 		connectionID := apid.New(apid.PrefixConnection)
 		require.NoError(t, tu.Db.CreateConnection(context.Background(), &database.Connection{
-			Id:               connectionID,
-			Namespace:        sconfig.RootNamespace,
-			ConnectorId:      connectorId,
-			ConnectorVersion: connectorVersion,
-			State:            database.ConnectionStateConfigured,
+			Id:                  connectionID,
+			Namespace:           sconfig.RootNamespace,
+			ConnectorId:         connectorId,
+			ConnectorGeneration: connectorGeneration,
+			State:               database.ConnectionStateConfigured,
 		}))
 
 		t.Run("rejects a different logical connector", func(t *testing.T) {
 			body := connectionActionBody(
-				schemaapi.ConnectionVersionMigrationActionKind,
+				schemaapi.ConnectionGenerationMigrationActionKind,
 				connectionID,
-				schemaapi.ConnectionVersionMigrationSpec{ConnectorRef: smeta.ObjectReference{
+				schemaapi.ConnectionGenerationMigrationSpec{ConnectorRef: smeta.ObjectReference{
 					APIVersion: smeta.APIVersionV1Alpha1,
 					Kind:       cschema.ConnectorKind,
 					ID:         oauthConnectorId.String(),
-					Generation: oauthConnectorVersion,
+					Generation: oauthConnectorGeneration,
 				}},
 			)
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPost,
-				"/connections/"+connectionID.String()+"/_migrateVersion",
+				"/connections/"+connectionID.String()+"/_migrateGeneration",
 				util.JsonToReader(body),
 				"root",
 				"some-actor",
@@ -745,7 +745,7 @@ func TestConnections(t *testing.T) {
 			connection, err := tu.Db.GetConnection(t.Context(), connectionID)
 			require.NoError(t, err)
 			require.Equal(t, connectorId, connection.ConnectorId)
-			require.Equal(t, connectorVersion, connection.ConnectorVersion)
+			require.Equal(t, connectorGeneration, connection.ConnectorGeneration)
 			require.Equal(t, "platform", connection.Labels["team"])
 			require.Equal(t, "integrations", connection.Annotations["owner"])
 		})
@@ -794,12 +794,12 @@ func TestConnections(t *testing.T) {
 		defer done()
 		u := apid.New(apid.PrefixConnection)
 		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
-			Id:               u,
-			Namespace:        sconfig.RootNamespace,
-			ConnectorId:      connectorId,
-			ConnectorVersion: connectorVersion,
-			State:            database.ConnectionStateSetup,
-			Labels:           database.Labels{"existing": "value"},
+			Id:                  u,
+			Namespace:           sconfig.RootNamespace,
+			ConnectorId:         connectorId,
+			ConnectorGeneration: connectorGeneration,
+			State:               database.ConnectionStateSetup,
+			Labels:              database.Labels{"existing": "value"},
 		})
 		require.NoError(t, err)
 
@@ -993,11 +993,11 @@ func TestConnections(t *testing.T) {
 		defer done()
 		u := apid.New(apid.PrefixConnection)
 		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
-			Id:               u,
-			Namespace:        sconfig.RootNamespace,
-			ConnectorId:      connectorId,
-			ConnectorVersion: connectorVersion,
-			State:            database.ConnectionStateSetup,
+			Id:                  u,
+			Namespace:           sconfig.RootNamespace,
+			ConnectorId:         connectorId,
+			ConnectorGeneration: connectorGeneration,
+			State:               database.ConnectionStateSetup,
 		})
 		require.NoError(t, err)
 
@@ -1118,11 +1118,11 @@ func TestConnections(t *testing.T) {
 
 		connId := apid.New(apid.PrefixConnection)
 		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
-			Id:               connId,
-			Namespace:        sconfig.RootNamespace,
-			ConnectorId:      connectorId,
-			ConnectorVersion: connectorVersion,
-			State:            database.ConnectionStateSetup,
+			Id:                  connId,
+			Namespace:           sconfig.RootNamespace,
+			ConnectorId:         connectorId,
+			ConnectorGeneration: connectorGeneration,
+			State:               database.ConnectionStateSetup,
 		})
 		require.NoError(t, err)
 
@@ -1225,11 +1225,11 @@ func TestConnections(t *testing.T) {
 
 		connId := apid.New(apid.PrefixConnection)
 		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
-			Id:               connId,
-			Namespace:        sconfig.RootNamespace,
-			ConnectorId:      connectorId,
-			ConnectorVersion: connectorVersion,
-			State:            database.ConnectionStateSetup,
+			Id:                  connId,
+			Namespace:           sconfig.RootNamespace,
+			ConnectorId:         connectorId,
+			ConnectorGeneration: connectorGeneration,
+			State:               database.ConnectionStateSetup,
 		})
 		require.NoError(t, err)
 
@@ -1278,11 +1278,11 @@ func TestConnections(t *testing.T) {
 
 		connId := apid.New(apid.PrefixConnection)
 		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
-			Id:               connId,
-			Namespace:        sconfig.RootNamespace,
-			ConnectorId:      connectorId,
-			ConnectorVersion: connectorVersion,
-			State:            database.ConnectionStateSetup,
+			Id:                  connId,
+			Namespace:           sconfig.RootNamespace,
+			ConnectorId:         connectorId,
+			ConnectorGeneration: connectorGeneration,
+			State:               database.ConnectionStateSetup,
 		})
 		require.NoError(t, err)
 
@@ -1330,11 +1330,11 @@ func TestConnections(t *testing.T) {
 
 		connId := apid.New(apid.PrefixConnection)
 		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
-			Id:               connId,
-			Namespace:        sconfig.RootNamespace,
-			ConnectorId:      connectorId,
-			ConnectorVersion: connectorVersion,
-			State:            database.ConnectionStateSetup,
+			Id:                  connId,
+			Namespace:           sconfig.RootNamespace,
+			ConnectorId:         connectorId,
+			ConnectorGeneration: connectorGeneration,
+			State:               database.ConnectionStateSetup,
 		})
 		require.NoError(t, err)
 
@@ -1384,11 +1384,11 @@ func TestConnections(t *testing.T) {
 		// "non-OAuth2" case for this endpoint's contract check.
 		nonOauthConnId := apid.New(apid.PrefixConnection)
 		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
-			Id:               nonOauthConnId,
-			Namespace:        sconfig.RootNamespace,
-			ConnectorId:      connectorId,
-			ConnectorVersion: connectorVersion,
-			State:            database.ConnectionStateConfigured,
+			Id:                  nonOauthConnId,
+			Namespace:           sconfig.RootNamespace,
+			ConnectorId:         connectorId,
+			ConnectorGeneration: connectorGeneration,
+			State:               database.ConnectionStateConfigured,
 		})
 		require.NoError(t, err)
 
@@ -1452,11 +1452,11 @@ func TestConnections(t *testing.T) {
 		t.Run("oauth2 connector returns requested and granted scopes", func(t *testing.T) {
 			oauthConnId := apid.New(apid.PrefixConnection)
 			err := tu.Db.CreateConnection(context.Background(), &database.Connection{
-				Id:               oauthConnId,
-				Namespace:        sconfig.RootNamespace,
-				ConnectorId:      oauthConnectorId,
-				ConnectorVersion: oauthConnectorVersion,
-				State:            database.ConnectionStateConfigured,
+				Id:                  oauthConnId,
+				Namespace:           sconfig.RootNamespace,
+				ConnectorId:         oauthConnectorId,
+				ConnectorGeneration: oauthConnectorGeneration,
+				State:               database.ConnectionStateConfigured,
 			})
 			require.NoError(t, err)
 
@@ -1510,7 +1510,7 @@ func TestConnections(t *testing.T) {
 			if name != nil {
 				spec["name"] = *name
 			}
-			body := connectorActionBody(schemaapi.ConnectionInitiateActionKind, connectorId, connectorVersion, spec)
+			body := connectorActionBody(schemaapi.ConnectionInitiateActionKind, connectorId, connectorGeneration, spec)
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPost, "/connections/_initiate", util.JsonToReader(body),

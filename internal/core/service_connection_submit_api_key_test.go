@@ -53,12 +53,12 @@ func newTestApiKeyConnection(
 
 	conn := &connection{
 		Connection: database.Connection{
-			Id:               "cxn_test1111111111aa",
-			Namespace:        "root",
-			State:            database.ConnectionStateSetup,
-			HealthState:      database.ConnectionHealthStateHealthy,
-			ConnectorId:      c.GetId(),
-			ConnectorVersion: c.GetVersion(),
+			Id:                  "cxn_test1111111111aa",
+			Namespace:           "root",
+			State:               database.ConnectionStateSetup,
+			HealthState:         database.ConnectionHealthStateHealthy,
+			ConnectorId:         c.GetId(),
+			ConnectorGeneration: c.GetGeneration(),
 		},
 		s:         s,
 		connector: c,
@@ -268,11 +268,11 @@ func TestApiKeySubmit_PreconnectFieldNamedApiKeyIsNotTreatedAsCredential(t *test
 	c := NewTestConnector(connector)
 	conn := &connection{
 		Connection: database.Connection{
-			Id:               "cxn_test2222222222aa",
-			Namespace:        "root",
-			State:            database.ConnectionStateSetup,
-			ConnectorId:      c.GetId(),
-			ConnectorVersion: c.GetVersion(),
+			Id:                  "cxn_test2222222222aa",
+			Namespace:           "root",
+			State:               database.ConnectionStateSetup,
+			ConnectorId:         c.GetId(),
+			ConnectorGeneration: c.GetGeneration(),
 		},
 		s:         s,
 		connector: c,
@@ -341,11 +341,11 @@ func TestApiKeySubmit_TransitionsToConfigureWhenNoProbes(t *testing.T) {
 	c := NewTestConnector(connector)
 	conn := &connection{
 		Connection: database.Connection{
-			Id:               "cxn_test3333333333aa",
-			Namespace:        "root",
-			State:            database.ConnectionStateSetup,
-			ConnectorId:      c.GetId(),
-			ConnectorVersion: c.GetVersion(),
+			Id:                  "cxn_test3333333333aa",
+			Namespace:           "root",
+			State:               database.ConnectionStateSetup,
+			ConnectorId:         c.GetId(),
+			ConnectorGeneration: c.GetGeneration(),
 		},
 		s:         s,
 		connector: c,

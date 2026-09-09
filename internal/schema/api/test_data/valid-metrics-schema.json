@@ -24,7 +24,7 @@
         "state",
         "health_state",
         "connector_id",
-        "connector_version"
+        "connector_generation"
       ]
     }
   ]

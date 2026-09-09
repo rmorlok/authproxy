@@ -21,12 +21,12 @@ const (
 )
 
 type RequestInfo struct {
-	Namespace        string
-	Type             RequestType
-	ConnectorId      apid.ID
-	ConnectorVersion uint64
-	ConnectionId     apid.ID
-	Labels           map[string]string
+	Namespace           string
+	Type                RequestType
+	ConnectorId         apid.ID
+	ConnectorGeneration uint64
+	ConnectionId        apid.ID
+	Labels              map[string]string
 
 	// RateLimiting is the rate limiting configuration for the connector, if available.
 	// Nil means use default behavior (enabled with standard Retry-After parsing).

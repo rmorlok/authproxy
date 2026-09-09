@@ -1,7 +1,7 @@
 import {
   Connector,
   CONNECTOR_KIND,
-  VersionedConnectorReference,
+  ConnectorGenerationReference,
   objectReference,
 } from '@authproxy/api';
 
@@ -78,7 +78,7 @@ export const connectorMatchesReference = (
     reference.namespace === connector.metadata.namespace;
 };
 
-export const connectorReference = (connector: Connector): VersionedConnectorReference => (
+export const connectorReference = (connector: Connector): ConnectorGenerationReference => (
   objectReference(CONNECTOR_KIND, {
     id: connector.metadata.id,
     generation: connector.metadata.generation,

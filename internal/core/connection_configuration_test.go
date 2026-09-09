@@ -20,11 +20,11 @@ func newTestConnectionWithService(s *service) *connection {
 	connId := apid.New(apid.PrefixConnection)
 	return &connection{
 		Connection: database.Connection{
-			Id:               connId,
-			Namespace:        "root",
-			State:            database.ConnectionStateSetup,
-			ConnectorId:      c.GetId(),
-			ConnectorVersion: c.GetVersion(),
+			Id:                  connId,
+			Namespace:           "root",
+			State:               database.ConnectionStateSetup,
+			ConnectorId:         c.GetId(),
+			ConnectorGeneration: c.GetGeneration(),
 		},
 		s:         s,
 		connector: c,

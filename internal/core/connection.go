@@ -22,7 +22,7 @@ import (
 )
 
 // Connection is a wrapper for the lower level database equivalent that handles wiring up logic specified in this
-// connection's connector version.
+// connection's connector generation.
 type connection struct {
 	database.Connection
 
@@ -52,7 +52,7 @@ func wrapConnection(
 			WithNamespace(dbConnection.Namespace).
 			WithConnectionId(dbConnection.Id).
 			WithConnectorId(c.Id).
-			WithConnectorVersion(c.Version).
+			WithConnectorGeneration(c.Generation).
 			Build(),
 	}
 }
@@ -84,8 +84,8 @@ func (c *connection) GetConnectorId() apid.ID {
 	return c.ConnectorId
 }
 
-func (c *connection) GetConnectorVersion() uint64 {
-	return c.ConnectorVersion
+func (c *connection) GetConnectorGeneration() uint64 {
+	return c.ConnectorGeneration
 }
 
 func (c *connection) GetCreatedAt() time.Time {
@@ -160,7 +160,7 @@ func (c *connection) GetResource(
 				ID:         c.connector.GetId().String(),
 				Name:       c.connector.GetName(),
 				Namespace:  c.connector.GetNamespace(),
-				Generation: c.connector.GetVersion(),
+				Generation: c.connector.GetGeneration(),
 			},
 			Configuration: configuration,
 		},

@@ -58,7 +58,7 @@ func (o *oAuth2Connection) refreshAccessToken(ctx context.Context, token *databa
 
 // connectorIDForTelemetry returns the connector id used as the
 // authproxy.connector_id SPAN attribute on lifecycle spans. Safe to call
-// when the connection / connector version isn't populated (returns the
+// when the connection / connector generation isn't populated (returns the
 // zero apid.ID, which connectorAttr treats as "absent"). Not used as a
 // metric dimension — see connectorAttr.
 func (o *oAuth2Connection) connectorIDForTelemetry() apid.ID {

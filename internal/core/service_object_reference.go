@@ -36,7 +36,7 @@ func (s *service) ResolveActorReference(
 }
 
 // ResolveConnectionReference resolves a connection and hydrates its pinned
-// connector definition version before returning the core object.
+// connector definition generation before returning the core object.
 func (s *service) ResolveConnectionReference(
 	ctx context.Context,
 	reference meta.ObjectReference,
@@ -49,7 +49,7 @@ func (s *service) ResolveConnectionReference(
 }
 
 // resolveLogicalConnectorReference resolves a connector reference without
-// selecting or hydrating a definition version. Use this for relationships that
+// selecting or hydrating a definition generation. Use this for relationships that
 // apply to the logical connector across all generations.
 func (s *service) resolveLogicalConnectorReference(
 	ctx context.Context,
@@ -63,8 +63,8 @@ func (s *service) resolveLogicalConnectorReference(
 }
 
 // ResolveConnectorReference resolves the logical connector first, then uses
-// generation to choose the requested definition version. An omitted
-// generation selects the primary version.
+// generation to choose the requested definition generation. An omitted
+// generation selects the primary generation.
 func (s *service) ResolveConnectorReference(
 	ctx context.Context,
 	reference meta.ObjectReference,
@@ -75,18 +75,18 @@ func (s *service) ResolveConnectorReference(
 	}
 
 	if reference.Generation != 0 {
-		return s.getConnectorVersion(ctx, connector.Id, reference.Generation)
+		return s.getConnectorGeneration(ctx, connector.Id, reference.Generation)
 	}
 
-	version, err := s.db.GetConnectorDefinitionVersionForState(
+	generation, err := s.db.GetConnectorGenerationForState(
 		ctx,
 		connector.Id,
-		database.ConnectorDefinitionVersionStatePrimary,
+		database.ConnectorGenerationStatePrimary,
 	)
 	if err != nil {
 		return nil, coreObjectReferenceError(reference.Kind, err)
 	}
-	result := wrapConnector(*version, s)
+	result := wrapConnector(*generation, s)
 	if _, err := result.getDefinition(); err != nil {
 		return nil, err
 	}

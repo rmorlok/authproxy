@@ -459,60 +459,60 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 		createdConnection := Connection{
-			Id:               apid.MustParse("cxn_test0000000000001"),
-			State:            ConnectionStateSetup,
-			ConnectorId:      apid.MustParse("cxr_test0000000000001"),
-			ConnectorVersion: 1,
-			CreatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
-			UpdatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
+			Id:                  apid.MustParse("cxn_test0000000000001"),
+			State:               ConnectionStateSetup,
+			ConnectorId:         apid.MustParse("cxr_test0000000000001"),
+			ConnectorGeneration: 1,
+			CreatedAt:           apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
+			UpdatedAt:           apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
 		}
 
 		readyConnection1 := Connection{
-			Id:               apid.MustParse("cxn_test0000000000002"),
-			State:            ConnectionStateConfigured,
-			ConnectorId:      apid.MustParse("cxr_test0000000000001"),
-			ConnectorVersion: 1,
-			CreatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
-			UpdatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
+			Id:                  apid.MustParse("cxn_test0000000000002"),
+			State:               ConnectionStateConfigured,
+			ConnectorId:         apid.MustParse("cxr_test0000000000001"),
+			ConnectorGeneration: 1,
+			CreatedAt:           apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
+			UpdatedAt:           apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
 		}
 
 		readyConnection2 := Connection{
-			Id:               apid.MustParse("cxn_test0000000000003"),
-			State:            ConnectionStateConfigured,
-			ConnectorId:      apid.MustParse("cxr_test0000000000001"),
-			ConnectorVersion: 1,
-			CreatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
-			UpdatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
+			Id:                  apid.MustParse("cxn_test0000000000003"),
+			State:               ConnectionStateConfigured,
+			ConnectorId:         apid.MustParse("cxr_test0000000000001"),
+			ConnectorGeneration: 1,
+			CreatedAt:           apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
+			UpdatedAt:           apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
 		}
 
 		disabledConnection := Connection{
-			Id:               apid.MustParse("cxn_test0000000000004"),
-			State:            ConnectionStateDisabled,
-			ConnectorId:      apid.MustParse("cxr_test0000000000001"),
-			ConnectorVersion: 1,
-			CreatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
-			UpdatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
+			Id:                  apid.MustParse("cxn_test0000000000004"),
+			State:               ConnectionStateDisabled,
+			ConnectorId:         apid.MustParse("cxr_test0000000000001"),
+			ConnectorGeneration: 1,
+			CreatedAt:           apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
+			UpdatedAt:           apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
 		}
 
 		deletedConnection := Connection{
-			Id:               apid.MustParse("cxn_test0000000000005"),
-			State:            ConnectionStateConfigured,
-			ConnectorId:      apid.MustParse("cxr_test0000000000001"),
-			ConnectorVersion: 1,
-			CreatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
-			UpdatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
-			DeletedAt:        util.ToPtr(apctx.GetClock(ctx).Now().Add(-30 * time.Minute)),
+			Id:                  apid.MustParse("cxn_test0000000000005"),
+			State:               ConnectionStateConfigured,
+			ConnectorId:         apid.MustParse("cxr_test0000000000001"),
+			ConnectorGeneration: 1,
+			CreatedAt:           apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
+			UpdatedAt:           apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
+			DeletedAt:           util.ToPtr(apctx.GetClock(ctx).Now().Add(-30 * time.Minute)),
 		}
 
 		manyReadyConnections := make([]Connection, 0)
 		for i := 0; i < 200; i++ {
 			manyReadyConnections = append(manyReadyConnections, Connection{
-				Id:               apid.New(apid.PrefixConnection),
-				State:            ConnectionStateConfigured,
-				ConnectorId:      apid.MustParse("cxr_test0000000000001"),
-				ConnectorVersion: 1,
-				CreatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
-				UpdatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
+				Id:                  apid.New(apid.PrefixConnection),
+				State:               ConnectionStateConfigured,
+				ConnectorId:         apid.MustParse("cxr_test0000000000001"),
+				ConnectorGeneration: 1,
+				CreatedAt:           apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
+				UpdatedAt:           apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
 			})
 		}
 

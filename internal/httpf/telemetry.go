@@ -231,8 +231,8 @@ func (rt *telemetryRoundTripper) identityAttributes() []attribute.KeyValue {
 	if !rt.requestInfo.ConnectorId.IsNil() {
 		attrs = append(attrs, attribute.String("authproxy.connector_id", rt.requestInfo.ConnectorId.String()))
 	}
-	if rt.requestInfo.ConnectorVersion != 0 {
-		attrs = append(attrs, attribute.Int64("authproxy.connector_version", int64(rt.requestInfo.ConnectorVersion)))
+	if rt.requestInfo.ConnectorGeneration != 0 {
+		attrs = append(attrs, attribute.Int64("authproxy.connector_generation", int64(rt.requestInfo.ConnectorGeneration)))
 	}
 	if !rt.requestInfo.ConnectionId.IsNil() {
 		attrs = append(attrs, attribute.String("authproxy.connection_id", rt.requestInfo.ConnectionId.String()))
@@ -273,4 +273,3 @@ func (rt *telemetryRoundTripper) metricAttributes(req *http.Request, status int)
 	attrs = append(attrs, rt.factory.projector.MetricDims(rt.requestInfo.Labels)...)
 	return attrs
 }
-

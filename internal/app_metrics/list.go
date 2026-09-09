@@ -19,31 +19,31 @@ import (
 type RequestOrderByField string
 
 const (
-	RequestOrderByTimestamp          RequestOrderByField = "timestamp"
-	RequestOrderByType               RequestOrderByField = "type"
-	RequestOrderByCorrelationId      RequestOrderByField = "correlation_id"
-	RequestOrderByConnectionId       RequestOrderByField = "connection_id"
-	RequestOrderByConnectorType      RequestOrderByField = "connector_type"
-	RequestOrderByConnectorId        RequestOrderByField = "connector_id"
-	RequestOrderByMethod             RequestOrderByField = "method"
-	RequestOrderByPath               RequestOrderByField = "path"
-	RequestOrderByResponseStatusCode RequestOrderByField = "response_status_code"
-	RequestOrderByConnectorVersion   RequestOrderByField = "connector_version"
-	RequestOrderByNamespace          RequestOrderByField = "namespace"
+	RequestOrderByTimestamp           RequestOrderByField = "timestamp"
+	RequestOrderByType                RequestOrderByField = "type"
+	RequestOrderByCorrelationId       RequestOrderByField = "correlation_id"
+	RequestOrderByConnectionId        RequestOrderByField = "connection_id"
+	RequestOrderByConnectorType       RequestOrderByField = "connector_type"
+	RequestOrderByConnectorId         RequestOrderByField = "connector_id"
+	RequestOrderByMethod              RequestOrderByField = "method"
+	RequestOrderByPath                RequestOrderByField = "path"
+	RequestOrderByResponseStatusCode  RequestOrderByField = "response_status_code"
+	RequestOrderByConnectorGeneration RequestOrderByField = "connector_generation"
+	RequestOrderByNamespace           RequestOrderByField = "namespace"
 )
 
 var validOrderByFields = map[RequestOrderByField]bool{
-	RequestOrderByTimestamp:          true,
-	RequestOrderByType:               true,
-	RequestOrderByCorrelationId:      true,
-	RequestOrderByConnectionId:       true,
-	RequestOrderByConnectorType:      true,
-	RequestOrderByConnectorId:        true,
-	RequestOrderByMethod:             true,
-	RequestOrderByPath:               true,
-	RequestOrderByResponseStatusCode: true,
-	RequestOrderByConnectorVersion:   true,
-	RequestOrderByNamespace:          true,
+	RequestOrderByTimestamp:           true,
+	RequestOrderByType:                true,
+	RequestOrderByCorrelationId:       true,
+	RequestOrderByConnectionId:        true,
+	RequestOrderByConnectorType:       true,
+	RequestOrderByConnectorId:         true,
+	RequestOrderByMethod:              true,
+	RequestOrderByPath:                true,
+	RequestOrderByResponseStatusCode:  true,
+	RequestOrderByConnectorGeneration: true,
+	RequestOrderByNamespace:           true,
 }
 
 func IsValidOrderByField(field RequestOrderByField) bool {
@@ -71,7 +71,7 @@ type ListRequestBuilder interface {
 	ForConnectionId(u apid.ID) ListRequestBuilder
 	ForConnectorType(t string) ListRequestBuilder
 	ForConnectorId(u apid.ID) ListRequestBuilder
-	ForConnectorVersion(v uint64) ListRequestBuilder
+	ForConnectorGeneration(v uint64) ListRequestBuilder
 	ForMethod(method string) ListRequestBuilder
 	ForStatusCode(s int) ListRequestBuilder
 	ForStatusCodeRangeInclusive(start, end int) ListRequestBuilder
@@ -98,7 +98,7 @@ type ListFilters struct {
 	ConnectionId             *apid.ID          `json:"connectionId,omitempty"`
 	ConnectorType            *string           `json:"connectorType,omitempty"`
 	ConnectorId              *apid.ID          `json:"connectorId,omitempty"`
-	ConnectorVersion         *uint64           `json:"connectorVersion,omitempty"`
+	ConnectorGeneration      *uint64           `json:"connectorGeneration,omitempty"`
 	Method                   *string           `json:"method,omitempty"`
 	StatusCodeRangeInclusive []int             `json:"statusCodeRange,omitempty"`
 	TimestampRange           []time.Time       `json:"timestampRange,omitempty"`
@@ -173,8 +173,8 @@ func (l *ListFilters) SetConnectorId(u apid.ID) {
 	l.ConnectorId = util.ToPtr(u)
 }
 
-func (l *ListFilters) SetConnectorVersion(v uint64) {
-	l.ConnectorVersion = util.ToPtr(v)
+func (l *ListFilters) SetConnectorGeneration(v uint64) {
+	l.ConnectorGeneration = util.ToPtr(v)
 }
 
 func (l *ListFilters) SetMethod(method string) {

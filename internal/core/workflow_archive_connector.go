@@ -18,8 +18,8 @@ import (
 const (
 	WorkflowNameArchiveConnectorV1 = "core.connector.archive.v1"
 
-	ActivityNameArchiveConnectorPrepareVersionsV1  = "core.connector.archive.prepare_versions.v1"
-	ActivityNameArchiveConnectorFinalizeVersionsV1 = "core.connector.archive.finalize_versions.v1"
+	ActivityNameArchiveConnectorPrepareGenerationsV1  = "core.connector.archive.prepare_generations.v1"
+	ActivityNameArchiveConnectorFinalizeGenerationsV1 = "core.connector.archive.finalize_generations.v1"
 )
 
 type archiveConnectorWorkflowInputV1 struct {
@@ -51,7 +51,7 @@ func archiveConnectorWorkflowV1(ctx wflib.Context, input archiveConnectorWorkflo
 	if _, err := wflib.ExecuteActivity[any](
 		ctx,
 		wflib.DefaultActivityOptions,
-		ActivityNameArchiveConnectorPrepareVersionsV1,
+		ActivityNameArchiveConnectorPrepareGenerationsV1,
 		input.ConnectorID,
 	).Get(ctx); err != nil {
 		return err
@@ -75,7 +75,7 @@ func archiveConnectorWorkflowV1(ctx wflib.Context, input archiveConnectorWorkflo
 	_, err := wflib.ExecuteActivity[any](
 		ctx,
 		wflib.DefaultActivityOptions,
-		ActivityNameArchiveConnectorFinalizeVersionsV1,
+		ActivityNameArchiveConnectorFinalizeGenerationsV1,
 		input.ConnectorID,
 	).Get(ctx)
 	return err
@@ -85,42 +85,42 @@ func validateArchiveConnectorWorkflowConnectorID(connectorID apid.ID) error {
 	if connectorID == apid.Nil {
 		return fmt.Errorf("connector id not specified")
 	}
-	return connectorID.ValidatePrefix(apid.PrefixConnectorVersion)
+	return connectorID.ValidatePrefix(apid.PrefixConnector)
 }
 
-// prepareArchiveConnectorVersionsV1 is the activity that prepares the archive connector workflow by moving
-// draft state connector versions to archived and primary versions to active. This prevents any future
+// prepareArchiveConnectorGenerationsV1 is the activity that prepares the archive connector workflow by moving
+// draft state connector generations to archived and primary generations to active. This prevents any future
 // connections from being made while the existing connections are cleaned up.
-func (s *service) prepareArchiveConnectorVersionsV1(ctx context.Context, connectorID apid.ID) error {
+func (s *service) prepareArchiveConnectorGenerationsV1(ctx context.Context, connectorID apid.ID) error {
 	logger := s.logger.With(
 		"workflow", WorkflowNameArchiveConnectorV1,
-		"activity", ActivityNameArchiveConnectorPrepareVersionsV1,
+		"activity", ActivityNameArchiveConnectorPrepareGenerationsV1,
 		"connector_id", connectorID,
 	)
-	logger.Info("prepare connector versions started")
-	defer logger.Info("prepare connector versions completed")
+	logger.Info("prepare connector generations started")
+	defer logger.Info("prepare connector generations completed")
 
 	if err := validateArchiveConnectorWorkflowConnectorID(connectorID); err != nil {
 		return err
 	}
 
 	found := false
-	err := s.db.ListConnectorDefinitionVersionsBuilder().
+	err := s.db.ListConnectorGenerationsBuilder().
 		ForId(connectorID).
 		Enumerate(ctx, func(page pagination.PageResult[database.ConnectorWithDefinition]) (pagination.KeepGoing, error) {
-			for _, version := range page.Results {
+			for _, generation := range page.Results {
 				found = true
-				switch version.State {
-				case database.ConnectorDefinitionVersionStateDraft:
-					logger.Info("archiving draft connector version", "version_id", version.Id)
-					if err := s.db.SetConnectorDefinitionVersionState(ctx, version.Id, version.Version, database.ConnectorDefinitionVersionStateArchived); err != nil {
-						logger.Info("failed archiving draft connector version", "version_id", version.Id, "error", err)
+				switch generation.State {
+				case database.ConnectorGenerationStateDraft:
+					logger.Info("archiving draft connector generation", "generation_id", generation.Id)
+					if err := s.db.SetConnectorGenerationState(ctx, generation.Id, generation.Generation, database.ConnectorGenerationStateArchived); err != nil {
+						logger.Info("failed archiving draft connector generation", "generation_id", generation.Id, "error", err)
 						return pagination.Stop, err
 					}
-				case database.ConnectorDefinitionVersionStatePrimary:
-					logger.Info("moving primary connector version to active", "version_id", version.Id)
-					if err := s.db.SetConnectorDefinitionVersionState(ctx, version.Id, version.Version, database.ConnectorDefinitionVersionStateActive); err != nil {
-						logger.Info("failed moving primary to active", "version_id", version.Id, "error", err)
+				case database.ConnectorGenerationStatePrimary:
+					logger.Info("moving primary connector generation to active", "generation_id", generation.Id)
+					if err := s.db.SetConnectorGenerationState(ctx, generation.Id, generation.Generation, database.ConnectorGenerationStateActive); err != nil {
+						logger.Info("failed moving primary to active", "generation_id", generation.Id, "error", err)
 						return pagination.Stop, err
 					}
 				}
@@ -136,34 +136,34 @@ func (s *service) prepareArchiveConnectorVersionsV1(ctx context.Context, connect
 	return nil
 }
 
-// finalizeArchiveConnectorVersionsV1 is the activity that runs after all connections have been cleaned up. It moves
-// all versions of the connector to the archived state.
-func (s *service) finalizeArchiveConnectorVersionsV1(ctx context.Context, connectorID apid.ID) error {
+// finalizeArchiveConnectorGenerationsV1 is the activity that runs after all connections have been cleaned up. It moves
+// all generations of the connector to the archived state.
+func (s *service) finalizeArchiveConnectorGenerationsV1(ctx context.Context, connectorID apid.ID) error {
 	logger := s.logger.With(
 		"workflow", WorkflowNameArchiveConnectorV1,
-		"activity", ActivityNameArchiveConnectorFinalizeVersionsV1,
+		"activity", ActivityNameArchiveConnectorFinalizeGenerationsV1,
 		"connector_id", connectorID,
 	)
-	logger.Info("finalize connector versions started")
-	defer logger.Info("finalize connector versions completed")
+	logger.Info("finalize connector generations started")
+	defer logger.Info("finalize connector generations completed")
 
 	if err := validateArchiveConnectorWorkflowConnectorID(connectorID); err != nil {
 		return err
 	}
 
 	found := false
-	err := s.db.ListConnectorDefinitionVersionsBuilder().
+	err := s.db.ListConnectorGenerationsBuilder().
 		ForId(connectorID).
 		Enumerate(ctx, func(page pagination.PageResult[database.ConnectorWithDefinition]) (pagination.KeepGoing, error) {
-			for _, version := range page.Results {
+			for _, generation := range page.Results {
 				found = true
-				if version.State == database.ConnectorDefinitionVersionStateArchived {
+				if generation.State == database.ConnectorGenerationStateArchived {
 					continue
 				}
 
-				logger.Info("archiving connector version", "version_id", version.Id)
-				if err := s.db.SetConnectorDefinitionVersionState(ctx, version.Id, version.Version, database.ConnectorDefinitionVersionStateArchived); err != nil {
-					logger.Info("failed archiving connector version", "version_id", version.Id, "error", err)
+				logger.Info("archiving connector generation", "generation_id", generation.Id)
+				if err := s.db.SetConnectorGenerationState(ctx, generation.Id, generation.Generation, database.ConnectorGenerationStateArchived); err != nil {
+					logger.Info("failed archiving connector generation", "generation_id", generation.Id, "error", err)
 					return pagination.Stop, err
 				}
 			}
@@ -186,13 +186,13 @@ func (s *service) registerArchiveConnectorWorkflow(worker workflowRegistrar) err
 		return err
 	}
 	if err := worker.RegisterActivity(
-		s.prepareArchiveConnectorVersionsV1,
-		registry.WithName(ActivityNameArchiveConnectorPrepareVersionsV1),
+		s.prepareArchiveConnectorGenerationsV1,
+		registry.WithName(ActivityNameArchiveConnectorPrepareGenerationsV1),
 	); err != nil {
 		return err
 	}
 	return worker.RegisterActivity(
-		s.finalizeArchiveConnectorVersionsV1,
-		registry.WithName(ActivityNameArchiveConnectorFinalizeVersionsV1),
+		s.finalizeArchiveConnectorGenerationsV1,
+		registry.WithName(ActivityNameArchiveConnectorFinalizeGenerationsV1),
 	)
 }

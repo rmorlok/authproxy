@@ -141,35 +141,35 @@ func TestResourceNamesEndToEndAcrossVersionsAndAuthorization(t *testing.T) {
 		require.NoError(t, setup.db.EnsureNamespaceByPath(ctx, ns))
 	}
 
-	createConnectorVersion := func(id apid.ID, ns, name string, version uint64, state database.ConnectorDefinitionVersionState) {
+	createConnectorGeneration := func(id apid.ID, ns, name string, generation uint64, state database.ConnectorGenerationState) {
 		t.Helper()
-		require.NoError(t, setup.db.UpsertConnectorDefinitionVersion(ctx, &database.ConnectorWithDefinition{
-			Id:        id,
-			Name:      scommon.ResourceName(name),
-			Namespace: ns,
-			Version:   version,
-			State:     state,
+		require.NoError(t, setup.db.UpsertConnectorGeneration(ctx, &database.ConnectorWithDefinition{
+			Id:         id,
+			Name:       scommon.ResourceName(name),
+			Namespace:  ns,
+			Generation: generation,
+			State:      state,
 			EncryptedDefinition: encfield.EncryptedField{
 				ID:   apid.New(apid.PrefixDataEncryptionKey),
-				Data: fmt.Sprintf("definition-%d", version),
+				Data: fmt.Sprintf("definition-%d", generation),
 			},
 		}))
 	}
 
 	allowedConnectorID := apid.New(apid.PrefixConnector)
-	createConnectorVersion(allowedConnectorID, "root.allowed", "payments-provider", 1, database.ConnectorDefinitionVersionStatePrimary)
-	createConnectorVersion(allowedConnectorID, "root.allowed", "", 2, database.ConnectorDefinitionVersionStateDraft)
+	createConnectorGeneration(allowedConnectorID, "root.allowed", "payments-provider", 1, database.ConnectorGenerationStatePrimary)
+	createConnectorGeneration(allowedConnectorID, "root.allowed", "", 2, database.ConnectorGenerationStateDraft)
 	hiddenConnectorID := apid.New(apid.PrefixConnector)
-	createConnectorVersion(hiddenConnectorID, "root.hidden", "billing-provider", 1, database.ConnectorDefinitionVersionStatePrimary)
+	createConnectorGeneration(hiddenConnectorID, "root.hidden", "billing-provider", 1, database.ConnectorGenerationStatePrimary)
 
 	connectionID := apid.New(apid.PrefixConnection)
 	require.NoError(t, setup.db.CreateConnection(ctx, &database.Connection{
-		Id:               connectionID,
-		Name:             "payments-live",
-		Namespace:        "root.allowed",
-		ConnectorId:      allowedConnectorID,
-		ConnectorVersion: 1,
-		State:            database.ConnectionStateConfigured,
+		Id:                  connectionID,
+		Name:                "payments-live",
+		Namespace:           "root.allowed",
+		ConnectorId:         allowedConnectorID,
+		ConnectorGeneration: 1,
+		State:               database.ConnectionStateConfigured,
 	}))
 
 	// Rename by immutable IDs, then drive the same reconciliation that the
@@ -179,16 +179,16 @@ func TestResourceNamesEndToEndAcrossVersionsAndAuthorization(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, setup.db.RefreshConnectionsForConnector(ctx, allowedConnectorID))
 
-	versions := setup.db.ListConnectorDefinitionVersionsBuilder().
+	generations := setup.db.ListConnectorGenerationsBuilder().
 		ForName("billing-provider").
 		ForNamespaceMatchers([]string{"root.allowed"}).
 		FetchPage(ctx)
-	require.NoError(t, versions.Error)
-	require.Len(t, versions.Results, 2)
-	for _, version := range versions.Results {
-		require.Equal(t, allowedConnectorID, version.Id)
-		require.Equal(t, scommon.ResourceName("billing-provider"), version.Name)
-		require.Equal(t, "billing-provider", version.Labels["apxy/cxr/-/name"])
+	require.NoError(t, generations.Error)
+	require.Len(t, generations.Results, 2)
+	for _, generation := range generations.Results {
+		require.Equal(t, allowedConnectorID, generation.Id)
+		require.Equal(t, scommon.ResourceName("billing-provider"), generation.Name)
+		require.Equal(t, "billing-provider", generation.Labels["apxy/cxr/-/name"])
 	}
 
 	connections := setup.db.ListConnectionsBuilder().
@@ -216,7 +216,7 @@ func TestResourceNamesEndToEndAcrossVersionsAndAuthorization(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	var response schemaapi.SearchResourcesResponseJson
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
-	require.Len(t, response.Items, 1, "the hidden duplicate and extra connector version must not leak")
+	require.Len(t, response.Items, 1, "the hidden duplicate and extra connector generation must not leak")
 	require.Equal(t, connectorschema.ConnectorKind, response.Items[0].ResourceRef.Kind)
 	require.Equal(t, allowedConnectorID.String(), response.Items[0].ResourceRef.ID)
 	require.Equal(t, scommon.ResourceName("billing-provider"), response.Items[0].ResourceRef.Name)

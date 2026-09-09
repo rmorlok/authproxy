@@ -22,7 +22,7 @@ vi.mock('@authproxy/api', () => {
     disconnect: vi.fn(),
     forceState: vi.fn(),
     get: vi.fn(),
-    migrateVersion: vi.fn(),
+    migrateGeneration: vi.fn(),
     putAnnotation: vi.fn(),
     update: vi.fn(),
   };
@@ -115,7 +115,7 @@ function connector(generation: number, state: ConnectorReleaseState) {
   };
 }
 
-const connectorVersions = [
+const connectorGenerations = [
   connector(4, ConnectorReleaseState.DRAFT),
   connector(3, ConnectorReleaseState.PRIMARY),
   connector(2, ConnectorReleaseState.ACTIVE),
@@ -134,16 +134,16 @@ function renderConnectionDetail() {
 describe('ConnectionDetail', () => {
   beforeEach(() => {
     vi.mocked(connections.get).mockResolvedValue({status: 200, data: connection} as any);
-    vi.mocked(connectors.getGeneration).mockResolvedValue({status: 200, data: connectorVersions[2]} as any);
+    vi.mocked(connectors.getGeneration).mockResolvedValue({status: 200, data: connectorGenerations[2]} as any);
     vi.mocked(connectors.listGenerations).mockResolvedValue({
       status: 200,
-      data: {apiVersion: 'authproxy.net/v1alpha1', kind: 'ConnectorList', metadata: {}, items: connectorVersions},
+      data: {apiVersion: 'authproxy.net/v1alpha1', kind: 'ConnectorList', metadata: {}, items: connectorGenerations},
     } as any);
-    vi.mocked(connections.migrateVersion).mockResolvedValue({
+    vi.mocked(connections.migrateGeneration).mockResolvedValue({
       status: 200,
       data: {
         apiVersion: 'authproxy.net/v1alpha1',
-        kind: 'ConnectionVersionMigration',
+        kind: 'ConnectionGenerationMigration',
         metadata: {target: {apiVersion: 'authproxy.net/v1alpha1', kind: 'Connection', id: connection.metadata.id}},
         spec: {connectorRef: {...connection.spec.connectorRef, generation: 3}},
         status: {taskId: 'task_test'},
@@ -159,7 +159,7 @@ describe('ConnectionDetail', () => {
         apiVersion: 'authproxy.net/v1alpha1',
         kind: 'Task',
         metadata: {id: 'task_test'},
-        spec: {type: 'connection-version-migration'},
+        spec: {type: 'connection-generation-migration'},
         status: {state: TaskState.COMPLETED},
       },
     } as any);
@@ -170,7 +170,7 @@ describe('ConnectionDetail', () => {
     vi.clearAllMocks();
   });
 
-  it('filters migration targets and starts a migration to the primary version', async () => {
+  it('filters migration targets and starts a migration to the primary generation', async () => {
     const user = userEvent.setup();
     vi.mocked(connections.get)
       .mockResolvedValueOnce({status: 200, data: connection} as any)
@@ -188,15 +188,15 @@ describe('ConnectionDetail', () => {
     expect(namespace).not.toBeNull();
     expect(within(namespace!).getByText('root')).toBeTruthy();
     await user.click(screen.getByRole('button', {name: 'actions'}));
-    await user.click(screen.getByRole('menuitem', {name: 'Change version…'}));
+    await user.click(screen.getByRole('menuitem', {name: 'Change generation…'}));
 
     expect(connectors.listGenerations).toHaveBeenCalledWith(connection.spec.connectorRef.id, {
       limit: 100,
       orderBy: 'generation desc',
     });
 
-    const dialog = await screen.findByRole('dialog', {name: 'Change connection version'});
-    const target = within(dialog).getByRole('combobox', {name: 'Target version'}) as HTMLSelectElement;
+    const dialog = await screen.findByRole('dialog', {name: 'Change connection generation'});
+    const target = within(dialog).getByRole('combobox', {name: 'Target generation'}) as HTMLSelectElement;
     expect(target.value).toBe('3');
     expect(within(target).queryByRole('option', {name: 'v4 (draft)'})).toBeNull();
     expect(within(target).queryByRole('option', {name: 'v2 (active)'})).toBeNull();
@@ -205,7 +205,7 @@ describe('ConnectionDetail', () => {
     await user.click(within(dialog).getByRole('button', {name: 'Migrate to v3'}));
 
     await waitFor(() => {
-      expect(connections.migrateVersion).toHaveBeenCalledWith(connection.metadata.id, {
+      expect(connections.migrateGeneration).toHaveBeenCalledWith(connection.metadata.id, {
         connectorRef: {...connection.spec.connectorRef, generation: 3},
         timeoutSeconds: 600,
       });
@@ -220,20 +220,20 @@ describe('ConnectionDetail', () => {
     expect(await screen.findByText('This connection requires re-authentication before it can be used.')).toBeTruthy();
   });
 
-  it('uses the same flow to roll back to an earlier active version', async () => {
+  it('uses the same flow to roll back to an earlier active generation', async () => {
     const user = userEvent.setup();
     renderConnectionDetail();
 
     await screen.findByText('Connection');
     await user.click(screen.getByRole('button', {name: 'actions'}));
-    await user.click(screen.getByRole('menuitem', {name: 'Change version…'}));
+    await user.click(screen.getByRole('menuitem', {name: 'Change generation…'}));
 
-    const dialog = await screen.findByRole('dialog', {name: 'Change connection version'});
-    await user.selectOptions(within(dialog).getByRole('combobox', {name: 'Target version'}), '1');
+    const dialog = await screen.findByRole('dialog', {name: 'Change connection generation'});
+    await user.selectOptions(within(dialog).getByRole('combobox', {name: 'Target generation'}), '1');
     await user.click(within(dialog).getByRole('button', {name: 'Rollback to v1'}));
 
     await waitFor(() => {
-      expect(connections.migrateVersion).toHaveBeenCalledWith(connection.metadata.id, {
+      expect(connections.migrateGeneration).toHaveBeenCalledWith(connection.metadata.id, {
         connectorRef: {...connection.spec.connectorRef, generation: 1},
         timeoutSeconds: 600,
       });
@@ -241,23 +241,23 @@ describe('ConnectionDetail', () => {
     expect(await screen.findByText('Rollback to v1 completed.')).toBeTruthy();
   });
 
-  it('explains when no other connector versions are eligible instead of rendering an empty selector', async () => {
+  it('explains when no other connector generations are eligible instead of rendering an empty selector', async () => {
     const user = userEvent.setup();
     vi.mocked(connectors.listGenerations).mockResolvedValue({
       status: 200,
-      data: {apiVersion: 'authproxy.net/v1alpha1', kind: 'ConnectorList', metadata: {}, items: [{...connectorVersions[2]}]},
+      data: {apiVersion: 'authproxy.net/v1alpha1', kind: 'ConnectorList', metadata: {}, items: [{...connectorGenerations[2]}]},
     } as any);
     renderConnectionDetail();
 
     await screen.findByText('Connection');
     await user.click(screen.getByRole('button', {name: 'actions'}));
-    await user.click(screen.getByRole('menuitem', {name: 'Change version…'}));
+    await user.click(screen.getByRole('menuitem', {name: 'Change generation…'}));
 
-    const dialog = await screen.findByRole('dialog', {name: 'Change connection version'});
-    expect(within(dialog).queryByRole('combobox', {name: 'Target version'})).toBeNull();
-    expect(within(dialog).getByRole('alert').textContent).toContain('No other active or primary versions are available.');
+    const dialog = await screen.findByRole('dialog', {name: 'Change connection generation'});
+    expect(within(dialog).queryByRole('combobox', {name: 'Target generation'})).toBeNull();
+    expect(within(dialog).getByRole('alert').textContent).toContain('No other active or primary generations are available.');
     expect(within(dialog).getByRole('button', {name: 'Close'})).toBeTruthy();
-    expect(within(dialog).queryByRole('button', {name: 'Change version'})).toBeNull();
+    expect(within(dialog).queryByRole('button', {name: 'Change generation'})).toBeNull();
   });
 
   it('renames the connection while keeping its id as the route identity', async () => {

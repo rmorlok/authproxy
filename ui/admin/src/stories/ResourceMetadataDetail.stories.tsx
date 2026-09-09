@@ -5,7 +5,7 @@ import {API_VERSION, configureClient, ConnectorReleaseState} from '@authproxy/ap
 import type {Connector as ConnectorResource} from '@authproxy/api';
 import NamespaceDetail from '../components/NamespaceDetail';
 import ConnectorDetail from '../components/ConnectorDetail';
-import ConnectorVersionDetail from '../components/ConnectorVersionDetail';
+import ConnectorGenerationDetail from '../components/ConnectorGenerationDetail';
 import ConnectionDetail from '../components/ConnectionDetail';
 import ActorDetail from '../components/ActorDetail';
 import KeyDetail from '../components/KeyDetail';
@@ -144,7 +144,7 @@ const actor = {
   status: {signingKeyConfigured: true},
 };
 
-const draftConnectorVersion: ConnectorResource = {
+const draftConnectorGeneration: ConnectorResource = {
   ...connector,
   kind: 'Connector',
   metadata: {...connector.metadata, generation: 4},
@@ -180,8 +180,8 @@ export const Connector: Story = {
   render: () => <DetailCanvas><ConnectorDetail connectorId={connector.metadata.id}/></DetailCanvas>,
 };
 
-export const ConnectorVersion: Story = {
-  render: () => <DetailCanvas><ConnectorVersionDetail connectorVersion={draftConnectorVersion}/></DetailCanvas>,
+export const ConnectorGeneration: Story = {
+  render: () => <DetailCanvas><ConnectorGenerationDetail connectorGeneration={draftConnectorGeneration}/></DetailCanvas>,
 };
 
 export const Connection: Story = {

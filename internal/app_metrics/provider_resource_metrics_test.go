@@ -19,56 +19,56 @@ func TestResourceMetrics_ConnectionCountsUseStoredSamples(t *testing.T) {
 	connID := apid.New(apid.PrefixConnection)
 	otherConnID := apid.New(apid.PrefixConnection)
 	excludedConnID := apid.New(apid.PrefixConnection)
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 
 	err := resourceStore.StoreConnectionResourceSamples(ctx, []*ConnectionResourceSample{
 		{
-			SampledAt:         start,
-			ResourceID:        connID,
-			Namespace:         "root.acme.prod",
-			Labels:            database.Labels{"env": "prod", "team": "api"},
-			State:             database.ConnectionStateConfigured,
-			HealthState:       database.ConnectionHealthStateHealthy,
-			ConnectorID:       connectorID,
-			ConnectorVersion:  1,
-			ResourceCreatedAt: start.Add(-time.Hour),
-			ResourceUpdatedAt: start,
+			SampledAt:           start,
+			ResourceID:          connID,
+			Namespace:           "root.acme.prod",
+			Labels:              database.Labels{"env": "prod", "team": "api"},
+			State:               database.ConnectionStateConfigured,
+			HealthState:         database.ConnectionHealthStateHealthy,
+			ConnectorID:         connectorID,
+			ConnectorGeneration: 1,
+			ResourceCreatedAt:   start.Add(-time.Hour),
+			ResourceUpdatedAt:   start,
 		},
 		{
-			SampledAt:         start,
-			ResourceID:        otherConnID,
-			Namespace:         "root.acme.prod",
-			Labels:            database.Labels{"env": "prod", "team": "api"},
-			State:             database.ConnectionStateSetup,
-			HealthState:       database.ConnectionHealthStateUnhealthy,
-			ConnectorID:       connectorID,
-			ConnectorVersion:  2,
-			ResourceCreatedAt: start.Add(-time.Hour),
-			ResourceUpdatedAt: start,
+			SampledAt:           start,
+			ResourceID:          otherConnID,
+			Namespace:           "root.acme.prod",
+			Labels:              database.Labels{"env": "prod", "team": "api"},
+			State:               database.ConnectionStateSetup,
+			HealthState:         database.ConnectionHealthStateUnhealthy,
+			ConnectorID:         connectorID,
+			ConnectorGeneration: 2,
+			ResourceCreatedAt:   start.Add(-time.Hour),
+			ResourceUpdatedAt:   start,
 		},
 		{
-			SampledAt:         start,
-			ResourceID:        excludedConnID,
-			Namespace:         "root.other",
-			Labels:            database.Labels{"env": "prod", "team": "api"},
-			State:             database.ConnectionStateConfigured,
-			HealthState:       database.ConnectionHealthStateHealthy,
-			ConnectorID:       connectorID,
-			ConnectorVersion:  1,
-			ResourceCreatedAt: start.Add(-time.Hour),
-			ResourceUpdatedAt: start,
+			SampledAt:           start,
+			ResourceID:          excludedConnID,
+			Namespace:           "root.other",
+			Labels:              database.Labels{"env": "prod", "team": "api"},
+			State:               database.ConnectionStateConfigured,
+			HealthState:         database.ConnectionHealthStateHealthy,
+			ConnectorID:         connectorID,
+			ConnectorGeneration: 1,
+			ResourceCreatedAt:   start.Add(-time.Hour),
+			ResourceUpdatedAt:   start,
 		},
 		{
-			SampledAt:         start.Add(5 * time.Minute),
-			ResourceID:        connID,
-			Namespace:         "root.acme.prod",
-			Labels:            database.Labels{"env": "prod", "team": "api"},
-			State:             database.ConnectionStateConfigured,
-			HealthState:       database.ConnectionHealthStateHealthy,
-			ConnectorID:       connectorID,
-			ConnectorVersion:  1,
-			ResourceCreatedAt: start.Add(-time.Hour),
-			ResourceUpdatedAt: start.Add(5 * time.Minute),
+			SampledAt:           start.Add(5 * time.Minute),
+			ResourceID:          connID,
+			Namespace:           "root.acme.prod",
+			Labels:              database.Labels{"env": "prod", "team": "api"},
+			State:               database.ConnectionStateConfigured,
+			HealthState:         database.ConnectionHealthStateHealthy,
+			ConnectorID:         connectorID,
+			ConnectorGeneration: 1,
+			ResourceCreatedAt:   start.Add(-time.Hour),
+			ResourceUpdatedAt:   start.Add(5 * time.Minute),
 		},
 	})
 	require.NoError(t, err)
@@ -81,16 +81,16 @@ func TestResourceMetrics_ConnectionCountsUseStoredSamples(t *testing.T) {
 		Step:              15 * time.Minute,
 		NamespaceMatchers: []string{"root.acme.**"},
 		LabelSelector:     "env=prod",
-		GroupBy:           []ResourceGroupBy{ResourceGroupByState, ResourceGroupByHealthState, ResourceGroupByConnectorVersion},
+		GroupBy:           []ResourceGroupBy{ResourceGroupByState, ResourceGroupByHealthState, ResourceGroupByConnectorGeneration},
 	}})
 	require.NoError(t, err)
 	require.Len(t, series, 2)
 
 	require.Equal(t, "connections", series[0].RefID)
 	require.Equal(t, map[string]string{
-		"connector_version": "1",
-		"health_state":      string(database.ConnectionHealthStateHealthy),
-		"state":             string(database.ConnectionStateConfigured),
+		"connector_generation": "1",
+		"health_state":         string(database.ConnectionHealthStateHealthy),
+		"state":                string(database.ConnectionStateConfigured),
 	}, series[0].Labels)
 	require.Equal(t, []ResourceMetricPoint{
 		{Timestamp: start, Value: 1},
@@ -98,9 +98,9 @@ func TestResourceMetrics_ConnectionCountsUseStoredSamples(t *testing.T) {
 	}, series[0].Points)
 
 	require.Equal(t, map[string]string{
-		"connector_version": "2",
-		"health_state":      string(database.ConnectionHealthStateUnhealthy),
-		"state":             string(database.ConnectionStateSetup),
+		"connector_generation": "2",
+		"health_state":         string(database.ConnectionHealthStateUnhealthy),
+		"state":                string(database.ConnectionStateSetup),
 	}, series[1].Labels)
 	require.Equal(t, []ResourceMetricPoint{
 		{Timestamp: start, Value: 1},
@@ -181,31 +181,31 @@ func TestResourceMetrics_AdditionalResourceCounts(t *testing.T) {
 
 	ctx := context.Background()
 	start := time.Date(2026, 5, 25, 12, 0, 0, 0, time.UTC)
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 	rateLimitID := apid.New(apid.PrefixRateLimit)
 
 	require.NoError(t, resourceStore.StoreConnectorResourceSamples(ctx, []*ConnectorResourceSample{
 		{
-			SampledAt:         start,
-			ResourceID:        connectorID,
-			Namespace:         "root.acme",
-			Labels:            database.Labels{"env": "prod"},
-			State:             database.ConnectorDefinitionVersionStatePrimary,
-			ConnectorVersion:  2,
-			ResourceCreatedAt: start.Add(-time.Hour),
-			ResourceUpdatedAt: start,
+			SampledAt:           start,
+			ResourceID:          connectorID,
+			Namespace:           "root.acme",
+			Labels:              database.Labels{"env": "prod"},
+			State:               database.ConnectorGenerationStatePrimary,
+			ConnectorGeneration: 2,
+			ResourceCreatedAt:   start.Add(-time.Hour),
+			ResourceUpdatedAt:   start,
 		},
 	}))
-	require.NoError(t, resourceStore.StoreConnectorVersionResourceSamples(ctx, []*ConnectorVersionResourceSample{
+	require.NoError(t, resourceStore.StoreConnectorGenerationResourceSamples(ctx, []*ConnectorGenerationResourceSample{
 		{
-			SampledAt:         start,
-			ResourceID:        connectorID,
-			Namespace:         "root.acme",
-			Labels:            database.Labels{"env": "prod"},
-			State:             database.ConnectorDefinitionVersionStatePrimary,
-			ConnectorVersion:  2,
-			ResourceCreatedAt: start.Add(-time.Hour),
-			ResourceUpdatedAt: start,
+			SampledAt:           start,
+			ResourceID:          connectorID,
+			Namespace:           "root.acme",
+			Labels:              database.Labels{"env": "prod"},
+			State:               database.ConnectorGenerationStatePrimary,
+			ConnectorGeneration: 2,
+			ResourceCreatedAt:   start.Add(-time.Hour),
+			ResourceUpdatedAt:   start,
 		},
 	}))
 	require.NoError(t, resourceStore.StoreNamespaceResourceSamples(ctx, []*NamespaceResourceSample{
@@ -240,7 +240,7 @@ func TestResourceMetrics_AdditionalResourceCounts(t *testing.T) {
 			Step:              15 * time.Minute,
 			NamespaceMatchers: []string{"root.acme"},
 			LabelSelector:     "env=prod",
-			GroupBy:           []ResourceGroupBy{ResourceGroupByState, ResourceGroupByConnectorVersion},
+			GroupBy:           []ResourceGroupBy{ResourceGroupByState, ResourceGroupByConnectorGeneration},
 		},
 		{
 			RefID:             "namespaces",
@@ -253,14 +253,14 @@ func TestResourceMetrics_AdditionalResourceCounts(t *testing.T) {
 			GroupBy:           []ResourceGroupBy{ResourceGroupByState},
 		},
 		{
-			RefID:             "connector-versions",
-			Metric:            ResourceMetricConnectorVersionsCount,
+			RefID:             "connector-generations",
+			Metric:            ResourceMetricConnectorGenerationsCount,
 			Start:             start,
 			End:               start.Add(30 * time.Minute),
 			Step:              15 * time.Minute,
 			NamespaceMatchers: []string{"root.acme"},
 			LabelSelector:     "env=prod",
-			GroupBy:           []ResourceGroupBy{ResourceGroupByConnectorID, ResourceGroupByConnectorVersion},
+			GroupBy:           []ResourceGroupBy{ResourceGroupByConnectorID, ResourceGroupByConnectorGeneration},
 		},
 		{
 			RefID:             "rate-limits",
@@ -278,8 +278,8 @@ func TestResourceMetrics_AdditionalResourceCounts(t *testing.T) {
 
 	require.Equal(t, "connectors", series[0].RefID)
 	require.Equal(t, map[string]string{
-		"connector_version": "2",
-		"state":             string(database.ConnectorDefinitionVersionStatePrimary),
+		"connector_generation": "2",
+		"state":                string(database.ConnectorGenerationStatePrimary),
 	}, series[0].Labels)
 	require.Equal(t, []ResourceMetricPoint{{Timestamp: start, Value: 1}, {Timestamp: start.Add(15 * time.Minute), Value: 0}}, series[0].Points)
 
@@ -287,10 +287,10 @@ func TestResourceMetrics_AdditionalResourceCounts(t *testing.T) {
 	require.Equal(t, map[string]string{"state": string(database.NamespaceStateActive)}, series[1].Labels)
 	require.Equal(t, []ResourceMetricPoint{{Timestamp: start, Value: 1}, {Timestamp: start.Add(15 * time.Minute), Value: 0}}, series[1].Points)
 
-	require.Equal(t, "connector-versions", series[2].RefID)
+	require.Equal(t, "connector-generations", series[2].RefID)
 	require.Equal(t, map[string]string{
-		"connector_id":      connectorID.String(),
-		"connector_version": "2",
+		"connector_id":         connectorID.String(),
+		"connector_generation": "2",
 	}, series[2].Labels)
 	require.Equal(t, []ResourceMetricPoint{{Timestamp: start, Value: 1}, {Timestamp: start.Add(15 * time.Minute), Value: 0}}, series[2].Points)
 

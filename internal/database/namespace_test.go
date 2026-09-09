@@ -2343,24 +2343,24 @@ func TestConnectorLabelChangePropagation(t *testing.T) {
 			Path: "root.cv", State: NamespaceStateActive,
 		}))
 
-		cvID := apid.New(apid.PrefixConnectorVersion)
-		require.NoError(t, db.UpsertConnectorDefinitionVersion(ctx, &ConnectorWithDefinition{
+		cvID := apid.New(apid.PrefixConnector)
+		require.NoError(t, db.UpsertConnectorGeneration(ctx, &ConnectorWithDefinition{
 			Id:                  cvID,
 			Name:                "drive",
-			Version:             1,
+			Generation:          1,
 			Namespace:           "root.cv",
-			State:               ConnectorDefinitionVersionStateDraft,
+			State:               ConnectorGenerationStateDraft,
 			Labels:              Labels{"type": "google-drive"},
 			EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "d"},
 		}))
 
 		connID := apid.New(apid.PrefixConnection)
 		require.NoError(t, db.CreateConnection(ctx, &Connection{
-			Id:               connID,
-			Namespace:        "root.cv",
-			ConnectorId:      cvID,
-			ConnectorVersion: 1,
-			State:            ConnectionStateSetup,
+			Id:                  connID,
+			Namespace:           "root.cv",
+			ConnectorId:         cvID,
+			ConnectorGeneration: 1,
+			State:               ConnectionStateSetup,
 		}))
 
 		c, err := db.GetConnection(ctx, connID)
@@ -2369,11 +2369,11 @@ func TestConnectorLabelChangePropagation(t *testing.T) {
 		require.Equal(t, "drive", c.Labels["apxy/cxr/-/name"])
 
 		// Re-upsert the draft cv with new user labels.
-		require.NoError(t, db.UpsertConnectorDefinitionVersion(ctx, &ConnectorWithDefinition{
+		require.NoError(t, db.UpsertConnectorGeneration(ctx, &ConnectorWithDefinition{
 			Id:                  cvID,
-			Version:             1,
+			Generation:          1,
 			Namespace:           "root.cv",
-			State:               ConnectorDefinitionVersionStateDraft,
+			State:               ConnectorGenerationStateDraft,
 			Labels:              Labels{"type": "slack", "extra": "x"},
 			EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "d2"},
 		}))
@@ -2403,15 +2403,15 @@ func TestReconcileCarryForwardLabels(t *testing.T) {
 		require.NoError(t, db.CreateNamespace(ctx, &Namespace{
 			Path: "root.recon", State: NamespaceStateActive, Labels: Labels{"team": "platform"},
 		}))
-		cvID := apid.New(apid.PrefixConnectorVersion)
-		require.NoError(t, db.UpsertConnectorDefinitionVersion(ctx, &ConnectorWithDefinition{
-			Id: cvID, Name: "recon-connector", Version: 1, Namespace: "root.recon",
-			State: ConnectorDefinitionVersionStateDraft, Labels: Labels{"type": "google-drive"},
+		cvID := apid.New(apid.PrefixConnector)
+		require.NoError(t, db.UpsertConnectorGeneration(ctx, &ConnectorWithDefinition{
+			Id: cvID, Name: "recon-connector", Generation: 1, Namespace: "root.recon",
+			State: ConnectorGenerationStateDraft, Labels: Labels{"type": "google-drive"},
 			EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "d"},
 		}))
 		connID := apid.New(apid.PrefixConnection)
 		require.NoError(t, db.CreateConnection(ctx, &Connection{
-			Id: connID, Namespace: "root.recon", ConnectorId: cvID, ConnectorVersion: 1,
+			Id: connID, Namespace: "root.recon", ConnectorId: cvID, ConnectorGeneration: 1,
 			State: ConnectionStateSetup,
 		}))
 		require.NoError(t, db.CreateKey(ctx, &Key{

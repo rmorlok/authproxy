@@ -32,7 +32,7 @@ const HTTP_METHODS = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'
 const REQUEST_TYPES = ['proxy', 'probe', 'oauth', 'public', 'global'];
 
 // Reserved dimension names from internal/schema/rate_limit/bucket.go.
-const RESERVED_DIMENSIONS = ['actor', 'connection', 'connector', 'connector_version', 'namespace', 'method'];
+const RESERVED_DIMENSIONS = ['actor', 'connection', 'connector', 'connector_generation', 'namespace', 'method'];
 
 type AlgorithmVariant = 'token_bucket' | 'fixed_window' | 'sliding_window';
 type ScopeKind = 'namespace-default' | 'namespace-matcher' | 'connector' | 'connection';
@@ -358,7 +358,7 @@ function BucketSection({ value, onChange }: { value: RateLimitBucket; onChange: 
                         size="small"
                         label="Dimensions"
                         placeholder="Pick reserved name or type labels/<key>"
-                        helperText="Reserved: actor, connection, connector, connector_version, namespace, method. Custom: labels/<key>."
+                        helperText="Reserved: actor, connection, connector, connector_generation, namespace, method. Custom: labels/<key>."
                     />
                 )}
             />

@@ -19,7 +19,7 @@ import (
 // and how the table resolves to a namespace.
 type EncryptedFieldRegistration struct {
 	Table          string
-	PrimaryKeyCols []string // e.g. ["id"] or ["id", "version"]
+	PrimaryKeyCols []string // e.g. ["id"] or ["id", "generation"]
 	EncryptedCols  []string // e.g. ["encrypted_access_token", "encrypted_refresh_token"]
 
 	// Direct namespace resolution (most tables)

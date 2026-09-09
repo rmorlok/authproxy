@@ -85,7 +85,7 @@ func TestState_RoundTripPreservesNamespaces(t *testing.T) {
 		ActorNamespace:      "root.tenant-a",
 		ConnectionNamespace: "root.tenant-a.user-a",
 		ActorId:             apid.New(apid.PrefixActor),
-		ConnectorId:         apid.New(apid.PrefixConnectorVersion),
+		ConnectorId:         apid.New(apid.PrefixConnector),
 		ConnectionId:        apid.New(apid.PrefixConnection),
 		ExpiresAt:           time.Now().Add(time.Minute).UTC(),
 		ReturnToUrl:         "https://example.com/return",
@@ -105,8 +105,8 @@ func TestSaveStateCapturesDistinctActorAndConnectionNamespaces(t *testing.T) {
 	_, r := apredis.MustApplyTestConfig(nil)
 	e := encrypt.NewFakeEncryptService(false)
 	connector := &mockCore.Connector{
-		Id:      apid.New(apid.PrefixConnectorVersion),
-		Version: 1,
+		Id:         apid.New(apid.PrefixConnector),
+		Generation: 1,
 	}
 	connection := &stateTestConnection{
 		id:        apid.New(apid.PrefixConnection),
@@ -142,7 +142,7 @@ func TestState_RedisValueIsCiphertext(t *testing.T) {
 		ActorNamespace:      "root.tenant-a",
 		ConnectionNamespace: "root.tenant-a.user-a",
 		ActorId:             apid.New(apid.PrefixActor),
-		ConnectorId:         apid.New(apid.PrefixConnectorVersion),
+		ConnectorId:         apid.New(apid.PrefixConnector),
 		ConnectionId:        apid.New(apid.PrefixConnection),
 		ExpiresAt:           time.Now().Add(time.Minute).UTC(),
 	}
@@ -166,7 +166,7 @@ func TestState_TamperedCiphertextFailsToDecrypt(t *testing.T) {
 		ActorNamespace:      "root.tenant-a",
 		ConnectionNamespace: "root.tenant-a.user-a",
 		ActorId:             apid.New(apid.PrefixActor),
-		ConnectorId:         apid.New(apid.PrefixConnectorVersion),
+		ConnectorId:         apid.New(apid.PrefixConnector),
 		ConnectionId:        apid.New(apid.PrefixConnection),
 		ExpiresAt:           time.Now().Add(time.Minute).UTC(),
 	}
@@ -195,7 +195,7 @@ func TestState_TamperedCiphertextFailsToDecrypt(t *testing.T) {
 func TestState_IsValidRequiresActorAndConnectionNamespaces(t *testing.T) {
 	base := state{
 		ActorId:      apid.New(apid.PrefixActor),
-		ConnectorId:  apid.New(apid.PrefixConnectorVersion),
+		ConnectorId:  apid.New(apid.PrefixConnector),
 		ConnectionId: apid.New(apid.PrefixConnection),
 		ExpiresAt:    time.Now().Add(time.Minute),
 	}
@@ -231,7 +231,7 @@ func TestGetOAuth2State_RejectsEmptyNamespaceInState(t *testing.T) {
 	s := &state{
 		Id:           stateId,
 		ActorId:      actorId,
-		ConnectorId:  apid.New(apid.PrefixConnectorVersion),
+		ConnectorId:  apid.New(apid.PrefixConnector),
 		ConnectionId: apid.New(apid.PrefixConnection),
 		ExpiresAt:    time.Now().Add(time.Minute).UTC(),
 	}
@@ -258,7 +258,7 @@ func TestGetOAuth2State_RejectsNamespaceMismatchOnActor(t *testing.T) {
 		ActorNamespace:      "root.tenant-a",
 		ConnectionNamespace: "root.tenant-a.user-a",
 		ActorId:             actorId,
-		ConnectorId:         apid.New(apid.PrefixConnectorVersion),
+		ConnectorId:         apid.New(apid.PrefixConnector),
 		ConnectionId:        apid.New(apid.PrefixConnection),
 		ExpiresAt:           time.Now().Add(time.Minute).UTC(),
 	}
@@ -287,7 +287,7 @@ func TestGetOAuth2State_RejectsNamespaceMismatchOnConnection(t *testing.T) {
 		ActorNamespace:      "root.tenant-a",
 		ConnectionNamespace: "root.tenant-a.user-a",
 		ActorId:             actorId,
-		ConnectorId:         apid.New(apid.PrefixConnectorVersion),
+		ConnectorId:         apid.New(apid.PrefixConnector),
 		ConnectionId:        apid.New(apid.PrefixConnection),
 		ExpiresAt:           time.Now().Add(time.Minute).UTC(),
 	}
@@ -312,7 +312,7 @@ func TestGetOAuth2State_AcceptsDistinctActorAndConnectionNamespaces(t *testing.T
 
 	stateId := apid.New(apid.PrefixOauth2State)
 	actorId := apid.New(apid.PrefixActor)
-	connectorId := apid.New(apid.PrefixConnectorVersion)
+	connectorId := apid.New(apid.PrefixConnector)
 	connectionId := apid.New(apid.PrefixConnection)
 	s := &state{
 		Id:                  stateId,
@@ -387,7 +387,7 @@ func TestGetOAuth2State_EmitsRejectionEvent_TamperedState(t *testing.T) {
 		ActorNamespace:      "root.tenant-a",
 		ConnectionNamespace: "root.tenant-a.user-a",
 		ActorId:             actor.id,
-		ConnectorId:         apid.New(apid.PrefixConnectorVersion),
+		ConnectorId:         apid.New(apid.PrefixConnector),
 		ConnectionId:        apid.New(apid.PrefixConnection),
 		ExpiresAt:           time.Now().Add(time.Minute).UTC(),
 	}
@@ -425,7 +425,7 @@ func TestGetOAuth2State_EmitsRejectionEvent_ActorMismatch(t *testing.T) {
 		ActorNamespace:      "root.tenant-a",
 		ConnectionNamespace: "root.tenant-a.user-a",
 		ActorId:             stateActorId,
-		ConnectorId:         apid.New(apid.PrefixConnectorVersion),
+		ConnectorId:         apid.New(apid.PrefixConnector),
 		ConnectionId:        apid.New(apid.PrefixConnection),
 		ExpiresAt:           time.Now().Add(time.Minute).UTC(),
 	}
@@ -457,7 +457,7 @@ func TestGetOAuth2State_EmitsRejectionEvent_NamespaceMismatchActor(t *testing.T)
 		ActorNamespace:      "root.tenant-a",
 		ConnectionNamespace: "root.tenant-a.user-a",
 		ActorId:             actorId,
-		ConnectorId:         apid.New(apid.PrefixConnectorVersion),
+		ConnectorId:         apid.New(apid.PrefixConnector),
 		ConnectionId:        apid.New(apid.PrefixConnection),
 		ExpiresAt:           time.Now().Add(time.Minute).UTC(),
 	}
@@ -488,7 +488,7 @@ func TestGetOAuth2State_EmitsRejectionEvent_NamespaceMismatchConnection(t *testi
 		ActorNamespace:      "root.tenant-a",
 		ConnectionNamespace: "root.tenant-a.user-a",
 		ActorId:             actorId,
-		ConnectorId:         apid.New(apid.PrefixConnectorVersion),
+		ConnectorId:         apid.New(apid.PrefixConnector),
 		ConnectionId:        apid.New(apid.PrefixConnection),
 		ExpiresAt:           time.Now().Add(time.Minute).UTC(),
 	}

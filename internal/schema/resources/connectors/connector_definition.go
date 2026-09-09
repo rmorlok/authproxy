@@ -62,7 +62,7 @@ type ConnectorDefinition struct {
 
 	// Migrations are optional connector-authored hooks used to migrate an
 	// existing connection's stored configuration, labels, and annotations
-	// between connector versions.
+	// between connector generations.
 	Migrations *Migrations `json:"migrations,omitempty" yaml:"migrations,omitempty"`
 
 	// RateLimiting configures how 429 rate limiting responses from the 3rd
@@ -165,8 +165,8 @@ func (c *ConnectorDefinition) Validate(vc *common.ValidationContext) error {
 
 // Hash computes a semantic hash of the connector data. It does not account for
 // data that is not stored in the configuration directly (e.g. environment
-// variables referenced). A change in the hash implies that a new version must
-// be created if the existing version is already live.
+// variables referenced). A change in the hash implies that a new generation must
+// be created if the existing generation is already live.
 func (c *ConnectorDefinition) Hash() string {
 	if c == nil {
 		return ""

@@ -48,7 +48,7 @@ Toggling a signal off while telemetry is enabled keeps the corresponding provide
 | Subsystem | Span name | Span kind | Key attributes |
 |---|---|---|---|
 | Inbound HTTP (Gin) | `HTTP {method}` | server | `http.request.method`, `http.route`, `http.response.status_code`, `url.path`, `authproxy.service` |
-| Outbound proxy (`httpf`) | `HTTP {method}` | client | semconv HTTP client + `authproxy.request.type`, `authproxy.namespace`, `authproxy.connector_id`, `authproxy.connector_version`, `authproxy.connection_id`, plus allowlisted labels (see [Label projection](#label-projection)) |
+| Outbound proxy (`httpf`) | `HTTP {method}` | client | semconv HTTP client + `authproxy.request.type`, `authproxy.namespace`, `authproxy.connector_id`, `authproxy.connector_generation`, `authproxy.connection_id`, plus allowlisted labels (see [Label projection](#label-projection)) |
 | Postgres / SQLite (`database/sql`) | `sql.conn.query`, `sql.rows`, … | client | semconv DB + `db.system` (`postgresql`, `sqlite`, `clickhouse`) |
 | Redis (`apredis`) | `redis.{command}` | client | semconv Redis + key (name only, never values) |
 | Asynq handlers + scheduler | `asynq.task {type}` and `asynq.scheduler.sync` | consumer / internal | `messaging.system=asynq`, `messaging.destination.name`, `messaging.message.id`, `authproxy.asynq.task_type`, `authproxy.asynq.retry_count`, `authproxy.asynq.max_retry` |

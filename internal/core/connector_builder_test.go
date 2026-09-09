@@ -50,7 +50,7 @@ func TestConnectorBuilderWithConfigSeparatesResourceFields(t *testing.T) {
 	connector, err := newConnectorBuilder(s).WithConfig(resource).Build()
 	require.NoError(t, err)
 	require.Equal(t, id, connector.Id)
-	require.Equal(t, uint64(3), connector.Version)
+	require.Equal(t, uint64(3), connector.Generation)
 	require.Equal(t, "root.test", connector.Namespace)
 	require.Equal(t, resource.Metadata.Name, connector.Name)
 	require.Equal(t, database.Labels(resource.Metadata.Labels), connector.Labels)
@@ -68,7 +68,7 @@ func TestConnectorBuilderSettersUpdateResourceMetadata(t *testing.T) {
 	resource := testConfiguredConnectorResource(apid.Nil)
 	connector, err := newConnectorBuilder(&service{encrypt: mockEncrypt}).WithConfig(resource).
 		WithId(id).
-		WithVersion(7).
+		WithGeneration(7).
 		WithState("primary").
 		Build()
 	require.NoError(t, err)
@@ -77,8 +77,8 @@ func TestConnectorBuilderSettersUpdateResourceMetadata(t *testing.T) {
 	require.Equal(t, uint64(7), resource.Metadata.Generation)
 	require.Equal(t, cschema.ConnectorReleaseStatePrimary, resource.Spec.Release.DesiredState)
 	require.Equal(t, id, connector.Id)
-	require.Equal(t, uint64(7), connector.Version)
-	require.Equal(t, database.ConnectorDefinitionVersionStatePrimary, connector.State)
+	require.Equal(t, uint64(7), connector.Generation)
+	require.Equal(t, database.ConnectorGenerationStatePrimary, connector.State)
 }
 
 func TestConnectorBuilderBuildWithDefinition(t *testing.T) {
@@ -93,7 +93,7 @@ func TestConnectorBuilderBuildWithDefinition(t *testing.T) {
 	connector, err := newConnectorBuilder(s).
 		WithDefinition(definition).
 		WithId(id).
-		WithVersion(1).
+		WithGeneration(1).
 		WithState("draft").
 		Build()
 	require.NoError(t, err)

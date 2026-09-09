@@ -29,7 +29,7 @@ func (s *service) CreateConnection(
 	logger.Info("creating new connection",
 		"namespace", namespace,
 		"connector_id", c.GetId(),
-		"connector_version", c.GetVersion(),
+		"connector_generation", c.GetGeneration(),
 	)
 
 	if !ns.IsSameOrChild(c.GetNamespace(), namespace) {
@@ -45,16 +45,16 @@ func (s *service) CreateConnection(
 	now := apctx.GetClock(ctx).Now()
 
 	dbConn := database.Connection{
-		Id:               id,
-		Namespace:        namespace,
-		Name:             name,
-		ConnectorId:      c.GetId(),
-		ConnectorVersion: c.GetVersion(),
-		Labels:           database.Labels(labels),
-		Annotations:      database.Annotations(annotations),
-		CreatedAt:        now,
-		UpdatedAt:        now,
-		State:            database.ConnectionStateSetup,
+		Id:                  id,
+		Namespace:           namespace,
+		Name:                name,
+		ConnectorId:         c.GetId(),
+		ConnectorGeneration: c.GetGeneration(),
+		Labels:              database.Labels(labels),
+		Annotations:         database.Annotations(annotations),
+		CreatedAt:           now,
+		UpdatedAt:           now,
+		State:               database.ConnectionStateSetup,
 	}
 	err = s.db.CreateConnection(ctx, &dbConn)
 	if err != nil {
@@ -67,7 +67,7 @@ func (s *service) CreateConnection(
 	logger.Info("created new connection",
 		"namespace", namespace,
 		"connector_id", c.GetId(),
-		"connector_version", c.GetVersion(),
+		"connector_generation", c.GetGeneration(),
 		"connection_id", id)
 
 	return wrapConnection(&dbConn, connector, s), nil
@@ -82,7 +82,7 @@ func (s *service) UpdateConnectionName(ctx context.Context, id apid.ID, name sco
 		return nil, err
 	}
 
-	c, err := s.getConnectorVersion(ctx, dbConn.ConnectorId, dbConn.ConnectorVersion)
+	c, err := s.getConnectorGeneration(ctx, dbConn.ConnectorId, dbConn.ConnectorGeneration)
 	if err != nil {
 		return nil, err
 	}

@@ -75,12 +75,12 @@ func newProbeHealthTestConn(
 
 	return &connection{
 		Connection: database.Connection{
-			Id:               connId,
-			Namespace:        "root",
-			State:            database.ConnectionStateConfigured,
-			HealthState:      initialHealth,
-			ConnectorId:      c.GetId(),
-			ConnectorVersion: c.GetVersion(),
+			Id:                  connId,
+			Namespace:           "root",
+			State:               database.ConnectionStateConfigured,
+			HealthState:         initialHealth,
+			ConnectorId:         c.GetId(),
+			ConnectorGeneration: c.GetGeneration(),
 		},
 		s:         s,
 		connector: c,
@@ -354,12 +354,12 @@ func TestRecordPeriodicProbeOutcome_ApiKeyStampsLastValidatedAt(t *testing.T) {
 
 	conn := &connection{
 		Connection: database.Connection{
-			Id:               connId,
-			Namespace:        "root",
-			State:            database.ConnectionStateConfigured,
-			HealthState:      database.ConnectionHealthStateHealthy,
-			ConnectorId:      c.GetId(),
-			ConnectorVersion: c.GetVersion(),
+			Id:                  connId,
+			Namespace:           "root",
+			State:               database.ConnectionStateConfigured,
+			HealthState:         database.ConnectionHealthStateHealthy,
+			ConnectorId:         c.GetId(),
+			ConnectorGeneration: c.GetGeneration(),
 		},
 		s:         s,
 		connector: c,
@@ -397,12 +397,12 @@ func TestRecordPeriodicProbeOutcome_OAuth2SkipsLastValidatedAt(t *testing.T) {
 
 	conn := &connection{
 		Connection: database.Connection{
-			Id:               connId,
-			Namespace:        "root",
-			State:            database.ConnectionStateConfigured,
-			HealthState:      database.ConnectionHealthStateHealthy,
-			ConnectorId:      c.GetId(),
-			ConnectorVersion: c.GetVersion(),
+			Id:                  connId,
+			Namespace:           "root",
+			State:               database.ConnectionStateConfigured,
+			HealthState:         database.ConnectionHealthStateHealthy,
+			ConnectorId:         c.GetId(),
+			ConnectorGeneration: c.GetGeneration(),
 		},
 		s:         s,
 		connector: c,

@@ -48,12 +48,12 @@ func newProbeTestConnection(t *testing.T, ctrl *gomock.Controller, def cschema.C
 	logger := slog.New(slog.NewTextHandler(testWriter{t}, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	conn := &connection{
 		Connection: database.Connection{
-			Id:               apid.New(apid.PrefixConnection),
-			Namespace:        "root",
-			State:            database.ConnectionStateConfigured,
-			HealthState:      database.ConnectionHealthStateHealthy,
-			ConnectorId:      c.GetId(),
-			ConnectorVersion: c.GetVersion(),
+			Id:                  apid.New(apid.PrefixConnection),
+			Namespace:           "root",
+			State:               database.ConnectionStateConfigured,
+			HealthState:         database.ConnectionHealthStateHealthy,
+			ConnectorId:         c.GetId(),
+			ConnectorGeneration: c.GetGeneration(),
 		},
 		s:         s,
 		connector: c,
@@ -208,12 +208,12 @@ func TestProbeHttp_RawHttp_Success(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(testWriter{t}, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	conn := &connection{
 		Connection: database.Connection{
-			Id:               apid.New(apid.PrefixConnection),
-			Namespace:        "root",
-			State:            database.ConnectionStateConfigured,
-			HealthState:      database.ConnectionHealthStateHealthy,
-			ConnectorId:      c.GetId(),
-			ConnectorVersion: c.GetVersion(),
+			Id:                  apid.New(apid.PrefixConnection),
+			Namespace:           "root",
+			State:               database.ConnectionStateConfigured,
+			HealthState:         database.ConnectionHealthStateHealthy,
+			ConnectorId:         c.GetId(),
+			ConnectorGeneration: c.GetGeneration(),
 		},
 		s:         s,
 		connector: c,
@@ -248,12 +248,12 @@ func TestProbeHttp_RawHttp_Non2xxIsFailure(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(testWriter{t}, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	conn := &connection{
 		Connection: database.Connection{
-			Id:               apid.New(apid.PrefixConnection),
-			Namespace:        "root",
-			State:            database.ConnectionStateConfigured,
-			HealthState:      database.ConnectionHealthStateHealthy,
-			ConnectorId:      c.GetId(),
-			ConnectorVersion: c.GetVersion(),
+			Id:                  apid.New(apid.PrefixConnection),
+			Namespace:           "root",
+			State:               database.ConnectionStateConfigured,
+			HealthState:         database.ConnectionHealthStateHealthy,
+			ConnectorId:         c.GetId(),
+			ConnectorGeneration: c.GetGeneration(),
 		},
 		s:         s,
 		connector: c,

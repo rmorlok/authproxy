@@ -31,7 +31,7 @@ import {
 } from '@authproxy/api';
 import {Link, useNavigate} from 'react-router-dom';
 import {StateChip} from "./StateChip";
-import ConnectorVersionDetail from "./ConnectorVersionDetail";
+import ConnectorGenerationDetail from "./ConnectorGenerationDetail";
 import ResourceIdentifier from './ResourceIdentifier';
 import ResourceMetadataMenuItems from './ResourceMetadataMenuItems';
 import AnnotationsEditor from "./AnnotationsEditor";
@@ -64,7 +64,7 @@ function connectorLogoUrl(definition: AdminConnectorDefinition): string {
   return `data:${definition.logo.mimeType || 'image/png'};base64,${definition.logo.base64}`;
 }
 
-export default function ConnectorDetail({connectorId, initialVersion}: { connectorId: string, initialVersion?: number }) {
+export default function ConnectorDetail({connectorId, initialGeneration}: { connectorId: string, initialGeneration?: number }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [conn, setConn] = useState<Connector | null>(null);
@@ -72,11 +72,11 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
   const [confirmArchiveOpen, setConfirmArchiveOpen] = useState(false);
   const [lifecycleStatus, setLifecycleStatus] = useState<LifecycleStatus | null>(null);
 
-  // versions state
-  const [versions, setVersions] = useState<Connector[]>([]);
-  const [versionsError, setVersionsError] = useState<string | null>(null);
+  // generations state
+  const [generations, setGenerations] = useState<Connector[]>([]);
+  const [generationsError, setGenerationsError] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
-  const [selectedVersion, setSelectedVersion] = useState<number | undefined>(initialVersion);
+  const [selectedGeneration, setSelectedGeneration] = useState<number | undefined>(initialGeneration);
   const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
   const [metadataNotice, setMetadataNotice] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -102,26 +102,26 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
     return () => { cancelled = true; };
   }, [connectorId]);
 
-  const fetchVersions = useCallback(() => {
+  const fetchGenerations = useCallback(() => {
     let cancelled = false;
-    setVersionsError(null);
-    setVersions([]);
+    setGenerationsError(null);
+    setGenerations([]);
     connectors.listGenerations(connectorId, { limit: 100, orderBy: 'generation desc' })
       .then(resp => {
         if (cancelled) return;
-        setVersions(resp.data.items || []);
+        setGenerations(resp.data.items || []);
       })
       .catch(err => {
         if (cancelled) return;
-        setVersionsError(err?.response?.data?.error || err.message || 'Failed to load versions');
+        setGenerationsError(err?.response?.data?.error || err.message || 'Failed to load generations');
       });
     return () => { cancelled = true; };
   }, [connectorId]);
 
   useEffect(() => fetchConnector(), [fetchConnector]);
 
-  // fetch versions
-  useEffect(() => fetchVersions(), [fetchVersions]);
+  // fetch generations
+  useEffect(() => fetchGenerations(), [fetchGenerations]);
 
   useEffect(() => {
     setConfirmDisconnectAllOpen(false);
@@ -129,38 +129,38 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
     setLifecycleStatus(null);
   }, [connectorId]);
 
-  // open drawer if initialVersion provided
+  // open drawer if initialGeneration provided
   useEffect(() => {
-    if (initialVersion) {
-      setSelectedVersion(initialVersion);
+    if (initialGeneration) {
+      setSelectedGeneration(initialGeneration);
       setDrawerOpen(true);
     }
-  }, [initialVersion]);
+  }, [initialGeneration]);
 
   const onRowClick = (v: Connector) => {
-    setSelectedVersion(v.metadata.generation);
+    setSelectedGeneration(v.metadata.generation);
     setDrawerOpen(true);
   };
 
   const closeDrawer = () => {
     setDrawerOpen(false);
-    setSelectedVersion(undefined);
+    setSelectedGeneration(undefined);
     navigate(`/connectors/${connectorId}`);
   };
 
   const selected = useMemo<Connector | undefined>(
-    () => versions.find(v => v.metadata.generation === selectedVersion),
-    [versions, selectedVersion],
+    () => generations.find(v => v.metadata.generation === selectedGeneration),
+    [generations, selectedGeneration],
   );
   const availableStates = useMemo(
-    () => Array.from(new Set(versions.map(v => v.status.release.state))),
-    [versions],
+    () => Array.from(new Set(generations.map(v => v.status.release.state))),
+    [generations],
   );
 
   const refreshConnectorData = useCallback(() => {
     fetchConnector();
-    fetchVersions();
-  }, [fetchConnector, fetchVersions]);
+    fetchGenerations();
+  }, [fetchConnector, fetchGenerations]);
 
   const runLifecycleAction = async (action: LifecycleAction) => {
     if (!conn) return;
@@ -262,7 +262,7 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
                 metadata: {labels},
                 spec: {},
               });
-              setMetadataNotice('Label changes were saved to a draft connector version.');
+              setMetadataNotice('Label changes were saved to a draft connector generation.');
               refreshConnectorData();
             }}
             onUpdateAnnotations={async (annotations) => {
@@ -272,7 +272,7 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
                 metadata: {annotations},
                 spec: {},
               });
-              setMetadataNotice('Annotation changes were saved to a draft connector version.');
+              setMetadataNotice('Annotation changes were saved to a draft connector generation.');
               refreshConnectorData();
             }}
             disabled={actionInProgress}
@@ -359,7 +359,7 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
         <ResourceIdentifier value={conn.metadata.id} copyLabel="Copy connector id"/>
         <ResourceNamespace namespace={conn.metadata.namespace}/>
         <Box>
-          <Typography variant="subtitle2" color="text.secondary">Version</Typography>
+          <Typography variant="subtitle2" color="text.secondary">Generation</Typography>
           <Typography variant="body1">{conn.metadata.generation}</Typography>
         </Box>
       </Stack>
@@ -376,16 +376,16 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
           </Stack>
         </Box>
         <Box>
-          <Typography variant="subtitle2" color="text.secondary">Versions</Typography>
-          <Typography variant="body1">{versions.length}</Typography>
+          <Typography variant="subtitle2" color="text.secondary">Generations</Typography>
+          <Typography variant="body1">{generations.length}</Typography>
         </Box>
       </Stack>
 
       <Box>
-        <Typography variant="h6" sx={{mt:2, mb:1}}>All Versions</Typography>
-        {versionsError && <Alert severity="error">{versionsError}</Alert>}
+        <Typography variant="h6" sx={{mt:2, mb:1}}>All Generations</Typography>
+        {generationsError && <Alert severity="error">{generationsError}</Alert>}
         <Stack spacing={1}>
-          {versions.map(v => (
+          {generations.map(v => (
             <Box key={`${v.metadata.id}:${v.metadata.generation}`} sx={{border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 1.5}}>
               <Stack direction={{xs: 'column', sm: 'row'}} spacing={1} alignItems={{sm: 'center'}} justifyContent="space-between">
                 <Stack direction="row" spacing={1} alignItems="center">
@@ -400,14 +400,14 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
               </Stack>
             </Box>
           ))}
-          {versions.length === 0 && (
-            <Typography variant="body2" color="text.secondary">No versions found.</Typography>
+          {generations.length === 0 && (
+            <Typography variant="body2" color="text.secondary">No generations found.</Typography>
           )}
         </Stack>
       </Box>
 
       <Drawer anchor="right" open={drawerOpen} onClose={closeDrawer} sx={{'& .MuiDrawer-paper': { width: { xs: '100%', sm: 800 }}}}>
-          {(selected && <ConnectorVersionDetail connectorVersion={selected} />)}
+          {(selected && <ConnectorGenerationDetail connectorGeneration={selected} />)}
       </Drawer>
 
       <Dialog open={confirmDisconnectAllOpen} onClose={() => !actionInProgress && setConfirmDisconnectAllOpen(false)} fullWidth maxWidth="sm">
@@ -438,7 +438,7 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
         <DialogTitle>Archive connector</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary">
-            This archives draft versions, prevents new connections, disconnects existing connections, and archives active versions when the workflow finishes.
+            This archives draft generations, prevents new connections, disconnects existing connections, and archives active generations when the workflow finishes.
           </Typography>
         </DialogContent>
         <DialogActions>

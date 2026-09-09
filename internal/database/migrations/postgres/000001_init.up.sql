@@ -27,7 +27,7 @@ create table connections
     annotations             jsonb,
     state                   text,
     connector_id            text,
-    connector_version       integer,
+    connector_generation       integer,
     encrypted_configuration jsonb,
     setup_step              text,
     created_at              timestamptz,
@@ -39,10 +39,10 @@ create table connections
 create index idx_connections_deleted_at
     on connections (deleted_at);
 
-create table connector_versions
+create table connector_generations
 (
     id                   text,
-    version              integer,
+    generation           integer,
     namespace            text,
     labels               jsonb,
     annotations          jsonb,
@@ -54,11 +54,11 @@ create table connector_versions
     updated_at           timestamptz,
     encrypted_at         timestamptz,
     deleted_at           timestamptz,
-    primary key (id, version)
+    primary key (id, generation)
 );
 
-create index idx_connector_versions_deleted_at
-    on connector_versions (deleted_at);
+create index idx_connector_generations_deleted_at
+    on connector_generations (deleted_at);
 
 create table namespaces
 (

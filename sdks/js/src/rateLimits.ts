@@ -51,7 +51,7 @@ export interface RateLimitSelector {
 
 export interface RateLimitBucket {
     /**
-     * Reserved names: actor, connection, connector, connector_version,
+     * Reserved names: actor, connection, connector, connector_generation,
      * namespace, method. Labels: `labels/<key>`. Empty / omitted = single
      * global bucket per rule.
      */

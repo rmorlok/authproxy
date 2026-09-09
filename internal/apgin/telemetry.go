@@ -328,4 +328,3 @@ func recordSpanErrors(span trace.Span, c *gin.Context, status int) {
 		span.RecordError(err)
 	}
 }
-

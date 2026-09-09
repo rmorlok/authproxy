@@ -235,10 +235,10 @@ func TestUpsertConnectorCreatesAndPublishesMissingSeed(t *testing.T) {
 			require.Equal(t, "demo-noauth", string(req.Metadata.Name))
 			require.Equal(t, "Demo NoAuth", req.Spec.Definition.DisplayName)
 			require.Equal(t, "true", req.Metadata.Labels["demo"])
-			writeJSON(t, w, connectorVersion(req.Spec.Definition, req.Metadata.Labels, cschema.ConnectorReleaseStateDraft, 1))
+			writeJSON(t, w, connectorGeneration(req.Spec.Definition, req.Metadata.Labels, cschema.ConnectorReleaseStateDraft, 1))
 		case "PUT /api/v1/connectors/cxr_testgmail0000001/generations/1/_forceState":
 			forcedPrimary = true
-			writeJSON(t, w, connectorVersion(seed.Spec.Definition, seed.Metadata.Labels, cschema.ConnectorReleaseStatePrimary, 1))
+			writeJSON(t, w, connectorGeneration(seed.Spec.Definition, seed.Metadata.Labels, cschema.ConnectorReleaseStatePrimary, 1))
 		default:
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
 		}
@@ -261,13 +261,13 @@ func TestUpsertConnectorSkipsMatchingPrimarySeed(t *testing.T) {
 					connectorSummary(
 						seed,
 						cschema.ConnectorReleaseStatePrimary,
-						1, // version
+						1, // generation
 					),
 				},
 				"", // continueToken
 			))
 		case "GET /api/v1/connectors/cxr_testgmail0000001/generations/1":
-			writeJSON(t, w, connectorVersion(seed.Spec.Definition, seed.Metadata.Labels, cschema.ConnectorReleaseStatePrimary, 1))
+			writeJSON(t, w, connectorGeneration(seed.Spec.Definition, seed.Metadata.Labels, cschema.ConnectorReleaseStatePrimary, 1))
 		default:
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
 		}
@@ -278,7 +278,7 @@ func TestUpsertConnectorSkipsMatchingPrimarySeed(t *testing.T) {
 	require.Equal(t, connectorAlreadyPresent, action)
 }
 
-func TestUpsertConnectorPublishesNewVersionWhenDefinitionChanges(t *testing.T) {
+func TestUpsertConnectorPublishesNewGenerationWhenDefinitionChanges(t *testing.T) {
 	seed := seedConnector(t, "demo-noauth", "New Demo NoAuth")
 	oldDefinition := mustConnector(t, "Old Demo NoAuth")
 	forcedPrimary := false
@@ -291,16 +291,16 @@ func TestUpsertConnectorPublishesNewVersionWhenDefinitionChanges(t *testing.T) {
 				"",
 			))
 		case "GET /api/v1/connectors/cxr_testgmail0000001/generations/1":
-			writeJSON(t, w, connectorVersion(oldDefinition, seed.Metadata.Labels, cschema.ConnectorReleaseStatePrimary, 1))
+			writeJSON(t, w, connectorGeneration(oldDefinition, seed.Metadata.Labels, cschema.ConnectorReleaseStatePrimary, 1))
 		case "POST /api/v1/connectors/cxr_testgmail0000001/generations":
 			var req cschema.Connector
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
 			require.Equal(t, "New Demo NoAuth", req.Spec.Definition.DisplayName)
 			require.NotNil(t, req.Metadata.Labels)
-			writeJSON(t, w, connectorVersion(req.Spec.Definition, req.Metadata.Labels, cschema.ConnectorReleaseStateDraft, 2))
+			writeJSON(t, w, connectorGeneration(req.Spec.Definition, req.Metadata.Labels, cschema.ConnectorReleaseStateDraft, 2))
 		case "PUT /api/v1/connectors/cxr_testgmail0000001/generations/2/_forceState":
 			forcedPrimary = true
-			writeJSON(t, w, connectorVersion(seed.Spec.Definition, seed.Metadata.Labels, cschema.ConnectorReleaseStatePrimary, 2))
+			writeJSON(t, w, connectorGeneration(seed.Spec.Definition, seed.Metadata.Labels, cschema.ConnectorReleaseStatePrimary, 2))
 		default:
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
 		}
@@ -685,16 +685,16 @@ func seedConnector(t *testing.T, name, displayName string) cschema.Connector {
 	return *resource
 }
 
-func connectorSummary(seed cschema.Connector, state cschema.ConnectorReleaseState, version uint64) cschema.Connector {
-	return connectorVersion(seed.Spec.Definition, seed.Metadata.Labels, state, version)
+func connectorSummary(seed cschema.Connector, state cschema.ConnectorReleaseState, generation uint64) cschema.Connector {
+	return connectorGeneration(seed.Spec.Definition, seed.Metadata.Labels, state, generation)
 }
 
-func connectorVersion(def config.ConnectorDefinition, labels map[string]string, state cschema.ConnectorReleaseState, version uint64) cschema.Connector {
+func connectorGeneration(def config.ConnectorDefinition, labels map[string]string, state cschema.ConnectorReleaseState, generation uint64) cschema.Connector {
 	resource := cschema.NewConnector()
 	resource.Metadata.ID = testConnectorID.String()
 	resource.Metadata.Name = "demo-noauth"
 	resource.Metadata.Namespace = "root"
-	resource.Metadata.Generation = version
+	resource.Metadata.Generation = generation
 	resource.Metadata.Labels = labels
 	resource.Spec.Release.DesiredState = cschema.DesiredReleaseStateForObserved(state)
 	resource.Spec.Definition = def

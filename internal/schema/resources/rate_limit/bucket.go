@@ -10,12 +10,12 @@ import (
 // Reserved bucket-dimension names that resolve to request-context fields
 // rather than to a request label.
 const (
-	DimensionActor            = "actor"
-	DimensionConnection       = "connection"
-	DimensionConnector        = "connector"
-	DimensionConnectorVersion = "connector_version"
-	DimensionNamespace        = "namespace"
-	DimensionMethod           = "method"
+	DimensionActor               = "actor"
+	DimensionConnection          = "connection"
+	DimensionConnector           = "connector"
+	DimensionConnectorGeneration = "connector_generation"
+	DimensionNamespace           = "namespace"
+	DimensionMethod              = "method"
 )
 
 // LabelDimensionPrefix marks a dimension whose value comes from the
@@ -23,12 +23,12 @@ const (
 const LabelDimensionPrefix = "labels/"
 
 var reservedDimensions = map[string]bool{
-	DimensionActor:            true,
-	DimensionConnection:       true,
-	DimensionConnector:        true,
-	DimensionConnectorVersion: true,
-	DimensionNamespace:        true,
-	DimensionMethod:           true,
+	DimensionActor:               true,
+	DimensionConnection:          true,
+	DimensionConnector:           true,
+	DimensionConnectorGeneration: true,
+	DimensionNamespace:           true,
+	DimensionMethod:              true,
 }
 
 // IsReservedDimension reports whether name refers to a request-context field.

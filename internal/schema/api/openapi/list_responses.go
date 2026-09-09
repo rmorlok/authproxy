@@ -270,23 +270,23 @@ type ConnectionDisconnectActionJson struct {
 	Status     *ConnectionDisconnectStatusJson `json:"status,omitempty"`
 }
 
-type ConnectionVersionMigrationSpecJson struct {
+type ConnectionGenerationMigrationSpecJson struct {
 	ConnectorRef   meta.ObjectReference `json:"connectorRef" binding:"required"`
 	TimeoutSeconds *int64               `json:"timeoutSeconds,omitempty" example:"600"`
 }
 
-type ConnectionVersionMigrationStatusJson struct {
+type ConnectionGenerationMigrationStatusJson struct {
 	TaskID             string               `json:"taskId"`
 	SourceConnectorRef meta.ObjectReference `json:"sourceConnectorRef"`
 	TargetConnectorRef meta.ObjectReference `json:"targetConnectorRef"`
 }
 
-type ConnectionVersionMigrationActionJson struct {
-	APIVersion string                                `json:"apiVersion" binding:"required" enums:"authproxy.net/v1alpha1" example:"authproxy.net/v1alpha1"`
-	Kind       string                                `json:"kind" binding:"required" enums:"ConnectionVersionMigration" example:"ConnectionVersionMigration"`
-	Metadata   ConnectionActionMetaJson              `json:"metadata" binding:"required"`
-	Spec       ConnectionVersionMigrationSpecJson    `json:"spec" binding:"required"`
-	Status     *ConnectionVersionMigrationStatusJson `json:"status,omitempty"`
+type ConnectionGenerationMigrationActionJson struct {
+	APIVersion string                                   `json:"apiVersion" binding:"required" enums:"authproxy.net/v1alpha1" example:"authproxy.net/v1alpha1"`
+	Kind       string                                   `json:"kind" binding:"required" enums:"ConnectionGenerationMigration" example:"ConnectionGenerationMigration"`
+	Metadata   ConnectionActionMetaJson                 `json:"metadata" binding:"required"`
+	Spec       ConnectionGenerationMigrationSpecJson    `json:"spec" binding:"required"`
+	Status     *ConnectionGenerationMigrationStatusJson `json:"status,omitempty"`
 }
 
 type ConnectionForceStateSpecJson struct {
@@ -508,7 +508,7 @@ type RateLimitAlgorithmJson struct {
 	TokenBucket   *RateLimitTokenBucketJson   `json:"tokenBucket,omitempty"`
 }
 
-// RateLimitConnectorReferenceJson documents an unversioned reference to a
+// RateLimitConnectorReferenceJson documents a generationless reference to a
 // Connector. Rate limits bind to connector identity, not one generation.
 type RateLimitConnectorReferenceJson struct {
 	APIVersion string `json:"apiVersion" binding:"required" enums:"authproxy.net/v1alpha1" example:"authproxy.net/v1alpha1"`

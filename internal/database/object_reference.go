@@ -153,7 +153,7 @@ func (s *service) lookupObjectReference(
 // resolveObjectReference is the single persistence-level reference resolver.
 // It maps a supported kind to a trusted table definition and applies the same
 // live-row identity rules to every resource. The generation field is not part
-// of database identity; core uses it when hydrating versioned resources.
+// of database identity; core uses it when hydrating generation-addressed resources.
 func (s *service) resolveObjectReference(
 	ctx context.Context,
 	reference meta.ObjectReference,

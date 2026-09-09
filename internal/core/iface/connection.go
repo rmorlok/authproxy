@@ -25,7 +25,7 @@ type Connection interface {
 	GetState() database.ConnectionState
 	GetHealthState() database.ConnectionHealthState
 	GetConnectorId() apid.ID
-	GetConnectorVersion() uint64
+	GetConnectorGeneration() uint64
 	GetCreatedAt() time.Time
 	GetUpdatedAt() time.Time
 	GetDeletedAt() *time.Time

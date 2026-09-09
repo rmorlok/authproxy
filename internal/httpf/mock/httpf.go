@@ -16,31 +16,45 @@ import (
 	gentleman "gopkg.in/h2non/gentleman.v2"
 )
 
-// MockConnectorVersion is a mock of ConnectorVersion interface.
-type MockConnectorVersion struct {
+// MockConnectorGeneration is a mock of ConnectorGeneration interface.
+type MockConnectorGeneration struct {
 	ctrl     *gomock.Controller
-	recorder *MockConnectorVersionMockRecorder
+	recorder *MockConnectorGenerationMockRecorder
 }
 
-// MockConnectorVersionMockRecorder is the mock recorder for MockConnectorVersion.
-type MockConnectorVersionMockRecorder struct {
-	mock *MockConnectorVersion
+// MockConnectorGenerationMockRecorder is the mock recorder for MockConnectorGeneration.
+type MockConnectorGenerationMockRecorder struct {
+	mock *MockConnectorGeneration
 }
 
-// NewMockConnectorVersion creates a new mock instance.
-func NewMockConnectorVersion(ctrl *gomock.Controller) *MockConnectorVersion {
-	mock := &MockConnectorVersion{ctrl: ctrl}
-	mock.recorder = &MockConnectorVersionMockRecorder{mock}
+// NewMockConnectorGeneration creates a new mock instance.
+func NewMockConnectorGeneration(ctrl *gomock.Controller) *MockConnectorGeneration {
+	mock := &MockConnectorGeneration{ctrl: ctrl}
+	mock.recorder = &MockConnectorGenerationMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockConnectorVersion) EXPECT() *MockConnectorVersionMockRecorder {
+func (m *MockConnectorGeneration) EXPECT() *MockConnectorGenerationMockRecorder {
 	return m.recorder
 }
 
+// GetGeneration mocks base method.
+func (m *MockConnectorGeneration) GetGeneration() uint64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetGeneration")
+	ret0, _ := ret[0].(uint64)
+	return ret0
+}
+
+// GetGeneration indicates an expected call of GetGeneration.
+func (mr *MockConnectorGenerationMockRecorder) GetGeneration() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetGeneration", reflect.TypeOf((*MockConnectorGeneration)(nil).GetGeneration))
+}
+
 // GetId mocks base method.
-func (m *MockConnectorVersion) GetId() apid.ID {
+func (m *MockConnectorGeneration) GetId() apid.ID {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetId")
 	ret0, _ := ret[0].(apid.ID)
@@ -48,13 +62,13 @@ func (m *MockConnectorVersion) GetId() apid.ID {
 }
 
 // GetId indicates an expected call of GetId.
-func (mr *MockConnectorVersionMockRecorder) GetId() *gomock.Call {
+func (mr *MockConnectorGenerationMockRecorder) GetId() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetId", reflect.TypeOf((*MockConnectorVersion)(nil).GetId))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetId", reflect.TypeOf((*MockConnectorGeneration)(nil).GetId))
 }
 
 // GetNamespace mocks base method.
-func (m *MockConnectorVersion) GetNamespace() string {
+func (m *MockConnectorGeneration) GetNamespace() string {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetNamespace")
 	ret0, _ := ret[0].(string)
@@ -62,60 +76,46 @@ func (m *MockConnectorVersion) GetNamespace() string {
 }
 
 // GetNamespace indicates an expected call of GetNamespace.
-func (mr *MockConnectorVersionMockRecorder) GetNamespace() *gomock.Call {
+func (mr *MockConnectorGenerationMockRecorder) GetNamespace() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNamespace", reflect.TypeOf((*MockConnectorVersion)(nil).GetNamespace))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNamespace", reflect.TypeOf((*MockConnectorGeneration)(nil).GetNamespace))
 }
 
-// GetVersion mocks base method.
-func (m *MockConnectorVersion) GetVersion() uint64 {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetVersion")
-	ret0, _ := ret[0].(uint64)
-	return ret0
-}
-
-// GetVersion indicates an expected call of GetVersion.
-func (mr *MockConnectorVersionMockRecorder) GetVersion() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetVersion", reflect.TypeOf((*MockConnectorVersion)(nil).GetVersion))
-}
-
-// MockGettableConnectorVersion is a mock of GettableConnectorVersion interface.
-type MockGettableConnectorVersion struct {
+// MockGettableConnectorGeneration is a mock of GettableConnectorGeneration interface.
+type MockGettableConnectorGeneration struct {
 	ctrl     *gomock.Controller
-	recorder *MockGettableConnectorVersionMockRecorder
+	recorder *MockGettableConnectorGenerationMockRecorder
 }
 
-// MockGettableConnectorVersionMockRecorder is the mock recorder for MockGettableConnectorVersion.
-type MockGettableConnectorVersionMockRecorder struct {
-	mock *MockGettableConnectorVersion
+// MockGettableConnectorGenerationMockRecorder is the mock recorder for MockGettableConnectorGeneration.
+type MockGettableConnectorGenerationMockRecorder struct {
+	mock *MockGettableConnectorGeneration
 }
 
-// NewMockGettableConnectorVersion creates a new mock instance.
-func NewMockGettableConnectorVersion(ctrl *gomock.Controller) *MockGettableConnectorVersion {
-	mock := &MockGettableConnectorVersion{ctrl: ctrl}
-	mock.recorder = &MockGettableConnectorVersionMockRecorder{mock}
+// NewMockGettableConnectorGeneration creates a new mock instance.
+func NewMockGettableConnectorGeneration(ctrl *gomock.Controller) *MockGettableConnectorGeneration {
+	mock := &MockGettableConnectorGeneration{ctrl: ctrl}
+	mock.recorder = &MockGettableConnectorGenerationMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockGettableConnectorVersion) EXPECT() *MockGettableConnectorVersionMockRecorder {
+func (m *MockGettableConnectorGeneration) EXPECT() *MockGettableConnectorGenerationMockRecorder {
 	return m.recorder
 }
 
 // GetConnector mocks base method.
-func (m *MockGettableConnectorVersion) GetConnector() httpf.ConnectorVersion {
+func (m *MockGettableConnectorGeneration) GetConnector() httpf.ConnectorGeneration {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetConnector")
-	ret0, _ := ret[0].(httpf.ConnectorVersion)
+	ret0, _ := ret[0].(httpf.ConnectorGeneration)
 	return ret0
 }
 
 // GetConnector indicates an expected call of GetConnector.
-func (mr *MockGettableConnectorVersionMockRecorder) GetConnector() *gomock.Call {
+func (mr *MockGettableConnectorGenerationMockRecorder) GetConnector() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnector", reflect.TypeOf((*MockGettableConnectorVersion)(nil).GetConnector))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnector", reflect.TypeOf((*MockGettableConnectorGeneration)(nil).GetConnector))
 }
 
 // MockRateLimitConfigProvider is a mock of RateLimitConfigProvider interface.
@@ -215,6 +215,20 @@ func (m *MockConnection) EXPECT() *MockConnectionMockRecorder {
 	return m.recorder
 }
 
+// GetConnectorGeneration mocks base method.
+func (m *MockConnection) GetConnectorGeneration() uint64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetConnectorGeneration")
+	ret0, _ := ret[0].(uint64)
+	return ret0
+}
+
+// GetConnectorGeneration indicates an expected call of GetConnectorGeneration.
+func (mr *MockConnectionMockRecorder) GetConnectorGeneration() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnectorGeneration", reflect.TypeOf((*MockConnection)(nil).GetConnectorGeneration))
+}
+
 // GetConnectorId mocks base method.
 func (m *MockConnection) GetConnectorId() apid.ID {
 	m.ctrl.T.Helper()
@@ -227,20 +241,6 @@ func (m *MockConnection) GetConnectorId() apid.ID {
 func (mr *MockConnectionMockRecorder) GetConnectorId() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnectorId", reflect.TypeOf((*MockConnection)(nil).GetConnectorId))
-}
-
-// GetConnectorVersion mocks base method.
-func (m *MockConnection) GetConnectorVersion() uint64 {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetConnectorVersion")
-	ret0, _ := ret[0].(uint64)
-	return ret0
-}
-
-// GetConnectorVersion indicates an expected call of GetConnectorVersion.
-func (mr *MockConnectionMockRecorder) GetConnectorVersion() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnectorVersion", reflect.TypeOf((*MockConnection)(nil).GetConnectorVersion))
 }
 
 // GetId mocks base method.
@@ -415,18 +415,18 @@ func (mr *MockFMockRecorder) ForConnection(cv interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ForConnection", reflect.TypeOf((*MockF)(nil).ForConnection), cv)
 }
 
-// ForConnectorVersion mocks base method.
-func (m *MockF) ForConnectorVersion(cv httpf.ConnectorVersion) httpf.F {
+// ForConnectorGeneration mocks base method.
+func (m *MockF) ForConnectorGeneration(cv httpf.ConnectorGeneration) httpf.F {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ForConnectorVersion", cv)
+	ret := m.ctrl.Call(m, "ForConnectorGeneration", cv)
 	ret0, _ := ret[0].(httpf.F)
 	return ret0
 }
 
-// ForConnectorVersion indicates an expected call of ForConnectorVersion.
-func (mr *MockFMockRecorder) ForConnectorVersion(cv interface{}) *gomock.Call {
+// ForConnectorGeneration indicates an expected call of ForConnectorGeneration.
+func (mr *MockFMockRecorder) ForConnectorGeneration(cv interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ForConnectorVersion", reflect.TypeOf((*MockF)(nil).ForConnectorVersion), cv)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ForConnectorGeneration", reflect.TypeOf((*MockF)(nil).ForConnectorGeneration), cv)
 }
 
 // ForLabels mocks base method.

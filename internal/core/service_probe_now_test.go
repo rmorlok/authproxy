@@ -32,12 +32,12 @@ func TestEnqueueProbeNow_EnqueuesEachProbeWhenThrottleAllows(t *testing.T) {
 		},
 	}
 	conn := &database.Connection{
-		Id:               connectionId,
-		Namespace:        "root",
-		State:            database.ConnectionStateConfigured,
-		HealthState:      database.ConnectionHealthStateHealthy,
-		ConnectorId:      apid.New(apid.PrefixConnectorVersion),
-		ConnectorVersion: 1,
+		Id:                  connectionId,
+		Namespace:           "root",
+		State:               database.ConnectionStateConfigured,
+		HealthState:         database.ConnectionHealthStateHealthy,
+		ConnectorId:         apid.New(apid.PrefixConnector),
+		ConnectorGeneration: 1,
 	}
 
 	svc, _, _, ctrl := setupVerifyTest(t, connectionId, conn, connector)
@@ -63,12 +63,12 @@ func TestEnqueueProbeNow_EnqueuesOnlyEnabledProbes(t *testing.T) {
 		},
 	}
 	conn := &database.Connection{
-		Id:               connectionId,
-		Namespace:        "root",
-		State:            database.ConnectionStateConfigured,
-		HealthState:      database.ConnectionHealthStateHealthy,
-		ConnectorId:      apid.New(apid.PrefixConnectorVersion),
-		ConnectorVersion: 1,
+		Id:                  connectionId,
+		Namespace:           "root",
+		State:               database.ConnectionStateConfigured,
+		HealthState:         database.ConnectionHealthStateHealthy,
+		ConnectorId:         apid.New(apid.PrefixConnector),
+		ConnectorGeneration: 1,
 	}
 
 	svc, _, _, ctrl := setupVerifyTest(t, connectionId, conn, connector)
@@ -92,12 +92,12 @@ func TestEnqueueProbeNow_ThrottleSkipsEnqueue(t *testing.T) {
 		},
 	}
 	conn := &database.Connection{
-		Id:               connectionId,
-		Namespace:        "root",
-		State:            database.ConnectionStateConfigured,
-		HealthState:      database.ConnectionHealthStateHealthy,
-		ConnectorId:      apid.New(apid.PrefixConnectorVersion),
-		ConnectorVersion: 1,
+		Id:                  connectionId,
+		Namespace:           "root",
+		State:               database.ConnectionStateConfigured,
+		HealthState:         database.ConnectionHealthStateHealthy,
+		ConnectorId:         apid.New(apid.PrefixConnector),
+		ConnectorGeneration: 1,
 	}
 
 	svc, _, _, ctrl := setupVerifyTest(t, connectionId, conn, connector)
@@ -122,12 +122,12 @@ func TestEnqueueProbeNow_MixedThrottle(t *testing.T) {
 		},
 	}
 	conn := &database.Connection{
-		Id:               connectionId,
-		Namespace:        "root",
-		State:            database.ConnectionStateConfigured,
-		HealthState:      database.ConnectionHealthStateHealthy,
-		ConnectorId:      apid.New(apid.PrefixConnectorVersion),
-		ConnectorVersion: 1,
+		Id:                  connectionId,
+		Namespace:           "root",
+		State:               database.ConnectionStateConfigured,
+		HealthState:         database.ConnectionHealthStateHealthy,
+		ConnectorId:         apid.New(apid.PrefixConnector),
+		ConnectorGeneration: 1,
 	}
 
 	svc, _, _, ctrl := setupVerifyTest(t, connectionId, conn, connector)
@@ -156,12 +156,12 @@ func TestEnqueueProbeNow_NoProbesShortCircuits(t *testing.T) {
 		Auth:        &cschema.Auth{InnerVal: &cschema.AuthApiKey{Type: cschema.AuthTypeAPIKey}},
 	}
 	conn := &database.Connection{
-		Id:               connectionId,
-		Namespace:        "root",
-		State:            database.ConnectionStateConfigured,
-		HealthState:      database.ConnectionHealthStateHealthy,
-		ConnectorId:      apid.New(apid.PrefixConnectorVersion),
-		ConnectorVersion: 1,
+		Id:                  connectionId,
+		Namespace:           "root",
+		State:               database.ConnectionStateConfigured,
+		HealthState:         database.ConnectionHealthStateHealthy,
+		ConnectorId:         apid.New(apid.PrefixConnector),
+		ConnectorGeneration: 1,
 	}
 
 	svc, _, _, ctrl := setupVerifyTest(t, connectionId, conn, connector)
@@ -186,12 +186,12 @@ func TestEnqueueProbeNow_RedisErrorIsSwallowedPerProbe(t *testing.T) {
 		},
 	}
 	conn := &database.Connection{
-		Id:               connectionId,
-		Namespace:        "root",
-		State:            database.ConnectionStateConfigured,
-		HealthState:      database.ConnectionHealthStateHealthy,
-		ConnectorId:      apid.New(apid.PrefixConnectorVersion),
-		ConnectorVersion: 1,
+		Id:                  connectionId,
+		Namespace:           "root",
+		State:               database.ConnectionStateConfigured,
+		HealthState:         database.ConnectionHealthStateHealthy,
+		ConnectorId:         apid.New(apid.PrefixConnector),
+		ConnectorGeneration: 1,
 	}
 
 	svc, _, _, ctrl := setupVerifyTest(t, connectionId, conn, connector)

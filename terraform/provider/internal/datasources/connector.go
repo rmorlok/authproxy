@@ -18,7 +18,7 @@ type ConnectorDataSource struct {
 type ConnectorDataSourceModel struct {
 	Id          types.String `tfsdk:"id"`
 	Namespace   types.String `tfsdk:"namespace"`
-	Version     types.Int64  `tfsdk:"version"`
+	Generation  types.Int64  `tfsdk:"generation"`
 	State       types.String `tfsdk:"state"`
 	DisplayName types.String `tfsdk:"display_name"`
 	Description types.String `tfsdk:"description"`
@@ -43,7 +43,7 @@ func (d *ConnectorDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 		Attributes: map[string]schema.Attribute{
 			"id":           schema.StringAttribute{Required: true},
 			"namespace":    schema.StringAttribute{Computed: true},
-			"version":      schema.Int64Attribute{Computed: true, Description: "The selected connector metadata.generation."},
+			"generation":   schema.Int64Attribute{Computed: true, Description: "The selected connector metadata.generation."},
 			"state":        schema.StringAttribute{Computed: true},
 			"display_name": schema.StringAttribute{Computed: true},
 			"description":  schema.StringAttribute{Computed: true},
@@ -77,7 +77,7 @@ func (d *ConnectorDataSource) Read(ctx context.Context, req datasource.ReadReque
 	}
 
 	config.Namespace = types.StringValue(conn.Metadata.Namespace)
-	config.Version = types.Int64Value(int64(conn.Metadata.Generation))
+	config.Generation = types.Int64Value(int64(conn.Metadata.Generation))
 	if conn.Status != nil {
 		config.State = types.StringValue(conn.Status.Release.State)
 	} else {

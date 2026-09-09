@@ -43,85 +43,85 @@ func FullMockService(tb testing.TB, ctrl *gomock.Controller) (*service, *mockDb.
 	return s, db, r, h, ac, encrypt
 }
 
-func TestGetConnectorVersionIdsForConnections(t *testing.T) {
+func TestGetConnectorGenerationIdsForConnections(t *testing.T) {
 	u1 := apid.MustParse("cxr_test1111111111aa")
 	u2 := apid.MustParse("cxr_test2222222222aa")
 
 	tests := []struct {
 		name        string
 		connections []database.Connection
-		expected    []iface.ConnectorVersionId
+		expected    []iface.ConnectorGenerationId
 	}{
 		{
 			name:        "empty input",
 			connections: nil,
-			expected:    []iface.ConnectorVersionId{},
+			expected:    []iface.ConnectorGenerationId{},
 		},
 		{
 			name:        "single connection",
-			connections: []database.Connection{{ConnectorId: u1, ConnectorVersion: 1}},
-			expected:    []iface.ConnectorVersionId{{Id: u1, Version: 1}},
+			connections: []database.Connection{{ConnectorId: u1, ConnectorGeneration: 1}},
+			expected:    []iface.ConnectorGenerationId{{Id: u1, Generation: 1}},
 		},
 		{
 			name: "multiple unique connections",
 			connections: []database.Connection{
-				{ConnectorId: u1, ConnectorVersion: 1},
-				{ConnectorId: u2, ConnectorVersion: 2},
+				{ConnectorId: u1, ConnectorGeneration: 1},
+				{ConnectorId: u2, ConnectorGeneration: 2},
 			},
-			expected: []iface.ConnectorVersionId{
-				{Id: u1, Version: 1},
-				{Id: u2, Version: 2},
+			expected: []iface.ConnectorGenerationId{
+				{Id: u1, Generation: 1},
+				{Id: u2, Generation: 2},
 			},
 		},
 		{
 			name: "duplicate connections are deduplicated",
 			connections: []database.Connection{
-				{ConnectorId: u1, ConnectorVersion: 1},
-				{ConnectorId: u1, ConnectorVersion: 1},
+				{ConnectorId: u1, ConnectorGeneration: 1},
+				{ConnectorId: u1, ConnectorGeneration: 1},
 			},
-			expected: []iface.ConnectorVersionId{
-				{Id: u1, Version: 1},
+			expected: []iface.ConnectorGenerationId{
+				{Id: u1, Generation: 1},
 			},
 		},
 		{
 			name: "different versions considered unique",
 			connections: []database.Connection{
-				{ConnectorId: u1, ConnectorVersion: 1},
-				{ConnectorId: u1, ConnectorVersion: 2},
+				{ConnectorId: u1, ConnectorGeneration: 1},
+				{ConnectorId: u1, ConnectorGeneration: 2},
 			},
-			expected: []iface.ConnectorVersionId{
-				{Id: u1, Version: 1},
-				{Id: u1, Version: 2},
+			expected: []iface.ConnectorGenerationId{
+				{Id: u1, Generation: 1},
+				{Id: u1, Generation: 2},
 			},
 		},
 		{
 			name: "different connector IDs considered unique",
 			connections: []database.Connection{
-				{ConnectorId: u1, ConnectorVersion: 1},
-				{ConnectorId: u2, ConnectorVersion: 1},
+				{ConnectorId: u1, ConnectorGeneration: 1},
+				{ConnectorId: u2, ConnectorGeneration: 1},
 			},
-			expected: []iface.ConnectorVersionId{
-				{Id: u1, Version: 1},
-				{Id: u2, Version: 1},
+			expected: []iface.ConnectorGenerationId{
+				{Id: u1, Generation: 1},
+				{Id: u2, Generation: 1},
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := GetConnectorVersionIdsForConnections(tt.connections)
+			got := GetConnectorGenerationIdsForConnections(tt.connections)
 			if !compareResults(got, tt.expected) {
-				t.Errorf("GetConnectorVersionIdsForConnections() = %v, want %v", got, tt.expected)
+				t.Errorf("GetConnectorGenerationIdsForConnections() = %v, want %v", got, tt.expected)
 			}
 		})
 	}
 }
 
-func compareResults(got, expected []iface.ConnectorVersionId) bool {
+func compareResults(got, expected []iface.ConnectorGenerationId) bool {
 	if len(got) != len(expected) {
 		return false
 	}
-	gotMap := make(map[iface.ConnectorVersionId]struct{}, len(got))
+	gotMap := make(map[iface.ConnectorGenerationId]struct{}, len(got))
 	for _, id := range got {
 		gotMap[id] = struct{}{}
 	}

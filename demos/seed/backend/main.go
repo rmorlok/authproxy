@@ -490,19 +490,19 @@ func listSeededConnector(c *resty.Client, baseUrl string, seed cschema.Connector
 	return &list.Items[0], nil
 }
 
-func getConnectorVersion(c *resty.Client, baseUrl string, connector cschema.Connector) (*cschema.Connector, error) {
-	var version cschema.Connector
+func getConnectorGeneration(c *resty.Client, baseUrl string, connector cschema.Connector) (*cschema.Connector, error) {
+	var generation cschema.Connector
 	resp, err := c.R().
 		SetHeader("Accept", "application/json").
-		SetResult(&version).
+		SetResult(&generation).
 		Get(fmt.Sprintf("%s/api/v1/connectors/%s/generations/%d", baseUrl, connector.GetId(), connector.Metadata.Generation))
 	if err != nil {
-		return nil, fmt.Errorf("GET connector version %s:%d: %w", connector.GetId(), connector.Metadata.Generation, err)
+		return nil, fmt.Errorf("GET connector generation %s:%d: %w", connector.GetId(), connector.Metadata.Generation, err)
 	}
 	if resp.StatusCode() >= 400 {
-		return nil, fmt.Errorf("GET connector version %s:%d returned %d: %s", connector.GetId(), connector.Metadata.Generation, resp.StatusCode(), resp.String())
+		return nil, fmt.Errorf("GET connector generation %s:%d returned %d: %s", connector.GetId(), connector.Metadata.Generation, resp.StatusCode(), resp.String())
 	}
-	return &version, nil
+	return &generation, nil
 }
 
 func createConnector(c *resty.Client, baseUrl string, seed cschema.Connector) (*cschema.Connector, error) {
@@ -532,27 +532,27 @@ func createConnectorDraft(c *resty.Client, baseUrl string, connector cschema.Con
 		SetResult(&created).
 		Post(fmt.Sprintf("%s/api/v1/connectors/%s/generations", baseUrl, connector.GetId()))
 	if err != nil {
-		return nil, fmt.Errorf("POST connector seed %q version: %w", seed.Metadata.Name, err)
+		return nil, fmt.Errorf("POST connector seed %q generation: %w", seed.Metadata.Name, err)
 	}
 	if resp.StatusCode() >= 400 {
-		return nil, fmt.Errorf("POST connector seed %q version returned %d: %s", seed.Metadata.Name, resp.StatusCode(), resp.String())
+		return nil, fmt.Errorf("POST connector seed %q generation returned %d: %s", seed.Metadata.Name, resp.StatusCode(), resp.String())
 	}
 	return &created, nil
 }
 
-func forceConnectorPrimary(c *resty.Client, baseUrl string, version cschema.Connector) error {
+func forceConnectorPrimary(c *resty.Client, baseUrl string, generation cschema.Connector) error {
 	resp, err := c.R().
 		SetHeader("Content-Type", "application/json").
 		SetBody(api.NewConnectorForceStateRequest(
-			meta.NewObjectReference(version.TypeMeta, version.Metadata),
+			meta.NewObjectReference(generation.TypeMeta, generation.Metadata),
 			cschema.ConnectorReleaseStatePrimary,
 		)).
-		Put(fmt.Sprintf("%s/api/v1/connectors/%s/generations/%d/_forceState", baseUrl, version.GetId(), version.Metadata.Generation))
+		Put(fmt.Sprintf("%s/api/v1/connectors/%s/generations/%d/_forceState", baseUrl, generation.GetId(), generation.Metadata.Generation))
 	if err != nil {
-		return fmt.Errorf("PUT connector seed %s:%d primary: %w", version.GetId(), version.Metadata.Generation, err)
+		return fmt.Errorf("PUT connector seed %s:%d primary: %w", generation.GetId(), generation.Metadata.Generation, err)
 	}
 	if resp.StatusCode() >= 400 {
-		return fmt.Errorf("PUT connector seed %s:%d primary returned %d: %s", version.GetId(), version.Metadata.Generation, resp.StatusCode(), resp.String())
+		return fmt.Errorf("PUT connector seed %s:%d primary returned %d: %s", generation.GetId(), generation.Metadata.Generation, resp.StatusCode(), resp.String())
 	}
 	return nil
 }
@@ -580,16 +580,16 @@ func upsertConnector(c *resty.Client, baseUrl string, seed cschema.Connector) (c
 		return connectorCreated, nil
 	}
 
-	version, err := getConnectorVersion(c, baseUrl, *existing)
+	generation, err := getConnectorGeneration(c, baseUrl, *existing)
 	if err != nil {
 		return "", err
 	}
 
-	if connectorDefinitionsEqual(seed.Spec.Definition, *version) &&
-		stringMapsEqual(seed.Metadata.Labels, userLabels(version.Metadata.Labels)) &&
-		stringMapsEqual(seed.Metadata.Annotations, version.Metadata.Annotations) {
-		if connectorObservedState(*version) != cschema.ConnectorReleaseStatePrimary {
-			if err := forceConnectorPrimary(c, baseUrl, *version); err != nil {
+	if connectorDefinitionsEqual(seed.Spec.Definition, *generation) &&
+		stringMapsEqual(seed.Metadata.Labels, userLabels(generation.Metadata.Labels)) &&
+		stringMapsEqual(seed.Metadata.Annotations, generation.Metadata.Annotations) {
+		if connectorObservedState(*generation) != cschema.ConnectorReleaseStatePrimary {
+			if err := forceConnectorPrimary(c, baseUrl, *generation); err != nil {
 				return "", err
 			}
 			return connectorUpdated, nil

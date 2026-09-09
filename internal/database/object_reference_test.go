@@ -48,15 +48,15 @@ func newObjectReferenceFixture(t *testing.T) objectReferenceFixture {
 		"billing",
 		1,
 	)
-	require.NoError(t, db.UpsertConnectorDefinitionVersion(ctx, connector))
+	require.NoError(t, db.UpsertConnectorGeneration(ctx, connector))
 
 	connection := &Connection{
-		Id:               apid.New(apid.PrefixConnection),
-		Namespace:        ns.Path,
-		Name:             "production",
-		State:            ConnectionStateConfigured,
-		ConnectorId:      connector.Id,
-		ConnectorVersion: connector.Version,
+		Id:                  apid.New(apid.PrefixConnection),
+		Namespace:           ns.Path,
+		Name:                "production",
+		State:               ConnectionStateConfigured,
+		ConnectorId:         connector.Id,
+		ConnectorGeneration: connector.Generation,
 	}
 	require.NoError(t, db.CreateConnection(ctx, connection))
 

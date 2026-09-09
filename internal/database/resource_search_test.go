@@ -109,9 +109,9 @@ func TestSearchResourcesCombinesTextSelectorAndNamespace(t *testing.T) {
 	wrongLabelID := apid.New(apid.PrefixConnection)
 	wrongNamespaceID := apid.New(apid.PrefixConnection)
 	for _, statement := range []string{
-		fmt.Sprintf(`INSERT INTO connections (id, name, namespace, labels, state, connector_id, connector_version, created_at, updated_at) VALUES ('%s', 'payments-api', 'root.team', '{"env":"prod"}', 'configured', 'cxr_test', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`, matchID),
-		fmt.Sprintf(`INSERT INTO connections (id, name, namespace, labels, state, connector_id, connector_version, created_at, updated_at) VALUES ('%s', 'payments-api-dev', 'root.team', '{"env":"dev"}', 'configured', 'cxr_test', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`, wrongLabelID),
-		fmt.Sprintf(`INSERT INTO connections (id, name, namespace, labels, state, connector_id, connector_version, created_at, updated_at) VALUES ('%s', 'payments-api', 'root.other', '{"env":"prod"}', 'configured', 'cxr_test', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`, wrongNamespaceID),
+		fmt.Sprintf(`INSERT INTO connections (id, name, namespace, labels, state, connector_id, connector_generation, created_at, updated_at) VALUES ('%s', 'payments-api', 'root.team', '{"env":"prod"}', 'configured', 'cxr_test', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`, matchID),
+		fmt.Sprintf(`INSERT INTO connections (id, name, namespace, labels, state, connector_id, connector_generation, created_at, updated_at) VALUES ('%s', 'payments-api-dev', 'root.team', '{"env":"dev"}', 'configured', 'cxr_test', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`, wrongLabelID),
+		fmt.Sprintf(`INSERT INTO connections (id, name, namespace, labels, state, connector_id, connector_generation, created_at, updated_at) VALUES ('%s', 'payments-api', 'root.other', '{"env":"prod"}', 'configured', 'cxr_test', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`, wrongNamespaceID),
 	} {
 		_, err := raw.Exec(statement)
 		require.NoError(t, err)
@@ -132,18 +132,18 @@ func TestSearchResourcesCombinesTextSelectorAndNamespace(t *testing.T) {
 	require.ElementsMatch(t, []SearchLabelMatch{{Key: "env", Value: "prod"}}, result.Items[0].MatchedLabels)
 }
 
-func TestSearchResourcesCollapsesConnectorDefinitionVersions(t *testing.T) {
+func TestSearchResourcesCollapsesConnectorGenerations(t *testing.T) {
 	_, db, raw := MustApplyBlankTestDbConfigRaw(t, nil)
 
-	connectorID := apid.New(apid.PrefixConnectorVersion)
-	definitionID1 := apid.New(apid.PrefixConnectorDefinitionVersion)
-	definitionID2 := apid.New(apid.PrefixConnectorDefinitionVersion)
-	definitionID3 := apid.New(apid.PrefixConnectorDefinitionVersion)
+	connectorID := apid.New(apid.PrefixConnector)
+	definitionID1 := apid.New(apid.PrefixConnectorGeneration)
+	definitionID2 := apid.New(apid.PrefixConnectorGeneration)
+	definitionID3 := apid.New(apid.PrefixConnectorGeneration)
 	for _, statement := range []string{
 		fmt.Sprintf(`INSERT INTO connectors (id, namespace, name, labels, created_at, updated_at) VALUES ('%s', 'root', 'connector-match', '{"type":"test"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`, connectorID),
-		fmt.Sprintf(`INSERT INTO connector_definition_versions (id, connector_id, version, state, encrypted_definition, created_at, updated_at) VALUES ('%s', '%s', 1, 'primary', '{"id":"dek_test","d":"v1"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`, definitionID1, connectorID),
-		fmt.Sprintf(`INSERT INTO connector_definition_versions (id, connector_id, version, state, encrypted_definition, created_at, updated_at) VALUES ('%s', '%s', 2, 'primary', '{"id":"dek_test","d":"v2"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`, definitionID2, connectorID),
-		fmt.Sprintf(`INSERT INTO connector_definition_versions (id, connector_id, version, state, encrypted_definition, created_at, updated_at) VALUES ('%s', '%s', 3, 'draft', '{"id":"dek_test","d":"v3"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`, definitionID3, connectorID),
+		fmt.Sprintf(`INSERT INTO connector_generations (id, connector_id, generation, state, encrypted_definition, created_at, updated_at) VALUES ('%s', '%s', 1, 'primary', '{"id":"dek_test","d":"v1"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`, definitionID1, connectorID),
+		fmt.Sprintf(`INSERT INTO connector_generations (id, connector_id, generation, state, encrypted_definition, created_at, updated_at) VALUES ('%s', '%s', 2, 'primary', '{"id":"dek_test","d":"v2"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`, definitionID2, connectorID),
+		fmt.Sprintf(`INSERT INTO connector_generations (id, connector_id, generation, state, encrypted_definition, created_at, updated_at) VALUES ('%s', '%s', 3, 'draft', '{"id":"dek_test","d":"v3"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`, definitionID3, connectorID),
 	} {
 		_, err := raw.Exec(statement)
 		require.NoError(t, err)

@@ -121,21 +121,21 @@ func TestMatch_ConnectorScope(t *testing.T) {
 
 	matched, _, err := Match(rule, proxyCtx(func(c *RequestContext) {
 		c.ConnectorID = "cxr_target"
-		c.ConnectorVersion = 7
+		c.ConnectorGeneration = 7
 	}))
 	require.NoError(t, err)
 	require.True(t, matched)
 
 	matched, _, err = Match(rule, proxyCtx(func(c *RequestContext) {
 		c.ConnectorID = "cxr_target"
-		c.ConnectorVersion = 8
+		c.ConnectorGeneration = 8
 	}))
 	require.NoError(t, err)
 	require.True(t, matched, "a connector scope applies across connector generations")
 
 	matched, _, reason, err := MatchExplain(rule, proxyCtx(func(c *RequestContext) {
 		c.ConnectorID = "cxr_other"
-		c.ConnectorVersion = 8
+		c.ConnectorGeneration = 8
 	}))
 	require.NoError(t, err)
 	require.False(t, matched)

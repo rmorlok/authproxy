@@ -110,4 +110,3 @@ var (
 	_ Limiter = (*slidingWindowLimiter)(nil)
 	_ Limiter = (*tokenBucketLimiter)(nil)
 )
-

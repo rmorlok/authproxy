@@ -36,7 +36,7 @@ percentiles plus a per-`type` panel demonstrating the
 - **Traces**: open the Explore tab → pick the **Tempo** datasource →
   search by service name (e.g. `authproxy-api`, `authproxy-worker`) or
   by tag. AuthProxy spans carry `authproxy.connection_id`,
-  `authproxy.connector_id`, `authproxy.connector_version`, and
+  `authproxy.connector_id`, `authproxy.connector_generation`, and
   `authproxy.namespace` as span attributes so you can pivot per-connection
   or per-connector from a single trace.
 - **Metrics**: pick **Prometheus**. Useful starting queries:

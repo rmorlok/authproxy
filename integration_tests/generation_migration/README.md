@@ -1,0 +1,15 @@
+# Connector generation migration integration tests
+
+This package contains end-to-end scenarios for single-connection connector
+generation migration. The tests define connectors, create real connections,
+publish newer connector generations, migrate those connections through
+`POST /connections/{id}/_migrateGeneration`, and assert resulting connection
+state, auth/config behavior, probes, and notifications.
+
+Scenario files:
+
+- API-key configure migration: [api_key_configure_change_test.md](api_key_configure_change_test.md).
+- API-key preconnect migration: [api_key_preconnect_change_test.md](api_key_preconnect_change_test.md).
+- OAuth required-scope reauth migration: [oauth_scope_expansion_reauth_test.md](oauth_scope_expansion_reauth_test.md).
+- OAuth required-scope rollback migration: [oauth_scope_expansion_rollback_test.md](oauth_scope_expansion_rollback_test.md).
+- No-auth defaults and target probe migration: [no_auth_defaults_and_probes_test.md](no_auth_defaults_and_probes_test.md).

@@ -42,9 +42,9 @@ func TestWrapConnector(t *testing.T) {
 	connectorId := apid.New(apid.PrefixActor)
 	dbConnector := database.ConnectorWithDefinition{
 		Id:                  connectorId,
-		Version:             1,
+		Generation:          1,
 		Labels:              map[string]string{"type": "test-connector"},
-		State:               database.ConnectorDefinitionVersionStateDraft,
+		State:               database.ConnectorGenerationStateDraft,
 		EncryptedDefinition: encfield.EncryptedField{ID: "dek_test", Data: "encrypted-data"},
 	}
 
@@ -71,9 +71,9 @@ func TestConnector_GetDefinition(t *testing.T) {
 	connectorId := apid.New(apid.PrefixActor)
 	dbConnector := database.ConnectorWithDefinition{
 		Id:                  connectorId,
-		Version:             1,
+		Generation:          1,
 		Labels:              map[string]string{"type": "test-connector"},
-		State:               database.ConnectorDefinitionVersionStateDraft,
+		State:               database.ConnectorGenerationStateDraft,
 		EncryptedDefinition: encfield.EncryptedField{ID: "dek_test", Data: "encrypted-data"},
 	}
 
@@ -118,8 +118,8 @@ func TestConnector_GetResource(t *testing.T) {
 			Id:          id,
 			Name:        "test-connector",
 			Namespace:   "root.acme",
-			Version:     3,
-			State:       database.ConnectorDefinitionVersionStateArchived,
+			Generation:  3,
+			State:       database.ConnectorGenerationStateArchived,
 			Labels:      labels,
 			Annotations: annotations,
 			CreatedAt:   createdAt,
@@ -164,8 +164,8 @@ func TestConnector_GetHashDerivesFromEncryptedDefinition(t *testing.T) {
 		Return(string(defJSON), nil)
 
 	c := wrapConnector(database.ConnectorWithDefinition{
-		Id:                  apid.New(apid.PrefixConnectorVersion),
-		Version:             1,
+		Id:                  apid.New(apid.PrefixConnector),
+		Generation:          1,
 		EncryptedDefinition: encryptedDefinition,
 	}, &service{encrypt: mockEncrypt, logger: aplog.NewNoopLogger()})
 
@@ -186,9 +186,9 @@ func TestConnector_SetDefinition(t *testing.T) {
 	connectorId := apid.New(apid.PrefixActor)
 	dbConnector := database.ConnectorWithDefinition{
 		Id:                  connectorId,
-		Version:             1,
+		Generation:          1,
 		Labels:              map[string]string{"type": "test-connector"},
-		State:               database.ConnectorDefinitionVersionStateDraft,
+		State:               database.ConnectorGenerationStateDraft,
 		EncryptedDefinition: encfield.EncryptedField{ID: "dek_test", Data: "encrypted-data"},
 	}
 
@@ -256,9 +256,9 @@ func NewTestConnector(c cschema.ConnectorDefinition) *Connector {
 
 	dbConnector := database.ConnectorWithDefinition{
 		Id:                  connectorId,
-		Version:             1,
+		Generation:          1,
 		Labels:              map[string]string{"type": "test-connector"},
-		State:               database.ConnectorDefinitionVersionStatePrimary,
+		State:               database.ConnectorGenerationStatePrimary,
 		EncryptedDefinition: encryptedDefinition,
 	}
 

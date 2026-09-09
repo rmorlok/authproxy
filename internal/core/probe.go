@@ -91,7 +91,7 @@ func NewProbe(cfg *cschema.Probe, s *service, c *Connector, conn *connection) if
 			WithNamespace(conn.Namespace).
 			WithConnectionId(conn.Id).
 			WithConnectorId(c.Id).
-			WithConnectorVersion(c.Version).
+			WithConnectorGeneration(c.Generation).
 			Build(),
 	}
 

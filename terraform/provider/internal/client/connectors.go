@@ -61,7 +61,7 @@ type UpdateConnectorRequest struct {
 	Spec     *ConnectorSpecPatch  `json:"spec"`
 }
 
-type CreateConnectorVersionRequest struct {
+type CreateConnectorGenerationRequest struct {
 	TypeMeta
 	Metadata ObjectMetadata `json:"metadata"`
 	Spec     ConnectorSpec  `json:"spec"`
@@ -71,7 +71,7 @@ type ConnectorForceStateSpec struct {
 	State string `json:"state"`
 }
 
-type ListConnectorVersionsResponse struct {
+type ListConnectorGenerationsResponse struct {
 	ResourceList[Connector]
 }
 
@@ -140,9 +140,9 @@ func (c *Client) GetConnector(ctx context.Context, id string) (*Connector, error
 	return &connector, err
 }
 
-func (c *Client) GetConnectorVersion(ctx context.Context, id string, version uint64) (*Connector, error) {
+func (c *Client) GetConnectorGeneration(ctx context.Context, id string, generation uint64) (*Connector, error) {
 	var connector Connector
-	err := c.readConnector(ctx, fmt.Sprintf("/api/v1/connectors/%s/generations/%d", id, version), &connector)
+	err := c.readConnector(ctx, fmt.Sprintf("/api/v1/connectors/%s/generations/%d", id, generation), &connector)
 	return &connector, err
 }
 
@@ -152,31 +152,31 @@ func (c *Client) UpdateConnector(ctx context.Context, id string, req UpdateConne
 	return &connector, err
 }
 
-func (c *Client) UpdateConnectorVersion(ctx context.Context, id string, version uint64, req UpdateConnectorRequest) (*Connector, error) {
+func (c *Client) UpdateConnectorGeneration(ctx context.Context, id string, generation uint64, req UpdateConnectorRequest) (*Connector, error) {
 	var connector Connector
-	err := c.writeConnector(ctx, "PATCH", fmt.Sprintf("/api/v1/connectors/%s/generations/%d", id, version), req, &connector)
+	err := c.writeConnector(ctx, "PATCH", fmt.Sprintf("/api/v1/connectors/%s/generations/%d", id, generation), req, &connector)
 	return &connector, err
 }
 
-func (c *Client) CreateConnectorVersion(ctx context.Context, id string, req CreateConnectorVersionRequest) (*Connector, error) {
+func (c *Client) CreateConnectorGeneration(ctx context.Context, id string, req CreateConnectorGenerationRequest) (*Connector, error) {
 	var connector Connector
 	err := c.writeConnector(ctx, "POST", fmt.Sprintf("/api/v1/connectors/%s/generations", id), req, &connector)
 	return &connector, err
 }
 
-func (c *Client) ForceConnectorVersionState(ctx context.Context, id string, version uint64, state string) error {
+func (c *Client) ForceConnectorGenerationState(ctx context.Context, id string, generation uint64, state string) error {
 	target := NewIDReference(ConnectorKind, id)
-	target.Generation = version
+	target.Generation = generation
 	request := NewActionRequest(
 		ConnectorForceStateKind,
 		*target,
 		ConnectorForceStateSpec{State: state},
 	)
-	return c.put(ctx, fmt.Sprintf("/api/v1/connectors/%s/generations/%d/_forceState", id, version), request, nil)
+	return c.put(ctx, fmt.Sprintf("/api/v1/connectors/%s/generations/%d/_forceState", id, generation), request, nil)
 }
 
-func (c *Client) ListConnectorVersions(ctx context.Context, id string) (*ListConnectorVersionsResponse, error) {
-	var response ListConnectorVersionsResponse
+func (c *Client) ListConnectorGenerations(ctx context.Context, id string) (*ListConnectorGenerationsResponse, error) {
+	var response ListConnectorGenerationsResponse
 	resp, err := c.http.R().SetContext(ctx).SetResult(&response).
 		Get(fmt.Sprintf("/api/v1/connectors/%s/generations", id))
 	if err != nil {

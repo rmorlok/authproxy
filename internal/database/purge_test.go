@@ -122,25 +122,25 @@ func TestPurgeSoftDeletedRecords(t *testing.T) {
 		require.Equal(t, int64(0), deleted)
 	})
 
-	t.Run("purging a connector cascades to its definition versions", func(t *testing.T) {
+	t.Run("purging a connector cascades to its generations", func(t *testing.T) {
 		_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
 		clk := clock.NewFakeClock(start)
 		ctx := apctx.NewBuilderBackground().WithClock(clk).Build()
-		connectorID := apid.New(apid.PrefixConnectorVersion)
+		connectorID := apid.New(apid.PrefixConnector)
 
-		require.NoError(t, db.UpsertConnectorDefinitionVersion(ctx, &ConnectorWithDefinition{
-			Id:        connectorID,
-			Namespace: "root",
-			Version:   1,
-			State:     ConnectorDefinitionVersionStatePrimary,
-			Labels:    Labels{"type": "test"},
+		require.NoError(t, db.UpsertConnectorGeneration(ctx, &ConnectorWithDefinition{
+			Id:         connectorID,
+			Namespace:  "root",
+			Generation: 1,
+			State:      ConnectorGenerationStatePrimary,
+			Labels:     Labels{"type": "test"},
 			EncryptedDefinition: encfield.EncryptedField{
 				ID:   apid.New(apid.PrefixDataEncryptionKey),
 				Data: "encrypted",
 			},
 		}))
 		require.NoError(t, db.DeleteConnector(ctx, connectorID))
-		require.Equal(t, 1, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_definition_versions"))
+		require.Equal(t, 1, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_generations"))
 
 		clk.Step(31 * 24 * time.Hour)
 		deleted, err := db.PurgeSoftDeletedRecords(
@@ -149,6 +149,6 @@ func TestPurgeSoftDeletedRecords(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.Equal(t, int64(1), deleted)
-		require.Equal(t, 0, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_definition_versions"))
+		require.Equal(t, 0, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_generations"))
 	})
 }

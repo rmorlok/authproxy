@@ -7,7 +7,7 @@ export type ResourceMetricsMetric =
     | 'resources.connections'
     | 'resources.actors'
     | 'resources.connectors'
-    | 'resources.connector_versions'
+    | 'resources.connector_generations'
     | 'resources.namespaces'
     | 'resources.rate_limits';
 export type MetricsMetric = RequestEventMetricsMetric | ResourceMetricsMetric;
@@ -22,7 +22,7 @@ export type ResourceMetricsGroupBy =
     | 'state'
     | 'health_state'
     | 'connector_id'
-    | 'connector_version'
+    | 'connector_generation'
     | 'namespace'
     | 'mode';
 export type MetricsGroupBy = RequestEventMetricsGroupBy | ResourceMetricsGroupBy;

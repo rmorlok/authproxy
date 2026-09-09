@@ -7,8 +7,8 @@ import (
 )
 
 // Migrations defines the optional connector-authored hooks used when a
-// connection moves between connector versions. Hooks are evaluated at runtime
-// against the connector-level JavaScript library for the version being crossed.
+// connection moves between connector generations. Hooks are evaluated at runtime
+// against the connector-level JavaScript library for the generation being crossed.
 type Migrations struct {
 	Up   *MigrationHook `json:"up,omitempty" yaml:"up,omitempty"`
 	Down *MigrationHook `json:"down,omitempty" yaml:"down,omitempty"`

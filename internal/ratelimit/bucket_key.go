@@ -130,13 +130,13 @@ func resolveDimension(name string, ctx *RequestContext) string {
 		return string(ctx.ConnectionID)
 	case rlschema.DimensionConnector:
 		return string(ctx.ConnectorID)
-	case rlschema.DimensionConnectorVersion:
-		// Render as decimal so two connectors with versions 1 and 11
+	case rlschema.DimensionConnectorGeneration:
+		// Render as decimal so two connectors with generations 1 and 11
 		// produce distinct buckets.
-		if ctx.ConnectorVersion == 0 {
+		if ctx.ConnectorGeneration == 0 {
 			return ""
 		}
-		return strconv.FormatUint(ctx.ConnectorVersion, 10)
+		return strconv.FormatUint(ctx.ConnectorGeneration, 10)
 	case rlschema.DimensionNamespace:
 		return ctx.Namespace
 	case rlschema.DimensionMethod:

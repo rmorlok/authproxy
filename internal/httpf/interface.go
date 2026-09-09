@@ -9,14 +9,14 @@ import (
 	"gopkg.in/h2non/gentleman.v2"
 )
 
-type ConnectorVersion interface {
+type ConnectorGeneration interface {
 	GetId() apid.ID
 	GetNamespace() string
-	GetVersion() uint64
+	GetGeneration() uint64
 }
 
-type GettableConnectorVersion interface {
-	GetConnector() ConnectorVersion
+type GettableConnectorGeneration interface {
+	GetConnector() ConnectorGeneration
 }
 
 // RateLimitConfigProvider is an optional interface that connections can implement to provide
@@ -36,7 +36,7 @@ type Connection interface {
 	GetId() apid.ID
 	GetNamespace() string
 	GetConnectorId() apid.ID
-	GetConnectorVersion() uint64
+	GetConnectorGeneration() uint64
 	GetLabels() map[string]string
 }
 
@@ -64,7 +64,7 @@ type F interface {
 	NewHTTPClient() *http.Client
 	ForRequestInfo(ri RequestInfo) F
 	ForRequestType(rt RequestType) F
-	ForConnectorVersion(cv ConnectorVersion) F
+	ForConnectorGeneration(cv ConnectorGeneration) F
 	ForConnection(cv Connection) F
 	ForActor(actor Actor) F
 	ForLabels(labels map[string]string) F

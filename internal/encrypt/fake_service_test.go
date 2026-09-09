@@ -18,10 +18,10 @@ func TestFakeService(t *testing.T) {
 	someString := "some string"
 	for _, doBase64 := range []bool{true, false} {
 		t.Run(fmt.Sprintf("doBase64=%v", doBase64), func(t *testing.T) {
-			connectorVersion := database.ConnectorWithDefinition{
-				Id:                  apid.New(apid.PrefixConnectorVersion),
-				Version:             1,
-				State:               database.ConnectorDefinitionVersionStatePrimary,
+			connectorGeneration := database.ConnectorWithDefinition{
+				Id:                  apid.New(apid.PrefixConnector),
+				Generation:          1,
+				State:               database.ConnectorGenerationStatePrimary,
 				Labels:              map[string]string{"type": "test"},
 				EncryptedDefinition: encfield.EncryptedField{ID: "dek_test", Data: "test"},
 			}
@@ -40,11 +40,11 @@ func TestFakeService(t *testing.T) {
 			s := NewEncryptService(cfg, db, nil)
 
 			connection := database.Connection{
-				Id:               apid.New(apid.PrefixConnection),
-				Namespace:        "root.some-namespace",
-				ConnectorId:      apid.New(apid.PrefixConnectorVersion),
-				ConnectorVersion: 1,
-				State:            database.ConnectionStateConfigured,
+				Id:                  apid.New(apid.PrefixConnection),
+				Namespace:           "root.some-namespace",
+				ConnectorId:         apid.New(apid.PrefixConnector),
+				ConnectorGeneration: 1,
+				State:               database.ConnectionStateConfigured,
 			}
 			require.NoError(t, db.CreateConnection(context.Background(), &connection))
 
@@ -68,7 +68,7 @@ func TestFakeService(t *testing.T) {
 					require.Equal(t, someString, decrypted)
 				})
 				t.Run("roundtrip connector", func(t *testing.T) {
-					encrypted, err := s.EncryptStringForEntity(context.Background(), &connectorVersion, someString)
+					encrypted, err := s.EncryptStringForEntity(context.Background(), &connectorGeneration, someString)
 					require.NoError(t, err)
 					require.False(t, encrypted.IsZero())
 
@@ -98,7 +98,7 @@ func TestFakeService(t *testing.T) {
 					require.Equal(t, someBytes, decrypted)
 				})
 				t.Run("roundtrip connector", func(t *testing.T) {
-					encryptedBytes, err := s.EncryptForEntity(context.Background(), &connectorVersion, someBytes)
+					encryptedBytes, err := s.EncryptForEntity(context.Background(), &connectorGeneration, someBytes)
 					require.NoError(t, err)
 					require.NotEmpty(t, encryptedBytes)
 

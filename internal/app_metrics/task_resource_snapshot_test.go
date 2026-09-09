@@ -34,19 +34,19 @@ func TestResourceSnapshotTask_CreatesSamplesAndIsIdempotent(t *testing.T) {
 	}))
 
 	connID := apid.New(apid.PrefixConnection)
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 	require.NoError(t, mainDB.CreateConnection(ctx, &database.Connection{
-		Id:               connID,
-		Namespace:        "root.metrics",
-		ConnectorId:      connectorID,
-		ConnectorVersion: 2,
-		State:            database.ConnectionStateConfigured,
-		HealthState:      database.ConnectionHealthStateUnhealthy,
-		Labels:           database.Labels{"connector": "crm"},
+		Id:                  connID,
+		Namespace:           "root.metrics",
+		ConnectorId:         connectorID,
+		ConnectorGeneration: 2,
+		State:               database.ConnectionStateConfigured,
+		HealthState:         database.ConnectionHealthStateUnhealthy,
+		Labels:              database.Labels{"connector": "crm"},
 	}))
 
-	connectorResourceID := apid.New(apid.PrefixConnectorVersion)
-	insertConnectorVersion(t, rawDB, connectorResourceID, "root.metrics", 1, database.ConnectorDefinitionVersionStatePrimary)
+	connectorResourceID := apid.New(apid.PrefixConnector)
+	insertConnectorGeneration(t, rawDB, connectorResourceID, "root.metrics", 1, database.ConnectorGenerationStatePrimary)
 
 	rateLimitID := apid.New(apid.PrefixRateLimit)
 	require.NoError(t, mainDB.CreateRateLimit(ctx, &database.RateLimit{
@@ -67,7 +67,7 @@ func TestResourceSnapshotTask_CreatesSamplesAndIsIdempotent(t *testing.T) {
 	require.Equal(t, database.ConnectionStateConfigured, connectionSamples[0].State)
 	require.Equal(t, database.ConnectionHealthStateUnhealthy, connectionSamples[0].HealthState)
 	require.Equal(t, connectorID, connectionSamples[0].ConnectorID)
-	require.Equal(t, uint64(2), connectionSamples[0].ConnectorVersion)
+	require.Equal(t, uint64(2), connectionSamples[0].ConnectorGeneration)
 	require.Equal(t, "crm", connectionSamples[0].Labels["connector"])
 
 	actorSamples := listActorSamples(t, retriever, ctx, sampledAt)
@@ -83,14 +83,14 @@ func TestResourceSnapshotTask_CreatesSamplesAndIsIdempotent(t *testing.T) {
 	require.Equal(t, connectorResourceID, connectorSamples[0].ResourceID)
 	require.Equal(t, sampledAt, connectorSamples[0].SampledAt)
 	require.Equal(t, "root.metrics", connectorSamples[0].Namespace)
-	require.Equal(t, database.ConnectorDefinitionVersionStatePrimary, connectorSamples[0].State)
-	require.Equal(t, uint64(1), connectorSamples[0].ConnectorVersion)
+	require.Equal(t, database.ConnectorGenerationStatePrimary, connectorSamples[0].State)
+	require.Equal(t, uint64(1), connectorSamples[0].ConnectorGeneration)
 
-	connectorVersionSamples := listConnectorVersionSamples(t, retriever, ctx, sampledAt)
-	require.Len(t, connectorVersionSamples, 1)
-	require.Equal(t, connectorResourceID, connectorVersionSamples[0].ResourceID)
-	require.Equal(t, uint64(1), connectorVersionSamples[0].ConnectorVersion)
-	require.Equal(t, database.ConnectorDefinitionVersionStatePrimary, connectorVersionSamples[0].State)
+	connectorGenerationSamples := listConnectorGenerationSamples(t, retriever, ctx, sampledAt)
+	require.Len(t, connectorGenerationSamples, 1)
+	require.Equal(t, connectorResourceID, connectorGenerationSamples[0].ResourceID)
+	require.Equal(t, uint64(1), connectorGenerationSamples[0].ConnectorGeneration)
+	require.Equal(t, database.ConnectorGenerationStatePrimary, connectorGenerationSamples[0].State)
 
 	namespaceSamples := listNamespaceSamples(t, retriever, ctx, sampledAt)
 	require.Contains(t, namespaceSampleIDs(namespaceSamples), "root.metrics")
@@ -121,15 +121,15 @@ func TestResourceSnapshotTask_DeletedResourcesDoNotAppearInLaterSlices(t *testin
 
 	connID := apid.New(apid.PrefixConnection)
 	require.NoError(t, mainDB.CreateConnection(ctx, &database.Connection{
-		Id:               connID,
-		Namespace:        "root.metrics",
-		ConnectorId:      apid.New(apid.PrefixConnectorVersion),
-		ConnectorVersion: 1,
-		State:            database.ConnectionStateConfigured,
+		Id:                  connID,
+		Namespace:           "root.metrics",
+		ConnectorId:         apid.New(apid.PrefixConnector),
+		ConnectorGeneration: 1,
+		State:               database.ConnectionStateConfigured,
 	}))
 
-	connectorResourceID := apid.New(apid.PrefixConnectorVersion)
-	insertConnectorVersion(t, rawDB, connectorResourceID, "root.metrics", 1, database.ConnectorDefinitionVersionStatePrimary)
+	connectorResourceID := apid.New(apid.PrefixConnector)
+	insertConnectorGeneration(t, rawDB, connectorResourceID, "root.metrics", 1, database.ConnectorGenerationStatePrimary)
 
 	require.NoError(t, mainDB.EnsureNamespaceByPath(ctx, "root.metrics.deleted"))
 
@@ -165,10 +165,10 @@ func TestResourceSnapshotTask_DeletedResourcesDoNotAppearInLaterSlices(t *testin
 	secondConnectorSamples := listConnectorSamples(t, retriever, ctx, secondSampledAt)
 	require.Empty(t, secondConnectorSamples)
 
-	firstConnectorVersionSamples := listConnectorVersionSamples(t, retriever, ctx, firstSampledAt)
-	require.Len(t, firstConnectorVersionSamples, 1)
-	secondConnectorVersionSamples := listConnectorVersionSamples(t, retriever, ctx, secondSampledAt)
-	require.Empty(t, secondConnectorVersionSamples)
+	firstConnectorGenerationSamples := listConnectorGenerationSamples(t, retriever, ctx, firstSampledAt)
+	require.Len(t, firstConnectorGenerationSamples, 1)
+	secondConnectorGenerationSamples := listConnectorGenerationSamples(t, retriever, ctx, secondSampledAt)
+	require.Empty(t, secondConnectorGenerationSamples)
 
 	firstNamespaceSamples := listNamespaceSamples(t, retriever, ctx, firstSampledAt)
 	require.Contains(t, namespaceSampleIDs(firstNamespaceSamples), "root.metrics.deleted")
@@ -228,27 +228,27 @@ func newResourceSnapshotTestHarness(t testing.TB) (
 	return context.Background(), mainDB, rawDB, resourceStore, resourceRetriever, handler
 }
 
-func insertConnectorVersion(
+func insertConnectorGeneration(
 	t testing.TB,
 	rawDB *sql.DB,
 	id apid.ID,
 	namespace string,
-	version uint64,
-	state database.ConnectorDefinitionVersionState,
+	generation uint64,
+	state database.ConnectorGenerationState,
 ) {
 	t.Helper()
-	definitionID := apid.New(apid.PrefixConnectorDefinitionVersion)
+	definitionID := apid.New(apid.PrefixConnectorGeneration)
 	_, err := rawDB.Exec(fmt.Sprintf(`
 INSERT INTO connectors
 (id, namespace, name, labels, created_at, updated_at)
 VALUES
 ('%s', '%s', '%s', '{"type":"test"}', '2026-05-29 12:00:00', '2026-05-29 12:00:00');
 
-INSERT INTO connector_definition_versions
-(id, connector_id, version, state, encrypted_definition, created_at, updated_at)
+INSERT INTO connector_generations
+(id, connector_id, generation, state, encrypted_definition, created_at, updated_at)
 VALUES
 ('%s', '%s', %d, '%s', '{"id":"dek_test","d":"encrypted-def"}', '2026-05-29 12:00:00', '2026-05-29 12:00:00')
-`, id, namespace, id, definitionID, id, version, state))
+`, id, namespace, id, definitionID, id, generation, state))
 	require.NoError(t, err)
 }
 
@@ -311,14 +311,14 @@ func listConnectorSamples(
 	return samples
 }
 
-func listConnectorVersionSamples(
+func listConnectorGenerationSamples(
 	t testing.TB,
 	retriever ResourceSampleRetriever,
 	ctx context.Context,
 	sampledAt time.Time,
-) []*ConnectorVersionResourceSample {
+) []*ConnectorGenerationResourceSample {
 	t.Helper()
-	samples, err := retriever.ListConnectorVersionResourceSamples(ctx, ResourceSampleQuery{
+	samples, err := retriever.ListConnectorGenerationResourceSamples(ctx, ResourceSampleQuery{
 		Start: &sampledAt,
 		End:   &sampledAt,
 	})

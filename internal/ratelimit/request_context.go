@@ -36,12 +36,12 @@ type RequestContext struct {
 	// referencing "actor" resolve to "" in that case.
 	ActorID apid.ID
 
-	// ConnectionID, ConnectorID, ConnectorVersion identify the connection
+	// ConnectionID, ConnectorID, ConnectorGeneration identify the connection
 	// being proxied through (where applicable). Zero values for traffic
 	// that doesn't traverse a connection.
-	ConnectionID     apid.ID
-	ConnectorID      apid.ID
-	ConnectorVersion uint64
+	ConnectionID        apid.ID
+	ConnectorID         apid.ID
+	ConnectorGeneration uint64
 
 	// Labels is the per-request label snapshot the labelSelector clause is
 	// evaluated against. Carry-forward / system labels are expected to

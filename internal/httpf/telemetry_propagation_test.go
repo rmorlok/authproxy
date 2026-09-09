@@ -16,10 +16,10 @@ import (
 // global default is true, and the per-connector override always wins.
 func TestPropagationDecisionMatrix(t *testing.T) {
 	cases := []struct {
-		name              string
-		globalDefault     bool
-		perConnector      *bool
-		expectInjected    bool
+		name           string
+		globalDefault  bool
+		perConnector   *bool
+		expectInjected bool
 	}{
 		{
 			name:           "global default false, no override → no injection (default opt-in case)",

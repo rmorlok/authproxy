@@ -518,7 +518,7 @@
         }
       ]
     },
-    "ConnectionVersionMigrationSpec": {
+    "ConnectionGenerationMigrationSpec": {
       "type": "object",
       "properties": {
         "connectorRef": { "$ref": "../resources/connection/schema.json#/$defs/ConnectorReference" },
@@ -532,7 +532,7 @@
       ],
       "additionalProperties": false
     },
-    "ConnectionVersionMigrationStatus": {
+    "ConnectionGenerationMigrationStatus": {
       "type": "object",
       "properties": {
         "taskId": {
@@ -548,21 +548,21 @@
       ],
       "additionalProperties": false
     },
-    "ConnectionVersionMigrationActionRequest": {
+    "ConnectionGenerationMigrationActionRequest": {
       "allOf": [
         { "$ref": "./v1alpha1/schema.json#/$defs/ActionRequest" },
         {
           "type": "object",
           "properties": {
             "apiVersion": { "const": "authproxy.net/v1alpha1" },
-            "kind": { "const": "ConnectionVersionMigration" },
+            "kind": { "const": "ConnectionGenerationMigration" },
             "metadata": { "$ref": "#/$defs/ConnectionActionTarget" },
-            "spec": { "$ref": "#/$defs/ConnectionVersionMigrationSpec" }
+            "spec": { "$ref": "#/$defs/ConnectionGenerationMigrationSpec" }
           }
         }
       ]
     },
-    "ConnectionVersionMigrationActionResponse": {
+    "ConnectionGenerationMigrationActionResponse": {
       "allOf": [
         { "$ref": "./v1alpha1/schema.json#/$defs/ActionResponse" },
         {
@@ -570,10 +570,10 @@
           "required": ["status"],
           "properties": {
             "apiVersion": { "const": "authproxy.net/v1alpha1" },
-            "kind": { "const": "ConnectionVersionMigration" },
+            "kind": { "const": "ConnectionGenerationMigration" },
             "metadata": { "$ref": "#/$defs/ConnectionActionTarget" },
-            "spec": { "$ref": "#/$defs/ConnectionVersionMigrationSpec" },
-            "status": { "$ref": "#/$defs/ConnectionVersionMigrationStatus" }
+            "spec": { "$ref": "#/$defs/ConnectionGenerationMigrationSpec" },
+            "status": { "$ref": "#/$defs/ConnectionGenerationMigrationStatus" }
           }
         }
       ]
@@ -931,7 +931,7 @@
             "resources.connections",
             "resources.actors",
             "resources.connectors",
-            "resources.connector_versions",
+            "resources.connector_generations",
             "resources.namespaces",
             "resources.rate_limits"
           ]
@@ -956,7 +956,7 @@
               "connector_id",
               "state",
               "health_state",
-              "connector_version",
+              "connector_generation",
               "namespace",
               "mode"
             ]
@@ -1070,7 +1070,7 @@
             "resources.connections",
             "resources.actors",
             "resources.connectors",
-            "resources.connector_versions",
+            "resources.connector_generations",
             "resources.namespaces",
             "resources.rate_limits"
           ]
@@ -1106,7 +1106,7 @@
               "connector_id",
               "state",
               "health_state",
-              "connector_version",
+              "connector_generation",
               "namespace",
               "mode"
             ]

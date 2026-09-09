@@ -19,27 +19,27 @@ import (
 
 /*
  * This file deals with connector queries that combine a logical connector with
- * one of its definition versions.
+ * one of its definition generations.
  */
 
 // ConnectorWithDefinition combines fields from connectors and
-// connector_definition_versions.
+// connector_generations.
 type ConnectorWithDefinition struct {
-	Id                  apid.ID
-	Namespace           string
-	Name                scommon.ResourceName
-	DefinitionVersionId apid.ID
-	Version             uint64
-	State               ConnectorDefinitionVersionState
-	EncryptedDefinition encfield.EncryptedField
-	Labels              Labels
-	Annotations         Annotations
-	CreatedAt           time.Time
-	UpdatedAt           time.Time
-	DefinitionCreatedAt time.Time
-	DefinitionUpdatedAt time.Time
-	EncryptedAt         *time.Time
-	DeletedAt           *time.Time
+	Id                     apid.ID
+	Namespace              string
+	Name                   scommon.ResourceName
+	DefinitionGenerationId apid.ID
+	Generation             uint64
+	State                  ConnectorGenerationState
+	EncryptedDefinition    encfield.EncryptedField
+	Labels                 Labels
+	Annotations            Annotations
+	CreatedAt              time.Time
+	UpdatedAt              time.Time
+	DefinitionCreatedAt    time.Time
+	DefinitionUpdatedAt    time.Time
+	EncryptedAt            *time.Time
+	DeletedAt              *time.Time
 }
 
 func connectorWithDefinitionSelectCols() []string {
@@ -48,7 +48,7 @@ func connectorWithDefinitionSelectCols() []string {
 		"c.namespace",
 		"c.name",
 		"dv.id",
-		"dv.version",
+		"dv.generation",
 		"dv.state",
 		"dv.encrypted_definition",
 		"c.labels",
@@ -67,8 +67,8 @@ func (cv *ConnectorWithDefinition) fields() []any {
 		&cv.Id,
 		&cv.Namespace,
 		&cv.Name,
-		&cv.DefinitionVersionId,
-		&cv.Version,
+		&cv.DefinitionGenerationId,
+		&cv.Generation,
 		&cv.State,
 		&cv.EncryptedDefinition,
 		&cv.Labels,
@@ -82,11 +82,11 @@ func (cv *ConnectorWithDefinition) fields() []any {
 	}
 }
 
-func (cv *ConnectorWithDefinition) definitionVersion() ConnectorDefinitionVersion {
-	return ConnectorDefinitionVersion{
-		Id:                  cv.DefinitionVersionId,
+func (cv *ConnectorWithDefinition) definitionGeneration() ConnectorGeneration {
+	return ConnectorGeneration{
+		Id:                  cv.DefinitionGenerationId,
 		ConnectorId:         cv.Id,
-		Version:             cv.Version,
+		Generation:          cv.Generation,
 		State:               cv.State,
 		EncryptedDefinition: cv.EncryptedDefinition,
 		CreatedAt:           cv.DefinitionCreatedAt,
@@ -103,8 +103,8 @@ func (cv *ConnectorWithDefinition) GetNamespace() string {
 	return cv.Namespace
 }
 
-func (cv *ConnectorWithDefinition) GetVersion() uint64 {
-	return cv.Version
+func (cv *ConnectorWithDefinition) GetGeneration() uint64 {
+	return cv.Generation
 }
 
 func (cv *ConnectorWithDefinition) Validate() error {
@@ -131,11 +131,11 @@ func (cv *ConnectorWithDefinition) Validate() error {
 		result = multierror.Append(result, fmt.Errorf("invalid connector annotations: %w", err))
 	}
 
-	definitionVersion := cv.definitionVersion()
-	if definitionVersion.Id.IsNil() {
-		definitionVersion.Id = apid.New(apid.PrefixConnectorDefinitionVersion)
+	definitionGeneration := cv.definitionGeneration()
+	if definitionGeneration.Id.IsNil() {
+		definitionGeneration.Id = apid.New(apid.PrefixConnectorGeneration)
 	}
-	if err := definitionVersion.Validate(); err != nil {
+	if err := definitionGeneration.Validate(); err != nil {
 		result = multierror.Append(result, err)
 	}
 
@@ -145,19 +145,19 @@ func (cv *ConnectorWithDefinition) Validate() error {
 type ConnectorOrderByField string
 
 const (
-	ConnectorOrderById        ConnectorOrderByField = "id"
-	ConnectorOrderByVersion   ConnectorOrderByField = "version"
-	ConnectorOrderByNamespace ConnectorOrderByField = "namespace"
-	ConnectorOrderByState     ConnectorOrderByField = "state"
-	ConnectorOrderByCreatedAt ConnectorOrderByField = "created_at"
-	ConnectorOrderByUpdatedAt ConnectorOrderByField = "updated_at"
-	ConnectorOrderByType      ConnectorOrderByField = "type"
+	ConnectorOrderById         ConnectorOrderByField = "id"
+	ConnectorOrderByGeneration ConnectorOrderByField = "generation"
+	ConnectorOrderByNamespace  ConnectorOrderByField = "namespace"
+	ConnectorOrderByState      ConnectorOrderByField = "state"
+	ConnectorOrderByCreatedAt  ConnectorOrderByField = "created_at"
+	ConnectorOrderByUpdatedAt  ConnectorOrderByField = "updated_at"
+	ConnectorOrderByType       ConnectorOrderByField = "type"
 )
 
 func IsValidConnectorOrderByField[T string | ConnectorOrderByField](field T) bool {
 	switch ConnectorOrderByField(field) {
 	case ConnectorOrderById,
-		ConnectorOrderByVersion,
+		ConnectorOrderByGeneration,
 		ConnectorOrderByNamespace,
 		ConnectorOrderByState,
 		ConnectorOrderByCreatedAt,
@@ -182,27 +182,27 @@ type ListConnectorsBuilder interface {
 	ForNamespaceMatcher(string) ListConnectorsBuilder
 	ForNamespaceMatchers([]string) ListConnectorsBuilder
 	ForName(name scommon.ResourceName) ListConnectorsBuilder
-	ForState(ConnectorDefinitionVersionState) ListConnectorsBuilder
-	ForStates([]ConnectorDefinitionVersionState) ListConnectorsBuilder
+	ForState(ConnectorGenerationState) ListConnectorsBuilder
+	ForStates([]ConnectorGenerationState) ListConnectorsBuilder
 	OrderBy(ConnectorOrderByField, pagination.OrderBy) ListConnectorsBuilder
 	IncludeDeleted() ListConnectorsBuilder
 	ForLabelSelector(selector string) ListConnectorsBuilder
 }
 
 type listConnectorsFilters struct {
-	s                 *service                          `json:"-"`
-	LimitVal          uint64                            `json:"limit"`
-	Offset            uint64                            `json:"offset"`
-	StatesVal         []ConnectorDefinitionVersionState `json:"states,omitempty"`
-	NamespaceMatchers []string                          `json:"namespaceMatchers,omitempty"`
-	TypeVal           []string                          `json:"types,omitempty"`
-	IdsVal            []apid.ID                         `json:"ids,omitempty"`
-	NameVal           *scommon.ResourceName             `json:"name,omitempty"`
-	OrderByFieldVal   *ConnectorOrderByField            `json:"orderByField"`
-	OrderByVal        *pagination.OrderBy               `json:"orderBy"`
-	IncludeDeletedVal bool                              `json:"includeDeleted,omitempty"`
-	LabelSelectorVal  *string                           `json:"labelSelector,omitempty"`
-	Errors            *multierror.Error                 `json:"-"`
+	s                 *service                   `json:"-"`
+	LimitVal          uint64                     `json:"limit"`
+	Offset            uint64                     `json:"offset"`
+	StatesVal         []ConnectorGenerationState `json:"states,omitempty"`
+	NamespaceMatchers []string                   `json:"namespaceMatchers,omitempty"`
+	TypeVal           []string                   `json:"types,omitempty"`
+	IdsVal            []apid.ID                  `json:"ids,omitempty"`
+	NameVal           *scommon.ResourceName      `json:"name,omitempty"`
+	OrderByFieldVal   *ConnectorOrderByField     `json:"orderByField"`
+	OrderByVal        *pagination.OrderBy        `json:"orderBy"`
+	IncludeDeletedVal bool                       `json:"includeDeleted,omitempty"`
+	LabelSelectorVal  *string                    `json:"labelSelector,omitempty"`
+	Errors            *multierror.Error          `json:"-"`
 }
 
 func (l *listConnectorsFilters) addError(e error) ListConnectorsBuilder {
@@ -215,12 +215,12 @@ func (l *listConnectorsFilters) Limit(limit int32) ListConnectorsBuilder {
 	return l
 }
 
-func (l *listConnectorsFilters) ForState(state ConnectorDefinitionVersionState) ListConnectorsBuilder {
-	l.StatesVal = []ConnectorDefinitionVersionState{state}
+func (l *listConnectorsFilters) ForState(state ConnectorGenerationState) ListConnectorsBuilder {
+	l.StatesVal = []ConnectorGenerationState{state}
 	return l
 }
 
-func (l *listConnectorsFilters) ForStates(states []ConnectorDefinitionVersionState) ListConnectorsBuilder {
+func (l *listConnectorsFilters) ForStates(states []ConnectorGenerationState) ListConnectorsBuilder {
 	l.StatesVal = states
 	return l
 }
@@ -318,17 +318,17 @@ func (l *listConnectorsFilters) fetchPage(ctx context.Context) pagination.PageRe
                         WHEN 'archived' THEN 4
                         ELSE 5
                     END,
-                    version DESC
+                    generation DESC
             ) AS row_num
         FROM %s
-    `, ConnectorDefinitionVersionsTable)
+    `, ConnectorGenerationsTable)
 
 	q := l.s.sq.Select(`
 c.id as id,
 c.namespace as namespace,
 c.name as name,
-rr.id as definition_version_id,
-rr.version as version,
+rr.id as definition_generation_id,
+rr.generation as generation,
 rr.state as state,
 rr.encrypted_definition as encrypted_definition,
 c.labels as labels,
@@ -388,7 +388,7 @@ c.deleted_at as deleted_at
 	if l.OrderByFieldVal != nil {
 		orderCol := string(*l.OrderByFieldVal)
 		switch *l.OrderByFieldVal {
-		case ConnectorOrderByVersion, ConnectorOrderByState:
+		case ConnectorOrderByGeneration, ConnectorOrderByState:
 			orderCol = "rr." + orderCol
 		case ConnectorOrderByType:
 			orderCol = "json_extract(c.labels, '$.type')"

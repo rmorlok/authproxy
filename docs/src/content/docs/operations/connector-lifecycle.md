@@ -15,7 +15,7 @@ polling contract as other long-running work.
 
 Admin lists display the connector name, but lifecycle URLs continue to use the
 immutable connector ID. Renaming a connector does not change an in-flight task,
-workflow instance ID, or any connector-version reference.
+workflow instance ID, or any connector-generation reference.
 
 ## Choosing An Operation
 
@@ -30,7 +30,7 @@ prepares its generations so no new connections can be created, then disconnects
 existing connections, then archives every generation after the disconnect work
 reaches a terminal state.
 
-The archive preparation step moves draft versions to `archived` and moves the current primary version to `active`. Moving the primary version out of `primary` prevents new connections while existing connections are being cleaned up. After cleanup, the finalize step moves every remaining version for that connector to `archived`.
+The archive preparation step moves draft generations to `archived` and moves the current primary generation to `active`. Moving the primary generation out of `primary` prevents new connections while existing connections are being cleaned up. After cleanup, the finalize step moves every remaining generation for that connector to `archived`.
 
 ## Request shape
 

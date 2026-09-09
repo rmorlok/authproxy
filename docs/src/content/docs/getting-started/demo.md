@@ -92,7 +92,7 @@ Choose **Admin UI** in the Demo Shell. It always opens as `demo-admin`.
 ![Managing AuthProxy in the Admin UI](../images/admin-walkthrough.gif)
 
 The Admin UI exposes namespaces, actors, connectors and immutable connector
-versions, connections, request events, background tasks and workflows,
+generations, connections, request events, background tasks and workflows,
 encryption keys, and rate limits.
 
 ## Grafana

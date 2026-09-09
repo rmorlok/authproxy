@@ -165,7 +165,7 @@ func (s *service) listDisconnectConnectorConnectionsV1(ctx context.Context, conn
 	if connectorID == apid.Nil {
 		return nil, fmt.Errorf("connector id not specified")
 	}
-	if err := connectorID.ValidatePrefix(apid.PrefixConnectorVersion); err != nil {
+	if err := connectorID.ValidatePrefix(apid.PrefixConnector); err != nil {
 		return nil, err
 	}
 

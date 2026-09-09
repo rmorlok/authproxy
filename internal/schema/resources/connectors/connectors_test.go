@@ -9,14 +9,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func testConfiguredConnector(id apid.ID, namespace, name string, version uint64) Connector {
+func testConfiguredConnector(id apid.ID, namespace, name string, generation uint64) Connector {
 	connector := Connector{
 		TypeMeta: meta.NewTypeMeta(ConnectorKind),
 		Metadata: meta.ObjectMeta{
 			ID:         id.String(),
 			Name:       common.ResourceName(name),
 			Namespace:  namespace,
-			Generation: version,
+			Generation: generation,
 			Labels:     map[string]string{"type": "shared-label-value"},
 		},
 		Spec: ConnectorSpec{Definition: ConnectorDefinition{
@@ -63,14 +63,14 @@ func TestConnectorsValidateUsesNamesForIdentity(t *testing.T) {
 			},
 		},
 		{
-			name: "versions share a name",
+			name: "generations share a name",
 			connectors: []Connector{
 				testConfiguredConnector(apid.Nil, "root", "shared", 1),
 				testConfiguredConnector(apid.Nil, "root", "shared", 2),
 			},
 		},
 		{
-			name: "id versions may specify name once",
+			name: "id generations may specify name once",
 			connectors: []Connector{
 				testConfiguredConnector(id1, "root", "shared", 1),
 				testConfiguredConnector(id1, "root", "", 2),
@@ -91,15 +91,15 @@ func TestConnectorsValidateUsesNamesForIdentity(t *testing.T) {
 			errMessage: "resource name must start and end",
 		},
 		{
-			name: "duplicate unversioned name",
+			name: "duplicate name without explicit generation",
 			connectors: []Connector{
 				testConfiguredConnector(apid.Nil, "root", "shared", 0),
 				testConfiguredConnector(apid.Nil, "root", "shared", 0),
 			},
-			errMessage: "multiple unversioned entries",
+			errMessage: "multiple entries without an explicit generation",
 		},
 		{
-			name: "duplicate name version",
+			name: "duplicate name generation",
 			connectors: []Connector{
 				testConfiguredConnector(apid.Nil, "root", "shared", 1),
 				testConfiguredConnector(apid.Nil, "root", "shared", 1),
@@ -139,7 +139,7 @@ func TestConnectorsValidateUsesNamesForIdentity(t *testing.T) {
 			errMessage: "assigned to multiple namespaces",
 		},
 		{
-			name: "duplicate id version",
+			name: "duplicate id generation",
 			connectors: []Connector{
 				testConfiguredConnector(id1, "root", "shared", 1),
 				testConfiguredConnector(id1, "root", "shared", 1),

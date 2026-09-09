@@ -9,7 +9,7 @@ spec:
     displayName: Migration Test
     logo:
       publicUrl: https://example.com/logo.png
-    description: Tests connector version migration hooks
+    description: Tests connector generation migration hooks
     auth:
       type: no-auth
     javascript: |

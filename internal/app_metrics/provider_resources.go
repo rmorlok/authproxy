@@ -23,7 +23,7 @@ var connectionResourceSampleColumns = []string{
 	"state",
 	"health_state",
 	"connector_id",
-	"connector_version",
+	"connector_generation",
 	"resource_created_at_ms",
 	"resource_updated_at_ms",
 	"resource_deleted_at_ms",
@@ -48,20 +48,20 @@ var connectorResourceSampleColumns = []string{
 	"namespace",
 	"labels",
 	"state",
-	"connector_version",
+	"connector_generation",
 	"resource_created_at_ms",
 	"resource_updated_at_ms",
 	"resource_deleted_at_ms",
 }
 
-var connectorVersionResourceSampleColumns = []string{
+var connectorGenerationResourceSampleColumns = []string{
 	"sampled_at_ms",
 	"resource_type",
 	"resource_id",
 	"namespace",
 	"labels",
 	"state",
-	"connector_version",
+	"connector_generation",
 	"resource_created_at_ms",
 	"resource_updated_at_ms",
 	"resource_deleted_at_ms",
@@ -115,7 +115,7 @@ func (s *sqlRecordStore) StoreConnectionResourceSamples(ctx context.Context, sam
 			string(sample.State),
 			string(sample.HealthState),
 			sample.ConnectorID.String(),
-			sample.ConnectorVersion,
+			sample.ConnectorGeneration,
 			sample.ResourceCreatedAt.UnixMilli(),
 			sample.ResourceUpdatedAt.UnixMilli(),
 			nullableUnixMillis(sample.ResourceDeletedAt),
@@ -130,7 +130,7 @@ func (s *sqlRecordStore) StoreConnectionResourceSamples(ctx context.Context, sam
 		state = excluded.state,
 		health_state = excluded.health_state,
 		connector_id = excluded.connector_id,
-		connector_version = excluded.connector_version,
+		connector_generation = excluded.connector_generation,
 		resource_created_at_ms = excluded.resource_created_at_ms,
 		resource_updated_at_ms = excluded.resource_updated_at_ms,
 		resource_deleted_at_ms = excluded.resource_deleted_at_ms,
@@ -217,7 +217,7 @@ func (s *sqlRecordStore) StoreConnectorResourceSamples(ctx context.Context, samp
 			sample.Namespace,
 			labelsVal,
 			string(sample.State),
-			sample.ConnectorVersion,
+			sample.ConnectorGeneration,
 			sample.ResourceCreatedAt.UnixMilli(),
 			sample.ResourceUpdatedAt.UnixMilli(),
 			nullableUnixMillis(sample.ResourceDeletedAt),
@@ -230,7 +230,7 @@ func (s *sqlRecordStore) StoreConnectorResourceSamples(ctx context.Context, samp
 		namespace = excluded.namespace,
 		labels = excluded.labels,
 		state = excluded.state,
-		connector_version = excluded.connector_version,
+		connector_generation = excluded.connector_generation,
 		resource_created_at_ms = excluded.resource_created_at_ms,
 		resource_updated_at_ms = excluded.resource_updated_at_ms,
 		resource_deleted_at_ms = excluded.resource_deleted_at_ms,
@@ -246,14 +246,14 @@ func (s *sqlRecordStore) StoreConnectorResourceSamples(ctx context.Context, samp
 	return nil
 }
 
-func (s *sqlRecordStore) StoreConnectorVersionResourceSamples(ctx context.Context, samples []*ConnectorVersionResourceSample) error {
+func (s *sqlRecordStore) StoreConnectorGenerationResourceSamples(ctx context.Context, samples []*ConnectorGenerationResourceSample) error {
 	if len(samples) == 0 {
 		return nil
 	}
 
-	builder := sq.Insert(connectorVersionSamplesTable).
+	builder := sq.Insert(connectorGenerationSamplesTable).
 		PlaceholderFormat(s.placeholderFormat).
-		Columns(append(append([]string{}, connectorVersionResourceSampleColumns...), "ingested_at_unix_nano")...)
+		Columns(append(append([]string{}, connectorGenerationResourceSampleColumns...), "ingested_at_unix_nano")...)
 
 	ingestedAt := time.Now().UnixNano()
 	for _, sample := range samples {
@@ -263,12 +263,12 @@ func (s *sqlRecordStore) StoreConnectorVersionResourceSamples(ctx context.Contex
 		}
 		builder = builder.Values(
 			sample.SampledAt.UnixMilli(),
-			defaultResourceType(sample.ResourceType, ResourceTypeConnectorVersion),
+			defaultResourceType(sample.ResourceType, ResourceTypeConnectorGeneration),
 			sample.ResourceID.String(),
 			sample.Namespace,
 			labelsVal,
 			string(sample.State),
-			sample.ConnectorVersion,
+			sample.ConnectorGeneration,
 			sample.ResourceCreatedAt.UnixMilli(),
 			sample.ResourceUpdatedAt.UnixMilli(),
 			nullableUnixMillis(sample.ResourceDeletedAt),
@@ -276,7 +276,7 @@ func (s *sqlRecordStore) StoreConnectorVersionResourceSamples(ctx context.Contex
 		)
 	}
 
-	builder = builder.Suffix(`ON CONFLICT (sampled_at_ms, resource_id, connector_version) DO UPDATE SET
+	builder = builder.Suffix(`ON CONFLICT (sampled_at_ms, resource_id, connector_generation) DO UPDATE SET
 		resource_type = excluded.resource_type,
 		namespace = excluded.namespace,
 		labels = excluded.labels,
@@ -288,10 +288,10 @@ func (s *sqlRecordStore) StoreConnectorVersionResourceSamples(ctx context.Contex
 
 	query, args, err := builder.ToSql()
 	if err != nil {
-		return fmt.Errorf("failed to build connector version resource sample insert: %w", err)
+		return fmt.Errorf("failed to build connector generation resource sample insert: %w", err)
 	}
 	if _, err := s.db.ExecContext(ctx, query, args...); err != nil {
-		return fmt.Errorf("failed to insert connector version resource samples: %w", err)
+		return fmt.Errorf("failed to insert connector generation resource samples: %w", err)
 	}
 	return nil
 }
@@ -430,7 +430,7 @@ func (s *clickhouseRecordStore) StoreConnectionResourceSamples(ctx context.Conte
 			string(sample.State),
 			string(sample.HealthState),
 			sample.ConnectorID.String(),
-			sample.ConnectorVersion,
+			sample.ConnectorGeneration,
 			sample.ResourceCreatedAt.UnixMilli(),
 			sample.ResourceUpdatedAt.UnixMilli(),
 			nullableUnixMillis(sample.ResourceDeletedAt),
@@ -523,7 +523,7 @@ func (s *clickhouseRecordStore) StoreConnectorResourceSamples(ctx context.Contex
 			sample.Namespace,
 			labelsVal,
 			string(sample.State),
-			sample.ConnectorVersion,
+			sample.ConnectorGeneration,
 			sample.ResourceCreatedAt.UnixMilli(),
 			sample.ResourceUpdatedAt.UnixMilli(),
 			nullableUnixMillis(sample.ResourceDeletedAt),
@@ -536,7 +536,7 @@ func (s *clickhouseRecordStore) StoreConnectorResourceSamples(ctx context.Contex
 	return tx.Commit()
 }
 
-func (s *clickhouseRecordStore) StoreConnectorVersionResourceSamples(ctx context.Context, samples []*ConnectorVersionResourceSample) error {
+func (s *clickhouseRecordStore) StoreConnectorGenerationResourceSamples(ctx context.Context, samples []*ConnectorGenerationResourceSample) error {
 	if len(samples) == 0 {
 		return nil
 	}
@@ -549,8 +549,8 @@ func (s *clickhouseRecordStore) StoreConnectorVersionResourceSamples(ctx context
 
 	stmt, err := tx.PrepareContext(ctx, fmt.Sprintf(
 		"INSERT INTO %s (%s, ingested_at_unix_nano) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-		connectorVersionSamplesTable,
-		strings.Join(connectorVersionResourceSampleColumns, ", "),
+		connectorGenerationSamplesTable,
+		strings.Join(connectorGenerationResourceSampleColumns, ", "),
 	))
 	if err != nil {
 		return err
@@ -565,18 +565,18 @@ func (s *clickhouseRecordStore) StoreConnectorVersionResourceSamples(ctx context
 		}
 		if _, err := stmt.ExecContext(ctx,
 			sample.SampledAt.UnixMilli(),
-			defaultResourceType(sample.ResourceType, ResourceTypeConnectorVersion),
+			defaultResourceType(sample.ResourceType, ResourceTypeConnectorGeneration),
 			sample.ResourceID.String(),
 			sample.Namespace,
 			labelsVal,
 			string(sample.State),
-			sample.ConnectorVersion,
+			sample.ConnectorGeneration,
 			sample.ResourceCreatedAt.UnixMilli(),
 			sample.ResourceUpdatedAt.UnixMilli(),
 			nullableUnixMillis(sample.ResourceDeletedAt),
 			ingestedAt,
 		); err != nil {
-			return fmt.Errorf("failed to insert clickhouse connector version resource sample: %w", err)
+			return fmt.Errorf("failed to insert clickhouse connector generation resource sample: %w", err)
 		}
 	}
 
@@ -687,8 +687,8 @@ func (r *sqlRecordRetriever) ListConnectorResourceSamples(ctx context.Context, q
 	return fetchConnectorResourceSamples(ctx, r.db, r.placeholderFormat, r.provider, query)
 }
 
-func (r *sqlRecordRetriever) ListConnectorVersionResourceSamples(ctx context.Context, query ResourceSampleQuery) ([]*ConnectorVersionResourceSample, error) {
-	return fetchConnectorVersionResourceSamples(ctx, r.db, r.placeholderFormat, r.provider, query)
+func (r *sqlRecordRetriever) ListConnectorGenerationResourceSamples(ctx context.Context, query ResourceSampleQuery) ([]*ConnectorGenerationResourceSample, error) {
+	return fetchConnectorGenerationResourceSamples(ctx, r.db, r.placeholderFormat, r.provider, query)
 }
 
 func (r *sqlRecordRetriever) ListNamespaceResourceSamples(ctx context.Context, query ResourceSampleQuery) ([]*NamespaceResourceSample, error) {
@@ -710,8 +710,8 @@ func (r *sqlRecordRetriever) QueryResourceMetrics(ctx context.Context, queries [
 		func(ctx context.Context, query ResourceMetricsQuery) ([]*ConnectorResourceSample, error) {
 			return fetchConnectorResourceSamples(ctx, r.db, r.placeholderFormat, r.provider, resourceMetricsSampleQuery(query))
 		},
-		func(ctx context.Context, query ResourceMetricsQuery) ([]*ConnectorVersionResourceSample, error) {
-			return fetchConnectorVersionResourceSamples(ctx, r.db, r.placeholderFormat, r.provider, resourceMetricsSampleQuery(query))
+		func(ctx context.Context, query ResourceMetricsQuery) ([]*ConnectorGenerationResourceSample, error) {
+			return fetchConnectorGenerationResourceSamples(ctx, r.db, r.placeholderFormat, r.provider, resourceMetricsSampleQuery(query))
 		},
 		func(ctx context.Context, query ResourceMetricsQuery) ([]*NamespaceResourceSample, error) {
 			return fetchNamespaceResourceSamples(ctx, r.db, r.placeholderFormat, r.provider, resourceMetricsSampleQuery(query))
@@ -734,8 +734,8 @@ func (r *clickhouseRecordRetriever) ListConnectorResourceSamples(ctx context.Con
 	return fetchConnectorResourceSamples(ctx, r.db, sq.Question, config.DatabaseProviderClickhouse, query)
 }
 
-func (r *clickhouseRecordRetriever) ListConnectorVersionResourceSamples(ctx context.Context, query ResourceSampleQuery) ([]*ConnectorVersionResourceSample, error) {
-	return fetchConnectorVersionResourceSamples(ctx, r.db, sq.Question, config.DatabaseProviderClickhouse, query)
+func (r *clickhouseRecordRetriever) ListConnectorGenerationResourceSamples(ctx context.Context, query ResourceSampleQuery) ([]*ConnectorGenerationResourceSample, error) {
+	return fetchConnectorGenerationResourceSamples(ctx, r.db, sq.Question, config.DatabaseProviderClickhouse, query)
 }
 
 func (r *clickhouseRecordRetriever) ListNamespaceResourceSamples(ctx context.Context, query ResourceSampleQuery) ([]*NamespaceResourceSample, error) {
@@ -757,8 +757,8 @@ func (r *clickhouseRecordRetriever) QueryResourceMetrics(ctx context.Context, qu
 		func(ctx context.Context, query ResourceMetricsQuery) ([]*ConnectorResourceSample, error) {
 			return fetchConnectorResourceSamples(ctx, r.db, sq.Question, config.DatabaseProviderClickhouse, resourceMetricsSampleQuery(query))
 		},
-		func(ctx context.Context, query ResourceMetricsQuery) ([]*ConnectorVersionResourceSample, error) {
-			return fetchConnectorVersionResourceSamples(ctx, r.db, sq.Question, config.DatabaseProviderClickhouse, resourceMetricsSampleQuery(query))
+		func(ctx context.Context, query ResourceMetricsQuery) ([]*ConnectorGenerationResourceSample, error) {
+			return fetchConnectorGenerationResourceSamples(ctx, r.db, sq.Question, config.DatabaseProviderClickhouse, resourceMetricsSampleQuery(query))
 		},
 		func(ctx context.Context, query ResourceMetricsQuery) ([]*NamespaceResourceSample, error) {
 			return fetchNamespaceResourceSamples(ctx, r.db, sq.Question, config.DatabaseProviderClickhouse, resourceMetricsSampleQuery(query))
@@ -871,17 +871,17 @@ func fetchConnectorResourceSamples(
 	return samples, rows.Err()
 }
 
-func fetchConnectorVersionResourceSamples(
+func fetchConnectorGenerationResourceSamples(
 	ctx context.Context,
 	db *sql.DB,
 	placeholderFormat sq.PlaceholderFormat,
 	provider config.DatabaseProvider,
 	query ResourceSampleQuery,
-) ([]*ConnectorVersionResourceSample, error) {
-	builder := sq.Select(connectorVersionResourceSampleColumns...).
-		From(resourceSampleTableName(connectorVersionSamplesTable, provider)).
+) ([]*ConnectorGenerationResourceSample, error) {
+	builder := sq.Select(connectorGenerationResourceSampleColumns...).
+		From(resourceSampleTableName(connectorGenerationSamplesTable, provider)).
 		PlaceholderFormat(placeholderFormat).
-		OrderBy("sampled_at_ms ASC", "resource_id ASC", "connector_version ASC")
+		OrderBy("sampled_at_ms ASC", "resource_id ASC", "connector_generation ASC")
 
 	builder, err := applyResourceSampleQuery(builder, provider, query)
 	if err != nil {
@@ -894,9 +894,9 @@ func fetchConnectorVersionResourceSamples(
 	}
 	defer rows.Close()
 
-	var samples []*ConnectorVersionResourceSample
+	var samples []*ConnectorGenerationResourceSample
 	for rows.Next() {
-		sample, err := scanConnectorVersionResourceSample(rows)
+		sample, err := scanConnectorGenerationResourceSample(rows)
 		if err != nil {
 			return nil, err
 		}
@@ -1036,7 +1036,7 @@ func scanConnectionResourceSample(row interface{ Scan(dest ...any) error }) (*Co
 		&sample.State,
 		&sample.HealthState,
 		&connectorID,
-		&sample.ConnectorVersion,
+		&sample.ConnectorGeneration,
 		&createdAtMs,
 		&updatedAtMs,
 		&deletedAtMs,
@@ -1092,7 +1092,7 @@ func scanConnectorResourceSample(row interface{ Scan(dest ...any) error }) (*Con
 		&sample.Namespace,
 		&sample.Labels,
 		&sample.State,
-		&sample.ConnectorVersion,
+		&sample.ConnectorGeneration,
 		&createdAtMs,
 		&updatedAtMs,
 		&deletedAtMs,
@@ -1108,11 +1108,11 @@ func scanConnectorResourceSample(row interface{ Scan(dest ...any) error }) (*Con
 	return sample, nil
 }
 
-func scanConnectorVersionResourceSample(row interface{ Scan(dest ...any) error }) (*ConnectorVersionResourceSample, error) {
+func scanConnectorGenerationResourceSample(row interface{ Scan(dest ...any) error }) (*ConnectorGenerationResourceSample, error) {
 	var sampledAtMs, createdAtMs, updatedAtMs int64
 	var deletedAtMs sql.NullInt64
 	var resourceID string
-	sample := &ConnectorVersionResourceSample{}
+	sample := &ConnectorGenerationResourceSample{}
 	err := row.Scan(
 		&sampledAtMs,
 		&sample.ResourceType,
@@ -1120,13 +1120,13 @@ func scanConnectorVersionResourceSample(row interface{ Scan(dest ...any) error }
 		&sample.Namespace,
 		&sample.Labels,
 		&sample.State,
-		&sample.ConnectorVersion,
+		&sample.ConnectorGeneration,
 		&createdAtMs,
 		&updatedAtMs,
 		&deletedAtMs,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to scan connector version resource sample: %w", err)
+		return nil, fmt.Errorf("failed to scan connector generation resource sample: %w", err)
 	}
 	sample.SampledAt = unixMillis(sampledAtMs)
 	sample.ResourceID = apid.ID(resourceID)

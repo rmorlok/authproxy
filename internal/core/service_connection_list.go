@@ -14,7 +14,7 @@ import (
 type listConnectionsWrapper struct {
 	l  database.ListConnectionsBuilder
 	e  database.ListConnectionsExecutor
-	cc map[iface.ConnectorVersionId]*Connector
+	cc map[iface.ConnectorGenerationId]*Connector
 	s  *service
 }
 
@@ -32,35 +32,35 @@ func (l *listConnectionsWrapper) convertPageResult(ctx context.Context, result p
 		return pagination.PageResult[iface.Connection]{Error: result.Error}
 	}
 
-	allNeededConnectorVersionIds := GetConnectorVersionIdsForConnections(result.Results)
-	toLoadConnectorVersions := make([]iface.ConnectorVersionId, 0, len(allNeededConnectorVersionIds))
-	for _, id := range allNeededConnectorVersionIds {
-		// Check if we already have the connector version loaded
+	allNeededConnectorGenerationIds := GetConnectorGenerationIdsForConnections(result.Results)
+	toLoadConnectorGenerations := make([]iface.ConnectorGenerationId, 0, len(allNeededConnectorGenerationIds))
+	for _, id := range allNeededConnectorGenerationIds {
+		// Check if we already have the connector generation loaded
 		if _, ok := l.cc[id]; !ok {
-			toLoadConnectorVersions = append(toLoadConnectorVersions, id)
+			toLoadConnectorGenerations = append(toLoadConnectorGenerations, id)
 		}
 	}
 
-	versions, err := l.s.getConnectorVersions(ctx, toLoadConnectorVersions)
+	generations, err := l.s.getConnectorGenerations(ctx, toLoadConnectorGenerations)
 	if err != nil {
 		return pagination.PageResult[iface.Connection]{Error: err}
 	}
 
-	for _, v := range versions {
+	for _, v := range generations {
 		if l.cc == nil {
-			l.cc = make(map[iface.ConnectorVersionId]*Connector)
+			l.cc = make(map[iface.ConnectorGenerationId]*Connector)
 		}
 
-		l.cc[iface.ConnectorVersionId{Id: v.GetId(), Version: v.GetVersion()}] = v
+		l.cc[iface.ConnectorGenerationId{Id: v.GetId(), Generation: v.GetGeneration()}] = v
 	}
 
 	connections := make([]iface.Connection, 0, len(result.Results))
 	for _, r := range result.Results {
-		if c, ok := l.cc[iface.ConnectorVersionId{Id: r.ConnectorId, Version: r.ConnectorVersion}]; ok {
+		if c, ok := l.cc[iface.ConnectorGenerationId{Id: r.ConnectorId, Generation: r.ConnectorGeneration}]; ok {
 			connections = append(connections, wrapConnection(&r, c, l.s))
 		} else {
 			return pagination.PageResult[iface.Connection]{
-				Error: fmt.Errorf("could not find connector version %s:%d", r.ConnectorId, r.ConnectorVersion),
+				Error: fmt.Errorf("could not find connector generation %s:%d", r.ConnectorId, r.ConnectorGeneration),
 			}
 		}
 	}

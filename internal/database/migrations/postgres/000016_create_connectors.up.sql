@@ -20,6 +20,10 @@ create unique index idx_connectors_live_namespace_name
     on connectors (namespace, name)
     where deleted_at is null;
 
+alter table connector_generations rename to legacy_connector_generations;
+drop index idx_connector_generations_deleted_at;
+drop index idx_connector_generations_resource_search;
+
 with ranked as (
     select
         id,
@@ -37,13 +41,13 @@ with ranked as (
                     when 'archived' then 4
                     else 5
                 end,
-                version desc
+                generation desc
         ) as row_num,
         min(created_at) over (partition by id) as earliest_created_at,
         max(updated_at) over (partition by id) as latest_updated_at,
-        sum(case when deleted_at is null then 1 else 0 end) over (partition by id) as live_versions,
+        sum(case when deleted_at is null then 1 else 0 end) over (partition by id) as live_generations,
         max(deleted_at) over (partition by id) as latest_deleted_at
-    from connector_versions
+    from legacy_connector_generations
 )
 insert into connectors (
     id,
@@ -63,34 +67,34 @@ select
     annotations,
     coalesce(earliest_created_at, current_timestamp),
     coalesce(latest_updated_at, earliest_created_at, current_timestamp),
-    case when live_versions > 0 then null else latest_deleted_at end
+    case when live_generations > 0 then null else latest_deleted_at end
 from ranked
 where row_num = 1;
 
-create table connector_definition_versions
+create table connector_generations
 (
     id                   text primary key,
     connector_id         text not null references connectors (id) on delete cascade,
-    version              bigint not null,
+    generation           bigint not null,
     state                text not null,
     encrypted_definition jsonb not null,
     created_at           timestamptz not null,
     updated_at           timestamptz not null,
     encrypted_at         timestamptz,
     deleted_at           timestamptz,
-    unique (connector_id, version)
+    unique (connector_id, generation)
 );
 
-create index idx_connector_definition_versions_connector_state
-    on connector_definition_versions (connector_id, state);
+create index idx_connector_generations_connector_state
+    on connector_generations (connector_id, state);
 
-create index idx_connector_definition_versions_deleted_at
-    on connector_definition_versions (deleted_at);
+create index idx_connector_generations_deleted_at
+    on connector_generations (deleted_at);
 
-insert into connector_definition_versions (
+insert into connector_generations (
     id,
     connector_id,
-    version,
+    generation,
     state,
     encrypted_definition,
     created_at,
@@ -99,16 +103,16 @@ insert into connector_definition_versions (
     deleted_at
 )
 select
-    'cvd_' || substr(cv.id, 5) || '_' || cv.version::text,
+    'cgn_' || substr(cv.id, 5) || '_' || cv.generation::text,
     cv.id,
-    cv.version,
+    cv.generation,
     cv.state,
     cv.encrypted_definition,
     coalesce(cv.created_at, c.created_at, current_timestamp),
     coalesce(cv.updated_at, cv.created_at, c.updated_at, c.created_at, current_timestamp),
     cv.encrypted_at,
     c.deleted_at
-from connector_versions cv
+from legacy_connector_generations cv
 join connectors c on c.id = cv.id;
 
-drop table connector_versions;
+drop table legacy_connector_generations;

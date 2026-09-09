@@ -8,7 +8,7 @@ import RequestsPage from "./pages/Requests";
 import RequestDetail from "./pages/RequestDetail";
 import ConnectorDetail from "./pages/ConnectorDetail";
 import ConnectionDetail from "./pages/ConnectionDetail";
-import ConnectorVersionDetail from "./pages/ConnectorVersionDetail";
+import ConnectorGenerationDetail from "./pages/ConnectorGenerationDetail";
 import ActorsPage from "./pages/Actors";
 import ActorDetailPage from "./pages/ActorDetail";
 import KeysPage from "./pages/Keys";
@@ -62,7 +62,7 @@ export const router = createBrowserRouter([
             },
             {
                 path: 'connectors/:id/generations/:generation',
-                element: <ConnectorVersionDetail />,
+                element: <ConnectorGenerationDetail />,
                 handle: [
                     {
                         title: 'Connectors',

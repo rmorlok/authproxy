@@ -52,7 +52,7 @@ const connector = {
   status: {release: {state: ConnectorReleaseState.PRIMARY}},
 };
 
-const connectorVersions = [
+const connectorGenerations = [
   connector,
   {...connector, metadata: {...connector.metadata, generation: 3, createdAt: '2026-07-24T00:00:00.000Z'}, status: {release: {state: ConnectorReleaseState.ACTIVE}}},
   {...connector, metadata: {...connector.metadata, generation: 2, createdAt: '2026-07-23T00:00:00.000Z'}, status: {release: {state: ConnectorReleaseState.ACTIVE}}},
@@ -64,7 +64,7 @@ describe('ConnectorDetail', () => {
     vi.mocked(connectors.get).mockResolvedValue({status: 200, data: connector} as never);
     vi.mocked(connectors.listGenerations).mockResolvedValue({
       status: 200,
-      data: {apiVersion: 'authproxy.net/v1alpha1', kind: 'ConnectorList', metadata: {}, items: connectorVersions},
+      data: {apiVersion: 'authproxy.net/v1alpha1', kind: 'ConnectorList', metadata: {}, items: connectorGenerations},
     } as never);
   });
 
@@ -73,7 +73,7 @@ describe('ConnectorDetail', () => {
     vi.clearAllMocks();
   });
 
-  it('derives available states and the version count from the version list', async () => {
+  it('derives available states and the generation count from the generation list', async () => {
     render(
       <MemoryRouter>
         <ConnectorDetail connectorId={connector.metadata.id}/>
@@ -92,7 +92,7 @@ describe('ConnectorDetail', () => {
     expect(within(states!).getAllByText(ConnectorReleaseState.ACTIVE)).toHaveLength(1);
     expect(within(states!).getAllByText(ConnectorReleaseState.ARCHIVED)).toHaveLength(1);
 
-    const count = screen.getByText('Versions').parentElement;
+    const count = screen.getByText('Generations').parentElement;
     expect(count).not.toBeNull();
     expect(within(count!).getByText('4')).toBeTruthy();
 

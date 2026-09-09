@@ -178,7 +178,7 @@ func TestLabels(t *testing.T) {
 }
 
 func TestApidPrefixToLabelToken(t *testing.T) {
-	require.Equal(t, "cxr", ApidPrefixToLabelToken(apid.PrefixConnectorVersion))
+	require.Equal(t, "cxr", ApidPrefixToLabelToken(apid.PrefixConnector))
 	require.Equal(t, "cxn", ApidPrefixToLabelToken(apid.PrefixConnection))
 	require.Equal(t, "act", ApidPrefixToLabelToken(apid.PrefixActor))
 	require.Equal(t, "key", ApidPrefixToLabelToken(apid.PrefixKey))

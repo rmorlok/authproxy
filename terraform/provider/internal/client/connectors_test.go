@@ -73,14 +73,14 @@ func TestConnectorPatchIncludesRequiredEmptySections(t *testing.T) {
 	assertCanonicalRequest(t, request, ConnectorKind)
 }
 
-func TestConnectorVersionListUsesCanonicalEnvelope(t *testing.T) {
+func TestConnectorGenerationListUsesCanonicalEnvelope(t *testing.T) {
 	data := []byte(`{
 		"apiVersion":"authproxy.net/v1alpha1",
 		"kind":"ConnectorList",
 		"metadata":{"continue":"next"},
 		"items":[{"apiVersion":"authproxy.net/v1alpha1","kind":"Connector","metadata":{"id":"cxr_test","generation":2},"spec":{"definition":{}},"status":{"release":{"state":"draft"}}}]
 	}`)
-	var response ListConnectorVersionsResponse
+	var response ListConnectorGenerationsResponse
 	if err := json.Unmarshal(data, &response); err != nil {
 		t.Fatal(err)
 	}
@@ -127,19 +127,19 @@ func TestConnectorGenerationOperationsUseGenerationPaths(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := api.GetConnectorVersion(t.Context(), "cxr_test", 2); err != nil {
+	if _, err := api.GetConnectorGeneration(t.Context(), "cxr_test", 2); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := api.UpdateConnectorVersion(t.Context(), "cxr_test", 2, UpdateConnectorRequest{}); err != nil {
+	if _, err := api.UpdateConnectorGeneration(t.Context(), "cxr_test", 2, UpdateConnectorRequest{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := api.CreateConnectorVersion(t.Context(), "cxr_test", CreateConnectorVersionRequest{}); err != nil {
+	if _, err := api.CreateConnectorGeneration(t.Context(), "cxr_test", CreateConnectorGenerationRequest{}); err != nil {
 		t.Fatal(err)
 	}
-	if err := api.ForceConnectorVersionState(t.Context(), "cxr_test", 2, "primary"); err != nil {
+	if err := api.ForceConnectorGenerationState(t.Context(), "cxr_test", 2, "primary"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := api.ListConnectorVersions(t.Context(), "cxr_test"); err != nil {
+	if _, err := api.ListConnectorGenerations(t.Context(), "cxr_test"); err != nil {
 		t.Fatal(err)
 	}
 	if requestIndex != len(expected) {
@@ -147,7 +147,7 @@ func TestConnectorGenerationOperationsUseGenerationPaths(t *testing.T) {
 	}
 }
 
-func TestForceConnectorVersionStateUsesCanonicalActionEnvelope(t *testing.T) {
+func TestForceConnectorGenerationStateUsesCanonicalActionEnvelope(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		if request.Method != http.MethodPut || request.URL.Path != "/api/v1/connectors/cxr_test/generations/2/_forceState" {
 			t.Errorf("request: %s %s", request.Method, request.URL.Path)
@@ -175,7 +175,7 @@ func TestForceConnectorVersionStateUsesCanonicalActionEnvelope(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := api.ForceConnectorVersionState(t.Context(), "cxr_test", 2, "archived"); err != nil {
+	if err := api.ForceConnectorGenerationState(t.Context(), "cxr_test", 2, "archived"); err != nil {
 		t.Fatal(err)
 	}
 }

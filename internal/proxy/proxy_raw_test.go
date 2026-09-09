@@ -70,7 +70,7 @@ func (s *stubHttpf) NewHTTPClient() *http.Client {
 }
 func (s *stubHttpf) ForRequestInfo(httpf.RequestInfo) httpf.F { return s }
 func (s *stubHttpf) ForRequestType(httpf.RequestType) httpf.F { return s }
-func (s *stubHttpf) ForConnectorVersion(httpf.ConnectorVersion) httpf.F {
+func (s *stubHttpf) ForConnectorGeneration(httpf.ConnectorGeneration) httpf.F {
 	return s
 }
 func (s *stubHttpf) ForConnection(httpf.Connection) httpf.F { return s }

@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS app_metrics_connector_resource_samples (
     namespace TEXT NOT NULL,
     labels JSONB NOT NULL DEFAULT '{}',
     state TEXT NOT NULL,
-    connector_version BIGINT NOT NULL DEFAULT 0,
+    connector_generation BIGINT NOT NULL DEFAULT 0,
     resource_created_at_ms BIGINT NOT NULL,
     resource_updated_at_ms BIGINT NOT NULL,
     resource_deleted_at_ms BIGINT,
@@ -17,24 +17,24 @@ CREATE INDEX IF NOT EXISTS idx_connector_resource_samples_namespace ON app_metri
 CREATE INDEX IF NOT EXISTS idx_connector_resource_samples_sampled_at ON app_metrics_connector_resource_samples (sampled_at_ms);
 CREATE INDEX IF NOT EXISTS idx_connector_resource_samples_state ON app_metrics_connector_resource_samples (state);
 
-CREATE TABLE IF NOT EXISTS app_metrics_connector_version_resource_samples (
+CREATE TABLE IF NOT EXISTS app_metrics_connector_generation_resource_samples (
     sampled_at_ms BIGINT NOT NULL,
-    resource_type TEXT NOT NULL DEFAULT 'connector_version',
+    resource_type TEXT NOT NULL DEFAULT 'connector_generation',
     resource_id TEXT NOT NULL,
     namespace TEXT NOT NULL,
     labels JSONB NOT NULL DEFAULT '{}',
     state TEXT NOT NULL,
-    connector_version BIGINT NOT NULL DEFAULT 0,
+    connector_generation BIGINT NOT NULL DEFAULT 0,
     resource_created_at_ms BIGINT NOT NULL,
     resource_updated_at_ms BIGINT NOT NULL,
     resource_deleted_at_ms BIGINT,
     ingested_at_unix_nano BIGINT NOT NULL,
-    PRIMARY KEY (sampled_at_ms, resource_id, connector_version)
+    PRIMARY KEY (sampled_at_ms, resource_id, connector_generation)
 );
 
-CREATE INDEX IF NOT EXISTS idx_connector_version_resource_samples_namespace ON app_metrics_connector_version_resource_samples (namespace);
-CREATE INDEX IF NOT EXISTS idx_connector_version_resource_samples_sampled_at ON app_metrics_connector_version_resource_samples (sampled_at_ms);
-CREATE INDEX IF NOT EXISTS idx_connector_version_resource_samples_state ON app_metrics_connector_version_resource_samples (state);
+CREATE INDEX IF NOT EXISTS idx_connector_generation_resource_samples_namespace ON app_metrics_connector_generation_resource_samples (namespace);
+CREATE INDEX IF NOT EXISTS idx_connector_generation_resource_samples_sampled_at ON app_metrics_connector_generation_resource_samples (sampled_at_ms);
+CREATE INDEX IF NOT EXISTS idx_connector_generation_resource_samples_state ON app_metrics_connector_generation_resource_samples (state);
 
 CREATE TABLE IF NOT EXISTS app_metrics_namespace_resource_samples (
     sampled_at_ms BIGINT NOT NULL,

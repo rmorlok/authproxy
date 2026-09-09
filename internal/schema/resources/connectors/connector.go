@@ -21,7 +21,7 @@ const (
 	ConnectorReleaseStateArchived ConnectorReleaseState = "archived"
 )
 
-// Connector is the versioned Kubernetes-style resource for a connector.
+// Connector is the generation-addressed Kubernetes-style resource for a connector.
 // Metadata identifies the logical connector and generation; Spec.Definition
 // contains provider behavior; Status contains server-observed release state.
 type Connector struct {
