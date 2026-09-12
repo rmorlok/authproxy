@@ -54,9 +54,11 @@ func pointer(path []string) string {
 
 func pointerParts(path string) []string {
 	parts := strings.Split(strings.TrimPrefix(path, "/"), "/")
+
 	for i := range parts {
 		parts[i] = strings.ReplaceAll(strings.ReplaceAll(parts[i], "~1", "/"), "~0", "~")
 	}
+
 	return parts
 }
 
@@ -64,6 +66,7 @@ func at(value any, path []string) (any, bool) {
 	if len(path) == 0 {
 		return value, true
 	}
+
 	switch v := value.(type) {
 	case map[string]any:
 		child, ok := v[path[0]]
@@ -78,6 +81,7 @@ func at(value any, path []string) (any, bool) {
 		}
 		return at(v[i], path[1:])
 	}
+
 	return nil, false
 }
 
@@ -87,10 +91,12 @@ func exclude(value map[string]any, path []string) {
 	if len(path) == 0 {
 		return
 	}
+
 	if len(path) == 1 {
 		delete(value, path[0])
 		return
 	}
+
 	switch child := value[path[0]].(type) {
 	case map[string]any:
 		exclude(child, path[1:])
@@ -104,6 +110,7 @@ func newHistory(doc Document) (*History, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	h := &History{Version: historyVersion, Desired: object}
 	for _, path := range apserde.SensitivePaths(doc.Resource) {
 		if _, ok := at(object, path); ok {
@@ -111,10 +118,12 @@ func newHistory(doc Document) (*History, error) {
 		}
 		exclude(object, path)
 	}
+
 	m, _ := object["metadata"].(map[string]any)
 	if ann, ok := m["annotations"].(map[string]any); ok {
 		delete(ann, LastAppliedAnnotation)
 	}
+
 	h.Secrets = uniqueSorted(h.Secrets)
 	return h, nil
 }
@@ -122,12 +131,14 @@ func newHistory(doc Document) (*History, error) {
 func uniqueSorted(values []string) []string {
 	seen := map[string]bool{}
 	result := []string{}
+
 	for _, v := range values {
 		if !seen[v] {
 			seen[v] = true
 			result = append(result, v)
 		}
 	}
+
 	sort.Strings(result)
 	return result
 }
@@ -136,47 +147,63 @@ func readHistory(raw string, kind meta.Kind) (*History, error) {
 	if len(raw) > meta.AnnotationsTotalMaxSize {
 		return nil, fmt.Errorf("last-applied history exceeds annotation limit")
 	}
+
 	var node yaml.Node
 	if yaml.Unmarshal([]byte(raw), &node) != nil || checkNode(&node) != nil {
 		return nil, fmt.Errorf("invalid last-applied history")
 	}
+
 	var h History
 	decoder := json.NewDecoder(strings.NewReader(raw))
 	decoder.UseNumber()
 	decoder.DisallowUnknownFields()
+
 	if decoder.Decode(&h) != nil || h.Version != historyVersion || h.Desired == nil {
 		return nil, fmt.Errorf("invalid or unsupported last-applied history")
 	}
+
 	var extra any
 	if decoder.Decode(&extra) != io.EOF {
 		return nil, fmt.Errorf("invalid last-applied history")
 	}
+
 	data, _ := json.Marshal(h.Desired)
+
 	resource, err := registry.NewResourceScheme().DecodeJSON(data)
 	if err != nil {
 		return nil, fmt.Errorf("invalid last-applied resource")
 	}
+
 	m, k, err := resourceMetadata(resource)
 	if err != nil || k != kind || normalizeIdentity(string(kind), &m, "") != nil {
 		return nil, fmt.Errorf("invalid last-applied identity")
 	}
+
 	// A history annotation is untrusted input. Never echo its payload on errors.
 	if _, ok := h.Desired["status"]; ok {
 		return nil, fmt.Errorf("server-owned fields in last-applied history")
 	}
-	clean, err := newHistory(Document{Kind: kind, Object: h.Desired, Resource: resource})
+
+	clean, err := newHistory(Document{
+		Kind:     kind,
+		Object:   h.Desired,
+		Resource: resource,
+	})
 	if err != nil {
 		return nil, err
 	}
+
 	a, _ := json.Marshal(clean.Desired)
 	b, _ := json.Marshal(h.Desired)
 	if !bytes.Equal(a, b) {
 		return nil, fmt.Errorf("last-applied history contains excluded fields")
 	}
+
 	for _, p := range h.Secrets {
 		if !strings.HasPrefix(p, "/spec/") || pointer(pointerParts(p)) != p {
 			return nil, fmt.Errorf("invalid secret presence history")
 		}
 	}
+
 	return &h, nil
 }
