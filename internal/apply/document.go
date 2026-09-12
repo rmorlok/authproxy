@@ -11,13 +11,8 @@ import (
 	"github.com/rmorlok/authproxy/internal/apserde"
 	apiv1alpha1 "github.com/rmorlok/authproxy/internal/schema/api/v1alpha1"
 	"github.com/rmorlok/authproxy/internal/schema/common"
-	"github.com/rmorlok/authproxy/internal/schema/resources/actor"
-	"github.com/rmorlok/authproxy/internal/schema/resources/connection"
-	"github.com/rmorlok/authproxy/internal/schema/resources/connectors"
-	"github.com/rmorlok/authproxy/internal/schema/resources/key"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	ns "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
-	rl "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 	"github.com/rmorlok/authproxy/internal/util"
 	"gopkg.in/yaml.v3"
 )
@@ -40,6 +35,7 @@ func (d Document) RedactedObject() (any, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s: cannot redact resource", d.Source)
 	}
+
 	return project(d.Object, safe), nil
 }
 
@@ -157,6 +153,9 @@ func checkNode(n *yaml.Node) error {
 	return nil
 }
 
+// object recursively loads objects from the specified data map into the
+// documents within this inputLoader. `expectedKind` is used to communicate
+// the kind of object expected in a list.
 func (l *inputLoader) object(
 	source string,
 	object map[string]any,
@@ -328,7 +327,13 @@ func (l *inputLoader) object(
 		return nil
 	}
 
-	doc := Document{Source: source, Kind: meta.Kind(kind), Metadata: m, Object: object, Resource: typed}
+	doc := Document{
+		Source:   source,
+		Kind:     meta.Kind(kind),
+		Metadata: m,
+		Object:   object,
+		Resource: typed,
+	}
 	identities := []string{}
 	if m.ID != "" {
 		identities = append(identities, kind+"/id/"+m.ID)
@@ -346,7 +351,7 @@ func (l *inputLoader) object(
 	}
 
 	l.documents = append(l.documents, doc)
-	
+
 	return nil
 }
 
@@ -412,8 +417,12 @@ func normalizeIdentity(kind string, m *meta.ObjectMeta, fallback string) error {
 	}
 
 	if m.ID != "" {
-		validators := map[string]func(string) error{"Actor": actor.ValidateID, "Connector": connectors.ValidateID, "Key": key.ValidateID, "RateLimit": rl.ValidateID, "Connection": connection.ValidateID}
-		if err := validators[kind](m.ID); err != nil {
+		descriptor, err := resourceType(meta.Kind(kind))
+		if err != nil {
+			return err
+		}
+
+		if err := descriptor.ValidateID(m.ID); err != nil {
 			return fmt.Errorf("invalid metadata.id for %s", kind)
 		}
 	}
