@@ -19,7 +19,7 @@ dimension. Prefer the explicit values below for least-privilege grants.
 | `app-metrics` | `query`, `schema` | Aggregate application-metric queries and metric-schema discovery |
 | `connections` | `create`, `disconnect`, `force_state`, `get`, `list`, `proxy`, `update` | Connection setup, configuration, lifecycle, and authenticated proxy requests |
 | `connectors` | `archive`, `create`, `disconnect_all`, `force_state`, `get`, `list`, `list/generations`, `update` | Connector definitions, generations, metadata, and lifecycle operations |
-| `keys` | `create`, `delete`, `get`, `list`, `update` | Reusable signing and encryption-key resources on both the main API and admin API |
+| `keys` | `create`, `delete`, `get`, `list`, `update` | Reusable signing and encryption-key resources |
 | `namespaces` | `create`, `get`, `list`, `update` | Namespace records, metadata, and namespace key assignments |
 | `rate_limits` | `create`, `delete`, `get`, `list`, `update` | Rate-limit rules, overrides, and related evaluation endpoints |
 | `request-events` | `get`, `list` | Individual and listed proxy request events |
