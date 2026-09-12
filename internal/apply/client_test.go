@@ -93,11 +93,9 @@ func TestResolveIDConsistencyAndMissingIDs(t *testing.T) {
 	require.NotContains(t, err.Error(), "secret")
 }
 
-func TestResolveBatchAliasesAndKeyPrecheck(t *testing.T) {
+func TestResolveBatchAliases(t *testing.T) {
 	id := apid.New(apid.PrefixActor).String()
-	var calls int
 	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
-		calls++
 		if r.URL.Path == "/api/v1/actors" {
 			fmt.Fprint(w, listJSON("Actor", []string{actorJSON(id, "bob", "root")}, ""))
 		} else {
@@ -109,11 +107,54 @@ func TestResolveBatchAliasesAndKeyPrecheck(t *testing.T) {
 	targets, err := c.ResolveBatch(context.Background(), []Document{doc, byID})
 	require.Nil(t, targets)
 	require.ErrorContains(t, err, "duplicate live target")
-	calls = 0
-	keyDoc := clientDoc(t, "Key", "  name: key\n  namespace: root", "{keyData: {value: secret}}")
-	_, err = c.ResolveBatch(context.Background(), []Document{doc, keyDoc})
-	require.ErrorContains(t, err, "admin")
-	require.Zero(t, calls)
+}
+
+func TestKeyOperationsOnBothServices(t *testing.T) {
+	for _, admin := range []bool{false, true} {
+		t.Run(fmt.Sprintf("admin=%t", admin), func(t *testing.T) {
+			id := apid.New(apid.PrefixKey).String()
+			response := liveJSON("Key", id, "example", "root", `{"usage":"data_encryption","materialType":"symmetric","desiredState":"active"}`)
+			var requests []string
+			c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+				requests = append(requests, r.Method+" "+r.URL.Path)
+				if r.Method == "GET" && r.URL.Path == "/api/v1/keys" {
+					fmt.Fprint(w, listJSON("Key", []string{response}, ""))
+				} else {
+					fmt.Fprint(w, response)
+				}
+			}, admin)
+			doc := clientDoc(t, "Key", "  name: example\n  namespace: root", "{}")
+			targets, err := c.ResolveBatch(context.Background(), []Document{doc})
+			require.NoError(t, err)
+			require.Equal(t, id, targets[0].Current.Metadata.ID)
+			byID := clientDoc(t, "Key", "  id: "+id, "{}")
+			_, err = c.Resolve(context.Background(), byID)
+			require.NoError(t, err)
+			create := clientDoc(t, "Key", "  name: example\n  namespace: root", "{keyData: {value: test-key}}")
+			_, err = c.Create(context.Background(), create)
+			require.NoError(t, err)
+			patch := []byte(`{"apiVersion":"authproxy.net/v1alpha1","kind":"Key","metadata":{"labels":{"env":"prod"}},"spec":{}}`)
+			_, err = c.Update(context.Background(), targets[0], patch)
+			require.NoError(t, err)
+			require.Equal(t, []string{"GET /api/v1/keys", "GET /api/v1/keys/" + id, "POST /api/v1/keys", "PATCH /api/v1/keys/" + id}, requests)
+		})
+	}
+}
+
+func TestKeyAPIPermissionDenied(t *testing.T) {
+	var calls int
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		w.WriteHeader(http.StatusForbidden)
+		fmt.Fprint(w, `{"message":"sensitive server detail"}`)
+	}, false)
+	doc := clientDoc(t, "Key", "  name: example\n  namespace: root", "{}")
+	_, err := c.ResolveBatch(context.Background(), []Document{doc})
+	var apiErr *APIError
+	require.ErrorAs(t, err, &apiErr)
+	require.Equal(t, http.StatusForbidden, apiErr.StatusCode)
+	require.NotContains(t, err.Error(), "sensitive")
+	require.Equal(t, 1, calls)
 }
 
 func TestMissingResourcesAndCreateValidation(t *testing.T) {

@@ -10,9 +10,10 @@ by itself.
 signing. It selects the API service normally and the admin API in admin mode,
 without silently falling back between them. Callers pass
 `DefaultRequestTimeout` (30 seconds) unless overridden; zero disables the
-per-request timeout. Client dry-run must not instantiate this client.
+per-request timeout. Key resources are supported on both services, subject to
+server authorization. Client dry-run must not instantiate this client.
 
-`ResolveBatch` performs reads only. It rejects unsupported/admin-only kinds
+`ResolveBatch` performs reads only. It rejects unsupported kinds
 before requests, resolves IDs or exact namespaced names, follows pagination,
 checks supplied identity fields, detects aliases resolving to the same live ID,
 and validates create or patch contracts. Explicit IDs and connector generations

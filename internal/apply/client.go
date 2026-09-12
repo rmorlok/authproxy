@@ -38,7 +38,6 @@ type ClientOptions struct {
 // mutations, or imply transactional batch semantics.
 type Client struct {
 	baseURL string
-	admin   bool
 	signer  jwt.Signer
 	http    *http.Client
 	scheme  *registry.ResourceScheme
@@ -59,7 +58,7 @@ func NewClient(options ClientOptions) (*Client, error) {
 	if options.Timeout < 0 {
 		return nil, fmt.Errorf("request timeout cannot be negative")
 	}
-	return &Client{baseURL: strings.TrimRight(endpoint, "/") + "/api/v1", admin: options.Admin, signer: options.Signer, scheme: registry.NewResourceScheme(), http: &http.Client{Timeout: options.Timeout, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}, nil
+	return &Client{baseURL: strings.TrimRight(endpoint, "/") + "/api/v1", signer: options.Signer, scheme: registry.NewResourceScheme(), http: &http.Client{Timeout: options.Timeout, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}, nil
 }
 
 // APIError exposes the status without echoing response bodies that may contain
@@ -89,13 +88,8 @@ type Target struct {
 }
 
 func (c *Client) checkKind(kind meta.Kind) error {
-	if _, err := resourceType(kind); err != nil {
-		return err
-	}
-	if kind == "Key" && !c.admin {
-		return fmt.Errorf("Key resources require admin mode and an admin API endpoint")
-	}
-	return nil
+	_, err := resourceType(kind)
+	return err
 }
 
 // ResolveBatch resolves and validates the complete batch without mutations.
