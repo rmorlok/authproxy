@@ -26,27 +26,38 @@ var fieldSchemaMu sync.Mutex
 
 // Unknown-field modes affect field discovery only. Strict typed decoding and
 // all identity, duplicate-key, placeholder and lifecycle checks still run.
-func (l *inputLoader) filterUnknown(source string, object map[string]any, kind meta.Kind) error {
+func (l *inputLoader) filterUnknown(
+	source string,
+	object map[string]any,
+	kind meta.Kind,
+) error {
 	if l.options.Validation == "" || l.options.Validation == ValidationStrict {
 		return nil
 	}
+
 	descriptor, err := resourceType(kind)
 	if err != nil {
 		return err
 	}
+
 	fieldSchemaMu.Lock()
 	contract, err := schema.CompileSchema(descriptor.SchemaRef)
 	fieldSchemaMu.Unlock()
+
 	if err != nil {
 		return fmt.Errorf("cannot load resource field schema")
 	}
+
 	filtered, removed := pruneUnknown(contract, object, 0)
+
 	for key := range object {
 		delete(object, key)
 	}
+
 	for key, value := range filtered.(map[string]any) {
 		object[key] = value
 	}
+
 	l.warnUnknown(source, removed)
 
 	return nil

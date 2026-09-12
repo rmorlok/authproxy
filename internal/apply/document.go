@@ -185,17 +185,23 @@ func (l *inputLoader) object(
 			return fail("unsupported list kind")
 		}
 
-		if l.options.Validation == ValidationWarn || l.options.Validation == ValidationIgnore {
+		if l.options.Validation == ValidationWarn ||
+			l.options.Validation == ValidationIgnore {
 			removed := 0
 			for field := range object {
-				if field != "apiVersion" && field != "kind" && field != "metadata" && field != "items" {
+				if field != "apiVersion" &&
+					field != "kind" && 
+					field != "metadata" && 
+					field != "items" {
 					delete(object, field)
 					removed++
 				}
 			}
 			if m, ok := object["metadata"].(map[string]any); ok {
 				for field := range m {
-					if field != "resourceVersion" && field != "continue" && field != "remainingItemCount" {
+					if field != "resourceVersion" &&
+						field != "continue" &&
+						field != "remainingItemCount" {
 						delete(m, field)
 						removed++
 					}
@@ -203,6 +209,7 @@ func (l *inputLoader) object(
 			}
 			l.warnUnknown(source, removed)
 		}
+
 		for field := range object {
 			if field != "apiVersion" &&
 				field != "kind" &&

@@ -58,8 +58,8 @@ func loadSchemasOnce() error {
 	return schemaErr
 }
 
-// CompileSchema compiles schema bytes with jsonschema/v5. It loads all the referenced schema files that are
-// referenced from the primary file.
+// CompileSchema compiles schema bytes with jsonschema/v5. It loads all the
+// referenced schema files that are referenced from the primary file.
 func CompileSchema(schemaId string) (*jsonschemav5.Schema, error) {
 	if err := loadSchemasOnce(); err != nil {
 		return nil, err
