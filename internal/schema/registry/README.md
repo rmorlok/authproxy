@@ -4,7 +4,8 @@
 capabilities of every canonical AuthProxy resource. The catalogue in
 `resourceTypes()` registers each resource and typed list together with its patch
 factory, metadata accessor, ID validator, lifecycle validation and patch
-application bindings, and REST collection name.
+application bindings, REST collection name, and embedded resource JSON schema
+reference (`SchemaRef`) for field discovery.
 
 Use `scheme.Lookup(gvk)` or `LookupResource(gvk)` to obtain a descriptor.
 `TypeOf(resource)` identifies a concrete resource without a caller-side type

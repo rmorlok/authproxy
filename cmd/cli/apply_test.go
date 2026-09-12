@@ -38,7 +38,7 @@ func TestApplyRejectsUnsupportedModesAndInvalidBatch(t *testing.T) {
 	cases := [][]string{
 		{"-f", "-"},
 		{"-f", "-", "--dry-run=server"},
-		{"-f", "-", "--dry-run=client", "--validate=ignore"},
+		{"-f", "-", "--dry-run=client", "--validate=unsupported"},
 		{"-f", "-", "--dry-run=client", "-o", "unknown"},
 		{"--dry-run=client"},
 		{"-f", "-", "--dry-run=client"}, // Missing namespace.
@@ -93,4 +93,28 @@ func TestApplyOutputFailure(t *testing.T) {
 	cmd.SetErr(&bytes.Buffer{})
 	cmd.SetArgs([]string{"-f", "-", "--dry-run=client", "-n", "root"})
 	require.ErrorContains(t, cmd.Execute(), "output unavailable")
+}
+
+func TestApplyValidationModes(t *testing.T) {
+	for _, mode := range []string{"strict", "warn", "ignore"} {
+		cmd := cmdApply()
+		var out, stderr bytes.Buffer
+		cmd.SetIn(strings.NewReader(applyActor + "unknown: secret-value\n"))
+		cmd.SetOut(&out)
+		cmd.SetErr(&stderr)
+		cmd.SetArgs([]string{"-f", "-", "--dry-run=client", "-n", "root", "--validate=" + mode, "--overwrite=false", "-o", "json"})
+		err := cmd.Execute()
+		if mode == "strict" {
+			require.Error(t, err)
+			continue
+		}
+		require.NoError(t, err)
+		require.NotContains(t, out.String(), "unknown")
+		require.NotContains(t, out.String(), "secret-value")
+		if mode == "warn" {
+			require.Contains(t, stderr.String(), "Warning:")
+		} else {
+			require.Empty(t, stderr.String())
+		}
+	}
 }

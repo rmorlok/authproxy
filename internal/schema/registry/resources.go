@@ -29,6 +29,7 @@ type Value interface {
 type ResourceType struct {
 	GVK          manifest.GVK
 	Collection   string
+	SchemaRef    string // Embedded JSON schema for resource field discovery.
 	NewResource  func() Value
 	NewPatch     func() Value
 	ValidateID   func(string) error
@@ -143,6 +144,7 @@ func resourceTypes() []ResourceType {
 	return []ResourceType{
 		describe[actor.Actor, actor.ActorPatch](
 			actor.ActorKind,
+			actor.SchemaIdActor,
 			"actors",
 			actor.ValidateID,
 			func(r *actor.Actor) (meta.TypeMeta, meta.ObjectMeta) { return r.TypeMeta, r.Metadata },
@@ -151,6 +153,7 @@ func resourceTypes() []ResourceType {
 			}),
 		describe[connection.Connection, connection.ConnectionPatch](
 			connection.ConnectionKind,
+			connection.SchemaIDConnection,
 			"connections",
 			connection.ValidateID,
 			func(r *connection.Connection) (meta.TypeMeta, meta.ObjectMeta) { return r.TypeMeta, r.Metadata },
@@ -159,6 +162,7 @@ func resourceTypes() []ResourceType {
 			}),
 		describe[connectors.Connector, connectors.ConnectorPatch](
 			connectors.ConnectorKind,
+			connectors.SchemaIdConnectors,
 			"connectors",
 			connectors.ValidateID,
 			func(r *connectors.Connector) (meta.TypeMeta, meta.ObjectMeta) { return r.TypeMeta, r.Metadata },
@@ -167,12 +171,14 @@ func resourceTypes() []ResourceType {
 			}),
 		describe[key.Key, key.KeyPatch](
 			key.KeyKind,
+			key.SchemaIdKey,
 			"keys",
 			key.ValidateID,
 			func(r *key.Key) (meta.TypeMeta, meta.ObjectMeta) { return r.TypeMeta, r.Metadata },
 			func(current *key.Key, patch *key.KeyPatch) (*key.Key, error) { return patch.ApplyTo(current, nil) }),
 		describe[namespace.Namespace, namespace.NamespacePatch](
 			namespace.NamespaceKind,
+			namespace.SchemaId,
 			"namespaces",
 			namespace.ValidatePath,
 			func(r *namespace.Namespace) (meta.TypeMeta, meta.ObjectMeta) { return r.TypeMeta, r.Metadata },
@@ -181,6 +187,7 @@ func resourceTypes() []ResourceType {
 			}),
 		describe[rate_limit.RateLimit, rate_limit.RateLimitPatch](
 			rate_limit.RateLimitKind,
+			rate_limit.SchemaIdRateLimit,
 			"rate-limits",
 			rate_limit.ValidateID,
 			func(r *rate_limit.RateLimit) (meta.TypeMeta, meta.ObjectMeta) { return r.TypeMeta, r.Metadata },
@@ -192,18 +199,20 @@ func resourceTypes() []ResourceType {
 
 func describe[R, P any](
 	kind meta.Kind,
+	schemaID string,
 	collection string,
 	validateID func(string) error,
 	metadata func(*R) (meta.TypeMeta, meta.ObjectMeta), merge func(*R, *P) (*R, error),
 ) ResourceType {
 	return ResourceType{
-		GVK: manifest.GVK{APIVersion: meta.APIVersionV1Alpha1, Kind: kind},
-		Collection: collection,
-		NewResource: func() Value { return any(new(R)).(Value) },
-		NewPatch:    func() Value { return any(new(P)).(Value) },
-		ValidateID:  validateID,
+		GVK:          manifest.GVK{APIVersion: meta.APIVersionV1Alpha1, Kind: kind},
+		Collection:   collection,
+		SchemaRef:    schemaID,
+		NewResource:  func() Value { return any(new(R)).(Value) },
+		NewPatch:     func() Value { return any(new(P)).(Value) },
+		ValidateID:   validateID,
 		resourceType: reflect.TypeOf(new(R)),
-		newList: func() any { return new(apiv1alpha1.ResourceList[R]) },
+		newList:      func() any { return new(apiv1alpha1.ResourceList[R]) },
 		metadata: func(value any) (meta.ObjectMeta, error) {
 			r, ok := value.(*R)
 			if !ok || r == nil {

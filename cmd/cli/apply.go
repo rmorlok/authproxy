@@ -13,6 +13,7 @@ import (
 func cmdApply() *cobra.Command {
 	var options apply.Options
 	var dryRun, output, validation string
+	var overwrite bool
 	cmd := &cobra.Command{
 		Use:   "apply -f FILENAME [flags]",
 		Short: "Validate resource manifests with client dry-run",
@@ -22,9 +23,14 @@ func cmdApply() *cobra.Command {
 			if dryRun != "client" {
 				return fmt.Errorf("only --dry-run=client is currently supported; cluster apply is not yet available")
 			}
-			if validation != "strict" && validation != "true" {
-				return fmt.Errorf("only --validate=strict is currently supported")
+			if validation == "true" {
+				validation = "strict"
 			}
+			if validation == "false" {
+				validation = "ignore"
+			}
+			options.Validation = apply.Validation(validation)
+			options.Warn = func(message string) { fmt.Fprintln(cmd.ErrOrStderr(), "Warning: "+message) }
 			switch output {
 			case "", "name", "json", "yaml":
 			default:
@@ -85,7 +91,8 @@ func cmdApply() *cobra.Command {
 	cmd.Flags().StringVarP(&options.Namespace, "namespace", "n", "", "Default namespace when omitted from a resource")
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Filter labels using =, ==, !=, key, or !key")
 	cmd.Flags().StringVar(&dryRun, "dry-run", "none", "Currently requires client; does not contact the cluster")
-	cmd.Flags().StringVar(&validation, "validate", "strict", "Validation mode (currently strict only)")
+	cmd.Flags().StringVar(&validation, "validate", "strict", "Unknown-field validation: strict, warn, ignore")
 	cmd.Flags().StringVarP(&output, "output", "o", "", "Output format: name, json, yaml (default: validation status)")
+	cmd.Flags().BoolVar(&overwrite, "overwrite", true, "Allow overwriting managed-field drift (no effect during client dry-run)")
 	return cmd
 }
