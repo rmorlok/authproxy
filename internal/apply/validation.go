@@ -3,7 +3,6 @@ package apply
 import (
 	"fmt"
 	"sort"
-	"sync"
 
 	"github.com/rmorlok/authproxy/internal/schema"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
@@ -22,8 +21,6 @@ func (v Validation) valid() bool {
 	return v == "" || v == ValidationStrict || v == ValidationWarn || v == ValidationIgnore
 }
 
-var fieldSchemaMu sync.Mutex
-
 // Unknown-field modes affect field discovery only. Strict typed decoding and
 // all identity, duplicate-key, placeholder and lifecycle checks still run.
 func (l *inputLoader) filterUnknown(
@@ -40,9 +37,7 @@ func (l *inputLoader) filterUnknown(
 		return err
 	}
 
-	fieldSchemaMu.Lock()
 	contract, err := schema.CompileSchema(descriptor.SchemaRef)
-	fieldSchemaMu.Unlock()
 
 	if err != nil {
 		return fmt.Errorf("cannot load resource field schema")
