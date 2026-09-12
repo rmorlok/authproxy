@@ -44,89 +44,121 @@ func Reconcile(target Target, options ReconcileOptions) (*Plan, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	if err := apserde.ValidateNoRedactedPlaceholders(doc.Resource); err != nil {
 		return nil, fmt.Errorf("redacted placeholders cannot be applied")
 	}
+
 	h, err := newHistory(doc)
 	if err != nil {
 		return nil, err
 	}
+
 	if _, ok := doc.Metadata.Annotations[LastAppliedAnnotation]; ok {
 		return nil, fmt.Errorf("last-applied annotation is managed by apply; omit it from manifests")
 	}
+
 	plan := &Plan{Target: target, Document: doc}
 	validator := &Client{scheme: registry.NewResourceScheme()}
+
 	if target.Current == nil {
 		object, err := plainObject(doc.Object)
 		if err != nil {
 			return nil, err
 		}
+
 		if err = attachHistory(object, h); err != nil {
 			return nil, err
 		}
+
 		plan.Document, err = documentWithObject(doc, object)
 		if err != nil {
 			return nil, err
 		}
+
 		if _, err = validator.createBody(plan.Document); err != nil {
 			return nil, err
 		}
+
 		plan.Operation = OperationCreate
 		return plan, nil
 	}
+
 	current := target.Current
 	actualMeta, actualKind, err := resourceMetadata(current.Resource)
+
 	if err != nil || actualKind != doc.Kind || actualMeta.ID != current.Metadata.ID {
 		return nil, fmt.Errorf("invalid reconciliation target")
 	}
-	if (doc.Metadata.ID != "" && doc.Metadata.ID != current.Metadata.ID) || (doc.Metadata.Name != "" && doc.Metadata.Name != current.Metadata.Name) || (doc.Metadata.Namespace != "" && doc.Metadata.Namespace != current.Metadata.Namespace) || (doc.Metadata.Generation != 0 && doc.Metadata.Generation != current.Metadata.Generation) {
+
+	if (doc.Metadata.ID != "" && doc.Metadata.ID != current.Metadata.ID) ||
+		(doc.Metadata.Name != "" && doc.Metadata.Name != current.Metadata.Name) ||
+		(doc.Metadata.Namespace != "" && doc.Metadata.Namespace != current.Metadata.Namespace) ||
+		(doc.Metadata.Generation != 0 && doc.Metadata.Generation != current.Metadata.Generation) {
 		return nil, fmt.Errorf("reconciliation target does not match supplied identity")
 	}
+
 	if current.Kind != doc.Kind {
 		return nil, fmt.Errorf("reconciliation target kind mismatch")
 	}
+
 	live, err := plainObject(current.Resource)
 	if err != nil {
 		return nil, err
 	}
+
 	previous := map[string]any{}
 	if raw, ok := current.Metadata.Annotations[LastAppliedAnnotation]; ok {
 		old, err := readHistory(raw, doc.Kind)
 		if err != nil {
 			return nil, err
 		}
+
 		previous = old.Desired
 		pm, _ := previous["metadata"].(map[string]any)
+
 		if id, _ := pm["id"].(string); id != "" && id != current.Metadata.ID {
 			return nil, fmt.Errorf("last-applied history belongs to a different resource")
 		}
+
 		if id, _ := pm["id"].(string); id == "" {
 			if name, _ := pm["name"].(string); name != string(current.Metadata.Name) {
 				return nil, fmt.Errorf("last-applied history belongs to a different resource")
 			}
 		}
+
 		if ns, _ := pm["namespace"].(string); ns != "" && ns != current.Metadata.Namespace {
 			return nil, fmt.Errorf("last-applied history belongs to a different namespace")
 		}
+
 		// Remember historical secret presence even when omitted now. It confers no
 		// right to clear a secret and contains no value or comparison fingerprint.
 		h.Secrets = uniqueSorted(append(h.Secrets, old.Secrets...))
 	} else {
 		plan.Warnings = append(plan.Warnings, "adopting resource without last-applied history; unspecified fields are preserved")
 	}
+
 	desired, err := plainObject(doc.Object)
 	if err != nil {
 		return nil, err
 	}
+
 	forces := map[string]bool{}
 	for _, path := range apserde.SensitivePaths(doc.Resource) {
 		if _, ok := at(desired, path); ok {
 			forces[pointer(path)] = true
 		}
 	}
+
 	merger := threeWay{overwrite: options.Overwrite, force: forces}
-	patch := map[string]any{"apiVersion": string(meta.APIVersionV1Alpha1), "kind": string(doc.Kind), "metadata": map[string]any{}, "spec": map[string]any{}}
+	patch := map[string]any{
+		"apiVersion": string(meta.APIVersionV1Alpha1),
+		"kind":       string(doc.Kind),
+		"metadata":   map[string]any{},
+		"spec":       map[string]any{},
+	}
 	patchMeta := patch["metadata"].(map[string]any)
+
 	// REST replaces whole metadata maps. Compute their contents with the same
 	// field ownership rules, then send the complete merged map.
 	for _, field := range []string{"labels", "annotations"} {
@@ -137,63 +169,80 @@ func Reconcile(target Target, options ReconcileOptions) (*Plan, error) {
 		a := asMap(old)
 		b := asMap(now)
 		d := asMap(next)
+
 		if field == "annotations" {
 			delete(a, LastAppliedAnnotation)
 			delete(b, LastAppliedAnnotation)
 			delete(d, LastAppliedAnnotation)
 		}
+
 		merged, _, err := merger.merge(a, true, b, true, d, true, path)
 		if err != nil {
 			return nil, err
 		}
+
 		if !equalJSON(b, merged) {
 			patchMeta[field] = merged
 		}
 	}
+
 	oldSpec := asMap(previous["spec"])
 	liveSpec := asMap(live["spec"])
 	desiredSpec := asMap(desired["spec"])
 	patchSpec := patch["spec"].(map[string]any)
+
 	for _, field := range keys(oldSpec, desiredSpec) {
 		old, op := oldSpec[field]
 		now, np := liveSpec[field]
 		next, dp := desiredSpec[field]
+
 		value, present, err := merger.merge(old, op, now, np, next, dp, []string{"spec", field})
 		if err != nil {
 			return nil, err
 		}
+
 		forced := merger.forced([]string{"spec", field})
+
 		if present == np && equalJSON(value, now) && !forced {
 			continue
 		}
+
 		if !present {
 			value = clearSpecField(doc.Kind, field)
 		}
+
 		patchSpec[field] = value
 	}
+
 	// Definition and other object patches replace entire fields. Do not replay
 	// masked values while preserving unowned fields. decodePatch below rejects
 	// any masked secret left in the replacement; a caller must provide it.
 	if len(forces) > 0 {
 		plan.Warnings = append(plan.Warnings, "explicit secrets are submitted without comparison; omitted secrets are preserved")
 	}
+
 	historyMeta := h.Desired["metadata"].(map[string]any)
 	historyMeta["id"] = current.Metadata.ID
 	if current.Metadata.Namespace != "" {
 		historyMeta["namespace"] = current.Metadata.Namespace
 	}
+
 	// Merge history into live/user annotations, even if no user annotation changed.
 	annotations := asMap(liveMeta(live)["annotations"])
 	if v, ok := patchMeta["annotations"]; ok {
 		annotations = asMap(v)
 	}
+
 	holder := map[string]any{"metadata": map[string]any{"annotations": annotations}}
+
 	if err := attachHistory(holder, h); err != nil {
 		return nil, err
 	}
+
 	if !equalJSON(liveMeta(live)["annotations"], annotations) {
 		patchMeta["annotations"] = annotations
 	}
+
 	// Compare effective typed values as well as JSON presence. For example an
 	// empty permissions list serializes as omitted on GET; do not patch it on
 	// every apply. Explicit secrets are intentionally never compared this way.
@@ -202,39 +251,49 @@ func Reconcile(target Target, options ReconcileOptions) (*Plan, error) {
 		if err != nil {
 			return nil, fmt.Errorf("cannot encode reconciled patch")
 		}
+
 		typedPatch, err := decodePatch(doc.Kind, candidate, current.Resource)
 		if err != nil {
 			return nil, err
 		}
+
 		descriptor, _ := resourceType(doc.Kind)
 		updated, err := descriptor.ApplyPatch(current.Resource, typedPatch)
 		if err != nil {
 			return nil, fmt.Errorf("invalid reconciled resource")
 		}
+
 		effective, err := plainObject(updated)
 		if err != nil {
 			return nil, err
 		}
+
 		effectiveSpec := asMap(effective["spec"])
+
 		for field := range patchSpec {
 			if !merger.forced([]string{"spec", field}) && equalJSON(liveSpec[field], effectiveSpec[field]) {
 				delete(patchSpec, field)
 			}
 		}
 	}
+
 	if len(patchMeta) == 0 && len(patchSpec) == 0 {
 		plan.Operation = OperationUnchanged
 		return plan, nil
 	}
+
 	data, err := json.Marshal(patch)
 	if err != nil {
 		return nil, fmt.Errorf("cannot encode reconciled patch")
 	}
+
 	if _, err = decodePatch(doc.Kind, data, current.Resource); err != nil {
 		return nil, err
 	}
+
 	plan.Operation = OperationUpdate
 	plan.Patch = data
+
 	return plan, nil
 }
 
@@ -298,10 +357,12 @@ func attachHistory(object map[string]any, h *History) error {
 	}
 	return nil
 }
+
 func liveMeta(object map[string]any) map[string]any {
 	m, _ := object["metadata"].(map[string]any)
 	return m
 }
+
 func asMap(value any) map[string]any {
 	result := map[string]any{}
 	if m, ok := value.(map[string]any); ok {
@@ -311,11 +372,13 @@ func asMap(value any) map[string]any {
 	}
 	return result
 }
+
 func equalJSON(a, b any) bool {
 	x, e1 := json.Marshal(a)
 	y, e2 := json.Marshal(b)
 	return e1 == nil && e2 == nil && bytes.Equal(x, y)
 }
+
 func keys(maps ...map[string]any) []string {
 	set := map[string]bool{}
 	for _, m := range maps {
@@ -330,6 +393,7 @@ func keys(maps ...map[string]any) []string {
 	sort.Strings(result)
 	return result
 }
+
 func clearSpecField(kind meta.Kind, field string) any {
 	if kind == "Actor" && field == "permissions" {
 		return []any{}
@@ -353,30 +417,45 @@ func (m threeWay) forced(path []string) bool {
 	}
 	return false
 }
-func (m threeWay) merge(old any, op bool, live any, lp bool, desired any, dp bool, path []string) (any, bool, error) {
+
+func (m threeWay) merge(
+	old any,
+	op bool,
+	live any,
+	lp bool,
+	desired any,
+	dp bool,
+	path []string,
+) (any, bool, error) {
 	if !op && !dp {
 		return live, lp, nil
 	}
+
 	if d, ok := desired.(map[string]any); dp && ok {
 		o := asMap(old)
 		l := asMap(live)
 		result := asMap(live)
+
 		for _, key := range keys(o, d) {
 			ov, ob := o[key]
 			lv, lb := l[key]
 			dv, db := d[key]
+
 			v, p, err := m.merge(ov, ob, lv, lb, dv, db, append(append([]string(nil), path...), key))
 			if err != nil {
 				return nil, false, err
 			}
+
 			if p {
 				result[key] = v
 			} else {
 				delete(result, key)
 			}
 		}
+
 		return result, true, nil
 	}
+
 	if !dp {
 		// Omitting a managed object deletes only its managed children.
 		if _, ok := old.(map[string]any); ok {
@@ -387,9 +466,11 @@ func (m threeWay) merge(old any, op bool, live any, lp bool, desired any, dp boo
 			return nil, false, err
 		}
 	}
+
 	changed := dp != lp || !equalJSON(desired, live)
 	if changed && op && !m.overwrite && (op != lp || !equalJSON(old, live)) && !m.forced(path) {
 		return nil, false, fmt.Errorf("apply conflict at %s; live field differs from last-applied configuration", pointer(path))
 	}
+
 	return desired, dp, nil
 }

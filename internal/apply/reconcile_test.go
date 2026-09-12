@@ -28,6 +28,7 @@ func reconcileLive(t *testing.T, kind, id, spec string, annotations map[string]s
 	require.NoError(t, err)
 	return live
 }
+
 func withHistory(t *testing.T, live *LiveResource, doc Document) *LiveResource {
 	t.Helper()
 	h, err := newHistory(doc)
@@ -42,12 +43,14 @@ func withHistory(t *testing.T, live *LiveResource, doc Document) *LiveResource {
 	require.NoError(t, err)
 	return result
 }
+
 func planObject(t *testing.T, plan *Plan) map[string]any {
 	t.Helper()
 	var object map[string]any
 	require.NoError(t, json.Unmarshal(plan.Patch, &object))
 	return object
 }
+
 func commitPlan(t *testing.T, plan *Plan) *LiveResource {
 	t.Helper()
 	descriptor, err := resourceType(plan.Target.Document.Kind)
