@@ -421,7 +421,7 @@ func normalizeIdentity(kind string, m *meta.ObjectMeta, fallback string) error {
 		if err != nil {
 			return err
 		}
-		
+
 		if err := descriptor.ValidateID(m.ID); err != nil {
 			return fmt.Errorf("invalid metadata.id for %s", kind)
 		}
