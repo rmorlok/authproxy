@@ -101,6 +101,7 @@ func (l *inputLoader) decode(source string, data []byte) error {
 		if err == io.EOF {
 			return nil
 		}
+
 		location := fmt.Sprintf("%s: document %d", source, index)
 		// YAML/type conversion errors can embed scalar values, including secrets.
 		if err != nil {
@@ -196,11 +197,15 @@ func (l *inputLoader) object(
 
 		if value, ok := object["metadata"]; ok {
 			payload, _ := yaml.Marshal(value)
+
 			var m apiv1alpha1.ListMeta
+
 			if err := util.DecodeYAMLStrict(payload, &m); err != nil {
 				return fail("invalid list metadata")
 			}
-			if m.Continue != "" || (m.RemainingItemCount != nil && *m.RemainingItemCount > 0) {
+
+			if m.Continue != "" ||
+				(m.RemainingItemCount != nil && *m.RemainingItemCount > 0) {
 				return fail("incomplete paginated list; supply all resources")
 			}
 		}
@@ -269,63 +274,79 @@ func (l *inputLoader) object(
 			}
 		}
 	}
-	
+
 	var m meta.ObjectMeta
 	payload, err := yaml.Marshal(metadata)
 	if err != nil {
 		return fail("invalid metadata")
 	}
+
 	if err := util.DecodeYAMLStrict(payload, &m); err != nil {
 		return fail("invalid metadata fields or types")
 	}
+
 	if _, supplied := metadata["generation"]; supplied && m.Generation == 0 {
 		return fail("metadata.generation must be positive when supplied")
 	}
+
 	if err := normalizeIdentity(kind, &m, l.options.Namespace); err != nil {
 		return fail(err.Error())
 	}
+
 	if m.Namespace != "" {
 		metadata["namespace"] = m.Namespace
 	}
+
 	if m.Name != "" {
 		metadata["name"] = string(m.Name)
 	}
+
 	if err := meta.ValidateUserLabels(m.Labels); err != nil {
 		return fail("invalid metadata.labels")
 	}
+
 	if err := meta.ValidateAnnotations(m.Annotations); err != nil {
 		return fail("invalid metadata.annotations")
 	}
+
 	payload, err = yaml.Marshal(object)
 	if err != nil {
 		return fail("cannot encode resource")
 	}
+
 	typed, err := l.scheme.DecodeYAML(payload)
 	if err != nil {
 		return fail("resource contains unknown fields or invalid field types")
 	}
+
 	if err := apserde.ValidateNoRedactedPlaceholders(typed); err != nil {
 		return fail("redacted placeholders cannot be applied")
 	}
+
 	l.count++
 	if !l.selector.Matches(m.Labels) {
 		return nil
 	}
+
 	doc := Document{Source: source, Kind: meta.Kind(kind), Metadata: m, Object: object, Resource: typed}
 	identities := []string{}
 	if m.ID != "" {
 		identities = append(identities, kind+"/id/"+m.ID)
 	}
+
 	if m.Name != "" && (m.Namespace != "" || kind == "Namespace") {
 		identities = append(identities, kind+"/name/"+m.Namespace+"/"+string(m.Name))
 	}
+
 	for _, identity := range identities {
 		if previous, exists := l.seen[identity]; exists {
 			return fail("duplicate resource identity; first defined at " + previous)
 		}
 		l.seen[identity] = source
 	}
+
 	l.documents = append(l.documents, doc)
+	
 	return nil
 }
 
