@@ -16,18 +16,20 @@ server authorization. Client dry-run must not instantiate this client.
 `ResolveBatch` performs reads only. It rejects unsupported kinds
 before requests, resolves IDs or exact namespaced names, follows pagination,
 checks supplied identity fields, detects aliases resolving to the same live ID,
-and validates calculated create or reconciliation patch contracts. Explicit IDs and connector generations
-must already exist. Namespace names derive a canonical path for direct lookup;
-a missing name-addressed Namespace can be created. Connections can only update
-existing mutable metadata.
+and validates calculated create or reconciliation patch contracts. Explicit IDs 
+and connector generations must already exist. Namespace names derive a canonical
+path for direct lookup; a missing name-addressed Namespace can be created. 
+Connections can only update existing mutable metadata.
 
-`Create` and `Update` submit one validated operation. They use canonical resource
-and patch types, including immutable-field checks and omitted/null/empty patch
-semantics. `Update` accepts a calculated canonical patch; callers must perform
-three-way reconciliation before using it. Validation in `ResolveBatch` does not retain an execution plan; callers use
-`Reconcile` on each resolved target with their overwrite policy. Resource recognition, patch factories, metadata access, ID validation and
-canonical lifecycle/merge capabilities come from `schema/registry`. Apply
-retains transport, target resolution, and operation policy.
+`Create` and `Update` submit one validated operation. They use canonical 
+resource and patch types, including immutable-field checks and 
+omitted/null/empty patch semantics. `Update` accepts a calculated canonical 
+patch; callers must perform three-way reconciliation before using it. Validation
+in `ResolveBatch` does not retain an execution plan; callers use `Reconcile` on 
+each resolved target with their overwrite policy. Resource recognition, patch 
+factories, metadata access, ID validation and canonical lifecycle/merge 
+capabilities come from`schema/registry`. Apply retains transport, target 
+resolution, and operation policy.
 
 `LiveResource` retains typed responses, the redaction header, and known
 write-only field paths. Never derive mutations from masked values or assume
@@ -51,15 +53,16 @@ to `Client.Create`; for update, submit `plan.Target` and `plan.Patch` to
 `Client.Update`. Unchanged plans need no write. The executor is a later stage;
 client dry-run does not resolve live state or run reconciliation.
 
-`authproxy.net/last-applied-configuration` is reserved for apply. Its JSON format
-is `{"version":1,"desired":{...},"secrets":["/spec/keyData"]}`. `desired` retains
-input presence after normalization, excluding this annotation and secret
+`authproxy.net/last-applied-configuration` is reserved for apply. Its JSON 
+format is `{"version":1,"desired":{...},"secrets":["/spec/keyData"]}`. `desired`
+retains input presence after normalization, excluding this annotation and secret
 subtrees. `secrets` contains only JSON-pointer presence markers, never values,
 masked strings, lengths, or hashes. Entire write-only Actor signing keys and
 Key provider configurations are excluded, including file/environment/provider
 references. Other secret paths come from canonical `apiredact` tags. Arrays
-containing secrets are excluded in full because elements have no stable identity.
-Secret presence is retained across omissions; it never authorizes deletion.
+containing secrets are excluded in full because elements have no stable 
+identity. Secret presence is retained across omissions; it never authorizes 
+deletion.
 
 Missing history produces an adoption warning and preserves unspecified fields.
 Invalid, unsupported, duplicate-key, unsafe or mismatched history fails closed.
@@ -85,8 +88,9 @@ secrets are always submitted, including supported explicit clears, because
 write-only or masked values cannot be compared safely. Omitted secrets are
 preserved. A replacement requiring a masked secret fails unless the manifest
 supplies that credential. Known equal connector definitions are omitted from
-patches, avoiding unnecessary generations; unspecified release intent is preserved.
-Effective typed comparison handles API serialization that omits empty values.
+patches, avoiding unnecessary generations; unspecified release intent is 
+preserved. Effective typed comparison handles API serialization that omits empty
+values.
 
 `Load` accepts `ValidationStrict` (default), `ValidationWarn`, or
 `ValidationIgnore`. Warn/ignore remove unknown fields using the registry's
