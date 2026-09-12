@@ -31,12 +31,15 @@ func plainObject(value any) (map[string]any, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot encode resource")
 	}
+
 	var object map[string]any
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.UseNumber()
+
 	if err := decoder.Decode(&object); err != nil {
 		return nil, fmt.Errorf("invalid resource object")
 	}
+
 	return object, nil
 }
 
@@ -45,8 +48,10 @@ func pointer(path []string) string {
 	for _, part := range path {
 		result += "/" + strings.ReplaceAll(strings.ReplaceAll(part, "~", "~0"), "/", "~1")
 	}
+
 	return result
 }
+
 func pointerParts(path string) []string {
 	parts := strings.Split(strings.TrimPrefix(path, "/"), "/")
 	for i := range parts {
@@ -54,6 +59,7 @@ func pointerParts(path string) []string {
 	}
 	return parts
 }
+
 func at(value any, path []string) (any, bool) {
 	if len(path) == 0 {
 		return value, true
@@ -92,6 +98,7 @@ func exclude(value map[string]any, path []string) {
 		delete(value, path[0])
 	}
 }
+
 func secretPaths(kind meta.Kind, resource any) [][]string {
 	paths := apserde.SecretPaths(resource)
 	switch kind {
@@ -102,6 +109,7 @@ func secretPaths(kind meta.Kind, resource any) [][]string {
 	}
 	return paths
 }
+
 func newHistory(doc Document) (*History, error) {
 	object, err := plainObject(doc.Object)
 	if err != nil {
@@ -121,6 +129,7 @@ func newHistory(doc Document) (*History, error) {
 	h.Secrets = uniqueSorted(h.Secrets)
 	return h, nil
 }
+
 func uniqueSorted(values []string) []string {
 	seen := map[string]bool{}
 	result := []string{}
@@ -133,6 +142,7 @@ func uniqueSorted(values []string) []string {
 	sort.Strings(result)
 	return result
 }
+
 func readHistory(raw string, kind meta.Kind) (*History, error) {
 	if len(raw) > meta.AnnotationsTotalMaxSize {
 		return nil, fmt.Errorf("last-applied history exceeds annotation limit")
