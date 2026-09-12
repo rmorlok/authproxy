@@ -59,7 +59,9 @@ func (l *inputLoader) filterUnknown(
 }
 
 func (l *inputLoader) warnUnknown(source string, removed int) {
-	if removed > 0 && l.options.Validation == ValidationWarn && l.options.Warn != nil {
+	if removed > 0 &&
+		l.options.Validation == ValidationWarn &&
+		l.options.Warn != nil {
 		// Field names can themselves contain sensitive data in malformed input.
 		l.options.Warn(fmt.Sprintf("%s: ignored %d unknown field(s)", source, removed))
 	}
@@ -72,29 +74,40 @@ func pruneUnknown(s *jsonschema.Schema, value any, depth int) (any, int) {
 	if s == nil || depth > 128 {
 		return value, 0
 	}
+
 	result := value
 	removed := 0
-	apply := func(child *jsonschema.Schema) { v, n := pruneUnknown(child, result, depth+1); result = v; removed += n }
+	apply := func(child *jsonschema.Schema) {
+		v, n := pruneUnknown(child, result, depth+1)
+		result = v
+		removed += n
+	}
+
 	if s.Ref != nil {
 		apply(s.Ref)
 	}
+
 	for _, child := range s.AllOf {
 		apply(child)
 	}
+
 	for _, union := range [][]*jsonschema.Schema{s.AnyOf, s.OneOf} {
 		bestCount := -1
 		var best any
 		ambiguous := false
+
 		for _, child := range union {
 			if !compatible(child, result, depth+1) {
 				continue
 			}
+
 			candidate, count := pruneUnknown(child, result, depth+1)
 			if bestCount < 0 {
 				best = candidate
 				bestCount = count
 				continue
 			}
+
 			if subsetJSON(best, candidate) {
 				best = candidate
 				bestCount = count
@@ -102,8 +115,10 @@ func pruneUnknown(s *jsonschema.Schema, value any, depth int) (any, int) {
 				ambiguous = true
 			}
 		}
-		// Never turn competing provider configurations into an arbitrary valid one.
-		// Leave incomparable alternatives intact so strict decoding rejects them.
+
+		// Never turn competing provider configurations into an arbitrary valid
+		// one. Leave incomparable alternatives intact so strict decoding
+		// rejects them.
 		if bestCount >= 0 && !ambiguous {
 			result = best
 			removed += bestCount
@@ -144,6 +159,7 @@ func pruneUnknown(s *jsonschema.Schema, value any, depth int) (any, int) {
 				removed += n
 			}
 		}
+
 		// Resource envelopes close properties across allOf using unevaluatedProperties.
 		if s.UnevaluatedProperties != nil && s.UnevaluatedProperties.Always != nil && !*s.UnevaluatedProperties.Always {
 			allowed := map[string]bool{}
@@ -155,6 +171,7 @@ func pruneUnknown(s *jsonschema.Schema, value any, depth int) (any, int) {
 				}
 			}
 		}
+
 		result = output
 	case []any:
 		output := append([]any{}, v...)
@@ -173,6 +190,7 @@ func pruneUnknown(s *jsonschema.Schema, value any, depth int) (any, int) {
 		}
 		result = output
 	}
+
 	return result, removed
 }
 func collectProperties(s *jsonschema.Schema, result map[string]bool, depth int) {

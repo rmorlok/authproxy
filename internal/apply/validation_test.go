@@ -18,24 +18,42 @@ func TestUnknownFieldModes(t *testing.T) {
 		} {
 			t.Run(string(mode)+tc.kind, func(t *testing.T) {
 				var warnings []string
-				input := manifestText(tc.kind, "  name: example\n  namespace: root\n  unknownSecret: sensitive-value", tc.spec) + "unknownSecret: sensitive-value\n"
-				docs, err := Load(context.Background(), Options{Filenames: []string{"-"}, Stdin: strings.NewReader(input), Validation: mode, Warn: func(s string) { warnings = append(warnings, s) }})
+
+				input := manifestText(
+					tc.kind,
+					"  name: example\n  namespace: root\n  unknownSecret: sensitive-value",
+					tc.spec,
+				) + "unknownSecret: sensitive-value\n"
+
+				docs, err := Load(
+					context.Background(),
+					Options{
+						Filenames:  []string{"-"},
+						Stdin:      strings.NewReader(input),
+						Validation: mode, Warn: func(s string) { warnings = append(warnings, s) },
+					},
+				)
+
 				if mode == ValidationStrict {
 					require.Error(t, err)
 					return
 				}
+
 				require.NoError(t, err)
 				require.Len(t, docs, 1)
+
 				object, err := plainObject(docs[0].Object)
 				require.NoError(t, err)
 				require.NotContains(t, object, "unknownSecret")
 				require.NotContains(t, object["metadata"], "unknownSecret")
+
 				if mode == ValidationWarn {
 					require.NotEmpty(t, warnings)
 					require.NotContains(t, strings.Join(warnings, ""), "sensitive-value")
 				} else {
 					require.Empty(t, warnings)
 				}
+
 				// The filtered manifest must pass the default strict loader again.
 				require.NotContains(t, docs[0].Object["spec"], "unknownSecret")
 			})
