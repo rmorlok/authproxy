@@ -11,13 +11,8 @@ import (
 	"github.com/rmorlok/authproxy/internal/apserde"
 	apiv1alpha1 "github.com/rmorlok/authproxy/internal/schema/api/v1alpha1"
 	"github.com/rmorlok/authproxy/internal/schema/common"
-	"github.com/rmorlok/authproxy/internal/schema/resources/actor"
-	"github.com/rmorlok/authproxy/internal/schema/resources/connection"
-	"github.com/rmorlok/authproxy/internal/schema/resources/connectors"
-	"github.com/rmorlok/authproxy/internal/schema/resources/key"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	ns "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
-	rl "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 	"github.com/rmorlok/authproxy/internal/util"
 	"gopkg.in/yaml.v3"
 )
@@ -412,8 +407,11 @@ func normalizeIdentity(kind string, m *meta.ObjectMeta, fallback string) error {
 	}
 
 	if m.ID != "" {
-		validators := map[string]func(string) error{"Actor": actor.ValidateID, "Connector": connectors.ValidateID, "Key": key.ValidateID, "RateLimit": rl.ValidateID, "Connection": connection.ValidateID}
-		if err := validators[kind](m.ID); err != nil {
+		descriptor, err := resourceType(meta.Kind(kind))
+		if err != nil {
+			return err
+		}
+		if err := descriptor.ValidateID(m.ID); err != nil {
 			return fmt.Errorf("invalid metadata.id for %s", kind)
 		}
 	}

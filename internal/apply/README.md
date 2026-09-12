@@ -24,8 +24,9 @@ existing mutable metadata.
 and patch types, including immutable-field checks and omitted/null/empty patch
 semantics. `Update` accepts a calculated canonical patch; callers must perform
 three-way reconciliation before using it. Validation of the original document
-in `ResolveBatch` is not a generated execution plan. Resource recognition uses
-`schema/registry`; per-kind operation adapters live here.
+in `ResolveBatch` is not a generated execution plan. Resource recognition, patch factories, metadata access, ID validation and
+canonical lifecycle/merge capabilities come from `schema/registry`. Apply
+retains transport, target resolution, and operation policy.
 
 `LiveResource` retains typed responses, the redaction header, and known
 write-only field paths. Never derive mutations from masked values or assume

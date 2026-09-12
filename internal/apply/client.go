@@ -16,7 +16,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/apauth/jwt"
 	"github.com/rmorlok/authproxy/internal/apserde"
 	apiv1alpha1 "github.com/rmorlok/authproxy/internal/schema/api/v1alpha1"
-	"github.com/rmorlok/authproxy/internal/schema/manifest"
 	"github.com/rmorlok/authproxy/internal/schema/registry"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
@@ -42,7 +41,7 @@ type Client struct {
 	admin   bool
 	signer  jwt.Signer
 	http    *http.Client
-	scheme  *manifest.Scheme
+	scheme  *registry.ResourceScheme
 }
 
 func NewClient(options ClientOptions) (*Client, error) {
@@ -90,7 +89,7 @@ type Target struct {
 }
 
 func (c *Client) checkKind(kind meta.Kind) error {
-	if _, err := adapterFor(kind); err != nil {
+	if _, err := resourceType(kind); err != nil {
 		return err
 	}
 	if kind == "Key" && !c.admin {
@@ -144,7 +143,7 @@ func (c *Client) Resolve(ctx context.Context, doc Document) (*LiveResource, erro
 	if err := c.checkKind(doc.Kind); err != nil {
 		return nil, err
 	}
-	adapter, _ := adapterFor(doc.Kind)
+	adapter, _ := resourceType(doc.Kind)
 	m := doc.Metadata
 	if err := normalizeIdentity(string(doc.Kind), &m, ""); err != nil {
 		return nil, err
@@ -156,13 +155,13 @@ func (c *Client) Resolve(ctx context.Context, doc Document) (*LiveResource, erro
 	var live *LiveResource
 	var err error
 	if id != "" {
-		live, err = c.get(ctx, doc.Kind, adapter.collection+"/"+url.PathEscape(id))
+		live, err = c.get(ctx, doc.Kind, adapter.Collection+"/"+url.PathEscape(id))
 		var apiErr *APIError
 		if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound && doc.Metadata.ID == "" && doc.Kind == "Namespace" {
 			return nil, nil
 		}
 	} else {
-		live, err = c.findByName(ctx, doc.Kind, adapter.collection, m)
+		live, err = c.findByName(ctx, doc.Kind, adapter.Collection, m)
 	}
 	if err != nil {
 		return nil, err
@@ -178,7 +177,7 @@ func (c *Client) Resolve(ctx context.Context, doc Document) (*LiveResource, erro
 	}
 	if m.Generation != 0 {
 		resolvedID := live.Metadata.ID
-		live, err = c.get(ctx, doc.Kind, adapter.collection+"/"+url.PathEscape(live.Metadata.ID)+"/generations/"+strconv.FormatUint(m.Generation, 10))
+		live, err = c.get(ctx, doc.Kind, adapter.Collection+"/"+url.PathEscape(live.Metadata.ID)+"/generations/"+strconv.FormatUint(m.Generation, 10))
 		if err != nil {
 			return nil, err
 		}
@@ -344,7 +343,8 @@ func (c *Client) createBody(doc Document) ([]byte, error) {
 	if err := apserde.ValidateNoRedactedPlaceholders(resource); err != nil {
 		return nil, fmt.Errorf("redacted placeholders cannot be submitted")
 	}
-	if err := resource.(lifecycleResource).ValidateFor(meta.ValidationModeCreate, nil); err != nil {
+	descriptor, _ := resourceType(kind)
+	if err := descriptor.ValidateResource(resource, meta.ValidationModeCreate); err != nil {
 		return nil, fmt.Errorf("%s create failed semantic validation", kind)
 	}
 	return data, nil
@@ -357,8 +357,8 @@ func (c *Client) Create(ctx context.Context, doc Document) (*LiveResource, error
 	if err != nil {
 		return nil, err
 	}
-	adapter, _ := adapterFor(doc.Kind)
-	data, redacted, err := c.request(ctx, http.MethodPost, adapter.collection, nil, body)
+	adapter, _ := resourceType(doc.Kind)
+	data, redacted, err := c.request(ctx, http.MethodPost, adapter.Collection, nil, body)
 	if err != nil {
 		return nil, err
 	}
@@ -378,8 +378,8 @@ func (c *Client) Update(ctx context.Context, target Target, patch []byte) (*Live
 	if _, err := decodePatch(kind, patch, target.Current.Resource); err != nil {
 		return nil, err
 	}
-	adapter, _ := adapterFor(kind)
-	path := adapter.collection + "/" + url.PathEscape(target.Current.Metadata.ID)
+	adapter, _ := resourceType(kind)
+	path := adapter.Collection + "/" + url.PathEscape(target.Current.Metadata.ID)
 	if target.Document.Metadata.Generation != 0 {
 		path += "/generations/" + strconv.FormatUint(target.Document.Metadata.Generation, 10)
 	}

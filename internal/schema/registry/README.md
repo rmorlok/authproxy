@@ -1,22 +1,34 @@
 # Resource Registry
 
-`NewResourceScheme()` is the central registration list for AuthProxy's canonical
-resources and typed resource-list envelopes. Each call returns an independent
-`manifest.Scheme`; there is no mutable global scheme or `init()` registration.
+`NewResourceScheme()` combines generic manifest decoding with the shared
+capabilities of every canonical AuthProxy resource. The catalogue in
+`resourceTypes()` registers each resource and typed list together with its patch
+factory, metadata accessor, ID validator, lifecycle validation and patch
+application bindings, and REST collection name.
 
-Add new resources here once, using `registerResource[T]` to register the resource
-and its `api/v1alpha1.ResourceList[T]` envelope together. Application consumers
-such as `internal/apply` use this constructor rather than maintaining their own
-GVK-to-Go-type registrations. The generic decoding machinery remains in
-`internal/schema/manifest`.
+Use `scheme.Lookup(gvk)` or `LookupResource(gvk)` to obtain a descriptor.
+`TypeOf(resource)` identifies a concrete resource without a caller-side type
+switch. Descriptors are fresh values; metadata access returns a detached copy.
+Wrong concrete types and typed nil pointers return errors.
 
-Recognition is separate from operation support. Consumers still decide which
-resources they can apply, create, or update, and perform lifecycle validation.
-Typed API handlers should keep decoding their specific request contracts:
-resource patches share a resource's GVK and cannot be distinguished by GVK
-alone. Actions, projections, and heterogeneous `List` input are not canonical
-resource registrations; consumers handle those separately.
+`scheme.DecodeJSON` and `scheme.DecodeYAML` decode resources and typed lists.
+`descriptor.DecodePatchJSON` explicitly selects and validates the patch contract,
+which shares the resource's GVK. `descriptor.ApplyPatch` delegates to the
+resource package's immutable-field and merge rules and returns the resulting
+resource without modifying the original. Lifecycle validation is available
+through `descriptor.ValidateResource` and stays implemented in resource packages.
+
+Each constructor returns an independent generic scheme. Additional custom
+contracts can be registered on its embedded `Scheme`; this does not grant them
+canonical resource capabilities. There is no mutable global registry or `init()`
+registration. Actions, projections, and heterogeneous `List` input remain
+consumer-specific contracts.
+
+Application policy remains outside this package: which resources an operation
+supports, namespace defaults, authorization and endpoint selection, HTTP calls,
+reconciliation, dependency ordering, and execution. The generic
+`internal/schema/manifest` package remains independent of concrete resource types.
 
 This package composes resource types and API list envelopes from outside both
-packages, preserving schema dependency direction. It defines no new serialized
-contracts and therefore needs no independent JSON Schema.
+packages, preserving schema dependency direction. It defines capabilities, not
+new serialized contracts, and therefore needs no independent JSON Schema.
