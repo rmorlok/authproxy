@@ -346,7 +346,7 @@ func (l *inputLoader) object(
 	}
 
 	l.documents = append(l.documents, doc)
-	
+
 	return nil
 }
 
