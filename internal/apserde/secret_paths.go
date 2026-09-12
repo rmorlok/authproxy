@@ -12,30 +12,40 @@ import (
 func SecretPaths(value any) [][]string {
 	var paths [][]string
 	seen := map[visit]bool{}
+
 	var walk func(reflect.Value, []string)
 	walk = func(v reflect.Value, path []string) {
 		v = unwrapInterface(v)
+
 		if !v.IsValid() || isNil(v) {
 			return
 		}
-		if v.Kind() == reflect.Pointer || v.Kind() == reflect.Map || v.Kind() == reflect.Slice {
+
+		if v.Kind() == reflect.Pointer ||
+			v.Kind() == reflect.Map ||
+			v.Kind() == reflect.Slice {
+
 			key := visit{typ: v.Type(), ptr: v.Pointer()}
+
 			if seen[key] {
 				return
 			}
 			seen[key] = true
 			defer delete(seen, key)
 		}
+
 		for v.Kind() == reflect.Pointer {
 			v = unwrapInterface(v.Elem())
 			if !v.IsValid() {
 				return
 			}
 		}
+
 		if inner, ok := innerValue(v); ok {
 			walk(inner, path)
 			return
 		}
+
 		switch v.Kind() {
 		case reflect.Struct:
 			for i := 0; i < v.NumField(); i++ {
@@ -71,6 +81,7 @@ func SecretPaths(value any) [][]string {
 			}
 		}
 	}
+
 	walk(reflect.ValueOf(value), nil)
 	return paths
 }

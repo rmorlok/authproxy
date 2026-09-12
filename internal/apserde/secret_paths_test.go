@@ -1,8 +1,9 @@
 package apserde
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestSecretPathsIncludeEmptyNullAndContainers(t *testing.T) {
@@ -15,7 +16,11 @@ func TestSecretPathsIncludeEmptyNullAndContainers(t *testing.T) {
 		Lookup map[string]nested `json:"lookup"`
 	}
 	p := payload{Items: []nested{{}}, Lookup: map[string]nested{"one": {}}}
-	require.ElementsMatch(t, [][]string{{"credential"}, {"items", "0", "credential"}, {"lookup", "one", "credential"}}, SecretPaths(p))
+	require.ElementsMatch(t, [][]string{
+		{"credential"},
+		{"items", "0", "credential"},
+		{"lookup", "one", "credential"},
+	}, SecretPaths(p))
 }
 
 func TestSecretPathsCyclesAndSharedValues(t *testing.T) {
@@ -26,5 +31,8 @@ func TestSecretPathsCyclesAndSharedValues(t *testing.T) {
 	r := &recursive{}
 	r.Next = r
 	require.Equal(t, [][]string{{"secret"}}, SecretPaths(r))
-	require.ElementsMatch(t, [][]string{{"0", "secret"}, {"1", "secret"}}, SecretPaths([]*recursive{r, r}))
+	require.ElementsMatch(t, [][]string{
+		{"0", "secret"},
+		{"1", "secret"},
+	}, SecretPaths([]*recursive{r, r}))
 }
