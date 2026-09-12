@@ -45,10 +45,14 @@ func (r ResourceType) Metadata(resource any) (meta.ObjectMeta, error) {
 }
 
 // ValidateResource delegates lifecycle semantics to the canonical schema.
-func (r ResourceType) ValidateResource(resource any, mode meta.ValidationMode) error {
+func (r ResourceType) ValidateResource(
+	resource any,
+	mode meta.ValidationMode,
+) error {
 	if _, err := r.Metadata(resource); err != nil {
 		return err
 	}
+	
 	return resource.(Value).ValidateFor(mode, nil)
 }
 
@@ -59,9 +63,11 @@ func (r ResourceType) DecodePatchJSON(data []byte) (Value, error) {
 	if err := util.DecodeJSONStrict(data, patch); err != nil {
 		return nil, err
 	}
+
 	if err := patch.ValidateFor(meta.ValidationModeUpdate, nil); err != nil {
 		return nil, err
 	}
+
 	return patch, nil
 }
 
@@ -82,19 +88,29 @@ func NewResourceScheme() *ResourceScheme {
 	scheme := manifest.NewScheme()
 	for _, r := range resourceTypes() {
 		resource := r
-		if err := scheme.Register(r.GVK, func() any { return resource.NewResource() }); err != nil {
+		if err := scheme.Register(
+			r.GVK,
+			func() any { return resource.NewResource() },
+		); err != nil {
 			panic(err)
 		}
-		if err := scheme.Register(manifest.GVK{APIVersion: r.GVK.APIVersion, Kind: apiv1alpha1.ListKind(r.GVK.Kind)}, r.newList); err != nil {
+
+		if err := scheme.Register(manifest.GVK{
+			APIVersion: r.GVK.APIVersion,
+			Kind:       apiv1alpha1.ListKind(r.GVK.Kind),
+		}, r.newList); err != nil {
 			panic(err)
 		}
 	}
+
 	return &ResourceScheme{Scheme: scheme}
 }
 
 // Lookup returns canonical capabilities; registering a custom decoder on the
 // embedded scheme does not give that type resource or mutation capabilities.
-func (s *ResourceScheme) Lookup(gvk manifest.GVK) (ResourceType, error) { return LookupResource(gvk) }
+func (s *ResourceScheme) Lookup(gvk manifest.GVK) (ResourceType, error) {
+	return LookupResource(gvk)
+}
 
 // LookupResource provides schema capabilities without allocating a decoder.
 func LookupResource(gvk manifest.GVK) (ResourceType, error) {
@@ -103,6 +119,7 @@ func LookupResource(gvk manifest.GVK) (ResourceType, error) {
 			return r, nil
 		}
 	}
+
 	return ResourceType{}, fmt.Errorf("unsupported resource %s", gvk)
 }
 
@@ -116,6 +133,7 @@ func TypeOf(resource any) (ResourceType, error) {
 			return r, nil
 		}
 	}
+
 	return ResourceType{}, fmt.Errorf("expected a canonical resource")
 }
 
@@ -123,30 +141,48 @@ func TypeOf(resource any) (ResourceType, error) {
 // Constructing descriptor values avoids a mutable global registry.
 func resourceTypes() []ResourceType {
 	return []ResourceType{
-		describe[actor.Actor, actor.ActorPatch](actor.ActorKind, "actors", actor.ValidateID,
+		describe[actor.Actor, actor.ActorPatch](
+			actor.ActorKind,
+			"actors",
+			actor.ValidateID,
 			func(r *actor.Actor) (meta.TypeMeta, meta.ObjectMeta) { return r.TypeMeta, r.Metadata },
 			func(current *actor.Actor, patch *actor.ActorPatch) (*actor.Actor, error) {
 				return patch.ApplyTo(current, nil)
 			}),
-		describe[connection.Connection, connection.ConnectionPatch](connection.ConnectionKind, "connections", connection.ValidateID,
+		describe[connection.Connection, connection.ConnectionPatch](
+			connection.ConnectionKind,
+			"connections",
+			connection.ValidateID,
 			func(r *connection.Connection) (meta.TypeMeta, meta.ObjectMeta) { return r.TypeMeta, r.Metadata },
 			func(current *connection.Connection, patch *connection.ConnectionPatch) (*connection.Connection, error) {
 				return current.ApplyUpdate(patch)
 			}),
-		describe[connectors.Connector, connectors.ConnectorPatch](connectors.ConnectorKind, "connectors", connectors.ValidateID,
+		describe[connectors.Connector, connectors.ConnectorPatch](
+			connectors.ConnectorKind,
+			"connectors",
+			connectors.ValidateID,
 			func(r *connectors.Connector) (meta.TypeMeta, meta.ObjectMeta) { return r.TypeMeta, r.Metadata },
 			func(current *connectors.Connector, patch *connectors.ConnectorPatch) (*connectors.Connector, error) {
 				return patch.ApplyTo(current, nil)
 			}),
-		describe[key.Key, key.KeyPatch](key.KeyKind, "keys", key.ValidateID,
+		describe[key.Key, key.KeyPatch](
+			key.KeyKind,
+			"keys",
+			key.ValidateID,
 			func(r *key.Key) (meta.TypeMeta, meta.ObjectMeta) { return r.TypeMeta, r.Metadata },
 			func(current *key.Key, patch *key.KeyPatch) (*key.Key, error) { return patch.ApplyTo(current, nil) }),
-		describe[namespace.Namespace, namespace.NamespacePatch](namespace.NamespaceKind, "namespaces", namespace.ValidatePath,
+		describe[namespace.Namespace, namespace.NamespacePatch](
+			namespace.NamespaceKind,
+			"namespaces",
+			namespace.ValidatePath,
 			func(r *namespace.Namespace) (meta.TypeMeta, meta.ObjectMeta) { return r.TypeMeta, r.Metadata },
 			func(current *namespace.Namespace, patch *namespace.NamespacePatch) (*namespace.Namespace, error) {
 				return patch.ApplyTo(current, nil)
 			}),
-		describe[rate_limit.RateLimit, rate_limit.RateLimitPatch](rate_limit.RateLimitKind, "rate-limits", rate_limit.ValidateID,
+		describe[rate_limit.RateLimit, rate_limit.RateLimitPatch](
+			rate_limit.RateLimitKind,
+			"rate-limits",
+			rate_limit.ValidateID,
 			func(r *rate_limit.RateLimit) (meta.TypeMeta, meta.ObjectMeta) { return r.TypeMeta, r.Metadata },
 			func(current *rate_limit.RateLimit, patch *rate_limit.RateLimitPatch) (*rate_limit.RateLimit, error) {
 				return patch.ApplyTo(current, nil)
@@ -154,13 +190,19 @@ func resourceTypes() []ResourceType {
 	}
 }
 
-func describe[R, P any](kind meta.Kind, collection string, validateID func(string) error,
-	metadata func(*R) (meta.TypeMeta, meta.ObjectMeta), merge func(*R, *P) (*R, error)) ResourceType {
+func describe[R, P any](
+	kind meta.Kind,
+	collection string,
+	validateID func(string) error,
+	metadata func(*R) (meta.TypeMeta, meta.ObjectMeta), merge func(*R, *P) (*R, error),
+) ResourceType {
 	return ResourceType{
-		GVK: manifest.GVK{APIVersion: meta.APIVersionV1Alpha1, Kind: kind}, Collection: collection,
+		GVK: manifest.GVK{APIVersion: meta.APIVersionV1Alpha1, Kind: kind},
+		Collection: collection,
 		NewResource: func() Value { return any(new(R)).(Value) },
 		NewPatch:    func() Value { return any(new(P)).(Value) },
-		ValidateID:  validateID, resourceType: reflect.TypeOf(new(R)),
+		ValidateID:  validateID,
+		resourceType: reflect.TypeOf(new(R)),
 		newList: func() any { return new(apiv1alpha1.ResourceList[R]) },
 		metadata: func(value any) (meta.ObjectMeta, error) {
 			r, ok := value.(*R)
