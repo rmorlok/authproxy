@@ -275,3 +275,88 @@ The matching `AUTHPROXY_HOST_APP_INITIATE_SESSION_URL` in each `.env` is templat
 - [Local development](/development/local-development/) — the surrounding source and UI workflow.
 - [AGENTS.md — Running locally](https://github.com/rmorlok/authproxy/blob/main/AGENTS.md#running-locally) — repository-specific contributor guidance.
 - [Telemetry](/operations/telemetry/) — what shows up in traces/metrics when these commands fire requests through the server.
+
+## Validate apply manifests (client dry-run)
+
+`ap apply` currently provides the manifest-loading stage of declarative apply.
+Use `--dry-run=client` to check resource types, fields, identity, and namespace
+selection without contacting the AuthProxy cluster. Cluster writes and
+operation-specific create/update validation are not implemented yet; invoking
+this command without `--dry-run=client` returns an error.
+
+```bash
+ap apply -f ./resources --recursive --namespace root.integrations --dry-run=client
+ap apply -f namespaces.yaml -f connectors.yaml --dry-run=client -o yaml
+cat resources.yaml | ap apply -f - --namespace root.integrations --dry-run=client
+```
+
+For example, save this as `namespace.yaml`:
+
+```yaml
+apiVersion: authproxy.net/v1alpha1
+kind: Namespace
+metadata:
+  name: integrations
+  namespace: root
+spec: {}
+```
+
+Then run `ap apply -f namespace.yaml --dry-run=client`. This validates the
+namespace `root.integrations`; it does not create it.
+
+### Identity and input rules
+
+Resources must contain `metadata.id` or both `metadata.namespace` and
+`metadata.name`. An explicit namespace takes precedence over `--namespace`.
+If a name-based resource omits its namespace and no flag supplies it, validation
+fails. There is no implicit `root` default. ID-only targets need no namespace;
+server lookup and consistency checks will be added with cluster execution.
+
+For `Namespace`, `metadata.namespace` is the parent path. A namespace ID supplies
+its canonical path, and any supplied name or parent must agree. `name: root`
+without a parent identifies the root namespace, which does not receive the
+flag's default parent.
+
+Supported kinds are `Namespace`, `Actor`, `Connector`, `Key`, `RateLimit`, and
+`Connection`, using `apiVersion: authproxy.net/v1alpha1`. Connection input is
+limited to mutable metadata and an omitted or empty spec; connection setup is
+not declarative creation. Status and timestamps are rejected. Only Connector
+manifests may address a generation.
+
+The loader accepts YAML, JSON, multi-document YAML, typed resource lists such as
+`ActorList`, and heterogeneous `List` envelopes. List items must carry their own
+API version and kind. Incomplete paginated lists are rejected. Duplicate keys,
+YAML aliases/merge keys, unknown fields, invalid identity, and duplicate selected
+resource identities fail the whole batch. Diagnostics identify the source,
+document, and list item. Multiple inputs retain their argument order; directory
+files are visited lexically. Symlinks discovered inside directories are skipped.
+
+### Available options
+
+| Option | Behavior |
+|---|---|
+| `-f`, `--filename` | Repeatable file, directory, HTTP(S) URL, or `-` for stdin. Stdin may appear only once. |
+| `-R`, `--recursive` | Traverse nested directories. Directory discovery includes `.yaml`, `.yml`, and `.json`. |
+| `-n`, `--namespace` | Supply a missing namespace or Namespace parent. |
+| `-l`, `--selector` | Filter input labels using `=`, `==`, `!=`, existence (`key`), or nonexistence (`!key`). |
+| `--dry-run=client` | Required in this initial implementation. No cluster access or signing configuration is needed. |
+| `--validate=strict` | The currently supported validation mode; unknown fields fail. `true` is an alias. |
+| `-o`, `--output` | `name`, `json` (an array), or `yaml` (a document stream). The default prints validation status. |
+
+The loader checks every resource before producing output, including resources
+excluded by a selector. A selector matching no resources succeeds with empty
+output (`[]` for JSON); input containing no resource documents fails.
+
+URL downloads use an independent, unsigned HTTP client, a 30-second timeout,
+and a 16 MiB limit per source. URL credentials and HTTPS-to-HTTP redirects are
+rejected. Local files and stdin use the same size limit. An HTTP source still
+requires network access during client dry-run.
+
+Structured output masks schema-declared secrets and retains explicit null and
+empty values. Redacted output is for inspection, not a replayable manifest;
+redacted secret placeholders are rejected as input. Dry-run does not verify
+resource existence, authorization, references, server defaults, or whether a
+subsequent apply would create or update a resource.
+
+Reconciliation, cluster execution, non-strict validation, and additional
+kubectl-style options are tracked in [the apply implementation plan](https://github.com/rmorlok/authproxy/issues/919).

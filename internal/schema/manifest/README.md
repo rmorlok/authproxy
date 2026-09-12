@@ -9,3 +9,9 @@ Multi-document support is intentionally YAML-only. A JSON list is itself a
 registered `<Kind>List` object rather than an untyped array of manifests. This
 package owns decoding infrastructure, not a serialized contract, so it has no
 independent JSON Schema.
+
+Application code decoding canonical AuthProxy resources should use
+[`registry.NewResourceScheme()`](../registry/README.md), which centralizes
+resource and typed-list registrations. Keep this package independent of
+concrete resource types; specialized schemes can still register their own
+contracts explicitly.
