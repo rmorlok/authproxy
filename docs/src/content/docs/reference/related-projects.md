@@ -51,7 +51,7 @@ That produces different tradeoffs from adjacent categories:
   owns and can use each third-party API connection; it is not a VPN, ZTNA, or
   general infrastructure-access product.
 - A **secret manager or credential proxy** protects secret access. AuthProxy
-  adds OAuth callbacks and refresh, user-facing setup, connector versions,
+  adds OAuth callbacks and refresh, user-facing setup, connector generations,
   health, rate limits, and request-event context.
 
 The relevant build-versus-buy question is therefore not only connector count.
@@ -72,7 +72,7 @@ column and the product notes below.
 
 | Product/Project | Primary Use Case | License | Code vs UI | Eventing/Webhooks | Connector Definition | Self-hosting |
 | --- | --- | --- | --- | --- | --- | --- |
-| **[AuthProxy](https://docs.authproxy.net/)** | Embedded connection lifecycle and authenticating proxy | [MIT](https://github.com/rmorlok/authproxy/blob/main/LICENSE) | Code-first with embedded Marketplace and Admin UIs | Not a workflow or event platform | Declarative, versioned definitions maintained by the adopting team | Yes |
+| **[AuthProxy](https://docs.authproxy.net/)** | Embedded connection lifecycle and authenticating proxy | [MIT](https://github.com/rmorlok/authproxy/blob/main/LICENSE) | Code-first with embedded Marketplace and Admin UIs | Not a workflow or event platform | Declarative, generation-based definitions maintained by the adopting team | Yes |
 | [Merge](https://www.merge.dev/) | Unified API for B2B SaaS data | Commercial | API-first (code) | Webhooks supported | Vendor-defined connectors maintained by Merge | Yes (paid option) |
 | [Kombo](https://www.kombo.dev/) | Unified HR/ATS/LMS/Payroll | Commercial | API-first (code) | Webhooks supported | Vendor-defined connectors maintained by Kombo | No public self-host option |
 | [Paragon](https://www.useparagon.com/) | Embedded integrations for SaaS | Commercial | Hybrid (SDK + UI) | Webhooks + workflow triggers | Prebuilt + custom connector builder | Yes (managed or unmanaged on-prem) |
@@ -256,7 +256,7 @@ difference. Octelium primarily governs which Users can reach an
 administrator-defined Service and is much broader across networks and
 protocols. AuthProxy primarily lets an application give each actor or tenant
 its own connection, including embedded OAuth2 authorization-code setup,
-refresh and revocation, connector-version lifecycle, and health management.
+refresh and revocation, connector-generation lifecycle, and health management.
 The products can also be complementary: Octelium can govern workforce or
 infrastructure access around an AuthProxy deployment while AuthProxy owns the
 application's tenant-facing provider connections.
@@ -305,14 +305,14 @@ They do not all provide customer-facing API integrations.
 - **LiteLLM**: Open-source LLM gateway supporting 100+ provider integrations, with spend tracking and routing. OSS page highlights self-hosting with no data sent to LiteLLM servers; docs show running the proxy via Docker or CLI. See: https://www.litellm.ai/oss and https://docs.litellm.ai/.
 - **Bifrost**: Apache-2.0 AI gateway with OpenAI-compatible APIs and routing across 20+ model providers. Its MCP subsystem connects to STDIO, HTTP, or SSE servers, exposes aggregated tools through an MCP Gateway URL, filters tools per request, client, or virtual key, and separates tool suggestions from explicit execution by default. It also supports shared OAuth with automatic refresh and per-user OAuth for upstream MCP servers. This overlaps AuthProxy's token lifecycle for MCP-native integrations, but Bifrost is centered on model requests and MCP tool execution rather than embedded setup for arbitrary native APIs. See: https://github.com/maximhq/bifrost, https://docs.getbifrost.ai/mcp/overview, and https://docs.getbifrost.ai/mcp/connecting-to-servers.
 - **Kong**: General-purpose API gateway available as an Apache-2.0 core, commercial self-managed editions, and the Konnect managed control plane. Kong centralizes routing and plugins for authentication, authorization, rate limiting, transformations, and observability across APIs. Its enterprise AI MCP Proxy can front existing MCP servers, convert OpenAPI-described REST operations into MCP tools, aggregate tool sets, and apply per-tool ACLs and standard Kong policies. This is a traffic and protocol control plane, not a tenant connection lifecycle: upstream APIs, MCP servers, identities, and credentials must still be provisioned. See: https://github.com/Kong/kong, https://developer.konghq.com/mcp/, and https://developer.konghq.com/plugins/ai-mcp-proxy/.
-- **Warden**: Self-hostable, MPL-2.0 gateway for agent and workload access to native APIs and MCP servers. It authenticates workload identities, injects static or dynamically minted upstream credentials, and applies namespace-scoped policy and auditing, including MCP tool and argument controls. Its OAuth2 driver supports client credentials and browser authorization-code consent with refresh-token rotation, so the overlap with AuthProxy extends beyond API-key injection. Warden centers on operator-configured providers, roles, and credential specs; AuthProxy centers on embedded customer connection setup, versioned connectors, health probes, and ongoing connection lifecycle. See: https://github.com/stephnangue/warden, [OAuth2 driver](https://github.com/stephnangue/warden/blob/9554d4ecb78d50fc4a4993a1a5477cda4d0133a7/site/src/content/docs/credential-drivers/oauth2.md), and [policy model](https://wardengateway.com/concepts/policies/) (reviewed 2026-09-07).
+- **Warden**: Self-hostable, MPL-2.0 gateway for agent and workload access to native APIs and MCP servers. It authenticates workload identities, injects static or dynamically minted upstream credentials, and applies namespace-scoped policy and auditing, including MCP tool and argument controls. Its OAuth2 driver supports client credentials and browser authorization-code consent with refresh-token rotation, so the overlap with AuthProxy extends beyond API-key injection. Warden centers on operator-configured providers, roles, and credential specs; AuthProxy centers on embedded customer connection setup, connector generations, health probes, and ongoing connection lifecycle. See: https://github.com/stephnangue/warden, [OAuth2 driver](https://github.com/stephnangue/warden/blob/9554d4ecb78d50fc4a4993a1a5477cda4d0133a7/site/src/content/docs/credential-drivers/oauth2.md), and [policy model](https://wardengateway.com/concepts/policies/) (reviewed 2026-09-07).
 - **Agent Vault**: Open-source HTTP credential proxy by Infisical, purpose-built for AI agents. Agents get a scoped session and a local `HTTPS_PROXY`; Agent Vault injects the credential at the network layer so credentials are never returned to the agent. Works with any HTTP-speaking agent (Claude Code, Cursor, Codex, custom Python/TypeScript, sandboxed processes) and any HTTPS API — there is no prebuilt connector catalog; you register your own services and credentials. Ships as a binary, Docker image, or from source; MIT-licensed with a separate `ee/` directory for enterprise features. Offers a container-sandbox mode (iptables-locked egress through the proxy) and an SDK for orchestrating sandboxed agents (Docker/Daytona/E2B). See: https://github.com/Infisical/agent-vault, https://docs.agent-vault.dev, and https://infisical.com/blog/agent-vault-the-open-source-credential-proxy-and-vault-for-agents.
 
 Warden's credential brokerage and OAuth2 lifecycle, and Bifrost's per-user OAuth
 and token refresh for upstream MCP servers, directly overlap with AuthProxy.
 Kong overlaps at the authenticated proxy and policy layer. The zero-trust access
 platforms above overlap in identity, authorization, and audit. AuthProxy remains distinct when the product
-needs an embeddable connection UI, versioned connector definitions, health and
+needs an embeddable connection UI, connector generation definitions, health and
 lifecycle management, and unrestricted forwarding to each provider's native
 API. An MCP gateway could consume tools backed by AuthProxy connections, or
 AuthProxy could sit behind a gateway or access platform when broader traffic or

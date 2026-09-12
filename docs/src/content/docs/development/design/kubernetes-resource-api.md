@@ -53,8 +53,8 @@ kind: Connector
 
 `apiVersion` versions the schema independently from the `/api/v1` HTTP routing
 namespace. Kind names are singular PascalCase. A list uses `<Kind>List`. A
-versioned connector definition is still `kind: Connector`; its definition
-version is `metadata.generation`.
+a connector generation is still `kind: Connector`; its generation number is
+`metadata.generation`.
 
 ### Resource envelope
 
@@ -83,7 +83,7 @@ Fields are included only where the resource supports them:
   is the parent path; the namespace's canonical path is derived from parent and
   name. Root has no parent.
 - `metadata.generation` identifies a resource generation when AuthProxy has
-  meaningful generations. Connector definition versions use it.
+  meaningful generations. Connector generations use it.
 - labels, annotations, and timestamps have one representation in ObjectMeta.
 - `spec` contains desired configuration.
 - `status` contains server-observed state and is rejected on client writes.
@@ -153,7 +153,7 @@ contracts. Authorization and business side effects remain in core and routes.
 ### Connector generations
 
 A logical connector keeps one `metadata.id`, `metadata.name`, and namespace.
-Each definition version is returned as another Connector object with a distinct
+Each generation is returned as another Connector object with a distinct
 `metadata.generation`:
 
 ```yaml
@@ -244,7 +244,7 @@ for every concrete registration in the audited route set.
 | Connection action | `POST /api/v1/connections/:id/_disconnect` | `ConnectionDisconnect` action |
 | Connection action | `POST /api/v1/connections/:id/_abort` | `ConnectionSetupAbort` action |
 | Connection action | `POST /api/v1/connections/:id/_reconfigure` | `ConnectionReconfigure` action |
-| Connection action | `POST /api/v1/connections/:id/_migrateVersion` | `ConnectionVersionMigration` action |
+| Connection action | `POST /api/v1/connections/:id/_migrateGeneration` | `ConnectionGenerationMigration` action |
 | Connection action | `POST /api/v1/connections/:id/_cancelSetup` | `ConnectionSetupCancel` action |
 | Connection action | `POST /api/v1/connections/:id/_retry` | `ConnectionSetupRetry` action |
 | Connection action | `POST /api/v1/connections/:id/_reauth` | `ConnectionReauthenticate` action |
@@ -324,11 +324,11 @@ disappear where the new resource structs are directly representable.
 
 | Current contract family | Target | Owner |
 | --- | --- | --- |
-| `ConnectorJson`, `ConnectorVersionJson`, create/update/version request types | Connector/ConnectorList using generation; create/patch policies over the same resource contract | #832, #839 |
+| `ConnectorJson`, `ConnectorGenerationJson`, create/update/generation request types | Connector/ConnectorList using generation; create/patch policies over the same resource contract | #832, #839 |
 | connector lifecycle and force-state request/response types | typed Connector actions and Connector/Task references in results | #839, #843 |
 | `ConnectionJson`, list/update types | Connection/ConnectionList | #840 |
 | initiate/submit/setup redirect/form/verifying/complete/error variants and data-source options | typed connection actions and setup/read projections | #840 |
-| disconnect, migrate-version, retry, reauth, force-state types | typed Connection actions; `targetVersion` becomes connector generation reference | #840 |
+| disconnect, migrate-generation, retry, reauth, force-state types | typed Connection actions; `targetGeneration` becomes connector generation reference | #840 |
 | `NamespaceJson`, create/update/list types | Namespace/NamespaceList | #834 |
 | `NamespaceKeyJson`, `SetNamespaceKeyRequestJson` | removed; `Namespace.spec.encryptionKeyRef` is authoritative | #834, #835, #849 |
 | `KeyJson`, create/update/list types | Key/KeyList with write-only/redacted secret spec | #835 |
@@ -403,7 +403,7 @@ is required, but versioned names prevent ambiguity in new persisted work.
 | `database:propagate_namespace_labels` | namespace path | update for canonical Namespace reference/path semantics; #834, #843 |
 | `database:propagate_connector_labels` | connector ID | update for Connector reference/generation rules; #839, #843 |
 | `database:reconcile_carry_forward_labels` | none | consume common metadata helpers; #831, #843 |
-| `core:migrate_connections_between_connector_versions` | none | rename version concepts to generation in behavior and monitoring; #839, #843 |
+| `core:migrate_connections_between_connector_generations` | none | use generation terminology in behavior and monitoring; #839, #843 |
 | `core:probe` | connection ID and probe ID | internal task with Connection reference terminology; #840, #843 |
 | `core:verify_connection` | connection ID | internal task with Connection reference terminology; #840, #843 |
 | `core:probe_outcome_cleanup` | retention seconds | unchanged internal task |
@@ -421,7 +421,7 @@ No task may be added to convert legacy encrypted connector definitions.
 | `core.connection.disconnect.v1` | connection ID, timeout | internal v1 payload with stable Connection reference terminology |
 | `core.connector.disconnect_connections.v1` | connector ID, timeout | internal v1 payload; Connector ID remains logical identity |
 | `core.connector.archive.v1` | connector ID, timeout | internal v1 payload; API action resolves to this workflow |
-| `core.connection.migrate_version.v1` | connection ID, target version, timeout | introduce a new workflow payload/name using target connector generation rather than silently changing persisted v1 semantics |
+| `core.connection.migrate_generation.v1` | connection ID, target generation, timeout | breaking pre-production rename; no replay compatibility with the former workflow name is required |
 
 Workflow monitoring history attributes are backend-owned arbitrary data. They
 remain a projection and must be redacted/bounded; they are not decoded as

@@ -98,22 +98,22 @@ func TestResolveBucketKey_ReservedDimensions(t *testing.T) {
 			rlschema.DimensionActor,
 			rlschema.DimensionConnection,
 			rlschema.DimensionConnector,
-			rlschema.DimensionConnectorVersion,
+			rlschema.DimensionConnectorGeneration,
 			rlschema.DimensionNamespace,
 			rlschema.DimensionMethod,
 		},
 	}}
 	ctx := &RequestContext{
-		ActorID:          apid.ID("act_a"),
-		ConnectionID:     apid.ID("cxn_1"),
-		ConnectorID:      apid.ID("cxr_1"),
-		ConnectorVersion: 7,
-		Namespace:        "root.team-x",
-		Method:           "POST",
+		ActorID:             apid.ID("act_a"),
+		ConnectionID:        apid.ID("cxn_1"),
+		ConnectorID:         apid.ID("cxr_1"),
+		ConnectorGeneration: 7,
+		Namespace:           "root.team-x",
+		Method:              "POST",
 	}
 	k := ResolveBucketKey(rule, ctx)
 	require.Equal(t,
-		"actor=act_a|connection=cxn_1|connector=cxr_1|connector_version=7|namespace=root.team-x|method=POST",
+		"actor=act_a|connection=cxn_1|connector=cxr_1|connector_generation=7|namespace=root.team-x|method=POST",
 		k.String(),
 	)
 }
@@ -153,16 +153,16 @@ func TestResolveBucketKey_NilContext(t *testing.T) {
 	require.Equal(t, "actor=", k.String())
 }
 
-func TestResolveBucketKey_ZeroConnectorVersionResolvesEmpty(t *testing.T) {
-	// 0 means "no connector version" (unset) — distinct from version 0,
+func TestResolveBucketKey_ZeroConnectorGenerationResolvesEmpty(t *testing.T) {
+	// 0 means "no connector generation" (unset) — distinct from generation 0,
 	// which is impossible per apid conventions. Render as "" so it
-	// doesn't bucket alongside other small versions.
+	// doesn't bucket alongside other small generations.
 	rule := rlschema.RateLimitSpec{Bucket: rlschema.Bucket{
-		Dimensions: []string{rlschema.DimensionConnectorVersion},
+		Dimensions: []string{rlschema.DimensionConnectorGeneration},
 	}}
-	ctx := &RequestContext{ConnectorVersion: 0}
+	ctx := &RequestContext{ConnectorGeneration: 0}
 	k := ResolveBucketKey(rule, ctx)
-	require.Equal(t, "connector_version=", k.String())
+	require.Equal(t, "connector_generation=", k.String())
 }
 
 func TestResolveBucketKey_UnknownDimensionResolvesEmpty(t *testing.T) {

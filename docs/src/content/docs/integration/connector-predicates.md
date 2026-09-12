@@ -49,7 +49,7 @@ auth:
       reason: We need activity access when activity sync is enabled.
 ```
 
-AuthProxy compiles connector-level JavaScript once for the connector version, validates it by running top-level initialization without runtime variables, and then runs it in a fresh JavaScript VM for each predicate or transform evaluation. This means helpers can share code, but mutable globals do not carry state between evaluations.
+AuthProxy compiles connector-level JavaScript once for the connector generation, validates it by running top-level initialization without runtime variables, and then runs it in a fresh JavaScript VM for each predicate or transform evaluation. This means helpers can share code, but mutable globals do not carry state between evaluations.
 
 Connector-level JavaScript cannot declare the reserved runtime variables `cfg`, `labels`, `annotations`, or `data`. AuthProxy injects those names for each evaluation. Syntax errors, top-level thrown errors, and reserved-name declarations fail connector validation.
 
@@ -147,8 +147,8 @@ Probe behavior:
 
 `apxy:verify` is inserted during setup only when at least one probe is enabled for the connection. If all probes are disabled, setup advances to the next eligible configure step or completes immediately when no configure step is left.
 
-## Versioning Notes
+## Generation Notes
 
-Adding, removing, or changing predicates or connector-level JavaScript changes the connector definition. For published connectors, publish a new connector version and migrate existing connections with the [connector version migration workflow](/operations/connector-version-migrations/).
+Adding, removing, or changing predicates or connector-level JavaScript changes the connector definition. For published connectors, publish a new connector generation and migrate existing connections with the [connector generation migration workflow](/operations/connector-generation-migrations/).
 
-Existing in-flight connections are evaluated against the connector version they are using. If a predicate changes in a new version, only connections migrated to that version use the new predicate behavior.
+Existing in-flight connections are evaluated against the connector generation they are using. If a predicate changes in a new generation, only connections migrated to that generation use the new predicate behavior.

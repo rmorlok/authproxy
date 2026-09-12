@@ -35,23 +35,23 @@ type OpenAPIConnectorLifecycleActionJson = schemaapiopenapi.ConnectorLifecycleAc
 type OpenAPIConnectorForceStateActionJson = schemaapiopenapi.ConnectorForceStateActionJson
 
 type ListConnectorsRequestQueryParams struct {
-	Cursor        *string                                   `form:"cursor"`
-	LimitVal      *int32                                    `form:"limit"`
-	StateVal      *database.ConnectorDefinitionVersionState `form:"state"`
-	NamespaceVal  *string                                   `form:"namespace"`
-	NameVal       *string                                   `form:"name"`
-	LabelSelector *string                                   `form:"labelSelector"`
-	OrderByVal    *string                                   `form:"orderBy"`
+	Cursor        *string                            `form:"cursor"`
+	LimitVal      *int32                             `form:"limit"`
+	StateVal      *database.ConnectorGenerationState `form:"state"`
+	NamespaceVal  *string                            `form:"namespace"`
+	NameVal       *string                            `form:"name"`
+	LabelSelector *string                            `form:"labelSelector"`
+	OrderByVal    *string                            `form:"orderBy"`
 }
 
 type ListConnectorGenerationsRequestQueryParams struct {
-	Cursor        *string                                   `form:"cursor"`
-	LimitVal      *int32                                    `form:"limit"`
-	StateVal      *database.ConnectorDefinitionVersionState `form:"state"`
-	NamespaceVal  *string                                   `form:"namespace"`
-	NameVal       *string                                   `form:"name"`
-	LabelSelector *string                                   `form:"labelSelector"`
-	OrderByVal    *string                                   `form:"orderBy"`
+	Cursor        *string                            `form:"cursor"`
+	LimitVal      *int32                             `form:"limit"`
+	StateVal      *database.ConnectorGenerationState `form:"state"`
+	NamespaceVal  *string                            `form:"namespace"`
+	NameVal       *string                            `form:"name"`
+	LabelSelector *string                            `form:"labelSelector"`
+	OrderByVal    *string                            `form:"orderBy"`
 }
 
 // connectorGenerationID is the composite identifier parsed from generation-level
@@ -281,11 +281,11 @@ func (r *ConnectorsRoutes) getGeneration(gctx *gin.Context) {
 	generation := generationID.Generation
 
 	b := r.connectors.
-		ListConnectorVersionsBuilder().
+		ListConnectorGenerationsBuilder().
 		ForId(connectorId).
 		Limit(1)
 
-	b = b.ForVersion(generation)
+	b = b.ForGeneration(generation)
 
 	// TODO: support lookup by certain states
 
@@ -327,7 +327,7 @@ func (r *ConnectorsRoutes) getGeneration(gctx *gin.Context) {
 // @Param			namespace		query		string	false	"Filter by namespace"
 // @Param			name			query		string	false	"Filter by exact resource name"
 // @Param			labelSelector	query		string	false	"Filter by label selector"
-// @Param			orderBy		query		string	false	"Order by field (e.g., 'version:desc')"
+// @Param			orderBy		query		string	false	"Order by field (e.g., 'generation desc')"
 // @Success		200				{object}	OpenAPIListConnectorGenerationsResponseJson
 // @Failure		400				{object}	ErrorResponse
 // @Failure		401				{object}	ErrorResponse
@@ -339,7 +339,7 @@ func (r *ConnectorsRoutes) listGenerations(gctx *gin.Context) {
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
 	var err error
-	var ex connIface.ListConnectorVersionsExecutor
+	var ex connIface.ListConnectorGenerationsExecutor
 
 	connectorId, httpErr := parseConnectorID(gctx)
 	if httpErr != nil {
@@ -373,7 +373,7 @@ func (r *ConnectorsRoutes) listGenerations(gctx *gin.Context) {
 	}
 
 	if req.Cursor != nil {
-		ex, err = r.connectors.ListConnectorVersionsFromCursor(ctx, *req.Cursor)
+		ex, err = r.connectors.ListConnectorGenerationsFromCursor(ctx, *req.Cursor)
 		if err != nil {
 			apgin.WriteError(
 				gctx,
@@ -389,7 +389,7 @@ func (r *ConnectorsRoutes) listGenerations(gctx *gin.Context) {
 			return
 		}
 	} else {
-		b := r.connectors.ListConnectorVersionsBuilder().
+		b := r.connectors.ListConnectorGenerationsBuilder().
 			ForId(connectorId)
 
 		if req.LimitVal != nil {
@@ -423,14 +423,14 @@ func (r *ConnectorsRoutes) listGenerations(gctx *gin.Context) {
 		}
 
 		if req.OrderByVal != nil {
-			field, order, err := pagination.SplitOrderByParam[database.ConnectorDefinitionVersionOrderByField](*req.OrderByVal)
+			field, order, err := pagination.SplitOrderByParam[database.ConnectorGenerationOrderByField](*req.OrderByVal)
 			if err != nil {
 				apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
 				val.MarkErrorReturn()
 				return
 			}
 
-			if !database.IsValidConnectorDefinitionVersionOrderByField(field) {
+			if !database.IsValidConnectorGenerationOrderByField(field) {
 				apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid sort field '%s'", field))
 				val.MarkErrorReturn()
 				return
@@ -641,7 +641,7 @@ func (r *ConnectorsRoutes) createGeneration(gctx *gin.Context) {
 		}
 	}
 
-	result, err := r.connectors.CreateConnectorVersion(ctx, connectorId, req)
+	result, err := r.connectors.CreateConnectorGeneration(ctx, connectorId, req)
 	if err != nil {
 		if errors.Is(err, core.ErrDraftAlreadyExists) {
 			apgin.WriteError(gctx, nil, httperr.Conflict("a draft generation already exists for this connector"))
@@ -706,7 +706,7 @@ func (r *ConnectorsRoutes) updateGeneration(gctx *gin.Context) {
 		return
 	}
 
-	existing, err := r.connectors.GetConnectorVersion(ctx, connectorId, generation)
+	existing, err := r.connectors.GetConnectorGeneration(ctx, connectorId, generation)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
 			apgin.WriteError(gctx, nil, httperr.NotFoundf("connector generation '%s:%d' not found", connectorId, generation))
@@ -723,13 +723,13 @@ func (r *ConnectorsRoutes) updateGeneration(gctx *gin.Context) {
 		return
 	}
 
-	if existing.GetState() != database.ConnectorDefinitionVersionStateDraft {
+	if existing.GetState() != database.ConnectorGenerationStateDraft {
 		apgin.WriteError(gctx, nil, httperr.Conflictf("connector generation '%s:%d' is not a draft", connectorId, generation))
 		val.MarkErrorReturn()
 		return
 	}
 
-	result, err := r.connectors.UpdateConnectorVersion(ctx, connectorId, generation, &req)
+	result, err := r.connectors.UpdateConnectorGeneration(ctx, connectorId, generation, &req)
 	if err != nil {
 		if errors.Is(err, core.ErrNotDraft) {
 			apgin.WriteError(gctx, nil, httperr.Conflictf("connector generation '%s:%d' is not a draft", connectorId, generation))
@@ -793,14 +793,14 @@ func (r *ConnectorsRoutes) forceGenerationState(gctx *gin.Context) {
 		return
 	}
 
-	state := database.ConnectorDefinitionVersionState(req.Spec.State)
-	if !database.IsValidConnectorDefinitionVersionState(state) {
+	state := database.ConnectorGenerationState(req.Spec.State)
+	if !database.IsValidConnectorGenerationState(state) {
 		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid connector generation state '%s'", req.Spec.State))
 		val.MarkErrorReturn()
 		return
 	}
 
-	c, err := r.connectors.GetConnectorVersion(ctx, connectorId, generation)
+	c, err := r.connectors.GetConnectorGeneration(ctx, connectorId, generation)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
 			apgin.WriteError(gctx, nil, httperr.NotFoundf("connector generation '%s:%d' not found", connectorId, generation))

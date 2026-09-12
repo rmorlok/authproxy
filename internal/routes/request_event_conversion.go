@@ -61,7 +61,7 @@ func requestEventToJSON(
 			ConnectorRef: requestEventResourceReference(
 				connectorschema.ConnectorKind,
 				record.ConnectorId,
-				record.ConnectorVersion,
+				record.ConnectorGeneration,
 				systemLabels,
 				record.Namespace,
 			),

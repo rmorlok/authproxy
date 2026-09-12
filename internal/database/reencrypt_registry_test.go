@@ -26,7 +26,7 @@ func TestReEncryptRegistry(t *testing.T) {
 		}
 		require.True(t, tableNames[ActorTable])
 		require.True(t, tableNames[ConnectionsTable])
-		require.True(t, tableNames[ConnectorDefinitionVersionsTable])
+		require.True(t, tableNames[ConnectorGenerationsTable])
 		require.True(t, tableNames[ConnectionCredentialsTable])
 		require.True(t, tableNames[OAuth2TokensTable])
 		require.False(t, tableNames[KeysTable])
@@ -126,10 +126,10 @@ func TestReEncryptRegistry(t *testing.T) {
 
 		// Create connection in root namespace
 		connId := apid.New(apid.PrefixConnection)
-		connectorId := apid.New(apid.PrefixConnectorVersion)
+		connectorId := apid.New(apid.PrefixConnector)
 		nowStr := now.Format(time.RFC3339)
 		_, err = rawDb.Exec(fmt.Sprintf(
-			`INSERT INTO connections (id, name, namespace, state, connector_id, connector_version, created_at, updated_at) VALUES ('%s', '%s', 'root', 'ready', '%s', 1, '%s', '%s')`,
+			`INSERT INTO connections (id, name, namespace, state, connector_id, connector_generation, created_at, updated_at) VALUES ('%s', '%s', 'root', 'ready', '%s', 1, '%s', '%s')`,
 			string(connId), string(connId), string(connectorId), nowStr, nowStr,
 		))
 		require.NoError(t, err)
@@ -168,10 +168,10 @@ func TestReEncryptRegistry(t *testing.T) {
 		require.NoError(t, err)
 
 		connId := apid.New(apid.PrefixConnection)
-		connectorId := apid.New(apid.PrefixConnectorVersion)
+		connectorId := apid.New(apid.PrefixConnector)
 		nowStr := now.Format(time.RFC3339)
 		_, err = rawDb.Exec(fmt.Sprintf(
-			`INSERT INTO connections (id, name, namespace, state, connector_id, connector_version, created_at, updated_at) VALUES ('%s', '%s', 'root', 'ready', '%s', 1, '%s', '%s')`,
+			`INSERT INTO connections (id, name, namespace, state, connector_id, connector_generation, created_at, updated_at) VALUES ('%s', '%s', 'root', 'ready', '%s', 1, '%s', '%s')`,
 			string(connId), string(connId), string(connectorId), nowStr, nowStr,
 		))
 		require.NoError(t, err)
@@ -215,10 +215,10 @@ func TestReEncryptRegistry(t *testing.T) {
 		require.NoError(t, err)
 
 		connId := apid.New(apid.PrefixConnection)
-		connectorId := apid.New(apid.PrefixConnectorVersion)
+		connectorId := apid.New(apid.PrefixConnector)
 		nowStr := now.Format(time.RFC3339)
 		_, err = rawDb.Exec(fmt.Sprintf(
-			`INSERT INTO connections (id, name, namespace, state, connector_id, connector_version, created_at, updated_at) VALUES ('%s', '%s', 'root', 'ready', '%s', 1, '%s', '%s')`,
+			`INSERT INTO connections (id, name, namespace, state, connector_id, connector_generation, created_at, updated_at) VALUES ('%s', '%s', 'root', 'ready', '%s', 1, '%s', '%s')`,
 			string(connId), string(connId), string(connectorId), nowStr, nowStr,
 		))
 		require.NoError(t, err)
@@ -244,7 +244,7 @@ func TestReEncryptRegistry(t *testing.T) {
 		require.True(t, found, "oauth2 token should resolve namespace via connections JOIN")
 	})
 
-	t.Run("connector definition version public row ID", func(t *testing.T) {
+	t.Run("connector generation public row ID", func(t *testing.T) {
 		_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
 		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
@@ -255,23 +255,23 @@ func TestReEncryptRegistry(t *testing.T) {
 		_, err := rawDb.Exec(fmt.Sprintf(`UPDATE namespaces SET target_data_encryption_key_id = '%s' WHERE path = 'root'`, string(targetEKVId)))
 		require.NoError(t, err)
 
-		cvId := apid.New(apid.PrefixConnectorVersion)
+		cvId := apid.New(apid.PrefixConnector)
 		cv := &ConnectorWithDefinition{
 			Id:                  cvId,
-			Version:             1,
+			Generation:          1,
 			Namespace:           "root",
-			State:               ConnectorDefinitionVersionStateDraft,
+			State:               ConnectorGenerationStateDraft,
 			EncryptedDefinition: encfield.EncryptedField{ID: oldEKVId, Data: "ZGVm"},
 			Labels:              Labels{},
 		}
-		err = db.UpsertConnectorDefinitionVersion(ctx, cv)
+		err = db.UpsertConnectorGeneration(ctx, cv)
 		require.NoError(t, err)
 
 		var cvTargets []ReEncryptionTarget
 		err = db.EnumerateFieldsRequiringReEncryption(ctx, func(targets []ReEncryptionTarget, lastPage bool) (keepGoing pagination.KeepGoing, err error) {
 			for _, tgt := range targets {
-				if tgt.Table == ConnectorDefinitionVersionsTable {
-					if id, ok := tgt.PrimaryKeyValues[0].(string); ok && apid.ID(id) == cv.DefinitionVersionId {
+				if tgt.Table == ConnectorGenerationsTable {
+					if id, ok := tgt.PrimaryKeyValues[0].(string); ok && apid.ID(id) == cv.DefinitionGenerationId {
 						cvTargets = append(cvTargets, tgt)
 					}
 				}
@@ -281,13 +281,13 @@ func TestReEncryptRegistry(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, cvTargets, 1)
 		require.Len(t, cvTargets[0].PrimaryKeyValues, 1)
-		require.Equal(t, apid.PrefixConnectorDefinitionVersion, cv.DefinitionVersionId.Prefix())
+		require.Equal(t, apid.PrefixConnectorGeneration, cv.DefinitionGenerationId.Prefix())
 
 		require.NoError(t, db.DeleteConnector(ctx, cvId))
 		cvTargets = nil
 		err = db.EnumerateFieldsRequiringReEncryption(ctx, func(targets []ReEncryptionTarget, lastPage bool) (keepGoing pagination.KeepGoing, err error) {
 			for _, tgt := range targets {
-				if tgt.Table == ConnectorDefinitionVersionsTable {
+				if tgt.Table == ConnectorGenerationsTable {
 					cvTargets = append(cvTargets, tgt)
 				}
 			}

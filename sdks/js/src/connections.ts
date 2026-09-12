@@ -9,7 +9,7 @@ import {
   ObjectReference,
   ResourceList,
   TypeMeta,
-  VersionedConnectorReference,
+  ConnectorGenerationReference,
   actionRequest,
   objectReference,
 } from './common';
@@ -38,7 +38,7 @@ export interface ConnectionMetadata extends ObjectMetadata {
 }
 
 export interface ConnectionSpec {
-  connectorRef: VersionedConnectorReference;
+  connectorRef: ConnectorGenerationReference;
   /** Connector-defined desired configuration. Auth credentials are stored separately. */
   configuration?: Record<string, unknown>;
 }
@@ -91,7 +91,7 @@ export const CONNECTION_SETUP_CANCEL_KIND = 'ConnectionSetupCancel' as const;
 export const CONNECTION_SETUP_RETRY_KIND = 'ConnectionSetupRetry' as const;
 export const CONNECTION_REAUTHENTICATE_KIND = 'ConnectionReauthenticate' as const;
 export const CONNECTION_DISCONNECT_KIND = 'ConnectionDisconnect' as const;
-export const CONNECTION_VERSION_MIGRATION_KIND = 'ConnectionVersionMigration' as const;
+export const CONNECTION_GENERATION_MIGRATION_KIND = 'ConnectionGenerationMigration' as const;
 export const CONNECTION_FORCE_STATE_KIND = 'ConnectionForceState' as const;
 
 export interface ConnectionInitiateSpec {
@@ -266,27 +266,27 @@ export type ConnectionDisconnectResponse = ActionResponse<
   ConnectionDisconnectStatus
 >;
 
-export interface ConnectionVersionMigrationSpec {
-  connectorRef: VersionedConnectorReference;
+export interface ConnectionGenerationMigrationSpec {
+  connectorRef: ConnectorGenerationReference;
   timeoutSeconds?: number;
 }
 
-export interface ConnectionVersionMigrationStatus {
+export interface ConnectionGenerationMigrationStatus {
   taskId: string;
-  sourceConnectorRef: VersionedConnectorReference;
-  targetConnectorRef: VersionedConnectorReference;
+  sourceConnectorRef: ConnectorGenerationReference;
+  targetConnectorRef: ConnectorGenerationReference;
 }
 
-export type ConnectionVersionMigrationRequest = ActionRequest<
-  typeof CONNECTION_VERSION_MIGRATION_KIND,
+export type ConnectionGenerationMigrationRequest = ActionRequest<
+  typeof CONNECTION_GENERATION_MIGRATION_KIND,
   typeof CONNECTION_KIND,
-  ConnectionVersionMigrationSpec
+  ConnectionGenerationMigrationSpec
 >;
-export type ConnectionVersionMigrationResponse = ActionResponse<
-  typeof CONNECTION_VERSION_MIGRATION_KIND,
+export type ConnectionGenerationMigrationResponse = ActionResponse<
+  typeof CONNECTION_GENERATION_MIGRATION_KIND,
   typeof CONNECTION_KIND,
-  ConnectionVersionMigrationSpec,
-  ConnectionVersionMigrationStatus
+  ConnectionGenerationMigrationSpec,
+  ConnectionGenerationMigrationStatus
 >;
 
 export interface ConnectionForceStateSpec {
@@ -385,14 +385,14 @@ export const disconnectConnection = (id: string, spec: ConnectionDisconnectSpec 
   );
 };
 
-export const migrateConnectionVersion = (id: string, spec: ConnectionVersionMigrationSpec) => {
-  const request: ConnectionVersionMigrationRequest = actionRequest(
-    CONNECTION_VERSION_MIGRATION_KIND,
+export const migrateConnectionGeneration = (id: string, spec: ConnectionGenerationMigrationSpec) => {
+  const request: ConnectionGenerationMigrationRequest = actionRequest(
+    CONNECTION_GENERATION_MIGRATION_KIND,
     connectionTarget(id),
     spec,
   );
-  return client.post<ConnectionVersionMigrationResponse>(
-    `/api/v1/connections/${id}/_migrateVersion`,
+  return client.post<ConnectionGenerationMigrationResponse>(
+    `/api/v1/connections/${id}/_migrateGeneration`,
     request,
   );
 };
@@ -471,7 +471,7 @@ export const connections = {
   initiate: initiateConnection,
   submit: submitConnection,
   disconnect: disconnectConnection,
-  migrateVersion: migrateConnectionVersion,
+  migrateGeneration: migrateConnectionGeneration,
   abort: abortConnection,
   forceState: forceConnectionState,
   update: updateConnection,

@@ -18,8 +18,8 @@ type ListConnectorsBuilder interface {
 	ListConnectorsExecutor
 	Limit(int32) ListConnectorsBuilder
 	ForId(apid.ID) ListConnectorsBuilder
-	ForState(database.ConnectorDefinitionVersionState) ListConnectorsBuilder
-	ForStates([]database.ConnectorDefinitionVersionState) ListConnectorsBuilder
+	ForState(database.ConnectorGenerationState) ListConnectorsBuilder
+	ForStates([]database.ConnectorGenerationState) ListConnectorsBuilder
 	ForNamespaceMatcher(string) ListConnectorsBuilder
 	ForNamespaceMatchers([]string) ListConnectorsBuilder
 	ForName(name common.ResourceName) ListConnectorsBuilder

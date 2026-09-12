@@ -40,7 +40,7 @@ func TestNotifications(t *testing.T) {
 			connID.String(),
 		),
 		Metadata: map[string]any{
-			"target_version": float64(2),
+			"target_generation": float64(2),
 		},
 	})
 	require.NoError(t, err)

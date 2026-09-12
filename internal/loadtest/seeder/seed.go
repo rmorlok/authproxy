@@ -46,7 +46,7 @@ type Result struct {
 	ProviderBaseURL           string             `json:"providerBaseUrl"`
 	BaseNamespace             string             `json:"baseNamespace"`
 	ConnectorID               apid.ID            `json:"connectorId"`
-	ConnectorVersion          uint64             `json:"connectorVersion"`
+	ConnectorGeneration       uint64             `json:"connectorGeneration"`
 	RequestedTenantNamespaces int                `json:"requestedTenantNamespaces"`
 	RequestedConnections      int                `json:"requestedConnections"`
 	RequestedStaleSetups      int                `json:"requestedStaleSetupConnections"`
@@ -84,7 +84,7 @@ type ConnectionRecord struct {
 	Namespace            string    `json:"namespace"`
 	ActorID              apid.ID   `json:"actorId"`
 	ConnectorID          apid.ID   `json:"connectorId"`
-	ConnectorVersion     uint64    `json:"connectorVersion"`
+	ConnectorGeneration  uint64    `json:"connectorGeneration"`
 	RefreshToken         string    `json:"refreshToken"`
 	AccessToken          string    `json:"accessToken"`
 	AccessTokenExpiresAt time.Time `json:"accessTokenExpiresAt"`
@@ -147,7 +147,7 @@ func Seed(ctx context.Context, opts Options) (*Result, error) {
 	slug := slugForID(opts.Profile.Name)
 	baseNamespace := nschema.PathFromRoot("loadtest", slugForNamespace(opts.Profile.Name))
 	connectorID := apid.ID(fmt.Sprintf("%slt_%s_oauth2", apid.PrefixConnector, slug))
-	connectorVersion := uint64(1)
+	connectorGeneration := uint64(1)
 	tenantCount := opts.Profile.TenantNamespaceCount()
 	connectionCount := opts.Profile.Objects.Connections
 	probeEnabledCount := percentCount(connectionCount, periodicProbePercent)
@@ -158,7 +158,7 @@ func Seed(ctx context.Context, opts Options) (*Result, error) {
 		ProviderBaseURL:           providerBaseURL,
 		BaseNamespace:             baseNamespace,
 		ConnectorID:               connectorID,
-		ConnectorVersion:          connectorVersion,
+		ConnectorGeneration:       connectorGeneration,
 		RequestedTenantNamespaces: tenantCount,
 		RequestedConnections:      connectionCount,
 		RequestedStaleSetups:      staleSetupConnections,
@@ -234,22 +234,22 @@ func Seed(ctx context.Context, opts Options) (*Result, error) {
 		return nil, fmt.Errorf("encrypt connector definition: %w", err)
 	}
 	connectorHash := connectorDef.Hash()
-	existingConnector, err := opts.DB.GetConnectorDefinitionVersion(ctx, connectorID, connectorVersion)
+	existingConnector, err := opts.DB.GetConnectorGeneration(ctx, connectorID, connectorGeneration)
 	if err != nil && !errors.Is(err, database.ErrNotFound) {
-		return nil, fmt.Errorf("get connector version: %w", err)
+		return nil, fmt.Errorf("get connector generation: %w", err)
 	}
 	if existingConnector != nil {
 		existingDefinition, decryptErr := opts.Encrypt.DecryptString(ctx, existingConnector.EncryptedDefinition)
 		if decryptErr != nil {
-			return nil, fmt.Errorf("decrypt existing connector version: %w", decryptErr)
+			return nil, fmt.Errorf("decrypt existing connector generation: %w", decryptErr)
 		}
 		var existingConnectorDefinition cschema.ConnectorDefinition
 		if err := json.Unmarshal([]byte(existingDefinition), &existingConnectorDefinition); err != nil {
-			return nil, fmt.Errorf("decode existing connector version: %w", err)
+			return nil, fmt.Errorf("decode existing connector generation: %w", err)
 		}
 		existingHash := existingConnectorDefinition.Hash()
 		if existingHash != connectorHash {
-			return nil, fmt.Errorf("connector %s:%d already exists with a different hash", connectorID, connectorVersion)
+			return nil, fmt.Errorf("connector %s:%d already exists with a different hash", connectorID, connectorGeneration)
 		}
 	}
 	if opts.ProviderClientBootstrap {
@@ -259,11 +259,11 @@ func Seed(ctx context.Context, opts Options) (*Result, error) {
 		}
 	}
 	if existingConnector == nil {
-		err = opts.DB.UpsertConnectorDefinitionVersion(ctx, &database.ConnectorWithDefinition{
+		err = opts.DB.UpsertConnectorGeneration(ctx, &database.ConnectorWithDefinition{
 			Id:                  connectorID,
-			Version:             connectorVersion,
+			Generation:          connectorGeneration,
 			Namespace:           baseNamespace,
-			State:               database.ConnectorDefinitionVersionStatePrimary,
+			State:               database.ConnectorGenerationStatePrimary,
 			EncryptedDefinition: encryptedDefinition,
 			Labels:              baseLabels(opts.Profile.Name),
 			Annotations: database.Annotations{
@@ -272,7 +272,7 @@ func Seed(ctx context.Context, opts Options) (*Result, error) {
 		})
 	}
 	if err != nil {
-		return nil, fmt.Errorf("upsert connector version: %w", err)
+		return nil, fmt.Errorf("upsert connector generation: %w", err)
 	}
 
 	if connectionCount > 0 && len(tenantNamespaces) == 0 {
@@ -294,13 +294,13 @@ func Seed(ctx context.Context, opts Options) (*Result, error) {
 		}
 
 		connection := &database.Connection{
-			Id:               connectionID,
-			Namespace:        ns,
-			State:            database.ConnectionStateConfigured,
-			HealthState:      database.ConnectionHealthStateHealthy,
-			ConnectorId:      connectorID,
-			ConnectorVersion: connectorVersion,
-			Labels:           connectionLabels(opts.Profile.Name, i, probeEnabled),
+			Id:                  connectionID,
+			Namespace:           ns,
+			State:               database.ConnectionStateConfigured,
+			HealthState:         database.ConnectionHealthStateHealthy,
+			ConnectorId:         connectorID,
+			ConnectorGeneration: connectorGeneration,
+			Labels:              connectionLabels(opts.Profile.Name, i, probeEnabled),
 			Annotations: database.Annotations{
 				"loadtest.authproxy.io/generated-by": "loadtest-seeder",
 			},
@@ -355,7 +355,7 @@ func Seed(ctx context.Context, opts Options) (*Result, error) {
 			Namespace:            ns,
 			ActorID:              actor.ActorID,
 			ConnectorID:          connectorID,
-			ConnectorVersion:     connectorVersion,
+			ConnectorGeneration:  connectorGeneration,
 			RefreshToken:         refreshToken,
 			AccessToken:          accessToken,
 			AccessTokenExpiresAt: expiresAt,
@@ -377,14 +377,14 @@ func Seed(ctx context.Context, opts Options) (*Result, error) {
 		connectionID := apid.ID(fmt.Sprintf("%slt_%s_stale_%09d", apid.PrefixConnection, slug, i))
 		setupStep := cschema.MustNewSetupStep("loadtest_stale_setup")
 		connection := &database.Connection{
-			Id:               connectionID,
-			Namespace:        ns,
-			State:            database.ConnectionStateSetup,
-			HealthState:      database.ConnectionHealthStateHealthy,
-			ConnectorId:      connectorID,
-			ConnectorVersion: connectorVersion,
-			SetupStep:        &setupStep,
-			Labels:           staleSetupConnectionLabels(opts.Profile.Name, i),
+			Id:                  connectionID,
+			Namespace:           ns,
+			State:               database.ConnectionStateSetup,
+			HealthState:         database.ConnectionHealthStateHealthy,
+			ConnectorId:         connectorID,
+			ConnectorGeneration: connectorGeneration,
+			SetupStep:           &setupStep,
+			Labels:              staleSetupConnectionLabels(opts.Profile.Name, i),
 			Annotations: database.Annotations{
 				"loadtest.authproxy.io/generated-by": "loadtest-seeder",
 				"loadtest.authproxy.io/scenario":     "stale-setup-cleanup",
@@ -409,12 +409,12 @@ func Seed(ctx context.Context, opts Options) (*Result, error) {
 			result.ExistingStaleSetups++
 		}
 		result.StaleSetups = append(result.StaleSetups, ConnectionRecord{
-			ConnectionID:     connectionID,
-			Namespace:        ns,
-			ActorID:          actor.ActorID,
-			ConnectorID:      connectorID,
-			ConnectorVersion: connectorVersion,
-			ProbeEnabled:     false,
+			ConnectionID:        connectionID,
+			Namespace:           ns,
+			ActorID:             actor.ActorID,
+			ConnectorID:         connectorID,
+			ConnectorGeneration: connectorGeneration,
+			ProbeEnabled:        false,
 		})
 
 		if i%progressEvery == 0 {

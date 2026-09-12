@@ -353,7 +353,7 @@ type OAuth2StateForTest struct {
 	ConnectionNamespace    string                `json:"connectionNamespace,omitempty"`
 	ActorId                apid.ID               `json:"actorId"`
 	ConnectorId            apid.ID               `json:"connectorId"`
-	ConnectorVersion       uint64                `json:"connectorVersion"`
+	ConnectorGeneration    uint64                `json:"connectorGeneration"`
 	ConnectionId           apid.ID               `json:"connectionId"`
 	ReturnToUrl            string                `json:"returnToUrl"`
 	CancelSessionAfterAuth bool                  `json:"cancelSessionAfterAuth"`

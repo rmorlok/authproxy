@@ -55,7 +55,7 @@ func smokeAdminPermissions(adminExternalID, userExternalID, connectionNamespace 
 		{
 			Namespace: demoConnectorNamespace,
 			Resources: []string{"connectors"},
-			Verbs:     []string{"list", "list/versions"},
+			Verbs:     []string{"list", "list/generations"},
 		},
 		{
 			Namespace: smokeConnectorNamespace,
@@ -196,7 +196,7 @@ func cloneSeededConnectorsIntoSmokeNamespace(
 	runID := fmt.Sprintf("%d", suffix)
 	const runLabel = "smoke.authproxy.net/run-id"
 	for i, source := range sources {
-		detailed := rig.GetConnectorVersionAsAdmin(t, source.GetId(), source.Metadata.Generation)
+		detailed := rig.GetConnectorGenerationAsAdmin(t, source.GetId(), source.Metadata.Generation)
 		resource := cschema.NewConnector()
 		resource.Metadata.Name = common.ResourceName(fmt.Sprintf("%s-smoke-%d-%d", source.Metadata.Name, suffix, i))
 		resource.Spec.Definition = detailed.Spec.Definition
@@ -218,9 +218,9 @@ func cloneSeededConnectorsIntoSmokeNamespace(
 		labels["smoke"] = "true"
 		labels[runLabel] = runID
 		created := rig.CreateConnectorWithLabels(t, *resource, labels)
-		rig.ForceConnectorVersionState(t, created.GetId(), created.Metadata.Generation, cschema.ConnectorReleaseStatePrimary)
+		rig.ForceConnectorGenerationState(t, created.GetId(), created.Metadata.Generation, cschema.ConnectorReleaseStatePrimary)
 		t.Cleanup(func() {
-			rig.ForceConnectorVersionState(t, created.GetId(), created.Metadata.Generation, cschema.ConnectorReleaseStateArchived)
+			rig.ForceConnectorGenerationState(t, created.GetId(), created.Metadata.Generation, cschema.ConnectorReleaseStateArchived)
 		})
 	}
 	return runLabel + "=" + runID
@@ -267,9 +267,9 @@ func TestRemoteOAuth2ProxySmoke(t *testing.T) {
 	})
 	created := rig.CreateConnector(t, connector)
 	require.Equal(t, uint64(1), created.Metadata.Generation)
-	rig.ForceConnectorVersionState(t, created.GetId(), created.Metadata.Generation, cschema.ConnectorReleaseStatePrimary)
+	rig.ForceConnectorGenerationState(t, created.GetId(), created.Metadata.Generation, cschema.ConnectorReleaseStatePrimary)
 	t.Cleanup(func() {
-		rig.ForceConnectorVersionState(t, created.GetId(), created.Metadata.Generation, cschema.ConnectorReleaseStateArchived)
+		rig.ForceConnectorGenerationState(t, created.GetId(), created.Metadata.Generation, cschema.ConnectorReleaseStateArchived)
 	})
 
 	connectionID, redirectURL := rig.InitiateOAuth2Connection(t, created.GetId(), rig.PublicURL+"/connections")

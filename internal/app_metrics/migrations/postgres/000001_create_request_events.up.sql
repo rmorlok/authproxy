@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS app_metrics_request_events (
     duration_ms BIGINT NOT NULL DEFAULT 0,
     connection_id TEXT NOT NULL DEFAULT '',
     connector_id TEXT NOT NULL DEFAULT '',
-    connector_version BIGINT NOT NULL DEFAULT 0,
+    connector_generation BIGINT NOT NULL DEFAULT 0,
     method TEXT NOT NULL DEFAULT '',
     host TEXT NOT NULL DEFAULT '',
     scheme TEXT NOT NULL DEFAULT '',

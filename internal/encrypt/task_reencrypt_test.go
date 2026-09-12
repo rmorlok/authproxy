@@ -119,10 +119,10 @@ func (env *reencryptTestEnv) encryptWithV1(t *testing.T, plaintext []byte) encfi
 func (env *reencryptTestEnv) createConnection(t *testing.T, namespace string) apid.ID {
 	t.Helper()
 	connId := apid.New(apid.PrefixConnection)
-	connectorId := apid.New(apid.PrefixConnectorVersion)
+	connectorId := apid.New(apid.PrefixConnector)
 	now := apctx.GetClock(env.ctx).Now().Format(time.RFC3339)
 	_, err := env.rawDb.Exec(fmt.Sprintf(
-		`INSERT INTO connections (id, name, namespace, state, connector_id, connector_version, created_at, updated_at) VALUES ('%s', '%s', '%s', 'ready', '%s', 1, '%s', '%s')`,
+		`INSERT INTO connections (id, name, namespace, state, connector_id, connector_generation, created_at, updated_at) VALUES ('%s', '%s', '%s', 'ready', '%s', 1, '%s', '%s')`,
 		string(connId), string(connId), namespace, string(connectorId), now, now,
 	))
 	require.NoError(t, err)

@@ -26,8 +26,7 @@ const updatedConnectorDefinition = `{
 }`
 
 // TestAccConnector_publishTrue tests: create with publish=true -> generation 1 is primary,
-// then update definition -> generation 2 is primary. The provider retains its
-// established `version` HCL name while mapping it to API metadata.generation.
+// then update definition -> generation 2 is primary.
 func TestAccConnector_publishTrue(t *testing.T) {
 	env := testSetup(t)
 	providerCfg := testProviderConfig(env)
@@ -56,14 +55,14 @@ resource "authproxy_connector" "test" {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("authproxy_connector.test", "id"),
 					resource.TestCheckResourceAttr("authproxy_connector.test", "namespace", "root.tf-test-connector"),
-					resource.TestCheckResourceAttr("authproxy_connector.test", "version", "1"),
+					resource.TestCheckResourceAttr("authproxy_connector.test", "generation", "1"),
 					resource.TestCheckResourceAttr("authproxy_connector.test", "state", "primary"),
 					resource.TestCheckResourceAttr("authproxy_connector.test", "publish", "true"),
 					resource.TestCheckResourceAttrSet("authproxy_connector.test", "display_name"),
 					resource.TestCheckResourceAttrSet("authproxy_connector.test", "created_at"),
 				),
 			},
-			// Step 2: Update definition -> new version 2 becomes primary
+			// Step 2: Update definition -> new generation 2 becomes primary
 			{
 				Config: providerCfg + `
 resource "authproxy_namespace" "test" {
@@ -82,7 +81,7 @@ resource "authproxy_connector" "test" {
 }
 `,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("authproxy_connector.test", "version", "2"),
+					resource.TestCheckResourceAttr("authproxy_connector.test", "generation", "2"),
 					resource.TestCheckResourceAttr("authproxy_connector.test", "state", "primary"),
 				),
 			},
@@ -118,7 +117,7 @@ resource "authproxy_connector" "test" {
 `,
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("authproxy_connector.test", "id"),
-					resource.TestCheckResourceAttr("authproxy_connector.test", "version", "1"),
+					resource.TestCheckResourceAttr("authproxy_connector.test", "generation", "1"),
 					resource.TestCheckResourceAttr("authproxy_connector.test", "state", "draft"),
 					resource.TestCheckResourceAttr("authproxy_connector.test", "publish", "false"),
 				),
@@ -142,7 +141,7 @@ resource "authproxy_connector" "test" {
 }
 `,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("authproxy_connector.test", "version", "1"),
+					resource.TestCheckResourceAttr("authproxy_connector.test", "generation", "1"),
 					resource.TestCheckResourceAttr("authproxy_connector.test", "state", "draft"),
 					resource.TestCheckResourceAttr("authproxy_connector.test", "display_name", "Draft Connector Updated"),
 				),
@@ -270,7 +269,7 @@ resource "authproxy_connector" "test" {
 					resource.TestCheckResourceAttr("authproxy_connector.test", "labels.env", "production"),
 					resource.TestCheckResourceAttr("authproxy_connector.test", "labels.team", "platform"),
 					// Resource metadata changes do not manufacture a new generation.
-					resource.TestCheckResourceAttr("authproxy_connector.test", "version", "1"),
+					resource.TestCheckResourceAttr("authproxy_connector.test", "generation", "1"),
 					resource.TestCheckResourceAttr("authproxy_connector.test", "state", "primary"),
 				),
 			},

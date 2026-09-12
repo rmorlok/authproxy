@@ -50,8 +50,8 @@ export const columns: GridColDef<Connector>[] = [
         valueGetter: (_, row) => row.metadata.id,
     },
     {
-        field: 'version',
-        headerName: 'Version',
+        field: 'generation',
+        headerName: 'Generation',
         flex: 0.4,
         minWidth: 70,
         sortable: true,

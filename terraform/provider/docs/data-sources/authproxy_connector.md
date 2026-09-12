@@ -17,8 +17,8 @@ data "authproxy_connector" "gmail" {
 ## Attribute Reference
 
 - `namespace` - The namespace.
-- `version` - The selected connector generation (`metadata.generation`).
-- `state` - The current version state.
+- `generation` - The selected connector generation (`metadata.generation`).
+- `state` - The current generation state.
 - `display_name` - The display name.
 - `description` - The description.
 - `logo` - The public URL or data URL from `spec.definition.logo`.

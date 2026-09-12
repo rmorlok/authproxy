@@ -48,8 +48,8 @@ tenancy model.
    namespace paths.
 2. **Provision actors.** Map host identities to AuthProxy actors and assign the
    minimum namespace permissions they require.
-3. **Publish connectors.** Operators manage connector definitions and versions;
-   application users consume the primary versions.
+3. **Publish connectors.** Operators manage connector definitions and generations;
+   application users consume the primary generations.
 4. **Add the Marketplace entry point.** The host authenticates the user and
    performs the one-time JWT handoff described in [Marketplace
    integration](/integration/marketplace/).
@@ -70,7 +70,7 @@ Keep reusable provider behavior in the connector:
 - API-key placement
 - setup forms and provider redirects
 - health probes and connector-specific 429 handling
-- version migration hooks that adapt stored connection configuration
+- generation migration hooks that adapt stored connection configuration
 
 Keep product behavior in the host:
 
@@ -89,8 +89,8 @@ predicates](/integration/connector-predicates/). Full setup-flow authoring is co
   resources and request events to host entities.
 - Use [application metrics](/operations/app-metrics/) for request-event
   queries and dashboards.
-- Use [connector version migrations](/operations/connector-version-migrations/)
-  when a new connector version requires stored connection data, labels, or user
+- Use [connector generation migrations](/operations/connector-generation-migrations/)
+  when a new connector generation requires stored connection data, labels, or user
   action to change.
 - Use [telemetry](/operations/telemetry/) for infrastructure traces,
   metrics, and logs.

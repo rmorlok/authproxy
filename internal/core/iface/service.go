@@ -21,7 +21,7 @@ import (
 	apworkflows "github.com/rmorlok/authproxy/internal/workflows"
 )
 
-type ConnectorVersionId = database.ConnectorDefinitionVersionId
+type ConnectorGenerationId = database.ConnectorGenerationId
 
 type ConnectorLifecycleOptions struct {
 	Timeout time.Duration
@@ -32,15 +32,15 @@ type ConnectionDisconnectOptions struct {
 }
 
 type ConnectionMigrationOptions struct {
-	TargetVersion uint64
-	Timeout       time.Duration
+	TargetGeneration uint64
+	Timeout          time.Duration
 }
 
 type ConnectionMigrationTask struct {
-	TaskInfo      *tasks.TaskInfo
-	ConnectionID  apid.ID
-	SourceVersion uint64
-	TargetVersion uint64
+	TaskInfo         *tasks.TaskInfo
+	ConnectionID     apid.ID
+	SourceGeneration uint64
+	TargetGeneration uint64
 }
 
 type ActorNotification struct {
@@ -66,7 +66,7 @@ type C interface {
 	// It checks if the connector already exists in the database:
 	// - If it doesn't exist, it creates a new one
 	// - If it exists and the data matches, it does nothing
-	// - If it exists and the data has changed, it creates a new version
+	// - If it exists and the data has changed, it creates a new generation
 	MigrateConnectors(ctx context.Context) error
 
 	/*
@@ -80,7 +80,7 @@ type C interface {
 	ResolveConnectionReference(ctx context.Context, reference meta.ObjectReference) (Connection, error)
 
 	// ResolveConnectorReference resolves and hydrates a Connector. An explicit
-	// generation selects that definition version; otherwise the primary version
+	// generation selects that definition generation; otherwise the primary generation
 	// is returned.
 	ResolveConnectorReference(ctx context.Context, reference meta.ObjectReference) (Connector, error)
 
@@ -101,25 +101,25 @@ type C interface {
 	 *
 	 */
 
-	// GetConnectorVersion returns the specified version of a connector.
-	GetConnectorVersion(
+	// GetConnectorGeneration returns the specified generation of a connector.
+	GetConnectorGeneration(
 		ctx context.Context,
 		id apid.ID,
-		version uint64,
+		generation uint64,
 	) (Connector, error)
 
-	// GetConnectorVersions Retrieves multiple connector versions at once.
-	GetConnectorVersions(
+	// GetConnectorGenerations Retrieves multiple connector generations at once.
+	GetConnectorGenerations(
 		ctx context.Context,
-		requested []ConnectorVersionId,
-	) (map[ConnectorVersionId]Connector, error)
+		requested []ConnectorGenerationId,
+	) (map[ConnectorGenerationId]Connector, error)
 
-	// GetConnectorVersionForState returns the most recent version of the
+	// GetConnectorGenerationForState returns the most recent generation of the
 	// connector for the specified state.
-	GetConnectorVersionForState(
+	GetConnectorGenerationForState(
 		ctx context.Context,
 		id apid.ID,
-		state database.ConnectorDefinitionVersionState,
+		state database.ConnectorGenerationState,
 	) (Connector, error)
 
 	// ListConnectorsBuilder returns a builder to allow the caller to list
@@ -133,16 +133,16 @@ type C interface {
 		cursor string,
 	) (ListConnectorsExecutor, error)
 
-	// ListConnectorVersionsBuilder returns a builder to allow the caller to
-	// list connector versions matching certain criteria.
-	ListConnectorVersionsBuilder() ListConnectorVersionsBuilder
+	// ListConnectorGenerationsBuilder returns a builder to allow the caller to
+	// list connector generations matching certain criteria.
+	ListConnectorGenerationsBuilder() ListConnectorGenerationsBuilder
 
-	// ListConnectorVersionsFromCursor continues listing connector versions from
+	// ListConnectorGenerationsFromCursor continues listing connector generations from
 	// a cursor to support pagination.
-	ListConnectorVersionsFromCursor(
+	ListConnectorGenerationsFromCursor(
 		ctx context.Context,
 		cursor string,
-	) (ListConnectorVersionsExecutor, error)
+	) (ListConnectorGenerationsExecutor, error)
 
 	// CreateConnector creates a logical connector and its first generation from
 	// the canonical resource envelope.
@@ -159,34 +159,34 @@ type C interface {
 		patch *cschema.ConnectorPatch,
 	) (Connector, error)
 
-	// CreateConnectorVersion creates the next sequential generation. A nil
+	// CreateConnectorGeneration creates the next sequential generation. A nil
 	// resource clones the newest generation as a draft.
-	CreateConnectorVersion(
+	CreateConnectorGeneration(
 		ctx context.Context,
 		id apid.ID,
 		resource *cschema.Connector,
 	) (Connector, error)
 
-	// UpdateConnectorVersion applies a resource patch to one draft generation.
-	UpdateConnectorVersion(
+	// UpdateConnectorGeneration applies a resource patch to one draft generation.
+	UpdateConnectorGeneration(
 		ctx context.Context,
 		id apid.ID,
-		version uint64,
+		generation uint64,
 		patch *cschema.ConnectorPatch,
 	) (Connector, error)
 
 	// UpdateConnectorName renames a logical connector without changing its
-	// definition-version history.
+	// definition-generation history.
 	UpdateConnectorName(
 		ctx context.Context,
 		id apid.ID,
 		name scommon.ResourceName,
 	) error
 
-	// CreateDraftConnectorVersion creates a new draft version for an existing
-	// connector. Returns ErrDraftAlreadyExists if a draft version already
+	// CreateDraftConnectorGeneration creates a new draft generation for an existing
+	// connector. Returns ErrDraftAlreadyExists if a draft generation already
 	// exists.
-	CreateDraftConnectorVersion(
+	CreateDraftConnectorGeneration(
 		ctx context.Context,
 		id apid.ID,
 		definition *cschema.ConnectorDefinition,
@@ -194,20 +194,20 @@ type C interface {
 		annotations map[string]string,
 	) (Connector, error)
 
-	// UpdateDraftConnectorVersion updates an existing draft version. Returns
-	// ErrNotDraft if the version is not in draft state.
-	UpdateDraftConnectorVersion(
+	// UpdateDraftConnectorGeneration updates an existing draft generation. Returns
+	// ErrNotDraft if the generation is not in draft state.
+	UpdateDraftConnectorGeneration(
 		ctx context.Context,
 		id apid.ID,
-		version uint64,
+		generation uint64,
 		definition *cschema.ConnectorDefinition,
 		labels map[string]string,
 		annotations map[string]string,
 	) (Connector, error)
 
-	// GetOrCreateDraftConnectorVersion returns the existing draft version, or
-	// creates a new one by cloning the latest version.
-	GetOrCreateDraftConnectorVersion(
+	// GetOrCreateDraftConnectorGeneration returns the existing draft generation, or
+	// creates a new one by cloning the latest generation.
+	GetOrCreateDraftConnectorGeneration(
 		ctx context.Context,
 		id apid.ID,
 	) (Connector, error)
@@ -242,9 +242,9 @@ type C interface {
 		opts ConnectionDisconnectOptions,
 	) (taskInfo *tasks.TaskInfo, err error)
 
-	// MigrateConnectionVersion starts a durable workflow that migrates a single
-	// connection to another version of the same connector.
-	MigrateConnectionVersion(
+	// MigrateConnectionGeneration starts a durable workflow that migrates a single
+	// connection to another generation of the same connector.
+	MigrateConnectionGeneration(
 		ctx context.Context,
 		id apid.ID,
 		opts ConnectionMigrationOptions,
@@ -256,7 +256,7 @@ type C interface {
 	AbortConnection(ctx context.Context, id apid.ID) error
 
 	// GetConnection returns a connection by ID. This connection has the full
-	// connection version details in it.
+	// connection generation details in it.
 	GetConnection(ctx context.Context, id apid.ID) (Connection, error)
 
 	// CreateConnection creates a new connection.

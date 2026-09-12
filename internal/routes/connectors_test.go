@@ -289,7 +289,7 @@ func TestConnectors(t *testing.T) {
 
 		ctrl := gomock.NewController(t)
 		ac := asynqmock.NewMockClient(ctrl)
-		// Connector-version label changes enqueue a propagation task. The
+		// Connector-generation label changes enqueue a propagation task. The
 		// route-level tests are not interested in the asynq side; allow any
 		// number of enqueue calls and let them succeed silently.
 		ac.EXPECT().EnqueueContext(gomock.Any(), gomock.Any()).AnyTimes().Return(nil, nil)
@@ -994,7 +994,7 @@ func TestConnectors(t *testing.T) {
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 					http.MethodGet,
-					"/connectors/cxr_test0000000000001/generations?orderBy=version%20asc",
+					"/connectors/cxr_test0000000000001/generations?orderBy=generation%20asc",
 					nil,
 					"root",
 					"some-actor",
@@ -1012,12 +1012,29 @@ func TestConnectors(t *testing.T) {
 				require.Equal(t, apid.MustParse("cxr_test0000000000001"), resp.Items[0].GetId())
 			})
 
+			t.Run("rejects legacy version sort field", func(t *testing.T) {
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					"/connectors/cxr_test0000000000001/generations?orderBy=version%20asc",
+					nil,
+					"root",
+					"some-actor",
+					aschema.PermissionsSingle("root.**", "connectors", "list/generations"),
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusBadRequest, w.Code)
+				require.JSONEq(t, `{"error":"invalid sort field 'version'"}`, w.Body.String())
+			})
+
 			t.Run("namespace filter", func(t *testing.T) {
 				w := httptest.NewRecorder()
 				// Namespace filter doesn't actually make sense here because generations can't change namespaces.
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 					http.MethodGet,
-					"/connectors/cxr_test0000000000001/generations?orderBy=version%20asc&namespace=root.child",
+					"/connectors/cxr_test0000000000001/generations?orderBy=generation%20asc&namespace=root.child",
 					nil,
 					"root",
 					"some-actor",
@@ -1391,7 +1408,7 @@ func TestConnectors(t *testing.T) {
 		})
 	})
 
-	t.Run("create version", func(t *testing.T) {
+	t.Run("create generation", func(t *testing.T) {
 		connectorId := apid.MustParse("cxr_test0000000000001")
 
 		t.Run("unauthorized", func(t *testing.T) {
@@ -1504,7 +1521,7 @@ func TestConnectors(t *testing.T) {
 
 		t.Run("valid - with custom definition", func(t *testing.T) {
 			tu := setup(t, nil)
-			def := cschema.ConnectorDefinition{DisplayName: "Custom Version"}
+			def := cschema.ConnectorDefinition{DisplayName: "Custom Generation"}
 			body := connectorCreateRequest("root", def)
 			jsonBody, _ := json.Marshal(body)
 			w := httptest.NewRecorder()
@@ -1525,11 +1542,11 @@ func TestConnectors(t *testing.T) {
 			var resp cschema.Connector
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
-			require.Equal(t, "Custom Version", resp.Spec.Definition.DisplayName)
+			require.Equal(t, "Custom Generation", resp.Spec.Definition.DisplayName)
 		})
 	})
 
-	t.Run("update version", func(t *testing.T) {
+	t.Run("update generation", func(t *testing.T) {
 		connectorId := apid.MustParse("cxr_test0000000000001")
 
 		t.Run("unauthorized", func(t *testing.T) {
@@ -1606,7 +1623,7 @@ func TestConnectors(t *testing.T) {
 			var createResp cschema.Connector
 			err = json.Unmarshal(w.Body.Bytes(), &createResp)
 			require.NoError(t, err)
-			draftVersion := createResp.Metadata.Generation
+			draftGeneration := createResp.Metadata.Generation
 
 			// Try to update with invalid definition
 			body := connectorDefinitionPatch(&cschema.ConnectorDefinition{
@@ -1617,7 +1634,7 @@ func TestConnectors(t *testing.T) {
 			w = httptest.NewRecorder()
 			req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPatch,
-				fmt.Sprintf("/connectors/%s/generations/%d", connectorId, draftVersion),
+				fmt.Sprintf("/connectors/%s/generations/%d", connectorId, draftGeneration),
 				bytes.NewReader(jsonBody),
 				"root",
 				"some-actor",
@@ -1650,7 +1667,7 @@ func TestConnectors(t *testing.T) {
 			var createResp cschema.Connector
 			err = json.Unmarshal(w.Body.Bytes(), &createResp)
 			require.NoError(t, err)
-			draftVersion := createResp.Metadata.Generation
+			draftGeneration := createResp.Metadata.Generation
 
 			// Now update it
 			body := connectorDefinitionPatch(&cschema.ConnectorDefinition{DisplayName: "Updated Draft"})
@@ -1658,7 +1675,7 @@ func TestConnectors(t *testing.T) {
 			w = httptest.NewRecorder()
 			req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPatch,
-				fmt.Sprintf("/connectors/%s/generations/%d", connectorId, draftVersion),
+				fmt.Sprintf("/connectors/%s/generations/%d", connectorId, draftGeneration),
 				bytes.NewReader(jsonBody),
 				"root",
 				"some-actor",
@@ -1674,7 +1691,7 @@ func TestConnectors(t *testing.T) {
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Equal(t, connectorId, resp.GetId())
-			require.Equal(t, draftVersion, resp.Metadata.Generation)
+			require.Equal(t, draftGeneration, resp.Metadata.Generation)
 			require.NotNil(t, resp.Status)
 			require.Equal(t, cschema.ConnectorReleaseStateDraft, resp.Status.Release.State)
 			require.Equal(t, "Updated Draft", resp.Spec.Definition.DisplayName)

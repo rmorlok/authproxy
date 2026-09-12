@@ -242,7 +242,7 @@ func (h *RemoteAuthProxy) ListConnectorsAsAdmin(t *testing.T, namespace, labelSe
 	return list.Items
 }
 
-func (h *RemoteAuthProxy) GetConnectorVersionAsAdmin(t *testing.T, connectorID apid.ID, generation uint64) cschema.Connector {
+func (h *RemoteAuthProxy) GetConnectorGenerationAsAdmin(t *testing.T, connectorID apid.ID, generation uint64) cschema.Connector {
 	t.Helper()
 
 	var connector cschema.Connector
@@ -278,7 +278,7 @@ func (h *RemoteAuthProxy) FindConnectorBySeedKey(t *testing.T, seedKey string) c
 	return connectors[0]
 }
 
-func (h *RemoteAuthProxy) ForceConnectorVersionState(t *testing.T, connectorID apid.ID, version uint64, state cschema.ConnectorReleaseState) cschema.Connector {
+func (h *RemoteAuthProxy) ForceConnectorGenerationState(t *testing.T, connectorID apid.ID, generation uint64, state cschema.ConnectorReleaseState) cschema.Connector {
 	t.Helper()
 
 	var updated cschema.Connector
@@ -287,13 +287,13 @@ func (h *RemoteAuthProxy) ForceConnectorVersionState(t *testing.T, connectorID a
 		h.AdminActorExternalID,
 		h.AdminActorNamespace,
 		http.MethodPut,
-		fmt.Sprintf("%s/api/v1/connectors/%s/generations/%d/_forceState", h.AdminURL, connectorID, version),
+		fmt.Sprintf("%s/api/v1/connectors/%s/generations/%d/_forceState", h.AdminURL, connectorID, generation),
 		schemaapi.NewConnectorForceStateRequest(
 			meta.ObjectReference{
 				APIVersion: meta.APIVersionV1Alpha1,
 				Kind:       cschema.ConnectorKind,
 				ID:         connectorID.String(),
-				Generation: version,
+				Generation: generation,
 			},
 			state,
 		),

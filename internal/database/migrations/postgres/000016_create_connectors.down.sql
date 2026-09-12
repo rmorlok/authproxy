@@ -1,7 +1,7 @@
-create table connector_versions
+create table legacy_connector_generations
 (
     id                   text,
-    version              bigint,
+    generation           bigint,
     namespace            text,
     labels               jsonb,
     annotations          jsonb,
@@ -13,12 +13,12 @@ create table connector_versions
     updated_at           timestamptz,
     encrypted_at         timestamptz,
     deleted_at           timestamptz,
-    primary key (id, version)
+    primary key (id, generation)
 );
 
-insert into connector_versions (
+insert into legacy_connector_generations (
     id,
-    version,
+    generation,
     namespace,
     labels,
     annotations,
@@ -33,7 +33,7 @@ insert into connector_versions (
 )
 select
     d.connector_id,
-    d.version,
+    d.generation,
     c.namespace,
     c.labels,
     c.annotations,
@@ -45,14 +45,16 @@ select
     d.updated_at,
     d.encrypted_at,
     d.deleted_at
-from connector_definition_versions d
+from connector_generations d
 join connectors c on c.id = d.connector_id;
 
-create index idx_connector_versions_deleted_at
-    on connector_versions (deleted_at);
+drop table connector_generations;
+alter table legacy_connector_generations rename to connector_generations;
 
-create index idx_connector_versions_resource_search
-    on connector_versions (deleted_at, updated_at desc, id, version);
+create index idx_connector_generations_deleted_at
+    on connector_generations (deleted_at);
 
-drop table connector_definition_versions;
+create index idx_connector_generations_resource_search
+    on connector_generations (deleted_at, updated_at desc, id, generation);
+
 drop table connectors;

@@ -8,8 +8,8 @@ import (
 )
 
 type ConnectorWithDefinitionMatcher struct {
-	ExpectedId      apid.ID
-	ExpectedVersion uint64
+	ExpectedId         apid.ID
+	ExpectedGeneration uint64
 }
 
 func (m ConnectorWithDefinitionMatcher) Matches(x interface{}) bool {
@@ -18,11 +18,11 @@ func (m ConnectorWithDefinitionMatcher) Matches(x interface{}) bool {
 		return false
 	}
 
-	return cv.Id == m.ExpectedId && cv.Version == m.ExpectedVersion
+	return cv.Id == m.ExpectedId && cv.Generation == m.ExpectedGeneration
 }
 
 func (m ConnectorWithDefinitionMatcher) String() string {
-	return fmt.Sprintf("is ConnectorWithDefinition with ID=%s, Version=%d", m.ExpectedId, m.ExpectedVersion)
+	return fmt.Sprintf("is ConnectorWithDefinition with ID=%s, Generation=%d", m.ExpectedId, m.ExpectedGeneration)
 }
 
 type ConnectionMatcher struct {

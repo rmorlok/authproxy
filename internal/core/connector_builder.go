@@ -10,11 +10,11 @@ import (
 )
 
 type connectorBuilder struct {
-	s              *service
-	c              *config.Connector
-	definition     *connectors.ConnectorDefinition
-	configSetters  []func(c *config.Connector)
-	versionSetters []func(v *Connector)
+	s                 *service
+	c                 *config.Connector
+	definition        *connectors.ConnectorDefinition
+	configSetters     []func(c *config.Connector)
+	generationSetters []func(v *Connector)
 }
 
 func newConnectorBuilder(s *service) *connectorBuilder {
@@ -27,16 +27,16 @@ func (b *connectorBuilder) WithConfig(c *config.Connector) *connectorBuilder {
 	b.c = c
 	b.definition = &c.Spec.Definition
 
-	b.versionSetters = append([]func(v *Connector){
+	b.generationSetters = append([]func(v *Connector){
 		func(v *Connector) {
-			v.Version = c.Metadata.Generation
+			v.Generation = c.Metadata.Generation
 			v.Id = c.GetId()
 			v.Namespace = c.GetNamespace()
 			v.Name = c.Metadata.Name
 			v.Labels = c.Metadata.Labels
 			v.Annotations = c.Metadata.Annotations
 		},
-	}, b.versionSetters...)
+	}, b.generationSetters...)
 
 	return b
 }
@@ -47,7 +47,7 @@ func (b *connectorBuilder) WithDefinition(definition *connectors.ConnectorDefini
 }
 
 func (b *connectorBuilder) WithId(id apid.ID) *connectorBuilder {
-	b.versionSetters = append(b.versionSetters,
+	b.generationSetters = append(b.generationSetters,
 		func(v *Connector) {
 			v.Id = id
 		},
@@ -61,8 +61,8 @@ func (b *connectorBuilder) WithId(id apid.ID) *connectorBuilder {
 	return b
 }
 
-func (b *connectorBuilder) WithState(state database.ConnectorDefinitionVersionState) *connectorBuilder {
-	b.versionSetters = append(b.versionSetters,
+func (b *connectorBuilder) WithState(state database.ConnectorGenerationState) *connectorBuilder {
+	b.generationSetters = append(b.generationSetters,
 		func(v *Connector) {
 			v.State = state
 		},
@@ -76,10 +76,10 @@ func (b *connectorBuilder) WithState(state database.ConnectorDefinitionVersionSt
 	return b
 }
 
-func (b *connectorBuilder) WithVersion(ver uint64) *connectorBuilder {
-	b.versionSetters = append(b.versionSetters,
+func (b *connectorBuilder) WithGeneration(ver uint64) *connectorBuilder {
+	b.generationSetters = append(b.generationSetters,
 		func(v *Connector) {
-			v.Version = ver
+			v.Generation = ver
 		},
 	)
 
@@ -108,7 +108,7 @@ func (b *connectorBuilder) Build() (*Connector, error) {
 		}
 	}
 
-	for _, setter := range b.versionSetters {
+	for _, setter := range b.generationSetters {
 		setter(&c)
 	}
 

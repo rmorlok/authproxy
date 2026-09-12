@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS app_metrics_request_events (
     duration_ms Int64 DEFAULT 0,
     connection_id String DEFAULT '',
     connector_id String DEFAULT '',
-    connector_version UInt64 DEFAULT 0,
+    connector_generation UInt64 DEFAULT 0,
     method String DEFAULT '',
     host String DEFAULT '',
     scheme String DEFAULT '',

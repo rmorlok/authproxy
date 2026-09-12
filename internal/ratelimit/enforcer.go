@@ -243,14 +243,14 @@ func (rt *EnforcerRoundTripper) buildRequestContext(
 	req *http.Request,
 ) *RequestContext {
 	rc := &RequestContext{
-		Type:             common.RequestType(rt.ri.Type),
-		Method:           req.Method,
-		UpstreamURL:      req.URL,
-		Namespace:        rt.ri.Namespace,
-		ConnectionID:     rt.ri.ConnectionId,
-		ConnectorID:      rt.ri.ConnectorId,
-		ConnectorVersion: rt.ri.ConnectorVersion,
-		Labels:           rt.ri.Labels,
+		Type:                common.RequestType(rt.ri.Type),
+		Method:              req.Method,
+		UpstreamURL:         req.URL,
+		Namespace:           rt.ri.Namespace,
+		ConnectionID:        rt.ri.ConnectionId,
+		ConnectorID:         rt.ri.ConnectorId,
+		ConnectorGeneration: rt.ri.ConnectorGeneration,
+		Labels:              rt.ri.Labels,
 	}
 	if rt.ri.Labels != nil {
 		if v, ok := rt.ri.Labels[actorIDLabelKey]; ok {

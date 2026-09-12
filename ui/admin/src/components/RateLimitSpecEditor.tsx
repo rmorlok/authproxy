@@ -15,7 +15,7 @@ interface Props {
 }
 
 // Tabbed editor: structured form (default) + read-only JSON preview using
-// the same CodeMirror + one-dark setup that ConnectorVersionDetail uses.
+// the same CodeMirror + one-dark setup that ConnectorGenerationDetail uses.
 // Keeping the JSON view read-only sidesteps the round-trip headaches of
 // parsing arbitrary edits back into the structured form.
 export default function RateLimitSpecEditor({ value, onChange }: Props) {

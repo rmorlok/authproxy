@@ -1205,14 +1205,14 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "/connections/{id}/_migrateVersion": {
+        "/connections/{id}/_migrateGeneration": {
             "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Start a workflow that migrates an existing connection to another version of the same connector",
+                "description": "Start a workflow that migrates an existing connection to another generation of the same connector",
                 "consumes": [
                     "application/json"
                 ],
@@ -1222,7 +1222,7 @@ const docTemplateadmin_api = `{
                 "tags": [
                     "connections"
                 ],
-                "summary": "Migrate connection connector version",
+                "summary": "Migrate connection connector generation",
                 "parameters": [
                     {
                         "type": "string",
@@ -1237,7 +1237,7 @@ const docTemplateadmin_api = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPIConnectionVersionMigrationActionJson"
+                            "$ref": "#/definitions/routes.OpenAPIConnectionGenerationMigrationActionJson"
                         }
                     }
                 ],
@@ -1245,7 +1245,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.OpenAPIConnectionVersionMigrationActionJson"
+                            "$ref": "#/definitions/routes.OpenAPIConnectionGenerationMigrationActionJson"
                         }
                     },
                     "400": {
@@ -2261,7 +2261,7 @@ const docTemplateadmin_api = `{
                     },
                     {
                         "type": "string",
-                        "description": "Order by field (e.g., 'version:desc')",
+                        "description": "Order by field (e.g., 'generation desc')",
                         "name": "orderBy",
                         "in": "query"
                     }
@@ -3085,8 +3085,8 @@ const docTemplateadmin_api = `{
                     },
                     {
                         "type": "integer",
-                        "description": "Filter by connector version",
-                        "name": "connectorVersion",
+                        "description": "Filter by connector generation",
+                        "name": "connectorGeneration",
                         "in": "query"
                     },
                     {
@@ -4978,6 +4978,35 @@ const docTemplateadmin_api = `{
                 }
             }
         },
+        "openapi.ConnectionGenerationMigrationSpecJson": {
+            "type": "object",
+            "required": [
+                "connectorRef"
+            ],
+            "properties": {
+                "connectorRef": {
+                    "$ref": "#/definitions/meta.ObjectReference"
+                },
+                "timeoutSeconds": {
+                    "type": "integer",
+                    "example": 600
+                }
+            }
+        },
+        "openapi.ConnectionGenerationMigrationStatusJson": {
+            "type": "object",
+            "properties": {
+                "sourceConnectorRef": {
+                    "$ref": "#/definitions/meta.ObjectReference"
+                },
+                "targetConnectorRef": {
+                    "$ref": "#/definitions/meta.ObjectReference"
+                },
+                "taskId": {
+                    "type": "string"
+                }
+            }
+        },
         "openapi.ConnectionJson": {
             "description": "Kubernetes-style Connection resource",
             "type": "object",
@@ -5085,35 +5114,6 @@ const docTemplateadmin_api = `{
                 },
                 "connectorRef": {
                     "$ref": "#/definitions/meta.ObjectReference"
-                }
-            }
-        },
-        "openapi.ConnectionVersionMigrationSpecJson": {
-            "type": "object",
-            "required": [
-                "connectorRef"
-            ],
-            "properties": {
-                "connectorRef": {
-                    "$ref": "#/definitions/meta.ObjectReference"
-                },
-                "timeoutSeconds": {
-                    "type": "integer",
-                    "example": 600
-                }
-            }
-        },
-        "openapi.ConnectionVersionMigrationStatusJson": {
-            "type": "object",
-            "properties": {
-                "sourceConnectorRef": {
-                    "$ref": "#/definitions/meta.ObjectReference"
-                },
-                "targetConnectorRef": {
-                    "$ref": "#/definitions/meta.ObjectReference"
-                },
-                "taskId": {
-                    "type": "string"
                 }
             }
         },
@@ -6696,6 +6696,40 @@ const docTemplateadmin_api = `{
                 }
             }
         },
+        "routes.OpenAPIConnectionGenerationMigrationActionJson": {
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "kind",
+                "metadata",
+                "spec"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "ConnectionGenerationMigration"
+                    ],
+                    "example": "ConnectionGenerationMigration"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/openapi.ConnectionActionMetaJson"
+                },
+                "spec": {
+                    "$ref": "#/definitions/openapi.ConnectionGenerationMigrationSpecJson"
+                },
+                "status": {
+                    "$ref": "#/definitions/openapi.ConnectionGenerationMigrationStatusJson"
+                }
+            }
+        },
         "routes.OpenAPIConnectionInitiateActionJson": {
             "type": "object",
             "required": [
@@ -6920,40 +6954,6 @@ const docTemplateadmin_api = `{
                 },
                 "spec": {
                     "$ref": "#/definitions/openapi.ConnectionSetupSubmitSpecJson"
-                }
-            }
-        },
-        "routes.OpenAPIConnectionVersionMigrationActionJson": {
-            "type": "object",
-            "required": [
-                "apiVersion",
-                "kind",
-                "metadata",
-                "spec"
-            ],
-            "properties": {
-                "apiVersion": {
-                    "type": "string",
-                    "enum": [
-                        "authproxy.net/v1alpha1"
-                    ],
-                    "example": "authproxy.net/v1alpha1"
-                },
-                "kind": {
-                    "type": "string",
-                    "enum": [
-                        "ConnectionVersionMigration"
-                    ],
-                    "example": "ConnectionVersionMigration"
-                },
-                "metadata": {
-                    "$ref": "#/definitions/openapi.ConnectionActionMetaJson"
-                },
-                "spec": {
-                    "$ref": "#/definitions/openapi.ConnectionVersionMigrationSpecJson"
-                },
-                "status": {
-                    "$ref": "#/definitions/openapi.ConnectionVersionMigrationStatusJson"
                 }
             }
         },

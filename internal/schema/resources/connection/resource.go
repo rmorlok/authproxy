@@ -90,7 +90,7 @@ type ConnectionSetupStatus struct {
 
 // ConnectionPatch is a metadata-only update. Connection bindings and all
 // status fields are immutable through CRUD; connector changes occur through
-// the version-migration action and setup state changes through setup actions.
+// the generation-migration action and setup state changes through setup actions.
 type ConnectionPatch struct {
 	meta.TypeMeta `json:",inline" yaml:",inline"`
 	Metadata      *meta.ObjectMetaPatch `json:"metadata" yaml:"metadata"`

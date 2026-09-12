@@ -66,7 +66,7 @@ resource "authproxy_rate_limit" "team_acme_writes" {
     - `kind` - One of `prefix`, `glob`, or `regex`.
     - `value` - The path expression interpreted per `kind`.
 - `bucket` - (Required block) Projects matched requests into independent counters.
-  - `dimensions` - (Optional) Ordered list of dimensions. Reserved names: `actor`, `connection`, `connector`, `connector_version`, `namespace`, `method`. Label values via `labels/<key>`. Empty / omitted = single global bucket per rule.
+  - `dimensions` - (Optional) Ordered list of dimensions. Reserved names: `actor`, `connection`, `connector`, `connector_generation`, `namespace`, `method`. Label values via `labels/<key>`. Empty / omitted = single global bucket per rule.
 - `algorithm` - (Required block) Tagged union — **exactly one** of the following must be set. The provider validates this at plan time.
   - `fixed_window` - Fixed-window counter that resets at floor(now/window) boundaries.
     - `window` - HumanDuration (e.g. `1m`, `5m`).

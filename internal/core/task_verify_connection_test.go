@@ -22,7 +22,7 @@ import (
 )
 
 // setupVerifyTest wires a minimal service whose db.GetConnection returns the
-// supplied connection and whose db.GetConnectorDefinitionVersion + encrypt.DecryptString
+// supplied connection and whose db.GetConnectorGeneration + encrypt.DecryptString
 // resolve to the supplied connector. Lets each subtest customize the
 // connection's setup_step / health_state without sharing fixture state.
 func setupVerifyTest(
@@ -51,11 +51,11 @@ func setupVerifyTest(
 
 	encryptedDef := encfield.EncryptedField{ID: "dek_mock", Data: "encrypted-def"}
 	db.EXPECT().
-		GetConnectorDefinitionVersion(gomock.Any(), conn.ConnectorId, conn.ConnectorVersion).
+		GetConnectorGeneration(gomock.Any(), conn.ConnectorId, conn.ConnectorGeneration).
 		Return(&database.ConnectorWithDefinition{
 			Id:                  conn.ConnectorId,
-			Version:             conn.ConnectorVersion,
-			State:               database.ConnectorDefinitionVersionStatePrimary,
+			Generation:          conn.ConnectorGeneration,
+			State:               database.ConnectorGenerationStatePrimary,
 			EncryptedDefinition: encryptedDef,
 		}, nil).
 		AnyTimes()
@@ -82,13 +82,13 @@ func TestRunVerifyConnection_NoProbes_AdvancesToReady(t *testing.T) {
 	}
 	verifyStep := cschema.SetupStepVerify
 	conn := &database.Connection{
-		Id:               connectionId,
-		Namespace:        "root",
-		State:            database.ConnectionStateSetup,
-		HealthState:      database.ConnectionHealthStateHealthy,
-		ConnectorId:      apid.New(apid.PrefixConnectorVersion),
-		ConnectorVersion: 1,
-		SetupStep:        &verifyStep,
+		Id:                  connectionId,
+		Namespace:           "root",
+		State:               database.ConnectionStateSetup,
+		HealthState:         database.ConnectionHealthStateHealthy,
+		ConnectorId:         apid.New(apid.PrefixConnector),
+		ConnectorGeneration: 1,
+		SetupStep:           &verifyStep,
 	}
 
 	svc, db, _, ctrl := setupVerifyTest(t, connectionId, conn, connector)
@@ -124,13 +124,13 @@ func TestRunVerifyConnection_AllProbesDisabled_AdvancesToReady(t *testing.T) {
 	}
 	verifyStep := cschema.SetupStepVerify
 	conn := &database.Connection{
-		Id:               connectionId,
-		Namespace:        "root",
-		State:            database.ConnectionStateSetup,
-		HealthState:      database.ConnectionHealthStateHealthy,
-		ConnectorId:      apid.New(apid.PrefixConnectorVersion),
-		ConnectorVersion: 1,
-		SetupStep:        &verifyStep,
+		Id:                  connectionId,
+		Namespace:           "root",
+		State:               database.ConnectionStateSetup,
+		HealthState:         database.ConnectionHealthStateHealthy,
+		ConnectorId:         apid.New(apid.PrefixConnector),
+		ConnectorGeneration: 1,
+		SetupStep:           &verifyStep,
 	}
 
 	svc, db, _, ctrl := setupVerifyTest(t, connectionId, conn, connector)
@@ -173,13 +173,13 @@ func TestRunVerifyConnection_MixedProbePredicates_RunOnlyEnabled(t *testing.T) {
 	}
 	verifyStep := cschema.SetupStepVerify
 	conn := &database.Connection{
-		Id:               connectionId,
-		Namespace:        "root",
-		State:            database.ConnectionStateSetup,
-		HealthState:      database.ConnectionHealthStateHealthy,
-		ConnectorId:      apid.New(apid.PrefixConnectorVersion),
-		ConnectorVersion: 1,
-		SetupStep:        &verifyStep,
+		Id:                  connectionId,
+		Namespace:           "root",
+		State:               database.ConnectionStateSetup,
+		HealthState:         database.ConnectionHealthStateHealthy,
+		ConnectorId:         apid.New(apid.PrefixConnector),
+		ConnectorGeneration: 1,
+		SetupStep:           &verifyStep,
 	}
 
 	svc, db, _, ctrl := setupVerifyTest(t, connectionId, conn, connector)
@@ -211,13 +211,13 @@ func TestRunVerifyConnection_StalePhase_SkipsCleanly(t *testing.T) {
 		Auth:        &cschema.Auth{InnerVal: &cschema.AuthApiKey{Type: cschema.AuthTypeAPIKey}},
 	}
 	conn := &database.Connection{
-		Id:               connectionId,
-		Namespace:        "root",
-		State:            database.ConnectionStateConfigured,
-		HealthState:      database.ConnectionHealthStateHealthy,
-		ConnectorId:      apid.New(apid.PrefixConnectorVersion),
-		ConnectorVersion: 1,
-		SetupStep:        nil, // already past verify
+		Id:                  connectionId,
+		Namespace:           "root",
+		State:               database.ConnectionStateConfigured,
+		HealthState:         database.ConnectionHealthStateHealthy,
+		ConnectorId:         apid.New(apid.PrefixConnector),
+		ConnectorGeneration: 1,
+		SetupStep:           nil, // already past verify
 	}
 
 	svc, _, _, ctrl := setupVerifyTest(t, connectionId, conn, connector)
@@ -270,13 +270,13 @@ func TestRunVerifyConnection_ProbeFailure(t *testing.T) {
 	}
 	verifyStep := cschema.SetupStepVerify
 	conn := &database.Connection{
-		Id:               connectionId,
-		Namespace:        "root",
-		State:            database.ConnectionStateSetup,
-		HealthState:      database.ConnectionHealthStateHealthy,
-		ConnectorId:      apid.New(apid.PrefixConnectorVersion),
-		ConnectorVersion: 1,
-		SetupStep:        &verifyStep,
+		Id:                  connectionId,
+		Namespace:           "root",
+		State:               database.ConnectionStateSetup,
+		HealthState:         database.ConnectionHealthStateHealthy,
+		ConnectorId:         apid.New(apid.PrefixConnector),
+		ConnectorGeneration: 1,
+		SetupStep:           &verifyStep,
 	}
 
 	svc, db, _, ctrl := setupVerifyTest(t, connectionId, conn, connector)

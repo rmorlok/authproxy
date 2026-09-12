@@ -32,7 +32,7 @@ provider "authproxy" {
 - `authproxy_namespace` - Manages namespaces for multi-tenancy
 - `authproxy_key` - Manages keys
 - `authproxy_actor` - Manages actors (users/entities that own connections)
-- `authproxy_connector` - Manages connectors with automatic version lifecycle
+- `authproxy_connector` - Manages connectors with automatic generation lifecycle
 - `authproxy_rate_limit` - Manages namespace-scoped rate-limit policies
 
 ## Data Sources
@@ -53,7 +53,7 @@ envelope in HCL; the provider maps fields as follows:
 | Resource or namespace ID/path | `metadata.id` |
 | Namespace ownership | `metadata.namespace` |
 | Labels and annotations | `metadata.labels` and `metadata.annotations` |
-| Connector `version` | `metadata.generation` |
+| Connector `generation` | `metadata.generation` |
 | Desired configuration | `spec` |
 | Observed lifecycle state | `status` |
 

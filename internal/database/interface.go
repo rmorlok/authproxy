@@ -107,13 +107,13 @@ type DB interface {
 	 * Connectors
 	 */
 
-	GetConnectorDefinitionVersion(ctx context.Context, id apid.ID, version uint64) (*ConnectorWithDefinition, error)
-	GetConnectorDefinitionVersions(ctx context.Context, requested []ConnectorDefinitionVersionId) (map[ConnectorDefinitionVersionId]*ConnectorWithDefinition, error)
-	GetConnectorDefinitionVersionForState(ctx context.Context, id apid.ID, state ConnectorDefinitionVersionState) (*ConnectorWithDefinition, error)
-	NewestConnectorDefinitionVersionForId(ctx context.Context, id apid.ID) (*ConnectorWithDefinition, error)
-	NewestPublishedConnectorDefinitionVersionForId(ctx context.Context, id apid.ID) (*ConnectorWithDefinition, error)
-	UpsertConnectorDefinitionVersion(ctx context.Context, cv *ConnectorWithDefinition) error
-	SetConnectorDefinitionVersionState(ctx context.Context, id apid.ID, version uint64, state ConnectorDefinitionVersionState) error
+	GetConnectorGeneration(ctx context.Context, id apid.ID, generation uint64) (*ConnectorWithDefinition, error)
+	GetConnectorGenerations(ctx context.Context, requested []ConnectorGenerationId) (map[ConnectorGenerationId]*ConnectorWithDefinition, error)
+	GetConnectorGenerationForState(ctx context.Context, id apid.ID, state ConnectorGenerationState) (*ConnectorWithDefinition, error)
+	NewestConnectorGenerationForId(ctx context.Context, id apid.ID) (*ConnectorWithDefinition, error)
+	NewestPublishedConnectorGenerationForId(ctx context.Context, id apid.ID) (*ConnectorWithDefinition, error)
+	UpsertConnectorGeneration(ctx context.Context, cv *ConnectorWithDefinition) error
+	SetConnectorGenerationState(ctx context.Context, id apid.ID, generation uint64, state ConnectorGenerationState) error
 	UpdateConnectorName(ctx context.Context, id apid.ID, name scommon.ResourceName) error
 	UpdateConnectorLabels(
 		ctx context.Context,
@@ -126,8 +126,8 @@ type DB interface {
 		annotations map[string]string,
 	) (*Connector, error)
 	DeleteConnector(ctx context.Context, id apid.ID) error
-	ListConnectorDefinitionVersionsBuilder() ListConnectorDefinitionVersionsBuilder
-	ListConnectorDefinitionVersionsFromCursor(ctx context.Context, cursor string) (ListConnectorDefinitionVersionsExecutor, error)
+	ListConnectorGenerationsBuilder() ListConnectorGenerationsBuilder
+	ListConnectorGenerationsFromCursor(ctx context.Context, cursor string) (ListConnectorGenerationsExecutor, error)
 	ListConnectorsBuilder() ListConnectorsBuilder
 	ListConnectorsFromCursor(ctx context.Context, cursor string) (ListConnectorsExecutor, error)
 
@@ -150,7 +150,7 @@ type DB interface {
 	UpdateConnectionAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*Connection, error)
 	PutConnectionAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*Connection, error)
 	DeleteConnectionAnnotations(ctx context.Context, id apid.ID, keys []string) (*Connection, error)
-	UpdateConnectionForVersionMigration(ctx context.Context, update ConnectionVersionMigrationUpdate) (*Connection, error)
+	UpdateConnectionForGenerationMigration(ctx context.Context, update ConnectionGenerationMigrationUpdate) (*Connection, error)
 	ListConnectionsBuilder() ListConnectionsBuilder
 	ListConnectionsFromCursor(ctx context.Context, cursor string) (ListConnectionsExecutor, error)
 

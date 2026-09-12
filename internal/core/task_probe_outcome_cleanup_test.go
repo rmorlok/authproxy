@@ -53,12 +53,12 @@ func TestEnabledProbeThresholdsForConnection_ExcludesDisabledProbes(t *testing.T
 		},
 	}
 	conn := &database.Connection{
-		Id:               connectionId,
-		Namespace:        "root",
-		State:            database.ConnectionStateConfigured,
-		HealthState:      database.ConnectionHealthStateHealthy,
-		ConnectorId:      apid.New(apid.PrefixConnectorVersion),
-		ConnectorVersion: 1,
+		Id:                  connectionId,
+		Namespace:           "root",
+		State:               database.ConnectionStateConfigured,
+		HealthState:         database.ConnectionHealthStateHealthy,
+		ConnectorId:         apid.New(apid.PrefixConnector),
+		ConnectorGeneration: 1,
 	}
 
 	svc, _, _, ctrl := setupVerifyTest(t, connectionId, conn, connector)

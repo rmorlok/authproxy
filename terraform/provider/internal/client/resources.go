@@ -40,7 +40,7 @@ type ObjectMetadataPatch struct {
 }
 
 // ObjectReference identifies another resource without copying its spec or
-// status. Generation is only populated for versioned resource kinds.
+// status. Generation is only populated for generation-tracked resource kinds.
 type ObjectReference struct {
 	APIVersion string `json:"apiVersion"`
 	Kind       string `json:"kind"`

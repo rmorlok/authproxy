@@ -54,7 +54,7 @@ var legacyWireTerms = []string{
 	"auth_token", "return_to", "return_to_url", "_proxy_raw", "_force_state",
 	"_disconnect_all", "_migrate_version", "_setup_step", "_data_source", "_cancel_setup",
 	"body_json", "body_raw", "connection_id", "external_id",
-	"into_namespace", "label_selector", "resource_type", "task_id", "target_version",
+	"into_namespace", "label_selector", "resource_type", "task_id", "target_generation",
 }
 
 func main() {

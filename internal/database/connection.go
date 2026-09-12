@@ -92,7 +92,7 @@ type Connection struct {
 	State                  ConnectionState
 	HealthState            ConnectionHealthState
 	ConnectorId            apid.ID
-	ConnectorVersion       uint64
+	ConnectorGeneration    uint64
 	Labels                 Labels
 	Annotations            Annotations
 	EncryptedConfiguration *encfield.EncryptedField
@@ -112,7 +112,7 @@ func (c *Connection) cols() []string {
 		"state",
 		"health_state",
 		"connector_id",
-		"connector_version",
+		"connector_generation",
 		"labels",
 		"annotations",
 		"encrypted_configuration",
@@ -133,7 +133,7 @@ func (c *Connection) fields() []any {
 		&c.State,
 		&c.HealthState,
 		&c.ConnectorId,
-		&c.ConnectorVersion,
+		&c.ConnectorGeneration,
 		&c.Labels,
 		&c.Annotations,
 		&c.EncryptedConfiguration,
@@ -154,7 +154,7 @@ func (c *Connection) values() []any {
 		c.State,
 		c.healthStateForInsert(),
 		c.ConnectorId,
-		c.ConnectorVersion,
+		c.ConnectorGeneration,
 		c.Labels,
 		c.Annotations,
 		c.EncryptedConfiguration,
@@ -192,8 +192,8 @@ func (c *Connection) GetConnectorId() apid.ID {
 	return c.ConnectorId
 }
 
-func (c *Connection) GetConnectorVersion() uint64 {
-	return c.ConnectorVersion
+func (c *Connection) GetConnectorGeneration() uint64 {
+	return c.ConnectorGeneration
 }
 
 func (c *Connection) GetNamespace() string {
@@ -239,12 +239,12 @@ func (c *Connection) Validate() error {
 		result = multierror.Append(result, errors.New("connection connector id is required"))
 	}
 
-	if err := c.ConnectorId.ValidatePrefix(apid.PrefixConnectorVersion); err != nil {
+	if err := c.ConnectorId.ValidatePrefix(apid.PrefixConnector); err != nil {
 		result = multierror.Append(result, fmt.Errorf("invalid connection connector id: %w", err))
 	}
 
-	if c.ConnectorVersion == 0 {
-		result = multierror.Append(result, errors.New("connection connector version is required"))
+	if c.ConnectorGeneration == 0 {
+		result = multierror.Append(result, errors.New("connection connector generation is required"))
 	}
 
 	if err := c.Labels.Validate(); err != nil {
@@ -294,7 +294,7 @@ func (s *service) CreateConnection(ctx context.Context, c *Connection) error {
 		// Then InjectSelfImplicitLabels writes apxy/cxn/-/* on top.
 		cpy.Labels = ApplyParentCarryForward(
 			cpy.Labels,
-			ParentCarryForward{Rt: ApidPrefixToLabelToken(apid.PrefixConnectorVersion), Labels: cvLabels},
+			ParentCarryForward{Rt: ApidPrefixToLabelToken(apid.PrefixConnector), Labels: cvLabels},
 			ParentCarryForward{Rt: NamespaceLabelToken, Labels: nsLabels},
 		)
 		cpy.Labels = InjectSelfImplicitLabels(cpy.Id, cpy.Name, cpy.Namespace, cpy.Labels)
@@ -567,14 +567,14 @@ func (s *service) SetConnectionEncryptedConfiguration(ctx context.Context, id ap
 	return nil
 }
 
-// ConnectionVersionMigrationUpdate is the complete connection row replacement
-// produced by a connector-version migration. The database layer applies it in a
-// single transaction so the target version, encrypted configuration, labels,
+// ConnectionGenerationMigrationUpdate is the complete connection row replacement
+// produced by a connector-generation migration. The database layer applies it in a
+// single transaction so the target generation, encrypted configuration, labels,
 // annotations, setup state, and health state cannot be partially persisted.
-type ConnectionVersionMigrationUpdate struct {
+type ConnectionGenerationMigrationUpdate struct {
 	Id                     apid.ID
 	ConnectorId            apid.ID
-	ConnectorVersion       uint64
+	ConnectorGeneration    uint64
 	EncryptedConfiguration *encfield.EncryptedField
 	UserLabels             map[string]string
 	Annotations            map[string]string
@@ -583,7 +583,7 @@ type ConnectionVersionMigrationUpdate struct {
 	HealthState            *ConnectionHealthState
 }
 
-func (u ConnectionVersionMigrationUpdate) validate() error {
+func (u ConnectionGenerationMigrationUpdate) validate() error {
 	result := &multierror.Error{}
 	if u.Id == apid.Nil {
 		result = multierror.Append(result, errors.New("connection id is required"))
@@ -594,11 +594,11 @@ func (u ConnectionVersionMigrationUpdate) validate() error {
 	if u.ConnectorId == apid.Nil {
 		result = multierror.Append(result, errors.New("connector id is required"))
 	}
-	if err := u.ConnectorId.ValidatePrefix(apid.PrefixConnectorVersion); err != nil {
+	if err := u.ConnectorId.ValidatePrefix(apid.PrefixConnector); err != nil {
 		result = multierror.Append(result, fmt.Errorf("invalid connector id: %w", err))
 	}
-	if u.ConnectorVersion == 0 {
-		result = multierror.Append(result, errors.New("connector version is required"))
+	if u.ConnectorGeneration == 0 {
+		result = multierror.Append(result, errors.New("connector generation is required"))
 	}
 	if err := smeta.ValidateUserLabels(u.UserLabels); err != nil {
 		result = multierror.Append(result, fmt.Errorf("invalid migration labels: %w", err))
@@ -612,7 +612,7 @@ func (u ConnectionVersionMigrationUpdate) validate() error {
 	return result.ErrorOrNil()
 }
 
-func (s *service) UpdateConnectionForVersionMigration(ctx context.Context, update ConnectionVersionMigrationUpdate) (*Connection, error) {
+func (s *service) UpdateConnectionForGenerationMigration(ctx context.Context, update ConnectionGenerationMigrationUpdate) (*Connection, error) {
 	if err := update.validate(); err != nil {
 		return nil, err
 	}
@@ -651,7 +651,7 @@ func (s *service) UpdateConnectionForVersionMigration(ctx context.Context, updat
 
 		newLabels := ApplyParentCarryForward(
 			Labels(update.UserLabels),
-			ParentCarryForward{Rt: ApidPrefixToLabelToken(apid.PrefixConnectorVersion), Labels: cvLabels},
+			ParentCarryForward{Rt: ApidPrefixToLabelToken(apid.PrefixConnector), Labels: cvLabels},
 			ParentCarryForward{Rt: NamespaceLabelToken, Labels: nsLabels},
 		)
 		newLabels = InjectSelfImplicitLabels(update.Id, existing.Name, existing.Namespace, newLabels)
@@ -665,7 +665,7 @@ func (s *service) UpdateConnectionForVersionMigration(ctx context.Context, updat
 		dbResult, err := s.sq.
 			Update(ConnectionsTable).
 			Set("connector_id", update.ConnectorId).
-			Set("connector_version", update.ConnectorVersion).
+			Set("connector_generation", update.ConnectorGeneration).
 			Set("labels", newLabels).
 			Set("annotations", Annotations(update.Annotations)).
 			Set("encrypted_configuration", update.EncryptedConfiguration).
@@ -692,7 +692,7 @@ func (s *service) UpdateConnectionForVersionMigration(ctx context.Context, updat
 		}
 
 		existing.ConnectorId = update.ConnectorId
-		existing.ConnectorVersion = update.ConnectorVersion
+		existing.ConnectorGeneration = update.ConnectorGeneration
 		existing.Labels = newLabels
 		existing.Annotations = Annotations(update.Annotations)
 		existing.EncryptedConfiguration = update.EncryptedConfiguration

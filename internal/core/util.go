@@ -7,17 +7,17 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 )
 
-// GetConnectorVersionIdsForConnections returns a list of unique connector version ids for the given set of
-// connections. The purpose of this is to support loading connector versions in bulk.
-func GetConnectorVersionIdsForConnections(
+// GetConnectorGenerationIdsForConnections returns a list of unique connector generation ids for the given set of
+// connections. The purpose of this is to support loading connector generations in bulk.
+func GetConnectorGenerationIdsForConnections(
 	connections []database.Connection,
-) []iface.ConnectorVersionId {
-	ids := make(map[iface.ConnectorVersionId]struct{}, len(connections))
+) []iface.ConnectorGenerationId {
+	ids := make(map[iface.ConnectorGenerationId]struct{}, len(connections))
 	for _, c := range connections {
-		ids[iface.ConnectorVersionId{Id: c.ConnectorId, Version: c.ConnectorVersion}] = struct{}{}
+		ids[iface.ConnectorGenerationId{Id: c.ConnectorId, Generation: c.ConnectorGeneration}] = struct{}{}
 	}
 
-	result := make([]iface.ConnectorVersionId, 0, len(ids))
+	result := make([]iface.ConnectorGenerationId, 0, len(ids))
 	for id := range ids {
 		result = append(result, id)
 	}

@@ -72,8 +72,8 @@ func (ss *StorageService) StoreConnectorResourceSamples(ctx context.Context, sam
 	return ss.store.(ResourceSampleStore).StoreConnectorResourceSamples(ctx, samples)
 }
 
-func (ss *StorageService) StoreConnectorVersionResourceSamples(ctx context.Context, samples []*ConnectorVersionResourceSample) error {
-	return ss.store.(ResourceSampleStore).StoreConnectorVersionResourceSamples(ctx, samples)
+func (ss *StorageService) StoreConnectorGenerationResourceSamples(ctx context.Context, samples []*ConnectorGenerationResourceSample) error {
+	return ss.store.(ResourceSampleStore).StoreConnectorGenerationResourceSamples(ctx, samples)
 }
 
 func (ss *StorageService) StoreNamespaceResourceSamples(ctx context.Context, samples []*NamespaceResourceSample) error {
@@ -96,8 +96,8 @@ func (ss *StorageService) ListConnectorResourceSamples(ctx context.Context, quer
 	return ss.retriever.(ResourceSampleRetriever).ListConnectorResourceSamples(ctx, query)
 }
 
-func (ss *StorageService) ListConnectorVersionResourceSamples(ctx context.Context, query ResourceSampleQuery) ([]*ConnectorVersionResourceSample, error) {
-	return ss.retriever.(ResourceSampleRetriever).ListConnectorVersionResourceSamples(ctx, query)
+func (ss *StorageService) ListConnectorGenerationResourceSamples(ctx context.Context, query ResourceSampleQuery) ([]*ConnectorGenerationResourceSample, error) {
+	return ss.retriever.(ResourceSampleRetriever).ListConnectorGenerationResourceSamples(ctx, query)
 }
 
 func (ss *StorageService) ListNamespaceResourceSamples(ctx context.Context, query ResourceSampleQuery) ([]*NamespaceResourceSample, error) {

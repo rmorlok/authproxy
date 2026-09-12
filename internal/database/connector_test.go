@@ -17,42 +17,42 @@ func testConnectorWithDefinition(
 	id apid.ID,
 	namespace string,
 	name scommon.ResourceName,
-	version uint64,
+	generation uint64,
 ) *ConnectorWithDefinition {
 	return &ConnectorWithDefinition{
-		Id:        id,
-		Namespace: namespace,
-		Name:      name,
-		Version:   version,
-		State:     ConnectorDefinitionVersionStateDraft,
+		Id:         id,
+		Namespace:  namespace,
+		Name:       name,
+		Generation: generation,
+		State:      ConnectorGenerationStateDraft,
 		EncryptedDefinition: encfield.EncryptedField{
 			ID:   apid.New(apid.PrefixDataEncryptionKey),
-			Data: fmt.Sprintf("encrypted-%d", version),
+			Data: fmt.Sprintf("encrypted-%d", generation),
 		},
 	}
 }
 
-func TestConnectorNameDefaultsAndProjectsAcrossVersions(t *testing.T) {
+func TestConnectorNameDefaultsAndProjectsAcrossGenerations(t *testing.T) {
 	_, db := MustApplyBlankTestDbConfig(t, nil)
 	ctx := context.Background()
-	id := apid.New(apid.PrefixConnectorVersion)
+	id := apid.New(apid.PrefixConnector)
 
-	require.NoError(t, db.UpsertConnectorDefinitionVersion(ctx, testConnectorWithDefinition(id, "root", "", 1)))
-	require.NoError(t, db.UpsertConnectorDefinitionVersion(ctx, testConnectorWithDefinition(id, "root", "", 2)))
+	require.NoError(t, db.UpsertConnectorGeneration(ctx, testConnectorWithDefinition(id, "root", "", 1)))
+	require.NoError(t, db.UpsertConnectorGeneration(ctx, testConnectorWithDefinition(id, "root", "", 2)))
 
-	first, err := db.GetConnectorDefinitionVersion(ctx, id, 1)
+	first, err := db.GetConnectorGeneration(ctx, id, 1)
 	require.NoError(t, err)
-	second, err := db.GetConnectorDefinitionVersion(ctx, id, 2)
+	second, err := db.GetConnectorGeneration(ctx, id, 2)
 	require.NoError(t, err)
 	require.Equal(t, scommon.ResourceName(id.String()), first.Name)
 	require.Equal(t, first.Name, second.Name)
 	require.Equal(t, id.String(), first.Labels["apxy/cxr/-/name"])
 
-	versions := db.ListConnectorDefinitionVersionsBuilder().ForId(id).FetchPage(ctx)
-	require.NoError(t, versions.Error)
-	require.Len(t, versions.Results, 2)
-	require.Equal(t, first.Name, versions.Results[0].Name)
-	require.Equal(t, first.Name, versions.Results[1].Name)
+	generations := db.ListConnectorGenerationsBuilder().ForId(id).FetchPage(ctx)
+	require.NoError(t, generations.Error)
+	require.Len(t, generations.Results, 2)
+	require.Equal(t, first.Name, generations.Results[0].Name)
+	require.Equal(t, first.Name, generations.Results[1].Name)
 
 	connectors := db.ListConnectorsBuilder().ForId(id).FetchPage(ctx)
 	require.NoError(t, connectors.Error)
@@ -60,19 +60,19 @@ func TestConnectorNameDefaultsAndProjectsAcrossVersions(t *testing.T) {
 	require.Equal(t, first.Name, connectors.Results[0].Name)
 }
 
-func TestConnectorRenameDoesNotRewriteVersions(t *testing.T) {
+func TestConnectorRenameDoesNotRewriteGenerations(t *testing.T) {
 	_, db, rawDB := MustApplyBlankTestDbConfigRaw(t, nil)
 	ctx := context.Background()
-	id := apid.New(apid.PrefixConnectorVersion)
+	id := apid.New(apid.PrefixConnector)
 
-	require.NoError(t, db.UpsertConnectorDefinitionVersion(ctx, testConnectorWithDefinition(id, "root", "original", 1)))
-	require.NoError(t, db.UpsertConnectorDefinitionVersion(ctx, testConnectorWithDefinition(id, "root", "", 2)))
+	require.NoError(t, db.UpsertConnectorGeneration(ctx, testConnectorWithDefinition(id, "root", "original", 1)))
+	require.NoError(t, db.UpsertConnectorGeneration(ctx, testConnectorWithDefinition(id, "root", "", 2)))
 
 	originalDefinitions := connectorDefinitionPayloads(t, rawDB, id)
 
 	require.NoError(t, db.UpdateConnectorName(ctx, id, "renamed"))
-	for _, version := range []uint64{1, 2} {
-		projected, err := db.GetConnectorDefinitionVersion(ctx, id, version)
+	for _, generation := range []uint64{1, 2} {
+		projected, err := db.GetConnectorGeneration(ctx, id, generation)
 		require.NoError(t, err)
 		require.Equal(t, scommon.ResourceName("renamed"), projected.Name)
 		require.Equal(t, "renamed", projected.Labels["apxy/cxr/-/name"])
@@ -80,20 +80,20 @@ func TestConnectorRenameDoesNotRewriteVersions(t *testing.T) {
 
 	renamedDefinitions := connectorDefinitionPayloads(t, rawDB, id)
 	require.Equal(t, originalDefinitions, renamedDefinitions)
-	require.Equal(t, 2, sqlhMustCountConnectorDefinitionVersions(t, rawDB, id))
+	require.Equal(t, 2, sqlhMustCountConnectorGenerations(t, rawDB, id))
 
-	err := db.UpsertConnectorDefinitionVersion(ctx, testConnectorWithDefinition(id, "root", "forked", 3))
+	err := db.UpsertConnectorGeneration(ctx, testConnectorWithDefinition(id, "root", "forked", 3))
 	require.ErrorContains(t, err, "cannot modify connector name")
 }
 
-func TestConnectorMetadataUpdatesDoNotRewriteVersions(t *testing.T) {
+func TestConnectorMetadataUpdatesDoNotRewriteGenerations(t *testing.T) {
 	_, db, rawDB := MustApplyBlankTestDbConfigRaw(t, nil)
 	ctx := context.Background()
-	id := apid.New(apid.PrefixConnectorVersion)
+	id := apid.New(apid.PrefixConnector)
 	connector := testConnectorWithDefinition(id, "root", "configured", 1)
 	connector.Labels = Labels{"environment": "demo"}
 	connector.Annotations = Annotations{"example.com/owner": "integrations"}
-	require.NoError(t, db.UpsertConnectorDefinitionVersion(ctx, connector))
+	require.NoError(t, db.UpsertConnectorGeneration(ctx, connector))
 
 	originalDefinitions := connectorDefinitionPayloads(t, rawDB, id)
 	updated, err := db.UpdateConnectorLabels(ctx, id, map[string]string{"environment": "production"})
@@ -106,19 +106,19 @@ func TestConnectorMetadataUpdatesDoNotRewriteVersions(t *testing.T) {
 	require.Equal(t, Annotations{"example.com/owner": "platform"}, updated.Annotations)
 
 	require.Equal(t, originalDefinitions, connectorDefinitionPayloads(t, rawDB, id))
-	require.Equal(t, 1, sqlhMustCountConnectorDefinitionVersions(t, rawDB, id))
+	require.Equal(t, 1, sqlhMustCountConnectorGenerations(t, rawDB, id))
 }
 
 func TestConnectorRejectsNamespaceFork(t *testing.T) {
 	_, db := MustApplyBlankTestDbConfig(t, nil)
 	ctx := context.Background()
-	id := apid.New(apid.PrefixConnectorVersion)
+	id := apid.New(apid.PrefixConnector)
 
-	require.NoError(t, db.UpsertConnectorDefinitionVersion(ctx, testConnectorWithDefinition(id, "root", "connector", 1)))
-	err := db.UpsertConnectorDefinitionVersion(ctx, testConnectorWithDefinition(id, "root.other", "", 2))
+	require.NoError(t, db.UpsertConnectorGeneration(ctx, testConnectorWithDefinition(id, "root", "connector", 1)))
+	err := db.UpsertConnectorGeneration(ctx, testConnectorWithDefinition(id, "root.other", "", 2))
 	require.ErrorContains(t, err, "cannot modify connector namespace")
 
-	projected, err := db.GetConnectorDefinitionVersion(ctx, id, 1)
+	projected, err := db.GetConnectorGeneration(ctx, id, 1)
 	require.NoError(t, err)
 	require.Equal(t, "root", projected.Namespace)
 	require.Equal(t, scommon.ResourceName("connector"), projected.Name)
@@ -129,14 +129,14 @@ func TestConnectorNameUniquenessAndDeleteReuse(t *testing.T) {
 	ctx := context.Background()
 	require.NoError(t, db.CreateNamespace(ctx, &Namespace{Path: "root.other"}))
 
-	firstID := apid.New(apid.PrefixConnectorVersion)
-	require.NoError(t, db.UpsertConnectorDefinitionVersion(ctx, testConnectorWithDefinition(firstID, "root", "shared", 1)))
+	firstID := apid.New(apid.PrefixConnector)
+	require.NoError(t, db.UpsertConnectorGeneration(ctx, testConnectorWithDefinition(firstID, "root", "shared", 1)))
 
-	conflictID := apid.New(apid.PrefixConnectorVersion)
-	require.Error(t, db.UpsertConnectorDefinitionVersion(ctx, testConnectorWithDefinition(conflictID, "root", "shared", 1)))
+	conflictID := apid.New(apid.PrefixConnector)
+	require.Error(t, db.UpsertConnectorGeneration(ctx, testConnectorWithDefinition(conflictID, "root", "shared", 1)))
 
-	otherNamespaceID := apid.New(apid.PrefixConnectorVersion)
-	require.NoError(t, db.UpsertConnectorDefinitionVersion(ctx, testConnectorWithDefinition(otherNamespaceID, "root.other", "shared", 1)))
+	otherNamespaceID := apid.New(apid.PrefixConnector)
+	require.NoError(t, db.UpsertConnectorGeneration(ctx, testConnectorWithDefinition(otherNamespaceID, "root.other", "shared", 1)))
 
 	require.NoError(t, db.CreateActor(ctx, &Actor{
 		Id:         apid.New(apid.PrefixActor),
@@ -146,8 +146,8 @@ func TestConnectorNameUniquenessAndDeleteReuse(t *testing.T) {
 	}))
 
 	require.NoError(t, db.DeleteConnector(ctx, firstID))
-	reusedID := apid.New(apid.PrefixConnectorVersion)
-	require.NoError(t, db.UpsertConnectorDefinitionVersion(ctx, testConnectorWithDefinition(reusedID, "root", "shared", 1)))
+	reusedID := apid.New(apid.PrefixConnector)
+	require.NoError(t, db.UpsertConnectorGeneration(ctx, testConnectorWithDefinition(reusedID, "root", "shared", 1)))
 
 	require.ErrorIs(t, db.UpdateConnectorName(ctx, firstID, "deleted"), ErrNotFound)
 }
@@ -158,12 +158,12 @@ func TestConnectorNameExactListPaginationAndNamespaceRestrictions(t *testing.T) 
 	require.NoError(t, db.EnsureNamespaceByPath(ctx, "root.allowed"))
 	require.NoError(t, db.EnsureNamespaceByPath(ctx, "root.hidden"))
 
-	allowedID := apid.New(apid.PrefixConnectorVersion)
-	hiddenID := apid.New(apid.PrefixConnectorVersion)
-	otherID := apid.New(apid.PrefixConnectorVersion)
-	require.NoError(t, db.UpsertConnectorDefinitionVersion(ctx, testConnectorWithDefinition(allowedID, "root.allowed", "shared", 1)))
-	require.NoError(t, db.UpsertConnectorDefinitionVersion(ctx, testConnectorWithDefinition(hiddenID, "root.hidden", "shared", 1)))
-	require.NoError(t, db.UpsertConnectorDefinitionVersion(ctx, testConnectorWithDefinition(otherID, "root.allowed", "other", 1)))
+	allowedID := apid.New(apid.PrefixConnector)
+	hiddenID := apid.New(apid.PrefixConnector)
+	otherID := apid.New(apid.PrefixConnector)
+	require.NoError(t, db.UpsertConnectorGeneration(ctx, testConnectorWithDefinition(allowedID, "root.allowed", "shared", 1)))
+	require.NoError(t, db.UpsertConnectorGeneration(ctx, testConnectorWithDefinition(hiddenID, "root.hidden", "shared", 1)))
+	require.NoError(t, db.UpsertConnectorGeneration(ctx, testConnectorWithDefinition(otherID, "root.allowed", "other", 1)))
 
 	allowed := db.ListConnectorsBuilder().ForName("shared").ForNamespaceMatchers([]string{"root.allowed"}).FetchPage(ctx)
 	require.NoError(t, allowed.Error)
@@ -181,33 +181,33 @@ func TestConnectorNameExactListPaginationAndNamespaceRestrictions(t *testing.T) 
 	require.Len(t, second.Results, 1)
 	require.ElementsMatch(t, []apid.ID{allowedID, hiddenID}, []apid.ID{first.Results[0].Id, second.Results[0].Id})
 
-	versions := db.ListConnectorDefinitionVersionsBuilder().ForName("shared").ForNamespaceMatchers([]string{"root.**"}).FetchPage(ctx)
-	require.NoError(t, versions.Error)
-	require.Len(t, versions.Results, 2)
-	for _, version := range versions.Results {
-		require.Equal(t, scommon.ResourceName("shared"), version.Name)
+	generations := db.ListConnectorGenerationsBuilder().ForName("shared").ForNamespaceMatchers([]string{"root.**"}).FetchPage(ctx)
+	require.NoError(t, generations.Error)
+	require.Len(t, generations.Results, 2)
+	for _, generation := range generations.Results {
+		require.Equal(t, scommon.ResourceName("shared"), generation.Name)
 	}
 
 	err = db.UpdateConnectorName(ctx, otherID, "shared")
 	require.ErrorIs(t, err, ErrDuplicate)
-	unchanged, getErr := db.GetConnectorDefinitionVersion(ctx, otherID, 1)
+	unchanged, getErr := db.GetConnectorGeneration(ctx, otherID, 1)
 	require.NoError(t, getErr)
 	require.Equal(t, "other", unchanged.Labels["apxy/cxr/-/name"])
 }
 
-func TestConnectorDefinitionVersionLifecyclePreservesName(t *testing.T) {
+func TestConnectorGenerationLifecyclePreservesName(t *testing.T) {
 	_, db := MustApplyBlankTestDbConfig(t, nil)
 	ctx := context.Background()
-	id := apid.New(apid.PrefixConnectorVersion)
+	id := apid.New(apid.PrefixConnector)
 
-	require.NoError(t, db.UpsertConnectorDefinitionVersion(ctx, testConnectorWithDefinition(id, "root", "lifecycle", 1)))
-	require.NoError(t, db.SetConnectorDefinitionVersionState(ctx, id, 1, ConnectorDefinitionVersionStatePrimary))
-	require.NoError(t, db.SetConnectorDefinitionVersionState(ctx, id, 1, ConnectorDefinitionVersionStateArchived))
+	require.NoError(t, db.UpsertConnectorGeneration(ctx, testConnectorWithDefinition(id, "root", "lifecycle", 1)))
+	require.NoError(t, db.SetConnectorGenerationState(ctx, id, 1, ConnectorGenerationStatePrimary))
+	require.NoError(t, db.SetConnectorGenerationState(ctx, id, 1, ConnectorGenerationStateArchived))
 
-	projected, err := db.GetConnectorDefinitionVersion(ctx, id, 1)
+	projected, err := db.GetConnectorGeneration(ctx, id, 1)
 	require.NoError(t, err)
 	require.Equal(t, scommon.ResourceName("lifecycle"), projected.Name)
-	require.Equal(t, ConnectorDefinitionVersionStateArchived, projected.State)
+	require.Equal(t, ConnectorGenerationStateArchived, projected.State)
 }
 
 func TestConnectorMigrationBackfillsDeterministically(t *testing.T) {
@@ -215,11 +215,11 @@ func TestConnectorMigrationBackfillsDeterministically(t *testing.T) {
 	service := db.(*service)
 	migrateDatabaseToVersion(t, service, 15)
 
-	liveID := apid.New(apid.PrefixConnectorVersion)
-	deletedID := apid.New(apid.PrefixConnectorVersion)
+	liveID := apid.New(apid.PrefixConnector)
+	deletedID := apid.New(apid.PrefixConnector)
 	_, err := rawDB.Exec(fmt.Sprintf(`
-		INSERT INTO connector_versions (
-			id, version, namespace, labels, annotations, state, hash, encrypted_definition,
+		INSERT INTO connector_generations (
+			id, generation, namespace, labels, annotations, state, hash, encrypted_definition,
 			created_at, updated_at, deleted_at
 		) VALUES
 		('%s', 1, 'root.old', '{"selected":"no"}', '{"selected":"no"}', 'archived', 'old', '{"id":"dek_old","d":"old"}',
@@ -254,39 +254,39 @@ func TestConnectorMigrationBackfillsDeterministically(t *testing.T) {
 	require.Equal(t, deletedID.String(), deletedName)
 	require.NotNil(t, deletedAt)
 
-	_, err = rawDB.Query("SELECT namespace FROM connector_definition_versions")
+	_, err = rawDB.Query("SELECT namespace FROM connector_generations")
 	require.Error(t, err)
-	_, err = rawDB.Query("SELECT labels FROM connector_definition_versions")
+	_, err = rawDB.Query("SELECT labels FROM connector_generations")
 	require.Error(t, err)
-	_, err = rawDB.Query("SELECT annotations FROM connector_definition_versions")
+	_, err = rawDB.Query("SELECT annotations FROM connector_generations")
 	require.Error(t, err)
-	_, err = rawDB.Query("SELECT hash FROM connector_definition_versions")
+	_, err = rawDB.Query("SELECT hash FROM connector_generations")
 	require.Error(t, err)
-	_, err = rawDB.Query("SELECT type FROM connector_definition_versions")
+	_, err = rawDB.Query("SELECT type FROM connector_generations")
 	require.Error(t, err)
 	var liveDefinitionCreatedAt, liveDefinitionUpdatedAt time.Time
 	require.NoError(t, rawDB.QueryRow(fmt.Sprintf(
-		"SELECT created_at, updated_at FROM connector_definition_versions WHERE connector_id = '%s' AND version = 2",
+		"SELECT created_at, updated_at FROM connector_generations WHERE connector_id = '%s' AND generation = 2",
 		liveID,
 	)).Scan(&liveDefinitionCreatedAt, &liveDefinitionUpdatedAt))
 	require.True(t, time.Date(2024, time.March, 1, 0, 0, 0, 0, time.UTC).Equal(liveDefinitionCreatedAt))
 	require.True(t, time.Date(2024, time.March, 2, 0, 0, 0, 0, time.UTC).Equal(liveDefinitionUpdatedAt))
 	var liveDefinitionDeletedAt any
 	require.NoError(t, rawDB.QueryRow(fmt.Sprintf(
-		"SELECT deleted_at FROM connector_definition_versions WHERE connector_id = '%s' LIMIT 1",
+		"SELECT deleted_at FROM connector_generations WHERE connector_id = '%s' LIMIT 1",
 		liveID,
 	)).Scan(&liveDefinitionDeletedAt))
 	require.Nil(t, liveDefinitionDeletedAt)
 
 	var deletedDefinitionDeletedAt any
 	require.NoError(t, rawDB.QueryRow(fmt.Sprintf(
-		"SELECT deleted_at FROM connector_definition_versions WHERE connector_id = '%s' LIMIT 1",
+		"SELECT deleted_at FROM connector_generations WHERE connector_id = '%s' LIMIT 1",
 		deletedID,
 	)).Scan(&deletedDefinitionDeletedAt))
 	require.NotNil(t, deletedDefinitionDeletedAt)
 
 	rows, err := rawDB.Query(fmt.Sprintf(
-		"SELECT id FROM connector_definition_versions WHERE connector_id = '%s' ORDER BY version",
+		"SELECT id FROM connector_generations WHERE connector_id = '%s' ORDER BY generation",
 		liveID,
 	))
 	require.NoError(t, err)
@@ -299,40 +299,40 @@ func TestConnectorMigrationBackfillsDeterministically(t *testing.T) {
 	require.NoError(t, rows.Close())
 	require.Len(t, definitionIDs, 2)
 	for _, definitionID := range definitionIDs {
-		require.Equal(t, apid.PrefixConnectorDefinitionVersion, definitionID.Prefix())
+		require.Equal(t, apid.PrefixConnectorGeneration, definitionID.Prefix())
 	}
 
 	_, err = rawDB.Exec(fmt.Sprintf(`
-		INSERT INTO connector_definition_versions (
-			id, connector_id, version, state, encrypted_definition, created_at, updated_at
+		INSERT INTO connector_generations (
+			id, connector_id, generation, state, encrypted_definition, created_at, updated_at
 		) VALUES (
 			'cvd_duplicate', '%s', 2, 'draft', '{"id":"dek_duplicate","d":"duplicate"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 		)
 	`, liveID))
-	require.Error(t, err, "(connector_id, version) must be unique")
+	require.Error(t, err, "(connector_id, generation) must be unique")
 
-	projected, err := db.GetConnectorDefinitionVersion(context.Background(), liveID, 2)
+	projected, err := db.GetConnectorGeneration(context.Background(), liveID, 2)
 	require.NoError(t, err)
 	require.Equal(t, "root.live", projected.Namespace)
 	require.Equal(t, scommon.ResourceName(liveID.String()), projected.Name)
 
 	// A connector that was already soft-deleted before the table split must
 	// release its backfilled name after the upgrade. Reusing the name creates a
-	// new logical connector without reviving or rewriting the old versions.
+	// new logical connector without reviving or rewriting the old generations.
 	replacementID := apid.New(apid.PrefixConnector)
-	require.NoError(t, db.UpsertConnectorDefinitionVersion(
+	require.NoError(t, db.UpsertConnectorGeneration(
 		context.Background(),
 		testConnectorWithDefinition(replacementID, "root.deleted", scommon.ResourceName(deletedID.String()), 1),
 	))
-	replacement, err := db.GetConnectorDefinitionVersion(context.Background(), replacementID, 1)
+	replacement, err := db.GetConnectorGeneration(context.Background(), replacementID, 1)
 	require.NoError(t, err)
 	require.Equal(t, scommon.ResourceName(deletedID.String()), replacement.Name)
-	require.Equal(t, 2, sqlhMustCountConnectorDefinitionVersions(t, rawDB, liveID))
-	require.Equal(t, 1, sqlhMustCountConnectorDefinitionVersions(t, rawDB, replacementID))
+	require.Equal(t, 2, sqlhMustCountConnectorGenerations(t, rawDB, liveID))
+	require.Equal(t, 1, sqlhMustCountConnectorGenerations(t, rawDB, replacementID))
 
 	migrateDatabaseToVersion(t, service, 15)
 	rows, err = rawDB.Query(fmt.Sprintf(
-		"SELECT DISTINCT namespace FROM connector_versions WHERE id = '%s'",
+		"SELECT DISTINCT namespace FROM connector_generations WHERE id = '%s'",
 		liveID,
 	))
 	require.NoError(t, err)
@@ -349,11 +349,11 @@ func TestConnectorMigrationBackfillsDeterministically(t *testing.T) {
 	migrateDatabaseToVersion(t, service, 16)
 }
 
-func sqlhMustCountConnectorDefinitionVersions(t *testing.T, rawDB *sql.DB, id apid.ID) int {
+func sqlhMustCountConnectorGenerations(t *testing.T, rawDB *sql.DB, id apid.ID) int {
 	t.Helper()
 	var count int
 	require.NoError(t, rawDB.QueryRow(fmt.Sprintf(
-		"SELECT COUNT(*) FROM connector_definition_versions WHERE connector_id = '%s'",
+		"SELECT COUNT(*) FROM connector_generations WHERE connector_id = '%s'",
 		id,
 	)).Scan(&count))
 	return count
@@ -362,7 +362,7 @@ func sqlhMustCountConnectorDefinitionVersions(t *testing.T, rawDB *sql.DB, id ap
 func connectorDefinitionPayloads(t *testing.T, rawDB *sql.DB, id apid.ID) []string {
 	t.Helper()
 	rows, err := rawDB.Query(fmt.Sprintf(
-		"SELECT encrypted_definition FROM connector_definition_versions WHERE connector_id = '%s' ORDER BY version",
+		"SELECT encrypted_definition FROM connector_generations WHERE connector_id = '%s' ORDER BY generation",
 		id,
 	))
 	require.NoError(t, err)

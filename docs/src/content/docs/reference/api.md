@@ -236,7 +236,7 @@ projections, not partial resource objects. Each item carries one typed
 Namespace results use the immutable namespace path as an ID-only reference;
 clients can derive the display segment from that path. Search never returns
 request events, task history, or other operational projections as if they were
-durable resources. See [connector migration notifications](/operations/connector-version-migrations/#notifications)
+durable resources. See [connector migration notifications](/operations/connector-generation-migrations/#notifications)
 for the separate actor-specific notification projection and its view actions.
 
 ## Actor resource shape

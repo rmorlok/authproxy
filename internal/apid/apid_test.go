@@ -28,9 +28,9 @@ func TestNewSessionPrefix(t *testing.T) {
 	require.Len(t, string(id), 5+suffixLen)
 }
 
-func TestNewConnectorDefinitionVersionPrefix(t *testing.T) {
-	id := New(PrefixConnectorDefinitionVersion)
-	require.True(t, id.HasPrefix(PrefixConnectorDefinitionVersion))
+func TestNewConnectorGenerationPrefix(t *testing.T) {
+	id := New(PrefixConnectorGeneration)
+	require.True(t, id.HasPrefix(PrefixConnectorGeneration))
 	require.Len(t, string(id), 4+suffixLen)
 }
 

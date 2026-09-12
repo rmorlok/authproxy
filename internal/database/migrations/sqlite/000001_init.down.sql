@@ -8,8 +8,8 @@ drop table main.actors;
 drop index main.idx_connections_deleted_at;
 drop table main.connections;
 
-drop index main.idx_connector_versions_deleted_at;
-drop table main.connector_versions;
+drop index main.idx_connector_generations_deleted_at;
+drop table main.connector_generations;
 
 drop index main.idx_namespaces_deleted_at;
 drop table main.namespaces;

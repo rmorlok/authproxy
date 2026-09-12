@@ -74,7 +74,7 @@ func (s *service) RefreshNamespaceLabelsCarryForward(ctx context.Context, nsPath
 
 // RefreshConnectionsForConnector re-derives the materialized apxy/
 // portion of every connection pointing at the logical connector. Labels are
-// connector-owned, so a change applies across every definition version.
+// connector-owned, so a change applies across every generation.
 func (s *service) RefreshConnectionsForConnector(ctx context.Context, id apid.ID) error {
 	rows, err := s.sq.
 		Select("id").
@@ -228,7 +228,7 @@ func (s *service) refreshConnectorsInNamespace(ctx context.Context, nsPath strin
 }
 
 // recomputeConnectionLabelsTx opens a short transaction, re-derives the
-// connection's full labels from its current connector version + namespace +
+// connection's full labels from its current connector generation + namespace +
 // own user labels, and persists the result if it differs. Returns true if
 // drift was detected and corrected.
 func (s *service) recomputeConnectionLabelsTx(ctx context.Context, id apid.ID) (bool, error) {
@@ -268,7 +268,7 @@ func (s *service) recomputeConnectionLabelsTx(ctx context.Context, id apid.ID) (
 
 		newLabels := ApplyParentCarryForward(
 			userLabels,
-			ParentCarryForward{Rt: ApidPrefixToLabelToken(apid.PrefixConnectorVersion), Labels: cvLabels},
+			ParentCarryForward{Rt: ApidPrefixToLabelToken(apid.PrefixConnector), Labels: cvLabels},
 			ParentCarryForward{Rt: NamespaceLabelToken, Labels: nsLabels},
 		)
 		newLabels = InjectSelfImplicitLabels(conn.Id, conn.Name, conn.Namespace, newLabels)

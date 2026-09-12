@@ -8,19 +8,19 @@ import (
 )
 
 const (
-	connectionResourceSamplesTable = "app_metrics_connection_resource_samples"
-	actorResourceSamplesTable      = "app_metrics_actor_resource_samples"
-	connectorResourceSamplesTable  = "app_metrics_connector_resource_samples"
-	connectorVersionSamplesTable   = "app_metrics_connector_version_resource_samples"
-	namespaceResourceSamplesTable  = "app_metrics_namespace_resource_samples"
-	rateLimitResourceSamplesTable  = "app_metrics_rate_limit_resource_samples"
+	connectionResourceSamplesTable  = "app_metrics_connection_resource_samples"
+	actorResourceSamplesTable       = "app_metrics_actor_resource_samples"
+	connectorResourceSamplesTable   = "app_metrics_connector_resource_samples"
+	connectorGenerationSamplesTable = "app_metrics_connector_generation_resource_samples"
+	namespaceResourceSamplesTable   = "app_metrics_namespace_resource_samples"
+	rateLimitResourceSamplesTable   = "app_metrics_rate_limit_resource_samples"
 
-	ResourceTypeConnection       = "connection"
-	ResourceTypeActor            = "actor"
-	ResourceTypeConnector        = "connector"
-	ResourceTypeConnectorVersion = "connector_version"
-	ResourceTypeNamespace        = "namespace"
-	ResourceTypeRateLimit        = "rate_limit"
+	ResourceTypeConnection          = "connection"
+	ResourceTypeActor               = "actor"
+	ResourceTypeConnector           = "connector"
+	ResourceTypeConnectorGeneration = "connector_generation"
+	ResourceTypeNamespace           = "namespace"
+	ResourceTypeRateLimit           = "rate_limit"
 )
 
 // ResourceSampleQuery filters point-in-time resource samples.
@@ -37,18 +37,18 @@ type ResourceSampleQuery struct {
 // resource metrics. Samples are keyed by SampledAt + ResourceID so rerunning a
 // snapshot bucket is idempotent.
 type ConnectionResourceSample struct {
-	SampledAt         time.Time
-	ResourceType      string
-	ResourceID        apid.ID
-	Namespace         string
-	Labels            database.Labels
-	State             database.ConnectionState
-	HealthState       database.ConnectionHealthState
-	ConnectorID       apid.ID
-	ConnectorVersion  uint64
-	ResourceCreatedAt time.Time
-	ResourceUpdatedAt time.Time
-	ResourceDeletedAt *time.Time
+	SampledAt           time.Time
+	ResourceType        string
+	ResourceID          apid.ID
+	Namespace           string
+	Labels              database.Labels
+	State               database.ConnectionState
+	HealthState         database.ConnectionHealthState
+	ConnectorID         apid.ID
+	ConnectorGeneration uint64
+	ResourceCreatedAt   time.Time
+	ResourceUpdatedAt   time.Time
+	ResourceDeletedAt   *time.Time
 }
 
 // ActorResourceSample is a point-in-time snapshot of an actor for resource
@@ -66,33 +66,33 @@ type ActorResourceSample struct {
 }
 
 // ConnectorResourceSample is a point-in-time snapshot of a connector collapsed
-// across versions.
+// across generations.
 type ConnectorResourceSample struct {
-	SampledAt         time.Time
-	ResourceType      string
-	ResourceID        apid.ID
-	Namespace         string
-	Labels            database.Labels
-	State             database.ConnectorDefinitionVersionState
-	ConnectorVersion  uint64
-	ResourceCreatedAt time.Time
-	ResourceUpdatedAt time.Time
-	ResourceDeletedAt *time.Time
+	SampledAt           time.Time
+	ResourceType        string
+	ResourceID          apid.ID
+	Namespace           string
+	Labels              database.Labels
+	State               database.ConnectorGenerationState
+	ConnectorGeneration uint64
+	ResourceCreatedAt   time.Time
+	ResourceUpdatedAt   time.Time
+	ResourceDeletedAt   *time.Time
 }
 
-// ConnectorVersionResourceSample is a point-in-time snapshot of a connector
-// version.
-type ConnectorVersionResourceSample struct {
-	SampledAt         time.Time
-	ResourceType      string
-	ResourceID        apid.ID
-	Namespace         string
-	Labels            database.Labels
-	State             database.ConnectorDefinitionVersionState
-	ConnectorVersion  uint64
-	ResourceCreatedAt time.Time
-	ResourceUpdatedAt time.Time
-	ResourceDeletedAt *time.Time
+// ConnectorGenerationResourceSample is a point-in-time snapshot of a connector
+// generation.
+type ConnectorGenerationResourceSample struct {
+	SampledAt           time.Time
+	ResourceType        string
+	ResourceID          apid.ID
+	Namespace           string
+	Labels              database.Labels
+	State               database.ConnectorGenerationState
+	ConnectorGeneration uint64
+	ResourceCreatedAt   time.Time
+	ResourceUpdatedAt   time.Time
+	ResourceDeletedAt   *time.Time
 }
 
 // NamespaceResourceSample is a point-in-time snapshot of a namespace.

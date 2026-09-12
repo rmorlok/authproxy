@@ -141,21 +141,21 @@ func TestConnectionLifecycleActionResponseValidation(t *testing.T) {
 		"taskId")
 
 	connectorRef := connection.Spec.ConnectorRef
-	migration := NewConnectionVersionMigrationResponse(
+	migration := NewConnectionGenerationMigrationResponse(
 		target,
-		ConnectionVersionMigrationSpec{
+		ConnectionGenerationMigrationSpec{
 			ConnectorRef: connectorRef,
 		},
-		ConnectionVersionMigrationStatus{
+		ConnectionGenerationMigrationStatus{
 			TaskID:             "task-token",
 			SourceConnectorRef: connectorRef,
 			TargetConnectorRef: connectorRef,
 		},
 	)
-	require.NoError(t, migration.ValidateResponse(ConnectionVersionMigrationActionKind))
+	require.NoError(t, migration.ValidateResponse(ConnectionGenerationMigrationActionKind))
 	migration.Status.TargetConnectorRef.Generation = 0
 	require.ErrorContains(t,
-		migration.ValidateResponse(ConnectionVersionMigrationActionKind),
+		migration.ValidateResponse(ConnectionGenerationMigrationActionKind),
 		"generation")
 
 	forceState := NewConnectionForceStateResponse(

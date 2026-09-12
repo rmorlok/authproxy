@@ -12,10 +12,10 @@ import (
 )
 
 const (
-	ConnectionDisconnectActionKind       meta.Kind = "ConnectionDisconnect"
-	ConnectionVersionMigrationActionKind meta.Kind = "ConnectionVersionMigration"
-	ConnectionForceStateActionKind       meta.Kind = "ConnectionForceState"
-	ConnectionScopeKind                  meta.Kind = "ConnectionScope"
+	ConnectionDisconnectActionKind          meta.Kind = "ConnectionDisconnect"
+	ConnectionGenerationMigrationActionKind meta.Kind = "ConnectionGenerationMigration"
+	ConnectionForceStateActionKind          meta.Kind = "ConnectionForceState"
+	ConnectionScopeKind                     meta.Kind = "ConnectionScope"
 )
 
 type ListConnectionResponseJson struct {
@@ -149,24 +149,24 @@ func NewConnectionDisconnectResponse(
 	)}
 }
 
-// ConnectionVersionMigrationSpec identifies the exact target connector
+// ConnectionGenerationMigrationSpec identifies the exact target connector
 // generation. The action target remains the Connection being migrated.
-type ConnectionVersionMigrationSpec struct {
+type ConnectionGenerationMigrationSpec struct {
 	ConnectorRef   meta.ObjectReference `json:"connectorRef" yaml:"connectorRef"`
 	TimeoutSeconds *int64               `json:"timeoutSeconds,omitempty" yaml:"timeoutSeconds,omitempty"`
 }
 
-type ConnectionVersionMigrationStatus struct {
+type ConnectionGenerationMigrationStatus struct {
 	TaskID             string               `json:"taskId" yaml:"taskId"`
 	SourceConnectorRef meta.ObjectReference `json:"sourceConnectorRef" yaml:"sourceConnectorRef"`
 	TargetConnectorRef meta.ObjectReference `json:"targetConnectorRef" yaml:"targetConnectorRef"`
 }
 
-type ConnectionVersionMigrationAction struct {
-	apiv1alpha1.Action[ConnectionVersionMigrationSpec, ConnectionVersionMigrationStatus] `json:",inline" yaml:",inline"`
+type ConnectionGenerationMigrationAction struct {
+	apiv1alpha1.Action[ConnectionGenerationMigrationSpec, ConnectionGenerationMigrationStatus] `json:",inline" yaml:",inline"`
 }
 
-func (a *ConnectionVersionMigrationAction) ValidateRequest(
+func (a *ConnectionGenerationMigrationAction) ValidateRequest(
 	expectedKind meta.Kind,
 ) error {
 	if err := a.Action.ValidateRequest(expectedKind); err != nil {
@@ -175,7 +175,7 @@ func (a *ConnectionVersionMigrationAction) ValidateRequest(
 	return a.validateFields(false)
 }
 
-func (a *ConnectionVersionMigrationAction) ValidateResponse(
+func (a *ConnectionGenerationMigrationAction) ValidateResponse(
 	expectedKind meta.Kind,
 ) error {
 	if err := a.Action.ValidateResponse(expectedKind); err != nil {
@@ -184,13 +184,13 @@ func (a *ConnectionVersionMigrationAction) ValidateResponse(
 	return a.validateFields(true)
 }
 
-func (a *ConnectionVersionMigrationAction) validateFields(
+func (a *ConnectionGenerationMigrationAction) validateFields(
 	requireStatus bool,
 ) error {
 	if err := validateConnectionActionTarget(a.Metadata.Target); err != nil {
 		return err
 	}
-	if err := validateVersionedConnectorReference(
+	if err := validateConnectorGenerationReference(
 		a.Spec.ConnectorRef,
 		"$.spec.connectorRef",
 	); err != nil {
@@ -208,13 +208,13 @@ func (a *ConnectionVersionMigrationAction) validateFields(
 	if a.Status.TaskID == "" {
 		return fmt.Errorf("$.status.taskId: is required")
 	}
-	if err := validateVersionedConnectorReference(
+	if err := validateConnectorGenerationReference(
 		a.Status.SourceConnectorRef,
 		"$.status.sourceConnectorRef",
 	); err != nil {
 		return err
 	}
-	if err := validateVersionedConnectorReference(
+	if err := validateConnectorGenerationReference(
 		a.Status.TargetConnectorRef,
 		"$.status.targetConnectorRef",
 	); err != nil {
@@ -223,7 +223,7 @@ func (a *ConnectionVersionMigrationAction) validateFields(
 	return nil
 }
 
-func validateVersionedConnectorReference(
+func validateConnectorGenerationReference(
 	reference meta.ObjectReference,
 	path string,
 ) error {
@@ -248,14 +248,14 @@ func validateVersionedConnectorReference(
 	return nil
 }
 
-func NewConnectionVersionMigrationResponse(
+func NewConnectionGenerationMigrationResponse(
 	target meta.ObjectReference,
-	spec ConnectionVersionMigrationSpec,
-	status ConnectionVersionMigrationStatus,
-) ConnectionVersionMigrationAction {
-	return ConnectionVersionMigrationAction{
+	spec ConnectionGenerationMigrationSpec,
+	status ConnectionGenerationMigrationStatus,
+) ConnectionGenerationMigrationAction {
+	return ConnectionGenerationMigrationAction{
 		Action: apiv1alpha1.NewActionResponse(
-			ConnectionVersionMigrationActionKind,
+			ConnectionGenerationMigrationActionKind,
 			target,
 			spec,
 			status,

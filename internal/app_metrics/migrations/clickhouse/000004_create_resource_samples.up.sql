@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS app_metrics_connection_resource_samples (
     state String,
     health_state String,
     connector_id String,
-    connector_version UInt64 DEFAULT 0,
+    connector_generation UInt64 DEFAULT 0,
     resource_created_at_ms Int64,
     resource_updated_at_ms Int64,
     resource_deleted_at_ms Nullable(Int64),

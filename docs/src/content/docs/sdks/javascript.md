@@ -59,7 +59,7 @@ Scope the JWT to only the services, namespaces, resources, verbs, and resource I
 The package exports the shared Axios `client`, individual functions, typed models, and grouped modules for:
 
 - actors
-- connectors and connector versions
+- connectors and connector generations
 - connections and setup flows
 - namespaces
 - encryption keys

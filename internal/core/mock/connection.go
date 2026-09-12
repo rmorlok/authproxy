@@ -18,23 +18,23 @@ import (
 )
 
 type Connection struct {
-	Id                apid.ID
-	Namespace         string
-	Name              common.ResourceName
-	State             database.ConnectionState
-	HealthState       database.ConnectionHealthState
-	ConnectorId       apid.ID
-	ConnectorVersion  uint64
-	ConnectorValue    iface.Connector
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
-	DeletedAt         *time.Time
-	Labels            map[string]string
-	Annotations       map[string]string
-	SetupStep         *cschema.SetupStep
-	SetupError        *string
-	Configuration     map[string]any
-	JavascriptLibrary *apjs.Library
+	Id                  apid.ID
+	Namespace           string
+	Name                common.ResourceName
+	State               database.ConnectionState
+	HealthState         database.ConnectionHealthState
+	ConnectorId         apid.ID
+	ConnectorGeneration uint64
+	ConnectorValue      iface.Connector
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+	DeletedAt           *time.Time
+	Labels              map[string]string
+	Annotations         map[string]string
+	SetupStep           *cschema.SetupStep
+	SetupError          *string
+	Configuration       map[string]any
+	JavascriptLibrary   *apjs.Library
 }
 
 func (m *Connection) GetId() apid.ID {
@@ -57,8 +57,8 @@ func (m *Connection) GetConnectorId() apid.ID {
 	return m.ConnectorId
 }
 
-func (m *Connection) GetConnectorVersion() uint64 {
-	return m.ConnectorVersion
+func (m *Connection) GetConnectorGeneration() uint64 {
+	return m.ConnectorGeneration
 }
 
 func (m *Connection) GetCreatedAt() time.Time {

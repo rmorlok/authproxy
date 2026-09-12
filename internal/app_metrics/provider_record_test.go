@@ -15,25 +15,25 @@ import (
 // recordOpts lets tests tweak the synthetic LogRecord they round-trip without
 // repeating the full field list each call.
 type recordOpts struct {
-	timestamp        time.Time
-	method           string
-	host             string
-	path             string
-	statusCode       int
-	duration         time.Duration
-	requestType      httpf.RequestType
-	correlationId    string
-	connectionId     apid.ID
-	connectorId      apid.ID
-	connectorVersion uint64
-	labels           database.Labels
-	responseSource   ResponseSource
-	rateLimitId      apid.ID
-	rateLimitMode    string
-	rateLimitBucket  map[string]string
-	rateLimitMatched []RateLimitMatch
-	reqBodySkipped   BodySkippedReason
-	respBodySkipped  BodySkippedReason
+	timestamp           time.Time
+	method              string
+	host                string
+	path                string
+	statusCode          int
+	duration            time.Duration
+	requestType         httpf.RequestType
+	correlationId       string
+	connectionId        apid.ID
+	connectorId         apid.ID
+	connectorGeneration uint64
+	labels              database.Labels
+	responseSource      ResponseSource
+	rateLimitId         apid.ID
+	rateLimitMode       string
+	rateLimitBucket     map[string]string
+	rateLimitMatched    []RateLimitMatch
+	reqBodySkipped      BodySkippedReason
+	respBodySkipped     BodySkippedReason
 }
 
 func makeRecord(namespace string, o recordOpts) *LogRecord {
@@ -67,7 +67,7 @@ func makeRecord(namespace string, o recordOpts) *LogRecord {
 		MillisecondDuration: MillisecondDuration(o.duration),
 		ConnectionId:        o.connectionId,
 		ConnectorId:         o.connectorId,
-		ConnectorVersion:    o.connectorVersion,
+		ConnectorGeneration: o.connectorGeneration,
 		Method:              o.method,
 		Host:                o.host,
 		Scheme:              "https",
@@ -97,15 +97,15 @@ func TestRequestEvents_StoreAndGetRecord_RoundTrip(t *testing.T) {
 	ctx := context.Background()
 
 	rec := makeRecord("root", recordOpts{
-		correlationId:    "corr-123",
-		connectionId:     apid.New(apid.PrefixConnection),
-		connectorId:      apid.New(apid.PrefixConnectorVersion),
-		connectorVersion: 7,
-		labels:           database.Labels{"env": "prod", "team": "api"},
-		responseSource:   ResponseSourceConnectorRateLimiter,
-		rateLimitId:      apid.New(apid.PrefixRateLimit),
-		rateLimitMode:    "enforce",
-		rateLimitBucket:  map[string]string{"path": "/api/test", "method": "GET"},
+		correlationId:       "corr-123",
+		connectionId:        apid.New(apid.PrefixConnection),
+		connectorId:         apid.New(apid.PrefixConnector),
+		connectorGeneration: 7,
+		labels:              database.Labels{"env": "prod", "team": "api"},
+		responseSource:      ResponseSourceConnectorRateLimiter,
+		rateLimitId:         apid.New(apid.PrefixRateLimit),
+		rateLimitMode:       "enforce",
+		rateLimitBucket:     map[string]string{"path": "/api/test", "method": "GET"},
 		rateLimitMatched: []RateLimitMatch{
 			{Id: apid.New(apid.PrefixRateLimit), Mode: "observe", Bucket: map[string]string{"k": "v"}},
 		},
@@ -126,7 +126,7 @@ func TestRequestEvents_StoreAndGetRecord_RoundTrip(t *testing.T) {
 	require.Equal(t, rec.MillisecondDuration, got.MillisecondDuration)
 	require.Equal(t, rec.ConnectionId, got.ConnectionId)
 	require.Equal(t, rec.ConnectorId, got.ConnectorId)
-	require.Equal(t, rec.ConnectorVersion, got.ConnectorVersion)
+	require.Equal(t, rec.ConnectorGeneration, got.ConnectorGeneration)
 	require.Equal(t, rec.Method, got.Method)
 	require.Equal(t, rec.Host, got.Host)
 	require.Equal(t, rec.Scheme, got.Scheme)
@@ -208,31 +208,31 @@ func TestRequestEvents_List_FilterByScalarFields(t *testing.T) {
 	ctx := context.Background()
 
 	connId := apid.New(apid.PrefixConnection)
-	connectorId := apid.New(apid.PrefixConnectorVersion)
+	connectorId := apid.New(apid.PrefixConnector)
 	rateLimitId := apid.New(apid.PrefixRateLimit)
 
 	wanted := makeRecord("root", recordOpts{
-		correlationId:    "match",
-		connectionId:     connId,
-		connectorId:      connectorId,
-		connectorVersion: 42,
-		method:           "POST",
-		path:             "/wanted",
-		statusCode:       404,
-		responseSource:   ResponseSourceConnectorRateLimiter,
-		rateLimitId:      rateLimitId,
-		requestType:      httpf.RequestTypeOAuth,
+		correlationId:       "match",
+		connectionId:        connId,
+		connectorId:         connectorId,
+		connectorGeneration: 42,
+		method:              "POST",
+		path:                "/wanted",
+		statusCode:          404,
+		responseSource:      ResponseSourceConnectorRateLimiter,
+		rateLimitId:         rateLimitId,
+		requestType:         httpf.RequestTypeOAuth,
 	})
 	other := makeRecord("root", recordOpts{
-		correlationId:    "other",
-		connectionId:     apid.New(apid.PrefixConnection),
-		connectorId:      apid.New(apid.PrefixConnectorVersion),
-		connectorVersion: 1,
-		method:           "GET",
-		path:             "/other",
-		statusCode:       200,
-		responseSource:   ResponseSourceUpstream,
-		requestType:      httpf.RequestTypeProxy,
+		correlationId:       "other",
+		connectionId:        apid.New(apid.PrefixConnection),
+		connectorId:         apid.New(apid.PrefixConnector),
+		connectorGeneration: 1,
+		method:              "GET",
+		path:                "/other",
+		statusCode:          200,
+		responseSource:      ResponseSourceUpstream,
+		requestType:         httpf.RequestTypeProxy,
 	})
 	require.NoError(t, store.StoreRecords(ctx, []*LogRecord{wanted, other}))
 
@@ -243,7 +243,7 @@ func TestRequestEvents_List_FilterByScalarFields(t *testing.T) {
 		{"correlation_id", func(b ListRequestBuilder) ListRequestBuilder { return b.ForCorrelationId("match") }},
 		{"connection_id", func(b ListRequestBuilder) ListRequestBuilder { return b.ForConnectionId(connId) }},
 		{"connector_id", func(b ListRequestBuilder) ListRequestBuilder { return b.ForConnectorId(connectorId) }},
-		{"connector_version", func(b ListRequestBuilder) ListRequestBuilder { return b.ForConnectorVersion(42) }},
+		{"connector_generation", func(b ListRequestBuilder) ListRequestBuilder { return b.ForConnectorGeneration(42) }},
 		{"method", func(b ListRequestBuilder) ListRequestBuilder { return b.ForMethod("POST") }},
 		{"status_code single", func(b ListRequestBuilder) ListRequestBuilder { return b.ForStatusCode(404) }},
 		{"status_code range", func(b ListRequestBuilder) ListRequestBuilder { return b.ForStatusCodeRangeInclusive(400, 499) }},
@@ -454,8 +454,8 @@ func TestRequestEvents_Metrics_FiltersAndGroups(t *testing.T) {
 	ctx := context.Background()
 
 	base := time.Date(2026, 5, 25, 12, 0, 0, 0, time.UTC)
-	connectorA := apid.New(apid.PrefixConnectorVersion)
-	connectorB := apid.New(apid.PrefixConnectorVersion)
+	connectorA := apid.New(apid.PrefixConnector)
+	connectorB := apid.New(apid.PrefixConnector)
 	require.NoError(t, store.StoreRecords(ctx, []*LogRecord{
 		makeRecord("root.team", recordOpts{
 			timestamp:   base.Add(time.Minute),

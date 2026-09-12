@@ -1,6 +1,6 @@
 # authproxy_connector
 
-Manages an AuthProxy connector with automatic generation lifecycle. The established Terraform attribute is named `version`, but its value comes from API `metadata.generation`.
+Manages an AuthProxy connector with automatic generation lifecycle.
 
 ## Example Usage
 
@@ -62,16 +62,16 @@ resource "authproxy_connector" "gmail_staging" {
 
 ## Attribute Reference
 
-- `id` - The stable connector ID (persists across version changes).
-- `version` - The selected connector generation (`metadata.generation`).
-- `state` - The current version state (`draft`, `primary`, `active`, `archived`).
+- `id` - The stable connector ID (persists across generation changes).
+- `generation` - The selected connector generation (`metadata.generation`).
+- `state` - The current generation state (`draft`, `primary`, `active`, `archived`).
 - `display_name` - Display name extracted from the definition.
 - `created_at` - Timestamp of creation.
 - `updated_at` - Timestamp of last update.
 
-## Version Lifecycle
+## Generation Lifecycle
 
-The connector resource abstracts version management:
+The connector resource abstracts generation management:
 
 - **Create**: Creates generation 1 with desired release state `primary` when `publish = true`, or `draft` when false.
 - **Update a published definition**: Creates a new generation. With `publish = true`, the new generation becomes primary and the previous primary becomes active.

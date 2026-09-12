@@ -194,7 +194,7 @@ type Notification struct {
 	ActionPermissions NotificationPermissions
 
 	// Metadata is producer-specific structured context for debugging or UI
-	// hints, e.g. {"target_version": 3, "requires_reauth": true}.
+	// hints, e.g. {"target_generation": 3, "requires_reauth": true}.
 	Metadata NotificationMetadata
 
 	// ResolvedAt is set when State transitions to resolved.

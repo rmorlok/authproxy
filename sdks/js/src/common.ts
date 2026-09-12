@@ -86,7 +86,7 @@ export interface ObjectReference<K extends string = ResourceKind> extends TypeMe
   generation?: number;
 }
 
-export type VersionedConnectorReference = ObjectReference<'Connector'> & {
+export type ConnectorGenerationReference = ObjectReference<'Connector'> & {
   generation: number;
 };
 

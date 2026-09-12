@@ -7,13 +7,13 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 )
 
-func configuredConnectorResource(id apid.ID, version uint64, namespace string, labels map[string]string, definition cschema.ConnectorDefinition) sconfig.Connector {
+func configuredConnectorResource(id apid.ID, generation uint64, namespace string, labels map[string]string, definition cschema.ConnectorDefinition) sconfig.Connector {
 	return sconfig.Connector{
 		TypeMeta: meta.NewTypeMeta(cschema.ConnectorKind),
 		Metadata: meta.ObjectMeta{
 			ID:         id.String(),
 			Namespace:  namespace,
-			Generation: version,
+			Generation: generation,
 			Labels:     labels,
 		},
 		Spec: cschema.ConnectorSpec{Definition: definition},

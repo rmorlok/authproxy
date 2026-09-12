@@ -670,17 +670,17 @@ func (env *IntegrationTestEnv) DoProxyRawStreamingRequest(
 }
 
 // CreateConnection creates a connection directly in the database.
-func (env *IntegrationTestEnv) CreateConnection(t *testing.T, connectorID apid.ID, connectorVersion uint64) string {
+func (env *IntegrationTestEnv) CreateConnection(t *testing.T, connectorID apid.ID, connectorGeneration uint64) string {
 	t.Helper()
 
 	id := apid.New(apid.PrefixConnection)
 
 	err := env.Db.CreateConnection(context.Background(), &database.Connection{
-		Id:               id,
-		Namespace:        sconfig.RootNamespace,
-		ConnectorId:      connectorID,
-		ConnectorVersion: connectorVersion,
-		State:            database.ConnectionStateSetup,
+		Id:                  id,
+		Namespace:           sconfig.RootNamespace,
+		ConnectorId:         connectorID,
+		ConnectorGeneration: connectorGeneration,
+		State:               database.ConnectionStateSetup,
 	})
 	require.NoError(t, err)
 

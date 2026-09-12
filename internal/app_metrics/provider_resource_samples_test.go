@@ -19,50 +19,50 @@ func TestResourceSamples_ConnectionSamples_IdempotentAndQueryable(t *testing.T) 
 	sampledAt := time.Date(2026, 5, 25, 12, 0, 0, 0, time.UTC)
 	connID := apid.New(apid.PrefixConnection)
 	otherConnID := apid.New(apid.PrefixConnection)
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 	createdAt := sampledAt.Add(-time.Hour)
 	updatedAt := sampledAt.Add(-time.Minute)
 
 	err := resourceStore.StoreConnectionResourceSamples(ctx, []*ConnectionResourceSample{
 		{
-			SampledAt:         sampledAt,
-			ResourceID:        connID,
-			Namespace:         "root.acme.prod",
-			Labels:            database.Labels{"env": "prod", "tier": "silver"},
-			State:             database.ConnectionStateSetup,
-			HealthState:       database.ConnectionHealthStateHealthy,
-			ConnectorID:       connectorID,
-			ConnectorVersion:  1,
-			ResourceCreatedAt: createdAt,
-			ResourceUpdatedAt: updatedAt,
+			SampledAt:           sampledAt,
+			ResourceID:          connID,
+			Namespace:           "root.acme.prod",
+			Labels:              database.Labels{"env": "prod", "tier": "silver"},
+			State:               database.ConnectionStateSetup,
+			HealthState:         database.ConnectionHealthStateHealthy,
+			ConnectorID:         connectorID,
+			ConnectorGeneration: 1,
+			ResourceCreatedAt:   createdAt,
+			ResourceUpdatedAt:   updatedAt,
 		},
 		{
-			SampledAt:         sampledAt,
-			ResourceID:        otherConnID,
-			Namespace:         "root.other",
-			Labels:            database.Labels{"env": "prod", "tier": "gold"},
-			State:             database.ConnectionStateConfigured,
-			HealthState:       database.ConnectionHealthStateHealthy,
-			ConnectorID:       connectorID,
-			ConnectorVersion:  1,
-			ResourceCreatedAt: createdAt,
-			ResourceUpdatedAt: updatedAt,
+			SampledAt:           sampledAt,
+			ResourceID:          otherConnID,
+			Namespace:           "root.other",
+			Labels:              database.Labels{"env": "prod", "tier": "gold"},
+			State:               database.ConnectionStateConfigured,
+			HealthState:         database.ConnectionHealthStateHealthy,
+			ConnectorID:         connectorID,
+			ConnectorGeneration: 1,
+			ResourceCreatedAt:   createdAt,
+			ResourceUpdatedAt:   updatedAt,
 		},
 	})
 	require.NoError(t, err)
 
 	err = resourceStore.StoreConnectionResourceSamples(ctx, []*ConnectionResourceSample{
 		{
-			SampledAt:         sampledAt,
-			ResourceID:        connID,
-			Namespace:         "root.acme.prod",
-			Labels:            database.Labels{"env": "prod", "tier": "gold"},
-			State:             database.ConnectionStateConfigured,
-			HealthState:       database.ConnectionHealthStateUnhealthy,
-			ConnectorID:       connectorID,
-			ConnectorVersion:  2,
-			ResourceCreatedAt: createdAt,
-			ResourceUpdatedAt: sampledAt,
+			SampledAt:           sampledAt,
+			ResourceID:          connID,
+			Namespace:           "root.acme.prod",
+			Labels:              database.Labels{"env": "prod", "tier": "gold"},
+			State:               database.ConnectionStateConfigured,
+			HealthState:         database.ConnectionHealthStateUnhealthy,
+			ConnectorID:         connectorID,
+			ConnectorGeneration: 2,
+			ResourceCreatedAt:   createdAt,
+			ResourceUpdatedAt:   sampledAt,
 		},
 	})
 	require.NoError(t, err)
@@ -86,7 +86,7 @@ func TestResourceSamples_ConnectionSamples_IdempotentAndQueryable(t *testing.T) 
 	require.Equal(t, database.ConnectionStateConfigured, got.State)
 	require.Equal(t, database.ConnectionHealthStateUnhealthy, got.HealthState)
 	require.Equal(t, connectorID, got.ConnectorID)
-	require.Equal(t, uint64(2), got.ConnectorVersion)
+	require.Equal(t, uint64(2), got.ConnectorGeneration)
 	require.True(t, sampledAt.Equal(got.SampledAt))
 	require.True(t, createdAt.Equal(got.ResourceCreatedAt))
 	require.True(t, sampledAt.Equal(got.ResourceUpdatedAt))
@@ -159,33 +159,33 @@ func TestResourceSamples_AdditionalSamples_IdempotentAndQueryable(t *testing.T) 
 
 	ctx := context.Background()
 	sampledAt := time.Date(2026, 5, 25, 12, 30, 0, 0, time.UTC)
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 	rateLimitID := apid.New(apid.PrefixRateLimit)
 	createdAt := sampledAt.Add(-time.Hour)
 	updatedAt := sampledAt.Add(-time.Minute)
 
 	require.NoError(t, resourceStore.StoreConnectorResourceSamples(ctx, []*ConnectorResourceSample{
 		{
-			SampledAt:         sampledAt,
-			ResourceID:        connectorID,
-			Namespace:         "root.acme",
-			Labels:            database.Labels{"env": "prod", "kind": "connector"},
-			State:             database.ConnectorDefinitionVersionStateDraft,
-			ConnectorVersion:  1,
-			ResourceCreatedAt: createdAt,
-			ResourceUpdatedAt: updatedAt,
+			SampledAt:           sampledAt,
+			ResourceID:          connectorID,
+			Namespace:           "root.acme",
+			Labels:              database.Labels{"env": "prod", "kind": "connector"},
+			State:               database.ConnectorGenerationStateDraft,
+			ConnectorGeneration: 1,
+			ResourceCreatedAt:   createdAt,
+			ResourceUpdatedAt:   updatedAt,
 		},
 	}))
 	require.NoError(t, resourceStore.StoreConnectorResourceSamples(ctx, []*ConnectorResourceSample{
 		{
-			SampledAt:         sampledAt,
-			ResourceID:        connectorID,
-			Namespace:         "root.acme",
-			Labels:            database.Labels{"env": "prod", "kind": "connector"},
-			State:             database.ConnectorDefinitionVersionStatePrimary,
-			ConnectorVersion:  2,
-			ResourceCreatedAt: createdAt,
-			ResourceUpdatedAt: sampledAt,
+			SampledAt:           sampledAt,
+			ResourceID:          connectorID,
+			Namespace:           "root.acme",
+			Labels:              database.Labels{"env": "prod", "kind": "connector"},
+			State:               database.ConnectorGenerationStatePrimary,
+			ConnectorGeneration: 2,
+			ResourceCreatedAt:   createdAt,
+			ResourceUpdatedAt:   sampledAt,
 		},
 	}))
 
@@ -196,30 +196,30 @@ func TestResourceSamples_AdditionalSamples_IdempotentAndQueryable(t *testing.T) 
 	require.NoError(t, err)
 	require.Len(t, connectorSamples, 1)
 	require.Equal(t, ResourceTypeConnector, connectorSamples[0].ResourceType)
-	require.Equal(t, database.ConnectorDefinitionVersionStatePrimary, connectorSamples[0].State)
-	require.Equal(t, uint64(2), connectorSamples[0].ConnectorVersion)
+	require.Equal(t, database.ConnectorGenerationStatePrimary, connectorSamples[0].State)
+	require.Equal(t, uint64(2), connectorSamples[0].ConnectorGeneration)
 
-	require.NoError(t, resourceStore.StoreConnectorVersionResourceSamples(ctx, []*ConnectorVersionResourceSample{
+	require.NoError(t, resourceStore.StoreConnectorGenerationResourceSamples(ctx, []*ConnectorGenerationResourceSample{
 		{
-			SampledAt:         sampledAt,
-			ResourceID:        connectorID,
-			Namespace:         "root.acme",
-			Labels:            database.Labels{"env": "prod", "kind": "connector-version"},
-			State:             database.ConnectorDefinitionVersionStatePrimary,
-			ConnectorVersion:  2,
-			ResourceCreatedAt: createdAt,
-			ResourceUpdatedAt: updatedAt,
+			SampledAt:           sampledAt,
+			ResourceID:          connectorID,
+			Namespace:           "root.acme",
+			Labels:              database.Labels{"env": "prod", "kind": "connector-generation"},
+			State:               database.ConnectorGenerationStatePrimary,
+			ConnectorGeneration: 2,
+			ResourceCreatedAt:   createdAt,
+			ResourceUpdatedAt:   updatedAt,
 		},
 	}))
-	connectorVersionSamples, err := resourceRetriever.ListConnectorVersionResourceSamples(ctx, ResourceSampleQuery{
+	connectorGenerationSamples, err := resourceRetriever.ListConnectorGenerationResourceSamples(ctx, ResourceSampleQuery{
 		NamespaceMatchers: []string{"root.acme"},
-		LabelSelector:     "kind=connector-version",
+		LabelSelector:     "kind=connector-generation",
 	})
 	require.NoError(t, err)
-	require.Len(t, connectorVersionSamples, 1)
-	require.Equal(t, ResourceTypeConnectorVersion, connectorVersionSamples[0].ResourceType)
-	require.Equal(t, database.ConnectorDefinitionVersionStatePrimary, connectorVersionSamples[0].State)
-	require.Equal(t, uint64(2), connectorVersionSamples[0].ConnectorVersion)
+	require.Len(t, connectorGenerationSamples, 1)
+	require.Equal(t, ResourceTypeConnectorGeneration, connectorGenerationSamples[0].ResourceType)
+	require.Equal(t, database.ConnectorGenerationStatePrimary, connectorGenerationSamples[0].State)
+	require.Equal(t, uint64(2), connectorGenerationSamples[0].ConnectorGeneration)
 
 	require.NoError(t, resourceStore.StoreNamespaceResourceSamples(ctx, []*NamespaceResourceSample{
 		{

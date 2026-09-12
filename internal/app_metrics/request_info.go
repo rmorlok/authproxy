@@ -15,7 +15,7 @@ func SetLogRecordFieldsFromRequestInfo(er *LogRecord, ri httpf.RequestInfo) {
 	er.Namespace = ri.Namespace
 	er.Type = t
 	er.ConnectorId = ri.ConnectorId
-	er.ConnectorVersion = ri.ConnectorVersion
+	er.ConnectorGeneration = ri.ConnectorGeneration
 	er.ConnectionId = ri.ConnectionId
 	er.Labels = ri.Labels
 }

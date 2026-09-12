@@ -45,7 +45,7 @@ type ListRequestEventsQuery struct {
 	ConnectionId             *apid.ID `form:"connectionId" swaggertype:"string"`
 	ConnectorType            *string  `form:"connectorType"`
 	ConnectorId              *apid.ID `form:"connectorId" swaggertype:"string"`
-	ConnectorVersion         *uint64  `form:"connectorVersion"`
+	ConnectorGeneration      *uint64  `form:"connectorGeneration"`
 	Method                   *string  `form:"method"`
 	StatusCode               *int     `form:"statusCode"`
 	StatusCodeRangeInclusive *string  `form:"statusCodeRange"`
@@ -84,8 +84,8 @@ func (q *ListRequestEventsQuery) ApplyToBuilder(
 		b = b.ForConnectorId(*q.ConnectorId)
 	}
 
-	if q.ConnectorVersion != nil {
-		b = b.ForConnectorVersion(*q.ConnectorVersion)
+	if q.ConnectorGeneration != nil {
+		b = b.ForConnectorGeneration(*q.ConnectorGeneration)
 	}
 
 	if q.Method != nil {
@@ -262,9 +262,9 @@ func resourceMetricFromAPI(metric, aggregation string) (app_metrics.ResourceMetr
 		if aggregation == "count" {
 			return app_metrics.ResourceMetricConnectorsCount, nil
 		}
-	case "resources.connector_versions":
+	case "resources.connector_generations":
 		if aggregation == "count" {
-			return app_metrics.ResourceMetricConnectorVersionsCount, nil
+			return app_metrics.ResourceMetricConnectorGenerationsCount, nil
 		}
 	case "resources.namespaces":
 		if aggregation == "count" {
@@ -315,7 +315,7 @@ func metricsSchemaResponse() sapi.MetricsSchemaResponseJson {
 					string(app_metrics.ResourceGroupByState),
 					string(app_metrics.ResourceGroupByHealthState),
 					string(app_metrics.ResourceGroupByConnectorID),
-					string(app_metrics.ResourceGroupByConnectorVersion),
+					string(app_metrics.ResourceGroupByConnectorGeneration),
 				},
 			},
 			{
@@ -332,18 +332,18 @@ func metricsSchemaResponse() sapi.MetricsSchemaResponseJson {
 				Aggregations: []string{"count"},
 				GroupBy: []string{
 					string(app_metrics.ResourceGroupByState),
-					string(app_metrics.ResourceGroupByConnectorVersion),
+					string(app_metrics.ResourceGroupByConnectorGeneration),
 					string(app_metrics.ResourceGroupByNamespace),
 				},
 			},
 			{
-				Metric:       "resources.connector_versions",
+				Metric:       "resources.connector_generations",
 				Kind:         "gauge",
 				Aggregations: []string{"count"},
 				GroupBy: []string{
 					string(app_metrics.ResourceGroupByState),
 					string(app_metrics.ResourceGroupByConnectorID),
-					string(app_metrics.ResourceGroupByConnectorVersion),
+					string(app_metrics.ResourceGroupByConnectorGeneration),
 					string(app_metrics.ResourceGroupByNamespace),
 				},
 			},
@@ -540,7 +540,7 @@ func (r *RequestEventsRoutes) get(gctx *gin.Context) {
 // @Param			connectionId		query		string	false	"Filter by connection UUID"
 // @Param			connectorType		query		string	false	"Filter by connector type"
 // @Param			connectorId		query		string	false	"Filter by connector UUID"
-// @Param			connectorVersion	query		integer	false	"Filter by connector version"
+// @Param			connectorGeneration	query		integer	false	"Filter by connector generation"
 // @Param			method				query		string	false	"Filter by HTTP method"
 // @Param			statusCode			query		integer	false	"Filter by exact status code"
 // @Param			statusCodeRange	query		string	false	"Filter by status code range (e.g., '200-299')"

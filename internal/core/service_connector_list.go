@@ -21,13 +21,13 @@ func (l *listConnectorWrapper) convertPageResult(result pagination.PageResult[da
 		return pagination.PageResult[iface.Connector]{Error: result.Error}
 	}
 
-	versions := make([]iface.Connector, 0, len(result.Results))
+	generations := make([]iface.Connector, 0, len(result.Results))
 	for _, r := range result.Results {
-		versions = append(versions, wrapConnector(r, l.s))
+		generations = append(generations, wrapConnector(r, l.s))
 	}
 
 	return pagination.PageResult[iface.Connector]{
-		Results: versions,
+		Results: generations,
 		Error:   result.Error,
 		HasMore: result.HasMore,
 		Cursor:  result.Cursor,
@@ -73,14 +73,14 @@ func (l *listConnectorWrapper) ForId(id apid.ID) iface.ListConnectorsBuilder {
 	}
 }
 
-func (l *listConnectorWrapper) ForState(s database.ConnectorDefinitionVersionState) iface.ListConnectorsBuilder {
+func (l *listConnectorWrapper) ForState(s database.ConnectorGenerationState) iface.ListConnectorsBuilder {
 	return &listConnectorWrapper{
 		l: l.l.ForState(s),
 		s: l.s,
 	}
 }
 
-func (l *listConnectorWrapper) ForStates(states []database.ConnectorDefinitionVersionState) iface.ListConnectorsBuilder {
+func (l *listConnectorWrapper) ForStates(states []database.ConnectorGenerationState) iface.ListConnectorsBuilder {
 	return &listConnectorWrapper{
 		l: l.l.ForStates(states),
 		s: l.s,

@@ -42,7 +42,7 @@ func TestSetConnectorStateMapsCanonicalResourceWithoutDefinitionStripping(t *tes
 	model := ConnectorResourceModel{Publish: types.BoolValue(true)}
 	setConnectorState(&model, connector)
 
-	if model.Id.ValueString() != "cxr_test" || model.Version.ValueInt64() != 3 || !model.Publish.ValueBool() {
+	if model.Id.ValueString() != "cxr_test" || model.Generation.ValueInt64() != 3 || !model.Publish.ValueBool() {
 		t.Fatalf("identity/release mapping: %+v", model)
 	}
 	if model.State.ValueString() != "primary" || model.DisplayName.ValueString() != "Example" {

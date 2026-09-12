@@ -22,10 +22,10 @@ func TestConnectionGetResourceBuildsCanonicalEnvelope(t *testing.T) {
 	connectorID := apid.New(apid.PrefixConnector)
 	connector := &Connector{
 		ConnectorWithDefinition: database.ConnectorWithDefinition{
-			Id:        connectorID,
-			Name:      "salesforce",
-			Namespace: "root.acme",
-			Version:   4,
+			Id:         connectorID,
+			Name:       "salesforce",
+			Namespace:  "root.acme",
+			Generation: 4,
 		}, def: &connectorschema.ConnectorDefinition{
 			SetupFlow: &connectorschema.SetupFlow{
 				Preconnect: &connectorschema.SetupFlowPhase{
@@ -55,7 +55,7 @@ func TestConnectionGetResourceBuildsCanonicalEnvelope(t *testing.T) {
 			State:                  database.ConnectionStateSetup,
 			HealthState:            database.ConnectionHealthStateUnhealthy,
 			ConnectorId:            connectorID,
-			ConnectorVersion:       4,
+			ConnectorGeneration:    4,
 			Labels:                 database.Labels{"team": "platform"},
 			Annotations:            database.Annotations{"owner": "integrations"},
 			SetupStep:              &connectorschema.SetupStepVerifyFailed,
@@ -100,22 +100,22 @@ func TestConnectionGetResourceOmitsSetupAndDefaultsHealth(t *testing.T) {
 	now := time.Now().UTC()
 	connector := &Connector{
 		ConnectorWithDefinition: database.ConnectorWithDefinition{
-			Id:        apid.New(apid.PrefixConnector),
-			Name:      "example",
-			Namespace: "root",
-			Version:   1,
+			Id:         apid.New(apid.PrefixConnector),
+			Name:       "example",
+			Namespace:  "root",
+			Generation: 1,
 		},
 		def: &connectorschema.ConnectorDefinition{},
 	}
 	wrapped := wrapConnection(&database.Connection{
-		Id:               apid.New(apid.PrefixConnection),
-		Name:             "example",
-		Namespace:        "root",
-		State:            database.ConnectionStateConfigured,
-		ConnectorId:      connector.Id,
-		ConnectorVersion: connector.Version,
-		CreatedAt:        now,
-		UpdatedAt:        now,
+		Id:                  apid.New(apid.PrefixConnection),
+		Name:                "example",
+		Namespace:           "root",
+		State:               database.ConnectionStateConfigured,
+		ConnectorId:         connector.Id,
+		ConnectorGeneration: connector.Generation,
+		CreatedAt:           now,
+		UpdatedAt:           now,
 	},
 		connector,
 		&service{logger: aplog.NewNoopLogger()},
@@ -140,10 +140,10 @@ func TestConnectionGetResourceReportsIncompleteRequiredConfiguration(t *testing.
 	now := time.Now().UTC()
 	connector := &Connector{
 		ConnectorWithDefinition: database.ConnectorWithDefinition{
-			Id:        apid.New(apid.PrefixConnector),
-			Name:      "example",
-			Namespace: "root",
-			Version:   1,
+			Id:         apid.New(apid.PrefixConnector),
+			Name:       "example",
+			Namespace:  "root",
+			Generation: 1,
 		},
 		def: &connectorschema.ConnectorDefinition{SetupFlow: &connectorschema.SetupFlow{
 			Configure: &connectorschema.SetupFlowPhase{Steps: []connectorschema.SetupFlowStep{{
@@ -155,14 +155,14 @@ func TestConnectionGetResourceReportsIncompleteRequiredConfiguration(t *testing.
 
 	wrapped := wrapConnection(
 		&database.Connection{
-			Id:               apid.New(apid.PrefixConnection),
-			Name:             "example",
-			Namespace:        "root",
-			State:            database.ConnectionStateSetup,
-			ConnectorId:      connector.Id,
-			ConnectorVersion: connector.Version,
-			CreatedAt:        now,
-			UpdatedAt:        now,
+			Id:                  apid.New(apid.PrefixConnection),
+			Name:                "example",
+			Namespace:           "root",
+			State:               database.ConnectionStateSetup,
+			ConnectorId:         connector.Id,
+			ConnectorGeneration: connector.Generation,
+			CreatedAt:           now,
+			UpdatedAt:           now,
 		},
 		connector,
 		&service{logger: aplog.NewNoopLogger()},

@@ -104,7 +104,7 @@ spec:
 List responses use `kind: RequestEventList`; pagination is returned in
 `metadata.continue`, and the exact match count (when available) is returned in
 `metadata.total`. Existing request-event filters retain their current query
-parameter names, including `connectorVersion` for generation-specific queries.
+parameter names, including `connectorGeneration` for generation-specific queries.
 
 Full request and response payloads are separate encrypted blobs and exist only
 when `fullRequestRecording` is `always`. Keep recording at `never` unless the
@@ -178,10 +178,10 @@ Resource metrics are computed from periodic app-metrics resource samples.
 
 | Metric | Aggregations | `group_by` |
 |---|---|---|
-| `resources.connections` | `count` | `state`, `health_state`, `connector_id`, `connector_version` |
+| `resources.connections` | `count` | `state`, `health_state`, `connector_id`, `connector_generation` |
 | `resources.actors` | `count` | `namespace` |
-| `resources.connectors` | `count` | `state`, `connector_version`, `namespace` |
-| `resources.connector_versions` | `count` | `state`, `connector_id`, `connector_version`, `namespace` |
+| `resources.connectors` | `count` | `state`, `connector_generation`, `namespace` |
+| `resources.connector_generations` | `count` | `state`, `connector_id`, `connector_generation`, `namespace` |
 | `resources.namespaces` | `count` | `state`, `namespace` |
 | `resources.rate_limits` | `count` | `mode`, `namespace` |
 

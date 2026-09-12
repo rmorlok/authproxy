@@ -15,23 +15,23 @@ import (
 type ResourceMetric string
 
 const (
-	ResourceMetricConnectionsCount       ResourceMetric = "resources.connections.count"
-	ResourceMetricActorsCount            ResourceMetric = "resources.actors.count"
-	ResourceMetricConnectorsCount        ResourceMetric = "resources.connectors.count"
-	ResourceMetricConnectorVersionsCount ResourceMetric = "resources.connector_versions.count"
-	ResourceMetricNamespacesCount        ResourceMetric = "resources.namespaces.count"
-	ResourceMetricRateLimitsCount        ResourceMetric = "resources.rate_limits.count"
+	ResourceMetricConnectionsCount          ResourceMetric = "resources.connections.count"
+	ResourceMetricActorsCount               ResourceMetric = "resources.actors.count"
+	ResourceMetricConnectorsCount           ResourceMetric = "resources.connectors.count"
+	ResourceMetricConnectorGenerationsCount ResourceMetric = "resources.connector_generations.count"
+	ResourceMetricNamespacesCount           ResourceMetric = "resources.namespaces.count"
+	ResourceMetricRateLimitsCount           ResourceMetric = "resources.rate_limits.count"
 )
 
 type ResourceGroupBy string
 
 const (
-	ResourceGroupByState            ResourceGroupBy = "state"
-	ResourceGroupByHealthState      ResourceGroupBy = "health_state"
-	ResourceGroupByConnectorID      ResourceGroupBy = "connector_id"
-	ResourceGroupByConnectorVersion ResourceGroupBy = "connector_version"
-	ResourceGroupByNamespace        ResourceGroupBy = "namespace"
-	ResourceGroupByMode             ResourceGroupBy = "mode"
+	ResourceGroupByState               ResourceGroupBy = "state"
+	ResourceGroupByHealthState         ResourceGroupBy = "health_state"
+	ResourceGroupByConnectorID         ResourceGroupBy = "connector_id"
+	ResourceGroupByConnectorGeneration ResourceGroupBy = "connector_generation"
+	ResourceGroupByNamespace           ResourceGroupBy = "namespace"
+	ResourceGroupByMode                ResourceGroupBy = "mode"
 )
 
 type ResourceMetricsQuery struct {
@@ -96,7 +96,7 @@ func isValidResourceMetric(metric ResourceMetric) bool {
 	case ResourceMetricConnectionsCount,
 		ResourceMetricActorsCount,
 		ResourceMetricConnectorsCount,
-		ResourceMetricConnectorVersionsCount,
+		ResourceMetricConnectorGenerationsCount,
 		ResourceMetricNamespacesCount,
 		ResourceMetricRateLimitsCount:
 		return true
@@ -116,7 +116,7 @@ func IsValidResourceGroupBy(metric ResourceMetric, groupBy ResourceGroupBy) bool
 		case ResourceGroupByState,
 			ResourceGroupByHealthState,
 			ResourceGroupByConnectorID,
-			ResourceGroupByConnectorVersion:
+			ResourceGroupByConnectorGeneration:
 			return true
 		}
 	case ResourceMetricActorsCount:
@@ -124,15 +124,15 @@ func IsValidResourceGroupBy(metric ResourceMetric, groupBy ResourceGroupBy) bool
 	case ResourceMetricConnectorsCount:
 		switch groupBy {
 		case ResourceGroupByState,
-			ResourceGroupByConnectorVersion,
+			ResourceGroupByConnectorGeneration,
 			ResourceGroupByNamespace:
 			return true
 		}
-	case ResourceMetricConnectorVersionsCount:
+	case ResourceMetricConnectorGenerationsCount:
 		switch groupBy {
 		case ResourceGroupByState,
 			ResourceGroupByConnectorID,
-			ResourceGroupByConnectorVersion,
+			ResourceGroupByConnectorGeneration,
 			ResourceGroupByNamespace:
 			return true
 		}
@@ -158,7 +158,7 @@ func executeResourceMetricsQueries(
 	fetchConnections func(context.Context, ResourceMetricsQuery) ([]*ConnectionResourceSample, error),
 	fetchActors func(context.Context, ResourceMetricsQuery) ([]*ActorResourceSample, error),
 	fetchConnectors func(context.Context, ResourceMetricsQuery) ([]*ConnectorResourceSample, error),
-	fetchConnectorVersions func(context.Context, ResourceMetricsQuery) ([]*ConnectorVersionResourceSample, error),
+	fetchConnectorGenerations func(context.Context, ResourceMetricsQuery) ([]*ConnectorGenerationResourceSample, error),
 	fetchNamespaces func(context.Context, ResourceMetricsQuery) ([]*NamespaceResourceSample, error),
 	fetchRateLimits func(context.Context, ResourceMetricsQuery) ([]*RateLimitResourceSample, error),
 ) ([]ResourceMetricSeries, error) {
@@ -186,12 +186,12 @@ func executeResourceMetricsQueries(
 				return nil, err
 			}
 			out = append(out, buildConnectorResourceMetricSeries(query, samples)...)
-		case ResourceMetricConnectorVersionsCount:
-			samples, err := fetchConnectorVersions(ctx, query)
+		case ResourceMetricConnectorGenerationsCount:
+			samples, err := fetchConnectorGenerations(ctx, query)
 			if err != nil {
 				return nil, err
 			}
-			out = append(out, buildConnectorVersionResourceMetricSeries(query, samples)...)
+			out = append(out, buildConnectorGenerationResourceMetricSeries(query, samples)...)
 		case ResourceMetricNamespacesCount:
 			samples, err := fetchNamespaces(ctx, query)
 			if err != nil {
@@ -241,13 +241,13 @@ func buildConnectorResourceMetricSeries(query ResourceMetricsQuery, samples []*C
 	})
 }
 
-func buildConnectorVersionResourceMetricSeries(query ResourceMetricsQuery, samples []*ConnectorVersionResourceSample) []ResourceMetricSeries {
-	return buildResourceMetricSeries(query, samples, func(sample *ConnectorVersionResourceSample) time.Time {
+func buildConnectorGenerationResourceMetricSeries(query ResourceMetricsQuery, samples []*ConnectorGenerationResourceSample) []ResourceMetricSeries {
+	return buildResourceMetricSeries(query, samples, func(sample *ConnectorGenerationResourceSample) time.Time {
 		return sample.SampledAt
-	}, func(sample *ConnectorVersionResourceSample) string {
-		return sample.ResourceID.String() + ":" + strconv.FormatUint(sample.ConnectorVersion, 10)
-	}, func(sample *ConnectorVersionResourceSample) map[string]string {
-		return connectorVersionResourceMetricLabels(sample, query.GroupBy)
+	}, func(sample *ConnectorGenerationResourceSample) string {
+		return sample.ResourceID.String() + ":" + strconv.FormatUint(sample.ConnectorGeneration, 10)
+	}, func(sample *ConnectorGenerationResourceSample) map[string]string {
+		return connectorGenerationResourceMetricLabels(sample, query.GroupBy)
 	})
 }
 
@@ -353,8 +353,8 @@ func connectionResourceMetricLabels(sample *ConnectionResourceSample, groupBy []
 			labels[string(group)] = string(sample.HealthState)
 		case ResourceGroupByConnectorID:
 			labels[string(group)] = sample.ConnectorID.String()
-		case ResourceGroupByConnectorVersion:
-			labels[string(group)] = strconv.FormatUint(sample.ConnectorVersion, 10)
+		case ResourceGroupByConnectorGeneration:
+			labels[string(group)] = strconv.FormatUint(sample.ConnectorGeneration, 10)
 		}
 	}
 	return labels
@@ -376,8 +376,8 @@ func connectorResourceMetricLabels(sample *ConnectorResourceSample, groupBy []Re
 		switch group {
 		case ResourceGroupByState:
 			labels[string(group)] = string(sample.State)
-		case ResourceGroupByConnectorVersion:
-			labels[string(group)] = strconv.FormatUint(sample.ConnectorVersion, 10)
+		case ResourceGroupByConnectorGeneration:
+			labels[string(group)] = strconv.FormatUint(sample.ConnectorGeneration, 10)
 		case ResourceGroupByNamespace:
 			labels[string(group)] = sample.Namespace
 		}
@@ -385,7 +385,7 @@ func connectorResourceMetricLabels(sample *ConnectorResourceSample, groupBy []Re
 	return labels
 }
 
-func connectorVersionResourceMetricLabels(sample *ConnectorVersionResourceSample, groupBy []ResourceGroupBy) map[string]string {
+func connectorGenerationResourceMetricLabels(sample *ConnectorGenerationResourceSample, groupBy []ResourceGroupBy) map[string]string {
 	labels := make(map[string]string, len(groupBy))
 	for _, group := range groupBy {
 		switch group {
@@ -393,8 +393,8 @@ func connectorVersionResourceMetricLabels(sample *ConnectorVersionResourceSample
 			labels[string(group)] = string(sample.State)
 		case ResourceGroupByConnectorID:
 			labels[string(group)] = sample.ResourceID.String()
-		case ResourceGroupByConnectorVersion:
-			labels[string(group)] = strconv.FormatUint(sample.ConnectorVersion, 10)
+		case ResourceGroupByConnectorGeneration:
+			labels[string(group)] = strconv.FormatUint(sample.ConnectorGeneration, 10)
 		case ResourceGroupByNamespace:
 			labels[string(group)] = sample.Namespace
 		}

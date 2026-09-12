@@ -25,8 +25,8 @@ INSERT INTO connectors
 ('cxr_testslack0000001',     'root.child2',      'cxr_testslack0000001',     '{"type":"outlook"}',      '2023-10-03 00:00:00', '2023-10-12 00:00:00', null),
 ('cxr_testgmail0000003',     'root.child.grand', 'cxr_testgmail0000003',     '{"type":"google_drive"}', '2023-10-04 00:00:00', '2023-10-14 00:00:00', null);
 
-INSERT INTO connector_definition_versions
-(id,                         connector_id,                version, state,      encrypted_definition,                       created_at,       updated_at) VALUES
+INSERT INTO connector_generations
+(id,                         connector_id,                generation, state,      encrypted_definition,                       created_at,       updated_at) VALUES
 ('cvd_testgmail0000011',     'cxr_testgmail0000001',      1,       'active',   '{"id":"dek_test","d":"encrypted-def"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 ('cvd_testgmail0000012',     'cxr_testgmail0000001',      2,       'primary',  '{"id":"dek_test","d":"encrypted-def"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 ('cvd_testgmail0000021',     'cxr_testgmail0000002',      1,       'archived', '{"id":"dek_test","d":"encrypted-def"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
@@ -72,8 +72,8 @@ INSERT INTO connectors
 ('cxr_testslack0000001',     'root.dev',          'cxr_testslack0000001',     '{"type":"outlook"}',      '2023-10-03 00:00:00', '2023-10-03 00:00:00', null),
 ('cxr_testgmail0000003',     'root.prod.tenant1', 'cxr_testgmail0000003',     '{"type":"google_drive"}', '2023-10-04 00:00:00', '2023-10-04 00:00:00', null);
 
-INSERT INTO connector_definition_versions
-(id,                         connector_id,                version, state,     encrypted_definition,                       created_at,       updated_at) VALUES
+INSERT INTO connector_generations
+(id,                         connector_id,                generation, state,     encrypted_definition,                       created_at,       updated_at) VALUES
 ('cvd_testgmail0000011',     'cxr_testgmail0000001',      1,       'primary', '{"id":"dek_test","d":"encrypted-def"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 ('cvd_testgmail0000021',     'cxr_testgmail0000002',      1,       'primary', '{"id":"dek_test","d":"encrypted-def"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 ('cvd_testslack0000011',     'cxr_testslack0000001',      1,       'primary', '{"id":"dek_test","d":"encrypted-def"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),

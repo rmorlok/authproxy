@@ -38,7 +38,7 @@ func NewFactoryWithMockingClient(ctrl *gomock.Controller) *MockF {
 
 	h.
 		EXPECT().
-		ForConnectorVersion(gomock.Any()).
+		ForConnectorGeneration(gomock.Any()).
 		Return(h).
 		AnyTimes()
 

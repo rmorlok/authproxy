@@ -11,13 +11,13 @@ import (
 )
 
 // Connector is the hydrated core representation of a logical connector at a
-// selected definition version.
+// selected definition generation.
 type Connector interface {
 	GetId() apid.ID
 	GetNamespace() string
 	GetName() common.ResourceName
-	GetVersion() uint64
-	GetState() database.ConnectorDefinitionVersionState
+	GetGeneration() uint64
+	GetState() database.ConnectorGenerationState
 	GetHash() string
 	GetCreatedAt() time.Time
 	GetUpdatedAt() time.Time
@@ -25,5 +25,5 @@ type Connector interface {
 	GetAnnotations() map[string]string
 	GetDefinition() *cschema.ConnectorDefinition
 	GetResource() *cschema.Connector
-	SetState(ctx context.Context, state database.ConnectorDefinitionVersionState) error
+	SetState(ctx context.Context, state database.ConnectorGenerationState) error
 }

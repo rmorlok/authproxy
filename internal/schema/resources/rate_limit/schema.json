@@ -88,7 +88,7 @@
             "actor",
             "connection",
             "connector",
-            "connector_version",
+            "connector_generation",
             "namespace",
             "method"
           ]

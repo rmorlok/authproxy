@@ -52,7 +52,7 @@ type MigrationAction = 'migrate' | 'rollback';
 interface MigrationStatus {
   action: MigrationAction;
   state: 'starting' | 'polling' | 'completed' | 'failed';
-  targetVersion: number;
+  targetGeneration: number;
   taskId?: string;
   task?: Task;
   message?: string;
@@ -100,26 +100,26 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [migrationOpen, setMigrationOpen] = useState(false);
-  const [migrationVersions, setMigrationVersions] = useState<Connector[]>([]);
-  const [migrationVersionsLoading, setMigrationVersionsLoading] = useState(false);
-  const [migrationVersionsError, setMigrationVersionsError] = useState<string | null>(null);
-  const [selectedMigrationVersion, setSelectedMigrationVersion] = useState<number | ''>('');
+  const [migrationGenerations, setMigrationGenerations] = useState<Connector[]>([]);
+  const [migrationGenerationsLoading, setMigrationGenerationsLoading] = useState(false);
+  const [migrationGenerationsError, setMigrationGenerationsError] = useState<string | null>(null);
+  const [selectedMigrationGeneration, setSelectedMigrationGeneration] = useState<number | ''>('');
   const [migrationStatus, setMigrationStatus] = useState<MigrationStatus | null>(null);
 
   const stateOptions = useMemo(() => Object.values(ConnectionState), []);
-  const eligibleMigrationVersions = useMemo(() => {
+  const eligibleMigrationGenerations = useMemo(() => {
     if (!conn) {
       return [];
     }
-    return migrationVersions.filter((version) =>
-      version.metadata.generation !== conn.spec.connectorRef.generation &&
-      (version.status.release.state === ConnectorReleaseState.PRIMARY ||
-        version.status.release.state === ConnectorReleaseState.ACTIVE),
+    return migrationGenerations.filter((generation) =>
+      generation.metadata.generation !== conn.spec.connectorRef.generation &&
+      (generation.status.release.state === ConnectorReleaseState.PRIMARY ||
+        generation.status.release.state === ConnectorReleaseState.ACTIVE),
     );
-  }, [conn, migrationVersions]);
+  }, [conn, migrationGenerations]);
   const selectedMigrationTarget = useMemo(
-    () => eligibleMigrationVersions.find((version) => version.metadata.generation === selectedMigrationVersion),
-    [eligibleMigrationVersions, selectedMigrationVersion],
+    () => eligibleMigrationGenerations.find((generation) => generation.metadata.generation === selectedMigrationGeneration),
+    [eligibleMigrationGenerations, selectedMigrationGeneration],
   );
   const migrationInProgress = migrationStatus?.state === 'starting' || migrationStatus?.state === 'polling';
 
@@ -244,12 +244,12 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
 
     setActionError(null);
     setMigrationStatus(null);
-    setMigrationVersions([]);
-    setMigrationVersionsError(null);
-    setSelectedMigrationVersion('');
+    setMigrationGenerations([]);
+    setMigrationGenerationsError(null);
+    setSelectedMigrationGeneration('');
     closeMenu();
     setMigrationOpen(true);
-    setMigrationVersionsLoading(true);
+    setMigrationGenerationsLoading(true);
 
     try {
       const connectorId = conn.spec.connectorRef.id;
@@ -260,21 +260,21 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
         limit: 100,
         orderBy: 'generation desc',
       });
-      const eligible = response.data.items.filter((version) =>
-        version.metadata.generation !== conn.spec.connectorRef.generation &&
-        (version.status.release.state === ConnectorReleaseState.PRIMARY ||
-          version.status.release.state === ConnectorReleaseState.ACTIVE),
+      const eligible = response.data.items.filter((generation) =>
+        generation.metadata.generation !== conn.spec.connectorRef.generation &&
+        (generation.status.release.state === ConnectorReleaseState.PRIMARY ||
+          generation.status.release.state === ConnectorReleaseState.ACTIVE),
       );
-      setMigrationVersions(response.data.items);
-      setSelectedMigrationVersion(
-        eligible.find((version) => version.status.release.state === ConnectorReleaseState.PRIMARY)?.metadata.generation ??
+      setMigrationGenerations(response.data.items);
+      setSelectedMigrationGeneration(
+        eligible.find((generation) => generation.status.release.state === ConnectorReleaseState.PRIMARY)?.metadata.generation ??
         eligible[0]?.metadata.generation ??
         '',
       );
     } catch (err: any) {
-      setMigrationVersionsError(err?.response?.data?.error || err.message || 'Failed to load connector versions');
+      setMigrationGenerationsError(err?.response?.data?.error || err.message || 'Failed to load connector generations');
     } finally {
-      setMigrationVersionsLoading(false);
+      setMigrationGenerationsLoading(false);
     }
   };
 
@@ -289,11 +289,11 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
     setMigrationStatus({
       action,
       state: 'starting',
-      targetVersion: targetGeneration,
+      targetGeneration: targetGeneration,
     });
 
     try {
-      const response = await connections.migrateVersion(conn.metadata.id, {
+      const response = await connections.migrateGeneration(conn.metadata.id, {
         connectorRef: {
           ...conn.spec.connectorRef,
           generation: targetGeneration,
@@ -303,7 +303,7 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
       setMigrationStatus({
         action,
         state: 'polling',
-        targetVersion: targetGeneration,
+        targetGeneration: targetGeneration,
         taskId: response.data.status.taskId,
       });
 
@@ -317,7 +317,7 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
         setMigrationStatus({
           action,
           state: 'failed',
-          targetVersion: targetGeneration,
+          targetGeneration: targetGeneration,
           taskId: response.data.status.taskId,
           task: result.task,
           message: result.task?.status.state === TaskState.FAILED
@@ -331,7 +331,7 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
       setMigrationStatus({
         action,
         state: 'completed',
-        targetVersion: targetGeneration,
+        targetGeneration: targetGeneration,
         taskId: response.data.status.taskId,
         task: result.task,
       });
@@ -340,7 +340,7 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
       setMigrationStatus({
         action,
         state: 'failed',
-        targetVersion: targetGeneration,
+        targetGeneration: targetGeneration,
         message: err?.response?.data?.error || err.message || 'Failed to start connection migration.',
       });
     } finally {
@@ -394,7 +394,7 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
             />
             <Divider/>
             <MenuItem onClick={onClickDisconnect} disabled={!canBeDisconnected(conn) || actionLoading || migrationInProgress}>Disconnect</MenuItem>
-            <MenuItem onClick={onClickMigration} disabled={actionLoading || migrationInProgress}>Change version…</MenuItem>
+            <MenuItem onClick={onClickMigration} disabled={actionLoading || migrationInProgress}>Change generation…</MenuItem>
             <Divider/>
             <MenuItem onClick={onClickForceState} disabled={actionLoading || migrationInProgress}>Force state…</MenuItem>
           </Menu>
@@ -427,9 +427,9 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
                 : 'info'
           }
         >
-          {migrationStatus.state === 'starting' && `${migrationActionLabel} to v${migrationStatus.targetVersion} is starting...`}
-          {migrationStatus.state === 'polling' && `${migrationActionLabel} to v${migrationStatus.targetVersion} is running.`}
-          {migrationStatus.state === 'completed' && `${migrationActionLabel} to v${migrationStatus.targetVersion} completed.`}
+          {migrationStatus.state === 'starting' && `${migrationActionLabel} to v${migrationStatus.targetGeneration} is starting...`}
+          {migrationStatus.state === 'polling' && `${migrationActionLabel} to v${migrationStatus.targetGeneration} is running.`}
+          {migrationStatus.state === 'completed' && `${migrationActionLabel} to v${migrationStatus.targetGeneration} completed.`}
           {migrationStatus.state === 'failed' && (migrationStatus.message || `${migrationActionLabel} failed.`)}
           {migrationStatus.taskId && (
             <Typography component="div" variant="caption" sx={{mt: 0.5, wordBreak: 'break-all'}}>
@@ -486,7 +486,7 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
           </Box>
           <ResourceLabels labels={connector?.metadata.labels}/>
           <Box>
-            <Typography variant="subtitle2" color="text.secondary">Version</Typography>
+            <Typography variant="subtitle2" color="text.secondary">Generation</Typography>
             <Typography variant="body1">
                 <Link to={`/connectors/${conn.spec.connectorRef.id}/generations/${conn.spec.connectorRef.generation}`} style={{color: 'inherit', textDecoration: 'none'}}>
                     {conn.spec.connectorRef.generation}
@@ -542,49 +542,49 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
       </Dialog>
 
       <Dialog open={migrationOpen} onClose={() => !actionLoading && setMigrationOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Change connection version</DialogTitle>
+        <DialogTitle>Change connection generation</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary">
             Move this connection from v{conn.spec.connectorRef.generation} to an eligible generation of the same connector.
           </Typography>
-          {migrationVersionsError && <Alert severity="error" sx={{mt: 2}}>{migrationVersionsError}</Alert>}
-          {migrationVersionsLoading && (
+          {migrationGenerationsError && <Alert severity="error" sx={{mt: 2}}>{migrationGenerationsError}</Alert>}
+          {migrationGenerationsLoading && (
             <Box sx={{display: 'flex', justifyContent: 'center', py: 3}}>
               <CircularProgress size={24}/>
             </Box>
           )}
-          {!migrationVersionsLoading && !migrationVersionsError && (
-            eligibleMigrationVersions.length === 0 ? (
+          {!migrationGenerationsLoading && !migrationGenerationsError && (
+            eligibleMigrationGenerations.length === 0 ? (
               <Alert severity="info" sx={{mt: 2}}>
-                No other active or primary versions are available.
+                No other active or primary generations are available.
               </Alert>
             ) : (
               <FormControl fullWidth sx={{mt: 2}}>
-                <InputLabel id="target-version-label" htmlFor="target-version">Target version</InputLabel>
+                <InputLabel id="target-generation-label" htmlFor="target-generation">Target generation</InputLabel>
                 <Select
                   native
                   inputProps={{
-                    id: 'target-version',
-                    'aria-labelledby': 'target-version-label',
+                    id: 'target-generation',
+                    'aria-labelledby': 'target-generation-label',
                   }}
-                  labelId="target-version-label"
-                  label="Target version"
-                  value={selectedMigrationVersion}
+                  labelId="target-generation-label"
+                  label="Target generation"
+                  value={selectedMigrationGeneration}
                   onChange={(event) => {
                     const value = String(event.target.value);
-                    setSelectedMigrationVersion(value === '' ? '' : Number(value));
+                    setSelectedMigrationGeneration(value === '' ? '' : Number(value));
                   }}
                 >
                   <option aria-label="None" value="" />
-                  {eligibleMigrationVersions.map((version) => (
-                    <option key={version.metadata.generation} value={version.metadata.generation}>
-                      v{version.metadata.generation} ({version.status.release.state})
+                  {eligibleMigrationGenerations.map((generation) => (
+                    <option key={generation.metadata.generation} value={generation.metadata.generation}>
+                      v{generation.metadata.generation} ({generation.status.release.state})
                     </option>
                   ))}
                 </Select>
                 <FormHelperText>
                   {selectedMigrationActionLabel === 'Rollback'
-                    ? 'An earlier target version rolls this connection back.'
+                    ? 'An earlier target generation rolls this connection back.'
                     : 'The migration can require setup or re-authentication after it completes.'}
                 </FormHelperText>
               </FormControl>
@@ -593,16 +593,16 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setMigrationOpen(false)} disabled={actionLoading}>
-            {eligibleMigrationVersions.length === 0 && !migrationVersionsLoading && !migrationVersionsError ? 'Close' : 'Cancel'}
+            {eligibleMigrationGenerations.length === 0 && !migrationGenerationsLoading && !migrationGenerationsError ? 'Close' : 'Cancel'}
           </Button>
-          {eligibleMigrationVersions.length > 0 && (
+          {eligibleMigrationGenerations.length > 0 && (
             <Button
               variant="contained"
               startIcon={actionLoading ? <CircularProgress size={16}/> : <SwapHorizIcon/>}
-              disabled={!selectedMigrationTarget || migrationVersionsLoading || actionLoading}
+              disabled={!selectedMigrationTarget || migrationGenerationsLoading || actionLoading}
               onClick={() => void onConfirmMigration()}
             >
-              {selectedMigrationTarget ? `${selectedMigrationActionLabel} to v${selectedMigrationTarget.metadata.generation}` : 'Change version'}
+              {selectedMigrationTarget ? `${selectedMigrationActionLabel} to v${selectedMigrationTarget.metadata.generation}` : 'Change generation'}
             </Button>
           )}
         </DialogActions>

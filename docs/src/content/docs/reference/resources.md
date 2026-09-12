@@ -144,7 +144,7 @@ not contain database identity, timestamps, status, or signing material. See
 
 A logical Connector has one immutable `metadata.id` and shared name and
 namespace. Every definition snapshot is returned as `kind: Connector`; the
-snapshot number is `metadata.generation`. There is no `ConnectorVersion` kind.
+snapshot number is `metadata.generation`. There is no `ConnectorGeneration` kind.
 
 ```yaml
 apiVersion: authproxy.net/v1alpha1

@@ -28,11 +28,11 @@ func TestReauthConnection(t *testing.T) {
 		conn.State = database.ConnectionStateSetup
 
 		db.EXPECT().GetConnection(gomock.Any(), conn.Id).Return(&conn.Connection, nil).AnyTimes()
-		db.EXPECT().GetConnectorDefinitionVersion(gomock.Any(), conn.connector.Id, conn.connector.Version).Return(&database.ConnectorWithDefinition{
+		db.EXPECT().GetConnectorGeneration(gomock.Any(), conn.connector.Id, conn.connector.Generation).Return(&database.ConnectorWithDefinition{
 			Id:                  conn.connector.Id,
-			Version:             conn.connector.Version,
+			Generation:          conn.connector.Generation,
 			Labels:              conn.connector.GetLabels(),
-			State:               database.ConnectorDefinitionVersionStatePrimary,
+			State:               database.ConnectorGenerationStatePrimary,
 			EncryptedDefinition: conn.connector.EncryptedDefinition,
 		}, nil).AnyTimes()
 
@@ -59,11 +59,11 @@ func TestReauthConnection(t *testing.T) {
 		setConnectionConfigFixture(t, conn, map[string]any{"api_key": priorApiKey})
 
 		db.EXPECT().GetConnection(gomock.Any(), conn.Id).Return(&conn.Connection, nil).AnyTimes()
-		db.EXPECT().GetConnectorDefinitionVersion(gomock.Any(), conn.connector.Id, conn.connector.Version).Return(&database.ConnectorWithDefinition{
+		db.EXPECT().GetConnectorGeneration(gomock.Any(), conn.connector.Id, conn.connector.Generation).Return(&database.ConnectorWithDefinition{
 			Id:                  conn.connector.Id,
-			Version:             conn.connector.Version,
+			Generation:          conn.connector.Generation,
 			Labels:              conn.connector.GetLabels(),
-			State:               database.ConnectorDefinitionVersionStatePrimary,
+			State:               database.ConnectorGenerationStatePrimary,
 			EncryptedDefinition: conn.connector.EncryptedDefinition,
 		}, nil).AnyTimes()
 
@@ -100,11 +100,11 @@ func TestReauthConnection(t *testing.T) {
 		conn.HealthState = database.ConnectionHealthStateUnhealthy
 
 		db.EXPECT().GetConnection(gomock.Any(), conn.Id).Return(&conn.Connection, nil).AnyTimes()
-		db.EXPECT().GetConnectorDefinitionVersion(gomock.Any(), conn.connector.Id, conn.connector.Version).Return(&database.ConnectorWithDefinition{
+		db.EXPECT().GetConnectorGeneration(gomock.Any(), conn.connector.Id, conn.connector.Generation).Return(&database.ConnectorWithDefinition{
 			Id:                  conn.connector.Id,
-			Version:             conn.connector.Version,
+			Generation:          conn.connector.Generation,
 			Labels:              conn.connector.GetLabels(),
-			State:               database.ConnectorDefinitionVersionStatePrimary,
+			State:               database.ConnectorGenerationStatePrimary,
 			EncryptedDefinition: conn.connector.EncryptedDefinition,
 		}, nil).AnyTimes()
 
@@ -129,11 +129,11 @@ func TestReauthConnection(t *testing.T) {
 		conn.SetupError = &priorErr
 
 		db.EXPECT().GetConnection(gomock.Any(), conn.Id).Return(&conn.Connection, nil).AnyTimes()
-		db.EXPECT().GetConnectorDefinitionVersion(gomock.Any(), conn.connector.Id, conn.connector.Version).Return(&database.ConnectorWithDefinition{
+		db.EXPECT().GetConnectorGeneration(gomock.Any(), conn.connector.Id, conn.connector.Generation).Return(&database.ConnectorWithDefinition{
 			Id:                  conn.connector.Id,
-			Version:             conn.connector.Version,
+			Generation:          conn.connector.Generation,
 			Labels:              conn.connector.GetLabels(),
-			State:               database.ConnectorDefinitionVersionStatePrimary,
+			State:               database.ConnectorGenerationStatePrimary,
 			EncryptedDefinition: conn.connector.EncryptedDefinition,
 		}, nil).AnyTimes()
 
@@ -169,12 +169,12 @@ func TestReauthConnection(t *testing.T) {
 		c := NewTestConnector(connector)
 		conn := &connection{
 			Connection: database.Connection{
-				Id:               "cxn_test1111111111aa",
-				Namespace:        "root",
-				State:            database.ConnectionStateConfigured,
-				HealthState:      database.ConnectionHealthStateUnhealthy,
-				ConnectorId:      c.GetId(),
-				ConnectorVersion: c.GetVersion(),
+				Id:                  "cxn_test1111111111aa",
+				Namespace:           "root",
+				State:               database.ConnectionStateConfigured,
+				HealthState:         database.ConnectionHealthStateUnhealthy,
+				ConnectorId:         c.GetId(),
+				ConnectorGeneration: c.GetGeneration(),
 			},
 			s:         s,
 			connector: c,
@@ -182,11 +182,11 @@ func TestReauthConnection(t *testing.T) {
 		}
 
 		db.EXPECT().GetConnection(gomock.Any(), conn.Id).Return(&conn.Connection, nil).AnyTimes()
-		db.EXPECT().GetConnectorDefinitionVersion(gomock.Any(), conn.connector.Id, conn.connector.Version).Return(&database.ConnectorWithDefinition{
+		db.EXPECT().GetConnectorGeneration(gomock.Any(), conn.connector.Id, conn.connector.Generation).Return(&database.ConnectorWithDefinition{
 			Id:                  conn.connector.Id,
-			Version:             conn.connector.Version,
+			Generation:          conn.connector.Generation,
 			Labels:              conn.connector.GetLabels(),
-			State:               database.ConnectorDefinitionVersionStatePrimary,
+			State:               database.ConnectorGenerationStatePrimary,
 			EncryptedDefinition: conn.connector.EncryptedDefinition,
 		}, nil).AnyTimes()
 
@@ -220,12 +220,12 @@ func TestReauthConnection(t *testing.T) {
 		c := NewTestConnector(connector)
 		conn := &connection{
 			Connection: database.Connection{
-				Id:               "cxn_test1111111111aa",
-				Namespace:        "root",
-				State:            database.ConnectionStateConfigured,
-				HealthState:      database.ConnectionHealthStateHealthy,
-				ConnectorId:      c.GetId(),
-				ConnectorVersion: c.GetVersion(),
+				Id:                  "cxn_test1111111111aa",
+				Namespace:           "root",
+				State:               database.ConnectionStateConfigured,
+				HealthState:         database.ConnectionHealthStateHealthy,
+				ConnectorId:         c.GetId(),
+				ConnectorGeneration: c.GetGeneration(),
 			},
 			s:         s,
 			connector: c,
@@ -233,11 +233,11 @@ func TestReauthConnection(t *testing.T) {
 		}
 
 		db.EXPECT().GetConnection(gomock.Any(), conn.Id).Return(&conn.Connection, nil).AnyTimes()
-		db.EXPECT().GetConnectorDefinitionVersion(gomock.Any(), conn.connector.Id, conn.connector.Version).Return(&database.ConnectorWithDefinition{
+		db.EXPECT().GetConnectorGeneration(gomock.Any(), conn.connector.Id, conn.connector.Generation).Return(&database.ConnectorWithDefinition{
 			Id:                  conn.connector.Id,
-			Version:             conn.connector.Version,
+			Generation:          conn.connector.Generation,
 			Labels:              conn.connector.GetLabels(),
-			State:               database.ConnectorDefinitionVersionStatePrimary,
+			State:               database.ConnectorGenerationStatePrimary,
 			EncryptedDefinition: conn.connector.EncryptedDefinition,
 		}, nil).AnyTimes()
 		// Rejected before any state-mutating writes — no SetConnectionSetupError /

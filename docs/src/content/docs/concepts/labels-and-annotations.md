@@ -57,7 +57,7 @@ Every namespace-scoped resource carries `labels` and `annotations` columns:
 |---|---|
 | `namespace` | Top of the hierarchy. Its labels carry forward to every resource defined in it. |
 | `actor` | Users / service accounts. Labels carry forward to requests an actor initiates. |
-| `connector` | The logical connector owns one label set and name shared by every definition version. |
+| `connector` | The logical connector owns one label set and name shared by every generation. |
 | `connection` | Inherits labels and identity from its logical connector, plus the namespace. |
 | `encryption_key` | Inherits from its namespace. |
 | `rate_limit` | Inherits from its namespace. See [Rate limits](/operations/rate-limits/). |
@@ -119,7 +119,7 @@ apxy/cxn/-/ns: root.acme
 
 For namespaces, `apxy/ns/-/id` and `apxy/ns/-/ns` contain the full path while
 `apxy/ns/-/name` contains its final segment. Connector identity labels use the
-logical connector's ID and name, so every connector version projects the same
+logical connector's ID and name, so every connector generation projects the same
 `apxy/cxr/-/name` value.
 
 These labels are useful for selecting a resource by ID or name from a

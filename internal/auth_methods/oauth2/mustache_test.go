@@ -151,20 +151,20 @@ func (e *errorConnection) GetMustacheContext(ctx context.Context) (map[string]an
 	return nil, e.configErr
 }
 
-// configuredConnection wraps a mock Connection to also return a ConnectorVersion.
+// configuredConnection wraps a mock Connection to also return a ConnectorGeneration.
 type configuredConnection struct {
 	*mockCore.Connection
-	connectorVersion iface.Connector
+	connectorGeneration iface.Connector
 }
 
 func (c *configuredConnection) GetConnector() iface.Connector {
-	return c.connectorVersion
+	return c.connectorGeneration
 }
 
 func TestGenerateAuthUrl_TemplatedEndpoint(t *testing.T) {
 	ctx := context.Background()
 	connectionId := apid.New(apid.PrefixConnection)
-	connectorVersionId := apid.New(apid.PrefixConnectorVersion)
+	connectorGenerationId := apid.New(apid.PrefixConnector)
 	stateId := apid.New(apid.PrefixOauth2State)
 
 	cfg := config.FromRoot(&sconfig.Root{
@@ -185,8 +185,8 @@ func TestGenerateAuthUrl_TemplatedEndpoint(t *testing.T) {
 						"tenant": "acme-corp",
 					},
 				},
-				connectorVersion: &mockCore.Connector{
-					Id: connectorVersionId,
+				connectorGeneration: &mockCore.Connector{
+					Id: connectorGenerationId,
 				},
 			},
 			auth: &cschema.AuthOAuth2{
@@ -221,8 +221,8 @@ func TestGenerateAuthUrl_TemplatedEndpoint(t *testing.T) {
 						"tenant": "acme-corp",
 					},
 				},
-				connectorVersion: &mockCore.Connector{
-					Id: connectorVersionId,
+				connectorGeneration: &mockCore.Connector{
+					Id: connectorGenerationId,
 				},
 			},
 			auth: &cschema.AuthOAuth2{
@@ -256,8 +256,8 @@ func TestGenerateAuthUrl_TemplatedEndpoint(t *testing.T) {
 					Id:     connectionId,
 					Labels: map[string]string{"tenant": "label-tenant"},
 				},
-				connectorVersion: &mockCore.Connector{
-					Id: connectorVersionId,
+				connectorGeneration: &mockCore.Connector{
+					Id: connectorGenerationId,
 				},
 			},
 			auth: &cschema.AuthOAuth2{
@@ -288,8 +288,8 @@ func TestGenerateAuthUrl_TemplatedEndpoint(t *testing.T) {
 					Id:            connectionId,
 					Configuration: nil,
 				},
-				connectorVersion: &mockCore.Connector{
-					Id: connectorVersionId,
+				connectorGeneration: &mockCore.Connector{
+					Id: connectorGenerationId,
 				},
 			},
 			auth: &cschema.AuthOAuth2{

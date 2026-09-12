@@ -20,50 +20,46 @@ const (
 type Prefix string
 
 const (
-	PrefixActor                      Prefix = "act_"
-	PrefixConnection                 Prefix = "cxn_"
-	PrefixConnector                  Prefix = "cxr_"
-	PrefixConnectorDefinitionVersion Prefix = "cvd_"
-	PrefixOAuth2Token                Prefix = "tok_"
-	PrefixOauth2State                Prefix = "oas_"
-	PrefixApiKeyCredential           Prefix = "akc_"
-	PrefixProbeOutcome               Prefix = "pou_"
-	PrefixNonce                      Prefix = "non_"
-	PrefixRequestEvents              Prefix = "req_"
-	PrefixCorrelation                Prefix = "cor_"
-	PrefixJwtId                      Prefix = "jti_"
-	PrefixKey                        Prefix = "key_"
-	PrefixDataEncryptionKey          Prefix = "dek_"
-	PrefixSession                    Prefix = "sess_"
-	PrefixRateLimit                  Prefix = "rl_"
-	PrefixSetupToken                 Prefix = "stk_"
-	PrefixNotification               Prefix = "ntf_"
-
-	// PrefixConnectorVersion is retained for source compatibility. cxr_
-	// identifies the logical connector; definition-version rows use cvd_.
-	PrefixConnectorVersion Prefix = PrefixConnector
+	PrefixActor               Prefix = "act_"
+	PrefixConnection          Prefix = "cxn_"
+	PrefixConnector           Prefix = "cxr_"
+	PrefixConnectorGeneration Prefix = "cgn_"
+	PrefixOAuth2Token         Prefix = "tok_"
+	PrefixOauth2State         Prefix = "oas_"
+	PrefixApiKeyCredential    Prefix = "akc_"
+	PrefixProbeOutcome        Prefix = "pou_"
+	PrefixNonce               Prefix = "non_"
+	PrefixRequestEvents       Prefix = "req_"
+	PrefixCorrelation         Prefix = "cor_"
+	PrefixJwtId               Prefix = "jti_"
+	PrefixKey                 Prefix = "key_"
+	PrefixDataEncryptionKey   Prefix = "dek_"
+	PrefixSession             Prefix = "sess_"
+	PrefixRateLimit           Prefix = "rl_"
+	PrefixSetupToken          Prefix = "stk_"
+	PrefixNotification        Prefix = "ntf_"
 )
 
 // validPrefixes is the set of all known prefixes for validation.
 var validPrefixes = map[Prefix]bool{
-	PrefixActor:                      true,
-	PrefixConnection:                 true,
-	PrefixConnector:                  true,
-	PrefixConnectorDefinitionVersion: true,
-	PrefixOAuth2Token:                true,
-	PrefixApiKeyCredential:           true,
-	PrefixProbeOutcome:               true,
-	PrefixNonce:                      true,
-	PrefixRequestEvents:              true,
-	PrefixCorrelation:                true,
-	PrefixJwtId:                      true,
-	PrefixOauth2State:                true,
-	PrefixSession:                    true,
-	PrefixKey:                        true,
-	PrefixDataEncryptionKey:          true,
-	PrefixRateLimit:                  true,
-	PrefixSetupToken:                 true,
-	PrefixNotification:               true,
+	PrefixActor:               true,
+	PrefixConnection:          true,
+	PrefixConnector:           true,
+	PrefixConnectorGeneration: true,
+	PrefixOAuth2Token:         true,
+	PrefixApiKeyCredential:    true,
+	PrefixProbeOutcome:        true,
+	PrefixNonce:               true,
+	PrefixRequestEvents:       true,
+	PrefixCorrelation:         true,
+	PrefixJwtId:               true,
+	PrefixOauth2State:         true,
+	PrefixSession:             true,
+	PrefixKey:                 true,
+	PrefixDataEncryptionKey:   true,
+	PrefixRateLimit:           true,
+	PrefixSetupToken:          true,
+	PrefixNotification:        true,
 }
 
 // ID is a prefixed identifier string. The zero value is Nil (empty string).

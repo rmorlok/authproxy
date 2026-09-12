@@ -43,8 +43,8 @@ system.
 - [Background tasks](/operations/background-tasks/) — run the worker and inspect queues.
 - [Connector lifecycle](/operations/connector-lifecycle/) — disconnect or archive a
   logical connector across its generations and monitor the resulting task.
-- [Connector version migrations](/operations/connector-version-migrations/) — move
-  existing connections to a new connector version, run hooks, handle required
+- [Connector generation migrations](/operations/connector-generation-migrations/) — move
+  existing connections to a new connector generation, run hooks, handle required
   setup or re-authentication, and surface actor notifications.
 
 ## Production baseline

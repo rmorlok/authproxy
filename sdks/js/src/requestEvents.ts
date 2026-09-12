@@ -112,7 +112,7 @@ export interface ListRequestEventsParams {
   connectionId?: string;
   connectorType?: string;
   connectorId?: string;
-  connectorVersion?: number;
+  connectorGeneration?: number;
   method?: string;
   statusCode?: number;
   statusCodeRange?: string;

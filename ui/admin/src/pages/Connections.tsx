@@ -94,8 +94,8 @@ export const columns: GridColDef<Connection>[] = [
         valueGetter: (_, row) => row.spec.connectorRef.id || '',
     },
     {
-        field: 'connector.version',
-        headerName: 'Connector Version',
+        field: 'connector.generation',
+        headerName: 'Connector Generation',
         flex: 0.4,
         minWidth: 80,
         sortable: false,

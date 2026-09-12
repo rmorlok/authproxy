@@ -15,10 +15,10 @@ func newTestConnectionWithDetails(u apid.ID, s database.ConnectionState, definit
 	c := NewTestConnector(definition)
 	return &connection{
 		Connection: database.Connection{
-			Id:               u,
-			State:            s,
-			ConnectorId:      c.GetId(),
-			ConnectorVersion: c.GetVersion(),
+			Id:                  u,
+			State:               s,
+			ConnectorId:         c.GetId(),
+			ConnectorGeneration: c.GetGeneration(),
 		},
 		s:         c.s,
 		connector: c,

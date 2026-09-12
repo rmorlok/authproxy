@@ -19,21 +19,21 @@ import (
 func TestConnections(t *testing.T) {
 	t.Run("validation rejects wrong prefix on id", func(t *testing.T) {
 		c := &Connection{
-			Id:               apid.New(apid.PrefixActor), // wrong prefix
-			Namespace:        "root",
-			ConnectorId:      apid.New(apid.PrefixConnectorVersion),
-			ConnectorVersion: 1,
-			State:            ConnectionStateSetup,
+			Id:                  apid.New(apid.PrefixActor), // wrong prefix
+			Namespace:           "root",
+			ConnectorId:         apid.New(apid.PrefixConnector),
+			ConnectorGeneration: 1,
+			State:               ConnectionStateSetup,
 		}
 		assert.Error(t, c.Validate())
 	})
 	t.Run("validation rejects wrong prefix on connector id", func(t *testing.T) {
 		c := &Connection{
-			Id:               apid.New(apid.PrefixConnection),
-			Namespace:        "root",
-			ConnectorId:      apid.New(apid.PrefixActor), // wrong prefix
-			ConnectorVersion: 1,
-			State:            ConnectionStateSetup,
+			Id:                  apid.New(apid.PrefixConnection),
+			Namespace:           "root",
+			ConnectorId:         apid.New(apid.PrefixActor), // wrong prefix
+			ConnectorGeneration: 1,
+			State:               ConnectionStateSetup,
 		}
 		assert.Error(t, c.Validate())
 	})
@@ -44,11 +44,11 @@ func TestConnections(t *testing.T) {
 
 		u := apid.New(apid.PrefixConnection)
 		err := db.CreateConnection(ctx, &Connection{
-			Id:               u,
-			Namespace:        "root.some-namespace",
-			ConnectorId:      apid.New(apid.PrefixConnectorVersion),
-			ConnectorVersion: 1,
-			State:            ConnectionStateSetup,
+			Id:                  u,
+			Namespace:           "root.some-namespace",
+			ConnectorId:         apid.New(apid.PrefixConnector),
+			ConnectorGeneration: 1,
+			State:               ConnectionStateSetup,
 		})
 		assert.NoError(t, err)
 
@@ -71,12 +71,12 @@ func TestConnections(t *testing.T) {
 			"project": "authproxy",
 		}
 		err := db.CreateConnection(ctx, &Connection{
-			Id:               u,
-			Namespace:        "root.some-namespace",
-			ConnectorId:      apid.New(apid.PrefixConnectorVersion),
-			ConnectorVersion: 1,
-			State:            ConnectionStateSetup,
-			Labels:           labels,
+			Id:                  u,
+			Namespace:           "root.some-namespace",
+			ConnectorId:         apid.New(apid.PrefixConnector),
+			ConnectorGeneration: 1,
+			State:               ConnectionStateSetup,
+			Labels:              labels,
 		})
 		assert.NoError(t, err)
 
@@ -107,11 +107,11 @@ func TestConnections(t *testing.T) {
 
 		u := apid.New(apid.PrefixConnection)
 		err := db.CreateConnection(ctx, &Connection{
-			Id:               u,
-			Namespace:        "root.some-namespace",
-			ConnectorId:      apid.New(apid.PrefixConnectorVersion),
-			ConnectorVersion: 1,
-			State:            ConnectionStateSetup})
+			Id:                  u,
+			Namespace:           "root.some-namespace",
+			ConnectorId:         apid.New(apid.PrefixConnector),
+			ConnectorGeneration: 1,
+			State:               ConnectionStateSetup})
 		assert.NoError(t, err)
 
 		test_utils.AssertSql(t, rawDb, `
@@ -170,11 +170,11 @@ func TestConnections(t *testing.T) {
 
 		u := apid.New(apid.PrefixConnection)
 		err := db.CreateConnection(ctx, &Connection{
-			Id:               u,
-			Namespace:        "root.some-namespace",
-			ConnectorId:      apid.New(apid.PrefixConnectorVersion),
-			ConnectorVersion: 1,
-			State:            ConnectionStateSetup,
+			Id:                  u,
+			Namespace:           "root.some-namespace",
+			ConnectorId:         apid.New(apid.PrefixConnector),
+			ConnectorGeneration: 1,
+			State:               ConnectionStateSetup,
 		})
 		assert.NoError(t, err)
 
@@ -226,11 +226,11 @@ func TestConnections(t *testing.T) {
 
 		u := apid.New(apid.PrefixConnection)
 		err := db.CreateConnection(ctx, &Connection{
-			Id:               u,
-			Namespace:        "root.some-namespace",
-			ConnectorId:      apid.New(apid.PrefixConnectorVersion),
-			ConnectorVersion: 1,
-			State:            ConnectionStateSetup,
+			Id:                  u,
+			Namespace:           "root.some-namespace",
+			ConnectorId:         apid.New(apid.PrefixConnector),
+			ConnectorGeneration: 1,
+			State:               ConnectionStateSetup,
 		})
 		assert.NoError(t, err)
 
@@ -266,11 +266,11 @@ func TestConnections(t *testing.T) {
 			}
 
 			err := db.CreateConnection(ctx, &Connection{
-				Id:               u,
-				Namespace:        fmt.Sprintf("root.some-namespace.%d", i%10),
-				ConnectorId:      apid.New(apid.PrefixConnectorVersion),
-				ConnectorVersion: 1,
-				State:            state,
+				Id:                  u,
+				Namespace:           fmt.Sprintf("root.some-namespace.%d", i%10),
+				ConnectorId:         apid.New(apid.PrefixConnector),
+				ConnectorGeneration: 1,
+				State:               state,
 			})
 			assert.NoError(t, err)
 		}
@@ -414,12 +414,12 @@ func TestConnections(t *testing.T) {
 
 		for _, conn := range connections {
 			err := db.CreateConnection(ctx, &Connection{
-				Id:               conn.id,
-				Namespace:        "root",
-				ConnectorId:      apid.New(apid.PrefixConnectorVersion),
-				ConnectorVersion: 1,
-				State:            ConnectionStateSetup,
-				Labels:           conn.labels,
+				Id:                  conn.id,
+				Namespace:           "root",
+				ConnectorId:         apid.New(apid.PrefixConnector),
+				ConnectorGeneration: 1,
+				State:               ConnectionStateSetup,
+				Labels:              conn.labels,
 			})
 			assert.NoError(t, err)
 		}
@@ -488,15 +488,15 @@ func TestConnections(t *testing.T) {
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		connectorId := apid.New(apid.PrefixConnectorVersion)
+		connectorId := apid.New(apid.PrefixConnector)
 		u := apid.New(apid.PrefixConnection)
 		err := db.CreateConnection(ctx, &Connection{
-			Id:               u,
-			Namespace:        "root.some-namespace",
-			ConnectorId:      connectorId,
-			ConnectorVersion: 1,
-			State:            ConnectionStateSetup,
-			Labels:           Labels{"existing": "value"},
+			Id:                  u,
+			Namespace:           "root.some-namespace",
+			ConnectorId:         connectorId,
+			ConnectorGeneration: 1,
+			State:               ConnectionStateSetup,
+			Labels:              Labels{"existing": "value"},
 		})
 		assert.NoError(t, err)
 
@@ -540,15 +540,15 @@ func TestConnections(t *testing.T) {
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		connectorId := apid.New(apid.PrefixConnectorVersion)
+		connectorId := apid.New(apid.PrefixConnector)
 		u := apid.New(apid.PrefixConnection)
 		err := db.CreateConnection(ctx, &Connection{
-			Id:               u,
-			Namespace:        "root.some-namespace",
-			ConnectorId:      connectorId,
-			ConnectorVersion: 1,
-			State:            ConnectionStateSetup,
-			Labels:           Labels{"env": "prod", "team": "backend", "version": "v1"},
+			Id:                  u,
+			Namespace:           "root.some-namespace",
+			ConnectorId:         connectorId,
+			ConnectorGeneration: 1,
+			State:               ConnectionStateSetup,
+			Labels:              Labels{"env": "prod", "team": "backend", "version": "v1"},
 		})
 		assert.NoError(t, err)
 
@@ -593,15 +593,15 @@ func TestConnections(t *testing.T) {
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		connectorId := apid.New(apid.PrefixConnectorVersion)
+		connectorId := apid.New(apid.PrefixConnector)
 		u := apid.New(apid.PrefixConnection)
 		err := db.CreateConnection(ctx, &Connection{
-			Id:               u,
-			Namespace:        "root.some-namespace",
-			ConnectorId:      connectorId,
-			ConnectorVersion: 1,
-			State:            ConnectionStateSetup,
-			Labels:           Labels{"old": "value", "other": "data"},
+			Id:                  u,
+			Namespace:           "root.some-namespace",
+			ConnectorId:         connectorId,
+			ConnectorGeneration: 1,
+			State:               ConnectionStateSetup,
+			Labels:              Labels{"old": "value", "other": "data"},
 		})
 		assert.NoError(t, err)
 
@@ -655,15 +655,15 @@ func TestConnections(t *testing.T) {
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		connectorId := apid.New(apid.PrefixConnectorVersion)
+		connectorId := apid.New(apid.PrefixConnector)
 		u := apid.New(apid.PrefixConnection)
 		err := db.CreateConnection(ctx, &Connection{
-			Id:               u,
-			Namespace:        "root.some-namespace",
-			ConnectorId:      connectorId,
-			ConnectorVersion: 1,
-			State:            ConnectionStateSetup,
-			Annotations:      Annotations{"existing": "value"},
+			Id:                  u,
+			Namespace:           "root.some-namespace",
+			ConnectorId:         connectorId,
+			ConnectorGeneration: 1,
+			State:               ConnectionStateSetup,
+			Annotations:         Annotations{"existing": "value"},
 		})
 		assert.NoError(t, err)
 
@@ -707,15 +707,15 @@ func TestConnections(t *testing.T) {
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		connectorId := apid.New(apid.PrefixConnectorVersion)
+		connectorId := apid.New(apid.PrefixConnector)
 		u := apid.New(apid.PrefixConnection)
 		err := db.CreateConnection(ctx, &Connection{
-			Id:               u,
-			Namespace:        "root.some-namespace",
-			ConnectorId:      connectorId,
-			ConnectorVersion: 1,
-			State:            ConnectionStateSetup,
-			Annotations:      Annotations{"env": "prod", "team": "backend", "version": "v1"},
+			Id:                  u,
+			Namespace:           "root.some-namespace",
+			ConnectorId:         connectorId,
+			ConnectorGeneration: 1,
+			State:               ConnectionStateSetup,
+			Annotations:         Annotations{"env": "prod", "team": "backend", "version": "v1"},
 		})
 		assert.NoError(t, err)
 
@@ -760,15 +760,15 @@ func TestConnections(t *testing.T) {
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		connectorId := apid.New(apid.PrefixConnectorVersion)
+		connectorId := apid.New(apid.PrefixConnector)
 		u := apid.New(apid.PrefixConnection)
 		err := db.CreateConnection(ctx, &Connection{
-			Id:               u,
-			Namespace:        "root.some-namespace",
-			ConnectorId:      connectorId,
-			ConnectorVersion: 1,
-			State:            ConnectionStateSetup,
-			Annotations:      Annotations{"old": "value", "other": "data"},
+			Id:                  u,
+			Namespace:           "root.some-namespace",
+			ConnectorId:         connectorId,
+			ConnectorGeneration: 1,
+			State:               ConnectionStateSetup,
+			Annotations:         Annotations{"old": "value", "other": "data"},
 		})
 		assert.NoError(t, err)
 
@@ -828,11 +828,11 @@ func TestConnections(t *testing.T) {
 			}
 
 			err := db.CreateConnection(ctx, &Connection{
-				Id:               u,
-				Namespace:        "root.some-namespace",
-				ConnectorId:      apid.New(apid.PrefixConnectorVersion),
-				ConnectorVersion: 1,
-				State:            state,
+				Id:                  u,
+				Namespace:           "root.some-namespace",
+				ConnectorId:         apid.New(apid.PrefixConnector),
+				ConnectorGeneration: 1,
+				State:               state,
 			})
 			assert.NoError(t, err)
 		}
@@ -842,11 +842,11 @@ func TestConnections(t *testing.T) {
 		c.SetTime(now)
 		u := apid.New(apid.PrefixConnection)
 		err := db.CreateConnection(ctx, &Connection{
-			Id:               u,
-			Namespace:        "root.some-namespace",
-			ConnectorId:      apid.New(apid.PrefixConnectorVersion),
-			ConnectorVersion: 1,
-			State:            ConnectionStateDisconnecting,
+			Id:                  u,
+			Namespace:           "root.some-namespace",
+			ConnectorId:         apid.New(apid.PrefixConnector),
+			ConnectorGeneration: 1,
+			State:               ConnectionStateDisconnecting,
 		})
 		assert.NoError(t, err)
 
@@ -855,11 +855,11 @@ func TestConnections(t *testing.T) {
 		c.SetTime(now)
 		u = apid.New(apid.PrefixConnection)
 		err = db.CreateConnection(ctx, &Connection{
-			Id:               u,
-			Namespace:        "root.some-namespace",
-			ConnectorId:      apid.New(apid.PrefixConnectorVersion),
-			ConnectorVersion: 1,
-			State:            ConnectionStateDisconnected,
+			Id:                  u,
+			Namespace:           "root.some-namespace",
+			ConnectorId:         apid.New(apid.PrefixConnector),
+			ConnectorGeneration: 1,
+			State:               ConnectionStateDisconnected,
 		})
 		assert.NoError(t, err)
 		now = now.Add(time.Second)
@@ -933,11 +933,11 @@ func TestConnections(t *testing.T) {
 
 		u := apid.New(apid.PrefixConnection)
 		err := db.CreateConnection(ctx, &Connection{
-			Id:               u,
-			Namespace:        "root.some-namespace",
-			ConnectorId:      apid.New(apid.PrefixConnectorVersion),
-			ConnectorVersion: 1,
-			State:            ConnectionStateSetup,
+			Id:                  u,
+			Namespace:           "root.some-namespace",
+			ConnectorId:         apid.New(apid.PrefixConnector),
+			ConnectorGeneration: 1,
+			State:               ConnectionStateSetup,
 		})
 		require.NoError(t, err)
 
@@ -1007,11 +1007,11 @@ func TestConnections(t *testing.T) {
 
 		u := apid.New(apid.PrefixConnection)
 		err := db.CreateConnection(ctx, &Connection{
-			Id:               u,
-			Namespace:        "root",
-			ConnectorId:      apid.New(apid.PrefixConnectorVersion),
-			ConnectorVersion: 1,
-			State:            ConnectionStateSetup,
+			Id:                  u,
+			Namespace:           "root",
+			ConnectorId:         apid.New(apid.PrefixConnector),
+			ConnectorGeneration: 1,
+			State:               ConnectionStateSetup,
 		})
 		require.NoError(t, err)
 
@@ -1031,11 +1031,11 @@ func TestConnections(t *testing.T) {
 
 		u := apid.New(apid.PrefixConnection)
 		err := db.CreateConnection(ctx, &Connection{
-			Id:               u,
-			Namespace:        "root.some-namespace",
-			ConnectorId:      apid.New(apid.PrefixConnectorVersion),
-			ConnectorVersion: 1,
-			State:            ConnectionStateSetup,
+			Id:                  u,
+			Namespace:           "root.some-namespace",
+			ConnectorId:         apid.New(apid.PrefixConnector),
+			ConnectorGeneration: 1,
+			State:               ConnectionStateSetup,
 		})
 		require.NoError(t, err)
 
@@ -1096,8 +1096,8 @@ func TestConnections(t *testing.T) {
 		err := db.CreateConnection(ctx, &Connection{
 			Id:                     u,
 			Namespace:              "root.some-namespace",
-			ConnectorId:            apid.New(apid.PrefixConnectorVersion),
-			ConnectorVersion:       1,
+			ConnectorId:            apid.New(apid.PrefixConnector),
+			ConnectorGeneration:    1,
 			State:                  ConnectionStateSetup,
 			SetupStep:              &step,
 			EncryptedConfiguration: &ef,
@@ -1116,7 +1116,7 @@ func TestConnections(t *testing.T) {
 		assert.True(t, c.EncryptedAt.Equal(now))
 	})
 
-	t.Run("carry-forward labels from connector version and namespace on create", func(t *testing.T) {
+	t.Run("carry-forward labels from connector generation and namespace on create", func(t *testing.T) {
 		_, db := MustApplyBlankTestDbConfig(t, nil)
 		now := time.Date(2024, time.January, 1, 12, 0, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
@@ -1129,25 +1129,25 @@ func TestConnections(t *testing.T) {
 			Labels: Labels{"tier": "pro"},
 		}))
 
-		connectorID := apid.New(apid.PrefixConnectorVersion)
-		require.NoError(t, db.UpsertConnectorDefinitionVersion(ctx, &ConnectorWithDefinition{
+		connectorID := apid.New(apid.PrefixConnector)
+		require.NoError(t, db.UpsertConnectorGeneration(ctx, &ConnectorWithDefinition{
 			Id:                  connectorID,
-			Version:             1,
+			Generation:          1,
 			Namespace:           "root.tenant-a",
-			State:               ConnectorDefinitionVersionStateDraft,
+			State:               ConnectorGenerationStateDraft,
 			Labels:              Labels{"type": "google-drive"},
 			EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "d"},
 		}))
 
-		// Create a connection that points at the connector version above.
+		// Create a connection that points at the connector generation above.
 		connID := apid.New(apid.PrefixConnection)
 		require.NoError(t, db.CreateConnection(ctx, &Connection{
-			Id:               connID,
-			Namespace:        "root.tenant-a",
-			ConnectorId:      connectorID,
-			ConnectorVersion: 1,
-			State:            ConnectionStateSetup,
-			Labels:           Labels{"subscription": "gold"},
+			Id:                  connID,
+			Namespace:           "root.tenant-a",
+			ConnectorId:         connectorID,
+			ConnectorGeneration: 1,
+			State:               ConnectionStateSetup,
+			Labels:              Labels{"subscription": "gold"},
 		}))
 
 		c, err := db.GetConnection(ctx, connID)
@@ -1160,7 +1160,7 @@ func TestConnections(t *testing.T) {
 		assert.Equal(t, string(connID), c.Labels["apxy/cxn/-/id"])
 		assert.Equal(t, "root.tenant-a", c.Labels["apxy/cxn/-/ns"])
 
-		// Connector-version carry-forward: user labels re-keyed under apxy/cxr/
+		// Connector-generation carry-forward: user labels re-keyed under apxy/cxr/
 		// plus the cv's self-implicit ids forwarded as-is.
 		assert.Equal(t, "google-drive", c.Labels["apxy/cxr/type"])
 		assert.Equal(t, string(connectorID), c.Labels["apxy/cxr/-/id"])
@@ -1186,42 +1186,42 @@ func TestConnections(t *testing.T) {
 			State: NamespaceStateActive,
 		}))
 
-		cvDrive := apid.New(apid.PrefixConnectorVersion)
-		require.NoError(t, db.UpsertConnectorDefinitionVersion(ctx, &ConnectorWithDefinition{
+		cvDrive := apid.New(apid.PrefixConnector)
+		require.NoError(t, db.UpsertConnectorGeneration(ctx, &ConnectorWithDefinition{
 			Id:                  cvDrive,
-			Version:             1,
+			Generation:          1,
 			Namespace:           "root.sel",
-			State:               ConnectorDefinitionVersionStateDraft,
+			State:               ConnectorGenerationStateDraft,
 			Labels:              Labels{"type": "google-drive"},
 			EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "d"},
 		}))
-		cvSlack := apid.New(apid.PrefixConnectorVersion)
-		require.NoError(t, db.UpsertConnectorDefinitionVersion(ctx, &ConnectorWithDefinition{
+		cvSlack := apid.New(apid.PrefixConnector)
+		require.NoError(t, db.UpsertConnectorGeneration(ctx, &ConnectorWithDefinition{
 			Id:                  cvSlack,
-			Version:             1,
+			Generation:          1,
 			Namespace:           "root.sel",
-			State:               ConnectorDefinitionVersionStateDraft,
+			State:               ConnectorGenerationStateDraft,
 			Labels:              Labels{"type": "slack"},
 			EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000002"), Data: "d"},
 		}))
 
 		driveConn := apid.New(apid.PrefixConnection)
 		require.NoError(t, db.CreateConnection(ctx, &Connection{
-			Id:               driveConn,
-			Namespace:        "root.sel",
-			ConnectorId:      cvDrive,
-			ConnectorVersion: 1,
-			State:            ConnectionStateSetup,
+			Id:                  driveConn,
+			Namespace:           "root.sel",
+			ConnectorId:         cvDrive,
+			ConnectorGeneration: 1,
+			State:               ConnectionStateSetup,
 		}))
 		require.NoError(t, db.CreateConnection(ctx, &Connection{
-			Id:               apid.New(apid.PrefixConnection),
-			Namespace:        "root.sel",
-			ConnectorId:      cvSlack,
-			ConnectorVersion: 1,
-			State:            ConnectionStateSetup,
+			Id:                  apid.New(apid.PrefixConnection),
+			Namespace:           "root.sel",
+			ConnectorId:         cvSlack,
+			ConnectorGeneration: 1,
+			State:               ConnectionStateSetup,
 		}))
 
-		// Filter connections by the parent connector version's user label —
+		// Filter connections by the parent connector generation's user label —
 		// works for free because Step 2b materializes the carry-forward into
 		// each connection's own labels column.
 		page := db.ListConnectionsBuilder().

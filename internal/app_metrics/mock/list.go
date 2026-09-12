@@ -27,7 +27,7 @@ type MockListRequestBuilderExecutor struct {
 	ConnectionId             *apid.ID    `json:"connectionId,omitempty"`
 	ConnectorType            *string     `json:"connectorType,omitempty"`
 	ConnectorId              *apid.ID    `json:"connectorId,omitempty"`
-	ConnectorVersion         *uint64     `json:"connectorVersion,omitempty"`
+	ConnectorGeneration      *uint64     `json:"connectorGeneration,omitempty"`
 	Method                   *string     `json:"method,omitempty"`
 	StatusCodeRangeInclusive []int       `json:"statusCodeRange,omitempty"`
 	TimestampRange           []time.Time `json:"timestampRange,omitempty"`
@@ -75,8 +75,8 @@ func (l *MockListRequestBuilderExecutor) ForConnectorId(u apid.ID) app_metrics.L
 	return l
 }
 
-func (l *MockListRequestBuilderExecutor) ForConnectorVersion(v uint64) app_metrics.ListRequestBuilder {
-	l.ConnectorVersion = util.ToPtr(v)
+func (l *MockListRequestBuilderExecutor) ForConnectorGeneration(v uint64) app_metrics.ListRequestBuilder {
+	l.ConnectorGeneration = util.ToPtr(v)
 	return l
 }
 

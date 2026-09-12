@@ -20,8 +20,8 @@ func TestLogRecord(t *testing.T) {
 		Timestamp:           time.Date(1970, time.January, 1, 0, 20, 34, 567000000, time.UTC), // This only has millisecond precision
 		MillisecondDuration: MillisecondDuration(2 * time.Second),
 		ConnectionId:        apid.New(apid.PrefixConnection),
-		ConnectorId:         apid.New(apid.PrefixConnectorVersion),
-		ConnectorVersion:    7,
+		ConnectorId:         apid.New(apid.PrefixConnector),
+		ConnectorGeneration: 7,
 		Method:              "GET",
 		Host:                "example.com",
 		Scheme:              "http",

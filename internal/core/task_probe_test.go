@@ -36,12 +36,12 @@ func TestRunProbe_Success(t *testing.T) {
 		}},
 	}
 	conn := &database.Connection{
-		Id:               connectionId,
-		Namespace:        "root",
-		State:            database.ConnectionStateConfigured,
-		HealthState:      database.ConnectionHealthStateHealthy,
-		ConnectorId:      apid.New(apid.PrefixConnectorVersion),
-		ConnectorVersion: 1,
+		Id:                  connectionId,
+		Namespace:           "root",
+		State:               database.ConnectionStateConfigured,
+		HealthState:         database.ConnectionHealthStateHealthy,
+		ConnectorId:         apid.New(apid.PrefixConnector),
+		ConnectorGeneration: 1,
 	}
 
 	svc, db, _, ctrl := setupVerifyTest(t, connectionId, conn, connector)
@@ -85,12 +85,12 @@ func TestRunProbe_FailureBelowThreshold(t *testing.T) {
 		}},
 	}
 	conn := &database.Connection{
-		Id:               connectionId,
-		Namespace:        "root",
-		State:            database.ConnectionStateConfigured,
-		HealthState:      database.ConnectionHealthStateHealthy,
-		ConnectorId:      apid.New(apid.PrefixConnectorVersion),
-		ConnectorVersion: 1,
+		Id:                  connectionId,
+		Namespace:           "root",
+		State:               database.ConnectionStateConfigured,
+		HealthState:         database.ConnectionHealthStateHealthy,
+		ConnectorId:         apid.New(apid.PrefixConnector),
+		ConnectorGeneration: 1,
 	}
 
 	svc, db, _, ctrl := setupVerifyTest(t, connectionId, conn, connector)
@@ -136,12 +136,12 @@ func TestRunProbe_FailureCrossesThreshold(t *testing.T) {
 		}},
 	}
 	conn := &database.Connection{
-		Id:               connectionId,
-		Namespace:        "root",
-		State:            database.ConnectionStateConfigured,
-		HealthState:      database.ConnectionHealthStateHealthy,
-		ConnectorId:      apid.New(apid.PrefixConnectorVersion),
-		ConnectorVersion: 1,
+		Id:                  connectionId,
+		Namespace:           "root",
+		State:               database.ConnectionStateConfigured,
+		HealthState:         database.ConnectionHealthStateHealthy,
+		ConnectorId:         apid.New(apid.PrefixConnector),
+		ConnectorGeneration: 1,
 	}
 
 	svc, db, _, ctrl := setupVerifyTest(t, connectionId, conn, connector)
@@ -177,12 +177,12 @@ func TestRunProbe_ProbeNotFound(t *testing.T) {
 		// No probes — the lookup for "ping" must fail.
 	}
 	conn := &database.Connection{
-		Id:               connectionId,
-		Namespace:        "root",
-		State:            database.ConnectionStateConfigured,
-		HealthState:      database.ConnectionHealthStateHealthy,
-		ConnectorId:      apid.New(apid.PrefixConnectorVersion),
-		ConnectorVersion: 1,
+		Id:                  connectionId,
+		Namespace:           "root",
+		State:               database.ConnectionStateConfigured,
+		HealthState:         database.ConnectionHealthStateHealthy,
+		ConnectorId:         apid.New(apid.PrefixConnector),
+		ConnectorGeneration: 1,
 	}
 
 	svc, _, _, ctrl := setupVerifyTest(t, connectionId, conn, connector)
@@ -209,12 +209,12 @@ func TestRunProbe_DisabledProbeSkipsRetry(t *testing.T) {
 		}},
 	}
 	conn := &database.Connection{
-		Id:               connectionId,
-		Namespace:        "root",
-		State:            database.ConnectionStateConfigured,
-		HealthState:      database.ConnectionHealthStateHealthy,
-		ConnectorId:      apid.New(apid.PrefixConnectorVersion),
-		ConnectorVersion: 1,
+		Id:                  connectionId,
+		Namespace:           "root",
+		State:               database.ConnectionStateConfigured,
+		HealthState:         database.ConnectionHealthStateHealthy,
+		ConnectorId:         apid.New(apid.PrefixConnector),
+		ConnectorGeneration: 1,
 	}
 
 	svc, _, _, ctrl := setupVerifyTest(t, connectionId, conn, connector)

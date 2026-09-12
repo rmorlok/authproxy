@@ -27,7 +27,7 @@ type state struct {
 	ConnectionNamespace    string    `json:"connectionNamespace,omitempty"`
 	ActorId                apid.ID   `json:"actorId"`
 	ConnectorId            apid.ID   `json:"connectorId"`
-	ConnectorVersion       uint64    `json:"connectorVersion"`
+	ConnectorGeneration    uint64    `json:"connectorGeneration"`
 	ConnectionId           apid.ID   `json:"connectionId"`
 	ReturnToUrl            string    `json:"returnToUrl"`
 	CancelSessionAfterAuth bool      `json:"cancelSessionAfterAuth"`
@@ -122,7 +122,7 @@ func (o *oAuth2Connection) saveStateToRedis(ctx context.Context, actor IActorDat
 		ConnectionNamespace: o.connection.GetNamespace(),
 		ActorId:             actor.GetId(),
 		ConnectorId:         o.connection.GetConnector().GetId(),
-		ConnectorVersion:    o.connection.GetConnector().GetVersion(),
+		ConnectorGeneration: o.connection.GetConnector().GetGeneration(),
 		ConnectionId:        o.connection.GetId(),
 		ExpiresAt:           time.Now().Add(ttl),
 		ReturnToUrl:         returnToUrl,

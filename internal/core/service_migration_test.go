@@ -35,7 +35,7 @@ type configuredConnector struct {
 	Id          apid.ID
 	Name        string
 	Namespace   *string
-	Version     uint64
+	Generation  uint64
 	State       string
 	Labels      map[string]string
 	Annotations map[string]string
@@ -48,7 +48,7 @@ func configuredConnectorResource(value configuredConnector) cschema.Connector {
 		Metadata: meta.ObjectMeta{
 			ID:          value.Id.String(),
 			Name:        scommon.ResourceName(value.Name),
-			Generation:  value.Version,
+			Generation:  value.Generation,
 			Labels:      value.Labels,
 			Annotations: value.Annotations,
 		},
@@ -234,13 +234,13 @@ func TestMigration(t *testing.T) {
 			assert.NoError(t, err)
 
 			type connectorResult struct {
-				Id      string
-				Version int64
-				State   string
+				Id         string
+				Generation int64
+				State      string
 			}
 
 			assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT connector_id AS id, version, state FROM connector_definition_versions;
+			SELECT connector_id AS id, generation, state FROM connector_generations;
 			`, []connectorResult{})
 		})
 
@@ -270,9 +270,9 @@ func TestMigration(t *testing.T) {
 				require.Equal(t, generatedID, result.Results[0].Id)
 				require.Equal(t, "after@example.com", result.Results[0].Annotations["example.com/owner"])
 
-				versions := db.ListConnectorDefinitionVersionsBuilder().ForId(generatedID).FetchPage(context.Background())
-				require.NoError(t, versions.Error)
-				require.Len(t, versions.Results, 1, "metadata-only changes must not create a connector generation")
+				generations := db.ListConnectorGenerationsBuilder().ForId(generatedID).FetchPage(context.Background())
+				require.NoError(t, generations.Error)
+				require.Len(t, generations.Results, 1, "metadata-only changes must not create a connector generation")
 			})
 
 			t.Run("label changes preserve the generated connector id", func(t *testing.T) {
@@ -299,12 +299,12 @@ func TestMigration(t *testing.T) {
 				require.Equal(t, generatedID, result.Results[0].Id)
 				require.Equal(t, "after", result.Results[0].Labels["type"])
 
-				versions := db.ListConnectorDefinitionVersionsBuilder().ForId(generatedID).FetchPage(context.Background())
-				require.NoError(t, versions.Error)
-				require.Len(t, versions.Results, 2)
+				generations := db.ListConnectorGenerationsBuilder().ForId(generatedID).FetchPage(context.Background())
+				require.NoError(t, generations.Error)
+				require.Len(t, generations.Results, 2)
 			})
 
-			t.Run("explicit id can rename without creating a version", func(t *testing.T) {
+			t.Run("explicit id can rename without creating a generation", func(t *testing.T) {
 				connectorID := apid.MustParse("cxr_test0000000000001")
 				cleanup := setup(t, []configuredConnector{{
 					Id:          connectorID,
@@ -324,12 +324,12 @@ func TestMigration(t *testing.T) {
 				require.Equal(t, connectorID, renamed.Results[0].Id)
 				require.Equal(t, "after", renamed.Results[0].Labels["apxy/cxr/-/name"])
 
-				versions := db.ListConnectorDefinitionVersionsBuilder().ForId(connectorID).FetchPage(context.Background())
-				require.NoError(t, versions.Error)
-				require.Len(t, versions.Results, 1)
+				generations := db.ListConnectorGenerationsBuilder().ForId(connectorID).FetchPage(context.Background())
+				require.NoError(t, generations.Error)
+				require.Len(t, generations.Results, 1)
 			})
 
-			t.Run("metadata and release changes do not create a version", func(t *testing.T) {
+			t.Run("metadata and release changes do not create a generation", func(t *testing.T) {
 				connectorID := apid.MustParse("cxr_test0000000000001")
 				cleanup := setup(t, []configuredConnector{{
 					Id:          connectorID,
@@ -348,30 +348,30 @@ func TestMigration(t *testing.T) {
 				resource.Spec.Release.DesiredState = cschema.ConnectorReleaseStatePrimary
 				require.NoError(t, service.MigrateConnectors(context.Background()))
 
-				versions := db.ListConnectorDefinitionVersionsBuilder().ForId(connectorID).FetchPage(context.Background())
-				require.NoError(t, versions.Error)
-				require.Len(t, versions.Results, 1)
-				require.Equal(t, database.ConnectorDefinitionVersionStatePrimary, versions.Results[0].State)
-				userLabels, _ := database.SplitUserAndApxyLabels(versions.Results[0].Labels)
+				generations := db.ListConnectorGenerationsBuilder().ForId(connectorID).FetchPage(context.Background())
+				require.NoError(t, generations.Error)
+				require.Len(t, generations.Results, 1)
+				require.Equal(t, database.ConnectorGenerationStatePrimary, generations.Results[0].State)
+				userLabels, _ := database.SplitUserAndApxyLabels(generations.Results[0].Labels)
 				require.Equal(t, database.Labels{"environment": "production"}, userLabels)
-				require.Equal(t, database.Annotations{"example.com/owner": "platform"}, versions.Results[0].Annotations)
+				require.Equal(t, database.Annotations{"example.com/owner": "platform"}, generations.Results[0].Annotations)
 			})
 
-			t.Run("explicit id can rename while adding a version", func(t *testing.T) {
+			t.Run("explicit id can rename while adding a generation", func(t *testing.T) {
 				connectorID := apid.MustParse("cxr_test0000000000001")
 				cleanup := setup(t, []configuredConnector{{
 					Id:          connectorID,
 					Name:        "before",
-					Version:     1,
+					Generation:  1,
 					Labels:      map[string]string{"type": "same"},
-					DisplayName: "Version one",
+					DisplayName: "Generation one",
 				}})
 				defer cleanup()
 
 				require.NoError(t, service.MigrateConnectors(context.Background()))
 				cfg.GetRoot().Connectors.LoadFromList[0].Metadata.Name = "after"
 				cfg.GetRoot().Connectors.LoadFromList[0].Metadata.Generation = 2
-				cfg.GetRoot().Connectors.LoadFromList[0].Spec.Definition.DisplayName = "Version two"
+				cfg.GetRoot().Connectors.LoadFromList[0].Spec.Definition.DisplayName = "Generation two"
 				require.NoError(t, service.MigrateConnectors(context.Background()))
 
 				renamed := db.ListConnectorsBuilder().ForName("after").FetchPage(context.Background())
@@ -379,9 +379,9 @@ func TestMigration(t *testing.T) {
 				require.Len(t, renamed.Results, 1)
 				require.Equal(t, connectorID, renamed.Results[0].Id)
 
-				versions := db.ListConnectorDefinitionVersionsBuilder().ForId(connectorID).FetchPage(context.Background())
-				require.NoError(t, versions.Error)
-				require.Len(t, versions.Results, 2)
+				generations := db.ListConnectorGenerationsBuilder().ForId(connectorID).FetchPage(context.Background())
+				require.NoError(t, generations.Error)
+				require.Len(t, generations.Results, 2)
 			})
 
 			t.Run("same name in different namespaces creates different connectors", func(t *testing.T) {
@@ -402,13 +402,13 @@ func TestMigration(t *testing.T) {
 			})
 		})
 
-		t.Run("id and version", func(t *testing.T) {
+		t.Run("id and generation", func(t *testing.T) {
 			t.Run("single initial", func(t *testing.T) {
 				cleanup := setup(t, []configuredConnector{
 					{
-						Id:      apid.MustParse("cxr_test0000000000001"),
-						Version: 1,
-						Labels:  map[string]string{"type": "fake"},
+						Id:         apid.MustParse("cxr_test0000000000001"),
+						Generation: 1,
+						Labels:     map[string]string{"type": "fake"},
 					},
 				})
 				defer cleanup()
@@ -417,18 +417,18 @@ func TestMigration(t *testing.T) {
 				require.NoError(t, err)
 
 				type connectorResult struct {
-					Id      string
-					Version int64
-					State   string
+					Id         string
+					Generation int64
+					State      string
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT connector_id AS id, version, state FROM connector_definition_versions;
+			SELECT connector_id AS id, generation, state FROM connector_generations;
 		`, []connectorResult{
 					{
-						Id:      "cxr_test0000000000001",
-						Version: 1,
-						State:   "primary",
+						Id:         "cxr_test0000000000001",
+						Generation: 1,
+						State:      "primary",
 					},
 				})
 			})
@@ -436,14 +436,14 @@ func TestMigration(t *testing.T) {
 			t.Run("double initial same type", func(t *testing.T) {
 				cleanup := setup(t, []configuredConnector{
 					{
-						Id:      apid.MustParse("cxr_test0000000000001"),
-						Version: 1,
-						Labels:  map[string]string{"type": "fake"},
+						Id:         apid.MustParse("cxr_test0000000000001"),
+						Generation: 1,
+						Labels:     map[string]string{"type": "fake"},
 					},
 					{
-						Id:      apid.MustParse("cxr_test0000000000002"),
-						Version: 1,
-						Labels:  map[string]string{"type": "fake"},
+						Id:         apid.MustParse("cxr_test0000000000002"),
+						Generation: 1,
+						Labels:     map[string]string{"type": "fake"},
 					},
 				})
 				defer cleanup()
@@ -452,23 +452,23 @@ func TestMigration(t *testing.T) {
 				require.NoError(t, err)
 
 				type connectorResult struct {
-					Id      string
-					Version int64
-					State   string
+					Id         string
+					Generation int64
+					State      string
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT connector_id AS id, version, state FROM connector_definition_versions ORDER BY id;
+			SELECT connector_id AS id, generation, state FROM connector_generations ORDER BY id;
 		`, []connectorResult{
 					{
-						Id:      "cxr_test0000000000001",
-						Version: 1,
-						State:   "primary",
+						Id:         "cxr_test0000000000001",
+						Generation: 1,
+						State:      "primary",
 					},
 					{
-						Id:      "cxr_test0000000000002",
-						Version: 1,
-						State:   "primary",
+						Id:         "cxr_test0000000000002",
+						Generation: 1,
+						State:      "primary",
 					},
 				})
 			})
@@ -476,14 +476,14 @@ func TestMigration(t *testing.T) {
 			t.Run("double initial different type", func(t *testing.T) {
 				cleanup := setup(t, []configuredConnector{
 					{
-						Id:      apid.MustParse("cxr_test0000000000001"),
-						Version: 1,
-						Labels:  map[string]string{"type": "fake1"},
+						Id:         apid.MustParse("cxr_test0000000000001"),
+						Generation: 1,
+						Labels:     map[string]string{"type": "fake1"},
 					},
 					{
-						Id:      apid.MustParse("cxr_test0000000000002"),
-						Version: 1,
-						Labels:  map[string]string{"type": "fake2"},
+						Id:         apid.MustParse("cxr_test0000000000002"),
+						Generation: 1,
+						Labels:     map[string]string{"type": "fake2"},
 					},
 				})
 				defer cleanup()
@@ -492,23 +492,23 @@ func TestMigration(t *testing.T) {
 				require.NoError(t, err)
 
 				type connectorResult struct {
-					Id      string
-					Version int64
-					State   string
+					Id         string
+					Generation int64
+					State      string
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT connector_id AS id, version, state FROM connector_definition_versions ORDER BY id;
+			SELECT connector_id AS id, generation, state FROM connector_generations ORDER BY id;
 		`, []connectorResult{
 					{
-						Id:      "cxr_test0000000000001",
-						Version: 1,
-						State:   "primary",
+						Id:         "cxr_test0000000000001",
+						Generation: 1,
+						State:      "primary",
 					},
 					{
-						Id:      "cxr_test0000000000002",
-						Version: 1,
-						State:   "primary",
+						Id:         "cxr_test0000000000002",
+						Generation: 1,
+						State:      "primary",
 					},
 				})
 			})
@@ -516,9 +516,9 @@ func TestMigration(t *testing.T) {
 			t.Run("unchanged from initial", func(t *testing.T) {
 				cleanup := setup(t, []configuredConnector{
 					{
-						Id:      apid.MustParse("cxr_test0000000000001"),
-						Version: 1,
-						Labels:  map[string]string{"type": "fake"},
+						Id:         apid.MustParse("cxr_test0000000000001"),
+						Generation: 1,
+						Labels:     map[string]string{"type": "fake"},
 					},
 				})
 				defer cleanup()
@@ -530,18 +530,18 @@ func TestMigration(t *testing.T) {
 				require.NoError(t, err)
 
 				type connectorResult struct {
-					Id      string
-					Version int64
-					State   string
+					Id         string
+					Generation int64
+					State      string
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT connector_id AS id, version, state FROM connector_definition_versions;
+			SELECT connector_id AS id, generation, state FROM connector_generations;
 		`, []connectorResult{
 					{
-						Id:      "cxr_test0000000000001",
-						Version: 1,
-						State:   "primary",
+						Id:         "cxr_test0000000000001",
+						Generation: 1,
+						State:      "primary",
 					},
 				})
 			})
@@ -550,7 +550,7 @@ func TestMigration(t *testing.T) {
 				cleanup := setup(t, []configuredConnector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
-						Version:     1,
+						Generation:  1,
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "initial",
 					},
@@ -574,23 +574,23 @@ func TestMigration(t *testing.T) {
 
 				type connectorResult struct {
 					Id          string
-					Version     int64
+					Generation  int64
 					State       string
 					DisplayName string
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
+			SELECT connector_id AS id, generation, state, DISPLAY_NAME_EXPR as display_name FROM connector_generations ORDER BY generation;
 		`, []connectorResult{
 					{
 						Id:          "cxr_test0000000000001",
-						Version:     1,
+						Generation:  1,
 						State:       "active",
 						DisplayName: "initial",
 					},
 					{
 						Id:          "cxr_test0000000000001",
-						Version:     2,
+						Generation:  2,
 						State:       "primary",
 						DisplayName: "changed",
 					},
@@ -603,11 +603,11 @@ func TestMigration(t *testing.T) {
 				require.Equal(t, "renamed", logicalName)
 			})
 
-			t.Run("add draft version", func(t *testing.T) {
+			t.Run("add draft generation", func(t *testing.T) {
 				cleanup := setup(t, []configuredConnector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
-						Version:     1,
+						Generation:  1,
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "initial",
 					},
@@ -617,10 +617,10 @@ func TestMigration(t *testing.T) {
 				err := service.MigrateConnectors(context.Background())
 				require.NoError(t, err)
 
-				// Draft versions can be added; non-specified versions default to primary
+				// Draft generations can be added; non-specified generations default to primary
 				cfg.GetRoot().Connectors.LoadFromList = appendConfiguredConnector(cfg.GetRoot().Connectors.LoadFromList, configuredConnector{
 					Id:          apid.MustParse("cxr_test0000000000001"),
-					Version:     2,
+					Generation:  2,
 					State:       "draft",
 					Labels:      map[string]string{"type": "fake"},
 					DisplayName: "changed",
@@ -631,23 +631,23 @@ func TestMigration(t *testing.T) {
 
 				type connectorResult struct {
 					Id          string
-					Version     int64
+					Generation  int64
 					State       string
 					DisplayName string
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
+			SELECT connector_id AS id, generation, state, DISPLAY_NAME_EXPR as display_name FROM connector_generations ORDER BY generation;
 		`, []connectorResult{
 					{
 						Id:          "cxr_test0000000000001",
-						Version:     1,
+						Generation:  1,
 						State:       "primary",
 						DisplayName: "initial",
 					},
 					{
 						Id:          "cxr_test0000000000001",
-						Version:     2,
+						Generation:  2,
 						State:       "draft",
 						DisplayName: "changed",
 					},
@@ -658,7 +658,7 @@ func TestMigration(t *testing.T) {
 				cleanup := setup(t, []configuredConnector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
-						Version:     1,
+						Generation:  1,
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "initial",
 					},
@@ -679,23 +679,23 @@ func TestMigration(t *testing.T) {
 
 				type connectorResult struct {
 					Id          string
-					Version     int64
+					Generation  int64
 					State       string
 					DisplayName string
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
+			SELECT connector_id AS id, generation, state, DISPLAY_NAME_EXPR as display_name FROM connector_generations ORDER BY generation;
 		`, []connectorResult{
 					{
 						Id:          "cxr_test0000000000001",
-						Version:     1,
+						Generation:  1,
 						State:       "active",
 						DisplayName: "initial",
 					},
 					{
 						Id:          "cxr_test0000000000001",
-						Version:     2,
+						Generation:  2,
 						State:       "primary",
 						DisplayName: "changed",
 					},
@@ -706,7 +706,7 @@ func TestMigration(t *testing.T) {
 				cleanup := setup(t, []configuredConnector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
-						Version:     1,
+						Generation:  1,
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "initial",
 					},
@@ -730,40 +730,40 @@ func TestMigration(t *testing.T) {
 
 				type connectorResult struct {
 					Id          string
-					Version     int64
+					Generation  int64
 					State       string
 					DisplayName string
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
+			SELECT connector_id AS id, generation, state, DISPLAY_NAME_EXPR as display_name FROM connector_generations ORDER BY generation;
 		`, []connectorResult{
 					{
 						Id:          "cxr_test0000000000001",
-						Version:     1,
+						Generation:  1,
 						State:       "active",
 						DisplayName: "initial",
 					},
 					{
 						Id:          "cxr_test0000000000001",
-						Version:     2,
+						Generation:  2,
 						State:       "active",
 						DisplayName: "changed",
 					},
 					{
 						Id:          "cxr_test0000000000001",
-						Version:     3,
+						Generation:  3,
 						State:       "primary",
 						DisplayName: "changed again",
 					},
 				})
 			})
 
-			t.Run("cannot change published version", func(t *testing.T) {
+			t.Run("cannot change published generation", func(t *testing.T) {
 				cleanup := setup(t, []configuredConnector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
-						Version:     1,
+						Generation:  1,
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "initial",
 					},
@@ -780,34 +780,34 @@ func TestMigration(t *testing.T) {
 
 				type connectorResult struct {
 					Id          string
-					Version     int64
+					Generation  int64
 					State       string
 					DisplayName string
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
+			SELECT connector_id AS id, generation, state, DISPLAY_NAME_EXPR as display_name FROM connector_generations ORDER BY generation;
 		`, []connectorResult{
 					{
 						Id:          "cxr_test0000000000001",
-						Version:     1,
+						Generation:  1,
 						State:       "primary",
 						DisplayName: "initial",
 					},
 				})
 			})
 
-			t.Run("does not allow duplicate id versions initial", func(t *testing.T) {
+			t.Run("does not allow duplicate id generations initial", func(t *testing.T) {
 				cleanup := setup(t, []configuredConnector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
-						Version:     1,
+						Generation:  1,
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "first",
 					},
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
-						Version:     1,
+						Generation:  1,
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "second",
 					},
@@ -819,21 +819,21 @@ func TestMigration(t *testing.T) {
 
 				type connectorResult struct {
 					Id          string
-					Version     int64
+					Generation  int64
 					State       string
 					DisplayName string
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
+			SELECT connector_id AS id, generation, state, DISPLAY_NAME_EXPR as display_name FROM connector_generations ORDER BY generation;
 		`, []connectorResult{})
 			})
 
-			t.Run("does not allow duplicate id versions when migrated", func(t *testing.T) {
+			t.Run("does not allow duplicate id generations when migrated", func(t *testing.T) {
 				cleanup := setup(t, []configuredConnector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
-						Version:     1,
+						Generation:  1,
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "first",
 					},
@@ -845,7 +845,7 @@ func TestMigration(t *testing.T) {
 
 				cfg.GetRoot().Connectors.LoadFromList = appendConfiguredConnector(cfg.GetRoot().Connectors.LoadFromList, configuredConnector{
 					Id:          apid.MustParse("cxr_test0000000000001"),
-					Version:     1,
+					Generation:  1,
 					Labels:      map[string]string{"type": "fake"},
 					DisplayName: "second",
 				})
@@ -855,17 +855,17 @@ func TestMigration(t *testing.T) {
 
 				type connectorResult struct {
 					Id          string
-					Version     int64
+					Generation  int64
 					State       string
 					DisplayName string
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
+			SELECT connector_id AS id, generation, state, DISPLAY_NAME_EXPR as display_name FROM connector_generations ORDER BY generation;
 		`, []connectorResult{
 					{
 						Id:          "cxr_test0000000000001",
-						Version:     1,
+						Generation:  1,
 						State:       "primary",
 						DisplayName: "first",
 					},
@@ -887,18 +887,18 @@ func TestMigration(t *testing.T) {
 				require.NoError(t, err)
 
 				type connectorResult struct {
-					Id      string
-					Version int64
-					State   string
+					Id         string
+					Generation int64
+					State      string
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT connector_id AS id, version, state FROM connector_definition_versions;
+			SELECT connector_id AS id, generation, state FROM connector_generations;
 		`, []connectorResult{
 					{
-						Id:      "cxr_test0000000000001",
-						Version: 1,
-						State:   "primary",
+						Id:         "cxr_test0000000000001",
+						Generation: 1,
+						State:      "primary",
 					},
 				})
 			})
@@ -920,23 +920,23 @@ func TestMigration(t *testing.T) {
 				require.NoError(t, err)
 
 				type connectorResult struct {
-					Id      string
-					Version int64
-					State   string
+					Id         string
+					Generation int64
+					State      string
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT connector_id AS id, version, state FROM connector_definition_versions ORDER BY id;
+			SELECT connector_id AS id, generation, state FROM connector_generations ORDER BY id;
 		`, []connectorResult{
 					{
-						Id:      "cxr_test0000000000001",
-						Version: 1,
-						State:   "primary",
+						Id:         "cxr_test0000000000001",
+						Generation: 1,
+						State:      "primary",
 					},
 					{
-						Id:      "cxr_test0000000000002",
-						Version: 1,
-						State:   "primary",
+						Id:         "cxr_test0000000000002",
+						Generation: 1,
+						State:      "primary",
 					},
 				})
 			})
@@ -957,18 +957,18 @@ func TestMigration(t *testing.T) {
 				require.NoError(t, err)
 
 				type connectorResult struct {
-					Id      string
-					Version int64
-					State   string
+					Id         string
+					Generation int64
+					State      string
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT connector_id AS id, version, state FROM connector_definition_versions;
+			SELECT connector_id AS id, generation, state FROM connector_generations;
 		`, []connectorResult{
 					{
-						Id:      "cxr_test0000000000001",
-						Version: 1,
-						State:   "primary",
+						Id:         "cxr_test0000000000001",
+						Generation: 1,
+						State:      "primary",
 					},
 				})
 			})
@@ -993,30 +993,30 @@ func TestMigration(t *testing.T) {
 
 				type connectorResult struct {
 					Id          string
-					Version     int64
+					Generation  int64
 					State       string
 					DisplayName string
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
+			SELECT connector_id AS id, generation, state, DISPLAY_NAME_EXPR as display_name FROM connector_generations ORDER BY generation;
 		`, []connectorResult{
 					{
 						Id:          "cxr_test0000000000001",
-						Version:     1,
+						Generation:  1,
 						State:       "active",
 						DisplayName: "initial",
 					},
 					{
 						Id:          "cxr_test0000000000001",
-						Version:     2,
+						Generation:  2,
 						State:       "primary",
 						DisplayName: "changed",
 					},
 				})
 			})
 
-			t.Run("add draft version", func(t *testing.T) {
+			t.Run("add draft generation", func(t *testing.T) {
 				cleanup := setup(t, []configuredConnector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
@@ -1041,23 +1041,23 @@ func TestMigration(t *testing.T) {
 
 				type connectorResult struct {
 					Id          string
-					Version     int64
+					Generation  int64
 					State       string
 					DisplayName string
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
+			SELECT connector_id AS id, generation, state, DISPLAY_NAME_EXPR as display_name FROM connector_generations ORDER BY generation;
 		`, []connectorResult{
 					{
 						Id:          "cxr_test0000000000001",
-						Version:     1,
+						Generation:  1,
 						State:       "primary",
 						DisplayName: "initial",
 					},
 					{
 						Id:          "cxr_test0000000000001",
-						Version:     2,
+						Generation:  2,
 						State:       "draft",
 						DisplayName: "changed",
 					},
@@ -1087,23 +1087,23 @@ func TestMigration(t *testing.T) {
 
 				type connectorResult struct {
 					Id          string
-					Version     int64
+					Generation  int64
 					State       string
 					DisplayName string
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
+			SELECT connector_id AS id, generation, state, DISPLAY_NAME_EXPR as display_name FROM connector_generations ORDER BY generation;
 		`, []connectorResult{
 					{
 						Id:          "cxr_test0000000000001",
-						Version:     1,
+						Generation:  1,
 						State:       "active",
 						DisplayName: "initial",
 					},
 					{
 						Id:          "cxr_test0000000000001",
-						Version:     2,
+						Generation:  2,
 						State:       "primary",
 						DisplayName: "changed",
 					},
@@ -1135,29 +1135,29 @@ func TestMigration(t *testing.T) {
 
 				type connectorResult struct {
 					Id          string
-					Version     int64
+					Generation  int64
 					State       string
 					DisplayName string
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
+			SELECT connector_id AS id, generation, state, DISPLAY_NAME_EXPR as display_name FROM connector_generations ORDER BY generation;
 		`, []connectorResult{
 					{
 						Id:          "cxr_test0000000000001",
-						Version:     1,
+						Generation:  1,
 						State:       "active",
 						DisplayName: "initial",
 					},
 					{
 						Id:          "cxr_test0000000000001",
-						Version:     2,
+						Generation:  2,
 						State:       "active",
 						DisplayName: "changed",
 					},
 					{
 						Id:          "cxr_test0000000000001",
-						Version:     3,
+						Generation:  3,
 						State:       "primary",
 						DisplayName: "changed again",
 					},
@@ -1184,13 +1184,13 @@ func TestMigration(t *testing.T) {
 
 				type connectorResult struct {
 					Id          string
-					Version     int64
+					Generation  int64
 					State       string
 					DisplayName string
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
+			SELECT connector_id AS id, generation, state, DISPLAY_NAME_EXPR as display_name FROM connector_generations ORDER BY generation;
 		`, []connectorResult{})
 			})
 
@@ -1218,17 +1218,17 @@ func TestMigration(t *testing.T) {
 
 				type connectorResult struct {
 					Id          string
-					Version     int64
+					Generation  int64
 					State       string
 					DisplayName string
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
+			SELECT connector_id AS id, generation, state, DISPLAY_NAME_EXPR as display_name FROM connector_generations ORDER BY generation;
 		`, []connectorResult{
 					{
 						Id:          "cxr_test0000000000001",
-						Version:     1,
+						Generation:  1,
 						State:       "primary",
 						DisplayName: "first",
 					},
@@ -1236,12 +1236,12 @@ func TestMigration(t *testing.T) {
 			})
 		})
 
-		t.Run("name and version", func(t *testing.T) {
+		t.Run("name and generation", func(t *testing.T) {
 			t.Run("changed once preserves generated id", func(t *testing.T) {
 				cleanup := setup(t, []configuredConnector{
 					{
 						Name:        "fake",
-						Version:     1,
+						Generation:  1,
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "initial",
 					},
@@ -1259,16 +1259,16 @@ func TestMigration(t *testing.T) {
 
 				type connectorResult struct {
 					Id          string
-					Version     int64
+					Generation  int64
 					State       string
 					DisplayName string
 				}
 
 				rows, err := rawDb.Query(withDisplayNameExpr(cfg, `
-			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name
-			FROM connector_definition_versions
+			SELECT connector_id AS id, generation, state, DISPLAY_NAME_EXPR as display_name
+			FROM connector_generations
 			WHERE connector_id IN (SELECT id FROM connectors WHERE deleted_at IS NULL)
-			ORDER BY version;
+			ORDER BY generation;
 		`))
 				require.NoError(t, err)
 				defer rows.Close()
@@ -1276,7 +1276,7 @@ func TestMigration(t *testing.T) {
 				var results []connectorResult
 				for rows.Next() {
 					var result connectorResult
-					require.NoError(t, rows.Scan(&result.Id, &result.Version, &result.State, &result.DisplayName))
+					require.NoError(t, rows.Scan(&result.Id, &result.Generation, &result.State, &result.DisplayName))
 					results = append(results, result)
 				}
 				require.NoError(t, rows.Err())
@@ -1284,23 +1284,23 @@ func TestMigration(t *testing.T) {
 				require.Equal(t, results[0].Id, results[1].Id)
 				require.Equal(t, connectorResult{
 					Id:          results[0].Id,
-					Version:     1,
+					Generation:  1,
 					State:       "active",
 					DisplayName: "initial",
 				}, results[0])
 				require.Equal(t, connectorResult{
 					Id:          results[0].Id,
-					Version:     2,
+					Generation:  2,
 					State:       "primary",
 					DisplayName: "changed",
 				}, results[1])
 			})
 
-			t.Run("initial version must start at one", func(t *testing.T) {
+			t.Run("initial generation must start at one", func(t *testing.T) {
 				cleanup := setup(t, []configuredConnector{
 					{
 						Name:        "fake",
-						Version:     2,
+						Generation:  2,
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "initial",
 					},
@@ -1311,21 +1311,21 @@ func TestMigration(t *testing.T) {
 				require.Error(t, err)
 
 				type connectorResult struct {
-					Id      string
-					Version int64
-					State   string
+					Id         string
+					Generation int64
+					State      string
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT connector_id AS id, version, state FROM connector_definition_versions WHERE connector_id IN (SELECT id FROM connectors WHERE deleted_at IS NULL);
+			SELECT connector_id AS id, generation, state FROM connector_generations WHERE connector_id IN (SELECT id FROM connectors WHERE deleted_at IS NULL);
 		`, []connectorResult{})
 			})
 
-			t.Run("cannot change published version", func(t *testing.T) {
+			t.Run("cannot change published generation", func(t *testing.T) {
 				cleanup := setup(t, []configuredConnector{
 					{
 						Name:        "fake",
-						Version:     1,
+						Generation:  1,
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "initial",
 					},
@@ -1341,19 +1341,19 @@ func TestMigration(t *testing.T) {
 				require.Error(t, err)
 
 				type connectorResult struct {
-					Version     int64
+					Generation  int64
 					State       string
 					DisplayName string
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT version, state, DISPLAY_NAME_EXPR as display_name
-			FROM connector_definition_versions
+			SELECT generation, state, DISPLAY_NAME_EXPR as display_name
+			FROM connector_generations
 			WHERE connector_id IN (SELECT id FROM connectors WHERE deleted_at IS NULL)
-			ORDER BY version;
+			ORDER BY generation;
 		`, []connectorResult{
 					{
-						Version:     1,
+						Generation:  1,
 						State:       "primary",
 						DisplayName: "initial",
 					},
@@ -1375,16 +1375,16 @@ func TestMigration(t *testing.T) {
 				require.NoError(t, err)
 
 				type connectorResult struct {
-					Version int64
-					State   string
+					Generation int64
+					State      string
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT version, state FROM connector_definition_versions;
+			SELECT generation, state FROM connector_generations;
 		`, []connectorResult{
 					{
-						Version: 1,
-						State:   "primary",
+						Generation: 1,
+						State:      "primary",
 					},
 				})
 			})
@@ -1405,16 +1405,16 @@ func TestMigration(t *testing.T) {
 				require.NoError(t, err)
 
 				type connectorResult struct {
-					Version int64
-					State   string
+					Generation int64
+					State      string
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT version, state FROM connector_definition_versions;
+			SELECT generation, state FROM connector_generations;
 		`, []connectorResult{
 					{
-						Version: 1,
-						State:   "primary",
+						Generation: 1,
+						State:      "primary",
 					},
 				})
 			})
@@ -1438,21 +1438,21 @@ func TestMigration(t *testing.T) {
 				require.NoError(t, err)
 
 				type connectorResult struct {
-					Version     int64
+					Generation  int64
 					State       string
 					DisplayName string
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
+			SELECT generation, state, DISPLAY_NAME_EXPR as display_name FROM connector_generations ORDER BY generation;
 		`, []connectorResult{
 					{
-						Version:     1,
+						Generation:  1,
 						State:       "active",
 						DisplayName: "initial",
 					},
 					{
-						Version:     2,
+						Generation:  2,
 						State:       "primary",
 						DisplayName: "changed",
 					},
@@ -1481,21 +1481,21 @@ func TestMigration(t *testing.T) {
 				require.NoError(t, err)
 
 				type connectorResult struct {
-					Version     int64
+					Generation  int64
 					State       string
 					DisplayName string
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
+			SELECT generation, state, DISPLAY_NAME_EXPR as display_name FROM connector_generations ORDER BY generation;
 		`, []connectorResult{
 					{
-						Version:     1,
+						Generation:  1,
 						State:       "active",
 						DisplayName: "initial",
 					},
 					{
-						Version:     2,
+						Generation:  2,
 						State:       "primary",
 						DisplayName: "changed",
 					},
@@ -1526,26 +1526,26 @@ func TestMigration(t *testing.T) {
 				require.NoError(t, err)
 
 				type connectorResult struct {
-					Version     int64
+					Generation  int64
 					State       string
 					DisplayName string
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
+			SELECT generation, state, DISPLAY_NAME_EXPR as display_name FROM connector_generations ORDER BY generation;
 		`, []connectorResult{
 					{
-						Version:     1,
+						Generation:  1,
 						State:       "active",
 						DisplayName: "initial",
 					},
 					{
-						Version:     2,
+						Generation:  2,
 						State:       "active",
 						DisplayName: "changed",
 					},
 					{
-						Version:     3,
+						Generation:  3,
 						State:       "primary",
 						DisplayName: "changed again",
 					},
@@ -1572,13 +1572,13 @@ func TestMigration(t *testing.T) {
 
 				type connectorResult struct {
 					Id          string
-					Version     int64
+					Generation  int64
 					State       string
 					DisplayName string
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
+			SELECT connector_id AS id, generation, state, DISPLAY_NAME_EXPR as display_name FROM connector_generations ORDER BY generation;
 		`, []connectorResult{})
 			})
 
@@ -1605,16 +1605,16 @@ func TestMigration(t *testing.T) {
 				require.Error(t, err)
 
 				type connectorResult struct {
-					Version     int64
+					Generation  int64
 					State       string
 					DisplayName string
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
+			SELECT generation, state, DISPLAY_NAME_EXPR as display_name FROM connector_generations ORDER BY generation;
 		`, []connectorResult{
 					{
-						Version:     1,
+						Generation:  1,
 						State:       "primary",
 						DisplayName: "first",
 					},
@@ -1623,17 +1623,17 @@ func TestMigration(t *testing.T) {
 		})
 
 		t.Run("bad config files", func(t *testing.T) {
-			t.Run("duplicate id version type", func(t *testing.T) {
+			t.Run("duplicate id generation type", func(t *testing.T) {
 				cleanup := setup(t, []configuredConnector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
-						Version:     1,
+						Generation:  1,
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
 					},
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
-						Version:     1,
+						Generation:  1,
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
 					},
@@ -1645,28 +1645,28 @@ func TestMigration(t *testing.T) {
 
 				type connectorResult struct {
 					Id          string
-					Version     int64
+					Generation  int64
 					State       string
 					DisplayName string
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
+			SELECT connector_id AS id, generation, state, DISPLAY_NAME_EXPR as display_name FROM connector_generations ORDER BY generation;
 		`, []connectorResult{})
 			})
 
-			t.Run("duplicate id version state primary", func(t *testing.T) {
+			t.Run("duplicate id generation state primary", func(t *testing.T) {
 				cleanup := setup(t, []configuredConnector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
-						Version:     1,
+						Generation:  1,
 						State:       "primary",
 						Labels:      map[string]string{"type": "fake1"},
 						DisplayName: "duplicate",
 					},
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
-						Version:     1,
+						Generation:  1,
 						State:       "primary",
 						Labels:      map[string]string{"type": "fake2"},
 						DisplayName: "duplicate",
@@ -1679,28 +1679,28 @@ func TestMigration(t *testing.T) {
 
 				type connectorResult struct {
 					Id          string
-					Version     int64
+					Generation  int64
 					State       string
 					DisplayName string
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
+			SELECT connector_id AS id, generation, state, DISPLAY_NAME_EXPR as display_name FROM connector_generations ORDER BY generation;
 		`, []connectorResult{})
 			})
 
-			t.Run("duplicate id version state draft", func(t *testing.T) {
+			t.Run("duplicate id generation state draft", func(t *testing.T) {
 				cleanup := setup(t, []configuredConnector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
-						Version:     1,
+						Generation:  1,
 						State:       "draft",
 						Labels:      map[string]string{"type": "fake1"},
 						DisplayName: "duplicate",
 					},
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
-						Version:     1,
+						Generation:  1,
 						State:       "draft",
 						Labels:      map[string]string{"type": "fake2"},
 						DisplayName: "duplicate",
@@ -1713,27 +1713,27 @@ func TestMigration(t *testing.T) {
 
 				type connectorResult struct {
 					Id          string
-					Version     int64
+					Generation  int64
 					State       string
 					DisplayName string
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
+			SELECT connector_id AS id, generation, state, DISPLAY_NAME_EXPR as display_name FROM connector_generations ORDER BY generation;
 		`, []connectorResult{})
 			})
 
-			t.Run("duplicate id version", func(t *testing.T) {
+			t.Run("duplicate id generation", func(t *testing.T) {
 				cleanup := setup(t, []configuredConnector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
-						Version:     1,
+						Generation:  1,
 						Labels:      map[string]string{"type": "fake1"},
 						DisplayName: "duplicate",
 					},
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
-						Version:     1,
+						Generation:  1,
 						Labels:      map[string]string{"type": "fake2"},
 						DisplayName: "duplicate",
 					},
@@ -1745,21 +1745,21 @@ func TestMigration(t *testing.T) {
 
 				type connectorResult struct {
 					Id          string
-					Version     int64
+					Generation  int64
 					State       string
 					DisplayName string
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
+			SELECT connector_id AS id, generation, state, DISPLAY_NAME_EXPR as display_name FROM connector_generations ORDER BY generation;
 		`, []connectorResult{})
 			})
 
-			t.Run("id with and without version", func(t *testing.T) {
+			t.Run("id with and without generation", func(t *testing.T) {
 				cleanup := setup(t, []configuredConnector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
-						Version:     1,
+						Generation:  1,
 						Labels:      map[string]string{"type": "fake1"},
 						DisplayName: "duplicate",
 					},
@@ -1776,22 +1776,22 @@ func TestMigration(t *testing.T) {
 
 				type connectorResult struct {
 					Id          string
-					Version     int64
+					Generation  int64
 					State       string
 					DisplayName string
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
+			SELECT connector_id AS id, generation, state, DISPLAY_NAME_EXPR as display_name FROM connector_generations ORDER BY generation;
 		`, []connectorResult{})
 			})
 
-			t.Run("id version and name without id", func(t *testing.T) {
+			t.Run("id generation and name without id", func(t *testing.T) {
 				cleanup := setup(t, []configuredConnector{
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
 						Name:        "fake",
-						Version:     1,
+						Generation:  1,
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
 					},
@@ -1810,13 +1810,13 @@ func TestMigration(t *testing.T) {
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
 						Name:        "fake",
-						Version:     1,
+						Generation:  1,
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
 					},
 					{
 						Name:        "fake",
-						Version:     2,
+						Generation:  2,
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
 					},
@@ -1830,13 +1830,13 @@ func TestMigration(t *testing.T) {
 					{
 						Id:          apid.MustParse("cxr_test0000000000001"),
 						Name:        "fake",
-						Version:     1,
+						Generation:  1,
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
 					},
 					{
 						Name:        "fake",
-						Version:     2,
+						Generation:  2,
 						State:       "draft",
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
@@ -1849,13 +1849,13 @@ func TestMigration(t *testing.T) {
 
 				type connectorResult struct {
 					Id          string
-					Version     int64
+					Generation  int64
 					State       string
 					DisplayName string
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
+			SELECT connector_id AS id, generation, state, DISPLAY_NAME_EXPR as display_name FROM connector_generations ORDER BY generation;
 		`, []connectorResult{})
 			})
 
@@ -1887,7 +1887,7 @@ func TestMigration(t *testing.T) {
 					},
 					{
 						Name:        "fake",
-						Version:     2,
+						Generation:  2,
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
 					},
@@ -1906,7 +1906,7 @@ func TestMigration(t *testing.T) {
 					},
 					{
 						Name:        "fake",
-						Version:     2,
+						Generation:  2,
 						State:       "draft",
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
@@ -1919,13 +1919,13 @@ func TestMigration(t *testing.T) {
 
 				type connectorResult struct {
 					Id          string
-					Version     int64
+					Generation  int64
 					State       string
 					DisplayName string
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT connector_id AS id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_definition_versions ORDER BY version;
+			SELECT connector_id AS id, generation, state, DISPLAY_NAME_EXPR as display_name FROM connector_generations ORDER BY generation;
 		`, []connectorResult{})
 			})
 		})
@@ -1934,14 +1934,14 @@ func TestMigration(t *testing.T) {
 			t.Run("config-sourced connector with no connections is removed", func(t *testing.T) {
 				cleanup := setup(t, []configuredConnector{
 					{
-						Id:      apid.MustParse("cxr_test0000000000001"),
-						Version: 1,
-						Labels:  map[string]string{"type": "fake1"},
+						Id:         apid.MustParse("cxr_test0000000000001"),
+						Generation: 1,
+						Labels:     map[string]string{"type": "fake1"},
 					},
 					{
-						Id:      apid.MustParse("cxr_test0000000000002"),
-						Version: 1,
-						Labels:  map[string]string{"type": "fake2"},
+						Id:         apid.MustParse("cxr_test0000000000002"),
+						Generation: 1,
+						Labels:     map[string]string{"type": "fake2"},
 					},
 				})
 				defer cleanup()
@@ -1956,30 +1956,30 @@ func TestMigration(t *testing.T) {
 				require.NoError(t, err)
 
 				type connectorResult struct {
-					Id      string
-					Version int64
-					State   string
+					Id         string
+					Generation int64
+					State      string
 				}
 
 				// The orphan's row is soft-deleted; only the surviving connector remains.
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT connector_id AS id, version, state FROM connector_definition_versions WHERE connector_id IN (SELECT id FROM connectors WHERE deleted_at IS NULL) ORDER BY id;
+			SELECT connector_id AS id, generation, state FROM connector_generations WHERE connector_id IN (SELECT id FROM connectors WHERE deleted_at IS NULL) ORDER BY id;
 		`, []connectorResult{
-					{Id: "cxr_test0000000000001", Version: 1, State: "primary"},
+					{Id: "cxr_test0000000000001", Generation: 1, State: "primary"},
 				})
 			})
 
 			t.Run("config-sourced connector with live connections is demoted", func(t *testing.T) {
 				cleanup := setup(t, []configuredConnector{
 					{
-						Id:      apid.MustParse("cxr_test0000000000001"),
-						Version: 1,
-						Labels:  map[string]string{"type": "fake1"},
+						Id:         apid.MustParse("cxr_test0000000000001"),
+						Generation: 1,
+						Labels:     map[string]string{"type": "fake1"},
 					},
 					{
-						Id:      apid.MustParse("cxr_test0000000000002"),
-						Version: 1,
-						Labels:  map[string]string{"type": "fake2"},
+						Id:         apid.MustParse("cxr_test0000000000002"),
+						Generation: 1,
+						Labels:     map[string]string{"type": "fake2"},
 					},
 				})
 				defer cleanup()
@@ -1989,11 +1989,11 @@ func TestMigration(t *testing.T) {
 
 				// Create a connection against the connector we are about to drop.
 				err = db.CreateConnection(context.Background(), &database.Connection{
-					Id:               apid.MustParse("cxn_test0000000000001"),
-					Namespace:        "root",
-					ConnectorId:      apid.MustParse("cxr_test0000000000002"),
-					ConnectorVersion: 1,
-					State:            database.ConnectionStateConfigured,
+					Id:                  apid.MustParse("cxn_test0000000000001"),
+					Namespace:           "root",
+					ConnectorId:         apid.MustParse("cxr_test0000000000002"),
+					ConnectorGeneration: 1,
+					State:               database.ConnectionStateConfigured,
 				})
 				require.NoError(t, err)
 
@@ -2003,27 +2003,27 @@ func TestMigration(t *testing.T) {
 				require.NoError(t, err)
 
 				type connectorResult struct {
-					Id      string
-					Version int64
-					State   string
+					Id         string
+					Generation int64
+					State      string
 				}
 
-				// Orphan must NOT be deleted (still rows present), and its primary version
+				// Orphan must NOT be deleted (still rows present), and its primary generation
 				// must be demoted to active.
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT connector_id AS id, version, state FROM connector_definition_versions WHERE connector_id IN (SELECT id FROM connectors WHERE deleted_at IS NULL) ORDER BY id;
+			SELECT connector_id AS id, generation, state FROM connector_generations WHERE connector_id IN (SELECT id FROM connectors WHERE deleted_at IS NULL) ORDER BY id;
 		`, []connectorResult{
-					{Id: "cxr_test0000000000001", Version: 1, State: "primary"},
-					{Id: "cxr_test0000000000002", Version: 1, State: "active"},
+					{Id: "cxr_test0000000000001", Generation: 1, State: "primary"},
+					{Id: "cxr_test0000000000002", Generation: 1, State: "active"},
 				})
 			})
 
 			t.Run("api-created connectors are not touched", func(t *testing.T) {
 				cleanup := setup(t, []configuredConnector{
 					{
-						Id:      apid.MustParse("cxr_test0000000000001"),
-						Version: 1,
-						Labels:  map[string]string{"type": "fake1"},
+						Id:         apid.MustParse("cxr_test0000000000001"),
+						Generation: 1,
+						Labels:     map[string]string{"type": "fake1"},
 					},
 				})
 				defer cleanup()
@@ -2031,14 +2031,14 @@ func TestMigration(t *testing.T) {
 				err := service.MigrateConnectors(context.Background())
 				require.NoError(t, err)
 
-				// Insert a connector version directly via the database, simulating
+				// Insert a connector generation directly via the database, simulating
 				// an API-driven create. It carries no apxy/cxr/source label.
 				apiId := apid.MustParse("cxr_test0000000000099")
-				err = db.UpsertConnectorDefinitionVersion(context.Background(), &database.ConnectorWithDefinition{
+				err = db.UpsertConnectorGeneration(context.Background(), &database.ConnectorWithDefinition{
 					Id:                  apiId,
-					Version:             1,
+					Generation:          1,
 					Namespace:           "root",
-					State:               database.ConnectorDefinitionVersionStatePrimary,
+					State:               database.ConnectorGenerationStatePrimary,
 					EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "api-created"},
 					Labels:              database.Labels{"type": "api-only"},
 				})
@@ -2050,16 +2050,16 @@ func TestMigration(t *testing.T) {
 				require.NoError(t, err)
 
 				type connectorResult struct {
-					Id      string
-					Version int64
-					State   string
+					Id         string
+					Generation int64
+					State      string
 				}
 
 				assertSqlWithDisplayName(t, rawDb, cfg, `
-			SELECT connector_id AS id, version, state FROM connector_definition_versions WHERE connector_id IN (SELECT id FROM connectors WHERE deleted_at IS NULL) ORDER BY id;
+			SELECT connector_id AS id, generation, state FROM connector_generations WHERE connector_id IN (SELECT id FROM connectors WHERE deleted_at IS NULL) ORDER BY id;
 		`, []connectorResult{
-					{Id: "cxr_test0000000000001", Version: 1, State: "primary"},
-					{Id: "cxr_test0000000000099", Version: 1, State: "primary"},
+					{Id: "cxr_test0000000000001", Generation: 1, State: "primary"},
+					{Id: "cxr_test0000000000099", Generation: 1, State: "primary"},
 				})
 			})
 		})

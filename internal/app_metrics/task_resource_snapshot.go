@@ -112,9 +112,9 @@ func (h *ResourceSnapshotTaskHandler) SnapshotResources(ctx context.Context, at 
 		return err
 	}
 
-	connectorVersionCount, err := h.snapshotConnectorVersions(ctx, sampledAt)
+	connectorGenerationCount, err := h.snapshotConnectorGenerations(ctx, sampledAt)
 	if err != nil {
-		logger.Error("failed to snapshot connector version resources", "error", err, "duration", time.Since(start))
+		logger.Error("failed to snapshot connector generation resources", "error", err, "duration", time.Since(start))
 		return err
 	}
 
@@ -135,7 +135,7 @@ func (h *ResourceSnapshotTaskHandler) SnapshotResources(ctx context.Context, at 
 		"connections", connectionCount,
 		"actors", actorCount,
 		"connectors", connectorCount,
-		"connector_versions", connectorVersionCount,
+		"connector_generations", connectorGenerationCount,
 		"namespaces", namespaceCount,
 		"rate_limits", rateLimitCount,
 		"duration", time.Since(start),
@@ -153,18 +153,18 @@ func (h *ResourceSnapshotTaskHandler) snapshotConnections(ctx context.Context, s
 			for _, conn := range page.Results {
 				conn := conn
 				samples = append(samples, &ConnectionResourceSample{
-					SampledAt:         sampledAt,
-					ResourceType:      ResourceTypeConnection,
-					ResourceID:        conn.Id,
-					Namespace:         conn.Namespace,
-					Labels:            conn.Labels,
-					State:             conn.State,
-					HealthState:       conn.HealthState,
-					ConnectorID:       conn.ConnectorId,
-					ConnectorVersion:  conn.ConnectorVersion,
-					ResourceCreatedAt: conn.CreatedAt,
-					ResourceUpdatedAt: conn.UpdatedAt,
-					ResourceDeletedAt: conn.DeletedAt,
+					SampledAt:           sampledAt,
+					ResourceType:        ResourceTypeConnection,
+					ResourceID:          conn.Id,
+					Namespace:           conn.Namespace,
+					Labels:              conn.Labels,
+					State:               conn.State,
+					HealthState:         conn.HealthState,
+					ConnectorID:         conn.ConnectorId,
+					ConnectorGeneration: conn.ConnectorGeneration,
+					ResourceCreatedAt:   conn.CreatedAt,
+					ResourceUpdatedAt:   conn.UpdatedAt,
+					ResourceDeletedAt:   conn.DeletedAt,
 				})
 			}
 			if err := h.store.StoreConnectionResourceSamples(ctx, samples); err != nil {
@@ -188,16 +188,16 @@ func (h *ResourceSnapshotTaskHandler) snapshotConnectors(ctx context.Context, sa
 			for _, connector := range page.Results {
 				connector := connector
 				samples = append(samples, &ConnectorResourceSample{
-					SampledAt:         sampledAt,
-					ResourceType:      ResourceTypeConnector,
-					ResourceID:        connector.Id,
-					Namespace:         connector.Namespace,
-					Labels:            connector.Labels,
-					State:             connector.State,
-					ConnectorVersion:  connector.Version,
-					ResourceCreatedAt: connector.CreatedAt,
-					ResourceUpdatedAt: connector.UpdatedAt,
-					ResourceDeletedAt: connector.DeletedAt,
+					SampledAt:           sampledAt,
+					ResourceType:        ResourceTypeConnector,
+					ResourceID:          connector.Id,
+					Namespace:           connector.Namespace,
+					Labels:              connector.Labels,
+					State:               connector.State,
+					ConnectorGeneration: connector.Generation,
+					ResourceCreatedAt:   connector.CreatedAt,
+					ResourceUpdatedAt:   connector.UpdatedAt,
+					ResourceDeletedAt:   connector.DeletedAt,
 				})
 			}
 			if err := h.store.StoreConnectorResourceSamples(ctx, samples); err != nil {
@@ -212,35 +212,35 @@ func (h *ResourceSnapshotTaskHandler) snapshotConnectors(ctx context.Context, sa
 	return total, nil
 }
 
-func (h *ResourceSnapshotTaskHandler) snapshotConnectorVersions(ctx context.Context, sampledAt time.Time) (int, error) {
+func (h *ResourceSnapshotTaskHandler) snapshotConnectorGenerations(ctx context.Context, sampledAt time.Time) (int, error) {
 	total := 0
-	err := h.db.ListConnectorDefinitionVersionsBuilder().
+	err := h.db.ListConnectorGenerationsBuilder().
 		Limit(resourceSnapshotBatchSize).
 		Enumerate(ctx, func(page pagination.PageResult[database.ConnectorWithDefinition]) (pagination.KeepGoing, error) {
-			samples := make([]*ConnectorVersionResourceSample, 0, len(page.Results))
-			for _, connectorVersion := range page.Results {
-				connectorVersion := connectorVersion
-				samples = append(samples, &ConnectorVersionResourceSample{
-					SampledAt:         sampledAt,
-					ResourceType:      ResourceTypeConnectorVersion,
-					ResourceID:        connectorVersion.Id,
-					Namespace:         connectorVersion.Namespace,
-					Labels:            connectorVersion.Labels,
-					State:             connectorVersion.State,
-					ConnectorVersion:  connectorVersion.Version,
-					ResourceCreatedAt: connectorVersion.CreatedAt,
-					ResourceUpdatedAt: connectorVersion.UpdatedAt,
-					ResourceDeletedAt: connectorVersion.DeletedAt,
+			samples := make([]*ConnectorGenerationResourceSample, 0, len(page.Results))
+			for _, connectorGeneration := range page.Results {
+				connectorGeneration := connectorGeneration
+				samples = append(samples, &ConnectorGenerationResourceSample{
+					SampledAt:           sampledAt,
+					ResourceType:        ResourceTypeConnectorGeneration,
+					ResourceID:          connectorGeneration.Id,
+					Namespace:           connectorGeneration.Namespace,
+					Labels:              connectorGeneration.Labels,
+					State:               connectorGeneration.State,
+					ConnectorGeneration: connectorGeneration.Generation,
+					ResourceCreatedAt:   connectorGeneration.CreatedAt,
+					ResourceUpdatedAt:   connectorGeneration.UpdatedAt,
+					ResourceDeletedAt:   connectorGeneration.DeletedAt,
 				})
 			}
-			if err := h.store.StoreConnectorVersionResourceSamples(ctx, samples); err != nil {
+			if err := h.store.StoreConnectorGenerationResourceSamples(ctx, samples); err != nil {
 				return pagination.Stop, err
 			}
 			total += len(samples)
 			return pagination.Continue, nil
 		})
 	if err != nil {
-		return total, fmt.Errorf("failed to enumerate connector version resources for app metrics snapshot: %w", err)
+		return total, fmt.Errorf("failed to enumerate connector generation resources for app metrics snapshot: %w", err)
 	}
 	return total, nil
 }

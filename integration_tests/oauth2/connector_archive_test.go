@@ -62,64 +62,64 @@ func (r *connectorDisconnectAllRig) archive(t *testing.T, connectorID apid.ID, t
 	helpers.RequireWorkflowTaskCompleted(t, r.env, body.Status.TaskID, time.Duration(timeoutSeconds+5)*time.Second)
 }
 
-func createArchiveVersionShape(t *testing.T, rig *connectorDisconnectAllRig, connector connectorDisconnectAllConnector) []uint64 {
+func createArchiveGenerationShape(t *testing.T, rig *connectorDisconnectAllRig, connector connectorDisconnectAllConnector) []uint64 {
 	t.Helper()
 
 	ctx := context.Background()
-	draft, err := rig.env.Core.CreateDraftConnectorVersion(ctx, connector.id, nil, nil, nil)
+	draft, err := rig.env.Core.CreateDraftConnectorGeneration(ctx, connector.id, nil, nil, nil)
 	require.NoError(t, err)
-	require.Equal(t, uint64(2), draft.GetVersion())
-	require.NoError(t, draft.SetState(ctx, database.ConnectorDefinitionVersionStatePrimary))
+	require.Equal(t, uint64(2), draft.GetGeneration())
+	require.NoError(t, draft.SetState(ctx, database.ConnectorGenerationStatePrimary))
 
-	nextDraft, err := rig.env.Core.CreateDraftConnectorVersion(ctx, connector.id, nil, nil, nil)
+	nextDraft, err := rig.env.Core.CreateDraftConnectorGeneration(ctx, connector.id, nil, nil, nil)
 	require.NoError(t, err)
-	require.Equal(t, uint64(3), nextDraft.GetVersion())
+	require.Equal(t, uint64(3), nextDraft.GetGeneration())
 
-	requireConnectorVersionState(t, rig.env.Db, connector.id, 1, database.ConnectorDefinitionVersionStateActive)
-	requireConnectorVersionState(t, rig.env.Db, connector.id, 2, database.ConnectorDefinitionVersionStatePrimary)
-	requireConnectorVersionState(t, rig.env.Db, connector.id, 3, database.ConnectorDefinitionVersionStateDraft)
+	requireConnectorGenerationState(t, rig.env.Db, connector.id, 1, database.ConnectorGenerationStateActive)
+	requireConnectorGenerationState(t, rig.env.Db, connector.id, 2, database.ConnectorGenerationStatePrimary)
+	requireConnectorGenerationState(t, rig.env.Db, connector.id, 3, database.ConnectorGenerationStateDraft)
 
 	return []uint64{1, 2, 3}
 }
 
-func requireConnectorVersionState(
+func requireConnectorGenerationState(
 	t *testing.T,
 	db database.DB,
 	connectorID apid.ID,
-	version uint64,
-	expected database.ConnectorDefinitionVersionState,
+	generation uint64,
+	expected database.ConnectorGenerationState,
 ) {
 	t.Helper()
 
-	connectorVersion, err := db.GetConnectorDefinitionVersion(context.Background(), connectorID, version)
+	connectorGeneration, err := db.GetConnectorGeneration(context.Background(), connectorID, generation)
 	require.NoError(t, err)
-	require.Equal(t, expected, connectorVersion.State)
+	require.Equal(t, expected, connectorGeneration.State)
 }
 
-func requireConnectorVersionsArchived(
+func requireConnectorGenerationsArchived(
 	t *testing.T,
 	db database.DB,
 	connectorID apid.ID,
-	versions []uint64,
+	generations []uint64,
 ) {
 	t.Helper()
 
-	for _, version := range versions {
-		requireConnectorVersionState(t, db, connectorID, version, database.ConnectorDefinitionVersionStateArchived)
+	for _, generation := range generations {
+		requireConnectorGenerationState(t, db, connectorID, generation, database.ConnectorGenerationStateArchived)
 	}
 }
 
-func TestConnectorArchive_ArchivesVersionsAndDisconnectsConnections(t *testing.T) {
+func TestConnectorArchive_ArchivesGenerationsAndDisconnectsConnections(t *testing.T) {
 	rig := newConnectorDisconnectAllRig(t, "connector-archive", 1)
 
 	connectionID := rig.completeAuthFlow(t, rig.connectors[0])
 	requireConnectionAvailable(t, rig, connectionID)
-	versions := createArchiveVersionShape(t, rig, rig.connectors[0])
+	generations := createArchiveGenerationShape(t, rig, rig.connectors[0])
 
 	helpers.StartCoreWorkflowWorker(t, rig.env)
 	rig.archive(t, rig.connectors[0].id, 20)
 
-	requireConnectorVersionsArchived(t, rig.env.Db, rig.connectors[0].id, versions)
+	requireConnectorGenerationsArchived(t, rig.env.Db, rig.connectors[0].id, generations)
 	requireConnectionDeletedByID(t, rig.env, connectionID)
 	requireProxyBlockedForProvider(t, rig.env, rig.provider, connectionID)
 
@@ -135,7 +135,7 @@ func TestConnectorArchive_RevocationFailureStillArchives(t *testing.T) {
 
 	connectionID := rig.completeAuthFlow(t, rig.connectors[0])
 	require.NotNil(t, rig.env.GetOAuth2Token(t, connectionID))
-	versions := createArchiveVersionShape(t, rig, rig.connectors[0])
+	generations := createArchiveGenerationShape(t, rig, rig.connectors[0])
 
 	rig.provider.Script(rig.connectors[0].clientKey, helpers.EndpointRevoke, helpers.ScriptAction{
 		Status:    http.StatusServiceUnavailable,
@@ -146,7 +146,7 @@ func TestConnectorArchive_RevocationFailureStillArchives(t *testing.T) {
 	helpers.StartCoreWorkflowWorker(t, rig.env)
 	rig.archive(t, rig.connectors[0].id, 20)
 
-	requireConnectorVersionsArchived(t, rig.env.Db, rig.connectors[0].id, versions)
+	requireConnectorGenerationsArchived(t, rig.env.Db, rig.connectors[0].id, generations)
 	requireConnectionDeletedByID(t, rig.env, connectionID)
 	requireProxyBlockedForProvider(t, rig.env, rig.provider, connectionID)
 

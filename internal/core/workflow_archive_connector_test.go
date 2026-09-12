@@ -20,7 +20,7 @@ import (
 )
 
 func TestArchiveConnectorWorkflowV1ExecutesRegisteredSteps(t *testing.T) {
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 	timeout := 5 * time.Minute
 	workflowTester := tester.NewWorkflowTester[any](archiveConnectorWorkflowV1)
 
@@ -36,7 +36,7 @@ func TestArchiveConnectorWorkflowV1ExecutesRegisteredSteps(t *testing.T) {
 
 	prepareCall := workflowTester.
 		OnActivityByName(
-			ActivityNameArchiveConnectorPrepareVersionsV1,
+			ActivityNameArchiveConnectorPrepareGenerationsV1,
 			prepareActivity,
 			testifymock.Anything,
 			connectorID,
@@ -58,7 +58,7 @@ func TestArchiveConnectorWorkflowV1ExecutesRegisteredSteps(t *testing.T) {
 		NotBefore(prepareCall)
 	workflowTester.
 		OnActivityByName(
-			ActivityNameArchiveConnectorFinalizeVersionsV1,
+			ActivityNameArchiveConnectorFinalizeGenerationsV1,
 			finalizeActivity,
 			testifymock.Anything,
 			connectorID,
@@ -79,7 +79,7 @@ func TestArchiveConnectorWorkflowV1ExecutesRegisteredSteps(t *testing.T) {
 }
 
 func TestArchiveConnectorWorkflowInstanceID(t *testing.T) {
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 	require.Equal(
 		t,
 		WorkflowNameArchiveConnectorV1+":"+connectorID.String(),
@@ -96,16 +96,16 @@ func TestRegisterArchiveConnectorWorkflowV1DurableNames(t *testing.T) {
 	_, err := reg.GetWorkflow(WorkflowNameArchiveConnectorV1)
 	require.NoError(t, err)
 
-	_, err = reg.GetActivity(ActivityNameArchiveConnectorPrepareVersionsV1)
+	_, err = reg.GetActivity(ActivityNameArchiveConnectorPrepareGenerationsV1)
 	require.NoError(t, err)
 
-	_, err = reg.GetActivity(ActivityNameArchiveConnectorFinalizeVersionsV1)
+	_, err = reg.GetActivity(ActivityNameArchiveConnectorFinalizeGenerationsV1)
 	require.NoError(t, err)
 }
 
 func TestArchiveConnectorStartsWorkflow(t *testing.T) {
 	ctx := context.Background()
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 	workflowClient := &fakeDisconnectWorkflowClient{
 		instance: &wflib.Instance{
 			InstanceID:  "workflow-instance",
@@ -131,51 +131,51 @@ func TestArchiveConnectorStartsWorkflow(t *testing.T) {
 	require.Equal(t, 5*time.Minute, input.Timeout)
 }
 
-func TestArchiveConnectorVersionActivitiesTransitionStates(t *testing.T) {
+func TestArchiveConnectorGenerationActivitiesTransitionStates(t *testing.T) {
 	ctx := context.Background()
 	_, db := database.MustApplyBlankTestDbConfig(t, nil)
 	svc := &service{db: db, logger: test_utils.NewTestLogger()}
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 
-	upsertConnectorVersion(t, db, connectorID, 1, database.ConnectorDefinitionVersionStatePrimary)
-	upsertConnectorVersion(t, db, connectorID, 2, database.ConnectorDefinitionVersionStatePrimary)
-	upsertConnectorVersion(t, db, connectorID, 3, database.ConnectorDefinitionVersionStateDraft)
+	upsertConnectorGeneration(t, db, connectorID, 1, database.ConnectorGenerationStatePrimary)
+	upsertConnectorGeneration(t, db, connectorID, 2, database.ConnectorGenerationStatePrimary)
+	upsertConnectorGeneration(t, db, connectorID, 3, database.ConnectorGenerationStateDraft)
 
-	require.NoError(t, svc.prepareArchiveConnectorVersionsV1(ctx, connectorID))
-	requireConnectorVersionState(t, db, connectorID, 1, database.ConnectorDefinitionVersionStateActive)
-	requireConnectorVersionState(t, db, connectorID, 2, database.ConnectorDefinitionVersionStateActive)
-	requireConnectorVersionState(t, db, connectorID, 3, database.ConnectorDefinitionVersionStateArchived)
+	require.NoError(t, svc.prepareArchiveConnectorGenerationsV1(ctx, connectorID))
+	requireConnectorGenerationState(t, db, connectorID, 1, database.ConnectorGenerationStateActive)
+	requireConnectorGenerationState(t, db, connectorID, 2, database.ConnectorGenerationStateActive)
+	requireConnectorGenerationState(t, db, connectorID, 3, database.ConnectorGenerationStateArchived)
 
-	require.NoError(t, svc.prepareArchiveConnectorVersionsV1(ctx, connectorID))
-	require.NoError(t, svc.finalizeArchiveConnectorVersionsV1(ctx, connectorID))
-	requireConnectorVersionState(t, db, connectorID, 1, database.ConnectorDefinitionVersionStateArchived)
-	requireConnectorVersionState(t, db, connectorID, 2, database.ConnectorDefinitionVersionStateArchived)
-	requireConnectorVersionState(t, db, connectorID, 3, database.ConnectorDefinitionVersionStateArchived)
+	require.NoError(t, svc.prepareArchiveConnectorGenerationsV1(ctx, connectorID))
+	require.NoError(t, svc.finalizeArchiveConnectorGenerationsV1(ctx, connectorID))
+	requireConnectorGenerationState(t, db, connectorID, 1, database.ConnectorGenerationStateArchived)
+	requireConnectorGenerationState(t, db, connectorID, 2, database.ConnectorGenerationStateArchived)
+	requireConnectorGenerationState(t, db, connectorID, 3, database.ConnectorGenerationStateArchived)
 
-	require.NoError(t, svc.finalizeArchiveConnectorVersionsV1(ctx, connectorID))
+	require.NoError(t, svc.finalizeArchiveConnectorGenerationsV1(ctx, connectorID))
 }
 
-func TestArchiveConnectorVersionActivitiesReturnNotFound(t *testing.T) {
+func TestArchiveConnectorGenerationActivitiesReturnNotFound(t *testing.T) {
 	ctx := context.Background()
 	_, db := database.MustApplyBlankTestDbConfig(t, nil)
 	svc := &service{db: db, logger: test_utils.NewTestLogger()}
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 
-	require.ErrorIs(t, svc.prepareArchiveConnectorVersionsV1(ctx, connectorID), database.ErrNotFound)
-	require.ErrorIs(t, svc.finalizeArchiveConnectorVersionsV1(ctx, connectorID), database.ErrNotFound)
+	require.ErrorIs(t, svc.prepareArchiveConnectorGenerationsV1(ctx, connectorID), database.ErrNotFound)
+	require.ErrorIs(t, svc.finalizeArchiveConnectorGenerationsV1(ctx, connectorID), database.ErrNotFound)
 }
 
-func upsertConnectorVersion(
+func upsertConnectorGeneration(
 	t *testing.T,
 	db database.DB,
 	connectorID apid.ID,
-	version uint64,
-	state database.ConnectorDefinitionVersionState,
+	generation uint64,
+	state database.ConnectorGenerationState,
 ) {
 	t.Helper()
-	require.NoError(t, db.UpsertConnectorDefinitionVersion(context.Background(), &database.ConnectorWithDefinition{
+	require.NoError(t, db.UpsertConnectorGeneration(context.Background(), &database.ConnectorWithDefinition{
 		Id:                  connectorID,
-		Version:             version,
+		Generation:          generation,
 		Namespace:           sconfig.RootNamespace,
 		State:               state,
 		EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("dek_test000000000001"), Data: "encrypted-definition"},
@@ -183,15 +183,15 @@ func upsertConnectorVersion(
 	}))
 }
 
-func requireConnectorVersionState(
+func requireConnectorGenerationState(
 	t *testing.T,
 	db database.DB,
 	connectorID apid.ID,
-	version uint64,
-	expected database.ConnectorDefinitionVersionState,
+	generation uint64,
+	expected database.ConnectorGenerationState,
 ) {
 	t.Helper()
-	connectorVersion, err := db.GetConnectorDefinitionVersion(context.Background(), connectorID, version)
+	connectorGeneration, err := db.GetConnectorGeneration(context.Background(), connectorID, generation)
 	require.NoError(t, err)
-	require.Equal(t, expected, connectorVersion.State)
+	require.Equal(t, expected, connectorGeneration.State)
 }

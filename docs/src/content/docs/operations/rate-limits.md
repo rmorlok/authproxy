@@ -145,7 +145,7 @@ scope:
     id: cxn_01example
 ```
 
-References may use `id`, or the pair `namespace` and `name`. A connector reference intentionally has no `generation`: RateLimit and Connector resources have no version binding, so the rule covers current and future connector generations. AuthProxy resolves every reference and rejects it unless the target resource belongs to `metadata.namespace` or one of its descendants.
+References may use `id`, or the pair `namespace` and `name`. A connector reference intentionally has no `generation`: RateLimit and Connector resources have no generation binding, so the rule covers current and future connector generations. AuthProxy resolves every reference and rejects it unless the target resource belongs to `metadata.namespace` or one of its descendants.
 
 ### Via Terraform
 
@@ -299,7 +299,7 @@ The `selector` block decides which requests the rule applies to. All clauses are
 }
 ```
 
-(`apxy/cxr/type` is carried forward from the connector version's user labels into each connection it's used by — see [Labels — Carry-forward](/concepts/labels-and-annotations/#carry-forward--how-labels-flow-through-the-hierarchy).)
+(`apxy/cxr/type` is carried forward from the connector generation's user labels into each connection it's used by — see [Labels — Carry-forward](/concepts/labels-and-annotations/#carry-forward--how-labels-flow-through-the-hierarchy).)
 
 **By path** — limit only writes against the Salesforce REST API:
 ```json
@@ -346,7 +346,7 @@ Each unique combination of values is its own counter. So `{actor=act_a, team=acm
 | `actor` | The initiating actor's id (`apxy/act/-/id`). Empty for system / unauthenticated traffic. |
 | `connection` | The connection's id. |
 | `connector` | The connector's id. |
-| `connector_version` | The numeric connector version. |
+| `connector_generation` | The numeric connector generation. |
 | `namespace` | The namespace path. |
 | `method` | The HTTP verb. |
 | `labels/<key>` | A per-request label value. Missing = empty string. |

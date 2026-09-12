@@ -18,7 +18,7 @@ dimension. Prefer the explicit values below for least-privilege grants.
 | `actors` | `create`, `delete`, `get`, `list`, `update` | Actor records, permissions, labels, annotations, and signing keys |
 | `app-metrics` | `query`, `schema` | Aggregate application-metric queries and metric-schema discovery |
 | `connections` | `create`, `disconnect`, `force_state`, `get`, `list`, `proxy`, `update` | Connection setup, configuration, lifecycle, and authenticated proxy requests |
-| `connectors` | `archive`, `create`, `disconnect_all`, `force_state`, `get`, `list`, `list/versions`, `update` | Connector definitions, versions, metadata, and lifecycle operations |
+| `connectors` | `archive`, `create`, `disconnect_all`, `force_state`, `get`, `list`, `list/generations`, `update` | Connector definitions, generations, metadata, and lifecycle operations |
 | `keys` | `create`, `delete`, `get`, `list`, `update` | Reusable signing and encryption-key resources |
 | `namespaces` | `create`, `get`, `list`, `update` | Namespace records, metadata, and namespace key assignments |
 | `rate_limits` | `create`, `delete`, `get`, `list`, `update` | Rate-limit rules, overrides, and related evaluation endpoints |
@@ -38,7 +38,7 @@ Most resources use the conventional `create`, `get`, `list`, `update`, and
 | `disconnect` | Disconnect one connection. |
 | `disconnect_all` | Disconnect all connections for a connector. |
 | `force_state` | Force a connector or connection into a lifecycle state. |
-| `list/versions` | Read or list connector-version data. |
+| `list/generations` | Read or list connector-generation data. |
 | `manage` | Mutate task-queue or workflow-monitoring state. |
 | `proxy` | Send a request through a connection with its credentials injected. |
 | `query` | Run an aggregate application-metrics query. |

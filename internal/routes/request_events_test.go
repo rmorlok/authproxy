@@ -894,7 +894,7 @@ func TestRequestEventsRoutes(t *testing.T) {
 				Metric:       "resources.connections",
 				Kind:         "gauge",
 				Aggregations: []string{"count"},
-				GroupBy:      []string{"state", "health_state", "connector_id", "connector_version"},
+				GroupBy:      []string{"state", "health_state", "connector_id", "connector_generation"},
 			})
 		})
 

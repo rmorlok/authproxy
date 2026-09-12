@@ -18,8 +18,8 @@ type Connector struct {
 	Id          apid.ID
 	Namespace   string
 	Name        common.ResourceName
-	Version     uint64
-	State       database.ConnectorDefinitionVersionState
+	Generation  uint64
+	State       database.ConnectorGenerationState
 	Type        string
 	Hash        string
 	CreatedAt   time.Time
@@ -41,11 +41,11 @@ func (m *Connector) GetName() common.ResourceName {
 	return m.Name
 }
 
-func (m *Connector) GetVersion() uint64 {
-	return m.Version
+func (m *Connector) GetGeneration() uint64 {
+	return m.Generation
 }
 
-func (m *Connector) GetState() database.ConnectorDefinitionVersionState {
+func (m *Connector) GetState() database.ConnectorGenerationState {
 	return m.State
 }
 
@@ -89,7 +89,7 @@ func (m *Connector) GetResource() *cschema.Connector {
 			ID:          m.Id.String(),
 			Name:        m.Name,
 			Namespace:   m.Namespace,
-			Generation:  m.Version,
+			Generation:  m.Generation,
 			Labels:      maps.Clone(m.Labels),
 			Annotations: maps.Clone(m.Annotations),
 			CreatedAt:   &m.CreatedAt,
@@ -105,27 +105,27 @@ func (m *Connector) GetResource() *cschema.Connector {
 	}
 }
 
-func (m *Connector) SetState(_ context.Context, state database.ConnectorDefinitionVersionState) error {
+func (m *Connector) SetState(_ context.Context, state database.ConnectorGenerationState) error {
 	m.State = state
 	return nil
 }
 
 var _ iface.Connector = (*Connector)(nil)
 
-type ConnectorVersionMatcher struct {
-	ExpectedId      apid.ID
-	ExpectedVersion uint64
+type ConnectorGenerationMatcher struct {
+	ExpectedId         apid.ID
+	ExpectedGeneration uint64
 }
 
-func (m ConnectorVersionMatcher) Matches(x interface{}) bool {
+func (m ConnectorGenerationMatcher) Matches(x interface{}) bool {
 	c, ok := x.(iface.Connector)
 	if !ok {
 		return false
 	}
 
-	return c.GetId() == m.ExpectedId && c.GetVersion() == m.ExpectedVersion
+	return c.GetId() == m.ExpectedId && c.GetGeneration() == m.ExpectedGeneration
 }
 
-func (m ConnectorVersionMatcher) String() string {
-	return fmt.Sprintf("is ConnectorVersion with ID=%s, Version=%d", m.ExpectedId, m.ExpectedVersion)
+func (m ConnectorGenerationMatcher) String() string {
+	return fmt.Sprintf("is ConnectorGeneration with ID=%s, Generation=%d", m.ExpectedId, m.ExpectedGeneration)
 }

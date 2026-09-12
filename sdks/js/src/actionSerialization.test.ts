@@ -26,7 +26,7 @@ import {
   disconnectConnection,
   forceConnectionState,
   initiateConnection,
-  migrateConnectionVersion,
+  migrateConnectionGeneration,
   submitConnection,
 } from './connections';
 import { markNotificationViewed, markNotificationsViewed } from './notifications';
@@ -130,17 +130,17 @@ describe('v1alpha1 action serialization', () => {
   });
 
   it('requires an exact connector generation for migration actions', () => {
-    migrateConnectionVersion('cxn_test', {
+    migrateConnectionGeneration('cxn_test', {
       connectorRef: objectReference('Connector', { id: 'cxr_test', generation: 3 }),
       timeoutSeconds: 600,
     });
     forceConnectionState('cxn_test', ConnectionState.CONFIGURED);
 
     expect(postMock).toHaveBeenCalledWith(
-      '/api/v1/connections/cxn_test/_migrateVersion',
+      '/api/v1/connections/cxn_test/_migrateGeneration',
       expect.objectContaining({
         apiVersion: API_VERSION,
-        kind: 'ConnectionVersionMigration',
+        kind: 'ConnectionGenerationMigration',
         spec: {
           connectorRef: {
             apiVersion: API_VERSION,

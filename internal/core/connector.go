@@ -20,7 +20,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/util"
 )
 
-// Connector hydrates a logical connector and one selected definition version
+// Connector hydrates a logical connector and one selected definition generation
 // with decrypted configuration and compiled JavaScript behavior.
 type Connector struct {
 	database.ConnectorWithDefinition
@@ -45,13 +45,13 @@ func wrapConnector(c database.ConnectorWithDefinition, s *service) *Connector {
 		l: aplog.NewBuilder(s.logger).
 			WithNamespace(c.Namespace).
 			WithConnectorId(c.Id).
-			WithConnectorVersion(c.Version).
+			WithConnectorGeneration(c.Generation).
 			Build(),
 	}
 }
 
 // connectorResourceFromDatabase converts a hydrated persistence row into the
-// canonical versioned Connector resource. The database state is observed
+// canonical generation-specific Connector resource. The database state is observed
 // state; published generations retain primary desired state after they become
 // active or archived.
 func connectorResourceFromDatabase(
@@ -67,7 +67,7 @@ func connectorResourceFromDatabase(
 			ID:          c.Id.String(),
 			Name:        c.Name,
 			Namespace:   c.Namespace,
-			Generation:  c.Version,
+			Generation:  c.Generation,
 			Labels:      maps.Clone(map[string]string(c.Labels)),
 			Annotations: maps.Clone(map[string]string(c.Annotations)),
 			CreatedAt:   &createdAt,
@@ -97,11 +97,11 @@ func (c *Connector) GetName() scommon.ResourceName {
 	return c.ConnectorWithDefinition.Name
 }
 
-func (c *Connector) GetVersion() uint64 {
-	return c.ConnectorWithDefinition.Version
+func (c *Connector) GetGeneration() uint64 {
+	return c.ConnectorWithDefinition.Generation
 }
 
-func (c *Connector) GetState() database.ConnectorDefinitionVersionState {
+func (c *Connector) GetState() database.ConnectorGenerationState {
 	return c.ConnectorWithDefinition.State
 }
 

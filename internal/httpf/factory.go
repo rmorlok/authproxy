@@ -85,11 +85,11 @@ func (f *clientFactory) ForRequestType(rt RequestType) F {
 	return f.ForRequestInfo(ri)
 }
 
-func (f *clientFactory) ForConnectorVersion(cv ConnectorVersion) F {
+func (f *clientFactory) ForConnectorGeneration(cv ConnectorGeneration) F {
 	ri := f.requestInfo
 	ri.Namespace = cv.GetNamespace()
 	ri.ConnectorId = cv.GetId()
-	ri.ConnectorVersion = cv.GetVersion()
+	ri.ConnectorGeneration = cv.GetGeneration()
 
 	return f.ForRequestInfo(ri)
 }
@@ -97,16 +97,16 @@ func (f *clientFactory) ForConnectorVersion(cv ConnectorVersion) F {
 func (f *clientFactory) ForConnection(c Connection) F {
 	var fp F = f
 
-	if cg, ok := c.(GettableConnectorVersion); ok {
+	if cg, ok := c.(GettableConnectorGeneration); ok {
 		cv := cg.GetConnector()
-		fp = fp.ForConnectorVersion(cv)
+		fp = fp.ForConnectorGeneration(cv)
 	}
 
 	ri := f.requestInfo
 	ri.ConnectionId = c.GetId()
 	ri.Namespace = c.GetNamespace()
 	ri.ConnectorId = c.GetConnectorId()
-	ri.ConnectorVersion = c.GetConnectorVersion()
+	ri.ConnectorGeneration = c.GetConnectorGeneration()
 
 	if connLabels := c.GetLabels(); len(connLabels) > 0 {
 		ri.Labels = make(map[string]string, len(connLabels))

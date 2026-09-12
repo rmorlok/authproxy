@@ -59,12 +59,12 @@ func newTestConnectionWithSetupFlowAndAsynq(t *testing.T, ctrl *gomock.Controlle
 	c := NewTestConnector(connector)
 	conn := &connection{
 		Connection: database.Connection{
-			Id:               "cxn_test1111111111aa",
-			Namespace:        "root",
-			State:            database.ConnectionStateSetup,
-			HealthState:      database.ConnectionHealthStateHealthy,
-			ConnectorId:      c.GetId(),
-			ConnectorVersion: c.GetVersion(),
+			Id:                  "cxn_test1111111111aa",
+			Namespace:           "root",
+			State:               database.ConnectionStateSetup,
+			HealthState:         database.ConnectionHealthStateHealthy,
+			ConnectorId:         c.GetId(),
+			ConnectorGeneration: c.GetGeneration(),
 		},
 		s:         s,
 		connector: c,
@@ -167,7 +167,7 @@ func TestSubmitForm(t *testing.T) {
 			SetupFlow: sf,
 		})
 		conn.ConnectorId = conn.connector.GetId()
-		conn.ConnectorVersion = conn.connector.GetVersion()
+		conn.ConnectorGeneration = conn.connector.GetGeneration()
 		step := cschema.MustNewSetupStep("tenant")
 		conn.SetupStep = &step
 
@@ -371,7 +371,7 @@ func TestGetCurrentSetupStepResponse(t *testing.T) {
 			},
 		})
 		conn.ConnectorId = conn.connector.GetId()
-		conn.ConnectorVersion = conn.connector.GetVersion()
+		conn.ConnectorGeneration = conn.connector.GetGeneration()
 		step := cschema.MustNewSetupStep(oauth2.OAuth2AuthorizeStepId)
 		conn.SetupStep = &step
 

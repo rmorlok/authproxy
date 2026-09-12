@@ -18,7 +18,7 @@ import (
 const ConnectorsTable = "connectors"
 
 // Connector is the database representation of a logical connector. Definition
-// versions are stored separately in connector_definition_versions.
+// generations are stored separately in connector_generations.
 type Connector struct {
 	Id          apid.ID
 	Namespace   string
@@ -110,10 +110,10 @@ func (s *service) ensureConnectorForDefinition(
 
 	if err == nil {
 		if existing.Namespace != cv.Namespace {
-			return errors.New("cannot modify connector namespace through a connector version")
+			return errors.New("cannot modify connector namespace through a connector generation")
 		}
 		if cv.Name != "" && cv.Name != existing.Name {
-			return errors.New("cannot modify connector name through a connector version")
+			return errors.New("cannot modify connector name through a connector generation")
 		}
 
 		labels := existing.Labels
@@ -194,7 +194,7 @@ func (s *service) ensureConnectorForDefinition(
 }
 
 // UpdateConnectorName renames one live logical connector without changing any
-// immutable connector-version definition rows.
+// immutable connector-generation definition rows.
 func (s *service) UpdateConnectorName(ctx context.Context, id apid.ID, name scommon.ResourceName) error {
 	if id.IsNil() {
 		return errors.New("connector id is required")

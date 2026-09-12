@@ -17,7 +17,7 @@ import (
 )
 
 func TestDisconnectConnectorConnectionsWorkflowV1ExecutesChildWorkflows(t *testing.T) {
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 	connectionIDs := []apid.ID{
 		apid.New(apid.PrefixConnection),
 		apid.New(apid.PrefixConnection),
@@ -79,7 +79,7 @@ func TestDisconnectConnectorConnectionsWorkflowV1ExecutesChildWorkflows(t *testi
 }
 
 func TestDisconnectConnectorConnectionsWorkflowV1ForcesFailedChildren(t *testing.T) {
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 	connectionID := apid.New(apid.PrefixConnection)
 	workflowTester := tester.NewWorkflowTester[any](disconnectConnectorConnectionsWorkflowV1)
 
@@ -136,7 +136,7 @@ func TestDisconnectConnectorConnectionsWorkflowV1ForcesFailedChildren(t *testing
 }
 
 func TestDisconnectConnectorConnectionsWorkflowV1ForcesRemainingOnTimeout(t *testing.T) {
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 	connectionID := apid.New(apid.PrefixConnection)
 	workflowTester := tester.NewWorkflowTester[any](disconnectConnectorConnectionsWorkflowV1)
 
@@ -197,7 +197,7 @@ func TestDisconnectConnectorConnectionChildTimeout(t *testing.T) {
 }
 
 func TestDisconnectConnectorConnectionsWorkflowInstanceID(t *testing.T) {
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 	require.Equal(
 		t,
 		WorkflowNameDisconnectConnectorConnectionsV1+":"+connectorID.String(),
@@ -223,7 +223,7 @@ func TestRegisterDisconnectConnectorConnectionsWorkflowV1DurableNames(t *testing
 
 func TestDisconnectConnectorConnectionsStartsWorkflow(t *testing.T) {
 	ctx := context.Background()
-	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectorID := apid.New(apid.PrefixConnector)
 	workflowClient := &fakeDisconnectWorkflowClient{
 		instance: &wflib.Instance{
 			InstanceID:  "workflow-instance",

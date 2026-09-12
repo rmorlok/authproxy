@@ -74,7 +74,7 @@ func (s *sqlRecordStore) StoreRecords(ctx context.Context, records []*LogRecord)
 			"duration_ms",
 			"connection_id",
 			"connector_id",
-			"connector_version",
+			"connector_generation",
 			"method",
 			"host",
 			"scheme",
@@ -126,7 +126,7 @@ func (s *sqlRecordStore) StoreRecords(ctx context.Context, records []*LogRecord)
 			record.MillisecondDuration.Duration().Milliseconds(),
 			record.ConnectionId.String(),
 			record.ConnectorId.String(),
-			record.ConnectorVersion,
+			record.ConnectorGeneration,
 			record.Method,
 			record.Host,
 			record.Scheme,
@@ -199,7 +199,7 @@ func NewSqlRecordRetriever(cfg *config.Database, cursorEncryptor pagination.Curs
 
 var entryRecordColumns = []string{
 	"request_id", "namespace", "type", "correlation_id", "timestamp_ms",
-	"duration_ms", "connection_id", "connector_id", "connector_version",
+	"duration_ms", "connection_id", "connector_id", "connector_generation",
 	"method", "host", "scheme", "path",
 	"response_status_code", "response_error",
 	"request_http_version", "request_size_bytes", "request_mime_type",
@@ -221,7 +221,7 @@ func scanLogRecord(row interface{ Scan(dest ...any) error }) (*LogRecord, error)
 
 	err := row.Scan(
 		&requestId, &er.Namespace, &er.Type, &er.CorrelationId, &timestampMs,
-		&durationMs, &connectionId, &connectorId, &er.ConnectorVersion,
+		&durationMs, &connectionId, &connectorId, &er.ConnectorGeneration,
 		&er.Method, &er.Host, &er.Scheme, &er.Path,
 		&er.ResponseStatusCode, &er.ResponseError,
 		&er.RequestHttpVersion, &er.RequestSizeBytes, &er.RequestMimeType,
@@ -315,17 +315,17 @@ var _ RecordRetriever = (*sqlRecordRetriever)(nil)
 // --- SQL ListRequestBuilder ---
 
 var sqlOrderByColumns = map[RequestOrderByField]string{
-	RequestOrderByTimestamp:          "timestamp_ms",
-	RequestOrderByType:               "type",
-	RequestOrderByCorrelationId:      "correlation_id",
-	RequestOrderByConnectionId:       "connection_id",
-	RequestOrderByConnectorType:      "type", // TODO: connector_type column
-	RequestOrderByConnectorId:        "connector_id",
-	RequestOrderByMethod:             "method",
-	RequestOrderByPath:               "path",
-	RequestOrderByResponseStatusCode: "response_status_code",
-	RequestOrderByConnectorVersion:   "connector_version",
-	RequestOrderByNamespace:          "namespace",
+	RequestOrderByTimestamp:           "timestamp_ms",
+	RequestOrderByType:                "type",
+	RequestOrderByCorrelationId:       "correlation_id",
+	RequestOrderByConnectionId:        "connection_id",
+	RequestOrderByConnectorType:       "type", // TODO: connector_type column
+	RequestOrderByConnectorId:         "connector_id",
+	RequestOrderByMethod:              "method",
+	RequestOrderByPath:                "path",
+	RequestOrderByResponseStatusCode:  "response_status_code",
+	RequestOrderByConnectorGeneration: "connector_generation",
+	RequestOrderByNamespace:           "namespace",
 }
 
 type sqlListRequestsBuilder struct {
@@ -390,8 +390,8 @@ func (l *sqlListRequestsBuilder) ForConnectorId(u apid.ID) ListRequestBuilder {
 	return l
 }
 
-func (l *sqlListRequestsBuilder) ForConnectorVersion(v uint64) ListRequestBuilder {
-	l.ListFilters.SetConnectorVersion(v)
+func (l *sqlListRequestsBuilder) ForConnectorGeneration(v uint64) ListRequestBuilder {
+	l.ListFilters.SetConnectorGeneration(v)
 	return l
 }
 
@@ -513,8 +513,8 @@ func (l *sqlListRequestsBuilder) applyFilters(builder sq.SelectBuilder) sq.Selec
 		builder = builder.Where(sq.Eq{"connector_id": l.ConnectorId.String()})
 	}
 
-	if l.ConnectorVersion != nil {
-		builder = builder.Where(sq.Eq{"connector_version": *l.ConnectorVersion})
+	if l.ConnectorGeneration != nil {
+		builder = builder.Where(sq.Eq{"connector_generation": *l.ConnectorGeneration})
 	}
 
 	if l.Method != nil {

@@ -120,7 +120,7 @@ type requestEvent struct {
 	MillisecondDuration int64             `json:"duration"`
 	ConnectionID        string            `json:"connectionId"`
 	ConnectorID         string            `json:"connectorId"`
-	ConnectorVersion    uint64            `json:"connectorVersion"`
+	ConnectorGeneration uint64            `json:"connectorGeneration"`
 	Method              string            `json:"method"`
 	Host                string            `json:"host"`
 	Scheme              string            `json:"scheme"`

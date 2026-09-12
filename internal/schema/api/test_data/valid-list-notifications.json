@@ -21,9 +21,9 @@
           "id": "cxn_test550e8400abcde"
         },
         "title": "Connection requires re-authentication",
-        "message": "The target connector version requires the user to re-authenticate.",
+        "message": "The target connector generation requires the user to re-authenticate.",
         "context": {
-          "targetVersion": 3
+          "targetGeneration": 3
         }
       },
       "status": {

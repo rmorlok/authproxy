@@ -30,7 +30,7 @@ AuthProxy is useful when you want to:
 - **Build instead of outsource your integration logic.** Keep native provider
   APIs, SDKs, and data models rather than adopting a lossy unified API.
 - **Avoid rebuilding connection infrastructure.** OAuth callbacks, refresh,
-  API-key injection, setup forms, health probes, connector versioning, and
+  API-key injection, setup forms, health probes, connector generation management, and
   connection UIs are shared across integrations.
 - **Keep control of the data plane.** AuthProxy is open source and self-hosted,
   so credentials and request data can remain inside infrastructure you control.

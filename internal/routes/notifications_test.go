@@ -114,7 +114,7 @@ func TestNotificationToJSONBuildsActorProjection(t *testing.T) {
 			Title:        "Reauthenticate",
 			Message:      "Credentials must be refreshed.",
 			ActionUrl:    &actionURL,
-			Metadata:     database.NotificationMetadata{"targetVersion": 2},
+			Metadata:     database.NotificationMetadata{"targetGeneration": 2},
 			CreatedAt:    now,
 			UpdatedAt:    now,
 		},
@@ -127,7 +127,7 @@ func TestNotificationToJSONBuildsActorProjection(t *testing.T) {
 	require.Equal(t, map[string]string{"team": "payments"}, item.Metadata.Labels)
 	require.Equal(t, connectionschema.ConnectionKind, item.Spec.ResourceRef.Kind)
 	require.Equal(t, "cxn_test0000000000001", item.Spec.ResourceRef.ID)
-	require.Equal(t, map[string]any{"targetVersion": 2}, item.Spec.Context)
+	require.Equal(t, map[string]any{"targetGeneration": 2}, item.Spec.Context)
 	require.True(t, item.Status.Viewed)
 	require.Equal(t, actionURL, item.Status.Action.URL)
 }

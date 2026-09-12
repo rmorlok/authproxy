@@ -10,8 +10,8 @@ import (
 var ErrNotFound = database.ErrNotFound
 var ErrConnectionNotFound = fmt.Errorf("connection not found: %w", ErrNotFound)
 var ErrProtected = database.ErrProtected
-var ErrDraftAlreadyExists = errors.New("a draft version already exists")
-var ErrNotDraft = errors.New("version is not a draft")
+var ErrDraftAlreadyExists = errors.New("a draft generation already exists")
+var ErrNotDraft = errors.New("generation is not a draft")
 var ErrKeyDataNotConfigured = errors.New("key data is not configured")
 
 // ErrInvalidArgument signals that the caller supplied input the core

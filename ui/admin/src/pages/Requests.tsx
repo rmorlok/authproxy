@@ -139,8 +139,8 @@ export const columns: (GridColDef<RequestEvent> & {hideInitial?: boolean})[] = [
         valueGetter: (_, row) => row.spec.connectionRef?.id,
     },
     {
-        field: 'connectorVersion',
-        headerName: 'Connector Version',
+        field: 'connectorGeneration',
+        headerName: 'Connector Generation',
         sortable: false,
         hideInitial: true,
         valueGetter: (_, row) => row.spec.connectorRef?.generation,

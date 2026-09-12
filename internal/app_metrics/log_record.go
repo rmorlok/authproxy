@@ -21,7 +21,7 @@ type LogRecord struct {
 	MillisecondDuration MillisecondDuration `json:"duration"`
 	ConnectionId        apid.ID             `json:"connectionId,omitempty"`
 	ConnectorId         apid.ID             `json:"connectorId,omitempty"`
-	ConnectorVersion    uint64              `json:"connectorVersion,omitempty"`
+	ConnectorGeneration uint64              `json:"connectorGeneration,omitempty"`
 	Method              string              `json:"method"`
 	Host                string              `json:"host"`
 	Scheme              string              `json:"scheme"`

@@ -54,7 +54,7 @@ func (s *clickhouseRecordStore) StoreRecords(ctx context.Context, records []*Log
 
 	stmt, err := tx.PrepareContext(ctx, fmt.Sprintf(
 		"INSERT INTO %s (request_id, namespace, type, correlation_id, timestamp_ms, "+
-			"duration_ms, connection_id, connector_id, connector_version, "+
+			"duration_ms, connection_id, connector_id, connector_generation, "+
 			"method, host, scheme, path, "+
 			"response_status_code, response_error, "+
 			"request_http_version, request_size_bytes, request_mime_type, "+
@@ -95,7 +95,7 @@ func (s *clickhouseRecordStore) StoreRecords(ctx context.Context, records []*Log
 		_, err = stmt.ExecContext(ctx,
 			r.RequestId.String(), r.Namespace, string(r.Type), r.CorrelationId,
 			r.Timestamp.UnixMilli(), r.MillisecondDuration.Duration().Milliseconds(),
-			r.ConnectionId.String(), r.ConnectorId.String(), r.ConnectorVersion,
+			r.ConnectionId.String(), r.ConnectorId.String(), r.ConnectorGeneration,
 			r.Method, r.Host, r.Scheme, r.Path,
 			r.ResponseStatusCode, r.ResponseError,
 			r.RequestHttpVersion, r.RequestSizeBytes, r.RequestMimeType,
@@ -301,8 +301,8 @@ func (l *clickhouseListRequestsBuilder) ForConnectorId(u apid.ID) ListRequestBui
 	return l
 }
 
-func (l *clickhouseListRequestsBuilder) ForConnectorVersion(v uint64) ListRequestBuilder {
-	l.sqlListRequestsBuilder.ForConnectorVersion(v)
+func (l *clickhouseListRequestsBuilder) ForConnectorGeneration(v uint64) ListRequestBuilder {
+	l.sqlListRequestsBuilder.ForConnectorGeneration(v)
 	return l
 }
 

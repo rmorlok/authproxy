@@ -50,7 +50,7 @@ type OpenAPIConnectionSetupSubmitActionJson = schemaapiopenapi.ConnectionSetupSu
 type OpenAPIConnectionSetupControlActionJson = schemaapiopenapi.ConnectionSetupControlActionJson
 type OpenAPIEmptyConnectionActionJson = schemaapiopenapi.EmptyConnectionActionJson
 type OpenAPIConnectionDisconnectActionJson = schemaapiopenapi.ConnectionDisconnectActionJson
-type OpenAPIConnectionVersionMigrationActionJson = schemaapiopenapi.ConnectionVersionMigrationActionJson
+type OpenAPIConnectionGenerationMigrationActionJson = schemaapiopenapi.ConnectionGenerationMigrationActionJson
 type OpenAPIConnectionForceStateActionJson = schemaapiopenapi.ConnectionForceStateActionJson
 type OpenAPIDataSourceOptionListJson = schemaapiopenapi.DataSourceOptionListJson
 type OpenAPIConnectionScopeListJson = schemaapiopenapi.ConnectionScopeListJson
@@ -452,7 +452,7 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 				val.MarkErrorReturn()
 				return
 			}
-			if err := connectorId.ValidatePrefix(apid.PrefixConnectorVersion); err != nil {
+			if err := connectorId.ValidatePrefix(apid.PrefixConnector); err != nil {
 				apgin.WriteError(gctx, nil, httperr.BadRequest("invalid connectorId prefix", httperr.WithInternalErr(err)))
 				val.MarkErrorReturn()
 				return
@@ -717,22 +717,22 @@ func connectionDisconnectOptions(
 	return coreIface.ConnectionDisconnectOptions{Timeout: timeout}
 }
 
-// @Summary		Migrate connection connector version
-// @Description	Start a workflow that migrates an existing connection to another version of the same connector
+// @Summary		Migrate connection connector generation
+// @Description	Start a workflow that migrates an existing connection to another generation of the same connector
 // @Tags			connections
 // @Accept			json
 // @Produce		json
 // @Param			id		path		string										true	"Connection UUID"
-// @Param			request	body		OpenAPIConnectionVersionMigrationActionJson	true	"Migration action"
-// @Success		200		{object}	OpenAPIConnectionVersionMigrationActionJson
+// @Param			request	body		OpenAPIConnectionGenerationMigrationActionJson	true	"Migration action"
+// @Success		200		{object}	OpenAPIConnectionGenerationMigrationActionJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		403		{object}	ErrorResponse
 // @Failure		404		{object}	ErrorResponse
 // @Failure		500		{object}	ErrorResponse
 // @Security		BearerAuth
-// @Router			/connections/{id}/_migrateVersion [post]
-func (r *ConnectionsRoutes) migrateVersion(gctx *gin.Context) {
+// @Router			/connections/{id}/_migrateGeneration [post]
+func (r *ConnectionsRoutes) migrateGeneration(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
@@ -759,11 +759,11 @@ func (r *ConnectionsRoutes) migrateVersion(gctx *gin.Context) {
 		return
 	}
 
-	var req schemaapi.ConnectionVersionMigrationAction
+	var req schemaapi.ConnectionGenerationMigrationAction
 	if err := apgin.BindActionJSON(
 		gctx,
 		&req,
-		schemaapi.ConnectionVersionMigrationActionKind,
+		schemaapi.ConnectionGenerationMigrationActionKind,
 	); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
@@ -796,11 +796,11 @@ func (r *ConnectionsRoutes) migrateVersion(gctx *gin.Context) {
 	}
 
 	opts := connectionMigrationOptions(
-		targetConnector.GetVersion(),
+		targetConnector.GetGeneration(),
 		req.Spec.TimeoutSeconds,
 	)
 
-	task, err := r.core.MigrateConnectionVersion(ctx, id, opts)
+	task, err := r.core.MigrateConnectionGeneration(ctx, id, opts)
 	if err != nil {
 		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
@@ -823,18 +823,18 @@ func (r *ConnectionsRoutes) migrateVersion(gctx *gin.Context) {
 		ID:         c.GetConnectorId().String(),
 		Name:       c.GetConnector().GetName(),
 		Namespace:  c.GetConnector().GetNamespace(),
-		Generation: c.GetConnectorVersion(),
+		Generation: c.GetConnectorGeneration(),
 	}
 	targetRef := req.Spec.ConnectorRef
 	targetRef.ID = targetConnector.GetId().String()
 	targetRef.Name = targetConnector.GetName()
 	targetRef.Namespace = targetConnector.GetNamespace()
-	targetRef.Generation = targetConnector.GetVersion()
+	targetRef.Generation = targetConnector.GetGeneration()
 
-	response := schemaapi.NewConnectionVersionMigrationResponse(
+	response := schemaapi.NewConnectionGenerationMigrationResponse(
 		req.Metadata.Target,
 		req.Spec,
-		schemaapi.ConnectionVersionMigrationStatus{
+		schemaapi.ConnectionGenerationMigrationStatus{
 			TaskID:             taskId,
 			SourceConnectorRef: sourceRef,
 			TargetConnectorRef: targetRef,
@@ -845,7 +845,7 @@ func (r *ConnectionsRoutes) migrateVersion(gctx *gin.Context) {
 		gctx,
 		http.StatusOK,
 		&response,
-		schemaapi.ConnectionVersionMigrationActionKind,
+		schemaapi.ConnectionGenerationMigrationActionKind,
 	); err != nil {
 		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
@@ -853,7 +853,7 @@ func (r *ConnectionsRoutes) migrateVersion(gctx *gin.Context) {
 }
 
 func connectionMigrationOptions(
-	targetVersion uint64,
+	targetGeneration uint64,
 	timeoutSeconds *int64,
 ) coreIface.ConnectionMigrationOptions {
 	timeout := defaultConnectorLifecycleTimeout
@@ -861,8 +861,8 @@ func connectionMigrationOptions(
 		timeout = time.Duration(*timeoutSeconds) * time.Second
 	}
 	return coreIface.ConnectionMigrationOptions{
-		TargetVersion: targetVersion,
-		Timeout:       timeout,
+		TargetGeneration: targetGeneration,
+		Timeout:          timeout,
 	}
 }
 
@@ -1619,13 +1619,13 @@ func (r *ConnectionsRoutes) Register(g gin.IRouter) {
 		r.reconfigure,
 	)
 	g.POST(
-		"/connections/:id/_migrateVersion",
+		"/connections/:id/_migrateGeneration",
 		r.auth.NewRequiredBuilder().
 			ForResource("connections").
 			ForVerb("update").
 			ForIdField("id").
 			Build(),
-		r.migrateVersion,
+		r.migrateGeneration,
 	)
 	g.POST(
 		"/connections/:id/_cancelSetup",

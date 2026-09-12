@@ -18,16 +18,16 @@ func setupAbortTest(t *testing.T, ctrl *gomock.Controller, sf *cschema.SetupFlow
 	conn, db := newTestConnectionWithSetupFlow(t, ctrl, sf)
 	conn.SetupStep = setupStep
 
-	// Set up the encrypt service on the main service so getConnection can decrypt the connector version
+	// Set up the encrypt service on the main service so getConnection can decrypt the connector generation
 	conn.s.encrypt = encrypt.NewFakeEncryptService(false)
 
 	// Mock the DB calls that getConnection makes
 	db.EXPECT().GetConnection(gomock.Any(), conn.Id).Return(&conn.Connection, nil).AnyTimes()
-	db.EXPECT().GetConnectorDefinitionVersion(gomock.Any(), conn.connector.Id, conn.connector.Version).Return(&database.ConnectorWithDefinition{
+	db.EXPECT().GetConnectorGeneration(gomock.Any(), conn.connector.Id, conn.connector.Generation).Return(&database.ConnectorWithDefinition{
 		Id:                  conn.connector.Id,
-		Version:             conn.connector.Version,
+		Generation:          conn.connector.Generation,
 		Labels:              conn.connector.GetLabels(),
-		State:               database.ConnectorDefinitionVersionStatePrimary,
+		State:               database.ConnectorGenerationStatePrimary,
 		EncryptedDefinition: conn.connector.EncryptedDefinition,
 	}, nil).AnyTimes()
 

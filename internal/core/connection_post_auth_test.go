@@ -37,7 +37,7 @@ func newTestOAuth2ConnectionAtAuthStep(t *testing.T, ctrl *gomock.Controller, sf
 	c := NewTestConnector(connector)
 	conn.connector = c
 	conn.ConnectorId = c.GetId()
-	conn.ConnectorVersion = c.GetVersion()
+	conn.ConnectorGeneration = c.GetGeneration()
 	// Position the connection at the OAuth2 redirect step, as it would be
 	// after SetStateAndGeneratePublicUrl ran and before the callback fires.
 	step := cschema.MustNewSetupStep(oauth2.OAuth2AuthorizeStepId)
@@ -63,7 +63,7 @@ func TestHandleCredentialsEstablished(t *testing.T) {
 		}
 		conn.connector = NewTestConnector(connector)
 		conn.ConnectorId = conn.connector.GetId()
-		conn.ConnectorVersion = conn.connector.GetVersion()
+		conn.ConnectorGeneration = conn.connector.GetGeneration()
 		current := cschema.MustNewSetupStep(oauth2.OAuth2AuthorizeStepId)
 		conn.SetupStep = &current
 
@@ -97,7 +97,7 @@ func TestHandleCredentialsEstablished(t *testing.T) {
 			SetupFlow: sf,
 		})
 		conn.ConnectorId = conn.connector.GetId()
-		conn.ConnectorVersion = conn.connector.GetVersion()
+		conn.ConnectorGeneration = conn.connector.GetGeneration()
 		current := cschema.MustNewSetupStep(oauth2.OAuth2AuthorizeStepId)
 		conn.SetupStep = &current
 
@@ -132,7 +132,7 @@ func TestHandleCredentialsEstablished(t *testing.T) {
 			}},
 		})
 		conn.ConnectorId = conn.connector.GetId()
-		conn.ConnectorVersion = conn.connector.GetVersion()
+		conn.ConnectorGeneration = conn.connector.GetGeneration()
 		setConnectionConfigFixture(t, conn, map[string]any{"run_probe": false})
 		current := cschema.MustNewSetupStep(oauth2.OAuth2AuthorizeStepId)
 		conn.SetupStep = &current
@@ -157,7 +157,7 @@ func TestHandleCredentialsEstablished(t *testing.T) {
 			Auth: &cschema.Auth{InnerVal: &cschema.AuthOAuth2{Type: cschema.AuthTypeOAuth2}},
 		})
 		conn.ConnectorId = conn.connector.GetId()
-		conn.ConnectorVersion = conn.connector.GetVersion()
+		conn.ConnectorGeneration = conn.connector.GetGeneration()
 		current := cschema.MustNewSetupStep(oauth2.OAuth2AuthorizeStepId)
 		conn.SetupStep = &current
 
@@ -182,7 +182,7 @@ func TestHandleCredentialsEstablished(t *testing.T) {
 			Auth: &cschema.Auth{InnerVal: &cschema.AuthOAuth2{Type: cschema.AuthTypeOAuth2}},
 		})
 		conn.ConnectorId = conn.connector.GetId()
-		conn.ConnectorVersion = conn.connector.GetVersion()
+		conn.ConnectorGeneration = conn.connector.GetGeneration()
 		conn.HealthState = database.ConnectionHealthStateUnhealthy
 		current := cschema.MustNewSetupStep(oauth2.OAuth2AuthorizeStepId)
 		conn.SetupStep = &current

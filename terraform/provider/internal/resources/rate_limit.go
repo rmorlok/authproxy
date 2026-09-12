@@ -204,7 +204,7 @@ func (r *RateLimitResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Description: "Projects matched requests into independent counters.",
 				Attributes: map[string]schema.Attribute{
 					"dimensions": schema.ListAttribute{
-						Description: "Ordered list of dimension references. Reserved names: actor, connection, connector, connector_version, namespace, method. Label values via labels/<key>. Empty list = single global bucket per rule.",
+						Description: "Ordered list of dimension references. Reserved names: actor, connection, connector, connector_generation, namespace, method. Label values via labels/<key>. Empty list = single global bucket per rule.",
 						Optional:    true,
 						ElementType: types.StringType,
 					},

@@ -64,23 +64,23 @@ func TestService(t *testing.T) {
 	s := newTestService(cfg, db)
 
 	connection := database.Connection{
-		Id:               apid.New(apid.PrefixConnection),
-		Namespace:        "root.some-namespace",
-		ConnectorId:      apid.New(apid.PrefixConnectorVersion),
-		ConnectorVersion: 1,
-		State:            database.ConnectionStateConfigured,
+		Id:                  apid.New(apid.PrefixConnection),
+		Namespace:           "root.some-namespace",
+		ConnectorId:         apid.New(apid.PrefixConnector),
+		ConnectorGeneration: 1,
+		State:               database.ConnectionStateConfigured,
 	}
 	require.NoError(t, db.CreateConnection(context.Background(), &connection))
 
-	connectorVersion := database.ConnectorWithDefinition{
-		Id:                  apid.New(apid.PrefixConnectorVersion),
-		Version:             1,
+	connectorGeneration := database.ConnectorWithDefinition{
+		Id:                  apid.New(apid.PrefixConnector),
+		Generation:          1,
 		Namespace:           "root.some-namespace",
-		State:               database.ConnectorDefinitionVersionStatePrimary,
+		State:               database.ConnectorGenerationStatePrimary,
 		Labels:              map[string]string{"type": "test"},
 		EncryptedDefinition: encfield.EncryptedField{ID: "dek_test", Data: "test"},
 	}
-	require.NoError(t, db.UpsertConnectorDefinitionVersion(context.Background(), &connectorVersion))
+	require.NoError(t, db.UpsertConnectorGeneration(context.Background(), &connectorGeneration))
 
 	t.Run("string", func(t *testing.T) {
 		t.Run("roundtrip global", func(t *testing.T) {
@@ -104,7 +104,7 @@ func TestService(t *testing.T) {
 			require.Equal(t, someString, decrypted)
 		})
 		t.Run("roundtrip connector", func(t *testing.T) {
-			encrypted, err := s.EncryptStringForEntity(context.Background(), &connectorVersion, someString)
+			encrypted, err := s.EncryptStringForEntity(context.Background(), &connectorGeneration, someString)
 			require.NoError(t, err)
 			require.False(t, encrypted.IsZero())
 			require.True(t, encrypted.ID.HasPrefix(apid.PrefixDataEncryptionKey))
@@ -147,7 +147,7 @@ func TestService(t *testing.T) {
 			require.Equal(t, someBytes, decrypted)
 		})
 		t.Run("roundtrip connector", func(t *testing.T) {
-			encryptedBytes, err := s.EncryptForEntity(context.Background(), &connectorVersion, someBytes)
+			encryptedBytes, err := s.EncryptForEntity(context.Background(), &connectorGeneration, someBytes)
 			require.NoError(t, err)
 			require.NotEmpty(t, encryptedBytes)
 			require.NotEqual(t, someBytes, encryptedBytes)
