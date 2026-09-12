@@ -5,11 +5,35 @@ import (
 	"strconv"
 )
 
+// WriteOnlyTagName marks canonical fields whose full configuration is not
+// returned by ordinary resource reads. Keep it aligned with JSON Schema's
+// writeOnly annotation. This metadata does not change API masking or replay.
+const WriteOnlyTagName = "apiwriteonly"
+
 // SecretPaths returns wire-format JSON path segments for schema-tagged secret
 // fields, including null and empty fields. Values are never included. Paths
-// through arrays use decimal indexes. Callers must also exclude write-only
-// contracts whose entire configuration must not be persisted.
+// through arrays use decimal indexes.
 func SecretPaths(value any) [][]string {
+	return fieldPaths(value, isSecretField)
+}
+
+// WriteOnlyPaths discovers entire write-only fields, including null fields.
+// Unlike secret masking, this also covers non-secret provider configuration
+// that cannot be compared with an ordinary resource read.
+func WriteOnlyPaths(value any) [][]string {
+	return fieldPaths(value, func(field reflect.StructField) bool {
+		return field.Tag.Get(WriteOnlyTagName) == "true"
+	})
+}
+
+// SensitivePaths includes both masked secrets and entire write-only contracts.
+// Consumers such as apply history must exclude these values, not hash or mask
+// them. Paths are discovered from the canonical fields without resource switches.
+func SensitivePaths(value any) [][]string {
+	return append(SecretPaths(value), WriteOnlyPaths(value)...)
+}
+
+func fieldPaths(value any, matches func(reflect.StructField) bool) [][]string {
 	var paths [][]string
 	seen := map[visit]bool{}
 
@@ -61,7 +85,7 @@ func SecretPaths(value any) [][]string {
 				if fieldIsInline(formatJSON, f) {
 					next = path
 				}
-				if isSecretField(f) {
+				if matches(f) {
 					paths = append(paths, next)
 				} else {
 					walk(v.Field(i), next)

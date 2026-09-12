@@ -57,7 +57,7 @@ type KeySpec struct {
 	Usage        KeyUsage        `json:"usage,omitempty" yaml:"usage,omitempty"`
 	MaterialType KeyMaterialType `json:"materialType,omitempty" yaml:"materialType,omitempty"`
 	DesiredState KeyState        `json:"desiredState,omitempty" yaml:"desiredState,omitempty"`
-	KeyData      *KeyData        `json:"keyData,omitempty" yaml:"keyData,omitempty"`
+	KeyData      *KeyData        `json:"keyData,omitempty" yaml:"keyData,omitempty" apiwriteonly:"true"`
 }
 
 // KeyStatus contains server-observed key state. KeyDataConfigured reports
@@ -81,7 +81,7 @@ type KeySpecPatch struct {
 	Usage        *KeyUsage        `json:"usage,omitempty" yaml:"usage,omitempty"`
 	MaterialType *KeyMaterialType `json:"materialType,omitempty" yaml:"materialType,omitempty"`
 	DesiredState *KeyState        `json:"desiredState,omitempty" yaml:"desiredState,omitempty"`
-	KeyData      *KeyData         `json:"keyData,omitempty" yaml:"keyData,omitempty"`
+	KeyData      *KeyData         `json:"keyData,omitempty" yaml:"keyData,omitempty" apiwriteonly:"true"`
 
 	keyDataPresent bool
 }

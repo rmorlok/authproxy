@@ -119,7 +119,7 @@ func Reconcile(target Target, options ReconcileOptions) (*Plan, error) {
 		return nil, err
 	}
 	forces := map[string]bool{}
-	for _, path := range secretPaths(doc.Kind, doc.Resource) {
+	for _, path := range apserde.SensitivePaths(doc.Resource) {
 		if _, ok := at(desired, path); ok {
 			forces[pointer(path)] = true
 		}

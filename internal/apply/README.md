@@ -59,7 +59,9 @@ retains input presence after normalization, excluding this annotation and secret
 subtrees. `secrets` contains only JSON-pointer presence markers, never values,
 masked strings, lengths, or hashes. Entire write-only Actor signing keys and
 Key provider configurations are excluded, including file/environment/provider
-references. Other secret paths come from canonical `apiredact` tags. Arrays
+references. Shared discovery uses canonical `apiwriteonly` and `apiredact`
+tags for both history exclusions and live-resource comparison metadata; no
+resource-specific path list is maintained in apply. Arrays
 containing secrets are excluded in full because elements have no stable 
 identity. Secret presence is retained across omissions; it never authorizes 
 deletion.

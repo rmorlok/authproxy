@@ -329,3 +329,20 @@ func TestHistoryPreservesLargeGenerationNumbers(t *testing.T) {
 	require.JSONEq(t, string(encoded), string(roundTrip))
 	require.Contains(t, string(roundTrip), "9007199254740993")
 }
+
+func TestHistoryExcludesWriteOnlyProviderReferences(t *testing.T) {
+	for _, tc := range []struct{ kind, spec, path string }{
+		{"Key", `{"keyData":{"envVar":"PRIVATE_KEY_ENV"}}`, "/spec/keyData"},
+		{"Actor", `{"signingKey":{"sharedKey":{"envVar":"PRIVATE_KEY_ENV"}}}`, "/spec/signingKey"},
+	} {
+		t.Run(tc.kind, func(t *testing.T) {
+			doc := clientDoc(t, tc.kind, "  name: example\n  namespace: root", tc.spec)
+			history, err := newHistory(doc)
+			require.NoError(t, err)
+			data, err := json.Marshal(history)
+			require.NoError(t, err)
+			require.NotContains(t, string(data), "PRIVATE_KEY_ENV")
+			require.Contains(t, history.Secrets, tc.path)
+		})
+	}
+}

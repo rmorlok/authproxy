@@ -381,12 +381,10 @@ func (c *Client) decodeLive(
 		redacted = true
 	}
 	live := &LiveResource{Resource: resource, Metadata: m, Kind: kind, Redacted: redacted}
-	switch kind {
-	case "Actor":
-		live.WriteOnlyFields = []string{"spec.signingKey"}
-	case "Key":
-		live.WriteOnlyFields = []string{"spec.keyData"}
+	for _, path := range apserde.WriteOnlyPaths(resource) {
+		live.WriteOnlyFields = append(live.WriteOnlyFields, strings.Join(path, "."))
 	}
+
 	return live, nil
 }
 

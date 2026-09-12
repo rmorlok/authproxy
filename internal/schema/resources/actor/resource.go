@@ -29,7 +29,7 @@ type Actor struct {
 type ActorSpec struct {
 	ExternalId  string                  `json:"externalId" yaml:"externalId"`
 	Permissions []authschema.Permission `json:"permissions,omitempty" yaml:"permissions,omitempty"`
-	SigningKey  *keyschema.SigningKey   `json:"signingKey,omitempty" yaml:"signingKey,omitempty"`
+	SigningKey  *keyschema.SigningKey   `json:"signingKey,omitempty" yaml:"signingKey,omitempty" apiwriteonly:"true"`
 }
 
 // ActorStatus contains safe, server-observed actor state.
@@ -51,7 +51,7 @@ type ActorPatch struct {
 type ActorSpecPatch struct {
 	ExternalId  *string                  `json:"externalId,omitempty" yaml:"externalId,omitempty"`
 	Permissions *[]authschema.Permission `json:"permissions,omitempty" yaml:"permissions,omitempty"`
-	SigningKey  *keyschema.SigningKey    `json:"signingKey,omitempty" yaml:"signingKey,omitempty"`
+	SigningKey  *keyschema.SigningKey    `json:"signingKey,omitempty" yaml:"signingKey,omitempty" apiwriteonly:"true"`
 
 	externalIdPresent  bool
 	permissionsPresent bool

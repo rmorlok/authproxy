@@ -99,24 +99,13 @@ func exclude(value map[string]any, path []string) {
 	}
 }
 
-func secretPaths(kind meta.Kind, resource any) [][]string {
-	paths := apserde.SecretPaths(resource)
-	switch kind {
-	case "Actor":
-		paths = append(paths, []string{"spec", "signingKey"})
-	case "Key":
-		paths = append(paths, []string{"spec", "keyData"})
-	}
-	return paths
-}
-
 func newHistory(doc Document) (*History, error) {
 	object, err := plainObject(doc.Object)
 	if err != nil {
 		return nil, err
 	}
 	h := &History{Version: historyVersion, Desired: object}
-	for _, path := range secretPaths(doc.Kind, doc.Resource) {
+	for _, path := range apserde.SensitivePaths(doc.Resource) {
 		if _, ok := at(object, path); ok {
 			h.Secrets = append(h.Secrets, pointer(path))
 		}
