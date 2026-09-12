@@ -52,7 +52,7 @@ func (r ResourceType) ValidateResource(
 	if _, err := r.Metadata(resource); err != nil {
 		return err
 	}
-	
+
 	return resource.(Value).ValidateFor(mode, nil)
 }
 
