@@ -7,7 +7,7 @@ import (
 )
 
 // ResolveApplyClient constructs the authenticated resource client for the
-// forthcoming apply executor. Client dry-run must never call this method.
+// apply executor. Client dry-run must never call this method.
 func (j *Resolver) ResolveApplyClient(timeout time.Duration) (*apply.Client, error) {
 	options := apply.ClientOptions{Admin: j.admin, Timeout: timeout}
 	var err error

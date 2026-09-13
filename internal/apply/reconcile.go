@@ -368,7 +368,7 @@ func attachHistory(object map[string]any, h *History) error {
 	if err := meta.ValidateAnnotations(typed); err != nil {
 		return fmt.Errorf("annotations including last-applied history are invalid or exceed 256 KiB")
 	}
-	
+
 	return nil
 }
 
