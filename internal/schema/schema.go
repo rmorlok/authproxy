@@ -58,8 +58,9 @@ func loadSchemasOnce() error {
 	return schemaErr
 }
 
-// CompileSchema compiles schema bytes with jsonschema/v5. It loads all the referenced schema files that are
-// referenced from the primary file.
+// CompileSchema compiles schema bytes with jsonschema/v5. It loads all the
+// referenced schema files that are referenced from the primary file. Concurrent
+// callers share cached schemas; compilation on the shared compiler is serialized.
 func CompileSchema(schemaId string) (*jsonschemav5.Schema, error) {
 	if err := loadSchemasOnce(); err != nil {
 		return nil, err
@@ -75,13 +76,19 @@ func CompileSchema(schemaId string) (*jsonschemav5.Schema, error) {
 		return s, nil
 	}
 
+	// A cache miss must also hold the lock while using the shared compiler:
+	// compilation mutates its resource and schema state, including references.
+	compileMutex.Lock()
+	defer compileMutex.Unlock()
+	if s, ok := schemaCache[schemaId]; ok {
+		return s, nil
+	}
+
 	compiled, err := schemaCompiler.Compile(schemaId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to compile schema '%s': %w", schemaId, err)
 	}
 
-	compileMutex.Lock()
-	defer compileMutex.Unlock()
 	schemaCache[schemaId] = compiled
 
 	return schemaCache[schemaId], nil

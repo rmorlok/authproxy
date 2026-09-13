@@ -10,7 +10,10 @@ import (
 )
 
 func resourceType(kind meta.Kind) (registry.ResourceType, error) {
-	return registry.LookupResource(manifest.GVK{APIVersion: meta.APIVersionV1Alpha1, Kind: kind})
+	return registry.LookupResource(manifest.GVK{
+		APIVersion: meta.APIVersionV1Alpha1,
+		Kind:       kind,
+	})
 }
 
 func resourceMetadata(resource any) (meta.ObjectMeta, meta.Kind, error) {
@@ -18,6 +21,7 @@ func resourceMetadata(resource any) (meta.ObjectMeta, meta.Kind, error) {
 	if err != nil {
 		return meta.ObjectMeta{}, "", err
 	}
+
 	metadata, err := descriptor.Metadata(resource)
 	return metadata, descriptor.GVK.Kind, err
 }

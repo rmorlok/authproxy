@@ -340,11 +340,14 @@ files are visited lexically. Symlinks discovered inside directories are skipped.
 | `-n`, `--namespace` | Supply a missing namespace or Namespace parent. |
 | `-l`, `--selector` | Filter input labels using `=`, `==`, `!=`, existence (`key`), or nonexistence (`!key`). |
 | `--dry-run=client` | Required in this initial implementation. No cluster access or signing configuration is needed. |
-| `--validate=strict` | The currently supported validation mode; unknown fields fail. `true` is an alias. |
+| `--validate` | `strict` (default) rejects unknown fields; `warn` drops them with warnings; `ignore` drops them silently. `true` aliases strict and `false` aliases ignore. |
+| `--overwrite` | Defaults to `true`; controls managed-field drift during reconciliation. Has no effect during client dry-run. |
 | `-o`, `--output` | `name`, `json` (an array), or `yaml` (a document stream). The default prints validation status. |
 
 The loader checks every resource before producing output, including resources
-excluded by a selector. A selector matching no resources succeeds with empty
+excluded by a selector. Validation modes never permit malformed identities,
+duplicate keys, invalid field types, server-owned fields, or redacted secret
+placeholders. Warn/ignore remove unknown fields before output. A selector matching no resources succeeds with empty
 output (`[]` for JSON); input containing no resource documents fails.
 
 URL downloads use an independent, unsigned HTTP client, a 30-second timeout,
@@ -358,5 +361,4 @@ redacted secret placeholders are rejected as input. Dry-run does not verify
 resource existence, authorization, references, server defaults, or whether a
 subsequent apply would create or update a resource.
 
-Reconciliation, cluster execution, non-strict validation, and additional
-kubectl-style options are tracked in [the apply implementation plan](https://github.com/rmorlok/authproxy/issues/919).
+Cluster execution and additional kubectl-style options are tracked in [the apply implementation plan](https://github.com/rmorlok/authproxy/issues/919).

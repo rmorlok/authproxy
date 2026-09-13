@@ -23,16 +23,21 @@ const maxSourceBytes = 16 << 20
 // Options controls input discovery. HTTP is used only for manifest sources;
 // never supply an authenticated cluster client here.
 type Options struct {
-	Filenames []string
-	Recursive bool
-	Namespace string
-	Selector  string
-	Stdin     io.Reader
+	Filenames  []string
+	Recursive  bool
+	Namespace  string
+	Selector   string
+	Stdin      io.Reader
+	Validation Validation
+	Warn       func(string)
 }
 
 // Load validates the entire input before returning any documents. Files within
 // directories are visited lexically; explicit inputs retain command-line order.
 func Load(ctx context.Context, options Options) ([]Document, error) {
+	if !options.Validation.valid() {
+		return nil, fmt.Errorf("--validate must be strict, warn, or ignore")
+	}
 	if len(options.Filenames) == 0 {
 		return nil, fmt.Errorf("at least one --filename is required")
 	}

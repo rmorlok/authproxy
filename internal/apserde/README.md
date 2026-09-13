@@ -58,3 +58,16 @@ the redaction header. Resource/action request binders in `internal/apgin` call
   marshalers and polymorphic wrappers.
 - Never call `WithSecretReplay` unless the request has already passed the
   corresponding permission check.
+
+`SecretPaths` discovers schema-tagged secret paths, including explicit null and
+empty values, without returning their contents. It uses the same JSON names,
+inline fields and polymorphic wrappers as API redaction. Apply uses these paths
+to exclude secrets entirely from last-applied history.
+
+Mark entire write-only fields on canonical resources and patches with
+`apiwriteonly:"true"`, matching the JSON Schema `writeOnly: true` annotation.
+`WriteOnlyPaths` discovers those fields even when nil. `SensitivePaths` combines
+secret and write-only paths so history excludes full provider configuration,
+including non-secret file/environment references. These tags describe field
+capabilities; they do not alter API masking, replay authorization, or persistence.
+New resource kinds participate automatically without caller-side switches.

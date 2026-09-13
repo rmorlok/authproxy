@@ -144,27 +144,17 @@ func (c *Client) ResolveBatch(
 		}
 
 		target := Target{Document: doc, Current: live}
-		if live == nil {
-			if _, err := c.createBody(doc); err != nil {
-				return nil, fmt.Errorf("%s: %w", doc.Source, err)
-			}
-		} else {
+		if live != nil {
 			identity := string(live.Kind) + "/" + live.Metadata.ID
-
 			if previous, ok := seen[identity]; ok {
 				return nil, fmt.Errorf("%s: duplicate live target; also defined at %s", doc.Source, previous)
 			}
-
 			seen[identity] = doc.Source
-
-			data, err := patchDocument(doc)
-			if err != nil {
-				return nil, err
-			}
-
-			if _, err := decodePatch(doc.Kind, data, live.Resource); err != nil {
-				return nil, fmt.Errorf("%s: %w", doc.Source, err)
-			}
+		}
+		// Validate the computed patch rather than submitting a partial desired
+		// definition to a REST contract that replaces that entire definition.
+		if _, err := Reconcile(target, ReconcileOptions{Overwrite: true}); err != nil {
+			return nil, fmt.Errorf("%s: %w", doc.Source, err)
 		}
 
 		targets = append(targets, target)
@@ -391,12 +381,10 @@ func (c *Client) decodeLive(
 		redacted = true
 	}
 	live := &LiveResource{Resource: resource, Metadata: m, Kind: kind, Redacted: redacted}
-	switch kind {
-	case "Actor":
-		live.WriteOnlyFields = []string{"spec.signingKey"}
-	case "Key":
-		live.WriteOnlyFields = []string{"spec.keyData"}
+	for _, path := range apserde.WriteOnlyPaths(resource) {
+		live.WriteOnlyFields = append(live.WriteOnlyFields, strings.Join(path, "."))
 	}
+
 	return live, nil
 }
 
@@ -568,22 +556,4 @@ func (c *Client) Update(
 	}
 
 	return c.decodeLive(kind, data, redacted)
-}
-
-func patchDocument(doc Document) ([]byte, error) {
-	object := make(map[string]any, len(doc.Object)+1)
-	for k, v := range doc.Object {
-		object[k] = v
-	}
-
-	if _, exists := object["spec"]; !exists {
-		object["spec"] = map[string]any{}
-	}
-
-	data, err := json.Marshal(object)
-	if err != nil {
-		return nil, fmt.Errorf("cannot encode patch document")
-	}
-
-	return data, nil
 }
