@@ -529,48 +529,117 @@ func TestReconcileEmptyListBecomesUnchanged(t *testing.T) {
 
 func TestReconcileNestedSecretsAndRedactedReplacement(t *testing.T) {
 	spec := `{"definition":{"displayName":"Example","auth":{"type":"OAuth2","clientId":{"value":"client"},"clientSecret":{"value":"confidential-material"},"authorization":{"endpoint":"https://example.com/auth"},"token":{"endpoint":"https://example.com/token"}}}}`
-	doc := clientDoc(t, "Connector", "  name: example\n  namespace: root", spec)
+	doc := clientDoc(
+		t,
+		"Connector",                          // kind
+		"  name: example\n  namespace: root", // metadata
+		spec,
+	)
+
 	h, err := newHistory(doc)
 	require.NoError(t, err)
+
 	data, err := json.Marshal(h)
 	require.NoError(t, err)
 	require.NotContains(t, string(data), "confidential-material")
 	require.Contains(t, h.Secrets, "/spec/definition/auth/clientSecret")
+
 	_, err = readHistory(string(data), "Connector")
 	require.NoError(t, err)
-	live := withHistory(t, reconcileLive(t, "Connector", apid.New(apid.PrefixConnector).String(), strings.ReplaceAll(spec, "confidential-material", "********"), nil), doc)
+
+	live := withHistory(
+		t,
+		reconcileLive(
+			t,
+			"Connector",
+			apid.New(apid.PrefixConnector).String(),
+			strings.ReplaceAll(spec, "confidential-material", "********"),
+			nil,
+		),
+		doc,
+	)
 	live.Redacted = true
+
 	// Omitted masked secrets do not prevent metadata-only writes.
-	metadataOnly := clientDoc(t, "Connector", "  name: example\n  namespace: root\n  labels: {env: prod}", strings.Replace(spec, `"clientSecret":{"value":"confidential-material"},`, "", 1))
+	metadataOnly := clientDoc(
+		t,
+		"Connector",
+		"  name: example\n  namespace: root\n  labels: {env: prod}",
+		strings.Replace(spec, `"clientSecret":{"value":"confidential-material"},`, "", 1),
+	)
+
 	plan, err := Reconcile(Target{metadataOnly, live}, ReconcileOptions{Overwrite: true})
 	require.NoError(t, err)
 	require.Empty(t, planObject(t, plan)["spec"])
+
 	// Replacing a definition cannot preserve an unknown masked credential.
-	changed := clientDoc(t, "Connector", "  name: example\n  namespace: root", strings.Replace(strings.Replace(spec, `"clientSecret":{"value":"confidential-material"},`, "", 1), "Example", "Changed", 1))
+	changed := clientDoc(
+		t,
+		"Connector",
+		"  name: example\n  namespace: root",
+		strings.Replace(strings.Replace(spec, `"clientSecret":{"value":"confidential-material"},`, "", 1), "Example", "Changed", 1),
+	)
 	_, err = Reconcile(Target{changed, live}, ReconcileOptions{Overwrite: true})
 	require.ErrorContains(t, err, "redacted placeholders")
+
 	// Supplying the credential allows the replacement; history still excludes it.
-	supplied := clientDoc(t, "Connector", "  name: example\n  namespace: root", strings.Replace(spec, "Example", "Changed", 1))
-	plan, err = Reconcile(Target{supplied, live}, ReconcileOptions{Overwrite: true})
+	supplied := clientDoc(
+		t,
+		"Connector",                          // kind
+		"  name: example\n  namespace: root", // metadata
+		strings.Replace(spec, "Example", "Changed", 1),
+	)
+
+	plan, err = Reconcile(
+		Target{supplied, live},
+		ReconcileOptions{Overwrite: true},
+	)
 	require.NoError(t, err)
-	require.NotContains(t, planObject(t, plan)["metadata"].(map[string]any)["annotations"].(map[string]any)[LastAppliedAnnotation], "confidential-material")
+	require.NotContains(
+		t,
+		planObject(t, plan)["metadata"].(map[string]any)["annotations"].(map[string]any)[LastAppliedAnnotation],
+		"confidential-material",
+	)
 }
 
 func TestHistoryRejectsEmbeddedSecretsAndWrongIdentity(t *testing.T) {
-	doc := clientDoc(t, "Key", "  name: example\n  namespace: root", `{"keyData":{"value":"do-not-echo"}}`)
-	raw, err := json.Marshal(History{Version: 1, Desired: doc.Object})
+	doc := clientDoc(
+		t,
+		"Key",                                 // kind
+		"  name: example\n  namespace: root",  // metadata
+		`{"keyData":{"value":"do-not-echo"}}`, // spec
+	)
+	raw, err := json.Marshal(History{
+		Version: 1,
+		Desired: doc.Object,
+	})
 	require.NoError(t, err)
+
 	_, err = readHistory(string(raw), "Key")
 	require.ErrorContains(t, err, "excluded fields")
 	require.NotContains(t, err.Error(), "do-not-echo")
-	live := reconcileLive(t, "Key", apid.New(apid.PrefixKey).String(), `{"usage":"data_encryption"}`, nil)
+
+	live := reconcileLive(
+		t,
+		"Key",                             // kind
+		apid.New(apid.PrefixKey).String(), // id
+		`{"usage":"data_encryption"}`,     // spec
+		nil,                               // annotations
+	)
 	h, err := newHistory(doc)
 	require.NoError(t, err)
+
 	h.Desired["metadata"].(map[string]any)["id"] = apid.New(apid.PrefixKey).String()
 	raw, err = json.Marshal(h)
 	require.NoError(t, err)
-	live.Metadata.Annotations = map[string]string{LastAppliedAnnotation: string(raw)}
-	_, err = Reconcile(Target{doc, live}, ReconcileOptions{Overwrite: true})
+
+	live.Metadata.Annotations = map[string]string{
+		LastAppliedAnnotation: string(raw),
+	}
+	_, err = Reconcile(
+		Target{doc, live},
+		ReconcileOptions{Overwrite: true},
+	)
 	require.ErrorContains(t, err, "different resource")
 }
 

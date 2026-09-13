@@ -302,34 +302,43 @@ func documentWithObject(doc Document, object map[string]any) (Document, error) {
 	if err != nil {
 		return Document{}, fmt.Errorf("cannot encode planned resource")
 	}
+
 	resource, err := registry.NewResourceScheme().DecodeJSON(data)
 	if err != nil {
 		return Document{}, fmt.Errorf("invalid planned resource")
 	}
+
 	m, kind, err := resourceMetadata(resource)
 	if err != nil {
 		return Document{}, err
 	}
+
 	if kind != doc.Kind {
 		return Document{}, fmt.Errorf("planned resource kind mismatch")
 	}
+
 	if _, ok := object["metadata"].(map[string]any); !ok {
 		return Document{}, fmt.Errorf("planned metadata must be an object")
 	}
+
 	if spec, present := object["spec"]; present {
 		if _, ok := spec.(map[string]any); !ok {
 			return Document{}, fmt.Errorf("planned spec must be an object")
 		}
 	}
+
 	if _, present := object["status"]; present {
 		return Document{}, fmt.Errorf("status is server-owned")
 	}
+
 	if err := normalizeIdentity(string(kind), &m, ""); err != nil {
 		return Document{}, err
 	}
+
 	doc.Object = object
 	doc.Resource = resource
 	doc.Metadata = m
+
 	return doc, nil
 }
 func attachHistory(object map[string]any, h *History) error {
@@ -337,14 +346,17 @@ func attachHistory(object map[string]any, h *History) error {
 	if err != nil {
 		return fmt.Errorf("cannot encode last-applied history")
 	}
+
 	m := liveMeta(object)
 	annotations, ok := m["annotations"].(map[string]any)
 	if !ok {
 		annotations = map[string]any{}
 		m["annotations"] = annotations
 	}
+
 	annotations[LastAppliedAnnotation] = string(data)
 	typed := map[string]string{}
+
 	for key, value := range annotations {
 		s, ok := value.(string)
 		if !ok {
@@ -352,9 +364,11 @@ func attachHistory(object map[string]any, h *History) error {
 		}
 		typed[key] = s
 	}
+
 	if err := meta.ValidateAnnotations(typed); err != nil {
 		return fmt.Errorf("annotations including last-applied history are invalid or exceed 256 KiB")
 	}
+	
 	return nil
 }
 
