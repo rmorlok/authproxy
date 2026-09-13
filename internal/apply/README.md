@@ -1,16 +1,57 @@
 # Apply infrastructure
 
-The apply implementation is delivered in stages. `Load` remains an offline
-manifest loader (apart from explicit manifest URL downloads). The CLI defaults
-to cluster execution and supports offline validation with `--dry-run=client`.
-`Client` supplies authenticated REST operations and prepares execution batches.
+The apply implementation is delivered in stages:
 
-`cmd/cli/config.Resolver.ResolveApplyClient` reuses CLI configuration and JWT
-signing. It selects the API service normally and the admin API in admin mode,
-without silently falling back between them. Callers pass
-`DefaultRequestTimeout` (30 seconds) unless overridden; zero disables the
-per-request timeout. Key resources are supported on both services, subject to
-server authorization. Client dry-run must not instantiate this client.
+* **Load** - read resource files and validate
+* **Resolve** - read from the cluster to resolve references and create plan for 
+  updates
+* **Apply** - execute the plan with creates/updates
+
+When planning updates, the system computes the patch that is needed to apply the
+changes rather than setting the state of the resoruces completely. It tracks the
+previously applied state via the `authproxy.net/last-applied-configuration`
+annotation, and uses that source of truth for which attributes should be
+created/updated/deleted. This allows it to ignore other changes that may have
+happened to the resources outside of the apply command, such as labels or
+annotations being applied to resources by separate processes. Only labels/
+annotations defined by apply woudl be updated by apply.
+
+Much of the logic in this package is centered around ingesting the JSON/YAML
+that is being supplied for the apply and then validating fields and redacting
+data that may be secret. It uses the JSON schema definitions for the resources
+to establish which fields are allowed, and it leverages annotations on the
+canonical resource definition structs to determine which fields are secret. To
+accomplish this is needs to extract that data into JSON paths that is can apply
+to general document.
+
+Secret redaction is especially important to this package because is stores the
+previous apply configuration in `authproxy.net/last-applied-configuration` and
+if a field were a secret value, it would be directly visible there. Instead it
+does redaction before storing in that attribute and then handles those redaction
+values when computing a plan.
+
+# Key Terminology
+
+* **Live** - refers to the resource definition that is downloaded from the 
+  cluster as the apply is being computed.
+* **Document** - the normalized imput loaded from JSON/YAML for the apply. 
+  This includes the location where the document was taken from, including 
+  for the fact that there can be multiple resources in a single file. The 
+  document retains much of the raw object structure so it can be validated 
+  with things like JSON path. It explicitly extracts things like the 
+  resource kind and common metadata block 
+  (name/id/namesaces/labels/annotations).
+* **History** - object used to compute/track the version state that will be 
+  stored on the `authproxy.net/last-applied-configuration`.
+* **Plan** - A computed single field mutation that is applied to the live 
+  resource.
+
+# Details
+
+`Load` is an offline manifest loader (apart from explicit manifest URL
+downloads). The CLI defaults to cluster execution and supports offline 
+validation with `--dry-run=client`.`Client` supplies authenticated REST 
+operations and prepares execution batches.
 
 `ResolveBatch` performs reads only. It rejects unsupported kinds
 before requests, resolves IDs or exact namespaced names, follows pagination,
@@ -30,6 +71,13 @@ factories, metadata access, ID validation and canonical lifecycle/merge
 capabilities come from`schema/registry`. Apply retains transport, target 
 resolution, and operation policy.
 
+`cmd/cli/config.Resolver.ResolveApplyClient` reuses CLI configuration and JWT
+signing. It selects the API service normally and the admin API in admin mode,
+without silently falling back between them. Callers pass
+`DefaultRequestTimeout` (30 seconds) unless overridden; zero disables the
+per-request timeout. Key resources are supported on both services, subject to
+server authorization. Client dry-run must not instantiate this client.
+
 `LiveResource` retains typed responses, the redaction header, and known
 write-only field paths. Never derive mutations from masked values or assume
 omitted write-only fields are absent on the server. Resources and documents may
@@ -38,10 +86,10 @@ reflecting response bodies, and the HTTP client refuses redirects so signing
 credentials are not forwarded elsewhere.
 
 Automatic mutation retries and conditional writes are not implemented in this
-layer. A successful operation
-followed by a lost/invalid response has an uncertain outcome; the client does
-not retry mutations. Server validation and authorization remain authoritative,
-and ordinary read/patch sequences do not prevent concurrent writes.
+layer. A successful operation followed by a lost/invalid response has an 
+uncertain outcome; the client does not retry mutations. Server validation and 
+authorization remain authoritative, and ordinary read/patch sequences do not 
+prevent concurrent writes.
 
 ## Reconciliation and history
 
