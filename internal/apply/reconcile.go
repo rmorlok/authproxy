@@ -418,6 +418,22 @@ func (m threeWay) forced(path []string) bool {
 	return false
 }
 
+// merge reconciles one field or subtree across three versions:
+//   - old is the previously applied desired value from sanitized history;
+//     op reports whether that history contains the field.
+//   - live is the current server value; lp reports whether the field is present
+//     in the live resource.
+//   - desired is the new manifest value; dp reports whether the manifest
+//     explicitly supplies the field.
+//   - path contains unescaped JSON property names (for example, {"spec",
+//     "definition", "displayName"}) used for conflict locations and matching
+//     forced secret writes. pointer converts these segments to a JSON pointer.
+//
+// Presence is independent of value: (nil, true) means explicit JSON null,
+// whereas (nil, false) means omitted. The same distinction applies to the
+// returned value and presence flag: false tells the caller to remove the field,
+// while true retains the returned value, including null. An error reports a
+// conflicting change when overwriting managed-field drift is disabled.
 func (m threeWay) merge(
 	old any,
 	op bool,
