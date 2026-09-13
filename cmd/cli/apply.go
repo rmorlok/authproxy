@@ -4,9 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/rmorlok/authproxy/cmd/cli/config"
 	"strings"
 	"time"
+
+	"github.com/rmorlok/authproxy/cmd/cli/config"
 
 	"github.com/rmorlok/authproxy/internal/apply"
 	"github.com/spf13/cobra"
@@ -29,56 +30,77 @@ func cmdApply() *cobra.Command {
 			if dryRun != "client" && dryRun != "none" {
 				return fmt.Errorf("--dry-run must be none or client")
 			}
+
 			if timeout < 0 {
 				return fmt.Errorf("--request-timeout cannot be negative")
 			}
+
 			if validation == "true" {
 				validation = "strict"
 			}
+
 			if validation == "false" {
 				validation = "ignore"
 			}
+
 			options.Validation = apply.Validation(validation)
+
 			var warningErr error
 			options.Warn = func(message string) {
 				if warningErr == nil {
 					_, warningErr = fmt.Fprintln(cmd.ErrOrStderr(), "Warning: "+message)
 				}
 			}
+
 			switch output {
 			case "", "name", "json", "yaml":
+				// Valid
 			default:
 				return fmt.Errorf("unsupported output format %q", output)
 			}
+
 			options.Stdin = cmd.InOrStdin()
+
 			docs, err := apply.Load(cmd.Context(), options)
 			if err != nil {
 				return err
 			}
+
 			if warningErr != nil {
 				return warningErr
 			}
+
 			if dryRun == "none" && len(docs) > 0 {
 				client, err := resolver.ResolveApplyClient(timeout)
 				if err != nil {
 					return err
 				}
-				batch, err := client.Prepare(cmd.Context(), docs, apply.ReconcileOptions{Overwrite: overwrite})
+
+				batch, err := client.Prepare(
+					cmd.Context(),
+					docs,
+					apply.ReconcileOptions{Overwrite: overwrite},
+				)
 				if err != nil {
 					return err
 				}
+
 				for _, warning := range batch.Warnings() {
 					if _, err := fmt.Fprintln(cmd.ErrOrStderr(), "Warning: "+warning); err != nil {
 						return err
 					}
 				}
+
 				results, executionErr := batch.Execute(cmd.Context())
+
 				outputErr := writeApplyResults(cmd, output, results)
 				if outputErr != nil {
 					outputErr = fmt.Errorf("cannot write apply results; successful writes remain applied: %w", outputErr)
 				}
+
 				return errors.Join(executionErr, outputErr)
 			}
+
 			// Prepare all output before printing so validation/redaction errors cannot
 			// leave a misleading partial batch on stdout.
 			objects := make([]any, 0, len(docs))
@@ -89,6 +111,7 @@ func cmdApply() *cobra.Command {
 				}
 				objects = append(objects, value)
 			}
+
 			switch output {
 			case "json":
 				encoder := json.NewEncoder(cmd.OutOrStdout())
@@ -124,6 +147,7 @@ func cmdApply() *cobra.Command {
 			}
 		},
 	}
+	
 	cmd.Flags().StringArrayVarP(&options.Filenames, "filename", "f", nil, "File, directory, HTTP(S) URL, or - for stdin (repeatable)")
 	cmd.Flags().BoolVarP(&options.Recursive, "recursive", "R", false, "Read manifest directories recursively")
 	cmd.Flags().StringVarP(&options.Namespace, "namespace", "n", "", "Default namespace when omitted from a resource")
