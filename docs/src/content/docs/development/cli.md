@@ -276,15 +276,15 @@ The matching `AUTHPROXY_HOST_APP_INITIATE_SESSION_URL` in each `.env` is templat
 - [AGENTS.md — Running locally](https://github.com/rmorlok/authproxy/blob/main/AGENTS.md#running-locally) — repository-specific contributor guidance.
 - [Telemetry](/operations/telemetry/) — what shows up in traces/metrics when these commands fire requests through the server.
 
-## Validate apply manifests (client dry-run)
+## Apply resource manifests
 
-`ap apply` currently provides the manifest-loading stage of declarative apply.
-Use `--dry-run=client` to check resource types, fields, identity, and namespace
-selection without contacting the AuthProxy cluster. Cluster writes and
-operation-specific create/update validation are not implemented yet; invoking
-this command without `--dry-run=client` returns an error.
+`ap apply` creates or updates resources through the configured API service. It
+validates the complete input and its prerequisites before writing, then executes
+in dependency order. Use `--dry-run=client` to check resource types, fields,
+identity, and namespace selection without contacting the cluster.
 
 ```bash
+ap apply -f ./resources --recursive --namespace root.integrations
 ap apply -f ./resources --recursive --namespace root.integrations --dry-run=client
 ap apply -f namespaces.yaml -f connectors.yaml --dry-run=client -o yaml
 cat resources.yaml | ap apply -f - --namespace root.integrations --dry-run=client
@@ -310,7 +310,8 @@ Resources must contain `metadata.id` or both `metadata.namespace` and
 `metadata.name`. An explicit namespace takes precedence over `--namespace`.
 If a name-based resource omits its namespace and no flag supplies it, validation
 fails. There is no implicit `root` default. ID-only targets need no namespace;
-server lookup and consistency checks will be added with cluster execution.
+cluster execution resolves them and checks any supplied identity fields.
+An explicit missing ID fails instead of creating a different resource.
 
 For `Namespace`, `metadata.namespace` is the parent path. A namespace ID supplies
 its canonical path, and any supplied name or parent must agree. `name: root`
@@ -326,7 +327,7 @@ manifests may address a generation.
 The loader accepts YAML, JSON, multi-document YAML, typed resource lists such as
 `ActorList`, and heterogeneous `List` envelopes. List items must carry their own
 API version and kind. Incomplete paginated lists are rejected. Duplicate keys,
-YAML aliases/merge keys, unknown fields, invalid identity, and duplicate selected
+YAML aliases/merge keys, unknown fields in strict mode, invalid identity, and duplicate selected
 resource identities fail the whole batch. Diagnostics identify the source,
 document, and list item. Multiple inputs retain their argument order; directory
 files are visited lexically. Symlinks discovered inside directories are skipped.
@@ -339,10 +340,11 @@ files are visited lexically. Symlinks discovered inside directories are skipped.
 | `-R`, `--recursive` | Traverse nested directories. Directory discovery includes `.yaml`, `.yml`, and `.json`. |
 | `-n`, `--namespace` | Supply a missing namespace or Namespace parent. |
 | `-l`, `--selector` | Filter input labels using `=`, `==`, `!=`, existence (`key`), or nonexistence (`!key`). |
-| `--dry-run=client` | Required in this initial implementation. No cluster access or signing configuration is needed. |
+| `--dry-run` | `none` (default) applies to the cluster; `client` validates without cluster access or signing configuration. |
 | `--validate` | `strict` (default) rejects unknown fields; `warn` drops them with warnings; `ignore` drops them silently. `true` aliases strict and `false` aliases ignore. |
 | `--overwrite` | Defaults to `true`; controls managed-field drift during reconciliation. Has no effect during client dry-run. |
-| `-o`, `--output` | `name`, `json` (an array), or `yaml` (a document stream). The default prints validation status. |
+| `-o`, `--output` | `name`, `json` (an array), or `yaml` (a document stream). Execution prints operation results; client dry-run prints desired resources. The default prints human-readable status. |
+| `--request-timeout` | Timeout per cluster request, default `30s`; `0` disables it. |
 
 The loader checks every resource before producing output, including resources
 excluded by a selector. Validation modes never permit malformed identities,
@@ -361,4 +363,42 @@ redacted secret placeholders are rejected as input. Dry-run does not verify
 resource existence, authorization, references, server defaults, or whether a
 subsequent apply would create or update a resource.
 
-Cluster execution and additional kubectl-style options are tracked in [the apply implementation plan](https://github.com/rmorlok/authproxy/issues/919).
+### Execution and failures
+
+Cluster execution uses the existing signing and configuration flags, including
+`--config`, `--actorId`, `--privateKeyPath`/`--secretKeyPath`, `--apiUrl`, and
+`--admin` with `--adminApiUrl`. It requires read access to namespace and explicit
+reference prerequisites as well as the resource read/create/patch permissions.
+A selector that matches no resources succeeds without connecting to the cluster.
+
+All targets and plans are validated before writes. Newly created namespaces
+precede their children and contained resources; explicit references precede their
+dependents. Prerequisites must be in the selected batch or already exist. Missing
+prerequisites and cycles fail before writes. For example, creating a namespace
+that references an encryption key being created inside that namespace is a cycle.
+When the namespace already exists, the key can be created before updating its
+namespace's encryption-key reference.
+
+History stored in `authproxy.net/last-applied-configuration` lets apply preserve
+unmanaged fields and remove formerly managed omissions where supported. Secrets
+are excluded from history. Explicit secret values are submitted without comparison;
+omitted secrets are preserved. `--overwrite=false` reports managed-field drift
+instead of overwriting it. Initial adoption of resources without history emits a
+warning.
+
+Execution results use `created`, `configured`, `unchanged`, `failed`, and `skipped`
+statuses. Failed prerequisites cause dependents to be skipped; independent
+resources continue. Any failure or skip returns a nonzero exit status. Cancellation
+stops further mutations. JSON output is an array of envelopes containing source,
+kind, identity, operation, status, a redacted resource on success, and an error on
+failure. YAML emits one envelope per document. Name output prints successful
+identifiers, with failures reported on stderr.
+
+Batches are not transactional and successful writes are not rolled back. A
+mutation that fails to return a valid response may already have succeeded; apply
+does not retry it automatically. Results are printed after execution, so an
+output error also cannot roll back writes. Preparation reads do not prevent
+concurrent edits; stronger concurrency guarantees and connector draft lifecycle
+handling are tracked in [the next task](https://github.com/rmorlok/authproxy/issues/924).
+Server dry-run, server-side apply, field managers and deletion/prune flags remain
+unsupported.

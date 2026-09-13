@@ -1,10 +1,9 @@
 # Apply infrastructure
 
 The apply implementation is delivered in stages. `Load` remains an offline
-manifest loader (apart from explicit manifest URL downloads). The CLI currently
-exposes client dry-run only. `Client` supplies the ordinary authenticated REST
-operations for the executor; it does not enable cluster apply
-by itself.
+manifest loader (apart from explicit manifest URL downloads). The CLI defaults
+to cluster execution and supports offline validation with `--dry-run=client`.
+`Client` supplies authenticated REST operations and prepares execution batches.
 
 `cmd/cli/config.Resolver.ResolveApplyClient` reuses CLI configuration and JWT
 signing. It selects the API service normally and the admin API in admin mode,
@@ -38,8 +37,8 @@ contain secrets and must not be logged. API errors expose HTTP status without
 reflecting response bodies, and the HTTP client refuses redirects so signing
 credentials are not forwarded elsewhere.
 
-Batch dependency ordering, automatic retries, and
-conditional writes are not implemented in this layer. A successful operation
+Automatic mutation retries and conditional writes are not implemented in this
+layer. A successful operation
 followed by a lost/invalid response has an uncertain outcome; the client does
 not retry mutations. Server validation and authorization remain authoritative,
 and ordinary read/patch sequences do not prevent concurrent writes.
@@ -50,8 +49,8 @@ and ordinary read/patch sequences do not prevent concurrent writes.
 `Plan` with `create`, `update`, or `unchanged` operation and warnings. It does
 not contact the cluster or mutate inputs. For create, submit `plan.Document`
 to `Client.Create`; for update, submit `plan.Target` and `plan.Patch` to
-`Client.Update`. Unchanged plans need no write. The executor is a later stage;
-client dry-run does not resolve live state or run reconciliation.
+`Client.Update`. Unchanged plans need no write. Batch execution uses these
+plans; client dry-run does not resolve live state or run reconciliation.
 
 `authproxy.net/last-applied-configuration` is reserved for apply. Its JSON 
 format is `{"version":1,"desired":{...},"secrets":["/spec/keyData"]}`. `desired`
@@ -102,3 +101,48 @@ Malformed input, duplicate keys, invalid identity, server-owned fields, wrong
 types and redacted placeholders always fail. The CLI exposes these as
 `--validate=strict|warn|ignore`; `--overwrite` is accepted but has no effect on
 client dry-run.
+
+## Batch preparation and execution
+
+`Client.Prepare(ctx, documents, options)` resolves every target and validates
+all reconciliation plans before writes. It discovers explicit typed
+`meta.ObjectReference` values through `registry.References`, verifies external
+references and namespace prerequisites, and produces a stable topological order.
+Use the earliest ready input when multiple resources can run. Selected input
+must include prerequisites being created, or those prerequisites must already
+exist in the cluster; unselected manifests are not silently added to the batch.
+
+Namespace membership and parent edges depend on namespace **creation**. An
+existing namespace need not finish an update before resources can be placed in
+it. This allows a new key in an existing namespace to precede an encryption-key
+reference update. A new namespace that references a key being created inside
+it forms a cycle and fails before any write. Explicit reference edges also order
+updates to referenced resources. Missing prerequisites, conflicting identities,
+cycles, invalid plans and failed reads abort preparation without mutation.
+This requires read access to prerequisite resources, in addition to apply's
+ordinary read/create/patch permissions.
+
+`Batch.Warnings()` exposes preparation warnings before writes. `Batch.Execute`
+attempts each operation once, skips dependents of failed/skipped operations,
+and continues independent operations. Cancellation skips remaining resources.
+Results follow execution order and carry `created`, `configured`, `unchanged`,
+`failed` or `skipped` status. Resource payloads are sanitized for output. Any
+failure or skip returns `ErrBatchFailed` (and cancellation remains inspectable
+with `errors.Is`). Batch instances are single-use, including after cancellation.
+
+There is no rollback or transactional guarantee. A failed write may have been
+applied if the response was lost or invalid; it is never automatically retried.
+Planning reads form a snapshot and do not prevent concurrent changes. Stronger
+conditional writes and connector draft lifecycle handling belong to the next
+implementation stage. Namespaced-name references remain references in the
+request; the server resolves them after ordered prerequisites succeed.
+
+The CLI registers the existing config/signing/service flags and adds
+`--request-timeout` (30 seconds per cluster request, 0 to disable). Structured
+execution output is an array of result envelopes for JSON or one envelope per
+YAML document; client dry-run continues to print desired resources. Name output
+prints successful resource identifiers; failures and skips go to stderr.
+Warnings are printed before writes, so warning-output errors abort execution.
+Result output is buffered until execution completes: a subsequent output error
+returns nonzero but cannot undo successful writes or trigger retries. Usage text
+is suppressed on errors to keep structured stdout parseable.
