@@ -375,7 +375,13 @@ func (b *Batch) Execute(ctx context.Context) ([]Result, error) {
 	failed := false
 	for _, i := range b.order {
 		plan := b.plans[i]
-		result := Result{Source: plan.Document.Source, Kind: plan.Document.Kind, Identity: documentIdentity(plan.Document), Operation: plan.Operation}
+		result := Result{
+			Source:    plan.Document.Source,
+			Kind:      plan.Document.Kind,
+			Identity:  documentIdentity(plan.Document),
+			Operation: plan.Operation,
+		}
+
 		if err := ctx.Err(); err != nil {
 			result.Status = "skipped"
 			result.Error = err.Error()
@@ -388,6 +394,7 @@ func (b *Batch) Execute(ctx context.Context) ([]Result, error) {
 				}
 			}
 		}
+
 		if result.Status == "" {
 			refreshed, err := b.refreshPlan(ctx, plan)
 			if err != nil {
@@ -398,6 +405,7 @@ func (b *Batch) Execute(ctx context.Context) ([]Result, error) {
 				result.Operation = plan.Operation
 			}
 		}
+
 		if result.Status == "" {
 			var live *LiveResource
 			var err error
@@ -462,16 +470,20 @@ func (b *Batch) refreshPlan(ctx context.Context, plan *Plan) (*Plan, error) {
 	if plan.Target.Current != nil {
 		lookup.Metadata.ID = plan.Target.Current.Metadata.ID
 	}
+
 	live, err := b.client.resolveApplyTarget(ctx, lookup)
 	if err != nil {
 		return nil, err
 	}
+
 	if plan.Target.Current == nil && live != nil {
 		return nil, fmt.Errorf("target appeared after preparation; prepare a new batch before applying it")
 	}
+
 	if plan.Target.Current != nil && (live == nil || live.Metadata.ID != plan.Target.Current.Metadata.ID) {
 		return nil, fmt.Errorf("target changed identity after preparation")
 	}
+
 	if plan.Target.Current != nil {
 		_, hadHistory := plan.Target.Current.Metadata.Annotations[LastAppliedAnnotation]
 		_, hasHistory := live.Metadata.Annotations[LastAppliedAnnotation]
@@ -479,5 +491,12 @@ func (b *Batch) refreshPlan(ctx context.Context, plan *Plan) (*Plan, error) {
 			return nil, fmt.Errorf("apply history was removed after preparation; prepare a new batch to review adoption")
 		}
 	}
-	return Reconcile(Target{Document: doc, Current: live}, b.options)
+
+	return Reconcile(
+		Target{
+			Document: doc,
+			Current:  live,
+		},
+		b.options,
+	)
 }
