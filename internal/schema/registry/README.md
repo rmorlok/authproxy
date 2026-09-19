@@ -39,3 +39,16 @@ resources, following nested containers and polymorphic wrappers. It skips omitte
 zero-value references and returns detached values. Consumers such as apply use
 this for dependency discovery without a resource-specific list of field paths.
 Arbitrary JSON objects that resemble references are not treated as references.
+
+`ResourceType.Generations` is an optional lifecycle capability. It adapts the
+resource package's typed `meta.GenerationPolicy` into checked runtime calls for
+state classification, generation-affecting patches, target selection, and patch
+finalization. A nil capability means ordinary resource handling. Connector
+policy lives in `resources/connectors`; its draft/primary names, field paths,
+and logical-endpoint publication behavior are not interpreted by callers.
+
+The capability performs no I/O, merging, or execution. Apply supplies selected,
+editable, and newest snapshots through the standard collection/generations API,
+reconciles the chosen target, then validates the policy-finalized patch. Selection
+context is opaque to apply and immutable. Explicit generation addressing bypasses
+source selection but still enforces the resource's finalization rules.

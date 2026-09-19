@@ -156,21 +156,24 @@ patches, avoiding unnecessary generations; unspecified release intent is
 preserved. Effective typed comparison handles API serialization that omits empty
 values.
 
-### Selecting connector generations
+### Selecting resource generations
 
-`resolveApplyTarget` keeps ordinary `Resolve` semantics for references, but
-selects a reconciliation target appropriate to the logical update endpoint. It
-reads all generation pages, validates identities and pagination, and inspects
-observed release state. This requires `connectors:list/generations` permission.
-An existing draft takes precedence for edits; without one, definition changes
-merge against the newest generation the server will clone. A primary declaration
-already satisfied by the selected primary does not publish an unrelated draft.
+`resolveApplyTarget` consults `ResourceType.Generations`. Resources without this
+capability use ordinary resolution; references still use ordinary `Resolve`.
+For versioned resources, apply reads the registered collection's generation pages,
+validates identity and pagination, and asks the capability to classify observed
+states and choose a source. It passes opaque selection context into finalization.
+`Reconcile` performs the three-way merge, delegates lifecycle adjustments, and
+validates the resulting patch before execution. No resource type, release state
+name, or lifecycle field path is encoded in this orchestration.
 
-`Reconcile` retains explicit publication intent when sending a changed definition,
-even when its source already declares primary. Equal definitions are omitted;
-explicit secrets remain writes because their live values cannot be compared.
-Explicit generation targets must be drafts for any update, including history
-adoption. They are never redirected to another generation or forced into a state.
+Connector policy lives in its resource package and requires the existing
+`connectors:list/generations` read permission. It prefers existing drafts for
+edits or the newest clone source, preserves explicit publication intent, and
+leaves unrelated drafts alone when the primary already satisfies a declaration.
+Explicit generations are never redirected and only drafts permit updates,
+including history adoption. Equal definitions are omitted; explicit secrets
+remain writes because their live values cannot be compared.
 
 ### Storing history without secrets
 

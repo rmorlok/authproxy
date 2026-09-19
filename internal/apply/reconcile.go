@@ -9,7 +9,6 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/apserde"
 	"github.com/rmorlok/authproxy/internal/schema/registry"
-	"github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 )
 
@@ -278,47 +277,21 @@ func Reconcile(target Target, options ReconcileOptions) (*Plan, error) {
 		}
 	}
 
-	// A logical declaration of primary asks for publication even if the source
-	// generation is now active/archived (its historical desired state is primary).
-	// Explicit generations retain their historical lifecycle and are never forced.
-	if doc.Kind == "Connector" && doc.Metadata.Generation == 0 {
-		resource := current.Resource.(*connectors.Connector)
-		state, _ := at(doc.Object, []string{"spec", "release", "desiredState"})
-		if state == string(connectors.ConnectorReleaseStatePrimary) && resource.Status != nil && resource.Status.Release.State != connectors.ConnectorReleaseStatePrimary {
-			patchSpec["release"] = map[string]any{"desiredState": state}
+	descriptor, err := resourceType(doc.Kind)
+	if err != nil {
+		return nil, err
+	}
+	if descriptor.Generations != nil {
+		patch, err = finalizeGenerationPatch(descriptor, doc, current, patch)
+		if err != nil {
+			return nil, err
 		}
+		patchMeta = asMap(patch["metadata"])
+		patchSpec = asMap(patch["spec"])
 	}
-
-	// The logical endpoint treats a release-only primary PATCH as a no-op when
-	// another primary exists. Include the complete desired definition to publish
-	// the chosen draft instead. Normal patch validation still rejects masked data.
-	if current.publishDefinition {
-		if _, changed := patchSpec["definition"]; !changed {
-			patchSpec["definition"] = liveSpec["definition"]
-		}
-	}
-
-	if current.requiresDraft && len(patchSpec) == 0 {
-		patchSpec["release"] = map[string]any{"desiredState": string(connectors.ConnectorReleaseStateDraft)}
-	}
-
 	if len(patchMeta) == 0 && len(patchSpec) == 0 {
 		plan.Operation = OperationUnchanged
 		return plan, nil
-	}
-
-	if doc.Kind == "Connector" {
-		liveConnector := current.Resource.(*connectors.Connector)
-		if doc.Metadata.Generation != 0 && (liveConnector.Status == nil || liveConnector.Status.Release.State != connectors.ConnectorReleaseStateDraft) {
-			return nil, fmt.Errorf("explicit connector generation is not a draft; it cannot be updated")
-		}
-		// A logical definition update can clone a new draft. Preserve explicit
-		// publication intent even if the source generation is already primary.
-		if _, changed := patchSpec["definition"]; changed {
-			if state, present := at(doc.Object, []string{"spec", "release", "desiredState"}); present {
-				patchSpec["release"] = map[string]any{"desiredState": state}
-			}
-		}
 	}
 
 	data, err := json.Marshal(patch)

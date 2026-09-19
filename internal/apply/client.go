@@ -109,14 +109,9 @@ type LiveResource struct {
 	Redacted        bool
 	WriteOnlyFields []string
 
-	// requiresDraft marks a newest-generation source selected for a logical
-	// update when no draft exists. Even an equal definition must be cloned when
-	// it differs from the selected primary; history-only PATCH cannot do that.
-	requiresDraft bool
-
-	// publishDefinition prevents a release-only logical PATCH from being treated
-	// as already satisfied by the existing primary when publishing another draft.
-	publishDefinition bool
+	// generationContext is opaque, immutable selection context owned by the
+	// resource's registry lifecycle capability and used during finalization.
+	generationContext any
 }
 
 // Target is a resolved document. Current nil means a namespaced-name lookup

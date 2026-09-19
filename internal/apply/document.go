@@ -190,8 +190,8 @@ func (l *inputLoader) object(
 			removed := 0
 			for field := range object {
 				if field != "apiVersion" &&
-					field != "kind" && 
-					field != "metadata" && 
+					field != "kind" &&
+					field != "metadata" &&
 					field != "items" {
 					delete(object, field)
 					removed++
@@ -279,8 +279,11 @@ func (l *inputLoader) object(
 		}
 	}
 
-	if _, ok := metadata["generation"]; ok && kind != "Connector" {
-		return fail("metadata.generation is only supported for Connector targets")
+	if _, ok := metadata["generation"]; ok {
+		descriptor, err := resourceType(meta.Kind(kind))
+		if err != nil || descriptor.Generations == nil {
+			return fail("metadata.generation is not supported for this resource type")
+		}
 	}
 
 	if value, exists := object["spec"]; exists {

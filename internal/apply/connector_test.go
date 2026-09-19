@@ -430,9 +430,17 @@ func TestConnectorPublicationCannotReplayMaskedSecrets(t *testing.T) {
 	spec := `{"definition":{"displayName":"Example","auth":{"type":"OAuth2","clientId":{"value":"client"},"clientSecret":{"value":"confidential-material"},"authorization":{"endpoint":"https://example.com/auth"},"token":{"endpoint":"https://example.com/token"}}}}`
 	old := batchDoc(t, "Connector", "example", "root", spec)
 	live := withHistory(t, reconcileLive(t, "Connector", apid.New(apid.PrefixConnector).String(), strings.ReplaceAll(spec, "confidential-material", "********"), nil), old)
-	live.publishDefinition = true
+	selected := live.Resource.(*connectors.Connector).Clone()
+	selected.Status = &connectors.ConnectorStatus{Release: connectors.ConnectorReleaseStatus{State: connectors.ConnectorReleaseStatePrimary}}
+	intent := selected.Clone()
+	intent.Spec.Release.DesiredState = connectors.ConnectorReleaseStatePrimary
+	descriptor, err := resourceType("Connector")
+	require.NoError(t, err)
+	selection, err := descriptor.Generations.Select(intent, selected, true, true)
+	require.NoError(t, err)
+	live.generationContext = selection.Context
 	desired := batchDoc(t, "Connector", "example", "root", strings.Replace(spec, `"clientSecret":{"value":"confidential-material"},`, "", 1))
-	_, err := Reconcile(Target{Document: desired, Current: live}, ReconcileOptions{Overwrite: true})
+	_, err = Reconcile(Target{Document: desired, Current: live}, ReconcileOptions{Overwrite: true})
 	require.ErrorContains(t, err, "redacted placeholders")
 	require.NotContains(t, err.Error(), "confidential-material")
 }
