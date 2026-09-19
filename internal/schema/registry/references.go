@@ -7,13 +7,24 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 )
 
+// referencesResourceTypeValidator is the validator used by the References
+// function to establish that the resource is a valid type. This is to gate
+// the function to only be able to use authproxy resource types, but allow
+// that gate to be bypassed for testing for scenarios that don't currently
+// exist in the current resource set.
+var referencesResourceTypeValidator = func(resource any) error {
+	// Make sure the object is of registered resource type
+	_, err := TypeOf(resource)
+	return err
+}
+
 // References identifies the other resources referenced from a given resource
 // in the form of ObjectReferences. It does this via reflection from the typed
 // structs to avoid a hard-coded list per-resoruce type. It follows typed
-// containers and polymorphic wrappers Returned references are values detached
+// containers and polymorphic wrappers. Returned references are values detached
 // from the resource.
 func References(resource any) ([]meta.ObjectReference, error) {
-	if _, err := TypeOf(resource); err != nil {
+	if err := referencesResourceTypeValidator(resource); err != nil {
 		return nil, err
 	}
 
@@ -28,6 +39,7 @@ func References(resource any) ([]meta.ObjectReference, error) {
 		ptr uintptr
 	}
 
+	// Track visits to pointer related types to avoid walking in cycles.
 	seen := map[visit]bool{}
 
 	var walk func(reflect.Value)
@@ -52,6 +64,8 @@ func References(resource any) ([]meta.ObjectReference, error) {
 			}
 
 			key := visit{v.Type(), v.Pointer()}
+
+			// Make sure we aren't walking in a cycle.
 			if seen[key] {
 				return
 			}
