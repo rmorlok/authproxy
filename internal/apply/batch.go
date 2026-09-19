@@ -149,6 +149,31 @@ func targetKeys(target Target) []string {
 	return keys
 }
 
+// dependency validates one prerequisite during batch preparation. If the
+// prerequisite is in the batch, it checks identity consistency and records a
+// deduplicated ordering edge in b.dependencies[dependent]. Otherwise, it reads
+// the prerequisite from the cluster and requires it to exist. Explicit reference
+// generations must already exist even when the target is in the batch. This
+// method performs no cluster writes; dependencyOrder checks cycles afterward.
+//
+// Parameters:
+//   - ctx controls cancellation and deadlines for prerequisite reads.
+//   - dependent is the input-order index in b.plans of the resource requiring ref.
+//   - ref identifies the prerequisite by kind and ID or namespaced name, with
+//     optional constraints on other identity fields and generation.
+//   - namespaceMembership is true for a resource's namespace or namespace parent.
+//     These require an ordering edge only when that namespace is being created;
+//     an existing namespace need not finish updating first. False denotes an
+//     explicit resource reference, which adds an edge even for an existing target.
+//   - index maps the identity aliases produced by targetKeys to b.plans indices.
+//     It contains all batch targets and is read-only here.
+//   - verified is a non-nil cache shared by dependency calls within one batch
+//     preparation. Successful external lookups are recorded by full reference
+//     identity and generation to avoid repeated reads without bypassing ID/name
+//     consistency checks.
+//
+// Invalid references, missing prerequisites and failed reads return an error
+// identifying the dependent's source and prerequisite kind.
 func (b *Batch) dependency(
 	ctx context.Context,
 	dependent int,
