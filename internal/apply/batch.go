@@ -18,11 +18,27 @@ import (
 // dependency validation would invalidate execution ordering. It is single-use:
 // retrying after an ambiguous mutation could create duplicate resources.
 type Batch struct {
-	client       *Client
-	plans        []*Plan
+	// client is the client used to interact with the authproxy server.
+	client *Client
+
+	// plans are the series of changes that need to be applied. These are in
+	// load order from the documents that were used to create the plans.
+	plans []*Plan
+
+	// dependencies is a graph representing the dependencies between plans. The
+	// plans are identified by their index in the plans slice. So
+	// dependencies[i] = [j, k, l] implies that the plan on index i depends on
+	// plans as indices j, k, and l. Cylces in the dependencies will be detected
+	// and cause an error.
 	dependencies [][]int
-	order        []int
-	executed     atomic.Bool
+
+	// order is the computed order in which the plans should be executed. Again,
+	// the values in the slice are indices in to the plans slice.
+	order []int
+
+	// executed tracks whether this batch has been executed to avoid the same
+	// batch being applied multiple times.
+	executed atomic.Bool
 }
 
 // Result is safe for human or structured output. Resource is sanitized before
@@ -56,7 +72,10 @@ func (c *Client) Prepare(
 		return nil, err
 	}
 
-	batch := &Batch{client: c, dependencies: make([][]int, len(targets))}
+	batch := &Batch{
+		client:       c,
+		dependencies: make([][]int, len(targets)),
+	}
 	index := map[string]int{}
 
 	for i, target := range targets {
@@ -115,16 +134,26 @@ func (c *Client) Prepare(
 			return nil, err
 		}
 		for _, ref := range references {
-			if err := batch.dependency(ctx, i, ref, false, index, verified); err != nil {
+			if err := batch.dependency(
+				ctx,
+				i,
+				ref,
+				false,
+				index,
+				verified,
+			); err != nil {
 				return nil, err
 			}
 		}
 	}
+
 	order, err := dependencyOrder(batch.dependencies)
 	if err != nil {
 		return nil, err
 	}
+
 	batch.order = order
+
 	return batch, nil
 }
 
@@ -234,7 +263,7 @@ func (b *Batch) dependency(
 		}
 		return nil
 	}
-	
+
 	// Cache full reference identities; ID and name supplied together must still
 	// be checked for consistency even if an ID-only reference was already read.
 	cacheKey := fmt.Sprintf("%s/%s/%s/%d", key, m.Namespace, m.Name, m.Generation)
@@ -257,6 +286,7 @@ func (b *Batch) dependency(
 func dependencyOrder(dependencies [][]int) ([]int, error) {
 	order := make([]int, 0, len(dependencies))
 	done := make([]bool, len(dependencies))
+
 	for len(order) < len(dependencies) {
 		ready := -1
 		for i, prerequisites := range dependencies {
@@ -275,12 +305,15 @@ func dependencyOrder(dependencies [][]int) ([]int, error) {
 				break
 			}
 		}
+
 		if ready < 0 {
 			return nil, fmt.Errorf("apply dependency cycle; no resources were written")
 		}
+
 		done[ready] = true
 		order = append(order, ready)
 	}
+
 	return order, nil
 }
 
@@ -303,6 +336,7 @@ func (b *Batch) Execute(ctx context.Context) ([]Result, error) {
 	if !b.executed.CompareAndSwap(false, true) {
 		return nil, fmt.Errorf("apply batch has already been executed; prepare a new batch before retrying")
 	}
+
 	results := make([]Result, 0, len(b.plans))
 	succeeded := make([]bool, len(b.plans))
 	failed := false
