@@ -33,3 +33,9 @@ reconciliation, dependency ordering, and execution. The generic
 This package composes resource types and API list envelopes from outside both
 packages, preserving schema dependency direction. It defines capabilities, not
 new serialized contracts, and therefore needs no independent JSON Schema.
+
+`References(resource)` discovers typed `meta.ObjectReference` values in canonical
+resources, following nested containers and polymorphic wrappers. It skips omitted
+zero-value references and returns detached values. Consumers such as apply use
+this for dependency discovery without a resource-specific list of field paths.
+Arbitrary JSON objects that resemble references are not treated as references.
