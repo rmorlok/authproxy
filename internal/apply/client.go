@@ -151,6 +151,7 @@ func (c *Client) ResolveBatch(
 			}
 			seen[identity] = doc.Source
 		}
+
 		// Validate the computed patch rather than submitting a partial desired
 		// definition to a REST contract that replaces that entire definition.
 		if _, err := Reconcile(target, ReconcileOptions{Overwrite: true}); err != nil {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"sync/atomic"
 
@@ -41,24 +42,33 @@ var ErrBatchFailed = errors.New("apply batch did not complete successfully; succ
 // Prepare resolves and reconciles the complete input, verifies external
 // prerequisites, and checks dependency cycles before any mutation is possible.
 // A failed read, invalid plan or missing prerequisite rejects the whole batch.
-func (c *Client) Prepare(ctx context.Context, documents []Document, options ReconcileOptions) (*Batch, error) {
+func (c *Client) Prepare(
+	ctx context.Context,
+	documents []Document,
+	options ReconcileOptions,
+) (*Batch, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+
 	targets, err := c.ResolveBatch(ctx, documents)
 	if err != nil {
 		return nil, err
 	}
+
 	batch := &Batch{client: c, dependencies: make([][]int, len(targets))}
 	index := map[string]int{}
+
 	for i, target := range targets {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
+
 		plan, err := Reconcile(target, options)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", target.Document.Source, err)
 		}
+
 		batch.plans = append(batch.plans, plan)
 		for _, key := range targetKeys(target) {
 			if previous, ok := index[key]; ok && previous != i {
@@ -67,24 +77,39 @@ func (c *Client) Prepare(ctx context.Context, documents []Document, options Reco
 			index[key] = i
 		}
 	}
+
 	verified := map[string]bool{}
 	for i, target := range targets {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
+
 		m := target.Document.Metadata
 		if target.Current != nil {
 			m = target.Current.Metadata
 		}
-		// Namespace membership depends on namespace creation, not on updating an
-		// already-existing namespace. This permits installing a key in an existing
-		// namespace before updating that namespace's encryptionKeyRef.
+
+		// Namespace membership depends on namespace creation, not on updating
+		// an already-existing namespace. This permits installing a key in an
+		// existing namespace before updating that namespace's encryptionKeyRef.
 		if m.Namespace != "" {
-			ref := meta.ObjectReference{APIVersion: meta.APIVersionV1Alpha1, Kind: "Namespace", ID: m.Namespace}
-			if err := batch.dependency(ctx, i, ref, true, index, verified); err != nil {
+			ref := meta.ObjectReference{
+				APIVersion: meta.APIVersionV1Alpha1,
+				Kind:       "Namespace",
+				ID:         m.Namespace,
+			}
+			if err := batch.dependency(
+				ctx,
+				i,
+				ref,
+				true,
+				index,
+				verified,
+			); err != nil {
 				return nil, err
 			}
 		}
+
 		references, err := registry.References(target.Document.Resource)
 		if err != nil {
 			return nil, err
@@ -124,29 +149,47 @@ func targetKeys(target Target) []string {
 	return keys
 }
 
-func (b *Batch) dependency(ctx context.Context, dependent int, ref meta.ObjectReference, namespaceMembership bool, index map[string]int, verified map[string]bool) error {
+func (b *Batch) dependency(
+	ctx context.Context,
+	dependent int,
+	ref meta.ObjectReference,
+	namespaceMembership bool,
+	index map[string]int,
+	verified map[string]bool,
+) error {
 	source := b.plans[dependent].Document.Source
-	fail := func(err error) error { return fmt.Errorf("%s: %s prerequisite: %w", source, ref.Kind, err) }
+	fail := func(err error) error {
+		return fmt.Errorf("%s: %s prerequisite: %w", source, ref.Kind, err)
+	}
+
 	if ref.APIVersion != meta.APIVersionV1Alpha1 {
 		return fail(fmt.Errorf("unsupported reference apiVersion"))
 	}
+
 	m := meta.ObjectMeta{ID: ref.ID, Name: ref.Name, Namespace: ref.Namespace, Generation: ref.Generation}
 	if err := normalizeIdentity(string(ref.Kind), &m, ""); err != nil {
 		return fail(err)
 	}
+
 	key := string(ref.Kind) + "/name/" + m.Namespace + "/" + string(m.Name)
 	if m.ID != "" {
 		key = string(ref.Kind) + "/id/" + m.ID
 	}
+
 	if prerequisite, ok := index[key]; ok {
 		plan := b.plans[prerequisite]
 		actual := plan.Document.Metadata
+
 		if plan.Target.Current != nil {
 			actual = plan.Target.Current.Metadata
 		}
-		if (ref.ID != "" && ref.Kind != "Namespace" && ref.ID != actual.ID) || (m.Name != "" && m.Name != actual.Name) || (m.Namespace != "" && m.Namespace != actual.Namespace) {
+
+		if (ref.ID != "" && ref.Kind != "Namespace" && ref.ID != actual.ID) ||
+			(m.Name != "" && m.Name != actual.Name) ||
+			(m.Namespace != "" && m.Namespace != actual.Namespace) {
 			return fail(fmt.Errorf("reference does not match batch target identity"))
 		}
+
 		if ref.Generation != 0 {
 			if plan.Target.Current == nil {
 				return fail(fmt.Errorf("explicit generation must already exist"))
@@ -156,16 +199,17 @@ func (b *Batch) dependency(ctx context.Context, dependent int, ref meta.ObjectRe
 				return fail(err)
 			}
 		}
+
 		if !namespaceMembership || plan.Operation == OperationCreate {
-			for _, existing := range b.dependencies[dependent] {
-				if existing == prerequisite {
-					return nil
-				}
+			if slices.Contains(b.dependencies[dependent], prerequisite) {
+				return nil
 			}
+
 			b.dependencies[dependent] = append(b.dependencies[dependent], prerequisite)
 		}
 		return nil
 	}
+	
 	// Cache full reference identities; ID and name supplied together must still
 	// be checked for consistency even if an ID-only reference was already read.
 	cacheKey := fmt.Sprintf("%s/%s/%s/%d", key, m.Namespace, m.Name, m.Generation)
