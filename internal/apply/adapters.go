@@ -9,6 +9,10 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 )
 
+// resourceType resolves a specified kind to a resource type. The resource type
+// provides the canonical methods for doing things against that resource
+// (creating new instances, patching, etc). If the specified kind is not valid
+// this method returns an error.
 func resourceType(kind meta.Kind) (registry.ResourceType, error) {
 	return registry.LookupResource(manifest.GVK{
 		APIVersion: meta.APIVersionV1Alpha1,
@@ -16,6 +20,10 @@ func resourceType(kind meta.Kind) (registry.ResourceType, error) {
 	})
 }
 
+// resourceMetadata extracts the object metadata from an arbitrary object. To
+// achieve this, it uses reflection to identify the concrete resource type and
+// then extracts the metadata from that type. If the object is not a valid
+// type from the registry, it returns an error.
 func resourceMetadata(resource any) (meta.ObjectMeta, meta.Kind, error) {
 	descriptor, err := registry.TypeOf(resource)
 	if err != nil {

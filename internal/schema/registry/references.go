@@ -7,70 +7,102 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 )
 
-// References discovers canonical ObjectReference fields in a resource. It
-// follows typed containers and polymorphic wrappers, rather than guessing from
-// JSON key names or maintaining a resource-specific catalogue of reference paths.
-// Returned references are values detached from the resource.
+// References identifies the other resources referenced from a given resource
+// in the form of ObjectReferences. It does this via reflection from the typed
+// structs to avoid a hard-coded list per-resoruce type. It follows typed
+// containers and polymorphic wrappers Returned references are values detached
+// from the resource.
 func References(resource any) ([]meta.ObjectReference, error) {
 	if _, err := TypeOf(resource); err != nil {
 		return nil, err
 	}
+
+	// The set of references we found.
 	var result []meta.ObjectReference
+
+	// The type we are looking for.
 	referenceType := reflect.TypeOf(meta.ObjectReference{})
+
 	type visit struct {
 		typ reflect.Type
 		ptr uintptr
 	}
+
 	seen := map[visit]bool{}
+
 	var walk func(reflect.Value)
 	walk = func(v reflect.Value) {
 		if !v.IsValid() {
 			return
 		}
+
+		// Step into interface values.
 		if v.Kind() == reflect.Interface {
 			if !v.IsNil() {
 				walk(v.Elem())
 			}
 			return
 		}
-		if v.Kind() == reflect.Pointer || v.Kind() == reflect.Map || v.Kind() == reflect.Slice {
+
+		if v.Kind() == reflect.Pointer ||
+			v.Kind() == reflect.Map ||
+			v.Kind() == reflect.Slice {
 			if v.IsNil() {
 				return
 			}
+
 			key := visit{v.Type(), v.Pointer()}
 			if seen[key] {
 				return
 			}
+
 			seen[key] = true
 			defer delete(seen, key)
 		}
+
+		// Step into pointer values.
 		if v.Kind() == reflect.Pointer {
 			walk(v.Elem())
 			return
 		}
+
 		if v.Type() == referenceType {
 			if v.IsZero() {
+				// Omitted value fields, such as Connection.spec.connectorRef.
 				return
-			} // Omitted value fields, such as Connection.spec.connectorRef.
+			}
+
+			// Found a reference. Add it to our tracking list.
 			result = append(result, v.Interface().(meta.ObjectReference))
+
 			return
 		}
+
 		switch v.Kind() {
+		// Walk over all fields of the struct
 		case reflect.Struct:
 			for i := 0; i < v.NumField(); i++ {
 				f := v.Type().Field(i)
 				if f.PkgPath != "" {
 					continue
 				}
+
+				// Skip fields that don't render to json or have an InnerVal,
+				// which our approach to implementing polymorphic types.
 				if f.Tag.Get("json") == "-" && f.Name != "InnerVal" {
 					continue
 				}
+
 				walk(v.Field(i))
 			}
+
+		// Walk over all elements of the slice or array
 		case reflect.Slice, reflect.Array:
 			for i := 0; i < v.Len(); i++ {
 				walk(v.Index(i))
 			}
+
+		// Walk over all elements of a map in a deterministic order
 		case reflect.Map:
 			// Resource maps use string keys; sorting makes discovery deterministic.
 			keys := v.MapKeys()
@@ -80,6 +112,10 @@ func References(resource any) ([]meta.ObjectReference, error) {
 			}
 		}
 	}
+
+	// Start teh walk at the root resource
 	walk(reflect.ValueOf(resource))
+
+
 	return result, nil
 }

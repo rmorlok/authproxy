@@ -77,6 +77,15 @@ func (c *Client) Prepare(
 		client:       c,
 		dependencies: make([][]int, len(targets)),
 	}
+
+	// Map that translates from a resource key to its index in the targets
+	// slice. Resource keys are constructed strings of the form:
+	//
+	//  <kind>/id/<id>
+	//  <kind>/name/<namespace>/<name>
+	//
+	// These values can be used to identify other resources reference by a
+	// given resource to establish the dependence graph.
 	index := map[string]int{}
 
 	for i, target := range targets {
@@ -90,10 +99,13 @@ func (c *Client) Prepare(
 		}
 
 		batch.plans = append(batch.plans, plan)
+
+		// Establish the map of resource keys to their corresponding indices
 		for _, key := range targetKeys(target) {
 			if previous, ok := index[key]; ok && previous != i {
 				return nil, fmt.Errorf("%s: duplicate batch target", target.Document.Source)
 			}
+
 			index[key] = i
 		}
 	}
@@ -134,6 +146,7 @@ func (c *Client) Prepare(
 		if err != nil {
 			return nil, err
 		}
+
 		for _, ref := range references {
 			if err := batch.dependency(
 				ctx,
@@ -158,24 +171,39 @@ func (c *Client) Prepare(
 	return batch, nil
 }
 
+// targetKeys resolves a given target to the set of identifiers that can be used
+// to refer to it (id or name+namespace). The keys are of the form:
+//
+//  -  <kind>/id/<id>
+//. -  <kind/name/<namespace>/<name>
+//
+// This method favors the metadata from the curren version of the resource which
+// will have id available. If the resource does not exist, only the metadata
+// specified in the document definition itself will be available (always
+// name + namespace, except for namespace resources themselves where the id is
+// derived from the namespace path).
 func targetKeys(target Target) []string {
 	m := target.Document.Metadata
 	if target.Current != nil {
 		m = target.Current.Metadata
 	}
+
 	kind := target.Document.Kind
 	keys := []string{}
 	if m.ID != "" {
 		keys = append(keys, string(kind)+"/id/"+m.ID)
 	}
+
 	if m.Name != "" {
 		keys = append(keys, string(kind)+"/name/"+m.Namespace+"/"+string(m.Name))
 	}
+
 	if kind == "Namespace" {
 		if path, err := namespace.PathFromMetadata(m); err == nil {
 			keys = append(keys, "Namespace/id/"+path)
 		}
 	}
+
 	return keys
 }
 

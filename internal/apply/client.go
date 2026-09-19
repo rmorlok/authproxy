@@ -117,6 +117,8 @@ type Target struct {
 	Current  *LiveResource
 }
 
+// checkKind validates that the specified kind is valid against all the resource
+// kinds in the registry.
 func (c *Client) checkKind(kind meta.Kind) error {
 	_, err := resourceType(kind)
 	return err
@@ -143,7 +145,11 @@ func (c *Client) ResolveBatch(
 			return nil, fmt.Errorf("%s: %w", doc.Source, err)
 		}
 
-		target := Target{Document: doc, Current: live}
+		target := Target{
+			Document: doc,
+			Current:  live,
+		}
+
 		if live != nil {
 			identity := string(live.Kind) + "/" + live.Metadata.ID
 			if previous, ok := seen[identity]; ok {
