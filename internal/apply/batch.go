@@ -21,6 +21,9 @@ type Batch struct {
 	// client is the client used to interact with the authproxy server.
 	client *Client
 
+	// options is retained so execution refreshes use the preparation policy.
+	options ReconcileOptions
+
 	// plans are the series of changes that need to be applied. These are in
 	// load order from the documents that were used to create the plans. Some
 	// plans may indicate that no change is required.
@@ -75,6 +78,7 @@ func (c *Client) Prepare(
 
 	batch := &Batch{
 		client:       c,
+		options:      options,
 		dependencies: make([][]int, len(targets)),
 	}
 
@@ -174,10 +178,10 @@ func (c *Client) Prepare(
 // targetKeys resolves a given target to the set of identifiers that can be used
 // to refer to it (id or name+namespace). The keys are of the form:
 //
-//  -  <kind>/id/<id>
-//. -  <kind/name/<namespace>/<name>
+//   - <kind>/id/<id>
+//   - <kind>/name/<namespace>/<name>
 //
-// This method favors the metadata from the curren version of the resource which
+// This method favors the metadata from the current version of the resource which
 // will have id available. If the resource does not exist, only the metadata
 // specified in the document definition itself will be available (always
 // name + namespace, except for namespace resources themselves where the id is
@@ -385,6 +389,16 @@ func (b *Batch) Execute(ctx context.Context) ([]Result, error) {
 			}
 		}
 		if result.Status == "" {
+			refreshed, err := b.refreshPlan(ctx, plan)
+			if err != nil {
+				result.Status = "failed"
+				result.Error = err.Error()
+			} else {
+				plan = refreshed
+				result.Operation = plan.Operation
+			}
+		}
+		if result.Status == "" {
 			var live *LiveResource
 			var err error
 			switch plan.Operation {
@@ -436,4 +450,34 @@ func documentIdentity(doc Document) string {
 // ResultName is the compact resource identifier used in human and name output.
 func ResultName(result Result) string {
 	return strings.ToLower(string(result.Kind)) + "/" + result.Identity
+}
+
+// refreshPlan narrows the preparation/execution window without pretending that
+// a GET followed by PATCH is atomic. Never switch an existing target to another
+// ID, or adopt a resource that appeared after a planned create. No mutation is
+// retried: even an HTTP conflict may follow partial server-side effects.
+func (b *Batch) refreshPlan(ctx context.Context, plan *Plan) (*Plan, error) {
+	doc := plan.Target.Document
+	lookup := doc
+	if plan.Target.Current != nil {
+		lookup.Metadata.ID = plan.Target.Current.Metadata.ID
+	}
+	live, err := b.client.resolveApplyTarget(ctx, lookup)
+	if err != nil {
+		return nil, err
+	}
+	if plan.Target.Current == nil && live != nil {
+		return nil, fmt.Errorf("target appeared after preparation; prepare a new batch before applying it")
+	}
+	if plan.Target.Current != nil && (live == nil || live.Metadata.ID != plan.Target.Current.Metadata.ID) {
+		return nil, fmt.Errorf("target changed identity after preparation")
+	}
+	if plan.Target.Current != nil {
+		_, hadHistory := plan.Target.Current.Metadata.Annotations[LastAppliedAnnotation]
+		_, hasHistory := live.Metadata.Annotations[LastAppliedAnnotation]
+		if hadHistory && !hasHistory {
+			return nil, fmt.Errorf("apply history was removed after preparation; prepare a new batch to review adoption")
+		}
+	}
+	return Reconcile(Target{Document: doc, Current: live}, b.options)
 }

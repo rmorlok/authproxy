@@ -156,6 +156,22 @@ patches, avoiding unnecessary generations; unspecified release intent is
 preserved. Effective typed comparison handles API serialization that omits empty
 values.
 
+### Selecting connector generations
+
+`resolveApplyTarget` keeps ordinary `Resolve` semantics for references, but
+selects a reconciliation target appropriate to the logical update endpoint. It
+reads all generation pages, validates identities and pagination, and inspects
+observed release state. This requires `connectors:list/generations` permission.
+An existing draft takes precedence for edits; without one, definition changes
+merge against the newest generation the server will clone. A primary declaration
+already satisfied by the selected primary does not publish an unrelated draft.
+
+`Reconcile` retains explicit publication intent when sending a changed definition,
+even when its source already declares primary. Equal definitions are omitted;
+explicit secrets remain writes because their live values cannot be compared.
+Explicit generation targets must be drafts for any update, including history
+adoption. They are never redirected to another generation or forced into a state.
+
 ### Storing history without secrets
 
 `authproxy.net/last-applied-configuration` is reserved for apply. Its JSON
@@ -220,9 +236,20 @@ with `errors.Is`). Batch instances are single-use, including after cancellation.
 
 There is no rollback or transactional guarantee. A failed write may have been
 applied if the response was lost or invalid; it is never automatically retried.
-Planning reads form a snapshot and do not prevent concurrent changes. Stronger
-conditional writes and connector draft lifecycle handling belong to the next
-implementation stage. Namespaced-name references remain references in the
+`Batch.Execute` refreshes and reconciles each target immediately before dispatch,
+including unchanged plans, using the original document and overwrite policy.
+Existing targets are pinned to their resolved IDs; a target appearing after a
+planned create fails without adoption. Removed history also fails so adoption
+can be reviewed in a newly prepared batch. Conflicts and precondition failures are
+reported without replaying writes. Callers must prepare a new batch after review.
+
+Refresh covers every batch resource kind and the history annotation in its patch,
+but it is not an atomic precondition. There is no ETag/revision enforcement, so a
+writer between the final read and mutation can still be overwritten. Some server
+updates perform metadata/history and generation writes separately; an error can
+therefore follow partial effects. No strong conflict guarantee is claimed, even
+with `Overwrite: false`. Low-level `Create`/`Update` still submit once without
+refresh; the executor owns refresh and reconciliation. Namespaced-name references remain references in the
 request; the server resolves them after ordered prerequisites succeed.
 
 Server validation and authorization remain authoritative.
