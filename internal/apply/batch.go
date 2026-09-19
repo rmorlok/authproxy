@@ -22,7 +22,8 @@ type Batch struct {
 	client *Client
 
 	// plans are the series of changes that need to be applied. These are in
-	// load order from the documents that were used to create the plans.
+	// load order from the documents that were used to create the plans. Some
+	// plans may indicate that no change is required.
 	plans []*Plan
 
 	// dependencies is a graph representing the dependencies between plans. The
@@ -36,8 +37,8 @@ type Batch struct {
 	// the values in the slice are indices in to the plans slice.
 	order []int
 
-	// executed tracks whether this batch has been executed to avoid the same
-	// batch being applied multiple times.
+	// executed tracks whether this batch has been started running to avoid the
+	// same batch being applied multiple times.
 	executed atomic.Bool
 }
 
