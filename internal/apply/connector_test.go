@@ -31,25 +31,42 @@ func newConnectorServer(t *testing.T) (*connectorServer, *Client) {
 	s := &connectorServer{t: t, id: apid.New(apid.PrefixConnector).String(), generations: map[uint64]*connectors.Connector{}}
 	return s, testClient(t, s.handle, false)
 }
+
 func (s *connectorServer) add(g uint64, state connectors.ConnectorReleaseState, display string) *connectors.Connector {
 	c := connectors.NewConnector()
-	c.Metadata = meta.ObjectMeta{ID: s.id, Name: common.ResourceName("example"), Namespace: "root", Generation: g}
+	c.Metadata = meta.ObjectMeta{
+		ID:         s.id,
+		Name:       common.ResourceName("example"),
+		Namespace:  "root",
+		Generation: g,
+	}
 	require.NoError(s.t, json.Unmarshal([]byte(fmt.Sprintf(`{"displayName":%q,"auth":{"type":"no-auth"}}`, display)), &c.Spec.Definition))
+
 	c.Spec.Release.DesiredState = connectors.DesiredReleaseStateForObserved(state)
-	c.Status = &connectors.ConnectorStatus{Release: connectors.ConnectorReleaseStatus{State: state}}
+	c.Status = &connectors.ConnectorStatus{
+		Release: connectors.ConnectorReleaseStatus{
+			State: state,
+		},
+	}
 	s.generations[g] = c
+
 	return c
 }
+
 func (s *connectorServer) selected() *connectors.Connector {
 	var selected *connectors.Connector
 	ranks := map[connectors.ConnectorReleaseState]int{"primary": 0, "draft": 1, "active": 2, "archived": 3}
 	for _, c := range s.generations {
-		if selected == nil || ranks[c.Status.Release.State] < ranks[selected.Status.Release.State] || (c.Status.Release.State == selected.Status.Release.State && c.Metadata.Generation > selected.Metadata.Generation) {
+		if selected == nil ||
+			ranks[c.Status.Release.State] < ranks[selected.Status.Release.State] ||
+			(c.Status.Release.State == selected.Status.Release.State &&
+				c.Metadata.Generation > selected.Metadata.Generation) {
 			selected = c
 		}
 	}
 	return selected
 }
+
 func (s *connectorServer) handle(w http.ResponseWriter, r *http.Request) {
 	t := s.t
 	path := strings.TrimPrefix(r.URL.Path, "/api/v1/")
@@ -107,19 +124,24 @@ func (s *connectorServer) handle(w http.ResponseWriter, r *http.Request) {
 	}
 	require.Equal(t, "PATCH", r.Method)
 	require.NotNil(t, selected)
+
 	var patch connectors.ConnectorPatch
 	require.NoError(t, json.NewDecoder(r.Body).Decode(&patch))
 	s.patches = append(s.patches, patch)
 	s.paths = append(s.paths, path)
+
 	// Match the logical endpoint's release-only primary shortcut.
 	if path == base && !patch.Spec.HasDefinition() && patch.Spec.HasRelease() && patch.Spec.Release.DesiredState != nil && *patch.Spec.Release.DesiredState == connectors.ConnectorReleaseStatePrimary && selected.Status.Release.State == connectors.ConnectorReleaseStatePrimary {
 		encode(selected)
 		return
 	}
+
 	current := selected
+
 	if path != base {
 		g, err := strconv.ParseUint(strings.TrimPrefix(path, base+"/generations/"), 10, 64)
 		require.NoError(t, err)
+
 		current = s.generations[g]
 		require.NotNil(t, current)
 		require.Equal(t, connectors.ConnectorReleaseStateDraft, current.Status.Release.State)
@@ -130,10 +152,12 @@ func (s *connectorServer) handle(w http.ResponseWriter, r *http.Request) {
 			if c.Status.Release.State == connectors.ConnectorReleaseStateDraft {
 				draft = c
 			}
+
 			if newest == nil || c.Metadata.Generation > newest.Metadata.Generation {
 				newest = c
 			}
 		}
+
 		if draft == nil {
 			draft = newest.Clone()
 			draft.Metadata.Generation++
@@ -141,11 +165,15 @@ func (s *connectorServer) handle(w http.ResponseWriter, r *http.Request) {
 			draft.Spec.Release.DesiredState = connectors.ConnectorReleaseStateDraft
 			s.generations[draft.Metadata.Generation] = draft
 		}
+
 		current = draft
 	}
+
 	updated, err := patch.ApplyTo(current, nil)
 	require.NoError(t, err)
+
 	updated.Status.Release.State = updated.Spec.Release.DesiredState
+
 	if updated.Status.Release.State == connectors.ConnectorReleaseStatePrimary {
 		for _, c := range s.generations {
 			if c.Status.Release.State == connectors.ConnectorReleaseStatePrimary {
@@ -153,11 +181,14 @@ func (s *connectorServer) handle(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+
 	s.generations[updated.Metadata.Generation] = updated
+
 	for _, c := range s.generations {
 		c.Metadata.Annotations = updated.Metadata.Annotations
 		c.Metadata.Labels = updated.Metadata.Labels
 	}
+
 	encode(updated)
 }
 
@@ -345,7 +376,17 @@ func TestConnectorReleaseAndRefresh(t *testing.T) {
 }
 
 func TestConnectorGenerationDiscoveryFailures(t *testing.T) {
-	for _, tc := range []string{"forbidden", "missing selected", "duplicate generation", "wrong identity", "multiple drafts", "missing status", "invalid list", "incomplete list", "repeated cursor"} {
+	for _, tc := range []string{
+		"forbidden",
+		"missing selected",
+		"duplicate generation",
+		"wrong identity",
+		"multiple drafts",
+		"missing status",
+		"invalid list",
+		"incomplete list",
+		"repeated cursor",
+	} {
 		t.Run(tc, func(t *testing.T) {
 			s, _ := newConnectorServer(t)
 			selected := s.add(1, "primary", "Old")
@@ -353,6 +394,7 @@ func TestConnectorGenerationDiscoveryFailures(t *testing.T) {
 			require.NoError(t, err)
 			writes := 0
 			pages := 0
+
 			c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
 				if r.Method != "GET" {
 					writes++
@@ -399,7 +441,9 @@ func TestConnectorGenerationDiscoveryFailures(t *testing.T) {
 					fmt.Fprint(w, listJSON("Connector", items, "again"))
 				}
 			}, false)
+
 			doc := batchDoc(t, "Connector", "example", "root", `{"definition":{"displayName":"New"}}`)
+
 			_, err = c.Prepare(context.Background(), []Document{doc}, ReconcileOptions{Overwrite: true})
 			require.Error(t, err)
 			require.Zero(t, writes)
