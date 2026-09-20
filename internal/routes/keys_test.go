@@ -906,6 +906,30 @@ func TestKeys(t *testing.T) {
 		})
 	})
 
+	t.Run("delete unused key permissions and references", func(t *testing.T) {
+		tu, done := setup(t, context.Background(), nil)
+		defer done()
+		unused := createKey(t, tu, "root", nil)
+		protected := createKey(t, tu, "root", nil)
+		protectedID := protected.GetId()
+		require.NoError(t, tu.Db.CreateNamespace(context.Background(), &database.Namespace{Path: "root.protected", KeyId: &protectedID}))
+		for _, tc := range []struct {
+			id     apid.ID
+			verb   string
+			status int
+		}{
+			{unused.GetId(), "get", http.StatusForbidden},
+			{protectedID, "delete", http.StatusConflict},
+			{unused.GetId(), "delete", http.StatusNoContent},
+		} {
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodDelete, "/keys/"+tc.id.String()+"/unused", nil, "root", "some-actor", aschema.PermissionsSingle("root.**", "keys", tc.verb))
+			require.NoError(t, err)
+			w := httptest.NewRecorder()
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, tc.status, w.Code, w.Body.String())
+		}
+	})
+
 	t.Run("delete key", func(t *testing.T) {
 		tu, done := setup(t, context.Background(), nil)
 		defer done()

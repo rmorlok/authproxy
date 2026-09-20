@@ -720,6 +720,20 @@ func (mr *MockDBMockRecorder) DeleteRateLimitLabels(ctx, id, keys interface{}) *
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteRateLimitLabels", reflect.TypeOf((*MockDB)(nil).DeleteRateLimitLabels), ctx, id, keys)
 }
 
+// DeleteUnusedKey mocks base method.
+func (m *MockDB) DeleteUnusedKey(ctx context.Context, id apid.ID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteUnusedKey", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteUnusedKey indicates an expected call of DeleteUnusedKey.
+func (mr *MockDBMockRecorder) DeleteUnusedKey(ctx, id interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUnusedKey", reflect.TypeOf((*MockDB)(nil).DeleteUnusedKey), ctx, id)
+}
+
 // DistinctProbeIdsForConnection mocks base method.
 func (m *MockDB) DistinctProbeIdsForConnection(ctx context.Context, connectionId apid.ID) ([]string, error) {
 	m.ctrl.T.Helper()

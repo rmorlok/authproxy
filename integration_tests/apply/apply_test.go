@@ -36,6 +36,16 @@ type cli struct {
 
 func (c cli) run(t *testing.T, input string, exit int, extra ...string) ([]apply.Result, string) {
 	t.Helper()
+	stdout, stderr := c.runRaw(t, input, exit, extra...)
+	var results []apply.Result
+	if len(stdout) != 0 {
+		require.NoError(t, json.Unmarshal(stdout, &results), "stdout: %s", stdout)
+	}
+	return results, stderr
+}
+
+func (c cli) runRaw(t *testing.T, input string, exit int, extra ...string) ([]byte, string) {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	args := []string{"apply", "-f", "-", "-o", "json", "--config", c.config, "--actorId", "apply-operator", "--privateKeyPath", filepath.Join(c.root, "dev_config/keys/admin/bobdole")}
@@ -59,11 +69,7 @@ func (c cli) run(t *testing.T, input string, exit int, extra ...string) ([]apply
 		require.ErrorAs(t, err, &failure, "stdout: %s\nstderr: %s", &stdout, &stderr)
 		require.Equal(t, exit, failure.ExitCode())
 	}
-	var results []apply.Result
-	if stdout.Len() != 0 {
-		require.NoError(t, json.Unmarshal(stdout.Bytes(), &results), "stdout: %s", &stdout)
-	}
-	return results, stderr.String()
+	return stdout.Bytes(), stderr.String()
 }
 
 func manifest(kind, name, namespace string, spec object) object {
@@ -152,6 +158,8 @@ func TestCLIApply(t *testing.T) {
 			t.Run("ConnectorGenerations", c.generations)
 			t.Run("DependenciesAndFailures", c.dependencies)
 			t.Run("ReferenceDependencies", c.references)
+			t.Run("Prune", c.prune)
+			t.Run("HistoryCommands", c.historyCommands)
 		})
 	}
 }
@@ -362,4 +370,45 @@ func (c cli) references(t *testing.T) {
 	c.run(t, encode(t, namespace), 0)
 	live = c.request(t, "GET", "namespaces/root.references", nil, 200)
 	require.Empty(t, live["spec"].(map[string]any)["encryptionKeyRef"])
+}
+
+func (c cli) prune(t *testing.T) {
+	namespace := manifest("Namespace", "prune", "root", object{})
+	c.run(t, encode(t, namespace), 0)
+	keep := manifest("Actor", "keep", "root.prune", object{"externalId": "keep"})
+	obsolete := manifest("Actor", "obsolete", "root.prune", object{"externalId": "obsolete"})
+	key := manifest("Key", "obsolete", "root.prune", object{"keyData": object{"numBytes": 32}})
+	limit := manifest("RateLimit", "obsolete", "root.prune", object{"algorithm": object{"tokenBucket": object{"capacity": 10, "refillRate": 1}}})
+	seeded, _ := c.run(t, encode(t, keep, obsolete, key, limit), 0)
+	results, _ := c.run(t, encode(t, keep), 0, "--namespace=root.prune", "--prune", "--all", "--prune-allowlist=Actor,Key,RateLimit")
+	require.Len(t, results, 4)
+	for _, result := range results[1:] {
+		require.Equal(t, "pruned", result.Status)
+	}
+	for i, collection := range []string{"actors", "keys", "rate-limits"} {
+		c.request(t, "GET", collection+"/"+seeded[i+1].Identity, nil, 404)
+	}
+	c.request(t, "GET", "actors/"+seeded[0].Identity, nil, 200)
+}
+
+func (c cli) historyCommands(t *testing.T) {
+	doc := manifest("Actor", "history", "root", object{"externalId": "original", "signingKey": object{"sharedKey": object{"value": "history-test-secret"}}})
+	results, _ := c.run(t, encode(t, doc), 0)
+	id := results[0].Identity
+	data, _ := c.runRaw(t, encode(t, doc), 0, "view-last-applied")
+	require.NotContains(t, string(data), "history-test-secret")
+	var desired []object
+	require.NoError(t, json.Unmarshal(data, &desired))
+	require.Equal(t, "original", desired[0]["spec"].(map[string]any)["externalId"])
+	doc["spec"] = object{"externalId": "history-only"}
+	c.run(t, encode(t, doc), 0, "set-last-applied")
+	require.Equal(t, "original", c.request(t, "GET", "actors/"+id, nil, 200)["spec"].(map[string]any)["externalId"])
+	doc["spec"] = object{"externalId": "edited-history"}
+	editor := filepath.Join(t.TempDir(), "editor")
+	require.NoError(t, os.WriteFile(editor, []byte("#!/bin/sh\ncat > \"$1\" <<'MANIFEST'\n"+encode(t, doc)+"\nMANIFEST\n"), 0700))
+	t.Setenv("KUBE_EDITOR", editor)
+	c.run(t, encode(t, doc), 0, "edit-last-applied")
+	data, _ = c.runRaw(t, encode(t, doc), 0, "view-last-applied")
+	require.Contains(t, string(data), "edited-history")
+	require.Equal(t, "original", c.request(t, "GET", "actors/"+id, nil, 200)["spec"].(map[string]any)["externalId"])
 }

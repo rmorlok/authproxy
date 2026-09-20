@@ -4148,6 +4148,28 @@ paths:
       summary: Update key
       tags:
       - keys
+  /keys/{id}/unused:
+    delete:
+      description: Refuse deletion if the key has namespace references or any data-encryption-key
+        history.
+      parameters:
+      - description: Key ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete an unused key
+      tags:
+      - keys
   /metrics/query:
     post:
       consumes:

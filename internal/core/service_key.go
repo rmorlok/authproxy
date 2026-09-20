@@ -351,3 +351,7 @@ func (s *service) ListKeysFromCursor(ctx context.Context, cursor string) (iface.
 }
 
 var _ iface.ListKeysBuilder = (*listKeyWrapper)(nil)
+
+func (s *service) DeleteUnusedKey(ctx context.Context, id apid.ID) error {
+	return mapDatabaseError(s.db.DeleteUnusedKey(ctx, id))
+}

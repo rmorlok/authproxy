@@ -405,14 +405,23 @@ result envelopes rather than replayable manifests.
 | Option | Behavior |
 |---|---|
 | `-f`, `--filename` | Repeatable file, directory, HTTP(S) URL, or `-` for stdin. Stdin may appear only once. |
+| `-k`, `--kustomize` | Build a local Kustomize directory; mutually exclusive with `-f` and `-R`. |
 | `-R`, `--recursive` | Traverse nested directories. Directory discovery includes `.yaml`, `.yml`, and `.json`. |
 | `-n`, `--namespace` | Supply a missing namespace or Namespace parent. |
 | `-l`, `--selector` | Filter input labels using `=`, `==`, `!=`, existence (`key`), or nonexistence (`!key`). |
 | `--dry-run` | `none` (default) applies to the cluster; `client` validates without cluster access or signing configuration. |
 | `--validate` | `strict` (default) rejects unknown fields; `warn` drops them with warnings; `ignore` drops them silently. `true` aliases strict and `false` aliases ignore. |
 | `--overwrite` | Defaults to `true`; controls managed-field drift during reconciliation. Has no effect during client dry-run. |
-| `-o`, `--output` | `name`, `json` (an array), or `yaml` (a document stream). Execution prints operation results; client dry-run prints desired resources. The default prints human-readable status. |
+| `-o`, `--output` | `name`, `json` (an array), `yaml` (a document stream), `go-template`, `go-template-file`, `jsonpath`, `jsonpath-file`, or `jsonpath-as-json`. Execution prints operation results; client dry-run prints desired resources. The default prints human-readable status. |
 | `--request-timeout` | Timeout per cluster request, default `30s`; `0` disables it. |
+| `--template` | Expression or file path for a template/JSONPath format. Alternatively use `-o 'jsonpath=EXPRESSION'` or `-o 'go-template=EXPRESSION'`. |
+| `--allow-missing-template-keys` | Defaults to `true`; set `false` to fail on missing template/JSONPath fields. |
+| `--prune` | After every apply succeeds, delete omitted, previously applied resources in an explicit scope. Defaults to `false`. |
+| `--prune-allowlist` | Required with prune. Repeatable or comma-separated `Actor`, `Key`, `RateLimit`, or their `authproxy.net/v1alpha1/KIND` forms. No implicit kind defaults. |
+| `--all` | With prune, select all labels in the exact namespace/kind scope. Mutually exclusive with a nonempty selector. |
+| `--wait` | Prune only; defaults to `true`. Poll each deleted resource until GET returns HTTP 404. |
+| `--timeout` | Prune only; wait deadline per deletion, default `30s`. `0` disables the wait deadline. Independent of per-request timeout. |
+
 
 The loader checks every resource before producing output, including resources
 excluded by a selector. Validation modes never permit malformed identities,
@@ -490,7 +499,8 @@ can still be overwritten, including with `--overwrite=false`. Connector metadata
 history, and generation changes can also partially succeed within one request.
 Serialize applies and other writers when this matters; this command does not
 provide strong concurrency guarantees. Server dry-run, server-side apply, field
-managers and deletion/prune flags remain unsupported.
+managers, `--force-conflicts`, force deletion, cascading deletion, grace-period
+and unsupported deletion flags remain unsupported. Scoped prune is described below.
 
 ### Connector generations
 
@@ -510,3 +520,118 @@ updates do not create generations.
 `metadata.generation` addresses exactly that existing generation. Updates require
 a draft; published generations can only return unchanged when no write (including
 history adoption) is needed. Apply never calls the force-state endpoint.
+
+
+### Kustomize input
+
+`ap apply -k ./overlays/production` builds the directory using the embedded
+Kustomize engine and then runs the same validation, selection, reconciliation,
+and redaction as `-f`. It needs no installed `kubectl` or `kustomize` binary.
+External plugins and Helm execution are disabled; normal Kustomize file-loading
+restrictions remain enabled. Remote bases may still require network access,
+including during client dry-run. `--request-timeout` governs cluster requests,
+not Kustomize builds.
+
+For example, `kustomization.yaml` can contain:
+
+```yaml
+resources:
+  - actor.yaml
+namespace: root.integrations
+labels:
+  - pairs:
+      managed-by: apply
+```
+
+AuthProxy's dotted namespace paths are retained. On AuthProxy `Namespace`
+resources, `metadata.namespace` remains the parent path, and the Kustomize
+namespace transformer leaves `metadata.name` intact. Kustomize's default name
+prefix/suffix rules also leave Namespace names alone. Set those names directly
+or use an explicit patch. Kustomize transformations happen first; `--namespace`
+then fills only namespace fields still missing from the rendered manifests.
+
+### Template and JSONPath output
+
+Templates and JSONPath evaluate the same sanitized **array** as JSON output:
+result envelopes for cluster execution, desired resources for client dry-run.
+They never receive unredacted API objects. Template syntax is checked before
+writes, but execution-time errors (for example, missing fields) can still occur
+after successful writes and do not roll them back.
+
+```bash
+ap apply -f resources.yaml -o 'jsonpath={range [*]}{.kind}{" "}{.status}{"\n"}{end}'
+ap apply -f resources.yaml --dry-run=client -o 'go-template={{range .}}{{.metadata.name}}{{"\n"}}{{end}}'
+ap apply -f resources.yaml -o go-template-file --template ./summary.tmpl
+```
+
+`jsonpath-as-json` encodes selected values as JSON. `go-template-file` and
+`jsonpath-file` read the expression from the path supplied by `--template` or
+the `-o FORMAT=PATH` form. An empty selection produces an empty array as the
+printer input. JSONPath and Go-template output do not change the process exit
+status for failed applies or prune operations.
+
+### Inspect and edit apply history
+
+History commands select existing resources using `-f` (including `-R`) or `-k`,
+with the same namespace fallback, selector, signing, endpoint, and request-timeout
+flags. They accept no positional resource names. They never create a resource or
+modify its spec or ordinary metadata; set/edit replace only the sanitized
+last-applied annotation.
+
+```bash
+ap apply view-last-applied -f resources.yaml -o yaml
+ap apply set-last-applied -f resources.yaml --create-annotation
+ap apply edit-last-applied -f resources.yaml
+```
+
+View prints sanitized desired manifests, as YAML documents by default or a JSON
+array with `-o json`. Set records the supplied manifests as history without
+applying their fields; it requires existing history unless `--create-annotation`
+is supplied. Edit opens sanitized manifests in `$KUBE_EDITOR`, then `$EDITOR`,
+or `vi`. Save and exit to update history, or leave the file unchanged to cancel.
+Failed edits retain a private temporary file and report its path. Set/edit output
+uses result envelopes in YAML or JSON.
+
+Edits must retain the selected resources, their order, identities, and generation
+selectors. Secret values are removed before history is stored, and existing
+secret-presence markers are retained. View refuses invalid or secret-bearing
+history instead of printing it. Set can replace malformed history with a clean
+manifest. A concurrent history change aborts the affected update; unrelated
+annotations are preserved. These checks are not atomic write preconditions,
+and a later failure cannot roll back earlier history updates.
+
+### Scoped prune
+
+Prune is opt-in and requires an explicit `--namespace`, a kind allowlist, and
+exactly one of `--selector` or `--all`. Every selected manifest must belong to
+that exact namespace (the parent namespace for a Namespace manifest). Descendant
+namespaces are excluded, even if the server's list filter includes them. Empty
+input or a selector matching no manifests is rejected for prune.
+
+```bash
+ap apply -f ./team-resources --namespace root.team \
+  --prune --prune-allowlist Actor,RateLimit --selector managed-by=apply
+```
+
+Candidates must be absent from the selected input, match the namespace/kind/label
+scope, and contain valid last-applied history for their identity. Unmanaged
+resources are never candidates. The command exhausts every inventory page before
+applying; incomplete pages, repeated cursors, malformed history, and read errors
+abort preparation. After all applies succeed, it rechecks candidates and key
+references before deleting. Candidate changes require another invocation.
+
+Only Actor, Key, and RateLimit deletion is supported. Key pruning requires
+namespace-list access and the server's guarded `DELETE /keys/{id}/unused`
+endpoint. It rejects the global key, namespace references, and any data-encryption
+key history, including retired/deleted entries, because old ciphertext can still
+need those keys. Older servers without that endpoint fail safely; there is no
+fallback to ordinary Key deletion. Namespace destruction, Connector archival,
+and Connection disconnection are not generic pruning operations.
+
+Prune is unavailable with client dry-run because offline validation cannot list
+or verify deletion candidates. Results append `operation: delete`, `status: pruned`
+envelopes after apply results. With `--wait=false`, this means the server accepted
+deletion; the default waits for HTTP 404. A failed delete or wait stops subsequent
+deletions and returns nonzero without retrying. Earlier applies and deletions
+remain committed. There are no atomic list/delete preconditions or locks against
+other writers; serialize conflicting changes when using prune.

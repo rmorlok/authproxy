@@ -1,0 +1,197 @@
+package apply
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"sort"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/stretchr/testify/require"
+)
+
+func pruneServer(t *testing.T) (*batchServer, *Client) {
+	s, _ := newBatchServer(t)
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(r.URL.Path, "/api/v1/")
+		if r.Method == "DELETE" {
+			s.writes = append(s.writes, "DELETE "+path)
+			delete(s.objects, path)
+			w.WriteHeader(204)
+			return
+		}
+		if r.Method == "GET" && !strings.Contains(path, "/") && r.URL.Query().Get("name") == "" {
+			var keys []string
+			for key := range s.objects {
+				if strings.HasPrefix(key, path+"/") {
+					keys = append(keys, key)
+				}
+			}
+			sort.Strings(keys)
+			items := []string{}
+			for _, key := range keys {
+				data, err := json.Marshal(s.objects[key])
+				require.NoError(t, err)
+				items = append(items, string(data))
+			}
+			kind := map[string]string{"actors": "Actor", "keys": "Key", "rate-limits": "RateLimit", "namespaces": "Namespace"}[path]
+			fmt.Fprint(w, listJSON(kind, items, ""))
+			return
+		}
+		s.handle(w, r)
+	}, false)
+	return s, c
+}
+func seedApply(t *testing.T, c *Client, docs ...Document) []Result {
+	t.Helper()
+	b, err := c.Prepare(context.Background(), docs, ReconcileOptions{Overwrite: true})
+	require.NoError(t, err)
+	results, err := b.Execute(context.Background())
+	require.NoError(t, err)
+	return results
+}
+func pruneOptions() PruneOptions {
+	return PruneOptions{Namespace: "root", All: true, Allowlist: []string{"Actor"}, Wait: true, Timeout: time.Second}
+}
+
+func TestPruneExactScopeAndManagedCandidates(t *testing.T) {
+	s, c := pruneServer(t)
+	ctx := context.Background()
+	keep := batchDoc(t, "Actor", "keep", "root", `{"externalId":"keep"}`)
+	obsolete := batchDoc(t, "Actor", "obsolete", "root", `{"externalId":"obsolete"}`)
+	seeded := seedApply(t, c, keep, obsolete)
+	unmanaged, err := c.Create(ctx, batchDoc(t, "Actor", "unmanaged", "root", `{"externalId":"unmanaged"}`))
+	require.NoError(t, err)
+	child := batchDoc(t, "Actor", "descendant", "root.child", `{"externalId":"descendant"}`)
+	live, err := c.Create(ctx, child)
+	require.NoError(t, err)
+	h, err := newHistory(child)
+	require.NoError(t, err)
+	require.NoError(t, attachHistory(s.objects["actors/"+live.Metadata.ID], h))
+	b, err := c.Prepare(ctx, []Document{keep}, ReconcileOptions{Overwrite: true})
+	require.NoError(t, err)
+	p, err := b.PreparePrune(ctx, pruneOptions())
+	require.NoError(t, err)
+	require.Len(t, p.candidates, 1)
+	_, err = b.Execute(ctx)
+	require.NoError(t, err)
+	results, err := p.Execute(ctx)
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	require.Equal(t, "pruned", results[0].Status)
+	require.NotContains(t, s.objects, "actors/"+seeded[1].Identity)
+	require.Contains(t, s.objects, "actors/"+seeded[0].Identity)
+	require.Contains(t, s.objects, "actors/"+unmanaged.Metadata.ID)
+	require.Contains(t, s.objects, "actors/"+live.Metadata.ID)
+	_, err = p.Execute(ctx)
+	require.ErrorContains(t, err, "already executed")
+}
+
+func TestPruneRejectsUnsafeScopes(t *testing.T) {
+	for _, o := range []PruneOptions{
+		{All: true, Allowlist: []string{"Actor"}},
+		{Namespace: "root", Allowlist: []string{"Actor"}},
+		{Namespace: "root", All: true, Selector: "team=ops", Allowlist: []string{"Actor"}},
+		{Namespace: "root", All: true},
+		{Namespace: "root", All: true, Allowlist: []string{"Namespace"}},
+		{Namespace: "root", All: true, Allowlist: []string{"Connector"}},
+		{Namespace: "root", All: true, Allowlist: []string{"Connection"}},
+	} {
+		require.Error(t, o.Validate())
+	}
+	require.NoError(t, (PruneOptions{Namespace: "root", Selector: "team=ops", Allowlist: []string{"authproxy.net/v1alpha1/Actor"}}).Validate())
+}
+
+func TestPruneNeverDeletesAfterFailedApplyOrCandidateChange(t *testing.T) {
+	for _, mode := range []string{"failure", "changed", "not-executed"} {
+		t.Run(mode, func(t *testing.T) {
+			s, c := pruneServer(t)
+			ctx := context.Background()
+			keep := batchDoc(t, "Actor", "keep", "root", `{"externalId":"keep"}`)
+			old := batchDoc(t, "Actor", "old", "root", `{"externalId":"old"}`)
+			seeded := seedApply(t, c, old)
+			b, err := c.Prepare(ctx, []Document{keep}, ReconcileOptions{Overwrite: true})
+			require.NoError(t, err)
+			p, err := b.PreparePrune(ctx, pruneOptions())
+			require.NoError(t, err)
+
+			if mode == "failure" {
+				s.failName = "keep"
+				_, err = b.Execute(ctx)
+				require.Error(t, err)
+			} else if mode != "not-executed" {
+				_, err = b.Execute(ctx)
+				require.NoError(t, err)
+			}
+			if mode == "changed" {
+				liveMeta(s.objects["actors/"+seeded[0].Identity])["labels"] = map[string]any{"changed": "yes"}
+			}
+			_, err = p.Execute(ctx)
+			require.Error(t, err)
+			for _, write := range s.writes {
+				require.NotContains(t, write, "DELETE")
+			}
+		})
+	}
+}
+
+func TestPruneRejectsIncompleteInventoryAndReferences(t *testing.T) {
+	t.Run("inventory", func(t *testing.T) {
+		c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+			fmt.Fprint(w, `{"apiVersion":"authproxy.net/v1alpha1","kind":"ActorList","metadata":{"remainingItemCount":1},"items":[]}`)
+		}, false)
+		_, err := c.listAll(context.Background(), "Actor", "root")
+		require.ErrorContains(t, err, "incomplete")
+	})
+	t.Run("reference", func(t *testing.T) {
+		s, c := pruneServer(t)
+		ctx := context.Background()
+		key := batchDoc(t, "Key", "oldkey", "root", `{"keyData":{"numBytes":32}}`)
+		seeded := seedApply(t, c, key)
+		s.objects["namespaces/root"]["spec"] = map[string]any{"encryptionKeyRef": map[string]any{"apiVersion": "authproxy.net/v1alpha1", "kind": "Key", "id": seeded[0].Identity}}
+		keep := batchDoc(t, "Actor", "keep", "root", `{"externalId":"keep"}`)
+		b, err := c.Prepare(ctx, []Document{keep}, ReconcileOptions{Overwrite: true})
+		require.NoError(t, err)
+		options := pruneOptions()
+		options.Allowlist = []string{"Key"}
+		p, err := b.PreparePrune(ctx, options)
+		require.NoError(t, err)
+		_, err = b.Execute(ctx)
+		require.NoError(t, err)
+		_, err = p.Execute(ctx)
+		require.ErrorContains(t, err, "referenced")
+		require.Contains(t, s.objects, "keys/"+seeded[0].Identity)
+	})
+}
+
+func TestPruneWaitTimeoutAndMissingGuardedEndpoint(t *testing.T) {
+	id := apid.New(apid.PrefixActor).String()
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, actorJSON(id, "old", "root")) }, false)
+	p := &PrunePlan{client: c, options: PruneOptions{Timeout: time.Millisecond}}
+	require.ErrorIs(t, p.waitDeleted(context.Background(), "Actor", "actors/"+id), context.DeadlineExceeded)
+	keyID := apid.New(apid.PrefixKey).String()
+	deletes := []string{}
+	c = testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "DELETE" {
+			deletes = append(deletes, r.URL.Path)
+			w.WriteHeader(404)
+			return
+		}
+		if r.URL.Path == "/api/v1/namespaces" {
+			fmt.Fprint(w, listJSON("Namespace", nil, ""))
+			return
+		}
+		fmt.Fprint(w, liveJSON("Key", keyID, "old", "root", `{}`))
+	}, false)
+	live, err := c.get(context.Background(), "Key", "keys/"+keyID)
+	require.NoError(t, err)
+	p = &PrunePlan{client: c, options: pruneOptions(), candidates: []*LiveResource{live}, batch: &Batch{}}
+	p.batch.completedSuccessfully.Store(true)
+	_, err = p.Execute(context.Background())
+	require.Error(t, err)
+	require.Equal(t, []string{"/api/v1/keys/" + keyID + "/unused"}, deletes, "older servers must never fall back to destructive ordinary Key deletion")
+}

@@ -550,6 +550,8 @@ type C interface {
 
 	// DeleteKey soft deletes a key.
 	DeleteKey(ctx context.Context, id apid.ID) error
+	// DeleteUnusedKey refuses keys with namespace references or any DEK history.
+	DeleteUnusedKey(ctx context.Context, id apid.ID) error
 
 	// SetKeyState sets the state of a key.
 	SetKeyState(ctx context.Context, id apid.ID, state database.KeyState) error
