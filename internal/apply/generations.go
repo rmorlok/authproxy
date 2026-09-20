@@ -143,18 +143,32 @@ func (c *Client) resourceGenerations(ctx context.Context, selected *LiveResource
 
 // finalizeGenerationPatch delegates only resource semantics. The resulting patch
 // still goes through ordinary redaction, immutable-field, and schema validation.
-func finalizeGenerationPatch(descriptor registry.ResourceType, doc Document, current *LiveResource, patch map[string]any) (map[string]any, error) {
+func finalizeGenerationPatch(
+	descriptor registry.ResourceType,
+	doc Document,
+	current *LiveResource,
+	patch map[string]any,
+) (map[string]any, error) {
 	data, err := json.Marshal(patch)
 	if err != nil {
 		return nil, fmt.Errorf("cannot encode generation patch")
 	}
+
 	typed, err := descriptor.DecodePatchJSON(data)
 	if err != nil {
 		return nil, fmt.Errorf("invalid generation patch")
 	}
-	finalized, err := descriptor.Generations.Finalize(doc.Resource, current.Resource, typed, current.generationContext, doc.Metadata.Generation != 0)
+
+	finalized, err := descriptor.Generations.Finalize(
+		doc.Resource,
+		current.Resource,
+		typed,
+		current.generationContext,
+		doc.Metadata.Generation != 0,
+	)
 	if err != nil {
 		return nil, err
 	}
+
 	return plainObject(finalized)
 }

@@ -281,14 +281,17 @@ func Reconcile(target Target, options ReconcileOptions) (*Plan, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	if descriptor.Generations != nil {
 		patch, err = finalizeGenerationPatch(descriptor, doc, current, patch)
 		if err != nil {
 			return nil, err
 		}
+
 		patchMeta = asMap(patch["metadata"])
 		patchSpec = asMap(patch["spec"])
 	}
+
 	if len(patchMeta) == 0 && len(patchSpec) == 0 {
 		plan.Operation = OperationUnchanged
 		return plan, nil
