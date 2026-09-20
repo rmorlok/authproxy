@@ -321,3 +321,24 @@ resp, _ := http.DefaultClient.Do(req)
 ## CI
 
 Integration tests run as a separate job in `.github/workflows/go.yml` with real service containers (Postgres, Redis, ClickHouse, MinIO).
+
+## Apply CLI coverage
+
+The `apply` package builds `cmd/cli` and runs the resulting executable against
+real API and admin API HTTP listeners. It covers namespace/name and ID targeting,
+all supported resource kinds, sanitized history, managed label removal, adoption,
+connector draft/publication behavior, dependency ordering, and process exit codes.
+A fault-injection proxy rejects one namespace mutation to verify partial failures;
+all other requests go to the real server. Connection setup is seeded with the
+existing database helper because apply supports only connection metadata updates.
+
+From the repository root, start the dependencies and run both database variants:
+
+```bash
+docker compose -f integration_tests/docker-compose.yml up -d postgres redis clickhouse minio minio-init
+AUTH_PROXY_TEST_DATABASE_PROVIDER=sqlite POSTGRES_TEST_PORT=5433 go -C integration_tests test -tags integration -count=1 ./apply
+AUTH_PROXY_TEST_DATABASE_PROVIDER=postgres POSTGRES_TEST_PORT=5433 go -C integration_tests test -tags integration -count=1 ./apply
+```
+
+The tests use isolated databases, random HTTP ports, and the repository's test
+signing key. They do not use your CLI configuration or contact external providers.

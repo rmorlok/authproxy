@@ -332,6 +332,74 @@ resource identities fail the whole batch. Diagnostics identify the source,
 document, and list item. Multiple inputs retain their argument order; directory
 files are visited lexically. Symlinks discovered inside directories are skipped.
 
+### Supported operations
+
+| Kind | Create | Update |
+|---|---|---|
+| `Namespace` | Name and parent path | Mutable metadata and namespace settings; the path is immutable. |
+| `Actor` | Name, namespace, and actor spec | Mutable metadata and actor settings, including explicitly supplied signing credentials. |
+| `Connector` | Name, namespace, and definition | Mutable metadata, draft definitions, and publication intent; see generations below. |
+| `Key` | Name, namespace, and key settings | Mutable metadata and supported key settings. Available through both API services; `--admin` selects the admin API. |
+| `RateLimit` | Name, namespace, and rate-limit policy | Mutable metadata and policy. |
+| `Connection` | Unsupported | Existing connection's mutable metadata only. Establish connections through the connection setup flow. |
+
+Canonical resource validation still applies: required fields cannot be removed,
+and immutable fields cannot be changed. Object fields are merged by child key;
+use explicit `null` to clear a nullable reference such as
+`spec.encryptionKeyRef`, including any ID the server added when resolving it.
+Removing a document from your input
+does not delete its resource.
+
+### Create, edit, and adopt resources
+
+This multi-document file creates a namespace and an actor inside it. Apply orders
+the namespace first even if the actor appears first in the file:
+
+```yaml
+apiVersion: authproxy.net/v1alpha1
+kind: Namespace
+metadata:
+  name: integrations
+  namespace: root
+spec: {}
+---
+apiVersion: authproxy.net/v1alpha1
+kind: Actor
+metadata:
+  name: worker
+  namespace: root.integrations
+  labels:
+    environment: development
+    temporary: "true"
+spec:
+  externalId: integration-worker
+```
+
+Run `ap apply -f resources.yaml`, then edit `environment` and remove `temporary`
+and apply again. Apply updates the managed label and removes the omitted label;
+labels added independently are preserved. Server-projected `apxy/` labels are
+read-only and are never submitted in patches. A later apply with the same desired
+state reports `unchanged`. An initial reapply may update history to include the
+server-assigned ID before reaching that steady state.
+
+To adopt an existing resource, use its namespace and name, or supply its ID:
+
+```yaml
+apiVersion: authproxy.net/v1alpha1
+kind: Actor
+metadata:
+  id: act_REPLACE_WITH_EXISTING_ID
+  labels:
+    environment: production
+spec: {}
+```
+
+Replace the placeholder with an actual actor ID. With no previous apply history,
+apply warns and takes ownership of the supplied fields; it preserves omitted
+fields. Do not copy a GET response directly into a manifest: remove status,
+timestamps, and redacted credentials first. Structured apply output also contains
+result envelopes rather than replayable manifests.
+
 ### Available options
 
 | Option | Behavior |
@@ -384,7 +452,12 @@ namespace's encryption-key reference.
 History stored in `authproxy.net/last-applied-configuration` lets apply preserve
 unmanaged fields and remove formerly managed omissions where supported. Secrets
 are excluded from history. Explicit secret values are submitted without comparison;
-omitted secrets are preserved. `--overwrite=false` reports managed-field drift
+omitted secrets are preserved. Because secrets cannot be compared with their
+stored values, keeping an explicit secret in a manifest may cause each apply to
+report `configured` rather than `unchanged`. History is stored as a resource
+annotation: non-secret desired values are visible to readers of that resource.
+Do not put credentials in labels, annotations, or other ordinary fields.
+`--overwrite=false` reports managed-field drift
 instead of overwriting it. Initial adoption of resources without history emits a
 warning.
 
@@ -428,7 +501,9 @@ Repeated applies omit known-equal definitions and do not manufacture generations
 Explicit secret values cannot be compared and may still cause definition writes.
 
 Set `spec.release.desiredState: primary` to publish a changed definition. With no
-release intent, a changed published definition becomes a draft. A declaration
+release intent, a changed published definition becomes a draft. If a manifest
+previously managed `desiredState: primary`, change it explicitly to `draft` to
+stop publishing edits; omitting a required managed field cannot clear it. A declaration
 already satisfied by the primary leaves an unrelated draft alone. Metadata-only
 updates do not create generations.
 

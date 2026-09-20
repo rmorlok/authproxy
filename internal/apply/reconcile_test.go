@@ -737,3 +737,29 @@ func TestHistoryExcludesWriteOnlyProviderReferences(t *testing.T) {
 		})
 	}
 }
+
+func TestReconcileExcludesProjectedLabelsFromPatches(t *testing.T) {
+	doc := clientDoc(t, "Actor", "  name: example\n  namespace: root\n  labels: {managed: before, remove: yes}", `{"externalId":"subject"}`)
+	live := withHistory(t, reconcileLive(t, "Actor", apid.New(apid.PrefixActor).String(), `{"externalId":"subject"}`, nil), doc)
+	object, err := plainObject(live.Resource)
+	require.NoError(t, err)
+	object["metadata"].(map[string]any)["labels"] = map[string]any{
+		"managed": "before", "remove": "yes", "unmanaged": "keep",
+		"apxy/act/-/id": live.Metadata.ID, "apxy/ns/environment": "inherited",
+	}
+	data, err := json.Marshal(object)
+	require.NoError(t, err)
+	live, err = newClient().decodeLive("Actor", data, false)
+	require.NoError(t, err)
+	for _, overwrite := range []bool{false, true} {
+		plan, err := Reconcile(Target{doc, live}, ReconcileOptions{Overwrite: overwrite})
+		require.NoError(t, err)
+		require.Equal(t, OperationUnchanged, plan.Operation)
+		changed := clientDoc(t, "Actor", "  name: example\n  namespace: root\n  labels: {managed: after}", `{"externalId":"subject"}`)
+		plan, err = Reconcile(Target{changed, live}, ReconcileOptions{Overwrite: overwrite})
+		require.NoError(t, err)
+		require.Equal(t, map[string]any{"managed": "after", "unmanaged": "keep"}, planObject(t, plan)["metadata"].(map[string]any)["labels"])
+		require.NotContains(t, string(plan.Patch), "apxy/")
+		require.Contains(t, live.Metadata.Labels, "apxy/act/-/id", "reconciliation must not mutate the live resource")
+	}
+}
