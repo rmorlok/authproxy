@@ -32,3 +32,10 @@ status:
 Configuration may use `metadata.id` or `metadata.name` to identify a connector and may set `metadata.generation` explicitly. It must omit `status`, which is server-owned. Connector API create and response bodies use `Connector` directly, while updates use the presence-aware `ConnectorPatch`; only endpoint-specific lifecycle actions remain in `internal/schema/api`.
 
 Connector-author setup-flow guidance lives in [`docs/src/content/docs/integration/connector-setup-flow.md`](../../../../docs/src/content/docs/integration/connector-setup-flow.md). Shared predicate behavior for setup steps, OAuth scopes, and probes lives in [`docs/src/content/docs/integration/connector-predicates.md`](../../../../docs/src/content/docs/integration/connector-predicates.md).
+
+`GenerationPolicy()` supplies the registry with Connector-specific lifecycle
+rules: draft generations are editable, primary is the selected published state,
+and active/archived are historical. It preserves explicit publication intent,
+selects drafts or newest clone sources, and handles the logical endpoint's
+release-only primary shortcut. HTTP reads and three-way reconciliation remain
+outside this package. Policy functions do not mutate resources or input patches.

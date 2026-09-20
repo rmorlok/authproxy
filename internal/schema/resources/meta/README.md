@@ -31,3 +31,9 @@ resolves only live rows by ID or exact namespace/name. Typed database methods
 perform the resource-specific cast. Core reference methods then wrap or hydrate
 the row as needed; in particular, connector generation is selected at this
 boundary and connections load their pinned connector generation.
+
+`GenerationPolicy[R, P]` describes optional generation lifecycle behavior for a
+typed resource and patch. It is runtime metadata rather than a serialized schema:
+policies classify observed state, identify generation changes, choose a source,
+and finalize patches without I/O or mutation of their inputs. Resource packages
+implement the policy; the registry exposes it to generic consumers.

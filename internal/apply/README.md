@@ -156,6 +156,25 @@ patches, avoiding unnecessary generations; unspecified release intent is
 preserved. Effective typed comparison handles API serialization that omits empty
 values.
 
+### Selecting resource generations
+
+`resolveApplyTarget` consults `ResourceType.Generations`. Resources without this
+capability use ordinary resolution; references still use ordinary `Resolve`.
+For versioned resources, apply reads the registered collection's generation pages,
+validates identity and pagination, and asks the capability to classify observed
+states and choose a source. It passes opaque selection context into finalization.
+`Reconcile` performs the three-way merge, delegates lifecycle adjustments, and
+validates the resulting patch before execution. No resource type, release state
+name, or lifecycle field path is encoded in this orchestration.
+
+Connector policy lives in its resource package and requires the existing
+`connectors:list/generations` read permission. It prefers existing drafts for
+edits or the newest clone source, preserves explicit publication intent, and
+leaves unrelated drafts alone when the primary already satisfies a declaration.
+Explicit generations are never redirected and only drafts permit updates,
+including history adoption. Equal definitions are omitted; explicit secrets
+remain writes because their live values cannot be compared.
+
 ### Storing history without secrets
 
 `authproxy.net/last-applied-configuration` is reserved for apply. Its JSON
@@ -220,9 +239,20 @@ with `errors.Is`). Batch instances are single-use, including after cancellation.
 
 There is no rollback or transactional guarantee. A failed write may have been
 applied if the response was lost or invalid; it is never automatically retried.
-Planning reads form a snapshot and do not prevent concurrent changes. Stronger
-conditional writes and connector draft lifecycle handling belong to the next
-implementation stage. Namespaced-name references remain references in the
+`Batch.Execute` refreshes and reconciles each target immediately before dispatch,
+including unchanged plans, using the original document and overwrite policy.
+Existing targets are pinned to their resolved IDs; a target appearing after a
+planned create fails without adoption. Removed history also fails so adoption
+can be reviewed in a newly prepared batch. Conflicts and precondition failures are
+reported without replaying writes. Callers must prepare a new batch after review.
+
+Refresh covers every batch resource kind and the history annotation in its patch,
+but it is not an atomic precondition. There is no ETag/revision enforcement, so a
+writer between the final read and mutation can still be overwritten. Some server
+updates perform metadata/history and generation writes separately; an error can
+therefore follow partial effects. No strong conflict guarantee is claimed, even
+with `Overwrite: false`. Low-level `Create`/`Update` still submit once without
+refresh; the executor owns refresh and reconciliation. Namespaced-name references remain references in the
 request; the server resolves them after ordered prerequisites succeed.
 
 Server validation and authorization remain authoritative.

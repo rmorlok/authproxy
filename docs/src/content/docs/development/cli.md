@@ -369,6 +369,8 @@ Cluster execution uses the existing signing and configuration flags, including
 `--config`, `--actorId`, `--privateKeyPath`/`--secretKeyPath`, `--apiUrl`, and
 `--admin` with `--adminApiUrl`. It requires read access to namespace and explicit
 reference prerequisites as well as the resource read/create/patch permissions.
+Logical Connector applies also require `connectors:list/generations` to inspect
+the selected generation, existing draft, and newest generation.
 A selector that matches no resources succeeds without connecting to the cluster.
 
 All targets and plans are validated before writes. Newly created namespaces
@@ -397,8 +399,39 @@ identifiers, with failures reported on stderr.
 Batches are not transactional and successful writes are not rolled back. A
 mutation that fails to return a valid response may already have succeeded; apply
 does not retry it automatically. Results are printed after execution, so an
-output error also cannot roll back writes. Preparation reads do not prevent
-concurrent edits; stronger concurrency guarantees and connector draft lifecycle
-handling are tracked in [the next task](https://github.com/rmorlok/authproxy/issues/924).
-Server dry-run, server-side apply, field managers and deletion/prune flags remain
-unsupported.
+output error also cannot roll back writes.
+
+Immediately before each operation, apply reads the target again and recomputes
+its plan using the same overwrite policy. This preserves unrelated changes
+visible at that read, including changes to labels, annotations, and apply history.
+Existing resources remain bound to their resolved IDs. History removed after
+preparation requires a new batch so adoption is not silent. A resource that appears
+after a planned create causes a failure rather than automatic adoption; a create
+conflict is also reported without retry. Review the cluster and rerun apply to
+prepare a new batch. Mutation errors, including HTTP 409/412 responses, are never
+replayed because the current API may have performed part of an update already.
+
+These reads are **not atomic write preconditions**. The API does not enforce
+ETags or object revisions for apply, so edits between the final read and write
+can still be overwritten, including with `--overwrite=false`. Connector metadata,
+history, and generation changes can also partially succeed within one request.
+Serialize applies and other writers when this matters; this command does not
+provide strong concurrency guarantees. Server dry-run, server-side apply, field
+managers and deletion/prune flags remain unsupported.
+
+### Connector generations
+
+Apply inspects the selected generation and available generations before planning
+logical Connector updates. It reuses an existing draft; if a draft must be
+created, it merges against the newest generation that the server will clone.
+Repeated applies omit known-equal definitions and do not manufacture generations.
+Explicit secret values cannot be compared and may still cause definition writes.
+
+Set `spec.release.desiredState: primary` to publish a changed definition. With no
+release intent, a changed published definition becomes a draft. A declaration
+already satisfied by the primary leaves an unrelated draft alone. Metadata-only
+updates do not create generations.
+
+`metadata.generation` addresses exactly that existing generation. Updates require
+a draft; published generations can only return unchanged when no write (including
+history adoption) is needed. Apply never calls the force-state endpoint.

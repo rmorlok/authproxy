@@ -27,6 +27,7 @@ type Value interface {
 // ResourceType describes reusable schema capabilities. Operation policy and
 // transport execution belong to callers. Descriptors are returned by value.
 type ResourceType struct {
+	Generations  GenerationLifecycle // nil for resources without generation lifecycle support.
 	GVK          manifest.GVK
 	Collection   string
 	SchemaRef    string // Embedded JSON schema for resource field discovery.
@@ -160,7 +161,7 @@ func resourceTypes() []ResourceType {
 			func(current *connection.Connection, patch *connection.ConnectionPatch) (*connection.Connection, error) {
 				return current.ApplyUpdate(patch)
 			}),
-		describe[connectors.Connector, connectors.ConnectorPatch](
+		withGenerations(describe[connectors.Connector, connectors.ConnectorPatch](
 			connectors.ConnectorKind,
 			connectors.SchemaIdConnectors,
 			"connectors",
@@ -168,7 +169,7 @@ func resourceTypes() []ResourceType {
 			func(r *connectors.Connector) (meta.TypeMeta, meta.ObjectMeta) { return r.TypeMeta, r.Metadata },
 			func(current *connectors.Connector, patch *connectors.ConnectorPatch) (*connectors.Connector, error) {
 				return patch.ApplyTo(current, nil)
-			}),
+			}), connectors.GenerationPolicy()),
 		describe[key.Key, key.KeyPatch](
 			key.KeyKind,
 			key.SchemaIdKey,

@@ -41,8 +41,8 @@ func (co ClientOptions) ApiNameForErr() string {
 	}[co.Admin]
 }
 
-// Client performs ordinary REST operations. It does not reconcile, retry
-// mutations, or imply transactional batch semantics.
+// Client supplies ordinary REST operations and batch preparation. Mutations are
+// never retried and batches do not imply transactional semantics.
 type Client struct {
 	baseURL string
 	signer  jwt.Signer
@@ -108,6 +108,10 @@ type LiveResource struct {
 	Kind            meta.Kind
 	Redacted        bool
 	WriteOnlyFields []string
+
+	// generationContext is opaque, immutable selection context owned by the
+	// resource's registry lifecycle capability and used during finalization.
+	generationContext any
 }
 
 // Target is a resolved document. Current nil means a namespaced-name lookup
@@ -140,7 +144,7 @@ func (c *Client) ResolveBatch(
 	seen := map[string]string{}
 
 	for _, doc := range documents {
-		live, err := c.Resolve(ctx, doc)
+		live, err := c.resolveApplyTarget(ctx, doc)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", doc.Source, err)
 		}
