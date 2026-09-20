@@ -170,6 +170,16 @@ func Reconcile(target Target, options ReconcileOptions) (*Plan, error) {
 		b := asMap(now)
 		d := asMap(next)
 
+		if field == "labels" {
+			// API reads include projected system labels. They are recomputed by
+			// the server and are forbidden in user patches, even when unchanged.
+			for key := range b {
+				if strings.HasPrefix(key, meta.SystemLabelPrefix) {
+					delete(b, key)
+				}
+			}
+		}
+
 		if field == "annotations" {
 			delete(a, LastAppliedAnnotation)
 			delete(b, LastAppliedAnnotation)
