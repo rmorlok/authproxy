@@ -32,23 +32,48 @@ func TestBatchRefreshPreservesConcurrentMetadata(t *testing.T) {
 			path := tc.collection + "/" + id
 			var obj map[string]any
 			require.NoError(t, json.Unmarshal([]byte(liveJSON(tc.kind, id, "example", "root", tc.spec)), &obj))
+
 			if tc.kind == "Connection" {
 				// Connection metadata patches validate the full live contract.
 				obj["metadata"].(map[string]any)["createdAt"] = "2026-09-01T00:00:00Z"
 				obj["metadata"].(map[string]any)["updatedAt"] = "2026-09-01T00:00:00Z"
-				obj["spec"] = map[string]any{"connectorRef": map[string]any{"apiVersion": "authproxy.net/v1alpha1", "kind": "Connector", "id": apid.New(apid.PrefixConnector).String(), "generation": 1}}
-				obj["status"] = map[string]any{"lifecycle": map[string]any{"state": "configured"}, "health": map[string]any{"state": "healthy"}, "configuration": map[string]any{"configured": true, "schema": map[string]any{"type": "object"}}}
+				obj["spec"] = map[string]any{
+					"connectorRef": map[string]any{
+						"apiVersion": "authproxy.net/v1alpha1",
+						"kind":       "Connector",
+						"id":         apid.New(apid.PrefixConnector).String(),
+						"generation": 1,
+					},
+				}
+				obj["status"] = map[string]any{
+					"lifecycle": map[string]any{
+						"state": "configured"},
+					"health": map[string]any{
+						"state": "healthy",
+					},
+					"configuration": map[string]any{
+						"configured": true,
+						"schema": map[string]any{
+							"type": "object",
+						},
+					},
+				}
 			}
+
 			s.objects[path] = obj
+
 			doc := clientDoc(t, tc.kind, "  name: example\n  namespace: root\n  labels: {team: blue}", `{}`)
 			b, err := c.Prepare(context.Background(), []Document{doc}, ReconcileOptions{Overwrite: true})
 			require.NoError(t, err)
+
 			// Changed after all preparation reads, before Execute's refresh.
 			liveMeta(obj)["labels"] = map[string]any{"audit": "external"}
 			liveMeta(obj)["annotations"] = map[string]any{"example.com/external": "preserved"}
+
 			result, err := b.Execute(context.Background())
 			require.NoError(t, err)
 			require.Equal(t, "configured", result[0].Status)
+
 			m := liveMeta(s.objects[path])
 			require.Equal(t, map[string]any{"audit": "external", "team": "blue"}, m["labels"])
 			require.Equal(t, "preserved", m["annotations"].(map[string]any)["example.com/external"])
