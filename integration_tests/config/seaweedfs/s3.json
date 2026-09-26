@@ -1,0 +1,27 @@
+{
+  "identities": [
+    {
+      "name": "authproxy",
+      "credentials": [
+        {
+          "accessKey": "authproxy",
+          "secretKey": "authproxy-local-secret"
+        }
+      ],
+      "actions": [
+        "Admin",
+        "Read",
+        "Write",
+        "List",
+        "Tagging"
+      ]
+    },
+    {
+      "name": "anonymous",
+      "actions": [
+        "Read:authproxy-streaming-test",
+        "Write:authproxy-streaming-test"
+      ]
+    }
+  ]
+}

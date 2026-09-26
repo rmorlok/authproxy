@@ -76,8 +76,8 @@ appMetrics:
     bucket: authproxy-request-logs
     credentials:
       type: access_key
-      accessKeyId: minioadmin
-      secretAccessKey: minioadmin
+      accessKeyId: authproxy
+      secretAccessKey: authproxy-local-secret
     forcePathStyle: true
     prefix: "integration-test/"
 

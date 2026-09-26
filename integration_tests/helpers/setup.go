@@ -191,7 +191,7 @@ func applyListenerToService(cfg config.C, id sconfig.ServiceId, l net.Listener) 
 }
 
 // Setup creates a full integration test environment backed by real infrastructure
-// (Postgres, Redis, ClickHouse, MinIO) started via docker-compose.
+// (Postgres, Redis, ClickHouse, SeaweedFS) started via docker-compose.
 func Setup(t *testing.T, opts SetupOptions) *IntegrationTestEnv {
 	t.Helper()
 	gin.SetMode(gin.ReleaseMode)
@@ -216,6 +216,15 @@ func Setup(t *testing.T, opts SetupOptions) *IntegrationTestEnv {
 
 	cfg, err := config.LoadConfig(configPath)
 	require.NoError(t, err, "failed to load integration test config from %s", configPath)
+
+	// Allow an isolated S3 service alongside another checkout's test stack.
+	if endpoint := os.Getenv("AUTHPROXY_TEST_S3_ENDPOINT"); endpoint != "" {
+		if metrics := cfg.GetRoot().AppMetrics; metrics != nil && metrics.BlobStorage != nil {
+			if storage, ok := metrics.BlobStorage.InnerVal.(*sconfig.BlobStorageS3); ok {
+				storage.Endpoint = endpoint
+			}
+		}
+	}
 
 	// Create an isolated database for this test using pgtestdb.
 	// This ensures each test gets a fresh, clean database.
@@ -606,8 +615,7 @@ func (env *IntegrationTestEnv) DoProxyRawRequest(
 //
 // contentLength controls the inbound framing: pass -1 for chunked
 // transfer-encoding (Content-Length omitted), or the exact byte
-// count for a known-length PUT. Some upstreams (notably S3 /
-// MinIO's raw API) reject chunked uploads and require a
+// count for a known-length PUT. Some S3-compatible upstreams reject chunked uploads and require a
 // Content-Length header — pass the known size in that case.
 //
 // Requires StartHTTPServer=true: the in-process gin path uses

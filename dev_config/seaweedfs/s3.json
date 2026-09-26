@@ -1,0 +1,20 @@
+{
+  "identities": [
+    {
+      "name": "authproxy",
+      "credentials": [
+        {
+          "accessKey": "authproxy",
+          "secretKey": "authproxy-local-secret"
+        }
+      ],
+      "actions": [
+        "Admin",
+        "Read",
+        "Write",
+        "List",
+        "Tagging"
+      ]
+    }
+  ]
+}

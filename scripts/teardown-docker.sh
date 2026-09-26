@@ -22,7 +22,7 @@ echo "Stopping docker compose services and removing volumes..."
 docker compose --profile server --profile tools --profile observability down -v 2>/dev/null || true
 
 # Also clean up any manually-started containers from the manual setup instructions
-MANUAL_CONTAINERS="redis-server postgres-server clickhouse-server minio redisinsight asynqmon"
+MANUAL_CONTAINERS="redis-server postgres-server clickhouse-server minio seaweedfs redisinsight asynqmon"
 for container in $MANUAL_CONTAINERS; do
     if docker ps -a --format '{{.Names}}' | grep -q "^${container}$"; then
         echo "Removing manually-started container: ${container}"

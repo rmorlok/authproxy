@@ -28,11 +28,11 @@ manager installations.
 docker compose up -d
 ```
 
-This starts Postgres, Redis, MinIO, and ClickHouse without starting the
+This starts Postgres, Redis, SeaweedFS, and ClickHouse without starting the
 AuthProxy image. You can select only the services needed for an experiment:
 
 ```bash
-docker compose up -d postgres redis minio minio-init clickhouse
+docker compose up -d postgres redis seaweedfs clickhouse
 ```
 
 The checked-in `dev_config/default.yaml` already points at these ports and

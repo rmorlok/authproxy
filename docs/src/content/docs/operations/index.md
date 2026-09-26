@@ -27,7 +27,7 @@ flowchart LR
 - [Telemetry](/operations/telemetry/) — OpenTelemetry traces, metrics, logs, sampling,
   and label projection.
 - [Blob storage](/operations/blob-storage/) — inspect full request/response payloads in
-  MinIO or S3 when recording is enabled.
+  S3-compatible storage when recording is enabled.
 - [RedisInsight](/operations/redis-insight/) — inspect local Redis state during
   development.
 

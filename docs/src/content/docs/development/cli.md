@@ -224,10 +224,10 @@ curl -H "Authorization: Bearer $TOKEN" \
   http://localhost:8081/api/v1/connectors/openai/probes/list-models
 ```
 
-### Stream a chunked upload to MinIO through a connection
+### Stream an upload to S3-compatible storage through a connection
 
 ```bash
-ap proxy --connection cxn_minio --upstream-base http://minio:9000 &
+ap proxy --connection cxn_s3 --upstream-base http://localhost:9000 &
 curl -X PUT -T big.bin http://127.0.0.1:9999/bucket/big.bin
 ```
 

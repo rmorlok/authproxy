@@ -56,22 +56,12 @@ jobs:
       with:
         go-version-file: integration_tests/go.mod
 
-    - name: Start MinIO
+    - name: Start SeaweedFS
       run: |
-        docker run -d --name minio -p 9003:9000 \
-          -e MINIO_ROOT_USER=minioadmin \
-          -e MINIO_ROOT_PASSWORD=minioadmin \
-          quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z server /data
-        for i in $(seq 1 30); do
-          curl -sf http://localhost:9003/minio/health/live && break
-          sleep 1
-        done
-
-    - name: Create MinIO bucket
-      run: |
-        docker run --rm --network host \
-          -e MC_HOST_minio=http://minioadmin:minioadmin@localhost:9003 \
-          quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z mb --ignore-existing minio/authproxy-request-logs
+        docker compose -f integration_tests/docker-compose.yml up -d --wait --wait-timeout 120 seaweedfs || {
+          docker compose -f integration_tests/docker-compose.yml logs seaweedfs
+          exit 1
+        }
 
     - name: Start Vault (dev mode)
       run: |
