@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"testing"
 	"time"
@@ -613,54 +614,64 @@ func TestKey(t *testing.T) {
 }
 
 func TestDeleteUnusedKey(t *testing.T) {
-	for _, dependency := range []string{
-		"none",
-		"namespace",
-		"dek",
-		"deleted-dek",
-	} {
-		t.Run(dependency, func(t *testing.T) {
-			_, db, raw := MustApplyBlankTestDbConfigRaw(t, nil)
-			ctx := context.Background()
-
-			key := &Key{
-				Id:        apid.New(apid.PrefixKey),
-				Namespace: "root",
-				State:     KeyStateActive,
-			}
-			require.NoError(t, db.CreateKey(ctx, key))
-
-			var dekID apid.ID
-
-			switch dependency {
-			case "namespace":
-				require.NoError(t, db.CreateNamespace(ctx, &Namespace{
-					Path:  "root.dependency",
-					KeyId: &key.Id,
-				}))
-			case "dek", "deleted-dek":
-				dekID = createDependencyDEK(t, ctx, db, key.Id)
-				if dependency == "deleted-dek" {
-					_, err := raw.Exec(fmt.Sprintf("UPDATE data_encryption_keys SET deleted_at = CURRENT_TIMESTAMP WHERE id = '%s'", dekID))
-					require.NoError(t, err)
-				}
-			}
-
-			err := db.DeleteUnusedKey(ctx, key.Id)
-			if dependency == "none" {
-				require.NoError(t, err)
-				_, err = db.GetKey(ctx, key.Id)
-				require.ErrorIs(t, err, ErrNotFound)
-			} else {
-				require.ErrorIs(t, err, ErrProtected)
-				_, err = db.GetKey(ctx, key.Id)
-				require.NoError(t, err)
-				if dependency == "dek" {
-					_, err = db.GetDataEncryptionKey(ctx, dekID)
-					require.NoError(t, err)
-				}
-			}
-			require.ErrorIs(t, db.DeleteUnusedKey(ctx, GlobalKeyID), ErrProtected)
-		})
+	ctx := context.Background()
+	setup := func(t *testing.T) (DB, *sql.DB, *Key) {
+		t.Helper()
+		_, db, raw := MustApplyBlankTestDbConfigRaw(t, nil)
+		key := &Key{
+			Id:        apid.New(apid.PrefixKey),
+			Namespace: "root",
+			State:     KeyStateActive,
+		}
+		require.NoError(t, db.CreateKey(ctx, key))
+		return db, raw, key
 	}
+
+	t.Run("deletes a key without dependencies", func(t *testing.T) {
+		db, _, key := setup(t)
+
+		require.NoError(t, db.DeleteUnusedKey(ctx, key.Id))
+		_, err := db.GetKey(ctx, key.Id)
+		require.ErrorIs(t, err, ErrNotFound)
+	})
+
+	t.Run("protects a key referenced by a namespace", func(t *testing.T) {
+		db, _, key := setup(t)
+		require.NoError(t, db.CreateNamespace(ctx, &Namespace{
+			Path:  "root.dependency",
+			KeyId: &key.Id,
+		}))
+
+		require.ErrorIs(t, db.DeleteUnusedKey(ctx, key.Id), ErrProtected)
+		_, err := db.GetKey(ctx, key.Id)
+		require.NoError(t, err)
+	})
+
+	t.Run("protects a key and its data encryption key", func(t *testing.T) {
+		db, _, key := setup(t)
+		dekID := createDependencyDEK(t, ctx, db, key.Id)
+
+		require.ErrorIs(t, db.DeleteUnusedKey(ctx, key.Id), ErrProtected)
+		_, err := db.GetKey(ctx, key.Id)
+		require.NoError(t, err)
+		_, err = db.GetDataEncryptionKey(ctx, dekID)
+		require.NoError(t, err)
+	})
+
+	t.Run("protects a key referenced by a deleted data encryption key", func(t *testing.T) {
+		db, raw, key := setup(t)
+		dekID := createDependencyDEK(t, ctx, db, key.Id)
+		_, err := raw.Exec(fmt.Sprintf("UPDATE data_encryption_keys SET deleted_at = CURRENT_TIMESTAMP WHERE id = '%s'", dekID))
+		require.NoError(t, err)
+
+		require.ErrorIs(t, db.DeleteUnusedKey(ctx, key.Id), ErrProtected)
+		_, err = db.GetKey(ctx, key.Id)
+		require.NoError(t, err)
+	})
+
+	t.Run("protects the global key", func(t *testing.T) {
+		_, db, _ := MustApplyBlankTestDbConfigRaw(t, nil)
+
+		require.ErrorIs(t, db.DeleteUnusedKey(ctx, GlobalKeyID), ErrProtected)
+	})
 }
