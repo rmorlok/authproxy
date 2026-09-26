@@ -183,7 +183,7 @@ func (c *Client) resourceGenerations(
 		if cursors[cursor] {
 			return nil, nil, fmt.Errorf("resource generation list repeated a pagination cursor")
 		}
-		
+
 		cursors[cursor] = true
 		query = url.Values{"cursor": {cursor}}
 	}

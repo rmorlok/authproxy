@@ -3,7 +3,7 @@ package config
 import (
 	"time"
 
-	"github.com/rmorlok/authproxy/internal/apply"
+	"github.com/rmorlok/authproxy/internal/cli/apply"
 )
 
 // ResolveApplyClient constructs the authenticated resource client for the
