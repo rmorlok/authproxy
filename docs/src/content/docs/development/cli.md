@@ -524,13 +524,19 @@ history adoption) is needed. Apply never calls the force-state endpoint.
 
 ### Kustomize input
 
+`ap apply` supports [Kustomize](https://kustomize.io/) as a way to configure
+AuthProxy resources without templates. Kustomize is part of the k8s ecosystem
+and embedded within the `kubectl` cli. The AuthProxy cli `ap` also embeds
+kustomize to allow configuration of AuthProxy's k8s-style resources, but removes
+Kubernetes/Helm specific features from Kustomize.
+
 `ap apply -k ./overlays/production` builds the directory using the embedded
 Kustomize engine and then runs the same validation, selection, reconciliation,
-and redaction as `-f`. It needs no installed `kubectl` or `kustomize` binary.
-External plugins and Helm execution are disabled; normal Kustomize file-loading
-restrictions remain enabled. Remote bases may still require network access,
-including during client dry-run. `--request-timeout` governs cluster requests,
-not Kustomize builds.
+and redaction as `-f`. It does not need an installed `kubectl` or `kustomize`
+binary. External plugins and Helm execution are disabled; normal Kustomize 
+file-loading restrictions remain enabled. Remote bases may still require network
+access, including during client dry-run. `--request-timeout` governs cluster 
+requests, not Kustomize builds.
 
 For example, `kustomization.yaml` can contain:
 
@@ -574,7 +580,7 @@ status for failed applies or prune operations.
 
 History commands select existing resources using `-f` (including `-R`) or `-k`,
 with the same namespace fallback, selector, signing, endpoint, and request-timeout
-flags. They accept no positional resource names. They never create a resource or
+flags. They accept no positional resource names. They don't create a resource or
 modify its spec or ordinary metadata; set/edit replace only the sanitized
 last-applied annotation.
 
