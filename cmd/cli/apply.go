@@ -8,19 +8,19 @@ import (
 	"time"
 
 	"github.com/rmorlok/authproxy/cmd/cli/config"
+	apply2 "github.com/rmorlok/authproxy/internal/cli/apply"
 
-	"github.com/rmorlok/authproxy/internal/apply"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
 
 func cmdApply() *cobra.Command {
-	var options apply.Options
+	var options apply2.Options
 	var dryRun, output, validation string
 	var overwrite bool
 	var kustomize, expression string
 	var allowMissing, prune bool
-	var pruneOptions apply.PruneOptions
+	var pruneOptions apply2.PruneOptions
 	var timeout time.Duration
 	var resolver *config.Resolver
 	cmd := &cobra.Command{
@@ -46,7 +46,7 @@ func cmdApply() *cobra.Command {
 				validation = "ignore"
 			}
 
-			options.Validation = apply.Validation(validation)
+			options.Validation = apply2.Validation(validation)
 
 			var warningErr error
 			options.Warn = func(message string) {
@@ -94,13 +94,13 @@ func cmdApply() *cobra.Command {
 				batch, err := client.Prepare(
 					cmd.Context(),
 					docs,
-					apply.ReconcileOptions{Overwrite: overwrite},
+					apply2.ReconcileOptions{Overwrite: overwrite},
 				)
 				if err != nil {
 					return err
 				}
 
-				var prunePlan *apply.PrunePlan
+				var prunePlan *apply2.PrunePlan
 				if prune {
 					prunePlan, err = batch.PreparePrune(cmd.Context(), pruneOptions)
 					if err != nil {
@@ -191,7 +191,7 @@ func cmdApply() *cobra.Command {
 	cmd.Flags().StringVar(&validation, "validate", "strict", "Unknown-field validation: strict, warn, ignore")
 	cmd.Flags().StringVarP(&output, "output", "o", "", "Output: name, json, yaml, go-template[-file], jsonpath[-file], jsonpath-as-json")
 	cmd.Flags().BoolVar(&overwrite, "overwrite", true, "Allow overwriting managed-field drift (no effect during client dry-run)")
-	cmd.Flags().DurationVar(&timeout, "request-timeout", apply.DefaultRequestTimeout, "Timeout per cluster request; 0 disables the deadline")
+	cmd.Flags().DurationVar(&timeout, "request-timeout", apply2.DefaultRequestTimeout, "Timeout per cluster request; 0 disables the deadline")
 	cmd.Flags().StringVarP(&kustomize, "kustomize", "k", "", "Build a Kustomize directory (exclusive with -f and -R)")
 	cmd.MarkFlagsMutuallyExclusive("kustomize", "filename")
 	cmd.MarkFlagsMutuallyExclusive("kustomize", "recursive")
@@ -210,7 +210,7 @@ func cmdApply() *cobra.Command {
 // Structured execution output contains per-resource results, including failures
 // and skips. It is emitted after execution; an output error cannot roll back
 // successful writes and must never trigger a mutation retry.
-func writeApplyResults(cmd *cobra.Command, format string, results []apply.Result) error {
+func writeApplyResults(cmd *cobra.Command, format string, results []apply2.Result) error {
 	switch format {
 	case "json":
 		encoder := json.NewEncoder(cmd.OutOrStdout())
@@ -236,14 +236,14 @@ func writeApplyResults(cmd *cobra.Command, format string, results []apply.Result
 	default:
 		for _, result := range results {
 			if result.Error != "" {
-				if _, err := fmt.Fprintf(cmd.ErrOrStderr(), "%s %s: %s\n", apply.ResultName(result), result.Status, result.Error); err != nil {
+				if _, err := fmt.Fprintf(cmd.ErrOrStderr(), "%s %s: %s\n", apply2.ResultName(result), result.Status, result.Error); err != nil {
 					return err
 				}
 			}
 			if format == "name" && (result.Status == "failed" || result.Status == "skipped") {
 				continue
 			}
-			line := apply.ResultName(result)
+			line := apply2.ResultName(result)
 			if format != "name" {
 				line += " " + result.Status
 			}
@@ -255,9 +255,9 @@ func writeApplyResults(cmd *cobra.Command, format string, results []apply.Result
 	}
 }
 
-func loadApplyInput(cmd *cobra.Command, options apply.Options, directory string) ([]apply.Document, error) {
+func loadApplyInput(cmd *cobra.Command, options apply2.Options, directory string) ([]apply2.Document, error) {
 	if directory != "" {
-		return apply.LoadKustomize(cmd.Context(), directory, options)
+		return apply2.LoadKustomize(cmd.Context(), directory, options)
 	}
-	return apply.Load(cmd.Context(), options)
+	return apply2.Load(cmd.Context(), options)
 }

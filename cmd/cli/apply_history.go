@@ -10,13 +10,13 @@ import (
 	"time"
 
 	"github.com/rmorlok/authproxy/cmd/cli/config"
-	"github.com/rmorlok/authproxy/internal/apply"
+	apply2 "github.com/rmorlok/authproxy/internal/cli/apply"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
 
 func cmdApplyHistory(action string) *cobra.Command {
-	var options apply.Options
+	var options apply2.Options
 	var directory, output string
 	var create bool
 	var timeout time.Duration
@@ -27,7 +27,7 @@ func cmdApplyHistory(action string) *cobra.Command {
 			return fmt.Errorf("history output must be yaml or json")
 		}
 		options.Stdin = cmd.InOrStdin()
-		options.Validation = apply.ValidationStrict
+		options.Validation = apply2.ValidationStrict
 		docs, err := loadApplyInput(cmd, options, directory)
 		if err != nil {
 			return err
@@ -117,7 +117,7 @@ func cmdApplyHistory(action string) *cobra.Command {
 		if bytes.Equal(edited, data.Bytes()) {
 			return nil
 		}
-		editedDocs, err := apply.Load(cmd.Context(), apply.Options{Filenames: []string{"-"}, Stdin: bytes.NewReader(edited), Validation: apply.ValidationStrict})
+		editedDocs, err := apply2.Load(cmd.Context(), apply2.Options{Filenames: []string{"-"}, Stdin: bytes.NewReader(edited), Validation: apply2.ValidationStrict})
 		if err != nil {
 			return err
 		}
@@ -135,7 +135,7 @@ func cmdApplyHistory(action string) *cobra.Command {
 	cmd.Flags().StringVarP(&options.Namespace, "namespace", "n", "", "Default namespace when omitted")
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Select manifest labels")
 	cmd.Flags().StringVarP(&output, "output", "o", "yaml", "Output: yaml or json")
-	cmd.Flags().DurationVar(&timeout, "request-timeout", apply.DefaultRequestTimeout, "Timeout per cluster request")
+	cmd.Flags().DurationVar(&timeout, "request-timeout", apply2.DefaultRequestTimeout, "Timeout per cluster request")
 	if action == "set-last-applied" {
 		cmd.Flags().BoolVar(&create, "create-annotation", false, "Initialize history on previously unmanaged resources")
 	}

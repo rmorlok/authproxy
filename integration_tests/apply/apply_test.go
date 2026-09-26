@@ -22,7 +22,7 @@ import (
 
 	"github.com/rmorlok/authproxy/integration_tests/helpers"
 	"github.com/rmorlok/authproxy/internal/apid"
-	"github.com/rmorlok/authproxy/internal/apply"
+	"github.com/rmorlok/authproxy/internal/cli/apply"
 	"github.com/stretchr/testify/require"
 )
 
