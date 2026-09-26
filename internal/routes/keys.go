@@ -649,6 +649,26 @@ func (r *KeysRoutes) update(gctx *gin.Context) {
 // @Security		BearerAuth
 // @Router			/keys/{id} [delete]
 func (r *KeysRoutes) delete(gctx *gin.Context) {
+	r.deleteWithPolicy(gctx, r.core.DeleteKey)
+}
+
+// deleteUnused conservatively protects current references and encryption history.
+// @Summary Delete an unused key
+// @Description Refuse deletion if the key has namespace references or any data-encryption-key history.
+// @Tags keys
+// @Param id path string true "Key ID"
+// @Success 204 "No Content"
+// @Failure 409 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /keys/{id}/unused [delete]
+func (r *KeysRoutes) deleteUnused(gctx *gin.Context) {
+	r.deleteWithPolicy(gctx, r.core.DeleteUnusedKey)
+}
+
+func (r *KeysRoutes) deleteWithPolicy(
+	gctx *gin.Context,
+	deleteKey func(context.Context, apid.ID) error,
+) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
@@ -693,10 +713,16 @@ func (r *KeysRoutes) delete(gctx *gin.Context) {
 		return
 	}
 
-	err = r.core.DeleteKey(ctx, id)
+	err = deleteKey(ctx, id)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
 			gctx.Status(http.StatusNoContent)
+			return
+		}
+
+		if errors.Is(err, database.ErrProtected) {
+			apgin.WriteError(gctx, nil, httperr.Conflict("key is still referenced or has encryption history"))
+			val.MarkErrorReturn()
 			return
 		}
 
@@ -713,7 +739,9 @@ func (r *KeysRoutes) delete(gctx *gin.Context) {
 }
 
 func (r *KeysRoutes) Register(g gin.IRouter) {
-	idExtractor := func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }
+	idExtractor := func(ek interface{}) string {
+		return string(ek.(coreIface.Key).GetId())
+	}
 
 	g.GET(
 		"/keys",
@@ -752,6 +780,15 @@ func (r *KeysRoutes) Register(g gin.IRouter) {
 			ForVerb("update").
 			Build(),
 		r.update,
+	)
+	g.DELETE("/keys/:id/unused",
+		r.authService.NewRequiredBuilder().
+			ForResource("keys").
+			ForIdField("id").
+			ForIdExtractor(idExtractor).
+			ForVerb("delete").
+			Build(),
+		r.deleteUnused,
 	)
 	g.DELETE(
 		"/keys/:id",

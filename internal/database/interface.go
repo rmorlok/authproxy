@@ -228,6 +228,8 @@ type DB interface {
 	UpdateKeyName(ctx context.Context, id apid.ID, name scommon.ResourceName) (*Key, error)
 	UpdateKey(ctx context.Context, id apid.ID, updates map[string]interface{}) (*Key, error)
 	DeleteKey(ctx context.Context, id apid.ID) error
+	// DeleteUnusedKey refuses keys with namespace references or any DEK history.
+	DeleteUnusedKey(ctx context.Context, id apid.ID) error
 	SetKeyState(ctx context.Context, id apid.ID, state KeyState) error
 	UpdateKeyLabels(ctx context.Context, id apid.ID, labels map[string]string) (*Key, error)
 	PutKeyLabels(ctx context.Context, id apid.ID, labels map[string]string) (*Key, error)
