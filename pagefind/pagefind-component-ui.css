@@ -1479,31 +1479,4 @@ pagefind-modal-trigger {
 
 /* Hide keyboard hints on touch-only devices (no hover capability) */
 @media (hover: none) {
-    :is(*, #\#):is(*, #\#):is(*, #\#) pagefind-keyboard-hints,
-    :is(*, #\#):is(*, #\#):is(*, #\#) .pf-keyboard-hints,
-    :is(*, #\#):is(*, #\#):is(*, #\#) .pf-searchbox-footer,
-    :is(*, #\#):is(*, #\#):is(*, #\#) .pf-modal-footer-hint {
-        display: none;
-    }
-}
-
-@media (max-width: 640px) {
-    :is(*, #\#):is(*, #\#):is(*, #\#) .pf-dropdown-menu {
-        min-width: unset;
-        width: max(180px, calc(100vw - 32px));
-        max-width: calc(100vw - 32px);
-        inset-inline-start: unset;
-        left: 50%;
-        transform: translateX(-50%);
-        max-height: min(var(--pf-dropdown-max-height), 50vh);
-    }
-
-    :is(*, #\#):is(*, #\#):is(*, #\#) .pf-searchbox-dropdown {
-        max-height: min(var(--pf-searchbox-dropdown-max-height), 60vh);
-    }
-
-    :is(*, #\#):is(*, #\#):is(*, #\#) .pf-filter-pane {
-        padding: 12px;
-        gap: 16px;
-    }
-}
+    :is(*, 
