@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"testing"
 	"time"
@@ -609,5 +610,68 @@ func TestKey(t *testing.T) {
 		}
 		err = db.CreateKey(ctx, ek)
 		require.Error(t, err)
+	})
+}
+
+func TestDeleteUnusedKey(t *testing.T) {
+	ctx := context.Background()
+	setup := func(t *testing.T) (DB, *sql.DB, *Key) {
+		t.Helper()
+		_, db, raw := MustApplyBlankTestDbConfigRaw(t, nil)
+		key := &Key{
+			Id:        apid.New(apid.PrefixKey),
+			Namespace: "root",
+			State:     KeyStateActive,
+		}
+		require.NoError(t, db.CreateKey(ctx, key))
+		return db, raw, key
+	}
+
+	t.Run("deletes a key without dependencies", func(t *testing.T) {
+		db, _, key := setup(t)
+
+		require.NoError(t, db.DeleteUnusedKey(ctx, key.Id))
+		_, err := db.GetKey(ctx, key.Id)
+		require.ErrorIs(t, err, ErrNotFound)
+	})
+
+	t.Run("protects a key referenced by a namespace", func(t *testing.T) {
+		db, _, key := setup(t)
+		require.NoError(t, db.CreateNamespace(ctx, &Namespace{
+			Path:  "root.dependency",
+			KeyId: &key.Id,
+		}))
+
+		require.ErrorIs(t, db.DeleteUnusedKey(ctx, key.Id), ErrProtected)
+		_, err := db.GetKey(ctx, key.Id)
+		require.NoError(t, err)
+	})
+
+	t.Run("protects a key and its data encryption key", func(t *testing.T) {
+		db, _, key := setup(t)
+		dekID := createDependencyDEK(t, ctx, db, key.Id)
+
+		require.ErrorIs(t, db.DeleteUnusedKey(ctx, key.Id), ErrProtected)
+		_, err := db.GetKey(ctx, key.Id)
+		require.NoError(t, err)
+		_, err = db.GetDataEncryptionKey(ctx, dekID)
+		require.NoError(t, err)
+	})
+
+	t.Run("protects a key referenced by a deleted data encryption key", func(t *testing.T) {
+		db, raw, key := setup(t)
+		dekID := createDependencyDEK(t, ctx, db, key.Id)
+		_, err := raw.Exec(fmt.Sprintf("UPDATE data_encryption_keys SET deleted_at = CURRENT_TIMESTAMP WHERE id = '%s'", dekID))
+		require.NoError(t, err)
+
+		require.ErrorIs(t, db.DeleteUnusedKey(ctx, key.Id), ErrProtected)
+		_, err = db.GetKey(ctx, key.Id)
+		require.NoError(t, err)
+	})
+
+	t.Run("protects the global key", func(t *testing.T) {
+		_, db, _ := MustApplyBlankTestDbConfigRaw(t, nil)
+
+		require.ErrorIs(t, db.DeleteUnusedKey(ctx, GlobalKeyID), ErrProtected)
 	})
 }

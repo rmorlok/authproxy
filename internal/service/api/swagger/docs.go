@@ -2947,6 +2947,40 @@ const docTemplateApi = `{
                 }
             }
         },
+        "/keys/{id}/unused": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Refuse deletion if the key has namespace references or any data-encryption-key history.",
+                "tags": [
+                    "keys"
+                ],
+                "summary": "Delete an unused key",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Key ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/metrics/query": {
             "post": {
                 "security": [

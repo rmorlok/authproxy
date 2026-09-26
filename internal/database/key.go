@@ -1046,3 +1046,38 @@ func (s *service) EnumerateKeysInDependencyOrder(
 
 	return orphans, nil
 }
+
+// DeleteUnusedKey is the conservative deletion policy used by declarative
+// prune. Even retired or deleted DEKs count as history: the absence of a current
+// namespace reference does not prove that old ciphertext no longer needs a key.
+func (s *service) DeleteUnusedKey(ctx context.Context, id apid.ID) error {
+	if id == GlobalKeyID {
+		return ErrProtected
+	}
+	now := apctx.GetClock(ctx).Now()
+	result, err := s.sq.Update(KeysTable).
+		Set("updated_at", now).
+		Set("deleted_at", now).
+		Where(sq.Eq{"id": id, "deleted_at": nil}).
+		Where(sq.Expr("NOT EXISTS (SELECT 1 FROM namespaces WHERE key_id = ?)", id)).
+		Where(sq.Expr("NOT EXISTS (SELECT 1 FROM data_encryption_keys WHERE key_id = ?)", id)).
+		RunWith(s.db).ExecContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	count, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if count == 1 {
+		return nil
+	}
+
+	if _, err := s.GetKey(ctx, id); err != nil {
+		return err
+	}
+
+	return fmt.Errorf("key has namespace references or encryption history: %w", ErrProtected)
+}
