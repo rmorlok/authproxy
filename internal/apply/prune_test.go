@@ -18,67 +18,137 @@ func pruneServer(t *testing.T) (*batchServer, *Client) {
 	s, _ := newBatchServer(t)
 	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
 		path := strings.TrimPrefix(r.URL.Path, "/api/v1/")
+
 		if r.Method == "DELETE" {
 			s.writes = append(s.writes, "DELETE "+path)
 			delete(s.objects, path)
 			w.WriteHeader(204)
 			return
 		}
-		if r.Method == "GET" && !strings.Contains(path, "/") && r.URL.Query().Get("name") == "" {
+
+		if r.Method == "GET" &&
+			!strings.Contains(path, "/") &&
+			r.URL.Query().Get("name") == "" {
 			var keys []string
+
 			for key := range s.objects {
 				if strings.HasPrefix(key, path+"/") {
 					keys = append(keys, key)
 				}
 			}
+
 			sort.Strings(keys)
+
 			items := []string{}
 			for _, key := range keys {
 				data, err := json.Marshal(s.objects[key])
 				require.NoError(t, err)
 				items = append(items, string(data))
 			}
-			kind := map[string]string{"actors": "Actor", "keys": "Key", "rate-limits": "RateLimit", "namespaces": "Namespace"}[path]
+
+			kind := map[string]string{
+				"actors":      "Actor",
+				"keys":        "Key",
+				"rate-limits": "RateLimit",
+				"namespaces":  "Namespace",
+			}[path]
+
 			fmt.Fprint(w, listJSON(kind, items, ""))
+
 			return
 		}
+
 		s.handle(w, r)
 	}, false)
 	return s, c
 }
+
+// seedApply applies one or more documents to the server
 func seedApply(t *testing.T, c *Client, docs ...Document) []Result {
 	t.Helper()
-	b, err := c.Prepare(context.Background(), docs, ReconcileOptions{Overwrite: true})
+	b, err := c.Prepare(
+		context.Background(),
+		docs,
+		ReconcileOptions{Overwrite: true},
+	)
 	require.NoError(t, err)
+
 	results, err := b.Execute(context.Background())
 	require.NoError(t, err)
+
 	return results
 }
+
 func pruneOptions() PruneOptions {
-	return PruneOptions{Namespace: "root", All: true, Allowlist: []string{"Actor"}, Wait: true, Timeout: time.Second}
+	return PruneOptions{
+		Namespace: "root",
+		All:       true,
+		Allowlist: []string{"Actor"},
+		Wait:      true,
+		Timeout:   time.Second,
+	}
 }
 
 func TestPruneExactScopeAndManagedCandidates(t *testing.T) {
 	s, c := pruneServer(t)
 	ctx := context.Background()
-	keep := batchDoc(t, "Actor", "keep", "root", `{"externalId":"keep"}`)
-	obsolete := batchDoc(t, "Actor", "obsolete", "root", `{"externalId":"obsolete"}`)
+	keep := batchDoc(
+		t,
+		"Actor",
+		"keep",
+		"root",
+		`{"externalId":"keep"}`,
+	)
+	obsolete := batchDoc(
+		t,
+		"Actor",
+		"obsolete",
+		"root",
+		`{"externalId":"obsolete"}`,
+	)
+
+	// Apply both the one we will keep and the one we will prune
 	seeded := seedApply(t, c, keep, obsolete)
-	unmanaged, err := c.Create(ctx, batchDoc(t, "Actor", "unmanaged", "root", `{"externalId":"unmanaged"}`))
+
+	// Now create a document that's not managed by an apply
+	unmanaged, err := c.Create(
+		ctx,
+		batchDoc(
+			t,
+			"Actor",
+			"unmanaged",
+			"root",
+			`{"externalId":"unmanaged"}`,
+		),
+	)
 	require.NoError(t, err)
-	child := batchDoc(t, "Actor", "descendant", "root.child", `{"externalId":"descendant"}`)
+
+	// Create another document not managed by apply in child namespace
+	child := batchDoc(
+		t,
+		"Actor",
+		"descendant",
+		"root.child",
+		`{"externalId":"descendant"}`,
+	)
 	live, err := c.Create(ctx, child)
 	require.NoError(t, err)
+
 	h, err := newHistory(child)
 	require.NoError(t, err)
+
 	require.NoError(t, attachHistory(s.objects["actors/"+live.Metadata.ID], h))
+
 	b, err := c.Prepare(ctx, []Document{keep}, ReconcileOptions{Overwrite: true})
 	require.NoError(t, err)
+
 	p, err := b.PreparePrune(ctx, pruneOptions())
 	require.NoError(t, err)
 	require.Len(t, p.candidates, 1)
+
 	_, err = b.Execute(ctx)
 	require.NoError(t, err)
+
 	results, err := p.Execute(ctx)
 	require.NoError(t, err)
 	require.Len(t, results, 1)
@@ -87,6 +157,8 @@ func TestPruneExactScopeAndManagedCandidates(t *testing.T) {
 	require.Contains(t, s.objects, "actors/"+seeded[0].Identity)
 	require.Contains(t, s.objects, "actors/"+unmanaged.Metadata.ID)
 	require.Contains(t, s.objects, "actors/"+live.Metadata.ID)
+
+	// You can't double apply the prune
 	_, err = p.Execute(ctx)
 	require.ErrorContains(t, err, "already executed")
 }
