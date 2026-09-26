@@ -648,7 +648,9 @@ func (r *KeysRoutes) update(gctx *gin.Context) {
 // @Failure		500		{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/keys/{id} [delete]
-func (r *KeysRoutes) delete(gctx *gin.Context) { r.deleteWithPolicy(gctx, r.core.DeleteKey) }
+func (r *KeysRoutes) delete(gctx *gin.Context) {
+	r.deleteWithPolicy(gctx, r.core.DeleteKey)
+}
 
 // deleteUnused conservatively protects current references and encryption history.
 // @Summary Delete an unused key
@@ -663,7 +665,10 @@ func (r *KeysRoutes) deleteUnused(gctx *gin.Context) {
 	r.deleteWithPolicy(gctx, r.core.DeleteUnusedKey)
 }
 
-func (r *KeysRoutes) deleteWithPolicy(gctx *gin.Context, deleteKey func(context.Context, apid.ID) error) {
+func (r *KeysRoutes) deleteWithPolicy(
+	gctx *gin.Context,
+	deleteKey func(context.Context, apid.ID) error,
+) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
@@ -720,6 +725,7 @@ func (r *KeysRoutes) deleteWithPolicy(gctx *gin.Context, deleteKey func(context.
 			val.MarkErrorReturn()
 			return
 		}
+
 		apgin.WriteError(
 			gctx,
 			nil, // logger
@@ -733,7 +739,9 @@ func (r *KeysRoutes) deleteWithPolicy(gctx *gin.Context, deleteKey func(context.
 }
 
 func (r *KeysRoutes) Register(g gin.IRouter) {
-	idExtractor := func(ek interface{}) string { return string(ek.(coreIface.Key).GetId()) }
+	idExtractor := func(ek interface{}) string {
+		return string(ek.(coreIface.Key).GetId())
+	}
 
 	g.GET(
 		"/keys",
@@ -774,7 +782,12 @@ func (r *KeysRoutes) Register(g gin.IRouter) {
 		r.update,
 	)
 	g.DELETE("/keys/:id/unused",
-		r.authService.NewRequiredBuilder().ForResource("keys").ForIdField("id").ForIdExtractor(idExtractor).ForVerb("delete").Build(),
+		r.authService.NewRequiredBuilder().
+			ForResource("keys").
+			ForIdField("id").
+			ForIdExtractor(idExtractor).
+			ForVerb("delete").
+			Build(),
 		r.deleteUnused,
 	)
 	g.DELETE(
