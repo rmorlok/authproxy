@@ -255,6 +255,8 @@ func TestPruneNeverDeletesAfterFailedApplyOrCandidateChange(t *testing.T) {
 
 func TestPruneRejectsIncompleteInventoryAndReferences(t *testing.T) {
 	t.Run("inventory", func(t *testing.T) {
+		// Return a page that claims more items remain but supplies no continuation
+		// cursor, simulating an inventory that cannot be read completely.
 		c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprint(w, `{
   "apiVersion":"authproxy.net/v1alpha1",
@@ -263,6 +265,8 @@ func TestPruneRejectsIncompleteInventoryAndReferences(t *testing.T) {
   "items":[]
 }`)
 		}, false)
+		// Reject the incomplete inventory instead of treating it as an empty
+		// resource set that could lead to an unsafe prune decision.
 		_, err := c.listAll(context.Background(), "Actor", "root")
 		require.ErrorContains(t, err, "incomplete")
 	})
@@ -271,6 +275,7 @@ func TestPruneRejectsIncompleteInventoryAndReferences(t *testing.T) {
 		s, c := pruneServer(t)
 		ctx := context.Background()
 
+		// Apply a key so it has the history required to be eligible for pruning.
 		key := batchDoc(
 			t,
 			"Key",
@@ -280,6 +285,8 @@ func TestPruneRejectsIncompleteInventoryAndReferences(t *testing.T) {
 		)
 		seeded := seedApply(t, c, key)
 
+		// Make root reference the key for encryption. This dependency must block
+		// deletion even when the key is omitted from the next apply.
 		s.objects["namespaces/root"]["spec"] = map[string]any{
 			"encryptionKeyRef": map[string]any{
 				"apiVersion": "authproxy.net/v1alpha1",
@@ -288,6 +295,8 @@ func TestPruneRejectsIncompleteInventoryAndReferences(t *testing.T) {
 			},
 		}
 
+		// Prepare a nonempty desired set that omits the key, making it obsolete
+		// from the perspective of apply while its namespace reference remains.
 		keep := batchDoc(
 			t,
 			"Actor",
@@ -298,15 +307,20 @@ func TestPruneRejectsIncompleteInventoryAndReferences(t *testing.T) {
 		b, err := c.Prepare(ctx, []Document{keep}, ReconcileOptions{Overwrite: true})
 		require.NoError(t, err)
 
+		// Limit pruning to keys and capture the deletion candidates before apply.
 		options := pruneOptions()
 		options.Allowlist = []string{"Key"}
 
 		p, err := b.PreparePrune(ctx, options)
 		require.NoError(t, err)
 
+		// Satisfy the successful-apply prerequisite so the reference check is
+		// what prevents pruning.
 		_, err = b.Execute(ctx)
 		require.NoError(t, err)
 
+		// Verify that the namespace dependency rejects pruning and preserves
+		// the key in the server.
 		_, err = p.Execute(ctx)
 		require.ErrorContains(t, err, "referenced")
 		require.Contains(t, s.objects, "keys/"+seeded[0].Identity)
@@ -314,6 +328,8 @@ func TestPruneRejectsIncompleteInventoryAndReferences(t *testing.T) {
 }
 
 func TestPruneWaitTimeoutAndMissingGuardedEndpoint(t *testing.T) {
+	// Keep returning the actor as present, simulating a deletion that never
+	// becomes visible to the polling client.
 	id := apid.New(apid.PrefixActor).String()
 	c := testClient(
 		t,
@@ -323,6 +339,8 @@ func TestPruneWaitTimeoutAndMissingGuardedEndpoint(t *testing.T) {
 		false,
 	)
 
+	// Use a short deadline to verify that waiting for deletion terminates
+	// with a timeout instead of polling indefinitely.
 	p := &PrunePlan{
 		client:  c,
 		options: PruneOptions{Timeout: time.Millisecond},
@@ -333,6 +351,8 @@ func TestPruneWaitTimeoutAndMissingGuardedEndpoint(t *testing.T) {
 		context.DeadlineExceeded,
 	)
 
+	// Model an older server that still serves the key but lacks the guarded
+	// deletion endpoint. Record DELETE paths to detect an unsafe fallback.
 	keyID := apid.New(apid.PrefixKey).String()
 
 	deletes := []string{}
@@ -345,6 +365,8 @@ func TestPruneWaitTimeoutAndMissingGuardedEndpoint(t *testing.T) {
 				return
 			}
 
+			// No namespace references should block the request before it reaches
+			// the guarded deletion endpoint.
 			if r.URL.Path == "/api/v1/namespaces" {
 				fmt.Fprint(w, listJSON("Namespace", nil, ""))
 				return
@@ -354,9 +376,12 @@ func TestPruneWaitTimeoutAndMissingGuardedEndpoint(t *testing.T) {
 		false, // admin
 	)
 
+	// Capture the live key as the candidate snapshot so freshness checks pass.
 	live, err := c.get(context.Background(), "Key", "keys/"+keyID)
 	require.NoError(t, err)
 
+	// Construct a plan with its apply prerequisite already satisfied to
+	// isolate handling of an unavailable guarded deletion endpoint.
 	p = &PrunePlan{
 		client:     c,
 		options:    pruneOptions(),
@@ -365,6 +390,8 @@ func TestPruneWaitTimeoutAndMissingGuardedEndpoint(t *testing.T) {
 	}
 	p.batch.completedSuccessfully.Store(true)
 
+	// A missing guarded endpoint must fail. Only /unused may be requested;
+	// ordinary key deletion could destroy keys that still protect stored data.
 	_, err = p.Execute(context.Background())
 	require.Error(t, err)
 	require.Equal(
