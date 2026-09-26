@@ -256,26 +256,57 @@ func TestPruneNeverDeletesAfterFailedApplyOrCandidateChange(t *testing.T) {
 func TestPruneRejectsIncompleteInventoryAndReferences(t *testing.T) {
 	t.Run("inventory", func(t *testing.T) {
 		c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
-			fmt.Fprint(w, `{"apiVersion":"authproxy.net/v1alpha1","kind":"ActorList","metadata":{"remainingItemCount":1},"items":[]}`)
+			fmt.Fprint(w, `{
+  "apiVersion":"authproxy.net/v1alpha1",
+  "kind":"ActorList",
+  "metadata":{"remainingItemCount":1},
+  "items":[]
+}`)
 		}, false)
 		_, err := c.listAll(context.Background(), "Actor", "root")
 		require.ErrorContains(t, err, "incomplete")
 	})
+
 	t.Run("reference", func(t *testing.T) {
 		s, c := pruneServer(t)
 		ctx := context.Background()
-		key := batchDoc(t, "Key", "oldkey", "root", `{"keyData":{"numBytes":32}}`)
+
+		key := batchDoc(
+			t,
+			"Key",
+			"oldkey",
+			"root",
+			`{"keyData":{"numBytes":32}}`,
+		)
 		seeded := seedApply(t, c, key)
-		s.objects["namespaces/root"]["spec"] = map[string]any{"encryptionKeyRef": map[string]any{"apiVersion": "authproxy.net/v1alpha1", "kind": "Key", "id": seeded[0].Identity}}
-		keep := batchDoc(t, "Actor", "keep", "root", `{"externalId":"keep"}`)
+
+		s.objects["namespaces/root"]["spec"] = map[string]any{
+			"encryptionKeyRef": map[string]any{
+				"apiVersion": "authproxy.net/v1alpha1",
+				"kind":       "Key",
+				"id":         seeded[0].Identity,
+			},
+		}
+
+		keep := batchDoc(
+			t,
+			"Actor",
+			"keep",
+			"root",
+			`{"externalId":"keep"}`,
+		)
 		b, err := c.Prepare(ctx, []Document{keep}, ReconcileOptions{Overwrite: true})
 		require.NoError(t, err)
+
 		options := pruneOptions()
 		options.Allowlist = []string{"Key"}
+
 		p, err := b.PreparePrune(ctx, options)
 		require.NoError(t, err)
+
 		_, err = b.Execute(ctx)
 		require.NoError(t, err)
+
 		_, err = p.Execute(ctx)
 		require.ErrorContains(t, err, "referenced")
 		require.Contains(t, s.objects, "keys/"+seeded[0].Identity)
@@ -284,28 +315,62 @@ func TestPruneRejectsIncompleteInventoryAndReferences(t *testing.T) {
 
 func TestPruneWaitTimeoutAndMissingGuardedEndpoint(t *testing.T) {
 	id := apid.New(apid.PrefixActor).String()
-	c := testClient(t, func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, actorJSON(id, "old", "root")) }, false)
-	p := &PrunePlan{client: c, options: PruneOptions{Timeout: time.Millisecond}}
-	require.ErrorIs(t, p.waitDeleted(context.Background(), "Actor", "actors/"+id), context.DeadlineExceeded)
+	c := testClient(
+		t,
+		func(w http.ResponseWriter, r *http.Request) {
+			fmt.Fprint(w, actorJSON(id, "old", "root"))
+		},
+		false,
+	)
+
+	p := &PrunePlan{
+		client:  c,
+		options: PruneOptions{Timeout: time.Millisecond},
+	}
+	require.ErrorIs(
+		t,
+		p.waitDeleted(context.Background(), "Actor", "actors/"+id),
+		context.DeadlineExceeded,
+	)
+
 	keyID := apid.New(apid.PrefixKey).String()
+
 	deletes := []string{}
-	c = testClient(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "DELETE" {
-			deletes = append(deletes, r.URL.Path)
-			w.WriteHeader(404)
-			return
-		}
-		if r.URL.Path == "/api/v1/namespaces" {
-			fmt.Fprint(w, listJSON("Namespace", nil, ""))
-			return
-		}
-		fmt.Fprint(w, liveJSON("Key", keyID, "old", "root", `{}`))
-	}, false)
+	c = testClient(
+		t,
+		func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == "DELETE" {
+				deletes = append(deletes, r.URL.Path)
+				w.WriteHeader(404)
+				return
+			}
+
+			if r.URL.Path == "/api/v1/namespaces" {
+				fmt.Fprint(w, listJSON("Namespace", nil, ""))
+				return
+			}
+			fmt.Fprint(w, liveJSON("Key", keyID, "old", "root", `{}`))
+		},
+		false, // admin
+	)
+
 	live, err := c.get(context.Background(), "Key", "keys/"+keyID)
 	require.NoError(t, err)
-	p = &PrunePlan{client: c, options: pruneOptions(), candidates: []*LiveResource{live}, batch: &Batch{}}
+
+	p = &PrunePlan{
+		client:     c,
+		options:    pruneOptions(),
+		candidates: []*LiveResource{live},
+		batch:      &Batch{},
+	}
 	p.batch.completedSuccessfully.Store(true)
+
 	_, err = p.Execute(context.Background())
 	require.Error(t, err)
-	require.Equal(t, []string{"/api/v1/keys/" + keyID + "/unused"}, deletes, "older servers must never fall back to destructive ordinary Key deletion")
+	require.Equal(
+		t,
+		[]string{"/api/v1/keys/" + keyID + "/unused"},
+		deletes,
+		"older servers must never fall back to destructive ordinary Key deletion",
+	)
 }
