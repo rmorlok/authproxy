@@ -107,10 +107,12 @@ func TestPruneExactScopeAndManagedCandidates(t *testing.T) {
 		`{"externalId":"obsolete"}`,
 	)
 
-	// Apply both the one we will keep and the one we will prune
+	// Seed two apply-managed actors in root. The next apply will keep only one,
+	// leaving the other eligible for pruning.
 	seeded := seedApply(t, c, keep, obsolete)
 
-	// Now create a document that's not managed by an apply
+	// Create an actor without apply history in the same namespace. Pruning
+	// must preserve resources that were never managed by apply.
 	unmanaged, err := c.Create(
 		ctx,
 		batchDoc(
@@ -123,7 +125,8 @@ func TestPruneExactScopeAndManagedCandidates(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	// Create another document not managed by apply in child namespace
+	// Create an actor in a descendant namespace to exercise exact namespace
+	// scoping, even when the inventory includes descendants.
 	child := batchDoc(
 		t,
 		"Actor",
@@ -134,21 +137,33 @@ func TestPruneExactScopeAndManagedCandidates(t *testing.T) {
 	live, err := c.Create(ctx, child)
 	require.NoError(t, err)
 
+	// Build last-applied history for the child actor so it can be marked as
+	// apply-managed without running another apply batch.
 	h, err := newHistory(child)
 	require.NoError(t, err)
 
+	// Attach that history to the stored actor. It must now survive because it
+	// is outside root, not because it lacks apply history.
 	require.NoError(t, attachHistory(s.objects["actors/"+live.Metadata.ID], h))
 
+	// Prepare the desired set containing only keep, intentionally omitting
+	// obsolete so the previously applied actor becomes a prune candidate.
 	b, err := c.Prepare(ctx, []Document{keep}, ReconcileOptions{Overwrite: true})
 	require.NoError(t, err)
 
+	// Inventory candidates before applying any writes. Only obsolete should
+	// qualify: keep is desired, unmanaged has no history, and child is out of scope.
 	p, err := b.PreparePrune(ctx, pruneOptions())
 	require.NoError(t, err)
 	require.Len(t, p.candidates, 1)
 
+	// Complete the apply successfully before pruning; deletion is gated on
+	// the associated batch succeeding.
 	_, err = b.Execute(ctx)
 	require.NoError(t, err)
 
+	// Execute the prepared prune plan and verify that only obsolete was
+	// deleted, preserving the desired, unmanaged, and child-namespace actors.
 	results, err := p.Execute(ctx)
 	require.NoError(t, err)
 	require.Len(t, results, 1)
@@ -158,7 +173,7 @@ func TestPruneExactScopeAndManagedCandidates(t *testing.T) {
 	require.Contains(t, s.objects, "actors/"+unmanaged.Metadata.ID)
 	require.Contains(t, s.objects, "actors/"+live.Metadata.ID)
 
-	// You can't double apply the prune
+	// A prune plan is single-use, so a second execution must be rejected.
 	_, err = p.Execute(ctx)
 	require.ErrorContains(t, err, "already executed")
 }
