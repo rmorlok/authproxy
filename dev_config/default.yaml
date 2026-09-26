@@ -108,11 +108,11 @@ appMetrics:
     credentials:
       type: access_key
       accessKeyId:
-        envVar: MINIO_ACCESS_KEY
-        default: minioadmin
+        envVar: S3_ACCESS_KEY
+        default: authproxy
       secretAccessKey:
-        envVar: MINIO_SECRET_KEY
-        default: minioadmin
+        envVar: S3_SECRET_KEY
+        default: authproxy-local-secret
     forcePathStyle: true
     prefix: "rlf/"
 

@@ -125,7 +125,7 @@ docker compose --profile server up --build -d
 ```
 
 The first run builds AuthProxy and its embedded UIs, then starts Postgres,
-Redis, MinIO, ClickHouse, and all four AuthProxy services. Verify the API:
+Redis, SeaweedFS, ClickHouse, and all four AuthProxy services. Verify the API:
 
 ```bash
 curl http://localhost:8081/ping

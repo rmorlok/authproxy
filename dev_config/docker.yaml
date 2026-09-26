@@ -87,13 +87,13 @@ appMetrics:
     database: authproxy
   blobStorage:
     provider: s3
-    endpoint: http://minio:9000
+    endpoint: http://seaweedfs:8333
     region: us-east-1
     bucket: authproxy-request-logs
     credentials:
       type: access_key
-      accessKeyId: minioadmin
-      secretAccessKey: minioadmin
+      accessKeyId: authproxy
+      secretAccessKey: authproxy-local-secret
     forcePathStyle: true
     prefix: "rlf/"
 

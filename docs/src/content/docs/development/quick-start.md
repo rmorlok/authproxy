@@ -31,7 +31,7 @@ Compose stack starts:
 | Worker health service | `http://localhost:8083` |
 | Postgres | `localhost:5432` |
 | Redis | `localhost:6379` |
-| MinIO API / console | `localhost:9000` / `localhost:9001` |
+| SeaweedFS S3 API | `localhost:9000` |
 | ClickHouse HTTP | `localhost:8123` |
 
 Confirm that AuthProxy and its dependencies are ready:

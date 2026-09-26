@@ -1,6 +1,6 @@
 # Integration Tests
 
-End-to-end tests that exercise AuthProxy features against real infrastructure (Postgres, Redis, ClickHouse, MinIO) with a full authproxy server.
+End-to-end tests that exercise AuthProxy features against real infrastructure (Postgres, Redis, ClickHouse, SeaweedFS) with a full authproxy server.
 
 ## Prerequisites
 
@@ -233,7 +233,7 @@ This is a separate Go module (`integration_tests/go.mod`) that depends on the ma
 - **Postgres 16** on port 5433 (avoids conflicts with local dev on 5432)
 - **Redis Stack** on port 6380 (avoids conflicts with local dev on 6379)
 - **ClickHouse** on port 8124 (avoids conflicts with local dev on 8123)
-- **MinIO** on port 9003 (avoids conflicts with local dev on 9000/9002)
+- **SeaweedFS** on port 9003 (avoids conflicts with local dev on 9000)
 - **OAuth test provider** ([rmorlok/go-oauth2-server](https://github.com/rmorlok/go-oauth2-server)) on port 8086, running in `--test-mode` (embedded SQLite, no remote config). The `/test/*` control plane lets tests register clients/users, drive authorize programmatically, script responses, and inspect recorded requests. See [test_mode_api.md](https://github.com/rmorlok/go-oauth2-server/blob/main/docs/test_mode_api.md) for the full API; `helpers.OAuth2TestProvider` wraps it.
 
 Each test gets a full authproxy server started in-process using `service.DependencyManager` and the real `GetGinServer()` functions. The server connects to the Docker services above.
@@ -320,7 +320,7 @@ resp, _ := http.DefaultClient.Do(req)
 
 ## CI
 
-Integration tests run as a separate job in `.github/workflows/go.yml` with real service containers (Postgres, Redis, ClickHouse, MinIO).
+Integration tests run as a separate job in `.github/workflows/go.yml` with real service containers (Postgres, Redis, ClickHouse, SeaweedFS).
 
 ## Apply CLI coverage
 
@@ -335,10 +335,28 @@ existing database helper because apply supports only connection metadata updates
 From the repository root, start the dependencies and run both database variants:
 
 ```bash
-docker compose -f integration_tests/docker-compose.yml up -d postgres redis clickhouse minio minio-init
+docker compose -f integration_tests/docker-compose.yml up -d postgres redis clickhouse seaweedfs
 AUTH_PROXY_TEST_DATABASE_PROVIDER=sqlite POSTGRES_TEST_PORT=5433 go -C integration_tests test -tags integration -count=1 ./apply
 AUTH_PROXY_TEST_DATABASE_PROVIDER=postgres POSTGRES_TEST_PORT=5433 go -C integration_tests test -tags integration -count=1 ./apply
 ```
 
 The tests use isolated databases, random HTTP ports, and the repository's test
 signing key. They do not use your CLI configuration or contact external providers.
+
+### S3 test storage
+
+SeaweedFS is pinned by version and multi-architecture image digest in both
+Compose files. Its `mini` command creates the buckets at startup, so no separate
+bucket initializer is needed. The request-log bucket requires the local
+`authproxy` / `authproxy-local-secret` credentials. Only
+`authproxy-streaming-test` permits anonymous reads and writes (including cleanup).
+
+To run a separate S3 instance alongside another checkout:
+
+```bash
+AUTHPROXY_TEST_S3_PORT=19003 docker compose -p authproxy-s3 up -d --wait seaweedfs
+AUTHPROXY_TEST_S3_ENDPOINT=http://localhost:19003 go test -tags integration ./blobstorage ./proxy
+```
+
+Update both image pins together when upgrading SeaweedFS, and run the blob-storage
+and proxy tests to check AWS SDK checksums, permissions, and large uploads.

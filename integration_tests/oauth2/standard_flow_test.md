@@ -42,7 +42,7 @@ provider, against the real marketplace UI, and stores what it receives.
 | OAuth2 provider          | **Docker** (`oauth-server`)    | `rmorlok/go-oauth2-server --test-mode`, port 8086. Acts as the upstream identity provider with real `/web/login` + `/web/authorize` forms and a `/test/*` control plane the harness uses to register clients/users and read recorded requests. |
 | Postgres                 | **Docker**                     | Real database the API and public services share. |
 | Redis                    | **Docker**                     | Stores the OAuth `state` (`oas_*`) record between `/oauth2/redirect` and `/oauth2/callback`, plus session cookies. |
-| MinIO, ClickHouse, Vault | **Docker**                     | Brought up by docker-compose for other tests; not exercised here. |
+| SeaweedFS, ClickHouse, Vault | **Docker**                     | Brought up by docker-compose for other tests; not exercised here. |
 
 ## Sequence
 

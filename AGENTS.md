@@ -44,7 +44,7 @@ This regenerates Swagger docs and checks the integration-tests module is consist
 ### Backend dependencies
 
 ```bash
-# Data stores only (Postgres, Redis, MinIO, ClickHouse)
+# Data stores only (Postgres, Redis, SeaweedFS, ClickHouse)
 docker compose up -d
 
 # Full stack including the AuthProxy server

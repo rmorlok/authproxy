@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"runtime"
 	"testing"
 	"time"
@@ -21,29 +22,34 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// minioBaseURL is the host-facing URL for the integration-tests MinIO
-// container. Mapped to 9003 in integration_tests/docker-compose.yml.
-const minioBaseURL = "http://127.0.0.1:9003"
+// s3BaseURL is the host-facing URL for the integration-tests S3
+// service. Mapped to 9003 in integration_tests/docker-compose.yml.
+func s3BaseURL() string {
+	if endpoint := os.Getenv("AUTHPROXY_TEST_S3_ENDPOINT"); endpoint != "" {
+		return endpoint
+	}
+	return "http://127.0.0.1:9003"
+}
 
-// minioStreamingBucket is the anonymous-policy bucket created by the
-// minio-init container. Public PUT/GET — no AWS Sig v4 required, which
+// s3StreamingBucket is the anonymous-policy bucket created by the
+// SeaweedFS configuration. Public PUT/GET — no AWS Sig v4 required, which
 // keeps the test focused on streaming behaviour rather than signing
 // machinery.
-const minioStreamingBucket = "authproxy-streaming-test"
+const s3StreamingBucket = "authproxy-streaming-test"
 
 // uploadSize is large enough that any full-body buffer in the proxy
 // path would show up clearly in the runtime.MemStats delta below.
 const uploadSize = 50 << 20 // 50 MiB
 
-// TestProxyRaw_MinIOLargeUpload proves /_proxyRaw streams a large
-// upload end-to-end without buffering: the bytes that hit MinIO are
+// TestProxyRaw_S3LargeUpload proves /_proxyRaw streams a large
+// upload end-to-end without buffering: the bytes that hit S3 are
 // byte-identical (SHA-256 match) to what the client sent, the
 // request log marks the body as too-large-skipped (so no tee
 // happened), and the process's heap delta during the upload is
 // bounded well below the upload size.
 //
 // Uses a known Content-Length rather than chunked transfer-encoding
-// because the S3 API (MinIO included) rejects raw chunked PUTs with
+// because S3-compatible stores can reject raw chunked PUTs with
 // 411 MissingContentLength — the chunked-skip path is already
 // covered by TestProxyRawBodyCapture_TeeDecision against an
 // httptest.Server. The realistic scenario for AuthProxy users is a
@@ -54,12 +60,12 @@ const uploadSize = 50 << 20 // 50 MiB
 // sha256.Hash, so neither the client nor the test ever materialises
 // the 50 MiB as a contiguous []byte — any large delta in MemStats is
 // attributable to AuthProxy itself.
-func TestProxyRaw_MinIOLargeUpload(t *testing.T) {
+func TestProxyRaw_S3LargeUpload(t *testing.T) {
 	connectorID := apid.MustParse("cxr_test0000000000330")
 
 	env := helpers.Setup(t, helpers.SetupOptions{
 		Connectors: []sconfig.Connector{
-			helpers.NewNoAuthConnector(connectorID, "minio-stream", nil),
+			helpers.NewNoAuthConnector(connectorID, "s3-stream", nil),
 		},
 		StartHTTPServer: true,
 	})
@@ -67,8 +73,8 @@ func TestProxyRaw_MinIOLargeUpload(t *testing.T) {
 	conn := env.CreateConnection(t, connectorID, 1)
 
 	objectName := fmt.Sprintf("upload-%d.bin", time.Now().UnixNano())
-	upstream := fmt.Sprintf("%s/%s/%s", minioBaseURL, minioStreamingBucket, objectName)
-	t.Cleanup(func() { deleteMinIOObject(t, upstream) })
+	upstream := fmt.Sprintf("%s/%s/%s", s3BaseURL(), s3StreamingBucket, objectName)
+	t.Cleanup(func() { deleteS3Object(t, upstream) })
 
 	// Tee the lazy random stream into the hasher so we know what we
 	// sent without ever holding the bytes ourselves.
@@ -89,17 +95,17 @@ func TestProxyRaw_MinIOLargeUpload(t *testing.T) {
 
 	respBody, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
-	require.Equal(t, http.StatusOK, resp.StatusCode, "minio response: %s", string(respBody))
+	require.Equal(t, http.StatusOK, resp.StatusCode, "s3 response: %s", string(respBody))
 
 	runtime.ReadMemStats(&after)
 
 	expectedHash := hasher.Sum(nil)
 
-	// Re-download from MinIO directly (bypassing AuthProxy) and hash
+	// Re-download from S3 directly (bypassing AuthProxy) and hash
 	// what came out.
-	gotHash := hashMinIOObject(t, upstream)
+	gotHash := hashS3Object(t, upstream)
 	assert.Equal(t, fmt.Sprintf("%x", expectedHash), fmt.Sprintf("%x", gotHash),
-		"MinIO object must be byte-identical to what was uploaded")
+		"S3 object must be byte-identical to what was uploaded")
 
 	// Too-large skip on the request side — proves the roundtripper
 	// declined to tee, which is the no-buffer guarantee we care
@@ -118,10 +124,10 @@ func TestProxyRaw_MinIOLargeUpload(t *testing.T) {
 		delta, uploadSize)
 }
 
-// deleteMinIOObject removes the uploaded object so the bucket doesn't
+// deleteS3Object removes the uploaded object so the bucket doesn't
 // accumulate state across runs. Best-effort: failures are logged but
 // don't fail the test.
-func deleteMinIOObject(t *testing.T, url string) {
+func deleteS3Object(t *testing.T, url string) {
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodDelete, url, nil)
 	if err != nil {
 		t.Logf("delete %s: build request: %v", url, err)
@@ -135,10 +141,10 @@ func deleteMinIOObject(t *testing.T, url string) {
 	resp.Body.Close()
 }
 
-// hashMinIOObject GETs the object directly from MinIO and returns the
+// hashS3Object GETs the object directly from S3 and returns the
 // SHA-256 of its bytes — streamed, so the test never materialises the
 // downloaded body either.
-func hashMinIOObject(t *testing.T, url string) []byte {
+func hashS3Object(t *testing.T, url string) []byte {
 	t.Helper()
 	resp, err := http.Get(url)
 	require.NoError(t, err)
