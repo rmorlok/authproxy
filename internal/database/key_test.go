@@ -613,16 +613,31 @@ func TestKey(t *testing.T) {
 }
 
 func TestDeleteUnusedKey(t *testing.T) {
-	for _, dependency := range []string{"none", "namespace", "dek", "deleted-dek"} {
+	for _, dependency := range []string{
+		"none",
+		"namespace",
+		"dek",
+		"deleted-dek",
+	} {
 		t.Run(dependency, func(t *testing.T) {
 			_, db, raw := MustApplyBlankTestDbConfigRaw(t, nil)
 			ctx := context.Background()
-			key := &Key{Id: apid.New(apid.PrefixKey), Namespace: "root", State: KeyStateActive}
+
+			key := &Key{
+				Id:        apid.New(apid.PrefixKey),
+				Namespace: "root",
+				State:     KeyStateActive,
+			}
 			require.NoError(t, db.CreateKey(ctx, key))
+
 			var dekID apid.ID
+
 			switch dependency {
 			case "namespace":
-				require.NoError(t, db.CreateNamespace(ctx, &Namespace{Path: "root.dependency", KeyId: &key.Id}))
+				require.NoError(t, db.CreateNamespace(ctx, &Namespace{
+					Path:  "root.dependency",
+					KeyId: &key.Id,
+				}))
 			case "dek", "deleted-dek":
 				dekID = createDependencyDEK(t, ctx, db, key.Id)
 				if dependency == "deleted-dek" {
@@ -630,6 +645,7 @@ func TestDeleteUnusedKey(t *testing.T) {
 					require.NoError(t, err)
 				}
 			}
+
 			err := db.DeleteUnusedKey(ctx, key.Id)
 			if dependency == "none" {
 				require.NoError(t, err)
