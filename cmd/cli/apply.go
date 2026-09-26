@@ -59,11 +59,13 @@ func cmdApply() *cobra.Command {
 			if err != nil {
 				return err
 			}
+
 			pruneOptions.Namespace, pruneOptions.Selector = options.Namespace, options.Selector
 			if prune {
 				if err := pruneOptions.Validate(); err != nil {
 					return err
 				}
+
 				if dryRun != "none" {
 					return fmt.Errorf("--prune requires cluster execution; client dry-run cannot inventory deletions")
 				}
@@ -85,6 +87,7 @@ func cmdApply() *cobra.Command {
 			if prune && len(docs) == 0 {
 				return fmt.Errorf("refusing prune with no selected manifests")
 			}
+
 			if dryRun == "none" && len(docs) > 0 {
 				client, err := resolver.ResolveApplyClient(timeout)
 				if err != nil {
@@ -107,6 +110,7 @@ func cmdApply() *cobra.Command {
 						return err
 					}
 				}
+
 				for _, warning := range batch.Warnings() {
 					if _, err := fmt.Fprintln(cmd.ErrOrStderr(), "Warning: "+warning); err != nil {
 						return err
@@ -120,12 +124,14 @@ func cmdApply() *cobra.Command {
 					results = append(results, pruned...)
 					executionErr = err
 				}
+
 				var outputErr error
 				if printer != nil {
 					outputErr = printer(cmd.OutOrStdout(), results)
 				} else {
 					outputErr = writeApplyResults(cmd, output, results)
 				}
+
 				if outputErr != nil {
 					outputErr = fmt.Errorf("cannot write apply results; successful writes remain applied: %w", outputErr)
 				}
@@ -141,6 +147,7 @@ func cmdApply() *cobra.Command {
 				if err != nil {
 					return err
 				}
+
 				objects = append(objects, value)
 			}
 
@@ -210,7 +217,11 @@ func cmdApply() *cobra.Command {
 // Structured execution output contains per-resource results, including failures
 // and skips. It is emitted after execution; an output error cannot roll back
 // successful writes and must never trigger a mutation retry.
-func writeApplyResults(cmd *cobra.Command, format string, results []apply2.Result) error {
+func writeApplyResults(
+	cmd *cobra.Command,
+	format string,
+	results []apply2.Result,
+) error {
 	switch format {
 	case "json":
 		encoder := json.NewEncoder(cmd.OutOrStdout())
@@ -255,7 +266,11 @@ func writeApplyResults(cmd *cobra.Command, format string, results []apply2.Resul
 	}
 }
 
-func loadApplyInput(cmd *cobra.Command, options apply2.Options, directory string) ([]apply2.Document, error) {
+func loadApplyInput(
+	cmd *cobra.Command,
+	options apply2.Options,
+	directory string,
+) ([]apply2.Document, error) {
 	if directory != "" {
 		return apply2.LoadKustomize(cmd.Context(), directory, options)
 	}
