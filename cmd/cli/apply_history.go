@@ -15,6 +15,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// cmdApplyHistory builds an apply subcommand for viewing or updating the stored
+// last-applied configuration of existing resources without changing their spec.
+// action must be "view-last-applied" (print stored history), "set-last-applied"
+// (replace history from input manifests), or "edit-last-applied" (edit stored
+// history in an external editor and save the changes).
 func cmdApplyHistory(action string) *cobra.Command {
 	var options apply2.Options
 	var directory, output string
