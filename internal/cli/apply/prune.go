@@ -120,7 +120,8 @@ func (c *Client) listAll(
 			return nil, fmt.Errorf("invalid prune inventory response")
 		}
 
-		if page.Metadata.RemainingItemCount != nil && *page.Metadata.RemainingItemCount < 0 {
+		if page.Metadata.RemainingItemCount != nil &&
+			*page.Metadata.RemainingItemCount < 0 {
 			return nil, fmt.Errorf("invalid prune inventory count")
 		}
 
@@ -340,12 +341,17 @@ func (p *PrunePlan) Execute(ctx context.Context) ([]Result, error) {
 	return results, nil
 }
 
-func (p *PrunePlan) waitDeleted(ctx context.Context, kind meta.Kind, path string) error {
+func (p *PrunePlan) waitDeleted(
+	ctx context.Context,
+	kind meta.Kind,
+	path string,
+) error {
 	if p.options.Timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, p.options.Timeout)
 		defer cancel()
 	}
+
 	for {
 		_, err := p.client.get(ctx, kind, path)
 		var apiErr *APIError
@@ -355,6 +361,7 @@ func (p *PrunePlan) waitDeleted(ctx context.Context, kind meta.Kind, path string
 		if err != nil {
 			return err
 		}
+
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -363,15 +370,27 @@ func (p *PrunePlan) waitDeleted(ctx context.Context, kind meta.Kind, path string
 	}
 }
 
-func (p *PrunePlan) checkCandidate(ctx context.Context, old *LiveResource) error {
+func (p *PrunePlan) checkCandidate(
+	ctx context.Context,
+	old *LiveResource,
+) error {
 	descriptor, _ := resourceType(old.Kind)
-	live, err := p.client.get(ctx, old.Kind, pathToOptionalGeneration(descriptor.Collection, old.Metadata.ID, 0))
+
+	live, err := p.client.get(
+		ctx,
+		old.Kind,
+		pathToOptionalGeneration(descriptor.Collection, old.Metadata.ID, 0),
+	)
 	if err != nil {
 		return err
 	}
+
 	selector, _ := database.ParseLabelSelector(p.options.Selector)
-	if live.Metadata.Namespace != p.options.Namespace || !selector.Matches(live.Metadata.Labels) || !equalJSON(live.Resource, old.Resource) {
+	if live.Metadata.Namespace != p.options.Namespace ||
+		!selector.Matches(live.Metadata.Labels) ||
+		!equalJSON(live.Resource, old.Resource) {
 		return fmt.Errorf("prune candidate changed; rerun apply")
 	}
+
 	return nil
 }
