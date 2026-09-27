@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rmorlok/authproxy/internal/apply"
+	apply2 "github.com/rmorlok/authproxy/internal/cli/apply"
 	"github.com/stretchr/testify/require"
 )
 
@@ -31,9 +31,9 @@ func TestResolveApplyClientSelectsServiceAndSignsRequests(t *testing.T) {
 			adminAPI := httptest.NewServer(handler(&adminCalls))
 			defer adminAPI.Close()
 			r := &Resolver{admin: admin, actorId: "operator", apis: "all", secretKeyPath: writeTestFile(t, "apply-test-secret"), apiUrl: api.URL, adminApiUrl: adminAPI.URL}
-			c, err := r.ResolveApplyClient(apply.DefaultRequestTimeout)
+			c, err := r.ResolveApplyClient(apply2.DefaultRequestTimeout)
 			require.NoError(t, err)
-			docs, err := apply.Load(context.Background(), apply.Options{Filenames: []string{"-"}, Stdin: strings.NewReader("apiVersion: authproxy.net/v1alpha1\nkind: Namespace\nmetadata: {id: root}\nspec: {}")})
+			docs, err := apply2.Load(context.Background(), apply2.Options{Filenames: []string{"-"}, Stdin: strings.NewReader("apiVersion: authproxy.net/v1alpha1\nkind: Namespace\nmetadata: {id: root}\nspec: {}")})
 			require.NoError(t, err)
 			_, err = c.Resolve(context.Background(), docs[0])
 			require.NoError(t, err)
@@ -50,6 +50,6 @@ func TestResolveApplyClientSelectsServiceAndSignsRequests(t *testing.T) {
 
 func TestResolveApplyClientDoesNotFallbackFromMissingAdminEndpoint(t *testing.T) {
 	r := &Resolver{admin: true, actorId: "operator", apis: "all", secretKeyPath: writeTestFile(t, "apply-test-secret"), apiUrl: "http://localhost:8081", root: &Root{}}
-	_, err := r.ResolveApplyClient(apply.DefaultRequestTimeout)
+	_, err := r.ResolveApplyClient(apply2.DefaultRequestTimeout)
 	require.ErrorContains(t, err, "admin API")
 }

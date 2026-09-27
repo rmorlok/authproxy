@@ -266,3 +266,24 @@ Warnings are printed before writes, so warning-output errors abort execution.
 Result output is buffered until execution completes: a subsequent output error
 returns nonzero but cannot undo successful writes or trigger retries. Usage text
 is suppressed on errors to keep structured stdout parseable.
+
+
+## Compatibility helpers
+
+`LoadKustomize` builds a local directory with the embedded upstream engine, then
+passes rendered YAML through `Load`. Builds are serialized because Kustomize's
+OpenAPI schema state is global. Plugin/Helm execution remains disabled.
+
+`HistoryTargets` pins selected existing identities and their history.
+`LastApplied` validates the untrusted annotation before exposing its sanitized
+desired document. `SetLastApplied` validates all proposed history patches, rereads
+before each write, and refuses concurrent history changes. It writes only the
+annotation and retains historical secret-presence markers.
+
+`Batch.PreparePrune` exhausts inventory pages before any writes and fixes the
+maximum deletion set. `PrunePlan.Execute` requires the prepared batch to have completed
+successfully, rechecks candidate snapshots and Key references, and stops on the
+first delete/wait error. Key deletion uses the guarded unused-key endpoint;
+ordinary Key DELETE is never a fallback. Plans are single-use. The client cannot
+supply atomic list/write preconditions, so callers must serialize competing
+writers. See the public CLI reference for scope requirements and options.

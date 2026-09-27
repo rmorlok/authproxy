@@ -43,6 +43,8 @@ type Batch struct {
 	// executed tracks whether this batch has been started running to avoid the
 	// same batch being applied multiple times.
 	executed atomic.Bool
+	// completedSuccessfully gates prune; starting a batch alone is insufficient.
+	completedSuccessfully atomic.Bool
 }
 
 // Result is safe for human or structured output. Resource is sanitized before
@@ -442,6 +444,7 @@ func (b *Batch) Execute(ctx context.Context) ([]Result, error) {
 	if failed {
 		return results, errors.Join(ErrBatchFailed, ctx.Err())
 	}
+	b.completedSuccessfully.Store(true)
 	return results, nil
 }
 

@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	"github.com/rmorlok/authproxy/internal/apid"
-	"github.com/rmorlok/authproxy/internal/apply"
+	apply2 "github.com/rmorlok/authproxy/internal/cli/apply"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
@@ -68,7 +68,7 @@ func executionServer(t *testing.T, failName string, existing bool) (*httptest.Se
 			return
 		}
 
-		require.Contains(t, metadata["annotations"], apply.LastAppliedAnnotation)
+		require.Contains(t, metadata["annotations"], apply2.LastAppliedAnnotation)
 
 		metadata["id"] = id
 		spec := resource["spec"].(map[string]any)
@@ -106,14 +106,14 @@ func TestApplyExecutesSignedRequestsWithStructuredResults(t *testing.T) {
 			require.NotContains(t, out.String(), "test-signing-secret")
 
 			if format == "json" {
-				var results []apply.Result
+				var results []apply2.Result
 				require.NoError(t, json.Unmarshal(out.Bytes(), &results))
 				require.Len(t, results, 1)
 				require.Equal(t, "created", results[0].Status)
 			}
 
 			if format == "yaml" {
-				var result apply.Result
+				var result apply2.Result
 				require.NoError(t, yaml.Unmarshal(out.Bytes(), &result))
 				require.Equal(t, "created", result.Status)
 			}
@@ -139,10 +139,10 @@ func TestApplyStructuredPartialFailureAndOutputFailure(t *testing.T) {
 		cmd.SetErr(&stderr)
 		cmd.SetArgs(append(executionArgs(t, server.URL), "-o", "json"))
 
-		require.ErrorIs(t, cmd.Execute(), apply.ErrBatchFailed)
+		require.ErrorIs(t, cmd.Execute(), apply2.ErrBatchFailed)
 		require.Equal(t, 2, *writes)
 
-		var results []apply.Result
+		var results []apply2.Result
 		require.NoError(t, json.Unmarshal(out.Bytes(), &results))
 		require.Len(t, results, 2)
 		require.Equal(t, "failed", results[0].Status)

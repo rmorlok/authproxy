@@ -327,7 +327,8 @@ Integration tests run as a separate job in `.github/workflows/go.yml` with real 
 The `apply` package builds `cmd/cli` and runs the resulting executable against
 real API and admin API HTTP listeners. It covers namespace/name and ID targeting,
 all supported resource kinds, sanitized history, managed label removal, adoption,
-connector draft/publication behavior, dependency ordering, and process exit codes.
+connector draft/publication behavior, dependency ordering, scoped Actor/Key/RateLimit
+pruning, history view/set/edit commands, and process exit codes.
 A fault-injection proxy rejects one namespace mutation to verify partial failures;
 all other requests go to the real server. Connection setup is seeded with the
 existing database helper because apply supports only connection metadata updates.
