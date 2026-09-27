@@ -365,10 +365,12 @@ jobs:
           echo "manifest=${manifest}" >> "$GITHUB_OUTPUT"
           grep -Fq "namespace: ${RELEASE_NS}" "${manifest}"
           grep -Fq "image: ghcr.io/rmorlok/authproxy-demo-seed:${{ steps.env.outputs.image_tag }}" "${manifest}"
+          grep -Fq "name: RESOURCE_MANIFEST_PATH" "${manifest}"
+          grep -Fq "resources.yaml: |" "${manifest}"
           grep -Fq "value: http://dev-authproxy:8082" "${manifest}"
           grep -Fq "baseUrl: http://dev-go-oauth2-server" "${manifest}"
 
-      - name: Run seed job
+      - name: Apply demo resources and seed test provider
         env:
           RELEASE_NS: ${{ steps.env.outputs.namespace }}
         run: |

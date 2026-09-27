@@ -181,6 +181,10 @@ func newRemoteSmokeRig(t *testing.T, connectionParentNamespace string) *helpers.
 	return rig
 }
 
+// Deployments populate root.demo with ap apply before this suite runs. Keep
+// per-run copies API-created: each needs isolated provider credentials and an
+// independent lifecycle, and the smoke test should exercise provisioning too.
+// No connector in this suite is loaded from AuthProxy server configuration.
 func cloneSeededConnectorsIntoSmokeNamespace(
 	t *testing.T,
 	rig *helpers.RemoteAuthProxy,

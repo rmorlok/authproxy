@@ -127,12 +127,15 @@ The recipe wires:
 - `authproxy:main` (postgres + redis + AuthProxy) on ports 8080/8081/8082
 - `authproxy-demo-shell:main` on port 8888, mounting the generated
   private key + pointing at the host-mapped AuthProxy URLs
-- `authproxy-demo-seed:main` as a one-shot job that creates `root.demo`,
-  `demo-user`, and a local no-auth demo connector
+- `authproxy-demo-seed:main` as a one-shot job that runs `ap apply` on `resources.yaml`
+  to reconcile `root.demo`, `demo-user`, and a local no-auth demo connector
 
 `./keys/demo-shell.pub` is bind-mounted into AuthProxy's actors directory
-so `dev_config/docker.yaml`'s `keys_path` picks it up and registers
-`demo-admin` as an admin actor. The recipe lives entirely under
+so the dedicated `compose/authproxy.yaml` config registers `demo-admin` as an
+admin actor. This config contains no connector definitions and uses only the
+PostgreSQL and Redis services in the recipe; app metrics and blobs are local
+to the AuthProxy container. `init-keys.sh` also preserves a generated AES key
+for encryption. The recipe lives entirely under
 `demos/shell/compose/` — pin all three application images to a non-`:main` tag via
 `IMAGE_TAG=pr-NNN docker compose up` when testing branches.
 

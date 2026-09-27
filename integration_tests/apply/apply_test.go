@@ -24,12 +24,14 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/cli/apply"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 type object = map[string]any
 
 type cli struct {
 	binary, root, config string
+	seedBinary           string
 	env                  *helpers.IntegrationTestEnv
 	admin                bool
 }
@@ -199,6 +201,12 @@ func TestCLIApply(t *testing.T) {
 	output, err := build.CombinedOutput()
 	require.NoError(t, err, "%s", output)
 
+	seedBinary := filepath.Join(directory, "demo-seed")
+	build = exec.Command("go", "build", "-o", seedBinary, "./demos/seed/backend")
+	build.Dir = root
+	output, err = build.CombinedOutput()
+	require.NoError(t, err, "%s", output)
+
 	publicKey, err := os.ReadFile(filepath.Join(root, "dev_config/keys/admin/bobdole.pub"))
 	require.NoError(t, err)
 
@@ -220,8 +228,8 @@ func TestCLIApply(t *testing.T) {
 			t.Cleanup(env.Cleanup)
 
 			c := cli{
-				binary: binary,
-				root:   root, config: config,
+				binary: binary, seedBinary: seedBinary,
+				root: root, config: config,
 				env:   env,
 				admin: admin,
 			}
@@ -255,6 +263,7 @@ func TestCLIApply(t *testing.T) {
 			t.Run("ReferenceDependencies", c.references)
 			t.Run("Prune", c.prune)
 			t.Run("HistoryCommands", c.historyCommands)
+			t.Run("DemoDeploymentManifests", c.demoManifests)
 		})
 	}
 }
@@ -713,4 +722,70 @@ func (c cli) historyCommands(t *testing.T) {
 	require.Contains(t, string(data), "edited-history")
 	live = c.request(t, "GET", "actors/"+id, nil, 200)
 	require.Equal(t, "original", live["spec"].(map[string]any)["externalId"])
+}
+
+// Exercise the same runner and manifests shipped in the deployment image. The
+// external provider has its own tests; an empty provider config keeps this
+// check focused on real CLI authentication, apply, and repeat deployments.
+func (c cli) demoManifests(t *testing.T) {
+	for _, environment := range []string{"compose", "demo", "dev"} {
+		t.Run(environment, func(t *testing.T) {
+			var resources string
+			if environment == "compose" {
+				data, err := os.ReadFile(filepath.Join(c.root, "demos/shell/compose/resources.yaml"))
+				require.NoError(t, err)
+				resources = string(data)
+			} else {
+				data, err := os.ReadFile(filepath.Join(c.root, "deploy/kustomize/authproxy-demo/overlays", environment, "seed/seed-config.yaml"))
+				require.NoError(t, err)
+				var cm struct {
+					Data map[string]string `yaml:"data"`
+				}
+				require.NoError(t, yaml.Unmarshal(data, &cm))
+				resources = cm.Data["resources.yaml"]
+			}
+			directory := t.TempDir()
+			resourcePath := filepath.Join(directory, "resources.yaml")
+			providerPath := filepath.Join(directory, "provider.yaml")
+			require.NoError(t, os.WriteFile(resourcePath, []byte(resources), 0600))
+			require.NoError(t, os.WriteFile(providerPath, []byte("{}"), 0600))
+
+			// Start the actual job executable with its production environment
+			// contract. It must find and run the CLI built from this checkout.
+			ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+			defer cancel()
+			cmd := exec.CommandContext(ctx, c.seedBinary)
+			cmd.Env = append(os.Environ(),
+				"PATH="+filepath.Dir(c.binary)+string(os.PathListSeparator)+os.Getenv("PATH"),
+				"ADMIN_API_URL="+c.env.ServerURL,
+				"ADMIN_USERNAME=apply-operator",
+				"ADMIN_PRIVATE_KEY_PATH="+filepath.Join(c.root, "dev_config/keys/admin/bobdole"),
+				"SEED_CONFIG_PATH="+providerPath,
+				"RESOURCE_MANIFEST_PATH="+resourcePath,
+			)
+			output, err := cmd.CombinedOutput()
+			require.NoError(t, err, "%s", output)
+
+			// Bind server-assigned identities, then verify stable identities
+			// on another deployment. Explicit OAuth secrets are always written
+			// by apply and therefore publish another connector generation.
+			previous, _ := c.run(t, resources, 0)
+			results, _ := c.run(t, resources, 0)
+			require.Len(t, results, len(previous))
+			for i, result := range results {
+				require.Equal(t, previous[i].Identity, result.Identity)
+				if result.Kind == "Connector" {
+					live := c.request(t, "GET", "connectors/"+result.Identity, nil, 200)
+					spec := live["spec"].(map[string]any)
+					auth := spec["definition"].(map[string]any)["auth"].(map[string]any)
+					require.Equal(t, "primary", live["status"].(map[string]any)["release"].(map[string]any)["state"])
+					if auth["type"] == "OAuth2" {
+						require.Equal(t, "configured", result.Status)
+						continue
+					}
+				}
+				require.Equal(t, "unchanged", result.Status, "%s/%s", result.Kind, result.Identity)
+			}
+		})
+	}
 }

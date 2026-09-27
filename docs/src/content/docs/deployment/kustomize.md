@@ -45,9 +45,24 @@ the overlay's `namePrefix`, it expects names for:
 - the Demo Shell signing key; and
 - database, Redis, and MinIO credentials in the persistent demo.
 
-Seeding is intentionally separate from deployment. The `Seed Demo` workflow
-renders the overlay's `seed` directory and runs a one-shot Job to create demo
-actors, fake OAuth users, and example connectors.
+Both deployment workflows run the overlay's `seed` Job after rollout and
+before smoke tests. The job configures the disposable OAuth provider, then
+uses `ap apply` to reconcile namespaces, actors, and connectors from the
+ConfigMap's `resources.yaml`. The CLI and server are built from the same
+revision. The manual `Seed Demo` workflow reruns that job when needed.
+
+AuthProxy resources are standard multi-document manifests. `seed.yaml` contains
+only external provider setup; the server configuration has an empty connector
+loader. Existing demo resources are adopted by namespace/name on the first
+apply, with later deploys using last-applied history. Provisioning failures fail
+the deployment. Prune is disabled, so removing a manifest does not delete or
+archive resources.
+
+Remote smoke tests verify the applied demo catalog and create isolated,
+uniquely named connector copies through the API for each test run. API creation
+is retained there to exercise provisioning and avoid changing the shared demo
+catalog. These temporary connectors are archived during cleanup; they are never
+loaded from server configuration.
 
 ## Hosted deployment behavior
 
@@ -60,3 +75,9 @@ label and tears it down when the pull request closes.
 See the [source package README](https://github.com/rmorlok/authproxy/blob/main/deploy/kustomize/authproxy-demo/README.md)
 and [EKS runbook](/deployment/eks-runbook/) when maintaining those project-owned
 environments.
+
+OAuth manifests explicitly contain disposable provider client secrets. The CLI
+resubmits explicit secrets without comparing them, so each deploy publishes a
+new OAuth connector generation while retaining the connector ID. Other unchanged
+resources converge to `unchanged`. This follows the CLI's secret-handling
+contract; secrets and comparison hashes are never stored in apply history.

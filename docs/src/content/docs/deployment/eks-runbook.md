@@ -158,9 +158,9 @@ kubectl delete ns hello-echo
 
 The `Deploy Demo` workflow (`.github/workflows/deploy-demo.yml`)
 applies the Kustomize demo overlay on every push to `main` with the
-image tag pinned to that commit's `sha-<short>`. Demo data is seeded
-separately through the manual `Seed Demo` workflow, so application
-rollouts and catalog refreshes can be run independently. One-time setup:
+image tag pinned to that commit's `sha-<short>`. After rollout, the seed Job
+uses `ap apply` to reconcile the demo catalog before smoke tests run. The manual
+`Seed Demo` workflow can repeat provisioning independently. One-time setup:
 
 1. **Create the demo namespace + keypair Secrets** (these are
    operator-provided, not auto-generated — see
@@ -217,7 +217,8 @@ rollouts and catalog refreshes can be run independently. One-time setup:
 
    The seed workflow renders `deploy/kustomize/authproxy-demo/overlays/demo/seed`
    and runs a one-shot Kubernetes Job against the already-deployed demo
-   services.
+   services. AuthProxy resources come from the ConfigMap's `resources.yaml`;
+   `seed.yaml` is reserved for the external test provider.
 
 ### 1.11 PR dev demo environments
 

@@ -20,6 +20,8 @@ spec:
           image: ghcr.io/rmorlok/authproxy-demo-seed:main
           imagePullPolicy: Always
           env:
+            - name: RESOURCE_MANIFEST_PATH
+              value: "/etc/authproxy/seed/resources.yaml"
             - name: ADMIN_API_URL
               value: "http://demo-authproxy:8082"
             - name: ADMIN_USERNAME

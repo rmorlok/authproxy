@@ -66,9 +66,34 @@ Both demo and dev deployment workflows run their seed job after the environment
 is ready. The `Seed Demo` GitHub Actions workflow remains available to rerun
 the demo seed job on demand.
 
-The job idempotently provisions `root.demo`, verifies or creates the
-least-privilege `demo-user`, and publishes demo connectors in `root.demo`.
-The seed ConfigMaps contain complete `authproxy.net/v1alpha1` `Namespace`,
-`Actor`, and `Connector` resources. Connector seed identity is its exact
-`metadata.namespace` and `metadata.name`; labels are ordinary resource
-metadata. The seed binary rejects the former flat resource forms.
+The job runs `ap apply` to reconcile `root.demo`, the least-privilege
+`demo-user`, and the demo connectors. Its image contains the CLI built from the
+same commit as the server. `resources.yaml` in the seed ConfigMap is a standard
+multi-document `authproxy.net/v1alpha1` manifest; `seed.yaml` contains only
+external OAuth-provider clients, users, and policies.
+
+The runner seeds the provider first, then invokes the CLI with the mounted
+`demo-admin` key, an explicit admin API URL, and an empty CLI config. It retries
+for up to five minutes to accommodate API readiness and bootstrap actor sync.
+The Job fails if provisioning does not succeed, so the deployment workflow does
+not run smoke tests against a partially provisioned catalog.
+
+Existing resources are adopted by namespace/name on the first CLI deployment.
+Subsequent applies use last-applied history, preserve fields not managed by
+apply, and publish new connector generations when definitions change. No prune
+is enabled: deleting a manifest does not archive an existing connector or
+remove demo users. AuthProxy server configs retain only an empty connector
+loader; catalog definitions live entirely in apply manifests.
+
+Remote smoke tests inspect this CLI-managed catalog, then create uniquely named
+copies in `root.smoke` through the API. Those copies use per-run OAuth clients
+and are archived by test cleanup. Keeping that setup in the smoke harness tests
+the public provisioning API without applying shared demo manifests into a
+concurrent test run. Neither smoke nor demo connectors are loaded from server
+configuration.
+
+OAuth manifests explicitly contain disposable provider client secrets. The CLI
+resubmits explicit secrets without comparing them, so each deploy publishes a
+new OAuth connector generation while retaining the connector ID. Other unchanged
+resources converge to `unchanged`. This follows the CLI's secret-handling
+contract; secrets and comparison hashes are never stored in apply history.
