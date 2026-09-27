@@ -34,34 +34,65 @@ type cli struct {
 	admin                bool
 }
 
-func (c cli) run(t *testing.T, input string, exit int, extra ...string) ([]apply.Result, string) {
+func (c cli) run(
+	t *testing.T,
+	input string,
+	exit int,
+	extra ...string,
+) ([]apply.Result, string) {
 	t.Helper()
 	stdout, stderr := c.runRaw(t, input, exit, extra...)
 	var results []apply.Result
+
 	if len(stdout) != 0 {
 		require.NoError(t, json.Unmarshal(stdout, &results), "stdout: %s", stdout)
 	}
+
 	return results, stderr
 }
 
-func (c cli) runRaw(t *testing.T, input string, exit int, extra ...string) ([]byte, string) {
+func (c cli) runRaw(
+	t *testing.T,
+	input string,
+	exit int,
+	extra ...string,
+) ([]byte, string) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	args := []string{"apply", "-f", "-", "-o", "json", "--config", c.config, "--actorId", "apply-operator", "--privateKeyPath", filepath.Join(c.root, "dev_config/keys/admin/bobdole")}
+	args := []string{
+		"apply",
+		"-f", "-",
+		"-o", "json",
+		"--config", c.config,
+		"--actorId", "apply-operator",
+		"--privateKeyPath", filepath.Join(c.root, "dev_config/keys/admin/bobdole"),
+	}
+
 	if c.admin {
-		args = append(args, "--admin", "--adminApiUrl", c.env.ServerURL, "--apiUrl", "http://127.0.0.1:1")
+		args = append(
+			args,
+			"--admin",
+			"--adminApiUrl", c.env.ServerURL,
+			"--apiUrl", "http://127.0.0.1:1",
+		)
 	} else {
-		args = append(args, "--apiUrl", c.env.ServerURL)
+		args = append(
+			args,
+			"--apiUrl", c.env.ServerURL,
+		)
 	}
 	args = append(args, extra...)
+
 	cmd := exec.CommandContext(ctx, c.binary, args...)
 	cmd.Dir = c.root
 	cmd.Stdin = strings.NewReader(input)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	err := cmd.Run()
+
 	require.NoError(t, ctx.Err(), "CLI timed out")
+
 	if exit == 0 {
 		require.NoError(t, err, "stdout: %s\nstderr: %s", &stdout, &stderr)
 	} else {
@@ -69,9 +100,11 @@ func (c cli) runRaw(t *testing.T, input string, exit int, extra ...string) ([]by
 		require.ErrorAs(t, err, &failure, "stdout: %s\nstderr: %s", &stdout, &stderr)
 		require.Equal(t, exit, failure.ExitCode())
 	}
+
 	return stdout.Bytes(), stderr.String()
 }
 
+// manifest constructs an object playload representing an k8s envelope
 func manifest(kind, name, namespace string, spec object) object {
 	metadata := object{}
 	if name != "" {
@@ -80,52 +113,84 @@ func manifest(kind, name, namespace string, spec object) object {
 	if namespace != "" {
 		metadata["namespace"] = namespace
 	}
-	return object{"apiVersion": "authproxy.net/v1alpha1", "kind": kind, "metadata": metadata, "spec": spec}
+	return object{
+		"apiVersion": "authproxy.net/v1alpha1",
+		"kind":       kind,
+		"metadata":   metadata,
+		"spec":       spec,
+	}
 }
+
+// encode marshalls multiple object payloads to json line separated by "---"
 func encode(t *testing.T, documents ...object) string {
 	t.Helper()
 	var parts []string
+
 	for _, doc := range documents {
 		b, err := json.Marshal(doc)
 		require.NoError(t, err)
 		parts = append(parts, string(b))
 	}
+
 	return strings.Join(parts, "\n---\n")
 }
+
 func metadata(doc object) object { return doc["metadata"].(map[string]any) }
-func resultResource(t *testing.T, results []apply.Result, status string) object {
+
+func resultResource(
+	t *testing.T,
+	results []apply.Result,
+	status string,
+) object {
 	t.Helper()
 	require.Len(t, results, 1)
 	require.Equal(t, status, results[0].Status)
+
 	resource, ok := results[0].Resource.(map[string]any)
 	require.True(t, ok)
+
 	return resource
 }
-func (c cli) request(t *testing.T, method, path string, body object, status int) object {
+
+func (c cli) request(
+	t *testing.T,
+	method, path string,
+	body object,
+	status int,
+) object {
 	t.Helper()
+
 	var input io.Reader
 	if body != nil {
 		input = strings.NewReader(encode(t, body))
 	}
+
 	req, err := http.NewRequest(method, c.env.ServerURL+"/api/v1/"+path, input)
 	require.NoError(t, err)
+
 	req.Header.Set("Authorization", "Bearer "+c.env.BearerToken)
 	req.Header.Set("Content-Type", "application/json")
+
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	require.NoError(t, err)
+
 	defer resp.Body.Close()
+
 	data, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
 	require.Equal(t, status, resp.StatusCode, "%s %s: %s", method, path, data)
+
 	var resource object
 	require.NoError(t, json.Unmarshal(data, &resource))
+
 	return resource
 }
 
 func TestCLIApply(t *testing.T) {
 	_, source, _, ok := runtime.Caller(0)
 	require.True(t, ok)
+
 	root := filepath.Clean(filepath.Join(filepath.Dir(source), "../.."))
 	directory := t.TempDir()
 	binary := filepath.Join(directory, "ap")
@@ -133,27 +198,57 @@ func TestCLIApply(t *testing.T) {
 	build.Dir = root
 	output, err := build.CombinedOutput()
 	require.NoError(t, err, "%s", output)
+
 	publicKey, err := os.ReadFile(filepath.Join(root, "dev_config/keys/admin/bobdole.pub"))
 	require.NoError(t, err)
+
 	config := filepath.Join(directory, "config.yaml")
 	require.NoError(t, os.WriteFile(config, []byte("{}"), 0600))
+
+	// Test against both the admin api and the normal api
 	for _, admin := range []bool{false, true} {
 		service := helpers.ServiceTypeAPI
 		if admin {
 			service = helpers.ServiceTypeAdminAPI
 		}
+
 		t.Run(string(service), func(t *testing.T) {
-			env := helpers.Setup(t, helpers.SetupOptions{Service: service, StartHTTPServer: true})
+			env := helpers.Setup(t, helpers.SetupOptions{
+				Service:         service,
+				StartHTTPServer: true,
+			})
 			t.Cleanup(env.Cleanup)
-			c := cli{binary: binary, root: root, config: config, env: env, admin: admin}
-			c.request(t, "POST", "actors", manifest("Actor", "apply-operator", "root", object{
-				"externalId": "apply-operator", "signingKey": object{"publicKey": object{"value": string(publicKey)}},
-				"permissions": []any{object{"namespace": "root.**", "resources": []string{"*"}, "verbs": []string{"*"}}},
-			}), 201)
+
+			c := cli{
+				binary: binary,
+				root:   root, config: config,
+				env:   env,
+				admin: admin,
+			}
+			c.request(t, "POST", "actors", manifest(
+				"Actor",          // kind
+				"apply-operator", // name
+				"root",           // namespace
+				object{
+					"externalId": "apply-operator",
+					"signingKey": object{
+						"publicKey": object{
+							"value": string(publicKey),
+						},
+					},
+					"permissions": []any{
+						object{
+							"namespace": "root.**",
+							"resources": []string{"*"},
+							"verbs":     []string{"*"},
+						},
+					},
+				}), 201)
 			t.Run("Identity", c.identity)
 			if !admin {
 				return
 			}
+
 			t.Run("ResourceLifecycles", c.lifecycles)
 			t.Run("ConnectorGenerations", c.generations)
 			t.Run("DependenciesAndFailures", c.dependencies)
@@ -165,25 +260,37 @@ func TestCLIApply(t *testing.T) {
 }
 
 func (c cli) identity(t *testing.T) {
-	doc := manifest("Actor", "identity", "", object{"externalId": "apply-identity"})
+	doc := manifest(
+		"Actor",    // kind
+		"identity", // name
+		"",         // namespace
+		object{"externalId": "apply-identity"},
+	)
 	results, _ := c.run(t, encode(t, doc), 1)
 	require.Empty(t, results)
+
 	results, _ = c.run(t, encode(t, doc), 0, "--namespace=root")
 	resource := resultResource(t, results, "created")
 	require.Equal(t, "root", metadata(resource)["namespace"])
+
 	id := metadata(resource)["id"].(string)
 	metadata(doc)["namespace"] = "root"
+
 	results, _ = c.run(t, encode(t, doc), 0, "--namespace=root.nonexistent")
 	require.Equal(t, id, metadata(resultResource(t, results, "configured"))["id"])
+
 	doc["metadata"] = object{"id": id}
 	results, _ = c.run(t, encode(t, doc), 0)
 	require.Equal(t, id, metadata(results[0].Resource.(map[string]any))["id"])
+
 	metadata(doc)["name"] = "wrong"
 	c.run(t, encode(t, doc), 1)
 	doc["metadata"] = object{"id": apid.New(apid.PrefixActor).String()}
 	c.run(t, encode(t, doc), 1)
+
 	if !c.admin {
-		c.run(t, encode(t, manifest("Key", "api-key", "root", object{"keyData": object{"numBytes": 32}})), 0)
+		c.run(t, encode(t, manifest(
+			"Key", "api-key", "root", object{"keyData": object{"numBytes": 32}})), 0)
 	}
 }
 
@@ -193,27 +300,63 @@ func (c cli) lifecycles(t *testing.T) {
 		spec       object
 	}{
 		{"Namespace", "namespaces", object{}},
-		{"Actor", "actors", object{"externalId": "apply-lifecycle", "signingKey": object{"sharedKey": object{"value": "apply-test-signing-secret"}}}},
-		{"Key", "keys", object{"keyData": object{"value": "0123456789abcdef0123456789abcdef"}}},
-		{"RateLimit", "rate-limits", object{"algorithm": object{"tokenBucket": object{"capacity": 10, "refillRate": 1}}}},
-		{"Connector", "connectors", object{"definition": object{"displayName": "Apply", "auth": object{"type": "no-auth"}}}},
+		{"Actor", "actors", object{
+			"externalId": "apply-lifecycle",
+			"signingKey": object{
+				"sharedKey": object{
+					"value": "apply-test-signing-secret",
+				},
+			},
+		}},
+		{"Key", "keys", object{
+			"keyData": object{
+				"value": "0123456789abcdef0123456789abcdef",
+			},
+		}},
+		{"RateLimit", "rate-limits", object{
+			"algorithm": object{
+				"tokenBucket": object{
+					"capacity": 10,
+					"refillRate": 1,
+				},
+			},
+		}},
+		{"Connector", "connectors", object{
+			"definition": object{
+				"displayName": "Apply",
+				"auth": object{
+					"type": "no-auth",
+				},
+			},
+		}},
 	}
+
 	for _, tc := range cases {
 		t.Run(tc.kind, func(t *testing.T) {
 			doc := manifest(tc.kind, "lifecycle-"+strings.ToLower(tc.kind), "root", tc.spec)
-			metadata(doc)["labels"] = object{"managed": "initial", "remove": "yes"}
+			metadata(doc)["labels"] = object{
+				"managed": "initial",
+				"remove": "yes",
+			}
+
 			results, _ := c.run(t, encode(t, doc), 0)
 			resource := resultResource(t, results, "created")
+
 			path := tc.path + "/" + metadata(resource)["id"].(string)
+
 			live := c.request(t, "GET", path, nil, 200)
+
 			history := metadata(live)["annotations"].(map[string]any)[apply.LastAppliedAnnotation].(string)
+
 			require.NotContains(t, history, "apply-test-signing-secret")
 			require.NotContains(t, history, "0123456789abcdef")
 			require.NotContains(t, fmt.Sprint(results), "apply-test-signing-secret")
 			require.NotContains(t, fmt.Sprint(results), "0123456789abcdef")
+
 			// Omitted secrets must survive subsequent metadata-only applies.
 			delete(tc.spec, "signingKey")
 			delete(tc.spec, "keyData")
+
 			c.run(t, encode(t, doc), 0) // Bind the server-assigned identity into history.
 			results, _ = c.run(t, encode(t, doc), 0)
 			resultResource(t, results, "unchanged")
@@ -226,6 +369,7 @@ func (c cli) lifecycles(t *testing.T) {
 			live = c.request(t, "GET", path, nil, 200)
 			require.Subset(t, metadata(live)["labels"], map[string]any{"managed": "updated", "unmanaged": "keep"})
 			require.NotContains(t, metadata(live)["labels"], "remove")
+
 			// A managed field changed outside apply conflicts when overwrite is disabled.
 			metadata(patch)["labels"] = object{"managed": "drifted", "unmanaged": "keep"}
 			c.request(t, "PATCH", path, patch, 200)
@@ -241,6 +385,7 @@ func (c cli) lifecycles(t *testing.T) {
 			results, warning := c.run(t, encode(t, doc), 0)
 			resultResource(t, results, "configured")
 			require.Contains(t, warning, "adopt")
+
 			if tc.kind == "Actor" {
 				actor, err := c.env.Db.GetActor(context.Background(), apid.ID(metadata(resource)["id"].(string)))
 				require.NoError(t, err)
@@ -249,6 +394,7 @@ func (c cli) lifecycles(t *testing.T) {
 				require.NoError(t, err)
 				require.Contains(t, plaintext, "apply-test-signing-secret")
 			}
+
 			if tc.kind == "Key" {
 				key, err := c.env.Db.GetKey(context.Background(), apid.ID(metadata(resource)["id"].(string)))
 				require.NoError(t, err)
@@ -257,6 +403,7 @@ func (c cli) lifecycles(t *testing.T) {
 				require.NoError(t, err)
 				require.Contains(t, plaintext, "0123456789abcdef0123456789abcdef")
 			}
+			
 			if tc.kind == "Connector" {
 				connectorID, err := apid.Parse(metadata(resource)["id"].(string))
 				require.NoError(t, err)
