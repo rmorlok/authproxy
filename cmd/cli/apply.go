@@ -23,6 +23,7 @@ func cmdApply() *cobra.Command {
 	var pruneOptions apply2.PruneOptions
 	var timeout time.Duration
 	var resolver *config.Resolver
+
 	cmd := &cobra.Command{
 		Use:          "apply (-f FILENAME | -k DIRECTORY) [flags]",
 		Short:        "Apply resource manifests to the cluster",
@@ -154,6 +155,7 @@ func cmdApply() *cobra.Command {
 			if printer != nil {
 				return printer(cmd.OutOrStdout(), objects)
 			}
+
 			switch output {
 			case "json":
 				encoder := json.NewEncoder(cmd.OutOrStdout())
@@ -209,8 +211,15 @@ func cmdApply() *cobra.Command {
 	cmd.Flags().BoolVar(&pruneOptions.All, "all", false, "Prune all labels within the explicit namespace and kind scope")
 	cmd.Flags().BoolVar(&pruneOptions.Wait, "wait", true, "Wait for each pruned resource to return HTTP 404")
 	cmd.Flags().DurationVar(&pruneOptions.Timeout, "timeout", 30*time.Second, "Deletion wait timeout per resource; 0 disables the deadline")
-	cmd.AddCommand(cmdApplyHistory("view-last-applied"), cmdApplyHistory("set-last-applied"), cmdApplyHistory("edit-last-applied"))
+
+	cmd.AddCommand(
+		cmdApplyHistory("view-last-applied"),
+		cmdApplyHistory("set-last-applied"),
+		cmdApplyHistory("edit-last-applied"),
+	)
+
 	resolver = config.WithConfigParams(cmd)
+
 	return cmd
 }
 
