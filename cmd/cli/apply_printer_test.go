@@ -18,27 +18,42 @@ func TestApplyCustomPrinters(t *testing.T) {
 		t.Run(tc.format, func(t *testing.T) {
 			p, err := newApplyPrinter(tc.format, tc.expression, true)
 			require.NoError(t, err)
+
 			var out bytes.Buffer
 			require.NoError(t, p(&out, []any{map[string]any{"kind": "Actor"}}))
 			require.Equal(t, tc.want, out.String())
+
 			file := filepath.Join(t.TempDir(), "template")
 			require.NoError(t, os.WriteFile(file, []byte(tc.expression), 0600))
+
 			if tc.format != "jsonpath-as-json" {
 				p, err = newApplyPrinter(tc.format+"-file", file, true)
 				require.NoError(t, err)
+
 				out.Reset()
+
 				require.NoError(t, p(&out, []any{map[string]any{"kind": "Actor"}}))
 				require.Equal(t, tc.want, out.String())
 			}
 		})
 	}
-	for _, format := range []string{"go-template={{.missing}}", "jsonpath={.missing}"} {
+
+	// Test templates that reference values that do not exist in the
+	// output stream
+	for _, format := range []string{
+		"go-template={{.missing}}",
+		"jsonpath={.missing}",
+	} {
 		p, err := newApplyPrinter(format, "", false)
 		require.NoError(t, err)
+
 		var out bytes.Buffer
+
 		require.Error(t, p(&out, map[string]any{}))
 		require.Empty(t, out.String())
 	}
+
+	// Test invalid formats for formatted output
 	for _, format := range []string{"go-template={{", "jsonpath={[}", "unknown"} {
 		_, err := newApplyPrinter(format, "", true)
 		require.Error(t, err)
