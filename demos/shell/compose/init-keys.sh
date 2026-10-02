@@ -5,6 +5,12 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 mkdir -p keys
+umask 077
+
+# Preserve the encryption key across repeated starts so stored data stays readable.
+if [[ ! -f keys/global_aes.key ]]; then
+  openssl rand -out keys/global_aes.key 32
+fi
 
 if [[ -f keys/demo-shell && -f keys/demo-shell.pub ]]; then
   echo "keys/demo-shell{,.pub} already exist — skipping (delete them to regenerate)."

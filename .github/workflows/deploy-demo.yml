@@ -477,10 +477,12 @@ jobs:
           echo "manifest=${manifest}" >> "$GITHUB_OUTPUT"
           grep -Fq "namespace: ${RELEASE_NS}" "${manifest}"
           grep -Fq "image: ghcr.io/rmorlok/authproxy-demo-seed:${IMAGE_TAG}" "${manifest}"
+          grep -Fq "name: RESOURCE_MANIFEST_PATH" "${manifest}"
+          grep -Fq "resources.yaml: |" "${manifest}"
           grep -Fq "value: http://${RELEASE_NAME}-authproxy:8082" "${manifest}"
           grep -Fq "namespace: root.demo" "${manifest}"
 
-      - name: Run seed job
+      - name: Apply demo resources and seed test provider
         run: |
           set -euo pipefail
           manifest="${{ steps.seed.outputs.manifest }}"

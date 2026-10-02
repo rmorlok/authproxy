@@ -1,0 +1,56 @@
+# Local demo infrastructure only. Catalog resources are applied from resources.yaml.
+public:
+  port: 8080
+  baseUrl: http://localhost:8080
+  enableProxy: true
+  static: {}
+api:
+  port: 8081
+adminApi:
+  port: 8082
+  ui:
+    enabled: true
+    baseUrl: http://localhost:8082
+    initiateSessionUrl: http://localhost:8888/
+  static: {}
+worker:
+  healthCheckPort: 8083
+hostApplication:
+  initiateSessionUrl: http://localhost:8888/
+database:
+  provider: postgres
+  host: postgres
+  port: 5432
+  user: postgres
+  password: postgres
+  database: authproxy
+  sslmode: disable
+redis:
+  provider: redis
+  address: redis:6379
+connectors:
+  loadFromList: []
+appMetrics:
+  database:
+    provider: sqlite
+    path: /tmp/demo-app-metrics.db
+  requestEvents:
+    fullRequestRecording: never
+  blobStorage:
+    provider: filesystem
+    path: /tmp/demo-blobs
+systemAuth:
+  jwtSigningKey:
+    publicKey:
+      path: /keys/demo-shell.pub
+    privateKey:
+      path: /keys/demo-shell
+  globalAesKey:
+    path: /keys/global_aes.key
+  actors:
+    root:
+      keysPath: /actors
+      permissions:
+        - namespace: root.**
+          resources: ["*"]
+          verbs: ["*"]
